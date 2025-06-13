@@ -34,8 +34,9 @@
         <div class="flex-grow text-center w-full min-w-0">
              <p id="headingLabel" class="text-2xl md:text-3xl font-bold text-pink-400 leading-tight">データを読み込んでいます...</p>
         </div>
-        <div class="w-full lg:w-auto lg:min-w-[150px] text-right">
+        <div class="w-full lg:w-auto lg:min-w-[150px] text-right flex flex-col items-end gap-2">
             <p id="sheetNameText" class="text-xs text-gray-400 h-4"></p>
+            <button id="unpublishBtn" class="hidden text-white font-bold py-1 px-3 rounded-md bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-75 text-xs">公開終了</button>
         </div>
     </header>
 
@@ -65,6 +66,9 @@
   </footer>
 
   <script>
+    const userEmail = "<?= userEmail ?>";
+    const isAdmin = userEmail.split('@')[0].includes('t');
+
     class StudyQuestApp {
         constructor() {
             this.elements = {
@@ -85,6 +89,7 @@
                 modalLikeBtn: document.getElementById('modalLikeBtn'),
                 classFilter: document.getElementById('classFilter'),
                 footer: document.getElementById('controlsFooter'),
+                unpublishBtn: document.getElementById('unpublishBtn'),
             };
             
             this.state = {
@@ -97,7 +102,8 @@
             
             this.gas = {
                 getPublishedSheetData: (classFilter) => this.runGas('getPublishedSheetData', classFilter),
-                addLike: (rowIndex) => this.runGas('addLike', rowIndex)
+                addLike: (rowIndex) => this.runGas('addLike', rowIndex),
+                unpublishApp: () => this.runGas('unpublishApp')
             };
             
             this.init();
@@ -108,6 +114,7 @@
             this.setupEventListeners();
             this.adjustLayout();
             this.loadInitialData();
+            this.setupAdminButton();
         }
 
         setupEventListeners() {
@@ -183,6 +190,8 @@
                             status: 'ok',
                             newScore: Math.floor(Math.random() * 10) + 1
                         });
+                    } else if (funcName === 'unpublishApp') {
+                        resolve('unpublished');
                     }
                 }, 500);
             });
@@ -421,10 +430,10 @@
         }
 
         hideAnswerModal() {
-            gsap.to(this.elements.answerModalContainer, { 
-                opacity: 0, 
-                duration: 0.3, 
-                onComplete: () => this.elements.answerModalContainer.classList.add('hidden') 
+            gsap.to(this.elements.answerModalContainer, {
+                opacity: 0,
+                duration: 0.3,
+                onComplete: () => this.elements.answerModalContainer.classList.add('hidden')
             });
             gsap.to(this.elements.answerModalCard, { 
                 scale: 0.95, 
@@ -436,6 +445,22 @@
                     }
                 }
             });
+        }
+
+        setupAdminButton() {
+            if (isAdmin && this.elements.unpublishBtn) {
+                this.elements.unpublishBtn.classList.remove('hidden');
+                this.elements.unpublishBtn.addEventListener('click', () => {
+                    if (confirm('公開を終了しますか？')) {
+                        this.gas.unpublishApp()
+                            .then(msg => {
+                                alert(msg);
+                                window.location.reload();
+                            })
+                            .catch(err => alert(err.message || 'エラーが発生しました'));
+                    }
+                });
+            }
         }
         
         getIcon(name, classes = '') {
