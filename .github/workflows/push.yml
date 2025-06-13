@@ -62,11 +62,9 @@ jobs:
 
       # 6. マージされたPR番号を特定（pushの時のみ）
       - name: Find Pull Request
-        if: github.event_name == 'push'
-        uses: peter-evans/find-pull-request@v3
+        uses: peter-evans/find-pull-request@v6
         id: find-pr
         with:
-          # GITHUB_TOKENにはデフォルトで権限が付与されています
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-sha: ${{ github.sha }}
           branch: main
