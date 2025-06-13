@@ -1,0 +1,24 @@
+name: Push to GAS
+
+on:
+  push:
+    paths:
+      - 'src/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - name: Authenticate clasp
+        run: |
+          echo "${{ secrets.CLASP_CREDENTIALS }}" > $HOME/clasp.json
+          npx -y @google/clasp login --creds $HOME/clasp.json
+      - name: Push to Apps Script
+        run: npm run push

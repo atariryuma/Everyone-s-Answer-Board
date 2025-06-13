@@ -28,3 +28,7 @@ your GAS project.
 All script files live directly under the `src` folder. **Do not create any
 subdirectories under `src`.**
 
+
+## Continuous Integration
+
+A GitHub Actions workflow automatically pushes code to the Apps Script project whenever files in `src/` change. To enable it, add your service account credentials JSON as the `CLASP_CREDENTIALS` secret in the repository settings.
