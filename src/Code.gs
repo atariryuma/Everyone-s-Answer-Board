@@ -309,4 +309,3 @@ function clearRosterCache() {
     SpreadsheetApp.getUi().alert('名簿のキャッシュをリセットしました。');
   } catch (e) { /* no-op */ }
 }
-
