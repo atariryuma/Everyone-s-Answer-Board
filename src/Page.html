@@ -453,8 +453,7 @@
                 this.elements.unpublishBtn.addEventListener('click', () => {
                     if (confirm('公開を終了しますか？')) {
                         this.gas.unpublishApp()
-                            .then(msg => {
-                                alert(msg);
+                            .then(() => {
                                 window.location.reload();
                             })
                             .catch(err => alert(err.message || 'エラーが発生しました'));
