@@ -1,0 +1,19 @@
+{
+  "name": "everyone-s-answer-board",
+  "version": "1.0.0",
+  "description": "Google Apps Script project",
+  "main": "index.js",
+  "scripts": {
+    "push": "clasp push",
+    "pull": "clasp pull",
+    "open": "clasp open",
+    "test": "echo \"No tests specified\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@google/clasp": "^3.0.6-alpha"
+  }
+}
