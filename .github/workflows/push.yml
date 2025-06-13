@@ -1,53 +1,98 @@
 # ワークフローの名前
-name: Push to GAS
+name: CI and Deploy to GAS
 
 # ワークフローが実行されるタイミング
 on:
-  # 'main' ブランチの 'src' ディレクトリ以下にpushされた時に実行
+  # 'main' ブランチに push された時にデプロイを実行
   push:
     branches:
-      - main # ※ご自身のメインブランチ名 ('master' 等) に合わせてください
+      - main
     paths:
       - 'src/**'
+      - '.github/workflows/**' # ワークフロー自体の変更でも実行
 
-  # GitHubの画面から手動で実行することも可能にする
+  # 'main' ブランチへのプルリクエストが作成/更新された時にテストを実行
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - '.github/workflows/**'
+
+  # 手動実行
   workflow_dispatch:
 
 jobs:
-  deploy:
-    # 実行環境として最新のUbuntuを使用
+  # ジョブの名前を「ci-and-deploy」に変更
+  ci-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. リポジトリのコードをチェックアウトします
-      #    - より新しく推奨されている v4 を使用します
+      # 1. リポジトリのコードをチェックアウト
       - name: Checkout repository
         uses: actions/checkout@v4
+        # pushイベントの際にコミット履歴をすべて取得（PR番号の特定に必要）
+        with:
+          fetch-depth: 0
 
-      # 2. Node.js環境をセットアップします
-      #    - こちらも v4 を使用します
+      # 2. Node.js環境をセットアップ
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          # npmのキャッシュを有効にし、次回以降の実行を高速化します
           cache: 'npm'
 
-      # 3. 依存パッケージをインストールします
-      #    - package-lock.json に基づいて正確にパッケージを導入します
+      # 3. 依存パッケージをインストール（CIの基本）
       - name: Install dependencies
         run: npm ci
 
-      # 4. Google Apps Scriptへの認証を設定します
-      #    - 注意: このステップには、リポジトリのSecretsに `CLASPRC_JSON` の設定が必須です。
-      #    - 中身は、ローカルPCのホームディレクトリにある `.clasprc.json` の内容をコピーしてください。
-      #    - `clasp login` を実行する代わりに、認証ファイルを直接作成する方がシンプルで確実です。
+      # 4. Google Apps Scriptへの認証を設定（pushの時のみ）
+      #    - このステップはマージ後のpushの時だけ実行
       - name: Create clasprc.json for authentication
+        if: github.event_name == 'push'
         run: echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
 
-      # 5. GASプロジェクトにコードをプッシュします
-      #    - 注意: このステップには、リポジトリのルートに `scriptId` を含む `.clasp.json` ファイルが必要です。
-      #    - `npm run push` は `package.json` で "push": "clasp push" のように定義されていることを想定しています。
-      #    - `-- --force` を付けることで、リモート側の不要なファイルが削除され、ローカルの状態と完全に同期します。
+      # 5. GASプロジェクトにコードをプッシュ（pushの時のみ）
+      #    - このステップはマージ後のpushの時だけ実行
       - name: Push to Apps Script
+        if: github.event_name == 'push'
         run: npm run push -- --force
+
+      # --- ここからがマージ後の結果を通知するステップ ---
+
+      # 6. マージされたPR番号を特定（pushの時のみ）
+      - name: Find Pull Request
+        if: github.event_name == 'push'
+        uses: peter-evans/find-pull-request@v3
+        id: find-pr
+        with:
+          # GITHUB_TOKENにはデフォルトで権限が付与されています
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-sha: ${{ github.sha }}
+          branch: main
+
+      # 7. デプロイ成功をPRにコメント（pushが成功した時のみ）
+      - name: Comment on PR (Success)
+        if: success() && github.event_name == 'push' && steps.find-pr.outputs.number
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.find-pr.outputs.number }},
+              body: '✅ **デプロイ成功**\n\nGoogle Apps Scriptへのプッシュが正常に完了しました。'
+            })
+
+      # 8. デプロイ失敗をPRにコメント（pushが失敗した時のみ）
+      - name: Comment on PR (Failure)
+        if: failure() && github.event_name == 'push' && steps.find-pr.outputs.number
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.find-pr.outputs.number }},
+              body: '❌ **デプロイ失敗**\n\nGoogle Apps Scriptへのプッシュ中にエラーが発生しました。詳細は [Actionsのログ](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) を確認してください。'
+            })
