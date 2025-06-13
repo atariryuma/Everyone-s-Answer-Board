@@ -3,10 +3,10 @@ name: Push to GAS
 
 # ワークフローが実行されるタイミング
 on:
-  # 'main' ブランチの 'src' ディレクトリ以下にpushされた時に実行
+  # 任意のブランチで src/ 以下が変更されたときに実行
   push:
     branches:
-      - main # ※ご自身のメインブランチ名 ('master' 等) に合わせてください
+      - '**'
     paths:
       - 'src/**'
 
@@ -50,4 +50,10 @@ jobs:
       #    - `npm run push` は `package.json` で "push": "clasp push" のように定義されていることを想定しています。
       #    - `-- --force` を付けることで、リモート側の不要なファイルが削除され、ローカルの状態と完全に同期します。
       - name: Push to Apps Script
+        id: gas_push
         run: npm run push -- --force
+
+      # GASへのpush結果をジョブサマリーに記録します
+      - name: Record push result
+        if: always()
+        run: echo "GAS push status: ${{ steps.gas_push.outcome }}" >> $GITHUB_STEP_SUMMARY
