@@ -85,12 +85,11 @@
             });
 
             function onPublishSuccess(message) {
-                messageArea.textContent = `${message} 3秒後にリロードします。`;
+                messageArea.textContent = `${message} ページを更新します...`;
                 messageArea.className = 'mt-4 text-sm h-5 text-green-400';
                 setTimeout(() => {
-                    // 自身をリロードするために window.top を使う
-                    window.top.location.reload();
-                }, 3000);
+                    window.location.reload();
+                }, 500);
             }
 
             function onPublishError(error) {
