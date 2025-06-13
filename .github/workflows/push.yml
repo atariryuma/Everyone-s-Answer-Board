@@ -10,7 +10,6 @@ on:
     paths:
       - 'src/**'
       - '.github/workflows/**' # ワークフロー自体の変更でも実行
-
   # 'main' ブランチへのプルリクエストが作成/更新された時にテストを実行
   pull_request:
     branches:
@@ -18,7 +17,6 @@ on:
     paths:
       - 'src/**'
       - '.github/workflows/**'
-
   # 手動実行
   workflow_dispatch:
 
@@ -26,7 +24,6 @@ jobs:
   # ジョブの名前を「ci-and-deploy」に変更
   ci-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
       # 1. リポジトリのコードをチェックアウト
       - name: Checkout repository
@@ -59,40 +56,48 @@ jobs:
         run: npm run push -- --force
 
       # --- ここからがマージ後の結果を通知するステップ ---
-
       # 6. マージされたPR番号を特定（pushの時のみ）
-      - name: Find Pull Request
+      - name: Get PR number from commit
         if: github.event_name == 'push'
-        uses: peter-evans/find-pull-request@v3
-        id: find-pr
-        with:
-          # GITHUB_TOKENにはデフォルトで権限が付与されています
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-sha: ${{ github.sha }}
-          branch: main
+        id: get-pr
+        run: |
+          # コミットメッセージからPR番号を抽出（"Merge pull request #123 from ..." の形式）
+          PR_NUMBER=$(git log --oneline -1 | grep -oP 'Merge pull request #\K\d+' || echo "")
+          if [ -z "$PR_NUMBER" ]; then
+            # コミットメッセージからPR番号を抽出（"(#123)" の形式も試す）
+            PR_NUMBER=$(git log --oneline -1 | grep -oP '\(#\K\d+(?=\))' || echo "")
+          fi
+          if [ -z "$PR_NUMBER" ]; then
+            # GitHub APIを使ってコミットに関連するPRを検索
+            PR_NUMBER=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" \
+              | jq -r '.[0].number // empty')
+          fi
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "Found PR number: $PR_NUMBER"
 
       # 7. デプロイ成功をPRにコメント（pushが成功した時のみ）
       - name: Comment on PR (Success)
-        if: success() && github.event_name == 'push' && steps.find-pr.outputs.number
+        if: success() && github.event_name == 'push' && steps.get-pr.outputs.pr_number != ''
         uses: actions/github-script@v7
         with:
           script: |
             github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: ${{ steps.find-pr.outputs.number }},
+              issue_number: ${{ steps.get-pr.outputs.pr_number }},
               body: '✅ **デプロイ成功**\n\nGoogle Apps Scriptへのプッシュが正常に完了しました。'
             })
 
       # 8. デプロイ失敗をPRにコメント（pushが失敗した時のみ）
       - name: Comment on PR (Failure)
-        if: failure() && github.event_name == 'push' && steps.find-pr.outputs.number
+        if: failure() && github.event_name == 'push' && steps.get-pr.outputs.pr_number != ''
         uses: actions/github-script@v7
         with:
           script: |
             github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: ${{ steps.find-pr.outputs.number }},
+              issue_number: ${{ steps.get-pr.outputs.pr_number }},
               body: '❌ **デプロイ失敗**\n\nGoogle Apps Scriptへのプッシュ中にエラーが発生しました。詳細は [Actionsのログ](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) を確認してください。'
             })
