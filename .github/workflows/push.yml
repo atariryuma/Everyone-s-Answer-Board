@@ -16,9 +16,9 @@ jobs:
           node-version: 20
           cache: 'npm'
       - run: npm ci
-      - name: Authenticate clasp
+      - name: Login to Google Apps Script
         run: |
-          echo "${{ secrets.CLASP_CREDENTIALS }}" > $HOME/clasp.json
+          echo '${{ secrets.CLASP_JSON_CREDS }}' > $HOME/clasp.json
           npx -y @google/clasp login --creds $HOME/clasp.json
       - name: Push to Apps Script
         run: npm run push
