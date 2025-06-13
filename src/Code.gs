@@ -165,51 +165,45 @@ function getSheetData(sheetName, classFilter) {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
     if (!sheet) throw new Error(`指定されたシート「${sheetName}」が見つかりません。`);
 
-    if (sheet.getLastRow() < 2) return { header: "シートにデータがありません", rows: [] };
-
+    const allValues = sheet.getDataRange().getValues();
+    if (allValues.length < 1) return { header: "シートにデータがありません", rows: [] };
+    
     const userEmail = Session.getActiveUser().getEmail();
-
-    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const headerIndices = getAndCacheHeaderIndices(sheetName, headerRow);
-    const numRows = sheet.getLastRow() - 1;
-
-    const emailCol = sheet.getRange(2, headerIndices[COLUMN_HEADERS.EMAIL] + 1, numRows).getValues().flat();
-    const classCol = sheet.getRange(2, headerIndices[COLUMN_HEADERS.CLASS] + 1, numRows).getValues().flat();
-    const opinionCol = sheet.getRange(2, headerIndices[COLUMN_HEADERS.OPINION] + 1, numRows).getValues().flat();
-    const reasonCol = sheet.getRange(2, headerIndices[COLUMN_HEADERS.REASON] + 1, numRows).getValues().flat();
-    const likesCol = sheet.getRange(2, headerIndices[COLUMN_HEADERS.LIKES] + 1, numRows).getValues().flat();
-
+    const headerIndices = getAndCacheHeaderIndices(sheetName, allValues[0]);
+    const dataRows = allValues.slice(1);
     const emailToNameMap = getRosterMap();
 
-    const rows = [];
-    for (let i = 0; i < numRows; i++) {
-      const className = classCol[i];
-      if (classFilter && classFilter !== 'すべて' && className !== classFilter) {
-        continue;
-      }
+    const filteredRows = dataRows.filter(row => {
+      if (!classFilter || classFilter === 'すべて') return true;
+      const className = row[headerIndices[COLUMN_HEADERS.CLASS]];
+      return className === classFilter;
+    });
 
-      const email = emailCol[i];
-      const opinion = opinionCol[i];
+    const rows = filteredRows.map((row) => {
+      const email = row[headerIndices[COLUMN_HEADERS.EMAIL]];
+      const opinion = row[headerIndices[COLUMN_HEADERS.OPINION]];
+
       if (email && opinion) {
-        const likersString = likesCol[i] || '';
+        const likersString = row[headerIndices[COLUMN_HEADERS.LIKES]] || '';
         const likers = likersString ? likersString.toString().split(',').filter(Boolean) : [];
-        const reason = reasonCol[i] || '';
+        const reason = row[headerIndices[COLUMN_HEADERS.REASON]] || '';
         const likes = likers.length;
         const baseScore = reason.length;
         const likeMultiplier = 1 + (likes * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
         const totalScore = baseScore * likeMultiplier;
-        rows.push({
-          rowIndex: i + 2,
+        return {
+          rowIndex: dataRows.indexOf(row) + 2,
           name: emailToNameMap[email] || email.split('@')[0],
-          class: className || '未分類',
+          class: row[headerIndices[COLUMN_HEADERS.CLASS]] || '未分類',
           opinion: opinion,
           reason: reason,
           likes: likes,
           hasLiked: userEmail ? likers.includes(userEmail) : false,
           score: totalScore
-        });
+        };
       }
-    }
+      return null;
+    }).filter(Boolean);
 
     rows.sort((a, b) => b.score - a.score);
     return { header: COLUMN_HEADERS.OPINION, rows: rows };
@@ -262,29 +256,24 @@ function getRosterMap() {
   if (cachedMap) { return JSON.parse(cachedMap); }
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ROSTER_CONFIG.SHEET_NAME);
   if (!sheet) { console.error(`名簿シート「${ROSTER_CONFIG.SHEET_NAME}」が見つかりません。`); return {}; }
-  const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const lastNameIndex = headerRow.indexOf(ROSTER_CONFIG.HEADER_LAST_NAME);
-  const firstNameIndex = headerRow.indexOf(ROSTER_CONFIG.HEADER_FIRST_NAME);
-  const nicknameIndex = headerRow.indexOf(ROSTER_CONFIG.HEADER_NICKNAME);
-  const emailIndex = headerRow.indexOf(ROSTER_CONFIG.HEADER_EMAIL);
+  const rosterValues = sheet.getDataRange().getValues();
+  const rosterHeaders = rosterValues.shift();
+  const lastNameIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_LAST_NAME);
+  const firstNameIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_FIRST_NAME);
+  const nicknameIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_NICKNAME);
+  const emailIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_EMAIL);
   if (lastNameIndex === -1 || firstNameIndex === -1 || emailIndex === -1) { throw new Error(`名簿シート「${ROSTER_CONFIG.SHEET_NAME}」に必要な列が見つかりません。`); }
-  const numRows = sheet.getLastRow() - 1;
-  const lastNames = sheet.getRange(2, lastNameIndex + 1, numRows).getValues().flat();
-  const firstNames = sheet.getRange(2, firstNameIndex + 1, numRows).getValues().flat();
-  const nicknames = nicknameIndex !== -1 ? sheet.getRange(2, nicknameIndex + 1, numRows).getValues().flat() : [];
-  const emails = sheet.getRange(2, emailIndex + 1, numRows).getValues().flat();
-
   const nameMap = {};
-  for (let i = 0; i < numRows; i++) {
-    const email = emails[i];
-    const lastName = lastNames[i];
-    const firstName = firstNames[i];
-    const nickname = nicknameIndex !== -1 ? (nicknames[i] || '') : '';
+  rosterValues.forEach(row => {
+    const email = row[emailIndex];
+    const lastName = row[lastNameIndex];
+    const firstName = row[firstNameIndex];
+    const nickname = (nicknameIndex !== -1 && row[nicknameIndex]) ? row[nicknameIndex] : ''; 
     if (email && lastName && firstName) {
       const fullName = `${lastName} ${firstName}`;
       nameMap[email] = nickname ? `${fullName} (${nickname})` : fullName;
     }
-  }
+  });
   cache.put(ROSTER_CONFIG.CACHE_KEY, JSON.stringify(nameMap), 21600);
   return nameMap;
 }
