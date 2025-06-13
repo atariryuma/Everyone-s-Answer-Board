@@ -1,24 +1,53 @@
+# ワークフローの名前
 name: Push to GAS
 
+# ワークフローが実行されるタイミング
 on:
+  # 'main' ブランチの 'src' ディレクトリ以下にpushされた時に実行
   push:
+    branches:
+      - main # ※ご自身のメインブランチ名 ('master' 等) に合わせてください
     paths:
       - 'src/**'
+
+  # GitHubの画面から手動で実行することも可能にする
   workflow_dispatch:
 
 jobs:
   deploy:
+    # 実行環境として最新のUbuntuを使用
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      # 1. リポジトリのコードをチェックアウトします
+      #    - より新しく推奨されている v4 を使用します
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Node.js環境をセットアップします
+      #    - こちらも v4 を使用します
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
+          # npmのキャッシュを有効にし、次回以降の実行を高速化します
           cache: 'npm'
-      - run: npm ci
-      - name: Login to Google Apps Script
-        run: |
-          echo '${{ secrets.CLASP_JSON_CREDS }}' > $HOME/clasp.json
-          npx -y @google/clasp login --creds $HOME/clasp.json
+
+      # 3. 依存パッケージをインストールします
+      #    - package-lock.json に基づいて正確にパッケージを導入します
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Google Apps Scriptへの認証を設定します
+      #    - 注意: このステップには、リポジトリのSecretsに `CLASPRC_JSON` の設定が必須です。
+      #    - 中身は、ローカルPCのホームディレクトリにある `.clasprc.json` の内容をコピーしてください。
+      #    - `clasp login` を実行する代わりに、認証ファイルを直接作成する方がシンプルで確実です。
+      - name: Create clasprc.json for authentication
+        run: echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
+
+      # 5. GASプロジェクトにコードをプッシュします
+      #    - 注意: このステップには、リポジトリのルートに `scriptId` を含む `.clasp.json` ファイルが必要です。
+      #    - `npm run push` は `package.json` で "push": "clasp push" のように定義されていることを想定しています。
+      #    - `-- --force` を付けることで、リモート側の不要なファイルが削除され、ローカルの状態と完全に同期します。
       - name: Push to Apps Script
-        run: npm run push
+        run: npm run push -- --force
