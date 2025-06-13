@@ -51,3 +51,13 @@ jobs:
       #    - `-- --force` を付けることで、リモート側の不要なファイルが削除され、ローカルの状態と完全に同期します。
       - name: Push to Apps Script
         run: npm run push -- --force
+      
+      # 6. マージされたPR番号を特定（pushの時のみ）
+      - name: Find Pull Request
+        if: github.event_name == 'push'
+        uses: peter-evans/find-pull-request@v6 # 変更点：v3からv6へ
+        id: find-pr
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-sha: ${{ github.sha }}
+          branch: main
