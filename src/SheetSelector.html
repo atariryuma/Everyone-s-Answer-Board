@@ -166,15 +166,17 @@
         }
         setLoading(true, "公開処理中...");
         google.script.run
-          .withFailureHandler(showError)
-          .saveDisplayMode(displayMode);
-        google.script.run
-          .withSuccessHandler((msg) => {
-            showMessage(msg, 'green');
-            loadInitialState();
+          .withSuccessHandler(() => {
+            google.script.run
+              .withSuccessHandler((msg) => {
+                showMessage(msg, 'green');
+                loadInitialState();
+              })
+              .withFailureHandler(showError)
+              .publishApp(selectedSheet);
           })
           .withFailureHandler(showError)
-          .publishApp(selectedSheet);
+          .saveDisplayMode(displayMode);
       }
 
       function unpublish() {
