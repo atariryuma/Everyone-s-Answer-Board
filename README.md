@@ -40,6 +40,11 @@ When the board is opened with the `?admin=1` query parameter,
 a star button is shown on each answer card to toggle this flag.
 Use the "Open as administrator" link in the sheet selector sidebar to launch the board in this mode.
 
+## Additional admin tools
+
+- **Word cloud** – From the sheet selector sidebar click the *単語クラウド* link to open a page showing a word cloud of all answers. The data is produced by the `generateWordCloudData` GAS function which uses `LanguageApp` for Japanese morphological analysis.
+- **Opinion groups** – The *意見グループ* link groups similar answers together. The `groupSimilarOpinions` function sends all opinions to an external service (replace the example URL with your own) and displays the returned clusters.
+
 
 ## Continuous Integration
 
