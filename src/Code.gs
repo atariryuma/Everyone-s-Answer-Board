@@ -332,7 +332,7 @@ function findHeaderIndices(sheetHeaders, requiredHeaders) {
 
 // Export for Jest testing
 if (typeof module !== 'undefined') {
-  module.exports = { findHeaderIndices };
+  module.exports = { findHeaderIndices, getSheetData, addLike };
 }
 
 function clearRosterCache() {
