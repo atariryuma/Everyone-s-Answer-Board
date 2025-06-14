@@ -58,6 +58,10 @@
       <div class="mt-6 text-right">
         <a id="open-admin" href="#" target="_blank" class="text-blue-600 underline">管理者として開く</a>
       </div>
+      <div class="mt-2 text-right flex gap-4">
+        <a id="open-wordcloud" href="#" target="_blank" class="text-blue-600 underline text-sm">単語クラウド</a>
+        <a id="open-groups" href="#" target="_blank" class="text-blue-600 underline text-sm">意見グループ</a>
+      </div>
 
     </div>
 
@@ -70,7 +74,9 @@
         messageArea: document.getElementById('message-area'),
         modeAnonymous: document.getElementById('mode-anonymous'),
         modeNamed: document.getElementById('mode-named'),
-        openAdmin: document.getElementById('open-admin')
+        openAdmin: document.getElementById('open-admin'),
+        openWordcloud: document.getElementById('open-wordcloud'),
+        openGroups: document.getElementById('open-groups')
       };
 
       let selectedSheet = null;
@@ -94,6 +100,8 @@
         google.script.run.withSuccessHandler(url => {
           if (url) {
             elements.openAdmin.href = url + '?admin=1';
+            elements.openWordcloud.href = url + '?admin=1&wordcloud=1';
+            elements.openGroups.href = url + '?admin=1&groups=1';
           }
         }).getWebAppUrl();
       });
