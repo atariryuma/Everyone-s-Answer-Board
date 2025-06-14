@@ -300,6 +300,11 @@ function findHeaderIndices(sheetHeaders, requiredHeaders) {
   return indices;
 }
 
+// Export for Jest testing
+if (typeof module !== 'undefined') {
+  module.exports = { findHeaderIndices };
+}
+
 function clearRosterCache() {
   const cache = CacheService.getScriptCache();
   const cacheKey = ROSTER_CONFIG.CACHE_KEY;
