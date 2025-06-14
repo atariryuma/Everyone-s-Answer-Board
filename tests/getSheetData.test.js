@@ -55,7 +55,7 @@ test('getSheetData filters and scores rows', () => {
   ];
   setupMocks(data, 'b@example.com');
 
-  const result = getSheetData('Sheet1');
+  const result = getSheetData('Sheet1', undefined, undefined, true);
 
   expect(result.header).toBe(COLUMN_HEADERS.OPINION);
   expect(result.rows).toHaveLength(2);
@@ -82,7 +82,28 @@ test('getSheetData sorts by newest when specified', () => {
   ];
   setupMocks(data, '');
 
-  const result = getSheetData('Sheet1', undefined, 'newest');
+  const result = getSheetData('Sheet1', undefined, 'newest', true);
 
   expect(result.rows.map(r => r.rowIndex)).toEqual([3, 2]);
+});
+
+test('getSheetData forces anonymous mode for non-admin', () => {
+  const data = [
+    [
+      COLUMN_HEADERS.EMAIL,
+      COLUMN_HEADERS.CLASS,
+      COLUMN_HEADERS.OPINION,
+      COLUMN_HEADERS.REASON,
+      COLUMN_HEADERS.UNDERSTAND,
+      COLUMN_HEADERS.SUPPORT,
+      COLUMN_HEADERS.CURIOUS,
+      COLUMN_HEADERS.HIGHLIGHT
+    ],
+    ['a@example.com', '1-1', 'Opinion1', 'Reason1', '', '', '', 'false']
+  ];
+  setupMocks(data, 'a@example.com');
+
+  const result = getSheetData('Sheet1', undefined, undefined, false);
+
+  expect(result.rows[0].name).toBe('匿名');
 });

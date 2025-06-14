@@ -118,7 +118,7 @@
             ];
 
             this.gas = {
-                getPublishedSheetData: (classFilter, sortMode, forceNamed) => this.runGas('getPublishedSheetData', classFilter, sortMode, forceNamed),
+                getPublishedSheetData: (classFilter, sortMode, isAdmin) => this.runGas('getPublishedSheetData', classFilter, sortMode, isAdmin),
                 addReaction: (rowIndex, reaction) => this.runGas('addReaction', rowIndex, reaction),
                 toggleHighlight: (rowIndex) => this.runGas('toggleHighlight', rowIndex),
                 unpublishApp: () => this.runGas('unpublishApp')
