@@ -7,13 +7,14 @@
     "push": "clasp push",
     "pull": "clasp pull",
     "open": "clasp open",
-    "test": "echo \"No tests specified\""
+    "test": "jest"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "@google/clasp": "^3.0.6-alpha"
+    "@google/clasp": "^3.0.6-alpha",
+    "jest": "^30.0.0"
   }
 }
