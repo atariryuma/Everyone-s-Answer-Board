@@ -121,7 +121,7 @@ function saveDisplayMode(mode) {
 // =================================================================
 // GAS Webアプリケーションのエントリーポイント
 // =================================================================
-function doGet() {
+function doGet(e) {
   const settings = getAppSettings();
   let userEmail;
   try {
@@ -130,9 +130,12 @@ function doGet() {
     userEmail = '匿名ユーザー';
   }
 
+  const isAdmin = e && e.parameter && e.parameter.admin === '1';
+
   if (!settings.isPublished) {
     const template = HtmlService.createTemplateFromFile('Unpublished');
     template.userEmail = userEmail;
+    template.isAdmin = isAdmin;
     return template.evaluate().setTitle('公開終了');
   }
   
@@ -143,6 +146,7 @@ function doGet() {
   // ★変更: Page.html にもメールアドレスを渡す
   const template = HtmlService.createTemplateFromFile('Page');
   template.userEmail = userEmail; // この行を追加
+  template.isAdmin = isAdmin;
   return template.evaluate()
       .setTitle('StudyQuest - みんなのかいとうボード')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -157,7 +161,7 @@ function doGet() {
  * サーバー側で設定されたシートのデータを取得します。
  */
 
-function getPublishedSheetData(classFilter, sortMode) {
+function getPublishedSheetData(classFilter, sortMode, forceNamed) {
   sortMode = sortMode || 'score';
   const settings = getAppSettings();
   const sheetName = settings.activeSheetName;
@@ -167,7 +171,8 @@ function getPublishedSheetData(classFilter, sortMode) {
   }
 
   // 既存のgetSheetDataロジックを再利用
-  const data = getSheetData(sheetName, classFilter, sortMode);
+  const displayModeOverride = forceNamed ? 'named' : null;
+  const data = getSheetData(sheetName, classFilter, sortMode, displayModeOverride);
 
   // ★改善: フロントエンドでシート名を表示できるよう、レスポンスに含める
   return {
@@ -175,6 +180,14 @@ function getPublishedSheetData(classFilter, sortMode) {
     header: data.header,
     rows: data.rows
   };
+}
+
+function getWebAppUrl() {
+  try {
+    return ScriptApp.getService().getUrl();
+  } catch (e) {
+    return '';
+  }
 }
 
 
@@ -192,7 +205,7 @@ function getSheets() {
   }
 }
 
-function getSheetData(sheetName, classFilter, sortMode) {
+function getSheetData(sheetName, classFilter, sortMode, forceDisplayMode) {
   sortMode = sortMode || 'score';
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
@@ -205,8 +218,11 @@ function getSheetData(sheetName, classFilter, sortMode) {
   const headerIndices = getAndCacheHeaderIndices(sheetName, allValues[0]);
   const dataRows = allValues.slice(1);
   const emailToNameMap = getRosterMap();
-  const displayMode = PropertiesService.getScriptProperties()
+  let displayMode = PropertiesService.getScriptProperties()
       .getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous';
+  if (forceDisplayMode === 'named') {
+    displayMode = 'named';
+  }
 
     const filteredRows = dataRows.filter(row => {
       if (!classFilter || classFilter === 'すべて') return true;
@@ -423,6 +439,7 @@ if (typeof module !== 'undefined') {
     addReaction,
     toggleHighlight,
     logDebug,
+    getWebAppUrl,
   };
 }
 
