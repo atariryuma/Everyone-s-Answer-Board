@@ -149,7 +149,7 @@ function getAdminEmails() {
      .getProperty(APP_PROPERTIES.ADMIN_EMAILS) || '';
  return str.split(',').map(e => e.trim()).filter(Boolean);
 }
-}
+
 
 
 // =================================================================
