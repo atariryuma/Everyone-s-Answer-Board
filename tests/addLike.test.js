@@ -1,7 +1,7 @@
-const { addLike, COLUMN_HEADERS } = require('../src/Code.gs');
+const { addReaction, COLUMN_HEADERS } = require('../src/Code.gs');
 
 function buildSheet() {
-  const headerRow = [COLUMN_HEADERS.EMAIL, COLUMN_HEADERS.CLASS, COLUMN_HEADERS.OPINION, COLUMN_HEADERS.REASON, COLUMN_HEADERS.LIKES];
+  const headerRow = [COLUMN_HEADERS.EMAIL, COLUMN_HEADERS.CLASS, COLUMN_HEADERS.OPINION, COLUMN_HEADERS.REASON, COLUMN_HEADERS.UNDERSTAND];
   let likeValue = 'a@example.com';
   return {
     getLastColumn: () => headerRow.length,
@@ -33,23 +33,23 @@ afterEach(() => {
   delete global.SpreadsheetApp;
 });
 
-test('addLike toggles user in list', () => {
+test('addReaction toggles user in list', () => {
   const sheet = buildSheet();
   setupMocks('b@example.com', sheet);
 
-  const result1 = addLike(2);
+  const result1 = addReaction(2, 'UNDERSTAND');
   expect(result1.status).toBe('ok');
   expect(result1.newScore).toBe(2);
 
-  const result2 = addLike(2);
+  const result2 = addReaction(2, 'UNDERSTAND');
   expect(result2.status).toBe('ok');
   expect(result2.newScore).toBe(1);
 });
 
-test('addLike errors when user email is empty', () => {
+test('addReaction errors when user email is empty', () => {
   const sheet = buildSheet();
   setupMocks('', sheet);
 
-  const result = addLike(2);
+  const result = addReaction(2, 'UNDERSTAND');
   expect(result.status).toBe('error');
 });

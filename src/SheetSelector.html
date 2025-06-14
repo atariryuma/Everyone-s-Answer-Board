@@ -27,6 +27,21 @@
         </div>
       </div>
 
+      <!-- Display Mode -->
+      <div class="mb-6">
+        <h4 class="font-semibold text-gray-700 mb-3">表示設定</h4>
+        <div class="bg-white p-3 rounded-lg shadow-md flex flex-col gap-2">
+          <div>
+            <input type="radio" id="mode-anonymous" name="displayMode" value="anonymous" checked>
+            <label for="mode-anonymous" class="ml-1">匿名で表示（生徒間の画面では名前を非表示）</label>
+          </div>
+          <div>
+            <input type="radio" id="mode-named" name="displayMode" value="named">
+            <label for="mode-named" class="ml-1">名前を表示（全ての画面で名前を表示）</label>
+          </div>
+        </div>
+      </div>
+
       <!-- Actions -->
       <div>
         <h3 class="font-semibold text-gray-700 mb-3">2. 操作を選択</h3>
@@ -51,15 +66,29 @@
         publishBtn: document.getElementById('publish-btn'),
         unpublishBtn: document.getElementById('unpublish-btn'),
         messageArea: document.getElementById('message-area'),
-        webAppLink: document.getElementById('webapp-link')
+        webAppLink: document.getElementById('webapp-link'),
+        modeAnonymous: document.getElementById('mode-anonymous'),
+        modeNamed: document.getElementById('mode-named')
       };
 
       let selectedSheet = null;
+      let displayMode = 'anonymous';
 
       document.addEventListener('DOMContentLoaded', () => {
         loadInitialState();
         elements.publishBtn.addEventListener('click', publish);
         elements.unpublishBtn.addEventListener('click', unpublish);
+        elements.modeNamed.addEventListener('click', () => {
+          if (!confirm('注意：生徒の心理的安全性を考慮し、通常は匿名表示を推奨します。本当に名前を表示しますか？')) {
+            elements.modeAnonymous.checked = true;
+            displayMode = 'anonymous';
+          } else {
+            displayMode = 'named';
+          }
+        });
+        elements.modeAnonymous.addEventListener('click', () => {
+          displayMode = 'anonymous';
+        });
       });
 
       function loadInitialState() {
@@ -76,6 +105,12 @@
 
       function updateUI(status) {
         selectedSheet = status.activeSheetName;
+        displayMode = status.displayMode || 'anonymous';
+        if (displayMode === 'named') {
+          elements.modeNamed.checked = true;
+        } else {
+          elements.modeAnonymous.checked = true;
+        }
         
         if (status.isPublished && status.activeSheetName) {
           elements.statusText.innerHTML = `公開中: <span class="font-bold text-green-700">${status.activeSheetName}</span>`;
@@ -130,6 +165,9 @@
           return;
         }
         setLoading(true, "公開処理中...");
+        google.script.run
+          .withFailureHandler(showError)
+          .saveDisplayMode(displayMode);
         google.script.run
           .withSuccessHandler((msg) => {
             showMessage(msg, 'green');
