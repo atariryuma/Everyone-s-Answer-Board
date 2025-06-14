@@ -23,6 +23,9 @@ your GAS project.
 - `npm run pull` – Download the latest code from GAS.
 - `npm run open` – Open the GAS project in your browser.
 
+## Running tests
+After installing dependencies (`npm install`), run `npm test` to execute Jest tests.
+
 ## Project structure
 
 All script files live directly under the `src` folder. **Do not create any
