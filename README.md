@@ -25,7 +25,7 @@ your GAS project.
 - `npm run update-url` – Save the latest web app URL to script properties.
 
 ## Running tests
-After installing dependencies (`npm install`), run `npm test` to execute Jest tests.
+Run `npm install` first to install Jest and other dev dependencies, then run `npm test`.
 
 ## Project structure
 
