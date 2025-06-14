@@ -55,6 +55,9 @@
       </div>
       
       <div id="message-area" class="mt-4 text-center text-sm h-5"></div>
+      <div class="mt-6 text-right">
+        <a id="open-admin" href="#" target="_blank" class="text-blue-600 underline">管理者として開く</a>
+      </div>
 
     </div>
 
@@ -66,7 +69,8 @@
         unpublishBtn: document.getElementById('unpublish-btn'),
         messageArea: document.getElementById('message-area'),
         modeAnonymous: document.getElementById('mode-anonymous'),
-        modeNamed: document.getElementById('mode-named')
+        modeNamed: document.getElementById('mode-named'),
+        openAdmin: document.getElementById('open-admin')
       };
 
       let selectedSheet = null;
@@ -87,6 +91,11 @@
         elements.modeAnonymous.addEventListener('click', () => {
           displayMode = 'anonymous';
         });
+        google.script.run.withSuccessHandler(url => {
+          if (url) {
+            elements.openAdmin.href = url + '?admin=1';
+          }
+        }).getWebAppUrl();
       });
 
       function loadInitialState() {

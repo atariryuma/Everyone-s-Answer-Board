@@ -29,10 +29,9 @@
 
     <script>
         const userEmail = "<?= userEmail ?>";
-        const emailName = userEmail.split('@')[0];
+        const isAdmin = <?= isAdmin ? 'true' : 'false' ?>;
 
-        // メールアドレスのネーム部分に 't' が含まれているかチェック
-        if (emailName.includes('t')) {
+        if (isAdmin) {
             const adminPanel = document.getElementById('admin-panel');
             adminPanel.classList.remove('hidden');
 

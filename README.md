@@ -35,8 +35,9 @@ subdirectories under `src`.**
 
 Add a column named `Highlight` to your spreadsheet (using a checkbox or TRUE/FALSE values).
 Rows marked as `TRUE` will appear with a yellow border on the board.
-When viewing the board as an administrator (your Google account name contains `t`),
+When the board is opened with the `?admin=1` query parameter,
 a star button is shown on each answer card to toggle this flag.
+Use the "Open as administrator" link in the sheet selector sidebar to launch the board in this mode.
 
 
 ## Continuous Integration
