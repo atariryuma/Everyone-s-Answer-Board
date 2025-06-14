@@ -357,20 +357,24 @@
         async handleLike(rowIndex) {
             const btns = document.querySelectorAll('[data-row-index="' + rowIndex + '"].like-btn');
             btns.forEach(btn => {
-                gsap.fromTo(btn, 
-                    { scale: 1 }, 
+                gsap.fromTo(btn,
+                    { scale: 1 },
                     { scale: 1.3, yoyo: true, repeat: 1, duration: 0.2, ease: 'power2.inOut' }
                 );
             });
-            
+
             try {
                 const res = await this.gas.addLike(rowIndex);
                 if (res && res.status === 'ok') {
+                    const oldAnswers = [...this.state.currentAnswers];
                     const dataItem = this.state.currentAnswers.find(item => item.rowIndex == rowIndex);
                     if (dataItem) {
                         dataItem.likes = res.newScore;
                         dataItem.hasLiked = !dataItem.hasLiked;
+                        dataItem.score = dataItem.reason.length * (1 + dataItem.likes * 0.05);
+                        this.state.currentAnswers.sort((a, b) => b.score - a.score);
                         this.updateLikeButtonUI(rowIndex, dataItem.likes, dataItem.hasLiked);
+                        this.renderBoard(false, oldAnswers);
                     }
                 } else if (res && res.message) {
                     alert(res.message);
