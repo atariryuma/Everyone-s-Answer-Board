@@ -391,7 +391,7 @@ if (typeof module !== 'undefined') {
     findHeaderIndices,
     getSheetData,
     addReaction,
-    toggleHighlight
+    toggleHighlight,
   };
 }
 
