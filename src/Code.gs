@@ -324,8 +324,9 @@ function clearRosterCache() {
  */
 function getWebAppUrl() {
   try {
-    const url = ScriptApp.getService().getUrl();
-    return url || '';
+    const scriptId = ScriptApp.getScriptId();
+    const url = scriptId ? `https://script.google.com/macros/s/${scriptId}/exec` : '';
+    return url;
   } catch (e) {
     console.error('getWebAppUrl Error:', e);
     throw new Error('ウェブアプリのURLを取得できませんでした。');
