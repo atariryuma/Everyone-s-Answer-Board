@@ -400,3 +400,4 @@ function getWebAppUrl() {
     throw new Error('ウェブアプリのURLを取得できませんでした。');
   }
 }
+
