@@ -246,9 +246,10 @@
                     this.elements.sheetNameText.textContent = 'シート: ' + data.sheetName;
                 }
 
-                if (JSON.stringify(this.state.currentAnswers) !== JSON.stringify(data.rows)) {
-                    this.state.currentAnswers = data.rows;
-                    this.elements.headingLabel.textContent = data.header || '問題';
+                const changed = JSON.stringify(this.state.currentAnswers) !== JSON.stringify(data.rows);
+                this.state.currentAnswers = data.rows;
+                this.elements.headingLabel.textContent = data.header || '問題';
+                if (changed || oldAnswers.length === 0) {
                     this.renderBoard(false, oldAnswers);
                 }
             } catch (error) {
