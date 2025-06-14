@@ -16,9 +16,12 @@ const COLUMN_HEADERS = {
   CURIOUS: 'もっと知りたい！',
   HIGHLIGHT: 'Highlight'
 };
+const CACHE_KEYS = {
+  ROSTER: 'roster_name_map_v3',
+  HEADERS: (sheetName) => `headers_${sheetName}_v1`
+};
 const ROSTER_CONFIG = {
   SHEET_NAME: 'sheet 1',
-  CACHE_KEY: 'roster_name_map_v3',
   HEADER_LAST_NAME: '姓',
   HEADER_FIRST_NAME: '名',
   HEADER_NICKNAME: 'ニックネーム',
@@ -120,9 +123,14 @@ function saveDisplayMode(mode) {
 // =================================================================
 function doGet() {
   const settings = getAppSettings();
-  
+  let userEmail;
+  try {
+    userEmail = Session.getActiveUser().getEmail();
+  } catch (e) {
+    userEmail = '匿名ユーザー';
+  }
+
   if (!settings.isPublished) {
-    const userEmail = Session.getActiveUser().getEmail();
     const template = HtmlService.createTemplateFromFile('Unpublished');
     template.userEmail = userEmail;
     return template.evaluate().setTitle('公開終了');
@@ -134,7 +142,7 @@ function doGet() {
 
   // ★変更: Page.html にもメールアドレスを渡す
   const template = HtmlService.createTemplateFromFile('Page');
-  template.userEmail = Session.getActiveUser().getEmail(); // この行を追加
+  template.userEmail = userEmail; // この行を追加
   return template.evaluate()
       .setTitle('StudyQuest - みんなのかいとうボード')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -267,8 +275,10 @@ function getSheetData(sheetName, classFilter, sortMode) {
 
 function addReaction(rowIndex, reactionKey) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
   try {
+    if (!lock.tryLock(10000)) {
+      return { status: 'error', message: '他のユーザーが操作中です。しばらく待ってから再試行してください。' };
+    }
     const userEmail = Session.getActiveUser().getEmail();
     if (!userEmail) return { status: 'error', message: 'ログインしていないため、操作できません。' };
     const settings = getAppSettings();
@@ -293,7 +303,11 @@ function addReaction(rowIndex, reactionKey) {
     console.error('addReaction Error:', error);
     return { status: 'error', message: `エラーが発生しました: ${error.message}` };
   } finally {
-    lock.releaseLock();
+    try {
+      lock.releaseLock();
+    } catch (e) {
+      // already released
+    }
   }
 }
 
@@ -332,7 +346,7 @@ function getAppSettings() {
 
 function getRosterMap() {
   const cache = CacheService.getScriptCache();
-  const cachedMap = cache.get(ROSTER_CONFIG.CACHE_KEY);
+  const cachedMap = cache.get(CACHE_KEYS.ROSTER);
   if (cachedMap) { return JSON.parse(cachedMap); }
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ROSTER_CONFIG.SHEET_NAME);
   if (!sheet) { console.error(`名簿シート「${ROSTER_CONFIG.SHEET_NAME}」が見つかりません。`); return {}; }
@@ -354,13 +368,13 @@ function getRosterMap() {
       nameMap[email] = nickname ? `${fullName} (${nickname})` : fullName;
     }
   });
-  cache.put(ROSTER_CONFIG.CACHE_KEY, JSON.stringify(nameMap), 21600);
+  cache.put(CACHE_KEYS.ROSTER, JSON.stringify(nameMap), 21600);
   return nameMap;
 }
 
 function getAndCacheHeaderIndices(sheetName, headerRow) {
   const cache = CacheService.getScriptCache();
-  const cacheKey = `headers_${sheetName}`;
+  const cacheKey = CACHE_KEYS.HEADERS(sheetName);
   const cachedHeaders = cache.get(cacheKey);
   if (cachedHeaders) { return JSON.parse(cachedHeaders); }
   const indices = findHeaderIndices(headerRow, Object.values(COLUMN_HEADERS));
@@ -414,7 +428,7 @@ if (typeof module !== 'undefined') {
 
 function clearRosterCache() {
   const cache = CacheService.getScriptCache();
-  const cacheKey = ROSTER_CONFIG.CACHE_KEY;
+  const cacheKey = CACHE_KEYS.ROSTER;
   cache.remove(cacheKey);
   console.log(`名簿キャッシュ（キー: ${cacheKey}）を削除しました。`);
   logDebug('Roster cache cleared');
