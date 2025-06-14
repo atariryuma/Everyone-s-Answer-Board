@@ -163,7 +163,7 @@ function doGet(e) {
  */
 
 function getPublishedSheetData(classFilter, sortMode, isAdmin) {
-  sortMode = sortMode || 'score';
+  sortMode = sortMode || 'newest';
   const settings = getAppSettings();
   const sheetName = settings.activeSheetName;
 
@@ -221,7 +221,7 @@ function getSheets() {
 }
 
 function getSheetData(sheetName, classFilter, sortMode, isAdmin) {
-  sortMode = sortMode || 'score';
+  sortMode = sortMode || 'newest';
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
     if (!sheet) throw new Error(`指定されたシート「${sheetName}」が見つかりません。`);
