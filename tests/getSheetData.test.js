@@ -55,7 +55,7 @@ test('getSheetData filters and scores rows', () => {
   ];
   setupMocks(data, 'b@example.com');
 
-  const result = getSheetData('Sheet1', undefined, undefined, true);
+  const result = getSheetData('Sheet1', undefined, 'score', true);
 
   expect(result.header).toBe(COLUMN_HEADERS.OPINION);
   expect(result.rows).toHaveLength(2);
