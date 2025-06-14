@@ -386,7 +386,13 @@ function findHeaderIndices(sheetHeaders, requiredHeaders) {
 
 // Export for Jest testing
 if (typeof module !== 'undefined') {
-  module.exports = { COLUMN_HEADERS, findHeaderIndices, getSheetData, addReaction };
+  module.exports = {
+    COLUMN_HEADERS,
+    findHeaderIndices,
+    getSheetData,
+    addReaction,
+    toggleHighlight
+  };
 }
 
 function clearRosterCache() {
