@@ -203,7 +203,7 @@ function getSheetData(sheetName, classFilter, sortMode) {
       return className === classFilter;
     });
 
-    const rows = filteredRows.map((row) => {
+    const rows = filteredRows.map((row, i) => {
       const email = row[headerIndices[COLUMN_HEADERS.EMAIL]];
       const opinion = row[headerIndices[COLUMN_HEADERS.OPINION]];
 
@@ -231,7 +231,7 @@ function getSheetData(sheetName, classFilter, sortMode) {
         const actualName = emailToNameMap[email] || email.split('@')[0];
         const name = displayMode === 'named' ? actualName : '匿名';
         return {
-          rowIndex: dataRows.indexOf(row) + 2,
+          rowIndex: i + 2,
           name: name,
           class: row[headerIndices[COLUMN_HEADERS.CLASS]] || '未分類',
           opinion: opinion,
@@ -391,6 +391,7 @@ if (typeof module !== 'undefined') {
     findHeaderIndices,
     getSheetData,
     addReaction,
+    toggleHighlight,
   };
 }
 
