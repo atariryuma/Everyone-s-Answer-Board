@@ -14,9 +14,11 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - 'src/**'
-      - '.github/workflows/**'
+    # --- 修正箇所 ---
+    # 以下の "paths" フィルターを削除しました。
+    # これにより、ブランチ保護ルールで必須チェックに指定されていても、
+    # ワークフローが必ず実行されるようになり、"Expected"のまま止まる問題を解消します。
+
   # 手動実行
   workflow_dispatch:
 
@@ -24,11 +26,9 @@ jobs:
   # ジョブの名前を「ci-and-deploy」に変更
   ci-and-deploy:
     runs-on: ubuntu-latest
-    # vvvvvvvvvvvvvvvvvvvvvvvvvv ここから追加 vvvvvvvvvvvvvvvvvvvvvvvvvv
     permissions:
       contents: read          # actions/checkoutがリポジトリをチェックアウトするために必要
       pull-requests: write # PRへのコメント書き込みに必要
-    # ^^^^^^^^^^^^^^^^^^^^^^^^^^ ここまで追加 ^^^^^^^^^^^^^^^^^^^^^^^^^^
     steps:
       # 1. リポジトリのコードをチェックアウト
       - name: Checkout repository
