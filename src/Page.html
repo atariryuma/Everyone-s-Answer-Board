@@ -22,13 +22,18 @@
     header { position: sticky; top: 0; z-index: 5; }
     .answer-card { will-change: transform, opacity; }
     .answer-preview { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; min-height: 120px; }
-    .like-btn svg { transition: all 0.2s ease-in-out; color: #facc15; fill: none; }
-    .like-btn.liked svg { stroke: transparent; fill: #facc15; transform: scale(1.1); }
+    .like-btn svg { transition: all 0.2s ease-in-out; fill: none; }
+    .like-btn[data-reaction="LIKE"] svg { color: #facc15; }
+    .like-btn[data-reaction="UNDERSTAND"] svg { color: #a3e635; }
+    .like-btn[data-reaction="CURIOUS"] svg { color: #38bdf8; }
+    .like-btn.liked[data-reaction="LIKE"] svg { stroke: transparent; fill: #facc15; transform: scale(1.1); }
+    .like-btn.liked[data-reaction="UNDERSTAND"] svg { stroke: transparent; fill: #a3e635; transform: scale(1.1); }
+    .like-btn.liked[data-reaction="CURIOUS"] svg { stroke: transparent; fill: #38bdf8; transform: scale(1.1); }
     .answer-card.highlighted { border-color: #facc15; box-shadow: 0 0 15px rgba(250, 204, 21, 0.4); }
     .highlight-badge { position: absolute; top: 0.25rem; right: 0.25rem; }
-    .reaction-bg-like { background-color: rgba(251, 146, 60, 0.2); }
-    .reaction-bg-understand { background-color: rgba(34, 197, 94, 0.2); }
-    .reaction-bg-curious { background-color: rgba(59, 130, 246, 0.2); }
+    .reaction-bg-like { border-color: #facc15; }
+    .reaction-bg-understand { border-color: #a3e635; }
+    .reaction-bg-curious { border-color: #38bdf8; }
     #controlsFooter { pointer-events: none; }
     #controlsFooter > .glass-panel { pointer-events: auto; }
   </style>
@@ -115,7 +120,7 @@
             
             this.reactionTypes = [
                 { key: 'UNDERSTAND', icon: 'lightbulb', label: 'なるほど！' },
-                { key: 'SUPPORT', icon: 'heart', label: 'いいね！' },
+                { key: 'LIKE', icon: 'thumb-up', label: 'いいね！' },
                 { key: 'CURIOUS', icon: 'search', label: 'もっと知りたい！' }
             ];
 
@@ -216,7 +221,7 @@
                                         reason: '理由は簡潔で分かりやすく、実現可能性が高いからです。',
                                         reactions: {
                                             UNDERSTAND: { count: 5, reacted: false },
-                                            SUPPORT: { count: 2, reacted: false },
+                                            LIKE: { count: 2, reacted: false },
                                             CURIOUS: { count: 1, reacted: false }
                                         }
                                     },
@@ -228,7 +233,7 @@
                                         reason: 'より多くの人の意見を聞く必要があると思います。',
                                         reactions: {
                                             UNDERSTAND: { count: 3, reacted: true },
-                                            SUPPORT: { count: 0, reacted: false },
+                                            LIKE: { count: 0, reacted: false },
                                             CURIOUS: { count: 0, reacted: false }
                                         }
                                     }
@@ -388,28 +393,26 @@
             card.dataset.rowIndex = data.rowIndex;
 
             const colors = {
-                SUPPORT: 'rgba(251,146,60,0.25)',
-                UNDERSTAND: 'rgba(34,197,94,0.25)',
-                CURIOUS: 'rgba(59,130,246,0.25)'
+                LIKE: 'rgba(250,204,21,0.25)',
+                UNDERSTAND: 'rgba(163,230,53,0.25)',
+                CURIOUS: 'rgba(56,189,248,0.25)'
             };
             const active = this.reactionTypes
                 .filter(rt => data.reactions && data.reactions[rt.key] && data.reactions[rt.key].count > 0)
                 .map(rt => rt.key);
             if (active.length === 1) {
-                if (active[0] === 'SUPPORT') card.classList.add('reaction-bg-like');
+                if (active[0] === 'LIKE') card.classList.add('reaction-bg-like');
                 if (active[0] === 'UNDERSTAND') card.classList.add('reaction-bg-understand');
                 if (active[0] === 'CURIOUS') card.classList.add('reaction-bg-curious');
-            } else if (active.length > 1) {
-                const gradient = active.map(k => colors[k]).join(', ');
-                card.style.background = `linear-gradient(135deg, ${gradient})`;
             }
 
+            const showCount = isAdmin;
             const reactionButtons = this.reactionTypes.map(rt => {
                 const rData = data.reactions ? data.reactions[rt.key] || { count: 0, reacted: false } : { count: 0, reacted: false };
                 const btnClass = rData.reacted ? 'liked' : '';
                 return '<button type="button" class="reaction-btn like-btn ' + btnClass + '" aria-label="' + rt.label + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '">' +
                     this.getIcon(rt.icon, 'w-5 h-5') +
-                    '<span class="reaction-count font-bold text-lg text-gray-200">' + rData.count + '</span>' +
+                    (showCount ? '<span class="reaction-count font-bold text-lg text-gray-200">' + rData.count + '</span>' : '') +
                     '</button>';
             }).join(' ');
 
@@ -432,9 +435,9 @@
                 this.escapeHtml(data.reason || '') + '</p>' +
                 '</div>' +
                 '<div class="text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center">' +
-                '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' +
-                '<div class="flex gap-2">' + reactionButtons + highlightBtn + '</div>' +
-                '</div>';
+                (isAdmin ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' : '<div></div>') +
+                '<div class="flex gap-2">' + reactionButtons + (isAdmin ? highlightBtn : '') + '</div>' +
+                '</div>'; 
 
             card.addEventListener('click', (e) => {
                 const reaction = e.target.closest('.reaction-btn');
@@ -535,14 +538,15 @@
                 this.escapeHtml(data.opinion || '') + '</p>' +
                 '<p class="text-gray-100 whitespace-pre-wrap break-words mt-6 text-xl">' +
                 this.escapeHtml(data.reason || '') + '</p>';
-            this.elements.modalStudentName.textContent = data.name;
+                this.elements.modalStudentName.textContent = isAdmin ? data.name : '';
 
+            const showCount = isAdmin;
             const reactionButtons = this.reactionTypes.map(rt => {
                 const rData = data.reactions ? data.reactions[rt.key] || { count: 0, reacted: false } : { count: 0, reacted: false };
                 const btnClass = rData.reacted ? 'liked' : '';
                 return '<button type="button" class="reaction-btn like-btn ' + btnClass + ' flex items-center gap-2 text-lg" aria-label="' + rt.label + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '">' +
                     this.getIcon(rt.icon, 'w-6 h-6') +
-                    '<span class="reaction-count font-bold text-xl text-gray-200">' + rData.count + '</span>' +
+                    (showCount ? '<span class="reaction-count font-bold text-xl text-gray-200">' + rData.count + '</span>' : '') +
                     '</button>';
             }).join('');
             
@@ -618,7 +622,8 @@
         getIcon(name, classes = 'w-6 h-6') {
             const icons = {
                 lightbulb: '<svg class="' + classes + '" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m12.728 0l-.707.707M12 21a9 9 0 110-18 9 9 0 010 18z" /></svg>',
-                heart: '<svg class="' + classes + '" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.5l1.318-1.182a4.5 4.5 0 116.364 6.364L12 21l-7.682-7.318a4.5 4.5 0 010-6.364z" /></svg>',
+                heart: '<svg class="' + classes + '" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.5l1.318-1.182a4.5 4.5 0 116.364 6.364L12 21l-7.682-7.318a4.5 4.5 0 010-6.364z" /></svg>',
+                'thumb-up': '<svg class="' + classes + '" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 9V5a3 3 0 00-6 0v4H5a3 3 0 000 6h3v6h8l3-8v-4h-5z" /></svg>',
                 search: '<svg class="' + classes + '" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>',
                 star: '<svg class="' + classes + '" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.539 1.118l-3.975-2.888a1 1 0 00-1.175 0l-3.976 2.888c-.783.57-1.838-.196-1.539-1.118l1.518-4.674a1 1 0 00-.363-1.118L2.05 10.1c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>',
                 users: '<svg class="' + classes + '" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm6-6a3 3 0 100-6 3 3 0 000 6z" /></svg>',

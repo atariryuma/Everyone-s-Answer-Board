@@ -12,7 +12,7 @@ const COLUMN_HEADERS = {
   OPINION: 'これまでの学んだことや、経験したことから、根からとり入れた水は、植物のからだのどこを通るのか予想しましょう。',
   REASON: '予想したわけを書きましょう。',
   UNDERSTAND: 'なるほど！',
-  SUPPORT: 'いいね！',
+  LIKE: 'いいね！',
   CURIOUS: 'もっと知りたい！',
   HIGHLIGHT: 'Highlight'
 };
@@ -133,12 +133,6 @@ function doGet(e) {
 
   const isAdmin = e && e.parameter && e.parameter.admin === '1';
 
-  if (isAdmin && e && e.parameter && e.parameter.wordcloud === '1') {
-    const t = HtmlService.createTemplateFromFile('WordCloud');
-    return t.evaluate()
-            .setTitle('単語クラウド')
-            .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-  }
 
   if (isAdmin && e && e.parameter && e.parameter.groups === '1') {
     const t = HtmlService.createTemplateFromFile('OpinionGroups');
@@ -196,32 +190,6 @@ function getPublishedSheetData(classFilter, sortMode, isAdmin) {
   };
 }
 
-function generateWordCloudData() {
-  const settings = getAppSettings();
-  const sheetName = settings.activeSheetName;
-  if (!sheetName) throw new Error('表示するシートが設定されていません。');
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-  if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
-  const values = sheet.getDataRange().getValues();
-  if (values.length < 2) return [];
-  const indices = findHeaderIndices(values[0], [COLUMN_HEADERS.OPINION, COLUMN_HEADERS.REASON]);
-  const texts = values.slice(1).map(r =>
-    [r[indices[COLUMN_HEADERS.OPINION]], r[indices[COLUMN_HEADERS.REASON]]].join(' ')
-  ).join(' ');
-  let tokens = [];
-  try {
-    const res = LanguageApp.analyzeSyntax(texts, 'ja');
-    tokens = res.getTokens().map(t => t.getLemma ? t.getLemma() : t.getText());
-  } catch (e) {
-    tokens = texts.split(/\s+/);
-  }
-  const freq = {};
-  tokens.forEach(w => {
-    const word = String(w).replace(/[\p{P}\p{S}]/gu, '');
-    if (word.length > 1) freq[word] = (freq[word] || 0) + 1;
-  });
-  return Object.keys(freq).map(k => ({ text: k, count: freq[k] })).sort((a,b) => b.count - a.count);
-}
 
 function groupSimilarOpinions() {
   const settings = getAppSettings();
@@ -230,22 +198,34 @@ function groupSimilarOpinions() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
   const values = sheet.getDataRange().getValues();
-  if (values.length < 2) return [];
-  const idx = findHeaderIndices(values[0], [COLUMN_HEADERS.OPINION]);
-  const opinions = values.slice(1).map(r => r[idx[COLUMN_HEADERS.OPINION]]).filter(Boolean);
+  if (values.length < 2) return '';
+  const idx = findHeaderIndices(values[0], [COLUMN_HEADERS.OPINION, COLUMN_HEADERS.REASON]);
+  const texts = values.slice(1).map(r => {
+    const op = r[idx[COLUMN_HEADERS.OPINION]];
+    const reason = r[idx[COLUMN_HEADERS.REASON]];
+    return `意見: ${op} 理由: ${reason}`;
+  }).filter(Boolean);
 
-  const payload = JSON.stringify({ opinions });
+  const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!apiKey) throw new Error('GEMINI APIキーが設定されていません。');
+
+  const prompt = '次の意見と理由を類似内容ごとにグループ化し、多数派と少数派を含めて要約してください。\n' + texts.join('\n');
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' + apiKey;
+  const payload = {
+    contents: [{ parts: [{ text: prompt }] }]
+  };
   try {
-    const res = UrlFetchApp.fetch('https://example.com/api/group', {
+    const res = UrlFetchApp.fetch(url, {
       method: 'post',
       contentType: 'application/json',
-      payload: payload,
+      payload: JSON.stringify(payload),
       muteHttpExceptions: true
     });
-    return JSON.parse(res.getContentText());
+    const json = JSON.parse(res.getContentText() || '{}');
+    return json.candidates && json.candidates[0] && json.candidates[0].content && json.candidates[0].content.parts ? json.candidates[0].content.parts[0].text : '';
   } catch (e) {
     console.error('groupSimilarOpinions error', e);
-    return [];
+    return '';
   }
 }
 
@@ -318,10 +298,10 @@ function getSheetData(sheetName, classFilter, sortMode, isAdmin) {
 
       if (email && opinion) {
         const understandStr = row[headerIndices[COLUMN_HEADERS.UNDERSTAND]] || '';
-        const supportStr = row[headerIndices[COLUMN_HEADERS.SUPPORT]] || '';
+        const likeStr = row[headerIndices[COLUMN_HEADERS.LIKE]] || '';
         const curiousStr = row[headerIndices[COLUMN_HEADERS.CURIOUS]] || '';
         const understandArr = understandStr ? understandStr.toString().split(',').filter(Boolean) : [];
-        const supportArr = supportStr ? supportStr.toString().split(',').filter(Boolean) : [];
+        const likeArr = likeStr ? likeStr.toString().split(',').filter(Boolean) : [];
         const curiousArr = curiousStr ? curiousStr.toString().split(',').filter(Boolean) : [];
         const reason = row[headerIndices[COLUMN_HEADERS.REASON]] || '';
         const highlightVal = row[headerIndices[COLUMN_HEADERS.HIGHLIGHT]];
@@ -329,11 +309,11 @@ function getSheetData(sheetName, classFilter, sortMode, isAdmin) {
 
         const reactions = {
           UNDERSTAND: { count: understandArr.length, reacted: userEmail ? understandArr.includes(userEmail) : false },
-          SUPPORT: { count: supportArr.length, reacted: userEmail ? supportArr.includes(userEmail) : false },
+          LIKE: { count: likeArr.length, reacted: userEmail ? likeArr.includes(userEmail) : false },
           CURIOUS: { count: curiousArr.length, reacted: userEmail ? curiousArr.includes(userEmail) : false },
         };
 
-        const totalReactions = reactions.UNDERSTAND.count + reactions.SUPPORT.count + reactions.CURIOUS.count;
+        const totalReactions = reactions.UNDERSTAND.count + reactions.LIKE.count + reactions.CURIOUS.count;
         const baseScore = reason.length;
         const likeMultiplier = 1 + (totalReactions * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
         const totalScore = baseScore * likeMultiplier;
@@ -520,7 +500,6 @@ if (typeof module !== 'undefined') {
     getSheetData,
     addReaction,
     toggleHighlight,
-    generateWordCloudData,
     groupSimilarOpinions,
     logDebug,
     getWebAppUrl,

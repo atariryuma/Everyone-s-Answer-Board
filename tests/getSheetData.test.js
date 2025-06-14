@@ -45,7 +45,7 @@ test('getSheetData filters and scores rows', () => {
       COLUMN_HEADERS.OPINION,
       COLUMN_HEADERS.REASON,
       COLUMN_HEADERS.UNDERSTAND,
-      COLUMN_HEADERS.SUPPORT,
+      COLUMN_HEADERS.LIKE,
       COLUMN_HEADERS.CURIOUS,
       COLUMN_HEADERS.HIGHLIGHT
     ],
@@ -73,7 +73,7 @@ test('getSheetData sorts by newest when specified', () => {
       COLUMN_HEADERS.OPINION,
       COLUMN_HEADERS.REASON,
       COLUMN_HEADERS.UNDERSTAND,
-      COLUMN_HEADERS.SUPPORT,
+      COLUMN_HEADERS.LIKE,
       COLUMN_HEADERS.CURIOUS,
       COLUMN_HEADERS.HIGHLIGHT
     ],
@@ -95,7 +95,7 @@ test('getSheetData forces anonymous mode for non-admin', () => {
       COLUMN_HEADERS.OPINION,
       COLUMN_HEADERS.REASON,
       COLUMN_HEADERS.UNDERSTAND,
-      COLUMN_HEADERS.SUPPORT,
+      COLUMN_HEADERS.LIKE,
       COLUMN_HEADERS.CURIOUS,
       COLUMN_HEADERS.HIGHLIGHT
     ],
