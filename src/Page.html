@@ -38,8 +38,7 @@
             <p id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0"></p>
             <select id="classFilter" class="hidden text-sm"></select>
             <select id="sortMode" class="text-sm">
-                <option value="score">スコア順</option>
-                <option value="newest">新着順</option>
+                <option value="newest" selected>新着順</option>
                 <option value="random">ランダム</option>
             </select>
         </div>
@@ -465,8 +464,6 @@
                             this.state.currentAnswers.sort((a, b) => b.rowIndex - a.rowIndex);
                         } else if (mode === 'random') {
                             this.state.currentAnswers.sort(() => Math.random() - 0.5);
-                        } else { // 'score' or default
-                            this.state.currentAnswers.sort((a, b) => b.score - a.score);
                         }
 
                         this.updateReactionButtonUI(rowIndex, reaction, rData.count, rData.reacted);
