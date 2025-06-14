@@ -11,7 +11,9 @@ const COLUMN_HEADERS = {
   CLASS: 'クラスを選択してください。',
   OPINION: 'これまでの学んだことや、経験したことから、根からとり入れた水は、植物のからだのどこを通るのか予想しましょう。',
   REASON: '予想したわけを書きましょう。',
-  LIKES: 'いいね！'
+  UNDERSTAND: 'なるほど！',
+  SUPPORT: '応援したい！',
+  CURIOUS: 'もっと知りたい！'
 };
 const ROSTER_CONFIG = {
   SHEET_NAME: 'sheet 1',
@@ -22,7 +24,7 @@ const ROSTER_CONFIG = {
   HEADER_EMAIL: 'Googleアカウント'
 };
 const SCORING_CONFIG = {
-  LIKE_MULTIPLIER_FACTOR: 0.05 // 1いいね！ごとにスコアが5%増加
+  LIKE_MULTIPLIER_FACTOR: 0.05 // 各リアクション1件ごとにスコアが5%増加
 };
 const APP_PROPERTIES = {
   ACTIVE_SHEET: 'ACTIVE_SHEET_NAME',
@@ -189,12 +191,23 @@ function getSheetData(sheetName, classFilter, sortMode) {
       const opinion = row[headerIndices[COLUMN_HEADERS.OPINION]];
 
       if (email && opinion) {
-        const likersString = row[headerIndices[COLUMN_HEADERS.LIKES]] || '';
-        const likers = likersString ? likersString.toString().split(',').filter(Boolean) : [];
+        const understandStr = row[headerIndices[COLUMN_HEADERS.UNDERSTAND]] || '';
+        const supportStr = row[headerIndices[COLUMN_HEADERS.SUPPORT]] || '';
+        const curiousStr = row[headerIndices[COLUMN_HEADERS.CURIOUS]] || '';
+        const understandArr = understandStr ? understandStr.toString().split(',').filter(Boolean) : [];
+        const supportArr = supportStr ? supportStr.toString().split(',').filter(Boolean) : [];
+        const curiousArr = curiousStr ? curiousStr.toString().split(',').filter(Boolean) : [];
         const reason = row[headerIndices[COLUMN_HEADERS.REASON]] || '';
-        const likes = likers.length;
+
+        const reactions = {
+          UNDERSTAND: { count: understandArr.length, reacted: userEmail ? understandArr.includes(userEmail) : false },
+          SUPPORT: { count: supportArr.length, reacted: userEmail ? supportArr.includes(userEmail) : false },
+          CURIOUS: { count: curiousArr.length, reacted: userEmail ? curiousArr.includes(userEmail) : false },
+        };
+
+        const totalReactions = reactions.UNDERSTAND.count + reactions.SUPPORT.count + reactions.CURIOUS.count;
         const baseScore = reason.length;
-        const likeMultiplier = 1 + (likes * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
+        const likeMultiplier = 1 + (totalReactions * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
         const totalScore = baseScore * likeMultiplier;
         return {
           rowIndex: dataRows.indexOf(row) + 2,
@@ -202,8 +215,7 @@ function getSheetData(sheetName, classFilter, sortMode) {
           class: row[headerIndices[COLUMN_HEADERS.CLASS]] || '未分類',
           opinion: opinion,
           reason: reason,
-          likes: likes,
-          hasLiked: userEmail ? likers.includes(userEmail) : false,
+          reactions: reactions,
           score: totalScore
         };
       }
@@ -228,7 +240,7 @@ function getSheetData(sheetName, classFilter, sortMode) {
   }
 }
 
-function addLike(rowIndex) {
+function addReaction(rowIndex, reactionKey) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -239,18 +251,21 @@ function addLike(rowIndex) {
     if (!sheet) throw new Error(`シート '${settings.activeSheetName}' が見つかりません。`);
 
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const headerIndices = findHeaderIndices(headerRow, [COLUMN_HEADERS.LIKES]);
-    const likesColIndex = headerIndices[COLUMN_HEADERS.LIKES] + 1;
+    if (!COLUMN_HEADERS[reactionKey]) {
+      throw new Error(`Unknown reaction: ${reactionKey}`);
+    }
+    const headerIndices = findHeaderIndices(headerRow, [COLUMN_HEADERS[reactionKey]]);
+    const colIndex = headerIndices[COLUMN_HEADERS[reactionKey]] + 1;
 
-    const likeCell = sheet.getRange(rowIndex, likesColIndex);
-    const likersString = likeCell.getValue().toString();
+    const cell = sheet.getRange(rowIndex, colIndex);
+    const likersString = cell.getValue().toString();
     let likers = likersString ? likersString.split(',').filter(Boolean) : [];
     const userIndex = likers.indexOf(userEmail);
     if (userIndex > -1) { likers.splice(userIndex, 1); } else { likers.push(userEmail); }
-    likeCell.setValue(likers.join(','));
-    return { status: 'ok', newScore: likers.length };
+    cell.setValue(likers.join(','));
+    return { status: 'ok', reaction: reactionKey, newScore: likers.length };
   } catch (error) {
-    console.error('addLike Error:', error);
+    console.error('addReaction Error:', error);
     return { status: 'error', message: `エラーが発生しました: ${error.message}` };
   } finally {
     lock.releaseLock();
