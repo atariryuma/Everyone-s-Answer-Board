@@ -129,16 +129,17 @@ function doGet() {
  * サーバー側で設定されたシートのデータを取得します。
  */
 
-function getPublishedSheetData(classFilter) {
+function getPublishedSheetData(classFilter, sortMode) {
+  sortMode = sortMode || 'score';
   const settings = getAppSettings();
   const sheetName = settings.activeSheetName;
-  
+
   if (!sheetName) {
     throw new Error('表示するシートが設定されていません。');
   }
-  
+
   // 既存のgetSheetDataロジックを再利用
-  const data = getSheetData(sheetName, classFilter);
+  const data = getSheetData(sheetName, classFilter, sortMode);
 
   // ★改善: フロントエンドでシート名を表示できるよう、レスポンスに含める
   return {
@@ -163,7 +164,8 @@ function getSheets() {
   }
 }
 
-function getSheetData(sheetName, classFilter) {
+function getSheetData(sheetName, classFilter, sortMode) {
+  sortMode = sortMode || 'score';
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
     if (!sheet) throw new Error(`指定されたシート「${sheetName}」が見つかりません。`);
@@ -208,7 +210,17 @@ function getSheetData(sheetName, classFilter) {
       return null;
     }).filter(Boolean);
 
-    rows.sort((a, b) => b.score - a.score);
+    switch (sortMode) {
+      case 'newest':
+        rows.sort((a, b) => b.rowIndex - a.rowIndex);
+        break;
+      case 'random':
+        rows.sort(() => Math.random() - 0.5);
+        break;
+      default:
+        rows.sort((a, b) => b.score - a.score);
+        break;
+    }
     return { header: COLUMN_HEADERS.OPINION, rows: rows };
   } catch(e) {
     console.error(`getSheetData Error for sheet "${sheetName}":`, e);
