@@ -31,6 +31,13 @@ After installing dependencies (`npm install`), run `npm test` to execute Jest te
 All script files live directly under the `src` folder. **Do not create any
 subdirectories under `src`.**
 
+## Highlighting answers
+
+Add a column named `Highlight` to your spreadsheet (using a checkbox or TRUE/FALSE values).
+Rows marked as `TRUE` will appear with a yellow border on the board.
+When viewing the board as an administrator (your Google account name contains `t`),
+a star button is shown on each answer card to toggle this flag.
+
 
 ## Continuous Integration
 
