@@ -75,12 +75,17 @@ function getAdminSettings() {
   const allSheets = getSheets(); // 既存の関数を再利用
   const adminEmailsRaw = properties.getProperty(APP_PROPERTIES.ADMIN_EMAILS) || '';
   const adminEmails = adminEmailsRaw ? adminEmailsRaw.split(',').map(e => e.trim()).filter(Boolean) : [];
+  let currentUser = '';
+  try {
+   currentUser = Session.getActiveUser().getEmail();
+  } catch (e) {}
   return {
     isPublished: properties.getProperty(APP_PROPERTIES.IS_PUBLISHED) === 'true',
     activeSheetName: properties.getProperty(APP_PROPERTIES.ACTIVE_SHEET),
     allSheets: allSheets,
     displayMode: properties.getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous',
-    adminEmails: adminEmails
+    adminEmails: adminEmails,
+    currentUserEmail: currentUser
   };
 }
 
@@ -123,15 +128,27 @@ function saveDisplayMode(mode) {
 }
 
 /**
- * 管理者メールアドレスを保存します。
- * @param {string} emails - カンマ区切りのメールアドレス文字列
- */
+* 管理者メールアドレスを保存します。
+* @param {string|Array} emails - カンマ区切りのメールアドレス文字列または配列
+*/
 function saveAdminEmails(emails) {
-  const properties = PropertiesService.getScriptProperties();
-  const value = (emails || '').split(',').map(e => e.trim()).filter(Boolean).join(',');
-  properties.setProperty(APP_PROPERTIES.ADMIN_EMAILS, value);
-  logDebug(`Admin emails updated: ${value}`);
-  return '管理者メールアドレスを更新しました。';
+ const properties = PropertiesService.getScriptProperties();
+ let value;
+ if (Array.isArray(emails)) {
+   value = emails.map(e => e.trim()).filter(Boolean).join(',');
+ } else {
+   value = (emails || '').split(',').map(e => e.trim()).filter(Boolean).join(',');
+ }
+ properties.setProperty(APP_PROPERTIES.ADMIN_EMAILS, value);
+ logDebug(`Admin emails updated: ${value}`);
+ return '管理者メールアドレスを更新しました。';
+}
+
+function getAdminEmails() {
+ const str = PropertiesService.getScriptProperties()
+     .getProperty(APP_PROPERTIES.ADMIN_EMAILS) || '';
+ return str.split(',').map(e => e.trim()).filter(Boolean);
+}
 }
 
 
@@ -147,7 +164,10 @@ function doGet(e) {
     userEmail = '匿名ユーザー';
   }
 
-  const isAdmin = e && e.parameter && e.parameter.admin === '1';
+  const adminEmails = getAdminEmails();
+  const isAdmin =
+      e && e.parameter && e.parameter.admin === '1' &&
+      adminEmails.includes(userEmail);
 
 
   if (isAdmin && e && e.parameter && e.parameter.groups === '1') {
