@@ -57,6 +57,11 @@
       
       <div id="message-area" class="mt-4 text-center text-sm h-5"></div>
 
+      <div id="debug-container" class="mt-6">
+        <h3 class="font-semibold text-gray-700 mb-2">デバッグログ</h3>
+        <div id="debug-log" class="bg-black text-green-300 text-xs font-mono p-2 rounded-lg h-32 overflow-y-auto"></div>
+      </div>
+
     </div>
 
     <script>
@@ -68,7 +73,8 @@
         messageArea: document.getElementById('message-area'),
         webAppLink: document.getElementById('webapp-link'),
         modeAnonymous: document.getElementById('mode-anonymous'),
-        modeNamed: document.getElementById('mode-named')
+        modeNamed: document.getElementById('mode-named'),
+        debugLog: document.getElementById('debug-log')
       };
 
       let selectedSheet = null;
@@ -76,6 +82,7 @@
 
       document.addEventListener('DOMContentLoaded', () => {
         loadInitialState();
+        loadDebugLog();
         elements.publishBtn.addEventListener('click', publish);
         elements.unpublishBtn.addEventListener('click', unpublish);
         elements.modeNamed.addEventListener('click', () => {
@@ -159,6 +166,21 @@
         }
       }
 
+      function loadDebugLog() {
+        google.script.run
+          .withSuccessHandler(lines => {
+            elements.debugLog.innerHTML = '';
+            lines.forEach(line => {
+              const div = document.createElement('div');
+              div.textContent = line;
+              elements.debugLog.appendChild(div);
+            });
+            elements.debugLog.scrollTop = elements.debugLog.scrollHeight;
+          })
+          .withFailureHandler(() => {})
+          .getDebugLog();
+      }
+
       function publish() {
         if (!selectedSheet) {
           showMessage('公開するシートを選択してください。', 'red');
@@ -171,6 +193,7 @@
               .withSuccessHandler((msg) => {
                 showMessage(msg, 'green');
                 loadInitialState();
+                loadDebugLog();
               })
               .withFailureHandler(showError)
               .publishApp(selectedSheet);
@@ -185,6 +208,7 @@
           .withSuccessHandler((msg) => {
             showMessage(msg, 'green');
             loadInitialState();
+            loadDebugLog();
           })
           .withFailureHandler(showError)
           .unpublishApp();
@@ -207,6 +231,7 @@
       function showError(error) {
         showMessage(error.message, 'red');
         setLoading(false);
+        loadDebugLog();
       }
     </script>
   </body>
