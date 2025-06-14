@@ -10,7 +10,6 @@ on:
     paths:
       - 'src/**'
       - '.github/workflows/**' # ワークフロー自体の変更でも実行
-
   # 'main' ブランチへのプルリクエストが作成/更新された時にテストを実行
   pull_request:
     branches:
@@ -18,7 +17,6 @@ on:
     paths:
       - 'src/**'
       - '.github/workflows/**'
-
   # 手動実行
   workflow_dispatch:
 
@@ -26,7 +24,11 @@ jobs:
   # ジョブの名前を「ci-and-deploy」に変更
   ci-and-deploy:
     runs-on: ubuntu-latest
-
+    # vvvvvvvvvvvvvvvvvvvvvvvvvv ここから追加 vvvvvvvvvvvvvvvvvvvvvvvvvv
+    permissions:
+      contents: read          # actions/checkoutがリポジトリをチェックアウトするために必要
+      pull-requests: write # PRへのコメント書き込みに必要
+    # ^^^^^^^^^^^^^^^^^^^^^^^^^^ ここまで追加 ^^^^^^^^^^^^^^^^^^^^^^^^^^
     steps:
       # 1. リポジトリのコードをチェックアウト
       - name: Checkout repository
@@ -59,40 +61,56 @@ jobs:
         run: npm run push -- --force
 
       # --- ここからがマージ後の結果を通知するステップ ---
-
       # 6. マージされたPR番号を特定（pushの時のみ）
-      - name: Find Pull Request
+      - name: Get PR number from commit
         if: github.event_name == 'push'
-        uses: peter-evans/find-pull-request@v3
-        id: find-pr
+        id: get-pr
+        uses: actions/github-script@v7
         with:
-          # GITHUB_TOKENにはデフォルトで権限が付与されています
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-sha: ${{ github.sha }}
-          branch: main
+          script: |
+            // GitHub APIを使ってコミットに関連するPRを検索
+            try {
+              const { data: pulls } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: context.sha
+              });
+
+              if (pulls.length > 0) {
+                const prNumber = pulls[0].number;
+                console.log(`Found PR number: ${prNumber}`);
+                core.setOutput('pr_number', prNumber.toString());
+              } else {
+                console.log('No PR found for this commit');
+                core.setOutput('pr_number', '');
+              }
+            } catch (error) {
+              console.log(`Error finding PR: ${error.message}`);
+              core.setOutput('pr_number', '');
+            }
 
       # 7. デプロイ成功をPRにコメント（pushが成功した時のみ）
       - name: Comment on PR (Success)
-        if: success() && github.event_name == 'push' && steps.find-pr.outputs.number
+        if: success() && github.event_name == 'push' && steps.get-pr.outputs.pr_number != ''
         uses: actions/github-script@v7
         with:
           script: |
             github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: ${{ steps.find-pr.outputs.number }},
+              issue_number: ${{ steps.get-pr.outputs.pr_number }},
               body: '✅ **デプロイ成功**\n\nGoogle Apps Scriptへのプッシュが正常に完了しました。'
             })
 
       # 8. デプロイ失敗をPRにコメント（pushが失敗した時のみ）
       - name: Comment on PR (Failure)
-        if: failure() && github.event_name == 'push' && steps.find-pr.outputs.number
+        if: failure() && github.event_name == 'push' && steps.get-pr.outputs.pr_number != ''
         uses: actions/github-script@v7
         with:
           script: |
             github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: ${{ steps.find-pr.outputs.number }},
+              issue_number: ${{ steps.get-pr.outputs.pr_number }},
               body: '❌ **デプロイ失敗**\n\nGoogle Apps Scriptへのプッシュ中にエラーが発生しました。詳細は [Actionsのログ](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) を確認してください。'
             })
