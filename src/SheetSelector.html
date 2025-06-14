@@ -53,13 +53,22 @@
           </button>
         </div>
       </div>
-      
+
+      <!-- Admin Emails -->
+      <div class="mb-6">
+        <h4 class="font-semibold text-gray-700 mb-3">管理者メールアドレス</h4>
+        <div class="bg-white p-3 rounded-lg shadow-md flex flex-col gap-2">
+          <input type="text" id="admin-emails" class="p-2 border rounded w-full" placeholder="teacher@example.com">
+          <button id="save-admin-emails" class="text-white font-bold py-1 px-4 rounded bg-green-500 hover:bg-green-600">保存</button>
+        </div>
+      </div>
+
       <div id="message-area" class="mt-4 text-center text-sm h-5"></div>
       <div class="mt-6 text-right">
-        <a id="open-admin" href="#" target="_blank" class="text-blue-600 underline">管理者として開く</a>
+        <a id="open-admin" href="#" target="_blank" style="display:none" class="text-blue-600 underline">管理者として開く</a>
       </div>
       <div class="mt-2 text-right">
-        <a id="open-groups" href="#" target="_blank" class="text-blue-600 underline text-sm">意見グループ</a>
+        <a id="open-groups" href="#" target="_blank" style="display:none" class="text-blue-600 underline text-sm">意見グループ</a>
       </div>
 
     </div>
@@ -74,7 +83,9 @@
         modeAnonymous: document.getElementById('mode-anonymous'),
         modeNamed: document.getElementById('mode-named'),
         openAdmin: document.getElementById('open-admin'),
-        openGroups: document.getElementById('open-groups')
+        openGroups: document.getElementById('open-groups'),
+        adminEmails: document.getElementById('admin-emails'),
+        saveAdminEmails: document.getElementById('save-admin-emails')
       };
 
       let selectedSheet = null;
@@ -84,6 +95,12 @@
         loadInitialState();
         elements.publishBtn.addEventListener('click', publish);
         elements.unpublishBtn.addEventListener('click', unpublish);
+        elements.saveAdminEmails.addEventListener('click', () => {
+          google.script.run
+            .withSuccessHandler(() => showMessage('保存しました', 'green'))
+            .withFailureHandler(showError)
+            .saveAdminEmails(elements.adminEmails.value);
+        });
         elements.modeNamed.addEventListener('click', () => {
           if (!confirm('注意：生徒の心理的安全性を考慮し、通常は匿名表示を推奨します。本当に名前を表示しますか？')) {
             elements.modeAnonymous.checked = true;
@@ -119,7 +136,12 @@
         } else {
           elements.modeAnonymous.checked = true;
         }
-        
+
+        elements.adminEmails.value = (status.adminEmails || []).join(',');
+        const isUserAdmin = status.adminEmails && status.currentUserEmail && status.adminEmails.indexOf(status.currentUserEmail) !== -1;
+        elements.openAdmin.style.display = isUserAdmin ? 'block' : 'none';
+        elements.openGroups.style.display = isUserAdmin ? 'block' : 'none';
+
         if (status.isPublished && status.activeSheetName) {
           elements.statusText.innerHTML = `公開中: <span class="font-bold text-green-700">${status.activeSheetName}</span>`;
           elements.unpublishBtn.disabled = false;

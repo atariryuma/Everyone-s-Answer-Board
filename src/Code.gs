@@ -34,7 +34,8 @@ const APP_PROPERTIES = {
   ACTIVE_SHEET: 'ACTIVE_SHEET_NAME',
   IS_PUBLISHED: 'IS_PUBLISHED',
   DISPLAY_MODE: 'DISPLAY_MODE',
-  WEB_APP_URL: 'WEB_APP_URL'
+  WEB_APP_URL: 'WEB_APP_URL',
+  ADMIN_EMAILS: 'ADMIN_EMAILS'
 };
 
 
@@ -72,11 +73,18 @@ function showAdminSidebar() {
 function getAdminSettings() {
   const properties = PropertiesService.getScriptProperties();
   const allSheets = getSheets(); // 既存の関数を再利用
+  const adminEmails = getAdminEmails();
+  let currentUser = '';
+  try {
+    currentUser = Session.getActiveUser().getEmail();
+  } catch (e) {}
   return {
     isPublished: properties.getProperty(APP_PROPERTIES.IS_PUBLISHED) === 'true',
     activeSheetName: properties.getProperty(APP_PROPERTIES.ACTIVE_SHEET),
     allSheets: allSheets,
-    displayMode: properties.getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous'
+    displayMode: properties.getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous',
+    adminEmails: adminEmails,
+    currentUserEmail: currentUser
   };
 }
 
@@ -118,6 +126,26 @@ function saveDisplayMode(mode) {
   return `表示モードを${value === 'named' ? '記名' : '匿名'}に設定しました。`;
 }
 
+function setAdminEmails(emailList) {
+  const props = PropertiesService.getScriptProperties();
+  if (Array.isArray(emailList)) {
+    props.setProperty(APP_PROPERTIES.ADMIN_EMAILS, emailList.join(','));
+  } else {
+    props.setProperty(APP_PROPERTIES.ADMIN_EMAILS, emailList || '');
+  }
+}
+
+function getAdminEmails() {
+  const str = PropertiesService.getScriptProperties()
+      .getProperty(APP_PROPERTIES.ADMIN_EMAILS) || '';
+  return str.split(',').map(e => e.trim()).filter(Boolean);
+}
+
+function saveAdminEmails(emailList) {
+  setAdminEmails(emailList);
+  return '管理者メールアドレスを保存しました。';
+}
+
 
 // =================================================================
 // GAS Webアプリケーションのエントリーポイント
@@ -131,7 +159,10 @@ function doGet(e) {
     userEmail = '匿名ユーザー';
   }
 
-  const isAdmin = e && e.parameter && e.parameter.admin === '1';
+  const adminEmails = getAdminEmails();
+  const isAdmin =
+      e && e.parameter && e.parameter.admin === '1' &&
+      adminEmails.includes(userEmail);
 
 
   if (isAdmin && e && e.parameter && e.parameter.groups === '1') {

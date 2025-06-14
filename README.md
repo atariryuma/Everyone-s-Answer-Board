@@ -40,6 +40,12 @@ When the board is opened with the `?admin=1` query parameter,
 a star button is shown on each answer card to toggle this flag.
 Use the "Open as administrator" link in the sheet selector sidebar to launch the board in this mode.
 
+## Admin access
+
+1. Open the sheet selector sidebar from the spreadsheet menu.
+2. Enter comma-separated administrator emails in the **管理者メールアドレス** field and click **保存**.
+3. Only these users will see the "管理者として開く" link and can append `?admin=1` to access admin features.
+
 ## Additional admin tools
 
 - **Opinion groups** – The *意見グループ* link groups similar answers together. The `groupSimilarOpinions` function uses Gemini API to analyze all opinions and reasons and returns a summary of majority and minority views.
