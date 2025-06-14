@@ -162,7 +162,7 @@ function doGet(e) {
  * サーバー側で設定されたシートのデータを取得します。
  */
 
-function getPublishedSheetData(classFilter, sortMode, forceNamed) {
+function getPublishedSheetData(classFilter, sortMode, isAdmin) {
   sortMode = sortMode || 'score';
   const settings = getAppSettings();
   const sheetName = settings.activeSheetName;
@@ -172,8 +172,7 @@ function getPublishedSheetData(classFilter, sortMode, forceNamed) {
   }
 
   // 既存のgetSheetDataロジックを再利用
-  const displayModeOverride = forceNamed ? 'named' : null;
-  const data = getSheetData(sheetName, classFilter, sortMode, displayModeOverride);
+  const data = getSheetData(sheetName, classFilter, sortMode, !!isAdmin);
 
   // ★改善: フロントエンドでシート名を表示できるよう、レスポンスに含める
   return {
@@ -221,7 +220,7 @@ function getSheets() {
   }
 }
 
-function getSheetData(sheetName, classFilter, sortMode, forceDisplayMode) {
+function getSheetData(sheetName, classFilter, sortMode, isAdmin) {
   sortMode = sortMode || 'score';
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
@@ -236,8 +235,8 @@ function getSheetData(sheetName, classFilter, sortMode, forceDisplayMode) {
   const emailToNameMap = getRosterMap();
   let displayMode = PropertiesService.getScriptProperties()
       .getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous';
-  if (forceDisplayMode === 'named') {
-    displayMode = 'named';
+  if (!isAdmin) {
+    displayMode = 'anonymous';
   }
 
     const filteredRows = dataRows.filter(row => {
