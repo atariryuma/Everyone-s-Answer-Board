@@ -12,6 +12,12 @@
     google.script.run.withSuccessHandler(render).groupSimilarOpinions();
     function render(groups) {
       const container = document.getElementById('groups');
+      if (typeof groups === 'string') {
+        container.innerHTML = '<pre class="whitespace-pre-wrap">' +
+          groups +
+          '</pre>';
+        return;
+      }
       if (!groups || !groups.length) {
         container.innerHTML = '<p>結果がありません。</p>';
         return;
