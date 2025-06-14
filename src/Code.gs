@@ -13,7 +13,8 @@ const COLUMN_HEADERS = {
   REASON: '予想したわけを書きましょう。',
   UNDERSTAND: 'なるほど！',
   SUPPORT: '応援したい！',
-  CURIOUS: 'もっと知りたい！'
+  CURIOUS: 'もっと知りたい！',
+  HIGHLIGHT: 'Highlight'
 };
 const ROSTER_CONFIG = {
   SHEET_NAME: 'sheet 1',
@@ -198,6 +199,8 @@ function getSheetData(sheetName, classFilter, sortMode) {
         const supportArr = supportStr ? supportStr.toString().split(',').filter(Boolean) : [];
         const curiousArr = curiousStr ? curiousStr.toString().split(',').filter(Boolean) : [];
         const reason = row[headerIndices[COLUMN_HEADERS.REASON]] || '';
+        const highlightVal = row[headerIndices[COLUMN_HEADERS.HIGHLIGHT]];
+        const highlight = String(highlightVal).toLowerCase() === 'true';
 
         const reactions = {
           UNDERSTAND: { count: understandArr.length, reacted: userEmail ? understandArr.includes(userEmail) : false },
@@ -216,6 +219,7 @@ function getSheetData(sheetName, classFilter, sortMode) {
           opinion: opinion,
           reason: reason,
           reactions: reactions,
+          highlight: highlight,
           score: totalScore
         };
       }
@@ -266,6 +270,31 @@ function addReaction(rowIndex, reactionKey) {
     return { status: 'ok', reaction: reactionKey, newScore: likers.length };
   } catch (error) {
     console.error('addReaction Error:', error);
+    return { status: 'error', message: `エラーが発生しました: ${error.message}` };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function toggleHighlight(rowIndex) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const settings = getAppSettings();
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(settings.activeSheetName);
+    if (!sheet) throw new Error(`シート '${settings.activeSheetName}' が見つかりません。`);
+
+    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const headerIndices = findHeaderIndices(headerRow, [COLUMN_HEADERS.HIGHLIGHT]);
+    const colIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT] + 1;
+
+    const cell = sheet.getRange(rowIndex, colIndex);
+    const current = !!cell.getValue();
+    const newValue = !current;
+    cell.setValue(newValue);
+    return { status: 'ok', highlight: newValue };
+  } catch (error) {
+    console.error('toggleHighlight Error:', error);
     return { status: 'error', message: `エラーが発生しました: ${error.message}` };
   } finally {
     lock.releaseLock();
