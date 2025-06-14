@@ -454,7 +454,7 @@
                     if (confirm('公開を終了しますか？')) {
                         this.gas.unpublishApp()
                             .then(() => {
-                                window.location.reload();
+                                window.top.location.reload();
                             })
                             .catch(err => alert(err.message || 'エラーが発生しました'));
                     }
