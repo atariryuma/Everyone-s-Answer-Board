@@ -22,6 +22,7 @@ your GAS project.
 - `npm run push` – Upload code in `src/` to the GAS project.
 - `npm run pull` – Download the latest code from GAS.
 - `npm run open` – Open the GAS project in your browser.
+- `npm run update-url` – Save the latest web app URL to script properties.
 
 ## Running tests
 After installing dependencies (`npm install`), run `npm test` to execute Jest tests.
