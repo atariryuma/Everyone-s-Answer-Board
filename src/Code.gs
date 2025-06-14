@@ -398,6 +398,7 @@ if (typeof module !== 'undefined') {
     addReaction,
     getPublishedSheetData,
     getAppSettings
+    toggleHighlight
   };
 }
 
