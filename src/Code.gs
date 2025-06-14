@@ -96,6 +96,7 @@ function publishApp(sheetName) {
 function unpublishApp() {
   const properties = PropertiesService.getScriptProperties();
   properties.setProperty(APP_PROPERTIES.IS_PUBLISHED, 'false');
+  properties.deleteProperty(APP_PROPERTIES.ACTIVE_SHEET);
   return 'アプリを非公開にしました。';
 }
 
