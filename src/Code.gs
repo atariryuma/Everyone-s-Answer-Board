@@ -33,7 +33,8 @@ const SCORING_CONFIG = {
 const APP_PROPERTIES = {
   ACTIVE_SHEET: 'ACTIVE_SHEET_NAME',
   IS_PUBLISHED: 'IS_PUBLISHED',
-  DISPLAY_MODE: 'DISPLAY_MODE'
+  DISPLAY_MODE: 'DISPLAY_MODE',
+  WEB_APP_URL: 'WEB_APP_URL'
 };
 
 
@@ -188,6 +189,21 @@ function getWebAppUrl() {
   } catch (e) {
     return '';
   }
+}
+
+function saveWebAppUrl(url) {
+  if (!url) {
+    try {
+      url = ScriptApp.getService().getUrl();
+    } catch (e) {
+      url = '';
+    }
+  }
+  PropertiesService.getScriptProperties().setProperty(APP_PROPERTIES.WEB_APP_URL, url);
+}
+
+function getWebAppUrlFromProps() {
+  return PropertiesService.getScriptProperties().getProperty(APP_PROPERTIES.WEB_APP_URL) || '';
 }
 
 
@@ -440,6 +456,8 @@ if (typeof module !== 'undefined') {
     toggleHighlight,
     logDebug,
     getWebAppUrl,
+    saveWebAppUrl,
+    getWebAppUrlFromProps,
   };
 }
 
