@@ -29,7 +29,8 @@ const SCORING_CONFIG = {
 };
 const APP_PROPERTIES = {
   ACTIVE_SHEET: 'ACTIVE_SHEET_NAME',
-  IS_PUBLISHED: 'IS_PUBLISHED'
+  IS_PUBLISHED: 'IS_PUBLISHED',
+  DISPLAY_MODE: 'DISPLAY_MODE'
 };
 
 
@@ -70,7 +71,8 @@ function getAdminSettings() {
   return {
     isPublished: properties.getProperty(APP_PROPERTIES.IS_PUBLISHED) === 'true',
     activeSheetName: properties.getProperty(APP_PROPERTIES.ACTIVE_SHEET),
-    allSheets: allSheets
+    allSheets: allSheets,
+    displayMode: properties.getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous'
   };
 }
 
@@ -95,6 +97,17 @@ function unpublishApp() {
   const properties = PropertiesService.getScriptProperties();
   properties.setProperty(APP_PROPERTIES.IS_PUBLISHED, 'false');
   return 'アプリを非公開にしました。';
+}
+
+/**
+ * 表示モードを保存します。
+ * @param {string} mode - 'anonymous' または 'named'
+ */
+function saveDisplayMode(mode) {
+  const properties = PropertiesService.getScriptProperties();
+  const value = mode === 'named' ? 'named' : 'anonymous';
+  properties.setProperty(APP_PROPERTIES.DISPLAY_MODE, value);
+  return `表示モードを${value === 'named' ? '記名' : '匿名'}に設定しました。`;
 }
 
 
@@ -176,10 +189,12 @@ function getSheetData(sheetName, classFilter, sortMode) {
     const allValues = sheet.getDataRange().getValues();
     if (allValues.length < 1) return { header: "シートにデータがありません", rows: [] };
     
-    const userEmail = Session.getActiveUser().getEmail();
-    const headerIndices = getAndCacheHeaderIndices(sheetName, allValues[0]);
-    const dataRows = allValues.slice(1);
-    const emailToNameMap = getRosterMap();
+  const userEmail = Session.getActiveUser().getEmail();
+  const headerIndices = getAndCacheHeaderIndices(sheetName, allValues[0]);
+  const dataRows = allValues.slice(1);
+  const emailToNameMap = getRosterMap();
+  const displayMode = PropertiesService.getScriptProperties()
+      .getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous';
 
     const filteredRows = dataRows.filter(row => {
       if (!classFilter || classFilter === 'すべて') return true;
@@ -212,9 +227,11 @@ function getSheetData(sheetName, classFilter, sortMode) {
         const baseScore = reason.length;
         const likeMultiplier = 1 + (totalReactions * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
         const totalScore = baseScore * likeMultiplier;
+        const actualName = emailToNameMap[email] || email.split('@')[0];
+        const name = displayMode === 'named' ? actualName : '匿名';
         return {
           rowIndex: dataRows.indexOf(row) + 2,
-          name: emailToNameMap[email] || email.split('@')[0],
+          name: name,
           class: row[headerIndices[COLUMN_HEADERS.CLASS]] || '未分類',
           opinion: opinion,
           reason: reason,
@@ -361,7 +378,7 @@ function findHeaderIndices(sheetHeaders, requiredHeaders) {
 
 // Export for Jest testing
 if (typeof module !== 'undefined') {
-  module.exports = { COLUMN_HEADERS, findHeaderIndices, getSheetData, addLike };
+  module.exports = { COLUMN_HEADERS, findHeaderIndices, getSheetData, addReaction };
 }
 
 function clearRosterCache() {

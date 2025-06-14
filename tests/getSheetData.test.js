@@ -27,20 +27,31 @@ function setupMocks(rows, userEmail) {
     getActiveUser: () => ({ getEmail: () => userEmail })
   };
   global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null }) };
+  global.PropertiesService = { getScriptProperties: () => ({ getProperty: () => 'named' }) };
 }
 
 afterEach(() => {
   delete global.SpreadsheetApp;
   delete global.Session;
   delete global.CacheService;
+  delete global.PropertiesService;
 });
 
 test('getSheetData filters and scores rows', () => {
   const data = [
-    [COLUMN_HEADERS.EMAIL, COLUMN_HEADERS.CLASS, COLUMN_HEADERS.OPINION, COLUMN_HEADERS.REASON, COLUMN_HEADERS.LIKES],
-    ['a@example.com', '1-1', 'Opinion1', 'Reason1', 'b@example.com'],
-    ['b@example.com', '1-1', 'Opinion2', 'Reason2', ''],
-    ['', '', '', '', ''] // ignored
+    [
+      COLUMN_HEADERS.EMAIL,
+      COLUMN_HEADERS.CLASS,
+      COLUMN_HEADERS.OPINION,
+      COLUMN_HEADERS.REASON,
+      COLUMN_HEADERS.UNDERSTAND,
+      COLUMN_HEADERS.SUPPORT,
+      COLUMN_HEADERS.CURIOUS,
+      COLUMN_HEADERS.HIGHLIGHT
+    ],
+    ['a@example.com', '1-1', 'Opinion1', 'Reason1', 'b@example.com', '', '', 'false'],
+    ['b@example.com', '1-1', 'Opinion2', 'Reason2', '', '', '', 'false'],
+    ['', '', '', '', '', '', '', ''] // ignored
   ];
   setupMocks(data, 'b@example.com');
 
@@ -49,16 +60,25 @@ test('getSheetData filters and scores rows', () => {
   expect(result.header).toBe(COLUMN_HEADERS.OPINION);
   expect(result.rows).toHaveLength(2);
   expect(result.rows[0].name).toBe('A Alice');
-  expect(result.rows[0].hasLiked).toBe(true);
+  expect(result.rows[0].reactions.UNDERSTAND.reacted).toBe(true);
   expect(result.rows[1].name).toBe('B Bob');
-  expect(result.rows[1].hasLiked).toBe(false);
+  expect(result.rows[1].reactions.UNDERSTAND.reacted).toBe(false);
 });
 
 test('getSheetData sorts by newest when specified', () => {
   const data = [
-    [COLUMN_HEADERS.EMAIL, COLUMN_HEADERS.CLASS, COLUMN_HEADERS.OPINION, COLUMN_HEADERS.REASON, COLUMN_HEADERS.LIKES],
-    ['first@example.com', '1-1', 'Old', 'A', ''],
-    ['second@example.com', '1-1', 'New', 'B', '']
+    [
+      COLUMN_HEADERS.EMAIL,
+      COLUMN_HEADERS.CLASS,
+      COLUMN_HEADERS.OPINION,
+      COLUMN_HEADERS.REASON,
+      COLUMN_HEADERS.UNDERSTAND,
+      COLUMN_HEADERS.SUPPORT,
+      COLUMN_HEADERS.CURIOUS,
+      COLUMN_HEADERS.HIGHLIGHT
+    ],
+    ['first@example.com', '1-1', 'Old', 'A', '', '', '', 'false'],
+    ['second@example.com', '1-1', 'New', 'B', '', '', '', 'false']
   ];
   setupMocks(data, '');
 
