@@ -325,8 +325,20 @@ function clearRosterCache() {
 function getWebAppUrl() {
   try {
     const scriptId = ScriptApp.getScriptId();
-    const url = scriptId ? `https://script.google.com/macros/s/${scriptId}/exec` : '';
-    return url;
+    const list = Script.Deployments.list(scriptId);
+    const deployments = (list && list.deployments) || [];
+    deployments.sort(function(a, b) {
+      return new Date(b.updateTime) - new Date(a.updateTime);
+    });
+    const target = deployments.find(function(d) {
+      return d.entryPoints && d.entryPoints.some(function(p) {
+        return p.webApp;
+      });
+    });
+    if (!target) {
+      throw new Error('Web App deployment not found');
+    }
+    return "https://script.google.com/macros/s/" + target.deploymentId + "/exec";
   } catch (e) {
     console.error('getWebAppUrl Error:', e);
     throw new Error('ウェブアプリのURLを取得できませんでした。');
