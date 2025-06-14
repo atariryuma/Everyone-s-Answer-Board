@@ -34,7 +34,8 @@ const APP_PROPERTIES = {
   ACTIVE_SHEET: 'ACTIVE_SHEET_NAME',
   IS_PUBLISHED: 'IS_PUBLISHED',
   DISPLAY_MODE: 'DISPLAY_MODE',
-  WEB_APP_URL: 'WEB_APP_URL'
+  WEB_APP_URL: 'WEB_APP_URL',
+  ADMIN_EMAILS: 'ADMIN_EMAILS'
 };
 
 
@@ -72,11 +73,14 @@ function showAdminSidebar() {
 function getAdminSettings() {
   const properties = PropertiesService.getScriptProperties();
   const allSheets = getSheets(); // 既存の関数を再利用
+  const adminEmailsRaw = properties.getProperty(APP_PROPERTIES.ADMIN_EMAILS) || '';
+  const adminEmails = adminEmailsRaw ? adminEmailsRaw.split(',').map(e => e.trim()).filter(Boolean) : [];
   return {
     isPublished: properties.getProperty(APP_PROPERTIES.IS_PUBLISHED) === 'true',
     activeSheetName: properties.getProperty(APP_PROPERTIES.ACTIVE_SHEET),
     allSheets: allSheets,
-    displayMode: properties.getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous'
+    displayMode: properties.getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous',
+    adminEmails: adminEmails
   };
 }
 
@@ -116,6 +120,18 @@ function saveDisplayMode(mode) {
   properties.setProperty(APP_PROPERTIES.DISPLAY_MODE, value);
   logDebug(`Display mode set to ${value}`);
   return `表示モードを${value === 'named' ? '記名' : '匿名'}に設定しました。`;
+}
+
+/**
+ * 管理者メールアドレスを保存します。
+ * @param {string} emails - カンマ区切りのメールアドレス文字列
+ */
+function saveAdminEmails(emails) {
+  const properties = PropertiesService.getScriptProperties();
+  const value = (emails || '').split(',').map(e => e.trim()).filter(Boolean).join(',');
+  properties.setProperty(APP_PROPERTIES.ADMIN_EMAILS, value);
+  logDebug(`Admin emails updated: ${value}`);
+  return '管理者メールアドレスを更新しました。';
 }
 
 
