@@ -34,6 +34,10 @@
     .reaction-bg-like { border-color: #facc15; }
     .reaction-bg-understand { border-color: #a3e635; }
     .reaction-bg-curious { border-color: #38bdf8; }
+    .reaction-bg-mixed {
+      border-color: transparent;
+      border-image: linear-gradient(90deg,#facc15,#a3e635,#38bdf8) 1;
+    }
     #controlsFooter { pointer-events: none; }
     #controlsFooter > .glass-panel { pointer-events: auto; }
   </style>
@@ -404,6 +408,8 @@
                 if (active[0] === 'LIKE') card.classList.add('reaction-bg-like');
                 if (active[0] === 'UNDERSTAND') card.classList.add('reaction-bg-understand');
                 if (active[0] === 'CURIOUS') card.classList.add('reaction-bg-curious');
+            } else if (active.length > 1) {
+                card.classList.add('reaction-bg-mixed');
             }
 
             const showCount = isAdmin;
