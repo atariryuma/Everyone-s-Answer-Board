@@ -12,7 +12,7 @@ const COLUMN_HEADERS = {
   OPINION: 'これまでの学んだことや、経験したことから、根からとり入れた水は、植物のからだのどこを通るのか予想しましょう。',
   REASON: '予想したわけを書きましょう。',
   UNDERSTAND: 'なるほど！',
-  SUPPORT: '応援したい！',
+  SUPPORT: 'いいね！',
   CURIOUS: 'もっと知りたい！',
   HIGHLIGHT: 'Highlight'
 };
