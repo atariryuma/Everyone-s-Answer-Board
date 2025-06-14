@@ -148,7 +148,10 @@ function doGet() {
 
 function getPublishedSheetData(classFilter, sortMode) {
   sortMode = sortMode || 'score';
-  const settings = getAppSettings();
+  const useExports = typeof module !== 'undefined' && module.exports;
+  const settings = useExports && module.exports.getAppSettings !== getAppSettings
+      ? module.exports.getAppSettings()
+      : getAppSettings();
   const sheetName = settings.activeSheetName;
 
   if (!sheetName) {
@@ -156,7 +159,9 @@ function getPublishedSheetData(classFilter, sortMode) {
   }
 
   // 既存のgetSheetDataロジックを再利用
-  const data = getSheetData(sheetName, classFilter, sortMode);
+  const data = useExports && module.exports.getSheetData !== getSheetData
+      ? module.exports.getSheetData(sheetName, classFilter, sortMode)
+      : getSheetData(sheetName, classFilter, sortMode);
 
   // ★改善: フロントエンドでシート名を表示できるよう、レスポンスに含める
   return {
@@ -391,6 +396,8 @@ if (typeof module !== 'undefined') {
     findHeaderIndices,
     getSheetData,
     addReaction,
+    getPublishedSheetData,
+    getAppSettings
     toggleHighlight
   };
 }
