@@ -399,16 +399,6 @@ function logDebug(message) {
   } catch (e) {}
 }
 
-function getDebugLog() {
-  if (typeof PropertiesService === 'undefined') return [];
-  try {
-    const props = PropertiesService.getScriptProperties();
-    const raw = props.getProperty('DEBUG_LOG') || '[]';
-    return JSON.parse(raw);
-  } catch (e) {
-    return [];
-  }
-}
 
 // Export for Jest testing
 if (typeof module !== 'undefined') {
@@ -419,7 +409,6 @@ if (typeof module !== 'undefined') {
     addReaction,
     toggleHighlight,
     logDebug,
-    getDebugLog,
   };
 }
 
@@ -434,29 +423,3 @@ function clearRosterCache() {
   } catch (e) { /* no-op */ }
 }
 
-/**
- * 公開中のウェブアプリのURLを取得します。
- * @return {string} ウェブアプリのURL
- */
-function getWebAppUrl() {
-  try {
-    const scriptId = ScriptApp.getScriptId();
-    const list = Script.Deployments.list(scriptId);
-    const deployments = (list && list.deployments) || [];
-    deployments.sort(function(a, b) {
-      return new Date(b.updateTime) - new Date(a.updateTime);
-    });
-    const target = deployments.find(function(d) {
-      return d.entryPoints && d.entryPoints.some(function(p) {
-        return p.webApp;
-      });
-    });
-    if (!target) {
-      throw new Error('Web App deployment not found');
-    }
-    return "https://script.google.com/macros/s/" + target.deploymentId + "/exec";
-  } catch (e) {
-    console.error('getWebAppUrl Error:', e);
-    throw new Error('ウェブアプリのURLを取得できませんでした。');
-  }
-}
