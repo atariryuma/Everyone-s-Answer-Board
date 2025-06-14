@@ -9,3 +9,9 @@ test('findHeaderIndices returns indices for existing headers', () => {
 test('findHeaderIndices throws for missing headers', () => {
   expect(() => findHeaderIndices(['X'], ['X', 'Y'])).toThrow('必須ヘッダーが見つかりません');
 });
+
+test('findHeaderIndices ignores whitespace differences', () => {
+  const headers = ['A B', ' C\nD '];
+  const required = ['AB', 'CD'];
+  expect(findHeaderIndices(headers, required)).toEqual({ AB:0, CD:1 });
+});

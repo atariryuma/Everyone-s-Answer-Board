@@ -366,13 +366,20 @@ function getAndCacheHeaderIndices(sheetName, headerRow) {
 
 function findHeaderIndices(sheetHeaders, requiredHeaders) {
   const indices = {};
-  const trimmedSheetHeaders = sheetHeaders.map(h => (typeof h === 'string' ? h.trim() : h));
+  const normalize = h => (typeof h === 'string' ? h.replace(/\s+/g, '') : h);
+  const normalizedHeaders = sheetHeaders.map(normalize);
   const missingHeaders = [];
   requiredHeaders.forEach(headerName => {
-    const index = trimmedSheetHeaders.indexOf(headerName);
-    if (index !== -1) { indices[headerName] = index; } else { missingHeaders.push(headerName); }
+    const index = normalizedHeaders.indexOf(normalize(headerName));
+    if (index !== -1) {
+      indices[headerName] = index;
+    } else {
+      missingHeaders.push(headerName);
+    }
   });
-  if (missingHeaders.length > 0) { throw new Error(`必須ヘッダーが見つかりません: [${missingHeaders.join(', ')}]`); }
+  if (missingHeaders.length > 0) {
+    throw new Error(`必須ヘッダーが見つかりません: [${missingHeaders.join(', ')}]`);
+  }
   return indices;
 }
 
