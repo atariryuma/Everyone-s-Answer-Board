@@ -43,6 +43,9 @@ function onOpen() {
       .addSeparator()
       .addItem('名簿キャッシュをリセット', 'clearRosterCache')
       .addToUi();
+
+  // スプレッドシートを開いたら自動で管理パネルを表示
+  showAdminSidebar();
 }
 
 /**
@@ -313,4 +316,18 @@ function clearRosterCache() {
   try {
     SpreadsheetApp.getUi().alert('名簿のキャッシュをリセットしました。');
   } catch (e) { /* no-op */ }
+}
+
+/**
+ * 公開中のウェブアプリのURLを取得します。
+ * @return {string} ウェブアプリのURL
+ */
+function getWebAppUrl() {
+  try {
+    const url = ScriptApp.getService().getUrl();
+    return url || '';
+  } catch (e) {
+    console.error('getWebAppUrl Error:', e);
+    throw new Error('ウェブアプリのURLを取得できませんでした。');
+  }
 }
