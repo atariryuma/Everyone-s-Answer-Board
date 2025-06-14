@@ -42,8 +42,7 @@ Use the "Open as administrator" link in the sheet selector sidebar to launch the
 
 ## Additional admin tools
 
-- **Word cloud** – From the sheet selector sidebar click the *単語クラウド* link to open a page showing a word cloud of all answers. The data is produced by the `generateWordCloudData` GAS function which uses `LanguageApp` for Japanese morphological analysis.
-- **Opinion groups** – The *意見グループ* link groups similar answers together. The `groupSimilarOpinions` function sends all opinions to an external service (replace the example URL with your own) and displays the returned clusters.
+- **Opinion groups** – The *意見グループ* link groups similar answers together. The `groupSimilarOpinions` function uses Gemini API to analyze all opinions and reasons and returns a summary of majority and minority views.
 
 
 ## Continuous Integration
