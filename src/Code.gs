@@ -133,6 +133,20 @@ function doGet(e) {
 
   const isAdmin = e && e.parameter && e.parameter.admin === '1';
 
+  if (isAdmin && e && e.parameter && e.parameter.wordcloud === '1') {
+    const t = HtmlService.createTemplateFromFile('WordCloud');
+    return t.evaluate()
+            .setTitle('単語クラウド')
+            .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
+
+  if (isAdmin && e && e.parameter && e.parameter.groups === '1') {
+    const t = HtmlService.createTemplateFromFile('OpinionGroups');
+    return t.evaluate()
+            .setTitle('意見のグループ化')
+            .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
+
   if (!settings.isPublished) {
     const template = HtmlService.createTemplateFromFile('Unpublished');
     template.userEmail = userEmail;
@@ -163,7 +177,7 @@ function doGet(e) {
  */
 
 function getPublishedSheetData(classFilter, sortMode, isAdmin) {
-  sortMode = sortMode || 'score';
+  sortMode = sortMode || 'newest';
   const settings = getAppSettings();
   const sheetName = settings.activeSheetName;
 
@@ -180,6 +194,59 @@ function getPublishedSheetData(classFilter, sortMode, isAdmin) {
     header: data.header,
     rows: data.rows
   };
+}
+
+function generateWordCloudData() {
+  const settings = getAppSettings();
+  const sheetName = settings.activeSheetName;
+  if (!sheetName) throw new Error('表示するシートが設定されていません。');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return [];
+  const indices = findHeaderIndices(values[0], [COLUMN_HEADERS.OPINION, COLUMN_HEADERS.REASON]);
+  const texts = values.slice(1).map(r =>
+    [r[indices[COLUMN_HEADERS.OPINION]], r[indices[COLUMN_HEADERS.REASON]]].join(' ')
+  ).join(' ');
+  let tokens = [];
+  try {
+    const res = LanguageApp.analyzeSyntax(texts, 'ja');
+    tokens = res.getTokens().map(t => t.getLemma ? t.getLemma() : t.getText());
+  } catch (e) {
+    tokens = texts.split(/\s+/);
+  }
+  const freq = {};
+  tokens.forEach(w => {
+    const word = String(w).replace(/[\p{P}\p{S}]/gu, '');
+    if (word.length > 1) freq[word] = (freq[word] || 0) + 1;
+  });
+  return Object.keys(freq).map(k => ({ text: k, count: freq[k] })).sort((a,b) => b.count - a.count);
+}
+
+function groupSimilarOpinions() {
+  const settings = getAppSettings();
+  const sheetName = settings.activeSheetName;
+  if (!sheetName) throw new Error('表示するシートが設定されていません。');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return [];
+  const idx = findHeaderIndices(values[0], [COLUMN_HEADERS.OPINION]);
+  const opinions = values.slice(1).map(r => r[idx[COLUMN_HEADERS.OPINION]]).filter(Boolean);
+
+  const payload = JSON.stringify({ opinions });
+  try {
+    const res = UrlFetchApp.fetch('https://example.com/api/group', {
+      method: 'post',
+      contentType: 'application/json',
+      payload: payload,
+      muteHttpExceptions: true
+    });
+    return JSON.parse(res.getContentText());
+  } catch (e) {
+    console.error('groupSimilarOpinions error', e);
+    return [];
+  }
 }
 
 function getWebAppUrl() {
@@ -221,7 +288,7 @@ function getSheets() {
 }
 
 function getSheetData(sheetName, classFilter, sortMode, isAdmin) {
-  sortMode = sortMode || 'score';
+  sortMode = sortMode || 'newest';
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
     if (!sheet) throw new Error(`指定されたシート「${sheetName}」が見つかりません。`);
@@ -453,6 +520,8 @@ if (typeof module !== 'undefined') {
     getSheetData,
     addReaction,
     toggleHighlight,
+    generateWordCloudData,
+    groupSimilarOpinions,
     logDebug,
     getWebAppUrl,
     saveWebAppUrl,

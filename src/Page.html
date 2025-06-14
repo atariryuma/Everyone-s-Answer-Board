@@ -26,6 +26,9 @@
     .like-btn.liked svg { stroke: transparent; fill: #facc15; transform: scale(1.1); }
     .answer-card.highlighted { border-color: #facc15; box-shadow: 0 0 15px rgba(250, 204, 21, 0.4); }
     .highlight-badge { position: absolute; top: 0.25rem; right: 0.25rem; }
+    .reaction-bg-like { background-color: rgba(251, 146, 60, 0.2); }
+    .reaction-bg-understand { background-color: rgba(34, 197, 94, 0.2); }
+    .reaction-bg-curious { background-color: rgba(59, 130, 246, 0.2); }
     #controlsFooter { pointer-events: none; }
     #controlsFooter > .glass-panel { pointer-events: auto; }
   </style>
@@ -38,8 +41,7 @@
             <p id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0"></p>
             <select id="classFilter" class="hidden text-sm"></select>
             <select id="sortMode" class="text-sm">
-                <option value="score">スコア順</option>
-                <option value="newest">新着順</option>
+                <option value="newest" selected>新着順</option>
                 <option value="random">ランダム</option>
             </select>
         </div>
@@ -385,6 +387,23 @@
             card.className = 'answer-card relative glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer opacity-0' + highlightClass;
             card.dataset.rowIndex = data.rowIndex;
 
+            const colors = {
+                SUPPORT: 'rgba(251,146,60,0.25)',
+                UNDERSTAND: 'rgba(34,197,94,0.25)',
+                CURIOUS: 'rgba(59,130,246,0.25)'
+            };
+            const active = this.reactionTypes
+                .filter(rt => data.reactions && data.reactions[rt.key] && data.reactions[rt.key].count > 0)
+                .map(rt => rt.key);
+            if (active.length === 1) {
+                if (active[0] === 'SUPPORT') card.classList.add('reaction-bg-like');
+                if (active[0] === 'UNDERSTAND') card.classList.add('reaction-bg-understand');
+                if (active[0] === 'CURIOUS') card.classList.add('reaction-bg-curious');
+            } else if (active.length > 1) {
+                const gradient = active.map(k => colors[k]).join(', ');
+                card.style.background = `linear-gradient(135deg, ${gradient})`;
+            }
+
             const reactionButtons = this.reactionTypes.map(rt => {
                 const rData = data.reactions ? data.reactions[rt.key] || { count: 0, reacted: false } : { count: 0, reacted: false };
                 const btnClass = rData.reacted ? 'liked' : '';
@@ -465,8 +484,6 @@
                             this.state.currentAnswers.sort((a, b) => b.rowIndex - a.rowIndex);
                         } else if (mode === 'random') {
                             this.state.currentAnswers.sort(() => Math.random() - 0.5);
-                        } else { // 'score' or default
-                            this.state.currentAnswers.sort((a, b) => b.score - a.score);
                         }
 
                         this.updateReactionButtonUI(rowIndex, reaction, rData.count, rData.reacted);
