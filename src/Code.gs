@@ -87,6 +87,7 @@ function publishApp(sheetName) {
   const properties = PropertiesService.getScriptProperties();
   properties.setProperty(APP_PROPERTIES.IS_PUBLISHED, 'true');
   properties.setProperty(APP_PROPERTIES.ACTIVE_SHEET, sheetName);
+  logDebug(`Published sheet: ${sheetName}`);
   return `「${sheetName}」を公開しました。`;
 }
 
@@ -97,6 +98,7 @@ function unpublishApp() {
   const properties = PropertiesService.getScriptProperties();
   properties.setProperty(APP_PROPERTIES.IS_PUBLISHED, 'false');
   properties.deleteProperty(APP_PROPERTIES.ACTIVE_SHEET);
+  logDebug('Unpublished app');
   return 'アプリを非公開にしました。';
 }
 
@@ -108,6 +110,7 @@ function saveDisplayMode(mode) {
   const properties = PropertiesService.getScriptProperties();
   const value = mode === 'named' ? 'named' : 'anonymous';
   properties.setProperty(APP_PROPERTIES.DISPLAY_MODE, value);
+  logDebug(`Display mode set to ${value}`);
   return `表示モードを${value === 'named' ? '記名' : '匿名'}に設定しました。`;
 }
 
@@ -384,6 +387,29 @@ function findHeaderIndices(sheetHeaders, requiredHeaders) {
   return indices;
 }
 
+function logDebug(message) {
+  if (typeof PropertiesService === 'undefined') return;
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const raw = props.getProperty('DEBUG_LOG') || '[]';
+    const logs = JSON.parse(raw);
+    logs.push(`${new Date().toISOString()} ${message}`);
+    while (logs.length > 200) logs.shift();
+    props.setProperty('DEBUG_LOG', JSON.stringify(logs));
+  } catch (e) {}
+}
+
+function getDebugLog() {
+  if (typeof PropertiesService === 'undefined') return [];
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const raw = props.getProperty('DEBUG_LOG') || '[]';
+    return JSON.parse(raw);
+  } catch (e) {
+    return [];
+  }
+}
+
 // Export for Jest testing
 if (typeof module !== 'undefined') {
   module.exports = {
@@ -392,6 +418,8 @@ if (typeof module !== 'undefined') {
     getSheetData,
     addReaction,
     toggleHighlight,
+    logDebug,
+    getDebugLog,
   };
 }
 
@@ -400,6 +428,7 @@ function clearRosterCache() {
   const cacheKey = ROSTER_CONFIG.CACHE_KEY;
   cache.remove(cacheKey);
   console.log(`名簿キャッシュ（キー: ${cacheKey}）を削除しました。`);
+  logDebug('Roster cache cleared');
   try {
     SpreadsheetApp.getUi().alert('名簿のキャッシュをリセットしました。');
   } catch (e) { /* no-op */ }
