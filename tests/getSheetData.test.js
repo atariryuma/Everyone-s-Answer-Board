@@ -1,13 +1,4 @@
-const { getSheetData } = require('../src/Code.gs');
-
-// Japanese column headers copied from Code.gs
-const HEADERS = {
-  EMAIL: 'メールアドレス',
-  CLASS: 'クラスを選択してください。',
-  OPINION: 'これまでの学んだことや、経験したことから、根からとり入れた水は、植物のからだのどこを通るのか予想しましょう。',
-  REASON: '予想したわけを書きましょう。',
-  LIKES: 'いいね！'
-};
+const { getSheetData, COLUMN_HEADERS } = require('../src/Code.gs');
 
 function setupMocks(rows, userEmail) {
   const rosterHeaders = ['姓', '名', 'ニックネーム', 'Googleアカウント'];
@@ -46,7 +37,7 @@ afterEach(() => {
 
 test('getSheetData filters and scores rows', () => {
   const data = [
-    [HEADERS.EMAIL, HEADERS.CLASS, HEADERS.OPINION, HEADERS.REASON, HEADERS.LIKES],
+    [COLUMN_HEADERS.EMAIL, COLUMN_HEADERS.CLASS, COLUMN_HEADERS.OPINION, COLUMN_HEADERS.REASON, COLUMN_HEADERS.LIKES],
     ['a@example.com', '1-1', 'Opinion1', 'Reason1', 'b@example.com'],
     ['b@example.com', '1-1', 'Opinion2', 'Reason2', ''],
     ['', '', '', '', ''] // ignored
@@ -55,10 +46,23 @@ test('getSheetData filters and scores rows', () => {
 
   const result = getSheetData('Sheet1');
 
-  expect(result.header).toBe(HEADERS.OPINION);
+  expect(result.header).toBe(COLUMN_HEADERS.OPINION);
   expect(result.rows).toHaveLength(2);
   expect(result.rows[0].name).toBe('A Alice');
   expect(result.rows[0].hasLiked).toBe(true);
   expect(result.rows[1].name).toBe('B Bob');
   expect(result.rows[1].hasLiked).toBe(false);
+});
+
+test('getSheetData sorts by newest when specified', () => {
+  const data = [
+    [COLUMN_HEADERS.EMAIL, COLUMN_HEADERS.CLASS, COLUMN_HEADERS.OPINION, COLUMN_HEADERS.REASON, COLUMN_HEADERS.LIKES],
+    ['first@example.com', '1-1', 'Old', 'A', ''],
+    ['second@example.com', '1-1', 'New', 'B', '']
+  ];
+  setupMocks(data, '');
+
+  const result = getSheetData('Sheet1', undefined, 'newest');
+
+  expect(result.rows.map(r => r.rowIndex)).toEqual([3, 2]);
 });

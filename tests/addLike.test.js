@@ -1,16 +1,7 @@
-const { addLike } = require('../src/Code.gs');
-
-// headers copied from Code.gs
-const HEADERS = {
-  EMAIL: 'メールアドレス',
-  CLASS: 'クラスを選択してください。',
-  OPINION: 'これまでの学んだことや、経験したことから、根からとり入れた水は、植物のからだのどこを通るのか予想しましょう。',
-  REASON: '予想したわけを書きましょう。',
-  LIKES: 'いいね！'
-};
+const { addLike, COLUMN_HEADERS } = require('../src/Code.gs');
 
 function buildSheet() {
-  const headerRow = [HEADERS.EMAIL, HEADERS.CLASS, HEADERS.OPINION, HEADERS.REASON, HEADERS.LIKES];
+  const headerRow = [COLUMN_HEADERS.EMAIL, COLUMN_HEADERS.CLASS, COLUMN_HEADERS.OPINION, COLUMN_HEADERS.REASON, COLUMN_HEADERS.LIKES];
   let likeValue = 'a@example.com';
   return {
     getLastColumn: () => headerRow.length,
@@ -42,7 +33,7 @@ afterEach(() => {
   delete global.SpreadsheetApp;
 });
 
- test('addLike toggles user in list', () => {
+test('addLike toggles user in list', () => {
   const sheet = buildSheet();
   setupMocks('b@example.com', sheet);
 
@@ -53,4 +44,12 @@ afterEach(() => {
   const result2 = addLike(2);
   expect(result2.status).toBe('ok');
   expect(result2.newScore).toBe(1);
+});
+
+test('addLike errors when user email is empty', () => {
+  const sheet = buildSheet();
+  setupMocks('', sheet);
+
+  const result = addLike(2);
+  expect(result.status).toBe('error');
 });
