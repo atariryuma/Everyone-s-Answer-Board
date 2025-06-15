@@ -47,12 +47,12 @@ test('admin default shows Unpublished when not published', () => {
   expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Unpublished');
 });
 
-test('mode=student forces non-admin view', () => {
+test('mode=admin enables admin view', () => {
   const { getTemplate } = setup({ isPublished: true });
-  const e = { parameter: { mode: 'student' } };
+  const e = { parameter: { mode: 'admin' } };
   doGet(e);
   const template = getTemplate();
   expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Page');
-  expect(template.isAdmin).toBe(false);
+  expect(template.isAdmin).toBe(true);
 });
 

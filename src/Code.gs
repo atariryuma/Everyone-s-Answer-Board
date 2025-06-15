@@ -176,8 +176,8 @@ function doGet(e) {
   const adminEmails = getAdminEmails();
   const userIsAdmin = adminEmails.includes(userEmail);
   const view = e && e.parameter && e.parameter.view;
-  const forceStudent = e && e.parameter && e.parameter.mode === 'student';
-  const isAdmin = userIsAdmin && !forceStudent;
+  const forceAdmin = e && e.parameter && e.parameter.mode === 'admin';
+  const isAdmin = userIsAdmin && forceAdmin;
 
   if (!settings.isPublished && !(userIsAdmin && view === 'board')) {
     const template = HtmlService.createTemplateFromFile('Unpublished');
@@ -209,7 +209,7 @@ function doGet(e) {
  * サーバー側で設定されたシートのデータを取得します。
  */
 
-function getPublishedSheetData(classFilter, sortMode) {
+function getPublishedSheetData(classFilter, sortMode, adminOverride) {
   sortMode = sortMode || 'newest';
   const settings = getAppSettings();
   const sheetName = settings.activeSheetName;
@@ -219,7 +219,7 @@ function getPublishedSheetData(classFilter, sortMode) {
   }
 
   // 既存のgetSheetDataロジックを再利用
-  const data = getSheetData(sheetName, classFilter, sortMode);
+  const data = getSheetData(sheetName, classFilter, sortMode, adminOverride);
 
   // ★改善: フロントエンドでシート名を表示できるよう、レスポンスに含める
   return {
@@ -253,13 +253,13 @@ function getWebAppUrlFromProps() {
   return PropertiesService.getScriptProperties().getProperty(APP_PROPERTIES.WEB_APP_URL) || '';
 }
 
-function getSheetUpdates(classFilter, sortMode, clientHashesJson) {
+function getSheetUpdates(classFilter, sortMode, clientHashesJson, adminOverride) {
   const settings = getAppSettings();
   const sheetName = settings.activeSheetName;
   if (!sheetName) {
     throw new Error('表示するシートが設定されていません。');
   }
-  const data = getSheetData(sheetName, classFilter, sortMode);
+  const data = getSheetData(sheetName, classFilter, sortMode, adminOverride);
   const clientMap = clientHashesJson ? JSON.parse(clientHashesJson) : {};
   const changedRows = [];
   const newMap = {};
@@ -299,9 +299,9 @@ function getSheets() {
   }
 }
 
-function getSheetData(sheetName, classFilter, sortMode) {
+function getSheetData(sheetName, classFilter, sortMode, adminOverride) {
   sortMode = sortMode || 'newest';
-  const isAdmin = isUserAdmin();
+  const isAdmin = typeof adminOverride === 'boolean' ? adminOverride : isUserAdmin();
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
     if (!sheet) throw new Error(`指定されたシート「${sheetName}」が見つかりません。`);
