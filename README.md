@@ -46,9 +46,9 @@ Administrators see a star button on each answer card allowing them to toggle thi
 
 ### Student view for administrators
 
-Administrators can force the standard student interface by appending `mode=student`
-to the web app URL. This is useful when projecting the board while keeping admin
-features on your personal device.
+Administrators normally see the same student interface. To enable admin
+features, append `mode=admin` to the web app URL. This is useful when projecting
+the board while keeping the standard view elsewhere.
 
 ## Continuous Integration
 
