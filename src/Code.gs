@@ -66,19 +66,9 @@ function saveSettings(settings) {
 function onOpen() {
   SpreadsheetApp.getUi()
       .createMenu('アプリ管理')
-      .addItem('管理パネルを開く', 'showAdminSidebar')
       .addSeparator()
       .addToUi();
 
-}
-
-/**
- * 管理用サイドバーを表示します。
- */
-function showAdminSidebar() {
-  const html = HtmlService.createHtmlOutputFromFile('SheetSelector')
-      .setTitle('管理パネル');
-  SpreadsheetApp.getUi().showSidebar(html);
 }
 
 /**
