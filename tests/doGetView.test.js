@@ -34,7 +34,7 @@ test('admin view=board shows Page template even when unpublished', () => {
 
 test('admin without board view shows Unpublished', () => {
   setup({ isPublished: true });
-  const e = {};
+  const e = { parameter: {} };
   doGet(e);
   expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Unpublished');
 });
