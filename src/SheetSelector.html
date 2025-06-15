@@ -117,12 +117,13 @@
             elements.openAdmin.href = url + '?admin=1';
             elements.openGroups.href = url + '?admin=1&groups=1';
           } else {
-            google.script.run.withSuccessHandler(fallback => {
-              if (fallback) {
-                elements.openAdmin.href = fallback + '?admin=1';
-                elements.openGroups.href = fallback + '?admin=1&groups=1';
-              }
-            }).getWebAppUrl();
+            const deploymentId = prompt('Webアプリのデプロイ ID を入力してください');
+            if (deploymentId) {
+              const newUrl = `https://script.google.com/macros/s/${deploymentId}/exec`;
+              google.script.run.saveWebAppUrl(newUrl);
+              elements.openAdmin.href = newUrl + '?admin=1';
+              elements.openGroups.href = newUrl + '?admin=1&groups=1';
+            }
           }
         }).getWebAppUrlFromProps();
       });
