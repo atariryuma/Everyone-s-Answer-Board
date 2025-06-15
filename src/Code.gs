@@ -262,6 +262,37 @@ function getWebAppUrlFromProps() {
   return PropertiesService.getScriptProperties().getProperty(APP_PROPERTIES.WEB_APP_URL) || '';
 }
 
+function getSheetUpdates(classFilter, sortMode, clientHashesJson) {
+  const settings = getAppSettings();
+  const sheetName = settings.activeSheetName;
+  if (!sheetName) {
+    throw new Error('表示するシートが設定されていません。');
+  }
+  const data = getSheetData(sheetName, classFilter, sortMode);
+  const clientMap = clientHashesJson ? JSON.parse(clientHashesJson) : {};
+  const changedRows = [];
+  const newMap = {};
+  data.rows.forEach(row => {
+    const hash = Utilities.base64Encode(
+      Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify(row))
+    );
+    newMap[row.rowIndex] = hash;
+    if (clientMap[String(row.rowIndex)] !== hash) {
+      changedRows.push(Object.assign({ hash: hash }, row));
+    }
+  });
+  const removedRows = Object.keys(clientMap)
+    .filter(k => !newMap[k])
+    .map(k => parseInt(k, 10));
+  return {
+    sheetName: sheetName,
+    header: data.header,
+    changedRows: changedRows,
+    removedRows: removedRows,
+    hashMap: newMap,
+  };
+}
+
 
 // =================================================================
 // 内部処理関数
@@ -544,7 +575,8 @@ if (typeof module !== 'undefined') {
     saveScoreSortSetting,
     getAppSettings,
     getWebAppUrl,
-    saveWebAppUrl,
-    getWebAppUrlFromProps,
+  saveWebAppUrl,
+  getWebAppUrlFromProps,
+  getSheetUpdates,
   };
 }
