@@ -77,6 +77,9 @@ function onOpen() {
  * @returns {object} - 現在の公開状態とシートのリスト
  */
 function getAdminSettings() {
+  if (!isUserAdmin()) {
+    throw new Error('管理者のみ実行できます。');
+  }
   const properties = PropertiesService.getScriptProperties();
   const allSheets = getSheets(); // 既存の関数を再利用
   const adminEmailsRaw = properties.getProperty(APP_PROPERTIES.ADMIN_EMAILS) || '';
