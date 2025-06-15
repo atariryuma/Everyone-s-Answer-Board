@@ -19,7 +19,16 @@ function buildSheet() {
 
 function setupMocks(sheet) {
   global.LockService = { getScriptLock: () => ({ waitLock: jest.fn(), releaseLock: jest.fn() }) };
-  global.PropertiesService = { getScriptProperties: () => ({ getProperty: () => 'Sheet1' }) };
+  global.PropertiesService = {
+    getScriptProperties: () => ({
+      getProperty: (key) => {
+        if (key === 'ADMIN_EMAILS') return 'admin@example.com';
+        if (key === 'ACTIVE_SHEET_NAME') return 'Sheet1';
+        return 'Sheet1';
+      }
+    })
+  };
+  global.Session = { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) };
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({ getSheetByName: () => sheet })
   };
@@ -29,6 +38,7 @@ afterEach(() => {
   delete global.LockService;
   delete global.PropertiesService;
   delete global.SpreadsheetApp;
+  delete global.Session;
 });
 
 test('toggleHighlight flips stored value', () => {

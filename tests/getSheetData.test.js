@@ -1,6 +1,6 @@
 const { getSheetData, COLUMN_HEADERS } = require('../src/Code.gs');
 
-function setupMocks(rows, userEmail) {
+function setupMocks(rows, userEmail, adminEmails = '') {
   const rosterHeaders = ['姓', '名', 'ニックネーム', 'Googleアカウント'];
   const rosterRows = [
     ['A', 'Alice', '', 'a@example.com'],
@@ -27,7 +27,15 @@ function setupMocks(rows, userEmail) {
     getActiveUser: () => ({ getEmail: () => userEmail })
   };
   global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null }) };
-  global.PropertiesService = { getScriptProperties: () => ({ getProperty: () => 'named' }) };
+  global.PropertiesService = {
+    getScriptProperties: () => ({
+      getProperty: (key) => {
+        if (key === 'DISPLAY_MODE') return 'named';
+        if (key === 'ADMIN_EMAILS') return adminEmails;
+        return null;
+      }
+    })
+  };
 }
 
 afterEach(() => {
@@ -53,9 +61,9 @@ test('getSheetData filters and scores rows', () => {
     ['b@example.com', '1-1', 'Opinion2', 'Reason2', '', '', '', 'false'],
     ['', '', '', '', '', '', '', ''] // ignored
   ];
-  setupMocks(data, 'b@example.com');
+  setupMocks(data, 'b@example.com', 'b@example.com');
 
-  const result = getSheetData('Sheet1', undefined, 'score', true);
+  const result = getSheetData('Sheet1', undefined, 'score');
 
   expect(result.header).toBe(COLUMN_HEADERS.OPINION);
   expect(result.rows).toHaveLength(2);
@@ -80,9 +88,9 @@ test('getSheetData sorts by newest when specified', () => {
     ['first@example.com', '1-1', 'Old', 'A', '', '', '', 'false'],
     ['second@example.com', '1-1', 'New', 'B', '', '', '', 'false']
   ];
-  setupMocks(data, '');
+  setupMocks(data, '', '');
 
-  const result = getSheetData('Sheet1', undefined, 'newest', true);
+  const result = getSheetData('Sheet1', undefined, 'newest');
 
   expect(result.rows.map(r => r.rowIndex)).toEqual([3, 2]);
 });
@@ -101,9 +109,9 @@ test('getSheetData forces anonymous mode for non-admin', () => {
     ],
     ['a@example.com', '1-1', 'Opinion1', 'Reason1', '', '', '', 'false']
   ];
-  setupMocks(data, 'a@example.com');
+  setupMocks(data, 'a@example.com', '');
 
-  const result = getSheetData('Sheet1', undefined, undefined, false);
+  const result = getSheetData('Sheet1', undefined, undefined);
 
   expect(result.rows[0].name).toBe('匿名');
 });
