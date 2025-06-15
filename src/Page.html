@@ -267,8 +267,11 @@
                         } else if (funcName === 'addReaction') {
                             resolve({
                                 status: 'ok',
-                                reaction: args[1] || 'UNDERSTAND',
-                                newScore: Math.floor(Math.random() * 10) + 1
+                                reactions: {
+                                    UNDERSTAND: { count: Math.floor(Math.random() * 5), reacted: false },
+                                    LIKE: { count: Math.floor(Math.random() * 5), reacted: false },
+                                    CURIOUS: { count: Math.floor(Math.random() * 5), reacted: true }
+                                }
                             });
                         } else if (funcName === 'unpublishApp') {
                             resolve('unpublished');
@@ -503,28 +506,12 @@
                 if (res && res.status === 'ok') {
                     const oldAnswers = [...this.state.currentAnswers];
                     const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
-                    if (item && item.reactions && item.reactions[reaction]) {
-                        const previous = this.reactionTypes
-                            .filter(rt => rt.key !== reaction && item.reactions[rt.key] && item.reactions[rt.key].reacted);
-
-                        const rData = item.reactions[reaction];
-                        const wasReacted = rData.reacted;
-                        rData.count = res.newScore;
-                        rData.reacted = !wasReacted;
-
-                        previous.forEach(rt => {
-                            const pr = item.reactions[rt.key];
-                            if (pr && pr.reacted) {
-                                pr.reacted = false;
-                                if (pr.count > 0) pr.count -= 1;
-                                this.updateReactionButtonUI(rowIndex, rt.key, pr.count, false);
-                            }
-                        });
+                    if (item && res.reactions) {
+                        item.reactions = res.reactions;
 
                         const total = Object.values(item.reactions).reduce((sum, r) => sum + r.count, 0);
                         item.score = item.reason.length * (1 + total * 0.05);
 
-                        // 並び替え機能のロジックをここに統合
                         const mode = this.elements.sortMode.value;
                         if (mode === 'newest') {
                             this.state.currentAnswers.sort((a, b) => b.rowIndex - a.rowIndex);
@@ -532,7 +519,11 @@
                             this.state.currentAnswers.sort(() => Math.random() - 0.5);
                         }
 
-                        this.updateReactionButtonUI(rowIndex, reaction, rData.count, rData.reacted);
+                        Object.keys(item.reactions).forEach(key => {
+                            const r = item.reactions[key];
+                            this.updateReactionButtonUI(rowIndex, key, r.count, r.reacted);
+                        });
+
                         this.renderBoard(false, oldAnswers);
                     }
                 } else if (res && res.message) {
