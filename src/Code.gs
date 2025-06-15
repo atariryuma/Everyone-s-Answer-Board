@@ -534,6 +534,7 @@ if (typeof module !== 'undefined') {
     COLUMN_HEADERS,
     findHeaderIndices,
     getSheetData,
+    getAdminSettings,
     addReaction,
     toggleHighlight,
     groupSimilarOpinions,
