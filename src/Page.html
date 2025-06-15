@@ -31,9 +31,18 @@
     .like-btn.liked[data-reaction="CURIOUS"] svg { stroke: transparent; fill: #38bdf8; transform: scale(1.1); }
     .answer-card.highlighted { border-color: #facc15; box-shadow: 0 0 15px rgba(250, 204, 21, 0.4); }
     .highlight-badge { position: absolute; top: 0.25rem; right: 0.25rem; }
-    .reaction-bg-like { border-color: #facc15; }
-    .reaction-bg-understand { border-color: #a3e635; }
-    .reaction-bg-curious { border-color: #38bdf8; }
+    .reaction-bg-like {
+      border-color: transparent;
+      border-image: linear-gradient(to bottom, #facc15, #fcd34d) 1;
+    }
+    .reaction-bg-understand {
+      border-color: transparent;
+      border-image: linear-gradient(to bottom, #a3e635, #bef264) 1;
+    }
+    .reaction-bg-curious {
+      border-color: transparent;
+      border-image: linear-gradient(to bottom, #38bdf8, #7dd3fc) 1;
+    }
     .reaction-bg-mixed {
       border-color: transparent;
       border-image: linear-gradient(90deg,#facc15,#a3e635,#38bdf8) 1;
