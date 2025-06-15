@@ -67,9 +67,6 @@
       <div class="mt-6 text-right">
         <a id="open-admin" href="#" target="_blank" style="display:none" class="text-blue-600 underline">管理者として開く</a>
       </div>
-      <div class="mt-2 text-right">
-        <a id="open-groups" href="#" target="_blank" style="display:none" class="text-blue-600 underline text-sm">意見グループ</a>
-      </div>
 
     </div>
 
@@ -83,7 +80,6 @@
         modeAnonymous: document.getElementById('mode-anonymous'),
         modeNamed: document.getElementById('mode-named'),
         openAdmin: document.getElementById('open-admin'),
-        openGroups: document.getElementById('open-groups'),
         adminEmails: document.getElementById('admin-emails'),
         saveAdminEmailsBtn: document.getElementById('save-admin-emails-btn')
       };
@@ -115,14 +111,12 @@
         google.script.run.withSuccessHandler(url => {
           if (url) {
             elements.openAdmin.href = url + '?admin=1';
-            elements.openGroups.href = url + '?admin=1&groups=1';
           } else {
             const deploymentId = prompt('Webアプリのデプロイ ID を入力してください');
             if (deploymentId) {
               const newUrl = `https://script.google.com/macros/s/${deploymentId}/exec`;
               google.script.run.saveWebAppUrl(newUrl);
               elements.openAdmin.href = newUrl + '?admin=1';
-              elements.openGroups.href = newUrl + '?admin=1&groups=1';
             }
           }
         }).getWebAppUrlFromProps();
@@ -148,7 +142,6 @@
         elements.adminEmails.value = (status.adminEmails || []).join(',');
         const isUserAdmin = status.adminEmails && status.currentUserEmail && status.adminEmails.indexOf(status.currentUserEmail) !== -1;
         elements.openAdmin.style.display = isUserAdmin ? 'block' : 'none';
-        elements.openGroups.style.display = isUserAdmin ? 'block' : 'none';
 
         if (status.isPublished && status.activeSheetName) {
           elements.statusText.innerHTML = `公開中: <span class="font-bold text-green-700">${status.activeSheetName}</span>`;
