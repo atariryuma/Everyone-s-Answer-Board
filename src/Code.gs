@@ -187,10 +187,7 @@ function doGet(e) {
     userEmail = '匿名ユーザー';
   }
 
-  const adminEmails = getAdminEmails();
-  const isAdmin =
-      e && e.parameter && e.parameter.admin === '1' &&
-      adminEmails.includes(userEmail);
+  const isAdmin = isUserAdmin();
   const view = e && e.parameter && e.parameter.view;
 
   if (isAdmin && view !== 'board') {
