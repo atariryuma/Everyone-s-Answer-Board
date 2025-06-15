@@ -35,7 +35,8 @@ const APP_PROPERTIES = {
   IS_PUBLISHED: 'IS_PUBLISHED',
   DISPLAY_MODE: 'DISPLAY_MODE',
   WEB_APP_URL: 'WEB_APP_URL',
-  ADMIN_EMAILS: 'ADMIN_EMAILS'
+  ADMIN_EMAILS: 'ADMIN_EMAILS',
+  REACTION_COUNT_ENABLED: 'REACTION_COUNT_ENABLED'
 };
 
 /**
@@ -100,7 +101,8 @@ function getAdminSettings() {
     allSheets: allSheets,
     displayMode: properties.getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous',
     adminEmails: adminEmails,
-    currentUserEmail: currentUser
+    currentUserEmail: currentUser,
+    reactionCountEnabled: properties.getProperty(APP_PROPERTIES.REACTION_COUNT_ENABLED) === 'true'
   };
 }
 
@@ -161,6 +163,12 @@ function saveAdminEmails(emails) {
   return '管理者メールアドレスを更新しました。';
 }
 
+function saveReactionCountSetting(enabled) {
+  const value = enabled ? 'true' : 'false';
+  saveSettings({ [APP_PROPERTIES.REACTION_COUNT_ENABLED]: value });
+  return `リアクション数表示を${enabled ? '有効' : '無効'}にしました。`;
+}
+
 function getAdminEmails() {
  const str = PropertiesService.getScriptProperties()
      .getProperty(APP_PROPERTIES.ADMIN_EMAILS) || '';
@@ -194,9 +202,9 @@ function doGet(e) {
   const isAdmin =
       e && e.parameter && e.parameter.admin === '1' &&
       adminEmails.includes(userEmail);
+  const view = e && e.parameter && e.parameter.view;
 
-
-  if (isAdmin && e && e.parameter && e.parameter.groups === '1') {
+  if (isAdmin && view === 'groups') {
     const t = HtmlService.createTemplateFromFile('OpinionGroups');
     return t.evaluate()
             .setTitle('意見のグループ化')
@@ -513,7 +521,8 @@ function getAppSettings() {
   const properties = PropertiesService.getScriptProperties();
   return {
     isPublished: properties.getProperty(APP_PROPERTIES.IS_PUBLISHED) === 'true',
-    activeSheetName: properties.getProperty(APP_PROPERTIES.ACTIVE_SHEET)
+    activeSheetName: properties.getProperty(APP_PROPERTIES.ACTIVE_SHEET),
+    reactionCountEnabled: properties.getProperty(APP_PROPERTIES.REACTION_COUNT_ENABLED) === 'true'
   };
 }
 
@@ -583,6 +592,9 @@ if (typeof module !== 'undefined') {
     getAdminSettings,
     addReaction,
     toggleHighlight,
+    saveReactionCountSetting,
+    getAppSettings,
+    doGet,
     groupSimilarOpinions,
     getWebAppUrl,
     saveWebAppUrl,
