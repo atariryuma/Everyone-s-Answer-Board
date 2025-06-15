@@ -38,6 +38,23 @@ const APP_PROPERTIES = {
   ADMIN_EMAILS: 'ADMIN_EMAILS'
 };
 
+/**
+ * Save multiple script properties at once.
+ * If a value is null or undefined the property is removed.
+ * @param {Object<string, any>} settings Key-value pairs to store.
+ */
+function saveSettings(settings) {
+  const props = PropertiesService.getScriptProperties();
+  Object.keys(settings || {}).forEach(key => {
+    const value = settings[key];
+    if (value === null || value === undefined) {
+      props.deleteProperty(key);
+    } else {
+      props.setProperty(key, String(value));
+    }
+  });
+}
+
 
 // =================================================================
 // スプレッドシートのカスタムメニュー
@@ -98,9 +115,10 @@ function publishApp(sheetName) {
   if (!sheetName) {
     throw new Error('シート名が指定されていません。');
   }
-  const properties = PropertiesService.getScriptProperties();
-  properties.setProperty(APP_PROPERTIES.IS_PUBLISHED, 'true');
-  properties.setProperty(APP_PROPERTIES.ACTIVE_SHEET, sheetName);
+  saveSettings({
+    [APP_PROPERTIES.IS_PUBLISHED]: 'true',
+    [APP_PROPERTIES.ACTIVE_SHEET]: sheetName
+  });
   logDebug(`Published sheet: ${sheetName}`);
   return `「${sheetName}」を公開しました。`;
 }
@@ -112,9 +130,10 @@ function unpublishApp() {
   if (!isUserAdmin()) {
     throw new Error('管理者のみ実行できます。');
   }
-  const properties = PropertiesService.getScriptProperties();
-  properties.setProperty(APP_PROPERTIES.IS_PUBLISHED, 'false');
-  properties.deleteProperty(APP_PROPERTIES.ACTIVE_SHEET);
+  saveSettings({
+    [APP_PROPERTIES.IS_PUBLISHED]: 'false',
+    [APP_PROPERTIES.ACTIVE_SHEET]: null
+  });
   logDebug('Unpublished app');
   return 'アプリを非公開にしました。';
 }
@@ -124,9 +143,8 @@ function unpublishApp() {
  * @param {string} mode - 'anonymous' または 'named'
  */
 function saveDisplayMode(mode) {
-  const properties = PropertiesService.getScriptProperties();
   const value = mode === 'named' ? 'named' : 'anonymous';
-  properties.setProperty(APP_PROPERTIES.DISPLAY_MODE, value);
+  saveSettings({ [APP_PROPERTIES.DISPLAY_MODE]: value });
   logDebug(`Display mode set to ${value}`);
   return `表示モードを${value === 'named' ? '記名' : '匿名'}に設定しました。`;
 }
@@ -136,16 +154,15 @@ function saveDisplayMode(mode) {
 * @param {string|Array} emails - カンマ区切りのメールアドレス文字列または配列
 */
 function saveAdminEmails(emails) {
- const properties = PropertiesService.getScriptProperties();
  let value;
- if (Array.isArray(emails)) {
-   value = emails.map(e => e.trim()).filter(Boolean).join(',');
- } else {
-   value = (emails || '').split(',').map(e => e.trim()).filter(Boolean).join(',');
- }
- properties.setProperty(APP_PROPERTIES.ADMIN_EMAILS, value);
- logDebug(`Admin emails updated: ${value}`);
- return '管理者メールアドレスを更新しました。';
+  if (Array.isArray(emails)) {
+    value = emails.map(e => e.trim()).filter(Boolean).join(',');
+  } else {
+    value = (emails || '').split(',').map(e => e.trim()).filter(Boolean).join(',');
+  }
+ saveSettings({ [APP_PROPERTIES.ADMIN_EMAILS]: value });
+  logDebug(`Admin emails updated: ${value}`);
+  return '管理者メールアドレスを更新しました。';
 }
 
 function getAdminEmails() {
@@ -295,7 +312,7 @@ function saveWebAppUrl(url) {
       url = '';
     }
   }
-  PropertiesService.getScriptProperties().setProperty(APP_PROPERTIES.WEB_APP_URL, url);
+  saveSettings({ [APP_PROPERTIES.WEB_APP_URL]: url });
 }
 
 function getWebAppUrlFromProps() {
