@@ -35,7 +35,8 @@ const APP_PROPERTIES = {
   IS_PUBLISHED: 'IS_PUBLISHED',
   DISPLAY_MODE: 'DISPLAY_MODE',
   WEB_APP_URL: 'WEB_APP_URL',
-  ADMIN_EMAILS: 'ADMIN_EMAILS'
+  ADMIN_EMAILS: 'ADMIN_EMAILS',
+  SHOW_REACTION_COUNT: 'SHOW_REACTION_COUNT'
 };
 
 /**
@@ -100,7 +101,8 @@ function getAdminSettings() {
     allSheets: allSheets,
     displayMode: properties.getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous',
     adminEmails: adminEmails,
-    currentUserEmail: currentUser
+    currentUserEmail: currentUser,
+    showReactionCount: properties.getProperty(APP_PROPERTIES.SHOW_REACTION_COUNT) === 'true'
   };
 }
 
@@ -159,6 +161,12 @@ function saveAdminEmails(emails) {
   }
  saveSettings({ [APP_PROPERTIES.ADMIN_EMAILS]: value });
   return '管理者メールアドレスを更新しました。';
+}
+
+function saveReactionCountSetting(show) {
+  const value = show ? 'true' : 'false';
+  saveSettings({ [APP_PROPERTIES.SHOW_REACTION_COUNT]: value });
+  return 'リアクション数表示設定を更新しました。';
 }
 
 function getAdminEmails() {
@@ -226,6 +234,7 @@ function doGet(e) {
   const template = HtmlService.createTemplateFromFile('Page');
   template.userEmail = userEmail; // この行を追加
   template.isAdmin = isAdmin;
+  template.showCounts = settings.showReactionCount;
   return template.evaluate()
       .setTitle('StudyQuest - みんなのかいとうボード')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -521,7 +530,8 @@ function getAppSettings() {
   const properties = PropertiesService.getScriptProperties();
   return {
     isPublished: properties.getProperty(APP_PROPERTIES.IS_PUBLISHED) === 'true',
-    activeSheetName: properties.getProperty(APP_PROPERTIES.ACTIVE_SHEET)
+    activeSheetName: properties.getProperty(APP_PROPERTIES.ACTIVE_SHEET),
+    showReactionCount: properties.getProperty(APP_PROPERTIES.SHOW_REACTION_COUNT) === 'true'
   };
 }
 

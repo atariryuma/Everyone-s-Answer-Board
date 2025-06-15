@@ -8,6 +8,7 @@ function setup() {
           case 'ACTIVE_SHEET_NAME': return 'SheetA';
           case 'DISPLAY_MODE': return 'named';
           case 'ADMIN_EMAILS': return 'a@example.com,b@example.com';
+          case 'SHOW_REACTION_COUNT': return 'true';
           default: return null;
         }
       }
@@ -37,9 +38,10 @@ afterEach(() => {
    expect(result).toEqual({
      isPublished: true,
      activeSheetName: 'SheetA',
-     allSheets: ['SheetA','SheetB'],
-     displayMode: 'named',
-     adminEmails: ['a@example.com','b@example.com'],
-     currentUserEmail: 'a@example.com'
-   });
+    allSheets: ['SheetA','SheetB'],
+    displayMode: 'named',
+    adminEmails: ['a@example.com','b@example.com'],
+    currentUserEmail: 'a@example.com',
+    showReactionCount: true
+  });
  });
