@@ -176,7 +176,8 @@ function doGet(e) {
   const adminEmails = getAdminEmails();
   const userIsAdmin = adminEmails.includes(userEmail);
   const view = e && e.parameter && e.parameter.view;
-  const isAdmin = userIsAdmin;
+  const forceStudent = e && e.parameter && e.parameter.mode === 'student';
+  const isAdmin = userIsAdmin && !forceStudent;
 
   if (!settings.isPublished && !(userIsAdmin && view === 'board')) {
     const template = HtmlService.createTemplateFromFile('Unpublished');

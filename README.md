@@ -44,6 +44,12 @@ Administrators see a star button on each answer card allowing them to toggle thi
 2. Enter comma-separated administrator emails in the **管理者メールアドレス** field and click **保存**.
 3. Users listed here automatically see admin features (reaction counts, names and highlight controls) when viewing the board.
 
+### Student view for administrators
+
+Administrators can force the standard student interface by appending `mode=student`
+to the web app URL. This is useful when projecting the board while keeping admin
+features on your personal device.
+
 ## Continuous Integration
 
 A GitHub Actions workflow automatically pushes code to the Apps Script project whenever files in `src/` change. To enable it, add your service account credentials JSON as the `CLASP_CREDENTIALS` secret in the repository settings.

@@ -19,10 +19,11 @@ function setup({isPublished, userEmail='admin@example.com', adminEmails='admin@e
   };
   global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };
   const output = { setTitle: jest.fn(() => output), addMetaTag: jest.fn(() => output) };
+  let template = { evaluate: () => output };
   global.HtmlService = {
-    createTemplateFromFile: jest.fn(() => ({ evaluate: () => output }))
+    createTemplateFromFile: jest.fn(() => template)
   };
-  return { output };
+  return { output, getTemplate: () => template };
 }
 
 test('admin view=board shows Page template even when unpublished', () => {
@@ -44,5 +45,14 @@ test('admin default shows Unpublished when not published', () => {
   const e = { parameter: {} };
   doGet(e);
   expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Unpublished');
+});
+
+test('mode=student forces non-admin view', () => {
+  const { getTemplate } = setup({ isPublished: true });
+  const e = { parameter: { mode: 'student' } };
+  doGet(e);
+  const template = getTemplate();
+  expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Page');
+  expect(template.isAdmin).toBe(false);
 });
 
