@@ -239,9 +239,6 @@ function getPublishedSheetData(classFilter, sortMode) {
   sortMode = sortMode || 'newest';
   const settings = getAppSettings();
   const sheetName = settings.activeSheetName;
-  const isAdmin = 
-        
-        ();
 
   if (!sheetName) {
     throw new Error('表示するシートが設定されていません。');
