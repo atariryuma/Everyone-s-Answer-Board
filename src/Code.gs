@@ -446,7 +446,14 @@ function addReaction(rowIndex, reactionKey) {
       lists[key].cell.setValue(lists[key].arr.join(','));
     });
 
-    return { status: 'ok', reaction: reactionKey, newScore: lists[reactionKey].arr.length };
+    const reactions = {};
+    Object.keys(lists).forEach(key => {
+      reactions[key] = {
+        count: lists[key].arr.length,
+        reacted: lists[key].arr.includes(userEmail)
+      };
+    });
+    return { status: 'ok', reactions: reactions };
   } catch (error) {
     console.error('addReaction Error:', error);
     return { status: 'error', message: `エラーが発生しました: ${error.message}` };
