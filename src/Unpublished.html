@@ -23,10 +23,7 @@
                     このシートで公開する
                 </button>
                 <button id="open-admin-btn" class="w-full bg-green-500 hover:bg-green-600 text-gray-900 font-bold py-2 px-4 rounded transition">
-                    管理者としてボードを開く
-                </button>
-                <button id="open-student-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-gray-900 font-bold py-2 px-4 rounded transition">
-                    生徒としてボードを開く
+                    ボードを開く
                 </button>
             </div>
             <p id="message-area" class="mt-4 text-sm h-5"></p>
@@ -103,11 +100,7 @@
             }
 
             document.getElementById('open-admin-btn').addEventListener('click', () => {
-                window.top.location.href = '?view=board&role=admin';
-            });
-
-            document.getElementById('open-student-btn').addEventListener('click', () => {
-                window.top.location.href = '?view=board&role=student';
+                window.top.location.href = '?view=board';
             });
         }
     </script>
