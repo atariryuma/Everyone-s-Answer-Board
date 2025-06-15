@@ -54,6 +54,10 @@
       border-color: transparent;
       border-image: linear-gradient(90deg, #ef4444, #fbbf24, #3b82f6) 1;
     }
+
+    .reaction-popular {
+      box-shadow: 0 0 15px rgba(250, 204, 21, 0.6);
+    }
     #controlsFooter { pointer-events: none; }
     #controlsFooter > .glass-panel { pointer-events: auto; }
   </style>
@@ -421,8 +425,15 @@
                 if (active[0] === 'LIKE') card.classList.add('reaction-bg-like');
                 if (active[0] === 'UNDERSTAND') card.classList.add('reaction-bg-understand');
                 if (active[0] === 'CURIOUS') card.classList.add('reaction-bg-curious');
-            } else if (active.length > 1) {
+            } else if (active.length === 2) {
+                card.classList.add('reaction-bg-mixed');
+            } else if (active.length > 2) {
                 card.classList.add('reaction-bg-all');
+            }
+
+            const totalReactions = Object.values(data.reactions || {}).reduce((s, r) => s + (r.count || 0), 0);
+            if (totalReactions >= 5) {
+                card.classList.add('reaction-popular');
             }
 
             const showCount = isAdmin;
@@ -494,9 +505,23 @@
                     const oldAnswers = [...this.state.currentAnswers];
                     const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
                     if (item && item.reactions && item.reactions[reaction]) {
+                        const previous = this.reactionTypes
+                            .filter(rt => rt.key !== reaction && item.reactions[rt.key] && item.reactions[rt.key].reacted);
+
                         const rData = item.reactions[reaction];
+                        const wasReacted = rData.reacted;
                         rData.count = res.newScore;
-                        rData.reacted = !rData.reacted;
+                        rData.reacted = !wasReacted;
+
+                        previous.forEach(rt => {
+                            const pr = item.reactions[rt.key];
+                            if (pr && pr.reacted) {
+                                pr.reacted = false;
+                                if (pr.count > 0) pr.count -= 1;
+                                this.updateReactionButtonUI(rowIndex, rt.key, pr.count, false);
+                            }
+                        });
+
                         const total = Object.values(item.reactions).reduce((sum, r) => sum + r.count, 0);
                         item.score = item.reason.length * (1 + total * 0.05);
 
