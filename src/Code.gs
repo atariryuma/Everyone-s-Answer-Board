@@ -435,16 +435,44 @@ function addReaction(rowIndex, reactionKey) {
     if (!COLUMN_HEADERS[reactionKey]) {
       throw new Error(`Unknown reaction: ${reactionKey}`);
     }
-    const headerIndices = findHeaderIndices(headerRow, [COLUMN_HEADERS[reactionKey]]);
-    const colIndex = headerIndices[COLUMN_HEADERS[reactionKey]] + 1;
+    const reactionHeaders = [COLUMN_HEADERS.UNDERSTAND, COLUMN_HEADERS.LIKE, COLUMN_HEADERS.CURIOUS];
+    const headerIndices = findHeaderIndices(headerRow, reactionHeaders);
+    const colIndices = {
+      UNDERSTAND: headerIndices[COLUMN_HEADERS.UNDERSTAND] + 1,
+      LIKE: headerIndices[COLUMN_HEADERS.LIKE] + 1,
+      CURIOUS: headerIndices[COLUMN_HEADERS.CURIOUS] + 1,
+    };
 
-    const cell = sheet.getRange(rowIndex, colIndex);
-    const likersString = cell.getValue().toString();
-    let likers = likersString ? likersString.split(',').filter(Boolean) : [];
-    const userIndex = likers.indexOf(userEmail);
-    if (userIndex > -1) { likers.splice(userIndex, 1); } else { likers.push(userEmail); }
-    cell.setValue(likers.join(','));
-    return { status: 'ok', reaction: reactionKey, newScore: likers.length };
+    const selectedHeader = COLUMN_HEADERS[reactionKey];
+    const selectedCol = colIndices[reactionKey];
+
+    // Retrieve current lists for all reactions
+    const lists = {};
+    Object.keys(colIndices).forEach(key => {
+      const cell = sheet.getRange(rowIndex, colIndices[key]);
+      const str = cell.getValue().toString();
+      lists[key] = { cell: cell, arr: str ? str.split(',').filter(Boolean) : [] };
+    });
+
+    const wasReacted = lists[reactionKey].arr.includes(userEmail);
+
+    // Remove user from all reactions
+    Object.keys(lists).forEach(key => {
+      const idx = lists[key].arr.indexOf(userEmail);
+      if (idx > -1) lists[key].arr.splice(idx, 1);
+    });
+
+    // If user wasn't toggling off the same reaction, add them to selected
+    if (!wasReacted) {
+      lists[reactionKey].arr.push(userEmail);
+    }
+
+    // Write back all values
+    Object.keys(lists).forEach(key => {
+      lists[key].cell.setValue(lists[key].arr.join(','));
+    });
+
+    return { status: 'ok', reaction: reactionKey, newScore: lists[reactionKey].arr.length };
   } catch (error) {
     console.error('addReaction Error:', error);
     return { status: 'error', message: `エラーが発生しました: ${error.message}` };
