@@ -22,6 +22,12 @@
                 <button id="publish-btn" class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-2 px-4 rounded transition disabled:opacity-50">
                     このシートで公開する
                 </button>
+                <button id="open-admin-btn" class="w-full bg-green-500 hover:bg-green-600 text-gray-900 font-bold py-2 px-4 rounded transition">
+                    管理者としてボードを開く
+                </button>
+                <button id="open-student-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-gray-900 font-bold py-2 px-4 rounded transition">
+                    生徒としてボードを開く
+                </button>
             </div>
             <p id="message-area" class="mt-4 text-sm h-5"></p>
         </div>
@@ -84,11 +90,10 @@
             });
 
             function onPublishSuccess(message) {
-                messageArea.textContent = `${message} ページを更新します...`;
+                messageArea.textContent = message;
                 messageArea.className = 'mt-4 text-sm h-5 text-green-400';
-                setTimeout(() => {
-                    window.top.location.reload();
-                }, 500);
+                publishBtn.disabled = false;
+                publishBtn.textContent = 'このシートで公開する';
             }
 
             function onPublishError(error) {
@@ -96,6 +101,14 @@
                 publishBtn.disabled = false;
                 publishBtn.textContent = 'このシートで公開する';
             }
+
+            document.getElementById('open-admin-btn').addEventListener('click', () => {
+                window.top.location.href = '?view=board&role=admin';
+            });
+
+            document.getElementById('open-student-btn').addEventListener('click', () => {
+                window.top.location.href = '?view=board&role=student';
+            });
         }
     </script>
 </body>

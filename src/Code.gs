@@ -183,23 +183,18 @@ function doGet(e) {
     userEmail = '匿名ユーザー';
   }
   const adminEmails = getAdminEmails();
-  const isAdmin = adminEmails.includes(userEmail);
+  const userIsAdmin = adminEmails.includes(userEmail);
   const view = e && e.parameter && e.parameter.view;
+  const role = e && e.parameter && e.parameter.role;
+  const isAdmin = userIsAdmin && role !== 'student';
 
-  if (isAdmin && view !== 'board') {
+  if (!settings.isPublished && !(userIsAdmin && view === 'board')) {
     const template = HtmlService.createTemplateFromFile('Unpublished');
     template.userEmail = userEmail;
-    template.isAdmin = isAdmin;
+    template.isAdmin = userIsAdmin;
     return template.evaluate().setTitle('公開終了');
   }
 
-  if (!settings.isPublished && !(isAdmin && view === 'board')) {
-    const template = HtmlService.createTemplateFromFile('Unpublished');
-    template.userEmail = userEmail;
-    template.isAdmin = isAdmin;
-    return template.evaluate().setTitle('公開終了');
-  }
-  
   if (!settings.activeSheetName) {
     return HtmlService.createHtmlOutput('エラー: 表示するシートが設定されていません。スプレッドシートの「アプリ管理」メニューから設定してください。').setTitle('エラー');
   }
