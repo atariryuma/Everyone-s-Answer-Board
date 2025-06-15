@@ -68,7 +68,6 @@ function onOpen() {
       .createMenu('アプリ管理')
       .addItem('管理パネルを開く', 'showAdminSidebar')
       .addSeparator()
-      .addItem('名簿キャッシュをリセット', 'clearRosterCache')
       .addToUi();
 
 }
@@ -563,14 +562,3 @@ if (typeof module !== 'undefined') {
     getWebAppUrlFromProps,
   };
 }
-
-function clearRosterCache() {
-  const cache = CacheService.getScriptCache();
-  const cacheKey = CACHE_KEYS.ROSTER;
-  cache.remove(cacheKey);
-  console.log(`名簿キャッシュ（キー: ${cacheKey}）を削除しました。`);
-  try {
-    SpreadsheetApp.getUi().alert('名簿のキャッシュをリセットしました。');
-  } catch (e) { /* no-op */ }
-}
-
