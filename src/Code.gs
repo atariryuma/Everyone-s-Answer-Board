@@ -185,14 +185,12 @@ function doGet(e) {
   const adminEmails = getAdminEmails();
   const isAdmin = adminEmails.includes(userEmail);
   const view = e && e.parameter && e.parameter.view;
-  const role = e && e.parameter && e.parameter.role;
 
   if (isAdmin && view !== 'board') {
-    const template = HtmlService.createTemplateFromFile('AdminPanel');
+    const template = HtmlService.createTemplateFromFile('Unpublished');
     template.userEmail = userEmail;
-    template.isAdmin = true;
-    template.isPublished = settings.isPublished;
-    return template.evaluate().setTitle('管理者パネル');
+    template.isAdmin = isAdmin;
+    return template.evaluate().setTitle('公開終了');
   }
 
   if (!settings.isPublished && !(isAdmin && view === 'board')) {
@@ -209,7 +207,7 @@ function doGet(e) {
   // ★変更: Page.html にもメールアドレスを渡す
   const template = HtmlService.createTemplateFromFile('Page');
   template.userEmail = userEmail; // この行を追加
-  template.isAdmin = isAdmin && role !== 'student';
+  template.isAdmin = isAdmin;
   template.showCounts = settings.reactionCountEnabled;
   return template.evaluate()
       .setTitle('StudyQuest - みんなのかいとうボード')
