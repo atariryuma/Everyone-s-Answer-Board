@@ -63,15 +63,6 @@
         </div>
       </div>
 
-      <!-- Admin Emails -->
-      <div class="mb-6">
-        <h4 class="font-semibold text-gray-700 mb-3">管理者メールアドレス</h4>
-        <div class="bg-white p-3 rounded-lg shadow-md flex flex-col gap-2">
-          <input type="text" id="admin-emails" class="p-2 border rounded w-full" placeholder="teacher@example.com">
-          <button id="save-admin-emails" class="text-white font-bold py-1 px-4 rounded bg-green-500 hover:bg-green-600">保存</button>
-        </div>
-      </div>
-
       <div id="message-area" class="mt-4 text-center text-sm h-5"></div>
       <div class="mt-6 text-right">
         <a id="open-admin" href="#" target="_blank" style="display:none" class="text-blue-600 underline">管理者として開く</a>
@@ -125,6 +116,13 @@
           if (url) {
             elements.openAdmin.href = url + '?admin=1';
             elements.openGroups.href = url + '?admin=1&groups=1';
+          } else {
+            google.script.run.withSuccessHandler(fallback => {
+              if (fallback) {
+                elements.openAdmin.href = fallback + '?admin=1';
+                elements.openGroups.href = fallback + '?admin=1&groups=1';
+              }
+            }).getWebAppUrl();
           }
         }).getWebAppUrlFromProps();
       });
