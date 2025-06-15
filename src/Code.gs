@@ -94,6 +94,9 @@ function getAdminSettings() {
  * @param {string} sheetName - 公開するシート名。
  */
 function publishApp(sheetName) {
+  if (!isUserAdmin()) {
+    throw new Error('管理者のみ実行できます。');
+  }
   if (!sheetName) {
     throw new Error('シート名が指定されていません。');
   }
@@ -108,6 +111,9 @@ function publishApp(sheetName) {
  * アプリの公開を終了します。
  */
 function unpublishApp() {
+  if (!isUserAdmin()) {
+    throw new Error('管理者のみ実行できます。');
+  }
   const properties = PropertiesService.getScriptProperties();
   properties.setProperty(APP_PROPERTIES.IS_PUBLISHED, 'false');
   properties.deleteProperty(APP_PROPERTIES.ACTIVE_SHEET);
@@ -148,6 +154,15 @@ function getAdminEmails() {
  const str = PropertiesService.getScriptProperties()
      .getProperty(APP_PROPERTIES.ADMIN_EMAILS) || '';
  return str.split(',').map(e => e.trim()).filter(Boolean);
+}
+
+function isUserAdmin() {
+  const admins = getAdminEmails();
+  let email = '';
+  try {
+    email = Session.getActiveUser().getEmail();
+  } catch (e) {}
+  return admins.includes(email);
 }
 
 
@@ -206,17 +221,18 @@ function doGet(e) {
  * サーバー側で設定されたシートのデータを取得します。
  */
 
-function getPublishedSheetData(classFilter, sortMode, isAdmin) {
+function getPublishedSheetData(classFilter, sortMode) {
   sortMode = sortMode || 'newest';
   const settings = getAppSettings();
   const sheetName = settings.activeSheetName;
+  const isAdmin = isUserAdmin();
 
   if (!sheetName) {
     throw new Error('表示するシートが設定されていません。');
   }
 
   // 既存のgetSheetDataロジックを再利用
-  const data = getSheetData(sheetName, classFilter, sortMode, !!isAdmin);
+  const data = getSheetData(sheetName, classFilter, sortMode);
 
   // ★改善: フロントエンドでシート名を表示できるよう、レスポンスに含める
   return {
@@ -303,8 +319,9 @@ function getSheets() {
   }
 }
 
-function getSheetData(sheetName, classFilter, sortMode, isAdmin) {
+function getSheetData(sheetName, classFilter, sortMode) {
   sortMode = sortMode || 'newest';
+  const isAdmin = isUserAdmin();
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
     if (!sheet) throw new Error(`指定されたシート「${sheetName}」が見つかりません。`);
@@ -426,6 +443,9 @@ function addReaction(rowIndex, reactionKey) {
 }
 
 function toggleHighlight(rowIndex) {
+  if (!isUserAdmin()) {
+    throw new Error('管理者のみ実行できます。');
+  }
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
