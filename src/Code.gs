@@ -53,8 +53,6 @@ function onOpen() {
       .addItem('名簿キャッシュをリセット', 'clearRosterCache')
       .addToUi();
 
-  // スプレッドシートを開いたら自動で管理パネルを表示
-  showAdminSidebar();
 }
 
 /**
