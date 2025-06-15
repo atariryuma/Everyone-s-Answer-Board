@@ -88,7 +88,9 @@
   <script>
     // 環境変数の安全な取得
     const userEmail = typeof window !== 'undefined' ? window.userEmail : "";
-    const isAdmin = typeof window !== 'undefined' ? Boolean(window.isAdminPage) : false;
+    const urlParams = new URLSearchParams(window.location.search);
+    const adminMode = urlParams.get('admin') === '1';
+    const isAdmin = adminMode && typeof window !== 'undefined' ? Boolean(window.isAdminPage) : false;
 
     class StudyQuestApp {
         constructor() {
