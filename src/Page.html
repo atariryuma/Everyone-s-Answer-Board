@@ -106,6 +106,8 @@
       </div>
   </footer>
 
+  <div id="toast" class="fixed bottom-20 left-1/2 -translate-x-1/2 bg-red-700 text-white px-4 py-2 rounded shadow-lg hidden flex items-center gap-2"></div>
+
   <script>
     // 環境変数の安全な取得
     const userEmail = typeof window !== 'undefined' ? window.userEmail : "";
@@ -133,6 +135,7 @@
                 sortMode: document.getElementById('sortMode'),
                 footer: document.getElementById('controlsFooter'),
                 unpublishBtn: document.getElementById('unpublishBtn'),
+                toast: document.getElementById('toast'),
             };
             
             this.state = {
@@ -326,17 +329,7 @@
             } catch (error) {
                 console.error('Error loading sheet data:', error);
                 const errorMessage = this.escapeHtml(error.message || 'Unknown error');
-                this.elements.answersContainer.innerHTML = 
-                    '<div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg">' +
-                    '<p class="font-bold">データの読み込みに失敗しました。</p>' +
-                    '<p class="text-sm mt-2">' + errorMessage + '</p>' +
-                    '<button id="retryLoadBtn" class="mt-4 game-btn bg-cyan-600 text-white px-4 py-2 rounded-lg font-bold border-cyan-800 hover:bg-cyan-500 text-sm">再試行</button>' +
-                    '</div>';
-                
-                const retryBtn = document.getElementById('retryLoadBtn');
-                if (retryBtn) {
-                    retryBtn.addEventListener('click', () => this.loadInitialData());
-                }
+                this.showToast('データの読み込みに失敗しました: ' + errorMessage, true);
             } finally {
                 this.state.isLoading = false;
             }
@@ -614,6 +607,32 @@
                 }
                 btn.classList.toggle('liked', reacted);
             });
+        }
+
+        showToast(message, withRetry = false) {
+            if (!this.elements.toast) return;
+            this.elements.toast.innerHTML = '<span>' + message + '</span>';
+            if (withRetry) {
+                const btn = document.createElement('button');
+                btn.id = 'retryLoadBtn';
+                btn.className = 'ml-4 game-btn bg-cyan-600 text-white px-2 py-1 rounded-md text-sm';
+                btn.textContent = '再試行';
+                btn.addEventListener('click', () => {
+                    this.hideToast();
+                    this.loadInitialData();
+                });
+                this.elements.toast.appendChild(btn);
+            }
+            this.elements.toast.classList.remove('hidden');
+            clearTimeout(this.toastTimeout);
+            this.toastTimeout = setTimeout(() => this.hideToast(), 5000);
+        }
+
+        hideToast() {
+            if (!this.elements.toast) return;
+            this.elements.toast.classList.add('hidden');
+            this.elements.toast.innerHTML = '';
+            clearTimeout(this.toastTimeout);
         }
         
         showAnswerModal(rowIndex) {
