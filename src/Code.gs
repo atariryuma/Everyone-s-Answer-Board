@@ -119,16 +119,6 @@ function unpublishApp() {
 }
 
 /**
- * 表示モードを保存します。
- * @param {string} mode - 'anonymous' または 'named'
- */
-function saveDisplayMode(mode) {
-  const value = mode === 'named' ? 'named' : 'anonymous';
-  saveSettings({ [APP_PROPERTIES.DISPLAY_MODE]: value });
-  return `表示モードを${value === 'named' ? '記名' : '匿名'}に設定しました。`;
-}
-
-/**
 * 管理者メールアドレスを保存します。
 * @param {string|Array} emails - カンマ区切りのメールアドレス文字列または配列
 */
