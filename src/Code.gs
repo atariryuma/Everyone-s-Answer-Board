@@ -194,7 +194,6 @@ function doGet(e) {
   } catch (e) {
     userEmail = '匿名ユーザー';
   }
-
   const adminEmails = getAdminEmails();
   const isAdmin = adminEmails.includes(userEmail);
   const view = e && e.parameter && e.parameter.view;
@@ -240,7 +239,9 @@ function getPublishedSheetData(classFilter, sortMode) {
   sortMode = sortMode || 'newest';
   const settings = getAppSettings();
   const sheetName = settings.activeSheetName;
-  const isAdmin = isUserAdmin();
+  const isAdmin = 
+        
+        ();
 
   if (!sheetName) {
     throw new Error('表示するシートが設定されていません。');
