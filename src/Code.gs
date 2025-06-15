@@ -119,7 +119,6 @@ function publishApp(sheetName) {
     [APP_PROPERTIES.IS_PUBLISHED]: 'true',
     [APP_PROPERTIES.ACTIVE_SHEET]: sheetName
   });
-  logDebug(`Published sheet: ${sheetName}`);
   return `「${sheetName}」を公開しました。`;
 }
 
@@ -134,7 +133,6 @@ function unpublishApp() {
     [APP_PROPERTIES.IS_PUBLISHED]: 'false',
     [APP_PROPERTIES.ACTIVE_SHEET]: null
   });
-  logDebug('Unpublished app');
   return 'アプリを非公開にしました。';
 }
 
@@ -145,7 +143,6 @@ function unpublishApp() {
 function saveDisplayMode(mode) {
   const value = mode === 'named' ? 'named' : 'anonymous';
   saveSettings({ [APP_PROPERTIES.DISPLAY_MODE]: value });
-  logDebug(`Display mode set to ${value}`);
   return `表示モードを${value === 'named' ? '記名' : '匿名'}に設定しました。`;
 }
 
@@ -161,7 +158,6 @@ function saveAdminEmails(emails) {
     value = (emails || '').split(',').map(e => e.trim()).filter(Boolean).join(',');
   }
  saveSettings({ [APP_PROPERTIES.ADMIN_EMAILS]: value });
-  logDebug(`Admin emails updated: ${value}`);
   return '管理者メールアドレスを更新しました。';
 }
 
@@ -578,19 +574,6 @@ function findHeaderIndices(sheetHeaders, requiredHeaders) {
   return indices;
 }
 
-function logDebug(message) {
-  if (typeof PropertiesService === 'undefined') return;
-  try {
-    const props = PropertiesService.getScriptProperties();
-    const raw = props.getProperty('DEBUG_LOG') || '[]';
-    const logs = JSON.parse(raw);
-    logs.push(`${new Date().toISOString()} ${message}`);
-    while (logs.length > 200) logs.shift();
-    props.setProperty('DEBUG_LOG', JSON.stringify(logs));
-  } catch (e) {}
-}
-
-
 // Export for Jest testing
 if (typeof module !== 'undefined') {
   module.exports = {
@@ -601,7 +584,6 @@ if (typeof module !== 'undefined') {
     addReaction,
     toggleHighlight,
     groupSimilarOpinions,
-    logDebug,
     getWebAppUrl,
     saveWebAppUrl,
     getWebAppUrlFromProps,
@@ -613,7 +595,6 @@ function clearRosterCache() {
   const cacheKey = CACHE_KEYS.ROSTER;
   cache.remove(cacheKey);
   console.log(`名簿キャッシュ（キー: ${cacheKey}）を削除しました。`);
-  logDebug('Roster cache cleared');
   try {
     SpreadsheetApp.getUi().alert('名簿のキャッシュをリセットしました。');
   } catch (e) { /* no-op */ }
