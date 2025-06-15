@@ -27,14 +27,14 @@ function setup({isPublished, userEmail='admin@example.com', adminEmails='admin@e
 
 test('admin view=board shows Page template even when unpublished', () => {
   const { output } = setup({ isPublished: false });
-  const e = { parameter: { admin: '1', view: 'board' } };
+  const e = { parameter: { view: 'board' } };
   doGet(e);
   expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Page');
 });
 
 test('admin without board view shows Unpublished', () => {
   setup({ isPublished: true });
-  const e = { parameter: { admin: '1' } };
+  const e = { parameter: {} };
   doGet(e);
   expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Unpublished');
 });

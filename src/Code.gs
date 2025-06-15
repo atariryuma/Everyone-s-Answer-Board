@@ -36,7 +36,8 @@ const APP_PROPERTIES = {
   DISPLAY_MODE: 'DISPLAY_MODE',
   WEB_APP_URL: 'WEB_APP_URL',
   ADMIN_EMAILS: 'ADMIN_EMAILS',
-  REACTION_COUNT_ENABLED: 'REACTION_COUNT_ENABLED'
+  REACTION_COUNT_ENABLED: 'REACTION_COUNT_ENABLED',
+  SCORE_SORT_ENABLED: 'SCORE_SORT_ENABLED'
 };
 
 /**
@@ -91,7 +92,8 @@ function getAdminSettings() {
     displayMode: properties.getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous',
     adminEmails: adminEmails,
     currentUserEmail: currentUser,
-    reactionCountEnabled: properties.getProperty(APP_PROPERTIES.REACTION_COUNT_ENABLED) === 'true'
+    reactionCountEnabled: properties.getProperty(APP_PROPERTIES.REACTION_COUNT_ENABLED) === 'true',
+    scoreSortEnabled: properties.getProperty(APP_PROPERTIES.SCORE_SORT_ENABLED) === 'true'
   };
 }
 
@@ -158,6 +160,12 @@ function saveReactionCountSetting(enabled) {
   return `リアクション数表示を${enabled ? '有効' : '無効'}にしました。`;
 }
 
+function saveScoreSortSetting(enabled) {
+  const value = enabled ? 'true' : 'false';
+  saveSettings({ [APP_PROPERTIES.SCORE_SORT_ENABLED]: value });
+  return `スコア順ソートを${enabled ? '有効' : '無効'}にしました。`;
+}
+
 function getAdminEmails() {
  const str = PropertiesService.getScriptProperties()
      .getProperty(APP_PROPERTIES.ADMIN_EMAILS) || '';
@@ -188,9 +196,7 @@ function doGet(e) {
   }
 
   const adminEmails = getAdminEmails();
-  const isAdmin =
-      e && e.parameter && e.parameter.admin === '1' &&
-      adminEmails.includes(userEmail);
+  const isAdmin = adminEmails.includes(userEmail);
   const view = e && e.parameter && e.parameter.view;
 
   if (isAdmin && view !== 'board') {
@@ -474,7 +480,8 @@ function getAppSettings() {
   return {
     isPublished: properties.getProperty(APP_PROPERTIES.IS_PUBLISHED) === 'true',
     activeSheetName: properties.getProperty(APP_PROPERTIES.ACTIVE_SHEET),
-    reactionCountEnabled: properties.getProperty(APP_PROPERTIES.REACTION_COUNT_ENABLED) === 'true'
+    reactionCountEnabled: properties.getProperty(APP_PROPERTIES.REACTION_COUNT_ENABLED) === 'true',
+    scoreSortEnabled: properties.getProperty(APP_PROPERTIES.SCORE_SORT_ENABLED) === 'true'
   };
 }
 
@@ -546,6 +553,7 @@ if (typeof module !== 'undefined') {
     addReaction,
     toggleHighlight,
     saveReactionCountSetting,
+    saveScoreSortSetting,
     getAppSettings,
     getWebAppUrl,
     saveWebAppUrl,

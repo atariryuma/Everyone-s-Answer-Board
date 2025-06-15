@@ -9,6 +9,7 @@ function setup() {
           case 'DISPLAY_MODE': return 'named';
           case 'ADMIN_EMAILS': return 'a@example.com,b@example.com';
           case 'REACTION_COUNT_ENABLED': return 'true';
+          case 'SCORE_SORT_ENABLED': return 'false';
           default: return null;
         }
       }
@@ -42,6 +43,7 @@ afterEach(() => {
     displayMode: 'named',
     adminEmails: ['a@example.com','b@example.com'],
     currentUserEmail: 'a@example.com',
-    reactionCountEnabled: true
+    reactionCountEnabled: true,
+    scoreSortEnabled: false
   });
 });

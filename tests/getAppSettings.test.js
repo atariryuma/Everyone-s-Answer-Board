@@ -8,6 +8,7 @@ function setup() {
           case 'IS_PUBLISHED': return 'true';
           case 'ACTIVE_SHEET_NAME': return 'SheetA';
           case 'REACTION_COUNT_ENABLED': return 'false';
+          case 'SCORE_SORT_ENABLED': return 'true';
           default: return null;
         }
       }
@@ -25,6 +26,7 @@ test('getAppSettings includes reaction count flag', () => {
   expect(result).toEqual({
     isPublished: true,
     activeSheetName: 'SheetA',
-    reactionCountEnabled: false
+    reactionCountEnabled: false,
+    scoreSortEnabled: true
   });
 });
