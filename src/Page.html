@@ -137,6 +137,7 @@
             
             this.state = {
                 currentAnswers: [],
+                rowHashes: {},
                 isLoading: false,
                 lastFocusedElement: null
             };
@@ -150,7 +151,7 @@
             ];
 
             this.gas = {
-                getPublishedSheetData: (classFilter, sortMode, isAdmin) => this.runGas('getPublishedSheetData', classFilter, sortMode, isAdmin),
+                getUpdates: (classFilter, sortMode, hashes) => this.runGas('getSheetUpdates', classFilter, sortMode, hashes),
                 addReaction: (rowIndex, reaction) => this.runGas('addReaction', rowIndex, reaction),
                 toggleHighlight: (rowIndex) => this.runGas('toggleHighlight', rowIndex),
                 unpublishApp: () => this.runGas('unpublishApp')
@@ -233,11 +234,11 @@
             return new Promise((resolve, reject) => {
                 setTimeout(() => {
                     try {
-                        if (funcName === 'getPublishedSheetData') {
+                        if (funcName === 'getSheetUpdates') {
                             resolve({
                                 header: 'テスト問題',
                                 sheetName: 'テストシート',
-                                rows: [
+                                changedRows: [
                                     {
                                         rowIndex: 1,
                                         name: '田中太郎',
@@ -262,7 +263,9 @@
                                             CURIOUS: { count: 0, reacted: false }
                                         }
                                     }
-                                ]
+                                ],
+                                removedRows: [],
+                                hashMap: { '1': 'a', '2': 'b' }
                             });
                         } else if (funcName === 'addReaction') {
                             resolve({
@@ -296,26 +299,26 @@
             
             const selectedClass = isInitialLoad ? 'すべて' : this.elements.classFilter.value;
             const selectedSort = this.elements.sortMode.value;
-            const oldAnswers = [...this.state.currentAnswers];
 
             if (showLoading) {
                 this.elements.answersContainer.innerHTML = '<p class="text-center text-gray-400 col-span-full mt-8">データを読み込み中...</p>';
             }
             
             try {
-                const data = await this.gas.getPublishedSheetData(selectedClass, selectedSort, isAdmin);
+                const data = await this.gas.getUpdates(selectedClass, selectedSort, JSON.stringify(this.state.rowHashes));
                 this.adjustLayout();
-                
-                if (isInitialLoad) {
-                    this.populateClassFilter(data.rows);
-                    this.elements.sheetNameText.textContent = 'シート: ' + data.sheetName;
-                }
 
-                const changed = JSON.stringify(this.state.currentAnswers) !== JSON.stringify(data.rows);
-                this.state.currentAnswers = data.rows;
-                this.elements.headingLabel.textContent = data.header || '問題';
-                if (changed || oldAnswers.length === 0) {
-                    this.renderBoard(false, oldAnswers);
+                if (isInitialLoad) {
+                    this.populateClassFilter(data.changedRows);
+                    this.elements.sheetNameText.textContent = 'シート: ' + data.sheetName;
+                    this.state.currentAnswers = data.changedRows;
+                    this.state.rowHashes = data.hashMap;
+                    this.elements.headingLabel.textContent = data.header || '問題';
+                    this.renderBoard(false, []);
+                } else {
+                    this.applyUpdates(data.changedRows, data.removedRows);
+                    this.state.rowHashes = data.hashMap;
+                    this.elements.headingLabel.textContent = data.header || '問題';
                 }
             } catch (error) {
                 console.error('Error loading sheet data:', error);
@@ -339,11 +342,53 @@
         populateClassFilter(rows) {
             const classFilter = this.elements.classFilter;
             const uniqueClasses = ['すべて', ...new Set(rows.map(r => r.class).filter(Boolean))];
-            classFilter.innerHTML = uniqueClasses.map(c => 
+            classFilter.innerHTML = uniqueClasses.map(c =>
                 '<option value="' + this.escapeHtml(c) + '">' + this.escapeHtml(c) + '</option>'
             ).join('');
             classFilter.value = 'すべて';
             classFilter.classList.remove('hidden');
+        }
+
+        applyUpdates(changedRows = [], removedRows = []) {
+            const map = new Map(this.state.currentAnswers.map(r => [String(r.rowIndex), r]));
+            removedRows.forEach(idx => {
+                map.delete(String(idx));
+                const el = this.elements.answersContainer.querySelector('.answer-card[data-row-index="' + idx + '"]');
+                if (el) el.remove();
+            });
+
+            let needRender = false;
+            changedRows.forEach(row => {
+                const key = String(row.rowIndex);
+                if (!map.has(key)) {
+                    needRender = true;
+                    map.set(key, row);
+                } else {
+                    map.set(key, row);
+                    const card = this.elements.answersContainer.querySelector('.answer-card[data-row-index="' + row.rowIndex + '"]');
+                    if (card) {
+                        const newCard = this.createAnswerCard(row);
+                        this.elements.answersContainer.replaceChild(newCard, card);
+                    } else {
+                        needRender = true;
+                    }
+                }
+            });
+
+            this.state.currentAnswers = Array.from(map.values());
+            const mode = this.elements.sortMode.value;
+            if (needRender || removedRows.length) {
+                if (mode === 'newest') {
+                    this.state.currentAnswers.sort((a, b) => b.rowIndex - a.rowIndex);
+                } else if (mode === 'random') {
+                    this.state.currentAnswers.sort(() => Math.random() - 0.5);
+                } else {
+                    this.state.currentAnswers.sort((a, b) => b.score - a.score);
+                }
+                this.renderBoard(false, []);
+            } else {
+                this.updateAnswerCount();
+            }
         }
 
         renderBoard(isLayoutChange = false, oldRows = this.state.currentAnswers) {
@@ -359,8 +404,7 @@
             this.elements.sliderValue.textContent = this.elements.sizeSlider.value;
             container.className = 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-' + this.elements.sizeSlider.value;
             
-            const userIcon = this.getIcon('users', 'w-4 h-4 inline-block -mt-1');
-            this.elements.answerCount.innerHTML = userIcon + '<span>' + newRows.length + '件</span>';
+            this.updateAnswerCount();
             
             const fragment = document.createDocumentFragment();
             if (newRows.length === 0) {
@@ -485,6 +529,11 @@
             return card;
         }
 
+        updateAnswerCount() {
+            const userIcon = this.getIcon('users', 'w-4 h-4 inline-block -mt-1');
+            this.elements.answerCount.innerHTML = userIcon + '<span>' + this.state.currentAnswers.length + '件</span>';
+        }
+
         async handleReaction(rowIndex, reaction) {
             const btns = document.querySelectorAll('[data-row-index="' + rowIndex + '"][data-reaction="' + reaction + '"]');
             
@@ -533,7 +582,7 @@
                         }
 
                         this.updateReactionButtonUI(rowIndex, reaction, rData.count, rData.reacted);
-                        this.renderBoard(false, oldAnswers);
+                        this.applyUpdates([item]);
                     }
                 } else if (res && res.message) {
                     alert(res.message);
@@ -551,7 +600,7 @@
                     if (item) {
                         item.highlight = res.highlight;
                     }
-                    this.renderBoard();
+                    this.applyUpdates([item]);
                 } else if (res && res.message) {
                     alert(res.message);
                 }
