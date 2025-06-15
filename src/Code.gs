@@ -320,12 +320,14 @@ function getSheetData(sheetName, classFilter, sortMode) {
   const userEmail = Session.getActiveUser().getEmail();
   const headerIndices = getAndCacheHeaderIndices(sheetName, allValues[0]);
   const dataRows = allValues.slice(1);
-  const emailToNameMap = getRosterMap();
+
   let displayMode = PropertiesService.getScriptProperties()
       .getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous';
   if (!isAdmin) {
     displayMode = 'anonymous';
   }
+
+  const emailToNameMap = displayMode === 'named' ? getRosterMap() : {};
 
     const filteredRows = dataRows.filter(row => {
       if (!classFilter || classFilter === 'すべて') return true;
@@ -358,7 +360,10 @@ function getSheetData(sheetName, classFilter, sortMode) {
         const baseScore = reason.length;
         const likeMultiplier = 1 + (totalReactions * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
         const totalScore = baseScore * likeMultiplier;
-        const actualName = emailToNameMap[email] || email.split('@')[0];
+        const actualName =
+          displayMode === 'named' && emailToNameMap[email]
+            ? emailToNameMap[email]
+            : email.split('@')[0];
         const name = displayMode === 'named' ? actualName : '匿名';
         return {
           rowIndex: i + 2,
