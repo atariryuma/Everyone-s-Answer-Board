@@ -33,9 +33,9 @@ afterEach(() => {
   delete global.Session;
 });
 
- test('getAdminSettings returns board state', () => {
-   setup();
-   const result = getAdminSettings();
+test('getAdminSettings returns board state', () => {
+  setup();
+  const result = getAdminSettings();
   expect(result).toEqual({
     isPublished: true,
     activeSheetName: 'SheetA',
@@ -46,4 +46,10 @@ afterEach(() => {
     reactionCountEnabled: true,
     scoreSortEnabled: false
   });
+});
+
+test('getAdminSettings throws for non-admin user', () => {
+  setup();
+  global.Session = { getActiveUser: () => ({ getEmail: () => 'other@example.com' }) };
+  expect(() => getAdminSettings()).toThrow('管理者のみ実行できます');
 });

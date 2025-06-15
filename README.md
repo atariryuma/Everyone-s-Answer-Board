@@ -36,15 +36,13 @@ subdirectories under `src`.**
 
 Add a column named `Highlight` to your spreadsheet (using a checkbox or TRUE/FALSE values).
 Rows marked as `TRUE` will appear with a yellow border on the board.
-When the board is opened with the `?admin=1` query parameter,
-a star button is shown on each answer card to toggle this flag.
-Use the "Open as administrator" link in the sheet selector sidebar to launch the board in this mode.
+Administrators see a star button on each answer card allowing them to toggle this flag.
 
 ## Admin access
 
 1. Open the sheet selector sidebar from the spreadsheet menu.
 2. Enter comma-separated administrator emails in the **管理者メールアドレス** field and click **保存**.
-3. Only these users will see the "管理者として開く" link and can append `?admin=1` to access admin features.
+3. Users listed here automatically see admin features (reaction counts, names and highlight controls) when viewing the board.
 
 ## Continuous Integration
 
