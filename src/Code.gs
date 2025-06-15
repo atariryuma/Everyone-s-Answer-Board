@@ -20,6 +20,7 @@ const CACHE_KEYS = {
   ROSTER: 'roster_name_map_v3',
   HEADERS: (sheetName) => `headers_${sheetName}_v1`
 };
+const HEADERS_CACHE_TTL = 1800; // seconds
 const ROSTER_CONFIG = {
   SHEET_NAME: 'sheet 1',
   HEADER_LAST_NAME: '姓',
@@ -542,7 +543,7 @@ function getAndCacheHeaderIndices(sheetName, headerRow) {
   const cachedHeaders = cache.get(cacheKey);
   if (cachedHeaders) { return JSON.parse(cachedHeaders); }
   const indices = findHeaderIndices(headerRow, Object.values(COLUMN_HEADERS));
-  cache.put(cacheKey, JSON.stringify(indices), 21600);
+  cache.put(cacheKey, JSON.stringify(indices), HEADERS_CACHE_TTL);
   return indices;
 }
 
