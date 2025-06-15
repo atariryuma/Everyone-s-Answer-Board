@@ -211,7 +211,14 @@ function doGet(e) {
             .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   }
 
-  if (!settings.isPublished) {
+  if (isAdmin && view !== 'board') {
+    const template = HtmlService.createTemplateFromFile('Unpublished');
+    template.userEmail = userEmail;
+    template.isAdmin = isAdmin;
+    return template.evaluate().setTitle('公開終了');
+  }
+
+  if (!settings.isPublished && !(isAdmin && view === 'board')) {
     const template = HtmlService.createTemplateFromFile('Unpublished');
     template.userEmail = userEmail;
     template.isAdmin = isAdmin;
@@ -590,6 +597,7 @@ if (typeof module !== 'undefined') {
     findHeaderIndices,
     getSheetData,
     getAdminSettings,
+    doGet,
     addReaction,
     toggleHighlight,
     saveReactionCountSetting,
