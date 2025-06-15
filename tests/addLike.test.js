@@ -56,11 +56,13 @@ test('addReaction toggles user in list', () => {
 
   const result1 = addReaction(2, 'UNDERSTAND');
   expect(result1.status).toBe('ok');
-  expect(result1.newScore).toBe(2);
+  expect(result1.reactions.UNDERSTAND.count).toBe(2);
+  expect(result1.reactions.UNDERSTAND.reacted).toBe(true);
 
   const result2 = addReaction(2, 'UNDERSTAND');
   expect(result2.status).toBe('ok');
-  expect(result2.newScore).toBe(1);
+  expect(result2.reactions.UNDERSTAND.count).toBe(1);
+  expect(result2.reactions.UNDERSTAND.reacted).toBe(false);
 });
 
 test('addReaction switches reaction columns', () => {
@@ -71,11 +73,14 @@ test('addReaction switches reaction columns', () => {
   expect(res1.status).toBe('ok');
   expect(sheet.values.LIKE).toBe('c@example.com');
   expect(sheet.values.UNDERSTAND).toBe('a@example.com');
+  expect(res1.reactions.LIKE.reacted).toBe(true);
 
   const res2 = addReaction(2, 'CURIOUS');
   expect(res2.status).toBe('ok');
   expect(sheet.values.LIKE).toBe('');
   expect(sheet.values.CURIOUS).toBe('c@example.com');
+  expect(res2.reactions.LIKE.reacted).toBe(false);
+  expect(res2.reactions.CURIOUS.reacted).toBe(true);
 });
 
 test('addReaction errors when user email is empty', () => {
