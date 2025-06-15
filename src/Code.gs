@@ -36,7 +36,7 @@ const APP_PROPERTIES = {
   DISPLAY_MODE: 'DISPLAY_MODE',
   WEB_APP_URL: 'WEB_APP_URL',
   ADMIN_EMAILS: 'ADMIN_EMAILS',
-  SHOW_REACTION_COUNT: 'SHOW_REACTION_COUNT'
+  REACTION_COUNT_ENABLED: 'REACTION_COUNT_ENABLED'
 };
 
 /**
@@ -102,7 +102,7 @@ function getAdminSettings() {
     displayMode: properties.getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous',
     adminEmails: adminEmails,
     currentUserEmail: currentUser,
-    showReactionCount: properties.getProperty(APP_PROPERTIES.SHOW_REACTION_COUNT) === 'true'
+    reactionCountEnabled: properties.getProperty(APP_PROPERTIES.REACTION_COUNT_ENABLED) === 'true'
   };
 }
 
@@ -163,10 +163,10 @@ function saveAdminEmails(emails) {
   return '管理者メールアドレスを更新しました。';
 }
 
-function saveReactionCountSetting(show) {
-  const value = show ? 'true' : 'false';
-  saveSettings({ [APP_PROPERTIES.SHOW_REACTION_COUNT]: value });
-  return 'リアクション数表示設定を更新しました。';
+function saveReactionCountSetting(enabled) {
+  const value = enabled ? 'true' : 'false';
+  saveSettings({ [APP_PROPERTIES.REACTION_COUNT_ENABLED]: value });
+  return `リアクション数表示を${enabled ? '有効' : '無効'}にしました。`;
 }
 
 function getAdminEmails() {
@@ -204,8 +204,7 @@ function doGet(e) {
       adminEmails.includes(userEmail);
   const view = e && e.parameter && e.parameter.view;
 
-
-  if (isAdmin && e && e.parameter && e.parameter.groups === '1') {
+  if (isAdmin && view === 'groups') {
     const t = HtmlService.createTemplateFromFile('OpinionGroups');
     return t.evaluate()
             .setTitle('意見のグループ化')
@@ -531,7 +530,7 @@ function getAppSettings() {
   return {
     isPublished: properties.getProperty(APP_PROPERTIES.IS_PUBLISHED) === 'true',
     activeSheetName: properties.getProperty(APP_PROPERTIES.ACTIVE_SHEET),
-    showReactionCount: properties.getProperty(APP_PROPERTIES.SHOW_REACTION_COUNT) === 'true'
+    reactionCountEnabled: properties.getProperty(APP_PROPERTIES.REACTION_COUNT_ENABLED) === 'true'
   };
 }
 
@@ -602,6 +601,9 @@ if (typeof module !== 'undefined') {
     doGet,
     addReaction,
     toggleHighlight,
+    saveReactionCountSetting,
+    getAppSettings,
+    doGet,
     groupSimilarOpinions,
     getWebAppUrl,
     saveWebAppUrl,

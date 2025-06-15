@@ -8,7 +8,7 @@ function setup() {
           case 'ACTIVE_SHEET_NAME': return 'SheetA';
           case 'DISPLAY_MODE': return 'named';
           case 'ADMIN_EMAILS': return 'a@example.com,b@example.com';
-          case 'SHOW_REACTION_COUNT': return 'true';
+          case 'REACTION_COUNT_ENABLED': return 'true';
           default: return null;
         }
       }
@@ -35,13 +35,13 @@ afterEach(() => {
  test('getAdminSettings returns board state', () => {
    setup();
    const result = getAdminSettings();
-   expect(result).toEqual({
-     isPublished: true,
-     activeSheetName: 'SheetA',
+  expect(result).toEqual({
+    isPublished: true,
+    activeSheetName: 'SheetA',
     allSheets: ['SheetA','SheetB'],
     displayMode: 'named',
     adminEmails: ['a@example.com','b@example.com'],
     currentUserEmail: 'a@example.com',
-    showReactionCount: true
+    reactionCountEnabled: true
   });
- });
+});
