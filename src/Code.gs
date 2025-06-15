@@ -204,13 +204,6 @@ function doGet(e) {
       adminEmails.includes(userEmail);
   const view = e && e.parameter && e.parameter.view;
 
-  if (isAdmin && view === 'groups') {
-    const t = HtmlService.createTemplateFromFile('OpinionGroups');
-    return t.evaluate()
-            .setTitle('意見のグループ化')
-            .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-  }
-
   if (isAdmin && view !== 'board') {
     const template = HtmlService.createTemplateFromFile('Unpublished');
     template.userEmail = userEmail;
@@ -233,7 +226,7 @@ function doGet(e) {
   const template = HtmlService.createTemplateFromFile('Page');
   template.userEmail = userEmail; // この行を追加
   template.isAdmin = isAdmin;
-  template.showCounts = settings.showReactionCount;
+  template.showCounts = settings.reactionCountEnabled;
   return template.evaluate()
       .setTitle('StudyQuest - みんなのかいとうボード')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -269,44 +262,6 @@ function getPublishedSheetData(classFilter, sortMode) {
   };
 }
 
-
-function groupSimilarOpinions() {
-  const settings = getAppSettings();
-  const sheetName = settings.activeSheetName;
-  if (!sheetName) throw new Error('表示するシートが設定されていません。');
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-  if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
-  const values = sheet.getDataRange().getValues();
-  if (values.length < 2) return '';
-  const idx = findHeaderIndices(values[0], [COLUMN_HEADERS.OPINION, COLUMN_HEADERS.REASON]);
-  const texts = values.slice(1).map(r => {
-    const op = r[idx[COLUMN_HEADERS.OPINION]];
-    const reason = r[idx[COLUMN_HEADERS.REASON]];
-    return `意見: ${op} 理由: ${reason}`;
-  }).filter(Boolean);
-
-  const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
-  if (!apiKey) throw new Error('GEMINI APIキーが設定されていません。');
-
-  const prompt = '次の意見と理由を類似内容ごとにグループ化し、多数派と少数派を含めて要約してください。\n' + texts.join('\n');
-  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' + apiKey;
-  const payload = {
-    contents: [{ parts: [{ text: prompt }] }]
-  };
-  try {
-    const res = UrlFetchApp.fetch(url, {
-      method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    });
-    const json = JSON.parse(res.getContentText() || '{}');
-    return json.candidates && json.candidates[0] && json.candidates[0].content && json.candidates[0].content.parts ? json.candidates[0].content.parts[0].text : '';
-  } catch (e) {
-    console.error('groupSimilarOpinions error', e);
-    return '';
-  }
-}
 
 function getWebAppUrl() {
   try {
@@ -603,8 +558,6 @@ if (typeof module !== 'undefined') {
     toggleHighlight,
     saveReactionCountSetting,
     getAppSettings,
-    doGet,
-    groupSimilarOpinions,
     getWebAppUrl,
     saveWebAppUrl,
     getWebAppUrlFromProps,

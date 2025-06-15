@@ -46,11 +46,6 @@ Use the "Open as administrator" link in the sheet selector sidebar to launch the
 2. Enter comma-separated administrator emails in the **管理者メールアドレス** field and click **保存**.
 3. Only these users will see the "管理者として開く" link and can append `?admin=1` to access admin features.
 
-## Additional admin tools
-
-- **Opinion groups** – The *意見グループ* link groups similar answers together. The `groupSimilarOpinions` function uses Gemini API to analyze all opinions and reasons and returns a summary of majority and minority views.
-
-
 ## Continuous Integration
 
 A GitHub Actions workflow automatically pushes code to the Apps Script project whenever files in `src/` change. To enable it, add your service account credentials JSON as the `CLASP_CREDENTIALS` secret in the repository settings.
