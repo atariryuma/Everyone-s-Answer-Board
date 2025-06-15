@@ -454,7 +454,7 @@
         createAnswerCard(data) {
             const card = document.createElement('div');
             const highlightClass = (isAdmin && data.highlight) ? ' highlighted' : '';
-            card.className = 'answer-card relative glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer opacity-0' + highlightClass;
+            card.className = 'answer-card relative glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer' + highlightClass;
             card.dataset.rowIndex = data.rowIndex;
 
             const active = this.reactionTypes
