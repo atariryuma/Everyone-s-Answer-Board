@@ -46,11 +46,9 @@ Administrators see a star button on each answer card allowing them to toggle thi
 
 ### Student view for administrators
 
-Administrators normally see the same student interface. To display admin
-features on demand, use the **管理者として開く** button in the sheet selector
-sidebar. The button opens the board with `mode=admin` automatically added to the
-URL. You can also manually append `mode=admin` when sharing the link or
-projecting the board.
+Administrators now automatically see the admin interface when opening the board.
+If needed, you can append `mode=admin` to the URL to force the admin view when
+sharing or projecting the board.
 
 ## Continuous Integration
 
