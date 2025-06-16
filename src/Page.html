@@ -508,7 +508,7 @@
                 this.escapeHtml(data.reason || '') + '</p>' +
                 '</div>' +
                 '<div class="text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center">' +
-                (isAdmin ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' : '<div></div>') +
+                (isAdmin ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' : '<div><span class="font-bold text-sm text-gray-200">名無しさん</span></div>') +
                 '<div class="flex gap-2">' + reactionButtons + (isAdmin ? highlightBtn : '') + '</div>' +
                 '</div>'; 
 
@@ -652,7 +652,7 @@
                 this.escapeHtml(data.opinion || '') + '</p>' +
                 '<p class="text-gray-100 whitespace-pre-wrap break-words mt-6 text-xl">' +
                 this.escapeHtml(data.reason || '') + '</p>';
-                this.elements.modalStudentName.textContent = isAdmin ? data.name : '';
+                this.elements.modalStudentName.textContent = isAdmin ? data.name : '名無しさん';
 
             const showCount = isAdmin;
             const reactionButtons = this.reactionTypes.map(rt => {
