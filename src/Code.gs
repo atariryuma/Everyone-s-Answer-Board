@@ -43,6 +43,15 @@ const APP_PROPERTIES = {
   PUBLISH_TIMESTAMP: 'PUBLISH_TIMESTAMP'
 };
 
+// Helper to safely get the active user's email
+this.getActiveUserEmail = function() {
+  try {
+    return Session.getActiveUser().getEmail() || '';
+  } catch (e) {
+    return '';
+  }
+};
+
 /**
  * Save multiple script properties at once.
  * If a value is null or undefined the property is removed.
@@ -74,7 +83,7 @@ function getAdminSettings() {
   const adminEmails = adminEmailsRaw ? adminEmailsRaw.split(',').map(e => e.trim()).filter(Boolean) : [];
   let currentUser = '';
   try {
-   currentUser = Session.getActiveUser().getEmail();
+   currentUser = getActiveUserEmail();
   } catch (e) {}
   return {
     isPublished: properties.getProperty(APP_PROPERTIES.IS_PUBLISHED) === 'true',
@@ -172,7 +181,7 @@ function isUserAdmin() {
   const admins = getAdminEmails();
   let email = '';
   try {
-    email = Session.getActiveUser().getEmail();
+    email = getActiveUserEmail();
   } catch (e) {}
   return admins.includes(email);
 }
@@ -201,7 +210,7 @@ function doGet(e) {
   const settings = getAppSettings();
   let userEmail;
   try {
-    userEmail = Session.getActiveUser().getEmail();
+    userEmail = getActiveUserEmail();
   } catch (e) {
     userEmail = '匿名ユーザー';
   }
@@ -302,7 +311,7 @@ function getSheetData(sheetName, classFilter, sortMode, adminOverride) {
     const allValues = sheet.getDataRange().getValues();
     if (allValues.length < 1) return { header: "シートにデータがありません", rows: [] };
     
-    const userEmail = Session.getActiveUser().getEmail();
+    const userEmail = getActiveUserEmail();
     const headerIndices = getAndCacheHeaderIndices(sheetName, allValues[0]);
     const dataRows = allValues.slice(1);
 
@@ -393,7 +402,7 @@ function addReaction(rowIndex, reactionKey) {
     if (!lock.tryLock(10000)) {
       return { status: 'error', message: '他のユーザーが操作中です。しばらく待ってから再試行してください。' };
     }
-    const userEmail = Session.getActiveUser().getEmail();
+    const userEmail = getActiveUserEmail();
     if (!userEmail) return { status: 'error', message: 'ログインしていないため、操作できません。' };
     const settings = getAppSettings();
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(settings.activeSheetName);
@@ -571,5 +580,6 @@ if (typeof module !== 'undefined') {
     getSheetUpdates,
     saveDisplayMode,
     saveDeployId,
+    getActiveUserEmail: this.getActiveUserEmail,
   };
 }

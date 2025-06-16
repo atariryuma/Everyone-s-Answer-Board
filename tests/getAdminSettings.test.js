@@ -24,14 +24,12 @@ function setup() {
       ]
     })
   };
-  global.Session = {
-    getActiveUser: () => ({ getEmail: () => 'a@example.com' })
-  };
+  global.getActiveUserEmail = () => 'a@example.com';
 }
 afterEach(() => {
   delete global.PropertiesService;
   delete global.SpreadsheetApp;
-  delete global.Session;
+  delete global.getActiveUserEmail;
 });
 
 test('getAdminSettings returns board state', () => {
@@ -52,6 +50,6 @@ test('getAdminSettings returns board state', () => {
 
 test('getAdminSettings throws for non-admin user', () => {
   setup();
-  global.Session = { getActiveUser: () => ({ getEmail: () => 'other@example.com' }) };
+  global.getActiveUserEmail = () => 'other@example.com';
   expect(() => getAdminSettings()).toThrow('管理者のみ実行できます');
 });
