@@ -218,7 +218,7 @@ function doGet(e) {
   const userIsAdmin = adminEmails.includes(userEmail);
   const view = e && e.parameter && e.parameter.view;
   const mode = e && e.parameter && e.parameter.mode;
-  const isAdmin = userIsAdmin;
+  const adminMode = userIsAdmin && mode === 'admin';
 
   if (!settings.isPublished && !(userIsAdmin && (view === 'board' || mode === 'admin'))) {
     const template = HtmlService.createTemplateFromFile('Unpublished');
@@ -234,8 +234,9 @@ function doGet(e) {
   const template = HtmlService.createTemplateFromFile('Page');
   template.userEmail = userEmail;
   template.isAdmin = userIsAdmin;
-  template.showCounts = userIsAdmin && settings.reactionCountEnabled;
-  template.scoreSortEnabled = userIsAdmin && settings.scoreSortEnabled;
+  template.adminMode = adminMode;
+  template.showCounts = adminMode && settings.reactionCountEnabled;
+  template.scoreSortEnabled = adminMode && settings.scoreSortEnabled;
   return template.evaluate()
       .setTitle('StudyQuest - みんなのかいとうボード')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -262,7 +263,7 @@ function getSheetUpdates(classFilter, sortMode, clientHashesJson, adminOverride)
   if (!sheetName) {
     throw new Error('表示するシートが設定されていません。');
   }
-  const data = getSheetData(sheetName, classFilter, sortMode);
+  const data = getSheetData(sheetName, classFilter, sortMode, adminOverride);
   const clientMap = clientHashesJson ? JSON.parse(clientHashesJson) : {};
   const changedRows = [];
   const newMap = {};
@@ -318,8 +319,8 @@ function getSheetData(sheetName, classFilter, sortMode, adminOverride) {
     // ★修正: 表示モードの決定を管理者権限ベースで行う
     let displayMode = PropertiesService.getScriptProperties()
         .getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous';
-    // 管理者でない場合は強制的に匿名モード
-    if (!isAdmin) {
+    // 管理者でない場合、または管理者モードでなければ匿名
+    if (!isAdmin || !adminOverride) {
       displayMode = 'anonymous';
     }
 

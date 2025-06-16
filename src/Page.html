@@ -8,7 +8,8 @@
   <!-- deferを削除してGSAPを即座に利用可能にする -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
   <script>
-    window.isAdminPage = <?= isAdmin ? 'true' : 'false' ?>;
+    window.isAdminUser = <?= isAdmin ? 'true' : 'false' ?>;
+    window.adminMode = <?= adminMode ? 'true' : 'false' ?>;
     window.showCounts = <?= showCounts ? 'true' : 'false' ?>;
     window.scoreSortEnabled = <?= scoreSortEnabled ? 'true' : 'false' ?>;
   </script>
@@ -115,7 +116,8 @@
 
   <script>
     // 環境変数の安全な取得
-    const isAdmin = typeof window !== 'undefined' ? Boolean(window.isAdminPage) : false;
+    const isAdminUser = typeof window !== 'undefined' ? Boolean(window.isAdminUser) : false;
+    const isAdmin = typeof window !== 'undefined' ? Boolean(window.adminMode) : false;
     const showCounts = typeof window !== 'undefined' ? Boolean(window.showCounts) : false;
     const scoreSortEnabled = typeof window !== 'undefined' ? Boolean(window.scoreSortEnabled) : false;
 
@@ -498,7 +500,7 @@
 
         createAnswerCard(data) {
             const card = document.createElement('div');
-            const highlightClass = (isAdmin && data.highlight) ? ' highlighted' : '';
+            const highlightClass = (isAdminUser && data.highlight) ? ' highlighted' : '';
             card.className = 'answer-card relative glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer' + highlightClass;
             card.dataset.rowIndex = data.rowIndex;
 
@@ -521,7 +523,7 @@
             }
 
             // ★修正: リアクション数表示の判定
-            const shouldShowCount = isAdmin && showCounts;
+            const shouldShowCount = showCounts;
             const reactionButtons = this.reactionTypes.map(rt => {
                 const rData = data.reactions ? data.reactions[rt.key] || { count: 0, reacted: false } : { count: 0, reacted: false };
                 const btnClass = rData.reacted ? 'liked' : '';
@@ -533,7 +535,7 @@
 
             // ★修正: ハイライトボタンは管理者のみ
             let highlightBtn = '';
-            if (isAdmin) {
+            if (isAdminUser) {
                 const cls = data.highlight ? 'liked' : '';
                 highlightBtn = '<button type="button" class="highlight-btn like-btn ' + cls + '" aria-label="Highlight" data-row-index="' + data.rowIndex + '">' +
                     this.getIcon('star', 'w-5 h-5') +
@@ -541,7 +543,7 @@
             }
 
             // ★修正: ハイライトバッジは管理者のみ
-            const badge = (isAdmin && data.highlight) ? '<span class="highlight-badge">' + this.getIcon('star', 'w-5 h-5 fill-yellow-400 stroke-yellow-400') + '</span>' : '';
+            const badge = (isAdminUser && data.highlight) ? '<span class="highlight-badge">' + this.getIcon('star', 'w-5 h-5 fill-yellow-400 stroke-yellow-400') + '</span>' : '';
 
             card.innerHTML =
                 badge +
@@ -562,7 +564,7 @@
                 if (reaction) {
                     e.stopPropagation();
                     this.handleReaction(data.rowIndex, reaction.dataset.reaction);
-                } else if (highlightButton && isAdmin) {
+                } else if (highlightButton && isAdminUser) {
                     e.stopPropagation();
                     this.handleHighlight(data.rowIndex);
                 } else {
@@ -627,7 +629,7 @@
         }
 
         async handleHighlight(rowIndex) {
-            if (!isAdmin) return; // 管理者のみ実行可能
+            if (!isAdminUser) return; // 管理者のみ実行可能
             
             try {
                 const res = await this.gas.toggleHighlight(rowIndex);
@@ -701,7 +703,7 @@
             this.elements.modalStudentName.textContent = data.name;
 
             // ★修正: モーダルでのリアクション数表示も管理者権限に基づく
-            const shouldShowCount = isAdmin && showCounts;
+            const shouldShowCount = showCounts;
             const reactionButtons = this.reactionTypes.map(rt => {
                 const rData = data.reactions ? data.reactions[rt.key] || { count: 0, reacted: false } : { count: 0, reacted: false };
                 const btnClass = rData.reacted ? 'liked' : '';
@@ -755,7 +757,7 @@
         }
         
         setupAdminButton() {
-            if (isAdmin && this.elements.unpublishBtn) {
+            if (isAdminUser && this.elements.unpublishBtn) {
                 this.elements.unpublishBtn.addEventListener('click', async () => {
                     if (confirm('このシートの公開を終了しますか？')) {
                         try {
