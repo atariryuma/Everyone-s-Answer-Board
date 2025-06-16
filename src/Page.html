@@ -8,7 +8,6 @@
   <!-- deferを削除してGSAPを即座に利用可能にする -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
   <script>
-    window.userEmail = "<?= userEmail ?>";
     window.isAdminPage = <?= isAdmin ? 'true' : 'false' ?>;
     window.showCounts = <?= showCounts ? 'true' : 'false' ?>;
     window.scoreSortEnabled = <?= scoreSortEnabled ? 'true' : 'false' ?>;
@@ -114,7 +113,6 @@
 
   <script>
     // 環境変数の安全な取得
-    const userEmail = typeof window !== 'undefined' ? window.userEmail : "";
     const isAdmin = typeof window !== 'undefined' ? Boolean(window.isAdminPage) : false;
 
     class StudyQuestApp {
