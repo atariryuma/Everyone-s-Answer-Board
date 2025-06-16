@@ -214,13 +214,12 @@ function doGet(e) {
   const adminEmails = getAdminEmails();
   const userIsAdmin = adminEmails.includes(userEmail);
   const view = e && e.parameter && e.parameter.view;
-  const forceAdmin = e && e.parameter && e.parameter.mode === 'admin';
-  const isAdmin = userIsAdmin || forceAdmin;
+  const isAdmin = userIsAdmin;
 
   if (!settings.isPublished && !(userIsAdmin && view === 'board')) {
     const template = HtmlService.createTemplateFromFile('Unpublished');
     template.userEmail = userEmail;
-    template.isAdmin = isAdmin;
+    template.isAdmin = userIsAdmin;
     return template.evaluate().setTitle('公開終了');
   }
 
@@ -228,14 +227,11 @@ function doGet(e) {
     return HtmlService.createHtmlOutput('エラー: 表示するシートが設定されていません。スプレッドシートの「アプリ管理」メニューから設定してください。').setTitle('エラー');
   }
 
-  // ★修正: Page.html に管理者権限と設定を正しく渡す
   const template = HtmlService.createTemplateFromFile('Page');
   template.userEmail = userEmail;
-  template.isAdmin = isAdmin;
-  // ★修正: 管理者の場合のみリアクション数を表示
-  template.showCounts = isAdmin && settings.reactionCountEnabled;
-  // ★修正: 管理者の場合のみスコア順ソートを有効化
-  template.scoreSortEnabled = isAdmin && settings.scoreSortEnabled;
+  template.isAdmin = userIsAdmin;
+  template.showCounts = userIsAdmin && settings.reactionCountEnabled;
+  template.scoreSortEnabled = userIsAdmin && settings.scoreSortEnabled;
   return template.evaluate()
       .setTitle('StudyQuest - みんなのかいとうボード')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -262,7 +258,7 @@ function getSheetUpdates(classFilter, sortMode, clientHashesJson, adminOverride)
   if (!sheetName) {
     throw new Error('表示するシートが設定されていません。');
   }
-  const data = getSheetData(sheetName, classFilter, sortMode, adminOverride);
+  const data = getSheetData(sheetName, classFilter, sortMode);
   const clientMap = clientHashesJson ? JSON.parse(clientHashesJson) : {};
   const changedRows = [];
   const newMap = {};
@@ -303,7 +299,7 @@ function getSheets() {
 
 function getSheetData(sheetName, classFilter, sortMode, adminOverride) {
   sortMode = sortMode || 'newest';
-  const isAdmin = typeof adminOverride === 'boolean' ? adminOverride : isUserAdmin();
+  const isAdmin = isUserAdmin();
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
     if (!sheet) throw new Error(`指定されたシート「${sheetName}」が見つかりません。`);
