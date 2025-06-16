@@ -235,7 +235,8 @@ function doGet(e) {
   template.userEmail = userEmail;
   template.isAdmin = userIsAdmin;
   template.adminMode = adminMode;
-  template.showCounts = adminMode && settings.reactionCountEnabled;
+  // Show reaction counts only to administrators similar to the unpublish button
+  template.showCounts = userIsAdmin && settings.reactionCountEnabled;
   template.scoreSortEnabled = adminMode && settings.scoreSortEnabled;
   return template.evaluate()
       .setTitle('StudyQuest - みんなのかいとうボード')
