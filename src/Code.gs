@@ -247,14 +247,6 @@ function doGet(e) {
 // =================================================================
 
 
-function getWebAppUrl() {
-  try {
-    return ScriptApp.getService().getUrl();
-  } catch (e) {
-    return '';
-  }
-}
-
 function saveWebAppUrl(url) {
   if (!url) {
     try {
@@ -264,10 +256,6 @@ function saveWebAppUrl(url) {
     }
   }
   saveSettings({ [APP_PROPERTIES.WEB_APP_URL]: url });
-}
-
-function getWebAppUrlFromProps() {
-  return PropertiesService.getScriptProperties().getProperty(APP_PROPERTIES.WEB_APP_URL) || '';
 }
 
 function getSheetUpdates(classFilter, sortMode, clientHashesJson, adminOverride) {
@@ -587,9 +575,7 @@ if (typeof module !== 'undefined') {
     saveReactionCountSetting,
     saveScoreSortSetting,
     getAppSettings,
-  getWebAppUrl,
   saveWebAppUrl,
-  getWebAppUrlFromProps,
   getSheetUpdates,
   saveDisplayMode,
   saveDeployId,
