@@ -73,7 +73,7 @@
             <select id="sortMode" class="text-sm">
                 <option value="newest" selected>新着順</option>
                 <option value="random">ランダム</option>
-<? if (isAdmin || scoreSortEnabled) { ?>
+<? if (window.scoreSortEnabled) { ?>
                 <option value="score">スコア順</option>
 <? } ?>
             </select>
@@ -83,7 +83,9 @@
         </div>
         <div class="w-full lg:w-auto lg:min-w-[150px] text-right flex flex-col items-end gap-2">
             <p id="sheetNameText" class="text-xs text-gray-400 h-4"></p>
-            <button id="unpublishBtn" class="hidden text-white font-bold py-1 px-3 rounded-md bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-75 text-xs">公開終了</button>
+<? if (isAdmin) { ?>
+            <button id="unpublishBtn" class="text-white font-bold py-1 px-3 rounded-md bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-75 text-xs">公開終了</button>
+<? } ?>
         </div>
     </header>
 
@@ -114,6 +116,8 @@
   <script>
     // 環境変数の安全な取得
     const isAdmin = typeof window !== 'undefined' ? Boolean(window.isAdminPage) : false;
+    const showCounts = typeof window !== 'undefined' ? Boolean(window.showCounts) : false;
+    const scoreSortEnabled = typeof window !== 'undefined' ? Boolean(window.scoreSortEnabled) : false;
 
     class StudyQuestApp {
         constructor() {
@@ -156,7 +160,7 @@
             ];
 
             this.gas = {
-                getUpdates: (classFilter, sortMode, hashes) => this.runGas('getSheetUpdates', classFilter, sortMode, hashes),
+                getUpdates: (classFilter, sortMode, hashes) => this.runGas('getSheetUpdates', classFilter, sortMode, hashes, isAdmin),
                 addReaction: (rowIndex, reaction) => this.runGas('addReaction', rowIndex, reaction),
                 toggleHighlight: (rowIndex) => this.runGas('toggleHighlight', rowIndex),
                 unpublishApp: () => this.runGas('unpublishApp')
@@ -192,6 +196,43 @@
             this.adjustLayout();
             this.loadInitialData();
             this.setupAdminButton();
+            
+            // ★修正: スコア順ソートオプションを動的に追加/削除
+            this.updateSortOptions();
+        }
+
+        // ★追加: ソートオプションの更新
+        updateSortOptions() {
+            const sortMode = this.elements.sortMode;
+            let hasScoreOption = false;
+            
+            // 既存のスコア順オプションを確認
+            for (let option of sortMode.options) {
+                if (option.value === 'score') {
+                    hasScoreOption = true;
+                    break;
+                }
+            }
+            
+            // 管理者かつスコア順ソートが有効な場合のみスコア順オプションを表示
+            if (isAdmin && scoreSortEnabled && !hasScoreOption) {
+                const scoreOption = document.createElement('option');
+                scoreOption.value = 'score';
+                scoreOption.textContent = 'スコア順';
+                sortMode.appendChild(scoreOption);
+            } else if ((!isAdmin || !scoreSortEnabled) && hasScoreOption) {
+                // 条件を満たさない場合はスコア順オプションを削除
+                for (let i = sortMode.options.length - 1; i >= 0; i--) {
+                    if (sortMode.options[i].value === 'score') {
+                        sortMode.removeChild(sortMode.options[i]);
+                        break;
+                    }
+                }
+                // 削除された場合は新着順に戻す
+                if (sortMode.value === 'score') {
+                    sortMode.value = 'newest';
+                }
+            }
         }
 
         setupEventListeners() {
@@ -246,7 +287,7 @@
                                 changedRows: [
                                     {
                                         rowIndex: 1,
-                                        name: '田中太郎',
+                                        name: isAdmin ? '田中太郎' : '匿名',
                                         class: '3年A組',
                                         opinion: 'これは素晴らしいアイデアだと思います。',
                                         reason: '理由は簡潔で分かりやすく、実現可能性が高いからです。',
@@ -254,11 +295,12 @@
                                             UNDERSTAND: { count: 5, reacted: false },
                                             LIKE: { count: 2, reacted: false },
                                             CURIOUS: { count: 1, reacted: false }
-                                        }
+                                        },
+                                        highlight: false
                                     },
                                     {
                                         rowIndex: 2,
-                                        name: '佐藤花子',
+                                        name: isAdmin ? '佐藤花子' : '匿名',
                                         class: '3年B組',
                                         opinion: '少し改善の余地があると考えます。',
                                         reason: 'より多くの人の意見を聞く必要があると思います。',
@@ -266,7 +308,8 @@
                                             UNDERSTAND: { count: 3, reacted: true },
                                             LIKE: { count: 0, reacted: false },
                                             CURIOUS: { count: 0, reacted: false }
-                                        }
+                                        },
+                                        highlight: true
                                     }
                                 ],
                                 removedRows: [],
@@ -477,16 +520,18 @@
                 card.classList.add('reaction-popular');
             }
 
-            const showCount = isAdmin;
+            // ★修正: リアクション数表示の判定
+            const shouldShowCount = isAdmin && showCounts;
             const reactionButtons = this.reactionTypes.map(rt => {
                 const rData = data.reactions ? data.reactions[rt.key] || { count: 0, reacted: false } : { count: 0, reacted: false };
                 const btnClass = rData.reacted ? 'liked' : '';
                     return '<button type="button" class="reaction-btn like-btn ' + btnClass + '" aria-label="' + rt.label + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '">' +
                     this.getIcon(rt.icon, 'w-5 h-5', rData.reacted) +
-                    (showCount ? '<span class="reaction-count font-bold text-lg text-gray-200">' + rData.count + '</span>' : '') +
+                    (shouldShowCount ? '<span class="reaction-count font-bold text-lg text-gray-200">' + rData.count + '</span>' : '') +
                     '</button>';
             }).join(' ');
 
+            // ★修正: ハイライトボタンは管理者のみ
             let highlightBtn = '';
             if (isAdmin) {
                 const cls = data.highlight ? 'liked' : '';
@@ -495,6 +540,7 @@
                     '</button>';
             }
 
+            // ★修正: ハイライトバッジは管理者のみ
             const badge = (isAdmin && data.highlight) ? '<span class="highlight-badge">' + this.getIcon('star', 'w-5 h-5 fill-yellow-400 stroke-yellow-400') + '</span>' : '';
 
             card.innerHTML =
@@ -506,8 +552,8 @@
                 this.escapeHtml(data.reason || '') + '</p>' +
                 '</div>' +
                 '<div class="text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center">' +
-                (isAdmin ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' : '<div><span class="font-bold text-sm text-gray-200">名無しさん</span></div>') +
-                '<div class="flex gap-2">' + reactionButtons + (isAdmin ? highlightBtn : '') + '</div>' +
+                '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' +
+                '<div class="flex gap-2">' + reactionButtons + highlightBtn + '</div>' +
                 '</div>'; 
 
             card.addEventListener('click', (e) => {
@@ -516,7 +562,7 @@
                 if (reaction) {
                     e.stopPropagation();
                     this.handleReaction(data.rowIndex, reaction.dataset.reaction);
-                } else if (highlightButton) {
+                } else if (highlightButton && isAdmin) {
                     e.stopPropagation();
                     this.handleHighlight(data.rowIndex);
                 } else {
@@ -565,13 +611,12 @@
                             this.state.currentAnswers.sort((a, b) => b.score - a.score);
                         }
 
-                        this.updateReactionButtonUI(rowIndex, reaction, rData.count, rData.reacted);
-						            Object.keys(item.reactions).forEach(key => {
-							          const r = item.reactions[key];
-							          this.updateReactionButtonUI(rowIndex, key, r.count, r.reacted);
-						            });
-						            this.applyUpdates([item]);
-						            this.renderBoard(false, oldAnswers);
+                        Object.keys(item.reactions).forEach(key => {
+                            const r = item.reactions[key];
+                            this.updateReactionButtonUI(rowIndex, key, r.count, r.reacted);
+                        });
+                        this.applyUpdates([item]);
+                        this.renderBoard(false, oldAnswers);
                     }
                 } else if (res && res.message) {
                     alert(res.message);
@@ -582,6 +627,8 @@
         }
 
         async handleHighlight(rowIndex) {
+            if (!isAdmin) return; // 管理者のみ実行可能
+            
             try {
                 const res = await this.gas.toggleHighlight(rowIndex);
                 if (res && res.status === 'ok') {
@@ -648,88 +695,89 @@
             this.elements.modalAnswer.innerHTML = 
                 '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + 
                 this.escapeHtml(data.opinion || '') + '</p>' +
-                '<p class="text-gray-100 whitespace-pre-wrap break-words mt-6 text-xl">' +
-                this.escapeHtml(data.reason || '') + '</p>';
-                this.elements.modalStudentName.textContent = isAdmin ? data.name : '名無しさん';
+                '<p class="text-gray-100 whitespace-pre-wrap break-words mt-6 text-xl">' +
+                this.escapeHtml(data.reason || '') + '</p>';
+                
+            this.elements.modalStudentName.textContent = data.name;
 
-            const showCount = isAdmin;
-            const reactionButtons = this.reactionTypes.map(rt => {
-                const rData = data.reactions ? data.reactions[rt.key] || { count: 0, reacted: false } : { count: 0, reacted: false };
-                const btnClass = rData.reacted ? 'liked' : '';
+            // ★修正: モーダルでのリアクション数表示も管理者権限に基づく
+            const shouldShowCount = isAdmin && showCounts;
+            const reactionButtons = this.reactionTypes.map(rt => {
+                const rData = data.reactions ? data.reactions[rt.key] || { count: 0, reacted: false } : { count: 0, reacted: false };
+                const btnClass = rData.reacted ? 'liked' : '';
                     return '<button type="button" class="reaction-btn like-btn ' + btnClass + ' flex items-center gap-2 text-lg" aria-label="' + rt.label + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '">' +
                     this.getIcon(rt.icon, 'w-6 h-6', rData.reacted) +
-                    (showCount ? '<span class="reaction-count font-bold text-xl text-gray-200">' + rData.count + '</span>' : '') +
+                    (shouldShowCount ? '<span class="reaction-count font-bold text-xl text-gray-200">' + rData.count + '</span>' : '') +
                     '</button>';
-            }).join('');
-            
-            this.elements.modalReactionButtons.innerHTML = reactionButtons;
-            this.elements.modalReactionButtons.querySelectorAll('.reaction-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.handleReaction(btn.dataset.rowIndex, btn.dataset.reaction);
-                });
-            });
+            }).join('');
+            
+            this.elements.modalReactionButtons.innerHTML = reactionButtons;
+            this.elements.modalReactionButtons.querySelectorAll('.reaction-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.handleReaction(btn.dataset.rowIndex, btn.dataset.reaction);
+                });
+            });
 
-            this.elements.answerModalContainer.classList.remove('hidden');
-            
-            // GSAPアニメーション（安全な実行）
-            if (typeof gsap !== 'undefined') {
-                gsap.to(this.elements.answerModalContainer, { opacity: 1, duration: 0.3, ease: 'power2.inOut' });
-                gsap.to(this.elements.answerModalCard, { scale: 1, duration: 0.3, ease: 'power2.inOut' });
-            } else {
-                this.elements.answerModalContainer.style.opacity = '1';
-                this.elements.answerModalCard.style.transform = 'scale(1)';
-            }
+            this.elements.answerModalContainer.classList.remove('hidden');
+            
+            // GSAPアニメーション（安全な実行）
+            if (typeof gsap !== 'undefined') {
+                gsap.to(this.elements.answerModalContainer, { opacity: 1, duration: 0.3, ease: 'power2.inOut' });
+                gsap.to(this.elements.answerModalCard, { scale: 1, duration: 0.3, ease: 'power2.inOut' });
+            } else {
+                this.elements.answerModalContainer.style.opacity = '1';
+                this.elements.answerModalCard.style.transform = 'scale(1)';
+            }
 
-            this.elements.answerModalCloseBtn.focus();
-        }
+            this.elements.answerModalCloseBtn.focus();
+        }
 
-        hideAnswerModal() {
-            // GSAPアニメーション（安全な実行）
-            if (typeof gsap !== 'undefined') {
-                gsap.to(this.elements.answerModalContainer, {
-                    opacity: 0,
-                    duration: 0.3,
-                    ease: 'power2.inOut',
-                    onComplete: () => this.elements.answerModalContainer.classList.add('hidden')
-                });
-                gsap.to(this.elements.answerModalCard, { scale: 0.95, duration: 0.3, ease: 'power2.inOut' });
-            } else {
-                this.elements.answerModalContainer.style.opacity = '0';
-                this.elements.answerModalCard.style.transform = 'scale(0.95)';
-                this.elements.answerModalContainer.classList.add('hidden');
-            }
+        hideAnswerModal() {
+            // GSAPアニメーション（安全な実行）
+            if (typeof gsap !== 'undefined') {
+                gsap.to(this.elements.answerModalContainer, {
+                    opacity: 0,
+                    duration: 0.3,
+                    ease: 'power2.inOut',
+                    onComplete: () => this.elements.answerModalContainer.classList.add('hidden')
+                });
+                gsap.to(this.elements.answerModalCard, { scale: 0.95, duration: 0.3, ease: 'power2.inOut' });
+            } else {
+                this.elements.answerModalContainer.style.opacity = '0';
+                this.elements.answerModalCard.style.transform = 'scale(0.95)';
+                this.elements.answerModalContainer.classList.add('hidden');
+            }
 
-            if (this.state.lastFocusedElement) {
-                this.state.lastFocusedElement.focus();
-            }
-        }
-        
-        setupAdminButton() {
-            if (isAdmin) {
-                this.elements.unpublishBtn.classList.remove('hidden');
-                this.elements.unpublishBtn.addEventListener('click', async () => {
-                    if (confirm('このシートの公開を終了しますか？')) {
-                        try {
-                            const result = await this.gas.unpublishApp();
-                            if (result === 'unpublished') {
-                                this.elements.mainContainer.innerHTML = '<div class="text-center p-8 glass-panel rounded-xl"><p class="text-xl">公開を終了しました。</p></div>';
-                                this.elements.footer.remove();
-                                if(this.pollingInterval) clearInterval(this.pollingInterval);
-                            }
-                        } catch (error) {
-                            console.error('Unpublish failed:', error);
-                            alert('公開終了に失敗しました: ' + error.message);
-                        }
-                    }
-                });
-            }
-        }
+            if (this.state.lastFocusedElement) {
+                this.state.lastFocusedElement.focus();
+            }
+        }
+        
+        setupAdminButton() {
+            if (isAdmin && this.elements.unpublishBtn) {
+                this.elements.unpublishBtn.addEventListener('click', async () => {
+                    if (confirm('このシートの公開を終了しますか？')) {
+                        try {
+                            const result = await this.gas.unpublishApp();
+                            if (result === 'unpublished') {
+                                this.elements.mainContainer.innerHTML = '<div class="text-center p-8 glass-panel rounded-xl"><p class="text-xl">公開を終了しました。</p></div>';
+                                this.elements.footer.remove();
+                                if(this.pollingInterval) clearInterval(this.pollingInterval);
+                            }
+                        } catch (error) {
+                            console.error('Unpublish failed:', error);
+                            alert('公開終了に失敗しました: ' + error.message);
+                        }
+                    }
+                });
+            }
+        }
 
-        renderIcons() {
-            this.elements.answerModalCloseBtn.innerHTML = this.getIcon('x', 'w-6 h-6');
-            document.getElementById('footerIcon').innerHTML = this.getIcon('layout-grid', 'w-5 h-5');
-        }
+        renderIcons() {
+            this.elements.answerModalCloseBtn.innerHTML = this.getIcon('x', 'w-6 h-6');
+            document.getElementById('footerIcon').innerHTML = this.getIcon('layout-grid', 'w-5 h-5');
+        }
 
         getIcon(name, classes = 'w-6 h-6', solid = false) {
             const icons = {
@@ -755,34 +803,33 @@
             if (typeof icon === 'string') return icon;
             return solid ? icon.solid : icon.outline;
         }
-        
-        debounce(func, delay) {
-            let timeout;
-            return (...args) => {
-                clearTimeout(timeout);
-                timeout = setTimeout(() => func.apply(this, args), delay);
-            };
-        }
+        
+        debounce(func, delay) {
+            let timeout;
+            return (...args) => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), delay);
+            };
+        }
 
-        escapeHtml(str) {
-            if (typeof str !== 'string') return '';
-            return str.replace(/[&<>"']/g, function(match) {
-                return {
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#39;'
-                }[match];
-            });
-        }
-    }
+        escapeHtml(str) {
+            if (typeof str !== 'string') return '';
+            return str.replace(/[&<>"']/g, function(match) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[match];
+            });
+        }
+    }
 
-    // アプリケーションの初期化
-    document.addEventListener('DOMContentLoaded', () => {
-        new StudyQuestApp();
-    });
-  </script>
+    // アプリケーションの初期化
+    document.addEventListener('DOMContentLoaded', () => {
+        new StudyQuestApp();
+    });
+  </script>
 </body>
 </html>
-
