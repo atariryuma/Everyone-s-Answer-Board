@@ -235,6 +235,7 @@ function doGet(e) {
   template.userEmail = userEmail; // この行を追加
   template.isAdmin = isAdmin;
   template.showCounts = settings.reactionCountEnabled;
+  template.scoreSortEnabled = settings.scoreSortEnabled;
   return template.evaluate()
       .setTitle('StudyQuest - みんなのかいとうボード')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
