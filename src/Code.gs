@@ -411,7 +411,6 @@ function addReaction(rowIndex, reactionKey) {
       CURIOUS: headerIndices[COLUMN_HEADERS.CURIOUS] + 1,
     };
 
-    const selectedHeader = COLUMN_HEADERS[reactionKey];
     const selectedCol = colIndices[reactionKey];
 
     // Retrieve current lists for all reactions
