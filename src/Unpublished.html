@@ -19,6 +19,16 @@
                 <select id="sheet-selector" class="w-full p-2 rounded bg-gray-800 border border-gray-600 text-white focus:ring-2 focus:ring-yellow-400 focus:outline-none">
                     <option>シートを読み込み中...</option>
                 </select>
+                <input id="admin-emails" type="text" placeholder="admin@example.com" class="w-full p-2 rounded bg-gray-800 border border-gray-600 text-white" />
+                <select id="display-mode" class="w-full p-2 rounded bg-gray-800 border border-gray-600 text-white">
+                    <option value="anonymous">匿名表示</option>
+                    <option value="named">実名表示</option>
+                </select>
+                <label class="text-left text-sm flex items-center gap-2">
+                    <input id="reaction-toggle" type="checkbox" class="accent-yellow-500" />
+                    <span>リアクション数を表示</span>
+                </label>
+                <input id="deploy-id" type="text" placeholder="Deploy ID" class="w-full p-2 rounded bg-gray-800 border border-gray-600 text-white" />
                 <button id="publish-btn" class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-2 px-4 rounded transition disabled:opacity-50">
                     このシートで公開する
                 </button>
@@ -41,12 +51,22 @@
             const sheetSelector = document.getElementById('sheet-selector');
             const publishBtn = document.getElementById('publish-btn');
             const messageArea = document.getElementById('message-area');
+            const adminEmailsInput = document.getElementById('admin-emails');
+            const displayModeSelect = document.getElementById('display-mode');
+            const reactionToggle = document.getElementById('reaction-toggle');
+            const deployIdInput = document.getElementById('deploy-id');
 
             // シートリストを取得してプルダウンを生成
             google.script.run
                 .withSuccessHandler(populateSheets)
                 .withFailureHandler(showError)
                 .getSheets();
+
+            // 現在の設定を取得
+            google.script.run
+                .withSuccessHandler(populateSettings)
+                .withFailureHandler(showError)
+                .getAdminSettings();
 
             function populateSheets(sheetNames) {
                 sheetSelector.innerHTML = '<option value="">-- シートを選択してください --</option>';
@@ -66,6 +86,18 @@
             function showError(error) {
                 messageArea.textContent = `エラー: ${error.message}`;
                 messageArea.className = 'mt-4 text-sm h-5 text-red-400';
+            }
+
+            function showMessage(msg) {
+                messageArea.textContent = msg;
+                messageArea.className = 'mt-4 text-sm h-5 text-green-400';
+            }
+
+            function populateSettings(settings) {
+                adminEmailsInput.value = (settings.adminEmails || []).join(',');
+                displayModeSelect.value = settings.displayMode || 'anonymous';
+                reactionToggle.checked = settings.reactionCountEnabled;
+                deployIdInput.value = settings.deployId || '';
             }
 
             publishBtn.addEventListener('click', () => {
@@ -98,6 +130,34 @@
                 publishBtn.disabled = false;
                 publishBtn.textContent = 'このシートで公開する';
             }
+
+            adminEmailsInput.addEventListener('change', () => {
+                google.script.run
+                    .withSuccessHandler(showMessage)
+                    .withFailureHandler(showError)
+                    .saveAdminEmails(adminEmailsInput.value);
+            });
+
+            displayModeSelect.addEventListener('change', () => {
+                google.script.run
+                    .withSuccessHandler(showMessage)
+                    .withFailureHandler(showError)
+                    .saveDisplayMode(displayModeSelect.value);
+            });
+
+            reactionToggle.addEventListener('change', () => {
+                google.script.run
+                    .withSuccessHandler(showMessage)
+                    .withFailureHandler(showError)
+                    .saveReactionCountSetting(reactionToggle.checked);
+            });
+
+            deployIdInput.addEventListener('change', () => {
+                google.script.run
+                    .withSuccessHandler(showMessage)
+                    .withFailureHandler(showError)
+                    .saveDeployId(deployIdInput.value);
+            });
 
             document.getElementById('open-admin-btn').addEventListener('click', () => {
                 window.top.location.href = '?view=board&mode=admin';

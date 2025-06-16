@@ -10,6 +10,7 @@ function setup() {
           case 'ADMIN_EMAILS': return 'a@example.com,b@example.com';
           case 'REACTION_COUNT_ENABLED': return 'true';
           case 'SCORE_SORT_ENABLED': return 'false';
+          case 'DEPLOY_ID': return 'deploy123';
           default: return null;
         }
       }
@@ -43,6 +44,7 @@ test('getAdminSettings returns board state', () => {
     displayMode: 'named',
     adminEmails: ['a@example.com','b@example.com'],
     currentUserEmail: 'a@example.com',
+    deployId: 'deploy123',
     reactionCountEnabled: true,
     scoreSortEnabled: false
   });

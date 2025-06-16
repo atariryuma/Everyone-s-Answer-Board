@@ -36,6 +36,7 @@ const APP_PROPERTIES = {
   IS_PUBLISHED: 'IS_PUBLISHED',
   DISPLAY_MODE: 'DISPLAY_MODE',
   WEB_APP_URL: 'WEB_APP_URL',
+  DEPLOY_ID: 'DEPLOY_ID',
   ADMIN_EMAILS: 'ADMIN_EMAILS',
   REACTION_COUNT_ENABLED: 'REACTION_COUNT_ENABLED',
   SCORE_SORT_ENABLED: 'SCORE_SORT_ENABLED'
@@ -81,6 +82,7 @@ function getAdminSettings() {
     displayMode: properties.getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous',
     adminEmails: adminEmails,
     currentUserEmail: currentUser,
+    deployId: properties.getProperty(APP_PROPERTIES.DEPLOY_ID) || '',
     reactionCountEnabled: properties.getProperty(APP_PROPERTIES.REACTION_COUNT_ENABLED) === 'true',
     scoreSortEnabled: properties.getProperty(APP_PROPERTIES.SCORE_SORT_ENABLED) === 'true'
   };
@@ -143,6 +145,18 @@ function saveScoreSortSetting(enabled) {
   const value = enabled ? 'true' : 'false';
   saveSettings({ [APP_PROPERTIES.SCORE_SORT_ENABLED]: value });
   return `スコア順ソートを${enabled ? '有効' : '無効'}にしました。`;
+}
+
+function saveDisplayMode(mode) {
+  const value = mode === 'named' ? 'named' : 'anonymous';
+  saveSettings({ [APP_PROPERTIES.DISPLAY_MODE]: value });
+  return `表示モードを${value === 'named' ? '実名' : '匿名'}にしました。`;
+}
+
+function saveDeployId(id) {
+  const value = id ? String(id).trim() : '';
+  saveSettings({ [APP_PROPERTIES.DEPLOY_ID]: value });
+  return 'デプロイIDを更新しました。';
 }
 
 function getAdminEmails() {
@@ -570,9 +584,11 @@ if (typeof module !== 'undefined') {
     saveReactionCountSetting,
     saveScoreSortSetting,
     getAppSettings,
-    getWebAppUrl,
+  getWebAppUrl,
   saveWebAppUrl,
   getWebAppUrlFromProps,
   getSheetUpdates,
+  saveDisplayMode,
+  saveDeployId,
   };
 }
