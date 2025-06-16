@@ -11,7 +11,7 @@
         <h1 class="text-4xl font-bold mb-4">現在は公開されていません</h1>
         <p class="text-gray-400">先生がアプリの公開を始めたら、また見てみましょう。</p>
         
-        <!-- ★管理者用パネル（条件を満たすユーザーにのみJSで表示） -->
+        <!-- ★管理者用パネル（管理者にのみ表示） -->
         <div id="admin-panel" class="hidden mt-12 p-6 bg-gray-700 rounded-xl max-w-sm mx-auto shadow-lg border border-gray-600">
             <h2 class="text-lg font-bold mb-4 text-yellow-300">管理者用パネル</h2>
             <p class="text-sm text-gray-300 mb-4">表示するシートを選択して公開してください。</p>
@@ -28,6 +28,10 @@
                     <input id="reaction-toggle" type="checkbox" class="accent-yellow-500" />
                     <span>リアクション数を表示</span>
                 </label>
+                <label class="text-left text-sm flex items-center gap-2">
+                    <input id="score-sort-toggle" type="checkbox" class="accent-yellow-500" />
+                    <span>スコア順ソートを有効化</span>
+                </label>
                 <input id="deploy-id" type="text" placeholder="Deploy ID" class="w-full p-2 rounded bg-gray-800 border border-gray-600 text-white" />
                 <button id="publish-btn" class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-2 px-4 rounded transition disabled:opacity-50">
                     このシートで公開する
@@ -38,16 +42,22 @@
             </div>
             <p id="message-area" class="mt-4 text-sm h-5"></p>
         </div>
-        <p id="admin-message" class="hidden mt-4 text-yellow-300">このパネルは管理者のみ閲覧できます。</p>
+        
+        <!-- ★非管理者用メッセージ -->
+        <div id="non-admin-message" class="hidden mt-8 p-4 bg-gray-700 rounded-xl max-w-sm mx-auto shadow-lg border border-gray-600">
+            <p class="text-gray-300 text-sm">アプリが公開されるまでお待ちください。</p>
+        </div>
     </div>
 
     <script>
         const userEmail = "<?= userEmail ?>";
         const isAdmin = <?= isAdmin ? 'true' : 'false' ?>;
         const adminPanel = document.getElementById('admin-panel');
-        const adminMessage = document.getElementById('admin-message');
+        const nonAdminMessage = document.getElementById('non-admin-message');
 
+        // ★修正: 管理者権限に基づいて表示を制御
         if (isAdmin) {
+            // 管理者の場合: 管理パネルを表示
             adminPanel.classList.remove('hidden');
 
             const sheetSelector = document.getElementById('sheet-selector');
@@ -56,6 +66,7 @@
             const adminEmailsInput = document.getElementById('admin-emails');
             const displayModeSelect = document.getElementById('display-mode');
             const reactionToggle = document.getElementById('reaction-toggle');
+            const scoreSortToggle = document.getElementById('score-sort-toggle');
             const deployIdInput = document.getElementById('deploy-id');
 
             // シートリストを取得してプルダウンを生成
@@ -98,7 +109,8 @@
             function populateSettings(settings) {
                 adminEmailsInput.value = (settings.adminEmails || []).join(',');
                 displayModeSelect.value = settings.displayMode || 'anonymous';
-                reactionToggle.checked = settings.reactionCountEnabled;
+                reactionToggle.checked = settings.reactionCountEnabled || false;
+                scoreSortToggle.checked = settings.scoreSortEnabled || false;
                 deployIdInput.value = settings.deployId || '';
             }
 
@@ -133,6 +145,7 @@
                 publishBtn.textContent = 'このシートで公開する';
             }
 
+            // ★管理者メールアドレス設定
             adminEmailsInput.addEventListener('change', () => {
                 google.script.run
                     .withSuccessHandler(showMessage)
@@ -140,6 +153,7 @@
                     .saveAdminEmails(adminEmailsInput.value);
             });
 
+            // ★表示モード設定
             displayModeSelect.addEventListener('change', () => {
                 google.script.run
                     .withSuccessHandler(showMessage)
@@ -147,6 +161,7 @@
                     .saveDisplayMode(displayModeSelect.value);
             });
 
+            // ★リアクション数表示設定
             reactionToggle.addEventListener('change', () => {
                 google.script.run
                     .withSuccessHandler(showMessage)
@@ -154,6 +169,15 @@
                     .saveReactionCountSetting(reactionToggle.checked);
             });
 
+            // ★スコア順ソート設定（新規追加）
+            scoreSortToggle.addEventListener('change', () => {
+                google.script.run
+                    .withSuccessHandler(showMessage)
+                    .withFailureHandler(showError)
+                    .saveScoreSortSetting(scoreSortToggle.checked);
+            });
+
+            // ★デプロイID設定
             deployIdInput.addEventListener('change', () => {
                 google.script.run
                     .withSuccessHandler(showMessage)
@@ -161,13 +185,14 @@
                     .saveDeployId(deployIdInput.value);
             });
 
+            // ★管理者ボード表示ボタン
             document.getElementById('open-admin-btn').addEventListener('click', () => {
                 window.top.location.href = '?view=board&mode=admin';
             });
         } else {
-            adminMessage.classList.remove('hidden');
+            // ★非管理者の場合: 簡潔なメッセージのみ表示
+            nonAdminMessage.classList.remove('hidden');
         }
     </script>
 </body>
 </html>
-
