@@ -217,12 +217,12 @@ function doGet(e) {
   const userIsAdmin = adminEmails.includes(userEmail);
   const view = e && e.parameter && e.parameter.view;
   const forceAdmin = e && e.parameter && e.parameter.mode === 'admin';
-  const isAdmin = userIsAdmin && forceAdmin;
+  const isAdmin = userIsAdmin || forceAdmin;
 
   if (!settings.isPublished && !(userIsAdmin && view === 'board')) {
     const template = HtmlService.createTemplateFromFile('Unpublished');
     template.userEmail = userEmail;
-    template.isAdmin = userIsAdmin;
+    template.isAdmin = isAdmin;
     return template.evaluate().setTitle('公開終了');
   }
 
