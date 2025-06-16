@@ -53,6 +53,6 @@ test('mode=admin enables admin view', () => {
   doGet(e);
   const template = getTemplate();
   expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Page');
-  expect(template.isAdmin).toBe(true);
+  expect(template.adminMode).toBe(true);
 });
 
