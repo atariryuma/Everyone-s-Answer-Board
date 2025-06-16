@@ -93,7 +93,7 @@ function getAdminSettings() {
  * 指定されたシートでアプリを公開します。
  * @param {string} sheetName - 公開するシート名。
  */
-function publishApp(sheetName, scheduleUnpublish) {
+function publishApp(sheetName) {
   if (!isUserAdmin()) {
     throw new Error('管理者のみ実行できます。');
   }
@@ -105,12 +105,6 @@ function publishApp(sheetName, scheduleUnpublish) {
     [APP_PROPERTIES.ACTIVE_SHEET]: sheetName,
     [APP_PROPERTIES.PUBLISH_TIMESTAMP]: Date.now()
   });
-  if (scheduleUnpublish) {
-    ScriptApp.newTrigger('unpublishApp')
-      .timeBased()
-      .after(6 * 60 * 60 * 1000)
-      .create();
-  }
   return `「${sheetName}」を公開しました。`;
 }
 
