@@ -28,7 +28,7 @@ function setupMocks(sheet) {
       }
     })
   };
-  global.Session = { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) };
+  global.getActiveUserEmail = () => 'admin@example.com';
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({ getSheetByName: () => sheet })
   };
@@ -38,7 +38,7 @@ afterEach(() => {
   delete global.LockService;
   delete global.PropertiesService;
   delete global.SpreadsheetApp;
-  delete global.Session;
+  delete global.getActiveUserEmail;
 });
 
 test('toggleHighlight flips stored value', () => {

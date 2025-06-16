@@ -16,7 +16,7 @@ function setupMocks(rows, userEmail) {
       }
     })
   };
-  global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };
+  global.getActiveUserEmail = () => userEmail;
   global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null }) };
   global.PropertiesService = {
     getScriptProperties: () => ({
@@ -36,7 +36,7 @@ function setupMocks(rows, userEmail) {
 
 afterEach(() => {
   delete global.SpreadsheetApp;
-  delete global.Session;
+  delete global.getActiveUserEmail;
   delete global.CacheService;
   delete global.PropertiesService;
   delete global.Utilities;

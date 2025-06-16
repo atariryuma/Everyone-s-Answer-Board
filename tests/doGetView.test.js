@@ -2,7 +2,7 @@ const { doGet } = require('../src/Code.gs');
 
 afterEach(() => {
   delete global.HtmlService;
-  delete global.Session;
+  delete global.getActiveUserEmail;
   delete global.PropertiesService;
 });
 
@@ -17,7 +17,7 @@ function setup({isPublished, userEmail='admin@example.com', adminEmails='admin@e
       }
     })
   };
-  global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };
+  global.getActiveUserEmail = () => userEmail;
   const output = { setTitle: jest.fn(() => output), addMetaTag: jest.fn(() => output) };
   let template = { evaluate: () => output };
   global.HtmlService = {
