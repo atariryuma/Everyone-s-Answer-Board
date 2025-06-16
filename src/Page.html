@@ -11,6 +11,7 @@
     window.userEmail = "<?= userEmail ?>";
     window.isAdminPage = <?= isAdmin ? 'true' : 'false' ?>;
     window.showCounts = <?= showCounts ? 'true' : 'false' ?>;
+    window.scoreSortEnabled = <?= scoreSortEnabled ? 'true' : 'false' ?>;
   </script>
   <style>
     body { color: #c0caf5; }
@@ -73,6 +74,9 @@
             <select id="sortMode" class="text-sm">
                 <option value="newest" selected>新着順</option>
                 <option value="random">ランダム</option>
+<? if (isAdmin || scoreSortEnabled) { ?>
+                <option value="score">スコア順</option>
+<? } ?>
             </select>
         </div>
         <div class="flex-grow text-center w-full min-w-0">
@@ -559,6 +563,8 @@
                             this.state.currentAnswers.sort((a, b) => b.rowIndex - a.rowIndex);
                         } else if (mode === 'random') {
                             this.state.currentAnswers.sort(() => Math.random() - 0.5);
+                        } else if (mode === 'score') {
+                            this.state.currentAnswers.sort((a, b) => b.score - a.score);
                         }
 
                         this.updateReactionButtonUI(rowIndex, reaction, rData.count, rData.reacted);
