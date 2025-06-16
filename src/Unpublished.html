@@ -11,8 +11,9 @@
         <h1 class="text-4xl font-bold mb-4">現在は公開されていません</h1>
         <p class="text-gray-400">先生がアプリの公開を始めたら、また見てみましょう。</p>
         
-        <!-- ★管理者用パネル（管理者にのみ表示） -->
-        <div id="admin-panel" class="hidden mt-12 p-6 bg-gray-700 rounded-xl max-w-sm mx-auto shadow-lg border border-gray-600">
+        <!-- ★管理者用パネル / 非管理者メッセージ -->
+        <? if (isAdmin) { ?>
+        <div id="admin-panel" class="mt-12 p-6 bg-gray-700 rounded-xl max-w-sm mx-auto shadow-lg border border-gray-600">
             <h2 class="text-lg font-bold mb-4 text-yellow-300">管理者用パネル</h2>
             <p class="text-sm text-gray-300 mb-4">表示するシートを選択して公開してください。</p>
             <div class="flex flex-col gap-4">
@@ -42,11 +43,11 @@
             </div>
             <p id="message-area" class="mt-4 text-sm h-5"></p>
         </div>
-        
-        <!-- ★非管理者用メッセージ -->
-        <div id="non-admin-message" class="hidden mt-8 p-4 bg-gray-700 rounded-xl max-w-sm mx-auto shadow-lg border border-gray-600">
+        <? } else { ?>
+        <div id="non-admin-message" class="mt-8 p-4 bg-gray-700 rounded-xl max-w-sm mx-auto shadow-lg border border-gray-600">
             <p class="text-gray-300 text-sm">アプリが公開されるまでお待ちください。</p>
         </div>
+        <? } ?>
     </div>
 
     <script>
