@@ -246,30 +246,6 @@ function doGet(e) {
 // クライアントサイドから呼び出される関数
 // =================================================================
 
-/**
- * サーバー側で設定されたシートのデータを取得します。
- */
-
-function getPublishedSheetData(classFilter, sortMode, adminOverride) {
-  sortMode = sortMode || 'newest';
-  const settings = getAppSettings();
-  const sheetName = settings.activeSheetName;
-
-  if (!sheetName) {
-    throw new Error('表示するシートが設定されていません。');
-  }
-
-  // 既存のgetSheetDataロジックを再利用
-  const data = getSheetData(sheetName, classFilter, sortMode, adminOverride);
-
-  // ★改善: フロントエンドでシート名を表示できるよう、レスポンスに含める
-  return {
-    sheetName: sheetName,
-    header: data.header,
-    rows: data.rows
-  };
-}
-
 
 function getWebAppUrl() {
   try {
