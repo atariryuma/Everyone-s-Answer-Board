@@ -199,8 +199,6 @@ function checkPublishExpiry() {
   }
 }
 
-
-
 // =================================================================
 // GAS Webアプリケーションのエントリーポイント
 // =================================================================
@@ -230,22 +228,22 @@ function doGet(e) {
     return HtmlService.createHtmlOutput('エラー: 表示するシートが設定されていません。スプレッドシートの「アプリ管理」メニューから設定してください。').setTitle('エラー');
   }
 
-  // ★変更: Page.html にもメールアドレスを渡す
+  // ★修正: Page.html に管理者権限と設定を正しく渡す
   const template = HtmlService.createTemplateFromFile('Page');
-  template.userEmail = userEmail; // この行を追加
+  template.userEmail = userEmail;
   template.isAdmin = isAdmin;
-  template.showCounts = settings.reactionCountEnabled;
-  template.scoreSortEnabled = settings.scoreSortEnabled;
+  // ★修正: 管理者の場合のみリアクション数を表示
+  template.showCounts = isAdmin && settings.reactionCountEnabled;
+  // ★修正: 管理者の場合のみスコア順ソートを有効化
+  template.scoreSortEnabled = isAdmin && settings.scoreSortEnabled;
   return template.evaluate()
       .setTitle('StudyQuest - みんなのかいとうボード')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-
 // =================================================================
 // クライアントサイドから呼び出される関数
 // =================================================================
-
 
 function saveWebAppUrl(url) {
   if (!url) {
@@ -289,7 +287,6 @@ function getSheetUpdates(classFilter, sortMode, clientHashesJson, adminOverride)
   };
 }
 
-
 // =================================================================
 // 内部処理関数
 // =================================================================
@@ -314,17 +311,19 @@ function getSheetData(sheetName, classFilter, sortMode, adminOverride) {
     const allValues = sheet.getDataRange().getValues();
     if (allValues.length < 1) return { header: "シートにデータがありません", rows: [] };
     
-  const userEmail = Session.getActiveUser().getEmail();
-  const headerIndices = getAndCacheHeaderIndices(sheetName, allValues[0]);
-  const dataRows = allValues.slice(1);
+    const userEmail = Session.getActiveUser().getEmail();
+    const headerIndices = getAndCacheHeaderIndices(sheetName, allValues[0]);
+    const dataRows = allValues.slice(1);
 
-  let displayMode = PropertiesService.getScriptProperties()
-      .getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous';
-  if (!isAdmin) {
-    displayMode = 'anonymous';
-  }
+    // ★修正: 表示モードの決定を管理者権限ベースで行う
+    let displayMode = PropertiesService.getScriptProperties()
+        .getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous';
+    // 管理者でない場合は強制的に匿名モード
+    if (!isAdmin) {
+      displayMode = 'anonymous';
+    }
 
-  const emailToNameMap = displayMode === 'named' ? getRosterMap() : {};
+    const emailToNameMap = displayMode === 'named' ? getRosterMap() : {};
 
     const filteredRows = dataRows.filter(row => {
       if (!classFilter || classFilter === 'すべて') return true;
@@ -357,11 +356,14 @@ function getSheetData(sheetName, classFilter, sortMode, adminOverride) {
         const baseScore = reason.length;
         const likeMultiplier = 1 + (totalReactions * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
         const totalScore = baseScore * likeMultiplier;
+        
+        // ★修正: 名前表示の決定
         const actualName =
           displayMode === 'named' && emailToNameMap[email]
             ? emailToNameMap[email]
             : email.split('@')[0];
         const name = displayMode === 'named' ? actualName : '匿名';
+        
         return {
           rowIndex: i + 2,
           name: name,
@@ -575,9 +577,9 @@ if (typeof module !== 'undefined') {
     saveReactionCountSetting,
     saveScoreSortSetting,
     getAppSettings,
-  saveWebAppUrl,
-  getSheetUpdates,
-  saveDisplayMode,
-  saveDeployId,
+    saveWebAppUrl,
+    getSheetUpdates,
+    saveDisplayMode,
+    saveDeployId,
   };
 }
