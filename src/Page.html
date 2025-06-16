@@ -475,7 +475,7 @@
                 card.classList.add('reaction-popular');
             }
 
-            const showCount = isAdmin || window.showCounts;
+            const showCount = isAdmin;
             const reactionButtons = this.reactionTypes.map(rt => {
                 const rData = data.reactions ? data.reactions[rt.key] || { count: 0, reacted: false } : { count: 0, reacted: false };
                 const btnClass = rData.reacted ? 'liked' : '';
@@ -648,7 +648,7 @@
                 this.escapeHtml(data.reason || '') + '</p>';
                 this.elements.modalStudentName.textContent = isAdmin ? data.name : '';
 
-            const showCount = isAdmin || window.showCounts;
+            const showCount = isAdmin;
             const reactionButtons = this.reactionTypes.map(rt => {
                 const rData = data.reactions ? data.reactions[rt.key] || { count: 0, reacted: false } : { count: 0, reacted: false };
                 const btnClass = rData.reacted ? 'liked' : '';
