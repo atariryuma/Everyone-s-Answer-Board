@@ -38,14 +38,16 @@
             </div>
             <p id="message-area" class="mt-4 text-sm h-5"></p>
         </div>
+        <p id="admin-message" class="hidden mt-4 text-yellow-300">このパネルは管理者のみ閲覧できます。</p>
     </div>
 
     <script>
         const userEmail = "<?= userEmail ?>";
         const isAdmin = <?= isAdmin ? 'true' : 'false' ?>;
+        const adminPanel = document.getElementById('admin-panel');
+        const adminMessage = document.getElementById('admin-message');
 
         if (isAdmin) {
-            const adminPanel = document.getElementById('admin-panel');
             adminPanel.classList.remove('hidden');
 
             const sheetSelector = document.getElementById('sheet-selector');
@@ -162,6 +164,8 @@
             document.getElementById('open-admin-btn').addEventListener('click', () => {
                 window.top.location.href = '?view=board&mode=admin';
             });
+        } else {
+            adminMessage.classList.remove('hidden');
         }
     </script>
 </body>
