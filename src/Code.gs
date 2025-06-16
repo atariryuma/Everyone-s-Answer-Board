@@ -39,7 +39,8 @@ const APP_PROPERTIES = {
   DEPLOY_ID: 'DEPLOY_ID',
   ADMIN_EMAILS: 'ADMIN_EMAILS',
   REACTION_COUNT_ENABLED: 'REACTION_COUNT_ENABLED',
-  SCORE_SORT_ENABLED: 'SCORE_SORT_ENABLED'
+  SCORE_SORT_ENABLED: 'SCORE_SORT_ENABLED',
+  PUBLISH_TIMESTAMP: 'PUBLISH_TIMESTAMP'
 };
 
 /**
@@ -92,7 +93,7 @@ function getAdminSettings() {
  * 指定されたシートでアプリを公開します。
  * @param {string} sheetName - 公開するシート名。
  */
-function publishApp(sheetName) {
+function publishApp(sheetName, scheduleUnpublish) {
   if (!isUserAdmin()) {
     throw new Error('管理者のみ実行できます。');
   }
@@ -101,21 +102,29 @@ function publishApp(sheetName) {
   }
   saveSettings({
     [APP_PROPERTIES.IS_PUBLISHED]: 'true',
-    [APP_PROPERTIES.ACTIVE_SHEET]: sheetName
+    [APP_PROPERTIES.ACTIVE_SHEET]: sheetName,
+    [APP_PROPERTIES.PUBLISH_TIMESTAMP]: Date.now()
   });
+  if (scheduleUnpublish) {
+    ScriptApp.newTrigger('unpublishApp')
+      .timeBased()
+      .after(6 * 60 * 60 * 1000)
+      .create();
+  }
   return `「${sheetName}」を公開しました。`;
 }
 
 /**
  * アプリの公開を終了します。
  */
-function unpublishApp() {
-  if (!isUserAdmin()) {
+function unpublishApp(force) {
+  if (!force && !isUserAdmin()) {
     throw new Error('管理者のみ実行できます。');
   }
   saveSettings({
     [APP_PROPERTIES.IS_PUBLISHED]: 'false',
-    [APP_PROPERTIES.ACTIVE_SHEET]: null
+    [APP_PROPERTIES.ACTIVE_SHEET]: null,
+    [APP_PROPERTIES.PUBLISH_TIMESTAMP]: null
   });
   return 'アプリを非公開にしました。';
 }
@@ -174,12 +183,29 @@ function isUserAdmin() {
   return admins.includes(email);
 }
 
+function checkPublishExpiry() {
+  const props = PropertiesService.getScriptProperties();
+  const ts = parseInt(props.getProperty(APP_PROPERTIES.PUBLISH_TIMESTAMP) || '0', 10);
+  const isPublished = props.getProperty(APP_PROPERTIES.IS_PUBLISHED) === 'true';
+  if (isPublished && ts) {
+    const age = Date.now() - ts;
+    if (age > 6 * 60 * 60 * 1000) {
+      try {
+        unpublishApp(true);
+      } catch (e) {
+        console.error('Auto unpublish failed:', e);
+      }
+    }
+  }
+}
+
 
 
 // =================================================================
 // GAS Webアプリケーションのエントリーポイント
 // =================================================================
 function doGet(e) {
+  checkPublishExpiry();
   const settings = getAppSettings();
   let userEmail;
   try {
