@@ -8,8 +8,6 @@
   <!-- deferを削除してGSAPを即座に利用可能にする -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
   <script>
-    window.isAdminUser = <?= isAdmin ? 'true' : 'false' ?>;
-    window.adminMode = <?= adminMode ? 'true' : 'false' ?>;
     window.showCounts = <?= showCounts ? 'true' : 'false' ?>;
     window.scoreSortEnabled = <?= scoreSortEnabled ? 'true' : 'false' ?>;
   </script>
@@ -31,8 +29,49 @@
     .like-btn.liked[data-reaction="LIKE"] svg { stroke: transparent; fill: #ef4444; transform: scale(1.1); }
     .like-btn.liked[data-reaction="UNDERSTAND"] svg { stroke: transparent; fill: #fbbf24; transform: scale(1.1); }
     .like-btn.liked[data-reaction="CURIOUS"] svg { stroke: transparent; fill: #3b82f6; transform: scale(1.1); }
-    .answer-card.highlighted { border-color: #facc15; box-shadow: 0 0 15px rgba(250, 204, 21, 0.4); }
-    .highlight-badge { position: absolute; top: 0.25rem; right: 0.25rem; }
+    .answer-card.highlighted { 
+      border-color: #facc15; 
+      box-shadow: 0 0 15px rgba(250, 204, 21, 0.4);
+      transform: scale(1.02);
+      transition: all 0.3s ease;
+    }
+    .highlight-badge { 
+      position: absolute; 
+      top: 0.25rem; 
+      right: 0.25rem;
+      animation: pulse 2s infinite;
+    }
+    
+    /* Loading states */
+    .loading { opacity: 0.6; pointer-events: none; }
+    .skeleton { 
+      background: linear-gradient(90deg, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 75%);
+      background-size: 200% 100%;
+      animation: skeleton-loading 1.5s infinite;
+    }
+    
+    @keyframes skeleton-loading {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    
+    /* Improved animations */
+    .answer-card:hover {
+      transform: translateY(-4px) scale(1.02);
+      box-shadow: 0 8px 25px rgba(139, 233, 253, 0.3);
+    }
+    
+    .answer-card.highlighted:hover {
+      transform: translateY(-4px) scale(1.04);
+    }
+    
+    /* Better focus states */
+    .answer-card:focus-visible,
+    .like-btn:focus-visible {
+      outline: 3px solid #8be9fd;
+      outline-offset: 2px;
+      border-radius: 8px;
+    }
     .reaction-bg-like {
       border-color: #ef4444;
       border-image: linear-gradient(to bottom, #facc15, #fcd34d) 1;
@@ -84,9 +123,7 @@
         </div>
         <div class="w-full lg:w-auto lg:min-w-[150px] text-right flex flex-col items-end gap-2">
             <p id="sheetNameText" class="text-xs text-gray-400 h-4"></p>
-<? if (isAdmin) { ?>
             <button id="unpublishBtn" class="text-white font-bold py-1 px-3 rounded-md bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-75 text-xs">公開終了</button>
-<? } ?>
         </div>
     </header>
 
@@ -116,13 +153,18 @@
 
   <script>
     // 環境変数の安全な取得
-    const isAdminUser = typeof window !== 'undefined' ? Boolean(window.isAdminUser) : false;
-    const isAdmin = typeof window !== 'undefined' ? Boolean(window.adminMode) : false;
     const showCounts = typeof window !== 'undefined' ? Boolean(window.showCounts) : false;
     const scoreSortEnabled = typeof window !== 'undefined' ? Boolean(window.scoreSortEnabled) : false;
 
     class StudyQuestApp {
         constructor() {
+            this.initializeElements();
+            this.initializeState();
+            this.initializeConfig();
+            this.initializeGasInterface();
+        }
+
+        initializeElements() {
             this.elements = {
                 body: document.body,
                 mainContainer: document.getElementById('main-container'),
@@ -145,24 +187,52 @@
                 unpublishBtn: document.getElementById('unpublishBtn'),
                 toast: document.getElementById('toast'),
             };
-            
+
+            // Validate critical elements
+            const criticalElements = ['mainContainer', 'answersContainer', 'classFilter', 'sortMode'];
+            criticalElements.forEach(elementKey => {
+                if (!this.elements[elementKey]) {
+                    console.warn(`Element not found: ${elementKey}`);
+                }
+            });
+        }
+
+        initializeState() {
             this.state = {
                 currentAnswers: [],
                 rowHashes: {},
                 isLoading: false,
-                lastFocusedElement: null
+                lastFocusedElement: null,
+                retryCount: 0,
+                isUpdating: false
             };
-            
-            this.pollingInterval = null;
-            
+        }
+
+        initializeConfig() {
+            this.config = {
+                polling: {
+                    interval: 3000,
+                    maxRetries: 3,
+                    retryDelay: 1000
+                },
+                ui: {
+                    debounceDelay: 200,
+                    animationDuration: 300,
+                    toastDuration: 3000
+                }
+            };
+
             this.reactionTypes = [
                 { key: 'UNDERSTAND', icon: 'lightbulb', label: 'なるほど！' },
                 { key: 'LIKE', icon: 'thumb-up', label: 'いいね！' },
                 { key: 'CURIOUS', icon: 'magnifying-glass-plus', label: 'もっと知りたい！' }
             ];
+        }
+
+        initializeGasInterface() {
 
             this.gas = {
-                getUpdates: (classFilter, sortMode, hashes) => this.runGas('getSheetUpdates', classFilter, sortMode, hashes, isAdmin),
+                getUpdates: (classFilter, sortMode, hashes) => this.runGas('getSheetUpdates', classFilter, sortMode, hashes),
                 addReaction: (rowIndex, reaction) => this.runGas('addReaction', rowIndex, reaction),
                 toggleHighlight: (rowIndex) => this.runGas('toggleHighlight', rowIndex),
                 unpublishApp: () => this.runGas('unpublishApp')
@@ -216,13 +286,13 @@
                 }
             }
             
-            // 管理者かつスコア順ソートが有効な場合のみスコア順オプションを表示
-            if (isAdmin && scoreSortEnabled && !hasScoreOption) {
+            // スコア順ソートが有効な場合のみスコア順オプションを表示
+            if (scoreSortEnabled && !hasScoreOption) {
                 const scoreOption = document.createElement('option');
                 scoreOption.value = 'score';
                 scoreOption.textContent = 'スコア順';
                 sortMode.appendChild(scoreOption);
-            } else if ((!isAdmin || !scoreSortEnabled) && hasScoreOption) {
+            } else if (!scoreSortEnabled && hasScoreOption) {
                 // 条件を満たさない場合はスコア順オプションを削除
                 for (let i = sortMode.options.length - 1; i >= 0; i--) {
                     if (sortMode.options[i].value === 'score') {
@@ -238,7 +308,7 @@
         }
 
         setupEventListeners() {
-            this.elements.sizeSlider.addEventListener('input', this.debounce(() => this.renderBoard(true), 200));
+            this.elements.sizeSlider.addEventListener('input', this.debounce(() => this.renderBoard(true), this.config.ui.debounceDelay));
             this.elements.answerModalCloseBtn.addEventListener('click', () => this.hideAnswerModal());
             this.elements.answerModalContainer.addEventListener('click', (e) => {
                 if (e.target === e.currentTarget) {
@@ -289,7 +359,7 @@
                                 changedRows: [
                                     {
                                         rowIndex: 1,
-                                        name: isAdmin ? '田中太郎' : '匿名',
+                                        name: '田中太郎',
                                         class: '3年A組',
                                         opinion: 'これは素晴らしいアイデアだと思います。',
                                         reason: '理由は簡潔で分かりやすく、実現可能性が高いからです。',
@@ -302,7 +372,7 @@
                                     },
                                     {
                                         rowIndex: 2,
-                                        name: isAdmin ? '佐藤花子' : '匿名',
+                                        name: '佐藤花子',
                                         class: '3年B組',
                                         opinion: '少し改善の余地があると考えます。',
                                         reason: 'より多くの人の意見を聞く必要があると思います。',
@@ -500,7 +570,7 @@
 
         createAnswerCard(data) {
             const card = document.createElement('div');
-            const highlightClass = (isAdminUser && data.highlight) ? ' highlighted' : '';
+            const highlightClass = data.highlight ? ' highlighted' : '';
             card.className = 'answer-card relative glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer' + highlightClass;
             card.dataset.rowIndex = data.rowIndex;
 
@@ -533,17 +603,15 @@
                     '</button>';
             }).join(' ');
 
-            // ★修正: ハイライトボタンは管理者のみ
+            // ハイライトボタン
             let highlightBtn = '';
-            if (isAdminUser) {
-                const cls = data.highlight ? 'liked' : '';
-                highlightBtn = '<button type="button" class="highlight-btn like-btn ' + cls + '" aria-label="Highlight" data-row-index="' + data.rowIndex + '">' +
-                    this.getIcon('star', 'w-5 h-5') +
-                    '</button>';
-            }
+            const cls = data.highlight ? 'liked' : '';
+            highlightBtn = '<button type="button" class="highlight-btn like-btn ' + cls + '" aria-label="Highlight" data-row-index="' + data.rowIndex + '">' +
+                this.getIcon('star', 'w-5 h-5') +
+                '</button>';
 
-            // ★修正: ハイライトバッジは管理者のみ
-            const badge = (isAdminUser && data.highlight) ? '<span class="highlight-badge">' + this.getIcon('star', 'w-5 h-5 fill-yellow-400 stroke-yellow-400') + '</span>' : '';
+            // ハイライトバッジ
+            const badge = data.highlight ? '<span class="highlight-badge">' + this.getIcon('star', 'w-5 h-5 fill-yellow-400 stroke-yellow-400') + '</span>' : '';
 
             card.innerHTML =
                 badge +
@@ -629,8 +697,6 @@
         }
 
         async handleHighlight(rowIndex) {
-            if (!isAdminUser) return; // 管理者のみ実行可能
-            
             try {
                 const res = await this.gas.toggleHighlight(rowIndex);
                 if (res && res.status === 'ok') {
@@ -757,7 +823,7 @@
         }
         
         setupAdminButton() {
-            if (isAdminUser && this.elements.unpublishBtn) {
+            if (this.elements.unpublishBtn) {
                 this.elements.unpublishBtn.addEventListener('click', async () => {
                     if (confirm('このシートの公開を終了しますか？')) {
                         try {

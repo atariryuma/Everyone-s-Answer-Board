@@ -11,16 +11,14 @@
         <h1 class="text-4xl font-bold mb-4">現在は公開されていません</h1>
         <p class="text-gray-400">先生がアプリの公開を始めたら、また見てみましょう。</p>
         
-        <!-- ★管理者用パネル / 非管理者メッセージ -->
-        <? if (isAdmin) { ?>
+        <!-- 管理用パネル -->
         <div id="admin-panel" class="mt-12 p-6 bg-gray-700 rounded-xl max-w-sm mx-auto shadow-lg border border-gray-600">
-            <h2 class="text-lg font-bold mb-4 text-yellow-300">管理者用パネル</h2>
+            <h2 class="text-lg font-bold mb-4 text-yellow-300">管理用パネル</h2>
             <p class="text-sm text-gray-300 mb-4">表示するシートを選択して公開してください。</p>
             <div class="flex flex-col gap-4">
                 <select id="sheet-selector" class="w-full p-2 rounded bg-gray-800 border border-gray-600 text-white focus:ring-2 focus:ring-yellow-400 focus:outline-none">
                     <option>シートを読み込み中...</option>
                 </select>
-                <input id="admin-emails" type="text" placeholder="admin@example.com" class="w-full p-2 rounded bg-gray-800 border border-gray-600 text-white" />
                 <select id="display-mode" class="w-full p-2 rounded bg-gray-800 border border-gray-600 text-white">
                     <option value="anonymous">匿名表示</option>
                     <option value="named">実名表示</option>
@@ -43,44 +41,31 @@
             </div>
             <p id="message-area" class="mt-4 text-sm h-5"></p>
         </div>
-        <? } else { ?>
-        <div id="non-admin-message" class="mt-8 p-4 bg-gray-700 rounded-xl max-w-sm mx-auto shadow-lg border border-gray-600">
-            <p class="text-gray-300 text-sm">アプリが公開されるまでお待ちください。</p>
-        </div>
-        <? } ?>
     </div>
 
     <script>
         const userEmail = "<?= userEmail ?>";
-        const isAdmin = <?= isAdmin ? 'true' : 'false' ?>;
         const adminPanel = document.getElementById('admin-panel');
-        const nonAdminMessage = document.getElementById('non-admin-message');
 
-        // ★修正: 管理者権限に基づいて表示を制御
-        if (isAdmin) {
-            // 管理者の場合: 管理パネルを表示
-            adminPanel.classList.remove('hidden');
+        const sheetSelector = document.getElementById('sheet-selector');
+        const publishBtn = document.getElementById('publish-btn');
+        const messageArea = document.getElementById('message-area');
+        const displayModeSelect = document.getElementById('display-mode');
+        const reactionToggle = document.getElementById('reaction-toggle');
+        const scoreSortToggle = document.getElementById('score-sort-toggle');
+        const deployIdInput = document.getElementById('deploy-id');
 
-            const sheetSelector = document.getElementById('sheet-selector');
-            const publishBtn = document.getElementById('publish-btn');
-            const messageArea = document.getElementById('message-area');
-            const adminEmailsInput = document.getElementById('admin-emails');
-            const displayModeSelect = document.getElementById('display-mode');
-            const reactionToggle = document.getElementById('reaction-toggle');
-            const scoreSortToggle = document.getElementById('score-sort-toggle');
-            const deployIdInput = document.getElementById('deploy-id');
+        // シートリストを取得してプルダウンを生成
+        google.script.run
+            .withSuccessHandler(populateSheets)
+            .withFailureHandler(showError)
+            .getSheets();
 
-            // シートリストを取得してプルダウンを生成
-            google.script.run
-                .withSuccessHandler(populateSheets)
-                .withFailureHandler(showError)
-                .getSheets();
-
-            // 現在の設定を取得
-            google.script.run
-                .withSuccessHandler(populateSettings)
-                .withFailureHandler(showError)
-                .getAdminSettings();
+        // 現在の設定を取得
+        google.script.run
+            .withSuccessHandler(populateSettings)
+            .withFailureHandler(showError)
+            .getAdminSettings();
 
             function populateSheets(sheetNames) {
                 sheetSelector.innerHTML = '<option value="">-- シートを選択してください --</option>';
@@ -107,13 +92,12 @@
                 messageArea.className = 'mt-4 text-sm h-5 text-green-400';
             }
 
-            function populateSettings(settings) {
-                adminEmailsInput.value = (settings.adminEmails || []).join(',');
-                displayModeSelect.value = settings.displayMode || 'anonymous';
-                reactionToggle.checked = settings.reactionCountEnabled || false;
-                scoreSortToggle.checked = settings.scoreSortEnabled || false;
-                deployIdInput.value = settings.deployId || '';
-            }
+        function populateSettings(settings) {
+            displayModeSelect.value = settings.displayMode || 'anonymous';
+            reactionToggle.checked = settings.reactionCountEnabled || false;
+            scoreSortToggle.checked = settings.scoreSortEnabled || false;
+            deployIdInput.value = settings.deployId || '';
+        }
 
             publishBtn.addEventListener('click', () => {
                 const selectedSheet = sheetSelector.value;
@@ -146,15 +130,7 @@
                 publishBtn.textContent = 'このシートで公開する';
             }
 
-            // ★管理者メールアドレス設定
-            adminEmailsInput.addEventListener('change', () => {
-                google.script.run
-                    .withSuccessHandler(showMessage)
-                    .withFailureHandler(showError)
-                    .saveAdminEmails(adminEmailsInput.value);
-            });
-
-            // ★表示モード設定
+            // 表示モード設定
             displayModeSelect.addEventListener('change', () => {
                 google.script.run
                     .withSuccessHandler(showMessage)
@@ -162,7 +138,7 @@
                     .saveDisplayMode(displayModeSelect.value);
             });
 
-            // ★リアクション数表示設定
+            // リアクション数表示設定
             reactionToggle.addEventListener('change', () => {
                 google.script.run
                     .withSuccessHandler(showMessage)
@@ -170,7 +146,7 @@
                     .saveReactionCountSetting(reactionToggle.checked);
             });
 
-            // ★スコア順ソート設定（新規追加）
+            // スコア順ソート設定
             scoreSortToggle.addEventListener('change', () => {
                 google.script.run
                     .withSuccessHandler(showMessage)
@@ -178,7 +154,7 @@
                     .saveScoreSortSetting(scoreSortToggle.checked);
             });
 
-            // ★デプロイID設定
+            // デプロイID設定
             deployIdInput.addEventListener('change', () => {
                 google.script.run
                     .withSuccessHandler(showMessage)
@@ -186,14 +162,10 @@
                     .saveDeployId(deployIdInput.value);
             });
 
-            // ★管理者ボード表示ボタン
+            // ボード表示ボタン
             document.getElementById('open-admin-btn').addEventListener('click', () => {
-                window.top.location.href = '?view=board&mode=admin';
+                window.top.location.href = '?view=board';
             });
-        } else {
-            // ★非管理者の場合: 簡潔なメッセージのみ表示
-            nonAdminMessage.classList.remove('hidden');
-        }
     </script>
 </body>
 </html>
