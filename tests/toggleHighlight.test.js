@@ -13,24 +13,20 @@ function buildSheet() {
         getValue: () => highlight,
         setValue: (val) => { highlight = val; }
       };
-    })
+    }),
+    isSheetHidden: () => false,
+    getName: () => 'Sheet1'
   };
 }
 
 function setupMocks(sheet) {
   global.LockService = { getScriptLock: () => ({ waitLock: jest.fn(), releaseLock: jest.fn() }) };
-  global.PropertiesService = {
-    getScriptProperties: () => ({
-      getProperty: (key) => {
-        if (key === 'ADMIN_EMAILS') return 'admin@example.com';
-        if (key === 'ACTIVE_SHEET_NAME') return 'Sheet1';
-        return 'Sheet1';
-      }
-    })
-  };
-  global.getActiveUserEmail = () => 'admin@example.com';
+  global.PropertiesService = { getScriptProperties: () => ({}) };
   global.SpreadsheetApp = {
-    getActiveSpreadsheet: () => ({ getSheetByName: () => sheet })
+    getActiveSpreadsheet: () => ({
+      getSheetByName: () => sheet,
+      getSheets: () => [sheet]
+    })
   };
 }
 
@@ -38,7 +34,6 @@ afterEach(() => {
   delete global.LockService;
   delete global.PropertiesService;
   delete global.SpreadsheetApp;
-  delete global.getActiveUserEmail;
 });
 
 test('toggleHighlight flips stored value', () => {
