@@ -191,6 +191,7 @@ function doGet(e) {
   template.showScoreSort = false; // 生徒用：スコア順表示なし
   template.showPublishControls = false; // 生徒用：公開終了ボタンなし
   template.displayMode = 'anonymous'; // 生徒用：匿名表示
+  template.isAdminUser = isUserAdmin(); // 管理者かどうか
   
   return template.evaluate()
       .setTitle('StudyQuest - みんなのかいとうボード')
@@ -223,6 +224,7 @@ function doGetAdmin(e) {
   template.showScoreSort = true; // 管理者用：スコア順表示あり
   template.showPublishControls = true; // 管理者用：公開終了ボタンあり
   template.displayMode = 'named'; // 管理者用：実名表示
+  template.isAdminUser = true; // 管理者判定
   
   let userEmail;
   try {
