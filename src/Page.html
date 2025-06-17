@@ -16,6 +16,7 @@
     window.showScoreSort = <?= showScoreSort ? 'true' : 'false' ?>;
     window.showPublishControls = <?= showPublishControls ? 'true' : 'false' ?>;
     window.displayMode = '<?= displayMode || 'anonymous' ?>';
+    window.isAdminUser = <?= typeof isAdminUser !== 'undefined' && isAdminUser ? 'true' : 'false' ?>;
   </script>
   <style>
     body { color: #c0caf5; }
@@ -129,7 +130,9 @@
         </div>
         <div class="w-full lg:w-auto lg:min-w-[150px] text-right flex flex-col items-end gap-2">
             <p id="sheetNameText" class="text-xs text-gray-400 h-4"></p>
+<? if (showPublishControls) { ?>
             <button id="unpublishBtn" class="text-white font-bold py-1 px-3 rounded-md bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-75 text-xs">公開終了</button>
+<? } ?>
         </div>
     </header>
 
@@ -166,6 +169,7 @@
     const showScoreSort = typeof window !== 'undefined' ? Boolean(window.showScoreSort) : false;
     const showPublishControls = typeof window !== 'undefined' ? Boolean(window.showPublishControls) : false;
     const displayMode = typeof window !== 'undefined' ? window.displayMode : 'anonymous';
+    const isAdminUser = typeof window !== 'undefined' ? Boolean(window.isAdminUser) : false;
 
     class StudyQuestApp {
         constructor() {
@@ -678,10 +682,12 @@
 
             // ハイライトボタン
             let highlightBtn = '';
-            const cls = data.highlight ? 'liked' : '';
-            highlightBtn = '<button type="button" class="highlight-btn like-btn ' + cls + '" aria-label="Highlight" data-row-index="' + data.rowIndex + '">' +
-                this.getIcon('star', 'w-5 h-5') +
-                '</button>';
+            if (showHighlightToggle) {
+                const cls = data.highlight ? 'liked' : '';
+                highlightBtn = '<button type="button" class="highlight-btn like-btn ' + cls + '" aria-label="Highlight" data-row-index="' + data.rowIndex + '">' +
+                    this.getIcon('star', 'w-5 h-5') +
+                    '</button>';
+            }
 
             // ハイライトバッジ
             const badge = data.highlight ? '<span class="highlight-badge">' + this.getIcon('star', 'w-5 h-5 fill-yellow-400 stroke-yellow-400') + '</span>' : '';
@@ -705,7 +711,7 @@
                 if (reaction) {
                     e.stopPropagation();
                     this.handleReaction(data.rowIndex, reaction.dataset.reaction);
-                } else if (highlightButton && isAdminUser) {
+                } else if (highlightButton && isAdminUser && showHighlightToggle) {
                     e.stopPropagation();
                     this.handleHighlight(data.rowIndex);
                 } else {
