@@ -442,11 +442,11 @@
                     this.populateClassFilter(data.rows);
                     this.state.currentAnswers = data.rows;
                     this.elements.headingLabel.textContent = data.header || '問題';
-                    this.renderBoard(false, []);
+                    this.renderBoard(false);
                 } else {
                     this.state.currentAnswers = data.rows;
                     this.elements.headingLabel.textContent = data.header || '問題';
-                    this.renderBoard(true, []);
+                    this.renderBoard(false);
                 }
             } catch (error) {
                 console.error('Error loading sheet data:', error);
@@ -503,7 +503,7 @@
                 } else {
                     this.state.currentAnswers.sort((a, b) => b.score - a.score);
                 }
-                this.renderBoard(false, []);
+                this.renderBoard(false);
             } else {
                 this.updateAnswerCount();
             }
@@ -537,7 +537,7 @@
                 this.updateBoardDifferentially(container, oldRowsMap, newRowsMap, oldPositions);
             } else {
                 // Full rebuild for layout changes or when switching from/to empty state
-                this.rebuildBoard(container, newRows);
+                this.rebuildBoard(container, newRows, oldPositions, isLayoutChange);
             }
         }
 
@@ -591,7 +591,7 @@
             });
         }
 
-        rebuildBoard(container, newRows) {
+        rebuildBoard(container, newRows, oldPositions = new Map(), isLayoutChange = false) {
             const fragment = document.createDocumentFragment();
             if (newRows.length === 0) {
                 const p = document.createElement('p');
