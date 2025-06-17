@@ -507,18 +507,86 @@
         renderBoard(isLayoutChange = false, oldRows = this.state.currentAnswers) {
             const container = this.elements.answersContainer;
             const newRows = this.state.currentAnswers;
+            
+            // Performance optimization: early return for empty state
+            if (newRows.length === 0 && container.children.length === 1 && 
+                container.querySelector('.text-center.text-gray-500')) {
+                return; // Already showing "no answers" state
+            }
+            
             const oldRowsMap = new Map(oldRows.map(r => [String(r.rowIndex), r]));
+            const newRowsMap = new Map(newRows.map(r => [String(r.rowIndex), r]));
             const oldPositions = new Map();
             
+            // Store positions before any DOM changes
             container.querySelectorAll('.answer-card').forEach(card => {
                 oldPositions.set(card.dataset.rowIndex, card.getBoundingClientRect());
             });
 
             this.elements.sliderValue.textContent = this.elements.sizeSlider.value;
             container.className = 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-' + this.elements.sizeSlider.value;
-            
             this.updateAnswerCount();
             
+            // Differential update instead of full rebuild
+            if (!isLayoutChange && oldRows.length > 0 && newRows.length > 0) {
+                this.updateBoardDifferentially(container, oldRowsMap, newRowsMap, oldPositions);
+            } else {
+                // Full rebuild for layout changes or when switching from/to empty state
+                this.rebuildBoard(container, newRows);
+            }
+        }
+
+        updateBoardDifferentially(container, oldRowsMap, newRowsMap, oldPositions) {
+            const existingCards = new Map();
+            
+            // Map existing cards
+            container.querySelectorAll('.answer-card').forEach(card => {
+                existingCards.set(card.dataset.rowIndex, card);
+            });
+            
+            // Remove cards that no longer exist
+            existingCards.forEach((card, rowIndex) => {
+                if (!newRowsMap.has(rowIndex)) {
+                    if (typeof gsap !== 'undefined') {
+                        gsap.to(card, { opacity: 0, y: -20, duration: 0.3, ease: 'power2.in', onComplete: () => card.remove() });
+                    } else {
+                        card.remove();
+                    }
+                }
+            });
+            
+            // Update or add cards
+            Array.from(newRowsMap.values()).forEach((rowData, index) => {
+                const rowIndex = String(rowData.rowIndex);
+                const existingCard = existingCards.get(rowIndex);
+                
+                if (existingCard) {
+                    // Update existing card if data changed
+                    const oldData = oldRowsMap.get(rowIndex);
+                    if (!oldData || this.hasRowDataChanged(rowData, oldData)) {
+                        this.updateExistingCard(existingCard, rowData);
+                    }
+                } else {
+                    // Add new card
+                    const newCard = this.createAnswerCard(rowData);
+                    
+                    // Insert at correct position
+                    const nextCard = container.children[index];
+                    if (nextCard) {
+                        container.insertBefore(newCard, nextCard);
+                    } else {
+                        container.appendChild(newCard);
+                    }
+                    
+                    // Animate new card
+                    if (typeof gsap !== 'undefined') {
+                        gsap.from(newCard, { opacity: 0, y: 30, duration: 0.5, ease: 'power3.out' });
+                    }
+                }
+            });
+        }
+
+        rebuildBoard(container, newRows) {
             const fragment = document.createDocumentFragment();
             if (newRows.length === 0) {
                 const p = document.createElement('p');
@@ -878,6 +946,79 @@
                 clearTimeout(timeout);
                 timeout = setTimeout(() => func.apply(this, args), delay);
             };
+        }
+
+        /**
+         * Check if row data has changed for differential updates
+         * @param {Object} newData - New row data
+         * @param {Object} oldData - Old row data
+         * @returns {boolean} True if data has changed
+         */
+        hasRowDataChanged(newData, oldData) {
+            if (!oldData || !newData) return true;
+            
+            // Check key fields that would require re-rendering
+            const keyFields = ['opinion', 'reason', 'name', 'highlight'];
+            for (const field of keyFields) {
+                if (newData[field] !== oldData[field]) return true;
+            }
+            
+            // Check reaction data
+            if (!newData.reactions || !oldData.reactions) return true;
+            for (const reactionType of ['UNDERSTAND', 'LIKE', 'CURIOUS']) {
+                const newReaction = newData.reactions[reactionType] || { count: 0, reacted: false };
+                const oldReaction = oldData.reactions[reactionType] || { count: 0, reacted: false };
+                if (newReaction.count !== oldReaction.count || newReaction.reacted !== oldReaction.reacted) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+
+        /**
+         * Update existing card with new data without full recreation
+         * @param {HTMLElement} card - Existing card element
+         * @param {Object} rowData - New row data
+         */
+        updateExistingCard(card, rowData) {
+            // Update highlight status
+            const isHighlighted = rowData.highlight;
+            card.classList.toggle('highlighted', isHighlighted);
+            
+            // Update highlight badge
+            let badge = card.querySelector('.highlight-badge');
+            if (isHighlighted && !badge) {
+                badge = document.createElement('div');
+                badge.className = 'highlight-badge absolute top-0 right-0 bg-yellow-500 text-black px-2 py-1 rounded-bl text-xs font-bold';
+                badge.innerHTML = this.getIcon('star', 'w-3 h-3');
+                card.style.position = 'relative';
+                card.appendChild(badge);
+            } else if (!isHighlighted && badge) {
+                badge.remove();
+            }
+            
+            // Update reaction buttons
+            const reactionContainer = card.querySelector('.reaction-buttons');
+            if (reactionContainer && rowData.reactions) {
+                this.reactionTypes.forEach(rt => {
+                    const button = reactionContainer.querySelector(`[data-reaction="${rt.key}"]`);
+                    if (button) {
+                        const rData = rowData.reactions[rt.key] || { count: 0, reacted: false };
+                        button.classList.toggle('liked', rData.reacted);
+                        
+                        const countSpan = button.querySelector('.reaction-count');
+                        if (countSpan && showCounts) {
+                            countSpan.textContent = rData.count;
+                        }
+                    }
+                });
+            }
+            
+            // Animate the update
+            if (typeof gsap !== 'undefined') {
+                gsap.fromTo(card, { scale: 1 }, { scale: 1.02, duration: 0.1, yoyo: true, repeat: 1 });
+            }
         }
 
         escapeHtml(str) {

@@ -20,7 +20,22 @@ const CACHE_KEYS = {
   ROSTER: 'roster_name_map_v3',
   HEADERS: (sheetName) => `headers_${sheetName}_v1`
 };
-const HEADERS_CACHE_TTL = 1800; // seconds
+// Time and performance constants
+const TIME_CONSTANTS = {
+  HEADERS_CACHE_TTL: 1800, // seconds (30 minutes)
+  ROSTER_CACHE_TTL: 21600, // seconds (6 hours)
+  PUBLISH_EXPIRY_MS: 6 * 60 * 60 * 1000, // 6 hours in milliseconds
+  LOCK_WAIT_MS: 10000, // 10 seconds
+  POLLING_INTERVAL_MS: 15000 // 15 seconds
+};
+
+// UI constants
+const UI_CONSTANTS = {
+  SIDEBAR_WIDTH: 400,
+  MAX_DISPLAY_LINES: 5,
+  ANIMATION_DURATION_MS: 300
+};
+
 const ROSTER_CONFIG = {
   SHEET_NAME: 'sheet 1',
   HEADER_LAST_NAME: '姓',
@@ -28,6 +43,7 @@ const ROSTER_CONFIG = {
   HEADER_NICKNAME: 'ニックネーム',
   HEADER_EMAIL: 'Googleアカウント'
 };
+
 const SCORING_CONFIG = {
   LIKE_MULTIPLIER_FACTOR: 0.05 // 各リアクション1件ごとにスコアが5%増加
 };
@@ -165,7 +181,7 @@ function checkPublishExpiry() {
   const isPublished = props.getProperty(APP_PROPERTIES.IS_PUBLISHED) === 'true';
   if (isPublished && ts) {
     const age = Date.now() - ts;
-    if (age > 6 * 60 * 60 * 1000) {
+    if (age > TIME_CONSTANTS.PUBLISH_EXPIRY_MS) {
       try {
         unpublishApp(true);
       } catch (e) {
@@ -222,6 +238,18 @@ function saveWebAppUrl(url) {
   saveSettings({ [APP_PROPERTIES.WEB_APP_URL]: url });
 }
 
+/**
+ * Get incremental sheet updates based on client-side hashes
+ * @param {string} classFilter - Class filter ('すべて' for all classes)
+ * @param {string} sortMode - Sort mode ('newest', 'oldest', 'score', 'random')
+ * @param {string} clientHashesJson - JSON string of client-side row hashes
+ * @returns {Object} Update data containing only changed rows
+ * @returns {string} returns.sheetName - Active sheet name
+ * @returns {string} returns.header - Column header for opinions
+ * @returns {Array<Object>} returns.changedRows - Rows that have changed
+ * @returns {Array<number>} returns.removedRows - Row indices that were removed
+ * @returns {Object<string, string>} returns.hashMap - Updated hash map for client
+ */
 function getSheetUpdates(classFilter, sortMode, clientHashesJson) {
   const settings = getAppSettings();
   const sheetName = settings.activeSheetName;
@@ -315,6 +343,12 @@ function getSheetData(sheetName, classFilter = '', sortMode = 'newest') {
 
 /**
  * Add or toggle reaction with optimized batch operations
+ * @param {number} rowIndex - Target row index (1-based)
+ * @param {string} reactionKey - Reaction type key ('UNDERSTAND', 'LIKE', 'CURIOUS')
+ * @returns {Object} Response object with status and updated reaction data
+ * @returns {string} returns.status - 'ok' or 'error'
+ * @returns {string} [returns.message] - Error message if status is 'error'
+ * @returns {Object<string, {count: number, reacted: boolean}>} [returns.reactions] - Updated reaction data
  */
 function addReaction(rowIndex, reactionKey) {
   // Input validation
@@ -324,7 +358,7 @@ function addReaction(rowIndex, reactionKey) {
   
   const lock = LockService.getScriptLock();
   try {
-    if (!lock.tryLock(10000)) {
+    if (!lock.tryLock(TIME_CONSTANTS.LOCK_WAIT_MS)) {
       return { status: 'error', message: '他のユーザーが操作中です。しばらく待ってから再試行してください。' };
     }
     
@@ -417,9 +451,17 @@ function addReaction(rowIndex, reactionKey) {
   }
 }
 
+/**
+ * Toggle highlight status for a specific row
+ * @param {number} rowIndex - Target row index (1-based)
+ * @returns {Object} Response object with status and highlight state
+ * @returns {string} returns.status - 'ok' or 'error'
+ * @returns {string} [returns.message] - Error message if status is 'error'
+ * @returns {boolean} [returns.highlight] - New highlight state
+ */
 function toggleHighlight(rowIndex) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  lock.waitLock(TIME_CONSTANTS.LOCK_WAIT_MS);
   try {
     const settings = getAppSettings();
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(settings.activeSheetName);
@@ -506,7 +548,7 @@ function getRosterMap() {
     
     // Cache for 6 hours with error handling
     try {
-      cache.put(CACHE_KEYS.ROSTER, JSON.stringify(nameMap), 21600);
+      cache.put(CACHE_KEYS.ROSTER, JSON.stringify(nameMap), TIME_CONSTANTS.ROSTER_CACHE_TTL);
     } catch (error) {
       console.warn('Failed to cache roster map:', error);
     }
@@ -543,28 +585,66 @@ function filterRowsByClass(dataRows, classFilter, headerIndices) {
 }
 
 /**
- * Parse reaction string to array
+ * Parse reaction string to array with enhanced error handling
+ * @param {any} reactionStr - Reaction string (can be null/undefined)
+ * @returns {Array<string>} Array of reaction emails
  */
 function parseReactionString(reactionStr) {
-  return reactionStr ? reactionStr.toString().split(',').filter(Boolean) : [];
+  if (!reactionStr) return [];
+  
+  try {
+    return String(reactionStr).split(',').filter(Boolean).map(s => s.trim());
+  } catch (error) {
+    console.warn('Failed to parse reaction string:', reactionStr, error);
+    return [];
+  }
 }
 
 /**
- * Calculate score based on reactions
+ * Calculate score based on reactions with null safety
+ * @param {Object} reactions - Reaction data object
+ * @returns {number} Calculated score
  */
 function calculateScore(reactions) {
-  const totalReactions = reactions.UNDERSTAND.count + reactions.LIKE.count + reactions.CURIOUS.count;
+  if (!reactions || typeof reactions !== 'object') return 0;
+  
+  const understandCount = reactions.UNDERSTAND?.count ?? 0;
+  const likeCount = reactions.LIKE?.count ?? 0;
+  const curiousCount = reactions.CURIOUS?.count ?? 0;
+  
+  const totalReactions = understandCount + likeCount + curiousCount;
   const baseScore = 0; // Can be extended with additional logic
   const likeMultiplier = 1 + (totalReactions * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
-  return baseScore * likeMultiplier;
+  
+  return Math.max(0, baseScore * likeMultiplier);
 }
 
 /**
- * Process single row data
+ * Process single row data with enhanced validation
+ * @param {Array} row - Row data array
+ * @param {number} index - Row index
+ * @param {Object} headerIndices - Header to index mapping
+ * @param {string} userEmail - Current user email
+ * @param {Object} emailToNameMap - Email to name mapping
+ * @returns {Object|null} Processed row data or null if invalid
  */
 function processRowData(row, index, headerIndices, userEmail, emailToNameMap) {
-  const email = row[headerIndices[COLUMN_HEADERS.EMAIL]];
-  const opinion = row[headerIndices[COLUMN_HEADERS.OPINION]];
+  // Enhanced input validation
+  if (!Array.isArray(row) || !headerIndices || typeof headerIndices !== 'object') {
+    console.warn('Invalid input to processRowData:', { row: !!row, headerIndices: !!headerIndices });
+    return null;
+  }
+  
+  const emailIndex = headerIndices[COLUMN_HEADERS.EMAIL];
+  const opinionIndex = headerIndices[COLUMN_HEADERS.OPINION];
+  
+  if (emailIndex === undefined || opinionIndex === undefined) {
+    console.warn('Missing required header indices');
+    return null;
+  }
+  
+  const email = row[emailIndex];
+  const opinion = row[opinionIndex];
   
   if (!email || !opinion) return null;
   
@@ -635,26 +715,49 @@ function getAndCacheHeaderIndices(sheetName, headerRow) {
   const cachedHeaders = cache.get(cacheKey);
   if (cachedHeaders) { return JSON.parse(cachedHeaders); }
   const indices = findHeaderIndices(headerRow, Object.values(COLUMN_HEADERS));
-  cache.put(cacheKey, JSON.stringify(indices), HEADERS_CACHE_TTL);
+  cache.put(cacheKey, JSON.stringify(indices), TIME_CONSTANTS.HEADERS_CACHE_TTL);
   return indices;
 }
 
+/**
+ * Find header indices with optimized normalization
+ * @param {Array<string>} sheetHeaders - Sheet header row
+ * @param {Array<string>} requiredHeaders - Required header names
+ * @returns {Object<string, number>} Header name to index mapping
+ */
 function findHeaderIndices(sheetHeaders, requiredHeaders) {
   const indices = {};
-  const normalize = h => (typeof h === 'string' ? h.replace(/\s+/g, '') : h);
-  const normalizedHeaders = sheetHeaders.map(normalize);
   const missingHeaders = [];
-  requiredHeaders.forEach(headerName => {
-    const index = normalizedHeaders.indexOf(normalize(headerName));
-    if (index !== -1) {
-      indices[headerName] = index;
+  
+  // Normalize function with memoization-like behavior
+  const normalize = h => (typeof h === 'string' ? h.replace(/\s+/g, '') : String(h));
+  
+  // Pre-normalize all headers once for O(n) instead of O(n*m)
+  const normalizedSheetHeaders = sheetHeaders.map(normalize);
+  const normalizedRequiredHeaders = requiredHeaders.map(normalize);
+  
+  // Create a lookup map for faster searches
+  const headerMap = new Map();
+  normalizedSheetHeaders.forEach((normalizedHeader, index) => {
+    headerMap.set(normalizedHeader, index);
+  });
+  
+  // Find indices using Map lookup (O(1) average case)
+  requiredHeaders.forEach((originalHeader, reqIndex) => {
+    const normalizedRequired = normalizedRequiredHeaders[reqIndex];
+    const index = headerMap.get(normalizedRequired);
+    
+    if (index !== undefined) {
+      indices[originalHeader] = index;
     } else {
-      missingHeaders.push(headerName);
+      missingHeaders.push(originalHeader);
     }
   });
+  
   if (missingHeaders.length > 0) {
     throw new Error(`必須ヘッダーが見つかりません: [${missingHeaders.join(', ')}]`);
   }
+  
   return indices;
 }
 
@@ -670,7 +773,7 @@ function showSheetSelector() {
     const htmlOutput = HtmlService.createTemplateFromFile('SheetSelector')
       .evaluate()
       .setTitle('StudyQuest 管理パネル')
-      .setWidth(400);
+      .setWidth(UI_CONSTANTS.SIDEBAR_WIDTH);
     
     SpreadsheetApp.getUi().showSidebar(htmlOutput);
   } catch (error) {
