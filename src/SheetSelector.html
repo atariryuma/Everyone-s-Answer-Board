@@ -30,12 +30,29 @@
       <div>
         <h3 class="font-semibold text-gray-700 mb-3">2. 操作を選択</h3>
         <div class="flex flex-col gap-3">
-          <button id="publish-btn" class="w-full text-white font-bold py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 transition disabled:bg-blue-300">
+          <button 
+            id="publish-btn" 
+            class="w-full text-white font-bold py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 transition disabled:bg-blue-300 disabled:cursor-not-allowed"
+            aria-describedby="publish-help"
+            disabled>
+            <span id="publish-icon" class="inline-block mr-2">📊</span>
             選択したシートを公開
           </button>
-          <button id="unpublish-btn" class="w-full text-white font-bold py-2 px-4 rounded-lg bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-75 transition disabled:bg-red-300">
+          <div id="publish-help" class="text-xs text-gray-500 hidden">
+            選択したシートの内容をWebアプリとして公開します
+          </div>
+          
+          <button 
+            id="unpublish-btn" 
+            class="w-full text-white font-bold py-2 px-4 rounded-lg bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-75 transition disabled:bg-red-300 disabled:cursor-not-allowed"
+            aria-describedby="unpublish-help"
+            disabled>
+            <span id="unpublish-icon" class="inline-block mr-2">🔒</span>
             公開を終了する
           </button>
+          <div id="unpublish-help" class="text-xs text-gray-500 hidden">
+            現在公開中のアプリを非公開にします
+          </div>
         </div>
       </div>
       
@@ -71,12 +88,19 @@
       function updateUI(status) {
         selectedSheet = status.activeSheetName;
         
+        // Update status display with enhanced accessibility
         if (status.isPublished && status.activeSheetName) {
-          elements.statusText.innerHTML = `公開中: <span class="font-bold text-green-700">${status.activeSheetName}</span>`;
+          elements.statusText.innerHTML = `公開中: <span class="font-bold text-green-700">${escapeHtml(status.activeSheetName)}</span>`;
+          elements.statusText.setAttribute('aria-label', `アプリは現在公開中です。公開中のシート: ${status.activeSheetName}`);
           elements.unpublishBtn.disabled = false;
+          elements.unpublishBtn.setAttribute('aria-label', `${status.activeSheetName}の公開を終了する`);
+          document.getElementById('unpublish-help').classList.remove('hidden');
         } else {
           elements.statusText.textContent = '現在、アプリは非公開です。';
+          elements.statusText.setAttribute('aria-label', 'アプリは現在非公開状態です');
           elements.unpublishBtn.disabled = true;
+          elements.unpublishBtn.removeAttribute('aria-label');
+          document.getElementById('unpublish-help').classList.add('hidden');
         }
         
         elements.sheetList.innerHTML = '';
@@ -96,6 +120,8 @@
             radio.onchange = () => {
               selectedSheet = name;
               elements.publishBtn.disabled = false;
+              elements.publishBtn.setAttribute('aria-label', `${name}を公開する`);
+              document.getElementById('publish-help').classList.remove('hidden');
             };
 
             label.appendChild(radio);
@@ -136,13 +162,6 @@
           .unpublishApp();
       }
 
-      function setLoading(isLoading, msg = "") {
-        elements.publishBtn.disabled = isLoading;
-        elements.unpublishBtn.disabled = isLoading;
-        if (isLoading) {
-            showMessage(msg, 'blue');
-        }
-      }
 
       function showMessage(msg, color = 'red') {
         const colorClasses = { red: 'text-red-600', green: 'text-green-600', blue: 'text-blue-600' };
@@ -153,6 +172,43 @@
       function showError(error) {
         showMessage(error.message, 'red');
         setLoading(false);
+      }
+
+      /**
+       * Escape HTML to prevent XSS
+       * @param {string} str - String to escape
+       * @returns {string} Escaped string
+       */
+      function escapeHtml(str) {
+        if (typeof str !== 'string') return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      /**
+       * Show loading state with improved accessibility
+       * @param {boolean} isLoading - Loading state
+       * @param {string} msg - Loading message
+       */
+      function setLoading(isLoading, msg = "") {
+        elements.publishBtn.disabled = isLoading;
+        elements.unpublishBtn.disabled = isLoading;
+        
+        // Update ARIA attributes for screen readers
+        elements.publishBtn.setAttribute('aria-busy', isLoading.toString());
+        elements.unpublishBtn.setAttribute('aria-busy', isLoading.toString());
+        
+        if (isLoading) {
+          showMessage(msg, 'blue');
+          // Add loading icons
+          document.getElementById('publish-icon').textContent = '⏳';
+          document.getElementById('unpublish-icon').textContent = '⏳';
+        } else {
+          // Restore original icons
+          document.getElementById('publish-icon').textContent = '📊';
+          document.getElementById('unpublish-icon').textContent = '🔒';
+        }
       }
     </script>
   </body>
