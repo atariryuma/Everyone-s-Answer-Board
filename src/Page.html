@@ -10,11 +10,11 @@
   <script>
     // Template variables from server
     window.isStudentMode = <?= typeof isStudentMode !== 'undefined' ? isStudentMode : 'true' ?>;
-    window.showCounts = <?= showCounts ? 'true' : 'false' ?>;
-    window.showAdminFeatures = <?= showAdminFeatures ? 'true' : 'false' ?>;
-    window.showHighlightToggle = <?= showHighlightToggle ? 'true' : 'false' ?>;
-    window.showScoreSort = <?= showScoreSort ? 'true' : 'false' ?>;
-    window.showPublishControls = <?= showPublishControls ? 'true' : 'false' ?>;
+      window.showCounts = <?= showCounts ?>;
+      window.showAdminFeatures = <?= showAdminFeatures ?>;
+      window.showHighlightToggle = <?= showHighlightToggle ?>;
+      window.showScoreSort = <?= showScoreSort ?>;
+      window.showPublishControls = <?= showPublishControls ?>;
     window.displayMode = '<?= displayMode || 'anonymous' ?>';
     window.isAdminUser = <?= typeof isAdminUser !== 'undefined' && isAdminUser ? 'true' : 'false' ?>;
   </script>
