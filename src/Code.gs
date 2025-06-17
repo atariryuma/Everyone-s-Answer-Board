@@ -49,7 +49,8 @@ const SCORING_CONFIG = {
 };
 const APP_PROPERTIES = {
   DEPLOY_ID: 'DEPLOY_ID',
-  ADMIN_EMAILS: 'ADMIN_EMAILS' // 管理者メールアドレスのリスト（カンマ区切り）
+  ADMIN_EMAILS: 'ADMIN_EMAILS', // 管理者メールアドレスのリスト（カンマ区切り）
+  WEB_APP_URL: 'WEB_APP_URL'
 };
 
 /**
@@ -162,6 +163,17 @@ function saveDeployId(id) {
   const value = id ? String(id).trim() : '';
   saveSettings({ [APP_PROPERTIES.DEPLOY_ID]: value });
   return 'デプロイIDを更新しました。';
+}
+
+/**
+ * Save the published Web App URL to script properties
+ * @param {string} url - Web app URL
+ * @returns {string} Status message
+ */
+function saveWebAppUrl(url) {
+  const value = url ? String(url).trim() : '';
+  saveSettings({ [APP_PROPERTIES.WEB_APP_URL]: value });
+  return 'Web App URL を保存しました。';
 }
 
 
@@ -843,6 +855,7 @@ if (typeof module !== 'undefined') {
     generateWebAppUrl,
     generateAdminUrl,
     saveDeployId,
+    saveWebAppUrl,
     showSheetSelector,
     onOpen,
     openPublishedApp,
