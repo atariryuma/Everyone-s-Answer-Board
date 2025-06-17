@@ -527,7 +527,7 @@ function getRosterMap() {
  */
 function getDisplayMode() {
   return PropertiesService.getScriptProperties()
-    .getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous';
+    .getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'named';
 }
 
 /**
@@ -588,10 +588,12 @@ function processRowData(row, index, headerIndices, userEmail, emailToNameMap) {
   };
   
   const displayMode = getDisplayMode();
-  const actualName = displayMode === 'named' && emailToNameMap[email] 
-    ? emailToNameMap[email] 
-    : email.split('@')[0];
-  const name = displayMode === 'named' ? actualName : '匿名';
+  let name;
+  if (displayMode === 'named') {
+    name = emailToNameMap[email] || email.split('@')[0];
+  } else {
+    name = '匿名';
+  }
   
   const reason = row[headerIndices[COLUMN_HEADERS.REASON]] || '';
   const highlight = String(row[headerIndices[COLUMN_HEADERS.HIGHLIGHT]]).toLowerCase() === 'true';
@@ -656,6 +658,81 @@ function findHeaderIndices(sheetHeaders, requiredHeaders) {
   return indices;
 }
 
+// =================================================================
+// SIDEBAR AND UI FUNCTIONS
+// =================================================================
+
+/**
+ * Show the sheet selector sidebar in Google Sheets
+ */
+function showSheetSelector() {
+  try {
+    const htmlOutput = HtmlService.createTemplateFromFile('SheetSelector')
+      .evaluate()
+      .setTitle('StudyQuest 管理パネル')
+      .setWidth(400);
+    
+    SpreadsheetApp.getUi().showSidebar(htmlOutput);
+  } catch (error) {
+    console.error('Failed to show sheet selector:', error);
+    SpreadsheetApp.getUi().alert('サイドバーの表示に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * Create custom menu in Google Sheets
+ */
+function onOpen() {
+  try {
+    const ui = SpreadsheetApp.getUi();
+    ui.createMenu('StudyQuest 管理')
+      .addItem('📊 管理パネルを開く', 'showSheetSelector')
+      .addSeparator()
+      .addItem('🚀 アプリを開く', 'openPublishedApp')
+      .addToUi();
+  } catch (error) {
+    console.error('Failed to create menu:', error);
+  }
+}
+
+/**
+ * Open the published app in a new tab
+ */
+function openPublishedApp() {
+  try {
+    const settings = getAppSettings();
+    let url = PropertiesService.getScriptProperties().getProperty(APP_PROPERTIES.WEB_APP_URL);
+    
+    if (!url) {
+      // Try to get the URL from ScriptApp if not saved
+      try {
+        url = ScriptApp.getService().getUrl();
+        if (url) {
+          saveSettings({ [APP_PROPERTIES.WEB_APP_URL]: url });
+        }
+      } catch (e) {
+        console.warn('Could not get web app URL:', e);
+      }
+    }
+    
+    if (url) {
+      const htmlOutput = HtmlService.createHtmlOutput(`
+        <script>
+          window.open('${url}', '_blank');
+          google.script.host.close();
+        </script>
+      `).setWidth(1).setHeight(1);
+      
+      SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'アプリを開いています...');
+    } else {
+      SpreadsheetApp.getUi().alert('アプリURLが設定されていません。管理パネルからデプロイIDを設定してください。');
+    }
+  } catch (error) {
+    console.error('Failed to open app:', error);
+    SpreadsheetApp.getUi().alert('アプリの起動に失敗しました: ' + error.message);
+  }
+}
+
 // Export for Jest testing
 if (typeof module !== 'undefined') {
   module.exports = {
@@ -673,6 +750,9 @@ if (typeof module !== 'undefined') {
     getSheetUpdates,
     saveDisplayMode,
     saveDeployId,
+    showSheetSelector,
+    onOpen,
+    openPublishedApp,
     getActiveUserEmail: this.getActiveUserEmail,
   };
 }
