@@ -51,7 +51,6 @@ const APP_PROPERTIES = {
   ACTIVE_SHEET: 'ACTIVE_SHEET_NAME',
   IS_PUBLISHED: 'IS_PUBLISHED',
   DISPLAY_MODE: 'DISPLAY_MODE',
-  WEB_APP_URL: 'WEB_APP_URL',
   DEPLOY_ID: 'DEPLOY_ID',
   REACTION_COUNT_ENABLED: 'REACTION_COUNT_ENABLED',
   SCORE_SORT_ENABLED: 'SCORE_SORT_ENABLED',
@@ -227,15 +226,20 @@ function doGet(e) {
 // クライアントサイドから呼び出される関数
 // =================================================================
 
-function saveWebAppUrl(url) {
-  if (!url) {
-    try {
-      url = ScriptApp.getService().getUrl();
-    } catch (e) {
-      url = '';
-    }
+/**
+ * Generate Web App URL from deploy ID
+ * @param {string} deployId - Google Apps Script deploy ID
+ * @returns {string} Complete Web App URL
+ */
+function generateWebAppUrl(deployId) {
+  if (!deployId) {
+    console.warn('Deploy ID is empty');
+    return '';
   }
-  saveSettings({ [APP_PROPERTIES.WEB_APP_URL]: url });
+  
+  // Google Apps Script Web App URL format
+  const baseUrl = 'https://script.google.com/macros/s';
+  return `${baseUrl}/${deployId}/exec`;
 }
 
 /**
@@ -799,24 +803,18 @@ function onOpen() {
 }
 
 /**
- * Open the published app in a new tab
+ * Open the published app in a new tab using DEPLOY_ID
  */
 function openPublishedApp() {
   try {
-    const settings = getAppSettings();
-    let url = PropertiesService.getScriptProperties().getProperty(APP_PROPERTIES.WEB_APP_URL);
+    const deployId = PropertiesService.getScriptProperties().getProperty(APP_PROPERTIES.DEPLOY_ID);
     
-    if (!url) {
-      // Try to get the URL from ScriptApp if not saved
-      try {
-        url = ScriptApp.getService().getUrl();
-        if (url) {
-          saveSettings({ [APP_PROPERTIES.WEB_APP_URL]: url });
-        }
-      } catch (e) {
-        console.warn('Could not get web app URL:', e);
-      }
+    if (!deployId) {
+      SpreadsheetApp.getUi().alert('デプロイIDが設定されていません。管理パネルからデプロイIDを設定してください。');
+      return;
     }
+    
+    const url = generateWebAppUrl(deployId);
     
     if (url) {
       const htmlOutput = HtmlService.createHtmlOutput(`
@@ -828,7 +826,7 @@ function openPublishedApp() {
       
       SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'アプリを開いています...');
     } else {
-      SpreadsheetApp.getUi().alert('アプリURLが設定されていません。管理パネルからデプロイIDを設定してください。');
+      SpreadsheetApp.getUi().alert('URLの生成に失敗しました。デプロイIDを確認してください。');
     }
   } catch (error) {
     console.error('Failed to open app:', error);
@@ -849,8 +847,8 @@ if (typeof module !== 'undefined') {
     saveReactionCountSetting,
     saveScoreSortSetting,
     getAppSettings,
-    saveWebAppUrl,
     getSheetUpdates,
+    generateWebAppUrl,
     saveDisplayMode,
     saveDeployId,
     showSheetSelector,
