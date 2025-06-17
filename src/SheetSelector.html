@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudyQuest °—ÕÎ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { 
+            font-family: 'Arial', sans-serif; 
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: #e2e8f0;
+        }
+        .glass-panel { 
+            background: rgba(30, 41, 59, 0.8); 
+            backdrop-filter: blur(12px); 
+            -webkit-backdrop-filter: blur(12px); 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            border: none;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(239, 68, 68, 0.3);
+        }
+        .form-input {
+            background: rgba(51, 65, 85, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #e2e8f0;
+            transition: all 0.3s ease;
+        }
+        .form-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            outline: none;
+        }
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .status-published { background-color: #10b981; }
+        .status-unpublished { background-color: #ef4444; }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    </style>
+</head>
+<body class="p-4">
+    <div class="max-w-md mx-auto">
+        <!-- ÿ√¿¸ -->
+        <div class="glass-panel rounded-xl p-6 mb-6">
+            <h1 class="text-2xl font-bold text-center mb-2 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                StudyQuest °—ÕÎ
+            </h1>
+            <div class="flex items-center justify-center mb-4">
+                <span id="status-indicator" class="status-indicator status-unpublished"></span>
+                <span id="status-text" class="text-sm">∂Kí∫ç-...</span>
+            </div>
+        </div>
+
+        <!-- ∑¸»xûªØ∑ÁÛ -->
+        <div class="glass-panel rounded-xl p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
+                </svg>
+                ∑¸»xû
+            </h2>
+            <select id="sheet-selector" class="form-input w-full p-3 rounded-lg mb-4">
+                <option value="">∑¸»í≠º-...</option>
+            </select>
+            <div class="text-xs text-gray-400 mb-4">
+                ˛(xû-: <span id="current-sheet" class="text-blue-400 font-mono">jW</span>
+            </div>
+        </div>
+
+        <!-- lã-öªØ∑ÁÛ -->
+        <div class="glass-panel rounded-xl p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/>
+                </svg>
+                lã-ö
+            </h2>
+            
+            <div class="space-y-4">
+                <button id="publish-btn" class="btn-primary w-full text-white font-bold py-3 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    =‚ ¢◊ÍílãYã
+                </button>
+                
+                <button id="unpublish-btn" class="btn-danger w-full text-white font-bold py-3 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    = lãíBÜYã
+                </button>
+                
+                <button id="open-app-btn" class="btn-success w-full text-white font-bold py-3 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    =Ä ¢◊ÍíãO
+                </button>
+            </div>
+        </div>
+
+        <!-- h:-öªØ∑ÁÛ -->
+        <div class="glass-panel rounded-xl p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+                </svg>
+                h:-ö
+            </h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">h:‚¸…</label>
+                    <select id="display-mode" class="form-input w-full p-3 rounded-lg">
+                        <option value="named">üh:</option>
+                        <option value="anonymous">?h:</option>
+                    </select>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <label class="text-sm font-medium">Í¢Ø∑ÁÛph:</label>
+                    <input id="reaction-toggle" type="checkbox" class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" />
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <label class="text-sm font-medium">π≥¢Ω¸»</label>
+                    <input id="score-sort-toggle" type="checkbox" class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" />
+                </div>
+            </div>
+        </div>
+
+        <!-- «◊Ì§≈1ªØ∑ÁÛ -->
+        <div class="glass-panel rounded-xl p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                </svg>
+                «◊Ì§≈1
+            </h2>
+            
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-sm font-medium mb-2">«◊Ì§ID</label>
+                    <input id="deploy-id" type="text" placeholder="AKfycby..." class="form-input w-full p-3 rounded-lg text-sm font-mono" />
+                </div>
+                
+                <div id="app-url-container" class="hidden">
+                    <label class="block text-sm font-medium mb-2">¢◊ÍURL</label>
+                    <div class="flex gap-2">
+                        <input id="app-url" type="text" readonly class="form-input flex-1 p-3 rounded-lg text-sm font-mono bg-gray-700" />
+                        <button id="copy-url-btn" class="btn-primary px-4 py-3 rounded-lg text-white">
+                            =À
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ·√ª¸∏®Í¢ -->
+        <div id="message-area" class="hidden glass-panel rounded-xl p-4 mb-6">
+            <div id="message-content" class="text-sm"></div>
+        </div>
+
+        <!-- ’√ø¸ -->
+        <div class="text-center text-xs text-gray-500">
+            <p>StudyQuest v2.0 - ìjnKDhF‹¸…</p>
+        </div>
+    </div>
+
+    <script>
+        class SheetSelectorApp {
+            constructor() {
+                this.initializeElements();
+                this.initializeState();
+                this.setupEventListeners();
+                this.loadInitialData();
+            }
+
+            initializeElements() {
+                this.elements = {
+                    statusIndicator: document.getElementById('status-indicator'),
+                    statusText: document.getElementById('status-text'),
+                    sheetSelector: document.getElementById('sheet-selector'),
+                    currentSheet: document.getElementById('current-sheet'),
+                    publishBtn: document.getElementById('publish-btn'),
+                    unpublishBtn: document.getElementById('unpublish-btn'),
+                    openAppBtn: document.getElementById('open-app-btn'),
+                    displayMode: document.getElementById('display-mode'),
+                    reactionToggle: document.getElementById('reaction-toggle'),
+                    scoreSortToggle: document.getElementById('score-sort-toggle'),
+                    deployId: document.getElementById('deploy-id'),
+                    appUrlContainer: document.getElementById('app-url-container'),
+                    appUrl: document.getElementById('app-url'),
+                    copyUrlBtn: document.getElementById('copy-url-btn'),
+                    messageArea: document.getElementById('message-area'),
+                    messageContent: document.getElementById('message-content')
+                };
+            }
+
+            initializeState() {
+                this.state = {
+                    currentSettings: null,
+                    sheets: [],
+                    isLoading: false
+                };
+            }
+
+            setupEventListeners() {
+                // ∑¸»xû
+                this.elements.sheetSelector.addEventListener('change', () => {
+                    this.updateCurrentSheetDisplay();
+                });
+
+                // lã/^lã‹øÛ
+                this.elements.publishBtn.addEventListener('click', () => this.publishApp());
+                this.elements.unpublishBtn.addEventListener('click', () => this.unpublishApp());
+                this.elements.openAppBtn.addEventListener('click', () => this.openApp());
+
+                // -ö	Ù
+                this.elements.displayMode.addEventListener('change', () => this.saveDisplayMode());
+                this.elements.reactionToggle.addEventListener('change', () => this.saveReactionSetting());
+                this.elements.scoreSortToggle.addEventListener('change', () => this.saveScoreSetting());
+                this.elements.deployId.addEventListener('change', () => this.saveDeployId());
+
+                // URL ≥‘¸
+                this.elements.copyUrlBtn.addEventListener('click', () => this.copyUrl());
+            }
+
+            async loadInitialData() {
+                this.setLoading(true);
+                try {
+                    // ∑¸»Íπ»í÷ó
+                    const sheets = await this.runGas('getSheets');
+                    this.populateSheets(sheets);
+
+                    // ˛(n-öí÷ó
+                    const settings = await this.runGas('getAdminSettings');
+                    this.updateSettingsDisplay(settings);
+
+                    this.showMessage('-öí≠º~W_', 'success');
+                } catch (error) {
+                    this.showMessage(`®È¸: ${error.message}`, 'error');
+                } finally {
+                    this.setLoading(false);
+                }
+            }
+
+            populateSheets(sheets) {
+                this.state.sheets = sheets;
+                this.elements.sheetSelector.innerHTML = '<option value="">-- ∑¸»íxûWfO`UD --</option>';
+                
+                if (sheets && sheets.length > 0) {
+                    sheets.forEach(name => {
+                        const option = document.createElement('option');
+                        option.value = name;
+                        option.textContent = name;
+                        this.elements.sheetSelector.appendChild(option);
+                    });
+                } else {
+                    this.elements.sheetSelector.innerHTML = '<option value="">)(Ô˝j∑¸»LBä~[ì</option>';
+                }
+            }
+
+            updateSettingsDisplay(settings) {
+                this.state.currentSettings = settings;
+
+                // π∆¸øπh:
+                if (settings.isPublished) {
+                    this.elements.statusIndicator.className = 'status-indicator status-published';
+                    this.elements.statusText.textContent = 'lã-';
+                    this.elements.publishBtn.disabled = true;
+                    this.elements.unpublishBtn.disabled = false;
+                    this.elements.openAppBtn.disabled = false;
+                } else {
+                    this.elements.statusIndicator.className = 'status-indicator status-unpublished';
+                    this.elements.statusText.textContent = '^lã';
+                    this.elements.publishBtn.disabled = false;
+                    this.elements.unpublishBtn.disabled = true;
+                    this.elements.openAppBtn.disabled = true;
+                }
+
+                // ∑¸»xû
+                this.elements.sheetSelector.value = settings.activeSheetName || '';
+                this.updateCurrentSheetDisplay();
+
+                // h:-ö
+                this.elements.displayMode.value = settings.displayMode || 'named';
+                this.elements.reactionToggle.checked = settings.reactionCountEnabled || false;
+                this.elements.scoreSortToggle.checked = settings.scoreSortEnabled || false;
+                this.elements.deployId.value = settings.deployId || '';
+
+                // URLh:
+                if (settings.webAppUrl) {
+                    this.elements.appUrl.value = settings.webAppUrl;
+                    this.elements.appUrlContainer.classList.remove('hidden');
+                }
+            }
+
+            updateCurrentSheetDisplay() {
+                const selectedSheet = this.elements.sheetSelector.value;
+                this.elements.currentSheet.textContent = selectedSheet || 'jW';
+            }
+
+            async publishApp() {
+                const selectedSheet = this.elements.sheetSelector.value;
+                if (!selectedSheet) {
+                    this.showMessage('∑¸»íxûWfO`UD', 'warning');
+                    return;
+                }
+
+                this.setLoading(true);
+                try {
+                    const result = await this.runGas('publishApp', selectedSheet);
+                    this.showMessage(result, 'success');
+                    await this.loadInitialData();
+                } catch (error) {
+                    this.showMessage(`lã®È¸: ${error.message}`, 'error');
+                } finally {
+                    this.setLoading(false);
+                }
+            }
+
+            async unpublishApp() {
+                if (!confirm('¢◊ÍnlãíBÜW~YK')) return;
+
+                this.setLoading(true);
+                try {
+                    const result = await this.runGas('unpublishApp');
+                    this.showMessage(result, 'success');
+                    await this.loadInitialData();
+                } catch (error) {
+                    this.showMessage(`^lã®È¸: ${error.message}`, 'error');
+                } finally {
+                    this.setLoading(false);
+                }
+            }
+
+            openApp() {
+                if (this.state.currentSettings && this.state.currentSettings.webAppUrl) {
+                    window.open(this.state.currentSettings.webAppUrl, '_blank');
+                } else {
+                    this.showMessage('¢◊ÍURLL-öUåfD~[ì', 'warning');
+                }
+            }
+
+            async saveDisplayMode() {
+                try {
+                    const result = await this.runGas('saveDisplayMode', this.elements.displayMode.value);
+                    this.showMessage(result, 'success');
+                } catch (error) {
+                    this.showMessage(`-ö®È¸: ${error.message}`, 'error');
+                }
+            }
+
+            async saveReactionSetting() {
+                try {
+                    const result = await this.runGas('saveReactionCountSetting', this.elements.reactionToggle.checked);
+                    this.showMessage(result, 'success');
+                } catch (error) {
+                    this.showMessage(`-ö®È¸: ${error.message}`, 'error');
+                }
+            }
+
+            async saveScoreSetting() {
+                try {
+                    const result = await this.runGas('saveScoreSortSetting', this.elements.scoreSortToggle.checked);
+                    this.showMessage(result, 'success');
+                } catch (error) {
+                    this.showMessage(`-ö®È¸: ${error.message}`, 'error');
+                }
+            }
+
+            async saveDeployId() {
+                try {
+                    const result = await this.runGas('saveDeployId', this.elements.deployId.value);
+                    this.showMessage(result, 'success');
+                } catch (error) {
+                    this.showMessage(`-ö®È¸: ${error.message}`, 'error');
+                }
+            }
+
+            copyUrl() {
+                if (this.elements.appUrl.value) {
+                    navigator.clipboard.writeText(this.elements.appUrl.value);
+                    this.showMessage('URLí≥‘¸W~W_', 'success');
+                }
+            }
+
+            showMessage(message, type = 'info') {
+                const colorClasses = {
+                    success: 'text-green-400 border-green-400',
+                    error: 'text-red-400 border-red-400',
+                    warning: 'text-yellow-400 border-yellow-400',
+                    info: 'text-blue-400 border-blue-400'
+                };
+
+                this.elements.messageContent.textContent = message;
+                this.elements.messageContent.className = `text-sm ${colorClasses[type] || colorClasses.info}`;
+                this.elements.messageArea.classList.remove('hidden');
+
+                setTimeout(() => {
+                    this.elements.messageArea.classList.add('hidden');
+                }, 5000);
+            }
+
+            setLoading(isLoading) {
+                this.state.isLoading = isLoading;
+                const buttons = [this.elements.publishBtn, this.elements.unpublishBtn];
+                
+                buttons.forEach(btn => {
+                    if (isLoading) {
+                        btn.disabled = true;
+                        btn.classList.add('animate-pulse');
+                    } else {
+                        btn.classList.remove('animate-pulse');
+                    }
+                });
+
+                if (isLoading) {
+                    this.elements.statusText.textContent = 'Ê-...';
+                }
+            }
+
+            runGas(functionName, ...args) {
+                return new Promise((resolve, reject) => {
+                    google.script.run
+                        .withSuccessHandler(resolve)
+                        .withFailureHandler(reject)
+                        [functionName](...args);
+                });
+            }
+        }
+
+        // ¢◊Í
+        document.addEventListener('DOMContentLoaded', () => {
+            new SheetSelectorApp();
+        });
+    </script>
+</body>
+</html>
