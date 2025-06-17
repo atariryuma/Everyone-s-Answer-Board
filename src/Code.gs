@@ -48,13 +48,8 @@ const SCORING_CONFIG = {
   LIKE_MULTIPLIER_FACTOR: 0.05 // 各リアクション1件ごとにスコアが5%増加
 };
 const APP_PROPERTIES = {
-  ACTIVE_SHEET: 'ACTIVE_SHEET_NAME',
-  IS_PUBLISHED: 'IS_PUBLISHED',
-  DISPLAY_MODE: 'DISPLAY_MODE',
   DEPLOY_ID: 'DEPLOY_ID',
-  REACTION_COUNT_ENABLED: 'REACTION_COUNT_ENABLED',
-  SCORE_SORT_ENABLED: 'SCORE_SORT_ENABLED',
-  PUBLISH_TIMESTAMP: 'PUBLISH_TIMESTAMP'
+  ADMIN_EMAILS: 'ADMIN_EMAILS' // 管理者メールアドレスのリスト（カンマ区切り）
 };
 
 /**
@@ -72,6 +67,39 @@ function safeGetUserEmail() {
 
 // Legacy compatibility
 this.getActiveUserEmail = safeGetUserEmail;
+
+/**
+ * Check if current user is an admin
+ * @returns {boolean} True if user is admin
+ */
+function isUserAdmin() {
+  const userEmail = safeGetUserEmail();
+  if (!userEmail) return false;
+  
+  const adminEmails = PropertiesService.getScriptProperties().getProperty(APP_PROPERTIES.ADMIN_EMAILS);
+  if (!adminEmails) return false;
+  
+  const adminList = adminEmails.split(',').map(email => email.trim().toLowerCase());
+  return adminList.includes(userEmail.toLowerCase());
+}
+
+/**
+ * Get admin emails list
+ * @returns {Array<string>} List of admin emails
+ */
+function getAdminEmails() {
+  const adminEmails = PropertiesService.getScriptProperties().getProperty(APP_PROPERTIES.ADMIN_EMAILS);
+  return adminEmails ? adminEmails.split(',').map(email => email.trim()) : [];
+}
+
+/**
+ * Set admin emails list
+ * @param {Array<string>} emails - List of admin emails
+ */
+function setAdminEmails(emails) {
+  const emailString = Array.isArray(emails) ? emails.join(',') : '';
+  saveSettings({ [APP_PROPERTIES.ADMIN_EMAILS]: emailString });
+}
 
 /**
  * Batch save script properties with null/undefined cleanup
@@ -98,73 +126,36 @@ function saveSettings(settings) {
 }
 
 /**
- * 管理パネルの初期化に必要なデータを取得します。
- * @returns {object} - 現在の公開状態とシートのリスト
+ * Get admin panel data - simplified for new structure
+ * @returns {object} - Admin panel data
  */
 function getAdminSettings() {
   const properties = PropertiesService.getScriptProperties();
-  const allSheets = getSheets(); // 既存の関数を再利用
+  const allSheets = getSheets();
   let currentUser = '';
   try {
    currentUser = getActiveUserEmail();
   } catch (e) {}
+  
   return {
-    isPublished: properties.getProperty(APP_PROPERTIES.IS_PUBLISHED) === 'true',
-    activeSheetName: properties.getProperty(APP_PROPERTIES.ACTIVE_SHEET),
     allSheets: allSheets,
-    displayMode: properties.getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous',
     currentUserEmail: currentUser,
     deployId: properties.getProperty(APP_PROPERTIES.DEPLOY_ID) || '',
-    reactionCountEnabled: properties.getProperty(APP_PROPERTIES.REACTION_COUNT_ENABLED) === 'true',
-    scoreSortEnabled: properties.getProperty(APP_PROPERTIES.SCORE_SORT_ENABLED) === 'true'
+    adminEmails: getAdminEmails(),
+    isUserAdmin: isUserAdmin()
   };
 }
 
 /**
- * 指定されたシートでアプリを公開します。
- * @param {string} sheetName - 公開するシート名。
+ * Generate admin URL with authentication
+ * @returns {string} Admin URL
  */
-function publishApp(sheetName) {
-  if (!sheetName) {
-    throw new Error('シート名が指定されていません。');
-  }
-  saveSettings({
-    [APP_PROPERTIES.IS_PUBLISHED]: 'true',
-    [APP_PROPERTIES.ACTIVE_SHEET]: sheetName,
-    [APP_PROPERTIES.PUBLISH_TIMESTAMP]: Date.now()
-  });
-  return `「${sheetName}」を公開しました。`;
-}
-
-/**
- * アプリの公開を終了します。
- */
-function unpublishApp(force) {
-  saveSettings({
-    [APP_PROPERTIES.IS_PUBLISHED]: 'false',
-    [APP_PROPERTIES.ACTIVE_SHEET]: null,
-    [APP_PROPERTIES.PUBLISH_TIMESTAMP]: null
-  });
-  return 'アプリを非公開にしました。';
-}
-
-
-function saveReactionCountSetting(enabled) {
-  const value = enabled ? 'true' : 'false';
-  saveSettings({ [APP_PROPERTIES.REACTION_COUNT_ENABLED]: value });
-  return `リアクション数表示を${enabled ? '有効' : '無効'}にしました。`;
-}
-
-function saveScoreSortSetting(enabled) {
-  const value = enabled ? 'true' : 'false';
-  saveSettings({ [APP_PROPERTIES.SCORE_SORT_ENABLED]: value });
-  return `スコア順ソートを${enabled ? '有効' : '無効'}にしました。`;
-}
-
-function saveDisplayMode(mode) {
-  const value = mode === 'named' ? 'named' : 'anonymous';
-  saveSettings({ [APP_PROPERTIES.DISPLAY_MODE]: value });
-  return `表示モードを${value === 'named' ? '実名' : '匿名'}にしました。`;
+function generateAdminUrl() {
+  const deployId = PropertiesService.getScriptProperties().getProperty(APP_PROPERTIES.DEPLOY_ID);
+  if (!deployId) return '';
+  
+  const baseUrl = generateWebAppUrl(deployId);
+  return `${baseUrl}?admin=true`;
 }
 
 function saveDeployId(id) {
@@ -174,51 +165,75 @@ function saveDeployId(id) {
 }
 
 
-function checkPublishExpiry() {
-  const props = PropertiesService.getScriptProperties();
-  const ts = parseInt(props.getProperty(APP_PROPERTIES.PUBLISH_TIMESTAMP) || '0', 10);
-  const isPublished = props.getProperty(APP_PROPERTIES.IS_PUBLISHED) === 'true';
-  if (isPublished && ts) {
-    const age = Date.now() - ts;
-    if (age > TIME_CONSTANTS.PUBLISH_EXPIRY_MS) {
-      try {
-        unpublishApp(true);
-      } catch (e) {
-        console.error('Auto unpublish failed:', e);
-      }
-    }
-  }
-}
 
 // =================================================================
 // GAS Webアプリケーションのエントリーポイント
 // =================================================================
+/**
+ * Default entry point - Student view (anonymous, no counts, no admin features)
+ * @param {Object} e - URL parameters
+ * @returns {HtmlOutput} Student interface
+ */
 function doGet(e) {
-  checkPublishExpiry();
-  const settings = getAppSettings();
+  // Check if admin mode is requested
+  const isAdminMode = e.parameter.admin === 'true';
+  
+  if (isAdminMode) {
+    return doGetAdmin(e);
+  }
+  
+  // Default student view
+  const template = HtmlService.createTemplateFromFile('Page');
+  template.isStudentMode = true;
+  template.showCounts = false; // 生徒用：リアクション数非表示
+  template.showAdminFeatures = false; // 生徒用：管理機能非表示
+  template.showHighlightToggle = false; // 生徒用：ハイライト切り替えなし
+  template.showScoreSort = false; // 生徒用：スコア順表示なし
+  template.showPublishControls = false; // 生徒用：公開終了ボタンなし
+  template.displayMode = 'anonymous'; // 生徒用：匿名表示
+  
+  return template.evaluate()
+      .setTitle('StudyQuest - みんなのかいとうボード')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/**
+ * Admin entry point - Full featured view with access control
+ * @param {Object} e - URL parameters  
+ * @returns {HtmlOutput} Admin interface or access denied
+ */
+function doGetAdmin(e) {
+  // Check admin access
+  if (!isUserAdmin()) {
+    return HtmlService.createHtmlOutput(`
+      <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+        <h2>アクセス拒否</h2>
+        <p>管理者権限が必要です。</p>
+        <p>アクセス権限がない場合は、管理者にお問い合わせください。</p>
+      </div>
+    `).setTitle('アクセス拒否');
+  }
+  
+  // Admin view with all features
+  const template = HtmlService.createTemplateFromFile('Page');
+  template.isStudentMode = false;
+  template.showCounts = true; // 管理者用：リアクション数表示
+  template.showAdminFeatures = true; // 管理者用：管理機能表示
+  template.showHighlightToggle = true; // 管理者用：ハイライト切り替えあり
+  template.showScoreSort = true; // 管理者用：スコア順表示あり
+  template.showPublishControls = true; // 管理者用：公開終了ボタンあり
+  template.displayMode = 'named'; // 管理者用：実名表示
+  
   let userEmail;
   try {
     userEmail = getActiveUserEmail();
   } catch (e) {
-    userEmail = '匿名ユーザー';
+    userEmail = '管理者';
   }
-
-  if (!settings.isPublished) {
-    const template = HtmlService.createTemplateFromFile('Unpublished');
-    template.userEmail = userEmail;
-    return template.evaluate().setTitle('公開終了');
-  }
-
-  if (!settings.activeSheetName) {
-    return HtmlService.createHtmlOutput('エラー: 表示するシートが設定されていません。スプレッドシートの「アプリ管理」メニューから設定してください。').setTitle('エラー');
-  }
-
-  const template = HtmlService.createTemplateFromFile('Page');
   template.userEmail = userEmail;
-  template.showCounts = settings.reactionCountEnabled;
-  template.scoreSortEnabled = settings.scoreSortEnabled;
+  
   return template.evaluate()
-      .setTitle('StudyQuest - みんなのかいとうボード')
+      .setTitle('StudyQuest - 管理者ビュー')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
@@ -243,46 +258,25 @@ function generateWebAppUrl(deployId) {
 }
 
 /**
- * Get incremental sheet updates based on client-side hashes
- * @param {string} classFilter - Class filter ('すべて' for all classes)
- * @param {string} sortMode - Sort mode ('newest', 'oldest', 'score', 'random')
- * @param {string} clientHashesJson - JSON string of client-side row hashes
- * @returns {Object} Update data containing only changed rows
- * @returns {string} returns.sheetName - Active sheet name
- * @returns {string} returns.header - Column header for opinions
- * @returns {Array<Object>} returns.changedRows - Rows that have changed
- * @returns {Array<number>} returns.removedRows - Row indices that were removed
- * @returns {Object<string, string>} returns.hashMap - Updated hash map for client
+ * Get sheet data for display - simplified version
+ * @param {string} sheetName - Sheet name to get data from  
+ * @param {string} classFilter - Class filter
+ * @param {string} sortMode - Sort mode
+ * @param {boolean} isAdminMode - Whether admin features are enabled
+ * @returns {Object} Sheet data
  */
-function getSheetUpdates(classFilter, sortMode, clientHashesJson) {
-  const settings = getAppSettings();
-  const sheetName = settings.activeSheetName;
+function getSheetDataForDisplay(sheetName, classFilter = '', sortMode = 'newest', isAdminMode = false) {
+  // Use first available sheet if no sheet name provided
   if (!sheetName) {
-    throw new Error('表示するシートが設定されていません。');
+    const sheets = getSheets();
+    sheetName = sheets.length > 0 ? sheets[0] : null;
   }
-  const data = getSheetData(sheetName, classFilter, sortMode);
-  const clientMap = clientHashesJson ? JSON.parse(clientHashesJson) : {};
-  const changedRows = [];
-  const newMap = {};
-  data.rows.forEach(row => {
-    const hash = Utilities.base64Encode(
-      Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify(row))
-    );
-    newMap[row.rowIndex] = hash;
-    if (clientMap[String(row.rowIndex)] !== hash) {
-      changedRows.push(Object.assign({ hash: hash }, row));
-    }
-  });
-  const removedRows = Object.keys(clientMap)
-    .filter(k => !newMap[k])
-    .map(k => parseInt(k, 10));
-  return {
-    sheetName: sheetName,
-    header: data.header,
-    changedRows: changedRows,
-    removedRows: removedRows,
-    hashMap: newMap,
-  };
+  
+  if (!sheetName) {
+    throw new Error('利用可能なシートがありません。');
+  }
+  
+  return getSheetData(sheetName, classFilter, sortMode, isAdminMode);
 }
 
 // =================================================================
@@ -304,9 +298,10 @@ function getSheets() {
  * @param {string} sheetName Target sheet name
  * @param {string} classFilter Class filter ('すべて' for all)
  * @param {string} sortMode Sort mode ('newest', 'oldest', 'score')
+ * @param {boolean} isAdminMode Whether admin features are enabled
  * @returns {Object} Processed sheet data
  */
-function getSheetData(sheetName, classFilter = '', sortMode = 'newest') {
+function getSheetData(sheetName, classFilter = '', sortMode = 'newest', isAdminMode = false) {
   if (!sheetName) {
     throw new Error('シート名が指定されていません');
   }
@@ -325,12 +320,13 @@ function getSheetData(sheetName, classFilter = '', sortMode = 'newest') {
     const userEmail = safeGetUserEmail();
     const headerIndices = getAndCacheHeaderIndices(sheetName, allValues[0]);
     const dataRows = allValues.slice(1);
-    const displayMode = getDisplayMode();
+    // Admin mode: named display, Student mode: anonymous
+    const displayMode = isAdminMode ? 'named' : 'anonymous';
     const emailToNameMap = displayMode === 'named' ? getRosterMap() : {};
 
     const filteredRows = filterRowsByClass(dataRows, classFilter, headerIndices);
     const rows = filteredRows
-      .map((row, i) => processRowData(row, i, headerIndices, userEmail, emailToNameMap))
+      .map((row, i) => processRowData(row, i, headerIndices, userEmail, emailToNameMap, displayMode))
       .filter(Boolean);
     
     const sortedRows = sortRows(rows, sortMode);
@@ -371,14 +367,20 @@ function addReaction(rowIndex, reactionKey) {
       return { status: 'error', message: 'ログインしていないため、操作できません。' };
     }
     
-    const settings = getAppSettings();
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(settings.activeSheetName);
+    // Use first available sheet
+    const sheets = getSheets();
+    if (sheets.length === 0) {
+      throw new Error('利用可能なシートがありません。');
+    }
+    
+    const sheetName = sheets[0];
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
     if (!sheet) {
-      throw new Error(`シート '${settings.activeSheetName}' が見つかりません。`);
+      throw new Error(`シート '${sheetName}' が見つかりません。`);
     }
 
     // Batch header lookup with caching
-    const headerIndices = getAndCacheHeaderIndices(settings.activeSheetName, 
+    const headerIndices = getAndCacheHeaderIndices(sheetName, 
       sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
     );
     
@@ -467,9 +469,15 @@ function toggleHighlight(rowIndex) {
   const lock = LockService.getScriptLock();
   lock.waitLock(TIME_CONSTANTS.LOCK_WAIT_MS);
   try {
-    const settings = getAppSettings();
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(settings.activeSheetName);
-    if (!sheet) throw new Error(`シート '${settings.activeSheetName}' が見つかりません。`);
+    // Use first available sheet
+    const sheets = getSheets();
+    if (sheets.length === 0) {
+      throw new Error('利用可能なシートがありません。');
+    }
+    
+    const sheetName = sheets[0];
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+    if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
 
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     const headerIndices = findHeaderIndices(headerRow, [COLUMN_HEADERS.HIGHLIGHT]);
@@ -488,15 +496,6 @@ function toggleHighlight(rowIndex) {
   }
 }
 
-function getAppSettings() {
-  const properties = PropertiesService.getScriptProperties();
-  return {
-    isPublished: properties.getProperty(APP_PROPERTIES.IS_PUBLISHED) === 'true',
-    activeSheetName: properties.getProperty(APP_PROPERTIES.ACTIVE_SHEET),
-    reactionCountEnabled: properties.getProperty(APP_PROPERTIES.REACTION_COUNT_ENABLED) === 'true',
-    scoreSortEnabled: properties.getProperty(APP_PROPERTIES.SCORE_SORT_ENABLED) === 'true'
-  };
-}
 
 /**
  * Get roster mapping with improved caching strategy
@@ -568,13 +567,6 @@ function getRosterMap() {
 // HELPER FUNCTIONS FOR DATA PROCESSING
 // =================================================================
 
-/**
- * Get display mode with fallback
- */
-function getDisplayMode() {
-  return PropertiesService.getScriptProperties()
-    .getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'named';
-}
 
 /**
  * Filter rows by class with null safety
@@ -630,9 +622,10 @@ function calculateScore(reactions) {
  * @param {Object} headerIndices - Header to index mapping
  * @param {string} userEmail - Current user email
  * @param {Object} emailToNameMap - Email to name mapping
+ * @param {string} displayMode - Display mode ('named' or 'anonymous')
  * @returns {Object|null} Processed row data or null if invalid
  */
-function processRowData(row, index, headerIndices, userEmail, emailToNameMap) {
+function processRowData(row, index, headerIndices, userEmail, emailToNameMap, displayMode = 'anonymous') {
   // Enhanced input validation
   if (!Array.isArray(row) || !headerIndices || typeof headerIndices !== 'object') {
     console.warn('Invalid input to processRowData:', { row: !!row, headerIndices: !!headerIndices });
@@ -671,7 +664,6 @@ function processRowData(row, index, headerIndices, userEmail, emailToNameMap) {
     }
   };
   
-  const displayMode = getDisplayMode();
   let name;
   if (displayMode === 'named') {
     name = emailToNameMap[email] || email.split('@')[0];
@@ -840,20 +832,21 @@ if (typeof module !== 'undefined') {
     COLUMN_HEADERS,
     findHeaderIndices,
     getSheetData,
+    getSheetDataForDisplay,
     getAdminSettings,
     doGet,
+    doGetAdmin,
     addReaction,
     toggleHighlight,
-    saveReactionCountSetting,
-    saveScoreSortSetting,
-    getAppSettings,
-    getSheetUpdates,
     generateWebAppUrl,
-    saveDisplayMode,
+    generateAdminUrl,
     saveDeployId,
     showSheetSelector,
     onOpen,
     openPublishedApp,
+    isUserAdmin,
+    getAdminEmails,
+    setAdminEmails,
     getActiveUserEmail: this.getActiveUserEmail,
   };
 }
