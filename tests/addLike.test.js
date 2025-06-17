@@ -8,7 +8,8 @@ function buildSheet() {
     COLUMN_HEADERS.REASON,
     COLUMN_HEADERS.UNDERSTAND,
     COLUMN_HEADERS.LIKE,
-    COLUMN_HEADERS.CURIOUS
+    COLUMN_HEADERS.CURIOUS,
+    COLUMN_HEADERS.HIGHLIGHT
   ];
   const values = {
     UNDERSTAND: 'a@example.com',
@@ -21,32 +22,49 @@ function buildSheet() {
       if (row === 1) {
         return { getValues: () => [headerRow] };
       }
-      const header = headerRow[col - 1];
+      const headers = headerRow.slice(col - 1, col - 1 + numCols);
       return {
-        getValue: () => values[Object.keys(COLUMN_HEADERS).find(k => COLUMN_HEADERS[k] === header)] || '',
+        getValue: () => values[Object.keys(COLUMN_HEADERS).find(k => COLUMN_HEADERS[k] === headers[0])] || '',
         setValue: (val) => {
-          const key = Object.keys(COLUMN_HEADERS).find(k => COLUMN_HEADERS[k] === header);
+          const key = Object.keys(COLUMN_HEADERS).find(k => COLUMN_HEADERS[k] === headers[0]);
           values[key] = val;
+        },
+        getValues: () => [headers.map(h => {
+          const key = Object.keys(COLUMN_HEADERS).find(k => COLUMN_HEADERS[k] === h);
+          return values[key] || '';
+        })],
+        setValues: (rows) => {
+          headers.forEach((h, i) => {
+            const key = Object.keys(COLUMN_HEADERS).find(k => COLUMN_HEADERS[k] === h);
+            values[key] = rows[0][i];
+          });
         }
       };
     }),
+    isSheetHidden: () => false,
+    getName: () => 'Sheet1',
     values
   };
 }
 
 function setupMocks(userEmail, sheet) {
   global.LockService = { getScriptLock: () => ({ tryLock: jest.fn(() => true), releaseLock: jest.fn() }) };
-  global.getActiveUserEmail = () => userEmail;
-  global.PropertiesService = { getScriptProperties: () => ({ getProperty: () => 'Sheet1' }) };
+  global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };
+  global.PropertiesService = { getScriptProperties: () => ({}) };
+  global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null }) };
   global.SpreadsheetApp = {
-    getActiveSpreadsheet: () => ({ getSheetByName: () => sheet })
+    getActiveSpreadsheet: () => ({
+      getSheetByName: () => sheet,
+      getSheets: () => [sheet]
+    })
   };
 }
 
 afterEach(() => {
   delete global.LockService;
-  delete global.getActiveUserEmail;
+  delete global.Session;
   delete global.PropertiesService;
+  delete global.CacheService;
   delete global.SpreadsheetApp;
 });
 

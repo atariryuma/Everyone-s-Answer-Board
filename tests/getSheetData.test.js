@@ -23,12 +23,11 @@ function setupMocks(rows, userEmail, adminEmails = '') {
   };
 
   // Mock other global services
-  global.getActiveUserEmail = () => userEmail;
+  global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };
   global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null }) };
   global.PropertiesService = {
     getScriptProperties: () => ({
       getProperty: (key) => {
-        if (key === 'DISPLAY_MODE') return 'named';
         if (key === 'ADMIN_EMAILS') return adminEmails;
         return null;
       }
@@ -38,7 +37,7 @@ function setupMocks(rows, userEmail, adminEmails = '') {
 
 afterEach(() => {
   delete global.SpreadsheetApp;
-  delete global.getActiveUserEmail;
+  delete global.Session;
   delete global.CacheService;
   delete global.PropertiesService;
 });
