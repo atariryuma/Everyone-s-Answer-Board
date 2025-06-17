@@ -37,36 +37,49 @@ const APP_PROPERTIES = {
   DISPLAY_MODE: 'DISPLAY_MODE',
   WEB_APP_URL: 'WEB_APP_URL',
   DEPLOY_ID: 'DEPLOY_ID',
-  ADMIN_EMAILS: 'ADMIN_EMAILS',
   REACTION_COUNT_ENABLED: 'REACTION_COUNT_ENABLED',
   SCORE_SORT_ENABLED: 'SCORE_SORT_ENABLED',
   PUBLISH_TIMESTAMP: 'PUBLISH_TIMESTAMP'
 };
 
-// Helper to safely get the active user's email
-this.getActiveUserEmail = function() {
+/**
+ * Safely get the active user's email with fallback
+ * @returns {string} User email or empty string
+ */
+function safeGetUserEmail() {
   try {
     return Session.getActiveUser().getEmail() || '';
-  } catch (e) {
+  } catch (error) {
+    console.warn('Failed to get user email:', error);
     return '';
   }
-};
+}
+
+// Legacy compatibility
+this.getActiveUserEmail = safeGetUserEmail;
 
 /**
- * Save multiple script properties at once.
- * If a value is null or undefined the property is removed.
- * @param {Object<string, any>} settings Key-value pairs to store.
+ * Batch save script properties with null/undefined cleanup
+ * @param {Object<string, any>} settings Key-value pairs to store
  */
 function saveSettings(settings) {
+  if (!settings || typeof settings !== 'object') return;
+  
   const props = PropertiesService.getScriptProperties();
-  Object.keys(settings || {}).forEach(key => {
-    const value = settings[key];
+  const batch = {};
+  const toDelete = [];
+  
+  Object.entries(settings).forEach(([key, value]) => {
     if (value === null || value === undefined) {
-      props.deleteProperty(key);
+      toDelete.push(key);
     } else {
-      props.setProperty(key, String(value));
+      batch[key] = String(value);
     }
   });
+  
+  // Batch operations for better performance
+  if (Object.keys(batch).length > 0) props.setProperties(batch);
+  toDelete.forEach(key => props.deleteProperty(key));
 }
 
 /**
@@ -74,13 +87,8 @@ function saveSettings(settings) {
  * @returns {object} - 現在の公開状態とシートのリスト
  */
 function getAdminSettings() {
-  if (!isUserAdmin()) {
-    throw new Error('管理者のみ実行できます。');
-  }
   const properties = PropertiesService.getScriptProperties();
   const allSheets = getSheets(); // 既存の関数を再利用
-  const adminEmailsRaw = properties.getProperty(APP_PROPERTIES.ADMIN_EMAILS) || '';
-  const adminEmails = adminEmailsRaw ? adminEmailsRaw.split(',').map(e => e.trim()).filter(Boolean) : [];
   let currentUser = '';
   try {
    currentUser = getActiveUserEmail();
@@ -90,7 +98,6 @@ function getAdminSettings() {
     activeSheetName: properties.getProperty(APP_PROPERTIES.ACTIVE_SHEET),
     allSheets: allSheets,
     displayMode: properties.getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous',
-    adminEmails: adminEmails,
     currentUserEmail: currentUser,
     deployId: properties.getProperty(APP_PROPERTIES.DEPLOY_ID) || '',
     reactionCountEnabled: properties.getProperty(APP_PROPERTIES.REACTION_COUNT_ENABLED) === 'true',
@@ -103,9 +110,6 @@ function getAdminSettings() {
  * @param {string} sheetName - 公開するシート名。
  */
 function publishApp(sheetName) {
-  if (!isUserAdmin()) {
-    throw new Error('管理者のみ実行できます。');
-  }
   if (!sheetName) {
     throw new Error('シート名が指定されていません。');
   }
@@ -121,9 +125,6 @@ function publishApp(sheetName) {
  * アプリの公開を終了します。
  */
 function unpublishApp(force) {
-  if (!force && !isUserAdmin()) {
-    throw new Error('管理者のみ実行できます。');
-  }
   saveSettings({
     [APP_PROPERTIES.IS_PUBLISHED]: 'false',
     [APP_PROPERTIES.ACTIVE_SHEET]: null,
@@ -132,20 +133,6 @@ function unpublishApp(force) {
   return 'アプリを非公開にしました。';
 }
 
-/**
-* 管理者メールアドレスを保存します。
-* @param {string|Array} emails - カンマ区切りのメールアドレス文字列または配列
-*/
-function saveAdminEmails(emails) {
- let value;
-  if (Array.isArray(emails)) {
-    value = emails.map(e => e.trim()).filter(Boolean).join(',');
-  } else {
-    value = (emails || '').split(',').map(e => e.trim()).filter(Boolean).join(',');
-  }
- saveSettings({ [APP_PROPERTIES.ADMIN_EMAILS]: value });
-  return '管理者メールアドレスを更新しました。';
-}
 
 function saveReactionCountSetting(enabled) {
   const value = enabled ? 'true' : 'false';
@@ -171,20 +158,6 @@ function saveDeployId(id) {
   return 'デプロイIDを更新しました。';
 }
 
-function getAdminEmails() {
- const str = PropertiesService.getScriptProperties()
-     .getProperty(APP_PROPERTIES.ADMIN_EMAILS) || '';
- return str.split(',').map(e => e.trim()).filter(Boolean);
-}
-
-function isUserAdmin() {
-  const admins = getAdminEmails();
-  let email = '';
-  try {
-    email = getActiveUserEmail();
-  } catch (e) {}
-  return admins.includes(email);
-}
 
 function checkPublishExpiry() {
   const props = PropertiesService.getScriptProperties();
@@ -214,16 +187,10 @@ function doGet(e) {
   } catch (e) {
     userEmail = '匿名ユーザー';
   }
-  const adminEmails = getAdminEmails();
-  const userIsAdmin = adminEmails.includes(userEmail);
-  const view = e && e.parameter && e.parameter.view;
-  const mode = e && e.parameter && e.parameter.mode;
-  const adminMode = userIsAdmin && mode === 'admin';
 
-  if (!settings.isPublished && !(userIsAdmin && (view === 'board' || mode === 'admin'))) {
+  if (!settings.isPublished) {
     const template = HtmlService.createTemplateFromFile('Unpublished');
     template.userEmail = userEmail;
-    template.isAdmin = userIsAdmin;
     return template.evaluate().setTitle('公開終了');
   }
 
@@ -233,11 +200,8 @@ function doGet(e) {
 
   const template = HtmlService.createTemplateFromFile('Page');
   template.userEmail = userEmail;
-  template.isAdmin = userIsAdmin;
-  template.adminMode = adminMode;
-  // Show reaction counts only to administrators similar to the unpublish button
-  template.showCounts = userIsAdmin && settings.reactionCountEnabled;
-  template.scoreSortEnabled = adminMode && settings.scoreSortEnabled;
+  template.showCounts = settings.reactionCountEnabled;
+  template.scoreSortEnabled = settings.scoreSortEnabled;
   return template.evaluate()
       .setTitle('StudyQuest - みんなのかいとうボード')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -258,13 +222,13 @@ function saveWebAppUrl(url) {
   saveSettings({ [APP_PROPERTIES.WEB_APP_URL]: url });
 }
 
-function getSheetUpdates(classFilter, sortMode, clientHashesJson, adminOverride) {
+function getSheetUpdates(classFilter, sortMode, clientHashesJson) {
   const settings = getAppSettings();
   const sheetName = settings.activeSheetName;
   if (!sheetName) {
     throw new Error('表示するシートが設定されていません。');
   }
-  const data = getSheetData(sheetName, classFilter, sortMode, adminOverride);
+  const data = getSheetData(sheetName, classFilter, sortMode);
   const clientMap = clientHashesJson ? JSON.parse(clientHashesJson) : {};
   const changedRows = [];
   const newMap = {};
@@ -303,136 +267,107 @@ function getSheets() {
   }
 }
 
-function getSheetData(sheetName, classFilter, sortMode, adminOverride) {
-  sortMode = sortMode || 'newest';
-  const isAdmin = isUserAdmin();
+/**
+ * Process and format sheet data with filtering and sorting
+ * @param {string} sheetName Target sheet name
+ * @param {string} classFilter Class filter ('すべて' for all)
+ * @param {string} sortMode Sort mode ('newest', 'oldest', 'score')
+ * @returns {Object} Processed sheet data
+ */
+function getSheetData(sheetName, classFilter = '', sortMode = 'newest') {
+  if (!sheetName) {
+    throw new Error('シート名が指定されていません');
+  }
+  
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-    if (!sheet) throw new Error(`指定されたシート「${sheetName}」が見つかりません。`);
+    if (!sheet) {
+      throw new Error(`指定されたシート「${sheetName}」が見つかりません。`);
+    }
 
     const allValues = sheet.getDataRange().getValues();
-    if (allValues.length < 1) return { header: "シートにデータがありません", rows: [] };
+    if (allValues.length < 1) {
+      return { header: "シートにデータがありません", rows: [] };
+    }
     
-    const userEmail = getActiveUserEmail();
+    const userEmail = safeGetUserEmail();
     const headerIndices = getAndCacheHeaderIndices(sheetName, allValues[0]);
     const dataRows = allValues.slice(1);
-
-    // ★修正: 表示モードの決定を管理者権限ベースで行う
-    let displayMode = PropertiesService.getScriptProperties()
-        .getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous';
-    // 管理者でない場合、または管理者モードでなければ匿名
-    if (!isAdmin || !adminOverride) {
-      displayMode = 'anonymous';
-    }
-
+    const displayMode = getDisplayMode();
     const emailToNameMap = displayMode === 'named' ? getRosterMap() : {};
 
-    const filteredRows = dataRows.filter(row => {
-      if (!classFilter || classFilter === 'すべて') return true;
-      const className = row[headerIndices[COLUMN_HEADERS.CLASS]];
-      return className === classFilter;
-    });
+    const filteredRows = filterRowsByClass(dataRows, classFilter, headerIndices);
+    const rows = filteredRows
+      .map((row, i) => processRowData(row, i, headerIndices, userEmail, emailToNameMap))
+      .filter(Boolean);
+    
+    const sortedRows = sortRows(rows, sortMode);
 
-    const rows = filteredRows.map((row, i) => {
-      const email = row[headerIndices[COLUMN_HEADERS.EMAIL]];
-      const opinion = row[headerIndices[COLUMN_HEADERS.OPINION]];
-
-      if (email && opinion) {
-        const understandStr = row[headerIndices[COLUMN_HEADERS.UNDERSTAND]] || '';
-        const likeStr = row[headerIndices[COLUMN_HEADERS.LIKE]] || '';
-        const curiousStr = row[headerIndices[COLUMN_HEADERS.CURIOUS]] || '';
-        const understandArr = understandStr ? understandStr.toString().split(',').filter(Boolean) : [];
-        const likeArr = likeStr ? likeStr.toString().split(',').filter(Boolean) : [];
-        const curiousArr = curiousStr ? curiousStr.toString().split(',').filter(Boolean) : [];
-        const reason = row[headerIndices[COLUMN_HEADERS.REASON]] || '';
-        const highlightVal = row[headerIndices[COLUMN_HEADERS.HIGHLIGHT]];
-        const highlight = String(highlightVal).toLowerCase() === 'true';
-
-        const reactions = {
-          UNDERSTAND: { count: understandArr.length, reacted: userEmail ? understandArr.includes(userEmail) : false },
-          LIKE: { count: likeArr.length, reacted: userEmail ? likeArr.includes(userEmail) : false },
-          CURIOUS: { count: curiousArr.length, reacted: userEmail ? curiousArr.includes(userEmail) : false },
-        };
-
-        const totalReactions = reactions.UNDERSTAND.count + reactions.LIKE.count + reactions.CURIOUS.count;
-        const baseScore = reason.length;
-        const likeMultiplier = 1 + (totalReactions * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
-        const totalScore = baseScore * likeMultiplier;
-        
-        // ★修正: 名前表示の決定
-        const actualName =
-          displayMode === 'named' && emailToNameMap[email]
-            ? emailToNameMap[email]
-            : email.split('@')[0];
-        const name = displayMode === 'named' ? actualName : '匿名';
-        
-        return {
-          rowIndex: i + 2,
-          name: name,
-          class: row[headerIndices[COLUMN_HEADERS.CLASS]] || '未分類',
-          opinion: opinion,
-          reason: reason,
-          reactions: reactions,
-          highlight: highlight,
-          score: totalScore
-        };
-      }
-      return null;
-    }).filter(Boolean);
-
-    switch (sortMode) {
-      case 'newest':
-        rows.sort((a, b) => b.rowIndex - a.rowIndex);
-        break;
-      case 'random':
-        rows.sort(() => Math.random() - 0.5);
-        break;
-      default:
-        rows.sort((a, b) => b.score - a.score);
-        break;
-    }
-    return { header: COLUMN_HEADERS.OPINION, rows: rows };
-  } catch(e) {
-    console.error(`getSheetData Error for sheet "${sheetName}":`, e);
-    throw new Error(`データの取得中にエラーが発生しました: ${e.message}`);
+    return {
+      header: COLUMN_HEADERS.OPINION,
+      rows: sortedRows
+    };
+  } catch (error) {
+    console.error(`getSheetData Error for sheet "${sheetName}":`, error);
+    throw new Error(`データの取得中にエラーが発生しました: ${error.message}`);
   }
 }
 
+/**
+ * Add or toggle reaction with optimized batch operations
+ */
 function addReaction(rowIndex, reactionKey) {
+  // Input validation
+  if (!rowIndex || !reactionKey || !COLUMN_HEADERS[reactionKey]) {
+    return { status: 'error', message: '無効なパラメータです。' };
+  }
+  
   const lock = LockService.getScriptLock();
   try {
     if (!lock.tryLock(10000)) {
       return { status: 'error', message: '他のユーザーが操作中です。しばらく待ってから再試行してください。' };
     }
-    const userEmail = getActiveUserEmail();
-    if (!userEmail) return { status: 'error', message: 'ログインしていないため、操作できません。' };
+    
+    const userEmail = safeGetUserEmail();
+    if (!userEmail) {
+      return { status: 'error', message: 'ログインしていないため、操作できません。' };
+    }
+    
     const settings = getAppSettings();
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(settings.activeSheetName);
-    if (!sheet) throw new Error(`シート '${settings.activeSheetName}' が見つかりません。`);
-
-    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    if (!COLUMN_HEADERS[reactionKey]) {
-      throw new Error(`Unknown reaction: ${reactionKey}`);
+    if (!sheet) {
+      throw new Error(`シート '${settings.activeSheetName}' が見つかりません。`);
     }
+
+    // Batch header lookup with caching
+    const headerIndices = getAndCacheHeaderIndices(settings.activeSheetName, 
+      sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+    );
+    
     const reactionHeaders = [COLUMN_HEADERS.UNDERSTAND, COLUMN_HEADERS.LIKE, COLUMN_HEADERS.CURIOUS];
-    const headerIndices = findHeaderIndices(headerRow, reactionHeaders);
-    const colIndices = {
-      UNDERSTAND: headerIndices[COLUMN_HEADERS.UNDERSTAND] + 1,
-      LIKE: headerIndices[COLUMN_HEADERS.LIKE] + 1,
-      CURIOUS: headerIndices[COLUMN_HEADERS.CURIOUS] + 1,
-    };
+    const colIndices = reactionHeaders.reduce((acc, header) => {
+      acc[header] = headerIndices[header] + 1;
+      return acc;
+    }, {});
 
-    const selectedCol = colIndices[reactionKey];
-
-    // Retrieve current lists for all reactions
+    // Batch read all reaction columns at once
+    const reactionCols = Object.values(colIndices);
+    const reactionRange = sheet.getRange(rowIndex, Math.min(...reactionCols), 1, Math.max(...reactionCols) - Math.min(...reactionCols) + 1);
+    const reactionValues = reactionRange.getValues()[0];
+    
+    // Process current reaction lists
     const lists = {};
-    Object.keys(colIndices).forEach(key => {
-      const cell = sheet.getRange(rowIndex, colIndices[key]);
-      const str = cell.getValue().toString();
-      lists[key] = { cell: cell, arr: str ? str.split(',').filter(Boolean) : [] };
+    Object.entries(colIndices).forEach(([header, colIndex]) => {
+      const valueIndex = colIndex - Math.min(...reactionCols);
+      const str = reactionValues[valueIndex] ? reactionValues[valueIndex].toString() : '';
+      lists[header] = {
+        colIndex,
+        arr: str ? str.split(',').filter(Boolean) : []
+      };
     });
 
-    const wasReacted = lists[reactionKey].arr.includes(userEmail);
+    const targetHeader = COLUMN_HEADERS[reactionKey];
+    const wasReacted = lists[targetHeader].arr.includes(userEmail);
 
     // Remove user from all reactions
     Object.keys(lists).forEach(key => {
@@ -442,21 +377,33 @@ function addReaction(rowIndex, reactionKey) {
 
     // If user wasn't toggling off the same reaction, add them to selected
     if (!wasReacted) {
-      lists[reactionKey].arr.push(userEmail);
+      lists[targetHeader].arr.push(userEmail);
     }
 
-    // Write back all values
-    Object.keys(lists).forEach(key => {
-      lists[key].cell.setValue(lists[key].arr.join(','));
+    // Batch write all values for better performance
+    const updateData = [];
+    Object.entries(lists).forEach(([header, data]) => {
+      updateData.push([data.arr.join(',')]);
     });
+    
+    if (updateData.length > 0) {
+      const writeRange = sheet.getRange(rowIndex, Math.min(...reactionCols), 1, updateData.length);
+      writeRange.setValues([updateData.map(item => item[0])]);
+    }
 
+    // Prepare response
     const reactions = {};
-    Object.keys(lists).forEach(key => {
-      reactions[key] = {
-        count: lists[key].arr.length,
-        reacted: lists[key].arr.includes(userEmail)
-      };
+    Object.entries(lists).forEach(([header, data]) => {
+      // Convert header back to reaction key
+      const reactionKeyForHeader = Object.keys(COLUMN_HEADERS).find(key => COLUMN_HEADERS[key] === header);
+      if (reactionKeyForHeader) {
+        reactions[reactionKeyForHeader] = {
+          count: data.arr.length,
+          reacted: data.arr.includes(userEmail)
+        };
+      }
     });
+    
     return { status: 'ok', reactions: reactions };
   } catch (error) {
     console.error('addReaction Error:', error);
@@ -471,9 +418,6 @@ function addReaction(rowIndex, reactionKey) {
 }
 
 function toggleHighlight(rowIndex) {
-  if (!isUserAdmin()) {
-    throw new Error('管理者のみ実行できます。');
-  }
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -508,32 +452,179 @@ function getAppSettings() {
   };
 }
 
+/**
+ * Get roster mapping with improved caching strategy
+ */
 function getRosterMap() {
   const cache = CacheService.getScriptCache();
   const cachedMap = cache.get(CACHE_KEYS.ROSTER);
-  if (cachedMap) { return JSON.parse(cachedMap); }
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ROSTER_CONFIG.SHEET_NAME);
-  if (!sheet) { console.error(`名簿シート「${ROSTER_CONFIG.SHEET_NAME}」が見つかりません。`); return {}; }
-  const rosterValues = sheet.getDataRange().getValues();
-  const rosterHeaders = rosterValues.shift();
-  const lastNameIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_LAST_NAME);
-  const firstNameIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_FIRST_NAME);
-  const nicknameIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_NICKNAME);
-  const emailIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_EMAIL);
-  if (lastNameIndex === -1 || firstNameIndex === -1 || emailIndex === -1) { throw new Error(`名簿シート「${ROSTER_CONFIG.SHEET_NAME}」に必要な列が見つかりません。`); }
-  const nameMap = {};
-  rosterValues.forEach(row => {
-    const email = row[emailIndex];
-    const lastName = row[lastNameIndex];
-    const firstName = row[firstNameIndex];
-    const nickname = (nicknameIndex !== -1 && row[nicknameIndex]) ? row[nicknameIndex] : ''; 
-    if (email && lastName && firstName) {
-      const fullName = `${lastName} ${firstName}`;
-      nameMap[email] = nickname ? `${fullName} (${nickname})` : fullName;
+  if (cachedMap) { 
+    try {
+      return JSON.parse(cachedMap);
+    } catch (error) {
+      console.warn('Failed to parse cached roster:', error);
+      cache.remove(CACHE_KEYS.ROSTER);
     }
+  }
+  
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ROSTER_CONFIG.SHEET_NAME);
+    if (!sheet) { 
+      console.warn(`名簿シート「${ROSTER_CONFIG.SHEET_NAME}」が見つかりません。`); 
+      return {}; 
+    }
+    
+    const rosterValues = sheet.getDataRange().getValues();
+    if (rosterValues.length < 2) return {}; // No data rows
+    
+    const rosterHeaders = rosterValues[0];
+    const headerMap = {
+      lastNameIndex: rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_LAST_NAME),
+      firstNameIndex: rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_FIRST_NAME),
+      nicknameIndex: rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_NICKNAME),
+      emailIndex: rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_EMAIL)
+    };
+    
+    if (headerMap.lastNameIndex === -1 || headerMap.firstNameIndex === -1 || headerMap.emailIndex === -1) { 
+      throw new Error(`名簿シート「${ROSTER_CONFIG.SHEET_NAME}」に必要な列が見つかりません。`); 
+    }
+    
+    const nameMap = {};
+    // Process in batches for large datasets
+    const dataRows = rosterValues.slice(1);
+    dataRows.forEach(row => {
+      const email = row[headerMap.emailIndex];
+      const lastName = row[headerMap.lastNameIndex];
+      const firstName = row[headerMap.firstNameIndex];
+      const nickname = (headerMap.nicknameIndex !== -1 && row[headerMap.nicknameIndex]) ? row[headerMap.nicknameIndex] : ''; 
+      
+      if (email && lastName && firstName) {
+        const fullName = `${lastName} ${firstName}`;
+        nameMap[email] = nickname ? `${fullName} (${nickname})` : fullName;
+      }
+    });
+    
+    // Cache for 6 hours with error handling
+    try {
+      cache.put(CACHE_KEYS.ROSTER, JSON.stringify(nameMap), 21600);
+    } catch (error) {
+      console.warn('Failed to cache roster map:', error);
+    }
+    
+    return nameMap;
+  } catch (error) {
+    console.error('Error getting roster map:', error);
+    return {};
+  }
+}
+
+// =================================================================
+// HELPER FUNCTIONS FOR DATA PROCESSING
+// =================================================================
+
+/**
+ * Get display mode with fallback
+ */
+function getDisplayMode() {
+  return PropertiesService.getScriptProperties()
+    .getProperty(APP_PROPERTIES.DISPLAY_MODE) || 'anonymous';
+}
+
+/**
+ * Filter rows by class with null safety
+ */
+function filterRowsByClass(dataRows, classFilter, headerIndices) {
+  if (!classFilter || classFilter === 'すべて') return dataRows;
+  
+  return dataRows.filter(row => {
+    const className = row[headerIndices[COLUMN_HEADERS.CLASS]];
+    return className === classFilter;
   });
-  cache.put(CACHE_KEYS.ROSTER, JSON.stringify(nameMap), 21600);
-  return nameMap;
+}
+
+/**
+ * Parse reaction string to array
+ */
+function parseReactionString(reactionStr) {
+  return reactionStr ? reactionStr.toString().split(',').filter(Boolean) : [];
+}
+
+/**
+ * Calculate score based on reactions
+ */
+function calculateScore(reactions) {
+  const totalReactions = reactions.UNDERSTAND.count + reactions.LIKE.count + reactions.CURIOUS.count;
+  const baseScore = 0; // Can be extended with additional logic
+  const likeMultiplier = 1 + (totalReactions * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
+  return baseScore * likeMultiplier;
+}
+
+/**
+ * Process single row data
+ */
+function processRowData(row, index, headerIndices, userEmail, emailToNameMap) {
+  const email = row[headerIndices[COLUMN_HEADERS.EMAIL]];
+  const opinion = row[headerIndices[COLUMN_HEADERS.OPINION]];
+  
+  if (!email || !opinion) return null;
+  
+  const understandArr = parseReactionString(row[headerIndices[COLUMN_HEADERS.UNDERSTAND]]);
+  const likeArr = parseReactionString(row[headerIndices[COLUMN_HEADERS.LIKE]]);
+  const curiousArr = parseReactionString(row[headerIndices[COLUMN_HEADERS.CURIOUS]]);
+  
+  const reactions = {
+    UNDERSTAND: { 
+      count: understandArr.length, 
+      reacted: userEmail ? understandArr.includes(userEmail) : false 
+    },
+    LIKE: { 
+      count: likeArr.length, 
+      reacted: userEmail ? likeArr.includes(userEmail) : false 
+    },
+    CURIOUS: { 
+      count: curiousArr.length, 
+      reacted: userEmail ? curiousArr.includes(userEmail) : false 
+    }
+  };
+  
+  const displayMode = getDisplayMode();
+  const actualName = displayMode === 'named' && emailToNameMap[email] 
+    ? emailToNameMap[email] 
+    : email.split('@')[0];
+  const name = displayMode === 'named' ? actualName : '匿名';
+  
+  const reason = row[headerIndices[COLUMN_HEADERS.REASON]] || '';
+  const highlight = String(row[headerIndices[COLUMN_HEADERS.HIGHLIGHT]]).toLowerCase() === 'true';
+  
+  const totalReactions = reactions.UNDERSTAND.count + reactions.LIKE.count + reactions.CURIOUS.count;
+  const baseScore = reason.length;
+  const likeMultiplier = 1 + (totalReactions * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
+  const totalScore = baseScore * likeMultiplier;
+  
+  return {
+    rowIndex: index + 2,
+    name: name,
+    class: row[headerIndices[COLUMN_HEADERS.CLASS]] || '未分類',
+    opinion: opinion,
+    reason: reason,
+    reactions: reactions,
+    highlight: highlight,
+    score: totalScore
+  };
+}
+
+/**
+ * Sort rows based on mode
+ */
+function sortRows(rows, sortMode) {
+  switch (sortMode) {
+    case 'newest':
+      return rows.sort((a, b) => b.rowIndex - a.rowIndex);
+    case 'random':
+      return rows.sort(() => Math.random() - 0.5);
+    default:
+      return rows.sort((a, b) => b.score - a.score);
+  }
 }
 
 function getAndCacheHeaderIndices(sheetName, headerRow) {
