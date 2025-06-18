@@ -9,7 +9,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
   <script>
     // Template variables from server
-    window.isStudentMode = <?= typeof isStudentMode !== 'undefined' ? isStudentMode : true ?>;
       window.showCounts = <?= showCounts ?>;
       window.showAdminFeatures = <?= showAdminFeatures ?>;
       window.showHighlightToggle = <?= showHighlightToggle ?>;
@@ -162,13 +161,13 @@
 
   <script>
     // 環境変数の安全な取得
-    const isStudentMode = typeof window !== 'undefined' ? Boolean(window.isStudentMode) : true;
     const showCounts = typeof window !== 'undefined' ? Boolean(window.showCounts) : false;
     const showAdminFeatures = typeof window !== 'undefined' ? Boolean(window.showAdminFeatures) : false;
     const showHighlightToggle = typeof window !== 'undefined' ? Boolean(window.showHighlightToggle) : false;
     const showScoreSort = typeof window !== 'undefined' ? Boolean(window.showScoreSort) : false;
     const showPublishControls = typeof window !== 'undefined' ? Boolean(window.showPublishControls) : false;
     const displayMode = typeof window !== 'undefined' ? window.displayMode : 'anonymous';
+    const isAdminMode = displayMode === 'named';
     const isAdminUser = typeof window !== 'undefined' ? Boolean(window.isAdminUser) : false;
 
     class StudyQuestApp {
@@ -247,7 +246,7 @@
         initializeGasInterface() {
 
             this.gas = {
-                getData: (sheetName, classFilter, sortMode) => this.runGas('getSheetDataForDisplay', sheetName, classFilter, sortMode, !isStudentMode),
+                getData: (sheetName, classFilter, sortMode) => this.runGas('getSheetDataForDisplay', sheetName, classFilter, sortMode, isAdminMode),
                 addReaction: (rowIndex, reaction) => this.runGas('addReaction', rowIndex, reaction),
                 toggleHighlight: (rowIndex) => this.runGas('toggleHighlight', rowIndex)
             };
