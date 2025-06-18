@@ -97,7 +97,7 @@
                 answerModalCard: document.getElementById('answerModalCard'),
                 modalAnswer: document.getElementById('modalAnswer'),
                 modalStudentName: document.getElementById('modalStudentName'),
-                modalLikeBtn: document.getElementById('modalLikeBtn'),
+                modalReactions: document.getElementById('modalReactions'),
                 classFilter: document.getElementById('classFilter'),
                 footer: document.getElementById('controlsFooter'),
             };
@@ -463,7 +463,8 @@
                 const rt = this.reactionTypes.find(r => r.key === reaction);
                 const svgEl = btn.querySelector('svg');
                 if (svgEl && rt) {
-                    svgEl.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', reacted);
+                    const size = btn.dataset.iconSize || 'w-5 h-5';
+                    svgEl.outerHTML = this.getIcon(rt.icon, size, reacted);
                 }
                 btn.classList.toggle('liked', reacted);
             });
@@ -494,17 +495,28 @@
                 this.escapeHtml(data.reason || '') + '</p>';
             
             this.elements.modalStudentName.textContent = data.name;
-            this.elements.modalLikeBtn.dataset.rowIndex = rowIndex;
-            this.updateReactionButtonUI(rowIndex, 'LIKE', data.reactions.LIKE.count, data.reactions.LIKE.reacted);
-            
-            if (!this.elements.modalLikeBtn.dataset.listenerAttached) {
-                this.elements.modalLikeBtn.addEventListener('click', () => {
-                    const id = this.elements.modalLikeBtn.dataset.rowIndex;
-                    if (id) {
-                        this.handleReaction(id, 'LIKE');
+            this.elements.modalReactions.innerHTML = this.reactionTypes.map(rt => {
+                const info = data.reactions[rt.key];
+                const cls = info.reacted ? 'liked' : '';
+                const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-blue-500';
+                return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" data-icon-size="w-[1em] h-[1em]" aria-label="' + rt.key + '">' +
+                       this.getIcon(rt.icon, 'w-[1em] h-[1em]', info.reacted) +
+                       '<span class="reaction-count font-bold text-2xl text-gray-200">' + (info.count || 0) + '</span>' +
+                       '</button>';
+            }).join('');
+
+            if (!this.elements.modalReactions.dataset.listenerAttached) {
+                this.elements.modalReactions.addEventListener('click', (e) => {
+                    const btn = e.target.closest('.reaction-btn');
+                    if (btn) {
+                        const id = btn.dataset.rowIndex;
+                        const reaction = btn.dataset.reaction;
+                        if (id && reaction) {
+                            this.handleReaction(id, reaction);
+                        }
                     }
                 });
-                this.elements.modalLikeBtn.dataset.listenerAttached = 'true';
+                this.elements.modalReactions.dataset.listenerAttached = 'true';
             }
             
             this.elements.answerModalContainer.classList.remove('hidden');
@@ -554,7 +566,6 @@
         
         renderIcons() {
             document.getElementById('answerModalCloseBtn').innerHTML = this.getIcon('x', 'w-6 h-6');
-            document.getElementById('modalLikeBtnIcon').innerHTML = this.getIcon('hand-thumb-up');
             document.getElementById('footerIcon').innerHTML = this.getIcon('grid-2x2');
         }
 
