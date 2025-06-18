@@ -26,9 +26,9 @@ function setup({userEmail='admin@example.com', adminEmails='admin@example.com'})
   return { output, getTemplate: () => template };
 }
 
-test('admin user with view parameter sees admin view', () => {
+test('admin user with ?page=admin sees admin view', () => {
   const { getTemplate } = setup({});
-  const e = { parameter: { view: 'board' } };
+  const e = { parameter: { page: 'admin' } };
   doGet(e);
   const template = getTemplate();
   expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Page');
@@ -44,32 +44,16 @@ test('non-admin default shows student view', () => {
   expect(template.displayMode).toBe('anonymous');
 });
 
-test('admin email automatically routes to admin view', () => {
+test('admin email without page parameter shows student view', () => {
   const { getTemplate } = setup({});
   const e = { parameter: {} };
   doGet(e);
   const template = getTemplate();
   expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Page');
-  expect(template.displayMode).toBe('named');
-});
-
-test('admin=true enables admin view', () => {
-  const { getTemplate } = setup({});
-  const e = { parameter: { admin: 'true' } };
-  doGet(e);
-  const template = getTemplate();
-  expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Page');
-  expect(template.displayMode).toBe('named');
-});
-
-test('admin=false forces student view even for admins', () => {
-  const { getTemplate } = setup({});
-  const e = { parameter: { admin: 'false' } };
-  doGet(e);
-  const template = getTemplate();
-  expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Page');
   expect(template.displayMode).toBe('anonymous');
 });
+
+
 
 test('doGet sets isAdminUser based on isUserAdmin when in student mode', () => {
   const { getTemplate } = setup({ userEmail: 'user@example.com', adminEmails: 'admin@example.com' });
