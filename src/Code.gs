@@ -11,9 +11,9 @@ const COLUMN_HEADERS = {
   CLASS: 'クラスを選択してください。',
   OPINION: 'これまでの学んだことや、経験したことから、根からとり入れた水は、植物のからだのどこを通るのか予想しましょう。',
   REASON: '予想したわけを書きましょう。',
-  UNDERSTAND: '理解',
-  LIKE: 'いいねリアクション',
-  CURIOUS: '質問',
+  UNDERSTAND: 'なるほど！',
+  LIKE: 'いいね！',
+  CURIOUS: 'もっと知りたい！',
   HIGHLIGHT: 'ハイライト'
 };
 const ROSTER_CONFIG = {
