@@ -12,7 +12,7 @@
     .game-btn { transition: all 0.2s ease; border-bottom-width: 4px; text-shadow: 1px 1px 2px rgba(0,0,0,0.4); }
     .game-btn:not(:disabled):hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 0 15px rgba(139, 233, 253, 0.4); }
     .game-btn:active:not(:disabled) { transform: translateY(2px); border-bottom-width: 2px; box-shadow: none; }
-    #classFilter { background-color: #2a2f4a; border: 1px solid #4a4f8a; color: #c0caf5; border-radius: 0.5rem; padding: 0.25rem 0.5rem; }
+    #classFilter, #sortOrder { background-color: #2a2f4a; border: 1px solid #4a4f8a; color: #c0caf5; border-radius: 0.5rem; padding: 0.25rem 0.5rem; }
     :focus-visible { outline: 3px solid #8be9fd; outline-offset: 2px; border-radius: 4px; }
     header { position: sticky; top: 0; z-index: 5; }
     .answer-card { will-change: transform, opacity; }
@@ -39,6 +39,11 @@
         <div class="flex items-center gap-4 w-full lg:w-auto">
             <p id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0"></p>
             <select id="classFilter" class="hidden text-sm"></select>
+            <select id="sortOrder" class="text-sm">
+                <option value="newest">新着順</option>
+                <option value="random">ランダム順</option>
+                <option value="score">スコア順</option>
+            </select>
         </div>
         <div class="flex-grow text-center w-full min-w-0">
              <p id="headingLabel" class="text-2xl md:text-3xl font-bold text-pink-400 leading-tight">データを読み込んでいます...</p>
@@ -107,6 +112,7 @@
                 modalStudentName: document.getElementById('modalStudentName'),
                 modalReactionContainer: document.getElementById('modalReactions'),
                 classFilter: document.getElementById('classFilter'),
+                sortOrder: document.getElementById('sortOrder'),
                 footer: document.getElementById('controlsFooter'),
             };
             
@@ -128,7 +134,7 @@
             ];
             
             this.gas = {
-                getPublishedSheetData: (classFilter) => this.runGas('getPublishedSheetData', classFilter),
+                getPublishedSheetData: (classFilter, sort) => this.runGas('getPublishedSheetData', classFilter, sort),
                 addLike: (rowIndex) => this.runGas('addReaction', rowIndex, 'LIKE'),
                 addReaction: (rowIndex, reaction) => this.runGas('addReaction', rowIndex, reaction),
                 toggleHighlight: (rowIndex) => this.runGas('toggleHighlight', rowIndex)
@@ -163,6 +169,7 @@
                 }
             });
             this.elements.classFilter.addEventListener('change', () => this.loadSheetData(true));
+            this.elements.sortOrder.addEventListener('change', () => this.loadSheetData(true));
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') {
                     this.hideAnswerModal();
@@ -252,7 +259,8 @@
             }
             
             try {
-                const data = await this.gas.getPublishedSheetData(selectedClass);
+                const sortOrder = this.elements.sortOrder.value;
+                const data = await this.gas.getPublishedSheetData(selectedClass, sortOrder);
                 this.adjustLayout();
                 
                 if (isInitialLoad) {

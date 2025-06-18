@@ -92,6 +92,29 @@ test('getSheetData sorts by newest when specified', () => {
   expect(result.rows.map(r => r.rowIndex)).toEqual([3, 2]);
 });
 
+test('getSheetData supports random sort', () => {
+  const data = [
+    [
+      COLUMN_HEADERS.EMAIL,
+      COLUMN_HEADERS.CLASS,
+      COLUMN_HEADERS.OPINION,
+      COLUMN_HEADERS.REASON,
+      COLUMN_HEADERS.UNDERSTAND,
+      COLUMN_HEADERS.LIKE,
+      COLUMN_HEADERS.CURIOUS,
+      COLUMN_HEADERS.HIGHLIGHT
+    ],
+    ['first@example.com', '1-1', 'Old', 'A', '', '', '', 'false'],
+    ['second@example.com', '1-1', 'New', 'B', '', '', '', 'false']
+  ];
+  setupMocks(data, '', '');
+
+  const result = getSheetData('Sheet1', undefined, 'random');
+
+  const indexes = result.rows.map(r => r.rowIndex).sort();
+  expect(indexes).toEqual([2, 3]);
+});
+
 test('getSheetData forces anonymous mode for non-admin', () => {
   const data = [
     [
