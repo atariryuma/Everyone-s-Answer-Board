@@ -57,11 +57,8 @@
           <div id="modalAnswer" class="flex-grow min-h-[200px] mb-4 overflow-y-auto pr-4"></div>
           <div class="text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex justify-between items-center">
               <div><span id="modalStudentName" class="font-bold text-2xl text-gray-200"></span></div>
-              <button type="button" id="modalLikeBtn" class="like-btn flex items-center gap-1.5 transition-colors" aria-label="いいね">
-                  <span id="modalLikeCount" class="like-count font-bold text-2xl text-gray-200">0</span>
-                  <span id="modalLikeBtnIcon" class="w-7 h-7"></span>
-              </button>
-          </div>
+              <div id="modalReactions" class="flex items-center gap-2"></div>
+            </div>
       </div>
   </div>
 
@@ -108,7 +105,7 @@
                 answerModalCard: document.getElementById('answerModalCard'),
                 modalAnswer: document.getElementById('modalAnswer'),
                 modalStudentName: document.getElementById('modalStudentName'),
-                modalLikeBtn: document.getElementById('modalLikeBtn'),
+                modalReactionContainer: document.getElementById('modalReactions'),
                 classFilter: document.getElementById('classFilter'),
                 footer: document.getElementById('controlsFooter'),
             };
@@ -153,6 +150,16 @@
             this.elements.answerModalContainer.addEventListener('click', (e) => {
                 if (e.target === e.currentTarget) {
                     this.hideAnswerModal();
+                }
+            });
+            this.elements.modalReactionContainer.addEventListener('click', (e) => {
+                const btn = e.target.closest('.reaction-btn');
+                if (btn) {
+                    const id = btn.dataset.rowIndex;
+                    const reaction = btn.dataset.reaction;
+                    if (id && reaction) {
+                        this.handleReaction(id, reaction);
+                    }
                 }
             });
             this.elements.classFilter.addEventListener('change', () => this.loadSheetData(true));
@@ -527,18 +534,22 @@
                 this.escapeHtml(data.reason || '') + '</p>';
             
             this.elements.modalStudentName.textContent = data.name;
-            this.elements.modalLikeBtn.dataset.rowIndex = rowIndex;
-            this.updateReactionButtonUI(rowIndex, 'LIKE', data.reactions.LIKE.count, data.reactions.LIKE.reacted);
-            
-            if (!this.elements.modalLikeBtn.dataset.listenerAttached) {
-                this.elements.modalLikeBtn.addEventListener('click', () => {
-                    const id = this.elements.modalLikeBtn.dataset.rowIndex;
-                    if (id) {
-                        this.handleReaction(id, 'LIKE');
-                    }
-                });
-                this.elements.modalLikeBtn.dataset.listenerAttached = 'true';
-            }
+
+            const html = this.reactionTypes.map(rt => {
+                const info = data.reactions[rt.key];
+                const cls = info.reacted ? 'liked' : '';
+                const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-blue-500';
+                return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' +
+                       'data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' +
+                       '<span class="reaction-count font-bold text-2xl text-gray-200">' + info.count + '</span>' +
+                       this.getIcon(rt.icon, 'w-5 h-5', info.reacted) +
+                       '</button>';
+            }).join('');
+            this.elements.modalReactionContainer.innerHTML = html;
+
+            this.reactionTypes.forEach(rt => {
+                this.updateReactionButtonUI(rowIndex, rt.key, data.reactions[rt.key].count, data.reactions[rt.key].reacted);
+            });
             
             this.elements.answerModalContainer.classList.remove('hidden');
             gsap.to(this.elements.answerModalContainer, { opacity: 1, duration: 0.3 });
@@ -575,7 +586,6 @@
         
         renderIcons() {
             document.getElementById('answerModalCloseBtn').innerHTML = this.getIcon('x', 'w-6 h-6');
-            document.getElementById('modalLikeBtnIcon').innerHTML = this.getIcon('hand-thumb-up');
             document.getElementById('footerIcon').innerHTML = this.getIcon('grid-2x2');
         }
 
