@@ -215,7 +215,7 @@ function doGet(e) {
  * サーバー側で設定されたシートのデータを取得します。
  */
 
-function getPublishedSheetData(classFilter) {
+function getPublishedSheetData(classFilter, sortBy) {
   const settings = getAppSettings();
   const sheetName = settings.activeSheetName;
 
@@ -223,7 +223,8 @@ function getPublishedSheetData(classFilter) {
     throw new Error('表示するシートが設定されていません。');
   }
 
-  const data = getSheetData(sheetName, classFilter, 'score', isUserAdmin());
+  const order = sortBy || 'newest';
+  const data = getSheetData(sheetName, classFilter, order, isUserAdmin());
 
   // ★改善: フロントエンドでシート名を表示できるよう、レスポンスに含める
   return {
@@ -307,6 +308,8 @@ function getSheetData(sheetName, classFilter, sortBy, named) {
 
     if (sortBy === 'newest') {
       rows.sort((a, b) => b.rowIndex - a.rowIndex);
+    } else if (sortBy === 'random') {
+      rows.sort(() => Math.random() - 0.5);
     } else {
       rows.sort((a, b) => b.score - a.score);
     }
