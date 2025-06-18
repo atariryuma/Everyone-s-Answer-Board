@@ -46,10 +46,14 @@ Administrators see a star button on each answer card allowing them to toggle thi
 
 ### Student view for administrators
 
-Administrators automatically receive the admin interface whenever they open the
-board. Use `?admin=false` if you want to preview the student view. If you need
-to force the admin view when sharing or projecting the board, you can append
-`?admin=true` to the URL.
+Administrators automatically see the admin interface whenever they open the
+board. You can override this behavior with URL parameters:
+
+- `?admin=false` &ndash; forces the student view, even if you are an admin.
+- `?admin=true` &ndash; forces the admin view regardless of your account.
+
+When neither parameter is present, the app falls back to your normal admin
+status.
 
 ## Continuous Integration
 

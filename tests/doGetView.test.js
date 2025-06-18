@@ -62,6 +62,15 @@ test('admin=true enables admin view', () => {
   expect(template.displayMode).toBe('named');
 });
 
+test('admin=false forces student view even for admins', () => {
+  const { getTemplate } = setup({});
+  const e = { parameter: { admin: 'false' } };
+  doGet(e);
+  const template = getTemplate();
+  expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Page');
+  expect(template.displayMode).toBe('anonymous');
+});
+
 test('doGet sets isAdminUser based on isUserAdmin when in student mode', () => {
   const { getTemplate } = setup({ userEmail: 'user@example.com', adminEmails: 'admin@example.com' });
   const e = { parameter: {} };
