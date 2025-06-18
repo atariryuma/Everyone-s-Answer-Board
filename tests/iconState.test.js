@@ -20,8 +20,8 @@ function updateReactionButtonUI(rowIndex, reaction, count, reacted) {
 
 test('updateReactionButtonUI applies solid icon when reacted', () => {
   const dom = new JSDOM(`
-    <button class="reaction-btn like-btn" data-row-index="1" data-reaction="LIKE" data-icon-size="w-5 h-5">
-      <svg class="w-5 h-5"></svg>
+    <button class="reaction-btn like-btn" data-row-index="1" data-reaction="LIKE" data-icon-size="w-[1em] h-[1em]">
+      <svg class="w-[1em] h-[1em]"></svg>
       <span class="reaction-count">0</span>
     </button>
   `);

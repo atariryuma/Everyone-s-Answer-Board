@@ -153,7 +153,7 @@
             const headerHeight = this.elements.header.offsetHeight;
             const footerHeight = this.elements.footer.offsetHeight;
             this.elements.mainContainer.style.paddingTop = headerHeight + 'px';
-            this.elements.body.style.paddingBottom = (footerHeight + 40) + 'px';
+            this.elements.body.style.paddingBottom = (footerHeight + 60) + 'px';
         }
 
         runGas(funcName, ...args) {
@@ -366,8 +366,8 @@
                 const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
                 const cls = info.reacted ? 'liked' : '';
                 const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-blue-500';
-                return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" data-icon-size="w-5 h-5" aria-label="' + rt.key + '">' +
-                       this.getIcon(rt.icon, 'w-5 h-5', info.reacted) +
+                return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" data-icon-size="w-[1em] h-[1em]" aria-label="' + rt.key + '">' +
+                       this.getIcon(rt.icon, 'w-[1em] h-[1em]', info.reacted) +
                        '<span class="reaction-count font-bold text-lg text-gray-200">' + (info.count || 0) + '</span>' +
                        '</button>';
             }).join('');
@@ -496,8 +496,8 @@
                 const info = data.reactions[rt.key];
                 const cls = info.reacted ? 'liked' : '';
                 const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-blue-500';
-                return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" data-icon-size="w-7 h-7" aria-label="' + rt.key + '">' +
-                       this.getIcon(rt.icon, 'w-7 h-7', info.reacted) +
+                return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" data-icon-size="w-[1em] h-[1em]" aria-label="' + rt.key + '">' +
+                       this.getIcon(rt.icon, 'w-[1em] h-[1em]', info.reacted) +
                        '<span class="reaction-count font-bold text-2xl text-gray-200">' + (info.count || 0) + '</span>' +
                        '</button>';
             }).join('');
