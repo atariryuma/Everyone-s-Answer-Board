@@ -134,7 +134,7 @@
             ];
             
             this.gas = {
-                getPublishedSheetData: (classFilter, sort) => this.runGas('getPublishedSheetData', classFilter, sort),
+                getPublishedSheetData: (classFilter, sort) => this.runGas('getPublishedSheetData', classFilter, sort, this.displayMode === 'named'),
                 addLike: (rowIndex) => this.runGas('addReaction', rowIndex, 'LIKE'),
                 addReaction: (rowIndex, reaction) => this.runGas('addReaction', rowIndex, reaction),
                 toggleHighlight: (rowIndex) => this.runGas('toggleHighlight', rowIndex)
@@ -396,8 +396,9 @@
                 const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
                 const cls = info.reacted ? 'liked' : '';
                 const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-blue-500';
+                const countSpan = this.showAdminFeatures ? '<span class="reaction-count font-bold text-lg text-gray-200">' + (info.count || 0) + '</span>' : '';
                 return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' +
-                       '<span class="reaction-count font-bold text-lg text-gray-200">' + (info.count || 0) + '</span>' +
+                       countSpan +
                        this.getIcon(rt.icon, 'w-5 h-5', info.reacted) +
                        '</button>';
             }).join('');
@@ -547,9 +548,10 @@
                 const info = data.reactions[rt.key];
                 const cls = info.reacted ? 'liked' : '';
                 const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-blue-500';
+                const countSpan = this.showAdminFeatures ? '<span class="reaction-count font-bold text-2xl text-gray-200">' + info.count + '</span>' : '';
                 return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' +
                        'data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' +
-                       '<span class="reaction-count font-bold text-2xl text-gray-200">' + info.count + '</span>' +
+                       countSpan +
                        this.getIcon(rt.icon, 'w-5 h-5', info.reacted) +
                        '</button>';
             }).join('');

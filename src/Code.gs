@@ -171,13 +171,14 @@ function doGet(e) {
   const params = e && e.parameter ? e.parameter : {};
   const userEmail = safeGetUserEmail();
   const adminOverride = params.admin;
-  let isAdminView;
-  if (adminOverride === 'true') {
+  const pageParam = params.page;
+  let isAdminView = false;
+  if (pageParam === 'admin') {
+    isAdminView = isUserAdmin(userEmail);
+  } else if (adminOverride === 'true') {
     isAdminView = true;
   } else if (adminOverride === 'false') {
     isAdminView = false;
-  } else {
-    isAdminView = isUserAdmin(userEmail);
   }
 
   const template = HtmlService.createTemplateFromFile('Page');
@@ -215,7 +216,7 @@ function doGet(e) {
  * サーバー側で設定されたシートのデータを取得します。
  */
 
-function getPublishedSheetData(classFilter, sortBy) {
+function getPublishedSheetData(classFilter, sortBy, namedView) {
   const settings = getAppSettings();
   const sheetName = settings.activeSheetName;
 
@@ -224,7 +225,8 @@ function getPublishedSheetData(classFilter, sortBy) {
   }
 
   const order = sortBy || 'newest';
-  const data = getSheetData(sheetName, classFilter, order, isUserAdmin());
+  const named = namedView && isUserAdmin();
+  const data = getSheetData(sheetName, classFilter, order, named);
 
   // ★改善: フロントエンドでシート名を表示できるよう、レスポンスに含める
   return {
