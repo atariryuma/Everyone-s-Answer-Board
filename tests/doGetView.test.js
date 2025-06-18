@@ -26,25 +26,31 @@ function setup({userEmail='admin@example.com', adminEmails='admin@example.com'})
   return { output, getTemplate: () => template };
 }
 
-test('admin view=board shows Page template', () => {
-  const { output } = setup({});
+test('admin user with view parameter sees admin view', () => {
+  const { getTemplate } = setup({});
   const e = { parameter: { view: 'board' } };
   doGet(e);
+  const template = getTemplate();
   expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Page');
+  expect(template.displayMode).toBe('named');
 });
 
-test('admin default shows Page', () => {
-  setup({});
+test('non-admin default shows student view', () => {
+  const { getTemplate } = setup({ userEmail: 'user@example.com' });
   const e = { parameter: {} };
   doGet(e);
+  const template = getTemplate();
   expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Page');
+  expect(template.displayMode).toBe('anonymous');
 });
 
-test('admin default uses Page template regardless of publish status', () => {
-  setup({});
+test('admin email automatically routes to admin view', () => {
+  const { getTemplate } = setup({});
   const e = { parameter: {} };
   doGet(e);
+  const template = getTemplate();
   expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Page');
+  expect(template.displayMode).toBe('named');
 });
 
 test('admin=true enables admin view', () => {
