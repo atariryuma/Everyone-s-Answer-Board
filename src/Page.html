@@ -20,7 +20,6 @@
     .answer-card:hover { transform: translateY(-4px) scale(1.02); box-shadow: 0 8px 25px rgba(139,233,253,0.3); }
     .answer-card.highlighted:hover { transform: translateY(-4px) scale(1.04); }
     .highlight-badge { position: absolute; top: -8px; right: -8px; }
-    .highlight-btn { position: absolute; top: 6px; right: 6px; }
     .reaction-bg-like { border-color:#ef4444; border-image: linear-gradient(to bottom,#facc15,#fcd34d) 1; }
     .reaction-bg-understand { border-color:#fbbf24; border-image: linear-gradient(to bottom,#a3e635,#bef264) 1; }
     .reaction-bg-curious { border-color:#3b82f6; border-image: linear-gradient(to bottom,#38bdf8,#7dd3fc) 1; }
@@ -377,7 +376,7 @@
             }).join('');
 
             card.innerHTML =
-                '<div class="relative flex-grow mb-3 answer-preview">' + badge + highlightBtn +
+                '<div class="relative flex-grow mb-3 answer-preview">' + badge +
                 '<p class="opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight">' +
                 this.escapeHtml(data.opinion || '') + '</p>' +
                 '<p class="text-gray-100 whitespace-pre-wrap break-words mt-4">' +
@@ -386,6 +385,7 @@
                 '<div class="text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center">' +
                 nameHtml +
                 '<div class="flex items-center gap-1">' +
+                highlightBtn +
                 reactionButtons +
                 '</div>' +
                 '</div>';
