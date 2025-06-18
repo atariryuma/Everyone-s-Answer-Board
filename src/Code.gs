@@ -187,8 +187,16 @@ function saveWebAppUrl(url) {
  * @returns {HtmlOutput} Student interface
  */
 function doGet(e) {
-  // Check if admin mode is requested
-  const isAdminMode = e.parameter.admin === 'true' || isUserAdmin();
+  // Determine admin mode based on URL parameter or user status
+  let isAdminMode;
+  const adminParam = String(e.parameter.admin).toLowerCase();
+  if (adminParam === 'false') {
+    isAdminMode = false; // Force student view
+  } else if (adminParam === 'true') {
+    isAdminMode = true; // Force admin view
+  } else {
+    isAdminMode = isUserAdmin();
+  }
   
   if (isAdminMode) {
     return doGetAdmin(e);
