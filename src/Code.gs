@@ -188,7 +188,7 @@ function saveWebAppUrl(url) {
  */
 function doGet(e) {
   // Check if admin mode is requested
-  const isAdminMode = e.parameter.admin === 'true';
+  const isAdminMode = e.parameter.admin === 'true' || isUserAdmin();
   
   if (isAdminMode) {
     return doGetAdmin(e);
@@ -202,7 +202,6 @@ function doGet(e) {
   template.showScoreSort = false; // 生徒用：スコア順表示なし
   template.showPublishControls = false; // 生徒用：公開終了ボタンなし
   template.displayMode = 'anonymous'; // 生徒用：匿名表示
-  template.isAdminUser = isUserAdmin(); // 管理者かどうか
   
   return template.evaluate()
       .setTitle('StudyQuest - みんなのかいとうボード')
