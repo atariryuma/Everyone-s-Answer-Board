@@ -1,480 +1,159 @@
 <!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <title>StudyQuest - みんなのかいとうボード</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js" defer></script>
-  <style>
-    body { color: #c0caf5; }
-    .glass-panel { background: rgba(26, 27, 38, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
-    .game-btn { transition: all 0.2s ease; border-bottom-width: 4px; text-shadow: 1px 1px 2px rgba(0,0,0,0.4); }
-    .game-btn:not(:disabled):hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 0 15px rgba(139, 233, 253, 0.4); }
-    .game-btn:active:not(:disabled) { transform: translateY(2px); border-bottom-width: 2px; box-shadow: none; }
-    #classFilter { background-color: #2a2f4a; border: 1px solid #4a4f8a; color: #c0caf5; border-radius: 0.5rem; padding: 0.25rem 0.5rem; }
-    :focus-visible { outline: 3px solid #8be9fd; outline-offset: 2px; border-radius: 4px; }
-    header { position: sticky; top: 0; z-index: 5; }
-    .answer-card { will-change: transform, opacity; }
-    .answer-preview { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; min-height: 120px; }
-    .like-btn svg { transition: all 0.2s ease-in-out; color: #facc15; fill: none; }
-    .like-btn.liked svg { stroke: transparent; fill: #facc15; transform: scale(1.1); }
-    #controlsFooter { pointer-events: none; }
-    #controlsFooter > .glass-panel { pointer-events: auto; }
-  </style>
-</head>
-<body class="bg-[#1a1b26] text-gray-200 font-sans">
+<html>
+  <head>
+    <base target="_top">
+    <link href="https://cdn.tailwindcss.com/tailwind.min.css" rel="stylesheet">
+    <style>
+      body { font-family: sans-serif; }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+  </head>
+  <body class="p-4 bg-gray-100">
+    <div id="app">
+      <h2 class="text-xl font-bold mb-4 text-gray-800">管理パネル</h2>
 
-  <div id="main-container" class="w-full mx-auto p-4 md:p-6">
-    <header id="main-header" class="glass-panel rounded-xl p-4 mb-4 flex flex-col lg:flex-row justify-between items-center gap-4 shadow-lg">
-        <div class="flex items-center gap-4 w-full lg:w-auto">
-            <p id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0"></p>
-            <select id="classFilter" class="hidden text-sm"></select>
-        </div>
-        <div class="flex-grow text-center w-full min-w-0">
-             <p id="headingLabel" class="text-2xl md:text-3xl font-bold text-pink-400 leading-tight">データを読み込んでいます...</p>
-        </div>
-        <div class="w-full lg:w-auto lg:min-w-[150px] text-right">
-            <p id="sheetNameText" class="text-xs text-gray-400 h-4"></p>
-        </div>
-    </header>
-
-    <main id="answers" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></main>
-  </div>
-  
-  <div id="answerModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300" role="dialog" aria-modal="true">
-      <div id="answerModalCard" class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full max-w-5xl h-auto max-h-[85vh] transform scale-95 transition-transform duration-300">
-          <button id="answerModalCloseBtn" class="absolute -top-3 -right-3 bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform" aria-label="閉じる"></button>
-          <div id="modalAnswer" class="flex-grow min-h-[200px] mb-4 overflow-y-auto pr-4"></div>
-          <div class="text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex justify-between items-center">
-              <div><span id="modalStudentName" class="font-bold text-2xl text-gray-200"></span></div>
-              <button type="button" id="modalLikeBtn" class="like-btn flex items-center gap-1.5 transition-colors" aria-label="いいね">
-                  <span id="modalLikeBtnIcon" class="w-7 h-7"></span>
-                  <span id="modalLikeCount" class="like-count font-bold text-2xl text-gray-200">0</span>
-              </button>
-          </div>
+      <!-- Current Status -->
+      <div class="mb-6 p-4 rounded-lg bg-white shadow-md">
+        <h3 class="font-semibold text-gray-700 mb-2">現在の状態</h3>
+        <p id="status-text" class="text-gray-600">状態を読み込み中...</p>
       </div>
-  </div>
 
-  <footer id="controlsFooter" class="fixed bottom-0 left-0 right-0 z-40 p-4">
-      <div class="glass-panel max-w-md mx-auto rounded-xl p-3 flex items-center justify-center gap-3">
-        <span id="footerIcon" class="w-5 h-5"></span>
-        <input type="range" id="sizeSlider" min="2" max="6" value="4" class="w-1/2" aria-label="表示列数の変更">
-        <span id="sliderValue" class="font-bold w-4 text-center text-lg">4</span>
+      <!-- Sheet Selection -->
+      <div class="mb-6">
+        <h3 class="font-semibold text-gray-700 mb-3">1. 公開するシートを選択</h3>
+        <div id="sheet-list" class="flex flex-col gap-2 rounded-lg bg-white p-2 shadow-md max-h-48 overflow-y-auto">
+          <p class="text-gray-500 p-2">シートを読み込み中...</p>
+        </div>
       </div>
-  </footer>
 
-  <script>
-    class StudyQuestApp {
-        constructor() {
-            this.elements = {
-                body: document.body,
-                mainContainer: document.getElementById('main-container'),
-                header: document.getElementById('main-header'),
-                answersContainer: document.getElementById('answers'),
-                sizeSlider: document.getElementById('sizeSlider'),
-                sliderValue: document.getElementById('sliderValue'),
-                headingLabel: document.getElementById('headingLabel'),
-                sheetNameText: document.getElementById('sheetNameText'),
-                answerCount: document.getElementById('answerCount'),
-                answerModalContainer: document.getElementById('answerModalContainer'),
-                answerModalCloseBtn: document.getElementById('answerModalCloseBtn'),
-                answerModalCard: document.getElementById('answerModalCard'),
-                modalAnswer: document.getElementById('modalAnswer'),
-                modalStudentName: document.getElementById('modalStudentName'),
-                modalLikeBtn: document.getElementById('modalLikeBtn'),
-                classFilter: document.getElementById('classFilter'),
-                footer: document.getElementById('controlsFooter'),
-            };
-            
-            this.state = {
-                currentAnswers: [],
-                isLoading: false,
-                lastFocusedElement: null
-            };
-            
-            this.pollingInterval = null;
-            
-            this.gas = {
-                getPublishedSheetData: (classFilter) => this.runGas('getPublishedSheetData', classFilter),
-                addLike: (rowIndex) => this.runGas('addLike', rowIndex)
-            };
-            
-            this.init();
-        }
+      <!-- Actions -->
+      <div>
+        <h3 class="font-semibold text-gray-700 mb-3">2. 操作を選択</h3>
+        <div class="flex flex-col gap-3">
+          <button id="publish-btn" class="w-full text-white font-bold py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 transition disabled:bg-blue-300">
+            選択したシートを公開
+          </button>
+          <button id="unpublish-btn" class="w-full text-white font-bold py-2 px-4 rounded-lg bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-75 transition disabled:bg-red-300">
+            公開を終了する
+          </button>
+        </div>
+      </div>
+      
+      <div id="message-area" class="mt-4 text-center text-sm h-5"></div>
 
-        init() {
-            this.renderIcons();
-            this.setupEventListeners();
-            this.adjustLayout();
-            this.loadInitialData();
-        }
+    </div>
 
-        setupEventListeners() {
-            this.elements.sizeSlider.addEventListener('input', this.debounce(() => this.renderBoard(true), 200));
-            this.elements.answerModalCloseBtn.addEventListener('click', () => this.hideAnswerModal());
-            this.elements.answerModalContainer.addEventListener('click', (e) => {
-                if (e.target === e.currentTarget) {
-                    this.hideAnswerModal();
-                }
-            });
-            this.elements.classFilter.addEventListener('change', () => this.loadSheetData(true));
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    this.hideAnswerModal();
-                }
-            });
-            window.addEventListener('resize', this.debounce(() => this.adjustLayout(), 100));
-        }
+    <script>
+      const elements = {
+        statusText: document.getElementById('status-text'),
+        sheetList: document.getElementById('sheet-list'),
+        publishBtn: document.getElementById('publish-btn'),
+        unpublishBtn: document.getElementById('unpublish-btn'),
+        messageArea: document.getElementById('message-area')
+      };
 
-        adjustLayout() {
-            const headerHeight = this.elements.header.offsetHeight;
-            const footerHeight = this.elements.footer.offsetHeight;
-            this.elements.mainContainer.style.paddingTop = headerHeight + 'px';
-            this.elements.body.style.paddingBottom = (footerHeight + 20) + 'px';
-        }
+      let selectedSheet = null;
 
-        runGas(funcName, ...args) {
-            return new Promise((resolve, reject) => {
-                if (typeof google !== 'undefined' && google.script && google.script.run) {
-                    google.script.run
-                        .withSuccessHandler(resolve)
-                        .withFailureHandler(reject)
-                        [funcName](...args);
-                } else {
-                    // デバッグ用のモックデータ
-                    console.warn('Google Apps Script environment not detected. Using mock data.');
-                    this.getMockData(funcName, ...args).then(resolve).catch(reject);
-                }
-            });
+      document.addEventListener('DOMContentLoaded', () => {
+        loadInitialState();
+        elements.publishBtn.addEventListener('click', publish);
+        elements.unpublishBtn.addEventListener('click', unpublish);
+      });
+
+      function loadInitialState() {
+        setLoading(true, "状態を更新中...");
+        google.script.run
+          .withSuccessHandler(updateUI)
+          .withFailureHandler(showError)
+          .getAdminSettings();
+      }
+
+      function updateUI(status) {
+        selectedSheet = status.activeSheetName;
+        
+        if (status.isPublished && status.activeSheetName) {
+          elements.statusText.innerHTML = `公開中: <span class="font-bold text-green-700">${status.activeSheetName}</span>`;
+          elements.unpublishBtn.disabled = false;
+        } else {
+          elements.statusText.textContent = '現在、アプリは非公開です。';
+          elements.unpublishBtn.disabled = true;
         }
         
-        // デバッグ用のモックデータ生成
-        getMockData(funcName, ...args) {
-            return new Promise((resolve) => {
-                setTimeout(() => {
-                    if (funcName === 'getPublishedSheetData') {
-                        resolve({
-                            header: 'テスト問題',
-                            sheetName: 'テストシート',
-                            rows: [
-                                {
-                                    rowIndex: 1,
-                                    name: '田中太郎',
-                                    class: '3年A組',
-                                    opinion: 'これは素晴らしいアイデアだと思います。',
-                                    reason: '理由は簡潔で分かりやすく、実現可能性が高いからです。',
-                                    likes: 5,
-                                    hasLiked: false
-                                },
-                                {
-                                    rowIndex: 2,
-                                    name: '佐藤花子',
-                                    class: '3年B組',
-                                    opinion: '少し改善の余地があると考えます。',
-                                    reason: 'より多くの人の意見を聞く必要があると思います。',
-                                    likes: 3,
-                                    hasLiked: true
-                                }
-                            ]
-                        });
-                    } else if (funcName === 'addLike') {
-                        resolve({
-                            status: 'ok',
-                            newScore: Math.floor(Math.random() * 10) + 1
-                        });
-                    }
-                }, 500);
-            });
-        }
-        
-        async loadInitialData() {
-            await this.loadSheetData(true, true);
-            if (this.pollingInterval) {
-                clearInterval(this.pollingInterval);
+        elements.sheetList.innerHTML = '';
+        if (status.allSheets && status.allSheets.length > 0) {
+          status.allSheets.forEach(name => {
+            const label = document.createElement('label');
+            label.className = 'flex items-center p-2 rounded-md hover:bg-gray-100 cursor-pointer';
+            
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = 'sheet';
+            radio.value = name;
+            radio.className = 'mr-3 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500';
+            if (name === status.activeSheetName) {
+              radio.checked = true;
             }
-            this.pollingInterval = setInterval(() => this.loadSheetData(false), 15000);
-        }
-
-        async loadSheetData(showLoading = true, isInitialLoad = false) {
-            if (this.state.isLoading && showLoading) return;
-            this.state.isLoading = true;
-            
-            const selectedClass = isInitialLoad ? 'すべて' : this.elements.classFilter.value;
-            const oldAnswers = [...this.state.currentAnswers];
-
-            if (showLoading) {
-                this.elements.answersContainer.innerHTML = '<p class="text-center text-gray-400 col-span-full mt-8">データを読み込み中...</p>';
-            }
-            
-            try {
-                const data = await this.gas.getPublishedSheetData(selectedClass);
-                this.adjustLayout();
-                
-                if (isInitialLoad) {
-                    this.populateClassFilter(data.rows);
-                    this.elements.sheetNameText.textContent = 'シート: ' + data.sheetName;
-                }
-
-                if (JSON.stringify(this.state.currentAnswers) !== JSON.stringify(data.rows)) {
-                    this.state.currentAnswers = data.rows;
-                    this.elements.headingLabel.textContent = data.header || '問題';
-                    this.renderBoard(false, oldAnswers);
-                }
-            } catch (error) {
-                console.error('Error loading sheet data:', error);
-                const errorMessage = this.escapeHtml(error.message || 'Unknown error');
-                this.elements.answersContainer.innerHTML = 
-                    '<div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg">' +
-                    '<p class="font-bold">データの読み込みに失敗しました。</p>' +
-                    '<p class="text-sm mt-2">' + errorMessage + '</p>' +
-                    '<button id="retryLoadBtn" class="mt-4 game-btn bg-cyan-600 text-white px-4 py-2 rounded-lg font-bold border-cyan-800 hover:bg-cyan-500 text-sm">再試行</button>' +
-                    '</div>';
-                
-                const retryBtn = document.getElementById('retryLoadBtn');
-                if (retryBtn) {
-                    retryBtn.addEventListener('click', () => this.loadInitialData());
-                }
-            } finally {
-                this.state.isLoading = false;
-            }
-        }
-
-        populateClassFilter(rows) {
-            const classFilter = this.elements.classFilter;
-            const uniqueClasses = ['すべて', ...new Set(rows.map(r => r.class).filter(Boolean))];
-            classFilter.innerHTML = uniqueClasses.map(c => 
-                '<option value="' + this.escapeHtml(c) + '">' + this.escapeHtml(c) + '</option>'
-            ).join('');
-            classFilter.value = 'すべて';
-            classFilter.classList.remove('hidden');
-        }
-
-        renderBoard(isLayoutChange = false, oldRows = this.state.currentAnswers) {
-            const container = this.elements.answersContainer;
-            const newRows = this.state.currentAnswers;
-            const oldRowsMap = new Map(oldRows.map(r => [String(r.rowIndex), r]));
-            const oldPositions = new Map();
-            
-            container.querySelectorAll('.answer-card').forEach(card => {
-                oldPositions.set(card.dataset.rowIndex, card.getBoundingClientRect());
-            });
-
-            this.elements.sliderValue.textContent = this.elements.sizeSlider.value;
-            container.className = 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-' + this.elements.sizeSlider.value;
-            
-            const userIcon = this.getIcon('users', 'w-4 h-4 inline-block -mt-1');
-            this.elements.answerCount.innerHTML = userIcon + '<span>' + newRows.length + '件</span>';
-            
-            const fragment = document.createDocumentFragment();
-            if (newRows.length === 0) {
-                const p = document.createElement('p');
-                p.className = 'text-center text-gray-500 col-span-full mt-8';
-                p.textContent = 'このクラスの回答はありません。';
-                fragment.appendChild(p);
-            } else {
-                newRows.forEach(r => fragment.appendChild(this.createAnswerCard(r)));
-            }
-            
-            container.innerHTML = '';
-            container.appendChild(fragment);
-
-            container.querySelectorAll('.answer-card').forEach((card) => {
-                const rowIndex = card.dataset.rowIndex;
-                const oldPos = oldPositions.get(rowIndex);
-                
-                if (isLayoutChange || !oldPos) {
-                    gsap.from(card, { opacity: 0, y: 30, duration: 0.5, ease: 'power3.out' });
-                } else {
-                    const newPos = card.getBoundingClientRect();
-                    const deltaX = oldPos.left - newPos.left;
-                    const deltaY = oldPos.top - newPos.top;
-                    gsap.set(card, { opacity: 1 });
-                    
-                    if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
-                        gsap.fromTo(card, 
-                            { x: deltaX, y: deltaY }, 
-                            { x: 0, y: 0, duration: 0.7, ease: 'power3.inOut' }
-                        );
-                    }
-                    
-                    const oldData = oldRowsMap.get(rowIndex);
-                    const newData = newRows.find(r => String(r.rowIndex) === rowIndex);
-                    if (oldData && newData && oldData.likes !== newData.likes) {
-                        gsap.fromTo(card, 
-                            { backgroundColor: 'rgba(250, 204, 21, 0.4)' }, 
-                            { backgroundColor: 'rgba(26, 27, 38, 0.7)', duration: 0.8, ease: 'expo.out' }
-                        );
-                    }
-                }
-            });
-        }
-
-        createAnswerCard(data) {
-            const card = document.createElement('div');
-            card.className = 'answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer opacity-0';
-            card.dataset.rowIndex = data.rowIndex;
-            
-            const likeIcon = this.getIcon('thumbs-up', 'w-5 h-5');
-            const hasLikedClass = data.hasLiked ? 'liked' : '';
-            
-            card.innerHTML = 
-                '<div class="flex-grow mb-3 answer-preview">' +
-                '<p class="opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight">' + 
-                this.escapeHtml(data.opinion || '') + '</p>' +
-                '<p class="text-gray-100 whitespace-pre-wrap break-words mt-4">' + 
-                this.escapeHtml(data.reason || '') + '</p>' +
-                '</div>' +
-                '<div class="text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center">' +
-                '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' +
-                '<button type="button" class="like-btn flex items-center gap-1.5 ' + hasLikedClass + '" aria-label="いいね" data-row-index="' + data.rowIndex + '">' +
-                likeIcon +
-                '<span class="like-count font-bold text-lg text-gray-200">' + (data.likes || 0) + '</span>' +
-                '</button>' +
-                '</div>';
-            
-            card.addEventListener('click', (e) => {
-                if (e.target.closest('.like-btn')) {
-                    e.stopPropagation();
-                    this.handleLike(data.rowIndex);
-                } else {
-                    this.showAnswerModal(data.rowIndex);
-                }
-            });
-            
-            return card;
-        }
-
-        async handleLike(rowIndex) {
-            const btns = document.querySelectorAll('[data-row-index="' + rowIndex + '"].like-btn');
-            btns.forEach(btn => {
-                gsap.fromTo(btn, 
-                    { scale: 1 }, 
-                    { scale: 1.3, yoyo: true, repeat: 1, duration: 0.2, ease: 'power2.inOut' }
-                );
-            });
-            
-            try {
-                const res = await this.gas.addLike(rowIndex);
-                if (res && res.status === 'ok') {
-                    const dataItem = this.state.currentAnswers.find(item => item.rowIndex == rowIndex);
-                    if (dataItem) {
-                        dataItem.likes = res.newScore;
-                        dataItem.hasLiked = !dataItem.hasLiked;
-                        this.updateLikeButtonUI(rowIndex, dataItem.likes, dataItem.hasLiked);
-                    }
-                } else if (res && res.message) {
-                    alert(res.message);
-                }
-            } catch (error) {
-                console.error('Failed to add like:', error);
-            }
-        }
-
-        updateLikeButtonUI(rowIndex, likes, hasLiked) {
-            document.querySelectorAll('[data-row-index="' + rowIndex + '"]').forEach(el => {
-                const btn = el.querySelector('.like-btn') || el;
-                if (btn.classList.contains('like-btn')) {
-                    const likeCountEl = btn.querySelector('.like-count');
-                    if (likeCountEl) {
-                        likeCountEl.textContent = likes;
-                    }
-                    btn.classList.toggle('liked', hasLiked);
-                }
-            });
-        }
-        
-        showAnswerModal(rowIndex) {
-            const data = this.state.currentAnswers.find(r => r.rowIndex == rowIndex);
-            if (!data) return;
-            
-            this.state.lastFocusedElement = document.activeElement;
-            
-            this.elements.modalAnswer.innerHTML = 
-                '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + 
-                this.escapeHtml(data.opinion || '') + '</p>' +
-                '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + 
-                this.escapeHtml(data.reason || '') + '</p>';
-            
-            this.elements.modalStudentName.textContent = data.name;
-            this.elements.modalLikeBtn.dataset.rowIndex = rowIndex;
-            this.updateLikeButtonUI(rowIndex, data.likes, data.hasLiked);
-            
-            if (!this.elements.modalLikeBtn.dataset.listenerAttached) {
-                this.elements.modalLikeBtn.addEventListener('click', () => {
-                    const id = this.elements.modalLikeBtn.dataset.rowIndex;
-                    if (id) {
-                        this.handleLike(id);
-                    }
-                });
-                this.elements.modalLikeBtn.dataset.listenerAttached = 'true';
-            }
-            
-            this.elements.answerModalContainer.classList.remove('hidden');
-            gsap.to(this.elements.answerModalContainer, { opacity: 1, duration: 0.3 });
-            gsap.to(this.elements.answerModalCard, { 
-                scale: 1, 
-                duration: 0.3, 
-                ease: 'back.out', 
-                onComplete: () => this.elements.answerModalCloseBtn.focus() 
-            });
-        }
-
-        hideAnswerModal() {
-            gsap.to(this.elements.answerModalContainer, { 
-                opacity: 0, 
-                duration: 0.3, 
-                onComplete: () => this.elements.answerModalContainer.classList.add('hidden') 
-            });
-            gsap.to(this.elements.answerModalCard, { 
-                scale: 0.95, 
-                duration: 0.3, 
-                ease: 'power2.in', 
-                onComplete: () => {
-                    if (this.state.lastFocusedElement) {
-                        this.state.lastFocusedElement.focus();
-                    }
-                }
-            });
-        }
-        
-        getIcon(name, classes = '') {
-            const icons = {
-                'book-open-check': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H2v15h7c1.7 0 3 1.3 3 3V7c0-2.2-1.8-4-4-4Z"/><path d="m16 12 2 2 4-4"/><path d="M22 6V3h-6c-2.2 0-4 1.8-4 4v14c0-1.7 1.3-3 3-3h7V6Z"/></svg>',
-                'x': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
-                'thumbs-up': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
-                'grid-2x2': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
-                'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+            radio.onchange = () => {
+              selectedSheet = name;
+              elements.publishBtn.disabled = false;
             };
-            return '<span class="' + classes + '">' + (icons[name] || '') + '</span>';
-        }
-        
-        renderIcons() {
-            document.getElementById('answerModalCloseBtn').innerHTML = this.getIcon('x', 'w-6 h-6');
-            document.getElementById('modalLikeBtnIcon').innerHTML = this.getIcon('thumbs-up');
-            document.getElementById('footerIcon').innerHTML = this.getIcon('grid-2x2');
+
+            label.appendChild(radio);
+            label.appendChild(document.createTextNode(name));
+            elements.sheetList.appendChild(label);
+          });
+        } else {
+          elements.sheetList.innerHTML = '<p class="text-gray-600 p-2">表示できるシートがありません。</p>';
         }
 
-        debounce(func, delay) {
-            let timeout;
-            return (...args) => {
-                clearTimeout(timeout);
-                timeout = setTimeout(() => func.apply(this, args), delay);
-            };
-        }
+        elements.publishBtn.disabled = !selectedSheet || (status.isPublished && selectedSheet === status.activeSheetName);
+        setLoading(false);
+      }
 
-        escapeHtml(str) {
-            if (!str) return '';
-            return str.toString()
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
+      function publish() {
+        if (!selectedSheet) {
+          showMessage('公開するシートを選択してください。', 'red');
+          return;
         }
-    }
-    
-    new StudyQuestApp();
-  </script>
-</body>
+        setLoading(true, "公開処理中...");
+        google.script.run
+          .withSuccessHandler((msg) => {
+            showMessage(msg, 'green');
+            loadInitialState();
+          })
+          .withFailureHandler(showError)
+          .publishApp(selectedSheet);
+      }
+
+      function unpublish() {
+        setLoading(true, "非公開処理中...");
+        google.script.run
+          .withSuccessHandler((msg) => {
+            showMessage(msg, 'green');
+            loadInitialState();
+          })
+          .withFailureHandler(showError)
+          .unpublishApp();
+      }
+
+      function setLoading(isLoading, msg = "") {
+        elements.publishBtn.disabled = isLoading;
+        elements.unpublishBtn.disabled = isLoading;
+        if (isLoading) {
+            showMessage(msg, 'blue');
+        }
+      }
+
+      function showMessage(msg, color = 'red') {
+        const colorClasses = { red: 'text-red-600', green: 'text-green-600', blue: 'text-blue-600' };
+        elements.messageArea.className = `mt-4 text-center text-sm h-5 ${colorClasses[color]}`;
+        elements.messageArea.textContent = msg;
+      }
+      
+      function showError(error) {
+        showMessage(error.message, 'red');
+        setLoading(false);
+      }
+    </script>
+  </body>
 </html>
