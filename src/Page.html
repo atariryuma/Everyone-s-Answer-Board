@@ -58,8 +58,8 @@
           <div class="text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex justify-between items-center">
               <div><span id="modalStudentName" class="font-bold text-2xl text-gray-200"></span></div>
               <button type="button" id="modalLikeBtn" class="like-btn flex items-center gap-1.5 transition-colors" aria-label="いいね">
-                  <span id="modalLikeBtnIcon" class="w-7 h-7"></span>
                   <span id="modalLikeCount" class="like-count font-bold text-2xl text-gray-200">0</span>
+                  <span id="modalLikeBtnIcon" class="w-7 h-7"></span>
               </button>
           </div>
       </div>
@@ -156,7 +156,7 @@
             const headerHeight = this.elements.header.offsetHeight;
             const footerHeight = this.elements.footer.offsetHeight;
             this.elements.mainContainer.style.paddingTop = headerHeight + 'px';
-            this.elements.body.style.paddingBottom = (footerHeight + 20) + 'px';
+            this.elements.body.style.paddingBottom = (footerHeight + 40) + 'px';
         }
 
         runGas(funcName, ...args) {
@@ -369,9 +369,9 @@
                 const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
                 const cls = info.reacted ? 'liked' : '';
                 const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-blue-500';
-                return '<button type="button" class="reaction-btn like-btn ' + colorClass + ' ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' +
-                       this.getIcon(rt.icon, 'w-5 h-5', info.reacted) +
+                return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' +
                        '<span class="reaction-count font-bold text-lg text-gray-200">' + (info.count || 0) + '</span>' +
+                       this.getIcon(rt.icon, 'w-5 h-5', info.reacted) +
                        '</button>';
             }).join('');
 
