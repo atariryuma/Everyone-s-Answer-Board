@@ -81,6 +81,7 @@
     const displayMode = '<?= displayMode ?>';
     const showAdminFeatures = <?= showAdminFeatures ? 'true' : 'false' ?>;
     const showHighlightToggle = <?= showHighlightToggle ? 'true' : 'false' ?>;
+    const showCounts = <?= showCounts ? 'true' : 'false' ?>;
     const ICONS = {
         'lightbulb-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
         'lightbulb-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6z M10.5 11.25 L11 13 L13 13 L13.5 11.25 H 10.5 Z"/><path d="M9 16.5h6v1H9z M9 18h6v1H9z M9 19.5h6v1H9z"/></svg>',
@@ -126,6 +127,7 @@
 
             this.showHighlightToggle = showHighlightToggle;
             this.showAdminFeatures = showAdminFeatures;
+            this.showCounts = showCounts;
             this.displayMode = displayMode;
             this.reactionTypes = [
                 { key: 'LIKE', icon: 'hand-thumb-up' },
@@ -396,8 +398,9 @@
                 const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
                 const cls = info.reacted ? 'liked' : '';
                 const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-blue-500';
+                const countHtml = this.showCounts ? '<span class="reaction-count font-bold text-lg text-gray-200">' + (info.count || 0) + '</span>' : '';
                 return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' +
-                       '<span class="reaction-count font-bold text-lg text-gray-200">' + (info.count || 0) + '</span>' +
+                       countHtml +
                        this.getIcon(rt.icon, 'w-5 h-5', info.reacted) +
                        '</button>';
             }).join('');
@@ -489,7 +492,7 @@
         updateReactionButtonUI(rowIndex, reaction, count, reacted) {
             document.querySelectorAll('[data-row-index="' + rowIndex + '"][data-reaction="' + reaction + '"]').forEach(btn => {
                 const countEl = btn.querySelector('.reaction-count');
-                if (countEl) {
+                if (countEl && this.showCounts) {
                     countEl.textContent = count;
                 }
                 const rt = this.reactionTypes.find(r => r.key === reaction);
@@ -547,9 +550,10 @@
                 const info = data.reactions[rt.key];
                 const cls = info.reacted ? 'liked' : '';
                 const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-blue-500';
+                const countHtml = this.showCounts ? '<span class="reaction-count font-bold text-2xl text-gray-200">' + info.count + '</span>' : '';
                 return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' +
                        'data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' +
-                       '<span class="reaction-count font-bold text-2xl text-gray-200">' + info.count + '</span>' +
+                       countHtml +
                        this.getIcon(rt.icon, 'w-5 h-5', info.reacted) +
                        '</button>';
             }).join('');
