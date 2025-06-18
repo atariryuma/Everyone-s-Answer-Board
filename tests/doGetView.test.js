@@ -62,3 +62,11 @@ test('admin=true enables admin view', () => {
   expect(template.displayMode).toBe('named');
 });
 
+test('doGet sets isAdminUser based on isUserAdmin when in student mode', () => {
+  const { getTemplate } = setup({ userEmail: 'user@example.com', adminEmails: 'admin@example.com' });
+  const e = { parameter: {} };
+  doGet(e);
+  const template = getTemplate();
+  expect(template.isAdminUser).toBe(false);
+});
+
