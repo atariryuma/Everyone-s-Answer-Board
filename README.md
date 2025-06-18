@@ -1,60 +1,63 @@
-# Everyone's Answer Board
+# StudyQuest - みんなの回答ボード
 
-This project contains the source code for a Google Apps Script (GAS) application.
-It uses [clasp](https://github.com/google/clasp) to push and pull code to and from
-your GAS project.
+This repository contains the source code of a Google Apps Script project. It publishes a web app that displays students' answers stored in a spreadsheet. Users can like answers and filter the board by class. Teachers can manage which sheet is currently published from a custom menu within the spreadsheet.
 
 ## Setup
 
-1. Install Node.js (v20 or later).
+1. Install **Node.js 20** or later.
 2. Install dependencies:
    ```bash
    npm install
    ```
-3. Authenticate clasp:
+3. Sign in to Google with clasp:
    ```bash
    npx clasp login
    ```
-4. Set your Apps Script project ID in `.clasp.json` by replacing `ENTER_YOUR_SCRIPT_ID`.
+4. Edit `.clasp.json` and set your Apps Script project ID.
 
 ## Usage
 
-- `npm run push` – Upload code in `src/` to the GAS project.
-- `npm run pull` – Download the latest code from GAS.
-- `npm run open` – Open the GAS project in your browser.
-- `npm run update-url` – Save the latest web app URL to script properties.
+- `npm run push` – Upload the contents of `src/` to your Apps Script project.
+- `npm run pull` – Download the latest code from Apps Script.
+- `npm run open` – Open the Apps Script project in a browser.
+- `npm run update-url` – Store the latest Web App URL in script properties.
 
-## Running tests
-Run `npm install` first to install Jest and other dev dependencies, then run `npm test`.
+## Spreadsheet structure
+
+The sheet you publish must contain the following columns:
+
+- **メールアドレス** – address of the user who submitted the answer
+- **クラスを選択してください。** – class name used for filtering
+- **これまでの学んだことや、経験したことから、根からとり入れた水は、植物のからだのどこを通るのか予想しましょう。** – question text displayed on the board
+- **予想したわけを書きましょう。** – explanation shown when opening a card
+- **いいね！** – comma separated list of users who liked the answer
+
+A separate sheet named `sheet 1` should contain roster information with the columns `姓`, `名`, `ニックネーム` and `Googleアカウント`. These names are shown on the board instead of raw email addresses.
+
+## Managing the board
+
+Opening the spreadsheet adds an **アプリ管理** menu. From here you can:
+
+1. **管理パネルを開く** – choose which sheet to publish or unpublish.
+2. **名簿キャッシュをリセット** – refresh the cached roster information.
+
+When unpublished, visiting the Web App URL shows a message that the board is closed. Once published, the board is available and updates automatically every 15 seconds.
+
+## Front‑end features
+
+- Answers are displayed in a responsive grid. A slider allows changing the number of columns.
+- You can filter answers by class.
+- Clicking a card opens a modal with the full text and a button to like the answer.
+- Like counts update instantly and contribute to the sorting order.
 
 ## Project structure
 
-All script files live directly under the `src` folder. **Do not create any
-subdirectories under `src`.**
+All Apps Script and HTML files must live directly in the `src` directory. **Do not create subdirectories under `src`.**
 
-## Highlighting answers
+## Testing
 
-Add a column named `Highlight` to your spreadsheet (using a checkbox or TRUE/FALSE values).
-Rows marked as `TRUE` will appear with a yellow border on the board.
-Administrators see a star button on each answer card allowing them to toggle this flag.
+Install dependencies first and then run:
+```bash
+npm test
+```
 
-## Admin access
-
-1. Open the sheet selector sidebar from the spreadsheet menu.
-2. Enter comma-separated administrator emails in the **管理者メールアドレス** field and click **保存**.
-3. Users listed here automatically see admin features (reaction counts, names and highlight controls) when viewing the board.
-
-### Student view for administrators
-
-Administrators automatically see the admin interface whenever they open the
-board. You can override this behavior with URL parameters:
-
-- `?admin=false` &ndash; forces the student view, even if you are an admin.
-- `?admin=true` &ndash; forces the admin view regardless of your account.
-
-When neither parameter is present, the app falls back to your normal admin
-status.
-
-## Continuous Integration
-
-A GitHub Actions workflow automatically pushes code to the Apps Script project whenever files in `src/` change. To enable it, add your service account credentials JSON as the `CLASP_CREDENTIALS` secret in the repository settings.
