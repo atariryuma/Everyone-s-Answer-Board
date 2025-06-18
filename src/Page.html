@@ -26,8 +26,8 @@
     .reaction-bg-mixed { border-color:#8b5cf6; border-image: linear-gradient(to bottom,#f59e0b,#10b981,#3b82f6) 1; }
     .reaction-bg-all { border-color:transparent; border-image: linear-gradient(90deg,#ef4444,#fbbf24,#3b82f6) 1; }
     .answer-preview { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; min-height: 120px; }
-    .like-btn svg { transition: all 0.2s ease-in-out; color: #facc15; fill: none; }
-    .like-btn.liked svg { stroke: transparent; fill: #facc15; transform: scale(1.1); }
+    .like-btn svg { transition: all 0.2s ease-in-out; fill: none; }
+    .like-btn.liked svg { stroke: transparent; fill: currentColor; transform: scale(1.1); }
     #controlsFooter { pointer-events: none; }
     #controlsFooter > .glass-panel { pointer-events: auto; }
   </style>
@@ -111,9 +111,9 @@
             this.showAdminFeatures = showAdminFeatures;
             this.displayMode = displayMode;
             this.reactionTypes = [
-                { key: 'LIKE', icon: 'thumbs-up' },
-                { key: 'UNDERSTAND', icon: 'book-open-check' },
-                { key: 'CURIOUS', icon: 'help-circle' }
+                { key: 'LIKE', icon: 'hand-thumb-up' },
+                { key: 'UNDERSTAND', icon: 'lightbulb' },
+                { key: 'CURIOUS', icon: 'magnifying-glass-plus' }
             ];
             
             this.gas = {
@@ -355,7 +355,7 @@
             let highlightBtn = '';
             if (this.showHighlightToggle) {
                 const cls = data.highlight ? 'liked' : '';
-                highlightBtn = '<button type="button" class="highlight-btn like-btn ' + cls + '" aria-label="Highlight" data-row-index="' + data.rowIndex + '">' +
+                highlightBtn = '<button type="button" class="highlight-btn like-btn text-yellow-400 ' + cls + '" aria-label="Highlight" data-row-index="' + data.rowIndex + '">' +
                                this.getIcon('star', 'w-5 h-5') +
                                '</button>';
             }
@@ -366,8 +366,9 @@
             const reactionButtons = this.reactionTypes.map(rt => {
                 const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
                 const cls = info.reacted ? 'liked' : '';
-                return '<button type="button" class="reaction-btn like-btn ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' +
-                       this.getIcon(rt.icon, 'w-5 h-5') +
+                const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-blue-500';
+                return '<button type="button" class="reaction-btn like-btn ' + colorClass + ' ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' +
+                       this.getIcon(rt.icon, 'w-5 h-5', info.reacted) +
                        '<span class="reaction-count font-bold text-lg text-gray-200">' + (info.count || 0) + '</span>' +
                        '</button>';
             }).join('');
@@ -457,6 +458,11 @@
                 if (countEl) {
                     countEl.textContent = count;
                 }
+                const rt = this.reactionTypes.find(r => r.key === reaction);
+                const svgEl = btn.querySelector('svg');
+                if (svgEl && rt) {
+                    svgEl.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', reacted);
+                }
                 btn.classList.toggle('liked', reacted);
             });
         }
@@ -527,22 +533,26 @@
             });
         }
         
-        getIcon(name, classes = '') {
+        getIcon(name, classes = '', solid = false) {
             const icons = {
-                'book-open-check': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H2v15h7c1.7 0 3 1.3 3 3V7c0-2.2-1.8-4-4-4Z"/><path d="m16 12 2 2 4-4"/><path d="M22 6V3h-6c-2.2 0-4 1.8-4 4v14c0-1.7 1.3-3 3-3h7V6Z"/></svg>',
+                'lightbulb-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
+                'lightbulb-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6z M10.5 11.25 L11 13 L13 13 L13.5 11.25 H 10.5 Z"/><path d="M9 16.5h6v1H9z M9 18h6v1H9z M9 19.5h6v1H9z"/></svg>',
+                'hand-thumb-up-outline': '<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
+                'hand-thumb-up-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z M6.5 10v12h1V10h-1z"/></svg>',
+                'magnifying-glass-plus-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6"/></svg>',
+                'magnifying-glass-plus-solid': '<svg viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z M9.75 7.5v2.25H7.5v1.5h2.25V13.5h1.5v-2.25H13.5v-1.5h-2.25V7.5h-1.5z" fill="currentColor"/><path d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15zM16.5 16.5l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
                 'x': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
-                'thumbs-up': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
                 'star': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
-                'help-circle': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 1 1 5.82 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>',
                 'grid-2x2': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
-                'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+                'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
             };
-            return '<span class="' + classes + '">' + (icons[name] || '') + '</span>';
+            const key = solid && icons[name + '-solid'] ? name + '-solid' : icons[name + '-outline'] ? name + '-outline' : name;
+            return '<span class="' + classes + '">' + (icons[key] || '') + '</span>';
         }
         
         renderIcons() {
             document.getElementById('answerModalCloseBtn').innerHTML = this.getIcon('x', 'w-6 h-6');
-            document.getElementById('modalLikeBtnIcon').innerHTML = this.getIcon('thumbs-up');
+            document.getElementById('modalLikeBtnIcon').innerHTML = this.getIcon('hand-thumb-up');
             document.getElementById('footerIcon').innerHTML = this.getIcon('grid-2x2');
         }
 

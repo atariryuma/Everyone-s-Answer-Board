@@ -425,10 +425,13 @@ function addLike(rowIndex) {
 }
 
 function getAppSettings() {
-  const properties = PropertiesService.getScriptProperties();
+  const properties = PropertiesService.getScriptProperties() || {};
+  const getProp = typeof properties.getProperty === 'function' ? (k) => properties.getProperty(k) : () => null;
+  const published = getProp(APP_PROPERTIES.IS_PUBLISHED);
+  const sheet = getProp(APP_PROPERTIES.ACTIVE_SHEET);
   return {
-    isPublished: properties.getProperty(APP_PROPERTIES.IS_PUBLISHED) === 'true',
-    activeSheetName: properties.getProperty(APP_PROPERTIES.ACTIVE_SHEET)
+    isPublished: published === null ? true : published === 'true',
+    activeSheetName: sheet || 'Sheet1'
   };
 }
 
@@ -472,13 +475,15 @@ function getAndCacheHeaderIndices(sheetName, headerRow) {
 
 function findHeaderIndices(sheetHeaders, requiredHeaders) {
   const indices = {};
-  const trimmedSheetHeaders = sheetHeaders.map(h => (typeof h === 'string' ? h.trim() : h));
+  const normalized = sheetHeaders.map(h => (typeof h === 'string' ? h.replace(/\s+/g, '') : h));
   const missingHeaders = [];
-  requiredHeaders.forEach(headerName => {
-    const index = trimmedSheetHeaders.indexOf(headerName);
-    if (index !== -1) { indices[headerName] = index; } else { missingHeaders.push(headerName); }
+  requiredHeaders.forEach(name => {
+    const idx = normalized.indexOf(name.replace(/\s+/g, ''));
+    if (idx !== -1) { indices[name] = idx; } else { missingHeaders.push(name); }
   });
-  if (missingHeaders.length > 0) { throw new Error(`必須ヘッダーが見つかりません: [${missingHeaders.join(', ')}]`); }
+  if (missingHeaders.length > 0) {
+    throw new Error(`必須ヘッダーが見つかりません: [${missingHeaders.join(', ')}]`);
+  }
   return indices;
 }
 
