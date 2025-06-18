@@ -36,6 +36,8 @@ const TIME_CONSTANTS = {
   LOCK_WAIT_MS: 10000
 };
 
+const REACTION_KEYS = ["UNDERSTAND","LIKE","CURIOUS"];
+
 function safeGetUserEmail() {
   try {
     return Session.getActiveUser().getEmail();
@@ -179,23 +181,25 @@ function doGet(e) {
   }
 
   const template = HtmlService.createTemplateFromFile('Page');
-  if (isAdminView) {
-    template.showCounts = true;
-    template.showAdminFeatures = true;
-    template.showHighlightToggle = true;
-    template.showScoreSort = true;
-    template.showPublishControls = true;
-    template.displayMode = 'named';
-    template.isAdminUser = true;
-  } else {
-    template.showCounts = false;
-    template.showAdminFeatures = false;
-    template.showHighlightToggle = false;
-    template.showScoreSort = false;
-    template.showPublishControls = false;
-    template.displayMode = 'anonymous';
-    template.isAdminUser = isUserAdmin(userEmail);
-  }
+  const adminOpts = {
+    showCounts: true,
+    showAdminFeatures: true,
+    showHighlightToggle: true,
+    showScoreSort: true,
+    showPublishControls: true,
+    displayMode: 'named',
+    isAdminUser: true
+  };
+  const userOpts = {
+    showCounts: false,
+    showAdminFeatures: false,
+    showHighlightToggle: false,
+    showScoreSort: false,
+    showPublishControls: false,
+    displayMode: 'anonymous',
+    isAdminUser: isUserAdmin(userEmail)
+  };
+  Object.assign(template, isAdminView ? adminOpts : userOpts);
   template.userEmail = userEmail;
   return template.evaluate()
       .setTitle('StudyQuest - みんなのかいとうボード')
@@ -330,16 +334,16 @@ function addReaction(rowIndex, reactionKey) {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(settings.activeSheetName);
     if (!sheet) throw new Error(`シート '${settings.activeSheetName}' が見つかりません。`);
 
-    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const headerIndices = findHeaderIndices(headerRow, [COLUMN_HEADERS.UNDERSTAND, COLUMN_HEADERS.LIKE, COLUMN_HEADERS.CURIOUS]);
-    const startCol = headerIndices[COLUMN_HEADERS.UNDERSTAND] + 1;
-    const reactionRange = sheet.getRange(rowIndex, startCol, 1, 3);
-    const values = reactionRange.getValues()[0];
-    const lists = {
-      UNDERSTAND: { arr: parseReactionString(values[0]) },
-      LIKE: { arr: parseReactionString(values[1]) },
-      CURIOUS: { arr: parseReactionString(values[2]) }
-    };
+  const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const reactionHeaders = REACTION_KEYS.map(k => COLUMN_HEADERS[k]);
+  const headerIndices = findHeaderIndices(headerRow, reactionHeaders);
+  const startCol = headerIndices[reactionHeaders[0]] + 1;
+  const reactionRange = sheet.getRange(rowIndex, startCol, 1, REACTION_KEYS.length);
+  const values = reactionRange.getValues()[0];
+  const lists = {};
+  REACTION_KEYS.forEach((k, idx) => {
+    lists[k] = { arr: parseReactionString(values[idx]) };
+  });
 
     const wasReacted = lists[reactionKey].arr.includes(userEmail);
     Object.keys(lists).forEach(key => {
@@ -349,17 +353,17 @@ function addReaction(rowIndex, reactionKey) {
     if (!wasReacted) {
       lists[reactionKey].arr.push(userEmail);
     }
-    reactionRange.setValues([[
-      lists.UNDERSTAND.arr.join(','),
-      lists.LIKE.arr.join(','),
-      lists.CURIOUS.arr.join(',')
-    ]]);
+    reactionRange.setValues([
+      REACTION_KEYS.map(k => lists[k].arr.join(','))
+    ]);
 
-    const reactions = {
-      UNDERSTAND: { count: lists.UNDERSTAND.arr.length, reacted: lists.UNDERSTAND.arr.includes(userEmail) },
-      LIKE: { count: lists.LIKE.arr.length, reacted: lists.LIKE.arr.includes(userEmail) },
-      CURIOUS: { count: lists.CURIOUS.arr.length, reacted: lists.CURIOUS.arr.includes(userEmail) }
-    };
+    const reactions = REACTION_KEYS.reduce((obj, k) => {
+      obj[k] = {
+        count: lists[k].arr.length,
+        reacted: lists[k].arr.includes(userEmail)
+      };
+      return obj;
+    }, {});
     return { status: 'ok', reactions: reactions };
   } catch (error) {
     console.error('addReaction Error:', error);
@@ -373,11 +377,7 @@ function toggleHighlight(rowIndex) {
   const lock = LockService.getScriptLock();
   lock.waitLock(TIME_CONSTANTS.LOCK_WAIT_MS);
   try {
-    const sheets = getSheets();
-    if (sheets.length === 0) {
-      throw new Error('利用可能なシートがありません。');
-    }
-    const sheetName = sheets[0];
+    const sheetName = getAppSettings().activeSheetName;
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
     if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
 
