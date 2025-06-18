@@ -196,7 +196,6 @@ function doGet(e) {
   
   // Default student view
   const template = HtmlService.createTemplateFromFile('Page');
-  template.isStudentMode = true;
   template.showCounts = false; // 生徒用：リアクション数非表示
   template.showAdminFeatures = false; // 生徒用：管理機能非表示
   template.showHighlightToggle = false; // 生徒用：ハイライト切り替えなし
@@ -229,7 +228,6 @@ function doGetAdmin(e) {
   
   // Admin view with all features
   const template = HtmlService.createTemplateFromFile('Page');
-  template.isStudentMode = false;
   template.showCounts = true; // 管理者用：リアクション数表示
   template.showAdminFeatures = true; // 管理者用：管理機能表示
   template.showHighlightToggle = true; // 管理者用：ハイライト切り替えあり
