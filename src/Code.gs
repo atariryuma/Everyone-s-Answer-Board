@@ -11,7 +11,10 @@ const COLUMN_HEADERS = {
   CLASS: 'クラスを選択してください。',
   OPINION: 'これまでの学んだことや、経験したことから、根からとり入れた水は、植物のからだのどこを通るのか予想しましょう。',
   REASON: '予想したわけを書きましょう。',
-  LIKES: 'いいね！'
+  UNDERSTAND: '理解',
+  LIKE: 'いいねリアクション',
+  CURIOUS: '質問',
+  HIGHLIGHT: 'ハイライト'
 };
 const ROSTER_CONFIG = {
   SHEET_NAME: 'sheet 1',
@@ -28,6 +31,34 @@ const APP_PROPERTIES = {
   ACTIVE_SHEET: 'ACTIVE_SHEET_NAME',
   IS_PUBLISHED: 'IS_PUBLISHED'
 };
+
+const TIME_CONSTANTS = {
+  LOCK_WAIT_MS: 10000
+};
+
+function safeGetUserEmail() {
+  try {
+    return Session.getActiveUser().getEmail();
+  } catch (e) {
+    return '';
+  }
+}
+
+function getAdminEmails() {
+  const props = PropertiesService.getScriptProperties();
+  const str = props.getProperty('ADMIN_EMAILS') || '';
+  return str.split(',').map(e => e.trim()).filter(Boolean);
+}
+
+function isUserAdmin(email) {
+  const userEmail = email || safeGetUserEmail();
+  return getAdminEmails().includes(userEmail);
+}
+
+function parseReactionString(val) {
+  if (!val) return [];
+  return val.toString().split(',').filter(Boolean);
+}
 
 
 // =================================================================
@@ -59,12 +90,16 @@ function showAdminSidebar() {
  * @returns {object} - 現在の公開状態とシートのリスト
  */
 function getAdminSettings() {
-  const properties = PropertiesService.getScriptProperties();
-  const allSheets = getSheets(); // 既存の関数を再利用
+  const props = PropertiesService.getScriptProperties();
+  const allSheets = getSheets();
+  const currentUserEmail = safeGetUserEmail();
+  const adminEmails = getAdminEmails();
   return {
-    isPublished: properties.getProperty(APP_PROPERTIES.IS_PUBLISHED) === 'true',
-    activeSheetName: properties.getProperty(APP_PROPERTIES.ACTIVE_SHEET),
-    allSheets: allSheets
+    allSheets: allSheets,
+    currentUserEmail: currentUserEmail,
+    deployId: props.getProperty('DEPLOY_ID'),
+    adminEmails: adminEmails,
+    isUserAdmin: adminEmails.includes(currentUserEmail)
   };
 }
 
@@ -91,11 +126,30 @@ function unpublishApp() {
   return 'アプリを非公開にしました。';
 }
 
+function doGetAdmin(e) {
+  const userEmail = safeGetUserEmail();
+  if (!isUserAdmin(userEmail)) {
+    return HtmlService.createHtmlOutput('アクセス拒否').setTitle('アクセス拒否');
+  }
+  const template = HtmlService.createTemplateFromFile('Page');
+  template.showCounts = true;
+  template.showAdminFeatures = true;
+  template.showHighlightToggle = true;
+  template.showScoreSort = true;
+  template.showPublishControls = true;
+  template.displayMode = 'named';
+  template.isAdminUser = true;
+  template.userEmail = userEmail;
+  return template.evaluate()
+      .setTitle('StudyQuest - みんなのかいとうボード')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
 
 // =================================================================
 // GAS Webアプリケーションのエントリーポイント
 // =================================================================
-function doGet() {
+function doGet(e) {
   const settings = getAppSettings();
   
   if (!settings.isPublished) {
@@ -109,9 +163,37 @@ function doGet() {
     return HtmlService.createHtmlOutput('エラー: 表示するシートが設定されていません。スプレッドシートの「アプリ管理」メニューから設定してください。').setTitle('エラー');
   }
 
-  // ★変更: Page.html にもメールアドレスを渡す
+  const params = e && e.parameter ? e.parameter : {};
+  const userEmail = safeGetUserEmail();
+  const adminOverride = params.admin;
+  let isAdminView;
+  if (adminOverride === 'true') {
+    isAdminView = true;
+  } else if (adminOverride === 'false') {
+    isAdminView = false;
+  } else {
+    isAdminView = isUserAdmin(userEmail);
+  }
+
   const template = HtmlService.createTemplateFromFile('Page');
-  template.userEmail = Session.getActiveUser().getEmail(); // この行を追加
+  if (isAdminView) {
+    template.showCounts = true;
+    template.showAdminFeatures = true;
+    template.showHighlightToggle = true;
+    template.showScoreSort = true;
+    template.showPublishControls = true;
+    template.displayMode = 'named';
+    template.isAdminUser = true;
+  } else {
+    template.showCounts = false;
+    template.showAdminFeatures = false;
+    template.showHighlightToggle = false;
+    template.showScoreSort = false;
+    template.showPublishControls = false;
+    template.displayMode = 'anonymous';
+    template.isAdminUser = isUserAdmin(userEmail);
+  }
+  template.userEmail = userEmail;
   return template.evaluate()
       .setTitle('StudyQuest - みんなのかいとうボード')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -129,13 +211,12 @@ function doGet() {
 function getPublishedSheetData(classFilter) {
   const settings = getAppSettings();
   const sheetName = settings.activeSheetName;
-  
+
   if (!sheetName) {
     throw new Error('表示するシートが設定されていません。');
   }
-  
-  // 既存のgetSheetDataロジックを再利用
-  const data = getSheetData(sheetName, classFilter);
+
+  const data = getSheetData(sheetName, classFilter, 'score', isUserAdmin());
 
   // ★改善: フロントエンドでシート名を表示できるよう、レスポンスに含める
   return {
@@ -160,7 +241,7 @@ function getSheets() {
   }
 }
 
-function getSheetData(sheetName, classFilter) {
+function getSheetData(sheetName, classFilter, sortBy, named) {
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
     if (!sheet) throw new Error(`指定されたシート「${sheetName}」が見つかりません。`);
@@ -168,7 +249,7 @@ function getSheetData(sheetName, classFilter) {
     const allValues = sheet.getDataRange().getValues();
     if (allValues.length < 1) return { header: "シートにデータがありません", rows: [] };
     
-    const userEmail = Session.getActiveUser().getEmail();
+    const userEmail = safeGetUserEmail();
     const headerIndices = getAndCacheHeaderIndices(sheetName, allValues[0]);
     const dataRows = allValues.slice(1);
     const emailToNameMap = getRosterMap();
@@ -184,32 +265,133 @@ function getSheetData(sheetName, classFilter) {
       const opinion = row[headerIndices[COLUMN_HEADERS.OPINION]];
 
       if (email && opinion) {
-        const likersString = row[headerIndices[COLUMN_HEADERS.LIKES]] || '';
-        const likers = likersString ? likersString.toString().split(',').filter(Boolean) : [];
+        const understandArr = parseReactionString(row[headerIndices[COLUMN_HEADERS.UNDERSTAND]]);
+        const likeArr = parseReactionString(row[headerIndices[COLUMN_HEADERS.LIKE]]);
+        const curiousArr = parseReactionString(row[headerIndices[COLUMN_HEADERS.CURIOUS]]);
         const reason = row[headerIndices[COLUMN_HEADERS.REASON]] || '';
-        const likes = likers.length;
+        const highlightVal = row[headerIndices[COLUMN_HEADERS.HIGHLIGHT]];
+        const likes = likeArr.length;
         const baseScore = reason.length;
         const likeMultiplier = 1 + (likes * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
         const totalScore = baseScore * likeMultiplier;
+        let name;
+        if (named) {
+          name = emailToNameMap[email] || email.split('@')[0];
+        } else {
+          name = '匿名';
+        }
         return {
           rowIndex: dataRows.indexOf(row) + 2,
-          name: emailToNameMap[email] || email.split('@')[0],
+          name: name,
           class: row[headerIndices[COLUMN_HEADERS.CLASS]] || '未分類',
           opinion: opinion,
           reason: reason,
-          likes: likes,
-          hasLiked: userEmail ? likers.includes(userEmail) : false,
+          reactions: {
+            UNDERSTAND: { count: understandArr.length, reacted: userEmail ? understandArr.includes(userEmail) : false },
+            LIKE: { count: likeArr.length, reacted: userEmail ? likeArr.includes(userEmail) : false },
+            CURIOUS: { count: curiousArr.length, reacted: userEmail ? curiousArr.includes(userEmail) : false }
+          },
+          highlight: highlightVal === true || String(highlightVal).toLowerCase() === 'true',
           score: totalScore
         };
       }
       return null;
     }).filter(Boolean);
 
-    rows.sort((a, b) => b.score - a.score);
+    if (sortBy === 'newest') {
+      rows.sort((a, b) => b.rowIndex - a.rowIndex);
+    } else {
+      rows.sort((a, b) => b.score - a.score);
+    }
     return { header: COLUMN_HEADERS.OPINION, rows: rows };
   } catch(e) {
     console.error(`getSheetData Error for sheet "${sheetName}":`, e);
     throw new Error(`データの取得中にエラーが発生しました: ${e.message}`);
+  }
+}
+
+function addReaction(rowIndex, reactionKey) {
+  if (!rowIndex || !reactionKey || !COLUMN_HEADERS[reactionKey]) {
+    return { status: 'error', message: '無効なパラメータです。' };
+  }
+  const lock = LockService.getScriptLock();
+  try {
+    if (!lock.tryLock(TIME_CONSTANTS.LOCK_WAIT_MS)) {
+      return { status: 'error', message: '他のユーザーが操作中です。しばらく待ってから再試行してください。' };
+    }
+    const userEmail = safeGetUserEmail();
+    if (!userEmail) {
+      return { status: 'error', message: 'ログインしていないため、操作できません。' };
+    }
+    const settings = getAppSettings();
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(settings.activeSheetName);
+    if (!sheet) throw new Error(`シート '${settings.activeSheetName}' が見つかりません。`);
+
+    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const headerIndices = findHeaderIndices(headerRow, [COLUMN_HEADERS.UNDERSTAND, COLUMN_HEADERS.LIKE, COLUMN_HEADERS.CURIOUS]);
+    const startCol = headerIndices[COLUMN_HEADERS.UNDERSTAND] + 1;
+    const reactionRange = sheet.getRange(rowIndex, startCol, 1, 3);
+    const values = reactionRange.getValues()[0];
+    const lists = {
+      UNDERSTAND: { arr: parseReactionString(values[0]) },
+      LIKE: { arr: parseReactionString(values[1]) },
+      CURIOUS: { arr: parseReactionString(values[2]) }
+    };
+
+    const wasReacted = lists[reactionKey].arr.includes(userEmail);
+    Object.keys(lists).forEach(key => {
+      const idx = lists[key].arr.indexOf(userEmail);
+      if (idx > -1) lists[key].arr.splice(idx, 1);
+    });
+    if (!wasReacted) {
+      lists[reactionKey].arr.push(userEmail);
+    }
+    reactionRange.setValues([[
+      lists.UNDERSTAND.arr.join(','),
+      lists.LIKE.arr.join(','),
+      lists.CURIOUS.arr.join(',')
+    ]]);
+
+    const reactions = {
+      UNDERSTAND: { count: lists.UNDERSTAND.arr.length, reacted: lists.UNDERSTAND.arr.includes(userEmail) },
+      LIKE: { count: lists.LIKE.arr.length, reacted: lists.LIKE.arr.includes(userEmail) },
+      CURIOUS: { count: lists.CURIOUS.arr.length, reacted: lists.CURIOUS.arr.includes(userEmail) }
+    };
+    return { status: 'ok', reactions: reactions };
+  } catch (error) {
+    console.error('addReaction Error:', error);
+    return { status: 'error', message: `エラーが発生しました: ${error.message}` };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
+function toggleHighlight(rowIndex) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(TIME_CONSTANTS.LOCK_WAIT_MS);
+  try {
+    const sheets = getSheets();
+    if (sheets.length === 0) {
+      throw new Error('利用可能なシートがありません。');
+    }
+    const sheetName = sheets[0];
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+    if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
+
+    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const headerIndices = findHeaderIndices(headerRow, [COLUMN_HEADERS.HIGHLIGHT]);
+    const colIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT] + 1;
+
+    const cell = sheet.getRange(rowIndex, colIndex);
+    const current = !!cell.getValue();
+    const newValue = !current;
+    cell.setValue(newValue);
+    return { status: 'ok', highlight: newValue };
+  } catch (error) {
+    console.error('toggleHighlight Error:', error);
+    return { status: 'error', message: `エラーが発生しました: ${error.message}` };
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -308,4 +490,34 @@ function clearRosterCache() {
   try {
     SpreadsheetApp.getUi().alert('名簿のキャッシュをリセットしました。');
   } catch (e) { /* no-op */ }
+}
+
+function saveWebAppUrl(url) {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperties({ WEB_APP_URL: (url || '').trim() });
+}
+
+function saveDeployId(id) {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperties({ DEPLOY_ID: (id || '').trim() });
+}
+
+if (typeof module !== 'undefined') {
+  module.exports = {
+    COLUMN_HEADERS,
+    getAdminSettings,
+    publishApp,
+    unpublishApp,
+    doGet,
+    doGetAdmin,
+    getPublishedSheetData,
+    getSheets,
+    getSheetData,
+    addReaction,
+    addLike,
+    toggleHighlight,
+    saveWebAppUrl,
+    saveDeployId,
+    findHeaderIndices
+  };
 }
