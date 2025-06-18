@@ -1,34 +1,38 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
   <head>
+    <meta charset="UTF-8" />
     <base target="_top">
-    <link href="https://cdn.tailwindcss.com/tailwind.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      body { font-family: sans-serif; }
+      body { color: #c0caf5; }
+      .glass-panel { background: rgba(26,27,38,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
       button:disabled { opacity: 0.5; cursor: not-allowed; }
+      :focus-visible { outline: 3px solid #8be9fd; outline-offset: 2px; border-radius: 4px; }
     </style>
   </head>
-  <body class="p-4 bg-gray-100">
-    <div id="app">
-      <h2 class="text-xl font-bold mb-4 text-gray-800">管理パネル</h2>
+  <body class="bg-[#1a1b26] text-gray-200 font-sans p-4">
+    <div id="app" class="glass-panel max-w-xl mx-auto rounded-xl p-6 shadow-lg">
+      <h2 class="text-xl font-bold mb-4 text-yellow-300">管理パネル</h2>
 
       <!-- Current Status -->
-      <div class="mb-6 p-4 rounded-lg bg-white shadow-md">
-        <h3 class="font-semibold text-gray-700 mb-2">現在の状態</h3>
-        <p id="status-text" class="text-gray-600">状態を読み込み中...</p>
+      <div class="mb-6 glass-panel p-4 rounded-lg">
+        <h3 class="font-semibold mb-2">現在の状態</h3>
+        <p id="status-text" class="text-gray-300">状態を読み込み中...</p>
       </div>
 
       <!-- Sheet Selection -->
       <div class="mb-6">
-        <h3 class="font-semibold text-gray-700 mb-3">1. 公開するシートを選択</h3>
-        <div id="sheet-list" class="flex flex-col gap-2 rounded-lg bg-white p-2 shadow-md max-h-48 overflow-y-auto">
-          <p class="text-gray-500 p-2">シートを読み込み中...</p>
+        <h3 class="font-semibold mb-3">1. 公開するシートを選択</h3>
+        <div id="sheet-list" class="flex flex-col gap-2 rounded-lg glass-panel p-2 max-h-48 overflow-y-auto">
+          <p class="text-gray-400 p-2">シートを読み込み中...</p>
         </div>
       </div>
 
       <!-- Actions -->
-      <div>
-        <h3 class="font-semibold text-gray-700 mb-3">2. 操作を選択</h3>
+      <div class="glass-panel p-4 rounded-lg">
+        <h3 class="font-semibold mb-3">2. 操作を選択</h3>
         <div class="flex flex-col gap-3">
           <button id="publish-btn" class="w-full text-white font-bold py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 transition disabled:bg-blue-300">
             選択したシートを公開

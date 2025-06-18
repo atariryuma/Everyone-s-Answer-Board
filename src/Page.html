@@ -67,9 +67,11 @@
 
   <footer id="controlsFooter" class="fixed bottom-0 left-0 right-0 z-40 p-4">
       <div class="glass-panel max-w-md mx-auto rounded-xl p-3 flex items-center justify-center gap-3">
-        <span id="footerIcon" class="w-5 h-5"></span>
         <input type="range" id="sizeSlider" min="2" max="6" value="4" class="w-1/2" aria-label="表示列数の変更">
-        <span id="sliderValue" class="font-bold w-4 text-center text-lg">4</span>
+        <div class="flex items-center gap-1">
+          <span id="sliderValue" class="font-bold text-lg">4</span>
+          <span id="footerIcon" class="w-4 h-4"></span>
+        </div>
       </div>
   </footer>
 
