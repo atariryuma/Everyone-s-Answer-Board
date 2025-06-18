@@ -94,12 +94,15 @@ function getAdminSettings() {
   const allSheets = getSheets();
   const currentUserEmail = safeGetUserEmail();
   const adminEmails = getAdminEmails();
+  const appSettings = getAppSettings();
   return {
     allSheets: allSheets,
     currentUserEmail: currentUserEmail,
     deployId: props.getProperty('DEPLOY_ID'),
     adminEmails: adminEmails,
-    isUserAdmin: adminEmails.includes(currentUserEmail)
+    isUserAdmin: adminEmails.includes(currentUserEmail),
+    isPublished: appSettings.isPublished,
+    activeSheetName: appSettings.activeSheetName
   };
 }
 
