@@ -53,13 +53,13 @@ test('admin email without page defaults to student view', () => {
   expect(template.displayMode).toBe('anonymous');
 });
 
-test('admin=true enables admin view', () => {
+test('admin=true alone does not enable admin view', () => {
   const { getTemplate } = setup({});
   const e = { parameter: { admin: 'true' } };
   doGet(e);
   const template = getTemplate();
   expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Page');
-  expect(template.displayMode).toBe('named');
+  expect(template.displayMode).toBe('anonymous');
 });
 
 test('admin=false forces student view even for admins', () => {
