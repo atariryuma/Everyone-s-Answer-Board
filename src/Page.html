@@ -30,6 +30,9 @@
     .like-btn.liked svg { stroke: transparent; fill: currentColor; transform: scale(1.1); }
     #controlsFooter { pointer-events: none; }
     #controlsFooter > .glass-panel { pointer-events: auto; }
+    .skeleton { position: relative; overflow: hidden; background-color: rgba(255,255,255,0.05); color: transparent; }
+    .skeleton::after { content: ""; position: absolute; inset: 0; background-image: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.3), rgba(255,255,255,0)); animation: skeleton-loading 1.2s infinite; }
+    @keyframes skeleton-loading { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
   </style>
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans">
@@ -285,13 +288,15 @@
             const oldAnswers = [...this.state.currentAnswers];
 
             if (showLoading) {
-                this.elements.answersContainer.innerHTML =
-                    '<div class="flex justify-center col-span-full mt-8" role="status">' +
-                    '<svg class="w-6 h-6 text-gray-400 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-                    '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>' +
-                    '<path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>' +
-                    '</svg>' +
-                    '</div>';
+                const count = parseInt(this.elements.sizeSlider.value, 10) * 2;
+                const frag = document.createDocumentFragment();
+                for (let i = 0; i < count; i++) {
+                    frag.appendChild(this.createSkeletonCard());
+                }
+                const container = this.elements.answersContainer;
+                container.className = 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-' + this.elements.sizeSlider.value;
+                container.innerHTML = '';
+                container.appendChild(frag);
             }
             
             try {
@@ -480,6 +485,19 @@
                 }
             });
 
+            return card;
+        }
+
+        createSkeletonCard() {
+            const card = document.createElement('div');
+            card.className = 'answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 skeleton';
+            card.innerHTML =
+                '<div class="flex-1 space-y-3">' +
+                '<div class="h-6 w-3/4 rounded bg-gray-500/30"></div>' +
+                '<div class="h-4 w-full rounded bg-gray-500/20"></div>' +
+                '<div class="h-4 w-5/6 rounded bg-gray-500/20"></div>' +
+                '</div>' +
+                '<div class="mt-4 h-8 rounded bg-gray-500/20"></div>';
             return card;
         }
 
