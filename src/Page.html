@@ -50,7 +50,7 @@
         </div>
         <div class="w-full lg:w-auto lg:min-w-[150px] text-right space-y-1">
             <p id="sheetNameText" class="text-xs text-gray-400 h-4"></p>
-            <button id="adminToggleBtn" class="text-xs text-cyan-400 underline hidden"></button>
+            <button id="adminToggleBtn" class="text-xs text-cyan-400 underline hidden" hidden></button>
         </div>
     </header>
 
@@ -151,6 +151,7 @@
             this.setupEventListeners();
             if (this.isAdminUser && this.elements.adminToggleBtn) {
                 this.elements.adminToggleBtn.classList.remove('hidden');
+                this.elements.adminToggleBtn.removeAttribute('hidden');
                 this.elements.adminToggleBtn.textContent = this.showAdminFeatures ? '閲覧モード' : '管理モード';
             }
             this.adjustLayout();
@@ -244,6 +245,8 @@
                             status: 'ok',
                             newScore: Math.floor(Math.random() * 10) + 1
                         });
+                    } else if (funcName === 'checkAdmin') {
+                        resolve(false);
                     }
                 }, 500);
             });
