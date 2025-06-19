@@ -414,8 +414,8 @@ function addLike(rowIndex) {
     if (!sheet) throw new Error(`シート '${settings.activeSheetName}' が見つかりません。`);
 
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const headerIndices = findHeaderIndices(headerRow, [COLUMN_HEADERS.LIKES]);
-    const likesColIndex = headerIndices[COLUMN_HEADERS.LIKES] + 1;
+    const headerIndices = findHeaderIndices(headerRow, [COLUMN_HEADERS.LIKE]);
+    const likesColIndex = headerIndices[COLUMN_HEADERS.LIKE] + 1;
 
     const likeCell = sheet.getRange(rowIndex, likesColIndex);
     const likersString = likeCell.getValue().toString();
