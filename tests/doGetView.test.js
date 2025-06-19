@@ -26,19 +26,20 @@ function setup({ userEmail = 'admin@example.com', adminEmails = 'admin@example.c
   return { getTemplate: () => template };
 }
 
-test('page parameter is ignored and interface starts in viewer mode', () => {
+test('page parameter is ignored and admin mode is based on user role', () => {
   const { getTemplate } = setup({});
   doGet({ parameter: { page: 'admin' } });
   const tpl = getTemplate();
-  expect(tpl.showAdminFeatures).toBe(false);
+  expect(tpl.isAdminUser).toBe(true);
+  expect(tpl.showAdminFeatures).toBe(true);
 });
 
-test('admin user is flagged but initial mode is viewer', () => {
+test('admin user starts in admin mode', () => {
   const { getTemplate } = setup({});
   doGet({ parameter: {} });
   const tpl = getTemplate();
   expect(tpl.isAdminUser).toBe(true);
-  expect(tpl.showAdminFeatures).toBe(false);
+  expect(tpl.showAdminFeatures).toBe(true);
 });
 
 test('non admin user starts in viewer mode', () => {

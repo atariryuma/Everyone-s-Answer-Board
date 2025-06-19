@@ -161,10 +161,11 @@ function doGet(e) {
   const userEmail = safeGetUserEmail();
 
   const template = HtmlService.createTemplateFromFile('Page');
+  const admin = isUserAdmin(userEmail);
   Object.assign(template, {
-    showAdminFeatures: false,
-    showHighlightToggle: false,
-    isAdminUser: isUserAdmin(userEmail)
+    showAdminFeatures: admin,
+    showHighlightToggle: admin,
+    isAdminUser: admin
   });
   template.userEmail = userEmail;
   return template.evaluate()
