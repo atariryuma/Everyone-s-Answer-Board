@@ -50,3 +50,18 @@ test('addLike updates value in LIKE column', () => {
   expect(sheet.getRange.mock.calls[1][0]).toBe(2);
   expect(sheet.getRange.mock.calls[1][1]).toBe(3);
 });
+
+test('addLike handles failure to get user email', () => {
+  const sheet = buildSheet();
+  global.LockService = { getScriptLock: () => ({ waitLock: jest.fn(), releaseLock: jest.fn() }) };
+  global.Session = { getActiveUser: () => ({ getEmail: () => { throw new Error('fail'); } }) };
+  global.PropertiesService = { getScriptProperties: () => ({}) };
+  global.SpreadsheetApp = {
+    getActiveSpreadsheet: () => ({
+      getSheetByName: () => sheet,
+      getSheets: () => [sheet]
+    })
+  };
+  const result = addLike(2);
+  expect(result.status).toBe('error');
+});
