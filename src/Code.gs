@@ -250,13 +250,11 @@ function getSheetData(sheetName, classFilter, sortBy, named) {
     const dataRows = allValues.slice(1);
     const emailToNameMap = getRosterMap();
 
-    const filteredRows = dataRows.filter(row => {
-      if (!classFilter || classFilter === 'すべて') return true;
-      const className = row[headerIndices[COLUMN_HEADERS.CLASS]];
-      return className === classFilter;
-    });
-
-    const rows = filteredRows.map((row) => {
+    const rows = dataRows.map((row, index) => {
+      if (classFilter && classFilter !== 'すべて') {
+        const className = row[headerIndices[COLUMN_HEADERS.CLASS]];
+        if (className !== classFilter) return null;
+      }
       const email = row[headerIndices[COLUMN_HEADERS.EMAIL]];
       const opinion = row[headerIndices[COLUMN_HEADERS.OPINION]];
 
@@ -277,7 +275,7 @@ function getSheetData(sheetName, classFilter, sortBy, named) {
           name = '匿名';
         }
         return {
-          rowIndex: dataRows.indexOf(row) + 2,
+          rowIndex: index + 2,
           name: name,
           class: row[headerIndices[COLUMN_HEADERS.CLASS]] || '未分類',
           opinion: opinion,
