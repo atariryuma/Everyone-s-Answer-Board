@@ -30,7 +30,7 @@ test('page parameter is ignored and interface starts in viewer mode', () => {
   const { getTemplate } = setup({});
   doGet({ parameter: { page: 'admin' } });
   const tpl = getTemplate();
-  expect(tpl.displayMode).toBe('anonymous');
+  expect(tpl.showAdminFeatures).toBe(false);
 });
 
 test('admin user is flagged but initial mode is viewer', () => {
@@ -38,7 +38,7 @@ test('admin user is flagged but initial mode is viewer', () => {
   doGet({ parameter: {} });
   const tpl = getTemplate();
   expect(tpl.isAdminUser).toBe(true);
-  expect(tpl.displayMode).toBe('anonymous');
+  expect(tpl.showAdminFeatures).toBe(false);
 });
 
 test('non admin user starts in viewer mode', () => {
@@ -46,5 +46,5 @@ test('non admin user starts in viewer mode', () => {
   doGet({ parameter: {} });
   const tpl = getTemplate();
   expect(tpl.isAdminUser).toBe(false);
-  expect(tpl.displayMode).toBe('anonymous');
+  expect(tpl.showAdminFeatures).toBe(false);
 });

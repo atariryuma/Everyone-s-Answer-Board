@@ -60,7 +60,7 @@ test('getSheetData filters and scores rows', () => {
   ];
   setupMocks(data, 'b@example.com', 'b@example.com');
 
-  const result = getSheetData('Sheet1', undefined, 'score', true);
+  const result = getSheetData('Sheet1', undefined, 'score');
 
   expect(result.header).toBe(COLUMN_HEADERS.OPINION);
   expect(result.rows).toHaveLength(2);
@@ -115,7 +115,7 @@ test('getSheetData supports random sort', () => {
   expect(indexes).toEqual([2, 3]);
 });
 
-test('getSheetData forces anonymous mode for non-admin', () => {
+test('getSheetData returns names for non-admin', () => {
   const data = [
     [
       COLUMN_HEADERS.EMAIL,
@@ -131,9 +131,9 @@ test('getSheetData forces anonymous mode for non-admin', () => {
   ];
   setupMocks(data, 'a@example.com', '');
 
-  const result = getSheetData('Sheet1', undefined, undefined);
+  const result = getSheetData('Sheet1');
 
-  expect(result.rows[0].name).toBe('匿名');
+  expect(result.rows[0].name).toBe('A Alice');
 });
 
 test('reaction lists trim spaces and ignore empties', () => {
@@ -161,7 +161,7 @@ test('reaction lists trim spaces and ignore empties', () => {
   ];
   setupMocks(data, 'a@example.com', 'a@example.com');
 
-  const result = getSheetData('Sheet1', undefined, undefined, true);
+  const result = getSheetData('Sheet1');
 
   const row = result.rows[0];
   expect(row.reactions.UNDERSTAND.count).toBe(2);

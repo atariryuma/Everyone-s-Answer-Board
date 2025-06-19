@@ -79,7 +79,6 @@
   </footer>
 
   <script>
-    const displayMode = '<?= displayMode ?>';
     const showAdminFeatures = <?= showAdminFeatures ? 'true' : 'false' ?>;
     const showHighlightToggle = <?= showHighlightToggle ? 'true' : 'false' ?>;
     const isAdminUser = <?= isAdminUser ? 'true' : 'false' ?>;
@@ -129,7 +128,6 @@
 
             this.showHighlightToggle = showHighlightToggle;
             this.showAdminFeatures = showAdminFeatures;
-            this.displayMode = displayMode;
             this.isAdminUser = isAdminUser;
             this.reactionTypes = [
                 { key: 'LIKE', icon: 'hand-thumb-up' },
@@ -138,7 +136,7 @@
             ];
             
             this.gas = {
-                getPublishedSheetData: (classFilter, sort) => this.runGas('getPublishedSheetData', classFilter, sort, this.displayMode === 'named'),
+                getPublishedSheetData: (classFilter, sort) => this.runGas('getPublishedSheetData', classFilter, sort),
                 addLike: (rowIndex) => this.runGas('addReaction', rowIndex, 'LIKE'),
                 addReaction: (rowIndex, reaction) => this.runGas('addReaction', rowIndex, reaction),
                 toggleHighlight: (rowIndex) => this.runGas('toggleHighlight', rowIndex),
@@ -515,7 +513,6 @@
             }
             this.showAdminFeatures = enable;
             this.showHighlightToggle = enable;
-            this.displayMode = enable ? 'named' : 'anonymous';
             if (this.elements.adminToggleBtn) {
                 this.elements.adminToggleBtn.textContent = enable ? '閲覧モード' : '管理モード';
             }

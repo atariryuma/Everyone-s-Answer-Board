@@ -182,7 +182,7 @@ function doGet(e) {
  * サーバー側で設定されたシートのデータを取得します。
  */
 
-function getPublishedSheetData(classFilter, sortBy, namedView) {
+function getPublishedSheetData(classFilter, sortBy) {
   const settings = getAppSettings();
   const sheetName = settings.activeSheetName;
 
@@ -191,8 +191,7 @@ function getPublishedSheetData(classFilter, sortBy, namedView) {
   }
 
   const order = sortBy || 'newest';
-  const named = namedView && isUserAdmin();
-  const data = getSheetData(sheetName, classFilter, order, named);
+  const data = getSheetData(sheetName, classFilter, order);
 
   // ★改善: フロントエンドでシート名を表示できるよう、レスポンスに含める
   return {
@@ -217,7 +216,7 @@ function getSheets() {
   }
 }
 
-function getSheetData(sheetName, classFilter, sortBy, named) {
+function getSheetData(sheetName, classFilter, sortBy) {
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
     if (!sheet) throw new Error(`指定されたシート「${sheetName}」が見つかりません。`);
@@ -248,12 +247,7 @@ function getSheetData(sheetName, classFilter, sortBy, named) {
         const baseScore = reason.length;
         const likeMultiplier = 1 + (likes * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
         const totalScore = baseScore * likeMultiplier;
-        let name;
-        if (named) {
-          name = emailToNameMap[email] || email.split('@')[0];
-        } else {
-          name = '匿名';
-        }
+        const name = emailToNameMap[email] || email.split('@')[0];
         return {
           rowIndex: index + 2,
           name: name,
