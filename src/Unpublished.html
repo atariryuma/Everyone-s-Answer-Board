@@ -29,76 +29,79 @@
 
     <script>
         const userEmail = "<?= userEmail ?>";
-        const emailName = userEmail.split('@')[0];
 
-        // メールアドレスのネーム部分に 't' が含まれているかチェック
-        if (emailName.includes('t')) {
-            const adminPanel = document.getElementById('admin-panel');
-            adminPanel.classList.remove('hidden');
+        google.script.run
+            .withSuccessHandler((isAdmin) => {
+                if (!isAdmin) return;
 
-            const sheetSelector = document.getElementById('sheet-selector');
-            const publishBtn = document.getElementById('publish-btn');
-            const messageArea = document.getElementById('message-area');
+                const adminPanel = document.getElementById('admin-panel');
+                adminPanel.classList.remove('hidden');
 
-            // シートリストを取得してプルダウンを生成
-            google.script.run
-                .withSuccessHandler(populateSheets)
-                .withFailureHandler(showError)
-                .getSheets();
+                const sheetSelector = document.getElementById('sheet-selector');
+                const publishBtn = document.getElementById('publish-btn');
+                const messageArea = document.getElementById('message-area');
 
-            function populateSheets(sheetNames) {
-                sheetSelector.innerHTML = '<option value="">-- シートを選択してください --</option>';
-                if (sheetNames && sheetNames.length > 0) {
-                    sheetNames.forEach(name => {
-                        const option = document.createElement('option');
-                        option.value = name;
-                        option.textContent = name;
-                        sheetSelector.appendChild(option);
-                    });
-                } else {
-                    sheetSelector.innerHTML = '<option>表示できるシートがありません</option>';
-                    publishBtn.disabled = true;
-                }
-            }
-
-            function showError(error) {
-                messageArea.textContent = `エラー: ${error.message}`;
-                messageArea.className = 'mt-4 text-sm h-5 text-red-400';
-            }
-
-            publishBtn.addEventListener('click', () => {
-                const selectedSheet = sheetSelector.value;
-                if (!selectedSheet) {
-                    messageArea.textContent = 'シートを選択してください。';
-                    messageArea.className = 'mt-4 text-sm h-5 text-yellow-300';
-                    return;
-                }
-                
-                publishBtn.disabled = true;
-                publishBtn.textContent = '公開処理中...';
-                messageArea.textContent = '';
-
+                // シートリストを取得してプルダウンを生成
                 google.script.run
-                    .withSuccessHandler(onPublishSuccess)
-                    .withFailureHandler(onPublishError)
-                    .publishApp(selectedSheet);
-            });
+                    .withSuccessHandler(populateSheets)
+                    .withFailureHandler(showError)
+                    .getSheets();
 
-            function onPublishSuccess(message) {
-                messageArea.textContent = `${message} 3秒後にリロードします。`;
-                messageArea.className = 'mt-4 text-sm h-5 text-green-400';
-                setTimeout(() => {
-                    // 自身をリロードするために window.top を使う
-                    window.top.location.reload();
-                }, 3000);
-            }
+                function populateSheets(sheetNames) {
+                    sheetSelector.innerHTML = '<option value="">-- シートを選択してください --</option>';
+                    if (sheetNames && sheetNames.length > 0) {
+                        sheetNames.forEach(name => {
+                            const option = document.createElement('option');
+                            option.value = name;
+                            option.textContent = name;
+                            sheetSelector.appendChild(option);
+                        });
+                    } else {
+                        sheetSelector.innerHTML = '<option>表示できるシートがありません</option>';
+                        publishBtn.disabled = true;
+                    }
+                }
 
-            function onPublishError(error) {
-                showError(error);
-                publishBtn.disabled = false;
-                publishBtn.textContent = 'このシートで公開する';
-            }
-        }
-    </script>
+                function showError(error) {
+                    messageArea.textContent = `エラー: ${error.message}`;
+                    messageArea.className = 'mt-4 text-sm h-5 text-red-400';
+                }
+
+                publishBtn.addEventListener('click', () => {
+                    const selectedSheet = sheetSelector.value;
+                    if (!selectedSheet) {
+                        messageArea.textContent = 'シートを選択してください。';
+                        messageArea.className = 'mt-4 text-sm h-5 text-yellow-300';
+                        return;
+                    }
+
+                    publishBtn.disabled = true;
+                    publishBtn.textContent = '公開処理中...';
+                    messageArea.textContent = '';
+
+                    google.script.run
+                        .withSuccessHandler(onPublishSuccess)
+                        .withFailureHandler(onPublishError)
+                        .publishApp(selectedSheet);
+                });
+
+                function onPublishSuccess(message) {
+                    messageArea.textContent = `${message} 3秒後にリロードします。`;
+                    messageArea.className = 'mt-4 text-sm h-5 text-green-400';
+                    setTimeout(() => {
+                        // 自身をリロードするために window.top を使う
+                        window.top.location.reload();
+                    }, 3000);
+                }
+
+                function onPublishError(error) {
+                    showError(error);
+                    publishBtn.disabled = false;
+                    publishBtn.textContent = 'このシートで公開する';
+                }
+            })
+            .withFailureHandler(() => {})
+            .isUserAdmin(userEmail);
+        </script>
 </body>
 </html>
