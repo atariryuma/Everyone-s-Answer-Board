@@ -19,7 +19,20 @@
     .answer-card.highlighted { border-color: #facc15; box-shadow: 0 0 15px rgba(250,204,21,0.4); transform: scale(1.02); transition: all 0.3s ease; }
     .answer-card:hover { transform: translateY(-4px) scale(1.02); box-shadow: 0 8px 25px rgba(139,233,253,0.3); }
     .answer-card.highlighted:hover { transform: translateY(-4px) scale(1.04); }
-    .highlight-badge { position: absolute; top: 4px; right: 4px; width: 1.75rem; height: 1.75rem; border-radius: 9999px; background-color: rgba(250,204,21,0.95); display:flex; align-items:center; justify-content:center; box-shadow:0 0 6px rgba(0,0,0,0.4); color:#1a1b26; }
+    .highlight-badge {
+      position: absolute;
+      top: -0.75rem;
+      right: -0.75rem;
+      width: 1.75rem;
+      height: 1.75rem;
+      border-radius: 9999px;
+      background-color: rgba(250,204,21,0.95);
+      color: #facc15;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+    }
     .reaction-bg-like { border-color:#ef4444; border-image: linear-gradient(to bottom,#facc15,#fcd34d) 1; }
     .reaction-bg-understand { border-color:#fbbf24; border-image: linear-gradient(to bottom,#a3e635,#bef264) 1; }
     .reaction-bg-curious { border-color:#3b82f6; border-image: linear-gradient(to bottom,#38bdf8,#7dd3fc) 1; }
@@ -439,7 +452,7 @@
                                this.getIcon('star', 'w-5 h-5') +
                                '</button>';
             }
-            const badge = data.highlight ? '<span class="highlight-badge">' + this.getIcon('star', 'w-6 h-6 text-[#1a1b26]') + '</span>' : '';
+            const badge = data.highlight ? '<span class="highlight-badge">' + this.getIcon('star', 'w-6 h-6') + '</span>' : '';
 
             const nameHtml = this.showAdminFeatures ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' : '';
 
@@ -625,7 +638,7 @@
                     if (item.highlight && preview && !badge) {
                         badge = document.createElement('span');
                         badge.className = 'highlight-badge';
-                        badge.innerHTML = this.getIcon('star', 'w-6 h-6 text-[#1a1b26]');
+                        badge.innerHTML = this.getIcon('star', 'w-6 h-6');
                         preview.insertBefore(badge, preview.firstChild);
                         this.animateHighlightBadge(badge);
                     } else if (!item.highlight && badge) {
