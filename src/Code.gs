@@ -57,6 +57,10 @@ function isUserAdmin(email) {
   return getAdminEmails().includes(userEmail);
 }
 
+function checkAdmin() {
+  return isUserAdmin();
+}
+
 function parseReactionString(val) {
   if (!val) return [];
   return val
@@ -520,6 +524,7 @@ if (typeof module !== 'undefined') {
     saveWebAppUrl,
     saveDeployId,
     findHeaderIndices,
-    parseReactionString
+    parseReactionString,
+    checkAdmin
   };
 }
