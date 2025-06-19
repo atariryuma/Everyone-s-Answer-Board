@@ -46,7 +46,12 @@
             </select>
         </div>
         <div class="flex-grow text-center w-full min-w-0">
-             <p id="headingLabel" class="text-2xl md:text-3xl font-bold text-pink-400 leading-tight">データを読み込んでいます...</p>
+             <p id="headingLabel" class="text-2xl md:text-3xl font-bold text-pink-400 leading-tight flex justify-center">
+                 <svg class="w-6 h-6 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                     <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
+                 </svg>
+             </p>
         </div>
         <div class="w-full lg:w-auto lg:min-w-[150px] text-right space-y-1">
             <p id="sheetNameText" class="text-xs text-gray-400 h-4"></p>
@@ -280,7 +285,13 @@
             const oldAnswers = [...this.state.currentAnswers];
 
             if (showLoading) {
-                this.elements.answersContainer.innerHTML = '<p class="text-center text-gray-400 col-span-full mt-8">データを読み込み中...</p>';
+                this.elements.answersContainer.innerHTML =
+                    '<div class="flex justify-center col-span-full mt-8" role="status">' +
+                    '<svg class="w-6 h-6 text-gray-400 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+                    '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>' +
+                    '<path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>' +
+                    '</svg>' +
+                    '</div>';
             }
             
             try {
