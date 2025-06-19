@@ -10,6 +10,7 @@
     <div class="text-center p-4">
         <h1 class="text-4xl font-bold mb-4">現在は公開されていません</h1>
         <p class="text-gray-400">先生がアプリの公開を始めたら、また見てみましょう。</p>
+        <p id="admin-check-message" class="text-gray-400 text-sm mt-2"></p>
         
         <!-- ★管理者用パネル（条件を満たすユーザーにのみJSで表示） -->
         <div id="admin-panel" class="hidden mt-12 p-6 bg-gray-700 rounded-xl max-w-sm mx-auto shadow-lg border border-gray-600">
@@ -29,9 +30,12 @@
 
     <script>
         const userEmail = "<?= userEmail ?>";
+        const adminCheckMessage = document.getElementById('admin-check-message');
+        adminCheckMessage.textContent = '管理者権限を確認中...';
 
         google.script.run
             .withSuccessHandler((isAdmin) => {
+                adminCheckMessage.textContent = '';
                 if (!isAdmin) return;
 
                 const adminPanel = document.getElementById('admin-panel');
@@ -100,7 +104,9 @@
                     publishBtn.textContent = 'このシートで公開する';
                 }
             })
-            .withFailureHandler(() => {})
+            .withFailureHandler(() => {
+                adminCheckMessage.textContent = '';
+            })
             .isUserAdmin(userEmail);
         </script>
 </body>
