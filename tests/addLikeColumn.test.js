@@ -1,7 +1,16 @@
 const { addLike, COLUMN_HEADERS } = require('../src/Code.gs');
 
 function buildSheet() {
-  const headerRow = [COLUMN_HEADERS.EMAIL, 'Other', COLUMN_HEADERS.LIKE];
+  const headerRow = [
+    COLUMN_HEADERS.EMAIL,
+    COLUMN_HEADERS.CLASS,
+    COLUMN_HEADERS.LIKE,
+    COLUMN_HEADERS.OPINION,
+    COLUMN_HEADERS.REASON,
+    COLUMN_HEADERS.UNDERSTAND,
+    COLUMN_HEADERS.CURIOUS,
+    COLUMN_HEADERS.HIGHLIGHT
+  ];
   let likeVal = '';
   const sheet = {
     getLastColumn: () => headerRow.length,
@@ -27,6 +36,7 @@ function setupMocks(email, sheet) {
   global.LockService = { getScriptLock: () => ({ waitLock: jest.fn(), releaseLock: jest.fn() }) };
   global.Session = { getActiveUser: () => ({ getEmail: () => email }) };
   global.PropertiesService = { getScriptProperties: () => ({}) };
+  global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null }) };
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({
       getSheetByName: () => sheet,
@@ -39,6 +49,7 @@ afterEach(() => {
   delete global.LockService;
   delete global.Session;
   delete global.PropertiesService;
+  delete global.CacheService;
   delete global.SpreadsheetApp;
 });
 
@@ -56,6 +67,7 @@ test('addLike handles failure to get user email', () => {
   global.LockService = { getScriptLock: () => ({ waitLock: jest.fn(), releaseLock: jest.fn() }) };
   global.Session = { getActiveUser: () => ({ getEmail: () => { throw new Error('fail'); } }) };
   global.PropertiesService = { getScriptProperties: () => ({}) };
+  global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null }) };
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({
       getSheetByName: () => sheet,

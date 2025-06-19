@@ -1,7 +1,16 @@
 const { toggleHighlight, COLUMN_HEADERS } = require('../src/Code.gs');
 
 function buildSheet() {
-  const headerRow = [COLUMN_HEADERS.HIGHLIGHT];
+  const headerRow = [
+    COLUMN_HEADERS.EMAIL,
+    COLUMN_HEADERS.CLASS,
+    COLUMN_HEADERS.OPINION,
+    COLUMN_HEADERS.REASON,
+    COLUMN_HEADERS.UNDERSTAND,
+    COLUMN_HEADERS.LIKE,
+    COLUMN_HEADERS.CURIOUS,
+    COLUMN_HEADERS.HIGHLIGHT
+  ];
   let highlight = false;
   return {
     getLastColumn: () => headerRow.length,
@@ -22,6 +31,7 @@ function buildSheet() {
 function setupMocks(sheet) {
   global.LockService = { getScriptLock: () => ({ waitLock: jest.fn(), releaseLock: jest.fn() }) };
   global.PropertiesService = { getScriptProperties: () => ({}) };
+  global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null }) };
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({
       getSheetByName: () => sheet,
@@ -33,6 +43,7 @@ function setupMocks(sheet) {
 afterEach(() => {
   delete global.LockService;
   delete global.PropertiesService;
+  delete global.CacheService;
   delete global.SpreadsheetApp;
 });
 
