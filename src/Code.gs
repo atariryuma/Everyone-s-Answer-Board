@@ -59,7 +59,11 @@ function isUserAdmin(email) {
 
 function parseReactionString(val) {
   if (!val) return [];
-  return val.toString().split(',').map(s => s.trim()).filter(Boolean);
+  return val
+    .toString()
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
 }
 
 
@@ -515,6 +519,7 @@ if (typeof module !== 'undefined') {
     toggleHighlight,
     saveWebAppUrl,
     saveDeployId,
-    findHeaderIndices
+    findHeaderIndices,
+    parseReactionString
   };
 }
