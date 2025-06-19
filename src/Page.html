@@ -377,11 +377,19 @@
                     
                     const oldData = oldRowsMap.get(rowIndex);
                     const newData = newRows.find(r => String(r.rowIndex) === rowIndex);
-                    if (oldData && newData && oldData.likes !== newData.likes) {
-                        gsap.fromTo(card, 
-                            { backgroundColor: 'rgba(250, 204, 21, 0.4)' }, 
-                            { backgroundColor: 'rgba(26, 27, 38, 0.7)', duration: 0.8, ease: 'expo.out' }
-                        );
+                    if (oldData && newData) {
+                        const oldTotal = this.reactionTypes.reduce((sum, rt) => {
+                            return sum + ((oldData.reactions && oldData.reactions[rt.key] ? oldData.reactions[rt.key].count : 0));
+                        }, 0);
+                        const newTotal = this.reactionTypes.reduce((sum, rt) => {
+                            return sum + ((newData.reactions && newData.reactions[rt.key] ? newData.reactions[rt.key].count : 0));
+                        }, 0);
+                        if (oldTotal !== newTotal) {
+                            gsap.fromTo(card,
+                                { backgroundColor: 'rgba(250, 204, 21, 0.4)' },
+                                { backgroundColor: 'rgba(26, 27, 38, 0.7)', duration: 0.8, ease: 'expo.out' }
+                            );
+                        }
                     }
                 }
             });
