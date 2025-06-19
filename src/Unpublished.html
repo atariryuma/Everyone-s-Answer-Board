@@ -17,8 +17,13 @@
             <h2 class="text-lg font-bold mb-4 text-yellow-300">管理者用パネル</h2>
             <p class="text-sm text-gray-300 mb-4">表示するシートを選択して公開してください。</p>
             <div class="flex flex-col gap-4">
-                <select id="sheet-selector" class="w-full p-2 rounded bg-gray-800 border border-gray-600 text-white focus:ring-2 focus:ring-yellow-400 focus:outline-none">
-                    <option>シートを読み込み中...</option>
+                <div id="sheet-loader" class="flex justify-center p-2" role="status">
+                    <svg class="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
+                    </svg>
+                </div>
+                <select id="sheet-selector" class="hidden w-full p-2 rounded bg-gray-800 border border-gray-600 text-white focus:ring-2 focus:ring-yellow-400 focus:outline-none">
                 </select>
                 <button id="publish-btn" class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-2 px-4 rounded transition disabled:opacity-50">
                     このシートで公開する
@@ -31,7 +36,10 @@
     <script>
         const userEmail = "<?= userEmail ?>";
         const adminCheckMessage = document.getElementById('admin-check-message');
-        adminCheckMessage.textContent = '管理者権限を確認中...';
+        adminCheckMessage.innerHTML = '<svg class="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+            '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>' +
+            '<path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>' +
+            '</svg>';
 
         google.script.run
             .withSuccessHandler((isAdmin) => {
@@ -42,6 +50,7 @@
                 adminPanel.classList.remove('hidden');
 
                 const sheetSelector = document.getElementById('sheet-selector');
+                const sheetLoader = document.getElementById('sheet-loader');
                 const publishBtn = document.getElementById('publish-btn');
                 const messageArea = document.getElementById('message-area');
 
@@ -52,6 +61,8 @@
                     .getSheets();
 
                 function populateSheets(sheetNames) {
+                    sheetLoader.classList.add('hidden');
+                    sheetSelector.classList.remove('hidden');
                     sheetSelector.innerHTML = '<option value="">-- シートを選択してください --</option>';
                     if (sheetNames && sheetNames.length > 0) {
                         sheetNames.forEach(name => {
@@ -67,6 +78,8 @@
                 }
 
                 function showError(error) {
+                    sheetLoader.classList.add('hidden');
+                    sheetSelector.classList.remove('hidden');
                     messageArea.textContent = `エラー: ${error.message}`;
                     messageArea.className = 'mt-4 text-sm h-5 text-red-400';
                 }
