@@ -158,7 +158,7 @@ function doGet(e) {
   const settings = getAppSettings();
   
   if (!settings.isPublished) {
-    const userEmail = Session.getActiveUser().getEmail();
+    const userEmail = safeGetUserEmail();
     const template = HtmlService.createTemplateFromFile('Unpublished');
     template.userEmail = userEmail;
     return template.evaluate().setTitle('公開終了');
@@ -407,7 +407,7 @@ function addLike(rowIndex) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const userEmail = Session.getActiveUser().getEmail();
+    const userEmail = safeGetUserEmail();
     if (!userEmail) return { status: 'error', message: 'ログインしていないため、操作できません。' };
     const settings = getAppSettings();
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(settings.activeSheetName);
