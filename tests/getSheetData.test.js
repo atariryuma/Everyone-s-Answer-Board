@@ -135,3 +135,38 @@ test('getSheetData forces anonymous mode for non-admin', () => {
 
   expect(result.rows[0].name).toBe('匿名');
 });
+
+test('reaction lists trim spaces and ignore empties', () => {
+  const data = [
+    [
+      COLUMN_HEADERS.EMAIL,
+      COLUMN_HEADERS.CLASS,
+      COLUMN_HEADERS.OPINION,
+      COLUMN_HEADERS.REASON,
+      COLUMN_HEADERS.UNDERSTAND,
+      COLUMN_HEADERS.LIKE,
+      COLUMN_HEADERS.CURIOUS,
+      COLUMN_HEADERS.HIGHLIGHT
+    ],
+    [
+      'a@example.com',
+      '1-1',
+      'Opinion',
+      'Reason',
+      ' a@example.com , b@example.com ',
+      ' a@example.com , ',
+      '   ',
+      'false'
+    ]
+  ];
+  setupMocks(data, 'a@example.com', 'a@example.com');
+
+  const result = getSheetData('Sheet1', undefined, undefined, true);
+
+  const row = result.rows[0];
+  expect(row.reactions.UNDERSTAND.count).toBe(2);
+  expect(row.reactions.UNDERSTAND.reacted).toBe(true);
+  expect(row.reactions.LIKE.count).toBe(1);
+  expect(row.reactions.LIKE.reacted).toBe(true);
+  expect(row.reactions.CURIOUS.count).toBe(0);
+});
