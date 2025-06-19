@@ -139,21 +139,6 @@ function unpublishApp() {
   return 'アプリを非公開にしました。';
 }
 
-function doGetAdmin(e) {
-  const userEmail = safeGetUserEmail();
-  if (!isUserAdmin(userEmail)) {
-    return HtmlService.createHtmlOutput('アクセス拒否').setTitle('アクセス拒否');
-  }
-  const template = HtmlService.createTemplateFromFile('Page');
-  template.showAdminFeatures = true;
-  template.showHighlightToggle = true;
-  template.displayMode = 'named';
-  template.isAdminUser = true;
-  template.userEmail = userEmail;
-  return template.evaluate()
-      .setTitle('StudyQuest - みんなのかいとうボード')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-}
 
 
 // =================================================================
@@ -173,28 +158,15 @@ function doGet(e) {
     return HtmlService.createHtmlOutput('エラー: 表示するシートが設定されていません。スプレッドシートの「アプリ管理」メニューから設定してください。').setTitle('エラー');
   }
 
-  const params = e && e.parameter ? e.parameter : {};
   const userEmail = safeGetUserEmail();
-  const pageParam = params.page;
-  let isAdminView = false;
-  if (pageParam === 'admin') {
-    isAdminView = isUserAdmin(userEmail);
-  }
 
   const template = HtmlService.createTemplateFromFile('Page');
-  const adminOpts = {
-    showAdminFeatures: true,
-    showHighlightToggle: true,
-    displayMode: 'named',
-    isAdminUser: true
-  };
-  const userOpts = {
+  Object.assign(template, {
     showAdminFeatures: false,
     showHighlightToggle: false,
     displayMode: 'anonymous',
     isAdminUser: isUserAdmin(userEmail)
-  };
-  Object.assign(template, isAdminView ? adminOpts : userOpts);
+  });
   template.userEmail = userEmail;
   return template.evaluate()
       .setTitle('StudyQuest - みんなのかいとうボード')
@@ -514,7 +486,6 @@ if (typeof module !== 'undefined') {
     publishApp,
     unpublishApp,
     doGet,
-    doGetAdmin,
     getPublishedSheetData,
     getSheets,
     getSheetData,

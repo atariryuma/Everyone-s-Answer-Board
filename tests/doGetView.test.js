@@ -7,7 +7,7 @@ afterEach(() => {
   delete global.PropertiesService;
 });
 
-function setup({userEmail='admin@example.com', adminEmails='admin@example.com'}) {
+function setup({ userEmail = 'admin@example.com', adminEmails = 'admin@example.com' }) {
   global.PropertiesService = {
     getScriptProperties: () => ({
       getProperty: (key) => {
@@ -23,59 +23,28 @@ function setup({userEmail='admin@example.com', adminEmails='admin@example.com'})
   global.HtmlService = {
     createTemplateFromFile: jest.fn(() => template)
   };
-  return { output, getTemplate: () => template };
+  return { getTemplate: () => template };
 }
 
-test('admin user with page parameter sees admin view', () => {
+test('page parameter is ignored and interface starts in viewer mode', () => {
   const { getTemplate } = setup({});
-  const e = { parameter: { page: 'admin' } };
-  doGet(e);
-  const template = getTemplate();
-  expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Page');
-  expect(template.displayMode).toBe('named');
+  doGet({ parameter: { page: 'admin' } });
+  const tpl = getTemplate();
+  expect(tpl.displayMode).toBe('anonymous');
 });
 
-test('non-admin default shows student view', () => {
+test('admin user is flagged but initial mode is viewer', () => {
+  const { getTemplate } = setup({});
+  doGet({ parameter: {} });
+  const tpl = getTemplate();
+  expect(tpl.isAdminUser).toBe(true);
+  expect(tpl.displayMode).toBe('anonymous');
+});
+
+test('non admin user starts in viewer mode', () => {
   const { getTemplate } = setup({ userEmail: 'user@example.com' });
-  const e = { parameter: {} };
-  doGet(e);
-  const template = getTemplate();
-  expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Page');
-  expect(template.displayMode).toBe('anonymous');
+  doGet({ parameter: {} });
+  const tpl = getTemplate();
+  expect(tpl.isAdminUser).toBe(false);
+  expect(tpl.displayMode).toBe('anonymous');
 });
-
-test('admin email without page defaults to student view', () => {
-  const { getTemplate } = setup({});
-  const e = { parameter: {} };
-  doGet(e);
-  const template = getTemplate();
-  expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Page');
-  expect(template.displayMode).toBe('anonymous');
-});
-
-test('admin=true alone does not enable admin view', () => {
-  const { getTemplate } = setup({});
-  const e = { parameter: { admin: 'true' } };
-  doGet(e);
-  const template = getTemplate();
-  expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Page');
-  expect(template.displayMode).toBe('anonymous');
-});
-
-test('admin=false forces student view even for admins', () => {
-  const { getTemplate } = setup({});
-  const e = { parameter: { admin: 'false' } };
-  doGet(e);
-  const template = getTemplate();
-  expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Page');
-  expect(template.displayMode).toBe('anonymous');
-});
-
-test('doGet sets isAdminUser based on isUserAdmin when in student mode', () => {
-  const { getTemplate } = setup({ userEmail: 'user@example.com', adminEmails: 'admin@example.com' });
-  const e = { parameter: {} };
-  doGet(e);
-  const template = getTemplate();
-  expect(template.isAdminUser).toBe(false);
-});
-
