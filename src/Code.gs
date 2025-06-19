@@ -483,6 +483,7 @@ if (typeof module !== 'undefined') {
     getPublishedSheetData,
     getSheets,
     getSheetData,
+    getRosterMap,
     addReaction,
     addLike,
     toggleHighlight,
