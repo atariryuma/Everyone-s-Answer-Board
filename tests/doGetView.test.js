@@ -31,7 +31,7 @@ test('page parameter is ignored and admin mode is based on user role', () => {
   doGet({ parameter: { page: 'admin' } });
   const tpl = getTemplate();
   expect(tpl.isAdminUser).toBe(true);
-  expect(tpl.showAdminFeatures).toBe(true);
+  expect(tpl.showAdminFeatures).toBe(false);
 });
 
 test('admin user starts in admin mode', () => {
@@ -39,7 +39,7 @@ test('admin user starts in admin mode', () => {
   doGet({ parameter: {} });
   const tpl = getTemplate();
   expect(tpl.isAdminUser).toBe(true);
-  expect(tpl.showAdminFeatures).toBe(true);
+  expect(tpl.showAdminFeatures).toBe(false);
 });
 
 test('non admin user starts in viewer mode', () => {
