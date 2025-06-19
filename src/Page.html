@@ -19,7 +19,21 @@
     .answer-card.highlighted { border-color: #facc15; box-shadow: 0 0 15px rgba(250,204,21,0.4); transform: scale(1.02); transition: all 0.3s ease; }
     .answer-card:hover { transform: translateY(-4px) scale(1.02); box-shadow: 0 8px 25px rgba(139,233,253,0.3); }
     .answer-card.highlighted:hover { transform: translateY(-4px) scale(1.04); }
-    .highlight-badge { position: absolute; top: 4px; right: 4px; width: 1.75rem; height: 1.75rem; border-radius: 9999px; background-color: rgba(250,204,21,0.95); display:flex; align-items:center; justify-content:center; box-shadow:0 0 6px rgba(0,0,0,0.4); color:#1a1b26; }
+    .highlight-badge {
+      position: absolute;
+      top: -0.75rem;
+      right: -0.75rem;
+      width: 1.75rem;
+      height: 1.75rem;
+      border-radius: 9999px;
+      background-color: rgba(250,204,21,0.95);
+      color: #1a1b26;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+      pointer-events: none;
+    }
     .reaction-bg-like { border-color:#ef4444; border-image: linear-gradient(to bottom,#facc15,#fcd34d) 1; }
     .reaction-bg-understand { border-color:#fbbf24; border-image: linear-gradient(to bottom,#a3e635,#bef264) 1; }
     .reaction-bg-curious { border-color:#3b82f6; border-image: linear-gradient(to bottom,#38bdf8,#7dd3fc) 1; }
@@ -416,7 +430,7 @@
         createAnswerCard(data) {
             const card = document.createElement('div');
             const highlightClass = data.highlight ? ' highlighted' : '';
-            card.className = 'answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer opacity-0' + highlightClass;
+            card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer opacity-0' + highlightClass;
             card.dataset.rowIndex = data.rowIndex;
 
             const active = this.reactionTypes
@@ -439,7 +453,7 @@
                                this.getIcon('star', 'w-5 h-5') +
                                '</button>';
             }
-            const badge = data.highlight ? '<span class="highlight-badge">' + this.getIcon('star', 'w-6 h-6 text-[#1a1b26]') + '</span>' : '';
+
 
             const nameHtml = this.showAdminFeatures ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' : '';
 
@@ -455,7 +469,7 @@
             }).join('');
 
             card.innerHTML =
-                '<div class="relative flex-grow mb-3 answer-preview">' + badge +
+                '<div class="relative flex-grow mb-3 answer-preview">' +
                 '<p class="opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight">' +
                 this.escapeHtml(data.opinion || '') + '</p>' +
                 '<p class="text-gray-100 whitespace-pre-wrap break-words mt-4">' +
@@ -468,6 +482,13 @@
                 highlightBtn +
                 '</div>' +
                 '</div>';
+
+            if (data.highlight) {
+                const badge = document.createElement('span');
+                badge.className = 'highlight-badge';
+                badge.innerHTML = this.getIcon('star', 'w-6 h-6');
+                card.appendChild(badge);
+            }
 
             const badgeEl = card.querySelector('.highlight-badge');
             if (badgeEl) {
@@ -620,13 +641,12 @@
                         card.classList.add('reaction-bg-all');
                     }
 
-                    const preview = card.querySelector('.answer-preview');
-                    let badge = preview ? preview.querySelector('.highlight-badge') : null;
-                    if (item.highlight && preview && !badge) {
+                    let badge = card.querySelector('.highlight-badge');
+                    if (item.highlight && !badge) {
                         badge = document.createElement('span');
                         badge.className = 'highlight-badge';
-                        badge.innerHTML = this.getIcon('star', 'w-6 h-6 text-[#1a1b26]');
-                        preview.insertBefore(badge, preview.firstChild);
+                        badge.innerHTML = this.getIcon('star', 'w-6 h-6');
+                        card.appendChild(badge);
                         this.animateHighlightBadge(badge);
                     } else if (!item.highlight && badge) {
                         gsap.to(badge, { scale: 0, opacity: 0, duration: 0.3, onComplete: () => badge.remove() });
