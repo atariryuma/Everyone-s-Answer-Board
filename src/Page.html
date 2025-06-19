@@ -226,8 +226,12 @@
                                     class: '3年A組',
                                     opinion: 'これは素晴らしいアイデアだと思います。',
                                     reason: '理由は簡潔で分かりやすく、実現可能性が高いからです。',
-                                    likes: 5,
-                                    hasLiked: false
+                                    reactions: {
+                                        UNDERSTAND: { count: 1, reacted: false },
+                                        LIKE: { count: 5, reacted: false },
+                                        CURIOUS: { count: 0, reacted: false }
+                                    },
+                                    highlight: false
                                 },
                                 {
                                     rowIndex: 2,
@@ -235,15 +239,23 @@
                                     class: '3年B組',
                                     opinion: '少し改善の余地があると考えます。',
                                     reason: 'より多くの人の意見を聞く必要があると思います。',
-                                    likes: 3,
-                                    hasLiked: true
+                                    reactions: {
+                                        UNDERSTAND: { count: 2, reacted: true },
+                                        LIKE: { count: 3, reacted: true },
+                                        CURIOUS: { count: 1, reacted: false }
+                                    },
+                                    highlight: true
                                 }
                             ]
                         });
-                    } else if (funcName === 'addLike') {
+                    } else if (funcName === 'addReaction') {
                         resolve({
                             status: 'ok',
-                            newScore: Math.floor(Math.random() * 10) + 1
+                            reactions: {
+                                UNDERSTAND: { count: 1, reacted: Math.random() < 0.5 },
+                                LIKE: { count: Math.floor(Math.random() * 10), reacted: Math.random() < 0.5 },
+                                CURIOUS: { count: Math.floor(Math.random() * 5), reacted: Math.random() < 0.5 }
+                            }
                         });
                     } else if (funcName === 'checkAdmin') {
                         resolve(false);
