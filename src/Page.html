@@ -328,6 +328,11 @@
                 const sortOrder = this.elements.sortOrder.value;
                 const data = await this.gas.getPublishedSheetData(selectedClass, sortOrder);
                 this.adjustLayout();
+
+                if (!this.isAdminUser) {
+                    this.showAdminFeatures = false;
+                    this.showHighlightToggle = false;
+                }
                 
                 if (isInitialLoad) {
                     this.populateClassFilter(data.rows);
