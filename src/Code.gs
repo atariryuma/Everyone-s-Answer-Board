@@ -164,7 +164,6 @@ function doGet(e) {
   Object.assign(template, {
     showAdminFeatures: false,
     showHighlightToggle: false,
-    displayMode: 'anonymous',
     isAdminUser: isUserAdmin(userEmail)
   });
   template.userEmail = userEmail;
