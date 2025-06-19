@@ -167,15 +167,10 @@ function doGet(e) {
 
   const params = e && e.parameter ? e.parameter : {};
   const userEmail = safeGetUserEmail();
-  const adminOverride = params.admin;
   const pageParam = params.page;
   let isAdminView = false;
   if (pageParam === 'admin') {
     isAdminView = isUserAdmin(userEmail);
-  } else if (adminOverride === 'true') {
-    isAdminView = true;
-  } else if (adminOverride === 'false') {
-    isAdminView = false;
   }
 
   const template = HtmlService.createTemplateFromFile('Page');
