@@ -565,6 +565,30 @@
                 const card = document.querySelector('.answer-card[data-row-index="' + item.rowIndex + '"]');
                 if (card) {
                     card.classList.toggle('highlighted', item.highlight);
+
+                    // Recompute active reaction types and update background classes
+                    const active = this.reactionTypes
+                        .filter(rt => item.reactions && item.reactions[rt.key] && item.reactions[rt.key].count > 0)
+                        .map(rt => rt.key);
+
+                    [
+                        'reaction-bg-like',
+                        'reaction-bg-understand',
+                        'reaction-bg-curious',
+                        'reaction-bg-mixed',
+                        'reaction-bg-all'
+                    ].forEach(cls => card.classList.remove(cls));
+
+                    if (active.length === 1) {
+                        if (active[0] === 'LIKE') card.classList.add('reaction-bg-like');
+                        if (active[0] === 'UNDERSTAND') card.classList.add('reaction-bg-understand');
+                        if (active[0] === 'CURIOUS') card.classList.add('reaction-bg-curious');
+                    } else if (active.length === 2) {
+                        card.classList.add('reaction-bg-mixed');
+                    } else if (active.length > 2) {
+                        card.classList.add('reaction-bg-all');
+                    }
+
                     const preview = card.querySelector('.answer-preview');
                     let badge = preview ? preview.querySelector('.highlight-badge') : null;
                     if (item.highlight && preview && !badge) {
