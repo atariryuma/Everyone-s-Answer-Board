@@ -137,11 +137,8 @@ function doGetAdmin(e) {
     return HtmlService.createHtmlOutput('アクセス拒否').setTitle('アクセス拒否');
   }
   const template = HtmlService.createTemplateFromFile('Page');
-  template.showCounts = true;
   template.showAdminFeatures = true;
   template.showHighlightToggle = true;
-  template.showScoreSort = true;
-  template.showPublishControls = true;
   template.displayMode = 'named';
   template.isAdminUser = true;
   template.userEmail = userEmail;
@@ -183,20 +180,14 @@ function doGet(e) {
 
   const template = HtmlService.createTemplateFromFile('Page');
   const adminOpts = {
-    showCounts: true,
     showAdminFeatures: true,
     showHighlightToggle: true,
-    showScoreSort: true,
-    showPublishControls: true,
     displayMode: 'named',
     isAdminUser: true
   };
   const userOpts = {
-    showCounts: false,
     showAdminFeatures: false,
     showHighlightToggle: false,
-    showScoreSort: false,
-    showPublishControls: false,
     displayMode: 'anonymous',
     isAdminUser: isUserAdmin(userEmail)
   };
