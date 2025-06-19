@@ -43,7 +43,9 @@ Opening the spreadsheet adds an **アプリ管理** menu. From here you can:
 
 When unpublished, visiting the Web App URL shows a message that the board is closed. Once published, the board is available and updates automatically every 15 seconds.
 
-Administrators can access a more complete interface by appending `?page=admin` to the Web App URL. Email addresses with admin rights are listed in the `ADMIN_EMAILS` script property.
+### Admin interface
+
+Administrators can open the full board interface by appending `?page=admin` to the Web App URL. The list of administrator email addresses is set in the `ADMIN_EMAILS` script property.
 
 ## Front‑end features
 
