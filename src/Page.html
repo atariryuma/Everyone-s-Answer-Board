@@ -699,7 +699,7 @@
         
         getIcon(name, classes = '', solid = false) {
             const key = solid && ICONS[name + '-solid'] ? name + '-solid' : ICONS[name + '-outline'] ? name + '-outline' : name;
-            return '<span class="' + classes + '">' + (ICONS[key] || '') + '</span>';
+            return '<span aria-hidden="true" class="' + classes + '">' + (ICONS[key] || '') + '</span>';
         }
         
         renderIcons() {
