@@ -45,7 +45,7 @@ When unpublished, visiting the Web App URL shows a message that the board is clo
 
 ### Admin interface
 
-Administrators can open the full board interface by appending `?page=admin` to the Web App URL. The list of administrator email addresses is set in the `ADMIN_EMAILS` script property.
+Administrators see a toggle button that allows switching between viewing and management modes. The list of administrator email addresses is set in the `ADMIN_EMAILS` script property.
 
 ## Front‑end features
 
