@@ -327,7 +327,7 @@ function addReaction(rowIndex, reactionKey) {
 
   const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const reactionHeaders = REACTION_KEYS.map(k => COLUMN_HEADERS[k]);
-  const headerIndices = findHeaderIndices(headerRow, reactionHeaders);
+  const headerIndices = getAndCacheHeaderIndices(settings.activeSheetName, headerRow);
   const startCol = headerIndices[reactionHeaders[0]] + 1;
   const reactionRange = sheet.getRange(rowIndex, startCol, 1, REACTION_KEYS.length);
   const values = reactionRange.getValues()[0];
@@ -373,7 +373,7 @@ function toggleHighlight(rowIndex) {
     if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
 
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const headerIndices = findHeaderIndices(headerRow, [COLUMN_HEADERS.HIGHLIGHT]);
+    const headerIndices = getAndCacheHeaderIndices(sheetName, headerRow);
     const colIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT] + 1;
 
     const cell = sheet.getRange(rowIndex, colIndex);
@@ -400,7 +400,7 @@ function addLike(rowIndex) {
     if (!sheet) throw new Error(`シート '${settings.activeSheetName}' が見つかりません。`);
 
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const headerIndices = findHeaderIndices(headerRow, [COLUMN_HEADERS.LIKE]);
+    const headerIndices = getAndCacheHeaderIndices(settings.activeSheetName, headerRow);
     const likesColIndex = headerIndices[COLUMN_HEADERS.LIKE] + 1;
 
     const likeCell = sheet.getRange(rowIndex, likesColIndex);
