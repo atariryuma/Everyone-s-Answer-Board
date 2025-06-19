@@ -25,13 +25,13 @@
       right: -0.75rem;
       width: 1.75rem;
       height: 1.75rem;
-      border-radius: 9999px;
       background-color: rgba(250,204,21,0.95);
       color: #facc15;
       display: flex;
       align-items: center;
       justify-content: center;
       box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+      clip-path: polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
     }
     .reaction-bg-like { border-color:#ef4444; border-image: linear-gradient(to bottom,#facc15,#fcd34d) 1; }
     .reaction-bg-understand { border-color:#fbbf24; border-image: linear-gradient(to bottom,#a3e635,#bef264) 1; }
@@ -172,11 +172,7 @@
         init() {
             this.renderIcons();
             this.setupEventListeners();
-            if (this.isAdminUser && this.elements.adminToggleBtn) {
-                this.elements.adminToggleBtn.classList.remove('hidden');
-                this.elements.adminToggleBtn.removeAttribute('hidden');
-                this.elements.adminToggleBtn.textContent = this.showAdminFeatures ? '閲覧モード' : '管理モード';
-            }
+            this.verifyAdmin();
             this.adjustLayout();
             this.loadInitialData();
         }
@@ -232,6 +228,20 @@
                     this.getMockData(funcName, ...args).then(resolve).catch(reject);
                 }
             });
+        }
+
+        async verifyAdmin() {
+            try {
+                const ok = await this.gas.checkAdmin();
+                if (ok && this.elements.adminToggleBtn) {
+                    this.isAdminUser = true;
+                    this.elements.adminToggleBtn.classList.remove('hidden');
+                    this.elements.adminToggleBtn.removeAttribute('hidden');
+                    this.elements.adminToggleBtn.textContent = this.showAdminFeatures ? '閲覧モード' : '管理モード';
+                }
+            } catch (e) {
+                console.error('Admin check failed', e);
+            }
         }
         
         // デバッグ用のモックデータ生成

@@ -163,8 +163,8 @@ function doGet(e) {
   const template = HtmlService.createTemplateFromFile('Page');
   const admin = isUserAdmin(userEmail);
   Object.assign(template, {
-    showAdminFeatures: admin,
-    showHighlightToggle: admin,
+    showAdminFeatures: false,
+    showHighlightToggle: false,
     isAdminUser: admin
   });
   template.userEmail = userEmail;
