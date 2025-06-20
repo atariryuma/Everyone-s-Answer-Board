@@ -8,14 +8,35 @@
   <!-- deferを削除してGSAPを即座に利用可能にする -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
   <script>
-    // Template variables from server
-    window.isStudentMode = <?= typeof isStudentMode !== 'undefined' ? isStudentMode : 'true' ?>;
-    window.showCounts = <?= showCounts ? 'true' : 'false' ?>;
-    window.showAdminFeatures = <?= showAdminFeatures ? 'true' : 'false' ?>;
-    window.showHighlightToggle = <?= showHighlightToggle ? 'true' : 'false' ?>;
-    window.showScoreSort = <?= showScoreSort ? 'true' : 'false' ?>;
-    window.showPublishControls = <?= showPublishControls ? 'true' : 'false' ?>;
-    window.displayMode = '<?= displayMode || 'anonymous' ?>';
+    // Template variables from server - fallback for preview mode
+    window.isStudentMode = typeof isStudentMode !== 'undefined' ? isStudentMode : <?= typeof isStudentMode !== 'undefined' ? isStudentMode : 'true' ?>;
+    window.showCounts = typeof showCounts !== 'undefined' ? showCounts : <?= showCounts ? 'true' : 'false' ?>;
+    window.showAdminFeatures = typeof showAdminFeatures !== 'undefined' ? showAdminFeatures : <?= showAdminFeatures ? 'true' : 'false' ?>;
+    window.showHighlightToggle = typeof showHighlightToggle !== 'undefined' ? showHighlightToggle : <?= showHighlightToggle ? 'true' : 'false' ?>;
+    window.showScoreSort = typeof showScoreSort !== 'undefined' ? showScoreSort : <?= showScoreSort ? 'true' : 'false' ?>;
+    window.showPublishControls = typeof showPublishControls !== 'undefined' ? showPublishControls : <?= showPublishControls ? 'true' : 'false' ?>;
+    window.displayMode = typeof displayMode !== 'undefined' ? displayMode : '<?= displayMode || 'anonymous' ?>';
+    
+    // Mock mode variables for preview (when server-side variables are not available)
+    if (!window.isStudentMode && window.location.hash === '#admin') {
+      // Admin mode simulation
+      window.isStudentMode = false;
+      window.showCounts = true;
+      window.showAdminFeatures = true;
+      window.showHighlightToggle = true;
+      window.showScoreSort = true;
+      window.showPublishControls = true;
+      window.displayMode = 'named';
+    } else if (!window.isStudentMode && window.location.hash === '#student' || window.location.pathname.includes('preview')) {
+      // Student mode simulation
+      window.isStudentMode = true;
+      window.showCounts = false;
+      window.showAdminFeatures = false;
+      window.showHighlightToggle = false;
+      window.showScoreSort = false;
+      window.showPublishControls = false;
+      window.displayMode = 'anonymous';
+    }
   </script>
   <style>
     body { color: #c0caf5; }
@@ -119,9 +140,7 @@
             <select id="sortMode" class="text-sm">
                 <option value="newest" selected>新着順</option>
                 <option value="random">ランダム</option>
-<? if (showScoreSort) { ?>
-                <option value="score">スコア順</option>
-<? } ?>
+                <option value="score" id="scoreOption" style="display: none;">スコア順</option>
             </select>
         </div>
         <div class="flex-grow text-center w-full min-w-0">
@@ -152,6 +171,7 @@
         <span id="footerIcon" class="w-5 h-5"></span>
         <input type="range" id="sizeSlider" min="2" max="6" value="4" class="w-1/2" aria-label="表示列数の変更">
         <span id="sliderValue" class="font-bold w-4 text-center text-lg">4</span>
+        <button type="button" id="modeToggleBtn" class="ml-4 px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm" title="プレビューモード切り替え">切替</button>
       </div>
   </footer>
 
@@ -251,6 +271,7 @@
             // GSAPの読み込み確認
             this.waitForGSAP().then(() => {
                 this.init();
+                this.setupInitialModeButton();
             });
         }
 
@@ -285,34 +306,16 @@
 
         // ★追加: ソートオプションの更新
         updateSortOptions() {
-            const sortMode = this.elements.sortMode;
-            let hasScoreOption = false;
-            
-            // 既存のスコア順オプションを確認
-            for (let option of sortMode.options) {
-                if (option.value === 'score') {
-                    hasScoreOption = true;
-                    break;
-                }
-            }
-            
-            // スコア順ソートが有効な場合のみスコア順オプションを表示
-            if (showScoreSort && !hasScoreOption) {
-                const scoreOption = document.createElement('option');
-                scoreOption.value = 'score';
-                scoreOption.textContent = 'スコア順';
-                sortMode.appendChild(scoreOption);
-            } else if (!showScoreSort && hasScoreOption) {
-                // 条件を満たさない場合はスコア順オプションを削除
-                for (let i = sortMode.options.length - 1; i >= 0; i--) {
-                    if (sortMode.options[i].value === 'score') {
-                        sortMode.removeChild(sortMode.options[i]);
-                        break;
+            const scoreOption = document.getElementById('scoreOption');
+            if (scoreOption) {
+                if (showScoreSort) {
+                    scoreOption.style.display = 'block';
+                } else {
+                    scoreOption.style.display = 'none';
+                    // 削除された場合は新着順に戻す
+                    if (this.elements.sortMode.value === 'score') {
+                        this.elements.sortMode.value = 'newest';
                     }
-                }
-                // 削除された場合は新着順に戻す
-                if (sortMode.value === 'score') {
-                    sortMode.value = 'newest';
                 }
             }
         }
@@ -333,6 +336,12 @@
                 }
             });
             window.addEventListener('resize', this.debounce(() => this.adjustLayout(), 100));
+            
+            // モード切り替えボタンのイベントリスナー
+            const modeToggleBtn = document.getElementById('modeToggleBtn');
+            if (modeToggleBtn) {
+                modeToggleBtn.addEventListener('click', () => this.togglePreviewMode());
+            }
         }
 
         adjustLayout() {
@@ -363,12 +372,16 @@
                 setTimeout(() => {
                     try {
                         if (funcName === 'getSheetDataForDisplay') {
+                            // 表示モードに応じた名前の切り替え
+                            const studentName1 = window.displayMode === 'named' ? '田中太郎' : '匿名';
+                            const studentName2 = window.displayMode === 'named' ? '佐藤花子' : '匿名';
+                            
                             resolve({
                                 header: 'テスト問題',
                                 rows: [
                                     {
                                         rowIndex: 1,
-                                        name: '田中太郎',
+                                        name: studentName1,
                                         class: '3年A組',
                                         opinion: 'これは素晴らしいアイデアだと思います。',
                                         reason: '理由は簡潔で分かりやすく、実現可能性が高いからです。',
@@ -381,7 +394,7 @@
                                     },
                                     {
                                         rowIndex: 2,
-                                        name: '佐藤花子',
+                                        name: studentName2,
                                         class: '3年B組',
                                         opinion: '少し改善の余地があると考えます。',
                                         reason: 'より多くの人の意見を聞く必要があると思います。',
@@ -705,7 +718,7 @@
                 if (reaction) {
                     e.stopPropagation();
                     this.handleReaction(data.rowIndex, reaction.dataset.reaction);
-                } else if (highlightButton && isAdminUser) {
+                } else if (highlightButton && !isStudentMode) {
                     e.stopPropagation();
                     this.handleHighlight(data.rowIndex);
                 } else {
@@ -1018,6 +1031,72 @@
             // Animate the update
             if (typeof gsap !== 'undefined') {
                 gsap.fromTo(card, { scale: 1 }, { scale: 1.02, duration: 0.1, yoyo: true, repeat: 1 });
+            }
+        }
+
+        togglePreviewMode() {
+            const currentMode = window.displayMode;
+            const modeToggleBtn = document.getElementById('modeToggleBtn');
+            
+            if (currentMode === 'anonymous') {
+                // 学生モードから管理者モードへ
+                window.isStudentMode = false;
+                window.showCounts = true;
+                window.showAdminFeatures = true;
+                window.showHighlightToggle = true;
+                window.showScoreSort = true;
+                window.showPublishControls = true;
+                window.displayMode = 'named';
+                modeToggleBtn.textContent = '学生';
+                modeToggleBtn.className = 'ml-4 px-3 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-sm';
+            } else {
+                // 管理者モードから学生モードへ
+                window.isStudentMode = true;
+                window.showCounts = false;
+                window.showAdminFeatures = false;
+                window.showHighlightToggle = false;
+                window.showScoreSort = false;
+                window.showPublishControls = false;
+                window.displayMode = 'anonymous';
+                modeToggleBtn.textContent = '管理者';
+                modeToggleBtn.className = 'ml-4 px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm';
+            }
+            
+            // 設定を更新
+            this.updateConfigFromGlobals();
+            
+            // UIを更新
+            this.updateSortOptions();
+            this.loadSheetData(true);
+        }
+        
+        setupInitialModeButton() {
+            const modeToggleBtn = document.getElementById('modeToggleBtn');
+            if (modeToggleBtn) {
+                const currentMode = window.displayMode;
+                if (currentMode === 'named') {
+                    modeToggleBtn.textContent = '学生';
+                    modeToggleBtn.className = 'ml-4 px-3 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-sm';
+                } else {
+                    modeToggleBtn.textContent = '管理者';
+                    modeToggleBtn.className = 'ml-4 px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm';
+                }
+            }
+        }
+        
+        updateConfigFromGlobals() {
+            // グローバル変数から設定を再読み込み
+            const isStudentMode = Boolean(window.isStudentMode);
+            const showCounts = Boolean(window.showCounts);
+            const showAdminFeatures = Boolean(window.showAdminFeatures);
+            const showHighlightToggle = Boolean(window.showHighlightToggle);
+            const showScoreSort = Boolean(window.showScoreSort);
+            const showPublishControls = Boolean(window.showPublishControls);
+            const displayMode = window.displayMode;
+            
+            // 必要に応じて他の設定も更新
+            if (this.elements.unpublishBtn) {
+                this.elements.unpublishBtn.style.display = showPublishControls ? 'block' : 'none';
             }
         }
 
