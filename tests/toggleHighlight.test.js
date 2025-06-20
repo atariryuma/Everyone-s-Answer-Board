@@ -28,10 +28,10 @@ function buildSheet() {
   };
 }
 
-function setupMocks(sheet) {
+function setupMocks(sheet, cacheImpl) {
   global.LockService = { getScriptLock: () => ({ waitLock: jest.fn(), releaseLock: jest.fn() }) };
   global.PropertiesService = { getScriptProperties: () => ({}) };
-  global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null }) };
+  global.CacheService = { getScriptCache: () => cacheImpl || ({ get: () => null, put: () => null }) };
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({
       getSheetByName: () => sheet,
@@ -56,4 +56,20 @@ test('toggleHighlight flips stored value', () => {
 
   const result2 = toggleHighlight(2);
   expect(result2).toEqual({ status: 'ok', highlight: false });
+});
+
+test('toggleHighlight reads headers only once with cache', () => {
+  const sheet = buildSheet();
+  const store = {};
+  const cache = {
+    get: jest.fn(key => store[key] || null),
+    put: jest.fn((key, val) => { store[key] = val; })
+  };
+  setupMocks(sheet, cache);
+
+  toggleHighlight(2);
+  toggleHighlight(2);
+
+  const headerCalls = sheet.getRange.mock.calls.filter(c => c[0] === 1).length;
+  expect(headerCalls).toBe(1);
 });
