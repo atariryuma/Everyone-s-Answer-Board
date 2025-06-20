@@ -115,7 +115,7 @@ test('getSheetData supports random sort', () => {
   expect(indexes).toEqual([2, 3]);
 });
 
-test('getSheetData returns names for non-admin', () => {
+test('getSheetData omits names for non-admin', () => {
   const data = [
     [
       COLUMN_HEADERS.EMAIL,
@@ -130,6 +130,27 @@ test('getSheetData returns names for non-admin', () => {
     ['a@example.com', '1-1', 'Opinion1', 'Reason1', '', '', '', 'false']
   ];
   setupMocks(data, 'a@example.com', '');
+
+  const result = getSheetData('Sheet1');
+
+  expect(result.rows[0].name).toBe('');
+});
+
+test('getSheetData returns names for admin users', () => {
+  const data = [
+    [
+      COLUMN_HEADERS.EMAIL,
+      COLUMN_HEADERS.CLASS,
+      COLUMN_HEADERS.OPINION,
+      COLUMN_HEADERS.REASON,
+      COLUMN_HEADERS.UNDERSTAND,
+      COLUMN_HEADERS.LIKE,
+      COLUMN_HEADERS.CURIOUS,
+      COLUMN_HEADERS.HIGHLIGHT
+    ],
+    ['a@example.com', '1-1', 'Opinion1', 'Reason1', '', '', '', 'false']
+  ];
+  setupMocks(data, 'a@example.com', 'a@example.com');
 
   const result = getSheetData('Sheet1');
 
