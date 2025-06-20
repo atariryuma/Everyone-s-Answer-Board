@@ -163,8 +163,8 @@ function doGet(e) {
   const template = HtmlService.createTemplateFromFile('Page');
   const admin = isUserAdmin(userEmail);
   Object.assign(template, {
-    showAdminFeatures: admin,
-    showHighlightToggle: admin,
+    showAdminFeatures: false,
+    showHighlightToggle: false,
     isAdminUser: admin
   });
   template.userEmail = userEmail;
@@ -297,9 +297,8 @@ function addReaction(rowIndex, reactionKey) {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(settings.activeSheetName);
     if (!sheet) throw new Error(`シート '${settings.activeSheetName}' が見つかりません。`);
 
-  const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const reactionHeaders = REACTION_KEYS.map(k => COLUMN_HEADERS[k]);
-  const headerIndices = getAndCacheHeaderIndices(settings.activeSheetName, headerRow);
+  const headerIndices = getHeaderIndices(settings.activeSheetName);
   const startCol = headerIndices[reactionHeaders[0]] + 1;
   const reactionRange = sheet.getRange(rowIndex, startCol, 1, REACTION_KEYS.length);
   const values = reactionRange.getValues()[0];
@@ -344,8 +343,7 @@ function toggleHighlight(rowIndex) {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
     if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
 
-    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const headerIndices = getAndCacheHeaderIndices(sheetName, headerRow);
+    const headerIndices = getHeaderIndices(sheetName);
     const colIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT] + 1;
 
     const cell = sheet.getRange(rowIndex, colIndex);
@@ -361,34 +359,6 @@ function toggleHighlight(rowIndex) {
   }
 }
 
-function addLike(rowIndex) {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
-    const userEmail = safeGetUserEmail();
-    if (!userEmail) return { status: 'error', message: 'ログインしていないため、操作できません。' };
-    const settings = getAppSettings();
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(settings.activeSheetName);
-    if (!sheet) throw new Error(`シート '${settings.activeSheetName}' が見つかりません。`);
-
-    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const headerIndices = getAndCacheHeaderIndices(settings.activeSheetName, headerRow);
-    const likesColIndex = headerIndices[COLUMN_HEADERS.LIKE] + 1;
-
-    const likeCell = sheet.getRange(rowIndex, likesColIndex);
-    const likersString = likeCell.getValue().toString();
-    let likers = likersString ? likersString.split(',').filter(Boolean) : [];
-    const userIndex = likers.indexOf(userEmail);
-    if (userIndex > -1) { likers.splice(userIndex, 1); } else { likers.push(userEmail); }
-    likeCell.setValue(likers.join(','));
-    return { status: 'ok', newScore: likers.length };
-  } catch (error) {
-    console.error('addLike Error:', error);
-    return { status: 'error', message: `エラーが発生しました: ${error.message}` };
-  } finally {
-    lock.releaseLock();
-  }
-}
 
 function getAppSettings() {
   const properties = PropertiesService.getScriptProperties() || {};
@@ -427,6 +397,19 @@ function getRosterMap() {
   });
   cache.put(ROSTER_CONFIG.CACHE_KEY, JSON.stringify(nameMap), 21600);
   return nameMap;
+}
+
+function getHeaderIndices(sheetName) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = `headers_${sheetName}`;
+  const cached = cache.get(cacheKey);
+  if (cached) { return JSON.parse(cached); }
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
+  const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const indices = findHeaderIndices(headerRow, Object.values(COLUMN_HEADERS));
+  cache.put(cacheKey, JSON.stringify(indices), 21600);
+  return indices;
 }
 
 function getAndCacheHeaderIndices(sheetName, headerRow) {
@@ -484,8 +467,8 @@ if (typeof module !== 'undefined') {
     getSheets,
     getSheetData,
     getRosterMap,
+    getHeaderIndices,
     addReaction,
-    addLike,
     toggleHighlight,
     saveWebAppUrl,
     saveDeployId,

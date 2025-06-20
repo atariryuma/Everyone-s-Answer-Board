@@ -1,4 +1,4 @@
-const { addLike, COLUMN_HEADERS } = require('../src/Code.gs');
+const { addReaction, COLUMN_HEADERS } = require('../src/Code.gs');
 
 function buildSheet() {
   const headerRow = [
@@ -11,29 +11,36 @@ function buildSheet() {
     COLUMN_HEADERS.CURIOUS,
     COLUMN_HEADERS.HIGHLIGHT
   ];
-  let likeVal = '';
+  const values = {
+    UNDERSTAND: 'a@example.com',
+    LIKE: '',
+    CURIOUS: ''
+  };
   const sheet = {
     getLastColumn: () => headerRow.length,
     getRange: jest.fn((row, col, numRows, numCols) => {
       if (row === 1 && col === 1) {
         return { getValues: () => [headerRow] };
       }
-      if (row === 2 && col === 3) {
+      if (row === 2 && col === 6 && numRows === 1 && numCols === 3) {
         return {
-          getValue: () => likeVal,
-          setValue: (v) => { likeVal = v; }
+          getValues: () => [[values.UNDERSTAND, values.LIKE, values.CURIOUS]],
+          setValues: (rows) => {
+            [values.UNDERSTAND, values.LIKE, values.CURIOUS] = rows[0];
+          }
         };
       }
       throw new Error('Unexpected range request');
     }),
     isSheetHidden: () => false,
-    getName: () => 'Sheet1'
+    getName: () => 'Sheet1',
+    values
   };
   return sheet;
 }
 
 function setupMocks(email, sheet) {
-  global.LockService = { getScriptLock: () => ({ waitLock: jest.fn(), releaseLock: jest.fn() }) };
+  global.LockService = { getScriptLock: () => ({ tryLock: jest.fn(() => true), releaseLock: jest.fn() }) };
   global.Session = { getActiveUser: () => ({ getEmail: () => email }) };
   global.PropertiesService = { getScriptProperties: () => ({}) };
   global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null }) };
@@ -53,18 +60,18 @@ afterEach(() => {
   delete global.SpreadsheetApp;
 });
 
-test('addLike updates value in LIKE column', () => {
+test('addReaction updates value in LIKE column', () => {
   const sheet = buildSheet();
   setupMocks('like@example.com', sheet);
-  const result = addLike(2);
+  const result = addReaction(2, 'LIKE');
   expect(result.status).toBe('ok');
   expect(sheet.getRange.mock.calls[1][0]).toBe(2);
-  expect(sheet.getRange.mock.calls[1][1]).toBe(3);
+  expect(sheet.getRange.mock.calls[1][1]).toBe(6);
 });
 
-test('addLike handles failure to get user email', () => {
+test('addReaction handles failure to get user email', () => {
   const sheet = buildSheet();
-  global.LockService = { getScriptLock: () => ({ waitLock: jest.fn(), releaseLock: jest.fn() }) };
+  global.LockService = { getScriptLock: () => ({ tryLock: jest.fn(() => true), releaseLock: jest.fn() }) };
   global.Session = { getActiveUser: () => ({ getEmail: () => { throw new Error('fail'); } }) };
   global.PropertiesService = { getScriptProperties: () => ({}) };
   global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null }) };
@@ -74,6 +81,6 @@ test('addLike handles failure to get user email', () => {
       getSheets: () => [sheet]
     })
   };
-  const result = addLike(2);
+  const result = addReaction(2, 'LIKE');
   expect(result.status).toBe('error');
 });
