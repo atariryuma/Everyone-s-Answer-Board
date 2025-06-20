@@ -163,7 +163,13 @@
                 toggleHighlight: (rowIndex) => this.runGas('toggleHighlight', rowIndex),
                 checkAdmin: () => this.runGas('checkAdmin')
             };
-            
+
+            const savedCols = localStorage.getItem('boardColumns');
+            if (savedCols) {
+                this.elements.sizeSlider.value = savedCols;
+                this.elements.sliderValue.textContent = savedCols;
+            }
+
             this.init();
         }
 
@@ -176,7 +182,11 @@
         }
 
         setupEventListeners() {
-            this.elements.sizeSlider.addEventListener('input', this.debounce(() => this.renderBoard(true), 200));
+            const debouncedRender = this.debounce(() => this.renderBoard(true), 200);
+            this.elements.sizeSlider.addEventListener('input', () => {
+                localStorage.setItem('boardColumns', this.elements.sizeSlider.value);
+                debouncedRender();
+            });
             this.elements.answerModalCloseBtn.addEventListener('click', () => this.hideAnswerModal());
             this.elements.answerModalContainer.addEventListener('click', (e) => {
                 if (e.target === e.currentTarget) {
