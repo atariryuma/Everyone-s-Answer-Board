@@ -365,9 +365,19 @@ function getAppSettings() {
   const getProp = typeof properties.getProperty === 'function' ? (k) => properties.getProperty(k) : () => null;
   const published = getProp(APP_PROPERTIES.IS_PUBLISHED);
   const sheet = getProp(APP_PROPERTIES.ACTIVE_SHEET);
+  let activeName = sheet;
+  if (!activeName) {
+    try {
+      const sheets = getSheets();
+      activeName = sheets[0] || '';
+    } catch (error) {
+      console.error('getAppSettings Error:', error);
+      activeName = '';
+    }
+  }
   return {
     isPublished: published === null ? true : published === 'true',
-    activeSheetName: sheet || 'Sheet1'
+    activeSheetName: activeName
   };
 }
 
