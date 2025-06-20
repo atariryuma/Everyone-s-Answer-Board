@@ -204,6 +204,13 @@
                 }
             });
             window.addEventListener('resize', this.debounce(() => this.adjustLayout(), 100));
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    this.stopPolling();
+                } else {
+                    this.startPolling();
+                }
+            });
         }
 
         adjustLayout() {
@@ -294,13 +301,24 @@
                 }, 500);
             });
         }
-        
-        async loadInitialData() {
-            await this.loadSheetData(true, true);
+
+        startPolling() {
             if (this.pollingInterval) {
                 clearInterval(this.pollingInterval);
             }
             this.pollingInterval = setInterval(() => this.loadSheetData(false), 15000);
+        }
+
+        stopPolling() {
+            if (this.pollingInterval) {
+                clearInterval(this.pollingInterval);
+                this.pollingInterval = null;
+            }
+        }
+
+        async loadInitialData() {
+            await this.loadSheetData(true, true);
+            this.startPolling();
         }
 
         async loadSheetData(showLoading = true, isInitialLoad = false) {
