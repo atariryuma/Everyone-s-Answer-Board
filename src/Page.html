@@ -21,17 +21,15 @@
     .answer-card.highlighted:hover { transform: translateY(-4px) scale(1.04); }
     .highlight-badge {
       position: absolute;
-      top: -0.75rem;
-      right: -0.75rem;
-      width: 1.75rem;
-      height: 1.75rem;
-      background-color: rgba(250,204,21,0.95);
+      top: 0.25rem;
+      right: 0.25rem;
+      width: 1.5rem;
+      height: 1.5rem;
       color: #facc15;
       display: flex;
       align-items: center;
       justify-content: center;
       box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
-      clip-path: polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
     }
     .reaction-bg-like { border-color:#ef4444; border-image: linear-gradient(to bottom,#facc15,#fcd34d) 1; }
     .reaction-bg-understand { border-color:#fbbf24; border-image: linear-gradient(to bottom,#a3e635,#bef264) 1; }
@@ -467,7 +465,7 @@
                                this.getIcon('star', 'w-5 h-5') +
                                '</button>';
             }
-            const badge = data.highlight ? '<span class="highlight-badge">' + this.getIcon('star', 'w-6 h-6') + '</span>' : '';
+            const badge = data.highlight ? '<span class="highlight-badge">' + this.getIcon('star') + '</span>' : '';
 
             const nameHtml = this.showAdminFeatures ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' : '';
 
@@ -500,7 +498,7 @@
             if (data.highlight) {
                 const badge = document.createElement('span');
                 badge.className = 'highlight-badge';
-                badge.innerHTML = this.getIcon('star', 'w-6 h-6');
+                badge.innerHTML = this.getIcon('star');
                 card.appendChild(badge);
             }
 
@@ -660,7 +658,7 @@
                     if (item.highlight && !badge) {
                         badge = document.createElement('span');
                         badge.className = 'highlight-badge';
-                        badge.innerHTML = this.getIcon('star', 'w-6 h-6');
+                        badge.innerHTML = this.getIcon('star');
                         preview?.insertBefore(badge, preview.firstChild);
                         this.animateHighlightBadge(badge);
                     } else if (!item.highlight && badge) {
