@@ -121,6 +121,9 @@ function getAdminSettings() {
  * @param {string} sheetName - 公開するシート名。
  */
 function publishApp(sheetName) {
+  if (!checkAdmin()) {
+    throw new Error('権限がありません。');
+  }
   if (!sheetName) {
     throw new Error('シート名が指定されていません。');
   }
@@ -134,6 +137,9 @@ function publishApp(sheetName) {
  * アプリの公開を終了します。
  */
 function unpublishApp() {
+  if (!checkAdmin()) {
+    throw new Error('権限がありません。');
+  }
   const properties = PropertiesService.getScriptProperties();
   properties.setProperty(APP_PROPERTIES.IS_PUBLISHED, 'false');
   return 'アプリを非公開にしました。';
@@ -337,6 +343,9 @@ function addReaction(rowIndex, reactionKey) {
 }
 
 function toggleHighlight(rowIndex) {
+  if (!checkAdmin()) {
+    return { status: 'error', message: '権限がありません。' };
+  }
   const lock = LockService.getScriptLock();
   lock.waitLock(TIME_CONSTANTS.LOCK_WAIT_MS);
   try {

@@ -1,7 +1,7 @@
 const fs = require('fs');
 const { JSDOM } = require('jsdom');
 
-test('size slider value persists with localStorage', () => {
+test('size slider value persists with localStorage', async () => {
   const html = fs.readFileSync('./src/Page.html', 'utf8');
   const start = html.lastIndexOf('<script>');
   const end = html.lastIndexOf('</script>');
@@ -29,7 +29,7 @@ test('size slider value persists with localStorage', () => {
     <select id="classFilter"></select>
     <select id="sortOrder"></select>
     <div id="controlsFooter"></div>
-  </body>`, { runScripts: 'outside-only', url: 'https://example.com' });
+  </body>`, { runScripts: 'dangerously', url: 'https://example.com' });
 
   const { window } = dom;
   global.window = window;
@@ -46,11 +46,12 @@ test('size slider value persists with localStorage', () => {
 
   window.localStorage.setItem('boardColumns', '5');
   const app = new window.StudyQuestApp();
+  await new Promise(res => setImmediate(res));
   expect(window.document.getElementById('sizeSlider').value).toBe('5');
   expect(window.document.getElementById('sliderValue').textContent).toBe('5');
 
   window.document.getElementById('sizeSlider').value = '3';
-  window.document.getElementById('sizeSlider').dispatchEvent(new window.Event('input'));
+  window.document.getElementById('sizeSlider').dispatchEvent(new window.InputEvent('input', { bubbles: true }));
   expect(window.localStorage.getItem('boardColumns')).toBe('3');
 
   delete global.window;

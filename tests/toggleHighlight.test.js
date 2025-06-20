@@ -28,9 +28,12 @@ function buildSheet() {
   };
 }
 
-function setupMocks(sheet, cacheImpl) {
+function setupMocks(sheet, cacheImpl, userEmail = 'admin@example.com', adminEmails = 'admin@example.com') {
   global.LockService = { getScriptLock: () => ({ waitLock: jest.fn(), releaseLock: jest.fn() }) };
-  global.PropertiesService = { getScriptProperties: () => ({}) };
+  global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };
+  global.PropertiesService = { getScriptProperties: () => ({
+    getProperty: (key) => key === 'ADMIN_EMAILS' ? adminEmails : null
+  }) };
   global.CacheService = { getScriptCache: () => cacheImpl || ({ get: () => null, put: () => null }) };
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({
@@ -42,6 +45,7 @@ function setupMocks(sheet, cacheImpl) {
 
 afterEach(() => {
   delete global.LockService;
+  delete global.Session;
   delete global.PropertiesService;
   delete global.CacheService;
   delete global.SpreadsheetApp;
@@ -72,4 +76,11 @@ test('toggleHighlight reads headers only once with cache', () => {
 
   const headerCalls = sheet.getRange.mock.calls.filter(c => c[0] === 1).length;
   expect(headerCalls).toBe(1);
+});
+
+test('toggleHighlight returns error for non-admin user', () => {
+  const sheet = buildSheet();
+  setupMocks(sheet, null, 'user@example.com', 'admin@example.com');
+  const result = toggleHighlight(2);
+  expect(result.status).toBe('error');
 });
