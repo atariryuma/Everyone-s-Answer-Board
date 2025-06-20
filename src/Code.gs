@@ -225,6 +225,7 @@ function getSheetData(sheetName, classFilter, sortBy) {
     if (allValues.length < 1) return { header: "シートにデータがありません", rows: [] };
     
     const userEmail = safeGetUserEmail();
+    const isAdmin = isUserAdmin(userEmail);
     const headerIndices = getAndCacheHeaderIndices(sheetName, allValues[0]);
     const dataRows = allValues.slice(1);
     const emailToNameMap = getRosterMap();
@@ -250,7 +251,7 @@ function getSheetData(sheetName, classFilter, sortBy) {
         const name = emailToNameMap[email] || email.split('@')[0];
         return {
           rowIndex: index + 2,
-          name: name,
+          name: isAdmin ? name : '',
           class: row[headerIndices[COLUMN_HEADERS.CLASS]] || '未分類',
           opinion: opinion,
           reason: reason,
