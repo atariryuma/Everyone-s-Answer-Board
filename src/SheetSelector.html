@@ -1,59 +1,55 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
   <head>
+    <meta charset="UTF-8" />
     <base target="_top">
-    <link href="https://cdn.tailwindcss.com/tailwind.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      body { font-family: sans-serif; }
+      body { color: #c0caf5; }
+      .glass-panel { background: rgba(26,27,38,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
       button:disabled { opacity: 0.5; cursor: not-allowed; }
+      :focus-visible { outline: 3px solid #8be9fd; outline-offset: 2px; border-radius: 4px; }
     </style>
   </head>
-  <body class="p-4 bg-gray-100">
-    <div id="app">
-      <h2 class="text-xl font-bold mb-4 text-gray-800">管理パネル</h2>
+  <body class="bg-[#1a1b26] text-gray-200 font-sans p-4">
+    <div id="app" class="glass-panel max-w-xl mx-auto rounded-xl p-6 shadow-lg">
+      <h2 class="text-xl font-bold mb-4 text-yellow-300">管理パネル</h2>
 
       <!-- Current Status -->
-      <div class="mb-6 p-4 rounded-lg bg-white shadow-md">
-        <h3 class="font-semibold text-gray-700 mb-2">現在の状態</h3>
-        <p id="status-text" class="text-gray-600">状態を読み込み中...</p>
+      <div class="mb-6 glass-panel p-4 rounded-lg">
+        <h3 class="font-semibold mb-2">現在の状態</h3>
+        <p id="status-text" class="text-gray-300 flex justify-center">
+          <svg class="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
+          </svg>
+        </p>
       </div>
 
-      <!-- Sheet Information -->
+      <!-- Sheet Selection -->
       <div class="mb-6">
-        <h3 class="font-semibold text-gray-700 mb-3">利用可能なシート</h3>
-        <div id="sheet-list" class="flex flex-col gap-2 rounded-lg bg-white p-2 shadow-md max-h-48 overflow-y-auto">
-          <p class="text-gray-500 p-2">シートを読み込み中...</p>
+        <h3 class="font-semibold mb-3">1. 公開するシートを選択</h3>
+        <div id="sheet-list" class="flex flex-col gap-2 rounded-lg glass-panel p-2 max-h-48 overflow-y-auto">
+          <div class="flex justify-center p-2" role="status">
+            <svg class="w-5 h-5 text-gray-400 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
+            </svg>
+          </div>
         </div>
       </div>
 
       <!-- Actions -->
-      <div>
-        <h3 class="font-semibold text-gray-700 mb-3">アプリを開く</h3>
+      <div class="glass-panel p-4 rounded-lg">
+        <h3 class="font-semibold mb-3">2. 操作を選択</h3>
         <div class="flex flex-col gap-3">
-          
-          <button 
-            id="open-app-btn" 
-            class="w-full text-white font-bold py-2 px-4 rounded-lg bg-green-500 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75 transition disabled:bg-green-300 disabled:cursor-not-allowed"
-            aria-describedby="open-app-help"
-            disabled>
-            <span id="open-app-icon" class="inline-block mr-2">🚀</span>
-            アプリを開く
+          <button id="publish-btn" class="w-full text-white font-bold py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 transition disabled:bg-blue-300">
+            選択したシートを公開
           </button>
-          <div id="open-app-help" class="text-xs text-gray-500 hidden">
-            公開中のアプリを新しいタブで開きます
-          </div>
-          
-          <button 
-            id="open-admin-btn" 
-            class="w-full text-white font-bold py-2 px-4 rounded-lg bg-purple-500 hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-opacity-75 transition disabled:bg-purple-300 disabled:cursor-not-allowed"
-            aria-describedby="open-admin-help"
-            disabled>
-            <span id="open-admin-icon" class="inline-block mr-2">👨‍💼</span>
-            管理者として開く
+          <button id="unpublish-btn" class="w-full text-white font-bold py-2 px-4 rounded-lg bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-75 transition disabled:bg-red-300">
+            公開を終了する
           </button>
-          <div id="open-admin-help" class="text-xs text-gray-500 hidden">
-            管理者権限でアプリを開きます（登録済み管理者のみ）
-          </div>
         </div>
       </div>
       
@@ -65,8 +61,8 @@
       const elements = {
         statusText: document.getElementById('status-text'),
         sheetList: document.getElementById('sheet-list'),
-        openAppBtn: document.getElementById('open-app-btn'),
-        openAdminBtn: document.getElementById('open-admin-btn'),
+        publishBtn: document.getElementById('publish-btn'),
+        unpublishBtn: document.getElementById('unpublish-btn'),
         messageArea: document.getElementById('message-area')
       };
 
@@ -74,8 +70,8 @@
 
       document.addEventListener('DOMContentLoaded', () => {
         loadInitialState();
-        elements.openAppBtn.addEventListener('click', openApp);
-        elements.openAdminBtn.addEventListener('click', openAdminApp);
+        elements.publishBtn.addEventListener('click', publish);
+        elements.unpublishBtn.addEventListener('click', unpublish);
       });
 
       function loadInitialState() {
@@ -89,72 +85,78 @@
       function updateUI(status) {
         selectedSheet = status.activeSheetName;
         
-        // Update status display with enhanced accessibility
-        const hasDeployId = status.deployId && status.deployId.trim() !== '';
-        
-        elements.statusText.innerHTML = `<span class="font-bold text-blue-700">管理パネル</span> - ${status.currentUserEmail}`;
-        elements.statusText.setAttribute('aria-label', `管理パネル。現在のユーザー: ${status.currentUserEmail}`);
-        
-        // Buttons availability based on deploy ID
-        elements.openAppBtn.disabled = !hasDeployId;
-        elements.openAdminBtn.disabled = !hasDeployId || !status.isUserAdmin;
-        
-        if (hasDeployId) {
-          elements.openAppBtn.setAttribute('aria-label', '生徒用アプリを開く');
-          document.getElementById('open-app-help').classList.remove('hidden');
-          
-          if (status.isUserAdmin) {
-            elements.openAdminBtn.setAttribute('aria-label', '管理者用アプリを開く');
-            document.getElementById('open-admin-help').classList.remove('hidden');
-          } else {
-            elements.openAdminBtn.removeAttribute('aria-label');
-            document.getElementById('open-admin-help').classList.add('hidden');
-          }
+        if (status.isPublished && status.activeSheetName) {
+          elements.statusText.innerHTML = `公開中: <span class="font-bold text-green-700">${status.activeSheetName}</span>`;
+          elements.unpublishBtn.disabled = false;
         } else {
-          elements.openAppBtn.removeAttribute('aria-label');
-          elements.openAdminBtn.removeAttribute('aria-label');
-          document.getElementById('open-app-help').classList.add('hidden');
-          document.getElementById('open-admin-help').classList.add('hidden');
+          elements.statusText.textContent = '現在、アプリは非公開です。';
+          elements.unpublishBtn.disabled = true;
         }
         
         elements.sheetList.innerHTML = '';
         if (status.allSheets && status.allSheets.length > 0) {
           status.allSheets.forEach(name => {
-            const div = document.createElement('div');
-            div.className = 'p-2 rounded-md bg-gray-50 border border-gray-200';
-            div.textContent = name;
-            elements.sheetList.appendChild(div);
+            const label = document.createElement('label');
+            label.className = 'flex items-center p-2 rounded-md hover:bg-gray-100 cursor-pointer';
+            
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = 'sheet';
+            radio.value = name;
+            radio.className = 'mr-3 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500';
+            if (name === status.activeSheetName) {
+              radio.checked = true;
+            }
+            radio.onchange = () => {
+              selectedSheet = name;
+              elements.publishBtn.disabled = false;
+            };
+
+            label.appendChild(radio);
+            label.appendChild(document.createTextNode(name));
+            elements.sheetList.appendChild(label);
           });
         } else {
           elements.sheetList.innerHTML = '<p class="text-gray-600 p-2">表示できるシートがありません。</p>';
         }
 
+        elements.publishBtn.disabled = !selectedSheet || (status.isPublished && selectedSheet === status.activeSheetName);
         setLoading(false);
       }
 
-      function openApp() {
+      function publish() {
+        if (!selectedSheet) {
+          showMessage('公開するシートを選択してください。', 'red');
+          return;
+        }
+        setLoading(true, "公開処理中...");
         google.script.run
-          .withSuccessHandler(() => {
-            showMessage('生徒用アプリを開いています...', 'blue');
+          .withSuccessHandler((msg) => {
+            showMessage(msg, 'green');
+            loadInitialState();
           })
           .withFailureHandler(showError)
-          .openPublishedApp();
+          .publishApp(selectedSheet);
       }
 
-      function openAdminApp() {
+      function unpublish() {
+        setLoading(true, "非公開処理中...");
         google.script.run
-          .withSuccessHandler((url) => {
-            if (url) {
-              window.open(url, '_blank');
-              showMessage('管理者用アプリを開いています...', 'blue');
-            } else {
-              showMessage('管理者用URLの生成に失敗しました。', 'red');
-            }
+          .withSuccessHandler((msg) => {
+            showMessage(msg, 'green');
+            loadInitialState();
           })
           .withFailureHandler(showError)
-          .generateAdminUrl();
+          .unpublishApp();
       }
 
+      function setLoading(isLoading, msg = "") {
+        elements.publishBtn.disabled = isLoading;
+        elements.unpublishBtn.disabled = isLoading;
+        if (isLoading) {
+            showMessage(msg, 'blue');
+        }
+      }
 
       function showMessage(msg, color = 'red') {
         const colorClasses = { red: 'text-red-600', green: 'text-green-600', blue: 'text-blue-600' };
@@ -165,43 +167,6 @@
       function showError(error) {
         showMessage(error.message, 'red');
         setLoading(false);
-      }
-
-      /**
-       * Escape HTML to prevent XSS
-       * @param {string} str - String to escape
-       * @returns {string} Escaped string
-       */
-      function escapeHtml(str) {
-        if (typeof str !== 'string') return '';
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-      }
-
-      /**
-       * Show loading state with improved accessibility
-       * @param {boolean} isLoading - Loading state
-       * @param {string} msg - Loading message
-       */
-      function setLoading(isLoading, msg = "") {
-        elements.openAppBtn.disabled = isLoading;
-        elements.openAdminBtn.disabled = isLoading;
-        
-        // Update ARIA attributes for screen readers
-        elements.openAppBtn.setAttribute('aria-busy', isLoading.toString());
-        elements.openAdminBtn.setAttribute('aria-busy', isLoading.toString());
-        
-        if (isLoading) {
-          showMessage(msg, 'blue');
-          // Add loading icons
-          document.getElementById('open-app-icon').textContent = '⏳';
-          document.getElementById('open-admin-icon').textContent = '⏳';
-        } else {
-          // Restore original icons
-          document.getElementById('open-app-icon').textContent = '🚀';
-          document.getElementById('open-admin-icon').textContent = '👨‍💼';
-        }
       }
     </script>
   </body>

@@ -1,7 +1,16 @@
 const { toggleHighlight, COLUMN_HEADERS } = require('../src/Code.gs');
 
 function buildSheet() {
-  const headerRow = [COLUMN_HEADERS.HIGHLIGHT];
+  const headerRow = [
+    COLUMN_HEADERS.EMAIL,
+    COLUMN_HEADERS.CLASS,
+    COLUMN_HEADERS.OPINION,
+    COLUMN_HEADERS.REASON,
+    COLUMN_HEADERS.UNDERSTAND,
+    COLUMN_HEADERS.LIKE,
+    COLUMN_HEADERS.CURIOUS,
+    COLUMN_HEADERS.HIGHLIGHT
+  ];
   let highlight = false;
   return {
     getLastColumn: () => headerRow.length,
@@ -13,32 +22,29 @@ function buildSheet() {
         getValue: () => highlight,
         setValue: (val) => { highlight = val; }
       };
-    })
+    }),
+    isSheetHidden: () => false,
+    getName: () => 'Sheet1'
   };
 }
 
-function setupMocks(sheet) {
+function setupMocks(sheet, cacheImpl) {
   global.LockService = { getScriptLock: () => ({ waitLock: jest.fn(), releaseLock: jest.fn() }) };
-  global.PropertiesService = {
-    getScriptProperties: () => ({
-      getProperty: (key) => {
-        if (key === 'ADMIN_EMAILS') return 'admin@example.com';
-        if (key === 'ACTIVE_SHEET_NAME') return 'Sheet1';
-        return 'Sheet1';
-      }
-    })
-  };
-  global.getActiveUserEmail = () => 'admin@example.com';
+  global.PropertiesService = { getScriptProperties: () => ({}) };
+  global.CacheService = { getScriptCache: () => cacheImpl || ({ get: () => null, put: () => null }) };
   global.SpreadsheetApp = {
-    getActiveSpreadsheet: () => ({ getSheetByName: () => sheet })
+    getActiveSpreadsheet: () => ({
+      getSheetByName: () => sheet,
+      getSheets: () => [sheet]
+    })
   };
 }
 
 afterEach(() => {
   delete global.LockService;
   delete global.PropertiesService;
+  delete global.CacheService;
   delete global.SpreadsheetApp;
-  delete global.getActiveUserEmail;
 });
 
 test('toggleHighlight flips stored value', () => {
@@ -50,4 +56,20 @@ test('toggleHighlight flips stored value', () => {
 
   const result2 = toggleHighlight(2);
   expect(result2).toEqual({ status: 'ok', highlight: false });
+});
+
+test('toggleHighlight reads headers only once with cache', () => {
+  const sheet = buildSheet();
+  const store = {};
+  const cache = {
+    get: jest.fn(key => store[key] || null),
+    put: jest.fn((key, val) => { store[key] = val; })
+  };
+  setupMocks(sheet, cache);
+
+  toggleHighlight(2);
+  toggleHighlight(2);
+
+  const headerCalls = sheet.getRange.mock.calls.filter(c => c[0] === 1).length;
+  expect(headerCalls).toBe(1);
 });
