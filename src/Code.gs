@@ -361,34 +361,6 @@ function toggleHighlight(rowIndex) {
   }
 }
 
-function addLike(rowIndex) {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
-    const userEmail = safeGetUserEmail();
-    if (!userEmail) return { status: 'error', message: 'ログインしていないため、操作できません。' };
-    const settings = getAppSettings();
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(settings.activeSheetName);
-    if (!sheet) throw new Error(`シート '${settings.activeSheetName}' が見つかりません。`);
-
-    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const headerIndices = getAndCacheHeaderIndices(settings.activeSheetName, headerRow);
-    const likesColIndex = headerIndices[COLUMN_HEADERS.LIKE] + 1;
-
-    const likeCell = sheet.getRange(rowIndex, likesColIndex);
-    const likersString = likeCell.getValue().toString();
-    let likers = likersString ? likersString.split(',').filter(Boolean) : [];
-    const userIndex = likers.indexOf(userEmail);
-    if (userIndex > -1) { likers.splice(userIndex, 1); } else { likers.push(userEmail); }
-    likeCell.setValue(likers.join(','));
-    return { status: 'ok', newScore: likers.length };
-  } catch (error) {
-    console.error('addLike Error:', error);
-    return { status: 'error', message: `エラーが発生しました: ${error.message}` };
-  } finally {
-    lock.releaseLock();
-  }
-}
 
 function getAppSettings() {
   const properties = PropertiesService.getScriptProperties() || {};
@@ -485,7 +457,6 @@ if (typeof module !== 'undefined') {
     getSheetData,
     getRosterMap,
     addReaction,
-    addLike,
     toggleHighlight,
     saveWebAppUrl,
     saveDeployId,
