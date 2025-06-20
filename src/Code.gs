@@ -297,9 +297,8 @@ function addReaction(rowIndex, reactionKey) {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(settings.activeSheetName);
     if (!sheet) throw new Error(`シート '${settings.activeSheetName}' が見つかりません。`);
 
-  const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const reactionHeaders = REACTION_KEYS.map(k => COLUMN_HEADERS[k]);
-  const headerIndices = getAndCacheHeaderIndices(settings.activeSheetName, headerRow);
+  const headerIndices = getHeaderIndices(settings.activeSheetName);
   const startCol = headerIndices[reactionHeaders[0]] + 1;
   const reactionRange = sheet.getRange(rowIndex, startCol, 1, REACTION_KEYS.length);
   const values = reactionRange.getValues()[0];
@@ -344,8 +343,7 @@ function toggleHighlight(rowIndex) {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
     if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
 
-    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const headerIndices = getAndCacheHeaderIndices(sheetName, headerRow);
+    const headerIndices = getHeaderIndices(sheetName);
     const colIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT] + 1;
 
     const cell = sheet.getRange(rowIndex, colIndex);
@@ -399,6 +397,19 @@ function getRosterMap() {
   });
   cache.put(ROSTER_CONFIG.CACHE_KEY, JSON.stringify(nameMap), 21600);
   return nameMap;
+}
+
+function getHeaderIndices(sheetName) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = `headers_${sheetName}`;
+  const cached = cache.get(cacheKey);
+  if (cached) { return JSON.parse(cached); }
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
+  const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const indices = findHeaderIndices(headerRow, Object.values(COLUMN_HEADERS));
+  cache.put(cacheKey, JSON.stringify(indices), 21600);
+  return indices;
 }
 
 function getAndCacheHeaderIndices(sheetName, headerRow) {
@@ -456,6 +467,7 @@ if (typeof module !== 'undefined') {
     getSheets,
     getSheetData,
     getRosterMap,
+    getHeaderIndices,
     addReaction,
     toggleHighlight,
     saveWebAppUrl,

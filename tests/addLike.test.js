@@ -47,11 +47,11 @@ function buildSheet() {
   };
 }
 
-function setupMocks(userEmail, sheet) {
+function setupMocks(userEmail, sheet, cacheImpl) {
   global.LockService = { getScriptLock: () => ({ tryLock: jest.fn(() => true), releaseLock: jest.fn() }) };
   global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };
   global.PropertiesService = { getScriptProperties: () => ({}) };
-  global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null }) };
+  global.CacheService = { getScriptCache: () => cacheImpl || ({ get: () => null, put: () => null }) };
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({
       getSheetByName: () => sheet,
@@ -107,4 +107,20 @@ test('addReaction errors when user email is empty', () => {
 
   const result = addReaction(2, 'UNDERSTAND');
   expect(result.status).toBe('error');
+});
+
+test('addReaction reads headers only once with cache', () => {
+  const sheet = buildSheet();
+  const store = {};
+  const cache = {
+    get: jest.fn(key => store[key] || null),
+    put: jest.fn((key, val) => { store[key] = val; })
+  };
+  setupMocks('cache@example.com', sheet, cache);
+
+  addReaction(2, 'LIKE');
+  addReaction(2, 'LIKE');
+
+  const headerCalls = sheet.getRange.mock.calls.filter(c => c[0] === 1).length;
+  expect(headerCalls).toBe(1);
 });
