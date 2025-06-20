@@ -4,6 +4,7 @@ afterEach(() => {
   delete global.PropertiesService;
   delete global.Session;
   delete global.HtmlService;
+  delete global.SpreadsheetApp;
 });
 
 function setup() {
@@ -16,6 +17,13 @@ function setup() {
     })
   };
   global.Session = { getActiveUser: () => ({ getEmail: () => { throw new Error('no user'); } }) };
+  global.SpreadsheetApp = {
+    getActiveSpreadsheet: () => ({
+      getSheets: () => [
+        { getName: () => 'Sheet1', isSheetHidden: () => false }
+      ]
+    })
+  };
   const output = { setTitle: jest.fn(() => output) };
   let template = { evaluate: () => output };
   global.HtmlService = {

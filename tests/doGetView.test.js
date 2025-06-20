@@ -5,6 +5,7 @@ afterEach(() => {
   delete global.getActiveUserEmail;
   delete global.Session;
   delete global.PropertiesService;
+  delete global.SpreadsheetApp;
 });
 
 function setup({ userEmail = 'admin@example.com', adminEmails = 'admin@example.com' }) {
@@ -18,6 +19,13 @@ function setup({ userEmail = 'admin@example.com', adminEmails = 'admin@example.c
   };
   global.getActiveUserEmail = () => userEmail;
   global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };
+  global.SpreadsheetApp = {
+    getActiveSpreadsheet: () => ({
+      getSheets: () => [
+        { getName: () => 'Sheet1', isSheetHidden: () => false }
+      ]
+    })
+  };
   const output = { setTitle: jest.fn(() => output), addMetaTag: jest.fn(() => output) };
   let template = { evaluate: () => output };
   global.HtmlService = {
