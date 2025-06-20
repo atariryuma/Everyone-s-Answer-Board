@@ -630,6 +630,7 @@
                 this.updateReactionButtonUI(item.rowIndex, 'CURIOUS', item.reactions.CURIOUS.count, item.reactions.CURIOUS.reacted);
                 const card = document.querySelector('.answer-card[data-row-index="' + item.rowIndex + '"]');
                 if (card) {
+                    const preview = card.querySelector('.answer-preview');
                     card.classList.toggle('highlighted', item.highlight);
 
                     // Recompute active reaction types and update background classes
@@ -660,7 +661,7 @@
                         badge = document.createElement('span');
                         badge.className = 'highlight-badge';
                         badge.innerHTML = this.getIcon('star', 'w-6 h-6');
-                        preview.insertBefore(badge, preview.firstChild);
+                        preview?.insertBefore(badge, preview.firstChild);
                         this.animateHighlightBadge(badge);
                     } else if (!item.highlight && badge) {
                         gsap.to(badge, { scale: 0, opacity: 0, duration: 0.3, onComplete: () => badge.remove() });
