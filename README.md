@@ -39,6 +39,9 @@ A separate sheet named `sheet 1` should contain roster information with the colu
 Opening the spreadsheet adds an **アプリ管理** menu. From here you can:
 
 1. **管理パネルを開く** – choose which sheet to publish or unpublish.
+   Use the "Config" section to map the question, answer and name columns. The
+   selected settings are saved automatically when publishing a sheet for the
+   first time.
 2. **名簿キャッシュをリセット** – refresh the cached roster information.
 
 When unpublished, visiting the Web App URL shows a message that the board is closed. Once published, the board is available and updates automatically every 15 seconds.
