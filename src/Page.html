@@ -412,9 +412,10 @@
       }
 
       // パフォーマンス最適化ユーティリティ
-      memoize(fn, keyGenerator = (...args) => JSON.stringify(args)) {
+      memoize(fn, keyGenerator) {
+        const kg = keyGenerator || ((...args) => JSON.stringify(args));
         return (...args) => {
-          const key = keyGenerator(...args);
+          const key = kg(...args);
           if (this.memoCache.has(key)) {
             return this.memoCache.get(key);
           }
