@@ -50,6 +50,19 @@ When unpublished, visiting the Web App URL shows a message that the board is clo
 
 Administrators see a toggle button that allows switching between viewing and management modes. The list of administrator email addresses is set in the `ADMIN_EMAILS` script property.
 
+### Setting `ADMIN_EMAILS`
+
+1. Open the Apps Script **Project Settings** and expand **Script Properties**.
+2. Click **Add script property** and set the name to `ADMIN_EMAILS`.
+3. Enter a comma‑separated list of addresses and save.
+
+You can also set the value from the console:
+
+```javascript
+PropertiesService.getScriptProperties()
+  .setProperty('ADMIN_EMAILS', 'teacher1@example.com,teacher2@example.com');
+```
+
 ## Front‑end features
 
 - Answers are displayed in a responsive grid. A slider allows changing the number of columns.
