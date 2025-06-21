@@ -675,11 +675,11 @@
           ) || 0;
         }
 
-        const headerHeight = this.elements.header.offsetHeight;
         const footerHeight = this.elements.footer.offsetHeight;
 
+        // Keep original padding only, removing extra space above the header
         this.elements.mainContainer.style.paddingTop =
-          headerHeight + this.baseMainPadding + 'px';
+          this.baseMainPadding + 'px';
         // Reserve only footer height so content ends right above the slider
         this.elements.body.style.paddingBottom =
           footerHeight + this.baseBodyPadding + 'px';
