@@ -199,12 +199,16 @@
       box-shadow: 0 0 15px rgba(250,204,21,0.4); 
       transform: scale(1.02); 
     }
-    .answer-card:hover { 
-      transform: translateY(-4px) scale(1.02); 
-      box-shadow: 0 8px 25px rgba(139,233,253,0.3); 
+    .answer-card:hover {
+      transform: translateY(-4px) scale(1.02);
+      box-shadow: 0 8px 25px rgba(139,233,253,0.3);
     }
-    .answer-card.highlighted:hover { 
-      transform: translateY(-4px) scale(1.04); 
+    .answer-card:focus-visible {
+      transform: translateY(-4px) scale(1.02);
+      box-shadow: 0 8px 25px rgba(139,233,253,0.3);
+    }
+    .answer-card.highlighted:hover {
+      transform: translateY(-4px) scale(1.04);
     }
     /* ハイライトバッジのスタイル */
     .highlight-badge {
