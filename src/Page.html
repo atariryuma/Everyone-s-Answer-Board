@@ -969,25 +969,79 @@
         const userIcon = this.getIcon('users', 'w-4 h-4 inline-block -mt-1');
         this.elements.answerCount.innerHTML = userIcon + '<span>' + newRows.length + '件</span>';
         
-        const fragment = document.createDocumentFragment();
         if (newRows.length === 0) {
-          const p = document.createElement('p');
-          p.className = 'text-center text-gray-500 col-span-full mt-8';
-          p.textContent = 'このクラスの回答はありません。';
-          fragment.appendChild(p);
+          if (!container.querySelector('.no-answers')) {
+            container.innerHTML = '';
+            const p = document.createElement('p');
+            p.className = 'text-center text-gray-500 col-span-full mt-8 no-answers';
+            p.textContent = 'このクラスの回答はありません。';
+            container.appendChild(p);
+          }
         } else {
-          console.log('Creating cards for', newRows.length, 'rows');
-          newRows.forEach((r, index) => {
-            console.log(`Creating card ${index + 1}:`, r);
-            const card = this.createAnswerCard(r);
-            fragment.appendChild(card);
+          const existingMap = new Map();
+          container.querySelectorAll('.answer-card').forEach(card => {
+            existingMap.set(card.dataset.rowIndex, card);
           });
+
+          // 不要になったカードを削除
+          existingMap.forEach((card, id) => {
+            if (!newRows.some(r => String(r.rowIndex) === id)) {
+              card.remove();
+              existingMap.delete(id);
+            }
+          });
+
+          const changedItems = [];
+          let prevNode = null;
+
+          newRows.forEach((row) => {
+            const rowId = String(row.rowIndex);
+            let card = existingMap.get(rowId);
+            const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
+
+            if (!card) {
+              card = this.createAnswerCard(row);
+              if (prevNode) {
+                container.insertBefore(card, prevNode.nextSibling);
+              } else {
+                container.insertBefore(card, container.firstChild);
+              }
+              changedItems.push(row);
+            } else {
+              if (prevNode && card.previousSibling !== prevNode) {
+                container.insertBefore(card, prevNode.nextSibling);
+              } else if (!prevNode && card !== container.firstChild) {
+                container.insertBefore(card, container.firstChild);
+              }
+
+              if (oldData) {
+                if (oldData.opinion !== row.opinion) {
+                  const t = card.querySelector('.opinion-text');
+                  if (t) t.textContent = row.opinion;
+                }
+                if (oldData.reason !== row.reason) {
+                  const p = card.querySelector('.answer-preview p');
+                  if (p) p.textContent = row.reason;
+                }
+                if (oldData.name !== row.name) {
+                  const n = card.querySelector('.font-bold');
+                  if (n) n.textContent = row.name;
+                }
+                if (JSON.stringify(oldData.reactions) !== JSON.stringify(row.reactions) ||
+                    oldData.highlight !== row.highlight) {
+                  changedItems.push(row);
+                }
+              }
+            }
+            prevNode = card;
+          });
+
+          if (changedItems.length) {
+            this.applyUpdates(changedItems);
+          }
+
+          console.log('DOM updated. Cards in container:', container.querySelectorAll('.answer-card').length);
         }
-        
-        container.innerHTML = ''; // コンテンツをクリア
-        container.appendChild(fragment); // 新しいコンテンツを追加
-        
-        console.log('DOM updated. Cards in container:', container.querySelectorAll('.answer-card').length);
 
         // カードのアニメーション（FLIPテクニック）
         container.querySelectorAll('.answer-card').forEach((card) => {
