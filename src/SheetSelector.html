@@ -30,14 +30,15 @@
       <!-- Sheet Selection -->
       <div class="mb-6">
         <h3 class="font-semibold mb-3">1. 公開するシートを選択</h3>
-        <div id="sheet-list" class="flex flex-col gap-2 rounded-lg glass-panel p-2 max-h-48 overflow-y-auto">
+        <fieldset id="sheet-list" class="flex flex-col gap-2 rounded-lg glass-panel p-2 max-h-48 overflow-y-auto border-0">
+          <legend class="sr-only">公開するシートを選択</legend>
           <div class="flex justify-center p-2" role="status">
             <svg class="w-5 h-5 text-gray-400 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
             </svg>
           </div>
-        </div>
+        </fieldset>
       </div>
 
       <!-- Config Setup -->
@@ -126,6 +127,7 @@
       };
 
       let selectedSheet = null;
+      const SHEET_LEGEND = '<legend class="sr-only">公開するシートを選択</legend>';
 
       document.addEventListener('DOMContentLoaded', () => {
         loadInitialState();
@@ -158,7 +160,7 @@
           elements.unpublishBtn.disabled = true;
         }
         
-        elements.sheetList.innerHTML = '';
+        elements.sheetList.innerHTML = SHEET_LEGEND;
         if (status.allSheets && status.allSheets.length > 0) {
           status.allSheets.forEach(name => {
             const label = document.createElement('label');
@@ -183,7 +185,7 @@
             elements.sheetList.appendChild(label);
           });
         } else {
-          elements.sheetList.innerHTML = '<p class="text-gray-600 p-2">表示できるシートがありません。</p>';
+          elements.sheetList.innerHTML = SHEET_LEGEND + '<p class="text-gray-600 p-2">表示できるシートがありません。</p>';
         }
 
         elements.publishBtn.disabled = !selectedSheet || (status.isPublished && selectedSheet === status.activeSheetName);
