@@ -217,8 +217,7 @@ function getSheets() {
     const visibleSheets = allSheets.filter(sheet => !sheet.isSheetHidden());
     return visibleSheets.map(sheet => sheet.getName());
   } catch (error) {
-    console.error('getSheets Error:', error);
-    throw new Error('シート一覧の取得に失敗しました。');
+    handleError('getSheets', error);
   }
 }
 
@@ -282,8 +281,7 @@ function getSheetData(sheetName, classFilter, sortBy) {
     }
     return { header: COLUMN_HEADERS.OPINION, rows: rows };
   } catch(e) {
-    console.error(`getSheetData Error for sheet "${sheetName}":`, e);
-    throw new Error(`データの取得中にエラーが発生しました: ${e.message}`);
+    handleError(`getSheetData for ${sheetName}`, e);
   }
 }
 
@@ -335,8 +333,7 @@ function addReaction(rowIndex, reactionKey) {
     }, {});
     return { status: 'ok', reactions: reactions };
   } catch (error) {
-    console.error('addReaction Error:', error);
-    return { status: 'error', message: `エラーが発生しました: ${error.message}` };
+    return handleError('addReaction', error, true);
   } finally {
     try { lock.releaseLock(); } catch (e) {}
   }
@@ -362,8 +359,7 @@ function toggleHighlight(rowIndex) {
     cell.setValue(newValue);
     return { status: 'ok', highlight: newValue };
   } catch (error) {
-    console.error('toggleHighlight Error:', error);
-    return { status: 'error', message: `エラーが発生しました: ${error.message}` };
+    return handleError('toggleHighlight', error, true);
   } finally {
     lock.releaseLock();
   }
@@ -477,6 +473,7 @@ function saveDeployId(id) {
 }
 
 if (typeof module !== 'undefined') {
+  const { handleError } = require('./ErrorHandling.gs');
   module.exports = {
     COLUMN_HEADERS,
     getAdminSettings,
@@ -494,6 +491,7 @@ if (typeof module !== 'undefined') {
     saveDeployId,
     findHeaderIndices,
     parseReactionString,
-    checkAdmin
+    checkAdmin,
+    handleError
   };
 }
