@@ -18,6 +18,7 @@ const COLUMN_HEADERS = {
 };
 const ROSTER_CONFIG = {
   SHEET_NAME: 'sheet 1',
+  PROPERTY_NAME: 'ROSTER_SHEET_NAME',
   CACHE_KEY: 'roster_name_map_v3',
   HEADER_LAST_NAME: '姓',
   HEADER_FIRST_NAME: '名',
@@ -473,15 +474,19 @@ function getRosterMap() {
   const cache = CacheService.getScriptCache();
   const cachedMap = cache.get(ROSTER_CONFIG.CACHE_KEY);
   if (cachedMap) { return JSON.parse(cachedMap); }
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ROSTER_CONFIG.SHEET_NAME);
-  if (!sheet) { console.error(`名簿シート「${ROSTER_CONFIG.SHEET_NAME}」が見つかりません。`); return {}; }
+  const props = PropertiesService.getScriptProperties();
+  const rosterSheetName = props && typeof props.getProperty === 'function'
+    ? (props.getProperty(ROSTER_CONFIG.PROPERTY_NAME) || ROSTER_CONFIG.SHEET_NAME)
+    : ROSTER_CONFIG.SHEET_NAME;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(rosterSheetName);
+  if (!sheet) { console.error(`名簿シート「${rosterSheetName}」が見つかりません。`); return {}; }
   const rosterValues = sheet.getDataRange().getValues();
   const rosterHeaders = rosterValues.shift();
   const lastNameIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_LAST_NAME);
   const firstNameIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_FIRST_NAME);
   const nicknameIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_NICKNAME);
   const emailIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_EMAIL);
-  if (lastNameIndex === -1 || firstNameIndex === -1 || emailIndex === -1) { throw new Error(`名簿シート「${ROSTER_CONFIG.SHEET_NAME}」に必要な列が見つかりません。`); }
+  if (lastNameIndex === -1 || firstNameIndex === -1 || emailIndex === -1) { throw new Error(`名簿シート「${rosterSheetName}」に必要な列が見つかりません。`); }
   const nameMap = {};
   rosterValues.forEach(row => {
     const email = row[emailIndex];
