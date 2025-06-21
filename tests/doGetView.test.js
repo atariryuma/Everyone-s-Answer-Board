@@ -6,7 +6,6 @@ afterEach(() => {
   delete global.Session;
   delete global.PropertiesService;
   delete global.SpreadsheetApp;
-  delete global.getConfig;
 });
 
 function setup({ userEmail = 'admin@example.com', adminEmails = 'admin@example.com' }) {
@@ -27,7 +26,6 @@ function setup({ userEmail = 'admin@example.com', adminEmails = 'admin@example.c
       ]
     })
   };
-  global.getConfig = jest.fn(() => ({ questionHeader: 'Q', answerHeader: 'A', reasonHeader: 'R', nameMode: '同一シート' }));
   const output = { setTitle: jest.fn(() => output), addMetaTag: jest.fn(() => output) };
   let template = { evaluate: () => output };
   global.HtmlService = {

@@ -5,7 +5,6 @@ afterEach(() => {
   delete global.Session;
   delete global.HtmlService;
   delete global.SpreadsheetApp;
-  delete global.getConfig;
 });
 
 function setup() {
@@ -17,7 +16,6 @@ function setup() {
       }
     })
   };
-  global.getConfig = jest.fn(() => ({ questionHeader: 'Q', answerHeader: 'A', reasonHeader: 'R', nameMode: '同一シート' }));
   global.Session = { getActiveUser: () => ({ getEmail: () => { throw new Error('no user'); } }) };
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({
