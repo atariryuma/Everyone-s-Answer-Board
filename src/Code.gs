@@ -163,6 +163,13 @@ function setShowDetails(flag) {
 // =================================================================
 function doGet(e) {
   const settings = getAppSettings();
+  const sheetName = (e && e.parameter && e.parameter.sheetName) || settings.activeSheetName;
+  var mapping = null;
+  try {
+    mapping = getConfig(sheetName);
+  } catch (err) {
+    mapping = null;
+  }
   
   if (!settings.isPublished) {
     const userEmail = safeGetUserEmail();
@@ -184,7 +191,9 @@ function doGet(e) {
     showHighlightToggle: false,
     isAdminUser: admin,
     showCounts: settings.showDetails,
-    displayMode: settings.showDetails ? 'named' : 'anonymous'
+    displayMode: settings.showDetails ? 'named' : 'anonymous',
+    sheetName: sheetName,
+    mapping: mapping
   });
   template.userEmail = userEmail;
   return template.evaluate()
@@ -297,6 +306,40 @@ function getSheetData(sheetName, classFilter, sortBy) {
   } catch(e) {
     handleError(`getSheetData for ${sheetName}`, e);
   }
+}
+
+function buildBoardData(sheetName) {
+  var cfg = getConfig(sheetName);
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) throw new Error('シートが見つかりません');
+  var values = sheet.getDataRange().getValues();
+  if (values.length === 0) {
+    return { header: cfg.questionHeader, entries: [] };
+  }
+  var headers = values.shift();
+  var questionIdx = headers.indexOf(cfg.questionHeader);
+  var answerIdx = headers.indexOf(cfg.answerHeader);
+  var reasonIdx = cfg.reasonHeader ? headers.indexOf(cfg.reasonHeader) : -1;
+  var nameIdx = cfg.nameMode === '同一シート' && cfg.nameHeader ? headers.indexOf(cfg.nameHeader) : -1;
+  var classIdx = cfg.classHeader ? headers.indexOf(cfg.classHeader) : -1;
+  var emailIdx = headers.indexOf(COLUMN_HEADERS.EMAIL);
+  var roster = cfg.nameMode === '別シート' ? getRosterMap() : {};
+
+  var entries = values.map(function(row) {
+    var ans = row[answerIdx];
+    if (!ans) return null;
+    var obj = { answer: ans };
+    if (reasonIdx !== -1) obj.reason = row[reasonIdx];
+    if (cfg.nameMode === '同一シート' && nameIdx !== -1) {
+      obj.name = row[nameIdx];
+    } else if (cfg.nameMode === '別シート' && emailIdx !== -1) {
+      var email = row[emailIdx];
+      if (roster[email]) obj.name = roster[email];
+    }
+    if (classIdx !== -1) obj.class = row[classIdx];
+    return obj;
+  }).filter(Boolean);
+  return { header: cfg.questionHeader, entries: entries };
 }
 
 function addReaction(rowIndex, reactionKey) {
@@ -501,6 +544,7 @@ if (typeof module !== 'undefined') {
     getSheetData,
     getRosterMap,
     getHeaderIndices,
+    buildBoardData,
     addReaction,
     toggleHighlight,
     setShowDetails,

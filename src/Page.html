@@ -88,6 +88,8 @@
   <script>
     window.showCounts = <?= showCounts ?>;
     window.displayMode = '<?= displayMode ?>';
+    const PAGE_SHEET_NAME = '<?= sheetName ?>';
+    const PAGE_MAPPING = <?= JSON.stringify(mapping || {}) ?>;
   </script>
   <style>
     /* カスタムプロパティ（CSS変数）定義 */
