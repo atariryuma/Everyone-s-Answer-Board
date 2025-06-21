@@ -370,7 +370,7 @@
           isLoading: false, // データロード中フラグ
           lastFocusedElement: null, // モーダル表示前のフォーカス要素
           // 初期化時にwindowグローバル変数を参照
-          isStudentMode: window.isStudentMode, 
+          isStudentMode: window.isStudentMode,
           showCounts: window.showCounts,
           showAdminFeatures: window.showAdminFeatures,
           showHighlightToggle: window.showHighlightToggle,
@@ -378,6 +378,9 @@
           showPublishControls: window.showPublishControls,
           displayMode: window.displayMode,
         };
+
+        // シート設定による詳細表示フラグを保持
+        this.serverShowDetails = window.showCounts;
         
         this.pollingInterval = null; // ポーリングタイマーID
 
@@ -856,9 +859,12 @@
           const data = await this.gas.getPublishedSheetData(selectedClass, sortOrder); // GASからデータを取得
           console.log('Received data:', data);
           if (typeof data.showDetails !== 'undefined') {
-            window.showCounts = data.showDetails;
-            window.displayMode = data.showDetails ? 'named' : 'anonymous';
-            this.updateConfigFromGlobals();
+            this.serverShowDetails = data.showDetails;
+            if (!this.state.showAdminFeatures) {
+              window.showCounts = data.showDetails;
+              window.displayMode = data.showDetails ? 'named' : 'anonymous';
+              this.updateConfigFromGlobals();
+            }
           }
           this.adjustLayout(); // レイアウト調整
 
@@ -1224,10 +1230,18 @@
         // グローバル変数と状態を更新
         window.showAdminFeatures = enable;
         window.showHighlightToggle = enable;
-        window.showCounts = enable; // 管理者モードではカウントを表示
-        window.showScoreSort = enable; // 管理者モードではスコアソートを表示
-        window.displayMode = enable ? 'named' : 'anonymous'; // 名前表示/匿名表示
-        window.isStudentMode = !enable; // 学生モード/非学生モード
+        window.showScoreSort = enable;
+        if (enable) {
+          // 管理者モードでは常に詳細表示
+          window.showCounts = true;
+          window.displayMode = 'named';
+          window.isStudentMode = false;
+        } else {
+          // 閲覧モードではシート設定を適用
+          window.showCounts = this.serverShowDetails;
+          window.displayMode = this.serverShowDetails ? 'named' : 'anonymous';
+          window.isStudentMode = true;
+        }
 
         this.updateConfigFromGlobals(); // グローバル変数から状態を同期
         
