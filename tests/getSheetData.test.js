@@ -20,7 +20,7 @@ function setupMocks(rows, userEmail, adminEmails = '') {
         if (name === 'Sheet1') {
           return { getDataRange: () => ({ getValues: () => rows }) };
         }
-        if (name === 'sheet 1') {
+        if (name === 'roster') {
           return { getDataRange: () => ({ getValues: () => [rosterHeaders, ...rosterRows] }) };
         }
         return null;

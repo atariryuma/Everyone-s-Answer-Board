@@ -54,14 +54,27 @@ function saveSheetConfig(sheetName, cfg) {
 
 function createConfigSheet() {
   const ss = SpreadsheetApp.getActive();
-  if (ss.getSheetByName('Config')) {
-    SpreadsheetApp.getUi().alert('Configシートは既に存在します。');
-    return;
+  const created = [];
+  let cfgSheet = ss.getSheetByName('Config');
+  if (!cfgSheet) {
+    cfgSheet = ss.insertSheet('Config');
+    const headers = ['表示シート名','問題文ヘッダー','回答ヘッダー','理由ヘッダー','名前取得モード','名前列ヘッダー','クラス列ヘッダー'];
+    cfgSheet.appendRow(headers);
+    created.push('Config');
   }
-  const sheet = ss.insertSheet('Config');
-  const headers = ['表示シート名','問題文ヘッダー','回答ヘッダー','理由ヘッダー','名前取得モード','名前列ヘッダー','クラス列ヘッダー'];
-  sheet.appendRow(headers);
-  SpreadsheetApp.getUi().alert('Configシートを作成しました。設定を入力してください。');
+  const rosterName = typeof ROSTER_CONFIG !== 'undefined' ? ROSTER_CONFIG.SHEET_NAME : 'roster';
+  let rosterSheet = ss.getSheetByName(rosterName);
+  if (!rosterSheet) {
+    rosterSheet = ss.insertSheet(rosterName);
+    const rosterHeaders = ['学年','組','番号','姓','名','Googleアカウント','ニックネーム'];
+    rosterSheet.appendRow(rosterHeaders);
+    created.push(rosterName);
+  }
+  if (created.length) {
+    SpreadsheetApp.getUi().alert(`${created.join('と')}シートを作成しました。設定を入力してください。`);
+  } else {
+    SpreadsheetApp.getUi().alert('ConfigシートとRosterシートは既に存在します。');
+  }
 }
 
 if (typeof module !== 'undefined') {

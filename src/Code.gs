@@ -17,7 +17,7 @@ const COLUMN_HEADERS = {
   HIGHLIGHT: 'ハイライト'
 };
 const ROSTER_CONFIG = {
-  SHEET_NAME: 'sheet 1',
+  SHEET_NAME: 'roster',
   PROPERTY_NAME: 'ROSTER_SHEET_NAME',
   CACHE_KEY: 'roster_name_map_v3',
   HEADER_LAST_NAME: '姓',
@@ -89,7 +89,7 @@ function onOpen() {
       .addItem('管理パネルを開く', 'showAdminSidebar')
       .addSeparator()
       .addItem('名簿キャッシュをリセット', 'clearRosterCache')
-      .addItem('Configシートを作成', 'createConfigSheet')
+      .addItem('設定シートを追加', 'createConfigSheet')
       .addToUi();
 }
 
