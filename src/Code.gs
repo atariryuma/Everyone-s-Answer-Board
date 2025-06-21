@@ -38,6 +38,10 @@ const TIME_CONSTANTS = {
 };
 
 const REACTION_KEYS = ["UNDERSTAND","LIKE","CURIOUS"];
+var getConfig;
+if (typeof global !== 'undefined' && global.getConfig) {
+  getConfig = global.getConfig;
+}
 
 function safeGetUserEmail() {
   try {
@@ -175,6 +179,8 @@ function doGet(e) {
     return HtmlService.createHtmlOutput('エラー: 表示するシートが設定されていません。スプレッドシートの「アプリ管理」メニューから設定してください。').setTitle('エラー');
   }
 
+  const sheetName = (e && e.parameter && e.parameter.sheetName) ? e.parameter.sheetName : settings.activeSheetName;
+  const mapping = (typeof getConfig === 'function') ? getConfig(sheetName) : {};
   const userEmail = safeGetUserEmail();
 
   const template = HtmlService.createTemplateFromFile('Page');
@@ -184,7 +190,9 @@ function doGet(e) {
     showHighlightToggle: false,
     isAdminUser: admin,
     showCounts: settings.showDetails,
-    displayMode: settings.showDetails ? 'named' : 'anonymous'
+    displayMode: settings.showDetails ? 'named' : 'anonymous',
+    sheetName: sheetName,
+    mapping: mapping
   });
   template.userEmail = userEmail;
   return template.evaluate()
@@ -297,6 +305,28 @@ function getSheetData(sheetName, classFilter, sortBy) {
   } catch(e) {
     handleError(`getSheetData for ${sheetName}`, e);
   }
+}
+
+function buildBoardData(sheetName) {
+  const cfgFunc = (typeof global !== 'undefined' && global.getConfig) ? global.getConfig : getConfig;
+  const cfg = cfgFunc ? cfgFunc(sheetName) : {};
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
+  const values = sheet.getDataRange().getValues();
+  const headers = values.shift();
+  const index = {};
+  headers.forEach((h,i)=>{ if(h) index[h]=i; });
+  const entries = values.map(row => {
+    const email = index[COLUMN_HEADERS.EMAIL] !== undefined ? row[index[COLUMN_HEADERS.EMAIL]] : '';
+    const nameFromRoster = cfg.nameMode === '別シート' ? (getRosterMap()[email] || undefined) : undefined;
+    return {
+      answer: row[index[cfg.answerHeader]],
+      reason: cfg.reasonHeader ? row[index[cfg.reasonHeader]] : null,
+      name: cfg.nameMode === '同一シート' && cfg.nameHeader ? row[index[cfg.nameHeader]] : nameFromRoster,
+      class: cfg.classHeader ? row[index[cfg.classHeader]] : undefined
+    };
+  });
+  return { header: cfg.questionHeader, entries };
 }
 
 function addReaction(rowIndex, reactionKey) {
@@ -490,12 +520,15 @@ function saveDeployId(id) {
 
 if (typeof module !== 'undefined') {
   const { handleError } = require('./ErrorHandling.gs');
+  const { getConfig } = require('./config.gs');
   module.exports = {
     COLUMN_HEADERS,
     getAdminSettings,
     publishApp,
     unpublishApp,
     doGet,
+    getConfig,
+    buildBoardData,
     getPublishedSheetData,
     getSheets,
     getSheetData,
