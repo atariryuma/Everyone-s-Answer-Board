@@ -127,9 +127,10 @@
     }
 
     /* 基本スタイル */
-    body { 
+    body {
       color: var(--color-text);
       background-color: var(--color-background);
+      margin: 0; /* remove default margin for minimal top spacing */
     }
     
     /* ガラスパネル効果 */
@@ -655,7 +656,8 @@
         const headerHeight = this.elements.header.offsetHeight;
         const footerHeight = this.elements.footer.offsetHeight;
         this.elements.mainContainer.style.paddingTop = headerHeight + 'px';
-        this.elements.body.style.paddingBottom = (footerHeight + 40) + 'px'; // フッターの下に少し余白を追加
+        // Reserve only footer height so content ends right above the slider
+        this.elements.body.style.paddingBottom = footerHeight + 'px';
       }
 
       /**
