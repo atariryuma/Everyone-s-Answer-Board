@@ -239,7 +239,11 @@ function getSheets() {
   try {
     const allSheets = SpreadsheetApp.getActiveSpreadsheet().getSheets();
     const visibleSheets = allSheets.filter(sheet => !sheet.isSheetHidden());
-    return visibleSheets.map(sheet => sheet.getName());
+    const filtered = visibleSheets.filter(sheet => {
+      const name = sheet.getName();
+      return name !== 'Config' && name !== ROSTER_CONFIG.SHEET_NAME;
+    });
+    return filtered.map(sheet => sheet.getName());
   } catch (error) {
     handleError('getSheets', error);
   }
