@@ -259,36 +259,58 @@ function getSheetData(sheetName, classFilter, sortBy) {
 
     const allValues = sheet.getDataRange().getValues();
     if (allValues.length < 1) return { header: "シートにデータがありません", rows: [] };
-    
+
+    const cfgFunc = (typeof getConfig === 'function') ? getConfig : null;
+    const cfg = cfgFunc ? cfgFunc(sheetName) : {};
+    const answerHeader = cfg.answerHeader || COLUMN_HEADERS.OPINION;
+    const reasonHeader = cfg.reasonHeader || COLUMN_HEADERS.REASON;
+    const classHeader = cfg.classHeader || COLUMN_HEADERS.CLASS;
+    const nameHeader = (cfg.nameMode === '同一シート') ? (cfg.nameHeader || '') : '';
+
+    const required = [
+      COLUMN_HEADERS.EMAIL,
+      classHeader,
+      answerHeader,
+      reasonHeader,
+      COLUMN_HEADERS.UNDERSTAND,
+      COLUMN_HEADERS.LIKE,
+      COLUMN_HEADERS.CURIOUS,
+      COLUMN_HEADERS.HIGHLIGHT
+    ];
+    if (nameHeader) required.push(nameHeader);
+
+    const headerIndices = findHeaderIndices(allValues[0], required);
+    const dataRows = allValues.slice(1);
     const userEmail = safeGetUserEmail();
     const isAdmin = isUserAdmin(userEmail);
-    const headerIndices = getAndCacheHeaderIndices(sheetName, allValues[0]);
-    const dataRows = allValues.slice(1);
     const emailToNameMap = getRosterMap();
 
     const rows = dataRows.map((row, index) => {
       if (classFilter && classFilter !== 'すべて') {
-        const className = row[headerIndices[COLUMN_HEADERS.CLASS]];
+        const className = row[headerIndices[classHeader]];
         if (className !== classFilter) return null;
       }
       const email = row[headerIndices[COLUMN_HEADERS.EMAIL]];
-      const opinion = row[headerIndices[COLUMN_HEADERS.OPINION]];
+      const opinion = row[headerIndices[answerHeader]];
 
       if (email && opinion) {
         const understandArr = parseReactionString(row[headerIndices[COLUMN_HEADERS.UNDERSTAND]]);
         const likeArr = parseReactionString(row[headerIndices[COLUMN_HEADERS.LIKE]]);
         const curiousArr = parseReactionString(row[headerIndices[COLUMN_HEADERS.CURIOUS]]);
-        const reason = row[headerIndices[COLUMN_HEADERS.REASON]] || '';
+        const reason = row[headerIndices[reasonHeader]] || '';
         const highlightVal = row[headerIndices[COLUMN_HEADERS.HIGHLIGHT]];
         const likes = likeArr.length;
         const baseScore = reason.length;
         const likeMultiplier = 1 + (likes * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
         const totalScore = baseScore * likeMultiplier;
-        const name = emailToNameMap[email] || email.split('@')[0];
+        let name = emailToNameMap[email] || email.split('@')[0];
+        if (nameHeader && row[headerIndices[nameHeader]]) {
+          name = row[headerIndices[nameHeader]];
+        }
         return {
           rowIndex: index + 2,
           name: isAdmin ? name : '',
-          class: row[headerIndices[COLUMN_HEADERS.CLASS]] || '未分類',
+          class: row[headerIndices[classHeader]] || '未分類',
           opinion: opinion,
           reason: reason,
           reactions: {
@@ -310,7 +332,8 @@ function getSheetData(sheetName, classFilter, sortBy) {
     } else {
       rows.sort((a, b) => b.score - a.score);
     }
-    return { header: COLUMN_HEADERS.OPINION, rows: rows };
+    const header = cfg.questionHeader || answerHeader;
+    return { header: header, rows: rows };
   } catch(e) {
     handleError(`getSheetData for ${sheetName}`, e);
   }
