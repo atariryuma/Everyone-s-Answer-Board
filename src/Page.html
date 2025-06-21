@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <title>StudyQuest - みんなのかいとうボード</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- GSAPアニメーションライブラリをdefer属性付きで読み込み、HTMLパースをブロックしないようにする -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js" defer></script>
@@ -147,11 +148,14 @@
     }
     
     /* ゲームボタンのスタイル */
-    .game-btn { 
+    .game-btn {
       transition: all var(--duration-fast) var(--ease-out);
       border-radius: var(--border-radius);
-      border-bottom-width: 4px; 
-      text-shadow: 1px 1px 2px rgba(0,0,0,0.4); 
+      border-bottom-width: 4px;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+    }
+    .game-font {
+      font-family: 'Press Start 2P', cursive;
     }
     .game-btn:not(:disabled):hover { 
       transform: translateY(-2px) scale(1.02); 
@@ -270,6 +274,7 @@
         </select>
       </div>
       <div class="flex-grow text-center w-full min-w-0">
+        <h1 id="siteTitle" class="game-font text-yellow-300 text-lg md:text-xl mb-1">みんなの回答ボード</h1>
         <p id="headingLabel" class="text-2xl md:text-3xl font-bold text-pink-400 leading-tight flex justify-center">
           <svg class="w-6 h-6 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -279,6 +284,7 @@
       </div>
       <div class="w-full lg:w-auto lg:min-w-[150px] text-right space-y-1">
         <p id="sheetNameText" class="text-xs text-gray-400 h-4"></p>
+        <p id="modeLabel" class="text-xs text-gray-400"></p>
         <button type="button" id="adminToggleBtn" class="text-xs text-cyan-400 underline hidden" hidden aria-label="管理者モード切り替え"></button>
       </div>
     </header>
@@ -352,6 +358,7 @@
           sliderValue: document.getElementById('sliderValue'),
           headingLabel: document.getElementById('headingLabel'),
           sheetNameText: document.getElementById('sheetNameText'),
+          modeLabel: document.getElementById('modeLabel'),
           adminToggleBtn: document.getElementById('adminToggleBtn'),
           answerCount: document.getElementById('answerCount'),
           answerModalContainer: document.getElementById('answerModalContainer'),
@@ -368,7 +375,11 @@
           modeToggleBtn: document.getElementById('modeToggleBtn'), // プレビューモード切り替えボタン
           footerIcon: document.getElementById('footerIcon'),
         };
-        
+
+        if (this.elements.modeLabel) {
+          this.elements.modeLabel.textContent = window.showAdminFeatures ? '管理モード' : '閲覧モード';
+        }
+
         // アプリケーションの状態管理
         this.state = {
           currentAnswers: [], // 現在表示されている回答データ
@@ -708,6 +719,9 @@
             this.elements.adminToggleBtn.removeAttribute('hidden');
             // 現在の管理者機能表示状態に基づいてボタンテキストを設定
             this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
+            if (this.elements.modeLabel) {
+              this.elements.modeLabel.textContent = this.state.showAdminFeatures ? '管理モード' : '閲覧モード';
+            }
           }
         } catch (e) {
           console.error('Admin check failed', e);
@@ -1340,6 +1354,9 @@
         
         if (this.elements.adminToggleBtn) {
           this.elements.adminToggleBtn.textContent = enable ? '閲覧モード' : '管理モード';
+        }
+        if (this.elements.modeLabel) {
+          this.elements.modeLabel.textContent = this.state.showAdminFeatures ? '管理モード' : '閲覧モード';
         }
         this.updateSortOptions(); // ソートオプションの表示を更新
         
