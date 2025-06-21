@@ -30,15 +30,9 @@
       <!-- Sheet Selection -->
       <div class="mb-6">
         <h3 class="font-semibold mb-3">1. 公開するシートを選択</h3>
-        <fieldset id="sheet-list" class="flex flex-col gap-2 rounded-lg glass-panel p-2 max-h-48 overflow-y-auto border-0">
-          <legend class="sr-only">公開するシートを選択</legend>
-          <div class="flex justify-center p-2" role="status">
-            <svg class="w-5 h-5 text-gray-400 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
-            </svg>
-          </div>
-        </fieldset>
+        <select id="sheet-select" class="w-full p-2 rounded-lg glass-panel text-gray-900">
+          <option>読み込み中...</option>
+        </select>
       </div>
 
       <!-- Config Setup -->
@@ -112,7 +106,7 @@
     <script>
       const elements = {
         statusText: document.getElementById('status-text'),
-        sheetList: document.getElementById('sheet-list'),
+        sheetSelect: document.getElementById('sheet-select'),
         publishBtn: document.getElementById('publish-btn'),
         unpublishBtn: document.getElementById('unpublish-btn'),
         messageArea: document.getElementById('message-area'),
@@ -127,7 +121,6 @@
       };
 
       let selectedSheet = null;
-      const SHEET_LEGEND = '<legend class="sr-only">公開するシートを選択</legend>';
 
       document.addEventListener('DOMContentLoaded', () => {
         loadInitialState();
@@ -160,33 +153,29 @@
           elements.unpublishBtn.disabled = true;
         }
         
-        elements.sheetList.innerHTML = SHEET_LEGEND;
+        elements.sheetSelect.innerHTML = '';
         if (status.allSheets && status.allSheets.length > 0) {
+          elements.sheetSelect.innerHTML = '<option value="">-- シートを選択してください --</option>';
           status.allSheets.forEach(name => {
-            const label = document.createElement('label');
-            label.className = 'flex items-center p-2 rounded-md hover:bg-gray-100 cursor-pointer';
-            
-            const radio = document.createElement('input');
-            radio.type = 'radio';
-            radio.name = 'sheet';
-            radio.value = name;
-            radio.className = 'mr-3 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500';
-            if (name === status.activeSheetName) {
-              radio.checked = true;
-            }
-            radio.onchange = () => {
-              selectedSheet = name;
-              elements.publishBtn.disabled = false;
-              loadConfigForSelected();
-            };
-
-            label.appendChild(radio);
-            label.appendChild(document.createTextNode(name));
-            elements.sheetList.appendChild(label);
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            elements.sheetSelect.appendChild(opt);
           });
+          elements.sheetSelect.disabled = false;
+          if (status.activeSheetName) {
+            elements.sheetSelect.value = status.activeSheetName;
+          }
         } else {
-          elements.sheetList.innerHTML = SHEET_LEGEND + '<p class="text-gray-600 p-2">表示できるシートがありません。</p>';
+          elements.sheetSelect.innerHTML = '<option value="">表示できるシートがありません</option>';
+          elements.sheetSelect.disabled = true;
         }
+
+        elements.sheetSelect.onchange = () => {
+          selectedSheet = elements.sheetSelect.value;
+          elements.publishBtn.disabled = !selectedSheet;
+          loadConfigForSelected();
+        };
 
         elements.publishBtn.disabled = !selectedSheet || (status.isPublished && selectedSheet === status.activeSheetName);
         loadConfigForSelected();
