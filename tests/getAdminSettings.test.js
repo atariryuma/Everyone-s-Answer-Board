@@ -39,7 +39,8 @@ test('getAdminSettings returns board state', () => {
     adminEmails: ['a@example.com','b@example.com'],
     isUserAdmin: true,
     isPublished: true,
-    activeSheetName: 'SheetA'
+    activeSheetName: 'SheetA',
+    showDetails: false
   });
 });
 
