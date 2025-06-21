@@ -29,7 +29,8 @@ const SCORING_CONFIG = {
 };
 const APP_PROPERTIES = {
   ACTIVE_SHEET: 'ACTIVE_SHEET_NAME',
-  IS_PUBLISHED: 'IS_PUBLISHED'
+  IS_PUBLISHED: 'IS_PUBLISHED',
+  SHOW_DETAILS: 'SHOW_DETAILS'
 };
 
 const TIME_CONSTANTS = {
@@ -112,7 +113,8 @@ function getAdminSettings() {
     adminEmails: adminEmails,
     isUserAdmin: adminEmails.includes(currentUserEmail),
     isPublished: appSettings.isPublished,
-    activeSheetName: appSettings.activeSheetName
+    activeSheetName: appSettings.activeSheetName,
+    showDetails: appSettings.showDetails
   };
 }
 
@@ -145,6 +147,15 @@ function unpublishApp() {
   return 'アプリを非公開にしました。';
 }
 
+function setShowDetails(flag) {
+  if (!checkAdmin()) {
+    throw new Error('権限がありません。');
+  }
+  const properties = PropertiesService.getScriptProperties();
+  properties.setProperty(APP_PROPERTIES.SHOW_DETAILS, String(flag));
+  return `詳細表示を${flag ? '有効' : '無効'}にしました。`;
+}
+
 
 
 // =================================================================
@@ -171,7 +182,9 @@ function doGet(e) {
   Object.assign(template, {
     showAdminFeatures: false,
     showHighlightToggle: false,
-    isAdminUser: admin
+    isAdminUser: admin,
+    showCounts: settings.showDetails,
+    displayMode: settings.showDetails ? 'named' : 'anonymous'
   });
   template.userEmail = userEmail;
   return template.evaluate()
@@ -203,7 +216,8 @@ function getPublishedSheetData(classFilter, sortBy) {
   return {
     sheetName: sheetName,
     header: data.header,
-    rows: data.rows
+    rows: data.rows,
+    showDetails: settings.showDetails
   };
 }
 
@@ -371,6 +385,7 @@ function getAppSettings() {
   const getProp = typeof properties.getProperty === 'function' ? (k) => properties.getProperty(k) : () => null;
   const published = getProp(APP_PROPERTIES.IS_PUBLISHED);
   const sheet = getProp(APP_PROPERTIES.ACTIVE_SHEET);
+  const showDetailsProp = getProp(APP_PROPERTIES.SHOW_DETAILS);
   let activeName = sheet;
   if (!activeName) {
     try {
@@ -383,7 +398,8 @@ function getAppSettings() {
   }
   return {
     isPublished: published === null ? true : published === 'true',
-    activeSheetName: activeName
+    activeSheetName: activeName,
+    showDetails: showDetailsProp === 'true'
   };
 }
 
@@ -487,6 +503,7 @@ if (typeof module !== 'undefined') {
     getHeaderIndices,
     addReaction,
     toggleHighlight,
+    setShowDetails,
     saveWebAppUrl,
     saveDeployId,
     findHeaderIndices,
