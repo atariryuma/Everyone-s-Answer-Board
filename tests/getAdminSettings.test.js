@@ -15,7 +15,9 @@ function setup() {
     getActiveSpreadsheet: () => ({
       getSheets: () => [
         { getName: () => 'SheetA', isSheetHidden: () => false },
-        { getName: () => 'SheetB', isSheetHidden: () => false }
+        { getName: () => 'SheetB', isSheetHidden: () => false },
+        { getName: () => 'Config', isSheetHidden: () => false },
+        { getName: () => 'sheet 1', isSheetHidden: () => false }
       ]
     })
   };
