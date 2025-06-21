@@ -39,7 +39,7 @@
       <div class="mb-6">
         <h3 class="font-semibold mb-3">2. Config設定</h3>
         <p class="text-sm text-gray-300 mb-2">ボードで使用する列を指定します。</p>
-        <div class="flex flex-col gap-2 rounded-lg glass-panel p-2" id="config-area">
+        <div class="flex flex-col gap-2 rounded-lg glass-panel p-2 hidden" id="config-area">
           <label class="flex items-center gap-2">
             <span class="whitespace-nowrap">問題文ヘッダー</span>
             <select id="qHeader" class="flex-1 p-1 rounded text-gray-900"></select>
@@ -117,7 +117,8 @@
         nameMode: document.getElementById('nameMode'),
         nameHeader: document.getElementById('nameHeader'),
         classHeader: document.getElementById('classHeader'),
-        saveConfigBtn: document.getElementById('save-config-btn')
+        saveConfigBtn: document.getElementById('save-config-btn'),
+        configArea: document.getElementById('config-area')
       };
 
       let selectedSheet = null;
@@ -139,6 +140,7 @@
 
       function updateUI(status) {
         selectedSheet = status.activeSheetName;
+        elements.configArea.classList.toggle('hidden', !selectedSheet);
 
         if (elements.detailOptions) {
           const radios = elements.detailOptions.querySelectorAll('input[name="showDetails"]');
@@ -174,6 +176,7 @@
         elements.sheetSelect.onchange = () => {
           selectedSheet = elements.sheetSelect.value;
           elements.publishBtn.disabled = !selectedSheet;
+          elements.configArea.classList.toggle('hidden', !selectedSheet);
           loadConfigForSelected();
         };
 
@@ -230,7 +233,12 @@
       }
 
       function loadConfigForSelected() {
-        if (!selectedSheet) { clearConfigFields(); return; }
+        if (!selectedSheet) {
+          elements.configArea.classList.add('hidden');
+          clearConfigFields();
+          return;
+        }
+        elements.configArea.classList.remove('hidden');
         google.script.run
           .withSuccessHandler((headers) => {
             populateHeaderOptions(headers);
