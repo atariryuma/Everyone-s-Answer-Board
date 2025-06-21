@@ -32,7 +32,7 @@ The sheet you publish must contain the following columns:
 - **予想したわけを書きましょう。** – explanation shown when opening a card
 - **いいね！** – comma separated list of users who liked the answer
 
-A separate sheet named `sheet 1` should contain roster information with the columns `姓`, `名`, `ニックネーム` and `Googleアカウント`. These names are shown on the board instead of raw email addresses. If your roster sheet has a different name, set the `ROSTER_SHEET_NAME` script property to override the default.
+A separate sheet named `roster` should contain roster information with the columns `学年`, `組`, `番号`, `姓`, `名`, `Googleアカウント`, `ニックネーム`. These names are shown on the board instead of raw email addresses. If your roster sheet has a different name, set the `ROSTER_SHEET_NAME` script property to override the default.
 
 ## Managing the board
 
@@ -67,7 +67,7 @@ PropertiesService.getScriptProperties()
 
 1. Open the Apps Script **Project Settings** and expand **Script Properties**.
 2. Add a property named `ROSTER_SHEET_NAME` and set its value to your roster sheet's name.
-3. Leave it blank or remove it to use the default `sheet 1`.
+3. Leave it blank or remove it to use the default `roster`.
 
 ## Front‑end features
 

@@ -11,7 +11,7 @@ function setup({configRows, dataRows, rosterRows}) {
         if (name === 'Sheet1') {
           return { getDataRange: () => ({ getValues: () => dataRows }) };
         }
-        if (name === 'sheet 1') {
+        if (name === 'roster') {
           return { getDataRange: () => ({ getValues: () => rosterRows }) };
         }
         return null;
