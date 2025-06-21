@@ -232,9 +232,11 @@
         google.script.run
           .withSuccessHandler((headers) => {
             populateHeaderOptions(headers);
+            const guesses = guessHeaders(headers);
+            populateConfig(guesses);
             google.script.run
-              .withSuccessHandler(populateConfig)
-              .withFailureHandler(clearConfigFields)
+              .withSuccessHandler(cfg => populateConfig(Object.assign({}, guesses, cfg)))
+              .withFailureHandler(() => {})
               .getConfig(selectedSheet);
           })
           .withFailureHandler(clearConfigFields)
@@ -252,6 +254,17 @@
             sel.appendChild(opt);
           });
         });
+      }
+
+      function guessHeaders(headers) {
+        const find = (keys) => headers.find(h => keys.some(k => h.includes(k))) || '';
+        return {
+          questionHeader: find(['質問', '問題']),
+          answerHeader: find(['回答', '答え']),
+          reasonHeader: find(['理由']),
+          nameHeader: find(['名前', '氏名']),
+          classHeader: find(['クラス'])
+        };
       }
 
       function populateConfig(cfg) {

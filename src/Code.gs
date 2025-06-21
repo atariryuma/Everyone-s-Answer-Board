@@ -133,6 +133,7 @@ function publishApp(sheetName) {
   if (!sheetName) {
     throw new Error('シート名が指定されていません。');
   }
+  prepareSheetForBoard(sheetName);
   const properties = PropertiesService.getScriptProperties();
   properties.setProperty(APP_PROPERTIES.IS_PUBLISHED, 'true');
   properties.setProperty(APP_PROPERTIES.ACTIVE_SHEET, sheetName);
@@ -491,6 +492,27 @@ function getAndCacheHeaderIndices(sheetName, headerRow) {
   return indices;
 }
 
+function prepareSheetForBoard(sheetName) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
+  const headers = getSheetHeaders(sheetName);
+  let lastCol = headers.length;
+  const required = [
+    COLUMN_HEADERS.UNDERSTAND,
+    COLUMN_HEADERS.LIKE,
+    COLUMN_HEADERS.CURIOUS,
+    COLUMN_HEADERS.HIGHLIGHT
+  ];
+  required.forEach(h => {
+    if (headers.indexOf(h) === -1) {
+      sheet.insertColumnAfter(lastCol);
+      lastCol++;
+      sheet.getRange(1, lastCol).setValue(h);
+      headers.push(h);
+    }
+  });
+}
+
 function findHeaderIndices(sheetHeaders, requiredHeaders) {
   const indices = {};
   const normalized = sheetHeaders.map(h => (typeof h === 'string' ? h.replace(/\s+/g, '') : h));
@@ -525,6 +547,36 @@ function saveDeployId(id) {
   props.setProperties({ DEPLOY_ID: (id || '').trim() });
 }
 
+function createTemplateSheet(name) {
+  if (!checkAdmin()) {
+    throw new Error('権限がありません。');
+  }
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetName = name || 'New Q&A';
+  if (ss.getSheetByName(sheetName)) {
+    throw new Error(`シート '${sheetName}' は既に存在します。`);
+  }
+  const sheet = ss.insertSheet(sheetName);
+  const headers = [
+    COLUMN_HEADERS.EMAIL,
+    COLUMN_HEADERS.CLASS,
+    '質問',
+    '回答',
+    '理由',
+    '名前',
+    'クラス'
+  ];
+  const req = [
+    COLUMN_HEADERS.UNDERSTAND,
+    COLUMN_HEADERS.LIKE,
+    COLUMN_HEADERS.CURIOUS,
+    COLUMN_HEADERS.HIGHLIGHT
+  ];
+  const all = headers.concat(req);
+  sheet.getRange(1, 1, 1, all.length).setValues([all]);
+  return sheet.getName();
+}
+
 if (typeof module !== 'undefined') {
   const { handleError } = require('./ErrorHandling.gs');
   const { getConfig, saveSheetConfig } = require('./config.gs');
@@ -551,6 +603,8 @@ if (typeof module !== 'undefined') {
     parseReactionString,
     checkAdmin,
     handleError,
-    saveSheetConfig
+    saveSheetConfig,
+    createTemplateSheet,
+    prepareSheetForBoard
   };
 }
