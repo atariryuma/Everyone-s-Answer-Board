@@ -243,6 +243,13 @@ function getSheets() {
   }
 }
 
+function getSheetHeaders(sheetName) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
+  const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  return headerRow.map(v => (v !== null && v !== undefined) ? String(v) : '');
+}
+
 function getSheetData(sheetName, classFilter, sortBy) {
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
@@ -531,6 +538,7 @@ if (typeof module !== 'undefined') {
     buildBoardData,
     getPublishedSheetData,
     getSheets,
+    getSheetHeaders,
     getSheetData,
     getRosterMap,
     getHeaderIndices,

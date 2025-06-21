@@ -44,15 +44,15 @@
       <div class="mb-6">
         <h3 class="font-semibold mb-3">2. Config設定</h3>
         <div class="flex flex-col gap-2 rounded-lg glass-panel p-2" id="config-area">
-          <input id="qHeader" type="text" placeholder="問題文ヘッダー" class="p-1 rounded text-gray-900" />
-          <input id="aHeader" type="text" placeholder="回答ヘッダー" class="p-1 rounded text-gray-900" />
-          <input id="rHeader" type="text" placeholder="理由ヘッダー(任意)" class="p-1 rounded text-gray-900" />
+          <select id="qHeader" class="p-1 rounded text-gray-900"></select>
+          <select id="aHeader" class="p-1 rounded text-gray-900"></select>
+          <select id="rHeader" class="p-1 rounded text-gray-900"></select>
           <select id="nameMode" class="p-1 rounded text-gray-900">
             <option value="同一シート">同一シート</option>
             <option value="別シート">別シート</option>
           </select>
-          <input id="nameHeader" type="text" placeholder="名前列ヘッダー(任意)" class="p-1 rounded text-gray-900" />
-          <input id="classHeader" type="text" placeholder="クラス列ヘッダー(任意)" class="p-1 rounded text-gray-900" />
+          <select id="nameHeader" class="p-1 rounded text-gray-900"></select>
+          <select id="classHeader" class="p-1 rounded text-gray-900"></select>
           <button id="save-config-btn" class="bg-green-600 hover:bg-green-700 text-white rounded py-1">保存</button>
         </div>
       </div>
@@ -209,9 +209,28 @@
       function loadConfigForSelected() {
         if (!selectedSheet) { clearConfigFields(); return; }
         google.script.run
-          .withSuccessHandler(populateConfig)
+          .withSuccessHandler((headers) => {
+            populateHeaderOptions(headers);
+            google.script.run
+              .withSuccessHandler(populateConfig)
+              .withFailureHandler(clearConfigFields)
+              .getConfig(selectedSheet);
+          })
           .withFailureHandler(clearConfigFields)
-          .getConfig(selectedSheet);
+          .getSheetHeaders(selectedSheet);
+      }
+
+      function populateHeaderOptions(headers) {
+        const selects = [elements.qHeader, elements.aHeader, elements.rHeader, elements.nameHeader, elements.classHeader];
+        selects.forEach(sel => {
+          sel.innerHTML = '<option value=""></option>';
+          headers.forEach(h => {
+            const opt = document.createElement('option');
+            opt.value = h;
+            opt.textContent = h;
+            sel.appendChild(opt);
+          });
+        });
       }
 
       function populateConfig(cfg) {
@@ -224,12 +243,11 @@
       }
 
       function clearConfigFields() {
-        elements.qHeader.value = '';
-        elements.aHeader.value = '';
-        elements.rHeader.value = '';
+        [elements.qHeader, elements.aHeader, elements.rHeader, elements.nameHeader, elements.classHeader].forEach(sel => {
+          sel.innerHTML = '<option value=""></option>';
+          sel.value = '';
+        });
         elements.nameMode.value = '同一シート';
-        elements.nameHeader.value = '';
-        elements.classHeader.value = '';
       }
 
       function saveConfig() {
