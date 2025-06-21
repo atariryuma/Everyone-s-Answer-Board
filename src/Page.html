@@ -653,11 +653,25 @@
        * ヘッダーとフッターの高さに基づいてメインコンテンツのパディングを調整
        */
       adjustLayout() {
+        if (this.baseMainPadding === undefined) {
+          this.baseMainPadding = parseFloat(
+            getComputedStyle(this.elements.mainContainer).paddingTop
+          ) || 0;
+        }
+        if (this.baseBodyPadding === undefined) {
+          this.baseBodyPadding = parseFloat(
+            getComputedStyle(this.elements.body).paddingBottom
+          ) || 0;
+        }
+
         const headerHeight = this.elements.header.offsetHeight;
         const footerHeight = this.elements.footer.offsetHeight;
-        this.elements.mainContainer.style.paddingTop = headerHeight + 'px';
+
+        this.elements.mainContainer.style.paddingTop =
+          headerHeight + this.baseMainPadding + 'px';
         // Reserve only footer height so content ends right above the slider
-        this.elements.body.style.paddingBottom = footerHeight + 'px';
+        this.elements.body.style.paddingBottom =
+          footerHeight + this.baseBodyPadding + 'px';
       }
 
       /**
