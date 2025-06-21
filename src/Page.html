@@ -218,6 +218,10 @@
     .reaction-bg-curious { border-color:#10b981; border-image: linear-gradient(to bottom,#34d399,#6ee7b7) 1; }
     .reaction-bg-mixed { border-color:#8b5cf6; border-image: linear-gradient(to bottom,#f59e0b,#10b981,#10b981) 1; }
     .reaction-bg-all { border-color:transparent; border-image: linear-gradient(90deg,#ef4444,#fbbf24,#10b981) 1; }
+    /* リアクション総数に応じたボーダー太さ */
+    .reaction-border-1 { border-width: 2px; }
+    .reaction-border-2 { border-width: 4px; }
+    .reaction-border-3 { border-width: 6px; }
     /* 回答プレビューの表示制限と省略 */
     .answer-preview { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; min-height: 120px; }
     /* いいねボタンのSVGトランジション */
@@ -1047,6 +1051,17 @@
           card.classList.add('reaction-bg-all');
         }
 
+        // リアクション総数に応じてボーダークラスを追加
+        const totalReactions = this.reactionTypes.reduce((sum, rt) =>
+          sum + (data.reactions?.[rt.key]?.count || 0), 0);
+        if (totalReactions >= 10) {
+          card.classList.add('reaction-border-3');
+        } else if (totalReactions >= 5) {
+          card.classList.add('reaction-border-2');
+        } else if (totalReactions > 0) {
+          card.classList.add('reaction-border-1');
+        }
+
         let highlightBtnHtml = '';
         // ハイライトトグル機能が有効な場合のみボタンを生成
         if (this.state.showHighlightToggle) {
@@ -1338,6 +1353,19 @@
               card.classList.add('reaction-bg-mixed');
             } else if (active.length > 2) {
               card.classList.add('reaction-bg-all');
+            }
+
+            // 総リアクション数によるボーダークラスの更新
+            const total = this.reactionTypes.reduce((sum, rt) =>
+              sum + (item.reactions?.[rt.key]?.count || 0), 0);
+            ['reaction-border-1','reaction-border-2','reaction-border-3']
+              .forEach(cls => card.classList.remove(cls));
+            if (total >= 10) {
+              card.classList.add('reaction-border-3');
+            } else if (total >= 5) {
+              card.classList.add('reaction-border-2');
+            } else if (total > 0) {
+              card.classList.add('reaction-border-1');
             }
 
             // ハイライトバッジの表示/非表示を制御
