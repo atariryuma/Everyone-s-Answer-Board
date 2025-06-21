@@ -328,6 +328,7 @@
 
     class StudyQuestApp {
       constructor() {
+        try {
         // パフォーマンス最適化のためのキャッシュ
         this.cache = new Map();
         this.memoCache = new Map();
