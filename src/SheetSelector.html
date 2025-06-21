@@ -40,9 +40,26 @@
         </div>
       </div>
 
+      <!-- Config Setup -->
+      <div class="mb-6">
+        <h3 class="font-semibold mb-3">2. Config設定</h3>
+        <div class="flex flex-col gap-2 rounded-lg glass-panel p-2" id="config-area">
+          <input id="qHeader" type="text" placeholder="問題文ヘッダー" class="p-1 rounded text-gray-900" />
+          <input id="aHeader" type="text" placeholder="回答ヘッダー" class="p-1 rounded text-gray-900" />
+          <input id="rHeader" type="text" placeholder="理由ヘッダー(任意)" class="p-1 rounded text-gray-900" />
+          <select id="nameMode" class="p-1 rounded text-gray-900">
+            <option value="同一シート">同一シート</option>
+            <option value="別シート">別シート</option>
+          </select>
+          <input id="nameHeader" type="text" placeholder="名前列ヘッダー(任意)" class="p-1 rounded text-gray-900" />
+          <input id="classHeader" type="text" placeholder="クラス列ヘッダー(任意)" class="p-1 rounded text-gray-900" />
+          <button id="save-config-btn" class="bg-green-600 hover:bg-green-700 text-white rounded py-1">保存</button>
+        </div>
+      </div>
+
       <!-- Display Options -->
       <div class="mb-6">
-        <h3 class="font-semibold mb-3">2. 表示オプション</h3>
+        <h3 class="font-semibold mb-3">3. 表示オプション</h3>
         <div id="detail-options" class="flex flex-col gap-2 rounded-lg glass-panel p-2">
           <label class="flex items-center p-2 rounded-md cursor-pointer">
             <input type="radio" name="showDetails" value="true" class="mr-3 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500">
@@ -57,7 +74,7 @@
 
       <!-- Actions -->
       <div class="glass-panel p-4 rounded-lg">
-        <h3 class="font-semibold mb-3">3. 操作を選択</h3>
+        <h3 class="font-semibold mb-3">4. 操作を選択</h3>
         <div class="flex flex-col gap-3">
           <button id="publish-btn" class="w-full text-white font-bold py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 transition disabled:bg-blue-300">
             選択したシートを公開
@@ -79,7 +96,14 @@
         publishBtn: document.getElementById('publish-btn'),
         unpublishBtn: document.getElementById('unpublish-btn'),
         messageArea: document.getElementById('message-area'),
-        detailOptions: document.getElementById('detail-options')
+        detailOptions: document.getElementById('detail-options'),
+        qHeader: document.getElementById('qHeader'),
+        aHeader: document.getElementById('aHeader'),
+        rHeader: document.getElementById('rHeader'),
+        nameMode: document.getElementById('nameMode'),
+        nameHeader: document.getElementById('nameHeader'),
+        classHeader: document.getElementById('classHeader'),
+        saveConfigBtn: document.getElementById('save-config-btn')
       };
 
       let selectedSheet = null;
@@ -88,6 +112,7 @@
         loadInitialState();
         elements.publishBtn.addEventListener('click', publish);
         elements.unpublishBtn.addEventListener('click', unpublish);
+        elements.saveConfigBtn.addEventListener('click', saveConfig);
       });
 
       function loadInitialState() {
@@ -131,6 +156,7 @@
             radio.onchange = () => {
               selectedSheet = name;
               elements.publishBtn.disabled = false;
+              loadConfigForSelected();
             };
 
             label.appendChild(radio);
@@ -142,6 +168,7 @@
         }
 
         elements.publishBtn.disabled = !selectedSheet || (status.isPublished && selectedSheet === status.activeSheetName);
+        loadConfigForSelected();
         setLoading(false);
       }
 
@@ -177,6 +204,52 @@
           .withSuccessHandler((msg) => { showMessage(msg, 'green'); setLoading(false); })
           .withFailureHandler(showError)
           .setShowDetails(val === 'true');
+      }
+
+      function loadConfigForSelected() {
+        if (!selectedSheet) { clearConfigFields(); return; }
+        google.script.run
+          .withSuccessHandler(populateConfig)
+          .withFailureHandler(clearConfigFields)
+          .getConfig(selectedSheet);
+      }
+
+      function populateConfig(cfg) {
+        elements.qHeader.value = cfg.questionHeader || '';
+        elements.aHeader.value = cfg.answerHeader || '';
+        elements.rHeader.value = cfg.reasonHeader || '';
+        elements.nameMode.value = cfg.nameMode || '同一シート';
+        elements.nameHeader.value = cfg.nameHeader || '';
+        elements.classHeader.value = cfg.classHeader || '';
+      }
+
+      function clearConfigFields() {
+        elements.qHeader.value = '';
+        elements.aHeader.value = '';
+        elements.rHeader.value = '';
+        elements.nameMode.value = '同一シート';
+        elements.nameHeader.value = '';
+        elements.classHeader.value = '';
+      }
+
+      function saveConfig() {
+        if (!selectedSheet) {
+          showMessage('シートを選択してください。', 'red');
+          return;
+        }
+        const cfg = {
+          questionHeader: elements.qHeader.value,
+          answerHeader: elements.aHeader.value,
+          reasonHeader: elements.rHeader.value,
+          nameMode: elements.nameMode.value,
+          nameHeader: elements.nameHeader.value,
+          classHeader: elements.classHeader.value
+        };
+        setLoading(true, '設定を保存中...');
+        google.script.run
+          .withSuccessHandler((msg) => { showMessage(msg, 'green'); setLoading(false); })
+          .withFailureHandler(showError)
+          .saveSheetConfig(selectedSheet, cfg);
       }
 
       function setLoading(isLoading, msg = "") {

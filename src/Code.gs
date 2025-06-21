@@ -520,7 +520,7 @@ function saveDeployId(id) {
 
 if (typeof module !== 'undefined') {
   const { handleError } = require('./ErrorHandling.gs');
-  const { getConfig } = require('./config.gs');
+  const { getConfig, saveSheetConfig } = require('./config.gs');
   module.exports = {
     COLUMN_HEADERS,
     getAdminSettings,
@@ -542,6 +542,7 @@ if (typeof module !== 'undefined') {
     findHeaderIndices,
     parseReactionString,
     checkAdmin,
-    handleError
+    handleError,
+    saveSheetConfig
   };
 }
