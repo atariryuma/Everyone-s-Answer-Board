@@ -88,6 +88,7 @@ function onOpen() {
       .addItem('管理パネルを開く', 'showAdminSidebar')
       .addSeparator()
       .addItem('名簿キャッシュをリセット', 'clearRosterCache')
+      .addItem('Configシートを作成', 'createConfigSheet')
       .addToUi();
 }
 
@@ -579,7 +580,7 @@ function createTemplateSheet(name) {
 
 if (typeof module !== 'undefined') {
   const { handleError } = require('./ErrorHandling.gs');
-  const { getConfig, saveSheetConfig } = require('./config.gs');
+  const { getConfig, saveSheetConfig, createConfigSheet } = require('./config.gs');
   module.exports = {
     COLUMN_HEADERS,
     getAdminSettings,
@@ -604,6 +605,7 @@ if (typeof module !== 'undefined') {
     checkAdmin,
     handleError,
     saveSheetConfig,
+    createConfigSheet,
     createTemplateSheet,
     prepareSheetForBoard
   };

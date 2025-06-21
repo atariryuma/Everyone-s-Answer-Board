@@ -52,6 +52,18 @@ function saveSheetConfig(sheetName, cfg) {
   return 'Config saved';
 }
 
+function createConfigSheet() {
+  const ss = SpreadsheetApp.getActive();
+  if (ss.getSheetByName('Config')) {
+    SpreadsheetApp.getUi().alert('Configシートは既に存在します。');
+    return;
+  }
+  const sheet = ss.insertSheet('Config');
+  const headers = ['表示シート名','問題文ヘッダー','回答ヘッダー','理由ヘッダー','名前取得モード','名前列ヘッダー','クラス列ヘッダー'];
+  sheet.appendRow(headers);
+  SpreadsheetApp.getUi().alert('Configシートを作成しました。設定を入力してください。');
+}
+
 if (typeof module !== 'undefined') {
-  module.exports = { getConfig, saveSheetConfig };
+  module.exports = { getConfig, saveSheetConfig, createConfigSheet };
 }
