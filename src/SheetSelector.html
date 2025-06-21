@@ -198,14 +198,27 @@
           showMessage('公開するシートを選択してください。', 'red');
           return;
         }
+        const cfg = {
+          questionHeader: elements.qHeader.value,
+          answerHeader: elements.aHeader.value,
+          reasonHeader: elements.rHeader.value,
+          nameMode: elements.nameMode.value,
+          nameHeader: elements.nameHeader.value,
+          classHeader: elements.classHeader.value
+        };
         setLoading(true, "公開処理中...");
         google.script.run
-          .withSuccessHandler((msg) => {
-            showMessage(msg, 'green');
-            loadInitialState();
+          .withSuccessHandler(() => {
+            google.script.run
+              .withSuccessHandler((msg) => {
+                showMessage(msg, 'green');
+                loadInitialState();
+              })
+              .withFailureHandler(showError)
+              .publishApp(selectedSheet);
           })
           .withFailureHandler(showError)
-          .publishApp(selectedSheet);
+          .saveSheetConfig(selectedSheet, cfg);
       }
 
       function unpublish() {
