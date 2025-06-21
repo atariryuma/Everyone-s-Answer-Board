@@ -21,6 +21,8 @@ This repository contains the source code of a Google Apps Script project. It pub
 - `npm run pull` – Download the latest code from Apps Script.
 - `npm run open` – Open the Apps Script project in a browser.
 - `npm run update-url` – Store the latest Web App URL in script properties.
+- Call `getWebAppUrl()` in Apps Script to read the stored URL. The same value is
+  also returned by `getAdminSettings()` for use in the admin panel.
 
 ## Spreadsheet structure
 

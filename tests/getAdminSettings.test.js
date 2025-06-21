@@ -5,6 +5,7 @@ function setup() {
       getProperty: (key) => {
         if (key === 'ADMIN_EMAILS') return 'a@example.com,b@example.com';
         if (key === 'DEPLOY_ID') return 'deploy123';
+        if (key === 'WEB_APP_URL') return 'https://example.com/app';
         if (key === 'IS_PUBLISHED') return 'true';
         if (key === 'ACTIVE_SHEET_NAME') return 'SheetA';
         return null;
@@ -38,6 +39,7 @@ test('getAdminSettings returns board state', () => {
     allSheets: ['SheetA','SheetB'],
     currentUserEmail: 'a@example.com',
     deployId: 'deploy123',
+    webAppUrl: 'https://example.com/app',
     adminEmails: ['a@example.com','b@example.com'],
     isUserAdmin: true,
     isPublished: true,
