@@ -43,16 +43,35 @@
       <!-- Config Setup -->
       <div class="mb-6">
         <h3 class="font-semibold mb-3">2. Config設定</h3>
+        <p class="text-sm text-gray-300 mb-2">ボードで使用する列を指定します。</p>
         <div class="flex flex-col gap-2 rounded-lg glass-panel p-2" id="config-area">
-          <select id="qHeader" class="p-1 rounded text-gray-900"></select>
-          <select id="aHeader" class="p-1 rounded text-gray-900"></select>
-          <select id="rHeader" class="p-1 rounded text-gray-900"></select>
-          <select id="nameMode" class="p-1 rounded text-gray-900">
-            <option value="同一シート">同一シート</option>
-            <option value="別シート">別シート</option>
-          </select>
-          <select id="nameHeader" class="p-1 rounded text-gray-900"></select>
-          <select id="classHeader" class="p-1 rounded text-gray-900"></select>
+          <label class="flex items-center gap-2">
+            <span class="whitespace-nowrap">問題文ヘッダー</span>
+            <select id="qHeader" class="flex-1 p-1 rounded text-gray-900"></select>
+          </label>
+          <label class="flex items-center gap-2">
+            <span class="whitespace-nowrap">回答ヘッダー</span>
+            <select id="aHeader" class="flex-1 p-1 rounded text-gray-900"></select>
+          </label>
+          <label class="flex items-center gap-2">
+            <span class="whitespace-nowrap">理由ヘッダー</span>
+            <select id="rHeader" class="flex-1 p-1 rounded text-gray-900"></select>
+          </label>
+          <label class="flex items-center gap-2">
+            <span class="whitespace-nowrap">名前取得モード</span>
+            <select id="nameMode" class="flex-1 p-1 rounded text-gray-900">
+              <option value="同一シート">同一シート</option>
+              <option value="別シート">別シート</option>
+            </select>
+          </label>
+          <label class="flex items-center gap-2">
+            <span class="whitespace-nowrap">名前列ヘッダー</span>
+            <select id="nameHeader" class="flex-1 p-1 rounded text-gray-900"></select>
+          </label>
+          <label class="flex items-center gap-2">
+            <span class="whitespace-nowrap">クラス列ヘッダー</span>
+            <select id="classHeader" class="flex-1 p-1 rounded text-gray-900"></select>
+          </label>
           <button id="save-config-btn" class="bg-green-600 hover:bg-green-700 text-white rounded py-1">保存</button>
         </div>
       </div>
