@@ -1117,14 +1117,17 @@
         const highlightClass = data.highlight ? ' highlighted' : '';
         card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer opacity-0' + highlightClass;
         card.dataset.rowIndex = data.rowIndex;
-        
+
         // アクセシビリティ属性を追加
         card.setAttribute('role', 'article');
         card.setAttribute('tabindex', '0');
         card.setAttribute('aria-label', '回答カード: ' + (data.opinion || '').substring(0, 50) + (data.opinion && data.opinion.length > 50 ? '...' : ''));
+        const instructionId = 'detail-instruction-' + data.rowIndex;
+        let describedBy = instructionId;
         if (data.highlight) {
-          card.setAttribute('aria-describedby', 'highlight-status-' + data.rowIndex);
+          describedBy += ' highlight-status-' + data.rowIndex;
         }
+        card.setAttribute('aria-describedby', describedBy);
 
         // アクティブなリアクションタイプに基づいて背景クラスを設定
         const active = this.reactionTypes
@@ -1191,8 +1194,10 @@
         }).join('');
 
         // ハイライト状態を隠れた要素で通知（スクリーンリーダー用）
-        const highlightStatusHtml = data.highlight ? 
+        const highlightStatusHtml = data.highlight ?
           '<div id="highlight-status-' + data.rowIndex + '" class="sr-only">この回答はハイライトされています</div>' : '';
+        // 詳細表示のヒントを隠れた要素で提供
+        const instructionHtml = '<div id="' + instructionId + '" class="sr-only">Enter または Space で詳細表示</div>';
         
         card.innerHTML =
           '<div class="relative flex-grow mb-3 answer-preview">' +
@@ -1208,7 +1213,8 @@
           highlightBtnHtml + // ハイライトボタン（管理者モードのみ）
           '</div>' +
           '</div>' +
-          highlightStatusHtml; // ハイライト状態通知
+          highlightStatusHtml + // ハイライト状態通知
+          instructionHtml; // 詳細表示ヒント
 
         // ハイライトバッジを動的に追加
         if (data.highlight) {
