@@ -1051,8 +1051,9 @@
                              '</button>';
         }
         
-        // 管理者ユーザーの場合のみ学生名を表示
-        const nameHtml = this.state.isAdminUser ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' : '';
+        // 名前表示設定に基づき学生名を表示
+        const showName = this.state.displayMode === 'named';
+        const nameHtml = showName ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' : '';
         const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
 
         // リアクションボタンのHTMLを生成（アクセシビリティ強化）
@@ -1372,10 +1373,11 @@
           '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + 
           this.escapeHtml(data.reason || '') + '</p>';
         
-        // 管理者ユーザーの場合のみ学生名を表示
-        this.elements.modalStudentName.textContent = this.state.isAdminUser ? data.name : '';
+        // 名前表示設定に基づき学生名を表示
+        const showName = this.state.displayMode === 'named';
+        this.elements.modalStudentName.textContent = showName ? data.name : '';
         const footerBase = 'text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex';
-        this.elements.modalFooter.className = footerBase + (this.state.isAdminUser ? ' justify-between items-center' : ' justify-end items-center');
+        this.elements.modalFooter.className = footerBase + (showName ? ' justify-between items-center' : ' justify-end items-center');
 
         // モーダル内のリアクションボタンを生成
         const reactionButtonsHtml = this.reactionTypes.map(rt => {
