@@ -1,20 +1,13 @@
 name: CI and Deploy to GAS
 
 on:
-  # main ブランチへの push（src/** またはワークフロー定義の変更時）で実行
   push:
-    branches:
-      - main
+    branches: [ main ]
     paths:
       - 'src/**'
       - '.github/workflows/**'
-
-  # main ブランチ宛の PR 作成/更新時にも必ずテストを実行
   pull_request:
-    branches:
-      - main
-
-  # 手動トリガー
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -22,71 +15,26 @@ jobs:
     name: ci-and-deploy
     runs-on: ubuntu-latest
     permissions:
-      contents: read          # checkout 用
-      pull-requests: write    # PR へのコメント書き込み用
+      contents: read
 
     steps:
-      # 1. コードを checkout
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        with: { fetch-depth: 0 }
 
-      # 2. Node.js 環境をセットアップ
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      # 3. 依存パッケージをインストール
       - name: Install dependencies
         run: npm ci
 
-      # 4. マージされた PR 番号を検出（push 時のみ）
-      - name: Get PR number from commit
-        if: github.event_name == 'push'
-        id: get-pr
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { data: pulls } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              commit_sha: context.sha
-            });
-            if (pulls.length > 0) {
-              core.setOutput('pr_number', pulls[0].number.toString());
-            } else {
-              core.setOutput('pr_number', '');
-            }
-
-      # 5. GAS 認証ファイル作成（push 時のみ）
-      - name: Create clasprc.json for authentication
+      - name: Create ~/.clasprc.json
         if: github.event_name == 'push'
         run: echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
 
-      # 6. Apps Script プロジェクトへプッシュ（push 時のみ）
       - name: Push to Apps Script
         if: github.event_name == 'push'
         run: npm run push -- --force
-
-      # 7. デプロイ成功時に PR へコメント
-      - name: Comment on PR about successful GAS deployment
-        if: github.event_name == 'push' && success() && steps.get-pr.outputs.pr_number != ''
-        uses: peter-evans/create-or-update-comment@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          issue-number: ${{ steps.get-pr.outputs.pr_number }}
-          body: |
-            ✅ GAS へのデプロイが正常に完了しました！
-
-      # 8. デプロイ失敗時に PR へコメント
-      - name: Comment on PR about failed GAS deployment
-        if: always() && failure() && github.event_name == 'push' && steps.get-pr.outputs.pr_number != ''
-        uses: peter-evans/create-or-update-comment@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          issue-number: ${{ steps.get-pr.outputs.pr_number }}
-          body: |
-            ❌ GAS へのデプロイに失敗しました。手動で状況をご確認ください。
