@@ -1,7 +1,16 @@
-const admin = require('./admin.gs');
-// Use global handleError in Apps Script; import for Node tests
+var admin;
+// When running in Node, load dependencies with require. In Apps Script the
+// referenced functions are available globally, so create a simple wrapper
+// object to access them.
 if (typeof module !== 'undefined') {
+  admin = require('./admin.gs');
   var handleError = require('./ErrorHandling.gs').handleError;
+} else {
+  admin = {
+    safeGetUserEmail: safeGetUserEmail,
+    getAppSettings: getAppSettings,
+    checkAdmin: checkAdmin
+  };
 }
 const REACTION_KEYS = ['UNDERSTAND','LIKE','CURIOUS'];
 
@@ -15,7 +24,9 @@ function parseReactionString(val) {
 }
 
 function addReaction(rowIndex, reactionKey) {
-  const { COLUMN_HEADERS, getHeaderIndices, TIME_CONSTANTS } = require('./Code.gs');
+  if (typeof module !== 'undefined') {
+    var { COLUMN_HEADERS, getHeaderIndices, TIME_CONSTANTS } = require('./Code.gs');
+  }
   if (!rowIndex || !reactionKey || !COLUMN_HEADERS[reactionKey]) {
     return { status: 'error', message: '無効なパラメータです。' };
   }
@@ -70,7 +81,9 @@ function addReaction(rowIndex, reactionKey) {
 }
 
 function toggleHighlight(rowIndex) {
-  const { COLUMN_HEADERS, getHeaderIndices, TIME_CONSTANTS } = require('./Code.gs');
+  if (typeof module !== 'undefined') {
+    var { COLUMN_HEADERS, getHeaderIndices, TIME_CONSTANTS } = require('./Code.gs');
+  }
   if (!admin.checkAdmin()) {
     return { status: 'error', message: '権限がありません。' };
   }
