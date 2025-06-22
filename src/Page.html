@@ -1500,6 +1500,15 @@
               card.classList.add('reaction-border-1');
             }
 
+            // ハイライトボタンのUI更新
+            const highlightBtn = card.querySelector('.highlight-btn');
+            if (highlightBtn) {
+              highlightBtn.classList.toggle('liked', item.highlight);
+              highlightBtn.setAttribute('aria-pressed', String(item.highlight));
+              const label = item.highlight ? 'ハイライトを解除する' : 'ハイライトする';
+              highlightBtn.setAttribute('aria-label', label);
+            }
+
             // ハイライトバッジの表示/非表示を制御
             let badge = card.querySelector('.highlight-badge');
             if (item.highlight && !badge) {
