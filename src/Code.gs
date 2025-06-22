@@ -19,7 +19,6 @@ const COLUMN_HEADERS = {
 const ROSTER_CONFIG = {
   SHEET_NAME: 'roster',
   PROPERTY_NAME: 'ROSTER_SHEET_NAME',
-  CACHE_KEY: 'roster_name_map_v3',
   HEADER_LAST_NAME: '姓',
   HEADER_FIRST_NAME: '名',
   HEADER_NICKNAME: 'ニックネーム',
@@ -64,6 +63,20 @@ if (typeof global !== 'undefined' && global.getConfig) {
 /**
  * スプレッドシートを開いた時に「アプリ管理」メニューを追加します。
  */
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('アプリ管理')
+    .addItem('管理パネルを開く', 'showAdminDialog')
+    .addToUi();
+}
+
+function showAdminDialog() {
+  const html = HtmlService
+    .createTemplateFromFile('SheetSelector')
+    .evaluate()
+    .setTitle('管理パネル');
+  SpreadsheetApp.getUi().showSidebar(html);
+}
 
 /**
  * 管理パネルの初期化に必要なデータを取得します。
@@ -264,9 +277,6 @@ function buildBoardData(sheetName) {
 
 
 function getRosterMap() {
-  const cache = CacheService.getScriptCache();
-  const cachedMap = cache.get(ROSTER_CONFIG.CACHE_KEY);
-  if (cachedMap) { return JSON.parse(cachedMap); }
   const props = PropertiesService.getScriptProperties();
   const rosterSheetName = props && typeof props.getProperty === 'function'
     ? (props.getProperty(ROSTER_CONFIG.PROPERTY_NAME) || ROSTER_CONFIG.SHEET_NAME)
@@ -291,7 +301,6 @@ function getRosterMap() {
       nameMap[email] = nickname ? `${fullName} (${nickname})` : fullName;
     }
   });
-  cache.put(ROSTER_CONFIG.CACHE_KEY, JSON.stringify(nameMap), 21600);
   return nameMap;
 }
 
@@ -344,15 +353,6 @@ function findHeaderIndices(sheetHeaders, requiredHeaders) {
   return indices;
 }
 
-function clearRosterCache() {
-  const cache = CacheService.getScriptCache();
-  const cacheKey = ROSTER_CONFIG.CACHE_KEY;
-  cache.remove(cacheKey);
-  console.log(`名簿キャッシュ（キー: ${cacheKey}）を削除しました。`);
-  try {
-    SpreadsheetApp.getUi().alert('名簿のキャッシュをリセットしました。');
-  } catch (e) { /* no-op */ }
-}
 
 
 function createTemplateSheet(name) {
