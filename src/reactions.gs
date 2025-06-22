@@ -24,6 +24,7 @@ function parseReactionString(val) {
 }
 
 function addReaction(rowIndex, reactionKey) {
+  rowIndex = Number(rowIndex);
   if (typeof module !== 'undefined') {
     var { COLUMN_HEADERS, getHeaderIndices, TIME_CONSTANTS } = require('./Code.gs');
   }
@@ -84,6 +85,7 @@ function addReaction(rowIndex, reactionKey) {
 }
 
 function toggleHighlight(rowIndex) {
+  rowIndex = Number(rowIndex);
   if (typeof module !== 'undefined') {
     var { COLUMN_HEADERS, getHeaderIndices, TIME_CONSTANTS } = require('./Code.gs');
   }
