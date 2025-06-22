@@ -453,8 +453,9 @@
 
         // シート設定による詳細表示フラグを保持
         this.serverShowDetails = window.showCounts;
-        
+
         this.pollingInterval = null; // ポーリングタイマーID
+        this.handlers = {}; // イベントハンドラ参照用
 
         // リアクションの種類とアイコンのマッピング
         this.reactionTypes = [
@@ -586,25 +587,29 @@
       setupEventListeners() {
         // スライダーの変更をデバウンスしてレンダリング
         const debouncedRender = this.debounce(() => this.renderBoard(true), CONFIG.POLLING.DEBOUNCE_MS);
-        this.elements.sizeSlider.addEventListener('input', () => {
+        this.handlers.onSizeSliderInput = () => {
           localStorage.setItem('boardColumns', this.elements.sizeSlider.value);
           debouncedRender();
-        });
+        };
+        this.elements.sizeSlider.addEventListener('input', this.handlers.onSizeSliderInput);
 
         // メインコンテナでイベント委譲を使用（パフォーマンス最適化）
         this.setupEventDelegation();
         // モーダルの閉じるボタンと背景クリック
-        this.elements.answerModalCloseBtn.addEventListener('click', () => this.hideAnswerModal());
-        this.elements.answerModalContainer.addEventListener('click', (e) => {
+        this.handlers.onAnswerModalCloseClick = () => this.hideAnswerModal();
+        this.elements.answerModalCloseBtn.addEventListener('click', this.handlers.onAnswerModalCloseClick);
+        this.handlers.onAnswerModalContainerClick = (e) => {
           if (e.target === e.currentTarget) {
             this.hideAnswerModal();
           }
-        });
+        };
+        this.elements.answerModalContainer.addEventListener('click', this.handlers.onAnswerModalContainerClick);
         if (this.elements.infoModalConfirmBtn) {
-          this.elements.infoModalConfirmBtn.addEventListener('click', () => this.hideInfoModal());
+          this.handlers.onInfoModalConfirmClick = () => this.hideInfoModal();
+          this.elements.infoModalConfirmBtn.addEventListener('click', this.handlers.onInfoModalConfirmClick);
         }
         // モーダル内のリアクションボタン
-        this.elements.modalReactionContainer.addEventListener('click', (e) => {
+        this.handlers.onModalReactionClick = (e) => {
           const btn = e.target.closest('.reaction-btn');
           if (btn) {
             const id = btn.dataset.rowIndex;
@@ -613,36 +618,44 @@
               this.handleReaction(id, reaction);
             }
           }
-        });
+        };
+        this.elements.modalReactionContainer.addEventListener('click', this.handlers.onModalReactionClick);
         // クラスフィルターとソート順の変更
-        this.elements.classFilter.addEventListener('change', () => this.loadSheetData(true));
-        this.elements.sortOrder.addEventListener('change', () => this.loadSheetData(true));
+        this.handlers.onClassFilterChange = () => this.loadSheetData(true);
+        this.handlers.onSortOrderChange = () => this.loadSheetData(true);
+        this.elements.classFilter.addEventListener('change', this.handlers.onClassFilterChange);
+        this.elements.sortOrder.addEventListener('change', this.handlers.onSortOrderChange);
         // 管理者モード切り替えボタン
         if (this.elements.adminToggleBtn) {
-          this.elements.adminToggleBtn.addEventListener('click', () => this.toggleAdminMode());
+          this.handlers.onAdminToggleClick = () => this.toggleAdminMode();
+          this.elements.adminToggleBtn.addEventListener('click', this.handlers.onAdminToggleClick);
         }
         // Escapeキーでモーダルを閉じる
-        document.addEventListener('keydown', (e) => {
+        this.handlers.onDocumentKeydown = (e) => {
           if (e.key === 'Escape') {
             this.hideAnswerModal();
           }
-        });
+        };
+        document.addEventListener('keydown', this.handlers.onDocumentKeydown);
         // ウィンドウリサイズ時のレイアウト調整をデバウンス
-        window.addEventListener('resize', this.debounce(() => this.adjustLayout(), 100));
+        this.handlers.onWindowResize = this.debounce(() => this.adjustLayout(), 100);
+        window.addEventListener('resize', this.handlers.onWindowResize);
         
         // プレビューモード切り替えボタンのイベントリスナー
         if (this.elements.modeToggleBtn) {
-          this.elements.modeToggleBtn.addEventListener('click', () => this.togglePreviewMode());
+          this.handlers.onModeToggleClick = () => this.togglePreviewMode();
+          this.elements.modeToggleBtn.addEventListener('click', this.handlers.onModeToggleClick);
         }
         
         // ブラウザタブの表示状態変更時のポーリング制御
-        document.addEventListener('visibilitychange', () => {
+        this.handlers.onVisibilityChange = () => {
           if (document.hidden) {
             this.stopPolling();
           } else {
             this.startPolling();
           }
-        });
+        };
+        document.addEventListener('visibilitychange', this.handlers.onVisibilityChange);
       }
 
       /**
@@ -651,7 +664,7 @@
        */
       setupEventDelegation() {
         // メインの回答コンテナでイベント委譲
-        this.elements.answersContainer.addEventListener('click', (e) => {
+        this.handlers.onAnswersContainerClick = (e) => {
           const answerCard = e.target.closest('.answer-card');
           if (!answerCard) return;
 
@@ -679,10 +692,11 @@
 
           // カード本体のクリック処理（モーダル表示）
           this.showAnswerModal(rowIndex);
-        });
+        };
+        this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
 
         // キーボードナビゲーション対応
-        this.elements.answersContainer.addEventListener('keydown', (e) => {
+        this.handlers.onAnswersContainerKeydown = (e) => {
           const answerCard = e.target.closest('.answer-card');
           if (!answerCard) return;
 
@@ -711,10 +725,11 @@
             // それ以外の場合はモーダルを表示
             this.showAnswerModal(rowIndex);
           }
-        });
+        };
+        this.elements.answersContainer.addEventListener('keydown', this.handlers.onAnswersContainerKeydown);
 
         // 動的に追加される要素用のイベント委譲（document レベル）
-        document.addEventListener('click', (e) => {
+        this.handlers.onDocumentClick = (e) => {
           // 再試行ボタンの処理
           if (e.target.matches('#retryLoadBtn')) {
             e.preventDefault();
@@ -723,7 +738,8 @@
           }
 
           // その他の動的ボタンがあれば追加
-        });
+        };
+        document.addEventListener('click', this.handlers.onDocumentClick);
       }
 
       /**
@@ -910,6 +926,62 @@
         if (this.pollingInterval) {
           clearInterval(this.pollingInterval);
           this.pollingInterval = null;
+        }
+      }
+
+      /**
+       * クリーンアップ処理 - イベントリスナーとポーリングを解除
+       */
+      destroy() {
+        this.stopPolling();
+
+        // setupEventListeners で登録したイベントリスナーを解除
+        if (this.elements.sizeSlider && this.handlers.onSizeSliderInput) {
+          this.elements.sizeSlider.removeEventListener('input', this.handlers.onSizeSliderInput);
+        }
+        if (this.elements.answerModalCloseBtn && this.handlers.onAnswerModalCloseClick) {
+          this.elements.answerModalCloseBtn.removeEventListener('click', this.handlers.onAnswerModalCloseClick);
+        }
+        if (this.elements.answerModalContainer && this.handlers.onAnswerModalContainerClick) {
+          this.elements.answerModalContainer.removeEventListener('click', this.handlers.onAnswerModalContainerClick);
+        }
+        if (this.elements.infoModalConfirmBtn && this.handlers.onInfoModalConfirmClick) {
+          this.elements.infoModalConfirmBtn.removeEventListener('click', this.handlers.onInfoModalConfirmClick);
+        }
+        if (this.elements.modalReactionContainer && this.handlers.onModalReactionClick) {
+          this.elements.modalReactionContainer.removeEventListener('click', this.handlers.onModalReactionClick);
+        }
+        if (this.elements.classFilter && this.handlers.onClassFilterChange) {
+          this.elements.classFilter.removeEventListener('change', this.handlers.onClassFilterChange);
+        }
+        if (this.elements.sortOrder && this.handlers.onSortOrderChange) {
+          this.elements.sortOrder.removeEventListener('change', this.handlers.onSortOrderChange);
+        }
+        if (this.elements.adminToggleBtn && this.handlers.onAdminToggleClick) {
+          this.elements.adminToggleBtn.removeEventListener('click', this.handlers.onAdminToggleClick);
+        }
+        if (this.handlers.onDocumentKeydown) {
+          document.removeEventListener('keydown', this.handlers.onDocumentKeydown);
+        }
+        if (this.handlers.onWindowResize) {
+          window.removeEventListener('resize', this.handlers.onWindowResize);
+        }
+        if (this.elements.modeToggleBtn && this.handlers.onModeToggleClick) {
+          this.elements.modeToggleBtn.removeEventListener('click', this.handlers.onModeToggleClick);
+        }
+        if (this.handlers.onVisibilityChange) {
+          document.removeEventListener('visibilitychange', this.handlers.onVisibilityChange);
+        }
+
+        // setupEventDelegation で登録したイベントリスナーを解除
+        if (this.elements.answersContainer && this.handlers.onAnswersContainerClick) {
+          this.elements.answersContainer.removeEventListener('click', this.handlers.onAnswersContainerClick);
+        }
+        if (this.elements.answersContainer && this.handlers.onAnswersContainerKeydown) {
+          this.elements.answersContainer.removeEventListener('keydown', this.handlers.onAnswersContainerKeydown);
+        }
+        if (this.handlers.onDocumentClick) {
+          document.removeEventListener('click', this.handlers.onDocumentClick);
         }
       }
 
@@ -1921,8 +1993,16 @@
     });
     
     try {
-      const app = new StudyQuestApp();
+      if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
+        window.studyQuestApp.destroy();
+      }
+      window.studyQuestApp = new StudyQuestApp();
       if (DEBUG) console.log('StudyQuestApp instance created successfully');
+      window.addEventListener('beforeunload', () => {
+        if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
+          window.studyQuestApp.destroy();
+        }
+      });
     } catch (error) {
       console.error('Error creating StudyQuestApp instance:', error);
       
