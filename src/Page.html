@@ -1347,7 +1347,7 @@
         try {
           const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
           // GAS関数を呼び出し、ハイライト状態を切り替える
-          const res = await this.gas.toggleHighlight(rowIndex, item.highlight); // 現在のハイライト状態をGASに渡す
+          const res = await this.gas.toggleHighlight(rowIndex);
           if (res && res.status === 'ok') {
             if (item) {
               item.highlight = res.highlight; // 最新のハイライト状態で更新
