@@ -62,10 +62,13 @@
     // プレビューモード検出とモード設定
     const ModeManager = {
       isPreviewMode() {
-        return window.location.protocol === 'file:' || 
-               window.location.hostname === 'localhost' || 
-               window.location.pathname.includes('preview') ||
-               window.location.href.includes('preview');
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+          return false; // GAS 環境では常に本番モード
+        }
+        const url = new URL(window.location.href);
+        return window.location.protocol === 'file:' ||
+               window.location.hostname === 'localhost' ||
+               url.searchParams.has('preview');
       },
       
       applyMode(modeConfig) {
