@@ -5,15 +5,19 @@ This repository contains the source code of a Google Apps Script project. It pub
 ## Setup
 
 1. Install **Node.js 20** or later.
-2. Install dependencies:
+2. Install dependencies (including dev dependencies):
    ```bash
    npm install
    ```
-3. Sign in to Google with clasp:
+3. Confirm that `jest` is available:
+   ```bash
+   npx jest --version
+   ```
+4. Sign in to Google with clasp:
    ```bash
    npx clasp login
    ```
-4. Edit `.clasp.json` and set your Apps Script project ID.
+5. Edit `.clasp.json` and set your Apps Script project ID.
 
 ## Usage
 
