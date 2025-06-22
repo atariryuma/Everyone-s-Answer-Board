@@ -38,6 +38,14 @@ const TIME_CONSTANTS = {
   LOCK_WAIT_MS: 10000
 };
 
+if (typeof global !== 'undefined') {
+  global.COLUMN_HEADERS = COLUMN_HEADERS;
+  global.ROSTER_CONFIG = ROSTER_CONFIG;
+  global.SCORING_CONFIG = SCORING_CONFIG;
+  global.APP_PROPERTIES = APP_PROPERTIES;
+  global.TIME_CONSTANTS = TIME_CONSTANTS;
+}
+
 var safeGetUserEmail, getAdminEmails, isUserAdmin, checkAdmin;
 var getAdminSettings, publishApp, unpublishApp, setShowDetails;
 var getSheets, getAppSettings;
