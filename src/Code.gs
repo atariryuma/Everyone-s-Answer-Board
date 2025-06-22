@@ -116,6 +116,7 @@ function getAdminSettings() {
     allSheets: allSheets,
     currentUserEmail: currentUserEmail,
     deployId: props.getProperty('DEPLOY_ID'),
+    webAppUrl: getWebAppUrl(),
     adminEmails: adminEmails,
     isUserAdmin: adminEmails.includes(currentUserEmail),
     isPublished: appSettings.isPublished,
@@ -575,6 +576,11 @@ function saveWebAppUrl(url) {
   props.setProperties({ WEB_APP_URL: (url || '').trim() });
 }
 
+function getWebAppUrl() {
+  const props = PropertiesService.getScriptProperties();
+  return (props.getProperty('WEB_APP_URL') || '').trim();
+}
+
 function saveDeployId(id) {
   const props = PropertiesService.getScriptProperties();
   props.setProperties({ DEPLOY_ID: (id || '').trim() });
@@ -631,6 +637,7 @@ if (typeof module !== 'undefined') {
     toggleHighlight,
     setShowDetails,
     saveWebAppUrl,
+    getWebAppUrl,
     saveDeployId,
     findHeaderIndices,
     parseReactionString,
