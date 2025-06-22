@@ -518,7 +518,12 @@ function getHeaderIndices(sheetName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
   const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const indices = findHeaderIndices(headerRow, Object.values(COLUMN_HEADERS));
+  const indices = findHeaderIndices(headerRow, [
+    COLUMN_HEADERS.UNDERSTAND,
+    COLUMN_HEADERS.LIKE,
+    COLUMN_HEADERS.CURIOUS,
+    COLUMN_HEADERS.HIGHLIGHT
+  ]);
   cache.put(cacheKey, JSON.stringify(indices), 21600);
   return indices;
 }
