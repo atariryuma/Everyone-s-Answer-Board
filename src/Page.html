@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <title>StudyQuest - みんなのかいとうボード</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- GSAPアニメーションライブラリをdefer属性付きで読み込み、HTMLパースをブロックしないようにする -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js" defer></script>
@@ -56,19 +55,13 @@
       }
     };
 
-    // デバッグ用フラグ
-    const DEBUG = false;
-
     // プレビューモード検出とモード設定
     const ModeManager = {
       isPreviewMode() {
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-          return false; // GAS 環境では常に本番モード
-        }
-        const url = new URL(window.location.href);
-        return window.location.protocol === 'file:' ||
-               window.location.hostname === 'localhost' ||
-               url.searchParams.has('preview');
+        return window.location.protocol === 'file:' || 
+               window.location.hostname === 'localhost' || 
+               window.location.pathname.includes('preview') ||
+               window.location.href.includes('preview');
       },
       
       applyMode(modeConfig) {
@@ -90,19 +83,6 @@
     
     // モード初期化
     ModeManager.initializeMode();
-  </script>
-  <script>
-    try {
-      window.showCounts = JSON.parse('<?= showCounts ?>');
-      window.displayMode = JSON.parse('<?= JSON.stringify(displayMode) ?>');
-      window.sheetName = JSON.parse('<?= JSON.stringify(sheetName) ?>');
-      window.mapping = JSON.parse('<?= JSON.stringify(mapping) ?>');
-    } catch (e) {
-      window.showCounts = false;
-      window.displayMode = 'anonymous';
-      window.sheetName = '';
-      window.mapping = {};
-    }
   </script>
   <style>
     /* カスタムプロパティ（CSS変数）定義 */
@@ -143,10 +123,9 @@
     }
 
     /* 基本スタイル */
-    body {
+    body { 
       color: var(--color-text);
       background-color: var(--color-background);
-      margin: 0; /* remove default margin for minimal top spacing */
     }
     
     /* ガラスパネル効果 */
@@ -163,14 +142,11 @@
     }
     
     /* ゲームボタンのスタイル */
-    .game-btn {
+    .game-btn { 
       transition: all var(--duration-fast) var(--ease-out);
       border-radius: var(--border-radius);
-      border-bottom-width: 4px;
-      text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
-    }
-    .game-font {
-      font-family: 'Press Start 2P', cursive;
+      border-bottom-width: 4px; 
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.4); 
     }
     .game-btn:not(:disabled):hover { 
       transform: translateY(-2px) scale(1.02); 
@@ -212,16 +188,12 @@
       box-shadow: 0 0 15px rgba(250,204,21,0.4); 
       transform: scale(1.02); 
     }
-    .answer-card:hover {
-      transform: translateY(-4px) scale(1.02);
-      box-shadow: 0 8px 25px rgba(139,233,253,0.3);
+    .answer-card:hover { 
+      transform: translateY(-4px) scale(1.02); 
+      box-shadow: 0 8px 25px rgba(139,233,253,0.3); 
     }
-    .answer-card:focus-visible {
-      transform: translateY(-4px) scale(1.02);
-      box-shadow: 0 8px 25px rgba(139,233,253,0.3);
-    }
-    .answer-card.highlighted:hover {
-      transform: translateY(-4px) scale(1.04);
+    .answer-card.highlighted:hover { 
+      transform: translateY(-4px) scale(1.04); 
     }
     /* ハイライトバッジのスタイル */
     .highlight-badge {
@@ -239,19 +211,14 @@
     /* リアクションボタンの背景グラデーションとボーダーカラー */
     .reaction-bg-like { border-color:#ef4444; border-image: linear-gradient(to bottom,#facc15,#fcd34d) 1; }
     .reaction-bg-understand { border-color:#fbbf24; border-image: linear-gradient(to bottom,#a3e635,#bef264) 1; }
-    .reaction-bg-curious { border-color:#10b981; border-image: linear-gradient(to bottom,#34d399,#6ee7b7) 1; }
-    .reaction-bg-mixed { border-color:#8b5cf6; border-image: linear-gradient(to bottom,#f59e0b,#10b981,#10b981) 1; }
-    .reaction-bg-all { border-color:transparent; border-image: linear-gradient(90deg,#ef4444,#fbbf24,#10b981) 1; }
-    /* リアクション総数に応じたボーダー太さ */
-    .reaction-border-1 { border-width: 2px; }
-    .reaction-border-2 { border-width: 4px; }
-    .reaction-border-3 { border-width: 6px; }
+    .reaction-bg-curious { border-color:#3b82f6; border-image: linear-gradient(to bottom,#38bdf8,#7dd3fc) 1; }
+    .reaction-bg-mixed { border-color:#8b5cf6; border-image: linear-gradient(to bottom,#f59e0b,#10b981,#3b82f6) 1; }
+    .reaction-bg-all { border-color:transparent; border-image: linear-gradient(90deg,#ef4444,#fbbf24,#3b82f6) 1; }
     /* 回答プレビューの表示制限と省略 */
     .answer-preview { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; min-height: 120px; }
     /* いいねボタンのSVGトランジション */
     .like-btn svg { transition: all 0.2s ease-in-out; fill: none; }
     .like-btn.liked svg { stroke: transparent; fill: currentColor; transform: scale(1.1); }
-    .reaction-btn:disabled { opacity: 0.5; pointer-events: none; }
     /* ハイライトボタンのスタイル */
     .highlight-btn {
       transition: all 0.2s ease;
@@ -279,7 +246,8 @@
   </style>
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans">
-  <div id="main-container" class="w-full mx-auto px-4 pt-4 pb-4 md:px-6 md:pt-6 md:pb-6">
+
+  <div id="main-container" class="w-full mx-auto p-4 md:p-6">
     <header id="main-header" class="glass-panel rounded-xl p-4 mb-4 flex flex-col lg:flex-row justify-between items-center gap-4 shadow-lg">
       <div class="flex items-center gap-4 w-full lg:w-auto">
         <p id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0"></p>
@@ -293,7 +261,6 @@
         </select>
       </div>
       <div class="flex-grow text-center w-full min-w-0">
-        <h1 id="siteTitle" class="game-font text-yellow-300 text-lg md:text-xl mb-1">みんなの回答ボード</h1>
         <p id="headingLabel" class="text-2xl md:text-3xl font-bold text-pink-400 leading-tight flex justify-center">
           <svg class="w-6 h-6 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -303,7 +270,6 @@
       </div>
       <div class="w-full lg:w-auto lg:min-w-[150px] text-right space-y-1">
         <p id="sheetNameText" class="text-xs text-gray-400 h-4"></p>
-        <p id="modeLabel" class="text-xs text-gray-400"></p>
         <button type="button" id="adminToggleBtn" class="text-xs text-cyan-400 underline hidden" hidden aria-label="管理者モード切り替え"></button>
       </div>
     </header>
@@ -315,27 +281,9 @@
     <div id="answerModalCard" class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full max-w-5xl h-auto max-h-[85vh] transform scale-95 transition-transform duration-300" role="document" aria-labelledby="modalAnswer">
       <button id="answerModalCloseBtn" class="absolute -top-3 -right-3 bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform" aria-label="閉じる"></button>
       <div id="modalAnswer" class="flex-grow min-h-[200px] mb-4 overflow-y-auto pr-4"></div>
-      <div id="modalFooter" class="text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex justify-between items-center">
+      <div class="text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex justify-between items-center">
         <div><span id="modalStudentName" class="font-bold text-2xl text-gray-200"></span></div>
         <div id="modalReactions" class="flex items-center gap-2"></div>
-      </div>
-    </div>
-  </div>
-
-  <div id="infoModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300" role="dialog" aria-modal="true">
-    <div id="infoModalCard" class="glass-panel rounded-xl p-6 shadow-2xl border-2 border-cyan-400/80 w-full max-w-lg transform scale-95 transition-transform duration-300 relative" role="document">
-      <div class="space-y-4 text-gray-200 text-lg leading-relaxed">
-        <p>みんなの意見を気持ちよく共有するために、リアクションのしかたをおぼえよう！</p>
-        <ul class="space-y-2">
-          <li class="flex items-center gap-2"><span id="infoIconLike" class="w-5 h-5 text-red-400"></span>いいね：すてきだと思ったときに押そう</li>
-          <li class="flex items-center gap-2"><span id="infoIconUnderstand" class="w-5 h-5 text-yellow-400"></span>なるほど：参考になったときに押そう</li>
-          <li class="flex items-center gap-2"><span id="infoIconCurious" class="w-5 h-5 text-green-400"></span>きになる：もっと知りたいときに押そう</li>
-        </ul>
-        <p class="flex items-center gap-2"><span id="infoIconHighlight" class="w-5 h-5 text-yellow-300"></span>先生が注目してほしい意見につけています</p>
-        <p>責任あるリアクションで、みんなで学びを深めよう！</p>
-        <div class="text-center mt-6">
-          <button id="infoModalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">わかった</button>
-        </div>
       </div>
     </div>
   </div>
@@ -380,7 +328,6 @@
 
     class StudyQuestApp {
       constructor() {
-        try {
         // パフォーマンス最適化のためのキャッシュ
         this.cache = new Map();
         this.memoCache = new Map();
@@ -395,7 +342,6 @@
           sliderValue: document.getElementById('sliderValue'),
           headingLabel: document.getElementById('headingLabel'),
           sheetNameText: document.getElementById('sheetNameText'),
-          modeLabel: document.getElementById('modeLabel'),
           adminToggleBtn: document.getElementById('adminToggleBtn'),
           answerCount: document.getElementById('answerCount'),
           answerModalContainer: document.getElementById('answerModalContainer'),
@@ -404,14 +350,6 @@
           modalAnswer: document.getElementById('modalAnswer'),
           modalStudentName: document.getElementById('modalStudentName'),
           modalReactionContainer: document.getElementById('modalReactions'),
-          modalFooter: document.getElementById('modalFooter'),
-          infoModalContainer: document.getElementById('infoModalContainer'),
-          infoModalCard: document.getElementById('infoModalCard'),
-          infoModalConfirmBtn: document.getElementById('infoModalConfirmBtn'),
-          infoIconLike: document.getElementById('infoIconLike'),
-          infoIconUnderstand: document.getElementById('infoIconUnderstand'),
-          infoIconCurious: document.getElementById('infoIconCurious'),
-          infoIconHighlight: document.getElementById('infoIconHighlight'),
           classFilter: document.getElementById('classFilter'),
           sortOrder: document.getElementById('sortOrder'),
           scoreOption: document.getElementById('scoreOption'), // スコア順オプション
@@ -419,18 +357,14 @@
           modeToggleBtn: document.getElementById('modeToggleBtn'), // プレビューモード切り替えボタン
           footerIcon: document.getElementById('footerIcon'),
         };
-
-        if (this.elements.modeLabel) {
-          this.elements.modeLabel.textContent = window.showAdminFeatures ? '管理モード' : '閲覧モード';
-        }
-
+        
         // アプリケーションの状態管理
         this.state = {
           currentAnswers: [], // 現在表示されている回答データ
           isLoading: false, // データロード中フラグ
           lastFocusedElement: null, // モーダル表示前のフォーカス要素
           // 初期化時にwindowグローバル変数を参照
-          isStudentMode: window.isStudentMode,
+          isStudentMode: window.isStudentMode, 
           showCounts: window.showCounts,
           showAdminFeatures: window.showAdminFeatures,
           showHighlightToggle: window.showHighlightToggle,
@@ -438,9 +372,6 @@
           showPublishControls: window.showPublishControls,
           displayMode: window.displayMode,
         };
-
-        // シート設定による詳細表示フラグを保持
-        this.serverShowDetails = window.showCounts;
         
         this.pollingInterval = null; // ポーリングタイマーID
 
@@ -481,10 +412,9 @@
       }
 
       // パフォーマンス最適化ユーティリティ
-      memoize(fn, keyGenerator) {
-        const kg = keyGenerator || ((...args) => JSON.stringify(args));
+      memoize(fn, keyGenerator = (...args) => JSON.stringify(args)) {
         return (...args) => {
-          const key = kg(...args);
+          const key = keyGenerator(...args);
           if (this.memoCache.has(key)) {
             return this.memoCache.get(key);
           }
@@ -545,9 +475,9 @@
        * アプリケーションの初期化処理
        */
       init() {
-        if (DEBUG) console.log('StudyQuestApp init() called');
-        if (DEBUG) console.log('Current state:', this.state);
-        if (DEBUG) console.log('Elements check:', {
+        console.log('StudyQuestApp init() called');
+        console.log('Current state:', this.state);
+        console.log('Elements check:', {
           answersContainer: !!this.elements.answersContainer,
           headingLabel: !!this.elements.headingLabel,
           answerCount: !!this.elements.answerCount
@@ -559,9 +489,6 @@
         this.loadInitialData(); // 初期データのロード
         this.setupInitialModeButton(); // モード切り替えボタンの初期設定
         this.updateSortOptions(); // ソートオプションの更新（スコア順の表示/非表示）
-        if (!localStorage.getItem('introSeen')) {
-          this.showInfoModal();
-        }
       }
 
       /**
@@ -584,9 +511,6 @@
             this.hideAnswerModal();
           }
         });
-        if (this.elements.infoModalConfirmBtn) {
-          this.elements.infoModalConfirmBtn.addEventListener('click', () => this.hideInfoModal());
-        }
         // モーダル内のリアクションボタン
         this.elements.modalReactionContainer.addEventListener('click', (e) => {
           const btn = e.target.closest('.reaction-btn');
@@ -714,25 +638,10 @@
        * ヘッダーとフッターの高さに基づいてメインコンテンツのパディングを調整
        */
       adjustLayout() {
-        if (this.baseMainPadding === undefined) {
-          this.baseMainPadding = parseFloat(
-            getComputedStyle(this.elements.mainContainer).paddingTop
-          ) || 0;
-        }
-        if (this.baseBodyPadding === undefined) {
-          this.baseBodyPadding = parseFloat(
-            getComputedStyle(this.elements.body).paddingBottom
-          ) || 0;
-        }
-
+        const headerHeight = this.elements.header.offsetHeight;
         const footerHeight = this.elements.footer.offsetHeight;
-
-        // Keep original padding only, removing extra space above the header
-        this.elements.mainContainer.style.paddingTop =
-          this.baseMainPadding + 'px';
-        // Reserve only footer height so content ends right above the slider
-        this.elements.body.style.paddingBottom =
-          footerHeight + this.baseBodyPadding + 'px';
+        this.elements.mainContainer.style.paddingTop = headerHeight + 'px';
+        this.elements.body.style.paddingBottom = (footerHeight + 40) + 'px'; // フッターの下に少し余白を追加
       }
 
       /**
@@ -769,9 +678,6 @@
             this.elements.adminToggleBtn.removeAttribute('hidden');
             // 現在の管理者機能表示状態に基づいてボタンテキストを設定
             this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
-            if (this.elements.modeLabel) {
-              this.elements.modeLabel.textContent = this.state.showAdminFeatures ? '管理モード' : '閲覧モード';
-            }
           }
         } catch (e) {
           console.error('Admin check failed', e);
@@ -785,7 +691,7 @@
        * @returns {Promise<any>} モックデータを解決するPromise
        */
       getMockData(funcName, ...args) {
-        if (DEBUG) console.log('getMockData called with:', funcName, args);
+        console.log('getMockData called with:', funcName, args);
         return new Promise((resolve) => {
           setTimeout(() => {
             if (funcName === 'getPublishedSheetData') {
@@ -901,7 +807,7 @@
        * 初期データをロードし、ポーリングを開始
        */
       async loadInitialData() {
-        if (DEBUG) console.log('DEBUG: loadInitialData started');
+        console.log('DEBUG: loadInitialData started');
         
         // 強制的にシンプルなテストカードを表示
         this.elements.answersContainer.innerHTML = '<div class="glass-panel rounded-xl p-4 text-white">テストカード表示中...</div>';
@@ -916,7 +822,7 @@
        * @param {boolean} isInitialLoad - 初回ロードかどうか
        */
       async loadSheetData(showLoading = true, isInitialLoad = false) {
-        if (DEBUG) console.log('loadSheetData called', { showLoading, isInitialLoad });
+        console.log('loadSheetData called', { showLoading, isInitialLoad });
         if (this.state.isLoading && showLoading) return; // すでにロード中の場合は何もしない
         this.state.isLoading = true;
         
@@ -939,17 +845,9 @@
         
         try {
           const sortOrder = this.elements.sortOrder.value;
-          if (DEBUG) console.log('Calling getPublishedSheetData with:', { selectedClass, sortOrder });
+          console.log('Calling getPublishedSheetData with:', { selectedClass, sortOrder });
           const data = await this.gas.getPublishedSheetData(selectedClass, sortOrder); // GASからデータを取得
-          if (DEBUG) console.log('Received data:', data);
-          if (typeof data.showDetails !== 'undefined') {
-            this.serverShowDetails = data.showDetails;
-            if (!this.state.showAdminFeatures) {
-              window.showCounts = data.showDetails;
-              window.displayMode = data.showDetails ? 'named' : 'anonymous';
-              this.updateConfigFromGlobals();
-            }
-          }
+          console.log('Received data:', data);
           this.adjustLayout(); // レイアウト調整
 
           // 管理者権限がない場合は管理機能を無効化
@@ -964,18 +862,18 @@
           }
 
           // データが変更された場合のみボードをレンダリング
-          if (DEBUG) console.log('Comparing data:', {
+          console.log('Comparing data:', {
             currentAnswers: this.state.currentAnswers.length,
             newRows: data.rows.length,
             dataChanged: JSON.stringify(this.state.currentAnswers) !== JSON.stringify(data.rows)
           });
           if (JSON.stringify(this.state.currentAnswers) !== JSON.stringify(data.rows)) {
-            if (DEBUG) console.log('Data changed, rendering board with', data.rows.length, 'rows');
+            console.log('Data changed, rendering board with', data.rows.length, 'rows');
             this.state.currentAnswers = data.rows;
             this.elements.headingLabel.textContent = this.escapeHtml(data.header || '問題');
             this.renderBoard(false, oldAnswers); // ボードをレンダリング
           } else {
-            if (DEBUG) console.log('Data unchanged, skipping render');
+            console.log('Data unchanged, skipping render');
           }
         } catch (error) {
           console.error('Error loading sheet data:', error);
@@ -1015,7 +913,7 @@
        * @param {Array<Object>} oldRows - 前回の回答データの配列
        */
       renderBoard(isLayoutChange = false, oldRows = []) {
-        if (DEBUG) console.log('renderBoard called with:', { isLayoutChange, newRowsCount: this.state.currentAnswers.length });
+        console.log('renderBoard called with:', { isLayoutChange, newRowsCount: this.state.currentAnswers.length });
         const container = this.elements.answersContainer;
         const newRows = this.state.currentAnswers;
         
@@ -1033,79 +931,25 @@
         const userIcon = this.getIcon('users', 'w-4 h-4 inline-block -mt-1');
         this.elements.answerCount.innerHTML = userIcon + '<span>' + newRows.length + '件</span>';
         
+        const fragment = document.createDocumentFragment();
         if (newRows.length === 0) {
-          if (!container.querySelector('.no-answers')) {
-            container.innerHTML = '';
-            const p = document.createElement('p');
-            p.className = 'text-center text-gray-500 col-span-full mt-8 no-answers';
-            p.textContent = 'このクラスの回答はありません。';
-            container.appendChild(p);
-          }
+          const p = document.createElement('p');
+          p.className = 'text-center text-gray-500 col-span-full mt-8';
+          p.textContent = 'このクラスの回答はありません。';
+          fragment.appendChild(p);
         } else {
-          const existingMap = new Map();
-          container.querySelectorAll('.answer-card').forEach(card => {
-            existingMap.set(card.dataset.rowIndex, card);
+          console.log('Creating cards for', newRows.length, 'rows');
+          newRows.forEach((r, index) => {
+            console.log(`Creating card ${index + 1}:`, r);
+            const card = this.createAnswerCard(r);
+            fragment.appendChild(card);
           });
-
-          // 不要になったカードを削除
-          existingMap.forEach((card, id) => {
-            if (!newRows.some(r => String(r.rowIndex) === id)) {
-              card.remove();
-              existingMap.delete(id);
-            }
-          });
-
-          const changedItems = [];
-          let prevNode = null;
-
-          newRows.forEach((row) => {
-            const rowId = String(row.rowIndex);
-            let card = existingMap.get(rowId);
-            const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
-
-            if (!card) {
-              card = this.createAnswerCard(row);
-              if (prevNode) {
-                container.insertBefore(card, prevNode.nextSibling);
-              } else {
-                container.insertBefore(card, container.firstChild);
-              }
-              changedItems.push(row);
-            } else {
-              if (prevNode && card.previousSibling !== prevNode) {
-                container.insertBefore(card, prevNode.nextSibling);
-              } else if (!prevNode && card !== container.firstChild) {
-                container.insertBefore(card, container.firstChild);
-              }
-
-              if (oldData) {
-                if (oldData.opinion !== row.opinion) {
-                  const t = card.querySelector('.opinion-text');
-                  if (t) t.textContent = row.opinion;
-                }
-                if (oldData.reason !== row.reason) {
-                  const p = card.querySelector('.answer-preview p');
-                  if (p) p.textContent = row.reason;
-                }
-                if (oldData.name !== row.name) {
-                  const n = card.querySelector('.font-bold');
-                  if (n) n.textContent = row.name;
-                }
-                if (JSON.stringify(oldData.reactions) !== JSON.stringify(row.reactions) ||
-                    oldData.highlight !== row.highlight) {
-                  changedItems.push(row);
-                }
-              }
-            }
-            prevNode = card;
-          });
-
-          if (changedItems.length) {
-            this.applyUpdates(changedItems);
-          }
-
-          if (DEBUG) console.log('DOM updated. Cards in container:', container.querySelectorAll('.answer-card').length);
         }
+        
+        container.innerHTML = ''; // コンテンツをクリア
+        container.appendChild(fragment); // 新しいコンテンツを追加
+        
+        console.log('DOM updated. Cards in container:', container.querySelectorAll('.answer-card').length);
 
         // カードのアニメーション（FLIPテクニック）
         container.querySelectorAll('.answer-card').forEach((card) => {
@@ -1157,22 +1001,19 @@
        * @returns {HTMLElement} 生成されたカード要素
        */
       createAnswerCard(data) {
-        if (DEBUG) console.log('createAnswerCard called with data:', data);
+        console.log('createAnswerCard called with data:', data);
         const card = document.createElement('div');
         const highlightClass = data.highlight ? ' highlighted' : '';
         card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer opacity-0' + highlightClass;
         card.dataset.rowIndex = data.rowIndex;
-
+        
         // アクセシビリティ属性を追加
         card.setAttribute('role', 'article');
         card.setAttribute('tabindex', '0');
         card.setAttribute('aria-label', '回答カード: ' + (data.opinion || '').substring(0, 50) + (data.opinion && data.opinion.length > 50 ? '...' : ''));
-        const instructionId = 'detail-instruction-' + data.rowIndex;
-        let describedBy = instructionId;
         if (data.highlight) {
-          describedBy += ' highlight-status-' + data.rowIndex;
+          card.setAttribute('aria-describedby', 'highlight-status-' + data.rowIndex);
         }
-        card.setAttribute('aria-describedby', describedBy);
 
         // アクティブなリアクションタイプに基づいて背景クラスを設定
         const active = this.reactionTypes
@@ -1188,17 +1029,6 @@
           card.classList.add('reaction-bg-all');
         }
 
-        // リアクション総数に応じてボーダークラスを追加
-        const totalReactions = this.reactionTypes.reduce((sum, rt) =>
-          sum + (data.reactions?.[rt.key]?.count || 0), 0);
-        if (totalReactions >= 10) {
-          card.classList.add('reaction-border-3');
-        } else if (totalReactions >= 5) {
-          card.classList.add('reaction-border-2');
-        } else if (totalReactions > 0) {
-          card.classList.add('reaction-border-1');
-        }
-
         let highlightBtnHtml = '';
         // ハイライトトグル機能が有効な場合のみボタンを生成
         if (this.state.showHighlightToggle) {
@@ -1209,16 +1039,14 @@
                              '</button>';
         }
         
-        // 名前表示設定に基づき学生名を表示
-        const showName = this.state.displayMode === 'named';
-        const nameHtml = showName ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' : '';
-        const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
+        // 管理者ユーザーの場合のみ学生名を表示
+        const nameHtml = this.state.isAdminUser ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' : '';
 
         // リアクションボタンのHTMLを生成（アクセシビリティ強化）
         const reactionButtonsHtml = this.reactionTypes.map(rt => {
           const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
           const cls = info.reacted ? 'liked' : '';
-          const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+          const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-blue-500';
           
           // showCountsがtrueの場合のみカウントを表示
           const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-lg text-gray-200" aria-hidden="true">' + (info.count || 0) + '</span>' : '';
@@ -1233,16 +1061,14 @@
           const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
           
           return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + ariaLabel + '" aria-pressed="' + info.reacted + '">' +
-                   this.getIcon(rt.icon, 'w-5 h-5', info.reacted) +
                    countSpan +
+                   this.getIcon(rt.icon, 'w-5 h-5', info.reacted) +
                    '</button>';
         }).join('');
 
         // ハイライト状態を隠れた要素で通知（スクリーンリーダー用）
-        const highlightStatusHtml = data.highlight ?
+        const highlightStatusHtml = data.highlight ? 
           '<div id="highlight-status-' + data.rowIndex + '" class="sr-only">この回答はハイライトされています</div>' : '';
-        // 詳細表示のヒントを隠れた要素で提供
-        const instructionHtml = '<div id="' + instructionId + '" class="sr-only">Enter または Space で詳細表示</div>';
         
         card.innerHTML =
           '<div class="relative flex-grow mb-3 answer-preview">' +
@@ -1251,15 +1077,14 @@
           '<p class="text-gray-100 whitespace-pre-wrap break-words mt-4">' +
           this.escapeHtml(data.reason || '') + '</p>' +
           '</div>' +
-          '<div class="' + containerClass + '">' +
+          '<div class="text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center">' +
           nameHtml + // 学生名（管理者モードのみ）
           '<div class="flex items-center gap-1" role="group" aria-label="回答への反応">' +
           reactionButtonsHtml + // リアクションボタン群
           highlightBtnHtml + // ハイライトボタン（管理者モードのみ）
           '</div>' +
           '</div>' +
-          highlightStatusHtml + // ハイライト状態通知
-          instructionHtml; // 詳細表示ヒント
+          highlightStatusHtml; // ハイライト状態通知
 
         // ハイライトバッジを動的に追加
         if (data.highlight) {
@@ -1278,7 +1103,7 @@
         // - ハイライトボタンのクリック処理  
         // - カード本体のクリック処理（モーダル表示）
 
-        if (DEBUG) console.log('Card created successfully:', card);
+        console.log('Card created successfully:', card);
         return card;
       }
 
@@ -1305,10 +1130,8 @@
        * @param {string} reaction - リアクションタイプ ('LIKE', 'UNDERSTAND', 'CURIOUS')
        */
       async handleReaction(rowIndex, reaction) {
-        rowIndex = Number(rowIndex); // datasetから取得した値を数値に変換
         // リアクションボタンのアニメーション
-        const btns = document.querySelectorAll('[data-row-index="' + rowIndex + '"][data-reaction]');
-        btns.forEach(b => b.disabled = true);
+        const btns = document.querySelectorAll('[data-row-index="' + rowIndex + '"][data-reaction="' + reaction + '"]');
         if (typeof gsap !== 'undefined') {
           btns.forEach(btn => {
             gsap.fromTo(btn,
@@ -1333,8 +1156,6 @@
           }
         } catch (error) {
           console.error('Failed to add reaction:', error);
-        } finally {
-          btns.forEach(b => b.disabled = false);
         }
       }
 
@@ -1343,7 +1164,6 @@
        * @param {number} rowIndex - 回答の行インデックス
        */
       async handleHighlight(rowIndex) {
-        rowIndex = Number(rowIndex); // 文字列の場合に備えて数値に変換
         try {
           const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
           // GAS関数を呼び出し、ハイライト状態を切り替える
@@ -1367,12 +1187,12 @@
        * 管理者モードと閲覧モードを切り替える
        */
       async toggleAdminMode() {
-        if (DEBUG) console.log('toggleAdminMode: start, current state:', {
+        console.log('toggleAdminMode: start, current state:', {
           showAdminFeatures: this.state.showAdminFeatures,
           showHighlightToggle: this.state.showHighlightToggle
         });
         const enable = !this.state.showAdminFeatures; // 現在の状態を反転
-        if (DEBUG) console.log('toggleAdminMode: enable =', enable);
+        console.log('toggleAdminMode: enable =', enable);
         if (enable) {
           try {
             const ok = await this.gas.checkAdmin(); // 管理者権限を再度チェック
@@ -1390,22 +1210,14 @@
         // グローバル変数と状態を更新
         window.showAdminFeatures = enable;
         window.showHighlightToggle = enable;
-        window.showScoreSort = enable;
-        if (enable) {
-          // 管理者モードでは常に詳細表示
-          window.showCounts = true;
-          window.displayMode = 'named';
-          window.isStudentMode = false;
-        } else {
-          // 閲覧モードではシート設定を適用
-          window.showCounts = this.serverShowDetails;
-          window.displayMode = this.serverShowDetails ? 'named' : 'anonymous';
-          window.isStudentMode = true;
-        }
+        window.showCounts = enable; // 管理者モードではカウントを表示
+        window.showScoreSort = enable; // 管理者モードではスコアソートを表示
+        window.displayMode = enable ? 'named' : 'anonymous'; // 名前表示/匿名表示
+        window.isStudentMode = !enable; // 学生モード/非学生モード
 
         this.updateConfigFromGlobals(); // グローバル変数から状態を同期
         
-        if (DEBUG) console.log('toggleAdminMode: state after update:', {
+        console.log('toggleAdminMode: state after update:', {
           showHighlightToggle: this.state.showHighlightToggle,
           showAdminFeatures: this.state.showAdminFeatures,
           showCounts: this.state.showCounts,
@@ -1415,9 +1227,6 @@
         
         if (this.elements.adminToggleBtn) {
           this.elements.adminToggleBtn.textContent = enable ? '閲覧モード' : '管理モード';
-        }
-        if (this.elements.modeLabel) {
-          this.elements.modeLabel.textContent = this.state.showAdminFeatures ? '管理モード' : '閲覧モード';
         }
         this.updateSortOptions(); // ソートオプションの表示を更新
         
@@ -1503,19 +1312,6 @@
               card.classList.add('reaction-bg-all');
             }
 
-            // 総リアクション数によるボーダークラスの更新
-            const total = this.reactionTypes.reduce((sum, rt) =>
-              sum + (item.reactions?.[rt.key]?.count || 0), 0);
-            ['reaction-border-1','reaction-border-2','reaction-border-3']
-              .forEach(cls => card.classList.remove(cls));
-            if (total >= 10) {
-              card.classList.add('reaction-border-3');
-            } else if (total >= 5) {
-              card.classList.add('reaction-border-2');
-            } else if (total > 0) {
-              card.classList.add('reaction-border-1');
-            }
-
             // ハイライトバッジの表示/非表示を制御
             let badge = card.querySelector('.highlight-badge');
             if (item.highlight && !badge) {
@@ -1563,23 +1359,20 @@
           '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + 
           this.escapeHtml(data.reason || '') + '</p>';
         
-        // 名前表示設定に基づき学生名を表示
-        const showName = this.state.displayMode === 'named';
-        this.elements.modalStudentName.textContent = showName ? data.name : '';
-        const footerBase = 'text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex';
-        this.elements.modalFooter.className = footerBase + (showName ? ' justify-between items-center' : ' justify-end items-center');
+        // 管理者ユーザーの場合のみ学生名を表示
+        this.elements.modalStudentName.textContent = this.state.isAdminUser ? data.name : '';
 
         // モーダル内のリアクションボタンを生成
         const reactionButtonsHtml = this.reactionTypes.map(rt => {
           const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
           const cls = info.reacted ? 'liked' : '';
-          const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+          const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-blue-500';
           // showCountsがtrueの場合のみカウントを表示
           const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-gray-200">' + info.count + '</span>' : '';
           return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' +
                    'data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' +
-                   this.getIcon(rt.icon, 'w-5 h-5', info.reacted) +
                    countSpan +
+                   this.getIcon(rt.icon, 'w-5 h-5', info.reacted) +
                    '</button>';
         }).join('');
         this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml;
@@ -1603,55 +1396,21 @@
        */
       hideAnswerModal() {
         // モーダル非表示のアニメーション
-        gsap.to(this.elements.answerModalContainer, {
-          opacity: 0,
-          duration: 0.3,
-          onComplete: () => this.elements.answerModalContainer.classList.add('hidden')
+        gsap.to(this.elements.answerModalContainer, { 
+          opacity: 0, 
+          duration: 0.3, 
+          onComplete: () => this.elements.answerModalContainer.classList.add('hidden') 
         });
-        gsap.to(this.elements.answerModalCard, {
-          scale: 0.95,
-          duration: 0.3,
-          ease: 'power2.in',
+        gsap.to(this.elements.answerModalCard, { 
+          scale: 0.95, 
+          duration: 0.3, 
+          ease: 'power2.in', 
           onComplete: () => {
             if (this.state.lastFocusedElement) {
               this.state.lastFocusedElement.focus(); // モーダル表示前の要素にフォーカスを戻す
             }
           }
         });
-      }
-
-      /**
-       * 情報モーダルを表示
-       */
-      showInfoModal() {
-        this.state.lastFocusedElement = document.activeElement;
-        this.elements.infoModalContainer.classList.remove('hidden');
-        gsap.to(this.elements.infoModalContainer, { opacity: 1, duration: 0.3 });
-        gsap.fromTo(this.elements.infoModalCard,
-          { scale: 0.95 },
-          {
-            scale: 1,
-            duration: 0.3,
-            ease: 'back.out',
-            onComplete: () => this.elements.infoModalConfirmBtn.focus()
-          }
-        );
-      }
-
-      /**
-       * 情報モーダルを非表示
-       */
-      hideInfoModal() {
-        gsap.to(this.elements.infoModalContainer, {
-          opacity: 0,
-          duration: 0.3,
-          onComplete: () => this.elements.infoModalContainer.classList.add('hidden')
-        });
-        gsap.to(this.elements.infoModalCard, { scale: 0.95, duration: 0.3, ease: 'power2.in' });
-        localStorage.setItem('introSeen', '1');
-        if (this.state.lastFocusedElement) {
-          this.state.lastFocusedElement.focus();
-        }
       }
       
       /**
@@ -1674,7 +1433,7 @@
           console.warn('Icon not found:', name);
           return '<span aria-hidden="true" class="' + classes + '">⭐</span>'; // フォールバック
         }
-        if (DEBUG) console.log('getIcon: using key', key, 'for name', name);
+        console.log('getIcon: using key', key, 'for name', name);
         // 存在するアイコンを返す
         return '<span aria-hidden="true" class="' + classes + '">' + ICONS[key] + '</span>';
       }
@@ -1685,18 +1444,6 @@
       renderIcons() {
         this.elements.answerModalCloseBtn.innerHTML = this.getIcon('x', 'w-6 h-6');
         this.elements.footerIcon.innerHTML = this.getIcon('grid-2x2');
-        if (this.elements.infoIconLike) {
-          this.elements.infoIconLike.innerHTML = this.getIcon('hand-thumb-up');
-        }
-        if (this.elements.infoIconUnderstand) {
-          this.elements.infoIconUnderstand.innerHTML = this.getIcon('lightbulb');
-        }
-        if (this.elements.infoIconCurious) {
-          this.elements.infoIconCurious.innerHTML = this.getIcon('magnifying-glass-plus');
-        }
-        if (this.elements.infoIconHighlight) {
-          this.elements.infoIconHighlight.innerHTML = this.getIcon('star');
-        }
       }
 
       /**
@@ -1833,8 +1580,8 @@
     }
     
     // アプリケーションインスタンスを作成
-    if (DEBUG) console.log('Creating StudyQuestApp instance...');
-    if (DEBUG) console.log('Window variables:', {
+    console.log('Creating StudyQuestApp instance...');
+    console.log('Window variables:', {
       isStudentMode: window.isStudentMode,
       showCounts: window.showCounts,
       showAdminFeatures: window.showAdminFeatures,
@@ -1846,7 +1593,7 @@
     
     try {
       const app = new StudyQuestApp();
-      if (DEBUG) console.log('StudyQuestApp instance created successfully');
+      console.log('StudyQuestApp instance created successfully');
     } catch (error) {
       console.error('Error creating StudyQuestApp instance:', error);
       

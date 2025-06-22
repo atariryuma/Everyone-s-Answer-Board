@@ -6,13 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      body { margin: 0; color: #c0caf5; }
+      body { color: #c0caf5; }
       .glass-panel { background: rgba(26,27,38,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
       button:disabled { opacity: 0.5; cursor: not-allowed; }
       :focus-visible { outline: 3px solid #8be9fd; outline-offset: 2px; border-radius: 4px; }
     </style>
   </head>
-  <body class="bg-[#1a1b26] text-gray-200 font-sans px-4 pb-4 pt-4">
+  <body class="bg-[#1a1b26] text-gray-200 font-sans p-4">
     <div id="app" class="glass-panel max-w-xl mx-auto rounded-xl p-6 shadow-lg">
       <h2 class="text-xl font-bold mb-4 text-yellow-300">管理パネル</h2>
 
@@ -30,65 +30,19 @@
       <!-- Sheet Selection -->
       <div class="mb-6">
         <h3 class="font-semibold mb-3">1. 公開するシートを選択</h3>
-        <select id="sheet-select" class="w-full p-2 rounded-lg glass-panel text-white">
-          <option>読み込み中...</option>
-        </select>
-      </div>
-
-      <!-- Config Setup -->
-      <div class="mb-6">
-        <h3 class="font-semibold mb-3">2. Config設定</h3>
-        <p class="text-sm text-gray-300 mb-2">ボードで使用する列を指定します。</p>
-          <div class="flex flex-col gap-2 rounded-lg glass-panel p-2 hidden" id="config-area">
-            <label class="flex flex-col gap-1">
-              <span>問題文ヘッダー</span>
-              <select id="qHeader" class="w-full p-1 rounded text-gray-900"></select>
-            </label>
-            <label class="flex flex-col gap-1">
-              <span>回答ヘッダー</span>
-              <select id="aHeader" class="w-full p-1 rounded text-gray-900"></select>
-            </label>
-            <label class="flex flex-col gap-1">
-              <span>理由ヘッダー</span>
-              <select id="rHeader" class="w-full p-1 rounded text-gray-900"></select>
-            </label>
-            <label class="flex flex-col gap-1">
-              <span>名前取得モード</span>
-              <select id="nameMode" class="w-full p-1 rounded text-gray-900">
-                <option value="同一シート">同一シート</option>
-                <option value="別シート">別シート</option>
-              </select>
-            </label>
-            <label class="flex flex-col gap-1">
-              <span>名前列ヘッダー</span>
-              <select id="nameHeader" class="w-full p-1 rounded text-gray-900"></select>
-            </label>
-            <label class="flex flex-col gap-1">
-              <span>クラス列ヘッダー</span>
-              <select id="classHeader" class="w-full p-1 rounded text-gray-900"></select>
-            </label>
-          <button id="save-config-btn" class="bg-green-600 hover:bg-green-700 text-white rounded py-1">保存</button>
-        </div>
-      </div>
-
-      <!-- Display Options -->
-      <div class="mb-6">
-        <h3 class="font-semibold mb-3">3. 表示オプション</h3>
-        <div id="detail-options" class="flex flex-col gap-2 rounded-lg glass-panel p-2">
-          <label class="flex items-center p-2 rounded-md cursor-pointer">
-            <input type="radio" name="showDetails" value="true" class="mr-3 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500">
-            名前・リアクション数を表示
-          </label>
-          <label class="flex items-center p-2 rounded-md cursor-pointer">
-            <input type="radio" name="showDetails" value="false" class="mr-3 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500">
-            表示しない
-          </label>
+        <div id="sheet-list" class="flex flex-col gap-2 rounded-lg glass-panel p-2 max-h-48 overflow-y-auto">
+          <div class="flex justify-center p-2" role="status">
+            <svg class="w-5 h-5 text-gray-400 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
+            </svg>
+          </div>
         </div>
       </div>
 
       <!-- Actions -->
       <div class="glass-panel p-4 rounded-lg">
-        <h3 class="font-semibold mb-3">4. 操作を選択</h3>
+        <h3 class="font-semibold mb-3">2. 操作を選択</h3>
         <div class="flex flex-col gap-3">
           <button id="publish-btn" class="w-full text-white font-bold py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 transition disabled:bg-blue-300">
             選択したシートを公開
@@ -99,26 +53,17 @@
         </div>
       </div>
       
-      <div id="message-area" class="mt-4 text-center text-sm h-5" aria-live="polite" role="status"></div>
+      <div id="message-area" class="mt-4 text-center text-sm h-5"></div>
 
     </div>
 
     <script>
       const elements = {
         statusText: document.getElementById('status-text'),
-        sheetSelect: document.getElementById('sheet-select'),
+        sheetList: document.getElementById('sheet-list'),
         publishBtn: document.getElementById('publish-btn'),
         unpublishBtn: document.getElementById('unpublish-btn'),
-        messageArea: document.getElementById('message-area'),
-        detailOptions: document.getElementById('detail-options'),
-        qHeader: document.getElementById('qHeader'),
-        aHeader: document.getElementById('aHeader'),
-        rHeader: document.getElementById('rHeader'),
-        nameMode: document.getElementById('nameMode'),
-        nameHeader: document.getElementById('nameHeader'),
-        classHeader: document.getElementById('classHeader'),
-        saveConfigBtn: document.getElementById('save-config-btn'),
-        configArea: document.getElementById('config-area')
+        messageArea: document.getElementById('message-area')
       };
 
       let selectedSheet = null;
@@ -127,7 +72,6 @@
         loadInitialState();
         elements.publishBtn.addEventListener('click', publish);
         elements.unpublishBtn.addEventListener('click', unpublish);
-        elements.saveConfigBtn.addEventListener('click', saveConfig);
       });
 
       function loadInitialState() {
@@ -140,12 +84,6 @@
 
       function updateUI(status) {
         selectedSheet = status.activeSheetName;
-        elements.configArea.classList.toggle('hidden', !selectedSheet);
-
-        if (elements.detailOptions) {
-          const radios = elements.detailOptions.querySelectorAll('input[name="showDetails"]');
-          radios.forEach(r => { r.checked = r.value === String(status.showDetails); r.onchange = () => updateShowDetails(r.value); });
-        }
         
         if (status.isPublished && status.activeSheetName) {
           elements.statusText.innerHTML = `公開中: <span class="font-bold text-green-700">${status.activeSheetName}</span>`;
@@ -155,33 +93,34 @@
           elements.unpublishBtn.disabled = true;
         }
         
-        elements.sheetSelect.innerHTML = '';
+        elements.sheetList.innerHTML = '';
         if (status.allSheets && status.allSheets.length > 0) {
-          elements.sheetSelect.innerHTML = '<option value="">-- シートを選択してください --</option>';
           status.allSheets.forEach(name => {
-            const opt = document.createElement('option');
-            opt.value = name;
-            opt.textContent = name;
-            elements.sheetSelect.appendChild(opt);
+            const label = document.createElement('label');
+            label.className = 'flex items-center p-2 rounded-md hover:bg-gray-100 cursor-pointer';
+            
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = 'sheet';
+            radio.value = name;
+            radio.className = 'mr-3 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500';
+            if (name === status.activeSheetName) {
+              radio.checked = true;
+            }
+            radio.onchange = () => {
+              selectedSheet = name;
+              elements.publishBtn.disabled = false;
+            };
+
+            label.appendChild(radio);
+            label.appendChild(document.createTextNode(name));
+            elements.sheetList.appendChild(label);
           });
-          elements.sheetSelect.disabled = false;
-          if (status.activeSheetName) {
-            elements.sheetSelect.value = status.activeSheetName;
-          }
         } else {
-          elements.sheetSelect.innerHTML = '<option value="">表示できるシートがありません</option>';
-          elements.sheetSelect.disabled = true;
+          elements.sheetList.innerHTML = '<p class="text-gray-600 p-2">表示できるシートがありません。</p>';
         }
 
-        elements.sheetSelect.onchange = () => {
-          selectedSheet = elements.sheetSelect.value;
-          elements.publishBtn.disabled = !selectedSheet;
-          elements.configArea.classList.toggle('hidden', !selectedSheet);
-          loadConfigForSelected();
-        };
-
         elements.publishBtn.disabled = !selectedSheet || (status.isPublished && selectedSheet === status.activeSheetName);
-        loadConfigForSelected();
         setLoading(false);
       }
 
@@ -190,27 +129,14 @@
           showMessage('公開するシートを選択してください。', 'red');
           return;
         }
-        const cfg = {
-          questionHeader: elements.qHeader.value,
-          answerHeader: elements.aHeader.value,
-          reasonHeader: elements.rHeader.value,
-          nameMode: elements.nameMode.value,
-          nameHeader: elements.nameHeader.value,
-          classHeader: elements.classHeader.value
-        };
         setLoading(true, "公開処理中...");
         google.script.run
-          .withSuccessHandler(() => {
-            google.script.run
-              .withSuccessHandler((msg) => {
-                showMessage(msg, 'green');
-                loadInitialState();
-              })
-              .withFailureHandler(showError)
-              .publishApp(selectedSheet);
+          .withSuccessHandler((msg) => {
+            showMessage(msg, 'green');
+            loadInitialState();
           })
           .withFailureHandler(showError)
-          .saveSheetConfig(selectedSheet, cfg);
+          .publishApp(selectedSheet);
       }
 
       function unpublish() {
@@ -222,96 +148,6 @@
           })
           .withFailureHandler(showError)
           .unpublishApp();
-      }
-
-      function updateShowDetails(val) {
-        setLoading(true, "設定を保存中...");
-        google.script.run
-          .withSuccessHandler((msg) => { showMessage(msg, 'green'); setLoading(false); })
-          .withFailureHandler(showError)
-          .setShowDetails(val === 'true');
-      }
-
-      function loadConfigForSelected() {
-        if (!selectedSheet) {
-          elements.configArea.classList.add('hidden');
-          clearConfigFields();
-          return;
-        }
-        elements.configArea.classList.remove('hidden');
-        google.script.run
-          .withSuccessHandler((headers) => {
-            populateHeaderOptions(headers);
-            const guesses = guessHeaders(headers);
-            populateConfig(guesses);
-            google.script.run
-              .withSuccessHandler(cfg => populateConfig(Object.assign({}, guesses, cfg)))
-              .withFailureHandler(() => {})
-              .getConfig(selectedSheet);
-          })
-          .withFailureHandler(clearConfigFields)
-          .getSheetHeaders(selectedSheet);
-      }
-
-      function populateHeaderOptions(headers) {
-        const selects = [elements.qHeader, elements.aHeader, elements.rHeader, elements.nameHeader, elements.classHeader];
-        selects.forEach(sel => {
-          sel.innerHTML = '<option value=""></option>';
-          headers.forEach(h => {
-            const opt = document.createElement('option');
-            opt.value = h;
-            opt.textContent = h;
-            sel.appendChild(opt);
-          });
-        });
-      }
-
-      function guessHeaders(headers) {
-        const find = (keys) => headers.find(h => keys.some(k => h.includes(k))) || '';
-        return {
-          questionHeader: find(['質問', '問題']),
-          answerHeader: find(['回答', '答え']),
-          reasonHeader: find(['理由']),
-          nameHeader: find(['名前', '氏名']),
-          classHeader: find(['クラス'])
-        };
-      }
-
-      function populateConfig(cfg) {
-        elements.qHeader.value = cfg.questionHeader || '';
-        elements.aHeader.value = cfg.answerHeader || '';
-        elements.rHeader.value = cfg.reasonHeader || '';
-        elements.nameMode.value = cfg.nameMode || '同一シート';
-        elements.nameHeader.value = cfg.nameHeader || '';
-        elements.classHeader.value = cfg.classHeader || '';
-      }
-
-      function clearConfigFields() {
-        [elements.qHeader, elements.aHeader, elements.rHeader, elements.nameHeader, elements.classHeader].forEach(sel => {
-          sel.innerHTML = '<option value=""></option>';
-          sel.value = '';
-        });
-        elements.nameMode.value = '同一シート';
-      }
-
-      function saveConfig() {
-        if (!selectedSheet) {
-          showMessage('シートを選択してください。', 'red');
-          return;
-        }
-        const cfg = {
-          questionHeader: elements.qHeader.value,
-          answerHeader: elements.aHeader.value,
-          reasonHeader: elements.rHeader.value,
-          nameMode: elements.nameMode.value,
-          nameHeader: elements.nameHeader.value,
-          classHeader: elements.classHeader.value
-        };
-        setLoading(true, '設定を保存中...');
-        google.script.run
-          .withSuccessHandler((msg) => { showMessage(msg, 'green'); setLoading(false); })
-          .withFailureHandler(showError)
-          .saveSheetConfig(selectedSheet, cfg);
       }
 
       function setLoading(isLoading, msg = "") {

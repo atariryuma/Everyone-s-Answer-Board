@@ -5,19 +5,15 @@ This repository contains the source code of a Google Apps Script project. It pub
 ## Setup
 
 1. Install **Node.js 20** or later.
-2. Install dependencies (including dev dependencies):
+2. Install dependencies:
    ```bash
    npm install
    ```
-3. Confirm that `jest` is available:
-   ```bash
-   npx jest --version
-   ```
-4. Sign in to Google with clasp:
+3. Sign in to Google with clasp:
    ```bash
    npx clasp login
    ```
-5. Edit `.clasp.json` and set your Apps Script project ID.
+4. Edit `.clasp.json` and set your Apps Script project ID.
 
 ## Usage
 
@@ -25,8 +21,6 @@ This repository contains the source code of a Google Apps Script project. It pub
 - `npm run pull` – Download the latest code from Apps Script.
 - `npm run open` – Open the Apps Script project in a browser.
 - `npm run update-url` – Store the latest Web App URL in script properties.
-- Call `getWebAppUrl()` in Apps Script to read the stored URL. The same value is
-  also returned by `getAdminSettings()` for use in the admin panel.
 
 ## Spreadsheet structure
 
@@ -38,41 +32,20 @@ The sheet you publish must contain the following columns:
 - **予想したわけを書きましょう。** – explanation shown when opening a card
 - **いいね！** – comma separated list of users who liked the answer
 
-A separate sheet named `roster` should contain roster information with the columns `学年`, `組`, `番号`, `姓`, `名`, `Googleアカウント`, `ニックネーム`. These names are shown on the board instead of raw email addresses. If your roster sheet has a different name, set the `ROSTER_SHEET_NAME` script property to override the default.
+A separate sheet named `sheet 1` should contain roster information with the columns `姓`, `名`, `ニックネーム` and `Googleアカウント`. These names are shown on the board instead of raw email addresses.
 
 ## Managing the board
 
 Opening the spreadsheet adds an **アプリ管理** menu. From here you can:
 
 1. **管理パネルを開く** – choose which sheet to publish or unpublish.
-   Use the "Config" section to map the question, answer and name columns. The
-   selected settings are saved automatically when publishing a sheet for the
-   first time.
+2. **名簿キャッシュをリセット** – refresh the cached roster information.
 
 When unpublished, visiting the Web App URL shows a message that the board is closed. Once published, the board is available and updates automatically every 15 seconds.
 
 ### Admin interface
 
 Administrators see a toggle button that allows switching between viewing and management modes. The list of administrator email addresses is set in the `ADMIN_EMAILS` script property.
-
-### Setting `ADMIN_EMAILS`
-
-1. Open the Apps Script **Project Settings** and expand **Script Properties**.
-2. Click **Add script property** and set the name to `ADMIN_EMAILS`.
-3. Enter a comma‑separated list of addresses and save.
-
-You can also set the value from the console:
-
-```javascript
-PropertiesService.getScriptProperties()
-  .setProperty('ADMIN_EMAILS', 'teacher1@example.com,teacher2@example.com');
-```
-
-### Setting `ROSTER_SHEET_NAME`
-
-1. Open the Apps Script **Project Settings** and expand **Script Properties**.
-2. Add a property named `ROSTER_SHEET_NAME` and set its value to your roster sheet's name.
-3. Leave it blank or remove it to use the default `roster`.
 
 ## Front‑end features
 
