@@ -1,4 +1,8 @@
-const { handleError } = require('./ErrorHandling.gs');
+// In the Apps Script environment, handleError is defined globally.
+// When running tests in Node, import it from the module.
+if (typeof module !== 'undefined') {
+  var handleError = require('./ErrorHandling.gs').handleError;
+}
 
 function safeGetUserEmail() {
   try {
