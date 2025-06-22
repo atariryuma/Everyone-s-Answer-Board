@@ -64,6 +64,9 @@ function addReaction(rowIndex, reactionKey) {
     reactionRange.setValues([
       REACTION_KEYS.map(k => lists[k].arr.join(','))
     ]);
+    if (typeof SpreadsheetApp !== 'undefined' && typeof SpreadsheetApp.flush === 'function') {
+      SpreadsheetApp.flush();
+    }
 
     const reactions = REACTION_KEYS.reduce((obj, k) => {
       obj[k] = {

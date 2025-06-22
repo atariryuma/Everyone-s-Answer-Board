@@ -241,6 +241,7 @@
     /* いいねボタンのSVGトランジション */
     .like-btn svg { transition: all 0.2s ease-in-out; fill: none; }
     .like-btn.liked svg { stroke: transparent; fill: currentColor; transform: scale(1.1); }
+    .reaction-btn:disabled { opacity: 0.5; pointer-events: none; }
     /* ハイライトボタンのスタイル */
     .highlight-btn {
       transition: all 0.2s ease;
@@ -1295,7 +1296,8 @@
        */
       async handleReaction(rowIndex, reaction) {
         // リアクションボタンのアニメーション
-        const btns = document.querySelectorAll('[data-row-index="' + rowIndex + '"][data-reaction="' + reaction + '"]');
+        const btns = document.querySelectorAll('[data-row-index="' + rowIndex + '"][data-reaction]');
+        btns.forEach(b => b.disabled = true);
         if (typeof gsap !== 'undefined') {
           btns.forEach(btn => {
             gsap.fromTo(btn,
@@ -1320,6 +1322,8 @@
           }
         } catch (error) {
           console.error('Failed to add reaction:', error);
+        } finally {
+          btns.forEach(b => b.disabled = false);
         }
       }
 
