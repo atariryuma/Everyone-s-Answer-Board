@@ -92,10 +92,17 @@
     ModeManager.initializeMode();
   </script>
   <script>
-    window.showCounts = <?= showCounts ?>;
-    window.displayMode = '<?= displayMode ?>';
-    const SHEET_NAME = '<?= sheetName ?>';
-    const MAPPING = <?= JSON.stringify(mapping) ?>;
+    try {
+      window.showCounts = JSON.parse('<?= showCounts ?>');
+      window.displayMode = JSON.parse('<?= JSON.stringify(displayMode) ?>');
+      window.sheetName = JSON.parse('<?= JSON.stringify(sheetName) ?>');
+      window.mapping = JSON.parse('<?= JSON.stringify(mapping) ?>');
+    } catch (e) {
+      window.showCounts = false;
+      window.displayMode = 'anonymous';
+      window.sheetName = '';
+      window.mapping = {};
+    }
   </script>
   <style>
     /* カスタムプロパティ（CSS変数）定義 */
