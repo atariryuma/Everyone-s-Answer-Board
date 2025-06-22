@@ -367,7 +367,7 @@ function buildBoardData(sheetName) {
   return { header: cfg.questionHeader, entries };
 }
 
-function addReaction(rowIndex, reactionKey) {
+function addReaction(rowIndex, reactionKey, sheetName) {
   if (!rowIndex || !reactionKey || !COLUMN_HEADERS[reactionKey]) {
     return { status: 'error', message: '無効なパラメータです。' };
   }
@@ -381,11 +381,12 @@ function addReaction(rowIndex, reactionKey) {
       return { status: 'error', message: 'ログインしていないため、操作できません。' };
     }
     const settings = getAppSettings();
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(settings.activeSheetName);
-    if (!sheet) throw new Error(`シート '${settings.activeSheetName}' が見つかりません。`);
+    const targetSheet = sheetName || settings.activeSheetName;
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(targetSheet);
+    if (!sheet) throw new Error(`シート '${targetSheet}' が見つかりません。`);
 
   const reactionHeaders = REACTION_KEYS.map(k => COLUMN_HEADERS[k]);
-  const headerIndices = getHeaderIndices(settings.activeSheetName);
+  const headerIndices = getHeaderIndices(targetSheet);
   const startCol = headerIndices[reactionHeaders[0]] + 1;
   const reactionRange = sheet.getRange(rowIndex, startCol, 1, REACTION_KEYS.length);
   const values = reactionRange.getValues()[0];
@@ -421,18 +422,19 @@ function addReaction(rowIndex, reactionKey) {
   }
 }
 
-function toggleHighlight(rowIndex) {
+function toggleHighlight(rowIndex, sheetName) {
   if (!checkAdmin()) {
     return { status: 'error', message: '権限がありません。' };
   }
   const lock = LockService.getScriptLock();
   lock.waitLock(TIME_CONSTANTS.LOCK_WAIT_MS);
   try {
-    const sheetName = getAppSettings().activeSheetName;
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-    if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
+    const settings = getAppSettings();
+    const targetSheet = sheetName || settings.activeSheetName;
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(targetSheet);
+    if (!sheet) throw new Error(`シート '${targetSheet}' が見つかりません。`);
 
-    const headerIndices = getHeaderIndices(sheetName);
+    const headerIndices = getHeaderIndices(targetSheet);
     const colIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT] + 1;
 
     const cell = sheet.getRange(rowIndex, colIndex);

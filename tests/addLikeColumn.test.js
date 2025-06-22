@@ -63,7 +63,7 @@ afterEach(() => {
 test('addReaction updates value in LIKE column', () => {
   const sheet = buildSheet();
   setupMocks('like@example.com', sheet);
-  const result = addReaction(2, 'LIKE');
+  const result = addReaction(2, 'LIKE', 'Sheet1');
   expect(result.status).toBe('ok');
   expect(sheet.getRange.mock.calls[1][0]).toBe(2);
   expect(sheet.getRange.mock.calls[1][1]).toBe(6);
@@ -81,6 +81,6 @@ test('addReaction handles failure to get user email', () => {
       getSheets: () => [sheet]
     })
   };
-  const result = addReaction(2, 'LIKE');
+  const result = addReaction(2, 'LIKE', 'Sheet1');
   expect(result.status).toBe('error');
 });

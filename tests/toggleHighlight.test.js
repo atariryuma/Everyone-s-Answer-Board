@@ -55,10 +55,10 @@ test('toggleHighlight flips stored value', () => {
   const sheet = buildSheet();
   setupMocks(sheet);
 
-  const result1 = toggleHighlight(2);
+  const result1 = toggleHighlight(2, 'Sheet1');
   expect(result1).toEqual({ status: 'ok', highlight: true });
 
-  const result2 = toggleHighlight(2);
+  const result2 = toggleHighlight(2, 'Sheet1');
   expect(result2).toEqual({ status: 'ok', highlight: false });
 });
 
@@ -71,8 +71,8 @@ test('toggleHighlight reads headers only once with cache', () => {
   };
   setupMocks(sheet, cache);
 
-  toggleHighlight(2);
-  toggleHighlight(2);
+  toggleHighlight(2, 'Sheet1');
+  toggleHighlight(2, 'Sheet1');
 
   const headerCalls = sheet.getRange.mock.calls.filter(c => c[0] === 1).length;
   expect(headerCalls).toBe(1);
@@ -81,6 +81,6 @@ test('toggleHighlight reads headers only once with cache', () => {
 test('toggleHighlight returns error for non-admin user', () => {
   const sheet = buildSheet();
   setupMocks(sheet, null, 'user@example.com', 'admin@example.com');
-  const result = toggleHighlight(2);
+  const result = toggleHighlight(2, 'Sheet1');
   expect(result.status).toBe('error');
 });
