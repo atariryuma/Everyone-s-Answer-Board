@@ -90,7 +90,11 @@ function publishApp(sheetName) {
   if (!sheetName) {
     throw new Error('シート名が指定されていません。');
   }
-  require('./Code.gs').prepareSheetForBoard(sheetName);
+  if (typeof require === 'function') {
+    require('./Code.gs').prepareSheetForBoard(sheetName);
+  } else {
+    prepareSheetForBoard(sheetName);
+  }
   const properties = PropertiesService.getScriptProperties();
   properties.setProperty(APP_PROPERTIES.IS_PUBLISHED, 'true');
   properties.setProperty(APP_PROPERTIES.ACTIVE_SHEET, sheetName);
