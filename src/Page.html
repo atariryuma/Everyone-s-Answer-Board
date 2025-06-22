@@ -1434,6 +1434,16 @@
             // アイコンを更新（solid/outline切り替え）
             svgEl.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', reacted);
           }
+
+          // 色クラスを常に保持
+          const colorClass = reaction === 'LIKE'
+            ? 'text-red-500'
+            : reaction === 'UNDERSTAND'
+            ? 'text-yellow-500'
+            : 'text-green-500';
+          btn.classList.remove('text-red-500', 'text-yellow-500', 'text-green-500');
+          btn.classList.add(colorClass);
+
           btn.classList.toggle('liked', reacted); // likedクラスを切り替え
           
           // アクセシビリティ属性を更新
