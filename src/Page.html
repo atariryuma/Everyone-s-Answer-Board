@@ -197,10 +197,15 @@
       transition: all var(--duration-normal) var(--ease-out);
       border-radius: var(--border-radius-lg);
     }
-    .answer-card.highlighted { 
-      border-color: var(--color-accent); 
-      box-shadow: 0 0 15px rgba(250,204,21,0.4); 
-      transform: scale(1.02); 
+    .answer-card.highlighted {
+      border-color: var(--color-accent) !important;
+      border-image: none !important;
+      border-width: 4px;
+      box-shadow: 0 0 15px rgba(250,204,21,0.6);
+      transform: scale(1.02);
+      animation: highlight-pulse 2s infinite;
+      z-index: 2;
+      background-image: radial-gradient(rgba(250,204,21,0.1), transparent);
     }
     .answer-card:hover {
       transform: translateY(-4px) scale(1.02);
@@ -220,11 +225,14 @@
       right: 0.25rem;
       width: 1.5rem;
       height: 1.5rem;
-      color: #facc15;
+      border-radius: 9999px;
+      background: #facc15;
+      color: #1a1b26;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 0 6px rgba(250, 204, 21, 0.6);
+      animation: badge-float 4s ease-in-out infinite;
     }
     /* リアクションボタンの背景グラデーションとボーダーカラー */
     .answer-card.reaction-bg-like { border-color:#ef4444 !important; border-image:none; }
@@ -264,6 +272,16 @@
     .skeleton { position: relative; overflow: hidden; background-color: rgba(255,255,255,0.05); color: transparent; }
     .skeleton::after { content: ""; position: absolute; inset: 0; background-image: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.3), rgba(255,255,255,0)); animation: skeleton-loading 1.2s infinite; }
     @keyframes skeleton-loading { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+
+    @keyframes highlight-pulse {
+      0%, 100% { box-shadow: 0 0 10px rgba(250,204,21,0.6); transform: scale(1); }
+      50% { box-shadow: 0 0 20px rgba(250,204,21,0.9); transform: scale(1.05); }
+    }
+
+    @keyframes badge-float {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-10%) rotate(6deg); }
+    }
     
     /* スクリーンリーダー専用クラス（アクセシビリティ） */
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
@@ -365,6 +383,7 @@
       'magnifying-glass-plus-solid': '<svg viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z M9.75 7.5v2.25H7.5v1.5h2.25V13.5h1.5v-2.25H13.5v-1.5h-2.25V7.5h-1.5z" fill="currentColor"/><path d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15zM16.5 16.5l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       'x': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
       'star-outline': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
+      'star-solid': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
       'star': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
       'grid-2x2': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
       'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
@@ -1274,7 +1293,7 @@
         if (data.highlight) {
           const badge = document.createElement('span');
           badge.className = 'highlight-badge';
-          badge.innerHTML = this.getIcon('star');
+          badge.innerHTML = this.getIcon('star', '', true);
           card.appendChild(badge);
           this.animateHighlightBadge(badge); // バッジのアニメーション
         }
@@ -1578,7 +1597,7 @@
             if (item.highlight && !badge) {
               badge = document.createElement('span');
               badge.className = 'highlight-badge';
-              badge.innerHTML = this.getIcon('star');
+              badge.innerHTML = this.getIcon('star', '', true);
               // card.querySelector('.answer-preview')が存在する場合のみinsertBeforeを使用
               const previewEl = card.querySelector('.answer-preview');
               if (previewEl) {
