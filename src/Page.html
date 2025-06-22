@@ -203,7 +203,7 @@
       border-width: 4px;
       box-shadow: 0 0 15px rgba(250,204,21,0.6);
       transform: scale(1.02);
-      animation: highlight-pulse 2s infinite;
+      animation: highlight-pulse 2s 3;
       z-index: 2;
       background-image: radial-gradient(rgba(250,204,21,0.1), transparent);
     }
@@ -232,16 +232,39 @@
       align-items: center;
       justify-content: center;
       box-shadow: 0 0 6px rgba(250, 204, 21, 0.6);
-      animation: badge-float 4s ease-in-out infinite;
+      animation: badge-float 4s ease-in-out 3;
     }
     /* リアクションボタンの背景グラデーションとボーダーカラー */
     .answer-card.reaction-bg-like { border-color:#ef4444 !important; border-image:none; }
     .answer-card.reaction-bg-understand { border-color:#fbbf24 !important; border-image:none; }
     .answer-card.reaction-bg-curious { border-color:#10b981 !important; border-image:none; }
-    .reaction-bg-like-understand { border-color:transparent; border-image: linear-gradient(90deg,#ef4444,#fbbf24) 1; }
-    .reaction-bg-like-curious { border-color:transparent; border-image: linear-gradient(90deg,#ef4444,#10b981) 1; }
-    .reaction-bg-understand-curious { border-color:transparent; border-image: linear-gradient(90deg,#fbbf24,#10b981) 1; }
-    .reaction-bg-all { border-color:transparent; border-image: linear-gradient(90deg,#ef4444,#fbbf24,#10b981) 1; }
+    .reaction-bg-like-understand,
+    .reaction-bg-like-curious,
+    .reaction-bg-understand-curious,
+    .reaction-bg-all {
+      border-color: transparent;
+      border-image: none;
+      background-image:
+        linear-gradient(var(--glass-bg), var(--glass-bg)),
+        linear-gradient(90deg,#ef4444,#fbbf24);
+      background-origin: padding-box, border-box;
+      background-clip: padding-box, border-box;
+    }
+    .reaction-bg-like-curious {
+      background-image:
+        linear-gradient(var(--glass-bg), var(--glass-bg)),
+        linear-gradient(90deg,#ef4444,#10b981);
+    }
+    .reaction-bg-understand-curious {
+      background-image:
+        linear-gradient(var(--glass-bg), var(--glass-bg)),
+        linear-gradient(90deg,#fbbf24,#10b981);
+    }
+    .reaction-bg-all {
+      background-image:
+        linear-gradient(var(--glass-bg), var(--glass-bg)),
+        linear-gradient(90deg,#ef4444,#fbbf24,#10b981);
+    }
     /* リアクション総数に応じたボーダー太さ */
     .reaction-border-1 { border-width: 2px; }
     .reaction-border-2 { border-width: 4px; }
