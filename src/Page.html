@@ -1295,6 +1295,7 @@
        * @param {string} reaction - リアクションタイプ ('LIKE', 'UNDERSTAND', 'CURIOUS')
        */
       async handleReaction(rowIndex, reaction) {
+        rowIndex = Number(rowIndex); // datasetから取得した値を数値に変換
         // リアクションボタンのアニメーション
         const btns = document.querySelectorAll('[data-row-index="' + rowIndex + '"][data-reaction]');
         btns.forEach(b => b.disabled = true);
@@ -1332,6 +1333,7 @@
        * @param {number} rowIndex - 回答の行インデックス
        */
       async handleHighlight(rowIndex) {
+        rowIndex = Number(rowIndex); // 文字列の場合に備えて数値に変換
         try {
           const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
           // GAS関数を呼び出し、ハイライト状態を切り替える
