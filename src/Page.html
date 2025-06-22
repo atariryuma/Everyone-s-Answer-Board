@@ -1302,6 +1302,10 @@
       async handleReaction(rowIndex, reaction) {
         // リアクションボタンのアニメーション
         const btns = document.querySelectorAll('[data-row-index="' + rowIndex + '"][data-reaction="' + reaction + '"]');
+        btns.forEach(btn => {
+          btn.disabled = true;
+          btn.setAttribute('aria-disabled', 'true');
+        });
         if (typeof gsap !== 'undefined') {
           btns.forEach(btn => {
             gsap.fromTo(btn,
@@ -1326,6 +1330,11 @@
           }
         } catch (error) {
           console.error('Failed to add reaction:', error);
+        } finally {
+          btns.forEach(btn => {
+            btn.disabled = false;
+            btn.setAttribute('aria-disabled', 'false');
+          });
         }
       }
 
