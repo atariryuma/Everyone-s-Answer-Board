@@ -62,10 +62,13 @@
     // プレビューモード検出とモード設定
     const ModeManager = {
       isPreviewMode() {
-        return window.location.protocol === 'file:' || 
-               window.location.hostname === 'localhost' || 
-               window.location.pathname.includes('preview') ||
-               window.location.href.includes('preview');
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+          return false; // GAS 環境では常に本番モード
+        }
+        const url = new URL(window.location.href);
+        return window.location.protocol === 'file:' ||
+               window.location.hostname === 'localhost' ||
+               url.searchParams.has('preview');
       },
       
       applyMode(modeConfig) {
@@ -89,10 +92,17 @@
     ModeManager.initializeMode();
   </script>
   <script>
-    window.showCounts = <?= showCounts ?>;
-    window.displayMode = '<?= displayMode ?>';
-    const SHEET_NAME = '<?= sheetName ?>';
-    const MAPPING = <?= JSON.stringify(mapping) ?>;
+    try {
+      window.showCounts = JSON.parse('<?= showCounts ?>');
+      window.displayMode = JSON.parse('<?= JSON.stringify(displayMode) ?>');
+      window.sheetName = JSON.parse('<?= JSON.stringify(sheetName) ?>');
+      window.mapping = JSON.parse('<?= JSON.stringify(mapping) ?>');
+    } catch (e) {
+      window.showCounts = false;
+      window.displayMode = 'anonymous';
+      window.sheetName = '';
+      window.mapping = {};
+    }
   </script>
   <style>
     /* カスタムプロパティ（CSS変数）定義 */
@@ -241,6 +251,7 @@
     /* いいねボタンのSVGトランジション */
     .like-btn svg { transition: all 0.2s ease-in-out; fill: none; }
     .like-btn.liked svg { stroke: transparent; fill: currentColor; transform: scale(1.1); }
+    .reaction-btn:disabled { opacity: 0.5; pointer-events: none; }
     /* ハイライトボタンのスタイル */
     .highlight-btn {
       transition: all 0.2s ease;
@@ -1294,8 +1305,10 @@
        * @param {string} reaction - リアクションタイプ ('LIKE', 'UNDERSTAND', 'CURIOUS')
        */
       async handleReaction(rowIndex, reaction) {
+        rowIndex = Number(rowIndex); // datasetから取得した値を数値に変換
         // リアクションボタンのアニメーション
-        const btns = document.querySelectorAll('[data-row-index="' + rowIndex + '"][data-reaction="' + reaction + '"]');
+        const btns = document.querySelectorAll('[data-row-index="' + rowIndex + '"][data-reaction]');
+        btns.forEach(b => b.disabled = true);
         if (typeof gsap !== 'undefined') {
           btns.forEach(btn => {
             gsap.fromTo(btn,
@@ -1320,6 +1333,8 @@
           }
         } catch (error) {
           console.error('Failed to add reaction:', error);
+        } finally {
+          btns.forEach(b => b.disabled = false);
         }
       }
 
@@ -1328,6 +1343,7 @@
        * @param {number} rowIndex - 回答の行インデックス
        */
       async handleHighlight(rowIndex) {
+        rowIndex = Number(rowIndex); // 文字列の場合に備えて数値に変換
         try {
           const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
           // GAS関数を呼び出し、ハイライト状態を切り替える
