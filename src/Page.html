@@ -310,8 +310,7 @@
 
   <div id="infoModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300" role="dialog" aria-modal="true">
     <div id="infoModalCard" class="glass-panel rounded-xl p-6 shadow-2xl border-2 border-cyan-400/80 w-full max-w-lg transform scale-95 transition-transform duration-300 relative" role="document">
-      <button id="infoModalCloseBtn" class="absolute -top-3 -right-3 bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform" aria-label="閉じる"></button>
-      <div class="space-y-4 text-gray-200 text-sm leading-relaxed">
+      <div class="space-y-4 text-gray-200 text-lg leading-relaxed">
         <p>みんなの意見を気持ちよく共有するために、リアクションのしかたをおぼえよう！</p>
         <ul class="space-y-2">
           <li class="flex items-center gap-2"><span id="infoIconLike" class="w-5 h-5 text-red-400"></span>いいね：すてきだと思ったときに押そう</li>
@@ -320,6 +319,9 @@
         </ul>
         <p class="flex items-center gap-2"><span id="infoIconHighlight" class="w-5 h-5 text-yellow-300"></span>先生が注目してほしい意見につけています</p>
         <p>責任あるリアクションで、みんなで学びを深めよう！</p>
+        <div class="text-center mt-6">
+          <button id="infoModalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">わかった</button>
+        </div>
       </div>
     </div>
   </div>
@@ -391,7 +393,7 @@
           modalFooter: document.getElementById('modalFooter'),
           infoModalContainer: document.getElementById('infoModalContainer'),
           infoModalCard: document.getElementById('infoModalCard'),
-          infoModalCloseBtn: document.getElementById('infoModalCloseBtn'),
+          infoModalConfirmBtn: document.getElementById('infoModalConfirmBtn'),
           infoIconLike: document.getElementById('infoIconLike'),
           infoIconUnderstand: document.getElementById('infoIconUnderstand'),
           infoIconCurious: document.getElementById('infoIconCurious'),
@@ -568,15 +570,8 @@
             this.hideAnswerModal();
           }
         });
-        if (this.elements.infoModalCloseBtn) {
-          this.elements.infoModalCloseBtn.addEventListener('click', () => this.hideInfoModal());
-        }
-        if (this.elements.infoModalContainer) {
-          this.elements.infoModalContainer.addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) {
-              this.hideInfoModal();
-            }
-          });
+        if (this.elements.infoModalConfirmBtn) {
+          this.elements.infoModalConfirmBtn.addEventListener('click', () => this.hideInfoModal());
         }
         // モーダル内のリアクションボタン
         this.elements.modalReactionContainer.addEventListener('click', (e) => {
@@ -600,7 +595,6 @@
         document.addEventListener('keydown', (e) => {
           if (e.key === 'Escape') {
             this.hideAnswerModal();
-            this.hideInfoModal();
           }
         });
         // ウィンドウリサイズ時のレイアウト調整をデバウンス
@@ -1620,7 +1614,7 @@
             scale: 1,
             duration: 0.3,
             ease: 'back.out',
-            onComplete: () => this.elements.infoModalCloseBtn.focus()
+            onComplete: () => this.elements.infoModalConfirmBtn.focus()
           }
         );
       }
@@ -1672,9 +1666,6 @@
       renderIcons() {
         this.elements.answerModalCloseBtn.innerHTML = this.getIcon('x', 'w-6 h-6');
         this.elements.footerIcon.innerHTML = this.getIcon('grid-2x2');
-        if (this.elements.infoModalCloseBtn) {
-          this.elements.infoModalCloseBtn.innerHTML = this.getIcon('x', 'w-6 h-6');
-        }
         if (this.elements.infoIconLike) {
           this.elements.infoIconLike.innerHTML = this.getIcon('hand-thumb-up');
         }
