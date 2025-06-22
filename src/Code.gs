@@ -516,6 +516,15 @@ function getHeaderIndices(sheetName) {
   return indices;
 }
 
+function getAndCacheHeaderIndices(sheetName, headerRow) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = `headers_${sheetName}`;
+  const cachedHeaders = cache.get(cacheKey);
+  if (cachedHeaders) { return JSON.parse(cachedHeaders); }
+  const indices = findHeaderIndices(headerRow, Object.values(COLUMN_HEADERS));
+  cache.put(cacheKey, JSON.stringify(indices), 21600);
+  return indices;
+}
 
 function prepareSheetForBoard(sheetName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
