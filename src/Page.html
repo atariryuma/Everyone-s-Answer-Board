@@ -426,6 +426,7 @@
           showScoreSort: window.showScoreSort,
           showPublishControls: window.showPublishControls,
           displayMode: window.displayMode,
+          sheetName: SHEET_NAME,
         };
 
         // シート設定による詳細表示フラグを保持
@@ -442,10 +443,14 @@
         
         // Google Apps Script関数へのラッパー
         this.gas = {
-          getPublishedSheetData: (classFilter, sort) => this.runGas('getPublishedSheetData', classFilter, sort),
-          addLike: (rowIndex) => this.runGas('addReaction', rowIndex, 'LIKE', SHEET_NAME),
-          addReaction: (rowIndex, reaction) => this.runGas('addReaction', rowIndex, reaction, SHEET_NAME),
-          toggleHighlight: (rowIndex, current) => this.runGas('toggleHighlight', rowIndex, SHEET_NAME, current),
+          getPublishedSheetData: (classFilter, sort) =>
+            this.runGas('getPublishedSheetData', classFilter, sort),
+          addLike: (rowIndex) =>
+            this.runGas('addReaction', rowIndex, 'LIKE', this.state.sheetName),
+          addReaction: (rowIndex, reaction) =>
+            this.runGas('addReaction', rowIndex, reaction, this.state.sheetName),
+          toggleHighlight: (rowIndex, current) =>
+            this.runGas('toggleHighlight', rowIndex, this.state.sheetName, current),
           checkAdmin: () => this.runGas('checkAdmin')
         };
         
@@ -931,6 +936,7 @@
           if (DEBUG) console.log('Calling getPublishedSheetData with:', { selectedClass, sortOrder });
           const data = await this.gas.getPublishedSheetData(selectedClass, sortOrder); // GASからデータを取得
           if (DEBUG) console.log('Received data:', data);
+          this.state.sheetName = data.sheetName;
           if (typeof data.showDetails !== 'undefined') {
             this.serverShowDetails = data.showDetails;
             if (!this.state.showAdminFeatures) {
