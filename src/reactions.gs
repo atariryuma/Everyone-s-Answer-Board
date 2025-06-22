@@ -1,5 +1,8 @@
 const admin = require('./admin.gs');
-const { handleError } = require('./ErrorHandling.gs');
+// Use global handleError in Apps Script; import for Node tests
+if (typeof module !== 'undefined') {
+  var handleError = require('./ErrorHandling.gs').handleError;
+}
 const REACTION_KEYS = ['UNDERSTAND','LIKE','CURIOUS'];
 
 function parseReactionString(val) {
