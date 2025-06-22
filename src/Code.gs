@@ -38,7 +38,6 @@ const TIME_CONSTANTS = {
   LOCK_WAIT_MS: 10000
 };
 
-const REACTION_KEYS = ["UNDERSTAND","LIKE","CURIOUS"];
 var safeGetUserEmail, getAdminEmails, isUserAdmin, checkAdmin;
 var getAdminSettings, publishApp, unpublishApp, setShowDetails;
 var getSheets, getAppSettings;
