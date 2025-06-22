@@ -39,42 +39,16 @@ const TIME_CONSTANTS = {
 };
 
 const REACTION_KEYS = ["UNDERSTAND","LIKE","CURIOUS"];
+var safeGetUserEmail, getAdminEmails, isUserAdmin, checkAdmin;
+var getAdminSettings, publishApp, unpublishApp, setShowDetails;
+var getSheets, getAppSettings;
+var saveWebAppUrl, getWebAppUrl, saveDeployId;
+var parseReactionString, addReaction, toggleHighlight;
 var getConfig;
 if (typeof global !== 'undefined' && global.getConfig) {
   getConfig = global.getConfig;
 }
 
-function safeGetUserEmail() {
-  try {
-    return Session.getActiveUser().getEmail();
-  } catch (e) {
-    return '';
-  }
-}
-
-function getAdminEmails() {
-  const props = PropertiesService.getScriptProperties();
-  const str = props.getProperty('ADMIN_EMAILS') || '';
-  return str.split(',').map(e => e.trim()).filter(Boolean);
-}
-
-function isUserAdmin(email) {
-  const userEmail = email || safeGetUserEmail();
-  return getAdminEmails().includes(userEmail);
-}
-
-function checkAdmin() {
-  return isUserAdmin();
-}
-
-function parseReactionString(val) {
-  if (!val) return [];
-  return val
-    .toString()
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
-}
 
 
 // =================================================================
@@ -83,86 +57,11 @@ function parseReactionString(val) {
 /**
  * スプレッドシートを開いた時に「アプリ管理」メニューを追加します。
  */
-function onOpen() {
-  SpreadsheetApp.getUi()
-      .createMenu('アプリ管理')
-      .addItem('管理パネルを開く', 'showAdminSidebar')
-      .addSeparator()
-      .addItem('名簿キャッシュをリセット', 'clearRosterCache')
-      .addItem('設定シートを追加', 'createConfigSheet')
-      .addToUi();
-}
-
-/**
- * 管理用サイドバーを表示します。
- */
-function showAdminSidebar() {
-  const html = HtmlService.createHtmlOutputFromFile('SheetSelector')
-      .setTitle('管理パネル');
-  SpreadsheetApp.getUi().showSidebar(html);
-}
 
 /**
  * 管理パネルの初期化に必要なデータを取得します。
  * @returns {object} - 現在の公開状態とシートのリスト
  */
-function getAdminSettings() {
-  const props = PropertiesService.getScriptProperties();
-  const allSheets = getSheets();
-  const currentUserEmail = safeGetUserEmail();
-  const adminEmails = getAdminEmails();
-  const appSettings = getAppSettings();
-  return {
-    allSheets: allSheets,
-    currentUserEmail: currentUserEmail,
-    deployId: props.getProperty('DEPLOY_ID'),
-    webAppUrl: getWebAppUrl(),
-    adminEmails: adminEmails,
-    isUserAdmin: adminEmails.includes(currentUserEmail),
-    isPublished: appSettings.isPublished,
-    activeSheetName: appSettings.activeSheetName,
-    showDetails: appSettings.showDetails
-  };
-}
-
-/**
- * 指定されたシートでアプリを公開します。
- * @param {string} sheetName - 公開するシート名。
- */
-function publishApp(sheetName) {
-  if (!checkAdmin()) {
-    throw new Error('権限がありません。');
-  }
-  if (!sheetName) {
-    throw new Error('シート名が指定されていません。');
-  }
-  prepareSheetForBoard(sheetName);
-  const properties = PropertiesService.getScriptProperties();
-  properties.setProperty(APP_PROPERTIES.IS_PUBLISHED, 'true');
-  properties.setProperty(APP_PROPERTIES.ACTIVE_SHEET, sheetName);
-  return `「${sheetName}」を公開しました。`;
-}
-
-/**
- * アプリの公開を終了します。
- */
-function unpublishApp() {
-  if (!checkAdmin()) {
-    throw new Error('権限がありません。');
-  }
-  const properties = PropertiesService.getScriptProperties();
-  properties.setProperty(APP_PROPERTIES.IS_PUBLISHED, 'false');
-  return 'アプリを非公開にしました。';
-}
-
-function setShowDetails(flag) {
-  if (!checkAdmin()) {
-    throw new Error('権限がありません。');
-  }
-  const properties = PropertiesService.getScriptProperties();
-  properties.setProperty(APP_PROPERTIES.SHOW_DETAILS, String(flag));
-  return `詳細表示を${flag ? '有効' : '無効'}にしました。`;
-}
 
 
 
@@ -237,19 +136,6 @@ function getPublishedSheetData(classFilter, sortBy) {
 // =================================================================
 // 内部処理関数
 // =================================================================
-function getSheets() {
-  try {
-    const allSheets = SpreadsheetApp.getActiveSpreadsheet().getSheets();
-    const visibleSheets = allSheets.filter(sheet => !sheet.isSheetHidden());
-    const filtered = visibleSheets.filter(sheet => {
-      const name = sheet.getName();
-      return name !== 'Config' && name !== ROSTER_CONFIG.SHEET_NAME;
-    });
-    return filtered.map(sheet => sheet.getName());
-  } catch (error) {
-    handleError('getSheets', error);
-  }
-}
 
 function getSheetHeaders(sheetName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
@@ -367,109 +253,8 @@ function buildBoardData(sheetName) {
   return { header: cfg.questionHeader, entries };
 }
 
-function addReaction(rowIndex, reactionKey) {
-  if (!rowIndex || !reactionKey || !COLUMN_HEADERS[reactionKey]) {
-    return { status: 'error', message: '無効なパラメータです。' };
-  }
-  const lock = LockService.getScriptLock();
-  try {
-    if (!lock.tryLock(TIME_CONSTANTS.LOCK_WAIT_MS)) {
-      return { status: 'error', message: '他のユーザーが操作中です。しばらく待ってから再試行してください。' };
-    }
-    const userEmail = safeGetUserEmail();
-    if (!userEmail) {
-      return { status: 'error', message: 'ログインしていないため、操作できません。' };
-    }
-    const settings = getAppSettings();
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(settings.activeSheetName);
-    if (!sheet) throw new Error(`シート '${settings.activeSheetName}' が見つかりません。`);
-
-  const reactionHeaders = REACTION_KEYS.map(k => COLUMN_HEADERS[k]);
-  const headerIndices = getHeaderIndices(settings.activeSheetName);
-  const startCol = headerIndices[reactionHeaders[0]] + 1;
-  const reactionRange = sheet.getRange(rowIndex, startCol, 1, REACTION_KEYS.length);
-  const values = reactionRange.getValues()[0];
-  const lists = {};
-  REACTION_KEYS.forEach((k, idx) => {
-    lists[k] = { arr: parseReactionString(values[idx]) };
-  });
-
-    const wasReacted = lists[reactionKey].arr.includes(userEmail);
-    Object.keys(lists).forEach(key => {
-      const idx = lists[key].arr.indexOf(userEmail);
-      if (idx > -1) lists[key].arr.splice(idx, 1);
-    });
-    if (!wasReacted) {
-      lists[reactionKey].arr.push(userEmail);
-    }
-    reactionRange.setValues([
-      REACTION_KEYS.map(k => lists[k].arr.join(','))
-    ]);
-
-    const reactions = REACTION_KEYS.reduce((obj, k) => {
-      obj[k] = {
-        count: lists[k].arr.length,
-        reacted: lists[k].arr.includes(userEmail)
-      };
-      return obj;
-    }, {});
-    return { status: 'ok', reactions: reactions };
-  } catch (error) {
-    return handleError('addReaction', error, true);
-  } finally {
-    try { lock.releaseLock(); } catch (e) {}
-  }
-}
-
-function toggleHighlight(rowIndex) {
-  if (!checkAdmin()) {
-    return { status: 'error', message: '権限がありません。' };
-  }
-  const lock = LockService.getScriptLock();
-  lock.waitLock(TIME_CONSTANTS.LOCK_WAIT_MS);
-  try {
-    const sheetName = getAppSettings().activeSheetName;
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-    if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
-
-    const headerIndices = getHeaderIndices(sheetName);
-    const colIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT] + 1;
-
-    const cell = sheet.getRange(rowIndex, colIndex);
-    const current = !!cell.getValue();
-    const newValue = !current;
-    cell.setValue(newValue);
-    return { status: 'ok', highlight: newValue };
-  } catch (error) {
-    return handleError('toggleHighlight', error, true);
-  } finally {
-    lock.releaseLock();
-  }
-}
 
 
-function getAppSettings() {
-  const properties = PropertiesService.getScriptProperties() || {};
-  const getProp = typeof properties.getProperty === 'function' ? (k) => properties.getProperty(k) : () => null;
-  const published = getProp(APP_PROPERTIES.IS_PUBLISHED);
-  const sheet = getProp(APP_PROPERTIES.ACTIVE_SHEET);
-  const showDetailsProp = getProp(APP_PROPERTIES.SHOW_DETAILS);
-  let activeName = sheet;
-  if (!activeName) {
-    try {
-      const sheets = getSheets();
-      activeName = sheets[0] || '';
-    } catch (error) {
-      console.error('getAppSettings Error:', error);
-      activeName = '';
-    }
-  }
-  return {
-    isPublished: published === null ? true : published === 'true',
-    activeSheetName: activeName,
-    showDetails: showDetailsProp === 'true'
-  };
-}
 
 function getRosterMap() {
   const cache = CacheService.getScriptCache();
@@ -562,20 +347,6 @@ function clearRosterCache() {
   } catch (e) { /* no-op */ }
 }
 
-function saveWebAppUrl(url) {
-  const props = PropertiesService.getScriptProperties();
-  props.setProperties({ WEB_APP_URL: (url || '').trim() });
-}
-
-function getWebAppUrl() {
-  const props = PropertiesService.getScriptProperties();
-  return (props.getProperty('WEB_APP_URL') || '').trim();
-}
-
-function saveDeployId(id) {
-  const props = PropertiesService.getScriptProperties();
-  props.setProperties({ DEPLOY_ID: (id || '').trim() });
-}
 
 function createTemplateSheet(name) {
   if (!checkAdmin()) {
@@ -610,8 +381,30 @@ function createTemplateSheet(name) {
 if (typeof module !== 'undefined') {
   const { handleError } = require('./ErrorHandling.gs');
   const { getConfig, saveSheetConfig, createConfigSheet } = require('./config.gs');
+  const admin = require('./admin.gs');
+  const reactions = require('./reactions.gs');
+
+  ({
+    safeGetUserEmail,
+    getAdminEmails,
+    isUserAdmin,
+    checkAdmin,
+    getSheets,
+    getAppSettings,
+    getAdminSettings,
+    publishApp,
+    unpublishApp,
+    setShowDetails,
+    saveWebAppUrl,
+    getWebAppUrl,
+    saveDeployId
+  } = admin);
+
+  ({ parseReactionString, addReaction, toggleHighlight } = reactions);
+
   module.exports = {
     COLUMN_HEADERS,
+    TIME_CONSTANTS,
     getAdminSettings,
     publishApp,
     unpublishApp,
