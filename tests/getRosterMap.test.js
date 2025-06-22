@@ -25,12 +25,16 @@ function setupMocks(cacheValue) {
       getSheetByName: jest.fn(() => sheet)
     })
   };
+  global.PropertiesService = {
+    getScriptProperties: () => ({ getProperty: () => null })
+  };
   return { sheet, cache: cacheObj };
 }
 
 afterEach(() => {
   delete global.CacheService;
   delete global.SpreadsheetApp;
+  delete global.PropertiesService;
 });
 
 test('getRosterMap builds map and caches it', () => {
@@ -60,5 +64,20 @@ test('getRosterMap returns cached map when available', () => {
   expect(result).toEqual(cached);
   expect(sheetCall).not.toHaveBeenCalled();
   expect(cache.put).not.toHaveBeenCalled();
+});
+
+test('getRosterMap uses ROSTER_SHEET_NAME property when set', () => {
+  const { sheet } = setupMocks(null);
+  const spy = jest.fn(() => sheet);
+  global.SpreadsheetApp = {
+    getActiveSpreadsheet: () => ({ getSheetByName: spy })
+  };
+  global.PropertiesService = {
+    getScriptProperties: () => ({ getProperty: () => 'RosterSheet' })
+  };
+
+  getRosterMap();
+
+  expect(spy).toHaveBeenCalledWith('RosterSheet');
 });
 

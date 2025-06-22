@@ -7,12 +7,19 @@ function setup(userEmail, adminEmails) {
   };
   global.PropertiesService = { getScriptProperties: () => props };
   global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };
+  const sheet = {
+    getLastColumn: () => 2,
+    getRange: () => ({ getValues: () => [['a','b']], setValue: jest.fn() }),
+    insertColumnAfter: jest.fn()
+  };
+  global.SpreadsheetApp = { getActiveSpreadsheet: () => ({ getSheetByName: () => sheet }) };
   return props;
 }
 
 afterEach(() => {
   delete global.PropertiesService;
   delete global.Session;
+  delete global.SpreadsheetApp;
 });
 
 test('publishApp succeeds for admin user', () => {
