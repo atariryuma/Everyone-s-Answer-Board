@@ -362,6 +362,7 @@
       'magnifying-glass-plus-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6"/></svg>',
       'magnifying-glass-plus-solid': '<svg viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z M9.75 7.5v2.25H7.5v1.5h2.25V13.5h1.5v-2.25H13.5v-1.5h-2.25V7.5h-1.5z" fill="currentColor"/><path d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15zM16.5 16.5l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       'x': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+      'star-outline': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
       'star': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
       'grid-2x2': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
       'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
@@ -1200,7 +1201,7 @@
           const cls = data.highlight ? 'liked' : '';
           const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
           highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-yellow-400 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' +
-                             this.getIcon('star', 'w-5 h-5') +
+                             this.getIcon('star', 'w-5 h-5', data.highlight) +
                              '</button>';
         }
         
@@ -1343,6 +1344,11 @@
        * @param {number} rowIndex - 回答の行インデックス
        */
       async handleHighlight(rowIndex) {
+        const btns = document.querySelectorAll('.highlight-btn[data-row-index="' + rowIndex + '"]');
+        btns.forEach(btn => {
+          btn.disabled = true;
+          btn.setAttribute('aria-disabled', 'true');
+        });
         try {
           const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
           // GAS関数を呼び出し、ハイライト状態を切り替える
@@ -1359,6 +1365,11 @@
           }
         } catch (error) {
           console.error('Failed to toggle highlight:', error);
+        } finally {
+          btns.forEach(btn => {
+            btn.disabled = false;
+            btn.setAttribute('aria-disabled', 'false');
+          });
         }
       }
 
@@ -1532,6 +1543,12 @@
               highlightBtn.setAttribute('aria-pressed', String(item.highlight));
               const label = item.highlight ? 'ハイライトを解除する' : 'ハイライトする';
               highlightBtn.setAttribute('aria-label', label);
+              const svgEl = highlightBtn.querySelector('svg');
+              if (svgEl) {
+                svgEl.outerHTML = this.getIcon('star', 'w-5 h-5', item.highlight);
+              }
+              highlightBtn.disabled = false;
+              highlightBtn.setAttribute('aria-disabled', 'false');
             }
 
             // ハイライトバッジの表示/非表示を制御
