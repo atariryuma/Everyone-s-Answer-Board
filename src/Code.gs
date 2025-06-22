@@ -67,6 +67,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('アプリ管理')
     .addItem('管理パネルを開く', 'showAdminDialog')
+    .addItem('Config/Rosterシート作成', 'createConfigSheet')
     .addToUi();
 }
 
