@@ -308,6 +308,24 @@
     </div>
   </div>
 
+  <div id="infoModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300" role="dialog" aria-modal="true">
+    <div id="infoModalCard" class="glass-panel rounded-xl p-6 shadow-2xl border-2 border-cyan-400/80 w-full max-w-lg transform scale-95 transition-transform duration-300 relative" role="document">
+      <div class="space-y-4 text-gray-200 text-lg leading-relaxed">
+        <p>みんなの意見を気持ちよく共有するために、リアクションのしかたをおぼえよう！</p>
+        <ul class="space-y-2">
+          <li class="flex items-center gap-2"><span id="infoIconLike" class="w-5 h-5 text-red-400"></span>いいね：すてきだと思ったときに押そう</li>
+          <li class="flex items-center gap-2"><span id="infoIconUnderstand" class="w-5 h-5 text-yellow-400"></span>なるほど：参考になったときに押そう</li>
+          <li class="flex items-center gap-2"><span id="infoIconCurious" class="w-5 h-5 text-green-400"></span>きになる：もっと知りたいときに押そう</li>
+        </ul>
+        <p class="flex items-center gap-2"><span id="infoIconHighlight" class="w-5 h-5 text-yellow-300"></span>先生が注目してほしい意見につけています</p>
+        <p>責任あるリアクションで、みんなで学びを深めよう！</p>
+        <div class="text-center mt-6">
+          <button id="infoModalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">わかった</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <footer id="controlsFooter" class="fixed bottom-0 left-0 right-0 z-40 p-4">
     <div class="glass-panel max-w-md mx-auto rounded-xl p-3 flex items-center justify-center gap-3">
       <input type="range" id="sizeSlider" min="2" max="6" value="4" class="w-1/2" aria-label="表示列数の変更">
@@ -373,6 +391,13 @@
           modalStudentName: document.getElementById('modalStudentName'),
           modalReactionContainer: document.getElementById('modalReactions'),
           modalFooter: document.getElementById('modalFooter'),
+          infoModalContainer: document.getElementById('infoModalContainer'),
+          infoModalCard: document.getElementById('infoModalCard'),
+          infoModalConfirmBtn: document.getElementById('infoModalConfirmBtn'),
+          infoIconLike: document.getElementById('infoIconLike'),
+          infoIconUnderstand: document.getElementById('infoIconUnderstand'),
+          infoIconCurious: document.getElementById('infoIconCurious'),
+          infoIconHighlight: document.getElementById('infoIconHighlight'),
           classFilter: document.getElementById('classFilter'),
           sortOrder: document.getElementById('sortOrder'),
           scoreOption: document.getElementById('scoreOption'), // スコア順オプション
@@ -520,6 +545,9 @@
         this.loadInitialData(); // 初期データのロード
         this.setupInitialModeButton(); // モード切り替えボタンの初期設定
         this.updateSortOptions(); // ソートオプションの更新（スコア順の表示/非表示）
+        if (!localStorage.getItem('introSeen')) {
+          this.showInfoModal();
+        }
       }
 
       /**
@@ -542,6 +570,9 @@
             this.hideAnswerModal();
           }
         });
+        if (this.elements.infoModalConfirmBtn) {
+          this.elements.infoModalConfirmBtn.addEventListener('click', () => this.hideInfoModal());
+        }
         // モーダル内のリアクションボタン
         this.elements.modalReactionContainer.addEventListener('click', (e) => {
           const btn = e.target.closest('.reaction-btn');
@@ -1553,21 +1584,55 @@
        */
       hideAnswerModal() {
         // モーダル非表示のアニメーション
-        gsap.to(this.elements.answerModalContainer, { 
-          opacity: 0, 
-          duration: 0.3, 
-          onComplete: () => this.elements.answerModalContainer.classList.add('hidden') 
+        gsap.to(this.elements.answerModalContainer, {
+          opacity: 0,
+          duration: 0.3,
+          onComplete: () => this.elements.answerModalContainer.classList.add('hidden')
         });
-        gsap.to(this.elements.answerModalCard, { 
-          scale: 0.95, 
-          duration: 0.3, 
-          ease: 'power2.in', 
+        gsap.to(this.elements.answerModalCard, {
+          scale: 0.95,
+          duration: 0.3,
+          ease: 'power2.in',
           onComplete: () => {
             if (this.state.lastFocusedElement) {
               this.state.lastFocusedElement.focus(); // モーダル表示前の要素にフォーカスを戻す
             }
           }
         });
+      }
+
+      /**
+       * 情報モーダルを表示
+       */
+      showInfoModal() {
+        this.state.lastFocusedElement = document.activeElement;
+        this.elements.infoModalContainer.classList.remove('hidden');
+        gsap.to(this.elements.infoModalContainer, { opacity: 1, duration: 0.3 });
+        gsap.fromTo(this.elements.infoModalCard,
+          { scale: 0.95 },
+          {
+            scale: 1,
+            duration: 0.3,
+            ease: 'back.out',
+            onComplete: () => this.elements.infoModalConfirmBtn.focus()
+          }
+        );
+      }
+
+      /**
+       * 情報モーダルを非表示
+       */
+      hideInfoModal() {
+        gsap.to(this.elements.infoModalContainer, {
+          opacity: 0,
+          duration: 0.3,
+          onComplete: () => this.elements.infoModalContainer.classList.add('hidden')
+        });
+        gsap.to(this.elements.infoModalCard, { scale: 0.95, duration: 0.3, ease: 'power2.in' });
+        localStorage.setItem('introSeen', '1');
+        if (this.state.lastFocusedElement) {
+          this.state.lastFocusedElement.focus();
+        }
       }
       
       /**
@@ -1601,6 +1666,18 @@
       renderIcons() {
         this.elements.answerModalCloseBtn.innerHTML = this.getIcon('x', 'w-6 h-6');
         this.elements.footerIcon.innerHTML = this.getIcon('grid-2x2');
+        if (this.elements.infoIconLike) {
+          this.elements.infoIconLike.innerHTML = this.getIcon('hand-thumb-up');
+        }
+        if (this.elements.infoIconUnderstand) {
+          this.elements.infoIconUnderstand.innerHTML = this.getIcon('lightbulb');
+        }
+        if (this.elements.infoIconCurious) {
+          this.elements.infoIconCurious.innerHTML = this.getIcon('magnifying-glass-plus');
+        }
+        if (this.elements.infoIconHighlight) {
+          this.elements.infoIconHighlight.innerHTML = this.getIcon('star');
+        }
       }
 
       /**

@@ -11,7 +11,7 @@ function setup({configRows, dataRows, rosterRows}) {
         if (name === 'Sheet1') {
           return { getDataRange: () => ({ getValues: () => dataRows }) };
         }
-        if (name === 'sheet 1') {
+        if (name === 'roster') {
           return { getDataRange: () => ({ getValues: () => rosterRows }) };
         }
         return null;
@@ -19,6 +19,9 @@ function setup({configRows, dataRows, rosterRows}) {
     })
   };
   global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null, remove: () => null }) };
+  global.PropertiesService = {
+    getScriptProperties: () => ({ getProperty: () => null })
+  };
   global.getConfig = (sheetName) => {
     const row = configRows.find((r, idx) => idx > 0 && r[0] === sheetName);
     if (!row) throw new Error('missing');
@@ -41,6 +44,7 @@ function setup({configRows, dataRows, rosterRows}) {
 afterEach(() => {
   delete global.SpreadsheetApp;
   delete global.CacheService;
+  delete global.PropertiesService;
   delete global.getConfig;
   delete global.getRosterMap;
 });

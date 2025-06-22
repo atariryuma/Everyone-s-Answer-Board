@@ -34,7 +34,7 @@ The sheet you publish must contain the following columns:
 - **予想したわけを書きましょう。** – explanation shown when opening a card
 - **いいね！** – comma separated list of users who liked the answer
 
-A separate sheet named `sheet 1` should contain roster information with the columns `姓`, `名`, `ニックネーム` and `Googleアカウント`. These names are shown on the board instead of raw email addresses.
+A separate sheet named `roster` should contain roster information with the columns `学年`, `組`, `番号`, `姓`, `名`, `Googleアカウント`, `ニックネーム`. These names are shown on the board instead of raw email addresses. If your roster sheet has a different name, set the `ROSTER_SHEET_NAME` script property to override the default.
 
 ## Managing the board
 
@@ -51,6 +51,25 @@ When unpublished, visiting the Web App URL shows a message that the board is clo
 ### Admin interface
 
 Administrators see a toggle button that allows switching between viewing and management modes. The list of administrator email addresses is set in the `ADMIN_EMAILS` script property.
+
+### Setting `ADMIN_EMAILS`
+
+1. Open the Apps Script **Project Settings** and expand **Script Properties**.
+2. Click **Add script property** and set the name to `ADMIN_EMAILS`.
+3. Enter a comma‑separated list of addresses and save.
+
+You can also set the value from the console:
+
+```javascript
+PropertiesService.getScriptProperties()
+  .setProperty('ADMIN_EMAILS', 'teacher1@example.com,teacher2@example.com');
+```
+
+### Setting `ROSTER_SHEET_NAME`
+
+1. Open the Apps Script **Project Settings** and expand **Script Properties**.
+2. Add a property named `ROSTER_SHEET_NAME` and set its value to your roster sheet's name.
+3. Leave it blank or remove it to use the default `roster`.
 
 ## Front‑end features
 

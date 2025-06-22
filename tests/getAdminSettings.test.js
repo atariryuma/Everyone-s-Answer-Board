@@ -18,7 +18,7 @@ function setup() {
         { getName: () => 'SheetA', isSheetHidden: () => false },
         { getName: () => 'SheetB', isSheetHidden: () => false },
         { getName: () => 'Config', isSheetHidden: () => false },
-        { getName: () => 'sheet 1', isSheetHidden: () => false }
+        { getName: () => 'roster', isSheetHidden: () => false }
       ]
     })
   };
