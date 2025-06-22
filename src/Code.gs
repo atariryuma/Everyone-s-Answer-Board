@@ -184,7 +184,10 @@ function doGet(e) {
   }
 
   const sheetName = (e && e.parameter && e.parameter.sheetName) ? e.parameter.sheetName : settings.activeSheetName;
-  const mapping = (typeof getConfig === 'function') ? getConfig(sheetName) : {};
+  const configFn = (typeof global !== 'undefined' && global.getConfig)
+      ? global.getConfig
+      : (typeof getConfig === 'function' ? getConfig : null);
+  const mapping = configFn ? configFn(sheetName) : {};
   const userEmail = safeGetUserEmail();
 
   const template = HtmlService.createTemplateFromFile('Page');
@@ -266,7 +269,9 @@ function getSheetData(sheetName, classFilter, sortBy) {
     const allValues = sheet.getDataRange().getValues();
     if (allValues.length < 1) return { header: "シートにデータがありません", rows: [] };
 
-    const cfgFunc = (typeof getConfig === 'function') ? getConfig : null;
+    const cfgFunc = (typeof global !== 'undefined' && global.getConfig)
+      ? global.getConfig
+      : (typeof getConfig === 'function' ? getConfig : null);
     const cfg = cfgFunc ? cfgFunc(sheetName) : {};
     const answerHeader = cfg.answerHeader || COLUMN_HEADERS.OPINION;
     const reasonHeader = cfg.reasonHeader || COLUMN_HEADERS.REASON;
