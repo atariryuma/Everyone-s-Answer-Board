@@ -978,8 +978,10 @@
         } catch (error) {
           console.error('Error loading sheet data:', error);
           const errorMessage = this.escapeHtml(error.message || 'Unknown error');
+          // Remove skeletons before showing the error message
+          this.elements.answersContainer.querySelectorAll('.skeleton').forEach(el => el.remove());
           // エラーメッセージを表示
-          this.elements.answersContainer.innerHTML = 
+          this.elements.answersContainer.innerHTML =
             '<div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg">' +
             '<p class="font-bold">データの読み込みに失敗しました。</p>' +
             '<p class="text-sm mt-2">' + errorMessage + '</p>' +
@@ -1015,6 +1017,8 @@
       renderBoard(isLayoutChange = false, oldRows = []) {
         if (DEBUG) console.log('renderBoard called with:', { isLayoutChange, newRowsCount: this.state.currentAnswers.length });
         const container = this.elements.answersContainer;
+        // Remove any skeleton placeholders before rendering
+        container.querySelectorAll('.skeleton').forEach(el => el.remove());
         const newRows = this.state.currentAnswers;
         
         // 旧い要素の位置を記録
