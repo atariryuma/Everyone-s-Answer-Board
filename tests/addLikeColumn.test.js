@@ -20,13 +20,25 @@ function buildSheet() {
     getLastColumn: () => headerRow.length,
     getRange: jest.fn((row, col, numRows, numCols) => {
       if (row === 1 && col === 1) {
-        return { getValues: () => [headerRow] };
+        const len = numCols || headerRow.length;
+        return { getValues: () => [headerRow.slice(0, len)] };
       }
-      if (row === 2 && col === 6 && numRows === 1 && numCols === 3) {
+      const header = headerRow[col - 1];
+      if (numRows === 1 && numCols === 1 || numRows === undefined) {
         return {
-          getValues: () => [[values.UNDERSTAND, values.LIKE, values.CURIOUS]],
+          getValue: () => values[Object.keys(COLUMN_HEADERS).find(k => COLUMN_HEADERS[k] === header)] || '',
+          setValue: (val) => {
+            const key = Object.keys(COLUMN_HEADERS).find(k => COLUMN_HEADERS[k] === header);
+            values[key] = val;
+          }
+        };
+      }
+      if (row === 2 && numRows === 1 && numCols === 3) {
+        const headers = headerRow.slice(col - 1, col - 1 + numCols);
+        return {
+          getValues: () => [headers.map(h => { const key = Object.keys(COLUMN_HEADERS).find(k => COLUMN_HEADERS[k] === h); return values[key] || ''; })],
           setValues: (rows) => {
-            [values.UNDERSTAND, values.LIKE, values.CURIOUS] = rows[0];
+            headers.forEach((h, i) => { const key = Object.keys(COLUMN_HEADERS).find(k => COLUMN_HEADERS[k] === h); values[key] = rows[0][i]; });
           }
         };
       }
@@ -65,8 +77,7 @@ test('addReaction updates value in LIKE column', () => {
   setupMocks('like@example.com', sheet);
   const result = addReaction(2, 'LIKE');
   expect(result.status).toBe('ok');
-  expect(sheet.getRange.mock.calls[1][0]).toBe(2);
-  expect(sheet.getRange.mock.calls[1][1]).toBe(6);
+  expect(sheet.values.LIKE).toBe('like@example.com');
 });
 
 test('addReaction handles failure to get user email', () => {

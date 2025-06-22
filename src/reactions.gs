@@ -44,14 +44,12 @@ function addReaction(rowIndex, reactionKey) {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(settings.activeSheetName);
     if (!sheet) throw new Error(`シート '${settings.activeSheetName}' が見つかりません。`);
 
-    const reactionHeaders = REACTION_KEYS.map(k => COLUMN_HEADERS[k]);
     const headerIndices = getHeaderIndices(settings.activeSheetName);
-    const startCol = headerIndices[reactionHeaders[0]] + 1;
-    const reactionRange = sheet.getRange(rowIndex, startCol, 1, REACTION_KEYS.length);
-    const values = reactionRange.getValues()[0];
     const lists = {};
-    REACTION_KEYS.forEach((k, idx) => {
-      lists[k] = { arr: parseReactionString(values[idx]) };
+    REACTION_KEYS.forEach(k => {
+      const col = headerIndices[COLUMN_HEADERS[k]] + 1;
+      const val = sheet.getRange(rowIndex, col).getValue();
+      lists[k] = { arr: parseReactionString(val), col: col };
     });
 
     const wasReacted = lists[reactionKey].arr.includes(userEmail);
@@ -62,9 +60,9 @@ function addReaction(rowIndex, reactionKey) {
     if (!wasReacted) {
       lists[reactionKey].arr.push(userEmail);
     }
-    reactionRange.setValues([
-      REACTION_KEYS.map(k => lists[k].arr.join(','))
-    ]);
+    REACTION_KEYS.forEach(k => {
+      sheet.getRange(rowIndex, lists[k].col).setValue(lists[k].arr.join(','));
+    });
     if (typeof SpreadsheetApp !== 'undefined' && typeof SpreadsheetApp.flush === 'function') {
       SpreadsheetApp.flush();
     }

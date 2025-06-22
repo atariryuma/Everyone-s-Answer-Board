@@ -19,16 +19,22 @@ function buildSheet() {
   return {
     getLastColumn: () => headerRow.length,
     getRange: jest.fn((row, col, numRows, numCols) => {
-      if (row === 1) {
-        return { getValues: () => [headerRow] };
+      if (row === 1 && col === 1) {
+        const len = numCols || headerRow.length;
+        return { getValues: () => [headerRow.slice(0, len)] };
+      }
+      const header = headerRow[col - 1];
+      if (numRows === 1 && numCols === 1 || numRows === undefined) {
+        return {
+          getValue: () => values[Object.keys(COLUMN_HEADERS).find(k => COLUMN_HEADERS[k] === header)] || '',
+          setValue: (val) => {
+            const key = Object.keys(COLUMN_HEADERS).find(k => COLUMN_HEADERS[k] === header);
+            values[key] = val;
+          }
+        };
       }
       const headers = headerRow.slice(col - 1, col - 1 + numCols);
       return {
-        getValue: () => values[Object.keys(COLUMN_HEADERS).find(k => COLUMN_HEADERS[k] === headers[0])] || '',
-        setValue: (val) => {
-          const key = Object.keys(COLUMN_HEADERS).find(k => COLUMN_HEADERS[k] === headers[0]);
-          values[key] = val;
-        },
         getValues: () => [headers.map(h => {
           const key = Object.keys(COLUMN_HEADERS).find(k => COLUMN_HEADERS[k] === h);
           return values[key] || '';
