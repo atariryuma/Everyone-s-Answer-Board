@@ -72,12 +72,12 @@ test('addReaction toggles user in list', () => {
   const sheet = buildSheet();
   setupMocks('b@example.com', sheet);
 
-  const result1 = addReaction(2, 'UNDERSTAND');
+  const result1 = addReaction(2, 'UNDERSTAND', 'Sheet1');
   expect(result1.status).toBe('ok');
   expect(result1.reactions.UNDERSTAND.count).toBe(2);
   expect(result1.reactions.UNDERSTAND.reacted).toBe(true);
 
-  const result2 = addReaction(2, 'UNDERSTAND');
+  const result2 = addReaction(2, 'UNDERSTAND', 'Sheet1');
   expect(result2.status).toBe('ok');
   expect(result2.reactions.UNDERSTAND.count).toBe(1);
   expect(result2.reactions.UNDERSTAND.reacted).toBe(false);
@@ -87,13 +87,13 @@ test('addReaction switches reaction columns', () => {
   const sheet = buildSheet();
   setupMocks('c@example.com', sheet);
 
-  const res1 = addReaction(2, 'LIKE');
+  const res1 = addReaction(2, 'LIKE', 'Sheet1');
   expect(res1.status).toBe('ok');
   expect(sheet.values.LIKE).toBe('c@example.com');
   expect(sheet.values.UNDERSTAND).toBe('a@example.com');
   expect(res1.reactions.LIKE.reacted).toBe(true);
 
-  const res2 = addReaction(2, 'CURIOUS');
+  const res2 = addReaction(2, 'CURIOUS', 'Sheet1');
   expect(res2.status).toBe('ok');
   expect(sheet.values.LIKE).toBe('');
   expect(sheet.values.CURIOUS).toBe('c@example.com');
@@ -105,7 +105,7 @@ test('addReaction errors when user email is empty', () => {
   const sheet = buildSheet();
   setupMocks('', sheet);
 
-  const result = addReaction(2, 'UNDERSTAND');
+  const result = addReaction(2, 'UNDERSTAND', 'Sheet1');
   expect(result.status).toBe('error');
 });
 
@@ -118,8 +118,8 @@ test('addReaction reads headers only once with cache', () => {
   };
   setupMocks('cache@example.com', sheet, cache);
 
-  addReaction(2, 'LIKE');
-  addReaction(2, 'LIKE');
+  addReaction(2, 'LIKE', 'Sheet1');
+  addReaction(2, 'LIKE', 'Sheet1');
 
   const headerCalls = sheet.getRange.mock.calls.filter(c => c[0] === 1).length;
   expect(headerCalls).toBe(1);

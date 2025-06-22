@@ -443,9 +443,9 @@
         // Google Apps Script関数へのラッパー
         this.gas = {
           getPublishedSheetData: (classFilter, sort) => this.runGas('getPublishedSheetData', classFilter, sort),
-          addLike: (rowIndex) => this.runGas('addReaction', rowIndex, 'LIKE'),
-          addReaction: (rowIndex, reaction) => this.runGas('addReaction', rowIndex, reaction),
-          toggleHighlight: (rowIndex) => this.runGas('toggleHighlight', rowIndex),
+          addLike: (rowIndex) => this.runGas('addReaction', rowIndex, 'LIKE', SHEET_NAME),
+          addReaction: (rowIndex, reaction) => this.runGas('addReaction', rowIndex, reaction, SHEET_NAME),
+          toggleHighlight: (rowIndex, current) => this.runGas('toggleHighlight', rowIndex, SHEET_NAME, current),
           checkAdmin: () => this.runGas('checkAdmin')
         };
         
@@ -853,7 +853,7 @@
               });
             } else if (funcName === 'toggleHighlight') {
               // ハイライトトグルのモック
-              const currentHighlight = args[1] === undefined ? false : !args[1]; // 現在のハイライト状態を反転させる
+              const currentHighlight = args[2] === undefined ? (args[1] === undefined ? false : !args[1]) : !args[2];
               resolve({
                 status: 'ok',
                 highlight: currentHighlight
