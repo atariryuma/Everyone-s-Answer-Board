@@ -56,6 +56,9 @@
       }
     };
 
+    // デバッグ用フラグ
+    const DEBUG = false;
+
     // プレビューモード検出とモード設定
     const ModeManager = {
       isPreviewMode() {
@@ -531,9 +534,9 @@
        * アプリケーションの初期化処理
        */
       init() {
-        console.log('StudyQuestApp init() called');
-        console.log('Current state:', this.state);
-        console.log('Elements check:', {
+        if (DEBUG) console.log('StudyQuestApp init() called');
+        if (DEBUG) console.log('Current state:', this.state);
+        if (DEBUG) console.log('Elements check:', {
           answersContainer: !!this.elements.answersContainer,
           headingLabel: !!this.elements.headingLabel,
           answerCount: !!this.elements.answerCount
@@ -771,7 +774,7 @@
        * @returns {Promise<any>} モックデータを解決するPromise
        */
       getMockData(funcName, ...args) {
-        console.log('getMockData called with:', funcName, args);
+        if (DEBUG) console.log('getMockData called with:', funcName, args);
         return new Promise((resolve) => {
           setTimeout(() => {
             if (funcName === 'getPublishedSheetData') {
@@ -887,7 +890,7 @@
        * 初期データをロードし、ポーリングを開始
        */
       async loadInitialData() {
-        console.log('DEBUG: loadInitialData started');
+        if (DEBUG) console.log('DEBUG: loadInitialData started');
         
         // 強制的にシンプルなテストカードを表示
         this.elements.answersContainer.innerHTML = '<div class="glass-panel rounded-xl p-4 text-white">テストカード表示中...</div>';
@@ -902,7 +905,7 @@
        * @param {boolean} isInitialLoad - 初回ロードかどうか
        */
       async loadSheetData(showLoading = true, isInitialLoad = false) {
-        console.log('loadSheetData called', { showLoading, isInitialLoad });
+        if (DEBUG) console.log('loadSheetData called', { showLoading, isInitialLoad });
         if (this.state.isLoading && showLoading) return; // すでにロード中の場合は何もしない
         this.state.isLoading = true;
         
@@ -925,9 +928,9 @@
         
         try {
           const sortOrder = this.elements.sortOrder.value;
-          console.log('Calling getPublishedSheetData with:', { selectedClass, sortOrder });
+          if (DEBUG) console.log('Calling getPublishedSheetData with:', { selectedClass, sortOrder });
           const data = await this.gas.getPublishedSheetData(selectedClass, sortOrder); // GASからデータを取得
-          console.log('Received data:', data);
+          if (DEBUG) console.log('Received data:', data);
           if (typeof data.showDetails !== 'undefined') {
             this.serverShowDetails = data.showDetails;
             if (!this.state.showAdminFeatures) {
@@ -950,18 +953,18 @@
           }
 
           // データが変更された場合のみボードをレンダリング
-          console.log('Comparing data:', {
+          if (DEBUG) console.log('Comparing data:', {
             currentAnswers: this.state.currentAnswers.length,
             newRows: data.rows.length,
             dataChanged: JSON.stringify(this.state.currentAnswers) !== JSON.stringify(data.rows)
           });
           if (JSON.stringify(this.state.currentAnswers) !== JSON.stringify(data.rows)) {
-            console.log('Data changed, rendering board with', data.rows.length, 'rows');
+            if (DEBUG) console.log('Data changed, rendering board with', data.rows.length, 'rows');
             this.state.currentAnswers = data.rows;
             this.elements.headingLabel.textContent = this.escapeHtml(data.header || '問題');
             this.renderBoard(false, oldAnswers); // ボードをレンダリング
           } else {
-            console.log('Data unchanged, skipping render');
+            if (DEBUG) console.log('Data unchanged, skipping render');
           }
         } catch (error) {
           console.error('Error loading sheet data:', error);
@@ -1001,7 +1004,7 @@
        * @param {Array<Object>} oldRows - 前回の回答データの配列
        */
       renderBoard(isLayoutChange = false, oldRows = []) {
-        console.log('renderBoard called with:', { isLayoutChange, newRowsCount: this.state.currentAnswers.length });
+        if (DEBUG) console.log('renderBoard called with:', { isLayoutChange, newRowsCount: this.state.currentAnswers.length });
         const container = this.elements.answersContainer;
         const newRows = this.state.currentAnswers;
         
@@ -1090,7 +1093,7 @@
             this.applyUpdates(changedItems);
           }
 
-          console.log('DOM updated. Cards in container:', container.querySelectorAll('.answer-card').length);
+          if (DEBUG) console.log('DOM updated. Cards in container:', container.querySelectorAll('.answer-card').length);
         }
 
         // カードのアニメーション（FLIPテクニック）
@@ -1143,7 +1146,7 @@
        * @returns {HTMLElement} 生成されたカード要素
        */
       createAnswerCard(data) {
-        console.log('createAnswerCard called with data:', data);
+        if (DEBUG) console.log('createAnswerCard called with data:', data);
         const card = document.createElement('div');
         const highlightClass = data.highlight ? ' highlighted' : '';
         card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer opacity-0' + highlightClass;
@@ -1264,7 +1267,7 @@
         // - ハイライトボタンのクリック処理  
         // - カード本体のクリック処理（モーダル表示）
 
-        console.log('Card created successfully:', card);
+        if (DEBUG) console.log('Card created successfully:', card);
         return card;
       }
 
@@ -1348,12 +1351,12 @@
        * 管理者モードと閲覧モードを切り替える
        */
       async toggleAdminMode() {
-        console.log('toggleAdminMode: start, current state:', {
+        if (DEBUG) console.log('toggleAdminMode: start, current state:', {
           showAdminFeatures: this.state.showAdminFeatures,
           showHighlightToggle: this.state.showHighlightToggle
         });
         const enable = !this.state.showAdminFeatures; // 現在の状態を反転
-        console.log('toggleAdminMode: enable =', enable);
+        if (DEBUG) console.log('toggleAdminMode: enable =', enable);
         if (enable) {
           try {
             const ok = await this.gas.checkAdmin(); // 管理者権限を再度チェック
@@ -1386,7 +1389,7 @@
 
         this.updateConfigFromGlobals(); // グローバル変数から状態を同期
         
-        console.log('toggleAdminMode: state after update:', {
+        if (DEBUG) console.log('toggleAdminMode: state after update:', {
           showHighlightToggle: this.state.showHighlightToggle,
           showAdminFeatures: this.state.showAdminFeatures,
           showCounts: this.state.showCounts,
@@ -1655,7 +1658,7 @@
           console.warn('Icon not found:', name);
           return '<span aria-hidden="true" class="' + classes + '">⭐</span>'; // フォールバック
         }
-        console.log('getIcon: using key', key, 'for name', name);
+        if (DEBUG) console.log('getIcon: using key', key, 'for name', name);
         // 存在するアイコンを返す
         return '<span aria-hidden="true" class="' + classes + '">' + ICONS[key] + '</span>';
       }
@@ -1814,8 +1817,8 @@
     }
     
     // アプリケーションインスタンスを作成
-    console.log('Creating StudyQuestApp instance...');
-    console.log('Window variables:', {
+    if (DEBUG) console.log('Creating StudyQuestApp instance...');
+    if (DEBUG) console.log('Window variables:', {
       isStudentMode: window.isStudentMode,
       showCounts: window.showCounts,
       showAdminFeatures: window.showAdminFeatures,
@@ -1827,7 +1830,7 @@
     
     try {
       const app = new StudyQuestApp();
-      console.log('StudyQuestApp instance created successfully');
+      if (DEBUG) console.log('StudyQuestApp instance created successfully');
     } catch (error) {
       console.error('Error creating StudyQuestApp instance:', error);
       
