@@ -89,10 +89,20 @@
     ModeManager.initializeMode();
   </script>
   <script>
-    window.showCounts = <?= showCounts ?>;
-    window.displayMode = '<?= displayMode ?>';
-    const SHEET_NAME = '<?= sheetName ?>';
-    const MAPPING = <?= JSON.stringify(mapping) ?>;
+    const __SHOW_COUNTS__ = '<?= showCounts ?>';
+    const __DISPLAY_MODE__ = '<?= displayMode ?>';
+    const __SHEET_NAME__ = '<?= sheetName ?>';
+    const __MAPPING__ = '<?= JSON.stringify(mapping) ?>';
+
+    window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : __SHOW_COUNTS__ === 'true';
+    window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
+    const SHEET_NAME = __SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHEET_NAME__;
+    let MAPPING;
+    try {
+      MAPPING = __MAPPING__.startsWith('<') ? {} : JSON.parse(__MAPPING__);
+    } catch (e) {
+      MAPPING = {};
+    }
   </script>
   <style>
     /* カスタムプロパティ（CSS変数）定義 */
