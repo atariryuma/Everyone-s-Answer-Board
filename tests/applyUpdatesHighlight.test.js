@@ -4,7 +4,6 @@ function getIcon() {
   return '<svg></svg>';
 }
 
-function animateHighlightBadge() {}
 
 function applyUpdates(items) {
   items.forEach(item => {
@@ -25,7 +24,6 @@ function applyUpdates(items) {
       badge.className = 'highlight-badge';
       badge.innerHTML = getIcon('star', 'w-6 h-6', true);
       if (preview) preview.insertBefore(badge, preview.firstChild);
-      animateHighlightBadge(badge);
     } else if (!item.highlight && badge) {
       badge.remove();
     }

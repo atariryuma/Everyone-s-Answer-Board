@@ -7,6 +7,7 @@ function buildSheet() {
     COLUMN_HEADERS.LIKE,
     COLUMN_HEADERS.OPINION,
     COLUMN_HEADERS.REASON,
+    COLUMN_HEADERS.TIMESTAMP,
     COLUMN_HEADERS.UNDERSTAND,
     COLUMN_HEADERS.CURIOUS,
     COLUMN_HEADERS.HIGHLIGHT
@@ -22,7 +23,7 @@ function buildSheet() {
       if (row === 1 && col === 1) {
         return { getValues: () => [headerRow] };
       }
-      if (row === 2 && col === 6 && numRows === 1 && numCols === 3) {
+      if (row === 2 && col === 7 && numRows === 1 && numCols === 3) {
         return {
           getValues: () => [[values.UNDERSTAND, values.LIKE, values.CURIOUS]],
           setValues: (rows) => {
@@ -66,7 +67,7 @@ test('addReaction updates value in LIKE column', () => {
   const result = addReaction(2, 'LIKE', 'Sheet1');
   expect(result.status).toBe('ok');
   expect(sheet.getRange.mock.calls[1][0]).toBe(2);
-  expect(sheet.getRange.mock.calls[1][1]).toBe(6);
+  expect(sheet.getRange.mock.calls[1][1]).toBe(7);
 });
 
 test('addReaction handles failure to get user email', () => {

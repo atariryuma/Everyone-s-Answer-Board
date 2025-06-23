@@ -14,7 +14,8 @@ const COLUMN_HEADERS = {
   UNDERSTAND: 'なるほど！',
   LIKE: 'いいね！',
   CURIOUS: 'もっと知りたい！',
-  HIGHLIGHT: 'ハイライト'
+  HIGHLIGHT: 'ハイライト',
+  TIMESTAMP: 'タイムスタンプ'
 };
 const ROSTER_CONFIG = {
   SHEET_NAME: 'roster',
@@ -40,6 +41,7 @@ const TIME_CONSTANTS = {
 
 const REACTION_KEYS = ["UNDERSTAND","LIKE","CURIOUS"];
 var getConfig;
+var handleError;
 if (typeof global !== 'undefined' && global.getConfig) {
   getConfig = global.getConfig;
 }
@@ -74,6 +76,16 @@ function parseReactionString(val) {
     .split(',')
     .map(s => s.trim())
     .filter(Boolean);
+}
+
+function hashTimestamp(ts) {
+  var str = String(ts);
+  var hash = 0;
+  for (var i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash;
 }
 
 
@@ -283,6 +295,7 @@ function getSheetData(sheetName, classFilter, sortBy) {
       classHeader,
       answerHeader,
       reasonHeader,
+      COLUMN_HEADERS.TIMESTAMP,
       COLUMN_HEADERS.UNDERSTAND,
       COLUMN_HEADERS.LIKE,
       COLUMN_HEADERS.CURIOUS,
@@ -310,6 +323,8 @@ function getSheetData(sheetName, classFilter, sortBy) {
         const curiousArr = parseReactionString(row[headerIndices[COLUMN_HEADERS.CURIOUS]]);
         const reason = row[headerIndices[reasonHeader]] || '';
         const highlightVal = row[headerIndices[COLUMN_HEADERS.HIGHLIGHT]];
+        const timestampRaw = row[headerIndices[COLUMN_HEADERS.TIMESTAMP]];
+        const timestamp = timestampRaw ? new Date(timestampRaw).toISOString() : '';
         const likes = likeArr.length;
         const baseScore = reason.length;
         const likeMultiplier = 1 + (likes * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
@@ -320,6 +335,7 @@ function getSheetData(sheetName, classFilter, sortBy) {
         }
         return {
           rowIndex: index + 2,
+          timestamp: timestamp,
           name: isAdmin ? name : '',
           class: row[headerIndices[classHeader]] || '未分類',
           opinion: opinion,
@@ -337,9 +353,9 @@ function getSheetData(sheetName, classFilter, sortBy) {
     }).filter(Boolean);
 
     if (sortBy === 'newest') {
-      rows.sort((a, b) => b.rowIndex - a.rowIndex);
+      rows.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     } else if (sortBy === 'random') {
-      rows.sort(() => Math.random() - 0.5);
+      rows.sort((a, b) => hashTimestamp(a.timestamp) - hashTimestamp(b.timestamp));
     } else {
       rows.sort((a, b) => b.score - a.score);
     }
@@ -519,6 +535,7 @@ function getHeaderIndices(sheetName) {
   if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
   const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const indices = findHeaderIndices(headerRow, [
+    COLUMN_HEADERS.TIMESTAMP,
     COLUMN_HEADERS.UNDERSTAND,
     COLUMN_HEADERS.LIKE,
     COLUMN_HEADERS.CURIOUS,
@@ -535,6 +552,7 @@ function prepareSheetForBoard(sheetName) {
   const headers = getSheetHeaders(sheetName);
   let lastCol = headers.length;
   const required = [
+    COLUMN_HEADERS.TIMESTAMP,
     COLUMN_HEADERS.UNDERSTAND,
     COLUMN_HEADERS.LIKE,
     COLUMN_HEADERS.CURIOUS,
@@ -620,7 +638,7 @@ function createTemplateSheet(name) {
 }
 
 if (typeof module !== 'undefined') {
-  const { handleError } = require('./ErrorHandling.gs');
+  handleError = require('./ErrorHandling.gs').handleError;
   const { getConfig, saveSheetConfig, createConfigSheet } = require('./config.gs');
   module.exports = {
     COLUMN_HEADERS,
