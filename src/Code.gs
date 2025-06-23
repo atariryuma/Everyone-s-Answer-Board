@@ -75,28 +75,32 @@ function safeGetUserEmail() {
   }
 }
 
-function getAdminEmails() {
+function getAdminEmails(spreadsheetId) {
   const props = PropertiesService.getScriptProperties();
+  if (spreadsheetId) {
+    const str = props.getProperty(`ADMIN_EMAILS_${spreadsheetId}`);
+    if (str) return str.split(',').map(e => e.trim()).filter(Boolean);
+  }
   const str = props.getProperty('ADMIN_EMAILS') || '';
   return str.split(',').map(e => e.trim()).filter(Boolean);
 }
 
 function isUserAdmin(email) {
+  const userProps = PropertiesService.getUserProperties();
+  const userId = userProps.getProperty('CURRENT_USER_ID');
   const userEmail = email || safeGetUserEmail();
+
+  if (userId) {
+    const userInfo = getUserInfo(userId);
+    const spreadsheetId = userInfo && userInfo.spreadsheetId;
+    const admins = getAdminEmails(spreadsheetId);
+    return admins.includes(userEmail);
+  }
+
   return getAdminEmails().includes(userEmail);
 }
 
 function checkAdmin() {
-  const userProps = PropertiesService.getUserProperties();
-  const userId = userProps.getProperty('CURRENT_USER_ID');
-  
-  if (userId) {
-    // マルチテナントモード
-    const userInfo = getUserInfo(userId);
-    return userInfo && userInfo.adminEmail === safeGetUserEmail();
-  }
-  
-  // 従来のモード
   return isUserAdmin();
 }
 
@@ -136,7 +140,7 @@ function getAdminSettings() {
     // マルチテナントモード
     const userInfo = getUserInfo(userId);
     if (userInfo) {
-      adminEmails = [userInfo.adminEmail];
+      adminEmails = getAdminEmails(userInfo.spreadsheetId);
       appSettings = getAppSettingsForUser();
     }
   } else {
@@ -1059,16 +1063,15 @@ function findUserByEmailAndSpreadsheet(email, spreadsheetId) {
  * 管理者メールアドレスを更新
  */
 function updateAdminEmails(spreadsheetId, email) {
-  // スプレッドシートのプロパティに管理者メールを保存
   try {
-    const ss = SpreadsheetApp.openById(spreadsheetId);
-    const docProps = PropertiesService.getDocumentProperties();
-    const currentAdmins = docProps.getProperty('ADMIN_EMAILS') || '';
-    const adminList = currentAdmins.split(',').filter(Boolean);
-    
-    if (!adminList.includes(email)) {
-      adminList.push(email);
-      docProps.setProperty('ADMIN_EMAILS', adminList.join(','));
+    const scriptProps = PropertiesService.getScriptProperties();
+    const key = `ADMIN_EMAILS_${spreadsheetId}`;
+    const current = scriptProps.getProperty(key) || '';
+    const list = current.split(',').filter(Boolean);
+
+    if (!list.includes(email)) {
+      list.push(email);
+      scriptProps.setProperty(key, list.join(','));
     }
   } catch (e) {
     console.error('管理者メール更新エラー:', e);
@@ -1108,6 +1111,7 @@ if (typeof module !== 'undefined') {
     findHeaderIndices,
     parseReactionString,
     checkAdmin,
+    isUserAdmin,
     handleError,
     saveSheetConfig,
     createConfigSheet,
