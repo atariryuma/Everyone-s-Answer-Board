@@ -12,7 +12,6 @@ function getConfig(sheetName) {
     questionHeader: target[idx['問題文ヘッダー']],
     answerHeader: target[idx['回答ヘッダー']],
     reasonHeader: idx['理由ヘッダー']!==undefined ? target[idx['理由ヘッダー']] : null,
-    nameMode: target[idx['名前取得モード']] || '同一シート',
     nameHeader: idx['名前列ヘッダー']!==undefined ? target[idx['名前列ヘッダー']] : null,
     classHeader: idx['クラス列ヘッダー']!==undefined ? target[idx['クラス列ヘッダー']] : null
   };
@@ -24,7 +23,7 @@ function saveSheetConfig(sheetName, cfg) {
   if (!sheet) {
     sheet = ss.insertSheet('Config');
   }
-  const headers = ['表示シート名','問題文ヘッダー','回答ヘッダー','理由ヘッダー','名前取得モード','名前列ヘッダー','クラス列ヘッダー'];
+  const headers = ['表示シート名','問題文ヘッダー','回答ヘッダー','理由ヘッダー','名前列ヘッダー','クラス列ヘッダー'];
   let values = sheet.getDataRange().getValues();
   if (values.length === 0) {
     sheet.appendRow(headers);
@@ -41,7 +40,6 @@ function saveSheetConfig(sheetName, cfg) {
   row[idx['問題文ヘッダー']] = cfg.questionHeader || '';
   row[idx['回答ヘッダー']] = cfg.answerHeader || '';
   row[idx['理由ヘッダー']] = cfg.reasonHeader || '';
-  row[idx['名前取得モード']] = cfg.nameMode || '同一シート';
   row[idx['名前列ヘッダー']] = cfg.nameHeader || '';
   row[idx['クラス列ヘッダー']] = cfg.classHeader || '';
   if (rowIndex === -1) {
@@ -58,7 +56,7 @@ function createConfigSheet() {
   let cfgSheet = ss.getSheetByName('Config');
   if (!cfgSheet) {
     cfgSheet = ss.insertSheet('Config');
-    const headers = ['表示シート名','問題文ヘッダー','回答ヘッダー','理由ヘッダー','名前取得モード','名前列ヘッダー','クラス列ヘッダー'];
+    const headers = ['表示シート名','問題文ヘッダー','回答ヘッダー','理由ヘッダー','名前列ヘッダー','クラス列ヘッダー'];
     cfgSheet.appendRow(headers);
     created.push('Config');
   }
