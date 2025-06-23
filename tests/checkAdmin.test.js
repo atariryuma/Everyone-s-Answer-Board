@@ -2,7 +2,12 @@ const { checkAdmin } = require('../src/Code.gs');
 
 function setup(admins, currentEmail) {
   global.PropertiesService = {
-    getScriptProperties: () => ({ getProperty: (key) => key === 'ADMIN_EMAILS' ? admins.join(',') : null })
+    getScriptProperties: () => ({ getProperty: (key) => key === 'ADMIN_EMAILS' ? admins.join(',') : null }),
+    getUserProperties: () => ({
+      getProperty: jest.fn(),
+      setProperty: jest.fn(),
+      setProperties: jest.fn()
+    })
   };
   global.Session = { getActiveUser: () => ({ getEmail: () => currentEmail }) };
 }

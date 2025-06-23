@@ -13,11 +13,21 @@ function setup(initialRows) {
       insertSheet: () => sheet
     })
   };
+  global.getCurrentSpreadsheet = () => global.SpreadsheetApp.getActive();
+  global.PropertiesService = {
+    getUserProperties: () => ({
+      getProperty: jest.fn(),
+      setProperty: jest.fn(),
+      setProperties: jest.fn()
+    })
+  };
   return { sheet, rows };
 }
 
 afterEach(() => {
   delete global.SpreadsheetApp;
+  delete global.getCurrentSpreadsheet;
+  delete global.PropertiesService;
 });
 
 test('saveSheetConfig appends new row', () => {

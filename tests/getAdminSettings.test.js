@@ -10,6 +10,11 @@ function setup() {
         if (key === 'ACTIVE_SHEET_NAME') return 'SheetA';
         return null;
       }
+    }),
+    getUserProperties: () => ({
+      getProperty: jest.fn(),
+      setProperty: jest.fn(),
+      setProperties: jest.fn()
     })
   };
   global.SpreadsheetApp = {

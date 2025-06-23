@@ -12,11 +12,19 @@ function setup(headers) {
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({ getSheetByName: () => sheet })
   };
+  global.PropertiesService = {
+    getUserProperties: () => ({
+      getProperty: jest.fn(),
+      setProperty: jest.fn(),
+      setProperties: jest.fn()
+    })
+  };
   return { sheet, headers };
 }
 
 afterEach(() => {
   delete global.SpreadsheetApp;
+  delete global.PropertiesService;
 });
 
 test('prepareSheetForBoard appends missing reaction columns', () => {

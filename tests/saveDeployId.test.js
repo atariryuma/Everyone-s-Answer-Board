@@ -2,7 +2,14 @@ const { saveDeployId } = require('../src/Code.gs');
 
 function setup() {
   const props = { setProperties: jest.fn(), deleteProperty: jest.fn() };
-  global.PropertiesService = { getScriptProperties: () => props };
+  global.PropertiesService = {
+    getScriptProperties: () => props,
+    getUserProperties: () => ({
+      getProperty: jest.fn(),
+      setProperty: jest.fn(),
+      setProperties: jest.fn()
+    })
+  };
   return props;
 }
 

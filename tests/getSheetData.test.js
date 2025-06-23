@@ -37,6 +37,11 @@ function setupMocks(rows, userEmail, adminEmails = '') {
         if (key === 'ADMIN_EMAILS') return adminEmails;
         return null;
       }
+    }),
+    getUserProperties: () => ({
+      getProperty: jest.fn(),
+      setProperty: jest.fn(),
+      setProperties: jest.fn()
     })
   };
 }

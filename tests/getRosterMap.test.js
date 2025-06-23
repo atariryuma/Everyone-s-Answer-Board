@@ -26,7 +26,12 @@ function setupMocks(cacheValue) {
     })
   };
   global.PropertiesService = {
-    getScriptProperties: () => ({ getProperty: () => null })
+    getScriptProperties: () => ({ getProperty: () => null }),
+    getUserProperties: () => ({
+      getProperty: jest.fn(),
+      setProperty: jest.fn(),
+      setProperties: jest.fn()
+    })
   };
   return { sheet, cache: cacheObj };
 }

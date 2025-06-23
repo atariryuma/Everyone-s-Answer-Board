@@ -10,11 +10,19 @@ function setup(headers) {
       getSheetByName: jest.fn(() => sheet)
     })
   };
+  global.PropertiesService = {
+    getUserProperties: () => ({
+      getProperty: jest.fn(),
+      setProperty: jest.fn(),
+      setProperties: jest.fn()
+    })
+  };
   return { sheet };
 }
 
 afterEach(() => {
   delete global.SpreadsheetApp;
+  delete global.PropertiesService;
 });
 
 test('getSheetHeaders returns header row', () => {
@@ -26,6 +34,13 @@ test('getSheetHeaders returns header row', () => {
 test('getSheetHeaders throws when sheet missing', () => {
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({ getSheetByName: jest.fn(() => null) })
+  };
+  global.PropertiesService = {
+    getUserProperties: () => ({
+      getProperty: jest.fn(),
+      setProperty: jest.fn(),
+      setProperties: jest.fn()
+    })
   };
   expect(() => getSheetHeaders('Missing')).toThrow("シート 'Missing' が見つかりません。");
 });
