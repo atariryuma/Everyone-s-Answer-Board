@@ -1000,9 +1000,9 @@ function getUserDatabase() {
       } catch (e) {}
       return SpreadsheetApp.openById(dbId).getSheetByName(USER_DB_CONFIG.SHEET_NAME);
     } catch (e) {
-      if (e && e.message && !/not found|見つかりません/i.test(e.message)) {
-        throw new Error('ユーザーデータベースにアクセスできません。');
-      }
+      // 何らかの理由で既存データベースにアクセスできない場合は
+      // 新しいデータベースを作成し直す
+      console.warn('Failed to access existing user database:', e);
       // データベースが削除されている場合は再作成
     }
   }
