@@ -37,6 +37,9 @@ The sheet you publish must contain the following columns:
 - **これまでの学んだことや、経験したことから、根からとり入れた水は、植物のからだのどこを通るのか予想しましょう。** – question text displayed on the board
 - **予想したわけを書きましょう。** – explanation shown when opening a card
 - **いいね！** – comma separated list of users who liked the answer
+- **タイムスタンプ** – date and time of submission used for chronological sorting
+
+A timestamp value is required so that answers can be ordered by recency when using the "newest" sorting option.
 
 A separate sheet named `roster` should contain roster information with the columns `学年`, `組`, `番号`, `姓`, `名`, `Googleアカウント`, `ニックネーム`. These names are shown on the board instead of raw email addresses. If your roster sheet has a different name, set the `ROSTER_SHEET_NAME` script property to override the default.
 
