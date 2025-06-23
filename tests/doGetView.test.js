@@ -29,7 +29,7 @@ function setup({ userEmail = 'admin@example.com', adminEmails = 'admin@example.c
     getDataRange: () => ({
       getValues: () => [
         ['userId','spreadsheetId','adminEmail','configJson','lastAccessedAt'],
-        ['u1','id1','admin@example.com', JSON.stringify({ isPublished: true, sheetName: 'Sheet1' }), '']
+        ['user1234567','id1','admin@example.com', JSON.stringify({ isPublished: true, sheetName: 'Sheet1' }), '']
       ]
     }),
     getRange: jest.fn(() => ({ setValue: jest.fn() }))
@@ -64,7 +64,7 @@ function setup({ userEmail = 'admin@example.com', adminEmails = 'admin@example.c
 
 test('page parameter is ignored and admin mode is based on user role', () => {
   const { getTemplate } = setup({});
-  doGet({ parameter: { page: 'admin', userId: 'u1' } });
+  doGet({ parameter: { page: 'admin', userId: 'user1234567' } });
   const tpl = getTemplate();
   expect(tpl.isAdminUser).toBe(true);
   expect(tpl.showAdminFeatures).toBe(false);
@@ -72,7 +72,7 @@ test('page parameter is ignored and admin mode is based on user role', () => {
 
 test('admin user starts in admin mode', () => {
   const { getTemplate } = setup({});
-  doGet({ parameter: { userId: 'u1' } });
+  doGet({ parameter: { userId: 'user1234567' } });
   const tpl = getTemplate();
   expect(tpl.isAdminUser).toBe(true);
   expect(tpl.showAdminFeatures).toBe(false);
@@ -80,7 +80,7 @@ test('admin user starts in admin mode', () => {
 
 test('non admin user starts in viewer mode', () => {
   const { getTemplate } = setup({ userEmail: 'user@example.com' });
-  doGet({ parameter: { userId: 'u1' } });
+  doGet({ parameter: { userId: 'user1234567' } });
   const tpl = getTemplate();
   expect(tpl.isAdminUser).toBe(false);
   expect(tpl.showAdminFeatures).toBe(false);
@@ -90,6 +90,6 @@ test('different domain user receives permission error', () => {
   setup({ userEmail: 'user@other.com' });
   const output = { setTitle: jest.fn(() => output) };
   global.HtmlService.createHtmlOutput = jest.fn(() => output);
-  doGet({ parameter: { userId: 'u1' } });
-  expect(HtmlService.createHtmlOutput).toHaveBeenCalledWith(expect.stringContaining('権限'));
+  doGet({ parameter: { userId: 'user1234567' } });
+  expect(HtmlService.createHtmlOutput).toHaveBeenCalledWith(expect.stringContaining('システムエラー'));
 });

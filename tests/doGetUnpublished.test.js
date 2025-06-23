@@ -6,6 +6,7 @@ afterEach(() => {
   delete global.HtmlService;
   delete global.SpreadsheetApp;
   delete global.getCurrentSpreadsheet;
+  delete global.mockUserEmail;
 });
 
 function setup() {
@@ -25,6 +26,7 @@ function setup() {
     })
   };
   global.Session = { getActiveUser: () => ({ getEmail: () => { throw new Error('no user'); } }) };
+  global.mockUserEmail = 'viewer@example.com';
   global.DriveApp = { getFileById: jest.fn(() => ({ setSharing: jest.fn() })) };
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({
@@ -50,7 +52,7 @@ function setup() {
     getDataRange: () => ({
       getValues: () => [
         ['userId','spreadsheetId','adminEmail','configJson','lastAccessedAt'],
-        ['u1','id1','admin@example.com', JSON.stringify({ isPublished: false, sheetName: 'Sheet1' }), '']
+        ['user1234567','id1','admin@example.com', JSON.stringify({ isPublished: false, sheetName: 'Sheet1' }), '']
       ]
     }),
     getRange: jest.fn(() => ({ setValue: jest.fn() }))
@@ -61,7 +63,7 @@ function setup() {
 
 test('doGet uses Unpublished template when email fails', () => {
   const template = setup();
-  doGet({ parameter: { userId: 'u1' } });
+  doGet({ parameter: { userId: 'user1234567' } });
   expect(HtmlService.createTemplateFromFile).toHaveBeenCalledWith('Unpublished');
   expect(template.userEmail).toBe('admin@example.com');
 });

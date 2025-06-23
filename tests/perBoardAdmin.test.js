@@ -56,7 +56,7 @@ afterEach(() => {
 test('returns true when user is admin for current board', () => {
   setup({
     currentEmail: 'board1admin@example.com',
-    userId: 'u1',
+    userId: 'user1234567',
     boardId: 'board1',
     adminLists: {
       board1: ['board1admin@example.com'],
@@ -69,7 +69,7 @@ test('returns true when user is admin for current board', () => {
 test('returns false when user is admin for a different board', () => {
   setup({
     currentEmail: 'board2admin@example.com',
-    userId: 'u1',
+    userId: 'user1234567',
     boardId: 'board1',
     adminLists: {
       board1: ['board1admin@example.com'],
