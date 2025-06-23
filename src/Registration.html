@@ -196,8 +196,10 @@
           showMessage(result.message || '登録が完了しました！', 'success');
 
           const baseUrl = window.location.origin + window.location.pathname;
-          const adminUrl = `${baseUrl}?userId=${result.userId}&mode=admin`;
-          const viewUrl = `${baseUrl}?userId=${result.userId}`;
+          const adminUrl = result.adminUrl ||
+            `${baseUrl}?userId=${result.userId}&mode=admin`;
+          const viewUrl = result.viewUrl ||
+            `${baseUrl}?userId=${result.userId}`;
           
           // 結果表示エリアにURLを表示
           const resultArea = document.getElementById('result-area');
