@@ -13,7 +13,7 @@ function setup() {
     getScriptProperties: () => ({
       getProperty: (key) => {
         if (key === 'IS_PUBLISHED') return 'false';
-        if (key === 'USER_DB_ID') return 'db1';
+        if (key === 'DATABASE_ID') return 'db1';
         return null;
       },
       setProperty: jest.fn()

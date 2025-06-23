@@ -5,7 +5,7 @@ function setup(userEmail, adminEmails) {
   const props = {
     getProperty: (key) => {
       if (key === 'ADMIN_EMAILS') return adminEmails.join(',');
-      if (key === 'USER_DB_ID') return 'db1';
+      if (key === 'DATABASE_ID') return 'db1';
       return null;
     },
     setProperty: jest.fn()
@@ -22,14 +22,16 @@ function setup(userEmail, adminEmails) {
     adminEmail: adminEmails[0],
     spreadsheetId: 'id1'
   }));
-  jest.spyOn(gas, 'getUserDatabase').mockImplementation(() => ({
-    getDataRange: () => ({
-      getValues: () => [
-        ['userId','spreadsheetId','adminEmail','configJson','lastAccessedAt'],
-        ['u1','id1','admin@example.com', JSON.stringify({ isPublished: true, sheetName: 'Sheet1' }), '']
-      ]
-    }),
-    getRange: jest.fn(() => ({ setValue: jest.fn() }))
+  jest.spyOn(gas, 'getDatabase').mockImplementation(() => ({
+    getSheetByName: () => ({
+      getDataRange: () => ({
+        getValues: () => [
+          ['userId','spreadsheetId','adminEmail','configJson','lastAccessedAt'],
+          ['u1','id1','admin@example.com', JSON.stringify({ isPublished: true, sheetName: 'Sheet1' }), '']
+        ]
+      }),
+      getRange: jest.fn(() => ({ setValue: jest.fn() }))
+    })
   }));
   global.DriveApp = { getFileById: jest.fn(() => ({ setSharing: jest.fn() })) };
   global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };

@@ -3,7 +3,7 @@ const { isUserAdmin } = require('../src/Code.gs');
 function setup({ currentEmail, userId, boardId, adminLists }) {
   const scriptProps = {
     getProperty: (key) => {
-      if (key === 'USER_DB_ID') return 'db1';
+      if (key === 'DATABASE_ID') return 'db1';
       if (key.startsWith('ADMIN_EMAILS_')) {
         const id = key.replace('ADMIN_EMAILS_', '');
         const emails = adminLists[id];
