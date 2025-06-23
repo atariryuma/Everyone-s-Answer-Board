@@ -9,13 +9,23 @@ function setup(headers) {
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({ getSheetByName: () => sheet })
   };
+  global.getCurrentSpreadsheet = () => global.SpreadsheetApp.getActiveSpreadsheet();
   global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null }) };
+  global.PropertiesService = {
+    getUserProperties: () => ({
+      getProperty: jest.fn(),
+      setProperty: jest.fn(),
+      setProperties: jest.fn()
+    })
+  };
   return { sheet };
 }
 
 afterEach(() => {
   delete global.SpreadsheetApp;
   delete global.CacheService;
+  delete global.getCurrentSpreadsheet;
+  delete global.PropertiesService;
 });
 
 test('getHeaderIndices ignores unrelated header differences', () => {

@@ -58,6 +58,7 @@ function setupMocks(email, sheet) {
       getSheets: () => [sheet]
     })
   };
+  global.getCurrentSpreadsheet = () => global.SpreadsheetApp.getActiveSpreadsheet();
 }
 
 afterEach(() => {
@@ -66,6 +67,7 @@ afterEach(() => {
   delete global.PropertiesService;
   delete global.CacheService;
   delete global.SpreadsheetApp;
+  delete global.getCurrentSpreadsheet;
 });
 
 test('addReaction updates value in LIKE column', () => {
@@ -96,6 +98,7 @@ test('addReaction handles failure to get user email', () => {
       getSheets: () => [sheet]
     })
   };
+  global.getCurrentSpreadsheet = () => global.SpreadsheetApp.getActiveSpreadsheet();
   const result = addReaction(2, 'LIKE', 'Sheet1');
   expect(result.status).toBe('error');
 });

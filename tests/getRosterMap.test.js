@@ -25,6 +25,7 @@ function setupMocks(cacheValue) {
       getSheetByName: jest.fn(() => sheet)
     })
   };
+  global.getCurrentSpreadsheet = () => global.SpreadsheetApp.getActiveSpreadsheet();
   global.PropertiesService = {
     getScriptProperties: () => ({ getProperty: () => null }),
     getUserProperties: () => ({
@@ -40,6 +41,7 @@ afterEach(() => {
   delete global.CacheService;
   delete global.SpreadsheetApp;
   delete global.PropertiesService;
+  delete global.getCurrentSpreadsheet;
 });
 
 test('getRosterMap builds map and caches it', () => {
@@ -77,8 +79,14 @@ test('getRosterMap uses ROSTER_SHEET_NAME property when set', () => {
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({ getSheetByName: spy })
   };
+  global.getCurrentSpreadsheet = () => global.SpreadsheetApp.getActiveSpreadsheet();
   global.PropertiesService = {
     getScriptProperties: () => ({ getProperty: () => 'RosterSheet' })
+    ,getUserProperties: () => ({
+      getProperty: jest.fn(),
+      setProperty: jest.fn(),
+      setProperties: jest.fn()
+    })
   };
 
   getRosterMap();

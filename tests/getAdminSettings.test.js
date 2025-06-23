@@ -27,6 +27,7 @@ function setup() {
       ]
     })
   };
+  global.getCurrentSpreadsheet = () => global.SpreadsheetApp.getActiveSpreadsheet();
   global.Session = { getActiveUser: () => ({ getEmail: () => 'a@example.com' }) };
   global.getActiveUserEmail = () => 'a@example.com';
 }
@@ -35,6 +36,7 @@ afterEach(() => {
   delete global.SpreadsheetApp;
   delete global.Session;
   delete global.getActiveUserEmail;
+  delete global.getCurrentSpreadsheet;
 });
 
 test('getAdminSettings returns board state', () => {
