@@ -194,6 +194,10 @@
 
         .withSuccessHandler(result => {
           showMessage(result.message || '登録が完了しました！', 'success');
+
+          const baseUrl = window.location.origin + window.location.pathname;
+          const adminUrl = `${baseUrl}?userId=${result.userId}&mode=admin`;
+          const viewUrl = `${baseUrl}?userId=${result.userId}`;
           
           // 結果表示エリアにURLを表示
           const resultArea = document.getElementById('result-area');
@@ -217,7 +221,7 @@
                 <div>
                   <label class="text-sm text-gray-400 block mb-1">管理画面URL（先生用）:</label>
                   <div class="flex gap-2">
-                    <input type="text" value="${result.adminUrl}" readonly
+                    <input type="text" value="${adminUrl}" readonly
                       id="admin-url"
                       class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
                       onclick="this.select()">
@@ -231,7 +235,7 @@
                 <div>
                   <label class="text-sm text-gray-400 block mb-1">生徒用URL:</label>
                   <div class="flex gap-2">
-                    <input type="text" value="${result.viewUrl}" readonly
+                    <input type="text" value="${viewUrl}" readonly
                       id="view-url"
                       class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
                       onclick="this.select()">
@@ -244,7 +248,7 @@
               </div>
               
               <div class="pt-4 space-y-2">
-                <a href="${result.adminUrl}" target="_blank"
+                <a href="${adminUrl}" target="_blank"
                   class="block w-full text-center px-4 py-3 bg-cyan-600 hover:bg-cyan-700 rounded-lg font-semibold transition-colors">
                   管理画面を開く →
                 </a>
@@ -261,7 +265,7 @@
           document.getElementById('spreadsheet-url').disabled = true;
 
           // 自動で管理画面を開き、次のステップを案内
-          window.open(result.adminUrl, '_blank');
+          window.open(adminUrl, '_blank');
           showMessage('管理画面を別タブで開きました。列設定を確認してください。', 'info');
         })
         .withFailureHandler(error => {
