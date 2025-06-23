@@ -41,7 +41,6 @@ The sheet you publish must contain the following columns:
 
 A timestamp value is required so that answers can be ordered by recency when using the "newest" sorting option.
 
-A separate sheet named `roster` should contain roster information with the columns `学年`, `組`, `番号`, `姓`, `名`, `Googleアカウント`, `ニックネーム`. These names are shown on the board instead of raw email addresses. If your roster sheet has a different name, set the `ROSTER_SHEET_NAME` script property to override the default.
 
 ## Managing the board
 
@@ -51,7 +50,6 @@ Opening the spreadsheet adds an **アプリ管理** menu. From here you can:
    Use the "Config" section to map the question, answer and name columns. The
    selected settings are saved automatically when publishing a sheet for the
    first time.
-2. **名簿キャッシュをリセット** – refresh the cached roster information.
 
 When unpublished, visiting the Web App URL shows a message that the board is closed. Once published, the board is available and updates automatically every 15 seconds.
 
@@ -71,12 +69,6 @@ You can also set the value from the console:
 PropertiesService.getScriptProperties()
   .setProperty('ADMIN_EMAILS', 'teacher1@example.com,teacher2@example.com');
 ```
-
-### Setting `ROSTER_SHEET_NAME`
-
-1. Open the Apps Script **Project Settings** and expand **Script Properties**.
-2. Add a property named `ROSTER_SHEET_NAME` and set its value to your roster sheet's name.
-3. Leave it blank or remove it to use the default `roster`.
 
 ## Front‑end features
 

@@ -34,15 +34,6 @@ const COLUMN_HEADERS = {
   TIMESTAMP: 'タイムスタンプ',
   NAME: '名前'
 };
-const ROSTER_CONFIG = {
-  SHEET_NAME: 'roster',
-  PROPERTY_NAME: 'ROSTER_SHEET_NAME',
-  CACHE_KEY: 'roster_name_map_v3',
-  HEADER_LAST_NAME: '姓',
-  HEADER_FIRST_NAME: '名',
-  HEADER_NICKNAME: 'ニックネーム',
-  HEADER_EMAIL: 'Googleアカウント'
-};
 const SCORING_CONFIG = {
   LIKE_MULTIPLIER_FACTOR: 0.05 // 1いいね！ごとにスコアが5%増加
 };
@@ -396,7 +387,7 @@ function getSheets() {
     const visibleSheets = allSheets.filter(sheet => !sheet.isSheetHidden());
     const filtered = visibleSheets.filter(sheet => {
       const name = sheet.getName();
-      return name !== 'Config' && name !== ROSTER_CONFIG.SHEET_NAME;
+      return name !== 'Config';
     });
     return filtered.map(sheet => sheet.getName());
   } catch (error) {
@@ -445,7 +436,6 @@ function getSheetData(sheetName, classFilter, sortBy) {
     const dataRows = allValues.slice(1);
     const userEmail = safeGetUserEmail();
     const isAdmin = isUserAdmin(userEmail);
-    const emailToNameMap = {};
 
     const rows = dataRows.map((row, index) => {
       if (classFilter && classFilter !== 'すべて') {
@@ -467,7 +457,7 @@ function getSheetData(sheetName, classFilter, sortBy) {
         const baseScore = reason.length;
         const likeMultiplier = 1 + (likes * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
         const totalScore = baseScore * likeMultiplier;
-        let name = emailToNameMap[email] || email.split('@')[0];
+        let name = email ? email.split('@')[0] : '';
         if (nameHeader && row[headerIndices[nameHeader]]) {
           name = row[headerIndices[nameHeader]];
         }
@@ -538,7 +528,6 @@ function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy)
     const dataRows = allValues.slice(1);
     const userEmail = safeGetUserEmail();
     const isAdmin = isUserAdmin(userEmail);
-    const emailToNameMap = {};
 
     const rows = dataRows.map((row, index) => {
       if (classFilter && classFilter !== 'すべて') {
@@ -560,7 +549,7 @@ function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy)
         const baseScore = reason.length;
         const likeMultiplier = 1 + (likes * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
         const totalScore = baseScore * likeMultiplier;
-        let name = emailToNameMap[email] || email.split('@')[0];
+        let name = email ? email.split('@')[0] : '';
         if (nameHeader && row[headerIndices[nameHeader]]) {
           name = row[headerIndices[nameHeader]];
         }
@@ -936,13 +925,6 @@ function prepareSpreadsheetForStudyQuest(spreadsheet) {
     configSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   }
   
-  // rosterシートがなければ作成
-  let rosterSheet = spreadsheet.getSheetByName('roster');
-  if (!rosterSheet) {
-    rosterSheet = spreadsheet.insertSheet('roster');
-    const headers = ['学年','組','番号','姓','名','Googleアカウント','ニックネーム'];
-    rosterSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-  }
 }
 
 /**
