@@ -996,7 +996,9 @@ function getUserDatabase() {
     try {
       const file = DriveApp.getFileById(dbId);
       try {
-        file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);
+        // Allow domain users to modify the ledger so that the
+        // web app can update it when running as the accessing user.
+        file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
       } catch (e) {}
       return SpreadsheetApp.openById(dbId).getSheetByName(USER_DB_CONFIG.SHEET_NAME);
     } catch (e) {
@@ -1014,10 +1016,12 @@ function getUserDatabase() {
   sheet.getRange(1, 1, 1, USER_DB_CONFIG.HEADERS.length)
     .setValues([USER_DB_CONFIG.HEADERS]);
 
-  // Share database so any user in the domain can read it via link
+  // Share database so any user in the domain can edit it via link.
+  // The web app executes as the accessing user, so they must have
+  // write permission to update the shared ledger.
   try {
     DriveApp.getFileById(newDb.getId())
-      .setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);
+      .setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
   } catch (e) {}
   
   PropertiesService.getScriptProperties().setProperty('USER_DB_ID', newDb.getId());
