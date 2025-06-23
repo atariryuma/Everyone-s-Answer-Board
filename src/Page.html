@@ -233,27 +233,76 @@
       filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.7));
     }
     /* リアクションボタンの背景グラデーションとボーダーカラー */
-    .answer-card.reaction-bg-like { border-color:#ef4444 !important; border-image:none; }
-    .answer-card.reaction-bg-understand { border-color:#fbbf24 !important; border-image:none; }
-    .answer-card.reaction-bg-curious { border-color:#10b981 !important; border-image:none; }
+    .answer-card.reaction-bg-like { 
+      border-color: #ef4444 !important; 
+      border-image: none; 
+    }
+    .answer-card.reaction-bg-understand { 
+      border-color: #fbbf24 !important; 
+      border-image: none; 
+    }
+    .answer-card.reaction-bg-curious { 
+      border-color: #10b981 !important; 
+      border-image: none; 
+    }
+
+    /* 複数リアクションのグラデーションボーダー */
     .reaction-bg-like-understand,
     .reaction-bg-like-curious,
     .reaction-bg-understand-curious,
     .reaction-bg-all {
-      border-color: transparent;
-      border-style: solid;
+      position: relative;
       background: var(--glass-bg);
-      border-image-slice: 1;
-      border-image-source: linear-gradient(90deg,#ef4444,#fbbf24);
+      border: 2px solid transparent;
+      border-radius: inherit; /* 既存の角丸を継承 */
     }
-    .reaction-bg-like-curious {
-      border-image-source: linear-gradient(90deg,#ef4444,#10b981);
+
+    .reaction-bg-like-understand::before {
+      content: '';
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      right: -2px;
+      bottom: -2px;
+      background: linear-gradient(90deg, #ef4444, #fbbf24);
+      border-radius: inherit;
+      z-index: -1;
     }
-    .reaction-bg-understand-curious {
-      border-image-source: linear-gradient(90deg,#fbbf24,#10b981);
+
+    .reaction-bg-like-curious::before {
+      content: '';
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      right: -2px;
+      bottom: -2px;
+      background: linear-gradient(90deg, #ef4444, #10b981);
+      border-radius: inherit;
+      z-index: -1;
     }
-    .reaction-bg-all {
-      border-image-source: linear-gradient(90deg,#ef4444,#fbbf24,#10b981);
+
+    .reaction-bg-understand-curious::before {
+      content: '';
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      right: -2px;
+      bottom: -2px;
+      background: linear-gradient(90deg, #fbbf24, #10b981);
+      border-radius: inherit;
+      z-index: -1;
+    }
+
+    .reaction-bg-all::before {
+      content: '';
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      right: -2px;
+      bottom: -2px;
+      background: linear-gradient(90deg, #ef4444, #fbbf24, #10b981);
+      border-radius: inherit;
+      z-index: -1;
     }
     /* リアクション総数に応じたボーダー太さ */
     .reaction-border-1 { border-width: 2px; }
