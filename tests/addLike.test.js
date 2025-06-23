@@ -66,6 +66,7 @@ function setupMocks(userEmail, sheet, cacheImpl) {
       getSheets: () => [sheet]
     })
   };
+  global.getCurrentSpreadsheet = () => global.SpreadsheetApp.getActiveSpreadsheet();
 }
 
 afterEach(() => {
@@ -74,6 +75,7 @@ afterEach(() => {
   delete global.PropertiesService;
   delete global.CacheService;
   delete global.SpreadsheetApp;
+  delete global.getCurrentSpreadsheet;
 });
 
 test('addReaction toggles user in list', () => {

@@ -27,6 +27,7 @@ function setupMocks(rows, userEmail, adminEmails = '') {
       }
     })
   };
+  global.getCurrentSpreadsheet = () => global.SpreadsheetApp.getActiveSpreadsheet();
 
   // Mock other global services
   global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };
@@ -52,6 +53,7 @@ afterEach(() => {
   delete global.CacheService;
   delete global.PropertiesService;
   delete global.getConfig;
+  delete global.getCurrentSpreadsheet;
 });
 
 test('getSheetData filters and scores rows', () => {

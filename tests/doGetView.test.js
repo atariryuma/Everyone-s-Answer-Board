@@ -7,6 +7,7 @@ afterEach(() => {
   delete global.PropertiesService;
   delete global.SpreadsheetApp;
   delete global.getUserDatabase;
+  delete global.getCurrentSpreadsheet;
 });
 
 function setup({ userEmail = 'admin@example.com', adminEmails = 'admin@example.com' }) {
@@ -50,6 +51,7 @@ function setup({ userEmail = 'admin@example.com', adminEmails = 'admin@example.c
       getId: () => 'id1'
     }))
   };
+  global.getCurrentSpreadsheet = () => global.SpreadsheetApp.getActiveSpreadsheet();
   const output = { setTitle: jest.fn(() => output), addMetaTag: jest.fn(() => output), setSandboxMode: jest.fn(() => output) };
   let template = { evaluate: () => output };
   global.HtmlService = {

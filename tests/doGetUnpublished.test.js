@@ -5,6 +5,7 @@ afterEach(() => {
   delete global.Session;
   delete global.HtmlService;
   delete global.SpreadsheetApp;
+  delete global.getCurrentSpreadsheet;
 });
 
 function setup() {
@@ -37,6 +38,7 @@ function setup() {
       getId: () => 'id1'
     }))
   };
+  global.getCurrentSpreadsheet = () => global.SpreadsheetApp.getActiveSpreadsheet();
   const output = { setTitle: jest.fn(() => output), addMetaTag: jest.fn(() => output) };
   let template = { evaluate: () => output };
   global.HtmlService = {

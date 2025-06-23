@@ -18,6 +18,7 @@ function setup({configRows, dataRows, rosterRows}) {
       }
     })
   };
+  global.getCurrentSpreadsheet = () => global.SpreadsheetApp.getActiveSpreadsheet();
   global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null, remove: () => null }) };
   global.PropertiesService = {
     getScriptProperties: () => ({ getProperty: () => null }),
@@ -52,6 +53,7 @@ afterEach(() => {
   delete global.PropertiesService;
   delete global.getConfig;
   delete global.getRosterMap;
+  delete global.getCurrentSpreadsheet;
 });
 
 test('buildBoardData reads names from same sheet', () => {

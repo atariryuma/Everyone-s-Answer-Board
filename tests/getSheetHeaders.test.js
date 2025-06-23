@@ -10,6 +10,7 @@ function setup(headers) {
       getSheetByName: jest.fn(() => sheet)
     })
   };
+  global.getCurrentSpreadsheet = () => global.SpreadsheetApp.getActiveSpreadsheet();
   global.PropertiesService = {
     getUserProperties: () => ({
       getProperty: jest.fn(),
@@ -23,6 +24,7 @@ function setup(headers) {
 afterEach(() => {
   delete global.SpreadsheetApp;
   delete global.PropertiesService;
+  delete global.getCurrentSpreadsheet;
 });
 
 test('getSheetHeaders returns header row', () => {
@@ -35,6 +37,7 @@ test('getSheetHeaders throws when sheet missing', () => {
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({ getSheetByName: jest.fn(() => null) })
   };
+  global.getCurrentSpreadsheet = () => global.SpreadsheetApp.getActiveSpreadsheet();
   global.PropertiesService = {
     getUserProperties: () => ({
       getProperty: jest.fn(),

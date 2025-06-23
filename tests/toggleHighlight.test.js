@@ -49,6 +49,7 @@ function setupMocks(sheet, cacheImpl, userEmail = 'admin@example.com', adminEmai
       getSheets: () => [sheet]
     })
   };
+  global.getCurrentSpreadsheet = () => global.SpreadsheetApp.getActiveSpreadsheet();
 }
 
 afterEach(() => {
@@ -57,6 +58,7 @@ afterEach(() => {
   delete global.PropertiesService;
   delete global.CacheService;
   delete global.SpreadsheetApp;
+  delete global.getCurrentSpreadsheet;
 });
 
 test('toggleHighlight flips stored value', () => {

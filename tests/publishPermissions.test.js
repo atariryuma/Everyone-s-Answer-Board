@@ -50,6 +50,7 @@ function setup(userEmail, adminEmails) {
       getId: () => 'newid'
     }))
   };
+  global.getCurrentSpreadsheet = () => global.SpreadsheetApp.getActiveSpreadsheet();
   return props;
 }
 
@@ -58,6 +59,7 @@ afterEach(() => {
   delete global.Session;
   delete global.SpreadsheetApp;
   delete global.getUserDatabase;
+  delete global.getCurrentSpreadsheet;
   jest.restoreAllMocks();
 });
 
