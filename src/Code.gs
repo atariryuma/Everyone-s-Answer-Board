@@ -69,10 +69,24 @@ function getCurrentSpreadsheet() {
 
 function safeGetUserEmail() {
   try {
-    return Session.getActiveUser().getEmail();
+    const email = Session.getActiveUser().getEmail();
+    if (!email || typeof email !== 'string' || !isValidEmail(email)) {
+      throw new Error('Invalid user email');
+    }
+    return email;
   } catch (e) {
-    return '';
+    console.error('Failed to get user email:', e);
+    // In test environment, return a default test email
+    if (typeof global !== 'undefined' && global.mockUserEmail) {
+      return global.mockUserEmail;
+    }
+    throw new Error('認証が必要です。Googleアカウントでログインしてください。');
   }
+}
+
+function isValidEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
 }
 
 function getEmailDomain(email) {
@@ -80,7 +94,15 @@ function getEmailDomain(email) {
 }
 
 function isSameDomain(emailA, emailB) {
-  return getEmailDomain(emailA) === getEmailDomain(emailB);
+  if (!emailA || !emailB || typeof emailA !== 'string' || typeof emailB !== 'string') {
+    return false;
+  }
+  if (!isValidEmail(emailA) || !isValidEmail(emailB)) {
+    return false;
+  }
+  const domainA = getEmailDomain(emailA);
+  const domainB = getEmailDomain(emailB);
+  return domainA && domainB && domainA === domainB;
 }
 
 function getAdminEmails(spreadsheetId) {
@@ -238,48 +260,79 @@ function setShowDetails(flag) {
 // =================================================================
 // GAS Webアプリケーションのエントリーポイント
 // =================================================================
+function validateUserId(userId) {
+  if (!userId || typeof userId !== 'string') {
+    throw new Error('ユーザーIDが指定されていません。');
+  }
+  if (!/^[a-zA-Z0-9-_]{10,}$/.test(userId)) {
+    throw new Error('無効なユーザーIDの形式です。');
+  }
+  return userId;
+}
+
 function doGet(e) {
-  e = e || {};
-  const params = e.parameter || {};
-  const userId = params.userId;
-  const mode = params.mode;
-  
-  // ユーザーIDがない場合は登録画面を表示
-  if (!userId) {
-    return HtmlService.createTemplateFromFile('Registration')
-      .evaluate()
-      .setTitle('StudyQuest - 新規登録')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-  }
-  
-  // ユーザー情報を取得
-  const userInfo = getUserInfo(userId);
-  if (!userInfo) {
-    return HtmlService.createHtmlOutput('無効なユーザーIDです。')
-      .setTitle('エラー');
-  }
+  try {
+    e = e || {};
+    const params = e.parameter || {};
+    const userId = params.userId;
+    const mode = params.mode;
+    
+    // ユーザーIDがない場合は登録画面を表示
+    if (!userId) {
+      return HtmlService.createTemplateFromFile('Registration')
+        .evaluate()
+        .setTitle('StudyQuest - 新規登録')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    }
+    
+    // ユーザーIDを検証
+    const validatedUserId = validateUserId(userId);
+    
+    // ユーザー情報を取得
+    const userInfo = getUserInfo(validatedUserId);
+    if (!userInfo) {
+      return HtmlService.createHtmlOutput('無効なユーザーIDです。')
+        .setTitle('エラー');
+    }
 
-  var viewerEmail = safeGetUserEmail();
-  if (viewerEmail && !isSameDomain(viewerEmail, userInfo.adminEmail)) {
-    return HtmlService.createHtmlOutput('権限がありません。')
-      .setTitle('エラー');
-  }
+    // 現在のユーザーを取得（必須）
+    let viewerEmail;
+    try {
+      viewerEmail = safeGetUserEmail();
+    } catch (e) {
+      if (typeof HtmlService !== 'undefined') {
+        return HtmlService.createHtmlOutput('認証が必要です。Googleアカウントでログインしてください。')
+          .setTitle('認証エラー');
+      }
+      throw e;
+    }
+    
+    // ドメインベースのアクセス制御
+    if (!isSameDomain(viewerEmail, userInfo.adminEmail)) {
+      auditLog('ACCESS_DENIED', validatedUserId, { viewerEmail, adminEmail: userInfo.adminEmail });
+      if (typeof HtmlService !== 'undefined') {
+        return HtmlService.createHtmlOutput('権限がありません。同じドメインのユーザーのみアクセスできます。')
+          .setTitle('エラー');
+      }
+      throw new Error('権限がありません。同じドメインのユーザーのみアクセスできます。');
+    }
 
-  // 現在のコンテキストを設定
-  PropertiesService.getUserProperties().setProperties({
-    CURRENT_USER_ID: userId,
-    CURRENT_SPREADSHEET_ID: userInfo.spreadsheetId
-  });
+    // 現在のコンテキストを設定
+    PropertiesService.getUserProperties().setProperties({
+      CURRENT_USER_ID: validatedUserId,
+      CURRENT_SPREADSHEET_ID: userInfo.spreadsheetId
+    });
   
-  // 管理モードの場合
-  if (mode === 'admin') {
-    const template = HtmlService.createTemplateFromFile('SheetSelector');
-    template.userId = userId;
-    template.userInfo = userInfo;
-    return template.evaluate()
-      .setTitle('StudyQuest - 管理パネル')
-      .setSandboxMode(HtmlService.SandboxMode.IFRAME);
-  }
+    // 管理モードの場合
+    if (mode === 'admin') {
+      const template = HtmlService.createTemplateFromFile('SheetSelector');
+      template.userId = validatedUserId;
+      template.userInfo = userInfo;
+      auditLog('ADMIN_ACCESS', validatedUserId, { viewerEmail });
+      return template.evaluate()
+        .setTitle('StudyQuest - 管理パネル')
+        .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+    }
   
   // 通常表示モード
   const config = userInfo.configJson || {};
@@ -314,11 +367,21 @@ function doGet(e) {
     userId: userId
   });
   
-  template.userEmail = Session.getActiveUser().getEmail();
-  
-  return template.evaluate()
-      .setTitle('StudyQuest - みんなのかいとうボード')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    template.userEmail = viewerEmail;
+    
+    auditLog('VIEW_ACCESS', validatedUserId, { viewerEmail, sheetName: config.sheetName });
+    
+    return template.evaluate()
+        .setTitle('StudyQuest - みんなのかいとうボード')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  } catch (error) {
+    console.error('doGet error:', error);
+    if (typeof HtmlService !== 'undefined') {
+      return HtmlService.createHtmlOutput('システムエラーが発生しました。管理者にお問い合わせください。')
+        .setTitle('エラー');
+    }
+    throw error;
+  }
 }
 
 
@@ -741,10 +804,19 @@ function getAppSettingsForUser() {
 function getHeaderIndices(sheetName) {
   const cache = CacheService.getScriptCache();
   const cacheKey = `headers_${sheetName}`;
-  const cached = cache.get(cacheKey);
-  if (cached) { return JSON.parse(cached); }
+  
+  try {
+    const cached = cache.get(cacheKey);
+    if (cached) { 
+      return JSON.parse(cached); 
+    }
+  } catch (e) {
+    console.error('Cache retrieval failed:', e);
+  }
+  
   const sheet = getCurrentSpreadsheet().getSheetByName(sheetName);
   if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
+  
   const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const indices = findHeaderIndices(headerRow, [
     COLUMN_HEADERS.TIMESTAMP,
@@ -753,7 +825,13 @@ function getHeaderIndices(sheetName) {
     COLUMN_HEADERS.CURIOUS,
     COLUMN_HEADERS.HIGHLIGHT
   ]);
-  cache.put(cacheKey, JSON.stringify(indices), 21600);
+  
+  try {
+    cache.put(cacheKey, JSON.stringify(indices), 21600); // 6 hours cache
+  } catch (e) {
+    console.error('Cache storage failed:', e);
+  }
+  
   return indices;
 }
 
@@ -852,22 +930,126 @@ function createTemplateSheet(name) {
 /**
  * 新規ユーザーを登録
  */
+function checkRateLimit(action, userEmail) {
+  const key = `rateLimit_${action}_${userEmail}`;
+  const cache = CacheService.getScriptCache();
+  const attempts = parseInt(cache.get(key) || '0');
+  
+  if (attempts > 10) { // 10 attempts per hour
+    throw new Error('レート制限に達しました。しばらく待ってから再試行してください。');
+  }
+  
+  cache.put(key, String(attempts + 1), 3600);
+}
+
+function validateSpreadsheetUrl(url) {
+  if (!url || typeof url !== 'string') {
+    throw new Error('無効なスプレッドシートURLです。');
+  }
+  
+  const sanitizedUrl = url.trim();
+  if (sanitizedUrl.length > 2048) {
+    throw new Error('URLが長すぎます。');
+  }
+  
+  return sanitizedUrl;
+}
+
+function createStudyQuestSpreadsheet(userEmail) {
+  try {
+    // 新しいスプレッドシートを作成
+    const spreadsheet = SpreadsheetApp.create(`StudyQuest - ${userEmail}`);
+    const sheet = spreadsheet.getActiveSheet();
+    sheet.setName('回答データ');
+    
+    // ヘッダー行を設定
+    const headers = [
+      COLUMN_HEADERS.TIMESTAMP,
+      COLUMN_HEADERS.EMAIL,
+      COLUMN_HEADERS.CLASS,
+      '質問',
+      COLUMN_HEADERS.OPINION,
+      COLUMN_HEADERS.REASON,
+      COLUMN_HEADERS.NAME,
+      COLUMN_HEADERS.UNDERSTAND,
+      COLUMN_HEADERS.LIKE,
+      COLUMN_HEADERS.CURIOUS,
+      COLUMN_HEADERS.HIGHLIGHT
+    ];
+    
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    
+    // ヘッダー行のフォーマット
+    const headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#E3F2FD');
+    
+    // 列幅を調整
+    sheet.autoResizeColumns(1, headers.length);
+    
+    // サンプルデータを追加（オプション）
+    const sampleData = [
+      [
+        new Date(),
+        userEmail,
+        'サンプルクラス',
+        'このアプリはどう思いますか？',
+        '使いやすそうです',
+        '直感的なインターフェースだから',
+        userEmail.split('@')[0],
+        '',
+        '',
+        '',
+        false
+      ]
+    ];
+    
+    sheet.getRange(2, 1, 1, headers.length).setValues(sampleData);
+    
+    // Configシートも作成
+    prepareSpreadsheetForStudyQuest(spreadsheet);
+    
+    return {
+      spreadsheetId: spreadsheet.getId(),
+      spreadsheetUrl: spreadsheet.getUrl()
+    };
+  } catch (error) {
+    console.error('Failed to create spreadsheet:', error);
+    throw new Error('スプレッドシートの作成に失敗しました。');
+  }
+}
+
 function registerNewUser(spreadsheetUrl) {
-  const userEmail = Session.getActiveUser().getEmail();
+  const userEmail = safeGetUserEmail();
   if (!userEmail) {
     throw new Error('ユーザー認証に失敗しました。');
   }
   
-  // URLからスプレッドシートIDを抽出
-  const spreadsheetId = extractSpreadsheetId(spreadsheetUrl);
+  // Rate limiting
+  checkRateLimit('REGISTER', userEmail);
   
-  // アクセス権限を確認
-  try {
-    const ss = SpreadsheetApp.openById(spreadsheetId);
-    // StudyQuest用の初期設定を行う
-    prepareSpreadsheetForStudyQuest(ss);
-  } catch (e) {
-    throw new Error('スプレッドシートにアクセスできません。編集権限があることを確認してください。');
+  let spreadsheetId, finalSpreadsheetUrl;
+  
+  if (spreadsheetUrl === 'AUTO_CREATE') {
+    // 自動セットアップ：新しいスプレッドシートを作成
+    const result = createStudyQuestSpreadsheet(userEmail);
+    spreadsheetId = result.spreadsheetId;
+    finalSpreadsheetUrl = result.spreadsheetUrl;
+    
+    auditLog('AUTO_SPREADSHEET_CREATED', '', { userEmail, spreadsheetId });
+  } else {
+    // 既存スプレッドシートを使用
+    const validatedUrl = validateSpreadsheetUrl(spreadsheetUrl);
+    spreadsheetId = extractSpreadsheetId(validatedUrl);
+    finalSpreadsheetUrl = validatedUrl;
+    
+    // アクセス権限を確認
+    try {
+      const ss = SpreadsheetApp.openById(spreadsheetId);
+      prepareSpreadsheetForStudyQuest(ss);
+    } catch (e) {
+      throw new Error('スプレッドシートにアクセスできません。共有設定を確認してください。');
+    }
   }
   
   // 既存ユーザーかチェック
@@ -891,11 +1073,11 @@ function registerNewUser(spreadsheetUrl) {
     userId,
     userEmail,
     spreadsheetId,
-    spreadsheetUrl,
+    finalSpreadsheetUrl,
     new Date(),
     accessToken,
     JSON.stringify({
-      sheetName: '',
+      sheetName: spreadsheetUrl === 'AUTO_CREATE' ? '回答データ' : '',
       showDetails: false,
       isPublished: false
     }),
@@ -906,12 +1088,22 @@ function registerNewUser(spreadsheetUrl) {
   // 管理者として登録
   updateAdminEmails(spreadsheetId, userEmail);
   
-  return {
+  const result = {
     adminUrl: `${getWebAppUrl()}?userId=${userId}&mode=admin`,
     viewUrl: `${getWebAppUrl()}?userId=${userId}`,
     userId: userId,
-    message: '新規登録が完了しました。'
+    message: spreadsheetUrl === 'AUTO_CREATE' ? 
+      '新規登録とスプレッドシート作成が完了しました！' : 
+      '新規登録が完了しました。'
   };
+  
+  // 自動作成の場合はスプレッドシートURLも返す
+  if (spreadsheetUrl === 'AUTO_CREATE') {
+    result.spreadsheetUrl = finalSpreadsheetUrl;
+    result.autoCreated = true;
+  }
+  
+  return result;
 }
 
 /**
@@ -924,15 +1116,76 @@ function prepareSpreadsheetForStudyQuest(spreadsheet) {
     configSheet = spreadsheet.insertSheet('Config');
     const headers = ['表示シート名','問題文ヘッダー','回答ヘッダー','理由ヘッダー','名前列ヘッダー','クラス列ヘッダー'];
     configSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    
+    // 自動作成の場合は初期設定を追加
+    const sheets = spreadsheet.getSheets().filter(s => s.getName() !== 'Config');
+    if (sheets.length > 0) {
+      const mainSheet = sheets[0];
+      const sheetName = mainSheet.getName();
+      
+      // デフォルト設定を追加
+      const defaultConfig = [
+        sheetName,           // 表示シート名
+        '質問',             // 問題文ヘッダー
+        COLUMN_HEADERS.OPINION, // 回答ヘッダー
+        COLUMN_HEADERS.REASON,  // 理由ヘッダー
+        COLUMN_HEADERS.NAME,    // 名前列ヘッダー
+        COLUMN_HEADERS.CLASS    // クラス列ヘッダー
+      ];
+      
+      configSheet.getRange(2, 1, 1, headers.length).setValues([defaultConfig]);
+    }
   }
-  
 }
 
-/**
- * ユーザー情報を取得
- */
-function getUserInfo(userId) {
+function canAccessUserData(currentUser, userId) {
+  // Users can always access their own data
+  // Admins can access data for users in their domain
+  try {
+    const userInfo = getUserInfoInternal(userId);
+    if (!userInfo) return false;
+    
+    // Check if current user is admin for this user's data
+    return isSameDomain(currentUser, userInfo.adminEmail);
+  } catch (error) {
+    console.error('Access check failed:', error);
+    return false;
+  }
+}
+
+function filterSensitiveUserData(userInfo, currentUser) {
+  if (!userInfo) return null;
+  
+  // Remove sensitive fields for non-admin users
+  const filtered = { ...userInfo };
+  
+  // Always remove access token
+  delete filtered.accessToken;
+  
+  // Only admins can see full user data
+  if (!isSameDomain(currentUser, userInfo.adminEmail)) {
+    delete filtered.spreadsheetId;
+    delete filtered.spreadsheetUrl;
+  }
+  
+  return filtered;
+}
+
+function getUserInfoInternal(userId) {
   if (!userId) return null;
+  
+  // Try cache first for performance
+  const cache = CacheService.getScriptCache();
+  const cacheKey = `userInfo_${userId}`;
+  
+  try {
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (e) {
+    console.error('User cache retrieval failed:', e);
+  }
   
   const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
   const data = userDb.getDataRange().getValues();
@@ -945,8 +1198,9 @@ function getUserInfo(userId) {
       headers.forEach((header, index) => {
         if (header === 'configJson') {
           try {
-            userInfo[header] = JSON.parse(data[i][index]);
+            userInfo[header] = JSON.parse(data[i][index] || '{}');
           } catch (e) {
+            console.error('Invalid JSON in configJson:', e);
             userInfo[header] = {};
           }
         } else {
@@ -954,8 +1208,12 @@ function getUserInfo(userId) {
         }
       });
       
-      // 最終アクセス日時を更新
-      userDb.getRange(i + 1, headers.indexOf('lastAccessedAt') + 1).setValue(new Date());
+      // Cache for 30 minutes
+      try {
+        cache.put(cacheKey, JSON.stringify(userInfo), 1800);
+      } catch (e) {
+        console.error('User cache storage failed:', e);
+      }
       
       return userInfo;
     }
@@ -965,25 +1223,114 @@ function getUserInfo(userId) {
 }
 
 /**
- * ユーザー設定を更新
+ * ユーザー情報を取得（セキュリティチェック付き）
+ */
+function getUserInfo(userId) {
+  if (!userId) return null;
+  
+  try {
+    const currentUser = safeGetUserEmail();
+    
+    // Authorization check
+    if (!canAccessUserData(currentUser, userId)) {
+      auditLog('UNAUTHORIZED_USER_ACCESS', userId, { currentUser });
+      throw new Error('このユーザー情報にアクセスする権限がありません。');
+    }
+    
+    const userInfo = getUserInfoInternal(userId);
+    if (!userInfo) return null;
+    
+    // Update last accessed time
+    const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
+    const data = userDb.getDataRange().getValues();
+    const headers = data[0];
+    const userIdIndex = headers.indexOf('userId');
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][userIdIndex] === userId) {
+        userDb.getRange(i + 1, headers.indexOf('lastAccessedAt') + 1).setValue(new Date());
+        break;
+      }
+    }
+    
+    return filterSensitiveUserData(userInfo, currentUser);
+  } catch (error) {
+    console.error('getUserInfo error:', error);
+    throw error;
+  }
+}
+
+/**
+ * ユーザー設定を更新（セキュリティチェック付き）
  */
 function updateUserConfig(userId, config) {
-  const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
-  const data = userDb.getDataRange().getValues();
-  const headers = data[0];
-  const userIdIndex = headers.indexOf('userId');
-  const configIndex = headers.indexOf('configJson');
+  // Use LockService only in production environment
+  const lock = (typeof LockService !== 'undefined') ? LockService.getScriptLock() : null;
+  try {
+    if (lock && !lock.tryLock(10000)) {
+      throw new Error('設定更新処理でロックを取得できませんでした。しばらく待ってから再試行してください。');
+    }
+    
+    const currentUser = safeGetUserEmail();
+    
+    // Authorization check
+    if (!canAccessUserData(currentUser, userId)) {
+      auditLog('UNAUTHORIZED_CONFIG_UPDATE', userId, { currentUser, config });
+      throw new Error('この設定を更新する権限がありません。');
+    }
+    
+    // Validate config data
+    if (!config || typeof config !== 'object') {
+      throw new Error('無効な設定データです。');
+    }
+    
+    const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
+    const data = userDb.getDataRange().getValues();
+    const headers = data[0];
+    const userIdIndex = headers.indexOf('userId');
+    const configIndex = headers.indexOf('configJson');
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][userIdIndex] === userId) {
+        const currentConfig = JSON.parse(data[i][configIndex] || '{}');
+        
+        // Sanitize config to prevent malicious data
+        const sanitizedConfig = sanitizeConfigData(config);
+        const newConfig = Object.assign({}, currentConfig, sanitizedConfig);
+        
+        userDb.getRange(i + 1, configIndex + 1).setValue(JSON.stringify(newConfig));
+        
+        auditLog('CONFIG_UPDATED', userId, { currentUser, updatedFields: Object.keys(sanitizedConfig) });
+        return newConfig;
+      }
+    }
+    
+    throw new Error('ユーザーが見つかりません。');
+  } finally {
+    if (lock) {
+      lock.releaseLock();
+    }
+  }
+}
+
+function sanitizeConfigData(config) {
+  const allowedFields = ['isPublished', 'sheetName', 'showDetails'];
+  const sanitized = {};
   
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][userIdIndex] === userId) {
-      const currentConfig = JSON.parse(data[i][configIndex] || '{}');
-      const newConfig = Object.assign({}, currentConfig, config);
-      userDb.getRange(i + 1, configIndex + 1).setValue(JSON.stringify(newConfig));
-      return newConfig;
+  for (const field of allowedFields) {
+    if (config.hasOwnProperty(field)) {
+      if (field === 'isPublished' || field === 'showDetails') {
+        sanitized[field] = Boolean(config[field]);
+      } else if (field === 'sheetName') {
+        const sheetName = config[field];
+        if (typeof sheetName === 'string' && sheetName.length <= 100) {
+          sanitized[field] = sheetName.trim();
+        }
+      }
     }
   }
   
-  throw new Error('ユーザーが見つかりません。');
+  return sanitized;
 }
 
 // ===============================================================
@@ -1048,11 +1395,39 @@ function extractSpreadsheetId(url) {
  * アクセストークン生成
  */
 function generateAccessToken() {
-  const bytes = Utilities.computeDigest(
-    Utilities.DigestAlgorithm.SHA_256,
-    Utilities.getUuid() + new Date().getTime()
+  const randomBytes = Utilities.getRandomBytes(32);
+  const timestamp = new Date().getTime();
+  const combined = randomBytes.concat(Utilities.newBlob(timestamp.toString()).getBytes());
+  
+  return Utilities.base64EncodeWebSafe(
+    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, combined)
   );
-  return Utilities.base64Encode(bytes);
+}
+
+function auditLog(action, userId, details) {
+  try {
+    const timestamp = new Date();
+    const currentUser = Session.getActiveUser().getEmail();
+    
+    // Use cache for temporary audit logging (since we can't create sheets dynamically in all environments)
+    const cache = CacheService.getScriptCache();
+    const logEntry = {
+      timestamp: timestamp.toISOString(),
+      user: currentUser,
+      action: action,
+      userId: userId,
+      details: details
+    };
+    
+    // Store in cache with 6 hour expiration
+    const cacheKey = `audit_${timestamp.getTime()}_${Utilities.getUuid()}`;
+    cache.put(cacheKey, JSON.stringify(logEntry), 21600);
+    
+    // Also log to console for immediate debugging
+    console.log(`AUDIT: ${action} by ${currentUser} for ${userId}`, details);
+  } catch (error) {
+    console.error('Audit logging failed:', error);
+  }
 }
 
 /**

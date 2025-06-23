@@ -62,27 +62,47 @@
         </ul>
       </div>
       
-      <!-- ステップ2: スプレッドシートURL入力 -->
+      <!-- ステップ2: データ準備方法選択 -->
       <div class="glass-panel rounded-lg p-6">
         <h2 class="text-xl font-semibold mb-4 text-cyan-400 flex items-center gap-2">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
           </svg>
-          スプレッドシートを指定
+          データの準備方法を選択
         </h2>
-        <p class="text-sm text-gray-400 mb-4">
-          使用するGoogleスプレッドシートのURLを入力してください
-        </p>
-        <input
-          type="url"
-          id="spreadsheet-url"
-          placeholder="https://docs.google.com/spreadsheets/d/..."
-          class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 text-white focus:ring-2 focus:ring-cyan-400 focus:outline-none transition-all"
-          autocomplete="off"
-        />
-        <p class="text-xs text-gray-500 mt-2">
-          ※ 編集権限があるスプレッドシートのみ使用できます
-        </p>
+        <div class="space-y-4">
+          <div class="border border-gray-600 rounded-lg p-4 bg-gray-800">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="radio" name="setup-method" value="auto" checked class="mt-1">
+              <div>
+                <div class="font-semibold text-white">簡単セットアップ（推奨）</div>
+                <div class="text-sm text-gray-400">回答ボード用のスプレッドシートを自動作成します</div>
+              </div>
+            </label>
+          </div>
+          
+          <div class="border border-gray-600 rounded-lg p-4 bg-gray-800">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="radio" name="setup-method" value="existing" class="mt-1">
+              <div>
+                <div class="font-semibold text-white">既存のスプレッドシートを使用</div>
+                <div class="text-sm text-gray-400">すでにお持ちのGoogleスプレッドシートを使用します</div>
+                <div class="mt-2" id="existing-sheet-input" style="display: none;">
+                  <input
+                    type="url"
+                    id="spreadsheet-url"
+                    placeholder="https://docs.google.com/spreadsheets/d/..."
+                    class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-cyan-400 focus:outline-none transition-all"
+                    autocomplete="off"
+                  />
+                  <p class="text-xs text-gray-400 mt-1">
+                    スプレッドシートのURLまたは共有リンクを貼り付けてください
+                  </p>
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
       </div>
       
       <!-- ステップ3: アカウント確認 -->
@@ -151,10 +171,25 @@
         .getActiveUserEmail();
     });
     
+    // セットアップ方法の切り替え
+    document.querySelectorAll('input[name="setup-method"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        const existingInput = document.getElementById('existing-sheet-input');
+        if (e.target.value === 'existing') {
+          existingInput.style.display = 'block';
+        } else {
+          existingInput.style.display = 'none';
+        }
+      });
+    });
+
     // URLフィールドのEnterキー対応
-    document.getElementById('spreadsheet-url').addEventListener('keypress', (e) => {
+    document.addEventListener('keypress', (e) => {
       if (e.key === 'Enter' && !document.getElementById('register-btn').disabled) {
-        document.getElementById('register-btn').click();
+        const urlInput = document.getElementById('spreadsheet-url');
+        if (urlInput && document.activeElement === urlInput) {
+          document.getElementById('register-btn').click();
+        }
       }
     });
     
@@ -162,20 +197,32 @@
     document.getElementById('register-btn').addEventListener('click', async () => {
       const btn = document.getElementById('register-btn');
       const messageArea = document.getElementById('message-area');
-      const spreadsheetUrl = document.getElementById('spreadsheet-url').value.trim();
+      const setupMethod = document.querySelector('input[name="setup-method"]:checked').value;
       
-      // バリデーション
-      if (!spreadsheetUrl) {
-        showMessage('スプレッドシートのURLを入力してください。', 'error');
-        document.getElementById('spreadsheet-url').focus();
-        return;
+      let spreadsheetUrl = '';
+      
+      if (setupMethod === 'existing') {
+        spreadsheetUrl = document.getElementById('spreadsheet-url').value.trim();
+        // バリデーション
+        if (!spreadsheetUrl) {
+          showMessage('スプレッドシートのURLを入力してください。', 'error');
+          document.getElementById('spreadsheet-url').focus();
+          return;
+        }
+      } else {
+        // 自動セットアップの場合は空文字列を渡し、サーバー側で新規作成
+        spreadsheetUrl = 'AUTO_CREATE';
       }
       
-      // URL形式の簡易チェック
-      if (!spreadsheetUrl.includes('docs.google.com/spreadsheets') && 
-          !spreadsheetUrl.match(/^[a-zA-Z0-9-_]+$/)) {
-        showMessage('有効なGoogleスプレッドシートのURLを入力してください。', 'error');
-        return;
+      // URL形式のチェック（自動セットアップの場合はスキップ）
+      if (setupMethod === 'existing') {
+        const googleSheetsPattern = /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9-_]{10,}/;
+        const idOnlyPattern = /^[a-zA-Z0-9-_]{10,}$/;
+        
+        if (!googleSheetsPattern.test(spreadsheetUrl) && !idOnlyPattern.test(spreadsheetUrl)) {
+          showMessage('有効なGoogleスプレッドシートのURLまたはIDを入力してください。', 'error');
+          return;
+        }
       }
       
       // ボタンを無効化
@@ -195,14 +242,57 @@
         .withSuccessHandler(result => {
           showMessage(result.message || '登録が完了しました！', 'success');
 
+          // URLのサニタイゼーション
+          function sanitizeUrl(url) {
+            if (!url || typeof url !== 'string') return '';
+            // 基本的なURL検証
+            try {
+              const parsed = new URL(url, window.location.origin);
+              if (parsed.origin !== window.location.origin) {
+                throw new Error('Invalid origin');
+              }
+              return parsed.href;
+            } catch (e) {
+              console.error('Invalid URL:', url);
+              return '';
+            }
+          }
+
           const baseUrl = window.location.origin + window.location.pathname;
-          const adminUrl = result.adminUrl ||
-            `${baseUrl}?userId=${result.userId}&mode=admin`;
-          const viewUrl = result.viewUrl ||
-            `${baseUrl}?userId=${result.userId}`;
+          const adminUrl = sanitizeUrl(result.adminUrl) ||
+            `${baseUrl}?userId=${encodeURIComponent(result.userId)}&mode=admin`;
+          const viewUrl = sanitizeUrl(result.viewUrl) ||
+            `${baseUrl}?userId=${encodeURIComponent(result.userId)}`;
+          
+          if (!adminUrl || !viewUrl) {
+            showMessage('エラー: 無効なURLが生成されました。', 'error');
+            return;
+          }
           
           // 結果表示エリアにURLを表示
           const resultArea = document.getElementById('result-area');
+          const adminUrlInput = document.createElement('input');
+          adminUrlInput.type = 'text';
+          adminUrlInput.value = adminUrl;
+          adminUrlInput.readOnly = true;
+          adminUrlInput.id = 'admin-url';
+          adminUrlInput.className = 'flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700';
+          adminUrlInput.onclick = function() { this.select(); };
+          
+          const viewUrlInput = document.createElement('input');
+          viewUrlInput.type = 'text';
+          viewUrlInput.value = viewUrl;
+          viewUrlInput.readOnly = true;
+          viewUrlInput.id = 'view-url';
+          viewUrlInput.className = 'flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700';
+          viewUrlInput.onclick = function() { this.select(); };
+          
+          const adminLink = document.createElement('a');
+          adminLink.href = adminUrl;
+          adminLink.target = '_blank';
+          adminLink.className = 'block w-full text-center px-4 py-3 bg-cyan-600 hover:bg-cyan-700 rounded-lg font-semibold transition-colors';
+          adminLink.textContent = '管理画面を開く →';
+          
           resultArea.innerHTML = `
             <div class="glass-panel rounded-lg p-6 space-y-4">
               <h3 class="font-bold text-lg text-green-400 flex items-center gap-2">
@@ -215,18 +305,14 @@
               <p class="text-sm text-gray-300">
                 以下のURLをブックマークして、いつでもアクセスできるようにしてください。
               </p>
-              <p class="text-sm text-gray-300">
-                管理画面は自動で開きます。まずは列の設定を確認しましょう。
+              <p class="text-sm text-gray-300" id="setup-guidance">
+                管理画面で設定を確認し、生徒に回答用URLを共有しましょう。
               </p>
               
               <div class="space-y-3">
                 <div>
                   <label class="text-sm text-gray-400 block mb-1">管理画面URL（先生用）:</label>
-                  <div class="flex gap-2">
-                    <input type="text" value="${adminUrl}" readonly
-                      id="admin-url"
-                      class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
-                      onclick="this.select()">
+                  <div class="flex gap-2" id="admin-url-container">
                     <button onclick="copyToClipboard('admin-url')"
                       class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
                       コピー
@@ -236,11 +322,7 @@
                 
                 <div>
                   <label class="text-sm text-gray-400 block mb-1">生徒用URL:</label>
-                  <div class="flex gap-2">
-                    <input type="text" value="${viewUrl}" readonly
-                      id="view-url"
-                      class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
-                      onclick="this.select()">
+                  <div class="flex gap-2" id="view-url-container">
                     <button onclick="copyToClipboard('view-url')"
                       class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
                       コピー
@@ -249,11 +331,7 @@
                 </div>
               </div>
               
-              <div class="pt-4 space-y-2">
-                <a href="${adminUrl}" target="_blank"
-                  class="block w-full text-center px-4 py-3 bg-cyan-600 hover:bg-cyan-700 rounded-lg font-semibold transition-colors">
-                  管理画面を開く →
-                </a>
+              <div class="pt-4 space-y-2" id="admin-link-container">
                 <button onclick="location.reload()"
                   class="block w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors">
                   別のスプレッドシートを登録
@@ -262,13 +340,56 @@
             </div>
           `;
           
+          // 安全にDOM要素を追加
+          const adminContainer = document.getElementById('admin-url-container');
+          adminContainer.insertBefore(adminUrlInput, adminContainer.firstChild);
+          
+          const viewContainer = document.getElementById('view-url-container');
+          viewContainer.insertBefore(viewUrlInput, viewContainer.firstChild);
+          
+          const linkContainer = document.getElementById('admin-link-container');
+          linkContainer.insertBefore(adminLink, linkContainer.firstChild);
+          
+          // 自動作成の場合はスプレッドシートURLも表示
+          if (result.autoCreated && result.spreadsheetUrl) {
+            const spreadsheetContainer = document.createElement('div');
+            spreadsheetContainer.innerHTML = `
+              <label class="text-sm text-gray-400 block mb-1">作成されたスプレッドシート:</label>
+              <div class="flex gap-2">
+                <input type="text" value="${result.spreadsheetUrl}" readonly
+                  id="created-spreadsheet-url"
+                  class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
+                  onclick="this.select()">
+                <button onclick="copyToClipboard('created-spreadsheet-url')"
+                  class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
+                  コピー
+                </button>
+                <a href="${result.spreadsheetUrl}" target="_blank"
+                  class="px-3 py-2 bg-green-700 hover:bg-green-600 rounded text-sm transition-colors">
+                  開く
+                </a>
+              </div>
+            `;
+            
+            // スプレッドシートURLを生徒用URLの前に挿入
+            const viewContainer = document.getElementById('view-url-container').parentElement;
+            viewContainer.parentElement.insertBefore(spreadsheetContainer, viewContainer);
+            
+            // ガイダンスメッセージを更新
+            document.getElementById('setup-guidance').textContent = 
+              'スプレッドシートが自動作成されました。すぐに回答ボードを使い始められます！';
+          }
+          
           resultArea.classList.remove('hidden');
           btn.style.display = 'none';
-          document.getElementById('spreadsheet-url').disabled = true;
+          
+          // 既存スプレッドシート入力を無効化
+          const existingInput = document.getElementById('spreadsheet-url');
+          if (existingInput) {
+            existingInput.disabled = true;
+          }
 
-          // 自動で管理画面を開き、次のステップを案内
-          window.open(adminUrl, '_blank');
-          showMessage('管理画面を別タブで開きました。列設定を確認してください。', 'info');
+          showMessage('登録が完了しました。管理画面リンクをクリックして設定を確認してください。', 'info');
         })
         .withFailureHandler(error => {
           showMessage(`エラー: ${error.message || '登録に失敗しました'}`, 'error');
@@ -296,22 +417,47 @@
       messageArea.innerHTML = `${icons[type] || ''}<span>${message}</span>`;
     }
     
-    // クリップボードにコピー
-    function copyToClipboard(elementId) {
+    // クリップボードにコピー（現代的なAPIを使用）
+    async function copyToClipboard(elementId) {
       const element = document.getElementById(elementId);
-      element.select();
-      document.execCommand('copy');
+      if (!element) return;
       
-      // コピー完了の視覚的フィードバック
-      const button = element.nextElementSibling;
-      const originalText = button.textContent;
-      button.textContent = '✓ コピー済み';
-      button.classList.add('bg-green-700');
+      const button = element.parentElement.querySelector('button');
+      const originalText = button ? button.textContent : '';
       
-      setTimeout(() => {
-        button.textContent = originalText;
-        button.classList.remove('bg-green-700');
-      }, 2000);
+      try {
+        // 現代的なClipboard APIを使用
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(element.value);
+        } else {
+          // フォールバック: 従来の方法
+          element.select();
+          element.setSelectionRange(0, 99999); // モバイル対応
+          document.execCommand('copy');
+        }
+        
+        // コピー完了の視覚的フィードバック
+        if (button) {
+          button.textContent = '✓ コピー済み';
+          button.classList.add('bg-green-700');
+          
+          setTimeout(() => {
+            button.textContent = originalText;
+            button.classList.remove('bg-green-700');
+          }, 2000);
+        }
+      } catch (error) {
+        console.error('コピーに失敗しました:', error);
+        if (button) {
+          button.textContent = '✗ コピー失敗';
+          button.classList.add('bg-red-700');
+          
+          setTimeout(() => {
+            button.textContent = originalText;
+            button.classList.remove('bg-red-700');
+          }, 2000);
+        }
+      }
     }
   </script>
 </body>
