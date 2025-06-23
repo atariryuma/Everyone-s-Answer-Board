@@ -244,27 +244,17 @@
     .reaction-bg-understand-curious,
     .reaction-bg-all {
       border-color: transparent;
-      border-image: none;
-      background-image:
-        linear-gradient(var(--glass-bg), var(--glass-bg)),
-        linear-gradient(90deg,#ef4444,#fbbf24);
-      background-origin: padding-box, border-box;
-      background-clip: padding-box, border-box;
+      border-image-slice: 1;
+      border-image-source: linear-gradient(90deg,#ef4444,#fbbf24);
     }
     .reaction-bg-like-curious {
-      background-image:
-        linear-gradient(var(--glass-bg), var(--glass-bg)),
-        linear-gradient(90deg,#ef4444,#10b981);
+      border-image-source: linear-gradient(90deg,#ef4444,#10b981);
     }
     .reaction-bg-understand-curious {
-      background-image:
-        linear-gradient(var(--glass-bg), var(--glass-bg)),
-        linear-gradient(90deg,#fbbf24,#10b981);
+      border-image-source: linear-gradient(90deg,#fbbf24,#10b981);
     }
     .reaction-bg-all {
-      background-image:
-        linear-gradient(var(--glass-bg), var(--glass-bg)),
-        linear-gradient(90deg,#ef4444,#fbbf24,#10b981);
+      border-image-source: linear-gradient(90deg,#ef4444,#fbbf24,#10b981);
     }
     /* リアクション総数に応じたボーダー太さ */
     .reaction-border-1 { border-width: 2px; }
