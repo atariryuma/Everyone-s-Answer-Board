@@ -886,15 +886,33 @@ function saveWebAppUrl(url) {
   props.setProperties({ WEB_APP_URL: (url || '').trim() });
 }
 
+function getUrlOrigin(url) {
+  const match = String(url).match(/^(https?:\/\/[^/]+)/);
+  return match ? match[1] : '';
+}
+
 function getWebAppUrl() {
   const props = PropertiesService.getScriptProperties();
-  const url = (props.getProperty('WEB_APP_URL') || '').trim();
-  if (url) return url;
+  let stored = (props.getProperty('WEB_APP_URL') || '').trim();
+  let current = '';
   try {
-    return ScriptApp.getService().getUrl();
+    if (typeof ScriptApp !== 'undefined') {
+      current = ScriptApp.getService().getUrl();
+    }
   } catch (e) {
-    return '';
+    current = '';
   }
+
+  if (current) {
+    const currOrigin = getUrlOrigin(current);
+    const storedOrigin = getUrlOrigin(stored);
+    if (!stored || (storedOrigin && currOrigin && currOrigin !== storedOrigin)) {
+      props.setProperties({ WEB_APP_URL: current.trim() });
+      stored = current.trim();
+    }
+  }
+
+  return stored || current || '';
 }
 
 function saveDeployId(id) {
@@ -1616,6 +1634,7 @@ if (typeof module !== 'undefined') {
     getActiveUserEmail,
     prepareSpreadsheetForStudyQuest,
     isSameDomain,
-    getEmailDomain
+    getEmailDomain,
+    getUrlOrigin
   };
 }
