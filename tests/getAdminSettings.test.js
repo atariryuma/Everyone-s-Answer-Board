@@ -10,7 +10,8 @@ function setup() {
         if (key === 'ACTIVE_SHEET_NAME') return 'SheetA';
         return null;
       }
-    })
+    }),
+    getUserProperties: () => ({ getProperty: () => null })
   };
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({
