@@ -23,16 +23,16 @@ const USER_DB_CONFIG = {
   ]
 };
 const COLUMN_HEADERS = {
+  TIMESTAMP: 'タイムスタンプ',
   EMAIL: 'メールアドレス',
-  CLASS: 'クラスを選択してください。',
-  OPINION: 'これまでの学んだことや、経験したことから、根からとり入れた水は、植物のからだのどこを通るのか予想しましょう。',
-  REASON: '予想したわけを書きましょう。',
+  CLASS: 'クラス',
+  OPINION: '回答',
+  REASON: '理由',
+  NAME: '名前',
   UNDERSTAND: 'なるほど！',
   LIKE: 'いいね！',
   CURIOUS: 'もっと知りたい！',
-  HIGHLIGHT: 'ハイライト',
-  TIMESTAMP: 'タイムスタンプ',
-  NAME: '名前'
+  HIGHLIGHT: 'ハイライト'
 };
 const SCORING_CONFIG = {
   LIKE_MULTIPLIER_FACTOR: 0.05 // 1いいね！ごとにスコアが5%増加
