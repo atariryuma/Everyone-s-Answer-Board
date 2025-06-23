@@ -886,7 +886,7 @@ function registerNewUser(spreadsheetUrl) {
   const accessToken = generateAccessToken();
   
   // ユーザー情報を保存
-  const userDb = getUserDatabase();
+  const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
   userDb.appendRow([
     userId,
     userEmail,
@@ -934,7 +934,7 @@ function prepareSpreadsheetForStudyQuest(spreadsheet) {
 function getUserInfo(userId) {
   if (!userId) return null;
   
-  const userDb = getUserDatabase();
+  const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
   const data = userDb.getDataRange().getValues();
   const headers = data[0];
   const userIdIndex = headers.indexOf('userId');
@@ -968,7 +968,7 @@ function getUserInfo(userId) {
  * ユーザー設定を更新
  */
 function updateUserConfig(userId, config) {
-  const userDb = getUserDatabase();
+  const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
   const data = userDb.getDataRange().getValues();
   const headers = data[0];
   const userIdIndex = headers.indexOf('userId');
@@ -986,46 +986,43 @@ function updateUserConfig(userId, config) {
   throw new Error('ユーザーが見つかりません。');
 }
 
+// ===============================================================
+// Database initialization and access
+// ===============================================================
+
+// 管理者が一度だけ実行
+function setup() {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('DATABASE_ID')) {
+    console.log('Setup already done.');
+    return;
+  }
+  const db = SpreadsheetApp.create('StudyQuest_UserDatabase');
+  props.setProperty('DATABASE_ID', db.getId());
+  const sheet = db.getSheets()[0];
+  sheet.setName(USER_DB_CONFIG.SHEET_NAME);
+  sheet.appendRow(USER_DB_CONFIG.HEADERS);
+  console.log('Database created. ID: ' + db.getId());
+}
+
+// DBアクセスは必ずこの関数を経由させる
+function getDatabase() {
+  const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_ID');
+  if (!dbId) {
+    throw new Error('Database not initialized. Please run setup().');
+  }
+  return SpreadsheetApp.openById(dbId);
+}
+
 /**
  * ユーザーデータベースを取得（なければ作成）
  */
 function getUserDatabase() {
-  const dbId = PropertiesService.getScriptProperties().getProperty('USER_DB_ID');
-  
-  if (dbId) {
-    try {
-      const file = DriveApp.getFileById(dbId);
-      try {
-        // Allow domain users to modify the ledger so that the
-        // web app can update it when running as the accessing user.
-        file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
-      } catch (e) {}
-      return SpreadsheetApp.openById(dbId).getSheetByName(USER_DB_CONFIG.SHEET_NAME);
-    } catch (e) {
-      // 何らかの理由で既存データベースにアクセスできない場合は
-      // 新しいデータベースを作成し直す
-      console.warn('Failed to access existing user database:', e);
-      // データベースが削除されている場合は再作成
-    }
+  const db = getDatabase();
+  const sheet = db.getSheetByName(USER_DB_CONFIG.SHEET_NAME);
+  if (!sheet) {
+    throw new Error('Database sheet not found. Please run setup().');
   }
-  
-  // 新規作成
-  const newDb = SpreadsheetApp.create('StudyQuest_UserDatabase');
-  const sheet = newDb.getActiveSheet();
-  sheet.setName(USER_DB_CONFIG.SHEET_NAME);
-  sheet.getRange(1, 1, 1, USER_DB_CONFIG.HEADERS.length)
-    .setValues([USER_DB_CONFIG.HEADERS]);
-
-  // Share database so any user in the domain can edit it via link.
-  // The web app executes as the accessing user, so they must have
-  // write permission to update the shared ledger.
-  try {
-    DriveApp.getFileById(newDb.getId())
-      .setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
-  } catch (e) {}
-  
-  PropertiesService.getScriptProperties().setProperty('USER_DB_ID', newDb.getId());
-  
   return sheet;
 }
 
@@ -1062,7 +1059,7 @@ function generateAccessToken() {
  * 既存ユーザーを検索
  */
 function findUserByEmailAndSpreadsheet(email, spreadsheetId) {
-  const userDb = getUserDatabase();
+  const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
   const data = userDb.getDataRange().getValues();
   const headers = data[0];
   
@@ -1142,6 +1139,8 @@ if (typeof module !== 'undefined') {
     getUserInfo,
     updateUserConfig,
     getUserDatabase,
+    setup,
+    getDatabase,
     extractSpreadsheetId,
     generateAccessToken,
     findUserByEmailAndSpreadsheet,

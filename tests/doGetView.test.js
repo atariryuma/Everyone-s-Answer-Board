@@ -14,7 +14,7 @@ function setup({ userEmail = 'admin@example.com', adminEmails = 'admin@example.c
     getScriptProperties: () => ({
       getProperty: (key) => {
         if (key === 'ADMIN_EMAILS') return adminEmails;
-        if (key === 'USER_DB_ID') return 'db1';
+        if (key === 'DATABASE_ID') return 'db1';
         return null;
       },
       setProperty: jest.fn()
