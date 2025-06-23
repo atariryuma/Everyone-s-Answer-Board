@@ -255,3 +255,69 @@ test('getSheetData supports custom headers from config', () => {
   expect(result.rows[0].opinion).toBe('Answer1');
   expect(result.rows[0].name).toBe('Alice');
 });
+
+test('getSheetData uses question column when answer header missing', () => {
+  global.getConfig = () => ({
+    questionHeader: 'Question',
+    answerHeader: '',
+    reasonHeader: 'Why',
+    nameHeader: 'Name',
+    classHeader: 'Class'
+  });
+
+  ({ getSheetData, COLUMN_HEADERS } = require('../src/Code.gs'));
+  const data = [
+    [
+      COLUMN_HEADERS.EMAIL,
+      'Class',
+      'Question',
+      'Why',
+      COLUMN_HEADERS.TIMESTAMP,
+      COLUMN_HEADERS.UNDERSTAND,
+      COLUMN_HEADERS.LIKE,
+      COLUMN_HEADERS.CURIOUS,
+      COLUMN_HEADERS.HIGHLIGHT,
+      'Name'
+    ],
+    ['a@example.com', '1-1', 'Answer1', 'Because', '2024-09-01T00:00:00Z', '', '', '', 'false', 'Alice']
+  ];
+  setupMocks(data, 'a@example.com', 'a@example.com');
+
+  const result = getSheetData('Sheet1');
+
+  expect(result.header).toBe('Question');
+  expect(result.rows[0].opinion).toBe('Answer1');
+});
+
+test('getSheetData uses answer column when question header missing', () => {
+  global.getConfig = () => ({
+    questionHeader: '',
+    answerHeader: 'Ans',
+    reasonHeader: 'Why',
+    nameHeader: 'Name',
+    classHeader: 'Class'
+  });
+
+  ({ getSheetData, COLUMN_HEADERS } = require('../src/Code.gs'));
+  const data = [
+    [
+      COLUMN_HEADERS.EMAIL,
+      'Class',
+      'Ans',
+      'Why',
+      COLUMN_HEADERS.TIMESTAMP,
+      COLUMN_HEADERS.UNDERSTAND,
+      COLUMN_HEADERS.LIKE,
+      COLUMN_HEADERS.CURIOUS,
+      COLUMN_HEADERS.HIGHLIGHT,
+      'Name'
+    ],
+    ['a@example.com', '1-1', 'Answer1', 'Because', '2024-10-01T00:00:00Z', '', '', '', 'false', 'Alice']
+  ];
+  setupMocks(data, 'a@example.com', 'a@example.com');
+
+  const result = getSheetData('Sheet1');
+
+  expect(result.header).toBe('Ans');
+  expect(result.rows[0].opinion).toBe('Answer1');
+});

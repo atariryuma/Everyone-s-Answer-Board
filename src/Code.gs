@@ -390,7 +390,7 @@ function getSheetData(sheetName, classFilter, sortBy) {
       ? global.getConfig
       : (typeof getConfig === 'function' ? getConfig : null);
     const cfg = cfgFunc ? cfgFunc(sheetName) : {};
-    const answerHeader = cfg.answerHeader || COLUMN_HEADERS.OPINION;
+    const answerHeader = cfg.answerHeader || cfg.questionHeader || COLUMN_HEADERS.OPINION;
     const reasonHeader = cfg.reasonHeader || COLUMN_HEADERS.REASON;
     const classHeader = cfg.classHeader || COLUMN_HEADERS.CLASS;
     const nameHeader = cfg.nameHeader || '';
@@ -482,7 +482,7 @@ function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy)
       ? global.getConfig
       : (typeof getConfig === 'function' ? getConfig : null);
     const cfg = cfgFunc ? cfgFunc(sheetName) : {};
-    const answerHeader = cfg.answerHeader || COLUMN_HEADERS.OPINION;
+    const answerHeader = cfg.answerHeader || cfg.questionHeader || COLUMN_HEADERS.OPINION;
     const reasonHeader = cfg.reasonHeader || COLUMN_HEADERS.REASON;
     const classHeader = cfg.classHeader || COLUMN_HEADERS.CLASS;
     const nameHeader = cfg.nameHeader || '';
@@ -565,6 +565,7 @@ function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy)
 function buildBoardData(sheetName) {
   const cfgFunc = (typeof global !== 'undefined' && global.getConfig) ? global.getConfig : getConfig;
   const cfg = cfgFunc ? cfgFunc(sheetName) : {};
+  const answerHeader = cfg.answerHeader || cfg.questionHeader || COLUMN_HEADERS.OPINION;
   const sheet = getCurrentSpreadsheet().getSheetByName(sheetName);
   if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
   const values = sheet.getDataRange().getValues();
@@ -574,13 +575,13 @@ function buildBoardData(sheetName) {
   const entries = values.map(row => {
     const email = index[COLUMN_HEADERS.EMAIL] !== undefined ? row[index[COLUMN_HEADERS.EMAIL]] : '';
     return {
-      answer: row[index[cfg.answerHeader]],
+      answer: row[index[answerHeader]],
       reason: cfg.reasonHeader ? row[index[cfg.reasonHeader]] : null,
       name: cfg.nameHeader ? row[index[cfg.nameHeader]] : (email ? email.split('@')[0] : ''),
       class: cfg.classHeader ? row[index[cfg.classHeader]] : undefined
     };
   });
-  return { header: cfg.questionHeader, entries };
+  return { header: cfg.questionHeader || answerHeader, entries };
 }
 
 function addReaction(rowIndex, reactionKey, sheetName) {
