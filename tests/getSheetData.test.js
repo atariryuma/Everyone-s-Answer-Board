@@ -57,14 +57,15 @@ test('getSheetData filters and scores rows', () => {
       COLUMN_HEADERS.CLASS,
       COLUMN_HEADERS.OPINION,
       COLUMN_HEADERS.REASON,
+      COLUMN_HEADERS.TIMESTAMP,
       COLUMN_HEADERS.UNDERSTAND,
       COLUMN_HEADERS.LIKE,
       COLUMN_HEADERS.CURIOUS,
       COLUMN_HEADERS.HIGHLIGHT
     ],
-    ['a@example.com', '1-1', 'Opinion1', 'Reason1', 'b@example.com', '', '', 'false'],
-    ['b@example.com', '1-1', 'Opinion2', 'Reason2', '', '', '', 'false'],
-    ['', '', '', '', '', '', '', ''] // ignored
+    ['a@example.com', '1-1', 'Opinion1', 'Reason1', '2024-01-01T00:00:00Z', 'b@example.com', '', '', 'false'],
+    ['b@example.com', '1-1', 'Opinion2', 'Reason2', '2024-01-02T00:00:00Z', '', '', '', 'false'],
+    ['', '', '', '', '', '', '', '', ''] // ignored
   ];
   setupMocks(data, 'b@example.com', 'b@example.com');
 
@@ -88,13 +89,14 @@ test('getSheetData sorts by newest when specified', () => {
       COLUMN_HEADERS.CLASS,
       COLUMN_HEADERS.OPINION,
       COLUMN_HEADERS.REASON,
+      COLUMN_HEADERS.TIMESTAMP,
       COLUMN_HEADERS.UNDERSTAND,
       COLUMN_HEADERS.LIKE,
       COLUMN_HEADERS.CURIOUS,
       COLUMN_HEADERS.HIGHLIGHT
     ],
-    ['first@example.com', '1-1', 'Old', 'A', '', '', '', 'false'],
-    ['second@example.com', '1-1', 'New', 'B', '', '', '', 'false']
+    ['first@example.com', '1-1', 'Old', 'A', '2024-01-01T00:00:00Z', '', '', '', 'false'],
+    ['second@example.com', '1-1', 'New', 'B', '2024-02-01T00:00:00Z', '', '', '', 'false']
   ];
   setupMocks(data, '', '');
 
@@ -113,13 +115,14 @@ test('getSheetData supports random sort', () => {
       COLUMN_HEADERS.CLASS,
       COLUMN_HEADERS.OPINION,
       COLUMN_HEADERS.REASON,
+      COLUMN_HEADERS.TIMESTAMP,
       COLUMN_HEADERS.UNDERSTAND,
       COLUMN_HEADERS.LIKE,
       COLUMN_HEADERS.CURIOUS,
       COLUMN_HEADERS.HIGHLIGHT
     ],
-    ['first@example.com', '1-1', 'Old', 'A', '', '', '', 'false'],
-    ['second@example.com', '1-1', 'New', 'B', '', '', '', 'false']
+    ['first@example.com', '1-1', 'Old', 'A', '2024-03-01T00:00:00Z', '', '', '', 'false'],
+    ['second@example.com', '1-1', 'New', 'B', '2024-04-01T00:00:00Z', '', '', '', 'false']
   ];
   setupMocks(data, '', '');
 
@@ -139,12 +142,13 @@ test('getSheetData omits names for non-admin', () => {
       COLUMN_HEADERS.CLASS,
       COLUMN_HEADERS.OPINION,
       COLUMN_HEADERS.REASON,
+      COLUMN_HEADERS.TIMESTAMP,
       COLUMN_HEADERS.UNDERSTAND,
       COLUMN_HEADERS.LIKE,
       COLUMN_HEADERS.CURIOUS,
       COLUMN_HEADERS.HIGHLIGHT
     ],
-    ['a@example.com', '1-1', 'Opinion1', 'Reason1', '', '', '', 'false']
+    ['a@example.com', '1-1', 'Opinion1', 'Reason1', '2024-05-01T00:00:00Z', '', '', '', 'false']
   ];
   setupMocks(data, 'a@example.com', '');
 
@@ -163,12 +167,13 @@ test('getSheetData returns names for admin users', () => {
       COLUMN_HEADERS.CLASS,
       COLUMN_HEADERS.OPINION,
       COLUMN_HEADERS.REASON,
+      COLUMN_HEADERS.TIMESTAMP,
       COLUMN_HEADERS.UNDERSTAND,
       COLUMN_HEADERS.LIKE,
       COLUMN_HEADERS.CURIOUS,
       COLUMN_HEADERS.HIGHLIGHT
     ],
-    ['a@example.com', '1-1', 'Opinion1', 'Reason1', '', '', '', 'false']
+    ['a@example.com', '1-1', 'Opinion1', 'Reason1', '2024-06-01T00:00:00Z', '', '', '', 'false']
   ];
   setupMocks(data, 'a@example.com', 'a@example.com');
 
@@ -187,6 +192,7 @@ test('reaction lists trim spaces and ignore empties', () => {
       COLUMN_HEADERS.CLASS,
       COLUMN_HEADERS.OPINION,
       COLUMN_HEADERS.REASON,
+      COLUMN_HEADERS.TIMESTAMP,
       COLUMN_HEADERS.UNDERSTAND,
       COLUMN_HEADERS.LIKE,
       COLUMN_HEADERS.CURIOUS,
@@ -197,6 +203,7 @@ test('reaction lists trim spaces and ignore empties', () => {
       '1-1',
       'Opinion',
       'Reason',
+      '2024-07-01T00:00:00Z',
       ' a@example.com , b@example.com ',
       ' a@example.com , ',
       '   ',
@@ -233,13 +240,14 @@ test('getSheetData supports custom headers from config', () => {
       'Class',
       'Ans',
       'Why',
+      COLUMN_HEADERS.TIMESTAMP,
       COLUMN_HEADERS.UNDERSTAND,
       COLUMN_HEADERS.LIKE,
       COLUMN_HEADERS.CURIOUS,
       COLUMN_HEADERS.HIGHLIGHT,
       'Name'
     ],
-    ['a@example.com', '1-1', 'Answer1', 'Because', '', '', '', 'false', 'Alice']
+    ['a@example.com', '1-1', 'Answer1', 'Because', '2024-08-01T00:00:00Z', '', '', '', 'false', 'Alice']
   ];
   setupMocks(data, 'a@example.com', 'a@example.com');
 
