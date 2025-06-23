@@ -23,6 +23,7 @@ test('prepareSheetForBoard appends missing reaction columns', () => {
   const base = [COLUMN_HEADERS.EMAIL, COLUMN_HEADERS.CLASS];
   const { headers } = setup(base);
   prepareSheetForBoard('Sheet1');
+  expect(headers).toContain(COLUMN_HEADERS.TIMESTAMP);
   expect(headers).toContain(COLUMN_HEADERS.UNDERSTAND);
   expect(headers).toContain(COLUMN_HEADERS.LIKE);
   expect(headers).toContain(COLUMN_HEADERS.CURIOUS);

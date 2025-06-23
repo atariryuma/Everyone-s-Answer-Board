@@ -23,6 +23,7 @@ test('getHeaderIndices ignores unrelated header differences', () => {
     'Email',
     'Class',
     'Question',
+    COLUMN_HEADERS.TIMESTAMP,
     COLUMN_HEADERS.UNDERSTAND,
     COLUMN_HEADERS.LIKE,
     COLUMN_HEADERS.CURIOUS,
@@ -31,10 +32,11 @@ test('getHeaderIndices ignores unrelated header differences', () => {
   setup(headers);
   const indices = getHeaderIndices('Sheet1');
   expect(indices).toEqual({
-    [COLUMN_HEADERS.UNDERSTAND]: 3,
-    [COLUMN_HEADERS.LIKE]: 4,
-    [COLUMN_HEADERS.CURIOUS]: 5,
-    [COLUMN_HEADERS.HIGHLIGHT]: 6
+    [COLUMN_HEADERS.TIMESTAMP]: 3,
+    [COLUMN_HEADERS.UNDERSTAND]: 4,
+    [COLUMN_HEADERS.LIKE]: 5,
+    [COLUMN_HEADERS.CURIOUS]: 6,
+    [COLUMN_HEADERS.HIGHLIGHT]: 7
   });
-  expect(Object.keys(indices)).toHaveLength(4);
+  expect(Object.keys(indices)).toHaveLength(5);
 });
