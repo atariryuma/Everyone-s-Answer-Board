@@ -7,11 +7,6 @@ beforeEach(() => {
 });
 
 function setupMocks(rows, userEmail, adminEmails = '') {
-  const rosterHeaders = ['姓', '名', 'ニックネーム', 'Googleアカウント'];
-  const rosterRows = [
-    ['A', 'Alice', '', 'a@example.com'],
-    ['B', 'Bob', '', 'b@example.com']
-  ];
 
   // Mock SpreadsheetApp
   global.SpreadsheetApp = {
@@ -19,9 +14,6 @@ function setupMocks(rows, userEmail, adminEmails = '') {
       getSheetByName: (name) => {
         if (name === 'Sheet1') {
           return { getDataRange: () => ({ getValues: () => rows }) };
-        }
-        if (name === 'roster') {
-          return { getDataRange: () => ({ getValues: () => [rosterHeaders, ...rosterRows] }) };
         }
         return null;
       }
@@ -82,9 +74,9 @@ test('getSheetData filters and scores rows', () => {
 
   expect(result.header).toBe(COLUMN_HEADERS.OPINION);
   expect(result.rows).toHaveLength(2);
-  expect(result.rows[0].name).toBe('A Alice');
+  expect(result.rows[0].name).toBe('a');
   expect(result.rows[0].reactions.UNDERSTAND.reacted).toBe(true);
-  expect(result.rows[1].name).toBe('B Bob');
+  expect(result.rows[1].name).toBe('b');
   expect(result.rows[1].reactions.UNDERSTAND.reacted).toBe(false);
 });
 
@@ -188,7 +180,7 @@ test('getSheetData returns names for admin users', () => {
 
   const result = getSheetData('Sheet1');
 
-  expect(result.rows[0].name).toBe('A Alice');
+  expect(result.rows[0].name).toBe('a');
 });
 
 test('reaction lists trim spaces and ignore empties', () => {
@@ -236,7 +228,6 @@ test('getSheetData supports custom headers from config', () => {
     questionHeader: 'Question',
     answerHeader: 'Ans',
     reasonHeader: 'Why',
-    nameMode: '同一シート',
     nameHeader: 'Name',
     classHeader: 'Class'
   });

@@ -31,7 +31,8 @@ const COLUMN_HEADERS = {
   LIKE: 'いいね！',
   CURIOUS: 'もっと知りたい！',
   HIGHLIGHT: 'ハイライト',
-  TIMESTAMP: 'タイムスタンプ'
+  TIMESTAMP: 'タイムスタンプ',
+  NAME: '名前'
 };
 const ROSTER_CONFIG = {
   SHEET_NAME: 'roster',
@@ -139,7 +140,6 @@ function onOpen() {
       .createMenu('アプリ管理')
       .addItem('管理パネルを開く', 'showAdminSidebar')
       .addSeparator()
-      .addItem('名簿キャッシュをリセット', 'clearRosterCache')
       .addItem('設定シートを追加', 'createConfigSheet')
       .addToUi();
 }
@@ -426,7 +426,7 @@ function getSheetData(sheetName, classFilter, sortBy) {
     const answerHeader = cfg.answerHeader || COLUMN_HEADERS.OPINION;
     const reasonHeader = cfg.reasonHeader || COLUMN_HEADERS.REASON;
     const classHeader = cfg.classHeader || COLUMN_HEADERS.CLASS;
-    const nameHeader = (cfg.nameMode === '同一シート') ? (cfg.nameHeader || '') : '';
+    const nameHeader = cfg.nameHeader || '';
 
     const required = [
       COLUMN_HEADERS.EMAIL,
@@ -445,7 +445,7 @@ function getSheetData(sheetName, classFilter, sortBy) {
     const dataRows = allValues.slice(1);
     const userEmail = safeGetUserEmail();
     const isAdmin = isUserAdmin(userEmail);
-    const emailToNameMap = getRosterMap();
+    const emailToNameMap = {};
 
     const rows = dataRows.map((row, index) => {
       if (classFilter && classFilter !== 'すべて') {
@@ -519,7 +519,7 @@ function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy)
     const answerHeader = cfg.answerHeader || COLUMN_HEADERS.OPINION;
     const reasonHeader = cfg.reasonHeader || COLUMN_HEADERS.REASON;
     const classHeader = cfg.classHeader || COLUMN_HEADERS.CLASS;
-    const nameHeader = (cfg.nameMode === '同一シート') ? (cfg.nameHeader || '') : '';
+    const nameHeader = cfg.nameHeader || '';
 
     const required = [
       COLUMN_HEADERS.EMAIL,
@@ -538,7 +538,7 @@ function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy)
     const dataRows = allValues.slice(1);
     const userEmail = safeGetUserEmail();
     const isAdmin = isUserAdmin(userEmail);
-    const emailToNameMap = getRosterMapForSpreadsheet(spreadsheet);
+    const emailToNameMap = {};
 
     const rows = dataRows.map((row, index) => {
       if (classFilter && classFilter !== 'すべて') {
@@ -608,11 +608,10 @@ function buildBoardData(sheetName) {
   headers.forEach((h,i)=>{ if(h) index[h]=i; });
   const entries = values.map(row => {
     const email = index[COLUMN_HEADERS.EMAIL] !== undefined ? row[index[COLUMN_HEADERS.EMAIL]] : '';
-    const nameFromRoster = cfg.nameMode === '別シート' ? (getRosterMap()[email] || undefined) : undefined;
     return {
       answer: row[index[cfg.answerHeader]],
       reason: cfg.reasonHeader ? row[index[cfg.reasonHeader]] : null,
-      name: cfg.nameMode === '同一シート' && cfg.nameHeader ? row[index[cfg.nameHeader]] : nameFromRoster,
+      name: cfg.nameHeader ? row[index[cfg.nameHeader]] : (email ? email.split('@')[0] : ''),
       class: cfg.classHeader ? row[index[cfg.classHeader]] : undefined
     };
   });
@@ -755,68 +754,6 @@ function getAppSettingsForUser() {
   };
 }
 
-function getRosterMap() {
-  const cache = CacheService.getScriptCache();
-  const cachedMap = cache.get(ROSTER_CONFIG.CACHE_KEY);
-  if (cachedMap) { return JSON.parse(cachedMap); }
-  const props = PropertiesService.getScriptProperties();
-  const rosterSheetName = props && typeof props.getProperty === 'function'
-    ? (props.getProperty(ROSTER_CONFIG.PROPERTY_NAME) || ROSTER_CONFIG.SHEET_NAME)
-    : ROSTER_CONFIG.SHEET_NAME;
-  const sheet = getCurrentSpreadsheet().getSheetByName(rosterSheetName);
-  if (!sheet) { console.error(`名簿シート「${rosterSheetName}」が見つかりません。`); return {}; }
-  const rosterValues = sheet.getDataRange().getValues();
-  const rosterHeaders = rosterValues.shift();
-  const lastNameIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_LAST_NAME);
-  const firstNameIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_FIRST_NAME);
-  const nicknameIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_NICKNAME);
-  const emailIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_EMAIL);
-  if (lastNameIndex === -1 || firstNameIndex === -1 || emailIndex === -1) { throw new Error(`名簿シート「${rosterSheetName}」に必要な列が見つかりません。`); }
-  const nameMap = {};
-  rosterValues.forEach(row => {
-    const email = row[emailIndex];
-    const lastName = row[lastNameIndex];
-    const firstName = row[firstNameIndex];
-    const nickname = (nicknameIndex !== -1 && row[nicknameIndex]) ? row[nicknameIndex] : ''; 
-    if (email && lastName && firstName) {
-      const fullName = `${lastName} ${firstName}`;
-      nameMap[email] = nickname ? `${fullName} (${nickname})` : fullName;
-    }
-  });
-  cache.put(ROSTER_CONFIG.CACHE_KEY, JSON.stringify(nameMap), 21600);
-  return nameMap;
-}
-
-function getRosterMapForSpreadsheet(spreadsheet) {
-  const rosterSheetName = ROSTER_CONFIG.SHEET_NAME;
-  const sheet = spreadsheet.getSheetByName(rosterSheetName);
-  if (!sheet) { 
-    console.error(`名簿シート「${rosterSheetName}」が見つかりません。`); 
-    return {}; 
-  }
-  const rosterValues = sheet.getDataRange().getValues();
-  const rosterHeaders = rosterValues.shift();
-  const lastNameIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_LAST_NAME);
-  const firstNameIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_FIRST_NAME);
-  const nicknameIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_NICKNAME);
-  const emailIndex = rosterHeaders.indexOf(ROSTER_CONFIG.HEADER_EMAIL);
-  if (lastNameIndex === -1 || firstNameIndex === -1 || emailIndex === -1) { 
-    throw new Error(`名簿シート「${rosterSheetName}」に必要な列が見つかりません。`); 
-  }
-  const nameMap = {};
-  rosterValues.forEach(row => {
-    const email = row[emailIndex];
-    const lastName = row[lastNameIndex];
-    const firstName = row[firstNameIndex];
-    const nickname = (nicknameIndex !== -1 && row[nicknameIndex]) ? row[nicknameIndex] : ''; 
-    if (email && lastName && firstName) {
-      const fullName = `${lastName} ${firstName}`;
-      nameMap[email] = nickname ? `${fullName} (${nickname})` : fullName;
-    }
-  });
-  return nameMap;
-}
-
 function getHeaderIndices(sheetName) {
   const cache = CacheService.getScriptCache();
   const cacheKey = `headers_${sheetName}`;
@@ -873,16 +810,6 @@ function findHeaderIndices(sheetHeaders, requiredHeaders) {
   return indices;
 }
 
-function clearRosterCache() {
-  const cache = CacheService.getScriptCache();
-  const cacheKey = ROSTER_CONFIG.CACHE_KEY;
-  cache.remove(cacheKey);
-  console.log(`名簿キャッシュ（キー: ${cacheKey}）を削除しました。`);
-  try {
-    SpreadsheetApp.getUi().alert('名簿のキャッシュをリセットしました。');
-  } catch (e) { /* no-op */ }
-}
-
 function saveWebAppUrl(url) {
   const props = PropertiesService.getScriptProperties();
   props.setProperties({ WEB_APP_URL: (url || '').trim() });
@@ -914,7 +841,7 @@ function createTemplateSheet(name) {
     '質問',
     '回答',
     '理由',
-    '名前',
+    COLUMN_HEADERS.NAME,
     'クラス'
   ];
   const req = [
@@ -1005,7 +932,7 @@ function prepareSpreadsheetForStudyQuest(spreadsheet) {
   let configSheet = spreadsheet.getSheetByName('Config');
   if (!configSheet) {
     configSheet = spreadsheet.insertSheet('Config');
-    const headers = ['表示シート名','問題文ヘッダー','回答ヘッダー','理由ヘッダー','名前取得モード','名前列ヘッダー','クラス列ヘッダー'];
+    const headers = ['表示シート名','問題文ヘッダー','回答ヘッダー','理由ヘッダー','名前列ヘッダー','クラス列ヘッダー'];
     configSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   }
   
@@ -1096,6 +1023,12 @@ function getUserDatabase() {
   sheet.setName(USER_DB_CONFIG.SHEET_NAME);
   sheet.getRange(1, 1, 1, USER_DB_CONFIG.HEADERS.length)
     .setValues([USER_DB_CONFIG.HEADERS]);
+
+  // Share database so users in the same domain can read it
+  try {
+    DriveApp.getFileById(newDb.getId())
+      .setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (e) {}
   
   PropertiesService.getScriptProperties().setProperty('USER_DB_ID', newDb.getId());
   
@@ -1196,8 +1129,6 @@ if (typeof module !== 'undefined') {
     getSheetHeaders,
     getSheetData,
     getSheetDataForSpreadsheet,
-    getRosterMap,
-    getRosterMapForSpreadsheet,
     getHeaderIndices,
     addReaction,
     toggleHighlight,
