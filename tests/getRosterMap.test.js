@@ -26,8 +26,7 @@ function setupMocks(cacheValue) {
     })
   };
   global.PropertiesService = {
-    getScriptProperties: () => ({ getProperty: () => null }),
-    getUserProperties: () => ({ getProperty: () => null })
+    getScriptProperties: () => ({ getProperty: () => null })
   };
   return { sheet, cache: cacheObj };
 }
@@ -74,8 +73,7 @@ test('getRosterMap uses ROSTER_SHEET_NAME property when set', () => {
     getActiveSpreadsheet: () => ({ getSheetByName: spy })
   };
   global.PropertiesService = {
-    getScriptProperties: () => ({ getProperty: () => 'RosterSheet' }),
-    getUserProperties: () => ({ getProperty: () => null })
+    getScriptProperties: () => ({ getProperty: () => 'RosterSheet' })
   };
 
   getRosterMap();

@@ -37,8 +37,7 @@ function setupMocks(rows, userEmail, adminEmails = '') {
         if (key === 'ADMIN_EMAILS') return adminEmails;
         return null;
       }
-    }),
-    getUserProperties: () => ({ getProperty: () => null })
+    })
   };
 }
 

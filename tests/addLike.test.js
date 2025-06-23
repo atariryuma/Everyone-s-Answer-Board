@@ -51,10 +51,7 @@ function buildSheet() {
 function setupMocks(userEmail, sheet, cacheImpl) {
   global.LockService = { getScriptLock: () => ({ tryLock: jest.fn(() => true), releaseLock: jest.fn() }) };
   global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };
-  global.PropertiesService = {
-    getScriptProperties: () => ({}),
-    getUserProperties: () => ({ getProperty: () => null })
-  };
+  global.PropertiesService = { getScriptProperties: () => ({}) };
   global.CacheService = { getScriptCache: () => cacheImpl || ({ get: () => null, put: () => null }) };
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({

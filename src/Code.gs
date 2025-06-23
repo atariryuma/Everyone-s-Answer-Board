@@ -175,7 +175,7 @@ function getAdminSettings() {
   } else {
     // 従来のモード
     adminEmails = getAdminEmails();
-    appSettings = getAppSettingsForUser();
+    appSettings = getAppSettings();
   }
   
   const allSheets = getSheets();
@@ -413,7 +413,7 @@ function getSheetHeaders(sheetName) {
 
 function getSheetData(sheetName, classFilter, sortBy) {
   try {
-    const sheet = getCurrentSpreadsheet().getSheetByName(sheetName);
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
     if (!sheet) throw new Error(`指定されたシート「${sheetName}」が見つかりません。`);
 
     const allValues = sheet.getDataRange().getValues();
@@ -600,7 +600,7 @@ function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy)
 function buildBoardData(sheetName) {
   const cfgFunc = (typeof global !== 'undefined' && global.getConfig) ? global.getConfig : getConfig;
   const cfg = cfgFunc ? cfgFunc(sheetName) : {};
-  const sheet = getCurrentSpreadsheet().getSheetByName(sheetName);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
   const values = sheet.getDataRange().getValues();
   const headers = values.shift();
@@ -685,9 +685,9 @@ function toggleHighlight(rowIndex, sheetName) {
   const lock = LockService.getScriptLock();
   lock.waitLock(TIME_CONSTANTS.LOCK_WAIT_MS);
   try {
-    const settings = getAppSettingsForUser();
+    const settings = getAppSettings();
     const targetSheet = sheetName || settings.activeSheetName;
-    const sheet = getCurrentSpreadsheet().getSheetByName(targetSheet);
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(targetSheet);
     if (!sheet) throw new Error(`シート '${targetSheet}' が見つかりません。`);
 
     const headerIndices = getHeaderIndices(targetSheet);
@@ -763,7 +763,7 @@ function getRosterMap() {
   const rosterSheetName = props && typeof props.getProperty === 'function'
     ? (props.getProperty(ROSTER_CONFIG.PROPERTY_NAME) || ROSTER_CONFIG.SHEET_NAME)
     : ROSTER_CONFIG.SHEET_NAME;
-  const sheet = getCurrentSpreadsheet().getSheetByName(rosterSheetName);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(rosterSheetName);
   if (!sheet) { console.error(`名簿シート「${rosterSheetName}」が見つかりません。`); return {}; }
   const rosterValues = sheet.getDataRange().getValues();
   const rosterHeaders = rosterValues.shift();
@@ -822,7 +822,7 @@ function getHeaderIndices(sheetName) {
   const cacheKey = `headers_${sheetName}`;
   const cached = cache.get(cacheKey);
   if (cached) { return JSON.parse(cached); }
-  const sheet = getCurrentSpreadsheet().getSheetByName(sheetName);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
   const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const indices = findHeaderIndices(headerRow, [
@@ -838,7 +838,7 @@ function getHeaderIndices(sheetName) {
 
 
 function prepareSheetForBoard(sheetName) {
-  const sheet = getCurrentSpreadsheet().getSheetByName(sheetName);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
   const headers = getSheetHeaders(sheetName);
   let lastCol = headers.length;
@@ -902,7 +902,7 @@ function createTemplateSheet(name) {
   if (!checkAdmin()) {
     throw new Error('権限がありません。');
   }
-  const ss = getCurrentSpreadsheet();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheetName = name || 'New Q&A';
   if (ss.getSheetByName(sheetName)) {
     throw new Error(`シート '${sheetName}' は既に存在します。`);
