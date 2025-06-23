@@ -75,6 +75,14 @@ function safeGetUserEmail() {
   }
 }
 
+function getEmailDomain(email) {
+  return (email || '').toString().split('@').pop().toLowerCase();
+}
+
+function isSameDomain(emailA, emailB) {
+  return getEmailDomain(emailA) === getEmailDomain(emailB);
+}
+
 function getAdminEmails(spreadsheetId) {
   const props = PropertiesService.getScriptProperties();
   if (spreadsheetId) {
@@ -250,7 +258,13 @@ function doGet(e) {
     return HtmlService.createHtmlOutput('無効なユーザーIDです。')
       .setTitle('エラー');
   }
-  
+
+  var viewerEmail = safeGetUserEmail();
+  if (viewerEmail && !isSameDomain(viewerEmail, userInfo.adminEmail)) {
+    return HtmlService.createHtmlOutput('権限がありません。')
+      .setTitle('エラー');
+  }
+
   // 現在のコンテキストを設定
   PropertiesService.getUserProperties().setProperties({
     CURRENT_USER_ID: userId,
@@ -986,6 +1000,9 @@ function getUserDatabase() {
       } catch (e) {}
       return SpreadsheetApp.openById(dbId).getSheetByName(USER_DB_CONFIG.SHEET_NAME);
     } catch (e) {
+      if (e && e.message && !/not found|見つかりません/i.test(e.message)) {
+        throw new Error('ユーザーデータベースにアクセスできません。');
+      }
       // データベースが削除されている場合は再作成
     }
   }
@@ -1126,6 +1143,8 @@ if (typeof module !== 'undefined') {
     findUserByEmailAndSpreadsheet,
     updateAdminEmails,
     getActiveUserEmail,
-    prepareSpreadsheetForStudyQuest
+    prepareSpreadsheetForStudyQuest,
+    isSameDomain,
+    getEmailDomain
   };
 }

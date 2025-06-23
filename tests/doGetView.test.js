@@ -6,7 +6,6 @@ afterEach(() => {
   delete global.Session;
   delete global.PropertiesService;
   delete global.SpreadsheetApp;
-  delete global.getUserDatabase;
   delete global.getCurrentSpreadsheet;
 });
 
@@ -85,4 +84,12 @@ test('non admin user starts in viewer mode', () => {
   const tpl = getTemplate();
   expect(tpl.isAdminUser).toBe(false);
   expect(tpl.showAdminFeatures).toBe(false);
+});
+
+test('different domain user receives permission error', () => {
+  setup({ userEmail: 'user@other.com' });
+  const output = { setTitle: jest.fn(() => output) };
+  global.HtmlService.createHtmlOutput = jest.fn(() => output);
+  doGet({ parameter: { userId: 'u1' } });
+  expect(HtmlService.createHtmlOutput).toHaveBeenCalledWith(expect.stringContaining('権限'));
 });

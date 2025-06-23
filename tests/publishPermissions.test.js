@@ -18,11 +18,11 @@ function setup(userEmail, adminEmails) {
       setProperties: jest.fn()
     })
   };
-  global.getUserInfo = jest.fn(() => ({
+  jest.spyOn(gas, 'getUserInfo').mockImplementation(() => ({
     adminEmail: adminEmails[0],
     spreadsheetId: 'id1'
   }));
-  global.getUserDatabase = jest.fn(() => ({
+  jest.spyOn(gas, 'getUserDatabase').mockImplementation(() => ({
     getDataRange: () => ({
       getValues: () => [
         ['userId','spreadsheetId','adminEmail','configJson','lastAccessedAt'],
@@ -31,6 +31,7 @@ function setup(userEmail, adminEmails) {
     }),
     getRange: jest.fn(() => ({ setValue: jest.fn() }))
   }));
+  global.DriveApp = { getFileById: jest.fn(() => ({ setSharing: jest.fn() })) };
   global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };
   const sheet = {
     getLastColumn: () => 2,
@@ -58,7 +59,7 @@ afterEach(() => {
   delete global.PropertiesService;
   delete global.Session;
   delete global.SpreadsheetApp;
-  delete global.getUserDatabase;
+  delete global.DriveApp;
   delete global.getCurrentSpreadsheet;
   jest.restoreAllMocks();
 });
