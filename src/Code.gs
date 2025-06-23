@@ -783,7 +783,13 @@ function saveWebAppUrl(url) {
 
 function getWebAppUrl() {
   const props = PropertiesService.getScriptProperties();
-  return (props.getProperty('WEB_APP_URL') || '').trim();
+  const url = (props.getProperty('WEB_APP_URL') || '').trim();
+  if (url) return url;
+  try {
+    return ScriptApp.getService().getUrl();
+  } catch (e) {
+    return '';
+  }
 }
 
 function saveDeployId(id) {
