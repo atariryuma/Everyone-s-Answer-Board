@@ -10,14 +10,12 @@ function setup(headers) {
     getActiveSpreadsheet: () => ({ getSheetByName: () => sheet })
   };
   global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null }) };
-  global.PropertiesService = { getUserProperties: () => ({ getProperty: () => null }) };
   return { sheet };
 }
 
 afterEach(() => {
   delete global.SpreadsheetApp;
   delete global.CacheService;
-  delete global.PropertiesService;
 });
 
 test('getHeaderIndices ignores unrelated header differences', () => {

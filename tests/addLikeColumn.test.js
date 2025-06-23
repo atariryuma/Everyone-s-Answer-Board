@@ -43,10 +43,7 @@ function buildSheet() {
 function setupMocks(email, sheet) {
   global.LockService = { getScriptLock: () => ({ tryLock: jest.fn(() => true), releaseLock: jest.fn() }) };
   global.Session = { getActiveUser: () => ({ getEmail: () => email }) };
-  global.PropertiesService = {
-    getScriptProperties: () => ({}),
-    getUserProperties: () => ({ getProperty: () => null })
-  };
+  global.PropertiesService = { getScriptProperties: () => ({}) };
   global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null }) };
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({
@@ -77,10 +74,7 @@ test('addReaction handles failure to get user email', () => {
   const sheet = buildSheet();
   global.LockService = { getScriptLock: () => ({ tryLock: jest.fn(() => true), releaseLock: jest.fn() }) };
   global.Session = { getActiveUser: () => ({ getEmail: () => { throw new Error('fail'); } }) };
-  global.PropertiesService = {
-    getScriptProperties: () => ({}),
-    getUserProperties: () => ({ getProperty: () => null })
-  };
+  global.PropertiesService = { getScriptProperties: () => ({}) };
   global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null }) };
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({

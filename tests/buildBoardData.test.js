@@ -20,8 +20,7 @@ function setup({configRows, dataRows, rosterRows}) {
   };
   global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null, remove: () => null }) };
   global.PropertiesService = {
-    getScriptProperties: () => ({ getProperty: () => null }),
-    getUserProperties: () => ({ getProperty: () => null })
+    getScriptProperties: () => ({ getProperty: () => null })
   };
   global.getConfig = (sheetName) => {
     const row = configRows.find((r, idx) => idx > 0 && r[0] === sheetName);

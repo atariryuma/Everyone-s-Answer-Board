@@ -5,38 +5,14 @@ function setup(userEmail, adminEmails) {
     getProperty: (key) => key === 'ADMIN_EMAILS' ? adminEmails.join(',') : null,
     setProperty: jest.fn()
   };
-  global.PropertiesService = {
-    getScriptProperties: () => ({
-      ...props,
-      getProperty: (key) => {
-        if (key === 'ADMIN_EMAILS') return adminEmails.join(',');
-        if (key === 'USER_DB_ID') return 'db';
-        return null;
-      },
-      setProperty: jest.fn()
-    }),
-    getUserProperties: () => ({
-      getProperty: (key) => key === 'CURRENT_USER_ID' ? 'user1' : null
-    })
-  };
-  global.getUserInfo = () => ({ adminEmail: userEmail, spreadsheetId: 'id123' });
+  global.PropertiesService = { getScriptProperties: () => props };
   global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };
   const sheet = {
     getLastColumn: () => 2,
     getRange: () => ({ getValues: () => [['a','b']], setValue: jest.fn() }),
     insertColumnAfter: jest.fn()
   };
-  global.SpreadsheetApp = {
-    getActiveSpreadsheet: () => ({ getSheetByName: () => sheet }),
-    openById: () => ({ getSheetByName: () => sheet }),
-    create: () => ({
-      getActiveSheet: () => ({
-        setName: jest.fn(),
-        getRange: () => ({ setValues: jest.fn() })
-      }),
-      getId: () => 'db'
-    })
-  };
+  global.SpreadsheetApp = { getActiveSpreadsheet: () => ({ getSheetByName: () => sheet }) };
   return props;
 }
 
@@ -44,7 +20,6 @@ afterEach(() => {
   delete global.PropertiesService;
   delete global.Session;
   delete global.SpreadsheetApp;
-  delete global.getUserInfo;
 });
 
 test('publishApp succeeds for admin user', () => {
