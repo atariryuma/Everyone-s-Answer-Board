@@ -491,7 +491,7 @@
 
           // 保存された列数をローカルストレージからロード
           const savedCols = localStorage.getItem('boardColumns');
-          if (savedCols) {
+          if (savedCols && this.elements.sizeSlider && this.elements.sliderValue) {
             this.elements.sizeSlider.value = savedCols;
             this.elements.sliderValue.textContent = savedCols;
           }
@@ -781,14 +781,15 @@
       runGas(funcName, ...args) {
         return new Promise((resolve, reject) => {
           // Google Apps Script環境で実行されているかチェック
-          if (typeof google !== 'undefined' && google.script && google.script.run) {
+          const isPreview = (typeof ModeManager !== 'undefined' && typeof ModeManager.isPreviewMode === 'function' && ModeManager.isPreviewMode());
+          if (!isPreview && typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
               .withSuccessHandler(resolve) // 成功時のハンドラ
               .withFailureHandler(reject) // 失敗時のハンドラ
               [funcName](...args); // GAS関数を実行
           } else {
-            // GAS環境がない場合は、デバッグ用のモックデータを使用
-            console.warn('Google Apps Script environment not detected. Using mock data.');
+            // GAS環境がない場合やプレビューでは、デバッグ用のモックデータを使用
+            console.warn('Google Apps Script environment not detected or preview mode. Using mock data.');
             this.getMockData(funcName, ...args).then(resolve).catch(reject);
           }
         });
