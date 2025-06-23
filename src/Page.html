@@ -204,10 +204,9 @@
       transform: scale(1.02);
       animation: highlight-pulse 2s 3;
       z-index: 2;
-      background-image:
-        linear-gradient(var(--glass-bg), var(--glass-bg)),
-        linear-gradient(90deg, var(--color-accent), var(--color-primary));
-      background-origin: padding-box, border-box;
+      background:
+        linear-gradient(var(--glass-bg), var(--glass-bg)) padding-box,
+        linear-gradient(90deg, var(--color-accent), var(--color-primary)) border-box;
       background-clip: padding-box, border-box;
     }
     .answer-card:hover {
@@ -244,17 +243,29 @@
     .reaction-bg-understand-curious,
     .reaction-bg-all {
       border-color: transparent;
-      border-image-slice: 1;
-      border-image-source: linear-gradient(90deg,#ef4444,#fbbf24);
+      border-style: solid;
+      background:
+        linear-gradient(var(--glass-bg), var(--glass-bg)) padding-box,
+        linear-gradient(90deg,#ef4444,#fbbf24) border-box;
+      background-clip: padding-box, border-box;
     }
     .reaction-bg-like-curious {
-      border-image-source: linear-gradient(90deg,#ef4444,#10b981);
+      background:
+        linear-gradient(var(--glass-bg), var(--glass-bg)) padding-box,
+        linear-gradient(90deg,#ef4444,#10b981) border-box;
+      background-clip: padding-box, border-box;
     }
     .reaction-bg-understand-curious {
-      border-image-source: linear-gradient(90deg,#fbbf24,#10b981);
+      background:
+        linear-gradient(var(--glass-bg), var(--glass-bg)) padding-box,
+        linear-gradient(90deg,#fbbf24,#10b981) border-box;
+      background-clip: padding-box, border-box;
     }
     .reaction-bg-all {
-      border-image-source: linear-gradient(90deg,#ef4444,#fbbf24,#10b981);
+      background:
+        linear-gradient(var(--glass-bg), var(--glass-bg)) padding-box,
+        linear-gradient(90deg,#ef4444,#fbbf24,#10b981) border-box;
+      background-clip: padding-box, border-box;
     }
     /* リアクション総数に応じたボーダー太さ */
     .reaction-border-1 { border-width: 2px; }
