@@ -669,9 +669,11 @@ function addReaction(rowIndex, reactionKey, sheetName) {
   if (!rowIndex || !reactionKey || !COLUMN_HEADERS[reactionKey]) {
     return { status: 'error', message: '無効なパラメータです。' };
   }
-  const lock = LockService.getScriptLock();
+  
+  // Use LockService only in production environment
+  const lock = (typeof LockService !== 'undefined') ? LockService.getScriptLock() : null;
   try {
-    if (!lock.tryLock(TIME_CONSTANTS.LOCK_WAIT_MS)) {
+    if (lock && !lock.tryLock(TIME_CONSTANTS.LOCK_WAIT_MS)) {
       return { status: 'error', message: '他のユーザーが操作中です。しばらく待ってから再試行してください。' };
     }
     const userEmail = safeGetUserEmail();
@@ -720,7 +722,9 @@ function addReaction(rowIndex, reactionKey, sheetName) {
   } catch (error) {
     return handleError('addReaction', error, true);
   } finally {
-    try { lock.releaseLock(); } catch (e) {}
+    if (lock) {
+      try { lock.releaseLock(); } catch (e) {}
+    }
   }
 }
 
@@ -728,9 +732,12 @@ function toggleHighlight(rowIndex, sheetName) {
   if (!checkAdmin()) {
     return { status: 'error', message: '権限がありません。' };
   }
-  const lock = LockService.getScriptLock();
-  lock.waitLock(TIME_CONSTANTS.LOCK_WAIT_MS);
+  
+  const lock = (typeof LockService !== 'undefined') ? LockService.getScriptLock() : null;
   try {
+    if (lock) {
+      lock.waitLock(TIME_CONSTANTS.LOCK_WAIT_MS);
+    }
     const settings = getAppSettingsForUser();
     const targetSheet = sheetName || settings.activeSheetName;
     const sheet = getCurrentSpreadsheet().getSheetByName(targetSheet);
@@ -747,7 +754,9 @@ function toggleHighlight(rowIndex, sheetName) {
   } catch (error) {
     return handleError('toggleHighlight', error, true);
   } finally {
-    lock.releaseLock();
+    if (lock) {
+      lock.releaseLock();
+    }
   }
 }
 
@@ -931,15 +940,20 @@ function createTemplateSheet(name) {
  * 新規ユーザーを登録
  */
 function checkRateLimit(action, userEmail) {
-  const key = `rateLimit_${action}_${userEmail}`;
-  const cache = CacheService.getScriptCache();
-  const attempts = parseInt(cache.get(key) || '0');
-  
-  if (attempts > 10) { // 10 attempts per hour
-    throw new Error('レート制限に達しました。しばらく待ってから再試行してください。');
+  try {
+    const key = `rateLimit_${action}_${userEmail}`;
+    const cache = CacheService.getScriptCache();
+    const attempts = parseInt(cache.get(key) || '0');
+    
+    if (attempts > 10) { // 10 attempts per hour
+      throw new Error('レート制限に達しました。しばらく待ってから再試行してください。');
+    }
+    
+    cache.put(key, String(attempts + 1), 3600);
+  } catch (error) {
+    // Cache service error - continue without rate limiting
+    console.warn('Rate limiting failed:', error);
   }
-  
-  cache.put(key, String(attempts + 1), 3600);
 }
 
 function validateSpreadsheetUrl(url) {
@@ -955,10 +969,94 @@ function validateSpreadsheetUrl(url) {
   return sanitizedUrl;
 }
 
-function createStudyQuestSpreadsheet(userEmail) {
+function createStudyQuestForm(userEmail) {
   try {
-    // 新しいスプレッドシートを作成
-    const spreadsheet = SpreadsheetApp.create(`StudyQuest - ${userEmail}`);
+    // FormAppの利用可能性をチェック
+    if (typeof FormApp === 'undefined') {
+      throw new Error('Google Forms API is not available');
+    }
+    
+    // 新しいGoogleフォームを作成
+    const form = FormApp.create(`StudyQuest - 回答フォーム - ${userEmail.split('@')[0]}`);
+    
+    // フォームの説明を設定
+    form.setDescription('StudyQuestで使用する回答フォームです。質問に対する回答を入力してください。');
+    
+    // 必要な項目を追加
+    form.addTextItem()
+        .setTitle('クラス')
+        .setRequired(true);
+    
+    form.addTextItem()
+        .setTitle('名前')
+        .setRequired(true);
+    
+    form.addParagraphTextItem()
+        .setTitle('回答')
+        .setHelpText('質問に対するあなたの回答を入力してください')
+        .setRequired(true);
+    
+    form.addParagraphTextItem()
+        .setTitle('理由')
+        .setHelpText('その回答を選んだ理由を教えてください')
+        .setRequired(false);
+    
+    // フォームの回答先スプレッドシートを作成
+    const spreadsheet = form.createSpreadsheet(`StudyQuest - 回答データ - ${userEmail.split('@')[0]}`);
+    const sheet = spreadsheet.getSheets()[0];
+    
+    // スプレッドシートに追加の列を準備
+    const existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const additionalHeaders = [
+      COLUMN_HEADERS.UNDERSTAND,
+      COLUMN_HEADERS.LIKE,
+      COLUMN_HEADERS.CURIOUS,
+      COLUMN_HEADERS.HIGHLIGHT
+    ];
+    
+    // 既存のヘッダーの後に追加の列を挿入
+    const startCol = existingHeaders.length + 1;
+    sheet.getRange(1, startCol, 1, additionalHeaders.length).setValues([additionalHeaders]);
+    
+    // ヘッダー行のフォーマット
+    const allHeadersRange = sheet.getRange(1, 1, 1, existingHeaders.length + additionalHeaders.length);
+    allHeadersRange.setFontWeight('bold');
+    allHeadersRange.setBackground('#E3F2FD');
+    
+    // 列幅を調整
+    try {
+      sheet.autoResizeColumns(1, allHeadersRange.getNumColumns());
+    } catch (e) {
+      console.warn('Auto-resize failed:', e);
+    }
+    
+    // Configシートも作成
+    prepareSpreadsheetForStudyQuest(spreadsheet);
+    
+    return {
+      formId: form.getId(),
+      formUrl: form.getPublishedUrl(),
+      spreadsheetId: spreadsheet.getId(),
+      spreadsheetUrl: spreadsheet.getUrl(),
+      editFormUrl: form.getEditUrl()
+    };
+  } catch (error) {
+    console.error('Failed to create form and spreadsheet:', error);
+    
+    // FormAppが利用できない場合はスプレッドシートのみ作成
+    if (error.message.includes('Google Forms API is not available')) {
+      console.warn('FormApp not available, creating spreadsheet only');
+      return createStudyQuestSpreadsheetFallback(userEmail);
+    }
+    
+    throw new Error('Googleフォームとスプレッドシートの作成に失敗しました。');
+  }
+}
+
+function createStudyQuestSpreadsheetFallback(userEmail) {
+  try {
+    // 新しいスプレッドシートを作成（フォームなし）
+    const spreadsheet = SpreadsheetApp.create(`StudyQuest - 回答データ - ${userEmail.split('@')[0]}`);
     const sheet = spreadsheet.getActiveSheet();
     sheet.setName('回答データ');
     
@@ -985,36 +1083,23 @@ function createStudyQuestSpreadsheet(userEmail) {
     headerRange.setBackground('#E3F2FD');
     
     // 列幅を調整
-    sheet.autoResizeColumns(1, headers.length);
-    
-    // サンプルデータを追加（オプション）
-    const sampleData = [
-      [
-        new Date(),
-        userEmail,
-        'サンプルクラス',
-        'このアプリはどう思いますか？',
-        '使いやすそうです',
-        '直感的なインターフェースだから',
-        userEmail.split('@')[0],
-        '',
-        '',
-        '',
-        false
-      ]
-    ];
-    
-    sheet.getRange(2, 1, 1, headers.length).setValues(sampleData);
+    try {
+      sheet.autoResizeColumns(1, headers.length);
+    } catch (e) {
+      console.warn('Auto-resize failed:', e);
+    }
     
     // Configシートも作成
     prepareSpreadsheetForStudyQuest(spreadsheet);
     
     return {
       spreadsheetId: spreadsheet.getId(),
-      spreadsheetUrl: spreadsheet.getUrl()
+      spreadsheetUrl: spreadsheet.getUrl(),
+      formUrl: null, // フォームは作成されていない
+      editFormUrl: null
     };
   } catch (error) {
-    console.error('Failed to create spreadsheet:', error);
+    console.error('Failed to create fallback spreadsheet:', error);
     throw new Error('スプレッドシートの作成に失敗しました。');
   }
 }
@@ -1030,13 +1115,15 @@ function registerNewUser(spreadsheetUrl) {
   
   let spreadsheetId, finalSpreadsheetUrl;
   
+  let formResult = null;
+  
   if (spreadsheetUrl === 'AUTO_CREATE') {
-    // 自動セットアップ：新しいスプレッドシートを作成
-    const result = createStudyQuestSpreadsheet(userEmail);
-    spreadsheetId = result.spreadsheetId;
-    finalSpreadsheetUrl = result.spreadsheetUrl;
+    // 自動セットアップ：新しいGoogleフォームとスプレッドシートを作成
+    formResult = createStudyQuestForm(userEmail);
+    spreadsheetId = formResult.spreadsheetId;
+    finalSpreadsheetUrl = formResult.spreadsheetUrl;
     
-    auditLog('AUTO_SPREADSHEET_CREATED', '', { userEmail, spreadsheetId });
+    auditLog('AUTO_FORM_CREATED', '', { userEmail, spreadsheetId, formId: formResult.formId });
   } else {
     // 既存スプレッドシートを使用
     const validatedUrl = validateSpreadsheetUrl(spreadsheetUrl);
@@ -1093,13 +1180,15 @@ function registerNewUser(spreadsheetUrl) {
     viewUrl: `${getWebAppUrl()}?userId=${userId}`,
     userId: userId,
     message: spreadsheetUrl === 'AUTO_CREATE' ? 
-      '新規登録とスプレッドシート作成が完了しました！' : 
+      '新規登録とGoogleフォーム作成が完了しました！' : 
       '新規登録が完了しました。'
   };
   
-  // 自動作成の場合はスプレッドシートURLも返す
-  if (spreadsheetUrl === 'AUTO_CREATE') {
+  // 自動作成の場合はフォーム・スプレッドシート情報も返す
+  if (spreadsheetUrl === 'AUTO_CREATE' && formResult) {
     result.spreadsheetUrl = finalSpreadsheetUrl;
+    result.formUrl = formResult.formUrl;
+    result.editFormUrl = formResult.editFormUrl;
     result.autoCreated = true;
   }
   
@@ -1395,13 +1484,17 @@ function extractSpreadsheetId(url) {
  * アクセストークン生成
  */
 function generateAccessToken() {
-  const randomBytes = Utilities.getRandomBytes(32);
+  // Utilities.getRandomBytes is not available, use alternative approach
+  const uuid = Utilities.getUuid();
   const timestamp = new Date().getTime();
-  const combined = randomBytes.concat(Utilities.newBlob(timestamp.toString()).getBytes());
+  const randomString = uuid + timestamp + Math.random().toString(36);
   
-  return Utilities.base64EncodeWebSafe(
-    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, combined)
+  const bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    randomString
   );
+  
+  return Utilities.base64EncodeWebSafe(bytes);
 }
 
 function auditLog(action, userId, details) {
