@@ -1,5 +1,5 @@
 function getConfig(sheetName) {
-  const sheet = SpreadsheetApp.getActive().getSheetByName('Config');
+  const sheet = getCurrentSpreadsheet().getSheetByName('Config');
   if (!sheet) throw new Error('Configシートが見つかりません。');
   const values = sheet.getDataRange().getValues();
   if (values.length < 2) throw new Error('Configシートが空です。');
@@ -19,7 +19,7 @@ function getConfig(sheetName) {
 }
 
 function saveSheetConfig(sheetName, cfg) {
-  const ss = SpreadsheetApp.getActive();
+  const ss = getCurrentSpreadsheet();
   let sheet = ss.getSheetByName('Config');
   if (!sheet) {
     sheet = ss.insertSheet('Config');
@@ -53,7 +53,7 @@ function saveSheetConfig(sheetName, cfg) {
 }
 
 function createConfigSheet() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = getCurrentSpreadsheet();
   const created = [];
   let cfgSheet = ss.getSheetByName('Config');
   if (!cfgSheet) {

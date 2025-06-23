@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <title>StudyQuest - 新規登録</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .glass-panel {
+      background: rgba(26,27,38,0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    button:disabled { 
+      opacity: 0.5; 
+      cursor: not-allowed; 
+    }
+    :focus-visible { 
+      outline: 3px solid #8be9fd; 
+      outline-offset: 2px; 
+      border-radius: 4px; 
+    }
+    .spinner {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body class="bg-[#1a1b26] text-gray-200 font-sans min-h-screen flex items-center justify-center p-4">
+  <div class="glass-panel rounded-xl p-8 max-w-2xl w-full shadow-2xl">
+    <div class="text-center mb-8">
+      <h1 class="text-3xl font-bold text-yellow-300 mb-2">StudyQuest</h1>
+      <p class="text-gray-400">みんなの回答ボード - 新規登録</p>
+    </div>
+    
+    <div class="space-y-6">
+      <!-- ステップ1: 説明 -->
+      <div class="glass-panel rounded-lg p-6">
+        <h2 class="text-xl font-semibold mb-4 text-cyan-400 flex items-center gap-2">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          StudyQuestとは
+        </h2>
+        <ul class="text-sm text-gray-300 space-y-2">
+          <li class="flex items-start gap-2">
+            <span class="text-green-400">✓</span>
+            <span>Googleスプレッドシートの回答を、美しいボード形式で表示します</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-green-400">✓</span>
+            <span>生徒同士で「いいね」「なるほど」「気になる」のリアクションができます</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-green-400">✓</span>
+            <span>先生は重要な回答をハイライトできます</span>
+          </li>
+        </ul>
+      </div>
+      
+      <!-- ステップ2: スプレッドシートURL入力 -->
+      <div class="glass-panel rounded-lg p-6">
+        <h2 class="text-xl font-semibold mb-4 text-cyan-400 flex items-center gap-2">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+          スプレッドシートを指定
+        </h2>
+        <p class="text-sm text-gray-400 mb-4">
+          使用するGoogleスプレッドシートのURLを入力してください
+        </p>
+        <input
+          type="url"
+          id="spreadsheet-url"
+          placeholder="https://docs.google.com/spreadsheets/d/..."
+          class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 text-white focus:ring-2 focus:ring-cyan-400 focus:outline-none transition-all"
+          autocomplete="off"
+        />
+        <p class="text-xs text-gray-500 mt-2">
+          ※ 編集権限があるスプレッドシートのみ使用できます
+        </p>
+      </div>
+      
+      <!-- ステップ3: アカウント確認 -->
+      <div class="glass-panel rounded-lg p-6">
+        <h2 class="text-xl font-semibold mb-4 text-cyan-400 flex items-center gap-2">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+          </svg>
+          アカウント確認
+        </h2>
+        <div class="bg-gray-800 rounded-lg p-4">
+          <p class="text-sm text-gray-400 mb-1">登録するアカウント:</p>
+          <p id="user-email" class="text-white font-semibold flex items-center gap-2">
+            <svg class="w-4 h-4 spinner" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
+            </svg>
+            確認中...
+          </p>
+        </div>
+      </div>
+      
+      <!-- 登録ボタン -->
+      <button
+        id="register-btn"
+        class="w-full py-3 px-6 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-bold rounded-lg transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg"
+        disabled
+      >
+        StudyQuestを開始する
+      </button>
+      
+      <!-- メッセージエリア -->
+      <div id="message-area" class="text-center min-h-[24px]" role="alert" aria-live="polite"></div>
+      
+      <!-- 結果表示エリア -->
+      <div id="result-area" class="hidden"></div>
+    </div>
+    
+    <!-- フッター -->
+    <div class="text-center mt-8 text-xs text-gray-500">
+      <p>StudyQuest - 教育現場のためのインタラクティブ回答ボード</p>
+    </div>
+  </div>
+  
+  <script>
+    let userEmail = '';
+    
+    // ユーザーメールアドレスを取得
+    window.addEventListener('DOMContentLoaded', () => {
+      google.script.run
+        .withSuccessHandler(email => {
+          userEmail = email;
+          document.getElementById('user-email').textContent = email || 'メールアドレスを取得できません';
+          
+          // メールアドレスが取得できた場合のみボタンを有効化
+          if (email) {
+            document.getElementById('register-btn').disabled = false;
+          } else {
+            showMessage('Googleアカウントでログインしてください。', 'error');
+          }
+        })
+        .withFailureHandler(error => {
+          document.getElementById('user-email').textContent = 'エラー: メールアドレスを取得できません';
+          showMessage('認証エラーが発生しました。', 'error');
+        })
+        .getActiveUserEmail();
+    });
+    
+    // URLフィールドのEnterキー対応
+    document.getElementById('spreadsheet-url').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !document.getElementById('register-btn').disabled) {
+        document.getElementById('register-btn').click();
+      }
+    });
+    
+    // 登録処理
+    document.getElementById('register-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('register-btn');
+      const messageArea = document.getElementById('message-area');
+      const spreadsheetUrl = document.getElementById('spreadsheet-url').value.trim();
+      
+      // バリデーション
+      if (!spreadsheetUrl) {
+        showMessage('スプレッドシートのURLを入力してください。', 'error');
+        document.getElementById('spreadsheet-url').focus();
+        return;
+      }
+      
+      // URL形式の簡易チェック
+      if (!spreadsheetUrl.includes('docs.google.com/spreadsheets') && 
+          !spreadsheetUrl.match(/^[a-zA-Z0-9-_]+$/)) {
+        showMessage('有効なGoogleスプレッドシートのURLを入力してください。', 'error');
+        return;
+      }
+      
+      // ボタンを無効化
+      btn.disabled = true;
+      btn.innerHTML = `
+        <svg class="w-5 h-5 spinner inline-block mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
+        </svg>
+        登録処理中...
+      `;
+      showMessage('スプレッドシートを確認しています...', 'info');
+      
+      // 登録処理を実行
+      google.script.run
+        .withSuccessHandler(result => {
+          showMessage(result.message || '登録が完了しました！', 'success');
+          
+          // 結果表示エリアにURLを表示
+          const resultArea = document.getElementById('result-area');
+          resultArea.innerHTML = `
+            <div class="glass-panel rounded-lg p-6 space-y-4">
+              <h3 class="font-bold text-lg text-green-400 flex items-center gap-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                登録完了！
+              </h3>
+              
+              <p class="text-sm text-gray-300">
+                以下のURLをブックマークして、いつでもアクセスできるようにしてください。
+              </p>
+              
+              <div class="space-y-3">
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">管理画面URL（先生用）:</label>
+                  <div class="flex gap-2">
+                    <input type="text" value="${result.adminUrl}" readonly
+                      id="admin-url"
+                      class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
+                      onclick="this.select()">
+                    <button onclick="copyToClipboard('admin-url')"
+                      class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
+                      コピー
+                    </button>
+                  </div>
+                </div>
+                
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">生徒用URL:</label>
+                  <div class="flex gap-2">
+                    <input type="text" value="${result.viewUrl}" readonly
+                      id="view-url"
+                      class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
+                      onclick="this.select()">
+                    <button onclick="copyToClipboard('view-url')"
+                      class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
+                      コピー
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="pt-4 space-y-2">
+                <a href="${result.adminUrl}" target="_blank"
+                  class="block w-full text-center px-4 py-3 bg-cyan-600 hover:bg-cyan-700 rounded-lg font-semibold transition-colors">
+                  管理画面を開く →
+                </a>
+                <button onclick="location.reload()"
+                  class="block w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors">
+                  別のスプレッドシートを登録
+                </button>
+              </div>
+            </div>
+          `;
+          
+          resultArea.classList.remove('hidden');
+          btn.style.display = 'none';
+          document.getElementById('spreadsheet-url').disabled = true;
+        })
+        .withFailureHandler(error => {
+          showMessage(`エラー: ${error.message || '登録に失敗しました'}`, 'error');
+          btn.disabled = false;
+          btn.textContent = 'StudyQuestを開始する';
+        })
+        .registerNewUser(spreadsheetUrl);
+    });
+    
+    // メッセージ表示関数
+    function showMessage(message, type) {
+      const messageArea = document.getElementById('message-area');
+      const icons = {
+        error: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+        success: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+        info: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
+      };
+      const colors = {
+        error: 'text-red-400',
+        success: 'text-green-400',
+        info: 'text-blue-400'
+      };
+      
+      messageArea.className = `text-center min-h-[24px] ${colors[type] || 'text-gray-400'} flex items-center justify-center gap-2`;
+      messageArea.innerHTML = `${icons[type] || ''}<span>${message}</span>`;
+    }
+    
+    // クリップボードにコピー
+    function copyToClipboard(elementId) {
+      const element = document.getElementById(elementId);
+      element.select();
+      document.execCommand('copy');
+      
+      // コピー完了の視覚的フィードバック
+      const button = element.nextElementSibling;
+      const originalText = button.textContent;
+      button.textContent = '✓ コピー済み';
+      button.classList.add('bg-green-700');
+      
+      setTimeout(() => {
+        button.textContent = originalText;
+        button.classList.remove('bg-green-700');
+      }, 2000);
+    }
+  </script>
+</body>
+</html>

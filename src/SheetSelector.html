@@ -104,6 +104,9 @@
     </div>
 
     <script>
+      // ユーザーIDをテンプレート変数から取得
+      const userId = '<?= userId ?>';
+      
       const elements = {
         statusText: document.getElementById('status-text'),
         sheetSelect: document.getElementById('sheet-select'),
@@ -132,9 +135,11 @@
 
       function loadInitialState() {
         setLoading(true, "状態を更新中...");
+        // ユーザーIDを渡すように修正
         google.script.run
           .withSuccessHandler(updateUI)
           .withFailureHandler(showError)
+          .withUserObject({ userId: userId })
           .getAdminSettings();
       }
 
