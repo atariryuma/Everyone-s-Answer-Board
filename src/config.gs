@@ -60,18 +60,10 @@ function createConfigSheet() {
     cfgSheet.appendRow(headers);
     created.push('Config');
   }
-  const rosterName = typeof ROSTER_CONFIG !== 'undefined' ? ROSTER_CONFIG.SHEET_NAME : 'roster';
-  let rosterSheet = ss.getSheetByName(rosterName);
-  if (!rosterSheet) {
-    rosterSheet = ss.insertSheet(rosterName);
-    const rosterHeaders = ['学年','組','番号','姓','名','Googleアカウント','ニックネーム'];
-    rosterSheet.appendRow(rosterHeaders);
-    created.push(rosterName);
-  }
   if (created.length) {
     SpreadsheetApp.getUi().alert(`${created.join('と')}シートを作成しました。設定を入力してください。`);
   } else {
-    SpreadsheetApp.getUi().alert('ConfigシートとRosterシートは既に存在します。');
+    SpreadsheetApp.getUi().alert('Configシートは既に存在します。');
   }
 }
 
