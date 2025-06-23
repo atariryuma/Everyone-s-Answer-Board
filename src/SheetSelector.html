@@ -123,6 +123,12 @@
         elements.publishBtn.addEventListener('click', publish);
         elements.unpublishBtn.addEventListener('click', unpublish);
         elements.saveConfigBtn.addEventListener('click', saveConfig);
+        elements.qHeader.addEventListener('change', () => {
+          if (!elements.aHeader.value) elements.aHeader.value = elements.qHeader.value;
+        });
+        elements.aHeader.addEventListener('change', () => {
+          if (!elements.qHeader.value) elements.qHeader.value = elements.aHeader.value;
+        });
       });
 
       function loadInitialState() {
@@ -187,9 +193,11 @@
           showMessage('公開するシートを選択してください。', 'red');
           return;
         }
+        const qVal = elements.qHeader.value;
+        const aVal = elements.aHeader.value || qVal;
         const cfg = {
-          questionHeader: elements.qHeader.value,
-          answerHeader: elements.aHeader.value,
+          questionHeader: qVal || aVal,
+          answerHeader: aVal || qVal,
           reasonHeader: elements.rHeader.value,
           nameHeader: elements.nameHeader.value,
           classHeader: elements.classHeader.value
@@ -264,9 +272,11 @@
 
       function guessHeaders(headers) {
         const find = (keys) => headers.find(h => keys.some(k => h.includes(k))) || '';
+        const question = find(['質問', '問題']);
+        const answer = find(['回答', '答え']);
         return {
-          questionHeader: find(['質問', '問題']),
-          answerHeader: find(['回答', '答え']),
+          questionHeader: question,
+          answerHeader: answer,
           reasonHeader: find(['理由']),
           nameHeader: find(['名前', '氏名']),
           classHeader: find(['クラス'])
@@ -274,8 +284,9 @@
       }
 
       function populateConfig(cfg) {
-        elements.qHeader.value = cfg.questionHeader || '';
-        elements.aHeader.value = cfg.answerHeader || '';
+        const q = cfg.questionHeader || cfg.answerHeader || '';
+        elements.qHeader.value = q;
+        elements.aHeader.value = cfg.answerHeader || cfg.questionHeader || '';
         elements.rHeader.value = cfg.reasonHeader || '';
         elements.nameHeader.value = cfg.nameHeader || '';
         elements.classHeader.value = cfg.classHeader || '';
@@ -293,9 +304,11 @@
           showMessage('シートを選択してください。', 'red');
           return;
         }
+        const qVal = elements.qHeader.value;
+        const aVal = elements.aHeader.value || qVal;
         const cfg = {
-          questionHeader: elements.qHeader.value,
-          answerHeader: elements.aHeader.value,
+          questionHeader: qVal || aVal,
+          answerHeader: aVal || qVal,
           reasonHeader: elements.rHeader.value,
           nameHeader: elements.nameHeader.value,
           classHeader: elements.classHeader.value

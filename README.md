@@ -46,8 +46,11 @@ A timestamp value is required so that answers can be ordered by recency when usi
 
 Visit the Web App with `?mode=admin` to open the management panel.
 Here you can choose which sheet to publish or unpublish. Use the "Config"
-section to map the question, answer and name columns. The selected settings are
-saved automatically when publishing a sheet for the first time.
+section to map the question column and any other optional columns. If either the
+question or answer column is left blank, the other column is used for both. This
+means you can simply select one column that has the question text in the header
+and the answers below it. The selected settings are saved automatically when
+publishing a sheet for the first time.
 
 When unpublished, visiting the Web App URL shows a message that the board is closed. Once published, the board is available and updates automatically every 15 seconds.
 
