@@ -50,3 +50,4 @@ test('stored preview url is converted when deploy id provided', () => {
   expect(getWebAppUrl()).toBe('https://script.google.com/macros/s/AK999/exec?y=2');
   expect(props.setProperties).toHaveBeenCalledWith({ WEB_APP_URL: 'https://script.google.com/macros/s/AK999/exec?y=2' });
 });
+
