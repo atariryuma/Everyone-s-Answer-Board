@@ -32,9 +32,16 @@ function buildSheet() {
 function setupMocks(sheet, cacheImpl, userEmail = 'admin@example.com', adminEmails = 'admin@example.com') {
   global.LockService = { getScriptLock: () => ({ waitLock: jest.fn(), releaseLock: jest.fn() }) };
   global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };
-  global.PropertiesService = { getScriptProperties: () => ({
-    getProperty: (key) => key === 'ADMIN_EMAILS' ? adminEmails : null
-  }) };
+  global.PropertiesService = {
+    getScriptProperties: () => ({
+      getProperty: (key) => key === 'ADMIN_EMAILS' ? adminEmails : null
+    }),
+    getUserProperties: () => ({
+      getProperty: jest.fn(),
+      setProperty: jest.fn(),
+      setProperties: jest.fn()
+    })
+  };
   global.CacheService = { getScriptCache: () => cacheImpl || ({ get: () => null, put: () => null }) };
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({

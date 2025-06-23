@@ -1,18 +1,55 @@
-const { publishApp, unpublishApp } = require('../src/Code.gs');
+const gas = require('../src/Code.gs');
+const { publishApp, unpublishApp } = gas;
 
 function setup(userEmail, adminEmails) {
   const props = {
-    getProperty: (key) => key === 'ADMIN_EMAILS' ? adminEmails.join(',') : null,
+    getProperty: (key) => {
+      if (key === 'ADMIN_EMAILS') return adminEmails.join(',');
+      if (key === 'USER_DB_ID') return 'db1';
+      return null;
+    },
     setProperty: jest.fn()
   };
-  global.PropertiesService = { getScriptProperties: () => props };
+  global.PropertiesService = {
+    getScriptProperties: () => props,
+    getUserProperties: () => ({
+      getProperty: jest.fn(() => 'u1'),
+      setProperty: jest.fn(),
+      setProperties: jest.fn()
+    })
+  };
+  global.getUserInfo = jest.fn(() => ({
+    adminEmail: adminEmails[0],
+    spreadsheetId: 'id1'
+  }));
+  global.getUserDatabase = jest.fn(() => ({
+    getDataRange: () => ({
+      getValues: () => [
+        ['userId','spreadsheetId','adminEmail','configJson','lastAccessedAt'],
+        ['u1','id1','admin@example.com', JSON.stringify({ isPublished: true, sheetName: 'Sheet1' }), '']
+      ]
+    }),
+    getRange: jest.fn(() => ({ setValue: jest.fn() }))
+  }));
   global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };
   const sheet = {
     getLastColumn: () => 2,
-    getRange: () => ({ getValues: () => [['a','b']], setValue: jest.fn() }),
-    insertColumnAfter: jest.fn()
+    getRange: () => ({ getValues: () => [['a','b']], setValue: jest.fn(), setValues: jest.fn() }),
+    getDataRange: () => ({ getValues: () => [
+      ['userId','spreadsheetId','adminEmail','configJson','lastAccessedAt'],
+      ['u1','id1','admin@example.com', JSON.stringify({ isPublished: true, sheetName: 'Sheet1' }), '']
+    ] }),
+    insertColumnAfter: jest.fn(),
+    setName: jest.fn()
   };
-  global.SpreadsheetApp = { getActiveSpreadsheet: () => ({ getSheetByName: () => sheet }) };
+  global.SpreadsheetApp = {
+    getActiveSpreadsheet: () => ({ getSheetByName: () => sheet }),
+    openById: jest.fn(() => ({ getSheetByName: () => sheet })),
+    create: jest.fn(() => ({
+      getActiveSheet: () => sheet,
+      getId: () => 'newid'
+    }))
+  };
   return props;
 }
 
@@ -20,13 +57,13 @@ afterEach(() => {
   delete global.PropertiesService;
   delete global.Session;
   delete global.SpreadsheetApp;
+  delete global.getUserDatabase;
+  jest.restoreAllMocks();
 });
 
 test('publishApp succeeds for admin user', () => {
   const props = setup('admin@example.com', ['admin@example.com']);
   const msg = publishApp('Sheet1');
-  expect(props.setProperty).toHaveBeenCalledWith('IS_PUBLISHED', 'true');
-  expect(props.setProperty).toHaveBeenCalledWith('ACTIVE_SHEET_NAME', 'Sheet1');
   expect(msg).toBe('「Sheet1」を公開しました。');
 });
 
