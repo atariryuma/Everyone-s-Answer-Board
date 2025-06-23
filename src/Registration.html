@@ -191,6 +191,7 @@
       
       // 登録処理を実行
       google.script.run
+
         .withSuccessHandler(result => {
           showMessage(result.message || '登録が完了しました！', 'success');
           
@@ -207,6 +208,9 @@
               
               <p class="text-sm text-gray-300">
                 以下のURLをブックマークして、いつでもアクセスできるようにしてください。
+              </p>
+              <p class="text-sm text-gray-300">
+                管理画面は自動で開きます。まずは列の設定を確認しましょう。
               </p>
               
               <div class="space-y-3">
@@ -255,6 +259,10 @@
           resultArea.classList.remove('hidden');
           btn.style.display = 'none';
           document.getElementById('spreadsheet-url').disabled = true;
+
+          // 自動で管理画面を開き、次のステップを案内
+          window.open(result.adminUrl, '_blank');
+          showMessage('管理画面を別タブで開きました。列設定を確認してください。', 'info');
         })
         .withFailureHandler(error => {
           showMessage(`エラー: ${error.message || '登録に失敗しました'}`, 'error');
