@@ -23,7 +23,7 @@ function applyUpdates(items) {
     if (item.highlight && !badge) {
       badge = document.createElement('span');
       badge.className = 'highlight-badge';
-      badge.innerHTML = getIcon('star', 'w-6 h-6');
+      badge.innerHTML = getIcon('star', 'w-6 h-6', true);
       if (preview) preview.insertBefore(badge, preview.firstChild);
       animateHighlightBadge(badge);
     } else if (!item.highlight && badge) {

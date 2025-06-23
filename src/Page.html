@@ -204,9 +204,10 @@
       transform: scale(1.02);
       animation: highlight-pulse 2s 3;
       z-index: 2;
-      background:
-        linear-gradient(var(--glass-bg), var(--glass-bg)) padding-box,
-        linear-gradient(90deg, var(--color-accent), var(--color-primary)) border-box;
+      background-image:
+        linear-gradient(var(--glass-bg), var(--glass-bg)),
+        linear-gradient(90deg, var(--color-accent), var(--color-primary));
+      background-origin: padding-box, border-box;
       background-clip: padding-box, border-box;
     }
     .answer-card:hover {
@@ -1330,7 +1331,7 @@
           const cls = data.highlight ? 'liked' : '';
           const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
           highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-yellow-400 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' +
-                             this.getIcon('star', 'w-5 h-5', data.highlight) +
+                             this.getIcon('star', 'w-5 h-5', true) +
                              '</button>';
         }
         
@@ -1683,7 +1684,7 @@
               highlightBtn.setAttribute('aria-label', label);
               const svgEl = highlightBtn.querySelector('svg');
               if (svgEl) {
-                svgEl.outerHTML = this.getIcon('star', 'w-5 h-5', item.highlight);
+                svgEl.outerHTML = this.getIcon('star', 'w-5 h-5', true);
               }
               highlightBtn.disabled = false;
               highlightBtn.setAttribute('aria-disabled', 'false');
