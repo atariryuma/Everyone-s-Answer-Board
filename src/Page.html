@@ -93,10 +93,12 @@
     const __DISPLAY_MODE__ = '<?= displayMode ?>';
     const __SHEET_NAME__ = '<?= sheetName ?>';
     const __MAPPING__ = '<?= JSON.stringify(mapping) ?>';
+    const __USER_ID__ = '<?= userId ?>';
 
     window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : __SHOW_COUNTS__ === 'true';
     window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
     const SHEET_NAME = __SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHEET_NAME__;
+    const USER_ID = __USER_ID__.startsWith('<') ? '' : __USER_ID__;
     let MAPPING;
     try {
       MAPPING = __MAPPING__.startsWith('<') ? {} : JSON.parse(__MAPPING__);
@@ -790,15 +792,16 @@
        */
       runGas(funcName, ...args) {
         return new Promise((resolve, reject) => {
-          // Google Apps Script環境で実行されているかチェック
           const isPreview = (typeof ModeManager !== 'undefined' && typeof ModeManager.isPreviewMode === 'function' && ModeManager.isPreviewMode());
           if (!isPreview && typeof google !== 'undefined' && google.script && google.script.run) {
+            // ユーザーIDを含める
+            const userId = USER_ID || '';
             google.script.run
-              .withSuccessHandler(resolve) // 成功時のハンドラ
-              .withFailureHandler(reject) // 失敗時のハンドラ
-              [funcName](...args); // GAS関数を実行
+              .withSuccessHandler(resolve)
+              .withFailureHandler(reject)
+              .withUserObject({ userId: userId })
+              [funcName](...args);
           } else {
-            // GAS環境がない場合やプレビューでは、デバッグ用のモックデータを使用
             console.warn('Google Apps Script environment not detected or preview mode. Using mock data.');
             this.getMockData(funcName, ...args).then(resolve).catch(reject);
           }
