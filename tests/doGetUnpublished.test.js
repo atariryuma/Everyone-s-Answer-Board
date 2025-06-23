@@ -15,7 +15,8 @@ function setup() {
         if (key === 'IS_PUBLISHED') return 'false';
         if (key === 'USER_DB_ID') return 'db1';
         return null;
-      }
+      },
+      setProperty: jest.fn()
     }),
     getUserProperties: () => ({
       getProperty: jest.fn(),
@@ -24,6 +25,7 @@ function setup() {
     })
   };
   global.Session = { getActiveUser: () => ({ getEmail: () => { throw new Error('no user'); } }) };
+  global.DriveApp = { getFileById: jest.fn(() => ({ setSharing: jest.fn() })) };
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({
       getSheets: () => [

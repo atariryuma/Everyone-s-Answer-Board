@@ -976,6 +976,10 @@ function getUserDatabase() {
   
   if (dbId) {
     try {
+      const file = DriveApp.getFileById(dbId);
+      try {
+        file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);
+      } catch (e) {}
       return SpreadsheetApp.openById(dbId).getSheetByName(USER_DB_CONFIG.SHEET_NAME);
     } catch (e) {
       // データベースが削除されている場合は再作成
@@ -989,7 +993,7 @@ function getUserDatabase() {
   sheet.getRange(1, 1, 1, USER_DB_CONFIG.HEADERS.length)
     .setValues([USER_DB_CONFIG.HEADERS]);
 
-  // Share database so users in the same domain can read it
+  // Share database so any user in the domain can read it via link
   try {
     DriveApp.getFileById(newDb.getId())
       .setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);

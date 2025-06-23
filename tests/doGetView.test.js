@@ -17,7 +17,8 @@ function setup({ userEmail = 'admin@example.com', adminEmails = 'admin@example.c
         if (key === 'ADMIN_EMAILS') return adminEmails;
         if (key === 'USER_DB_ID') return 'db1';
         return null;
-      }
+      },
+      setProperty: jest.fn()
     }),
     getUserProperties: () => ({
       getProperty: jest.fn(),
@@ -36,6 +37,7 @@ function setup({ userEmail = 'admin@example.com', adminEmails = 'admin@example.c
   };
   global.getActiveUserEmail = () => userEmail;
   global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };
+  global.DriveApp = { getFileById: jest.fn(() => ({ setSharing: jest.fn() })) };
   global.SpreadsheetApp = {
     getActiveSpreadsheet: () => ({
       getSheets: () => [
