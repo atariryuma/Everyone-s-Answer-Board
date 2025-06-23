@@ -228,13 +228,11 @@
       right: 0.25rem;
       width: 1.5rem;
       height: 1.5rem;
-      border-radius: 9999px;
-      background: #facc15;
-      color: #1a1b26;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 0 6px rgba(250, 204, 21, 0.6);
+      color: #facc15;
+      filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.7));
       animation: badge-float 4s ease-in-out 3;
     }
     /* リアクションボタンの背景グラデーションとボーダーカラー */
@@ -246,27 +244,17 @@
     .reaction-bg-understand-curious,
     .reaction-bg-all {
       border-color: transparent;
-      border-image: none;
-      background-image:
-        linear-gradient(var(--glass-bg), var(--glass-bg)),
-        linear-gradient(90deg,#ef4444,#fbbf24);
-      background-origin: padding-box, border-box;
-      background-clip: padding-box, border-box;
+      border-image-slice: 1;
+      border-image-source: linear-gradient(90deg,#ef4444,#fbbf24);
     }
     .reaction-bg-like-curious {
-      background-image:
-        linear-gradient(var(--glass-bg), var(--glass-bg)),
-        linear-gradient(90deg,#ef4444,#10b981);
+      border-image-source: linear-gradient(90deg,#ef4444,#10b981);
     }
     .reaction-bg-understand-curious {
-      background-image:
-        linear-gradient(var(--glass-bg), var(--glass-bg)),
-        linear-gradient(90deg,#fbbf24,#10b981);
+      border-image-source: linear-gradient(90deg,#fbbf24,#10b981);
     }
     .reaction-bg-all {
-      background-image:
-        linear-gradient(var(--glass-bg), var(--glass-bg)),
-        linear-gradient(90deg,#ef4444,#fbbf24,#10b981);
+      border-image-source: linear-gradient(90deg,#ef4444,#fbbf24,#10b981);
     }
     /* リアクション総数に応じたボーダー太さ */
     .reaction-border-1 { border-width: 2px; }
