@@ -260,8 +260,10 @@ function setShowDetails(flag) {
 // GAS Webアプリケーションのエントリーポイント
 // =================================================================
 function doGet(e) {
-  const userId = e.parameter.userId;
-  const mode = e.parameter.mode;
+  e = e || {};
+  const params = e.parameter || {};
+  const userId = params.userId;
+  const mode = params.mode;
   
   // ユーザーIDがない場合は登録画面を表示
   if (!userId) {
