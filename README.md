@@ -1,6 +1,6 @@
 # StudyQuest - みんなの回答ボード
 
-This repository contains the source code of a Google Apps Script project. It publishes a web app that displays students' answers stored in a spreadsheet. Users can like answers and filter the board by class. Teachers can manage which sheet is currently published from a custom menu within the spreadsheet.
+This repository contains the source code of a Google Apps Script project. It publishes a web app that displays students' answers stored in a spreadsheet. Users can like answers and filter the board by class. Teachers manage which sheet is currently published from the admin panel.
 
 ## Setup
 
@@ -44,12 +44,10 @@ A timestamp value is required so that answers can be ordered by recency when usi
 
 ## Managing the board
 
-Opening the spreadsheet adds an **アプリ管理** menu. From here you can:
-
-1. **管理パネルを開く** – choose which sheet to publish or unpublish.
-   Use the "Config" section to map the question, answer and name columns. The
-   selected settings are saved automatically when publishing a sheet for the
-   first time.
+Visit the Web App with `?mode=admin` to open the management panel.
+Here you can choose which sheet to publish or unpublish. Use the "Config"
+section to map the question, answer and name columns. The selected settings are
+saved automatically when publishing a sheet for the first time.
 
 When unpublished, visiting the Web App URL shows a message that the board is closed. Once published, the board is available and updates automatically every 15 seconds.
 

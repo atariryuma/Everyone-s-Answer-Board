@@ -1,6 +1,6 @@
 /**
  * @fileoverview StudyQuest - みんなの回答ボード
- * ★【管理者メニュー実装版】スプレッドシートのカスタムメニューからアプリを管理する機能を実装。
+ * スプレッドシートのカスタムメニューを使用しない独立版。
  */
 
 // =================================================================
@@ -119,30 +119,6 @@ function hashTimestamp(ts) {
   return hash;
 }
 
-
-// =================================================================
-// スプレッドシートのカスタムメニュー
-// =================================================================
-/**
- * スプレッドシートを開いた時に「アプリ管理」メニューを追加します。
- */
-function onOpen() {
-  SpreadsheetApp.getUi()
-      .createMenu('アプリ管理')
-      .addItem('管理パネルを開く', 'showAdminSidebar')
-      .addSeparator()
-      .addItem('設定シートを追加', 'createConfigSheet')
-      .addToUi();
-}
-
-/**
- * 管理用サイドバーを表示します。
- */
-function showAdminSidebar() {
-  const html = HtmlService.createHtmlOutputFromFile('SheetSelector')
-      .setTitle('管理パネル');
-  SpreadsheetApp.getUi().showSidebar(html);
-}
 
 /**
  * 管理パネルの初期化に必要なデータを取得します。
