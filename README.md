@@ -32,14 +32,16 @@ This repository contains the source code of a Google Apps Script project. It pub
 
 The sheet you publish must contain the following columns:
 
-- **メールアドレス** – address of the user who submitted the answer
-- **クラスを選択してください。** – class name used for filtering
-- **これまでの学んだことや、経験したことから、根からとり入れた水は、植物のからだのどこを通るのか予想しましょう。** – question text displayed on the board
-- **予想したわけを書きましょう。** – explanation shown when opening a card
-- **いいね！** – comma separated list of users who liked the answer
 - **タイムスタンプ** – date and time of submission used for chronological sorting
+- **メールアドレス** – address of the user who submitted the answer
+- **クラス** – class name used for filtering
+- **回答** – text displayed on the board
+- **理由** – explanation shown when opening a card
+- **いいね！** – comma separated list of users who liked the answer
 
 A timestamp value is required so that answers can be ordered by recency when using the "newest" sorting option.
+
+The board script automatically adds the **なるほど！**, **もっと知りたい！** and **ハイライト** columns to store reactions and highlight status if they are missing.
 
 
 ## Managing the board
