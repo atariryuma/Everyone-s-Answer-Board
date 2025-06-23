@@ -23,6 +23,9 @@ function setupMocks(rows, userEmail, adminEmails = '') {
 
   // Mock other global services
   global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };
+  if (!userEmail) {
+    global.mockUserEmail = 'test@example.com';
+  }
   global.CacheService = { getScriptCache: () => ({ get: () => null, put: () => null }) };
   global.PropertiesService = {
     getScriptProperties: () => ({
@@ -46,6 +49,7 @@ afterEach(() => {
   delete global.PropertiesService;
   delete global.getConfig;
   delete global.getCurrentSpreadsheet;
+  delete global.mockUserEmail;
 });
 
 test('getSheetData filters and scores rows', () => {
