@@ -89,10 +89,20 @@
     ModeManager.initializeMode();
   </script>
   <script>
-    window.showCounts = <?= showCounts ?>;
-    window.displayMode = '<?= displayMode ?>';
-    const SHEET_NAME = '<?= sheetName ?>';
-    const MAPPING = <?= JSON.stringify(mapping) ?>;
+    const __SHOW_COUNTS__ = '<?= showCounts ?>';
+    const __DISPLAY_MODE__ = '<?= displayMode ?>';
+    const __SHEET_NAME__ = '<?= sheetName ?>';
+    const __MAPPING__ = '<?= JSON.stringify(mapping) ?>';
+
+    window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : __SHOW_COUNTS__ === 'true';
+    window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
+    const SHEET_NAME = __SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHEET_NAME__;
+    let MAPPING;
+    try {
+      MAPPING = __MAPPING__.startsWith('<') ? {} : JSON.parse(__MAPPING__);
+    } catch (e) {
+      MAPPING = {};
+    }
   </script>
   <style>
     /* カスタムプロパティ（CSS変数）定義 */
@@ -491,7 +501,7 @@
 
           // 保存された列数をローカルストレージからロード
           const savedCols = localStorage.getItem('boardColumns');
-          if (savedCols) {
+          if (savedCols && this.elements.sizeSlider && this.elements.sliderValue) {
             this.elements.sizeSlider.value = savedCols;
             this.elements.sliderValue.textContent = savedCols;
           }
@@ -781,14 +791,15 @@
       runGas(funcName, ...args) {
         return new Promise((resolve, reject) => {
           // Google Apps Script環境で実行されているかチェック
-          if (typeof google !== 'undefined' && google.script && google.script.run) {
+          const isPreview = (typeof ModeManager !== 'undefined' && typeof ModeManager.isPreviewMode === 'function' && ModeManager.isPreviewMode());
+          if (!isPreview && typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run
               .withSuccessHandler(resolve) // 成功時のハンドラ
               .withFailureHandler(reject) // 失敗時のハンドラ
               [funcName](...args); // GAS関数を実行
           } else {
-            // GAS環境がない場合は、デバッグ用のモックデータを使用
-            console.warn('Google Apps Script environment not detected. Using mock data.');
+            // GAS環境がない場合やプレビューでは、デバッグ用のモックデータを使用
+            console.warn('Google Apps Script environment not detected or preview mode. Using mock data.');
             this.getMockData(funcName, ...args).then(resolve).catch(reject);
           }
         });
