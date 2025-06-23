@@ -44,3 +44,10 @@ test('getWebAppUrl converts preview domain using deploy id', () => {
   expect(getWebAppUrl()).toBe('https://script.google.com/macros/s/AK123/exec?x=1');
   expect(props.setProperties).toHaveBeenCalledWith({ WEB_APP_URL: 'https://script.google.com/macros/s/AK123/exec?x=1' });
 });
+
+test('stored preview url is converted when deploy id provided', () => {
+  const props = setup('https://foo-1234-script.googleusercontent.com/userCodeAppPanel?y=2', '', 'AK999');
+  expect(getWebAppUrl()).toBe('https://script.google.com/macros/s/AK999/exec?y=2');
+  expect(props.setProperties).toHaveBeenCalledWith({ WEB_APP_URL: 'https://script.google.com/macros/s/AK999/exec?y=2' });
+});
+

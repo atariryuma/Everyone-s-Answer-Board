@@ -906,28 +906,42 @@ function convertPreviewUrl(url, deployId) {
 }
 
 function getWebAppUrl() {
-  const props = PropertiesService.getScriptProperties();
-  let stored = (props.getProperty('WEB_APP_URL') || '').trim();
-  let current = '';
-  try {
-    if (typeof ScriptApp !== 'undefined') {
-      current = ScriptApp.getService().getUrl();
-    }
-  } catch (e) {
-    current = '';
-  }
+  const props = PropertiesService.getScriptProperties();
+  // deployIdを最初に取得しており、見通しが良い
+  const deployId = props.getProperty('DEPLOY_ID'); 
+  let stored = (props.getProperty('WEB_APP_URL') || '').trim();
 
-  if (current) {
-    current = convertPreviewUrl(current, props.getProperty('DEPLOY_ID'));
-    const currOrigin = getUrlOrigin(current);
-    const storedOrigin = getUrlOrigin(stored);
-    if (!stored || (storedOrigin && currOrigin && currOrigin !== storedOrigin)) {
-      props.setProperties({ WEB_APP_URL: current.trim() });
-      stored = current.trim();
-    }
-  }
+  // ★★★ このブロックが重要 ★★★
+  // 保存済みのURLが/dev形式の場合、正規の/exec形式に変換して保存し直す自己修正機能。
+  // これにより、プロパティに保存されるURLの形式が一貫する。
+  if (stored) {
+    const converted = convertPreviewUrl(stored, deployId);
+    if (converted !== stored) {
+      props.setProperties({ WEB_APP_URL: converted.trim() });
+      stored = converted.trim();
+    }
+  }
 
-  return stored || current || '';
+  let current = '';
+  try {
+    if (typeof ScriptApp !== 'undefined') {
+      current = ScriptApp.getService().getUrl();
+    }
+  } catch (e) {
+    current = '';
+  }
+
+  if (current) {
+    current = convertPreviewUrl(current, deployId);
+    const currOrigin = getUrlOrigin(current);
+    const storedOrigin = getUrlOrigin(stored);
+    // 現在のURLと保存されているURLのドメインが異なる場合に更新するロジック
+    if (!stored || (storedOrigin && currOrigin && currOrigin !== storedOrigin)) {
+      props.setProperties({ WEB_APP_URL: current.trim() });
+      stored = current.trim();
+    }
+  }
+  return stored || current || '';
 }
 
 function saveDeployId(id) {
