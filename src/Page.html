@@ -202,7 +202,6 @@
       border-image: none !important;
       box-shadow: 0 0 15px rgba(250,204,21,0.6);
       transform: scale(1.02);
-      animation: highlight-pulse 2s 3;
       z-index: 2;
       background-image:
         linear-gradient(var(--glass-bg), var(--glass-bg)),
@@ -233,7 +232,6 @@
       justify-content: center;
       color: #facc15;
       filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.7));
-      animation: badge-float 4s ease-in-out 3;
     }
     /* リアクションボタンの背景グラデーションとボーダーカラー */
     .answer-card.reaction-bg-like { border-color:#ef4444 !important; border-image:none; }
@@ -293,15 +291,7 @@
     .skeleton::after { content: ""; position: absolute; inset: 0; background-image: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.3), rgba(255,255,255,0)); animation: skeleton-loading 1.2s infinite; }
     @keyframes skeleton-loading { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 
-    @keyframes highlight-pulse {
-      0%, 100% { box-shadow: 0 0 10px rgba(250,204,21,0.6); transform: scale(1); }
-      50% { box-shadow: 0 0 20px rgba(250,204,21,0.9); transform: scale(1.05); }
-    }
 
-    @keyframes badge-float {
-      0%, 100% { transform: translateY(0) rotate(0deg); }
-      50% { transform: translateY(-10%) rotate(6deg); }
-    }
     
     /* スクリーンリーダー専用クラス（アクセシビリティ） */
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
@@ -1387,7 +1377,6 @@
           badge.className = 'highlight-badge';
           badge.innerHTML = this.getIcon('star', '', true);
           card.appendChild(badge);
-          this.animateHighlightBadge(badge); // バッジのアニメーション
         }
         
         // カードクリックイベントリスナーは setupEventDelegation() で一括処理されるため不要
@@ -1697,7 +1686,6 @@
               } else {
                 card.appendChild(badge); // フォールバック
               }
-              this.animateHighlightBadge(badge);
             } else if (!item.highlight && badge) {
               gsap.to(badge, { scale: 0, opacity: 0, duration: 0.3, onComplete: () => badge.remove() });
             }
@@ -1705,15 +1693,6 @@
         });
       }
 
-      /**
-       * ハイライトバッジのアニメーション
-       * @param {HTMLElement} el - アニメーションする要素
-       */
-      animateHighlightBadge(el) {
-        if (typeof gsap === 'undefined' || !el) return;
-        gsap.fromTo(el, { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: 'back.out(1.7)' });
-      }
-      
       /**
        * 回答モーダルを表示
        * @param {number} rowIndex - 表示する回答の行インデックス
