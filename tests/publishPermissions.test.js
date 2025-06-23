@@ -13,7 +13,7 @@ function setup(userEmail, adminEmails) {
   global.PropertiesService = {
     getScriptProperties: () => props,
     getUserProperties: () => ({
-      getProperty: jest.fn(() => 'u1'),
+      getProperty: jest.fn(() => 'user1234567'),
       setProperty: jest.fn(),
       setProperties: jest.fn()
     })
@@ -27,7 +27,7 @@ function setup(userEmail, adminEmails) {
       getDataRange: () => ({
         getValues: () => [
           ['userId','spreadsheetId','adminEmail','configJson','lastAccessedAt'],
-          ['u1','id1','admin@example.com', JSON.stringify({ isPublished: true, sheetName: 'Sheet1' }), '']
+          ['user1234567','id1','admin@example.com', JSON.stringify({ isPublished: true, sheetName: 'Sheet1' }), '']
         ]
       }),
       getRange: jest.fn(() => ({ setValue: jest.fn() }))
@@ -40,7 +40,7 @@ function setup(userEmail, adminEmails) {
     getRange: () => ({ getValues: () => [['a','b']], setValue: jest.fn(), setValues: jest.fn() }),
     getDataRange: () => ({ getValues: () => [
       ['userId','spreadsheetId','adminEmail','configJson','lastAccessedAt'],
-      ['u1','id1','admin@example.com', JSON.stringify({ isPublished: true, sheetName: 'Sheet1' }), '']
+      ['user1234567','id1','admin@example.com', JSON.stringify({ isPublished: true, sheetName: 'Sheet1' }), '']
     ] }),
     insertColumnAfter: jest.fn(),
     setName: jest.fn()
