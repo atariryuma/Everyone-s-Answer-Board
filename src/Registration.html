@@ -76,7 +76,7 @@
               <input type="radio" name="setup-method" value="auto" checked class="mt-1">
               <div>
                 <div class="font-semibold text-white">簡単セットアップ（推奨）</div>
-                <div class="text-sm text-gray-400">回答ボード用のスプレッドシートを自動作成します</div>
+                <div class="text-sm text-gray-400">回答ボード用Googleフォームを自動作成します</div>
               </div>
             </label>
           </div>
@@ -350,34 +350,92 @@
           const linkContainer = document.getElementById('admin-link-container');
           linkContainer.insertBefore(adminLink, linkContainer.firstChild);
           
-          // 自動作成の場合はスプレッドシートURLも表示
-          if (result.autoCreated && result.spreadsheetUrl) {
-            const spreadsheetContainer = document.createElement('div');
-            spreadsheetContainer.innerHTML = `
-              <label class="text-sm text-gray-400 block mb-1">作成されたスプレッドシート:</label>
-              <div class="flex gap-2">
-                <input type="text" value="${result.spreadsheetUrl}" readonly
-                  id="created-spreadsheet-url"
-                  class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
-                  onclick="this.select()">
-                <button onclick="copyToClipboard('created-spreadsheet-url')"
-                  class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
-                  コピー
-                </button>
-                <a href="${result.spreadsheetUrl}" target="_blank"
-                  class="px-3 py-2 bg-green-700 hover:bg-green-600 rounded text-sm transition-colors">
-                  開く
-                </a>
-              </div>
-            `;
+          // 自動作成の場合はフォーム・スプレッドシートURLも表示
+          if (result.autoCreated) {
+            const additionalContainer = document.createElement('div');
+            additionalContainer.className = 'space-y-3';
             
-            // スプレッドシートURLを生徒用URLの前に挿入
-            const viewContainer = document.getElementById('view-url-container').parentElement;
-            viewContainer.parentElement.insertBefore(spreadsheetContainer, viewContainer);
+            // Googleフォーム（生徒回答用）
+            if (result.formUrl) {
+              const formContainer = document.createElement('div');
+              formContainer.innerHTML = `
+                <label class="text-sm text-gray-400 block mb-1">生徒回答用Googleフォーム:</label>
+                <div class="flex gap-2">
+                  <input type="text" value="${result.formUrl}" readonly
+                    id="created-form-url"
+                    class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
+                    onclick="this.select()">
+                  <button onclick="copyToClipboard('created-form-url')"
+                    class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
+                    コピー
+                  </button>
+                  <a href="${result.formUrl}" target="_blank"
+                    class="px-3 py-2 bg-blue-700 hover:bg-blue-600 rounded text-sm transition-colors">
+                    開く
+                  </a>
+                </div>
+              `;
+              additionalContainer.appendChild(formContainer);
+            }
+            
+            // フォーム編集用URL
+            if (result.editFormUrl) {
+              const editFormContainer = document.createElement('div');
+              editFormContainer.innerHTML = `
+                <label class="text-sm text-gray-400 block mb-1">フォーム編集用URL（先生用）:</label>
+                <div class="flex gap-2">
+                  <input type="text" value="${result.editFormUrl}" readonly
+                    id="edit-form-url"
+                    class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
+                    onclick="this.select()">
+                  <button onclick="copyToClipboard('edit-form-url')"
+                    class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
+                    コピー
+                  </button>
+                  <a href="${result.editFormUrl}" target="_blank"
+                    class="px-3 py-2 bg-green-700 hover:bg-green-600 rounded text-sm transition-colors">
+                    編集
+                  </a>
+                </div>
+              `;
+              additionalContainer.appendChild(editFormContainer);
+            }
+            
+            // スプレッドシート（データ確認用）
+            if (result.spreadsheetUrl) {
+              const spreadsheetContainer = document.createElement('div');
+              spreadsheetContainer.innerHTML = `
+                <label class="text-sm text-gray-400 block mb-1">回答データ（スプレッドシート）:</label>
+                <div class="flex gap-2">
+                  <input type="text" value="${result.spreadsheetUrl}" readonly
+                    id="created-spreadsheet-url"
+                    class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
+                    onclick="this.select()">
+                  <button onclick="copyToClipboard('created-spreadsheet-url')"
+                    class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
+                    コピー
+                  </button>
+                  <a href="${result.spreadsheetUrl}" target="_blank"
+                    class="px-3 py-2 bg-green-700 hover:bg-green-600 rounded text-sm transition-colors">
+                    確認
+                  </a>
+                </div>
+              `;
+              additionalContainer.appendChild(spreadsheetContainer);
+            }
+            
+            // 管理画面URLの前に挿入
+            const adminContainer = document.getElementById('admin-url-container').parentElement;
+            adminContainer.parentElement.insertBefore(additionalContainer, adminContainer);
             
             // ガイダンスメッセージを更新
-            document.getElementById('setup-guidance').textContent = 
-              'スプレッドシートが自動作成されました。すぐに回答ボードを使い始められます！';
+            if (result.formUrl) {
+              document.getElementById('setup-guidance').textContent = 
+                'Googleフォームが自動作成されました！生徒にフォームURLを共有して回答を収集し、回答ボードで結果を確認できます。';
+            } else {
+              document.getElementById('setup-guidance').textContent = 
+                'スプレッドシートが自動作成されました。データを手動で入力するか、別途Googleフォームを作成してご利用ください。';
+            }
           }
           
           resultArea.classList.remove('hidden');
