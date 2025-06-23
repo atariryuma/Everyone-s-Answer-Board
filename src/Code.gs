@@ -811,13 +811,15 @@ function getAppSettingsForUser() {
 }
 
 function getHeaderIndices(sheetName) {
-  const cache = CacheService.getScriptCache();
+  const cache = (typeof CacheService !== 'undefined') ? CacheService.getScriptCache() : null;
   const cacheKey = `headers_${sheetName}`;
   
   try {
-    const cached = cache.get(cacheKey);
-    if (cached) { 
-      return JSON.parse(cached); 
+    if (cache) {
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
     }
   } catch (e) {
     console.error('Cache retrieval failed:', e);
@@ -836,7 +838,9 @@ function getHeaderIndices(sheetName) {
   ]);
   
   try {
-    cache.put(cacheKey, JSON.stringify(indices), 21600); // 6 hours cache
+    if (cache) {
+      cache.put(cacheKey, JSON.stringify(indices), 21600); // 6 hours cache
+    }
   } catch (e) {
     console.error('Cache storage failed:', e);
   }
@@ -886,15 +890,54 @@ function saveWebAppUrl(url) {
   props.setProperties({ WEB_APP_URL: (url || '').trim() });
 }
 
+function getUrlOrigin(url) {
+  const match = String(url).match(/^(https?:\/\/[^/]+)/);
+  return match ? match[1] : '';
+}
+
+function convertPreviewUrl(url, deployId) {
+  if (!url) return url;
+  if (/script\.googleusercontent\.com/.test(url) && deployId) {
+    const query = url.split('?')[1] || '';
+    const base = `https://script.google.com/macros/s/${deployId}/exec`;
+    return query ? `${base}?${query}` : base;
+  }
+  return url;
+}
+
 function getWebAppUrl() {
   const props = PropertiesService.getScriptProperties();
-  const url = (props.getProperty('WEB_APP_URL') || '').trim();
-  if (url) return url;
-  try {
-    return ScriptApp.getService().getUrl();
-  } catch (e) {
-    return '';
+  const deployId = props.getProperty('DEPLOY_ID');
+  let stored = (props.getProperty('WEB_APP_URL') || '').trim();
+
+  if (stored) {
+    const converted = convertPreviewUrl(stored, deployId);
+    if (converted !== stored) {
+      props.setProperties({ WEB_APP_URL: converted.trim() });
+      stored = converted.trim();
+    }
   }
+
+  let current = '';
+  try {
+    if (typeof ScriptApp !== 'undefined') {
+      current = ScriptApp.getService().getUrl();
+    }
+  } catch (e) {
+    current = '';
+  }
+
+  if (current) {
+    current = convertPreviewUrl(current, deployId);
+    const currOrigin = getUrlOrigin(current);
+    const storedOrigin = getUrlOrigin(stored);
+    if (!stored || (storedOrigin && currOrigin && currOrigin !== storedOrigin)) {
+      props.setProperties({ WEB_APP_URL: current.trim() });
+      stored = current.trim();
+    }
+  }
+
+  return stored || current || '';
 }
 
 function saveDeployId(id) {
@@ -942,14 +985,16 @@ function createTemplateSheet(name) {
 function checkRateLimit(action, userEmail) {
   try {
     const key = `rateLimit_${action}_${userEmail}`;
-    const cache = CacheService.getScriptCache();
-    const attempts = parseInt(cache.get(key) || '0');
+    const cache = (typeof CacheService !== 'undefined') ? CacheService.getScriptCache() : null;
+    const attempts = cache ? parseInt(cache.get(key) || '0') : 0;
     
     if (attempts > 10) { // 10 attempts per hour
       throw new Error('レート制限に達しました。しばらく待ってから再試行してください。');
     }
     
-    cache.put(key, String(attempts + 1), 3600);
+    if (cache) {
+      cache.put(key, String(attempts + 1), 3600);
+    }
   } catch (error) {
     // Cache service error - continue without rate limiting
     console.warn('Rate limiting failed:', error);
@@ -1262,15 +1307,17 @@ function filterSensitiveUserData(userInfo, currentUser) {
 
 function getUserInfoInternal(userId) {
   if (!userId) return null;
-  
+
   // Try cache first for performance
-  const cache = CacheService.getScriptCache();
+  const cache = (typeof CacheService !== 'undefined') ? CacheService.getScriptCache() : null;
   const cacheKey = `userInfo_${userId}`;
   
   try {
-    const cached = cache.get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached);
+    if (cache) {
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
     }
   } catch (e) {
     console.error('User cache retrieval failed:', e);
@@ -1299,7 +1346,9 @@ function getUserInfoInternal(userId) {
       
       // Cache for 30 minutes
       try {
-        cache.put(cacheKey, JSON.stringify(userInfo), 1800);
+        if (cache) {
+          cache.put(cacheKey, JSON.stringify(userInfo), 1800);
+        }
       } catch (e) {
         console.error('User cache storage failed:', e);
       }
@@ -1501,9 +1550,9 @@ function auditLog(action, userId, details) {
   try {
     const timestamp = new Date();
     const currentUser = Session.getActiveUser().getEmail();
-    
+
     // Use cache for temporary audit logging (since we can't create sheets dynamically in all environments)
-    const cache = CacheService.getScriptCache();
+    const cache = (typeof CacheService !== 'undefined') ? CacheService.getScriptCache() : null;
     const logEntry = {
       timestamp: timestamp.toISOString(),
       user: currentUser,
@@ -1514,7 +1563,9 @@ function auditLog(action, userId, details) {
     
     // Store in cache with 6 hour expiration
     const cacheKey = `audit_${timestamp.getTime()}_${Utilities.getUuid()}`;
-    cache.put(cacheKey, JSON.stringify(logEntry), 21600);
+    if (cache) {
+      cache.put(cacheKey, JSON.stringify(logEntry), 21600);
+    }
     
     // Also log to console for immediate debugging
     console.log(`AUDIT: ${action} by ${currentUser} for ${userId}`, details);
@@ -1616,6 +1667,8 @@ if (typeof module !== 'undefined') {
     getActiveUserEmail,
     prepareSpreadsheetForStudyQuest,
     isSameDomain,
-    getEmailDomain
+    getEmailDomain,
+    getUrlOrigin,
+    convertPreviewUrl
   };
 }
