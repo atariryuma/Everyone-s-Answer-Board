@@ -1328,7 +1328,7 @@
           const cls = data.highlight ? 'liked' : '';
           const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
           highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-yellow-400 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' +
-                             this.getIcon('star', 'w-5 h-5', data.highlight) +
+                             this.getIcon('star', 'w-5 h-5', true) +
                              '</button>';
         }
         
@@ -1681,7 +1681,7 @@
               highlightBtn.setAttribute('aria-label', label);
               const svgEl = highlightBtn.querySelector('svg');
               if (svgEl) {
-                svgEl.outerHTML = this.getIcon('star', 'w-5 h-5', item.highlight);
+                svgEl.outerHTML = this.getIcon('star', 'w-5 h-5', true);
               }
               highlightBtn.disabled = false;
               highlightBtn.setAttribute('aria-disabled', 'false');
