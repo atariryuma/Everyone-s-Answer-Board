@@ -1380,12 +1380,24 @@ function registerNewUser(spreadsheetUrl) {
   if (!userEmail) {
     throw new Error('ユーザー認証に失敗しました。');
   }
-  
+
   // Rate limiting
   checkRateLimit('REGISTER', userEmail);
-  
+
+  // If the user already has a board, return existing URLs
+  const existingByEmail = findUserByEmail(userEmail);
+  if (existingByEmail) {
+    return {
+      adminUrl: `${getWebAppUrl()}?userId=${existingByEmail.userId}&mode=admin`,
+      viewUrl: `${getWebAppUrl()}?userId=${existingByEmail.userId}`,
+      userId: existingByEmail.userId,
+      spreadsheetUrl: existingByEmail.spreadsheetUrl,
+      message: '既に登録済みです。'
+    };
+  }
+
   let spreadsheetId, finalSpreadsheetUrl;
-  
+
   let formResult = null;
   
   if (spreadsheetUrl === 'AUTO_CREATE') {
@@ -1410,16 +1422,6 @@ function registerNewUser(spreadsheetUrl) {
     }
   }
   
-  // 既存ユーザーかチェック
-  const existingUser = findUserByEmailAndSpreadsheet(userEmail, spreadsheetId);
-  if (existingUser) {
-    return {
-      adminUrl: `${getWebAppUrl()}?userId=${existingUser.userId}&mode=admin`,
-      viewUrl: `${getWebAppUrl()}?userId=${existingUser.userId}`,
-      userId: existingUser.userId,
-      message: '既存の登録が見つかりました。'
-    };
-  }
   
   // 新規ユーザーID生成
   const userId = Utilities.getUuid();
@@ -1846,6 +1848,35 @@ function findUserByEmailAndSpreadsheet(email, spreadsheetId) {
 }
 
 /**
+ * Find existing user by email only (used for single board per user).
+ */
+function findUserByEmail(email) {
+  const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
+  const data = userDb.getDataRange().getValues();
+  const headers = data[0];
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][headers.indexOf('adminEmail')] === email) {
+      const userInfo = {};
+      headers.forEach((header, index) => {
+        userInfo[header] = data[i][index];
+      });
+      // Parse configJson if needed
+      if (userInfo.configJson && typeof userInfo.configJson === 'string') {
+        try {
+          userInfo.configJson = JSON.parse(userInfo.configJson);
+        } catch (e) {
+          userInfo.configJson = {};
+        }
+      }
+      return userInfo;
+    }
+  }
+
+  return null;
+}
+
+/**
  * 管理者メールアドレスを更新
  */
 function updateAdminEmails(spreadsheetId, email) {
@@ -1869,6 +1900,21 @@ function updateAdminEmails(spreadsheetId, email) {
  */
 function getActiveUserEmail() {
   return Session.getActiveUser().getEmail();
+}
+
+/**
+ * Return existing board info for the current user if available.
+ */
+function getExistingBoard() {
+  const email = safeGetUserEmail();
+  const user = findUserByEmail(email);
+  if (!user) return null;
+  return {
+    adminUrl: `${getWebAppUrl()}?userId=${user.userId}&mode=admin`,
+    viewUrl: `${getWebAppUrl()}?userId=${user.userId}`,
+    spreadsheetUrl: user.spreadsheetUrl,
+    userId: user.userId
+  };
 }
 
 if (typeof module !== 'undefined') {
@@ -1912,6 +1958,8 @@ if (typeof module !== 'undefined') {
     extractSpreadsheetId,
     generateAccessToken,
     findUserByEmailAndSpreadsheet,
+    findUserByEmail,
+    getExistingBoard,
     updateAdminEmails,
     getActiveUserEmail,
     prepareSpreadsheetForStudyQuest,
