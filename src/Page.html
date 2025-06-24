@@ -118,6 +118,10 @@ header { position: sticky; top: 0; z-index: 5; contain: layout; }
 .answer-card.reaction-bg-like { border-color:#ef4444 !important; }
 .answer-card.reaction-bg-understand { border-color:#fbbf24 !important; }
 .answer-card.reaction-bg-curious { border-color:#10b981 !important; }
+.answer-card.reaction-bg-like-understand { border-image: linear-gradient(45deg, #ef4444, #fbbf24) 1 !important; }
+.answer-card.reaction-bg-like-curious { border-image: linear-gradient(45deg, #ef4444, #10b981) 1 !important; }
+.answer-card.reaction-bg-understand-curious { border-image: linear-gradient(45deg, #fbbf24, #10b981) 1 !important; }
+.answer-card.reaction-bg-like-understand-curious { border-image: linear-gradient(45deg, #ef4444, #fbbf24, #10b981) 1 !important; }
 .reaction-border-1 { border-width: 2px; }
 .reaction-border-2 { border-width: 4px; }
 .reaction-border-3 { border-width: 6px; }
@@ -154,24 +158,24 @@ header { position: sticky; top: 0; z-index: 5; contain: layout; }
 <option value="score" id="scoreOption" style="display: none;">スコア順</option>
 </select>
 </div>
-<div class="flex-grow text-center w-full min-w-0">
-<h1 id="siteTitle" class="game-font text-yellow-300 text-lg md:text-xl mb-1">みんなの回答ボード</h1>
-<p id="headingLabel" class="text-2xl md:text-3xl font-bold text-pink-400 leading-tight flex justify-center">
-<svg class="w-6 h-6 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<div class="flex-grow text-center w-full min-w-0 px-2">
+<h1 id="siteTitle" class="game-font text-yellow-300 text-base md:text-lg lg:text-xl mb-1 truncate">みんなの回答ボード</h1>
+<p id="headingLabel" class="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-pink-400 leading-tight flex justify-center items-center min-h-[2rem]">
+<svg class="w-5 h-5 md:w-6 md:h-6 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
 </svg>
 </p>
 </div>
-<div class="w-full lg:w-auto lg:min-w-[150px] text-right space-y-1">
-<p id="ownerNameText" class="text-xs text-gray-500 h-4"></p>
-<p id="sheetNameText" class="text-xs text-gray-400 h-4"></p>
-<p id="modeLabel" class="text-xs text-gray-400"></p>
-<div class="flex justify-end gap-2">
-<button type="button" id="endPublicationBtn" class="text-xs bg-orange-600 hover:bg-orange-700 text-white px-2 py-1 rounded hidden" hidden aria-label="公開終了">公開終了</button>
-<button type="button" id="adminPanelBtn" class="text-xs bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded hidden" hidden aria-label="管理画面を開く">管理画面</button>
-<button type="button" id="adminToggleBtn" class="text-xs text-cyan-400 underline hidden" hidden aria-label="管理者モード切り替え"></button>
-<button type="button" id="adminEndBtn" class="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded hidden" hidden aria-label="管理モード終了">管理終了</button>
+<div class="w-full lg:w-auto lg:min-w-[150px] text-right space-y-1 px-2">
+<p id="ownerNameText" class="text-xs text-gray-500 h-4 truncate"></p>
+<p id="sheetNameText" class="text-xs text-gray-400 h-4 truncate"></p>
+<p id="modeLabel" class="text-xs text-gray-400 truncate"></p>
+<div class="flex justify-end gap-1 flex-wrap">
+<button type="button" id="endPublicationBtn" class="text-xs bg-orange-600 hover:bg-orange-700 text-white px-2 py-1 rounded hidden whitespace-nowrap" hidden aria-label="公開終了">公開終了</button>
+<button type="button" id="adminPanelBtn" class="text-xs bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded hidden whitespace-nowrap" hidden aria-label="管理画面を開く">管理画面</button>
+<button type="button" id="adminToggleBtn" class="text-xs text-cyan-400 underline hidden whitespace-nowrap" hidden aria-label="管理者モード切り替え"></button>
+<button type="button" id="adminEndBtn" class="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded hidden whitespace-nowrap" hidden aria-label="管理モード終了">管理終了</button>
 </div>
 </div>
 </header>
@@ -980,6 +984,13 @@ class StudyQuestApp {
       if (active[0] === 'LIKE') card.classList.add('reaction-bg-like');
       if (active[0] === 'UNDERSTAND') card.classList.add('reaction-bg-understand');
       if (active[0] === 'CURIOUS') card.classList.add('reaction-bg-curious');
+    } else if (active.length === 2) {
+      const sorted = active.sort();
+      if (sorted[0] === 'CURIOUS' && sorted[1] === 'LIKE') card.classList.add('reaction-bg-like-curious');
+      else if (sorted[0] === 'LIKE' && sorted[1] === 'UNDERSTAND') card.classList.add('reaction-bg-like-understand');
+      else if (sorted[0] === 'CURIOUS' && sorted[1] === 'UNDERSTAND') card.classList.add('reaction-bg-understand-curious');
+    } else if (active.length === 3) {
+      card.classList.add('reaction-bg-like-understand-curious');
     }
     const totalReactions = this.reactionTypes.reduce((sum, rt) => sum + (data.reactions?.[rt.key]?.count || 0), 0);
     if (totalReactions >= 10) {
@@ -1191,11 +1202,18 @@ class StudyQuestApp {
       if (card) {
         card.classList.toggle('highlighted', item.highlight);
         const active = this.reactionTypes.filter(rt => item.reactions && item.reactions[rt.key] && item.reactions[rt.key].count > 0).map(rt => rt.key);
-        ['reaction-bg-like', 'reaction-bg-understand', 'reaction-bg-curious'].forEach(cls => card.classList.remove(cls));
+        ['reaction-bg-like', 'reaction-bg-understand', 'reaction-bg-curious', 'reaction-bg-like-understand', 'reaction-bg-like-curious', 'reaction-bg-understand-curious', 'reaction-bg-like-understand-curious'].forEach(cls => card.classList.remove(cls));
         if (active.length === 1) {
           if (active[0] === 'LIKE') card.classList.add('reaction-bg-like');
           if (active[0] === 'UNDERSTAND') card.classList.add('reaction-bg-understand');
           if (active[0] === 'CURIOUS') card.classList.add('reaction-bg-curious');
+        } else if (active.length === 2) {
+          const sorted = active.sort();
+          if (sorted[0] === 'CURIOUS' && sorted[1] === 'LIKE') card.classList.add('reaction-bg-like-curious');
+          else if (sorted[0] === 'LIKE' && sorted[1] === 'UNDERSTAND') card.classList.add('reaction-bg-like-understand');
+          else if (sorted[0] === 'CURIOUS' && sorted[1] === 'UNDERSTAND') card.classList.add('reaction-bg-understand-curious');
+        } else if (active.length === 3) {
+          card.classList.add('reaction-bg-like-understand-curious');
         }
         const total = this.reactionTypes.reduce((sum, rt) => sum + (item.reactions?.[rt.key]?.count || 0), 0);
         ['reaction-border-1', 'reaction-border-2', 'reaction-border-3'].forEach(cls => card.classList.remove(cls));

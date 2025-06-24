@@ -212,7 +212,10 @@
       
       // 回答ボードの状態表示
       if (status.activeSheetName) {
-        elements.statusText.innerHTML = `<span class="font-bold text-green-400">利用可能</span> - アクティブシート: <span class="font-bold text-blue-400">${status.activeSheetName}</span>`;
+        const answerCount = status.answerCount || 0;
+        const totalReactions = status.totalReactions || 0;
+        elements.statusText.innerHTML = `<span class="font-bold text-green-400">利用可能</span> - アクティブシート: <span class="font-bold text-blue-400">${escapeHtml(status.activeSheetName)}</span><br>
+        <span class="text-sm text-gray-300">回答数: ${answerCount}件 | 総リアクション数: ${totalReactions}件</span>`;
         // 生徒用URLを表示
         const baseUrl = status.webAppUrl || (window.location.origin + window.location.pathname);
         const boardUrl = `${baseUrl}?userId=${userId}`;
@@ -445,6 +448,12 @@
     function showError(error) {
       showMessage(error.message, 'red');
       setLoading(false);
+    }
+    
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
     }
   </script>
 </body>
