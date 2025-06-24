@@ -224,13 +224,17 @@ function publishApp(sheetName) {
   }
   
   prepareSheetForBoard(sheetName);
-  
+
   // ユーザー設定を更新
   updateUserConfig(userId, {
     isPublished: true,
     sheetName: sheetName
   });
-  
+
+  const scriptProps = PropertiesService.getScriptProperties();
+  scriptProps.setProperty(APP_PROPERTIES.IS_PUBLISHED, 'true');
+  scriptProps.setProperty(APP_PROPERTIES.ACTIVE_SHEET, sheetName);
+
   return `「${sheetName}」を公開しました。`;
 }
 
