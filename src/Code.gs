@@ -440,7 +440,7 @@ function doGet(e) {
     template.userInfo = userInfo;
     template.isOwner = userInfo.adminEmail === viewerEmail;
     template.ownerName = userInfo.adminEmail || 'Unknown';
-    template.boardUrl = `${ScriptApp.getService().getUrl()}?userId=${validatedUserId}`;
+    template.boardUrl = `${getWebAppUrl()}?userId=${validatedUserId}`;
     auditLog('UNPUBLISHED_ACCESS', validatedUserId, { viewerEmail, isOwner: template.isOwner });
     return template.evaluate()
       .setTitle('StudyQuest - 回答ボード')
