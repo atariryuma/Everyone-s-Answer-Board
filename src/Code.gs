@@ -1308,12 +1308,18 @@ function createStudyQuestForm(userEmail) {
     console.error('Failed to create form and spreadsheet:', error);
     
     // FormAppが利用できない場合はスプレッドシートのみ作成
-    if (error.message.includes('Google Forms API is not available')) {
+    if (error.message.includes('Google Forms API is not available') || error.message.includes('FormApp')) {
       console.warn('FormApp not available, creating spreadsheet only');
       return createStudyQuestSpreadsheetFallback(userEmail);
     }
     
-    throw new Error('Googleフォームとスプレッドシートの作成に失敗しました。');
+    // 権限エラーの場合
+    if (error.message.includes('permission') || error.message.includes('Permission')) {
+      throw new Error('Googleフォーム作成の権限がありません。管理者にお問い合わせください。');
+    }
+    
+    // その他のエラー詳細を含める
+    throw new Error(`Googleフォームとスプレッドシートの作成に失敗しました。詳細: ${error.message}`);
   }
 }
 
