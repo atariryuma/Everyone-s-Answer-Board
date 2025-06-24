@@ -1,5 +1,5 @@
 # ワークフローの名前
-name: CI and Deploy to GAS
+name: ci-and-deploy
 
 # ワークフローが実行されるタイミング
 on:
