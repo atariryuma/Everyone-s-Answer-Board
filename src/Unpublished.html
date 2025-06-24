@@ -2,57 +2,178 @@
 <html lang="ja">
 <head>
     <base target="_top">
-    <title>公開終了</title>
+    <title>StudyQuest - 回答ボード</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       body { margin: 0; }
+      .glass-panel { 
+        background: rgba(26,27,38,0.7); 
+        backdrop-filter: blur(12px); 
+        -webkit-backdrop-filter: blur(12px); 
+        border: 1px solid rgba(255,255,255,0.1); 
+      }
     </style>
 </head>
 <body class="bg-gray-800 text-white flex items-center justify-center h-screen">
-    <div class="text-center p-4">
-        <h1 class="text-4xl font-bold mb-4">現在は公開されていません</h1>
-        <p class="text-gray-400">先生がアプリの公開を始めたら、また見てみましょう。</p>
-        
-        <? if (typeof debugInfo !== 'undefined' && debugInfo) { ?>
-        <div class="mt-8 p-4 bg-gray-700 rounded-lg text-left max-w-lg mx-auto">
-            <h2 class="text-lg font-bold mb-2 text-yellow-300">デバッグ情報（管理者用）</h2>
-            <div class="text-sm text-gray-300 space-y-1">
-                <p><strong>設定状態:</strong> <?= debugInfo.configExists ? '存在' : '未設定' ?></p>
-                <p><strong>公開状態:</strong> <?= debugInfo.isPublished ? 'true' : 'false' ?></p>
-                <p><strong>シート名:</strong> <?= debugInfo.sheetName || '未設定' ?></p>
-                <p><strong>設定キー:</strong> <?= debugInfo.configKeys ? debugInfo.configKeys.join(', ') : 'なし' ?></p>
-            </div>
-            
-            <div class="mt-4 p-3 bg-red-800 rounded">
-                <p class="text-sm font-semibold text-red-200">非公開の理由:</p>
-                <? if (!debugInfo.configExists) { ?>
-                    <p class="text-xs text-red-300">• 設定が存在しません。初回設定が必要です。</p>
-                <? } else if (!debugInfo.isPublished) { ?>
-                    <p class="text-xs text-red-300">• 設定は存在しますが、公開フラグがfalseです。</p>
-                    <? if (!debugInfo.sheetName) { ?>
-                        <p class="text-xs text-red-300">• シートが選択されていません。</p>
-                    <? } ?>
+    <div class="text-center p-4 max-w-lg">
+        <? if (typeof isOwner !== 'undefined' && isOwner) { ?>
+            <!-- 管理者用画面：統合された管理パネル -->
+            <div class="glass-panel rounded-xl p-8 shadow-2xl">
+                <h1 class="text-3xl font-bold mb-4 text-yellow-300">StudyQuest 管理画面</h1>
+                <p class="text-gray-400 mb-6">スプレッドシートを追加して回答ボードを開始しましょう</p>
+                
+                <? if (typeof ownerName !== 'undefined' && ownerName) { ?>
+                <p class="text-xs text-gray-500 mb-4">管理者: <?= ownerName ?></p>
                 <? } ?>
-                <? if (debugInfo.configKeys && debugInfo.configKeys.length === 0) { ?>
-                    <p class="text-xs text-red-300">• 設定データが空です。データベースの問題の可能性があります。</p>
+                
+                <!-- 生徒用URL表示 -->
+                <div class="mb-6 p-4 bg-gray-700 rounded-lg">
+                    <p class="text-sm text-gray-400 mb-2">生徒用URL（固定）:</p>
+                    <div class="flex gap-2">
+                        <input type="text" id="board-url" readonly value="<?= boardUrl || '' ?>"
+                               class="flex-1 p-2 bg-gray-600 border border-gray-500 rounded text-sm cursor-pointer hover:bg-gray-500"
+                               onclick="this.select()">
+                        <button type="button" onclick="copyBoardUrl()" 
+                                class="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 rounded text-sm">
+                          コピー
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1">このURLは変わりません。一度生徒に共有すれば、ずっと使い続けられます。</p>
+                </div>
+                
+                <!-- スプレッドシートURL入力 -->
+                <div class="mb-6">
+                    <h3 class="font-semibold mb-3 text-left">スプレッドシートを追加</h3>
+                    <div class="space-y-3">
+                        <div class="flex gap-2">
+                            <input type="url" id="spreadsheet-url-input" 
+                                   placeholder="https://docs.google.com/spreadsheets/d/..."
+                                   class="flex-1 p-3 rounded-lg bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-cyan-400">
+                            <button type="button" id="add-spreadsheet-btn" 
+                                    class="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
+                              追加
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-400 text-left">GoogleスプレッドシートのURLを入力して追加してください</p>
+                    </div>
+                </div>
+
+                <!-- メッセージエリア -->
+                <div id="message-area" class="mb-4 text-center text-sm h-5" aria-live="polite" role="status"></div>
+                
+                <!-- 説明 -->
+                <div class="text-left space-y-2 text-sm text-gray-300">
+                    <p>📝 <strong>使い方:</strong></p>
+                    <ol class="list-decimal list-inside space-y-1 ml-4">
+                        <li>GoogleスプレッドシートのURLを上記に入力</li>
+                        <li>スプレッドシートが追加され、回答ボードが表示されます</li>
+                        <li>生徒用URLを生徒に共有してください</li>
+                    </ol>
+                </div>
+            </div>
+        <? } else { ?>
+            <!-- 一般ユーザー用画面 -->
+            <div class="glass-panel rounded-xl p-8 shadow-2xl">
+                <h1 class="text-4xl font-bold mb-4 text-yellow-300">現在は準備中です</h1>
+                <p class="text-gray-400 mb-4">先生がスプレッドシートを設定したら、回答が表示されます。</p>
+                
+                <? if (typeof ownerName !== 'undefined' && ownerName) { ?>
+                <p class="text-xs text-gray-500">管理者: <?= ownerName ?></p>
                 <? } ?>
+                
+                <div class="mt-6">
+                    <button type="button" onclick="location.reload()" 
+                            class="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg font-semibold">
+                        更新
+                    </button>
+                </div>
             </div>
-            
-            <div class="mt-4">
-                <p class="text-xs text-gray-400">
-                    <? if (!debugInfo.configExists || (debugInfo.configKeys && debugInfo.configKeys.length === 0)) { ?>
-                        データベースに問題がある可能性があります。管理画面でシートを再選択・公開してください。
-                    <? } else { ?>
-                        管理画面にアクセスして、シートを選択・公開してください。
-                    <? } ?>
-                </p>
-                <a href="?userId=<?= userId ?>&mode=admin" class="inline-block mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                    管理画面へ
-                </a>
-            </div>
-        </div>
         <? } ?>
     </div>
+
+    <script>
+        function copyBoardUrl() {
+            const urlInput = document.getElementById('board-url');
+            if (urlInput) {
+                try {
+                    if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(urlInput.value);
+                    } else {
+                        urlInput.select();
+                        document.execCommand('copy');
+                    }
+                    showMessage('URLをコピーしました', 'success');
+                } catch (error) {
+                    showMessage('コピーに失敗しました', 'error');
+                }
+            }
+        }
+
+        function showMessage(message, type = 'info') {
+            const messageArea = document.getElementById('message-area');
+            if (messageArea) {
+                const colors = {
+                    success: 'text-green-400',
+                    error: 'text-red-400',
+                    info: 'text-blue-400'
+                };
+                messageArea.className = `mb-4 text-center text-sm h-5 ${colors[type] || 'text-gray-400'}`;
+                messageArea.textContent = message;
+                
+                setTimeout(() => {
+                    messageArea.textContent = '';
+                }, 3000);
+            }
+        }
+
+        // 管理者用機能
+        <? if (typeof isOwner !== 'undefined' && isOwner) { ?>
+        document.getElementById('add-spreadsheet-btn').addEventListener('click', function() {
+            const urlInput = document.getElementById('spreadsheet-url-input');
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                showMessage('スプレッドシートのURLを入力してください', 'error');
+                return;
+            }
+            
+            // URL形式チェック
+            const googleSheetsPattern = /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9-_]{10,}/;
+            if (!googleSheetsPattern.test(url)) {
+                showMessage('有効なGoogleスプレッドシートのURLを入力してください', 'error');
+                return;
+            }
+            
+            // ボタンを無効化
+            this.disabled = true;
+            this.textContent = '追加中...';
+            showMessage('スプレッドシートを追加中...', 'info');
+            
+            // サーバーに送信
+            google.script.run
+                .withSuccessHandler((result) => {
+                    showMessage(result.message || 'スプレッドシートが追加されました', 'success');
+                    // ページをリロードして回答ボードを表示
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                })
+                .withFailureHandler((error) => {
+                    showMessage('エラー: ' + (error.message || 'スプレッドシートの追加に失敗しました'), 'error');
+                    this.disabled = false;
+                    this.textContent = '追加';
+                })
+                .addSpreadsheetUrl(url);
+        });
+
+        // Enterキーでも追加
+        document.getElementById('spreadsheet-url-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('add-spreadsheet-btn').click();
+            }
+        });
+        <? } ?>
+    </script>
 </body>
 </html>

@@ -76,32 +76,25 @@
               <input type="radio" name="setup-method" value="auto" checked class="mt-1">
               <div>
                 <div class="font-semibold text-white">簡単セットアップ（推奨）</div>
-                <div class="text-sm text-gray-400">回答ボード用Googleフォームを自動作成します。教師専用の永続的な回答ボードが作成されます。</div>
+                <div class="text-sm text-gray-400">回答ボード用Googleフォームを自動作成します。あなた専用の固定URLの回答ボードが作成され、複数のスプレッドシートを切り替えて使用できます。</div>
               </div>
             </label>
           </div>
-          
-          <div class="border border-gray-600 rounded-lg p-4 bg-gray-800">
-            <label class="flex items-start gap-3 cursor-pointer">
-              <input type="radio" name="setup-method" value="existing" class="mt-1">
-              <div>
-                <div class="font-semibold text-white">既存のスプレッドシートを使用</div>
-                <div class="text-sm text-gray-400">すでにお持ちのGoogleスプレッドシートを使用します</div>
-                <div class="mt-2" id="existing-sheet-input" style="display: none;">
-                  <input
-                    type="url"
-                    id="spreadsheet-url"
-                    placeholder="https://docs.google.com/spreadsheets/d/..."
-                    class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-cyan-400 focus:outline-none transition-all"
-                    autocomplete="off"
-                  />
-                  <p class="text-xs text-gray-400 mt-1">
-                    スプレッドシートのURLまたは共有リンクを貼り付けてください
-                  </p>
-                </div>
-              </div>
-            </label>
-          </div>
+        </div>
+        
+        <!-- 重要な注意事項 -->
+        <div class="mt-4 p-4 bg-yellow-900/30 border border-yellow-600/50 rounded-lg">
+          <h3 class="font-semibold text-yellow-400 mb-2 flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+            重要なお知らせ
+          </h3>
+          <ul class="text-sm text-yellow-200 space-y-1">
+            <li>• 一度登録すると、<strong>固定URLの回答ボード</strong>があなた専用で作成されます</li>
+            <li>• 登録後は<strong>管理画面でスプレッドシートのURLを追加</strong>して使用できます</li>
+            <li>• 生徒には<strong>同じURLを共有</strong>し続けることができ、授業ごとにURLを変える必要がありません</li>
+          </ul>
         </div>
       </div>
       
@@ -171,17 +164,17 @@
         .getActiveUserEmail();
     });
     
-    // セットアップ方法の切り替え
-    document.querySelectorAll('input[name="setup-method"]').forEach(radio => {
-      radio.addEventListener('change', (e) => {
-        const existingInput = document.getElementById('existing-sheet-input');
-        if (e.target.value === 'existing') {
-          existingInput.style.display = 'block';
-        } else {
-          existingInput.style.display = 'none';
-        }
-      });
-    });
+    // セットアップ方法の切り替え（統合版では自動セットアップのみ）
+    // document.querySelectorAll('input[name="setup-method"]').forEach(radio => {
+    //   radio.addEventListener('change', (e) => {
+    //     const existingInput = document.getElementById('existing-sheet-input');
+    //     if (e.target.value === 'existing') {
+    //       existingInput.style.display = 'block';
+    //     } else {
+    //       existingInput.style.display = 'none';
+    //     }
+    //   });
+    // });
 
     // URLフィールドのEnterキー対応
     document.addEventListener('keypress', (e) => {
@@ -197,33 +190,9 @@
     document.getElementById('register-btn').addEventListener('click', async () => {
       const btn = document.getElementById('register-btn');
       const messageArea = document.getElementById('message-area');
-      const setupMethod = document.querySelector('input[name="setup-method"]:checked').value;
-      
-      let spreadsheetUrl = '';
-      
-      if (setupMethod === 'existing') {
-        spreadsheetUrl = document.getElementById('spreadsheet-url').value.trim();
-        // バリデーション
-        if (!spreadsheetUrl) {
-          showMessage('スプレッドシートのURLを入力してください。', 'error');
-          document.getElementById('spreadsheet-url').focus();
-          return;
-        }
-      } else {
-        // 自動セットアップの場合は空文字列を渡し、サーバー側で新規作成
-        spreadsheetUrl = 'AUTO_CREATE';
-      }
-      
-      // URL形式のチェック（自動セットアップの場合はスキップ）
-      if (setupMethod === 'existing') {
-        const googleSheetsPattern = /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9-_]{10,}/;
-        const idOnlyPattern = /^[a-zA-Z0-9-_]{10,}$/;
-        
-        if (!googleSheetsPattern.test(spreadsheetUrl) && !idOnlyPattern.test(spreadsheetUrl)) {
-          showMessage('有効なGoogleスプレッドシートのURLまたはIDを入力してください。', 'error');
-          return;
-        }
-      }
+      // 統合版では常に自動セットアップ
+      const setupMethod = 'auto';
+      const spreadsheetUrl = 'AUTO_CREATE';
       
       // ボタンを無効化
       btn.disabled = true;
@@ -287,7 +256,7 @@
                 あなた専用の回答ボードが作成されました。以下のURLをブックマークして、いつでもアクセスできるようにしてください。
               </p>
               <p class="text-sm text-gray-300" id="setup-guidance">
-                管理画面でシートを選択すると、生徒用URLで即座に表示されます。シートの切り替えは管理画面からいつでも可能です。
+                管理画面でスプレッドシートURLを追加すると、生徒用URLで即座に表示されます。複数のスプレッドシートを切り替えて使用できます。
               </p>
               
               <div class="space-y-3">
