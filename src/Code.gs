@@ -214,19 +214,11 @@ function switchActiveSheet(sheetName) {
   const props = PropertiesService.getUserProperties();
   const userId = props.getProperty('CURRENT_USER_ID');
   
-  console.log('SwitchActiveSheet DEBUG 1 - Starting sheet switch:', { userId, sheetName });
-  
   if (!userId) {
     throw new Error('ユーザー情報が見つかりません。');
   }
   
   const userInfo = getUserInfo(userId);
-  console.log('SwitchActiveSheet DEBUG 2 - Current user info:', {
-    userId,
-    hasUserInfo: !!userInfo,
-    currentConfig: userInfo ? userInfo.configJson : null,
-    adminEmail: userInfo ? userInfo.adminEmail : null
-  });
   
   if (!userInfo || userInfo.adminEmail !== Session.getActiveUser().getEmail()) {
     throw new Error('権限がありません。');
@@ -245,33 +237,15 @@ function switchActiveSheet(sheetName) {
   
   prepareSheetForBoard(sheetName);
 
-  // アクティブシートを更新（常に利用可能なので公開フラグは不要）
-  console.log('SwitchActiveSheet DEBUG 3 - About to update config with:', {
-    activeSheetName: sheetName
-  });
-  
   try {
-    const updatedConfig = updateUserConfig(userId, {
+    updateUserConfig(userId, {
       activeSheetName: sheetName
     });
-    
-    console.log('SwitchActiveSheet DEBUG 4 - Config updated successfully:', updatedConfig);
-    
-    // Verify the update by retrieving fresh user info
-    const verifyUserInfo = getUserInfo(userId);
-    console.log('SwitchActiveSheet DEBUG 5 - Verification check:', {
-      configJson: verifyUserInfo.configJson,
-      activeSheetName: verifyUserInfo.configJson ? verifyUserInfo.configJson.activeSheetName : 'NO_CONFIG'
-    });
-    
   } catch (error) {
-    console.error('SwitchActiveSheet DEBUG ERROR - Failed to update user config:', error);
     throw new Error(`設定の更新に失敗しました: ${error.message}`);
   }
 
   auditLog('ACTIVE_SHEET_CHANGED', userId, { sheetName, userEmail: userInfo.adminEmail });
-
-  console.log('SwitchActiveSheet DEBUG 6 - Sheet switch completed successfully');
   return `アクティブシートを「${sheetName}」に変更しました。`;
 }
 
@@ -1637,14 +1611,6 @@ function updateUserConfig(userId, config) {
         // Sanitize config to prevent malicious data
         const sanitizedConfig = sanitizeConfigData(config);
         const newConfig = Object.assign({}, currentConfig, sanitizedConfig);
-        
-        console.log('Updating user config:', {
-          userId: userId,
-          currentConfig: currentConfig,
-          incomingConfig: config,
-          sanitizedConfig: sanitizedConfig,
-          newConfig: newConfig
-        });
         
         userDb.getRange(i + 1, configIndex + 1).setValue(JSON.stringify(newConfig));
         
