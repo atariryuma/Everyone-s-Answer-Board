@@ -203,11 +203,20 @@ function publishApp(sheetName) {
   const props = PropertiesService.getUserProperties();
   const userId = props.getProperty('CURRENT_USER_ID');
   
+  console.log('PublishApp DEBUG 1 - Starting publication:', { userId, sheetName });
+  
   if (!userId) {
     throw new Error('ユーザー情報が見つかりません。');
   }
   
   const userInfo = getUserInfo(userId);
+  console.log('PublishApp DEBUG 2 - Current user info:', {
+    userId,
+    hasUserInfo: !!userInfo,
+    currentConfig: userInfo ? userInfo.configJson : null,
+    adminEmail: userInfo ? userInfo.adminEmail : null
+  });
+  
   if (userInfo.adminEmail !== Session.getActiveUser().getEmail()) {
     throw new Error('権限がありません。');
   }
@@ -226,15 +235,35 @@ function publishApp(sheetName) {
   prepareSheetForBoard(sheetName);
 
   // ユーザー設定を更新
-  updateUserConfig(userId, {
+  console.log('PublishApp DEBUG 3 - About to update config with:', {
     isPublished: true,
     sheetName: sheetName
   });
+  
+  try {
+    const updatedConfig = updateUserConfig(userId, {
+      isPublished: true,
+      sheetName: sheetName
+    });
+    
+    console.log('PublishApp DEBUG 4 - Config updated successfully:', updatedConfig);
+    
+    // Verify the update by retrieving fresh user info
+    const verifyUserInfo = getUserInfo(userId);
+    console.log('PublishApp DEBUG 5 - Verification check:', {
+      configJson: verifyUserInfo.configJson,
+      isPublished: verifyUserInfo.configJson ? verifyUserInfo.configJson.isPublished : 'NO_CONFIG',
+      sheetName: verifyUserInfo.configJson ? verifyUserInfo.configJson.sheetName : 'NO_CONFIG'
+    });
+    
+  } catch (error) {
+    console.error('PublishApp DEBUG ERROR - Failed to update user config:', error);
+    throw new Error(`設定の更新に失敗しました: ${error.message}`);
+  }
 
-  const scriptProps = PropertiesService.getScriptProperties();
-  scriptProps.setProperty(APP_PROPERTIES.IS_PUBLISHED, 'true');
-  scriptProps.setProperty(APP_PROPERTIES.ACTIVE_SHEET, sheetName);
+  auditLog('APP_PUBLISHED', userId, { sheetName, userEmail: userInfo.adminEmail });
 
+  console.log('PublishApp DEBUG 6 - Publication completed successfully');
   return `「${sheetName}」を公開しました。`;
 }
 
@@ -242,20 +271,58 @@ function publishApp(sheetName) {
  * アプリの公開を終了します。
  */
 function unpublishApp() {
-  if (!checkAdmin()) {
+  const props = PropertiesService.getUserProperties();
+  const userId = props.getProperty('CURRENT_USER_ID');
+  
+  if (!userId) {
+    throw new Error('ユーザー情報が見つかりません。');
+  }
+  
+  const userInfo = getUserInfo(userId);
+  if (userInfo.adminEmail !== Session.getActiveUser().getEmail()) {
     throw new Error('権限がありません。');
   }
-  const properties = PropertiesService.getScriptProperties();
-  properties.setProperty(APP_PROPERTIES.IS_PUBLISHED, 'false');
+  
+  // ユーザー設定を更新
+  try {
+    updateUserConfig(userId, {
+      isPublished: false
+    });
+  } catch (error) {
+    console.error('Failed to update user config:', error);
+    throw new Error(`設定の更新に失敗しました: ${error.message}`);
+  }
+  
+  auditLog('APP_UNPUBLISHED', userId, { userEmail: userInfo.adminEmail });
+  
   return 'アプリを非公開にしました。';
 }
 
 function setShowDetails(flag) {
-  if (!checkAdmin()) {
+  const props = PropertiesService.getUserProperties();
+  const userId = props.getProperty('CURRENT_USER_ID');
+  
+  if (!userId) {
+    throw new Error('ユーザー情報が見つかりません。');
+  }
+  
+  const userInfo = getUserInfo(userId);
+  if (userInfo.adminEmail !== Session.getActiveUser().getEmail()) {
     throw new Error('権限がありません。');
   }
-  const properties = PropertiesService.getScriptProperties();
-  properties.setProperty(APP_PROPERTIES.SHOW_DETAILS, String(flag));
+  
+  // ユーザー設定を更新
+  try {
+    updateUserConfig(userId, {
+      showDetails: Boolean(flag)
+    });
+  } catch (error) {
+    console.error('Failed to update user config:', error);
+    throw new Error(`設定の更新に失敗しました: ${error.message}`);
+  }
+  
+  auditLog('SHOW_DETAILS_UPDATED', userId, { showDetails: Boolean(flag), userEmail: userInfo.adminEmail });
+  
   return `詳細表示を${flag ? '有効' : '無効'}にしました。`;
 }
 
@@ -341,10 +408,25 @@ function doGet(e) {
   // 通常表示モード
   const config = userInfo.configJson || {};
   
+  // デバッグ情報をログに出力
+  console.log('Config debug:', {
+    userId: validatedUserId,
+    configJson: config,
+    isPublished: config.isPublished,
+    sheetName: config.sheetName
+  });
+  
   if (!config.isPublished) {
     const template = HtmlService.createTemplateFromFile('Unpublished');
     template.userEmail = userInfo.adminEmail;
-    template.userId = userId;
+    template.userId = validatedUserId;
+    template.debugInfo = {
+      configExists: !!userInfo.configJson,
+      isPublished: config.isPublished,
+      sheetName: config.sheetName,
+      configKeys: Object.keys(config)
+    };
+    auditLog('UNPUBLISHED_ACCESS', validatedUserId, { viewerEmail, config });
     return template.evaluate().setTitle('公開終了');
   }
   
@@ -1444,9 +1526,24 @@ function updateUserConfig(userId, config) {
         const sanitizedConfig = sanitizeConfigData(config);
         const newConfig = Object.assign({}, currentConfig, sanitizedConfig);
         
+        console.log('Updating user config:', {
+          userId: userId,
+          currentConfig: currentConfig,
+          incomingConfig: config,
+          sanitizedConfig: sanitizedConfig,
+          newConfig: newConfig
+        });
+        
         userDb.getRange(i + 1, configIndex + 1).setValue(JSON.stringify(newConfig));
         
-        auditLog('CONFIG_UPDATED', userId, { currentUser, updatedFields: Object.keys(sanitizedConfig) });
+        // キャッシュをクリアして最新のデータが取得されるようにする
+        const cache = (typeof CacheService !== 'undefined') ? CacheService.getScriptCache() : null;
+        if (cache) {
+          const cacheKey = `userInfo_${userId}`;
+          cache.remove(cacheKey);
+        }
+        
+        auditLog('CONFIG_UPDATED', userId, { currentUser, updatedFields: Object.keys(sanitizedConfig), newConfig });
         return newConfig;
       }
     }
