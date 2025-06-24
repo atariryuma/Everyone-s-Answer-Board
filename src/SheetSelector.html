@@ -193,7 +193,7 @@
         if (status.activeSheetName) {
           elements.statusText.innerHTML = `<span class="font-bold text-green-400">利用可能</span> - アクティブシート: <span class="font-bold text-blue-400">${status.activeSheetName}</span>`;
           // 生徒用URLを表示
-          const baseUrl = window.location.origin + window.location.pathname;
+          const baseUrl = status.webAppUrl || (window.location.origin + window.location.pathname);
           const boardUrl = `${baseUrl}?userId=${userId}`;
           elements.boardUrl.value = boardUrl;
           elements.viewBoardLink.href = boardUrl;
