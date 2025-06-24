@@ -4,8 +4,11 @@
 <meta charset="UTF-8">
 <title>StudyQuest - みんなのかいとうボード</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"></noscript>
+<link rel="dns-prefetch" href="//script.google.com">
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<script src="https://cdn.tailwindcss.com" defer></script>
 <script>
 const __SHOW_COUNTS__ = '<?= typeof showCounts !== "undefined" ? showCounts : false ?>';
 const __DISPLAY_MODE__ = '<?= typeof displayMode !== "undefined" ? displayMode : "anonymous" ?>';
@@ -79,11 +82,12 @@ body {
   outline-offset: 2px; 
   border-radius: 0.75rem; 
 }
-header { position: sticky; top: 0; z-index: 5; }
+header { position: sticky; top: 0; z-index: 5; contain: layout; }
 .answer-card { 
   will-change: transform;
   transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
   border-radius: 1rem;
+  contain: layout style;
 }
 .answer-card.highlighted {
   border: 4px solid var(--color-accent) !important;
@@ -129,6 +133,7 @@ header { position: sticky; top: 0; z-index: 5; }
 .skeleton::after { content: ""; position: absolute; inset: 0; background-image: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.2), rgba(255,255,255,0)); animation: skeleton-loading 1.5s infinite; }
 @keyframes skeleton-loading { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.render-optimized { transform: translateZ(0); }
 .modal-fade { animation: modalFade 0.2s ease-out; }
 @keyframes modalFade { from { opacity: 0; } to { opacity: 1; } }
 .modal-scale { animation: modalScale 0.2s ease-out; }
@@ -211,6 +216,8 @@ header { position: sticky; top: 0; z-index: 5; }
 </div>
 </footer>
 <script>
+// Optimize initial render
+const RENDER_BATCH_SIZE = 10;
 const ICONS = {
   'lightbulb-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
   'lightbulb-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6z M10.5 11.25 L11 13 L13 13 L13.5 11.25 H 10.5 Z"/><path d="M9 16.5h6v1H9z M9 18h6v1H9z M9 19.5h6v1H9z"/></svg>',
@@ -228,6 +235,8 @@ const ICONS = {
 class StudyQuestApp {
   constructor() {
     this.simpleCache = new Map();
+    this.renderCache = new Map();
+    this.iconCache = new Map();
     this.elements = {
       body: document.body,
       mainContainer: document.getElementById('main-container'),
@@ -302,23 +311,38 @@ class StudyQuestApp {
     this.init();
   }
   init() {
-    this.renderIcons();
-    this.setupEventListeners();
+    // Critical path only - non-blocking
+    this.setupCriticalElements();
     this.setupOwnerName();
-    this.verifyAdmin();
-    this.adjustLayout();
-    this.loadInitialData();
-    this.updateSortOptions();
-    if (!localStorage.getItem('introSeen')) {
-      this.showInfoModal();
-    }
+    this.showMinimalSkeleton();
+    
+    // Immediate async loading for data
+    this.loadDataImmediate();
+    
+    // Defer all non-critical operations
+    requestIdleCallback(() => {
+      this.setupNonCriticalEventListeners();
+      this.renderIcons();
+      this.adjustLayout();
+      this.updateSortOptions();
+      if (!localStorage.getItem('introSeen')) {
+        setTimeout(() => this.showInfoModal(), 500);
+      }
+    }, { timeout: 50 });
   }
   setupOwnerName() {
     if (OWNER_NAME && this.elements.ownerNameText) {
       this.elements.ownerNameText.textContent = `管理者: ${OWNER_NAME}`;
     }
   }
-  setupEventListeners() {
+  setupCriticalElements() {
+    // Only setup absolutely critical event listeners
+    this.setupEventDelegation();
+    this.handlers.onAnswerModalCloseClick = () => this.hideAnswerModal();
+    if (this.elements.answerModalCloseBtn) {
+      this.elements.answerModalCloseBtn.addEventListener('click', this.handlers.onAnswerModalCloseClick);
+    }
+    // Size slider for immediate response
     const debouncedRender = this.debounce(() => this.renderBoard(true), 200);
     this.handlers.onSizeSliderInput = () => {
       localStorage.setItem('boardColumns', this.elements.sizeSlider.value);
@@ -327,11 +351,10 @@ class StudyQuestApp {
     if (this.elements.sizeSlider) {
       this.elements.sizeSlider.addEventListener('input', this.handlers.onSizeSliderInput);
     }
-    this.setupEventDelegation();
-    this.handlers.onAnswerModalCloseClick = () => this.hideAnswerModal();
-    if (this.elements.answerModalCloseBtn) {
-      this.elements.answerModalCloseBtn.addEventListener('click', this.handlers.onAnswerModalCloseClick);
-    }
+  }
+  
+  setupNonCriticalEventListeners() {
+    // Modal handlers
     this.handlers.onAnswerModalContainerClick = (e) => {
       if (e.target === e.currentTarget) {
         this.hideAnswerModal();
@@ -445,50 +468,71 @@ class StudyQuestApp {
     this.elements.body.style.paddingBottom = footerHeight + this.baseBodyPadding + 'px';
   }
   runGas(funcName, ...args) {
+    // Simple request deduplication for identical calls
+    const cacheKey = funcName + JSON.stringify(args);
+    if (this.simpleCache.has(cacheKey)) {
+      const cached = this.simpleCache.get(cacheKey);
+      if (Date.now() - cached.timestamp < 1000) { // 1 second cache
+        return Promise.resolve(cached.data);
+      }
+    }
+    
     return new Promise((resolve, reject) => {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         const userId = USER_ID || '';
         google.script.run
-          .withSuccessHandler(resolve)
+          .withSuccessHandler((result) => {
+            this.simpleCache.set(cacheKey, { data: result, timestamp: Date.now() });
+            resolve(result);
+          })
           .withFailureHandler(reject)
           .withUserObject({ userId: userId })
           [funcName](...args);
       } else {
         console.warn('Google Apps Script environment not detected.');
-        this.getMockData(funcName, ...args).then(resolve).catch(reject);
+        this.getMockData(funcName, ...args).then((result) => {
+          this.simpleCache.set(cacheKey, { data: result, timestamp: Date.now() });
+          resolve(result);
+        }).catch(reject);
       }
     });
   }
-  async verifyAdmin() {
-    try {
-      // サーバーから渡された管理者フラグを使用、フォールバックでcheckAdminを呼び出し
-      let isAdmin = window.isAdminUser;
-      if (!isAdmin) {
-        isAdmin = await this.gas.checkAdmin();
+  async verifyAdminAsync() {
+    // Use server-provided flag first (fast)
+    if (window.isAdminUser) {
+      requestIdleCallback(() => this.showAdminControls());
+      return;
+    }
+    
+    // Fallback API call (slower) - defer to idle
+    requestIdleCallback(async () => {
+      try {
+        const isAdmin = await this.gas.checkAdmin();
+        if (isAdmin) {
+          this.showAdminControls();
+        }
+      } catch (e) {
+        console.error('Admin check failed', e);
       }
-      
-      if (isAdmin) {
-        this.state.isAdminUser = true;
-        
-        // 管理画面ボタンを表示
-        if (this.elements.adminPanelBtn) {
-          this.elements.adminPanelBtn.classList.remove('hidden');
-          this.elements.adminPanelBtn.removeAttribute('hidden');
-        }
-        
-        // 管理モード切り替えボタンを表示
-        if (this.elements.adminToggleBtn) {
-          this.elements.adminToggleBtn.classList.remove('hidden');
-          this.elements.adminToggleBtn.removeAttribute('hidden');
-          this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
-        }
-        
-        if (this.elements.modeLabel) {
-          this.elements.modeLabel.textContent = this.state.showAdminFeatures ? '管理モード' : '閲覧モード';
-        }
-      }
-    } catch (e) {
-      console.error('Admin check failed', e);
+    });
+  }
+  
+  showAdminControls() {
+    this.state.isAdminUser = true;
+    
+    if (this.elements.adminPanelBtn) {
+      this.elements.adminPanelBtn.classList.remove('hidden');
+      this.elements.adminPanelBtn.removeAttribute('hidden');
+    }
+    
+    if (this.elements.adminToggleBtn) {
+      this.elements.adminToggleBtn.classList.remove('hidden');
+      this.elements.adminToggleBtn.removeAttribute('hidden');
+      this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
+    }
+    
+    if (this.elements.modeLabel) {
+      this.elements.modeLabel.textContent = this.state.showAdminFeatures ? '管理モード' : '閲覧モード';
     }
   }
   getMockData(funcName, ...args) {
@@ -605,18 +649,42 @@ class StudyQuestApp {
       document.removeEventListener('click', this.handlers.onDocumentClick);
     }
   }
-  async loadInitialData() {
-    await this.loadAvailableSheets();
-    await this.loadSheetData(true, true);
-    this.startPolling();
+  async loadDataImmediate() {
+    // Start loading immediately without waiting
+    this.loadSheetData(false, true).then(() => {
+      this.startPolling();
+    });
+    
+    // Load sheets in background
+    this.loadAvailableSheets();
+    
+    // Verify admin in background
+    this.verifyAdminAsync();
+  }
+  
+  showMinimalSkeleton() {
+    // Show only 3 skeletons for immediate visual feedback
+    const count = 3;
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < count; i++) {
+      frag.appendChild(this.createSkeletonCard());
+    }
+    this.elements.answersContainer.appendChild(frag);
   }
   async loadSheetData(showLoading = true, isInitialLoad = false, requestedSheetName = null) {
     if (this.state.isLoading && showLoading) return;
     this.state.isLoading = true;
-    const selectedClass = isInitialLoad ? 'すべて' : this.elements.classFilter.value;
+    const selectedClass = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
     const oldAnswers = [...this.state.currentAnswers];
-    if (showLoading) {
-      const count = parseInt(this.elements.sizeSlider.value, 10) * 2;
+    
+    // Show immediate visual feedback
+    if (isInitialLoad) {
+      this.elements.headingLabel.innerHTML = '<svg class="w-6 h-6 animate-spin inline-block" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path></svg>';
+    }
+    
+    // Optimized loading state - don't clear if initial load
+    if (showLoading && !isInitialLoad) {
+      const count = Math.min(parseInt(this.elements.sizeSlider.value, 10) * 2, 8); // Cap at 8
       const frag = document.createDocumentFragment();
       for (let i = 0; i < count; i++) {
         frag.appendChild(this.createSkeletonCard());
@@ -644,13 +712,20 @@ class StudyQuestApp {
         this.state.showHighlightToggle = false;
       }
       if (isInitialLoad) {
-        this.populateClassFilter(data.rows);
-        this.elements.sheetNameText.textContent = 'シート: ' + this.escapeHtml(data.sheetName || '不明');
+        // Add visual feedback that loading is complete
+        this.elements.answersContainer.classList.add('render-optimized');
+        requestIdleCallback(() => {
+          this.populateClassFilter(data.rows);
+          this.elements.sheetNameText.textContent = 'シート: ' + this.escapeHtml(data.sheetName || '不明');
+        });
       }
       if (JSON.stringify(this.state.currentAnswers) !== JSON.stringify(data.rows)) {
         this.state.currentAnswers = data.rows;
         this.elements.headingLabel.textContent = this.escapeHtml(data.header || '問題');
-        this.renderBoard(false, oldAnswers);
+        // Use requestAnimationFrame for smooth rendering
+        requestAnimationFrame(() => {
+          this.renderBoard(false, oldAnswers);
+        });
       }
     } catch (error) {
       console.error('Error loading sheet data:', error);
@@ -738,10 +813,24 @@ class StudyQuestApp {
     const container = this.elements.answersContainer;
     container.querySelectorAll('.skeleton').forEach(el => el.remove());
     const newRows = this.state.currentAnswers;
-    this.elements.sliderValue.textContent = this.elements.sizeSlider.value;
-    container.className = 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-' + this.elements.sizeSlider.value;
+    
+    // Batch DOM updates
+    const updates = [];
+    if (this.elements.sliderValue.textContent !== this.elements.sizeSlider.value) {
+      updates.push(() => this.elements.sliderValue.textContent = this.elements.sizeSlider.value);
+    }
+    const newClassName = 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-' + this.elements.sizeSlider.value;
+    if (container.className !== newClassName) {
+      updates.push(() => container.className = newClassName);
+    }
     const userIcon = this.getIcon('users', 'w-4 h-4 inline-block -mt-1');
-    this.elements.answerCount.innerHTML = userIcon + '<span>' + newRows.length + '件</span>';
+    const countHtml = userIcon + '<span>' + newRows.length + '件</span>';
+    if (this.elements.answerCount.innerHTML !== countHtml) {
+      updates.push(() => this.elements.answerCount.innerHTML = countHtml);
+    }
+    
+    // Apply all updates at once
+    updates.forEach(update => update());
     if (newRows.length === 0) {
       if (!container.querySelector('.no-answers')) {
         container.innerHTML = '';
@@ -763,51 +852,122 @@ class StudyQuestApp {
       });
       const changedItems = [];
       let prevNode = null;
-      newRows.forEach((row) => {
-        const rowId = String(row.rowIndex);
-        let card = existingMap.get(rowId);
-        const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
-        if (!card) {
-          card = this.createAnswerCard(row);
-          card.classList.add('new-card');
-          if (prevNode) {
-            container.insertBefore(card, prevNode.nextSibling);
-          } else {
-            container.insertBefore(card, container.firstChild);
-          }
-          changedItems.push(row);
-        } else {
-          if (prevNode && card.previousSibling !== prevNode) {
-            container.insertBefore(card, prevNode.nextSibling);
-          } else if (!prevNode && card !== container.firstChild) {
-            container.insertBefore(card, container.firstChild);
-          }
-          if (oldData) {
-            if (oldData.opinion !== row.opinion) {
-              const t = card.querySelector('.opinion-text');
-              if (t) t.textContent = row.opinion;
-            }
-            if (oldData.reason !== row.reason) {
-              const p = card.querySelector('.answer-preview p');
-              if (p) p.textContent = row.reason;
-            }
-            if (oldData.name !== row.name) {
-              const n = card.querySelector('.font-bold');
-              if (n) n.textContent = row.name;
-            }
-            if (JSON.stringify(oldData.reactions) !== JSON.stringify(row.reactions) || oldData.highlight !== row.highlight) {
+      // Batch process for better performance
+      if (newRows.length > RENDER_BATCH_SIZE) {
+        // Process in chunks for large datasets
+        const processBatch = (startIndex = 0) => {
+          const endIndex = Math.min(startIndex + RENDER_BATCH_SIZE, newRows.length);
+          const batch = newRows.slice(startIndex, endIndex);
+          
+          batch.forEach((row) => {
+            const rowId = String(row.rowIndex);
+            let card = existingMap.get(rowId);
+            const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
+            if (!card) {
+              card = this.createAnswerCard(row);
+              card.classList.add('new-card');
+              if (prevNode) {
+                container.insertBefore(card, prevNode.nextSibling);
+              } else {
+                container.insertBefore(card, container.firstChild);
+              }
               changedItems.push(row);
+            } else {
+              if (prevNode && card.previousSibling !== prevNode) {
+                container.insertBefore(card, prevNode.nextSibling);
+              } else if (!prevNode && card !== container.firstChild) {
+                container.insertBefore(card, container.firstChild);
+              }
+              if (oldData) {
+                if (oldData.opinion !== row.opinion) {
+                  const t = card.querySelector('.opinion-text');
+                  if (t) t.textContent = row.opinion;
+                }
+                if (oldData.reason !== row.reason) {
+                  const p = card.querySelector('.answer-preview p');
+                  if (p) p.textContent = row.reason;
+                }
+                if (oldData.name !== row.name) {
+                  const n = card.querySelector('.font-bold');
+                  if (n) n.textContent = row.name;
+                }
+                if (JSON.stringify(oldData.reactions) !== JSON.stringify(row.reactions) || oldData.highlight !== row.highlight) {
+                  changedItems.push(row);
+                }
+              }
+            }
+            prevNode = card;
+          });
+          
+          if (endIndex < newRows.length) {
+            requestIdleCallback(() => processBatch(endIndex));
+          }
+        };
+        processBatch();
+      } else {
+        newRows.forEach((row) => {
+          const rowId = String(row.rowIndex);
+          let card = existingMap.get(rowId);
+          const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
+          if (!card) {
+            card = this.createAnswerCard(row);
+            card.classList.add('new-card');
+            if (prevNode) {
+              container.insertBefore(card, prevNode.nextSibling);
+            } else {
+              container.insertBefore(card, container.firstChild);
+            }
+            changedItems.push(row);
+          } else {
+            if (prevNode && card.previousSibling !== prevNode) {
+              container.insertBefore(card, prevNode.nextSibling);
+            } else if (!prevNode && card !== container.firstChild) {
+              container.insertBefore(card, container.firstChild);
+            }
+            if (oldData) {
+              if (oldData.opinion !== row.opinion) {
+                const t = card.querySelector('.opinion-text');
+                if (t) t.textContent = row.opinion;
+              }
+              if (oldData.reason !== row.reason) {
+                const p = card.querySelector('.answer-preview p');
+                if (p) p.textContent = row.reason;
+              }
+              if (oldData.name !== row.name) {
+                const n = card.querySelector('.font-bold');
+                if (n) n.textContent = row.name;
+              }
+              if (JSON.stringify(oldData.reactions) !== JSON.stringify(row.reactions) || oldData.highlight !== row.highlight) {
+                changedItems.push(row);
+              }
             }
           }
-        }
-        prevNode = card;
-      });
+          prevNode = card;
+        });
+      }
       if (changedItems.length) {
         this.applyUpdates(changedItems);
       }
     }
   }
   createAnswerCard(data) {
+    // Check cache first for unchanged data
+    const cacheKey = JSON.stringify({
+      rowIndex: data.rowIndex,
+      opinion: data.opinion,
+      reason: data.reason,
+      name: data.name,
+      reactions: data.reactions,
+      highlight: data.highlight,
+      showCounts: this.state.showCounts,
+      displayMode: this.state.displayMode,
+      showHighlightToggle: this.state.showHighlightToggle
+    });
+    
+    if (this.renderCache.has(cacheKey)) {
+      return this.renderCache.get(cacheKey).cloneNode(true);
+    }
+    
     const card = document.createElement('div');
     const highlightClass = data.highlight ? ' highlighted' : '';
     card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer' + highlightClass;
@@ -855,12 +1015,21 @@ class StudyQuestApp {
       badge.innerHTML = this.getIcon('star', '', true);
       card.appendChild(badge);
     }
+    
+    // Cache the card for reuse (limit cache size)
+    if (this.renderCache.size > 50) {
+      const firstKey = this.renderCache.keys().next().value;
+      this.renderCache.delete(firstKey);
+    }
+    this.renderCache.set(cacheKey, card.cloneNode(true));
+    
     return card;
   }
   createSkeletonCard() {
     const card = document.createElement('div');
     card.className = 'answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 skeleton';
-    card.innerHTML = '<div class="flex-1 space-y-3">' + '<div class="h-6 w-3/4 rounded bg-gray-500/30"></div>' + '<div class="h-4 w-full rounded bg-gray-500/20"></div>' + '<div class="h-4 w-5/6 rounded bg-gray-500/20"></div>' + '</div>' + '<div class="mt-4 h-8 rounded bg-gray-500/20"></div>';
+    // Simplified skeleton for faster rendering
+    card.innerHTML = '<div class="h-20 w-full rounded bg-gray-500/30 mb-4"></div><div class="h-6 w-full rounded bg-gray-500/20"></div>';
     return card;
   }
   async handleReaction(rowIndex, reaction) {
@@ -1107,6 +1276,12 @@ class StudyQuestApp {
     }
   }
   getIcon(name, classes = '', solid = false) {
+    // Cache icons to avoid repeated string concatenation
+    const cacheKey = `${name}-${classes}-${solid}`;
+    if (this.iconCache.has(cacheKey)) {
+      return this.iconCache.get(cacheKey);
+    }
+    
     let key = name;
     if (ICONS[name + '-outline'] || ICONS[name + '-solid']) {
       key = solid ? name + '-solid' : name + '-outline';
@@ -1114,9 +1289,13 @@ class StudyQuestApp {
     const icon = ICONS[key];
     if (!icon) {
       console.warn('Icon not found:', key);
-      return '<span aria-hidden="true" class="' + classes + '">⭐</span>';
+      const fallback = '<span aria-hidden="true" class="' + classes + '">⭐</span>';
+      this.iconCache.set(cacheKey, fallback);
+      return fallback;
     }
-    return '<span aria-hidden="true" class="' + classes + '">' + icon + '</span>';
+    const result = '<span aria-hidden="true" class="' + classes + '">' + icon + '</span>';
+    this.iconCache.set(cacheKey, result);
+    return result;
   }
   renderIcons() {
     if (this.elements.infoIconLike) {
