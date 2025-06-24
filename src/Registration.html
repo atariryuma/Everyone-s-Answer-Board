@@ -242,27 +242,8 @@
         .withSuccessHandler(result => {
           showMessage(result.message || '登録が完了しました！', 'success');
 
-          // URLのサニタイゼーション
-          function sanitizeUrl(url) {
-            if (!url || typeof url !== 'string') return '';
-            // 基本的なURL検証
-            try {
-              const parsed = new URL(url, window.location.origin);
-              if (parsed.origin !== window.location.origin) {
-                throw new Error('Invalid origin');
-              }
-              return parsed.href;
-            } catch (e) {
-              console.error('Invalid URL:', url);
-              return '';
-            }
-          }
-
-          const baseUrl = window.location.origin + window.location.pathname;
-          const adminUrl = sanitizeUrl(result.adminUrl) ||
-            `${baseUrl}?userId=${encodeURIComponent(result.userId)}&mode=admin`;
-          const viewUrl = sanitizeUrl(result.viewUrl) ||
-            `${baseUrl}?userId=${encodeURIComponent(result.userId)}`;
+          const adminUrl = result.adminUrl || '';
+          const viewUrl = result.viewUrl || '';
           
           if (!adminUrl || !viewUrl) {
             showMessage('エラー: 無効なURLが生成されました。', 'error');
