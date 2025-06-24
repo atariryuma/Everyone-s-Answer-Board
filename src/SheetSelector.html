@@ -43,9 +43,26 @@
         </div>
       </div>
 
+      <!-- Spreadsheet URL Input -->
+      <div class="mb-6">
+        <h3 class="font-semibold mb-3">1. スプレッドシートを追加</h3>
+        <div class="space-y-3">
+          <div class="flex gap-2">
+            <input type="url" id="spreadsheet-url-input" 
+                   placeholder="https://docs.google.com/spreadsheets/d/..."
+                   class="flex-1 p-2 rounded-lg glass-panel text-white border border-gray-600 focus:ring-2 focus:ring-cyan-400">
+            <button type="button" id="add-spreadsheet-btn" 
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+              追加
+            </button>
+          </div>
+          <p class="text-xs text-gray-400">GoogleスプレッドシートのURLを入力して追加してください</p>
+        </div>
+      </div>
+
       <!-- Sheet Selection -->
       <div class="mb-6">
-        <h3 class="font-semibold mb-3">1. 表示するシートを選択</h3>
+        <h3 class="font-semibold mb-3">2. 表示するシートを選択</h3>
         <select id="sheet-select" class="w-full p-2 rounded-lg glass-panel text-white">
           <option>読み込み中...</option>
         </select>
@@ -53,7 +70,7 @@
 
       <!-- Config Setup -->
       <div class="mb-6">
-        <h3 class="font-semibold mb-3">2. Config設定</h3>
+        <h3 class="font-semibold mb-3">3. Config設定</h3>
         <p class="text-sm text-gray-300 mb-2">ボードで使用する列を指定します。シートを選ぶと候補が表示されます。</p>
           <div class="flex flex-col gap-2 rounded-lg glass-panel p-2 hidden" id="config-area">
             <label class="flex flex-col gap-1">
@@ -76,13 +93,13 @@
               <span>クラス列ヘッダー</span>
               <select id="classHeader" class="w-full p-1 rounded text-gray-900"></select>
             </label>
-          <button id="save-config-btn" class="bg-green-600 hover:bg-green-700 text-white rounded py-1">保存</button>
+          <button type="button" id="save-config-btn" class="bg-green-600 hover:bg-green-700 text-white rounded py-1">保存</button>
         </div>
       </div>
 
       <!-- Display Options -->
       <div class="mb-6">
-        <h3 class="font-semibold mb-3">3. 表示オプション</h3>
+        <h3 class="font-semibold mb-3">4. 表示オプション</h3>
         <div id="detail-options" class="flex flex-col gap-2 rounded-lg glass-panel p-2">
           <label class="flex items-center p-2 rounded-md cursor-pointer">
             <input type="radio" name="showDetails" value="true" class="mr-3 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500">
@@ -97,7 +114,7 @@
 
       <!-- Actions -->
       <div class="glass-panel p-4 rounded-lg">
-        <h3 class="font-semibold mb-3">4. 操作を選択</h3>
+        <h3 class="font-semibold mb-3">5. 操作を選択</h3>
         <div class="flex flex-col gap-3">
           <button id="switch-sheet-btn" class="w-full text-white font-bold py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 transition disabled:bg-blue-300">
             このシートをアクティブにする

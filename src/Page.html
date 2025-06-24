@@ -12,10 +12,12 @@ const __DISPLAY_MODE__ = '<?= displayMode ?>';
 const __SHEET_NAME__ = '<?= sheetName ?>';
 const __MAPPING__ = '<?= JSON.stringify(mapping) ?>';
 const __USER_ID__ = '<?= userId ?>';
+const __OWNER_NAME__ = '<?= ownerName ?>';
 window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : __SHOW_COUNTS__ === 'true';
 window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
 const SHEET_NAME = __SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHEET_NAME__;
 const USER_ID = __USER_ID__.startsWith('<') ? '' : __USER_ID__;
+const OWNER_NAME = __OWNER_NAME__.startsWith('<') ? '' : __OWNER_NAME__;
 let MAPPING;
 try {
   MAPPING = __MAPPING__.startsWith('<') ? {} : JSON.parse(__MAPPING__);
@@ -132,12 +134,6 @@ header { position: sticky; top: 0; z-index: 5; }
 <header id="main-header" class="glass-panel rounded-xl p-4 mb-4 flex flex-col lg:flex-row justify-between items-center gap-4 shadow-lg">
 <div class="flex items-center gap-4 w-full lg:w-auto">
 <p id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0"></p>
-<div class="flex items-center gap-2">
-<label for="sheetSelector" class="text-xs text-gray-400">シート:</label>
-<select id="sheetSelector" class="text-xs bg-gray-700 border border-gray-600 rounded px-2 py-1">
-<option value="">読み込み中...</option>
-</select>
-</div>
 <label for="classFilter" class="sr-only">クラス絞り込み</label>
 <select id="classFilter" class="hidden text-sm"></select>
 <label for="sortOrder" class="sr-only">並び順</label>
@@ -157,16 +153,20 @@ header { position: sticky; top: 0; z-index: 5; }
 </p>
 </div>
 <div class="w-full lg:w-auto lg:min-w-[150px] text-right space-y-1">
+<p id="ownerNameText" class="text-xs text-gray-500 h-4"></p>
 <p id="sheetNameText" class="text-xs text-gray-400 h-4"></p>
 <p id="modeLabel" class="text-xs text-gray-400"></p>
+<div class="flex justify-end gap-2">
 <button type="button" id="adminToggleBtn" class="text-xs text-cyan-400 underline hidden" hidden aria-label="管理者モード切り替え"></button>
+<button type="button" id="adminEndBtn" class="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded hidden" hidden aria-label="管理モード終了">管理終了</button>
+</div>
 </div>
 </header>
 <main id="answers" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" role="main" aria-live="polite" aria-label="回答一覧"></main>
 </div>
 <div id="answerModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
-<div id="answerModalCard" class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full max-w-5xl h-auto max-h-[85vh]" role="document" aria-labelledby="modalAnswer">
-<button id="answerModalCloseBtn" class="absolute -top-3 -right-3 bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform" aria-label="閉じる">
+<div id="answerModalCard" class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full max-w-5xl h-auto max-h-[85vh] relative" role="document" aria-labelledby="modalAnswer">
+<button type="button" id="answerModalCloseBtn" class="absolute top-2 right-2 bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform" aria-label="閉じる">
   <span id="iconClose" class="w-6 h-6"></span>
 </button>
 <div id="modalAnswer" class="flex-grow min-h-[200px] mb-4 overflow-y-auto pr-4"></div>
@@ -230,8 +230,9 @@ class StudyQuestApp {
       sheetNameText: document.getElementById('sheetNameText'),
       modeLabel: document.getElementById('modeLabel'),
       adminToggleBtn: document.getElementById('adminToggleBtn'),
+      adminEndBtn: document.getElementById('adminEndBtn'),
+      ownerNameText: document.getElementById('ownerNameText'),
       answerCount: document.getElementById('answerCount'),
-      sheetSelector: document.getElementById('sheetSelector'),
       answerModalContainer: document.getElementById('answerModalContainer'),
       answerModalCloseBtn: document.getElementById('answerModalCloseBtn'),
       answerModalCard: document.getElementById('answerModalCard'),
@@ -293,12 +294,18 @@ class StudyQuestApp {
   init() {
     this.renderIcons();
     this.setupEventListeners();
+    this.setupOwnerName();
     this.verifyAdmin();
     this.adjustLayout();
     this.loadInitialData();
     this.updateSortOptions();
     if (!localStorage.getItem('introSeen')) {
       this.showInfoModal();
+    }
+  }
+  setupOwnerName() {
+    if (OWNER_NAME && this.elements.ownerNameText) {
+      this.elements.ownerNameText.textContent = `管理者: ${OWNER_NAME}`;
     }
   }
   setupEventListeners() {
@@ -341,6 +348,10 @@ class StudyQuestApp {
     if (this.elements.adminToggleBtn) {
       this.handlers.onAdminToggleClick = () => this.toggleAdminMode();
       this.elements.adminToggleBtn.addEventListener('click', this.handlers.onAdminToggleClick);
+    }
+    if (this.elements.adminEndBtn) {
+      this.handlers.onAdminEndClick = () => this.endAdminMode();
+      this.elements.adminEndBtn.addEventListener('click', this.handlers.onAdminEndClick);
     }
     this.handlers.onDocumentKeydown = (e) => {
       if (e.key === 'Escape') {
@@ -889,6 +900,12 @@ class StudyQuestApp {
     }
     this.updateSortOptions();
     this.loadSheetData(true, true);
+  }
+  endAdminMode() {
+    // Redirect to admin URL with mode=admin parameter to show management interface
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.set('mode', 'admin');
+    window.location.href = currentUrl.toString();
   }
   updateReactionButtonUI(rowIndex, reaction, count, reacted) {
     document.querySelectorAll('[data-row-index="' + rowIndex + '"][data-reaction="' + reaction + '"]').forEach(btn => {

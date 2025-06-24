@@ -433,15 +433,17 @@ function doGet(e) {
     hasActiveSheet: !!activeSheetName
   });
   
-  // アクティブシートが設定されていない場合は、シート選択画面を表示
+  // アクティブシートが設定されていない場合は、統合された管理画面を表示
   if (!activeSheetName) {
-    const template = HtmlService.createTemplateFromFile('SheetSelector');
+    const template = HtmlService.createTemplateFromFile('Unpublished');
     template.userId = validatedUserId;
     template.userInfo = userInfo;
-    template.isInitialSetup = true; // 初回設定モードを示すフラグ
-    auditLog('INITIAL_SHEET_SELECTION', validatedUserId, { viewerEmail });
+    template.isOwner = userInfo.adminEmail === viewerEmail;
+    template.ownerName = userInfo.adminEmail || 'Unknown';
+    template.boardUrl = `${ScriptApp.getService().getUrl()}?userId=${validatedUserId}`;
+    auditLog('UNPUBLISHED_ACCESS', validatedUserId, { viewerEmail, isOwner: template.isOwner });
     return template.evaluate()
-      .setTitle('StudyQuest - シート選択')
+      .setTitle('StudyQuest - 回答ボード')
       .setSandboxMode(HtmlService.SandboxMode.IFRAME);
   }
   
@@ -460,7 +462,8 @@ function doGet(e) {
     displayMode: config.showDetails ? 'named' : 'anonymous',
     sheetName: config.sheetName,
     mapping: mapping,
-    userId: userId
+    userId: userId,
+    ownerName: userInfo.adminEmail || 'Unknown'
   });
   
     template.userEmail = viewerEmail;
@@ -562,6 +565,89 @@ function getAvailableSheets() {
     })),
     activeSheetName: activeSheetName
   };
+}
+
+/**
+ * 新しいスプレッドシートURLを追加し、アクティブシートとして設定します。
+ * @param {string} spreadsheetUrl - 追加するスプレッドシートのURL
+ */
+function addSpreadsheetUrl(spreadsheetUrl) {
+  const props = PropertiesService.getUserProperties();
+  const userId = props.getProperty('CURRENT_USER_ID');
+  
+  if (!userId) {
+    throw new Error('ユーザー情報が見つかりません。');
+  }
+  
+  const userInfo = getUserInfo(userId);
+  if (userInfo.adminEmail !== Session.getActiveUser().getEmail()) {
+    throw new Error('権限がありません。');
+  }
+  
+  // URLからスプレッドシートIDを抽出
+  let spreadsheetId;
+  const urlPattern = /\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
+  const match = spreadsheetUrl.match(urlPattern);
+  
+  if (match) {
+    spreadsheetId = match[1];
+  } else {
+    throw new Error('有効なGoogleスプレッドシートのURLではありません。');
+  }
+  
+  // スプレッドシートにアクセスできるかテスト
+  try {
+    const testSpreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheets = testSpreadsheet.getSheets();
+    
+    if (sheets.length === 0) {
+      throw new Error('スプレッドシートにシートが見つかりません。');
+    }
+    
+    // ユーザー設定を更新：新しいスプレッドシートIDを設定
+    const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
+    const data = userDb.getDataRange().getValues();
+    const headers = data[0];
+    const userIdIndex = headers.indexOf('userId');
+    const spreadsheetIdIndex = headers.indexOf('spreadsheetId');
+    const spreadsheetUrlIndex = headers.indexOf('spreadsheetUrl');
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][userIdIndex] === userId) {
+        // スプレッドシートIDとURLを更新
+        userDb.getRange(i + 1, spreadsheetIdIndex + 1).setValue(spreadsheetId);
+        userDb.getRange(i + 1, spreadsheetUrlIndex + 1).setValue(spreadsheetUrl);
+        break;
+      }
+    }
+    
+    // ユーザープロパティも更新
+    props.setProperty('CURRENT_SPREADSHEET_ID', spreadsheetId);
+    
+    // 最初のシートをアクティブシートとして設定
+    const firstSheetName = sheets[0].getName();
+    updateUserConfig(userId, {
+      activeSheetName: firstSheetName
+    });
+    
+    auditLog('SPREADSHEET_ADDED', userId, { 
+      spreadsheetId, 
+      spreadsheetUrl, 
+      firstSheetName,
+      userEmail: userInfo.adminEmail 
+    });
+    
+    return {
+      success: true,
+      message: `スプレッドシート「${testSpreadsheet.getName()}」が追加され、シート「${firstSheetName}」がアクティブになりました。`,
+      spreadsheetId: spreadsheetId,
+      firstSheetName: firstSheetName
+    };
+    
+  } catch (error) {
+    console.error('Failed to access spreadsheet:', error);
+    throw new Error(`スプレッドシートにアクセスできません。URLが正しいか、共有設定を確認してください。エラー: ${error.message}`);
+  }
 }
 
 
