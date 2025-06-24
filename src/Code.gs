@@ -1266,7 +1266,8 @@ function createStudyQuestForm(userEmail) {
         .setRequired(false);
     
     // フォームの回答先スプレッドシートを作成
-    const spreadsheet = form.createSpreadsheet(`StudyQuest - 回答データ - ${userEmail.split('@')[0]}`);
+    const spreadsheet = SpreadsheetApp.create(`StudyQuest - 回答データ - ${userEmail.split('@')[0]}`);
+    form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheet.getId());
     const sheet = spreadsheet.getSheets()[0];
     
     // スプレッドシートに追加の列を準備
