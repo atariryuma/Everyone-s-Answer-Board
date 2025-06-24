@@ -13,6 +13,46 @@
     <div class="text-center p-4">
         <h1 class="text-4xl font-bold mb-4">現在は公開されていません</h1>
         <p class="text-gray-400">先生がアプリの公開を始めたら、また見てみましょう。</p>
+        
+        <? if (typeof debugInfo !== 'undefined' && debugInfo) { ?>
+        <div class="mt-8 p-4 bg-gray-700 rounded-lg text-left max-w-lg mx-auto">
+            <h2 class="text-lg font-bold mb-2 text-yellow-300">デバッグ情報（管理者用）</h2>
+            <div class="text-sm text-gray-300 space-y-1">
+                <p><strong>設定状態:</strong> <?= debugInfo.configExists ? '存在' : '未設定' ?></p>
+                <p><strong>公開状態:</strong> <?= debugInfo.isPublished ? 'true' : 'false' ?></p>
+                <p><strong>シート名:</strong> <?= debugInfo.sheetName || '未設定' ?></p>
+                <p><strong>設定キー:</strong> <?= debugInfo.configKeys ? debugInfo.configKeys.join(', ') : 'なし' ?></p>
+            </div>
+            
+            <div class="mt-4 p-3 bg-red-800 rounded">
+                <p class="text-sm font-semibold text-red-200">非公開の理由:</p>
+                <? if (!debugInfo.configExists) { ?>
+                    <p class="text-xs text-red-300">• 設定が存在しません。初回設定が必要です。</p>
+                <? } else if (!debugInfo.isPublished) { ?>
+                    <p class="text-xs text-red-300">• 設定は存在しますが、公開フラグがfalseです。</p>
+                    <? if (!debugInfo.sheetName) { ?>
+                        <p class="text-xs text-red-300">• シートが選択されていません。</p>
+                    <? } ?>
+                <? } ?>
+                <? if (debugInfo.configKeys && debugInfo.configKeys.length === 0) { ?>
+                    <p class="text-xs text-red-300">• 設定データが空です。データベースの問題の可能性があります。</p>
+                <? } ?>
+            </div>
+            
+            <div class="mt-4">
+                <p class="text-xs text-gray-400">
+                    <? if (!debugInfo.configExists || (debugInfo.configKeys && debugInfo.configKeys.length === 0)) { ?>
+                        データベースに問題がある可能性があります。管理画面でシートを再選択・公開してください。
+                    <? } else { ?>
+                        管理画面にアクセスして、シートを選択・公開してください。
+                    <? } ?>
+                </p>
+                <a href="?userId=<?= userId ?>&mode=admin" class="inline-block mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                    管理画面へ
+                </a>
+            </div>
+        </div>
+        <? } ?>
     </div>
 </body>
 </html>
