@@ -449,10 +449,15 @@ function doGet(e) {
   
   // 既存のPage.htmlを使用
   const template = HtmlService.createTemplateFromFile('Page');
-  const configFn = (typeof global !== 'undefined' && global.getConfig)
-      ? global.getConfig
-      : (typeof getConfig === 'function' ? getConfig : null);
-  const mapping = configFn ? configFn(config.sheetName) : {};
+  let mapping = {};
+  try {
+    if (typeof getConfig === 'function') {
+      mapping = getConfig(activeSheetName);
+    }
+  } catch (error) {
+    console.warn('Config not found for sheet:', activeSheetName, error);
+    mapping = {};
+  }
   
   Object.assign(template, {
     showAdminFeatures: false,
@@ -460,7 +465,7 @@ function doGet(e) {
     isAdminUser: userInfo.adminEmail === Session.getActiveUser().getEmail(),
     showCounts: config.showDetails || false,
     displayMode: config.showDetails ? 'named' : 'anonymous',
-    sheetName: config.sheetName,
+    sheetName: activeSheetName,
     mapping: mapping,
     userId: userId,
     ownerName: userInfo.adminEmail || 'Unknown'
@@ -468,7 +473,7 @@ function doGet(e) {
   
     template.userEmail = viewerEmail;
     
-    auditLog('VIEW_ACCESS', validatedUserId, { viewerEmail, sheetName: config.sheetName });
+    auditLog('VIEW_ACCESS', validatedUserId, { viewerEmail, sheetName: activeSheetName });
     
     return template.evaluate()
         .setTitle('StudyQuest - みんなのかいとうボード')

@@ -420,6 +420,11 @@
     // 既存ボード情報の表示
     function showExistingBoard(data) {
       if (!data) return;
+      
+      // 登録ボタンを非表示にする
+      const registerBtn = document.getElementById('register-btn');
+      registerBtn.style.display = 'none';
+      
       const area = document.getElementById('existing-board-area');
       const adminInput = document.createElement('input');
       adminInput.type = 'text';
@@ -451,6 +456,9 @@
             </svg>
             既に登録済みの回答ボードがあります
           </h3>
+          <p class="text-sm text-gray-300">
+            あなたのアカウントには既にStudyQuestの回答ボードが設定されています。以下のURLをご利用ください。
+          </p>
           <div class="space-y-3">
             <div>
               <label class="text-sm text-gray-400 block mb-1">管理画面URL（先生用）:</label>
@@ -476,6 +484,9 @@
       linkContainer.appendChild(adminLink);
 
       area.classList.remove('hidden');
+      
+      // 成功メッセージを表示
+      showMessage('既存の回答ボードが見つかりました。管理画面からスプレッドシートを追加できます。', 'success');
     }
 
     // メッセージ表示関数
