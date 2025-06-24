@@ -7,15 +7,15 @@
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
-const __SHOW_COUNTS__ = '<?= showCounts ?>';
-const __DISPLAY_MODE__ = '<?= displayMode ?>';
-const __SHEET_NAME__ = '<?= sheetName ?>';
-const __MAPPING__ = '<?= JSON.stringify(mapping) ?>';
-const __USER_ID__ = '<?= userId ?>';
-const __OWNER_NAME__ = '<?= ownerName ?>';
-const __SHOW_ADMIN_FEATURES__ = '<?= showAdminFeatures ?>';
-const __SHOW_HIGHLIGHT_TOGGLE__ = '<?= showHighlightToggle ?>';
-const __IS_ADMIN_USER__ = '<?= isAdminUser ?>';
+const __SHOW_COUNTS__ = '<?= typeof showCounts !== "undefined" ? showCounts : false ?>';
+const __DISPLAY_MODE__ = '<?= typeof displayMode !== "undefined" ? displayMode : "anonymous" ?>';
+const __SHEET_NAME__ = '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>';
+const __MAPPING__ = '<?= typeof mapping !== "undefined" ? JSON.stringify(mapping) : "{}" ?>';
+const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
+const __OWNER_NAME__ = '<?= typeof ownerName !== "undefined" ? ownerName : "" ?>';
+const __SHOW_ADMIN_FEATURES__ = '<?= typeof showAdminFeatures !== "undefined" ? showAdminFeatures : false ?>';
+const __SHOW_HIGHLIGHT_TOGGLE__ = '<?= typeof showHighlightToggle !== "undefined" ? showHighlightToggle : false ?>';
+const __IS_ADMIN_USER__ = '<?= typeof isAdminUser !== "undefined" ? isAdminUser : false ?>';
 window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : __SHOW_COUNTS__ === 'true';
 window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
 window.showAdminFeatures = __SHOW_ADMIN_FEATURES__.startsWith('<') ? false : __SHOW_ADMIN_FEATURES__ === 'true';

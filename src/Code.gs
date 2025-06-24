@@ -45,6 +45,18 @@ const TIME_CONSTANTS = {
 const REACTION_KEYS = ["UNDERSTAND","LIKE","CURIOUS"];
 var getConfig;
 var handleError;
+
+// Default error handler
+if (!handleError) {
+  handleError = function(context, error, returnErrorObj = false) {
+    console.error(`Error in ${context}:`, error);
+    if (returnErrorObj) {
+      return { status: 'error', message: error.message || 'エラーが発生しました。' };
+    }
+    throw error;
+  };
+}
+
 if (typeof global !== 'undefined' && global.getConfig) {
   getConfig = global.getConfig;
 }
@@ -216,7 +228,7 @@ function switchActiveSheet(sheetName) {
     adminEmail: userInfo ? userInfo.adminEmail : null
   });
   
-  if (userInfo.adminEmail !== Session.getActiveUser().getEmail()) {
+  if (!userInfo || userInfo.adminEmail !== Session.getActiveUser().getEmail()) {
     throw new Error('権限がありません。');
   }
   
@@ -275,7 +287,7 @@ function clearActiveSheet() {
   }
   
   const userInfo = getUserInfo(userId);
-  if (userInfo.adminEmail !== Session.getActiveUser().getEmail()) {
+  if (!userInfo || userInfo.adminEmail !== Session.getActiveUser().getEmail()) {
     throw new Error('権限がありません。');
   }
   
@@ -304,7 +316,7 @@ function setShowDetails(flag) {
   }
   
   const userInfo = getUserInfo(userId);
-  if (userInfo.adminEmail !== Session.getActiveUser().getEmail()) {
+  if (!userInfo || userInfo.adminEmail !== Session.getActiveUser().getEmail()) {
     throw new Error('権限がありません。');
   }
   
@@ -581,7 +593,7 @@ function addSpreadsheetUrl(spreadsheetUrl) {
   }
   
   const userInfo = getUserInfo(userId);
-  if (userInfo.adminEmail !== Session.getActiveUser().getEmail()) {
+  if (!userInfo || userInfo.adminEmail !== Session.getActiveUser().getEmail()) {
     throw new Error('権限がありません。');
   }
   
@@ -963,8 +975,11 @@ function getAppSettingsForUser() {
   const userId = props.getProperty('CURRENT_USER_ID');
   
   if (!userId) {
-    // 従来の動作
-    return getAppSettings();
+    // 従来の動作のフォールバック
+    return {
+      activeSheetName: '',
+      showDetails: false
+    };
   }
   
   // マルチテナント時
