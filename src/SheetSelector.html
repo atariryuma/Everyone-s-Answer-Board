@@ -160,6 +160,7 @@
         elements.switchSheetBtn.addEventListener('click', switchToSelectedSheet);
         elements.clearSelectionBtn.addEventListener('click', clearSheetSelection);
         elements.saveConfigBtn.addEventListener('click', saveConfig);
+        document.getElementById('add-spreadsheet-btn').addEventListener('click', addSpreadsheet);
         elements.qHeader.addEventListener('change', () => {
           if (!elements.aHeader.value) elements.aHeader.value = elements.qHeader.value;
         });
@@ -363,6 +364,32 @@
           sel.innerHTML = '<option value=""></option>';
           sel.value = '';
         });
+      }
+
+      function addSpreadsheet() {
+        const urlInput = document.getElementById('spreadsheet-url-input');
+        const url = urlInput.value.trim();
+        
+        if (!url) {
+          showMessage('スプレッドシートURLを入力してください。', 'red');
+          return;
+        }
+        
+        if (!url.includes('docs.google.com/spreadsheets')) {
+          showMessage('有効なGoogleスプレッドシートのURLを入力してください。', 'red');
+          return;
+        }
+        
+        setLoading(true, 'スプレッドシートを追加中...');
+        google.script.run
+          .withSuccessHandler((result) => {
+            showMessage(result.message, 'green');
+            urlInput.value = '';
+            // スプレッドシート追加後、状態を再読み込み
+            loadInitialState();
+          })
+          .withFailureHandler(showError)
+          .addSpreadsheetUrl(url);
       }
 
       function saveConfig() {
