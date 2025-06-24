@@ -132,6 +132,12 @@ header { position: sticky; top: 0; z-index: 5; }
 <header id="main-header" class="glass-panel rounded-xl p-4 mb-4 flex flex-col lg:flex-row justify-between items-center gap-4 shadow-lg">
 <div class="flex items-center gap-4 w-full lg:w-auto">
 <p id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0"></p>
+<div class="flex items-center gap-2">
+<label for="sheetSelector" class="text-xs text-gray-400">シート:</label>
+<select id="sheetSelector" class="text-xs bg-gray-700 border border-gray-600 rounded px-2 py-1">
+<option value="">読み込み中...</option>
+</select>
+</div>
 <label for="classFilter" class="sr-only">クラス絞り込み</label>
 <select id="classFilter" class="hidden text-sm"></select>
 <label for="sortOrder" class="sr-only">並び順</label>
@@ -225,6 +231,7 @@ class StudyQuestApp {
       modeLabel: document.getElementById('modeLabel'),
       adminToggleBtn: document.getElementById('adminToggleBtn'),
       answerCount: document.getElementById('answerCount'),
+      sheetSelector: document.getElementById('sheetSelector'),
       answerModalContainer: document.getElementById('answerModalContainer'),
       answerModalCloseBtn: document.getElementById('answerModalCloseBtn'),
       answerModalCard: document.getElementById('answerModalCard'),
@@ -270,7 +277,8 @@ class StudyQuestApp {
       { key: 'CURIOUS', icon: 'magnifying-glass-plus' }
     ];
     this.gas = {
-      getPublishedSheetData: (classFilter, sort) => this.runGas('getPublishedSheetData', classFilter, sort),
+      getPublishedSheetData: (sheetName, classFilter, sort) => this.runGas('getPublishedSheetData', sheetName, classFilter, sort),
+      getAvailableSheets: () => this.runGas('getAvailableSheets'),
       addReaction: (rowIndex, reaction) => this.runGas('addReaction', rowIndex, reaction, this.state.sheetName),
       toggleHighlight: (rowIndex, current) => this.runGas('toggleHighlight', rowIndex, this.state.sheetName, current),
       checkAdmin: () => this.runGas('checkAdmin')
@@ -324,8 +332,10 @@ class StudyQuestApp {
       }
     };
     this.elements.modalReactionContainer.addEventListener('click', this.handlers.onModalReactionClick);
+    this.handlers.onSheetSelectorChange = () => this.switchSheet();
     this.handlers.onClassFilterChange = () => this.loadSheetData(true);
     this.handlers.onSortOrderChange = () => this.loadSheetData(true);
+    this.elements.sheetSelector.addEventListener('change', this.handlers.onSheetSelectorChange);
     this.elements.classFilter.addEventListener('change', this.handlers.onClassFilterChange);
     this.elements.sortOrder.addEventListener('change', this.handlers.onSortOrderChange);
     if (this.elements.adminToggleBtn) {
@@ -535,10 +545,11 @@ class StudyQuestApp {
     }
   }
   async loadInitialData() {
+    await this.loadAvailableSheets();
     await this.loadSheetData(true, true);
     this.startPolling();
   }
-  async loadSheetData(showLoading = true, isInitialLoad = false) {
+  async loadSheetData(showLoading = true, isInitialLoad = false, requestedSheetName = null) {
     if (this.state.isLoading && showLoading) return;
     this.state.isLoading = true;
     const selectedClass = isInitialLoad ? 'すべて' : this.elements.classFilter.value;
@@ -556,7 +567,7 @@ class StudyQuestApp {
     }
     try {
       const sortOrder = this.elements.sortOrder.value;
-      const data = await this.gas.getPublishedSheetData(selectedClass, sortOrder);
+      const data = await this.gas.getPublishedSheetData(requestedSheetName, selectedClass, sortOrder);
       this.state.sheetName = data.sheetName;
       if (typeof data.showDetails !== 'undefined') {
         this.serverShowDetails = data.showDetails;
@@ -588,6 +599,72 @@ class StudyQuestApp {
     } finally {
       this.state.isLoading = false;
     }
+  }
+  async loadAvailableSheets() {
+    try {
+      const sheetsData = await this.gas.getAvailableSheets();
+      this.populateSheetSelector(sheetsData);
+    } catch (error) {
+      console.error('Failed to load available sheets:', error);
+      this.elements.sheetSelector.innerHTML = '<option value="">エラー: シート読み込み失敗</option>';
+    }
+  }
+  populateSheetSelector(sheetsData) {
+    const selector = this.elements.sheetSelector;
+    
+    if (!sheetsData || !sheetsData.sheets || sheetsData.sheets.length === 0) {
+      selector.innerHTML = '<option value="">利用可能なシートがありません</option>';
+      selector.disabled = true;
+      return;
+    }
+    
+    // シート選択肢を構築
+    const options = sheetsData.sheets.map(sheet => {
+      const selected = sheet.isActive ? 'selected' : '';
+      const activeLabel = sheet.isActive ? ' (現在のアクティブシート)' : '';
+      return `<option value="${this.escapeHtml(sheet.name)}" ${selected}>${this.escapeHtml(sheet.name)}${activeLabel}</option>`;
+    }).join('');
+    
+    selector.innerHTML = options;
+    selector.disabled = false;
+    
+    // 現在のアクティブシートを記録
+    this.state.currentActiveSheet = sheetsData.activeSheetName;
+  }
+  async switchSheet() {
+    const selectedSheet = this.elements.sheetSelector.value;
+    if (!selectedSheet || selectedSheet === this.state.currentActiveSheet) {
+      return;
+    }
+    
+    try {
+      // 新しいシートのデータを読み込み
+      await this.loadSheetData(true, false, selectedSheet);
+      this.state.currentActiveSheet = selectedSheet;
+      
+      // UIを更新
+      this.updateSheetSelectorLabels();
+    } catch (error) {
+      console.error('Failed to switch sheet:', error);
+      // エラー時は元のシートに戻す
+      this.elements.sheetSelector.value = this.state.currentActiveSheet || '';
+    }
+  }
+  updateSheetSelectorLabels() {
+    const selector = this.elements.sheetSelector;
+    const options = Array.from(selector.options);
+    
+    options.forEach(option => {
+      const sheetName = option.value;
+      const isActive = sheetName === this.state.currentActiveSheet;
+      const cleanName = sheetName.replace(/ \(現在のアクティブシート\)$/, '');
+      
+      if (isActive) {
+        option.textContent = `${cleanName} (現在のアクティブシート)`;
+      } else {
+        option.textContent = cleanName;
+      }
+    });
   }
   populateClassFilter(rows) {
     const classFilter = this.elements.classFilter;

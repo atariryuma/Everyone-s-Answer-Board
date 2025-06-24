@@ -39,7 +39,6 @@ const SCORING_CONFIG = {
 };
 const APP_PROPERTIES = {
   ACTIVE_SHEET: 'ACTIVE_SHEET_NAME',
-  IS_PUBLISHED: 'IS_PUBLISHED',
   SHOW_DETAILS: 'SHOW_DETAILS'
 };
 
@@ -156,7 +155,7 @@ function hashTimestamp(ts) {
 
 /**
  * 管理パネルの初期化に必要なデータを取得します。
- * @returns {object} - 現在の公開状態とシートのリスト
+ * @returns {object} - 現在のアクティブシート情報とシートのリスト
  */
 function getAdminSettings() {
   const props = PropertiesService.getScriptProperties();
@@ -182,6 +181,10 @@ function getAdminSettings() {
   const allSheets = getSheets();
   const currentUserEmail = safeGetUserEmail();
   
+  // 新しいシステム：常に利用可能な回答ボード
+  // activeSheetNameがあれば利用可能、なければシート選択が必要
+  const isAvailable = !!(appSettings.activeSheetName);
+  
   return {
     allSheets: allSheets,
     currentUserEmail: currentUserEmail,
@@ -189,28 +192,28 @@ function getAdminSettings() {
     webAppUrl: getWebAppUrl(),
     adminEmails: adminEmails,
     isUserAdmin: adminEmails.includes(currentUserEmail),
-    isPublished: appSettings.isPublished,
     activeSheetName: appSettings.activeSheetName,
-    showDetails: appSettings.showDetails
+    showDetails: appSettings.showDetails,
+    isAvailable: isAvailable  // 新しい状態：回答ボードが利用可能かどうか
   };
 }
 
 /**
- * 指定されたシートでアプリを公開します。
- * @param {string} sheetName - 公開するシート名。
+ * アクティブシートを指定されたシートに変更します。
+ * @param {string} sheetName - アクティブにするシート名。
  */
-function publishApp(sheetName) {
+function switchActiveSheet(sheetName) {
   const props = PropertiesService.getUserProperties();
   const userId = props.getProperty('CURRENT_USER_ID');
   
-  console.log('PublishApp DEBUG 1 - Starting publication:', { userId, sheetName });
+  console.log('SwitchActiveSheet DEBUG 1 - Starting sheet switch:', { userId, sheetName });
   
   if (!userId) {
     throw new Error('ユーザー情報が見つかりません。');
   }
   
   const userInfo = getUserInfo(userId);
-  console.log('PublishApp DEBUG 2 - Current user info:', {
+  console.log('SwitchActiveSheet DEBUG 2 - Current user info:', {
     userId,
     hasUserInfo: !!userInfo,
     currentConfig: userInfo ? userInfo.configJson : null,
@@ -225,7 +228,7 @@ function publishApp(sheetName) {
     throw new Error('シート名が指定されていません。');
   }
   
-  // スプレッドシートの準備
+  // スプレッドシートの存在確認
   const spreadsheet = SpreadsheetApp.openById(userInfo.spreadsheetId);
   const sheet = spreadsheet.getSheetByName(sheetName);
   if (!sheet) {
@@ -234,43 +237,47 @@ function publishApp(sheetName) {
   
   prepareSheetForBoard(sheetName);
 
-  // ユーザー設定を更新
-  console.log('PublishApp DEBUG 3 - About to update config with:', {
-    isPublished: true,
-    sheetName: sheetName
+  // アクティブシートを更新（常に利用可能なので公開フラグは不要）
+  console.log('SwitchActiveSheet DEBUG 3 - About to update config with:', {
+    activeSheetName: sheetName
   });
   
   try {
     const updatedConfig = updateUserConfig(userId, {
-      isPublished: true,
-      sheetName: sheetName
+      activeSheetName: sheetName
     });
     
-    console.log('PublishApp DEBUG 4 - Config updated successfully:', updatedConfig);
+    console.log('SwitchActiveSheet DEBUG 4 - Config updated successfully:', updatedConfig);
     
     // Verify the update by retrieving fresh user info
     const verifyUserInfo = getUserInfo(userId);
-    console.log('PublishApp DEBUG 5 - Verification check:', {
+    console.log('SwitchActiveSheet DEBUG 5 - Verification check:', {
       configJson: verifyUserInfo.configJson,
-      isPublished: verifyUserInfo.configJson ? verifyUserInfo.configJson.isPublished : 'NO_CONFIG',
-      sheetName: verifyUserInfo.configJson ? verifyUserInfo.configJson.sheetName : 'NO_CONFIG'
+      activeSheetName: verifyUserInfo.configJson ? verifyUserInfo.configJson.activeSheetName : 'NO_CONFIG'
     });
     
   } catch (error) {
-    console.error('PublishApp DEBUG ERROR - Failed to update user config:', error);
+    console.error('SwitchActiveSheet DEBUG ERROR - Failed to update user config:', error);
     throw new Error(`設定の更新に失敗しました: ${error.message}`);
   }
 
-  auditLog('APP_PUBLISHED', userId, { sheetName, userEmail: userInfo.adminEmail });
+  auditLog('ACTIVE_SHEET_CHANGED', userId, { sheetName, userEmail: userInfo.adminEmail });
 
-  console.log('PublishApp DEBUG 6 - Publication completed successfully');
-  return `「${sheetName}」を公開しました。`;
+  console.log('SwitchActiveSheet DEBUG 6 - Sheet switch completed successfully');
+  return `アクティブシートを「${sheetName}」に変更しました。`;
 }
 
 /**
- * アプリの公開を終了します。
+ * 下位互換性のためのpublishApp関数（switchActiveSheetのエイリアス）
  */
-function unpublishApp() {
+function publishApp(sheetName) {
+  return switchActiveSheet(sheetName);
+}
+
+/**
+ * アクティブシートの選択をクリアします。
+ */
+function clearActiveSheet() {
   const props = PropertiesService.getUserProperties();
   const userId = props.getProperty('CURRENT_USER_ID');
   
@@ -283,19 +290,26 @@ function unpublishApp() {
     throw new Error('権限がありません。');
   }
   
-  // ユーザー設定を更新
+  // アクティブシートをクリア
   try {
     updateUserConfig(userId, {
-      isPublished: false
+      activeSheetName: ''
     });
   } catch (error) {
     console.error('Failed to update user config:', error);
     throw new Error(`設定の更新に失敗しました: ${error.message}`);
   }
   
-  auditLog('APP_UNPUBLISHED', userId, { userEmail: userInfo.adminEmail });
+  auditLog('ACTIVE_SHEET_CLEARED', userId, { userEmail: userInfo.adminEmail });
   
-  return 'アプリを非公開にしました。';
+  return 'アクティブシートをクリアしました。';
+}
+
+/**
+ * 下位互換性のためのunpublishApp関数（clearActiveSheetのエイリアス）
+ */
+function unpublishApp() {
+  return clearActiveSheet();
 }
 
 function setShowDetails(flag) {
@@ -405,34 +419,30 @@ function doGet(e) {
         .setSandboxMode(HtmlService.SandboxMode.IFRAME);
     }
   
-  // 通常表示モード
+  // 通常表示モード - 常に回答ボードを表示
   const config = userInfo.configJson || {};
+  
+  // 下位互換性：古いsheetNameを新しいactiveSheetNameにマッピング
+  const activeSheetName = config.activeSheetName || config.sheetName || '';
   
   // デバッグ情報をログに出力
   console.log('Config debug:', {
     userId: validatedUserId,
     configJson: config,
-    isPublished: config.isPublished,
-    sheetName: config.sheetName
+    activeSheetName: activeSheetName,
+    hasActiveSheet: !!activeSheetName
   });
   
-  if (!config.isPublished) {
-    const template = HtmlService.createTemplateFromFile('Unpublished');
-    template.userEmail = userInfo.adminEmail;
+  // アクティブシートが設定されていない場合は、シート選択画面を表示
+  if (!activeSheetName) {
+    const template = HtmlService.createTemplateFromFile('SheetSelector');
     template.userId = validatedUserId;
-    template.debugInfo = {
-      configExists: !!userInfo.configJson,
-      isPublished: config.isPublished,
-      sheetName: config.sheetName,
-      configKeys: Object.keys(config)
-    };
-    auditLog('UNPUBLISHED_ACCESS', validatedUserId, { viewerEmail, config });
-    return template.evaluate().setTitle('公開終了');
-  }
-  
-  if (!config.sheetName) {
-    return HtmlService.createHtmlOutput('エラー: 表示するシートが設定されていません。')
-      .setTitle('エラー');
+    template.userInfo = userInfo;
+    template.isInitialSetup = true; // 初回設定モードを示すフラグ
+    auditLog('INITIAL_SHEET_SELECTION', validatedUserId, { viewerEmail });
+    return template.evaluate()
+      .setTitle('StudyQuest - シート選択')
+      .setSandboxMode(HtmlService.SandboxMode.IFRAME);
   }
   
   // 既存のPage.htmlを使用
@@ -476,10 +486,12 @@ function doGet(e) {
 // =================================================================
 
 /**
- * サーバー側で設定されたシートのデータを取得します。
+ * 指定されたシートまたはアクティブシートのデータを取得します。
+ * @param {string} requestedSheetName - 取得するシート名（省略時はアクティブシート）
+ * @param {string} classFilter - クラスフィルター
+ * @param {string} sortBy - ソート順
  */
-
-function getPublishedSheetData(classFilter, sortBy) {
+function getPublishedSheetData(requestedSheetName, classFilter, sortBy) {
   const props = PropertiesService.getUserProperties();
   const spreadsheetId = props.getProperty('CURRENT_SPREADSHEET_ID');
   const userId = props.getProperty('CURRENT_USER_ID');
@@ -494,29 +506,61 @@ function getPublishedSheetData(classFilter, sortBy) {
   }
   
   const config = userInfo.configJson || {};
-  const sheetName = config.sheetName;
   
-  if (!sheetName) {
+  // 下位互換性を保ちながら、アクティブシート名を取得
+  const activeSheetName = config.activeSheetName || config.sheetName || '';
+  
+  // リクエストされたシート名、またはアクティブシートを使用
+  const targetSheetName = requestedSheetName || activeSheetName;
+  
+  if (!targetSheetName) {
     throw new Error('表示するシートが設定されていません。');
   }
   
   // ユーザーのスプレッドシートを開く
   const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-  const sheet = spreadsheet.getSheetByName(sheetName);
+  const sheet = spreadsheet.getSheetByName(targetSheetName);
   
   if (!sheet) {
-    throw new Error(`シート「${sheetName}」が見つかりません。`);
+    throw new Error(`シート「${targetSheetName}」が見つかりません。`);
   }
   
   // 既存のgetSheetData関数のロジックを使用（スプレッドシートを指定）
   const order = sortBy || 'newest';
-  const data = getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, order);
+  const data = getSheetDataForSpreadsheet(spreadsheet, targetSheetName, classFilter, order);
   
   return {
-    sheetName: sheetName,
+    sheetName: targetSheetName,
     header: data.header,
     rows: data.rows,
-    showDetails: config.showDetails || false
+    showDetails: config.showDetails || false,
+    isActiveSheet: targetSheetName === activeSheetName
+  };
+}
+
+/**
+ * 利用可能なシート一覧とアクティブシート情報を取得します。
+ */
+function getAvailableSheets() {
+  const props = PropertiesService.getUserProperties();
+  const userId = props.getProperty('CURRENT_USER_ID');
+  
+  if (!userId) {
+    throw new Error('ユーザー情報が見つかりません。');
+  }
+  
+  const userInfo = getUserInfo(userId);
+  const config = userInfo.configJson || {};
+  const activeSheetName = config.activeSheetName || config.sheetName || '';
+  
+  const allSheets = getSheets();
+  
+  return {
+    sheets: allSheets.map(sheetName => ({
+      name: sheetName,
+      isActive: sheetName === activeSheetName
+    })),
+    activeSheetName: activeSheetName
   };
 }
 
@@ -850,7 +894,6 @@ function toggleHighlight(rowIndex, sheetName) {
 function getAppSettings() {
   const properties = PropertiesService.getScriptProperties() || {};
   const getProp = typeof properties.getProperty === 'function' ? (k) => properties.getProperty(k) : () => null;
-  const published = getProp(APP_PROPERTIES.IS_PUBLISHED);
   const sheet = getProp(APP_PROPERTIES.ACTIVE_SHEET);
   const showDetailsProp = getProp(APP_PROPERTIES.SHOW_DETAILS);
   let activeName = sheet;
@@ -864,7 +907,6 @@ function getAppSettings() {
     }
   }
   return {
-    isPublished: published === null ? true : published === 'true',
     activeSheetName: activeName,
     showDetails: showDetailsProp === 'true'
   };
@@ -883,15 +925,16 @@ function getAppSettingsForUser() {
   const userInfo = getUserInfo(userId);
   if (!userInfo || !userInfo.configJson) {
     return {
-      isPublished: false,
       activeSheetName: '',
       showDetails: false
     };
   }
   
+  // 下位互換性：古いsheetNameを新しいactiveSheetNameにマッピング
+  const activeSheetName = userInfo.configJson.activeSheetName || userInfo.configJson.sheetName || '';
+  
   return {
-    isPublished: userInfo.configJson.isPublished || false,
-    activeSheetName: userInfo.configJson.sheetName || '',
+    activeSheetName: activeSheetName,
     showDetails: userInfo.configJson.showDetails || false
   };
 }
@@ -1299,9 +1342,8 @@ function registerNewUser(spreadsheetUrl) {
     new Date(),
     accessToken,
     JSON.stringify({
-      sheetName: spreadsheetUrl === 'AUTO_CREATE' ? '回答データ' : '',
-      showDetails: false,
-      isPublished: false
+      activeSheetName: spreadsheetUrl === 'AUTO_CREATE' ? '回答データ' : '',
+      showDetails: false
     }),
     new Date(),
     true
@@ -1557,19 +1599,28 @@ function updateUserConfig(userId, config) {
 }
 
 function sanitizeConfigData(config) {
-  const allowedFields = ['isPublished', 'sheetName', 'showDetails'];
+  // 新しいシステム：isPublishedを削除し、常に利用可能な回答ボード
+  const allowedFields = ['activeSheetName', 'showDetails'];
   const sanitized = {};
   
   for (const field of allowedFields) {
     if (config.hasOwnProperty(field)) {
-      if (field === 'isPublished' || field === 'showDetails') {
+      if (field === 'showDetails') {
         sanitized[field] = Boolean(config[field]);
-      } else if (field === 'sheetName') {
+      } else if (field === 'activeSheetName') {
         const sheetName = config[field];
         if (typeof sheetName === 'string' && sheetName.length <= 100) {
           sanitized[field] = sheetName.trim();
         }
       }
+    }
+  }
+  
+  // 下位互換性のためのマッピング
+  if (config.hasOwnProperty('sheetName')) {
+    const sheetName = config['sheetName'];
+    if (typeof sheetName === 'string' && sheetName.length <= 100) {
+      sanitized['activeSheetName'] = sheetName.trim();
     }
   }
   
