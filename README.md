@@ -1,92 +1,68 @@
 # StudyQuest - みんなの回答ボード
 
-This repository contains the source code of a Google Apps Script project. It publishes a web app that displays students' answers stored in a spreadsheet. Users can like answers and filter the board by class. Teachers manage which sheet is currently published from the admin panel.
+このリポジトリは Google Apps Script で動作する回答共有アプリのソースコードです。
+スプレッドシートに保存した回答を Web アプリとして公開し、生徒はリアクションを付けたり、クラス別に絞り込んで閲覧できます。管理者はどのシートを公開するかを設定し、公開を終了することも可能です。
 
-## Setup
+## 必要環境
 
-1. Install **Node.js 20** or later.
-2. Install dependencies (including dev dependencies):
+1. **Node.js 20** 以降をインストールしてください。
+2. 依存パッケージをインストールします。
    ```bash
    npm install
    ```
-3. Confirm that `jest` is available:
+3. `jest` が利用できることを確認します。
    ```bash
    npx jest --version
    ```
-4. Sign in to Google with clasp:
+4. `clasp` で Google にログインします。
    ```bash
    npx clasp login
    ```
-5. Edit `.clasp.json` and set your Apps Script project ID.
+5. `.clasp.json` の `scriptId` をあなたの Apps Script プロジェクト ID に書き換えます。
 
-## Usage
+## 使い方
 
-- `npm run push` – Upload the contents of `src/` to your Apps Script project.
-- `npm run pull` – Download the latest code from Apps Script.
-- `npm run open` – Open the Apps Script project in a browser.
-- `npm run update-url` – Store the latest Web App URL in script properties.
-- Call `getWebAppUrl()` in Apps Script to read the stored URL. The same value is
-  also returned by `getAdminSettings()` for use in the admin panel.
+- `npm run push` – `src/` の内容を Apps Script プロジェクトにアップロードします。
+- `npm run pull` – Apps Script 側の最新コードを取得します。
+- `npm run open` – ブラウザで Apps Script の編集画面を開きます。
+- `npm run update-url` – デプロイされた Web アプリの URL をスクリプトプロパティに保存します。
+- Apps Script から `getWebAppUrl()` を呼び出すと保存された URL を取得できます。
 
-## Spreadsheet structure
+## スプレッドシートの構成
 
-The sheet you publish must contain the following columns:
+公開するシートには次の列が必要です。
 
-- **タイムスタンプ** – date and time of submission used for chronological sorting
-- **メールアドレス** – address of the user who submitted the answer
-- **クラス** – class name used for filtering
-- **回答** – text displayed on the board
-- **理由** – explanation shown when opening a card
-- **いいね！** – comma separated list of users who liked the answer
+- **タイムスタンプ**
+- **メールアドレス**
+- **クラス**
+- **回答**
+- **理由**
+- **いいね！** (カンマ区切りのユーザー一覧)
 
-A timestamp value is required so that answers can be ordered by recency when using the "newest" sorting option.
+不足している場合は **なるほど！**、**もっと知りたい！**、**ハイライト** の列が自動で追加されます。
 
-The board script automatically adds the **なるほど！**, **もっと知りたい！** and **ハイライト** columns to store reactions and highlight status if they are missing.
+## 回答ボードの管理
 
+Web アプリの URL に `?mode=admin` を付けてアクセスすると管理画面が表示されます。ここでシートの公開・非公開や列設定を行います。シートを公開すると生徒向け URL から回答ボードを閲覧できます。公開を終了すると生徒はアクセスできなくなります。
 
-## Managing the board
+管理者のメールアドレスは `ADMIN_EMAILS` スクリプトプロパティで設定してください。
 
-Visit the Web App with `?mode=admin` to open the management panel.
-Here you can choose which sheet to publish or unpublish. Use the "Config"
-section to map the question column and any other optional columns. If either the
-question or answer column is left blank, the other column is used for both. This
-means you can simply select one column that has the question text in the header
-and the answers below it. The selected settings are saved automatically when
-publishing a sheet for the first time.
+## フロントエンドの機能
 
-When unpublished, visiting the Web App URL shows a message that the board is closed. Once published, the board is available and updates automatically every 15 seconds.
+- レスポンシブなグリッド表示
+- クラスごとの絞り込み
+- 回答を開いてリアクションを付与
+- リアクション数に応じたソート
+- カラム数を調整できるスライダー
 
-### Admin interface
+## ディレクトリ構成
 
-Administrators see a toggle button that allows switching between viewing and management modes. The list of administrator email addresses is set in the `ADMIN_EMAILS` script property.
+Apps Script ファイルと HTML ファイルはすべて `src` 直下に配置します。サブディレクトリは作成しないでください。
 
-### Setting `ADMIN_EMAILS`
+## テスト
 
-1. Open the Apps Script **Project Settings** and expand **Script Properties**.
-2. Click **Add script property** and set the name to `ADMIN_EMAILS`.
-3. Enter a comma‑separated list of addresses and save.
+依存パッケージをインストール後、次のコマンドで実行できます。
 
-You can also set the value from the console:
-
-```javascript
-PropertiesService.getScriptProperties()
-  .setProperty('ADMIN_EMAILS', 'teacher1@example.com,teacher2@example.com');
-```
-
-## Front‑end features
-
-- Answers are displayed in a responsive grid. A slider allows changing the number of columns.
-- You can filter answers by class.
-- Clicking a card opens a modal with the full text and a button to like the answer.
-- Like counts update instantly and contribute to the sorting order.
-
-## Project structure
-
-All Apps Script and HTML files must live directly in the `src` directory. **Do not create subdirectories under `src`.**
-
-## Testing
-
-Install dependencies first and then run:
 ```bash
 npm test
 ```
