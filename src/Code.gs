@@ -37,10 +37,6 @@ const COLUMN_HEADERS = {
 const SCORING_CONFIG = {
   LIKE_MULTIPLIER_FACTOR: 0.05 // 1いいね！ごとにスコアが5%増加
 };
-const APP_PROPERTIES = {
-  ACTIVE_SHEET: 'ACTIVE_SHEET_NAME',
-  SHOW_DETAILS: 'SHOW_DETAILS'
-};
 
 const TIME_CONSTANTS = {
   LOCK_WAIT_MS: 10000
@@ -268,13 +264,6 @@ function switchActiveSheet(sheetName) {
 }
 
 /**
- * 下位互換性のためのpublishApp関数（switchActiveSheetのエイリアス）
- */
-function publishApp(sheetName) {
-  return switchActiveSheet(sheetName);
-}
-
-/**
  * アクティブシートの選択をクリアします。
  */
 function clearActiveSheet() {
@@ -305,12 +294,6 @@ function clearActiveSheet() {
   return 'アクティブシートをクリアしました。';
 }
 
-/**
- * 下位互換性のためのunpublishApp関数（clearActiveSheetのエイリアス）
- */
-function unpublishApp() {
-  return clearActiveSheet();
-}
 
 function setShowDetails(flag) {
   const props = PropertiesService.getUserProperties();
@@ -410,7 +393,7 @@ function doGet(e) {
   
     // 管理モードの場合
     if (mode === 'admin') {
-      const template = HtmlService.createTemplateFromFile('SheetSelector');
+      const template = HtmlService.createTemplateFromFile('AdminPanel');
       template.userId = validatedUserId;
       template.userInfo = userInfo;
       auditLog('ADMIN_ACCESS', validatedUserId, { viewerEmail });
@@ -435,16 +418,27 @@ function doGet(e) {
   
   // アクティブシートが設定されていない場合は、統合された管理画面を表示
   if (!activeSheetName) {
-    const template = HtmlService.createTemplateFromFile('Unpublished');
-    template.userId = validatedUserId;
-    template.userInfo = userInfo;
-    template.isOwner = userInfo.adminEmail === viewerEmail;
-    template.ownerName = userInfo.adminEmail || 'Unknown';
-    template.boardUrl = `${getWebAppUrl()}?userId=${validatedUserId}`;
-    auditLog('UNPUBLISHED_ACCESS', validatedUserId, { viewerEmail, isOwner: template.isOwner });
-    return template.evaluate()
-      .setTitle('StudyQuest - 回答ボード')
-      .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+    // 管理者の場合は統合管理画面、一般ユーザーの場合は待機画面
+    if (userInfo.adminEmail === viewerEmail) {
+      const template = HtmlService.createTemplateFromFile('AdminPanel');
+      template.userId = validatedUserId;
+      template.userInfo = userInfo;
+      auditLog('ADMIN_ACCESS_NO_SHEET', validatedUserId, { viewerEmail });
+      return template.evaluate()
+        .setTitle('StudyQuest - 管理パネル')
+        .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+    } else {
+      const template = HtmlService.createTemplateFromFile('Unpublished');
+      template.userId = validatedUserId;
+      template.userInfo = userInfo;
+      template.isOwner = false;
+      template.ownerName = userInfo.adminEmail || 'Unknown';
+      template.boardUrl = `${getWebAppUrl()}?userId=${validatedUserId}`;
+      auditLog('UNPUBLISHED_ACCESS', validatedUserId, { viewerEmail, isOwner: false });
+      return template.evaluate()
+        .setTitle('StudyQuest - 回答ボード')
+        .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+    }
   }
   
   // 既存のPage.htmlを使用
@@ -459,10 +453,12 @@ function doGet(e) {
     mapping = {};
   }
   
+  const isCurrentUserAdmin = userInfo.adminEmail === viewerEmail;
+  
   Object.assign(template, {
-    showAdminFeatures: false,
-    showHighlightToggle: false,
-    isAdminUser: userInfo.adminEmail === Session.getActiveUser().getEmail(),
+    showAdminFeatures: isCurrentUserAdmin,
+    showHighlightToggle: isCurrentUserAdmin,
+    isAdminUser: isCurrentUserAdmin,
     showCounts: config.showDetails || false,
     displayMode: config.showDetails ? 'named' : 'anonymous',
     sheetName: activeSheetName,
@@ -864,27 +860,6 @@ function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy)
   }
 }
 
-function buildBoardData(sheetName) {
-  const cfgFunc = (typeof global !== 'undefined' && global.getConfig) ? global.getConfig : getConfig;
-  const cfg = cfgFunc ? cfgFunc(sheetName) : {};
-  const answerHeader = cfg.answerHeader || cfg.questionHeader || COLUMN_HEADERS.OPINION;
-  const sheet = getCurrentSpreadsheet().getSheetByName(sheetName);
-  if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
-  const values = sheet.getDataRange().getValues();
-  const headers = values.shift();
-  const index = {};
-  headers.forEach((h,i)=>{ if(h) index[h]=i; });
-  const entries = values.map(row => {
-    const email = index[COLUMN_HEADERS.EMAIL] !== undefined ? row[index[COLUMN_HEADERS.EMAIL]] : '';
-    return {
-      answer: row[index[answerHeader]],
-      reason: cfg.reasonHeader ? row[index[cfg.reasonHeader]] : null,
-      name: cfg.nameHeader ? row[index[cfg.nameHeader]] : (email ? email.split('@')[0] : ''),
-      class: cfg.classHeader ? row[index[cfg.classHeader]] : undefined
-    };
-  });
-  return { header: cfg.questionHeader || answerHeader, entries };
-}
 
 function addReaction(rowIndex, reactionKey, sheetName) {
   if (!rowIndex || !reactionKey || !COLUMN_HEADERS[reactionKey]) {
@@ -982,26 +957,6 @@ function toggleHighlight(rowIndex, sheetName) {
 }
 
 
-function getAppSettings() {
-  const properties = PropertiesService.getScriptProperties() || {};
-  const getProp = typeof properties.getProperty === 'function' ? (k) => properties.getProperty(k) : () => null;
-  const sheet = getProp(APP_PROPERTIES.ACTIVE_SHEET);
-  const showDetailsProp = getProp(APP_PROPERTIES.SHOW_DETAILS);
-  let activeName = sheet;
-  if (!activeName) {
-    try {
-      const sheets = getSheets();
-      activeName = sheets[0] || '';
-    } catch (error) {
-      console.error('getAppSettings Error:', error);
-      activeName = '';
-    }
-  }
-  return {
-    activeSheetName: activeName,
-    showDetails: showDetailsProp === 'true'
-  };
-}
 
 function getAppSettingsForUser() {
   const props = PropertiesService.getUserProperties();
@@ -1928,11 +1883,8 @@ if (typeof module !== 'undefined') {
   module.exports = {
     COLUMN_HEADERS,
     getAdminSettings,
-    publishApp,
-    unpublishApp,
     doGet,
     getConfig,
-    buildBoardData,
     getPublishedSheetData,
     getSheets,
     getSheetHeaders,
