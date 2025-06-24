@@ -157,11 +157,24 @@
           document.getElementById('user-email').textContent = email || 'メールアドレスを取得できません';
 
           if (email) {
-            document.getElementById('register-btn').disabled = false;
-
-            // fetch existing board information
+            // まず既存ボード情報をチェック
             google.script.run
-              .withSuccessHandler(showExistingBoard)
+              .withSuccessHandler((existingBoard) => {
+                if (existingBoard) {
+                  // 既存ボードがある場合
+                  showExistingBoard(existingBoard);
+                } else {
+                  // 既存ボードがない場合のみボタンを有効化
+                  document.getElementById('register-btn').disabled = false;
+                  showMessage('アカウント確認が完了しました。StudyQuestを開始できます。', 'success');
+                }
+              })
+              .withFailureHandler((error) => {
+                console.error('既存ボード確認エラー:', error);
+                // エラーが発生した場合もボタンを有効化（新規登録として扱う）
+                document.getElementById('register-btn').disabled = false;
+                showMessage('アカウント確認が完了しました。StudyQuestを開始できます。', 'success');
+              })
               .getExistingBoard();
           } else {
             showMessage('Googleアカウントでログインしてください。', 'error');

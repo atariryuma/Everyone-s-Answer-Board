@@ -314,16 +314,22 @@ class StudyQuestApp {
       localStorage.setItem('boardColumns', this.elements.sizeSlider.value);
       debouncedRender();
     };
-    this.elements.sizeSlider.addEventListener('input', this.handlers.onSizeSliderInput);
+    if (this.elements.sizeSlider) {
+      this.elements.sizeSlider.addEventListener('input', this.handlers.onSizeSliderInput);
+    }
     this.setupEventDelegation();
     this.handlers.onAnswerModalCloseClick = () => this.hideAnswerModal();
-    this.elements.answerModalCloseBtn.addEventListener('click', this.handlers.onAnswerModalCloseClick);
+    if (this.elements.answerModalCloseBtn) {
+      this.elements.answerModalCloseBtn.addEventListener('click', this.handlers.onAnswerModalCloseClick);
+    }
     this.handlers.onAnswerModalContainerClick = (e) => {
       if (e.target === e.currentTarget) {
         this.hideAnswerModal();
       }
     };
-    this.elements.answerModalContainer.addEventListener('click', this.handlers.onAnswerModalContainerClick);
+    if (this.elements.answerModalContainer) {
+      this.elements.answerModalContainer.addEventListener('click', this.handlers.onAnswerModalContainerClick);
+    }
     if (this.elements.infoModalConfirmBtn) {
       this.handlers.onInfoModalConfirmClick = () => this.hideInfoModal();
       this.elements.infoModalConfirmBtn.addEventListener('click', this.handlers.onInfoModalConfirmClick);
@@ -338,13 +344,21 @@ class StudyQuestApp {
         }
       }
     };
-    this.elements.modalReactionContainer.addEventListener('click', this.handlers.onModalReactionClick);
+    if (this.elements.modalReactionContainer) {
+      this.elements.modalReactionContainer.addEventListener('click', this.handlers.onModalReactionClick);
+    }
     this.handlers.onSheetSelectorChange = () => this.switchSheet();
     this.handlers.onClassFilterChange = () => this.loadSheetData(true);
     this.handlers.onSortOrderChange = () => this.loadSheetData(true);
-    this.elements.sheetSelector.addEventListener('change', this.handlers.onSheetSelectorChange);
-    this.elements.classFilter.addEventListener('change', this.handlers.onClassFilterChange);
-    this.elements.sortOrder.addEventListener('change', this.handlers.onSortOrderChange);
+    if (this.elements.sheetSelector) {
+      this.elements.sheetSelector.addEventListener('change', this.handlers.onSheetSelectorChange);
+    }
+    if (this.elements.classFilter) {
+      this.elements.classFilter.addEventListener('change', this.handlers.onClassFilterChange);
+    }
+    if (this.elements.sortOrder) {
+      this.elements.sortOrder.addEventListener('change', this.handlers.onSortOrderChange);
+    }
     if (this.elements.adminToggleBtn) {
       this.handlers.onAdminToggleClick = () => this.toggleAdminMode();
       this.elements.adminToggleBtn.addEventListener('click', this.handlers.onAdminToggleClick);
@@ -393,7 +407,9 @@ class StudyQuestApp {
       }
       this.showAnswerModal(rowIndex);
     };
-    this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
+    if (this.elements.answersContainer) {
+      this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
+    }
     this.handlers.onDocumentClick = (e) => {
       if (e.target.matches('#retryLoadBtn')) {
         e.preventDefault();
