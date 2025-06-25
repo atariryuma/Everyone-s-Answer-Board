@@ -132,6 +132,20 @@ header { position: sticky; top: 0; z-index: 5; contain: layout; }
 .answer-preview { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; min-height: 120px; }
 .like-btn svg { transition: all 0.15s ease-in-out; fill: none; }
 .like-btn.liked svg { stroke: transparent; fill: currentColor; transform: scale(1.1); }
+.like-btn.loading { opacity: 0.7; position: relative; pointer-events: none; }
+.like-btn.loading::after { 
+  content: ""; 
+  position: absolute; 
+  inset: 0; 
+  border: 2px solid transparent; 
+  border-top: 2px solid currentColor; 
+  border-radius: 50%; 
+  animation: spin 0.8s linear infinite; 
+  width: 16px; 
+  height: 16px; 
+  margin: auto; 
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 .highlight-btn { transition: all 0.15s ease; border-radius: 4px; padding: 2px; }
 .highlight-btn:hover { background: rgba(250, 204, 21, 0.1); transform: scale(1.1); }
 .highlight-btn.liked { color: #facc15; }
@@ -297,6 +311,8 @@ class StudyQuestApp {
     this.pollingInterval = null;
     this.handlers = {};
     this.adminModeVerified = false; // 管理モード切り替え時の権限確認フラグ
+    this.reactionDebounce = new Map(); // リアクションのデバウンス処理用
+    this.pendingReactions = new Set(); // 処理中のリアクション
     this.reactionTypes = [
       { key: 'LIKE', icon: 'hand-thumb-up' },
       { key: 'UNDERSTAND', icon: 'lightbulb' },
@@ -1102,30 +1118,101 @@ class StudyQuestApp {
     return card;
   }
   async handleReaction(rowIndex, reaction) {
+    const reactionKey = `${rowIndex}-${reaction}`;
+    
+    // デバウンス処理 - 同じリアクションの連続実行を防ぐ
+    if (this.reactionDebounce.has(reactionKey)) {
+      clearTimeout(this.reactionDebounce.get(reactionKey));
+    }
+    
+    // 既に処理中の場合は無視
+    if (this.pendingReactions.has(reactionKey)) {
+      return;
+    }
+    
+    this.pendingReactions.add(reactionKey);
+    
     const btns = document.querySelectorAll('[data-row-index="' + rowIndex + '"][data-reaction="' + reaction + '"]');
+    const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
+    
+    if (!item || !item.reactions) return;
+    
+    // 元の状態を保存（ロールバック用）
+    const originalReaction = { ...item.reactions[reaction] };
+    const originalReactions = { ...item.reactions };
+    
+    // 楽観的UI更新 - 即座にUIを更新
+    const wasReacted = item.reactions[reaction].reacted;
+    item.reactions[reaction] = {
+      count: wasReacted ? Math.max(0, item.reactions[reaction].count - 1) : item.reactions[reaction].count + 1,
+      reacted: !wasReacted
+    };
+    
+    // ローディング状態を設定
     btns.forEach(btn => {
+      btn.classList.add('loading');
       btn.disabled = true;
       btn.setAttribute('aria-disabled', 'true');
     });
+    
+    // UIを即座に更新
+    this.applyUpdates([item]);
+    
     try {
+      // サーバーに送信
       const res = await this.gas.addReaction(rowIndex, reaction);
-      if (res && res.status === 'ok') {
-        const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
-        if (item && res.reactions) {
-          item.reactions = res.reactions;
-          this.applyUpdates([item]);
-        }
-      } else if (res && res.message) {
-        console.error('Failed to add reaction:', res.message);
+      
+      if (res && res.status === 'ok' && res.reactions) {
+        // サーバーからの正確な値で更新
+        item.reactions = res.reactions;
+        this.applyUpdates([item]);
+      } else {
+        // エラー時はロールバック
+        throw new Error(res?.message || 'リアクションの処理に失敗しました');
       }
     } catch (error) {
       console.error('Failed to add reaction:', error);
+      
+      // ロールバック - 元の状態に戻す
+      item.reactions = originalReactions;
+      this.applyUpdates([item]);
+      
+      // エラーフィードバック
+      this.showErrorFeedback(btns[0], 'リアクションに失敗しました');
     } finally {
+      // ローディング状態を解除
       btns.forEach(btn => {
+        btn.classList.remove('loading');
         btn.disabled = false;
         btn.setAttribute('aria-disabled', 'false');
       });
+      
+      // 処理完了
+      this.pendingReactions.delete(reactionKey);
+      
+      // デバウンス設定 - 200ms後に同じリアクションを許可
+      const debounceTimeout = setTimeout(() => {
+        this.reactionDebounce.delete(reactionKey);
+      }, 200);
+      this.reactionDebounce.set(reactionKey, debounceTimeout);
     }
+  }
+  
+  showErrorFeedback(btn, message) {
+    if (!btn) return;
+    
+    // 元のクラスを保存
+    const originalClasses = btn.className;
+    
+    // エラー表示
+    btn.classList.add('bg-red-500');
+    btn.title = message;
+    
+    // 2秒後に元に戻す
+    setTimeout(() => {
+      btn.className = originalClasses;
+      btn.title = '';
+    }, 2000);
   }
   async handleHighlight(rowIndex) {
     const btns = document.querySelectorAll('.highlight-btn[data-row-index="' + rowIndex + '"]');
