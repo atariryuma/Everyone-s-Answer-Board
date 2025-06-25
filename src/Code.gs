@@ -440,10 +440,12 @@ function doGet(e) {
   }
   
   const isCurrentUserAdmin = userInfo.adminEmail === viewerEmail;
-  
+
   Object.assign(template, {
     showAdminFeatures: isCurrentUserAdmin,
     showHighlightToggle: isCurrentUserAdmin,
+    showScoreSort: isCurrentUserAdmin,
+    isStudentMode: !isCurrentUserAdmin,
     isAdminUser: isCurrentUserAdmin,
     showCounts: config.showDetails || false,
     displayMode: config.showDetails ? 'named' : 'anonymous',
