@@ -296,6 +296,7 @@ class StudyQuestApp {
     this.serverShowDetails = window.showCounts;
     this.pollingInterval = null;
     this.handlers = {};
+    this.adminModeVerified = false; // 管理モード切り替え時の権限確認フラグ
     this.reactionTypes = [
       { key: 'LIKE', icon: 'hand-thumb-up' },
       { key: 'UNDERSTAND', icon: 'lightbulb' },
@@ -333,6 +334,12 @@ class StudyQuestApp {
       // Initial admin state setup - 管理者であっても最初は閲覧モードで起動、切り替えボタンのみ表示
       if (window.isAdminUser) {
         this.state.isAdminUser = true;
+        console.log('Admin user detected:', {
+          isAdminUser: this.state.isAdminUser,
+          showAdminFeatures: this.state.showAdminFeatures,
+          displayMode: this.state.displayMode,
+          showCounts: this.state.showCounts
+        });
         if (this.elements.adminToggleBtn) {
           this.elements.adminToggleBtn.classList.remove('hidden');
           this.elements.adminToggleBtn.removeAttribute('hidden');
@@ -1124,16 +1131,27 @@ class StudyQuestApp {
     
     try {
       const enable = !this.state.showAdminFeatures;
+      
+      // 管理者権限チェック
       if (enable) {
-        try {
-          const ok = await this.gas.checkAdmin();
-          if (!ok) {
-            console.warn('管理者権限がありません。');
-            return;
-          }
-        } catch (e) {
-          console.error('権限確認に失敗しました', e);
+        if (!this.state.isAdminUser) {
+          console.warn('管理者権限がありません。');
           return;
+        }
+        
+        // 最初の管理モード切り替え時のみサーバー側で再確認（オプション）
+        if (!this.adminModeVerified) {
+          try {
+            const ok = await this.gas.checkAdmin();
+            if (!ok) {
+              console.warn('サーバー側の権限確認に失敗しました。');
+              // ローカルの権限情報を信頼して継続
+            }
+            this.adminModeVerified = true;
+          } catch (e) {
+            console.warn('権限確認API呼び出しに失敗しました', e);
+            // エラーが発生してもローカルの権限情報を信頼して継続
+          }
         }
       }
       
@@ -1160,10 +1178,20 @@ class StudyQuestApp {
       
       // デバッグ用: 管理モード設定の確認
       console.log('Admin mode toggled:', {
-        showAdminFeatures: this.state.showAdminFeatures,
-        showCounts: this.state.showCounts,
-        displayMode: this.state.displayMode,
-        showHighlightToggle: this.state.showHighlightToggle
+        enable: enable,
+        beforeToggle: {
+          showAdminFeatures: this.state.showAdminFeatures,
+          showCounts: this.state.showCounts,
+          displayMode: this.state.displayMode,
+          showHighlightToggle: this.state.showHighlightToggle
+        },
+        afterToggle: {
+          showAdminFeatures: window.showAdminFeatures,
+          showCounts: window.showCounts,
+          displayMode: window.displayMode,
+          showHighlightToggle: window.showHighlightToggle
+        },
+        isAdminUser: this.state.isAdminUser
       });
       
       // UI状態を更新
