@@ -726,8 +726,8 @@ function getSheetData(sheetName, classFilter, sortBy) {
         return {
           rowIndex: index + 2,
           timestamp: timestamp,
-          name: isAdmin ? name : '',
-          email: isAdmin ? email : '', // 管理者の場合のみemailを含める
+          name: name, // 常に名前を含める（クライアント側で制御）
+          email: email, // 常にemailを含める（クライアント側で制御）
           class: row[headerIndices[classHeader]] || '未分類',
           opinion: opinion,
           reason: reason,
@@ -819,8 +819,8 @@ function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy)
         return {
           rowIndex: index + 2,
           timestamp: timestamp,
-          name: isAdmin ? name : '',
-          email: isAdmin ? email : '', // 管理者の場合のみemailを含める
+          name: name, // 常に名前を含める（クライアント側で制御）
+          email: email, // 常にemailを含める（クライアント側で制御）
           class: row[headerIndices[classHeader]] || '未分類',
           opinion: opinion,
           reason: reason,
