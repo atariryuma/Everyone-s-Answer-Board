@@ -42,20 +42,36 @@
                     <p class="text-xs text-gray-400 mt-1">このURLは変わりません。一度生徒に共有すれば、ずっと使い続けられます。</p>
                 </div>
                 
-                <!-- スプレッドシートURL入力 -->
-                <div class="mb-6">
-                    <h3 class="font-semibold mb-3 text-left">スプレッドシートを追加</h3>
-                    <div class="space-y-3">
-                        <div class="flex gap-2">
+                <!-- スプレッドシートURL入力 - 改善版 -->
+                <div class="mb-8 text-center">
+                    <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-r from-cyan-500/20 to-blue-500/20 flex items-center justify-center border-2 border-cyan-400/30">
+                        <svg class="w-10 h-10 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-3 text-white">ここから始めましょう！</h3>
+                    <p class="text-gray-400 mb-6">GoogleスプレッドシートのURLを追加して、美しい回答ボードを作成しましょう</p>
+                    
+                    <div class="max-w-md mx-auto space-y-4">
+                        <div class="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-lg p-4 border border-blue-400/30">
+                            <h4 class="font-semibold text-blue-300 mb-2">💡 簡単3ステップ</h4>
+                            <div class="text-sm text-blue-200 text-left space-y-1">
+                                <p>1. GoogleスプレッドシートのURLをコピー</p>
+                                <p>2. 下のフィールドに貼り付け</p>
+                                <p>3. 「追加」ボタンをクリック</p>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-3">
                             <input type="url" id="spreadsheet-url-input" 
                                    placeholder="https://docs.google.com/spreadsheets/d/..."
-                                   class="flex-1 p-3 rounded-lg bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-cyan-400">
+                                   class="w-full p-4 rounded-lg bg-gray-700 border-2 border-gray-600 text-white focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 text-center">
                             <button type="button" id="add-spreadsheet-btn" 
-                                    class="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
-                              追加
+                                    class="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-lg font-bold text-lg transition-all transform hover:scale-105 shadow-lg">
+                              🚀 スプレッドシートを追加
                             </button>
                         </div>
-                        <p class="text-xs text-gray-400 text-left">GoogleスプレッドシートのURLを入力して追加してください</p>
+                        <p class="text-xs text-gray-500">URL形式: https://docs.google.com/spreadsheets/d/[ID]/edit</p>
                     </div>
                 </div>
 
