@@ -1198,11 +1198,7 @@ class StudyQuestApp {
       this.showAdminControls();
       this.updateSortOptions();
       // 管理モード切り替え時は設定変更のため再描画が必要
-      // 既に読み込み中の場合は完了を待ってからデータを再取得する
-      while (this.state.isLoading) {
-        await new Promise(r => setTimeout(r, 50));
-      }
-      await this.loadSheetData(true, false);
+      this.loadSheetData(true, false);
     } finally {
       // ボタンを再度有効化
       if (btn) {
