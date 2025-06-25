@@ -442,11 +442,11 @@ function doGet(e) {
   const isCurrentUserAdmin = userInfo.adminEmail === viewerEmail;
 
   Object.assign(template, {
-    showAdminFeatures: isCurrentUserAdmin,
-    showHighlightToggle: isCurrentUserAdmin,
-    showScoreSort: isCurrentUserAdmin,
-    isStudentMode: !isCurrentUserAdmin,
-    isAdminUser: isCurrentUserAdmin,
+    showAdminFeatures: false, // 管理者であっても最初は閲覧モードで起動
+    showHighlightToggle: false, // 管理者であっても最初は閲覧モードで起動
+    showScoreSort: false, // 管理者であっても最初は閲覧モードで起動
+    isStudentMode: true, // 管理者であっても最初は学生モードで起動
+    isAdminUser: isCurrentUserAdmin, // 管理者権限の有無はそのまま渡す
     showCounts: config.showDetails || false,
     displayMode: config.showDetails ? 'named' : 'anonymous',
     sheetName: activeSheetName,

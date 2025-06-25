@@ -277,19 +277,19 @@ class StudyQuestApp {
       scoreOption: document.getElementById('scoreOption'),
       footer: document.getElementById('controlsFooter')
     };
-    // 管理者であっても最初は閲覧モードで起動
+    // サーバーから渡された設定に基づいてモードラベルを設定
     if (this.elements.modeLabel) {
-      this.elements.modeLabel.textContent = '閲覧モード';
+      this.elements.modeLabel.textContent = window.showAdminFeatures ? '管理モード' : '閲覧モード';
     }
     this.state = {
       currentAnswers: [],
       isLoading: false,
       lastFocusedElement: null,
-      isStudentMode: true, // 管理者であっても最初は学生モードで起動
+      isStudentMode: window.isStudentMode,
       showCounts: window.showCounts,
-      showAdminFeatures: false, // 管理者であっても最初は管理機能無効で起動
-      showHighlightToggle: false, // 管理者であっても最初はハイライト機能無効で起動
-      showScoreSort: false, // 管理者であっても最初はスコアソート機能無効で起動
+      showAdminFeatures: window.showAdminFeatures,
+      showHighlightToggle: window.showHighlightToggle,
+      showScoreSort: window.showScoreSort,
       displayMode: window.displayMode,
       sheetName: SHEET_NAME
     };
@@ -330,15 +330,13 @@ class StudyQuestApp {
       this.renderIcons();
       this.adjustLayout();
       this.updateSortOptions();
-      // Initial admin state setup - 管理者であっても最初は閲覧モードで起動
+      // Initial admin state setup - 管理者であっても最初は閲覧モードで起動、切り替えボタンのみ表示
       if (window.isAdminUser) {
-        // 管理者権限があることを記録するが、最初は閲覧モードのままにする
         this.state.isAdminUser = true;
-        // 管理モード切り替えボタンのみ表示
         if (this.elements.adminToggleBtn) {
           this.elements.adminToggleBtn.classList.remove('hidden');
           this.elements.adminToggleBtn.removeAttribute('hidden');
-          this.elements.adminToggleBtn.textContent = '管理モード';
+          this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
         }
       }
       if (!localStorage.getItem('introSeen')) {
@@ -508,13 +506,11 @@ class StudyQuestApp {
   async verifyAdminAsync() {
     // Use server-provided flag first (fast)
     if (window.isAdminUser) {
-      // 管理者権限があることを記録するが、最初は閲覧モードのままにする
       this.state.isAdminUser = true;
-      // 管理モード切り替えボタンのみ表示
       if (this.elements.adminToggleBtn) {
         this.elements.adminToggleBtn.classList.remove('hidden');
         this.elements.adminToggleBtn.removeAttribute('hidden');
-        this.elements.adminToggleBtn.textContent = '管理モード';
+        this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
       }
       return;
     }
@@ -526,11 +522,10 @@ class StudyQuestApp {
         if (isAdmin) {
           window.isAdminUser = true;
           this.state.isAdminUser = true;
-          // 管理モード切り替えボタンのみ表示
           if (this.elements.adminToggleBtn) {
             this.elements.adminToggleBtn.classList.remove('hidden');
             this.elements.adminToggleBtn.removeAttribute('hidden');
-            this.elements.adminToggleBtn.textContent = '管理モード';
+            this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
           }
         }
       } catch (e) {
