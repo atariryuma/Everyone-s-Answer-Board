@@ -1034,7 +1034,22 @@ class StudyQuestApp {
       highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-yellow-400 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
     }
     const showName = this.state.displayMode === 'named';
-    const nameHtml = showName ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' : '';
+    let displayName = data.name;
+    // 管理モード時に名前が空でemailがある場合は、emailから名前を生成
+    if (showName && !displayName && data.email) {
+      displayName = data.email.split('@')[0];
+    }
+    // デバッグ用ログ
+    if (showName && !displayName) {
+      console.log('Name display issue:', {
+        displayMode: this.state.displayMode,
+        dataName: data.name,
+        dataEmail: data.email,
+        showName: showName,
+        rowIndex: data.rowIndex
+      });
+    }
+    const nameHtml = showName ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(displayName) + '</span></div>' : '';
     const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
     const reactionButtonsHtml = this.reactionTypes.map(rt => {
       const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
@@ -1310,7 +1325,12 @@ class StudyQuestApp {
     this.state.lastFocusedElement = document.activeElement;
     this.elements.modalAnswer.innerHTML = '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + this.escapeHtml(data.opinion || '') + '</p>' + '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + this.escapeHtml(data.reason || '') + '</p>';
     const showName = this.state.displayMode === 'named';
-    this.elements.modalStudentName.textContent = showName ? data.name : '';
+    let modalDisplayName = data.name;
+    // 管理モード時に名前が空でemailがある場合は、emailから名前を生成
+    if (showName && !modalDisplayName && data.email) {
+      modalDisplayName = data.email.split('@')[0];
+    }
+    this.elements.modalStudentName.textContent = showName ? modalDisplayName : '';
     const footerBase = 'text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex';
     this.elements.modalFooter.className = footerBase + (showName ? ' justify-between items-center' : ' justify-end items-center');
     const reactionButtonsHtml = this.reactionTypes.map(rt => {
