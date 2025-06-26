@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>モーダルデバッグテスト</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white">
+    <div class="p-8">
+        <h1 class="text-2xl mb-4">モーダル動作テスト</h1>
+        
+        <!-- テスト用カード -->
+        <div id="testCard" class="answer-card bg-gray-800 p-4 rounded cursor-pointer border-2 border-cyan-400" data-row-index="1">
+            <h3 class="text-cyan-200 text-xl mb-2">テスト回答</h3>
+            <p class="text-gray-300">これはテスト用の回答です</p>
+        </div>
+        
+        <!-- モーダル -->
+        <div id="answerModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden">
+            <div id="answerModalCard" class="bg-gray-800 rounded-xl p-6 w-full max-w-2xl">
+                <button id="answerModalCloseBtn" class="float-right bg-red-600 text-white px-3 py-1 rounded">×</button>
+                <div id="modalAnswer" class="mt-4"></div>
+                <div id="modalStudentName" class="mt-2 font-bold"></div>
+                <div id="modalFooter" class="mt-4 flex justify-end">
+                    <div id="modalReactions" class="flex gap-2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- デバッグ用ログ表示 -->
+    <div id="debugLog" class="fixed bottom-4 right-4 bg-black/80 text-green-400 p-4 rounded max-w-md max-h-64 overflow-y-auto text-xs">
+        <div class="font-bold mb-2">デバッグログ:</div>
+        <div id="logContent"></div>
+    </div>
+
+    <script>
+        // デバッグ用ログ関数
+        function debugLog(message) {
+            console.log(message);
+            const logContent = document.getElementById('logContent');
+            const timestamp = new Date().toLocaleTimeString();
+            logContent.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+
+        // 簡素化されたモーダル表示関数
+        function showAnswerModal(rowIndex) {
+            debugLog(`showAnswerModal called with rowIndex: ${rowIndex}`);
+            
+            const modalContainer = document.getElementById('answerModalContainer');
+            const modalAnswer = document.getElementById('modalAnswer');
+            const modalStudentName = document.getElementById('modalStudentName');
+            
+            if (!modalContainer) {
+                debugLog('ERROR: answerModalContainer not found');
+                return;
+            }
+            
+            if (!modalAnswer) {
+                debugLog('ERROR: modalAnswer not found');
+                return;
+            }
+            
+            // テストデータ
+            const testData = {
+                rowIndex: rowIndex,
+                opinion: 'テスト意見: これはテスト用の意見です',
+                reason: 'テスト理由: これはテスト用の理由です',
+                name: 'テストユーザー'
+            };
+            
+            debugLog(`Setting modal content for row ${rowIndex}`);
+            
+            // モーダル内容設定
+            modalAnswer.innerHTML = `
+                <p class="text-cyan-200 text-2xl font-bold mb-4">${testData.opinion}</p>
+                <p class="text-gray-200 text-lg">${testData.reason}</p>
+            `;
+            
+            modalStudentName.textContent = testData.name;
+            
+            // モーダル表示
+            modalContainer.classList.remove('hidden');
+            debugLog('Modal should now be visible');
+        }
+
+        // モーダル非表示関数
+        function hideAnswerModal() {
+            debugLog('hideAnswerModal called');
+            const modalContainer = document.getElementById('answerModalContainer');
+            if (modalContainer) {
+                modalContainer.classList.add('hidden');
+                debugLog('Modal hidden');
+            }
+        }
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            debugLog('DOM loaded, initializing event handlers');
+            
+            // カードクリックイベント
+            const testCard = document.getElementById('testCard');
+            if (testCard) {
+                testCard.addEventListener('click', function(e) {
+                    debugLog('Card clicked');
+                    const rowIndex = this.dataset.rowIndex;
+                    showAnswerModal(rowIndex);
+                });
+                debugLog('Card click handler attached');
+            } else {
+                debugLog('ERROR: Test card not found');
+            }
+            
+            // モーダル閉じるボタン
+            const closeBtn = document.getElementById('answerModalCloseBtn');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function(e) {
+                    debugLog('Close button clicked');
+                    hideAnswerModal();
+                });
+                debugLog('Close button handler attached');
+            }
+            
+            // モーダル背景クリックで閉じる
+            const modalContainer = document.getElementById('answerModalContainer');
+            if (modalContainer) {
+                modalContainer.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        debugLog('Modal background clicked');
+                        hideAnswerModal();
+                    }
+                });
+                debugLog('Modal background click handler attached');
+            }
+            
+            debugLog('Initialization complete');
+        });
+    </script>
+</body>
+</html>

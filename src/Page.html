@@ -663,7 +663,7 @@ class StudyQuestApp {
       getPublishedSheetData: (sheetName, classFilter, sort) => this.runGas('getPublishedSheetData', sheetName, classFilter, sort),
       getAvailableSheets: () => this.runGas('getAvailableSheets'),
       addReaction: (rowIndex, reaction) => this.runGas('addReaction', rowIndex, reaction, this.state.sheetName),
-      toggleHighlight: (rowIndex, current) => this.runGas('toggleHighlight', rowIndex, this.state.sheetName, current),
+      toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', rowIndex, sheetName),
       checkAdmin: () => this.runGas('checkAdmin')
     };
     const savedCols = localStorage.getItem('boardColumns');
@@ -811,13 +811,25 @@ class StudyQuestApp {
   }
   setupEventDelegation() {
     this.handlers.onAnswersContainerClick = (e) => {
+      console.log('Answer container clicked', e.target);
+      
       const answerCard = e.target.closest('.answer-card');
-      if (!answerCard) return;
+      if (!answerCard) {
+        console.log('No answer card found');
+        return;
+      }
+      
       const rowIndex = answerCard.dataset.rowIndex;
-      if (!rowIndex) return;
+      if (!rowIndex) {
+        console.log('No rowIndex found on card');
+        return;
+      }
+      
+      console.log('Card clicked with rowIndex:', rowIndex);
       
       const reactionBtn = e.target.closest('.reaction-btn');
       if (reactionBtn) {
+        console.log('Reaction button clicked, stopping propagation');
         e.stopPropagation();
         const reactionType = reactionBtn.dataset.reaction;
         if (reactionType && !reactionBtn.disabled) {
@@ -828,6 +840,7 @@ class StudyQuestApp {
       
       const highlightBtn = e.target.closest('.highlight-btn');
       if (highlightBtn) {
+        console.log('Highlight button clicked, stopping propagation');
         e.stopPropagation();
         if (!highlightBtn.disabled) {
           this.handleHighlight(rowIndex);
@@ -835,6 +848,7 @@ class StudyQuestApp {
         return;
       }
       
+      console.log('Calling showAnswerModal with rowIndex:', rowIndex);
       this.showAnswerModal(rowIndex);
     };
     
@@ -1745,8 +1759,8 @@ class StudyQuestApp {
     this.applyUpdates([item]);
     
     try {
-      console.log('toggleHighlight request', rowIndex, SHEET_NAME);
-      const res = await this.gas.toggleHighlight(rowIndex, SHEET_NAME);
+      console.log('toggleHighlight request', rowIndex, this.state.sheetName);
+      const res = await this.gas.toggleHighlight(rowIndex, this.state.sheetName);
       console.log('toggleHighlight response', res);
       
       if (res && res.status === 'ok') {
@@ -1967,8 +1981,21 @@ class StudyQuestApp {
     });
   }
   showAnswerModal(rowIndex) {
+    console.log('showAnswerModal called with rowIndex:', rowIndex);
+    console.log('Current answers:', this.state.currentAnswers);
+    console.log('Modal elements:', {
+      container: this.elements.answerModalContainer,
+      answer: this.elements.modalAnswer,
+      studentName: this.elements.modalStudentName
+    });
+    
     const data = this.state.currentAnswers.find(r => r.rowIndex == rowIndex);
-    if (!data) return;
+    if (!data) {
+      console.error('No data found for rowIndex:', rowIndex);
+      return;
+    }
+    
+    console.log('Found data for modal:', data);
     this.state.lastFocusedElement = document.activeElement;
     this.elements.modalAnswer.innerHTML = '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + this.escapeHtml(data.opinion || '') + '</p>' + '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + this.escapeHtml(data.reason || '') + '</p>';
     const showName = this.state.displayMode === 'named';
@@ -1997,12 +2024,9 @@ class StudyQuestApp {
     // ハイライトボタンを追加
     let highlightBtnHtml = '';
     if (this.state.showHighlightToggle) {
-      const data = this.state.filteredData.find(item => item.rowIndex === rowIndex);
-      if (data) {
-        const cls = data.highlight ? 'liked' : '';
-        const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
-        highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-yellow-400 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
-      }
+      const cls = data.highlight ? 'liked' : '';
+      const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
+      highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-yellow-400 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
     }
     
     this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
@@ -2039,9 +2063,16 @@ class StudyQuestApp {
       this.elements.answerModalCard.classList.add('reaction-border-1');
     }
     
+    console.log('Attempting to show modal...');
+    console.log('Modal container classes before:', this.elements.answerModalContainer.className);
+    
     this.elements.answerModalContainer.classList.remove('hidden');
     this.elements.answerModalContainer.classList.add('modal-fade');
     this.elements.answerModalCard.classList.add('modal-scale');
+    
+    console.log('Modal container classes after:', this.elements.answerModalContainer.className);
+    console.log('Modal should now be visible');
+    
     this.elements.answerModalCloseBtn.focus();
   }
   hideAnswerModal() {
