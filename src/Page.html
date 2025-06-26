@@ -582,13 +582,62 @@ const ICONS = {
   'grid-2x2': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
   'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
 };
+
+class UnifiedCache {
+  constructor() {
+    this.data = new Map();
+    this.timestamps = new Map();
+  }
+  
+  set(key, value, ttl = 300000) { // 5分のデフォルトTTL
+    this.data.set(key, value);
+    this.timestamps.set(key, Date.now() + ttl);
+  }
+  
+  get(key) {
+    if (!this.data.has(key)) return undefined;
+    
+    const expiry = this.timestamps.get(key);
+    if (expiry && Date.now() > expiry) {
+      this.delete(key);
+      return undefined;
+    }
+    
+    return this.data.get(key);
+  }
+  
+  has(key) {
+    return this.get(key) !== undefined;
+  }
+  
+  delete(key) {
+    this.data.delete(key);
+    this.timestamps.delete(key);
+  }
+  
+  clear() {
+    this.data.clear();
+    this.timestamps.clear();
+  }
+  
+  cleanup() {
+    const now = Date.now();
+    for (const [key, expiry] of this.timestamps.entries()) {
+      if (now > expiry) {
+        this.delete(key);
+      }
+    }
+  }
+  
+  get size() {
+    return this.data.size;
+  }
+}
+
 class StudyQuestApp {
   constructor() {
-    this.simpleCache = new Map();
-    this.renderCache = new Map();
-    this.iconCache = new Map();
+    this.cache = new UnifiedCache();
     this.weakCache = new WeakMap(); // For DOM element caching
-    this.cacheTimestamps = new Map(); // Track cache entry times
     this.performanceMetrics = { frameTime: 0, domOperations: 0 };
     this.visibilityObserver = null;
     this.resizeObserver = null;
@@ -662,8 +711,8 @@ class StudyQuestApp {
     this.gas = {
       getPublishedSheetData: (sheetName, classFilter, sort) => this.runGas('getPublishedSheetData', sheetName, classFilter, sort),
       getAvailableSheets: () => this.runGas('getAvailableSheets'),
-      addReaction: (rowIndex, reaction) => this.runGas('addReaction', rowIndex, reaction, this.state.sheetName),
-      toggleHighlight: (rowIndex) => this.runGas('toggleHighlight', rowIndex, this.state.sheetName),
+      addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', rowIndex, reaction, sheetName),
+      toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', rowIndex, sheetName),
       checkAdmin: () => this.runGas('checkAdmin')
     };
     const savedCols = localStorage.getItem('boardColumns');
@@ -770,12 +819,8 @@ class StudyQuestApp {
     if (this.elements.modalReactionContainer) {
       this.elements.modalReactionContainer.addEventListener('click', this.handlers.onModalReactionClick);
     }
-    this.handlers.onSheetSelectorChange = () => this.switchSheet();
     this.handlers.onClassFilterChange = () => this.loadSheetData(true);
     this.handlers.onSortOrderChange = () => this.loadSheetData(true);
-    if (this.elements.sheetSelector) {
-      this.elements.sheetSelector.addEventListener('change', this.handlers.onSheetSelectorChange);
-    }
     if (this.elements.classFilter) {
       this.elements.classFilter.addEventListener('change', this.handlers.onClassFilterChange);
     }
@@ -811,25 +856,14 @@ class StudyQuestApp {
   }
   setupEventDelegation() {
     this.handlers.onAnswersContainerClick = (e) => {
-      console.log('Answer container clicked', e.target);
-      
       const answerCard = e.target.closest('.answer-card');
-      if (!answerCard) {
-        console.log('No answer card found');
-        return;
-      }
+      if (!answerCard) return;
       
       const rowIndex = answerCard.dataset.rowIndex;
-      if (!rowIndex) {
-        console.log('No rowIndex found on card');
-        return;
-      }
-      
-      console.log('Card clicked with rowIndex:', rowIndex);
+      if (!rowIndex) return;
       
       const reactionBtn = e.target.closest('.reaction-btn');
       if (reactionBtn) {
-        console.log('Reaction button clicked, stopping propagation');
         e.stopPropagation();
         const reactionType = reactionBtn.dataset.reaction;
         if (reactionType && !reactionBtn.disabled) {
@@ -840,7 +874,6 @@ class StudyQuestApp {
       
       const highlightBtn = e.target.closest('.highlight-btn');
       if (highlightBtn) {
-        console.log('Highlight button clicked, stopping propagation');
         e.stopPropagation();
         if (!highlightBtn.disabled) {
           this.handleHighlight(rowIndex);
@@ -848,7 +881,6 @@ class StudyQuestApp {
         return;
       }
       
-      console.log('Calling showAnswerModal with rowIndex:', rowIndex);
       this.showAnswerModal(rowIndex);
     };
     
@@ -874,11 +906,9 @@ class StudyQuestApp {
   runGas(funcName, ...args) {
     // Simple request deduplication for identical calls
     const cacheKey = funcName + JSON.stringify(args);
-    if (this.simpleCache.has(cacheKey)) {
-      const cached = this.simpleCache.get(cacheKey);
-      if (Date.now() - cached.timestamp < 1000) { // 1 second cache
-        return Promise.resolve(cached.data);
-      }
+    const cached = this.cache.get(cacheKey);
+    if (cached) {
+      return Promise.resolve(cached);
     }
     
     return new Promise((resolve, reject) => {
@@ -886,7 +916,7 @@ class StudyQuestApp {
         const userId = USER_ID || '';
         google.script.run
           .withSuccessHandler((result) => {
-            this.simpleCache.set(cacheKey, { data: result, timestamp: Date.now() });
+            this.cache.set(cacheKey, result, 1000); // 1秒キャッシュ
             resolve(result);
           })
           .withFailureHandler(reject)
@@ -895,7 +925,7 @@ class StudyQuestApp {
       } else {
         console.warn('Google Apps Script environment not detected.');
         this.getMockData(funcName, ...args).then((result) => {
-          this.simpleCache.set(cacheKey, { data: result, timestamp: Date.now() });
+          this.cache.set(cacheKey, result, 1000); // 1秒キャッシュ
           resolve(result);
         }).catch(reject);
       }
@@ -1027,7 +1057,7 @@ class StudyQuestApp {
     
     // Start automatic cleanup for memory management
     this.cleanupInterval = setInterval(() => {
-      this.cleanup();
+      this.cache.cleanup();
     }, 5 * 60 * 1000); // Cleanup every 5 minutes
   }
   stopPolling() {
@@ -1098,9 +1128,7 @@ class StudyQuestApp {
       cancelIdleCallback(this.idleCallbackId);
     }
     // Clear caches
-    this.simpleCache.clear();
-    this.renderCache.clear();
-    this.iconCache.clear();
+    this.cache.clear();
     this.deferredUpdates.clear();
     this.domFragmentPool.length = 0;
   }
@@ -1213,7 +1241,6 @@ class StudyQuestApp {
   async loadAvailableSheets() {
     try {
       const sheetsData = await this.gas.getAvailableSheets();
-      this.populateSheetSelector(sheetsData);
     } catch (error) {
       console.error('Failed to load available sheets:', error);
       this.elements.sheetSelector.innerHTML = '<option value="">エラー: シート読み込み失敗</option>';
@@ -1547,7 +1574,7 @@ class StudyQuestApp {
       showHighlightToggle: this.state.showHighlightToggle
     });
     
-    const cachedCard = this.getCacheWithValidation(this.renderCache, cacheKey);
+    const cachedCard = this.cache.get(`render-${cacheKey}`);
     if (cachedCard) {
       return cachedCard.cloneNode(true);
     }
@@ -1576,16 +1603,6 @@ class StudyQuestApp {
         displayName = data.email.split('@')[0];
       }
       
-      // デバッグ用ログ
-      console.log('Name display debug:', {
-        displayMode: this.state.displayMode,
-        showAdminFeatures: this.state.showAdminFeatures,
-        dataName: data.name,
-        dataEmail: data.email,
-        finalDisplayName: displayName,
-        showName: showName,
-        rowIndex: data.rowIndex
-      });
     }
     
     const nameHtml = showName && displayName ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(displayName) + '</span></div>' : '';
@@ -1612,12 +1629,10 @@ class StudyQuestApp {
     this.applyReactionStyles(card, data);
     
     // Cache the card for reuse (limit cache size)
-    if (this.renderCache.size > 50) {
-      const firstKey = this.renderCache.keys().next().value;
-      this.renderCache.delete(firstKey);
-      this.cacheTimestamps.delete(firstKey);
+    if (this.cache.size > 100) {
+      this.cache.cleanup();
     }
-    this.setCacheWithTimestamp(this.renderCache, cacheKey, card.cloneNode(true));
+    this.cache.set(`render-${cacheKey}`, card.cloneNode(true));
     
     return card;
   }
@@ -1681,7 +1696,7 @@ class StudyQuestApp {
     
     try {
       // サーバーに送信
-      const res = await this.gas.addReaction(rowIndex, reaction);
+      const res = await this.gas.addReaction(rowIndex, reaction, this.state.sheetName);
       
       if (res && res.status === 'ok' && res.reactions) {
         // サーバーからの正確な値で更新
@@ -1793,9 +1808,7 @@ class StudyQuestApp {
     this.applyUpdates([item]);
     
     try {
-      console.log('toggleHighlight request', rowIndex, this.state.sheetName);
-      const res = await this.gas.toggleHighlight(rowIndex);
-      console.log('toggleHighlight response', res);
+      const res = await this.gas.toggleHighlight(rowIndex, this.state.sheetName);
       
       if (res && res.status === 'ok') {
         // サーバーからの正確な値で更新
@@ -2001,13 +2014,6 @@ class StudyQuestApp {
     });
   }
   showAnswerModal(rowIndex) {
-    console.log('showAnswerModal called with rowIndex:', rowIndex);
-    console.log('Current answers:', this.state.currentAnswers);
-    console.log('Modal elements:', {
-      container: this.elements.answerModalContainer,
-      answer: this.elements.modalAnswer,
-      studentName: this.elements.modalStudentName
-    });
     
     // 最新データを取得（filteredDataとcurrentAnswersの両方から）
     let data = this.state.currentAnswers.find(r => r.rowIndex == rowIndex);
@@ -2015,11 +2021,8 @@ class StudyQuestApp {
       data = this.state.filteredData.find(r => r.rowIndex == rowIndex);
     }
     if (!data) {
-      console.error('No data found for rowIndex:', rowIndex);
       return;
     }
-    
-    console.log('Found data for modal:', data);
     this.state.lastFocusedElement = document.activeElement;
     this.elements.modalAnswer.innerHTML = '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + this.escapeHtml(data.opinion || '') + '</p>' + '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + this.escapeHtml(data.reason || '') + '</p>';
     const showName = this.state.displayMode === 'named';
@@ -2058,15 +2061,9 @@ class StudyQuestApp {
     // リアクションに基づくカード色の適用
     this.applyReactionStyles(this.elements.answerModalCard, data);
     
-    console.log('Attempting to show modal...');
-    console.log('Modal container classes before:', this.elements.answerModalContainer.className);
-    
     this.elements.answerModalContainer.classList.remove('hidden');
     this.elements.answerModalContainer.classList.add('modal-fade');
     this.elements.answerModalCard.classList.add('modal-scale');
-    
-    console.log('Modal container classes after:', this.elements.answerModalContainer.className);
-    console.log('Modal should now be visible');
     
     this.elements.answerModalCloseBtn.focus();
   }
@@ -2121,8 +2118,8 @@ class StudyQuestApp {
   }
   getIcon(name, classes = '', solid = false) {
     // Cache icons to avoid repeated string concatenation
-    const cacheKey = `${name}-${classes}-${solid}`;
-    const cachedIcon = this.getCacheWithValidation(this.iconCache, cacheKey);
+    const cacheKey = `icon-${name}-${classes}-${solid}`;
+    const cachedIcon = this.cache.get(cacheKey);
     if (cachedIcon) {
       return cachedIcon;
     }
@@ -2135,11 +2132,11 @@ class StudyQuestApp {
     if (!icon) {
       console.warn('Icon not found:', key);
       const fallback = '<span aria-hidden="true" class="' + classes + '">⭐</span>';
-      this.setCacheWithTimestamp(this.iconCache, cacheKey, fallback);
+      this.cache.set(cacheKey, fallback);
       return fallback;
     }
     const result = '<span aria-hidden="true" class="' + classes + '">' + icon + '</span>';
-    this.setCacheWithTimestamp(this.iconCache, cacheKey, result);
+    this.cache.set(cacheKey, result);
     return result;
   }
   renderIcons() {
@@ -2466,23 +2463,6 @@ class StudyQuestApp {
   }
   
   // Enhanced cache methods with timestamp tracking
-  setCacheWithTimestamp(cache, key, value) {
-    cache.set(key, value);
-    this.cacheTimestamps.set(key, Date.now());
-  }
-  
-  getCacheWithValidation(cache, key, maxAge = 5 * 60 * 1000) { // 5 minutes default
-    if (!cache.has(key)) return null;
-    
-    const timestamp = this.cacheTimestamps.get(key);
-    if (timestamp && Date.now() - timestamp > maxAge) {
-      cache.delete(key);
-      this.cacheTimestamps.delete(key);
-      return null;
-    }
-    
-    return cache.get(key);
-  }
 }
 try {
   if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
