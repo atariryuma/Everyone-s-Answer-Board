@@ -982,6 +982,9 @@ class StudyQuestApp {
       if (!this.state.isAdminUser) {
         this.state.showAdminFeatures = false;
         this.state.showHighlightToggle = false;
+      } else {
+        // 管理者の場合はハイライトトグルを有効化
+        this.state.showHighlightToggle = window.showHighlightToggle || this.state.isAdminUser;
       }
       if (isInitialLoad) {
         // Add visual feedback that loading is complete
@@ -1492,7 +1495,7 @@ class StudyQuestApp {
     
     try {
       console.log('toggleHighlight request', rowIndex, SHEET_NAME);
-      const res = await this.gas.toggleHighlight(rowIndex, originalHighlight);
+      const res = await this.gas.toggleHighlight(rowIndex, SHEET_NAME);
       console.log('toggleHighlight response', res);
       
       if (res && res.status === 'ok') {

@@ -1393,7 +1393,21 @@ function toggleHighlight(rowIndex, sheetName) {
     if (!sheet) throw new Error(`シート '${targetSheet}' が見つかりません。`);
 
     const headerIndices = getHeaderIndices(targetSheet);
-    const colIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT] + 1;
+    let highlightColIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT];
+    
+    // ハイライト列が存在しない場合は追加する
+    if (highlightColIndex === undefined || highlightColIndex === -1) {
+      prepareSheetForBoard(targetSheet);
+      // 再度ヘッダーインデックスを取得
+      const updatedHeaderIndices = getHeaderIndices(targetSheet);
+      highlightColIndex = updatedHeaderIndices[COLUMN_HEADERS.HIGHLIGHT];
+      
+      if (highlightColIndex === undefined || highlightColIndex === -1) {
+        throw new Error('ハイライト列が見つかりません。スプレッドシートにハイライト列が存在することを確認してください。');
+      }
+    }
+    
+    const colIndex = highlightColIndex + 1;
 
     const cell = sheet.getRange(rowIndex, colIndex);
     const current = !!cell.getValue();
