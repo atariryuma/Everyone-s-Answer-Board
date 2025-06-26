@@ -874,22 +874,39 @@ function getSheetHeaders(sheetName) {
 
 /**
  * ヘッダー配列から設定項目を推測する関数
+ *
+ * Keywords cover common variants (e.g. コメント vs 回答) and include
+ * both full/half-width characters. Header strings are normalized by
+ * trimming/collapsing whitespace and converting full-width ASCII before
+ * searching.
+ *
  * @param {Array} headers - ヘッダー名の配列
  * @returns {Object} 推測された設定オブジェクト
  */
 function guessHeadersFromArray(headers) {
+  // Normalize header strings: convert full-width ASCII, collapse whitespace and lowercase
+  const normalize = (str) => String(str || '')
+    .replace(/[\uFF01-\uFF5E]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+  const normalizedHeaders = headers.map(h => ({ original: String(h), normalized: normalize(h) }));
+
+  // Find the first header that contains any of the provided keywords
   const find = (keys) => {
-    const header = headers.find(h => {
-      const hStr = String(h || '').toLowerCase();
-      return keys.some(k => hStr.includes(k.toLowerCase()));
-    });
-    return header ? String(header) : '';
+    const keyNorm = keys.map(k => normalize(k));
+    const found = normalizedHeaders.find(h => keyNorm.some(k => h.normalized.includes(k)));
+    return found ? found.original : '';
   };
   
   console.log('Available headers:', headers);
   
   // Googleフォーム特有のヘッダー構造に対応
-  const isGoogleForm = headers.some(h => String(h || '').includes('タイムスタンプ') || String(h || '').includes('メールアドレス'));
+  const isGoogleForm = normalizedHeaders.some(h =>
+    h.normalized.includes(normalize('タイムスタンプ')) ||
+    h.normalized.includes(normalize('メールアドレス'))
+  );
   
   let question = '';
   let answer = '';
@@ -901,26 +918,25 @@ function guessHeadersFromArray(headers) {
     console.log('Detected Google Form response sheet');
     
     // Googleフォームの一般的な構造: タイムスタンプ, メールアドレス, [質問1], [質問2], ...
-    const nonMetaHeaders = headers.filter(h => {
-      const hStr = String(h || '').toLowerCase();
-      return !hStr.includes('タイムスタンプ') && 
-             !hStr.includes('timestamp') && 
-             !hStr.includes('メールアドレス') && 
+    const nonMetaHeaders = normalizedHeaders.filter(h => {
+      const hStr = h.normalized;
+      return !hStr.includes(normalize('タイムスタンプ')) &&
+             !hStr.includes('timestamp') &&
+             !hStr.includes(normalize('メールアドレス')) &&
              !hStr.includes('email');
     });
     
-    console.log('Non-meta headers:', nonMetaHeaders);
+    console.log('Non-meta headers:', nonMetaHeaders.map(h => h.original));
     
     // より柔軟な推測ロジック
     for (let i = 0; i < nonMetaHeaders.length; i++) {
-      const header = nonMetaHeaders[i];
-      const hStr = String(header || '').toLowerCase();
+      const { original: header, normalized: hStr } = nonMetaHeaders[i];
       
       // 質問を含む長いテキストを質問ヘッダーとして推測
       if (!question && (hStr.includes('だろうか') || hStr.includes('ですか') || hStr.includes('でしょうか') || hStr.length > 20)) {
         question = header;
         // 同じ内容が複数列にある場合、回答用として2番目を使用
-        if (i + 1 < nonMetaHeaders.length && nonMetaHeaders[i + 1] === header) {
+        if (i + 1 < nonMetaHeaders.length && nonMetaHeaders[i + 1].original === header) {
           answer = header;
           continue;
         }
@@ -950,16 +966,17 @@ function guessHeadersFromArray(headers) {
     // フォールバック: まだ回答が見つからない場合
     if (!answer && nonMetaHeaders.length > 0) {
       // 最初の非メタヘッダーを回答として使用
-      answer = nonMetaHeaders[0];
+      answer = nonMetaHeaders[0].original;
     }
     
   } else {
     // 通常のシート用の推測ロジック
-    question = find(['質問', '問題', 'question', 'Q']);
-    answer = find(['回答', '答え', 'answer', 'A', '意見', 'opinion']);
-    reason = find(['理由', 'reason', '詳細', 'detail']);
-    name = find(['名前', '氏名', 'name', '学生', 'student']);
-    classHeader = find(['クラス', 'class', '組', '学級']);
+    // Keyword lists include common variants and full/half-width characters
+    question = find(['質問', '質問内容', '問題', '問い', 'お題', 'question', 'question text', 'q', 'Ｑ']);
+    answer = find(['回答', '解答', '答え', '返答', 'answer', 'a', 'Ａ', '意見', 'コメント', 'opinion', 'response']);
+    reason = find(['理由', '訳', 'わけ', '根拠', '詳細', '説明', 'comment', 'why', 'reason', 'detail']);
+    name = find(['名前', '氏名', 'name', '学生', 'student', 'ペンネーム', 'ニックネーム', 'author']);
+    classHeader = find(['クラス', 'class', 'classroom', '組', '学級', '班', 'グループ']);
   }
   
   const guessed = {
@@ -977,14 +994,16 @@ function guessHeadersFromArray(headers) {
     console.log('No specific headers found, using positional mapping');
     
     // タイムスタンプとメールを除外して最初の列を回答として使用
-    const usableHeaders = headers.filter(h => {
-      const hStr = String(h || '').toLowerCase();
-      return !hStr.includes('タイムスタンプ') && 
-             !hStr.includes('timestamp') && 
-             !hStr.includes('メールアドレス') && 
-             !hStr.includes('email') &&
-             String(h || '').trim() !== '';
-    });
+    const usableHeaders = normalizedHeaders
+      .filter(h => {
+        const hStr = h.normalized;
+        return !hStr.includes(normalize('タイムスタンプ')) &&
+               !hStr.includes('timestamp') &&
+               !hStr.includes(normalize('メールアドレス')) &&
+               !hStr.includes('email') &&
+               h.normalized !== '';
+      })
+      .map(h => h.original);
     
     if (usableHeaders.length > 0) {
       guessed.answerHeader = usableHeaders[0];
@@ -2368,6 +2387,7 @@ if (typeof module !== 'undefined') {
     getEmailDomain,
     getUrlOrigin,
     convertPreviewUrl,
-    buildBoardData
+    buildBoardData,
+    guessHeadersFromArray
   };
 }
