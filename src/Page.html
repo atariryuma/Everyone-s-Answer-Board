@@ -1644,7 +1644,8 @@ class StudyQuestApp {
     return card;
   }
   async handleReaction(rowIndex, reaction) {
-    const reactionKey = `${rowIndex}-${reaction}`;
+    const numericRowIndex = parseInt(rowIndex, 10);
+    const reactionKey = `${numericRowIndex}-${reaction}`;
     
     // Enhanced debounce - prevent rapid consecutive clicks
     if (this.reactionDebounce.has(reactionKey)) {
@@ -1668,8 +1669,8 @@ class StudyQuestApp {
     if (!this.lastReactionTimes) this.lastReactionTimes = new Map();
     this.lastReactionTimes.set(reactionKey, now);
     
-    const btns = document.querySelectorAll('[data-row-index="' + rowIndex + '"][data-reaction="' + reaction + '"]');
-    const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
+    const btns = document.querySelectorAll('[data-row-index="' + numericRowIndex + '"][data-reaction="' + reaction + '"]');
+    const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
     
     if (!item || !item.reactions) return;
     
@@ -1696,7 +1697,7 @@ class StudyQuestApp {
     
     try {
       // サーバーに送信
-      const res = await this.gas.addReaction(rowIndex, reaction, this.state.sheetName);
+      const res = await this.gas.addReaction(numericRowIndex, reaction, this.state.sheetName);
       
       if (res && res.status === 'ok' && res.reactions) {
         // サーバーからの正確な値で更新
@@ -1759,7 +1760,8 @@ class StudyQuestApp {
     }, 2000);
   }
   async handleHighlight(rowIndex) {
-    const highlightKey = `${rowIndex}-highlight`;
+    const numericRowIndex = parseInt(rowIndex, 10);
+    const highlightKey = `${numericRowIndex}-highlight`;
     
     // Enhanced debounce for highlight operations
     if (this.reactionDebounce.has(highlightKey)) {
@@ -1783,8 +1785,8 @@ class StudyQuestApp {
     if (!this.lastReactionTimes) this.lastReactionTimes = new Map();
     this.lastReactionTimes.set(highlightKey, now);
     
-    const btns = document.querySelectorAll('.highlight-btn[data-row-index="' + rowIndex + '"]');
-    const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
+    const btns = document.querySelectorAll('.highlight-btn[data-row-index="' + numericRowIndex + '"]');
+    const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
     
     if (!item) {
       this.pendingReactions.delete(highlightKey);
@@ -1808,7 +1810,7 @@ class StudyQuestApp {
     this.applyUpdates([item]);
     
     try {
-      const res = await this.gas.toggleHighlight(rowIndex, this.state.sheetName);
+      const res = await this.gas.toggleHighlight(numericRowIndex, this.state.sheetName);
       
       if (res && res.status === 'ok') {
         // サーバーからの正確な値で更新
