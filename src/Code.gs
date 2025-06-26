@@ -257,8 +257,9 @@ function switchActiveSheet(sheetName) {
   if (!sheet) {
     throw new Error(`シート「${sheetName}」が見つかりません。`);
   }
-  
+
   prepareSheetForBoard(sheetName);
+  clearHeaderCache(sheetName);
 
   try {
     updateUserConfig(userId, {
@@ -1375,7 +1376,9 @@ function toggleHighlight(rowIndex, sheetName) {
   if (!checkAdmin()) {
     return { status: 'error', message: '権限がありません。' };
   }
-  
+
+  console.log('toggleHighlight request', { rowIndex: rowIndex, sheetName: sheetName });
+
   const lock = (typeof LockService !== 'undefined') ? LockService.getScriptLock() : null;
   try {
     if (lock) {
@@ -1393,8 +1396,10 @@ function toggleHighlight(rowIndex, sheetName) {
     const current = !!cell.getValue();
     const newValue = !current;
     cell.setValue(newValue);
+    console.log('toggleHighlight updated', { rowIndex: rowIndex, sheetName: targetSheet, highlight: newValue });
     return { status: 'ok', highlight: newValue };
   } catch (error) {
+    console.error('toggleHighlight failed:', error);
     return handleError('toggleHighlight', error, true);
   } finally {
     if (lock) {
@@ -1476,6 +1481,17 @@ function getHeaderIndices(sheetName) {
   return indices;
 }
 
+function clearHeaderCache(sheetName) {
+  const cache = (typeof CacheService !== 'undefined') ? CacheService.getScriptCache() : null;
+  if (cache) {
+    try {
+      cache.remove(`headers_${sheetName}`);
+    } catch (e) {
+      console.error('Cache removal failed:', e);
+    }
+  }
+}
+
 
 function prepareSheetForBoard(sheetName) {
   const sheet = getCurrentSpreadsheet().getSheetByName(sheetName);
@@ -1497,6 +1513,7 @@ function prepareSheetForBoard(sheetName) {
       headers.push(h);
     }
   });
+  clearHeaderCache(sheetName);
 }
 
 function findHeaderIndices(sheetHeaders, requiredHeaders) {
@@ -2388,6 +2405,7 @@ if (typeof module !== 'undefined') {
     getUrlOrigin,
     convertPreviewUrl,
     buildBoardData,
-    guessHeadersFromArray
+    guessHeadersFromArray,
+    clearHeaderCache
   };
 }
