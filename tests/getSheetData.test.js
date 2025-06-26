@@ -137,7 +137,7 @@ test('getSheetData supports random sort', () => {
   expect(indexes).toEqual([2, 3]);
 });
 
-test('getSheetData omits names for non-admin', () => {
+test('getSheetData derives name from email for non-admin', () => {
   ({ getSheetData, COLUMN_HEADERS } = require('../src/Code.gs'));
   const data = [
     [
@@ -159,7 +159,7 @@ test('getSheetData omits names for non-admin', () => {
 
   const result = getSheetData('Sheet1');
 
-  expect(result.rows[0].name).toBe('');
+  expect(result.rows[0].name).toBe('a');
 });
 
 test('getSheetData returns names for admin users', () => {
@@ -227,7 +227,7 @@ test('reaction lists trim spaces and ignore empties', () => {
   expect(row.reactions.CURIOUS.count).toBe(0);
 });
 
-test('getSheetData supports custom headers from config', () => {
+test('getSheetData supports custom headers from config for non-admin', () => {
   global.getConfig = () => ({
     questionHeader: 'Question',
     answerHeader: 'Ans',
@@ -251,7 +251,7 @@ test('getSheetData supports custom headers from config', () => {
     ],
     ['a@example.com', '1-1', 'Answer1', 'Because', '2024-08-01T00:00:00Z', '', '', '', 'false', 'Alice']
   ];
-  setupMocks(data, 'a@example.com', 'a@example.com');
+  setupMocks(data, 'a@example.com', '');
 
   const result = getSheetData('Sheet1');
 
