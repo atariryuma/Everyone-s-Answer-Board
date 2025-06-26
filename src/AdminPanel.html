@@ -354,27 +354,17 @@
           </div>
           <div id="detail-options" class="space-y-2">
             <label class="flex items-center p-3 rounded border border-gray-600 cursor-pointer hover:border-orange-400 transition-all">
-              <input type="radio" name="showDetails" value="true" class="mr-3 text-orange-400" />
-              <div class="flex items-center">
-                <svg class="w-4 h-4 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                </svg>
-                <div>
-                  <div class="font-medium text-white">名前・リアクション数を表示</div>
-                  <div class="text-xs text-gray-400">生徒名とリアクション数が表示されます</div>
-                </div>
+              <input type="checkbox" name="showNames" class="mr-3 text-orange-400" />
+              <div>
+                <div class="font-medium text-white">名前を表示</div>
+                <div class="text-xs text-gray-400">生徒名を表示します</div>
               </div>
             </label>
             <label class="flex items-center p-3 rounded border border-gray-600 cursor-pointer hover:border-orange-400 transition-all">
-              <input type="radio" name="showDetails" value="false" class="mr-3 text-orange-400" />
-              <div class="flex items-center">
-                <svg class="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
-                </svg>
-                <div>
-                  <div class="font-medium text-white">匿名表示</div>
-                  <div class="text-xs text-gray-400">匿名表示でリアクション数も非表示</div>
-                </div>
+              <input type="checkbox" name="showCounts" class="mr-3 text-orange-400" />
+              <div>
+                <div class="font-medium text-white">リアクション数を表示</div>
+                <div class="text-xs text-gray-400">各リアクションの数を表示します</div>
               </div>
             </label>
           </div>
@@ -569,8 +559,10 @@
       
       // Display options
       elements.detailOptions.addEventListener('change', function(e) {
-        if (e.target.name === 'showDetails') {
-          updateShowDetails(e.target.value);
+        if (e.target.name === 'showNames' || e.target.name === 'showCounts') {
+          const showNames = elements.detailOptions.querySelector('input[name="showNames"]').checked;
+          const showCounts = elements.detailOptions.querySelector('input[name="showCounts"]').checked;
+          updateDisplayOptions(showNames, showCounts);
         }
       });
       
@@ -759,10 +751,10 @@
 
       // Update display options
       if (elements.detailOptions) {
-        const radios = elements.detailOptions.querySelectorAll('input[name="showDetails"]');
-        radios.forEach(r => {
-          r.checked = r.value === String(status.showDetails);
-        });
+        const nameCb = elements.detailOptions.querySelector('input[name="showNames"]');
+        const countCb = elements.detailOptions.querySelector('input[name="showCounts"]');
+        if (nameCb) nameCb.checked = !!status.showNames;
+        if (countCb) countCb.checked = !!status.showCounts;
       }
       
       updateUIForSelectedSheet();
@@ -1125,7 +1117,7 @@
         .clearActiveSheet();
     }
 
-    function updateShowDetails(val) {
+    function updateDisplayOptions(showNames, showCounts) {
       setLoading(true, '表示設定を更新中...');
       google.script.run
         .withSuccessHandler((msg) => {
@@ -1133,7 +1125,7 @@
           setLoading(false);
         })
         .withFailureHandler(showError)
-        .setShowDetails(val === 'true');
+        .setDisplayOptions({ showNames, showCounts });
     }
 
     function openPreview() {

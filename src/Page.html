@@ -523,7 +523,8 @@ class StudyQuestApp {
       displayMode: window.displayMode,
       sheetName: SHEET_NAME
     };
-    this.serverShowDetails = window.showCounts;
+    this.serverShowCounts = window.showCounts;
+    this.serverDisplayMode = window.displayMode;
     this.pollingInterval = null;
     this.handlers = {};
     this.adminModeVerified = false; // 管理モード切り替え時の権限確認フラグ
@@ -961,13 +962,16 @@ class StudyQuestApp {
       const sortOrder = this.elements.sortOrder.value;
       const data = await this.gas.getPublishedSheetData(requestedSheetName, selectedClass, sortOrder);
       this.state.sheetName = data.sheetName;
-      if (typeof data.showDetails !== 'undefined') {
-        this.serverShowDetails = data.showDetails;
-        if (!this.state.showAdminFeatures) {
-          window.showCounts = data.showDetails;
-          window.displayMode = data.showDetails ? 'named' : 'anonymous';
-          this.updateConfigFromGlobals();
-        }
+      if (typeof data.showCounts !== 'undefined') {
+        this.serverShowCounts = data.showCounts;
+      }
+      if (typeof data.showNames !== 'undefined') {
+        this.serverDisplayMode = data.showNames ? 'named' : 'anonymous';
+      }
+      if (!this.state.showAdminFeatures) {
+        window.showCounts = this.serverShowCounts;
+        window.displayMode = this.serverDisplayMode;
+        this.updateConfigFromGlobals();
       }
       this.adjustLayout();
       if (!this.state.isAdminUser) {
@@ -1491,15 +1495,15 @@ class StudyQuestApp {
       
       // グローバル設定を更新
       window.showAdminFeatures = enable;
-      window.showHighlightToggle = enable;
+      window.showHighlightToggle = enable || this.state.isAdminUser;
       window.showScoreSort = enable;
       if (enable) {
         window.showCounts = true;
         window.displayMode = 'named';
         window.isStudentMode = false;
       } else {
-        window.showCounts = this.serverShowDetails;
-        window.displayMode = this.serverShowDetails ? 'named' : 'anonymous';
+        window.showCounts = this.serverShowCounts;
+        window.displayMode = this.serverDisplayMode;
         window.isStudentMode = true;
       }
       this.updateConfigFromGlobals();

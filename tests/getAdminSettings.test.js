@@ -50,7 +50,8 @@ test('getAdminSettings returns board state', () => {
     isUserAdmin: true,
     isPublished: true,
     activeSheetName: 'SheetA',
-    showDetails: false
+    showNames: false,
+    showCounts: false
   });
 });
 
