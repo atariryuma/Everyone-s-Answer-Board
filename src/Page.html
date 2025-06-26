@@ -1435,31 +1435,82 @@ class StudyQuestApp {
     }, 2000);
   }
   async handleHighlight(rowIndex) {
+    const highlightKey = `${rowIndex}-highlight`;
+    
+    // デバウンス処理 - 同じハイライト操作の連続実行を防ぐ
+    if (this.reactionDebounce.has(highlightKey)) {
+      clearTimeout(this.reactionDebounce.get(highlightKey));
+    }
+    
+    // 既に処理中の場合は無視
+    if (this.pendingReactions.has(highlightKey)) {
+      return;
+    }
+    
+    this.pendingReactions.add(highlightKey);
+    
     const btns = document.querySelectorAll('.highlight-btn[data-row-index="' + rowIndex + '"]');
+    const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
+    
+    if (!item) {
+      this.pendingReactions.delete(highlightKey);
+      return;
+    }
+    
+    // 元の状態を保存（ロールバック用）
+    const originalHighlight = item.highlight;
+    
+    // 楽観的UI更新 - 即座にUIを更新
+    item.highlight = !originalHighlight;
+    
+    // ローディング状態を設定
     btns.forEach(btn => {
+      btn.classList.add('loading');
       btn.disabled = true;
       btn.setAttribute('aria-disabled', 'true');
     });
+    
+    // UIを即座に更新
+    this.applyUpdates([item]);
+    
     try {
-      const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
       console.log('toggleHighlight request', rowIndex, this.state.sheetName);
-      const res = await this.gas.toggleHighlight(rowIndex, item.highlight);
+      const res = await this.gas.toggleHighlight(rowIndex, originalHighlight);
       console.log('toggleHighlight response', res);
+      
       if (res && res.status === 'ok') {
-        if (item) {
-          item.highlight = res.highlight;
-        }
+        // サーバーからの正確な値で更新
+        item.highlight = res.highlight;
         this.applyUpdates([item]);
-      } else if (res && res.message) {
-        console.error('Failed to toggle highlight:', res.message);
+      } else {
+        // エラー時はロールバック
+        throw new Error(res?.message || 'ハイライトの処理に失敗しました');
       }
     } catch (error) {
       console.error('Failed to toggle highlight:', error);
+      
+      // ロールバック - 元の状態に戻す
+      item.highlight = originalHighlight;
+      this.applyUpdates([item]);
+      
+      // エラーフィードバック
+      this.showErrorFeedback(btns[0], 'ハイライトに失敗しました');
     } finally {
+      // ローディング状態を解除
       btns.forEach(btn => {
+        btn.classList.remove('loading');
         btn.disabled = false;
         btn.setAttribute('aria-disabled', 'false');
       });
+      
+      // 処理完了
+      this.pendingReactions.delete(highlightKey);
+      
+      // デバウンス設定 - 200ms後に同じハイライト操作を許可
+      const debounceTimeout = setTimeout(() => {
+        this.reactionDebounce.delete(highlightKey);
+      }, 200);
+      this.reactionDebounce.set(highlightKey, debounceTimeout);
     }
   }
   async toggleAdminMode() {
