@@ -15,9 +15,9 @@
       border: 1px solid rgba(255,255,255,0.1); 
       transition: all 0.2s ease;
     }
-    .glass-panel:hover { border-color: rgba(255,255,255,0.2); }
+    .glass-panel:hover { border-color: rgba(255,255,255,0.2); will-change: border-color; }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
-    button:not(:disabled):hover { transform: translateY(-1px); }
+    button:not(:disabled):hover { transform: translate3d(0, -1px, 0); will-change: transform; }
     :focus-visible { outline: 3px solid #8be9fd; outline-offset: 2px; border-radius: 4px; }
     .loading { opacity: 0.6; pointer-events: none; }
     .success-pulse { animation: successPulse 0.6s ease-out; }
@@ -54,18 +54,18 @@
     .tooltip:hover::after { opacity: 1; }
     
     @keyframes successPulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-      100% { transform: scale(1); }
+      0% { will-change: transform; }
+      50% { transform: scale3d(1.05, 1.05, 1); }
+      100% { transform: scale3d(1, 1, 1); }
     }
     @keyframes errorShake {
-      0%, 100% { transform: translateX(0); }
-      25% { transform: translateX(-5px); }
-      75% { transform: translateX(5px); }
+      0%, 100% { will-change: transform; }
+      25% { transform: translate3d(-5px, 0, 0); }
+      75% { transform: translate3d(5px, 0, 0); }
     }
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; will-change: opacity; }
+      to { opacity: 1; }
     }
     
     .progress-bar {
@@ -80,6 +80,23 @@
       background: linear-gradient(90deg, #8be9fd, #50fa7b);
       transition: width 0.3s ease;
       border-radius: 2px;
+    }
+    
+    /* Performance optimizations */
+    @media (max-width: 768px) and (max-resolution: 150dpi) {
+      .glass-panel {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        background: rgba(26, 27, 38, 0.95);
+      }
+    }
+    
+    /* Reduced motion support */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
     }
   </style>
 </head>

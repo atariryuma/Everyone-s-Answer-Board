@@ -27,7 +27,7 @@
     }
     .glass-panel:hover {
       border-color: rgba(255, 255, 255, 0.2);
-      transform: translateY(-2px);
+      transform: translate3d(0, -2px, 0);
     }
     
     button:disabled { 
@@ -35,11 +35,11 @@
       cursor: not-allowed; 
     }
     button:not(:disabled):hover {
-      transform: translateY(-2px);
+      transform: translate3d(0, -2px, 0);
       box-shadow: 0 8px 16px rgba(0,0,0,0.3);
     }
     button:active:not(:disabled) {
-      transform: translateY(0);
+      transform: translate3d(0, 0, 0);
     }
     
     :focus-visible { 
@@ -101,7 +101,7 @@
     }
     .feature-card:hover {
       border-color: var(--color-primary);
-      transform: translateY(-4px);
+      transform: translate3d(0, -4px, 0);
       box-shadow: 0 12px 24px rgba(139, 233, 253, 0.1);
     }
     
@@ -138,21 +138,21 @@
     }
     
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; will-change: opacity; }
+      to { opacity: 1; }
     }
     @keyframes slideIn {
-      from { opacity: 0; transform: translateX(-20px); }
-      to { opacity: 1; transform: translateX(0); }
+      from { opacity: 0; will-change: opacity; }
+      to { opacity: 1; }
     }
     @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.1); }
+      0%, 100% { will-change: transform; }
+      50% { transform: scale3d(1.05, 1.05, 1); }
     }
     @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      25% { transform: translateX(-5px); }
-      75% { transform: translateX(5px); }
+      0%, 100% { will-change: transform; }
+      25% { transform: translate3d(-5px, 0, 0); }
+      75% { transform: translate3d(5px, 0, 0); }
     }
     
     /* Responsive improvements */
@@ -168,11 +168,29 @@
       }
     }
     
+    /* Performance optimizations */
+    .fade-in, .slide-in, .pulse, .shake {
+      will-change: auto;
+    }
+    
     /* Reduced motion support */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
         animation-duration: 0.01ms !important;
         transition-duration: 0.01ms !important;
+      }
+    }
+    
+    /* Low-end device optimizations */
+    @media (max-width: 768px) and (max-resolution: 150dpi) {
+      .glass-panel {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        background: rgba(26, 27, 38, 0.95);
+      }
+      .feature-card:hover {
+        transform: none;
+        box-shadow: 0 4px 8px rgba(139, 233, 253, 0.1);
       }
     }
   </style>
@@ -201,17 +219,17 @@
     <div class="mb-8 slide-in">
       <div class="flex items-center justify-between relative">
         <div class="absolute top-4 left-0 right-0 h-0.5 bg-gray-600 rounded-full"></div>
-        <div class="absolute top-4 left-0 h-0.5 bg-gradient-to-r from-cyan-400 to-blue-400 transition-all duration-500 rounded-full" id="progress-bar" style="width: 33%"></div>
+        <div class="absolute top-4 left-0 h-0.5 bg-gradient-to-r from-cyan-400 to-blue-400 transition-all duration-500 rounded-full" id="progress-bar"></div>
         
-        <div class="step-indicator completed" id="step-1" role="progressbar" aria-valuenow="1" aria-valuemin="1" aria-valuemax="3">
+        <div class="step-indicator completed" id="step-1" role="progressbar" aria-valuenow="1" aria-valuemin="1" aria-valuemax="3" aria-label="ステップ1: 理解">
           <div class="step-number w-8 h-8 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-sm relative z-10 transition-all">1</div>
           <span class="text-xs mt-2 block text-cyan-400">理解</span>
         </div>
-        <div class="step-indicator" id="step-2" role="progressbar" aria-valuenow="2" aria-valuemin="1" aria-valuemax="3">
+        <div class="step-indicator" id="step-2" role="progressbar" aria-valuenow="2" aria-valuemin="1" aria-valuemax="3" aria-label="ステップ2: 確認">
           <div class="step-number w-8 h-8 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm relative z-10 transition-all">2</div>
           <span class="text-xs mt-2 block text-gray-400">確認</span>
         </div>
-        <div class="step-indicator" id="step-3" role="progressbar" aria-valuenow="3" aria-valuemin="1" aria-valuemax="3">
+        <div class="step-indicator" id="step-3" role="progressbar" aria-valuenow="3" aria-valuemin="1" aria-valuemax="3" aria-label="ステップ3: 開始">
           <div class="step-number w-8 h-8 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm relative z-10 transition-all">3</div>
           <span class="text-xs mt-2 block text-gray-400">開始</span>
         </div>
@@ -339,9 +357,11 @@
     function updateStep(step) {
       currentStep = step;
       
-      // Update progress bar
+      // Update progress bar with performance optimization
       const progressBar = document.getElementById('progress-bar');
-      progressBar.style.width = `${(step / 3) * 100}%`;
+      requestAnimationFrame(() => {
+        progressBar.style.width = `${(step / 3) * 100}%`;
+      });
       
       // Update step indicators
       for (let i = 1; i <= 3; i++) {
