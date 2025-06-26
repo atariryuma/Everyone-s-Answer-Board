@@ -1442,7 +1442,9 @@ class StudyQuestApp {
     });
     try {
       const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
+      console.log('toggleHighlight request', rowIndex, this.state.sheetName);
       const res = await this.gas.toggleHighlight(rowIndex, item.highlight);
+      console.log('toggleHighlight response', res);
       if (res && res.status === 'ok') {
         if (item) {
           item.highlight = res.highlight;
