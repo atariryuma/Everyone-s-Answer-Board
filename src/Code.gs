@@ -561,16 +561,29 @@ function getAvailableSheets() {
  * @param {string} spreadsheetUrl - 追加するスプレッドシートのURL
  */
 function addSpreadsheetUrl(spreadsheetUrl) {
+  console.log('addSpreadsheetUrl called with:', spreadsheetUrl);
+  
   const props = PropertiesService.getUserProperties();
   const userId = props.getProperty('CURRENT_USER_ID');
   
+  console.log('Current user ID:', userId);
+  
   if (!userId) {
-    throw new Error('ユーザー情報が見つかりません。');
+    throw new Error('ユーザー情報が見つかりません。登録プロセスを再実行してください。');
   }
   
   const userInfo = getUserInfo(userId);
-  if (!userInfo || userInfo.adminEmail !== Session.getActiveUser().getEmail()) {
-    throw new Error('権限がありません。');
+  const currentUserEmail = Session.getActiveUser().getEmail();
+  
+  console.log('User info:', userInfo);
+  console.log('Current user email:', currentUserEmail);
+  
+  if (!userInfo) {
+    throw new Error('ユーザー情報が見つかりません。登録プロセスを再実行してください。');
+  }
+  
+  if (userInfo.adminEmail !== currentUserEmail) {
+    throw new Error('権限がありません。管理者アカウントでログインしてください。');
   }
   
   // URLからスプレッドシートIDを抽出
@@ -586,8 +599,12 @@ function addSpreadsheetUrl(spreadsheetUrl) {
   
   // スプレッドシートにアクセスできるかテスト
   try {
+    console.log('Attempting to open spreadsheet with ID:', spreadsheetId);
     const testSpreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheets = testSpreadsheet.getSheets();
+    
+    console.log('Spreadsheet name:', testSpreadsheet.getName());
+    console.log('Number of sheets:', sheets.length);
     
     if (sheets.length === 0) {
       throw new Error('スプレッドシートにシートが見つかりません。');
@@ -645,6 +662,9 @@ function addSpreadsheetUrl(spreadsheetUrl) {
       userEmail: userInfo.adminEmail 
     });
     
+    console.log('Successfully added spreadsheet:', testSpreadsheet.getName());
+    console.log('Active sheet set to:', firstSheetName);
+    
     return {
       success: true,
       message: `スプレッドシート「${testSpreadsheet.getName()}」が追加され、シート「${firstSheetName}」がアクティブになりました。`,
@@ -656,6 +676,79 @@ function addSpreadsheetUrl(spreadsheetUrl) {
     console.error('Failed to access spreadsheet:', error);
     throw new Error(`スプレッドシートにアクセスできません。URLが正しいか、共有設定を確認してください。エラー: ${error.message}`);
   }
+}
+
+/**
+ * AdminPanel用のステータス取得関数
+ */
+function getStatus() {
+  try {
+    const settings = getAdminSettings();
+    const props = PropertiesService.getUserProperties();
+    const userId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!userId) {
+      return {
+        activeSheetName: '',
+        allSheets: [],
+        answerCount: 0,
+        totalReactions: 0,
+        webAppUrl: getWebAppUrl(),
+        showDetails: false
+      };
+    }
+    
+    const userInfo = getUserInfo(userId);
+    const config = userInfo ? userInfo.configJson || {} : {};
+    const activeSheetName = config.activeSheetName || '';
+    
+    // Get available sheets
+    let allSheets = [];
+    try {
+      allSheets = getSheets() || [];
+    } catch (error) {
+      console.warn('Failed to get sheets:', error);
+    }
+    
+    // Get answer count if active sheet exists
+    let answerCount = 0;
+    let totalReactions = 0;
+    
+    if (activeSheetName) {
+      try {
+        const sheetData = getPublishedSheetData(activeSheetName);
+        answerCount = sheetData.rows ? sheetData.rows.length : 0;
+        totalReactions = sheetData.rows ? 
+          sheetData.rows.reduce((sum, row) => {
+            const reactions = row.reactions || {};
+            return sum + (reactions.UNDERSTAND?.count || 0) + 
+                       (reactions.LIKE?.count || 0) + 
+                       (reactions.CURIOUS?.count || 0);
+          }, 0) : 0;
+      } catch (error) {
+        console.warn('Failed to get sheet data for status:', error);
+      }
+    }
+    
+    return {
+      activeSheetName: activeSheetName,
+      allSheets: allSheets,
+      answerCount: answerCount,
+      totalReactions: totalReactions,
+      webAppUrl: getWebAppUrl(),
+      showDetails: config.showDetails || false
+    };
+  } catch (error) {
+    console.error('getStatus error:', error);
+    throw new Error('ステータスの取得に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * AdminPanel用のシート切り替え関数（エイリアス）
+ */
+function switchToSheet(sheetName) {
+  return switchActiveSheet(sheetName);
 }
 
 
