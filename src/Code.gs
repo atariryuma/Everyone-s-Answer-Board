@@ -689,16 +689,42 @@ function getSheetHeaders(sheetName) {
  * @returns {Object} 推測された設定オブジェクト
  */
 function guessHeadersFromArray(headers) {
-  const find = (keys) => headers.find(h => keys.some(k => String(h).includes(k))) || '';
-  const question = find(['質問', '問題']);
-  const answer = find(['回答', '答え']);
-  return {
+  const find = (keys) => {
+    const header = headers.find(h => {
+      const hStr = String(h || '').toLowerCase();
+      return keys.some(k => hStr.includes(k.toLowerCase()));
+    });
+    return header ? String(header) : '';
+  };
+  
+  console.log('Available headers:', headers);
+  
+  const question = find(['質問', '問題', 'question', 'Q']);
+  const answer = find(['回答', '答え', 'answer', 'A', '意見', 'opinion']);
+  const reason = find(['理由', 'reason', '詳細', 'detail']);
+  const name = find(['名前', '氏名', 'name', '学生', 'student']);
+  const classHeader = find(['クラス', 'class', '組', '学級']);
+  
+  const guessed = {
     questionHeader: question,
     answerHeader: answer,
-    reasonHeader: find(['理由']),
-    nameHeader: find(['名前', '氏名']),
-    classHeader: find(['クラス'])
+    reasonHeader: reason,
+    nameHeader: name,
+    classHeader: classHeader
   };
+  
+  console.log('Guessed headers:', guessed);
+  
+  // フォールバック: 何も推測できない場合、最初の数列を使用
+  if (!question && !answer && headers.length > 0) {
+    console.log('No specific headers found, using fallback mapping');
+    guessed.answerHeader = headers[Math.min(1, headers.length - 1)] || headers[0] || '';
+    if (headers.length > 2) guessed.reasonHeader = headers[2] || '';
+    if (headers.length > 3) guessed.nameHeader = headers[3] || '';
+    if (headers.length > 4) guessed.classHeader = headers[4] || '';
+  }
+  
+  return guessed;
 }
 
 function getSheetData(sheetName, classFilter, sortBy) {
@@ -712,7 +738,30 @@ function getSheetData(sheetName, classFilter, sortBy) {
     const cfgFunc = (typeof global !== 'undefined' && global.getConfig)
       ? global.getConfig
       : (typeof getConfig === 'function' ? getConfig : null);
-    const cfg = cfgFunc ? cfgFunc(sheetName) : {};
+    
+    let cfg = {};
+    try {
+      cfg = cfgFunc ? cfgFunc(sheetName) : {};
+    } catch (configError) {
+      console.log(`Config not found for sheet ${sheetName} in getSheetData, creating default config:`, configError.message);
+      
+      // ヘッダーから自動推測して基本設定を作成
+      const headers = allValues[0] || [];
+      const guessedConfig = guessHeadersFromArray(headers);
+      
+      // 少なくとも1つのヘッダーが推測できた場合、デフォルト設定を保存
+      if (guessedConfig.questionHeader || guessedConfig.answerHeader) {
+        try {
+          saveSheetConfig(sheetName, guessedConfig);
+          cfg = guessedConfig;
+          console.log('Auto-created and saved config for sheet in getSheetData:', sheetName, cfg);
+        } catch (saveError) {
+          console.warn('Failed to save auto-created config in getSheetData:', saveError.message);
+          cfg = guessedConfig; // 保存に失敗してもメモリ上のconfigは使用
+        }
+      }
+    }
+    
     const answerHeader = cfg.answerHeader || cfg.questionHeader || COLUMN_HEADERS.OPINION;
     const reasonHeader = cfg.reasonHeader || COLUMN_HEADERS.REASON;
     const classHeader = cfg.classHeader || COLUMN_HEADERS.CLASS;
@@ -805,7 +854,30 @@ function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy)
     const cfgFunc = (typeof global !== 'undefined' && global.getConfig)
       ? global.getConfig
       : (typeof getConfig === 'function' ? getConfig : null);
-    const cfg = cfgFunc ? cfgFunc(sheetName) : {};
+    
+    let cfg = {};
+    try {
+      cfg = cfgFunc ? cfgFunc(sheetName) : {};
+    } catch (configError) {
+      console.log(`Config not found for sheet ${sheetName}, creating default config:`, configError.message);
+      
+      // ヘッダーから自動推測して基本設定を作成
+      const headers = allValues[0] || [];
+      const guessedConfig = guessHeadersFromArray(headers);
+      
+      // 少なくとも1つのヘッダーが推測できた場合、デフォルト設定を保存
+      if (guessedConfig.questionHeader || guessedConfig.answerHeader) {
+        try {
+          saveSheetConfig(sheetName, guessedConfig);
+          cfg = guessedConfig;
+          console.log('Auto-created and saved config for sheet:', sheetName, cfg);
+        } catch (saveError) {
+          console.warn('Failed to save auto-created config:', saveError.message);
+          cfg = guessedConfig; // 保存に失敗してもメモリ上のconfigは使用
+        }
+      }
+    }
+    
     const answerHeader = cfg.answerHeader || cfg.questionHeader || COLUMN_HEADERS.OPINION;
     const reasonHeader = cfg.reasonHeader || COLUMN_HEADERS.REASON;
     const classHeader = cfg.classHeader || COLUMN_HEADERS.CLASS;
