@@ -430,6 +430,15 @@
               })
               .withFailureHandler((error) => {
                 console.error('既存ボード確認エラー:', error);
+                let errorMessage = '既存ボード確認で問題が発生しましたが、新規登録を続行できます。';
+                
+                if (error && typeof error === 'object' && error.message) {
+                  errorMessage = `既存ボード確認エラー: ${error.message}`;
+                } else if (typeof error === 'string') {
+                  errorMessage = `既存ボード確認エラー: ${error}`;
+                }
+                
+                console.warn(errorMessage);
                 // エラーが発生した場合もボタンを有効化（新規登録として扱う）
                 document.getElementById('register-btn').disabled = false;
                 showMessage('アカウント確認が完了しました。StudyQuestを開始できます。', 'success');
@@ -440,8 +449,17 @@
           }
         })
         .withFailureHandler(error => {
-          document.getElementById('user-email').textContent = 'エラー: メールアドレスを取得できません';
-          showMessage('認証エラーが発生しました。', 'error');
+          console.error('User email fetch error:', error);
+          let errorMessage = 'メールアドレスを取得できません';
+          
+          if (error && typeof error === 'object' && error.message) {
+            errorMessage = error.message;
+          } else if (typeof error === 'string') {
+            errorMessage = error;
+          }
+          
+          document.getElementById('user-email').textContent = `エラー: ${errorMessage}`;
+          showMessage('認証エラーが発生しました。Googleアカウントでログインしてください。', 'error');
         })
         .getActiveUserEmail();
     });

@@ -645,11 +645,21 @@
         .withSuccessHandler(updateStatus)
         .withFailureHandler((error) => {
           console.error('getStatus error:', error);
-          showError(error);
-          // Provide helpful guidance for common issues
-          if (error && error.message && error.message.includes('ユーザー情報')) {
-            showMessage('初回使用の場合は、先に新規登録を完了してください。', 'yellow');
+          let errorMessage = 'ステータスの取得に失敗しました';
+          
+          if (error && typeof error === 'object') {
+            if (error.message && typeof error.message === 'string') {
+              errorMessage = error.message;
+              if (error.message.includes('ユーザー情報')) {
+                showMessage('初回使用の場合は、先に新規登録を完了してください。', 'yellow');
+                return;
+              }
+            }
+          } else if (typeof error === 'string') {
+            errorMessage = error;
           }
+          
+          showError(new Error(errorMessage));
         })
         .getStatus();
     }
