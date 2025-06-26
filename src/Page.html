@@ -48,54 +48,209 @@ try {
   --color-accent: #facc15;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
+  --color-success: #10b981;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
 }
 body {
   color: var(--color-text);
   background-color: var(--color-background);
   margin: 0;
+  overflow-x: hidden;
 }
 .glass-panel { 
   background: var(--color-surface);
   border: 1px solid var(--color-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: all 0.2s ease;
+}
+.glass-panel:hover {
+  border-color: rgba(255, 255, 255, 0.2);
 }
 .game-font {
   font-family: 'Press Start 2P', cursive;
 }
 .game-btn {
-  transition: transform 0.15s ease-out;
+  transition: all 0.2s ease;
   border-radius: 0.75rem;
   border-bottom-width: 4px;
   text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+  position: relative;
+  overflow: hidden;
 }
 .game-btn:not(:disabled):hover { 
   transform: translateY(-2px); 
+  box-shadow: 0 8px 16px rgba(0,0,0,0.3);
 }
 .game-btn:active:not(:disabled) { 
   transform: translateY(2px); 
   border-bottom-width: 2px; 
+}
+.game-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
 }
 #classFilter, #sortOrder { 
   background-color: #6272a4; 
   border: 1px solid var(--color-border); 
   color: var(--color-text); 
   border-radius: 0.75rem; 
-  padding: 0.25rem 0.5rem; 
+  padding: 0.5rem 0.75rem; 
+  transition: all 0.2s ease;
+}
+#classFilter:focus, #sortOrder:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(139, 233, 253, 0.1);
 }
 :focus-visible { 
   outline: 3px solid var(--color-primary); 
   outline-offset: 2px; 
   border-radius: 0.75rem; 
 }
-header { position: sticky; top: 0; z-index: 5; contain: layout; }
+header { 
+  position: sticky; 
+  top: 0; 
+  z-index: 50; 
+  contain: layout;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
 .answer-card { 
   will-change: transform;
-  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+  transition: all 0.3s ease;
   border-radius: 1rem;
   contain: layout style;
+  position: relative;
+  overflow: hidden;
 }
 .answer-card.highlighted {
   border: 4px solid var(--color-accent) !important;
-  box-shadow: 0 0 10px rgba(250,204,21,0.4);
+  box-shadow: 0 0 20px rgba(250,204,21,0.4);
+  transform: scale(1.02);
+}
+.answer-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.2);
+}
+.answer-card.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+.reaction-btn {
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+.reaction-btn:hover {
+  transform: scale(1.1);
+}
+.reaction-btn:active {
+  transform: scale(0.95);
+}
+.reaction-btn.reacted {
+  background-color: var(--color-primary) !important;
+  color: #000 !important;
+  box-shadow: 0 0 10px rgba(139, 233, 253, 0.5);
+}
+.reaction-btn.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+.slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+.pulse {
+  animation: pulse 0.6s ease-out;
+}
+.shake {
+  animation: shake 0.5s ease-out;
+}
+.admin-toggle {
+  transition: all 0.3s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.admin-toggle:hover {
+  background-color: rgba(139, 233, 253, 0.1);
+}
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(26, 27, 38, 0.8);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(139, 233, 253, 0.3);
+  border-top: 4px solid var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+  .answer-card {
+    margin-bottom: 1rem;
+  }
+  .game-btn {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
+  header {
+    padding: 1rem;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --color-border: rgba(255, 255, 255, 0.3);
+    --color-surface: rgba(26, 27, 38, 0.98);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 .answer-card:hover {
   transform: translateY(-4px);
@@ -163,37 +318,87 @@ header { position: sticky; top: 0; z-index: 5; contain: layout; }
 </style>
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans">
+<!-- Loading Overlay -->
+<div id="loading-overlay" class="loading-overlay hidden">
+  <div class="text-center">
+    <div class="spinner"></div>
+    <p class="mt-4 text-gray-300">読み込み中...</p>
+  </div>
+</div>
+
 <div id="main-container" class="w-full mx-auto px-4 pt-4 pb-4 md:px-6 md:pt-6 md:pb-6">
-<header id="main-header" class="glass-panel rounded-xl p-4 mb-4 flex flex-col lg:flex-row justify-between items-center gap-4 shadow-lg">
-<div class="flex items-center gap-4 w-full lg:w-auto">
-<p id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0"></p>
-<label for="classFilter" class="sr-only">クラス絞り込み</label>
-<select id="classFilter" class="hidden text-sm"></select>
-<label for="sortOrder" class="sr-only">並び順</label>
-<select id="sortOrder" class="text-sm">
-<option value="newest" selected>新着順</option>
-<option value="random">ランダム順</option>
-<option value="score" id="scoreOption" style="display: none;">スコア順</option>
-</select>
-</div>
-<div class="flex-grow text-center w-full min-w-0 px-2">
-<h1 id="siteTitle" class="game-font text-yellow-300 text-base md:text-lg lg:text-xl mb-1 truncate">みんなの回答ボード</h1>
-<p id="headingLabel" class="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-pink-400 leading-tight flex justify-center items-center min-h-[2rem]">
-<svg class="w-5 h-5 md:w-6 md:h-6 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-<path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
-</svg>
-</p>
-</div>
-<div class="w-full lg:w-auto lg:min-w-[150px] text-right space-y-1 px-2">
-<p id="ownerNameText" class="text-xs text-gray-500 h-4 truncate"></p>
-<p id="sheetNameText" class="text-xs text-gray-400 h-4 truncate"></p>
-<p id="modeLabel" class="text-xs text-gray-400 truncate"></p>
-<div class="flex justify-end gap-1 flex-wrap">
-<button type="button" id="endPublicationBtn" class="text-xs bg-orange-600 hover:bg-orange-700 text-white px-2 py-1 rounded hidden whitespace-nowrap" hidden aria-label="公開終了">公開終了</button>
-<button type="button" id="adminToggleBtn" class="text-xs text-gray-500 hover:text-cyan-400 transition-colors opacity-60 hover:opacity-100 hidden whitespace-nowrap" hidden aria-label="管理者モード切り替え"></button>
-</div>
-</div>
+<header id="main-header" class="glass-panel rounded-xl p-4 mb-4 flex flex-col lg:flex-row justify-between items-center gap-4 shadow-lg fade-in">
+  <!-- Left Section: Controls -->
+  <div class="flex items-center gap-4 w-full lg:w-auto">
+    <div id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0">
+      <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+      </svg>
+      <span id="answerCountText">0 件の回答</span>
+    </div>
+    
+    <div class="flex items-center gap-2">
+      <label for="classFilter" class="sr-only">クラス絞り込み</label>
+      <select id="classFilter" class="hidden text-sm bg-gray-700 border border-gray-600 rounded px-2 py-1"></select>
+      
+      <label for="sortOrder" class="sr-only">並び順</label>
+      <div class="relative">
+        <select id="sortOrder" class="text-sm bg-gray-700 border border-gray-600 rounded px-3 py-1 pr-8 appearance-none cursor-pointer">
+          <option value="newest" selected>新着順</option>
+          <option value="random">ランダム順</option>
+          <option value="score" id="scoreOption" class="hidden">スコア順</option>
+        </select>
+        <svg class="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Center Section: Title -->
+  <div class="flex-grow text-center w-full min-w-0 px-2">
+    <h1 id="siteTitle" class="game-font text-yellow-300 text-base md:text-lg lg:text-xl mb-2 truncate flex items-center justify-center gap-2">
+      <svg class="w-5 h-5 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+      </svg>
+      みんなの回答ボード
+    </h1>
+    <div id="headingLabel" class="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-pink-400 leading-tight flex justify-center items-center min-h-[2rem]">
+      <svg class="w-5 h-5 md:w-6 md:h-6 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Right Section: Info & Admin Controls -->
+  <div class="w-full lg:w-auto lg:min-w-[150px] text-right space-y-1 px-2">
+    <p id="ownerNameText" class="text-xs text-gray-500 h-4 truncate flex items-center justify-end gap-1">
+      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+      </svg>
+    </p>
+    <p id="sheetNameText" class="text-xs text-gray-400 h-4 truncate flex items-center justify-end gap-1">
+      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+      </svg>
+    </p>
+    <p id="modeLabel" class="text-xs text-gray-400 truncate"></p>
+    <div class="flex justify-end gap-1 flex-wrap">
+      <button type="button" id="endPublicationBtn" class="admin-toggle text-xs bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded hidden whitespace-nowrap transition-all flex items-center gap-1" hidden aria-label="公開終了">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"></path>
+        </svg>
+        公開終了
+      </button>
+      <button type="button" id="adminToggleBtn" class="admin-toggle text-xs text-gray-500 hover:text-cyan-400 transition-all opacity-60 hover:opacity-100 hidden whitespace-nowrap flex items-center gap-1 px-2 py-1 rounded" hidden aria-label="管理者モード切り替え">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
 </header>
 <main id="answers" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" role="main" aria-live="polite" aria-label="回答一覧"></main>
 </div>

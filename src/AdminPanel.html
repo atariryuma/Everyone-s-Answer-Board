@@ -8,955 +8,673 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { margin: 0; color: #c0caf5; }
-    .glass-panel { background: rgba(26,27,38,0.7); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+    .glass-panel { 
+      background: rgba(26,27,38,0.7); 
+      -webkit-backdrop-filter: blur(12px); 
+      backdrop-filter: blur(12px); 
+      border: 1px solid rgba(255,255,255,0.1); 
+      transition: all 0.2s ease;
+    }
+    .glass-panel:hover { border-color: rgba(255,255,255,0.2); }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button:not(:disabled):hover { transform: translateY(-1px); }
     :focus-visible { outline: 3px solid #8be9fd; outline-offset: 2px; border-radius: 4px; }
-    .wizard-step { text-align: center; position: relative; z-index: 10; }
-    .wizard-content { transition: opacity 0.3s ease-in-out; }
-    .help-tooltip { cursor: help; }
-    .help-tooltip:hover { background-color: rgba(59, 130, 246, 0.2); border-radius: 50%; }
-    #wizard-progress { transition: width 0.5s ease-in-out; }
+    .loading { opacity: 0.6; pointer-events: none; }
+    .success-pulse { animation: successPulse 0.6s ease-out; }
+    .error-shake { animation: errorShake 0.5s ease-out; }
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+    .status-indicator { 
+      width: 8px; 
+      height: 8px; 
+      border-radius: 50%; 
+      display: inline-block; 
+      margin-right: 8px;
+    }
+    .status-active { background-color: #10b981; box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
+    .status-inactive { background-color: #f59e0b; }
+    .status-error { background-color: #ef4444; }
+    .tooltip { position: relative; }
+    .tooltip::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.9);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      z-index: 1000;
+    }
+    .tooltip:hover::after { opacity: 1; }
+    
+    @keyframes successPulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    @keyframes errorShake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .progress-bar {
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #8be9fd, #50fa7b);
+      transition: width 0.3s ease;
+      border-radius: 2px;
+    }
   </style>
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans px-4 pb-4 pt-4">
-  <div id="app" class="glass-panel max-w-2xl mx-auto rounded-xl p-6 shadow-lg">
-    <h2 class="text-2xl font-bold mb-6 text-yellow-300 text-center">StudyQuest 管理画面</h2>
-
-    <!-- Dashboard Status Cards -->
-    <div class="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-      <!-- Status Card -->
-      <div class="glass-panel p-6 rounded-lg text-center">
-        <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-blue-500/20 flex items-center justify-center">
-          <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-        </div>
-        <div class="text-2xl font-bold text-white mb-1" id="board-status">準備中</div>
-        <div class="text-xs text-gray-400">ボード状態</div>
+  <div id="app" class="glass-panel max-w-4xl mx-auto rounded-xl p-6 shadow-lg">
+    <div class="text-center mb-6">
+      <h2 class="text-2xl font-bold text-yellow-300 mb-2">StudyQuest 管理画面</h2>
+      <div class="progress-bar">
+        <div class="progress-fill" id="setup-progress" style="width: 0%"></div>
       </div>
-      
-      <!-- Answer Count Card -->
-      <div class="glass-panel p-6 rounded-lg text-center">
-        <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-green-500/20 flex items-center justify-center">
-          <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <p class="text-sm text-gray-400" id="setup-status">設定を開始してください</p>
+    </div>
+
+    <!-- Status Dashboard -->
+    <div class="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="glass-panel p-4 rounded-lg text-center fade-in">
+        <div class="flex items-center justify-center mb-2">
+          <span class="status-indicator status-inactive" id="board-status-indicator"></span>
+          <span class="text-sm text-gray-400">ボード状態</span>
+        </div>
+        <div class="text-2xl font-bold text-white" id="board-status">準備中</div>
+      </div>
+      <div class="glass-panel p-4 rounded-lg text-center fade-in">
+        <div class="flex items-center justify-center mb-2">
+          <svg class="w-4 h-4 text-blue-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
           </svg>
+          <span class="text-sm text-gray-400">回答数</span>
         </div>
-        <div class="text-2xl font-bold text-white mb-1" id="answer-count">0</div>
-        <div class="text-xs text-gray-400">回答数</div>
+        <div class="text-2xl font-bold text-white" id="answer-count">0</div>
       </div>
-      
-      <!-- Reaction Count Card -->
-      <div class="glass-panel p-6 rounded-lg text-center">
-        <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-purple-500/20 flex items-center justify-center">
-          <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div class="glass-panel p-4 rounded-lg text-center fade-in">
+        <div class="flex items-center justify-center mb-2">
+          <svg class="w-4 h-4 text-purple-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
           </svg>
+          <span class="text-sm text-gray-400">総リアクション</span>
         </div>
-        <div class="text-2xl font-bold text-white mb-1" id="reaction-count">0</div>
-        <div class="text-xs text-gray-400">総リアクション</div>
+        <div class="text-2xl font-bold text-white" id="reaction-count">0</div>
       </div>
     </div>
 
-    <!-- Current Status Detail -->
-    <div class="mb-6 glass-panel p-4 rounded-lg">
-      <h3 class="font-semibold mb-3 flex items-center gap-2">
-        <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+    <!-- Student URL Section -->
+    <div class="mb-6 glass-panel p-4 rounded-lg hidden" id="board-url-section">
+      <div class="flex items-center mb-3">
+        <svg class="w-5 h-5 text-cyan-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
         </svg>
-        回答ボードの利用状況
-      </h3>
-      <p id="status-text" class="text-gray-300 flex justify-center">
-        <svg class="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
-        </svg>
-      </p>
-      <div id="board-url-section" class="mt-3 hidden">
-        <p class="text-sm text-gray-400 mb-2">生徒用URL:</p>
-        <div class="flex gap-2">
-          <input type="text" id="board-url" readonly 
-                 class="flex-1 p-2 bg-gray-700 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-600"
-                 onclick="this.select()">
-          <button onclick="copyBoardUrl()" 
-                  class="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 rounded text-sm transition-colors">
-            コピー
-          </button>
-          <a id="view-board-link" href="#" target="_blank"
-             class="px-3 py-2 bg-green-600 hover:bg-green-700 rounded text-sm transition-colors">
-            表示
-          </a>
-        </div>
-        <p class="text-xs text-gray-400 mt-1">このURLは固定です。一度生徒に共有すれば、ずっと使い続けられます。</p>
+        <h3 class="font-semibold text-cyan-400">生徒用URL</h3>
+        <span class="ml-2 px-2 py-1 bg-green-600 text-xs rounded-full">準備完了</span>
+      </div>
+      <div class="bg-cyan-900/20 border border-cyan-500/30 rounded p-3 mb-3">
+        <p class="text-sm text-cyan-200">このURLは固定です。一度共有すれば、ずっと使い続けられます。</p>
+      </div>
+      <div class="flex gap-2">
+        <input type="text" id="board-url" readonly 
+               class="flex-1 p-3 bg-gray-700 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-600 focus:ring-2 focus:ring-cyan-400"
+               onclick="this.select()" placeholder="URLが生成されます">
+        <button onclick="copyBoardUrl()" 
+                class="tooltip px-4 py-3 bg-cyan-600 hover:bg-cyan-700 rounded text-sm transition-all flex items-center"
+                data-tooltip="URLをクリップボードにコピー">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+          </svg>
+        </button>
+        <a id="view-board-link" href="#" target="_blank"
+           class="tooltip px-4 py-3 bg-green-600 hover:bg-green-700 rounded text-sm transition-all flex items-center"
+           data-tooltip="新しいタブで回答ボードを開く">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+          </svg>
+        </a>
       </div>
     </div>
 
-    <!-- No Active Sheet Message with Add Spreadsheet Option -->
-    <div id="no-sheet-message" class="mb-6 p-4 bg-yellow-900/30 border border-yellow-600/50 rounded-lg hidden">
-      <div class="flex items-center gap-2 mb-3">
-        <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z"></path>
-        </svg>
-        <h3 class="font-semibold text-yellow-400">回答ボードが設定されていません</h3>
-      </div>
-      <p class="text-sm text-yellow-200 mb-4">
-        スプレッドシートを追加してシートを選択すると、生徒がアクセスできる回答ボードが開始されます。
-      </p>
+    <!-- Main Control Panel -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       
-      <!-- Quick Add Spreadsheet -->
-      <div class="bg-yellow-800/20 rounded-lg p-3 border border-yellow-600/30">
-        <h4 class="text-sm font-semibold text-yellow-300 mb-2">新しいスプレッドシートを追加</h4>
-        <div class="flex gap-2">
-          <input type="url" id="quick-spreadsheet-url" 
-                 placeholder="https://docs.google.com/spreadsheets/d/..."
-                 class="flex-1 p-2 rounded bg-gray-700 border border-gray-600 text-white text-sm focus:ring-2 focus:ring-yellow-400">
-          <button type="button" id="quick-add-btn" 
-                  class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded font-semibold text-sm transition-all">
-            追加
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Setup Wizard -->
-    <div class="mb-8">
-      <div class="flex items-center justify-between relative mb-6">
-        <div class="absolute top-4 left-0 right-0 h-0.5 bg-gray-600"></div>
-        <div class="absolute top-4 left-0 h-0.5 bg-cyan-400 transition-all duration-500" id="wizard-progress" style="width: 25%"></div>
+      <!-- Left Column: Spreadsheet & Sheet Management -->
+      <div class="space-y-6">
         
-        <div class="wizard-step" id="wizard-step-1">
-          <div class="w-8 h-8 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-sm relative z-10">1</div>
-          <span class="text-xs mt-2 block text-cyan-400">URL追加</span>
-        </div>
-        <div class="wizard-step" id="wizard-step-2">
-          <div class="w-8 h-8 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm relative z-10">2</div>
-          <span class="text-xs mt-2 block text-gray-400">シート選択</span>
-        </div>
-        <div class="wizard-step" id="wizard-step-3">
-          <div class="w-8 h-8 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm relative z-10">3</div>
-          <span class="text-xs mt-2 block text-gray-400">列設定</span>
-        </div>
-        <div class="wizard-step" id="wizard-step-4">
-          <div class="w-8 h-8 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm relative z-10">4</div>
-          <span class="text-xs mt-2 block text-gray-400">公開</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Step 1: Spreadsheet URL Input -->
-    <div class="mb-6 wizard-content" id="wizard-content-1">
-      <div class="glass-panel p-6 rounded-lg">
-        <h3 class="font-semibold mb-3 flex items-center gap-2">
-          <div class="w-6 h-6 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-sm">1</div>
-          スプレッドシートを追加
-        </h3>
-        <div class="space-y-4">
-          <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-            <h4 class="font-semibold text-blue-300 mb-2">💡 ヒント</h4>
-            <p class="text-sm text-blue-200">GoogleスプレッドシートのURLをコピーして貼り付けてください。回答データが入力されているシートを使用してください。</p>
+        <!-- Spreadsheet Management -->
+        <div class="glass-panel p-4 rounded-lg">
+          <div class="flex items-center mb-3">
+            <svg class="w-5 h-5 text-blue-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <h3 class="font-semibold text-blue-400">スプレッドシート管理</h3>
           </div>
-          <div class="flex gap-2">
-            <input type="url" id="spreadsheet-url-input" 
-                   placeholder="https://docs.google.com/spreadsheets/d/..."
-                   class="flex-1 p-3 rounded-lg glass-panel text-white border border-gray-600 focus:ring-2 focus:ring-cyan-400">
-            <button type="button" id="add-spreadsheet-btn" 
-                    class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all">
-              追加
-            </button>
-          </div>
-          <p class="text-xs text-gray-400">URL形式: https://docs.google.com/spreadsheets/d/[ID]/edit</p>
-          
-          <!-- Step 1 Navigation -->
-          <div class="flex justify-between items-center pt-4 border-t border-gray-600">
-            <div></div> <!-- Empty for alignment -->
-            <button type="button" id="step1-next-btn" disabled
-                    class="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-600 text-white rounded-lg font-semibold transition-all">
-              シート選択へ →
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Step 2: Sheet Selection -->
-    <div class="mb-6 wizard-content hidden" id="wizard-content-2">
-      <div class="glass-panel p-6 rounded-lg">
-        <h3 class="font-semibold mb-3 flex items-center gap-2">
-          <div class="w-6 h-6 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm" id="step-2-icon">2</div>
-          表示するシートを選択
-        </h3>
-        <div class="space-y-4">
-          <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
-            <h4 class="font-semibold text-green-300 mb-2">📋 シート選択</h4>
-            <p class="text-sm text-green-200">スプレッドシート内のどのシートを回答ボードで表示するかを選択してください。</p>
-          </div>
-          <select id="sheet-select" title="表示するシートを選択" aria-label="スプレッドシートのシート選択" class="w-full p-3 rounded-lg glass-panel text-white border border-gray-600 focus:ring-2 focus:ring-cyan-400">
-            <option>読み込み中...</option>
-          </select>
-          
-          <!-- Step 2 Navigation -->
-          <div class="flex justify-between items-center pt-4 border-t border-gray-600">
-            <button type="button" id="step2-prev-btn"
-                    class="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-all">
-              ← URL追加に戻る
-            </button>
-            <button type="button" id="step2-next-btn" disabled
-                    class="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-600 text-white rounded-lg font-semibold transition-all">
-              列設定へ →
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Step 3: Config Setup -->
-    <div class="mb-6 wizard-content hidden" id="wizard-content-3">
-      <div class="glass-panel p-6 rounded-lg">
-        <h3 class="font-semibold mb-3 flex items-center gap-2">
-          <div class="w-6 h-6 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm" id="step-3-icon">3</div>
-          列の設定
-        </h3>
-        <div class="space-y-4">
-          <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
-            <h4 class="font-semibold text-purple-300 mb-2">⚙️ 列マッピング</h4>
-            <p class="text-sm text-purple-200">ボードで使用する各項目に対応するスプレッドシートの列を指定してください。自動で推測された値を確認・調整できます。</p>
-          </div>
-          <div class="flex flex-col gap-3 rounded-lg glass-panel p-4" id="config-area">
-            <label class="flex flex-col gap-1">
-              <span class="text-sm font-medium text-gray-300">問題文ヘッダー 
-                <button type="button" class="help-tooltip ml-1 text-xs text-blue-400 hover:text-blue-300" title="回答ボードのタイトルとして表示される列">?</button>
-              </span>
-              <select id="qHeader" class="w-full p-2 rounded text-gray-900 border border-gray-300"></select>
-            </label>
-            <label class="flex flex-col gap-1">
-              <span class="text-sm font-medium text-gray-300">回答ヘッダー 
-                <button type="button" class="help-tooltip ml-1 text-xs text-blue-400 hover:text-blue-300" title="回答カードのメインテキストとして表示される列">?</button>
-              </span>
-              <select id="aHeader" class="w-full p-2 rounded text-gray-900 border border-gray-300"></select>
-            </label>
-            <label class="flex flex-col gap-1">
-              <span class="text-sm font-medium text-gray-300">理由ヘッダー 
-                <button type="button" class="help-tooltip ml-1 text-xs text-blue-400 hover:text-blue-300" title="回答カードの本文として表示される列">?</button>
-              </span>
-              <select id="rHeader" class="w-full p-2 rounded text-gray-900 border border-gray-300"></select>
-            </label>
-            <label class="flex flex-col gap-1">
-              <span class="text-sm font-medium text-gray-300">名前列ヘッダー 
-                <button type="button" class="help-tooltip ml-1 text-xs text-blue-400 hover:text-blue-300" title="学生名として表示される列">?</button>
-              </span>
-              <select id="nameHeader" class="w-full p-2 rounded text-gray-900 border border-gray-300"></select>
-            </label>
-            <label class="flex flex-col gap-1">
-              <span class="text-sm font-medium text-gray-300">クラス列ヘッダー 
-                <button type="button" class="help-tooltip ml-1 text-xs text-blue-400 hover:text-blue-300" title="クラス分けフィルター機能で使用される列">?</button>
-              </span>
-              <select id="classHeader" class="w-full p-2 rounded text-gray-900 border border-gray-300"></select>
-            </label>
-            <button type="button" id="save-config-btn" class="w-full bg-green-600 hover:bg-green-700 text-white rounded-lg py-2 font-semibold transition-all">設定を保存</button>
-          </div>
-          
-          <!-- Step 3 Navigation -->
-          <div class="flex justify-between items-center pt-4 border-t border-gray-600">
-            <button type="button" id="step3-prev-btn"
-                    class="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-all">
-              ← シート選択に戻る
-            </button>
-            <button type="button" id="step3-next-btn" disabled
-                    class="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-600 text-white rounded-lg font-semibold transition-all">
-              最終確認へ →
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Step 4: Final Setup and Publishing -->
-    <div class="mb-6 wizard-content hidden" id="wizard-content-4">
-      <div class="glass-panel p-6 rounded-lg">
-        <h3 class="font-semibold mb-3 flex items-center gap-2">
-          <div class="w-6 h-6 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm" id="step-4-icon">4</div>
-          最終確認と公開
-        </h3>
-        <div class="space-y-6">
-          <!-- Current Settings Summary -->
-          <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-            <h4 class="font-semibold text-blue-300 mb-3">📋 現在の設定</h4>
-            <div id="settings-summary" class="space-y-2 text-sm">
-              <div class="flex justify-between">
-                <span class="text-gray-400">選択シート:</span>
-                <span class="text-white" id="summary-sheet">未選択</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-400">問題文列:</span>
-                <span class="text-white" id="summary-question">未設定</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-400">回答列:</span>
-                <span class="text-white" id="summary-answer">未設定</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-400">理由列:</span>
-                <span class="text-white" id="summary-reason">未設定</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-400">名前列:</span>
-                <span class="text-white" id="summary-name">未設定</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-400">クラス列:</span>
-                <span class="text-white" id="summary-class">未設定</span>
-              </div>
+          <div class="space-y-3">
+            <div class="bg-blue-900/20 border border-blue-500/30 rounded p-3">
+              <p class="text-sm text-blue-200 mb-2">💡 手順</p>
+              <ol class="text-xs text-blue-200 space-y-1">
+                <li>1. GoogleスプレッドシートのURLをコピー</li>
+                <li>2. 下のフィールドに貼り付け</li>
+                <li>3. 「追加」ボタンをクリック</li>
+              </ol>
             </div>
-            <button type="button" id="edit-settings-btn" 
-                    class="mt-3 w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-all">
-              ⚙️ 設定を修正する
+            <div class="relative">
+              <input type="url" id="spreadsheet-url-input" 
+                     placeholder="https://docs.google.com/spreadsheets/d/..."
+                     class="w-full p-3 pl-10 rounded bg-gray-700 border border-gray-600 text-white text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all">
+              <svg class="absolute left-3 top-3.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+              </svg>
+            </div>
+            <button type="button" id="add-spreadsheet-btn" 
+                    class="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded font-semibold text-sm transition-all flex items-center justify-center">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+              </svg>
+              <span id="add-spreadsheet-text">スプレッドシートを追加</span>
             </button>
           </div>
-          <!-- Display Options -->
-          <div>
-            <h4 class="font-semibold mb-3 text-orange-300">📊 表示オプション</h4>
-            <div id="detail-options" class="flex flex-col gap-3 rounded-lg glass-panel p-4">
-              <label class="flex items-center p-3 rounded-md cursor-pointer border border-gray-600 hover:border-gray-500 transition-colors">
-                <input type="radio" name="showDetails" value="true" class="mr-3" />
+        </div>
+
+        <!-- Sheet Selection -->
+        <div class="glass-panel p-4 rounded-lg">
+          <div class="flex items-center mb-3">
+            <svg class="w-5 h-5 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <h3 class="font-semibold text-green-400">シート選択</h3>
+            <span class="ml-2 text-xs bg-gray-600 px-2 py-1 rounded" id="sheet-count">0 枚</span>
+          </div>
+          <div class="space-y-3">
+            <div class="relative">
+              <select id="sheet-select" 
+                      class="w-full p-3 pr-10 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-green-400 focus:border-green-400 transition-all">
+                <option>読み込み中...</option>
+              </select>
+              <svg class="absolute right-3 top-3.5 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" id="switch-sheet-btn" disabled
+                      class="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded font-semibold text-sm transition-all">
+                <span id="switch-sheet-text">シートを選択</span>
+              </button>
+              <button type="button" id="clear-selection-btn" disabled
+                      class="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white rounded text-sm transition-all">
+                リセット
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Display Options -->
+        <div class="glass-panel p-4 rounded-lg">
+          <div class="flex items-center mb-3">
+            <svg class="w-5 h-5 text-orange-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+            </svg>
+            <h3 class="font-semibold text-orange-400">表示設定</h3>
+          </div>
+          <div class="bg-orange-900/20 border border-orange-500/30 rounded p-3 mb-3">
+            <p class="text-sm text-orange-200">生徒画面での名前とリアクション数の表示を制御できます</p>
+          </div>
+          <div id="detail-options" class="space-y-2">
+            <label class="flex items-center p-3 rounded border border-gray-600 cursor-pointer hover:border-orange-400 transition-all">
+              <input type="radio" name="showDetails" value="true" class="mr-3 text-orange-400" />
+              <div class="flex items-center">
+                <svg class="w-4 h-4 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
                 <div>
                   <div class="font-medium text-white">名前・リアクション数を表示</div>
-                  <div class="text-xs text-gray-400">生徒の名前とリアクション数が表示されます</div>
+                  <div class="text-xs text-gray-400">生徒名とリアクション数が表示されます</div>
                 </div>
-              </label>
-              <label class="flex items-center p-3 rounded-md cursor-pointer border border-gray-600 hover:border-gray-500 transition-colors">
-                <input type="radio" name="showDetails" value="false" class="mr-3" />
+              </div>
+            </label>
+            <label class="flex items-center p-3 rounded border border-gray-600 cursor-pointer hover:border-orange-400 transition-all">
+              <input type="radio" name="showDetails" value="false" class="mr-3 text-orange-400" />
+              <div class="flex items-center">
+                <svg class="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
+                </svg>
                 <div>
                   <div class="font-medium text-white">匿名表示</div>
                   <div class="text-xs text-gray-400">匿名表示でリアクション数も非表示</div>
                 </div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Column: Configuration -->
+      <div class="space-y-6">
+        
+        <!-- Column Configuration -->
+        <div class="glass-panel p-4 rounded-lg" id="config-section">
+          <div class="flex items-center mb-3">
+            <svg class="w-5 h-5 text-purple-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+            </svg>
+            <h3 class="font-semibold text-purple-400">列設定</h3>
+            <span class="ml-2 px-2 py-1 bg-purple-600 text-xs rounded-full hidden" id="config-status">設定済み</span>
+          </div>
+          <div id="config-area" class="space-y-4 hidden">
+            <div class="bg-purple-900/20 border border-purple-500/30 rounded p-3">
+              <div class="flex items-center mb-2">
+                <svg class="w-4 h-4 text-purple-300 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p class="text-sm text-purple-200">列マッピング設定</p>
+              </div>
+              <p class="text-xs text-purple-200">スプレッドシートの列と表示項目を対応させてください。自動推測された値を確認・調整できます。</p>
+            </div>
+            
+            <div class="space-y-3">
+              <label class="block">
+                <div class="flex items-center mb-2">
+                  <svg class="w-4 h-4 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <span class="text-sm font-medium text-gray-300">問題文列 <span class="text-red-400">*</span></span>
+                  <span class="tooltip ml-1 text-xs text-blue-400 cursor-help" data-tooltip="回答ボードのタイトルとして表示">?</span>
+                </div>
+                <select id="qHeader" class="w-full p-3 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition-all"></select>
+              </label>
+              
+              <label class="block">
+                <div class="flex items-center mb-2">
+                  <svg class="w-4 h-4 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <span class="text-sm font-medium text-gray-300">回答列 <span class="text-red-400">*</span></span>
+                  <span class="tooltip ml-1 text-xs text-blue-400 cursor-help" data-tooltip="回答カードのメインテキスト">?</span>
+                </div>
+                <select id="aHeader" class="w-full p-3 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition-all"></select>
+              </label>
+              
+              <label class="block">
+                <div class="flex items-center mb-2">
+                  <svg class="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <span class="text-sm font-medium text-gray-300">理由列</span>
+                  <span class="tooltip ml-1 text-xs text-blue-400 cursor-help" data-tooltip="回答の詳細説明">?</span>
+                </div>
+                <select id="rHeader" class="w-full p-3 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition-all"></select>
+              </label>
+              
+              <label class="block">
+                <div class="flex items-center mb-2">
+                  <svg class="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                  </svg>
+                  <span class="text-sm font-medium text-gray-300">名前列</span>
+                  <span class="tooltip ml-1 text-xs text-blue-400 cursor-help" data-tooltip="学生名として表示">?</span>
+                </div>
+                <select id="nameHeader" class="w-full p-3 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition-all"></select>
+              </label>
+              
+              <label class="block">
+                <div class="flex items-center mb-2">
+                  <svg class="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                  </svg>
+                  <span class="text-sm font-medium text-gray-300">クラス列</span>
+                  <span class="tooltip ml-1 text-xs text-blue-400 cursor-help" data-tooltip="クラス分けフィルター用">?</span>
+                </div>
+                <select id="classHeader" class="w-full p-3 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition-all"></select>
               </label>
             </div>
-          </div>
-
-          <!-- Preview and Actions -->
-          <div class="space-y-3">
-            <div class="flex gap-3">
-              <button type="button" id="preview-btn" 
-                      class="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all">
-                <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                </svg>
-                プレビュー
-              </button>
-              <button type="button" id="switch-sheet-btn" disabled
-                      class="flex-1 px-4 py-3 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-600 text-white rounded-lg font-semibold transition-all">
-                🚀 このシートをアクティブにする
-              </button>
-            </div>
-            <button type="button" id="clear-selection-btn" disabled
-                    class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white rounded-lg transition-all">
-              アクティブシートをクリア
+            
+            <button type="button" id="save-config-btn" disabled
+                    class="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded py-3 font-semibold transition-all flex items-center justify-center">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+              </svg>
+              <span id="save-config-text">設定を保存</span>
             </button>
           </div>
           
-          <!-- Step 4 Navigation -->
-          <div class="flex justify-between items-center pt-4 border-t border-gray-600">
-            <button type="button" id="step4-prev-btn"
-                    class="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-all">
-              ← 列設定に戻る
+          <div id="config-placeholder" class="text-center py-12">
+            <svg class="w-12 h-12 mx-auto text-gray-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+            </svg>
+            <p class="text-gray-400 text-sm">シートを選択すると</p>
+            <p class="text-gray-400 text-sm">列設定が表示されます</p>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="glass-panel p-4 rounded-lg">
+          <div class="flex items-center mb-3">
+            <svg class="w-5 h-5 text-cyan-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+            <h3 class="font-semibold text-cyan-400">操作</h3>
+          </div>
+          <div class="space-y-3">
+            <button type="button" id="preview-btn" disabled
+                    class="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded font-semibold transition-all flex items-center justify-center">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+              </svg>
+              回答ボードをプレビュー
             </button>
-            <div class="flex gap-2">
-              <button type="button" id="final-preview-btn" 
-                      class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all">
-                👁️ プレビュー
-              </button>
-              <button type="button" id="final-publish-btn" disabled
-                      class="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg font-semibold transition-all">
-                🚀 公開する
-              </button>
+            <div class="bg-cyan-900/20 border border-cyan-500/30 rounded p-3">
+              <p class="text-xs text-cyan-200">アクティブなシートがあるときに回答ボードをプレビューできます</p>
             </div>
           </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Legacy Display Options (hidden by default, shown when not in wizard mode) -->
-    <div class="mb-6 hidden" id="legacy-display-options">
-      <h3 class="font-semibold mb-3">4. 表示オプション</h3>
-      <div id="detail-options-legacy" class="flex flex-col gap-2 rounded-lg glass-panel p-2">
-        <label class="flex items-center p-2 rounded-md cursor-pointer">
-          <input type="radio" name="showDetails" value="true" class="mr-2" />
-          <div>
-            <div class="font-medium">名前・リアクション数を表示</div>
-            <div class="text-xs text-gray-400">生徒の名前とリアクション数が表示されます</div>
-          </div>
-        </label>
-        <label class="flex items-center p-2 rounded-md cursor-pointer">
-          <input type="radio" name="showDetails" value="false" class="mr-2" />
-          <div>
-            <div class="font-medium">表示しない</div>
-            <div class="text-xs text-gray-400">匿名表示でリアクション数も非表示</div>
-          </div>
-        </label>
       </div>
-    </div>
 
-    <!-- Legacy Actions (hidden by default, shown when not in wizard mode) -->
-    <div class="mb-6 hidden" id="legacy-actions">
-      <h3 class="font-semibold mb-3">5. 操作を選択</h3>
-      <div class="flex flex-col gap-2">
-        <button type="button" id="preview-btn-legacy" 
-                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
-          プレビュー
-        </button>
-        <button type="button" id="switch-sheet-btn-legacy" disabled
-                class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-600 text-white rounded-lg">
-          このシートをアクティブにする
-        </button>
-        <button type="button" id="clear-selection-btn-legacy" disabled
-                class="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white rounded-lg">
-          アクティブシートをクリア
-        </button>
-      </div>
     </div>
 
     <!-- Message Area -->
-    <div id="message-area" class="mt-4 text-center text-sm h-5"></div>
+    <div id="message-area" class="mt-6 text-center text-sm h-5" aria-live="polite" role="status"></div>
   </div>
 
   <script>
     const userId = '<?= userId ?>';
-    let currentWizardStep = 1;
-    let wizardMode = true;
-    let autoAdvance = false; // ユーザー主導の確認型フロー
+    let selectedSheet = '';
+    let currentActiveSheet = '';
     
-    // Wizard functionality
-    function updateWizardStep(step, force = false) {
-      // Allow explicit step navigation when force is true
-      if (!force && step <= currentWizardStep && currentWizardStep < 4) {
-        return;
-      }
-      
-      currentWizardStep = step;
-      
-      // Update progress bar
-      const progressBar = document.getElementById('wizard-progress');
-      if (progressBar) {
-        progressBar.style.width = `${(step / 4) * 100}%`;
-      }
-      
-      // Update step indicators
-      for (let i = 1; i <= 4; i++) {
-        const stepElement = document.getElementById(`wizard-step-${i}`);
-        const contentElement = document.getElementById(`wizard-content-${i}`);
-        
-        if (stepElement) {
-          const stepCircle = stepElement.querySelector('div');
-          const stepLabel = stepElement.querySelector('span');
-          
-          if (i <= step) {
-            if (stepCircle) {
-              stepCircle.className = 'w-8 h-8 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-sm relative z-10';
-            }
-            if (stepLabel) {
-              stepLabel.className = 'text-xs mt-2 block text-cyan-400';
-            }
-          } else {
-            if (stepCircle) {
-              stepCircle.className = 'w-8 h-8 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm relative z-10';
-            }
-            if (stepLabel) {
-              stepLabel.className = 'text-xs mt-2 block text-gray-400';
-            }
-          }
-        }
-        
-        // Show/hide content
-        if (contentElement) {
-          if (i === step) {
-            contentElement.classList.remove('hidden');
-          } else {
-            contentElement.classList.add('hidden');
-          }
-        }
-      }
-      
-      // Update step icons in content
-      const stepIcons = ['step-2-icon', 'step-3-icon', 'step-4-icon'];
-      stepIcons.forEach((iconId, index) => {
-        const icon = document.getElementById(iconId);
-        if (icon) {
-          const stepNum = index + 2;
-          if (stepNum <= step) {
-            icon.className = 'w-6 h-6 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-sm';
-          } else {
-            icon.className = 'w-6 h-6 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm';
-          }
-        }
-      });
-    }
-    
-    // Preview functionality
-    function openPreview() {
-      if (!selectedSheet) {
-        showMessage('プレビューするシートを選択してください。', 'red');
-        return;
-      }
-      
-      // Get current config values
-      const config = {
-        questionHeader: elements.qHeader.value,
-        answerHeader: elements.aHeader.value,
-        reasonHeader: elements.rHeader.value,
-        nameHeader: elements.nameHeader.value,
-        classHeader: elements.classHeader.value
-      };
-      
-      // Get display settings
-      const showDetails = document.querySelector('input[name="showDetails"]:checked')?.value === 'true';
-      
-      // Construct preview URL
-      const baseUrl = window.location.origin + window.location.pathname.replace('AdminPanel.html', 'Page.html');
-      const previewUrl = `${baseUrl}?userId=${userId}&preview=true&sheet=${encodeURIComponent(selectedSheet)}&showDetails=${showDetails}`;
-      
-      // Open in new tab
-      window.open(previewUrl, '_blank', 'width=1200,height=800');
-    }
-    
+    // UI Elements
     const elements = {
-      statusText: document.getElementById('status-text'),
       sheetSelect: document.getElementById('sheet-select'),
-      switchSheetBtn: document.getElementById('switch-sheet-btn'),
-      clearSelectionBtn: document.getElementById('clear-selection-btn'),
       configArea: document.getElementById('config-area'),
+      configPlaceholder: document.getElementById('config-placeholder'),
       qHeader: document.getElementById('qHeader'),
       aHeader: document.getElementById('aHeader'),
       rHeader: document.getElementById('rHeader'),
       nameHeader: document.getElementById('nameHeader'),
       classHeader: document.getElementById('classHeader'),
+      switchSheetBtn: document.getElementById('switch-sheet-btn'),
+      clearSelectionBtn: document.getElementById('clear-selection-btn'),
       saveConfigBtn: document.getElementById('save-config-btn'),
       detailOptions: document.getElementById('detail-options'),
-      messageArea: document.getElementById('message-area'),
-      boardUrlSection: document.getElementById('board-url-section'),
+      statusText: document.querySelector('#board-status'),
       boardUrl: document.getElementById('board-url'),
       viewBoardLink: document.getElementById('view-board-link'),
-      noSheetMessage: document.getElementById('no-sheet-message')
+      boardUrlSection: document.getElementById('board-url-section'),
+      setupProgress: document.getElementById('setup-progress'),
+      setupStatus: document.getElementById('setup-status'),
+      boardStatusIndicator: document.getElementById('board-status-indicator'),
+      sheetCount: document.getElementById('sheet-count'),
+      switchSheetText: document.getElementById('switch-sheet-text'),
+      configStatus: document.getElementById('config-status'),
+      addSpreadsheetText: document.getElementById('add-spreadsheet-text'),
+      saveConfigText: document.getElementById('save-config-text'),
+      previewBtn: document.getElementById('preview-btn')
     };
 
-    let selectedSheet = null;
-    let currentActiveSheet = null;
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+      loadStatus();
+      setupEventListeners();
+    });
 
-    document.addEventListener('DOMContentLoaded', () => {
-      loadInitialState();
-      
-      // Standard event listeners
-      elements.switchSheetBtn.addEventListener('click', switchToSelectedSheet);
+    function setupEventListeners() {
+      // Sheet selection
+      elements.sheetSelect.addEventListener('change', function() {
+        selectedSheet = this.value;
+        updateUIForSelectedSheet();
+        loadConfigForSelected();
+      });
+
+      // Actions
+      elements.switchSheetBtn.addEventListener('click', switchToSheet);
       elements.clearSelectionBtn.addEventListener('click', clearSheetSelection);
       elements.saveConfigBtn.addEventListener('click', saveConfig);
       
-      // Wizard-specific event listeners
-      document.getElementById('add-spreadsheet-btn').addEventListener('click', () => {
-        addSpreadsheet();
-        // 自動進行は無効 - ユーザーが次へボタンで進む
-      });
+      // Spreadsheet management
+      document.getElementById('add-spreadsheet-btn').addEventListener('click', addSpreadsheet);
       
-      elements.qHeader.addEventListener('change', () => {
-        if (!elements.aHeader.value) elements.aHeader.value = elements.qHeader.value;
-        updateNavigationButtons();
-      });
-      elements.aHeader.addEventListener('change', () => {
-        if (!elements.qHeader.value) elements.qHeader.value = elements.aHeader.value;
-        updateNavigationButtons();
-      });
-      
-      // Preview button listeners
-      const previewBtn = document.getElementById('preview-btn');
-      const previewBtnLegacy = document.getElementById('preview-btn-legacy');
-      if (previewBtn) previewBtn.addEventListener('click', openPreview);
-      if (previewBtnLegacy) previewBtnLegacy.addEventListener('click', openPreview);
-      
-      // Help tooltip functionality
-      document.querySelectorAll('.help-tooltip').forEach(tooltip => {
-        tooltip.addEventListener('click', (e) => {
-          e.preventDefault();
-          const title = tooltip.getAttribute('title');
-          if (title) {
-            showMessage(title, 'blue');
-            setTimeout(() => showMessage('', 'blue'), 3000);
-          }
-        });
-      });
-      
-      // Wizard navigation event listeners
-      setupWizardNavigation();
-      
-      // Initialize wizard
-      if (wizardMode) {
-        updateWizardStep(1);
-      }
-    });
-    
-    // Wizard navigation setup
-    function setupWizardNavigation() {
-      // Step 1 navigation
-      const step1NextBtn = document.getElementById('step1-next-btn');
-      if (step1NextBtn) {
-        step1NextBtn.addEventListener('click', () => {
-          if (validateStep1()) {
-            updateWizardStep(2, true);
-          }
-        });
-      }
-      
-      // Step 2 navigation
-      const step2PrevBtn = document.getElementById('step2-prev-btn');
-      const step2NextBtn = document.getElementById('step2-next-btn');
-      if (step2PrevBtn) {
-        step2PrevBtn.addEventListener('click', () => updateWizardStep(1, true));
-      }
-      if (step2NextBtn) {
-        step2NextBtn.addEventListener('click', () => {
-          if (validateStep2()) {
-            updateWizardStep(3, true);
-          }
-        });
-      }
-      
-      // Step 3 navigation
-      const step3PrevBtn = document.getElementById('step3-prev-btn');
-      const step3NextBtn = document.getElementById('step3-next-btn');
-      if (step3PrevBtn) {
-        step3PrevBtn.addEventListener('click', () => updateWizardStep(2, true));
-      }
-      if (step3NextBtn) {
-        step3NextBtn.addEventListener('click', () => {
-          if (validateStep3()) {
-            updateSettingsSummary();
-            updateWizardStep(4, true);
-          }
-        });
-      }
-      
-      // Step 4 navigation
-      const step4PrevBtn = document.getElementById('step4-prev-btn');
-      const finalPreviewBtn = document.getElementById('final-preview-btn');
-      const finalPublishBtn = document.getElementById('final-publish-btn');
-      const editSettingsBtn = document.getElementById('edit-settings-btn');
-      
-      if (step4PrevBtn) {
-        step4PrevBtn.addEventListener('click', () => updateWizardStep(3, true));
-      }
-      if (finalPreviewBtn) {
-        finalPreviewBtn.addEventListener('click', openPreview);
-      }
-      if (finalPublishBtn) {
-        finalPublishBtn.addEventListener('click', publishBoard);
-      }
-      if (editSettingsBtn) {
-        editSettingsBtn.addEventListener('click', () => updateWizardStep(3, true));
-      }
-      
-      // Quick add functionality for no-sheet state
-      const quickAddBtn = document.getElementById('quick-add-btn');
-      if (quickAddBtn) {
-        quickAddBtn.addEventListener('click', () => {
-          const urlInput = document.getElementById('quick-spreadsheet-url');
-          if (urlInput && urlInput.value.trim()) {
-            addSpreadsheetFromUrl(urlInput.value.trim());
-            urlInput.value = '';
-          }
-        });
-      }
-    }
-    
-    // Validation functions
-    function validateStep1() {
-      // Check if at least one spreadsheet is available
-      if (!elements.sheetSelect || elements.sheetSelect.options.length <= 1) {
-        showMessage('スプレッドシートを追加してください。', 'red');
-        return false;
-      }
-      return true;
-    }
-    
-    function validateStep2() {
-      if (!selectedSheet) {
-        showMessage('シートを選択してください。', 'red');
-        return false;
-      }
-      return true;
-    }
-    
-    function validateStep3() {
-      if (!elements.qHeader.value && !elements.aHeader.value) {
-        showMessage('問題文または回答のヘッダーを設定してください。', 'red');
-        return false;
-      }
-      return true;
-    }
-    
-    // Update settings summary
-    function updateSettingsSummary() {
-      document.getElementById('summary-sheet').textContent = selectedSheet || '未選択';
-      document.getElementById('summary-question').textContent = elements.qHeader.value || '未設定';
-      document.getElementById('summary-answer').textContent = elements.aHeader.value || '未設定';
-      document.getElementById('summary-reason').textContent = elements.rHeader.value || '未設定';
-      document.getElementById('summary-name').textContent = elements.nameHeader.value || '未設定';
-      document.getElementById('summary-class').textContent = elements.classHeader.value || '未設定';
-      
-      // Enable publish button if basic requirements are met
-      const finalPublishBtn = document.getElementById('final-publish-btn');
-      if (finalPublishBtn) {
-        const canPublish = selectedSheet && (elements.qHeader.value || elements.aHeader.value);
-        finalPublishBtn.disabled = !canPublish;
-      }
-    }
-    
-    // Publish board function
-    function publishBoard() {
-      if (!selectedSheet) {
-        showMessage('公開するシートを選択してください。', 'red');
-        return;
-      }
-      
-      // Save config first, then activate sheet
-      const config = {
-        questionHeader: elements.qHeader.value || elements.aHeader.value,
-        answerHeader: elements.aHeader.value || elements.qHeader.value,
-        reasonHeader: elements.rHeader.value,
-        nameHeader: elements.nameHeader.value,
-        classHeader: elements.classHeader.value
-      };
-      
-      setLoading(true, '設定を保存中...');
-      google.script.run
-        .withSuccessHandler((msg) => {
-          showMessage('設定を保存しました', 'green');
-          // Now activate the sheet
-          activateSheet();
-        })
-        .withFailureHandler(showError)
-        .saveSheetConfig(selectedSheet, config);
-    }
-    
-    function activateSheet() {
-      setLoading(true, 'シートを公開中...');
-      google.script.run
-        .withSuccessHandler((msg) => {
-          showMessage('回答ボードを公開しました！', 'green');
-          loadInitialState(); // Refresh the state
-        })
-        .withFailureHandler(showError)
-        .switchActiveSheet(selectedSheet);
-    }
-    
-    // Add spreadsheet from URL
-    function addSpreadsheetFromUrl(url) {
-      if (!url.includes('docs.google.com/spreadsheets')) {
-        showMessage('有効なGoogleスプレッドシートのURLを入力してください。', 'red');
-        return;
-      }
-      
-      setLoading(true, 'スプレッドシートを追加中...');
-      google.script.run
-        .withSuccessHandler((result) => {
-          showMessage(result.message, 'green');
-          loadInitialState(); // Refresh to load new sheets
-        })
-        .withFailureHandler(showError)
-        .addSpreadsheetUrl(url);
-    }
-    
-    // Update navigation button states
-    function updateNavigationButtons() {
-      // Step 1
-      const step1NextBtn = document.getElementById('step1-next-btn');
-      if (step1NextBtn) {
-        step1NextBtn.disabled = !validateStep1();
-      }
-      
-      // Step 2  
-      const step2NextBtn = document.getElementById('step2-next-btn');
-      if (step2NextBtn) {
-        step2NextBtn.disabled = !selectedSheet;
-      }
-      
-      // Step 3
-      const step3NextBtn = document.getElementById('step3-next-btn');
-      if (step3NextBtn) {
-        step3NextBtn.disabled = !validateStep3();
-      }
-    }
-
-    function loadInitialState() {
-      setLoading(true, "状態を更新中...");
-      google.script.run
-        .withSuccessHandler(updateUI)
-        .withFailureHandler(showError)
-        .withUserObject({ userId: userId })
-        .getAdminSettings();
-    }
-
-    function updateUI(status) {
-      currentActiveSheet = status.activeSheetName;
-      selectedSheet = status.activeSheetName;
-      elements.configArea.classList.toggle('hidden', !selectedSheet);
-
-      // Update dashboard cards
-      const answerCount = status.answerCount || 0;
-      const totalReactions = status.totalReactions || 0;
-      
-      document.getElementById('board-status').textContent = status.activeSheetName ? '利用中' : '準備中';
-      document.getElementById('answer-count').textContent = answerCount;
-      document.getElementById('reaction-count').textContent = totalReactions;
-      
-      // Update dashboard card colors based on status
-      const statusCard = document.querySelector('#board-status').closest('.glass-panel');
-      if (status.activeSheetName && statusCard) {
-        const statusIconDiv = statusCard.querySelector('div.w-12');
-        const statusSvg = statusCard.querySelector('svg');
-        if (statusIconDiv && statusIconDiv.className.includes('rounded-full')) {
-          statusIconDiv.className = 'w-12 h-12 mx-auto mb-3 rounded-full bg-green-500/20 flex items-center justify-center';
+      // Display options
+      elements.detailOptions.addEventListener('change', function(e) {
+        if (e.target.name === 'showDetails') {
+          updateShowDetails(e.target.value);
         }
-        if (statusSvg) {
-          statusSvg.className = 'w-6 h-6 text-green-400';
-        }
-      }
+      });
+      
+      // Preview
+      document.getElementById('preview-btn').addEventListener('click', openPreview);
 
-      if (elements.detailOptions) {
-        const radios = elements.detailOptions.querySelectorAll('input[name="showDetails"]');
-        radios.forEach(r => { r.checked = r.value === String(status.showDetails); r.onchange = () => updateShowDetails(r.value); });
+      // Auto-update config when headers change
+      elements.qHeader.addEventListener('change', updateConfigButtons);
+      elements.aHeader.addEventListener('change', updateConfigButtons);
+    }
+
+    function updateUIForSelectedSheet() {
+      const hasSelected = !!selectedSheet;
+      const isCurrentActive = selectedSheet === currentActiveSheet;
+      
+      elements.switchSheetBtn.disabled = !hasSelected || isCurrentActive;
+      
+      if (elements.switchSheetText) {
+        elements.switchSheetText.textContent = isCurrentActive ? 
+          '現在のアクティブシート' : 
+          (hasSelected ? `「${selectedSheet}」をアクティブ` : 'シートを選択');
       }
       
-      // 回答ボードの状態表示
-      if (status.activeSheetName) {
-        elements.statusText.innerHTML = `<span class="font-bold text-green-400">利用可能</span> - アクティブシート: <span class="font-bold text-blue-400">${escapeHtml(status.activeSheetName)}</span><br>
-        <span class="text-sm text-gray-300">回答数: ${answerCount}件 | 総リアクション数: ${totalReactions}件</span>`;
-        // 生徒用URLを表示
-        const baseUrl = status.webAppUrl || (window.location.origin + window.location.pathname);
-        const boardUrl = `${baseUrl}?userId=${userId}`;
-        elements.boardUrl.value = boardUrl;
-        elements.viewBoardLink.href = boardUrl;
-        elements.boardUrlSection.classList.remove('hidden');
-        elements.noSheetMessage.classList.add('hidden');
-        
-        // アクティブシートがある場合も自動進行しない
+      if (hasSelected) {
+        elements.configArea.classList.remove('hidden');
+        elements.configPlaceholder.classList.add('hidden');
+        elements.configArea.classList.add('fade-in');
       } else {
-        elements.statusText.innerHTML = '<span class="font-bold text-yellow-400">未設定</span> - シートを選択して利用を開始してください';
-        elements.boardUrlSection.classList.add('hidden');
-        elements.noSheetMessage.classList.remove('hidden');
+        elements.configArea.classList.add('hidden');
+        elements.configPlaceholder.classList.remove('hidden');
       }
       
+      updateSetupProgress();
+    }
+
+    function updateSetupProgress() {
+      let progress = 0;
+      let statusText = '設定を開始してください';
+      
+      // Calculate progress based on completion
+      const hasSpreadsheet = elements.sheetSelect.options.length > 1;
+      const hasSelectedSheet = !!selectedSheet;
+      const hasActiveSheet = !!currentActiveSheet;
+      const hasConfig = elements.qHeader.value || elements.aHeader.value;
+      
+      if (hasSpreadsheet) {
+        progress = 25;
+        statusText = 'スプレッドシートが追加されました';
+      }
+      if (hasSelectedSheet) {
+        progress = 50;
+        statusText = 'シートが選択されました';
+      }
+      if (hasConfig) {
+        progress = 75;
+        statusText = '列設定が完了しました';
+      }
+      if (hasActiveSheet) {
+        progress = 100;
+        statusText = '回答ボードが準備完了です';
+      }
+      
+      if (elements.setupProgress) {
+        elements.setupProgress.style.width = `${progress}%`;
+      }
+      if (elements.setupStatus) {
+        elements.setupStatus.textContent = statusText;
+      }
+    }
+
+    function updateConfigButtons() {
+      // Enable save button if we have at least question or answer header
+      const hasConfig = elements.qHeader.value || elements.aHeader.value;
+      elements.saveConfigBtn.disabled = !hasConfig;
+    }
+
+    function loadStatus() {
+      setLoading(true, 'ステータス読み込み中...');
+      google.script.run
+        .withSuccessHandler(updateStatus)
+        .withFailureHandler(showError)
+        .getStatus();
+    }
+
+    function updateStatus(status) {
+      currentActiveSheet = status.activeSheetName || '';
+      
+      // Update dashboard with animations
+      const boardStatus = document.getElementById('board-status');
+      const isActive = !!status.activeSheetName;
+      
+      boardStatus.textContent = isActive ? '利用中' : '準備中';
+      document.getElementById('answer-count').textContent = status.answerCount || 0;
+      document.getElementById('reaction-count').textContent = status.totalReactions || 0;
+      
+      // Update status indicator
+      if (elements.boardStatusIndicator) {
+        elements.boardStatusIndicator.className = `status-indicator ${isActive ? 'status-active' : 'status-inactive'}`;
+      }
+      
+      // Update sheet options with count
       elements.sheetSelect.innerHTML = '';
+      const sheetsCount = status.allSheets ? status.allSheets.length : 0;
+      
+      if (elements.sheetCount) {
+        elements.sheetCount.textContent = `${sheetsCount} 枚`;
+      }
+      
       if (status.allSheets && status.allSheets.length > 0) {
         elements.sheetSelect.innerHTML = '<option value="">-- シートを選択してください --</option>';
         status.allSheets.forEach(name => {
           const opt = document.createElement('option');
           opt.value = name;
           opt.textContent = name;
+          if (name === currentActiveSheet) opt.textContent += ' (アクティブ)';
           elements.sheetSelect.appendChild(opt);
         });
         elements.sheetSelect.disabled = false;
         if (status.activeSheetName) {
           elements.sheetSelect.value = status.activeSheetName;
+          selectedSheet = status.activeSheetName;
         }
       } else {
         elements.sheetSelect.innerHTML = '<option value="">表示できるシートがありません</option>';
         elements.sheetSelect.disabled = true;
       }
 
-      elements.sheetSelect.onchange = () => {
-        selectedSheet = elements.sheetSelect.value;
-        elements.switchSheetBtn.disabled = !selectedSheet;
-        elements.configArea.classList.toggle('hidden', !selectedSheet);
+      // Update board URL with enhanced visibility
+      if (status.activeSheetName) {
+        const baseUrl = status.webAppUrl || (window.location.origin + window.location.pathname);
+        const boardUrl = `${baseUrl}?userId=${userId}`;
+        elements.boardUrl.value = boardUrl;
+        elements.viewBoardLink.href = boardUrl;
+        elements.boardUrlSection.classList.remove('hidden');
+        elements.boardUrlSection.classList.add('fade-in');
         
-        // シート切り替えボタンのテキストを動的に変更
-        if (selectedSheet && selectedSheet === currentActiveSheet) {
-          elements.switchSheetBtn.textContent = '現在のアクティブシート';
-          elements.switchSheetBtn.disabled = true;
-        } else if (selectedSheet) {
-          elements.switchSheetBtn.textContent = `🚀「${selectedSheet}」をアクティブにする`;
-          elements.switchSheetBtn.disabled = false;
-        } else {
-          elements.switchSheetBtn.textContent = 'このシートをアクティブにする';
-          elements.switchSheetBtn.disabled = true;
+        // Enable preview button
+        if (elements.previewBtn) {
+          elements.previewBtn.disabled = false;
         }
+      } else {
+        elements.boardUrlSection.classList.add('hidden');
         
-        loadConfigForSelected();
-        updateNavigationButtons(); // Update navigation button states
-      };
+        // Disable preview button
+        if (elements.previewBtn) {
+          elements.previewBtn.disabled = true;
+        }
+      }
 
-      // 初期状態のボタン設定
-      elements.switchSheetBtn.disabled = !selectedSheet || selectedSheet === currentActiveSheet;
-      elements.clearSelectionBtn.disabled = !currentActiveSheet;
+      // Update display options
+      if (elements.detailOptions) {
+        const radios = elements.detailOptions.querySelectorAll('input[name="showDetails"]');
+        radios.forEach(r => {
+          r.checked = r.value === String(status.showDetails);
+        });
+      }
       
+      updateUIForSelectedSheet();
       loadConfigForSelected();
-      updateNavigationButtons(); // Update navigation button states
       setLoading(false);
     }
 
     function addSpreadsheet() {
       const urlInput = document.getElementById('spreadsheet-url-input');
+      const addBtn = document.getElementById('add-spreadsheet-btn');
       const url = urlInput.value.trim();
       
       if (!url) {
         showMessage('スプレッドシートURLを入力してください。', 'red');
+        addVisualFeedback(urlInput, 'error');
+        urlInput.focus();
         return;
       }
       
       if (!url.includes('docs.google.com/spreadsheets')) {
         showMessage('有効なGoogleスプレッドシートのURLを入力してください。', 'red');
+        addVisualFeedback(urlInput, 'error');
+        urlInput.focus();
         return;
       }
       
+      // Visual loading state
       setLoading(true, 'スプレッドシートを追加中...');
+      addBtn.disabled = true;
+      if (elements.addSpreadsheetText) {
+        elements.addSpreadsheetText.textContent = '追加中...';
+      }
+      
       google.script.run
         .withSuccessHandler((result) => {
-          showMessage(result.message, 'green');
+          showMessage(result.message || 'スプレッドシートが追加されました', 'green');
+          addVisualFeedback(urlInput, 'success');
           urlInput.value = '';
-          // スプレッドシート追加後、状態を再読み込み
-          loadInitialState();
-          updateNavigationButtons();
+          addBtn.disabled = false;
+          if (elements.addSpreadsheetText) {
+            elements.addSpreadsheetText.textContent = 'スプレッドシートを追加';
+          }
+          loadStatus(); // Refresh the status
         })
-        .withFailureHandler(showError)
+        .withFailureHandler((error) => {
+          showMessage('エラー: ' + (error.message || 'スプレッドシートの追加に失敗しました'), 'red');
+          addVisualFeedback(addBtn, 'error');
+          addBtn.disabled = false;
+          if (elements.addSpreadsheetText) {
+            elements.addSpreadsheetText.textContent = 'スプレッドシートを追加';
+          }
+          setLoading(false);
+        })
         .addSpreadsheetUrl(url);
-    }
-
-    function switchToSelectedSheet() {
-      if (!selectedSheet) return;
-      setLoading(true, 'シートを切り替え中...');
-      google.script.run
-        .withSuccessHandler((msg) => {
-          showMessage(msg, 'green');
-          loadInitialState();
-        })
-        .withFailureHandler(showError)
-        .switchActiveSheet(selectedSheet);
-    }
-
-    function clearSheetSelection() {
-      if (!confirm('アクティブシートをクリアしますか？生徒は回答ボードにアクセスできなくなります。')) return;
-      setLoading(true, 'シート選択をクリア中...');
-      google.script.run
-        .withSuccessHandler((msg) => {
-          showMessage(msg, 'green');
-          loadInitialState();
-        })
-        .withFailureHandler(showError)
-        .clearActiveSheet();
-    }
-
-    function updateShowDetails(val) {
-      setLoading(true, '表示設定を更新中...');
-      google.script.run
-        .withSuccessHandler((msg) => { showMessage(msg, 'green'); setLoading(false); })
-        .withFailureHandler(showError)
-        .setShowDetails(val === 'true');
     }
 
     function loadConfigForSelected() {
       if (!selectedSheet) {
-        elements.configArea.classList.add('hidden');
         clearConfigFields();
         return;
       }
-      elements.configArea.classList.remove('hidden');
+      
       google.script.run
         .withSuccessHandler((headers) => {
           populateHeaderOptions(headers);
@@ -964,31 +682,13 @@
           populateConfig(guesses);
           google.script.run
             .withSuccessHandler(cfg => {
-              // Merge server config with guesses, prioritizing server config
               populateConfig(Object.assign({}, guesses, cfg));
+              updateConfigButtons();
             })
             .withFailureHandler((error) => {
-              // Handle config not found - create default config from guesses
-              console.log('Config not found for sheet, using guessed headers:', error);
+              console.log('Config not found, using guessed headers:', error);
               showMessage('新しいシートの設定を自動推測しました。確認してください。', 'blue');
-              // Save the guessed config automatically for new sheets
-              if (guesses.questionHeader || guesses.answerHeader) {
-                const defaultConfig = {
-                  questionHeader: guesses.questionHeader || guesses.answerHeader || '',
-                  answerHeader: guesses.answerHeader || guesses.questionHeader || '',
-                  reasonHeader: guesses.reasonHeader || '',
-                  nameHeader: guesses.nameHeader || '',
-                  classHeader: guesses.classHeader || ''
-                };
-                google.script.run
-                  .withSuccessHandler(() => {
-                    console.log('Default config saved for new sheet');
-                  })
-                  .withFailureHandler((saveError) => {
-                    console.error('Failed to save default config:', saveError);
-                  })
-                  .saveSheetConfig(selectedSheet, defaultConfig);
-              }
+              updateConfigButtons();
             })
             .getConfig(selectedSheet);
         })
@@ -1003,7 +703,7 @@
     function populateHeaderOptions(headers) {
       const selects = [elements.qHeader, elements.aHeader, elements.rHeader, elements.nameHeader, elements.classHeader];
       selects.forEach(sel => {
-        sel.innerHTML = '<option value=""></option>';
+        sel.innerHTML = '<option value="">-- 選択してください --</option>';
         headers.forEach(h => {
           const opt = document.createElement('option');
           opt.value = h;
@@ -1027,9 +727,8 @@
     }
 
     function populateConfig(cfg) {
-      const q = cfg.questionHeader || cfg.answerHeader || '';
-      elements.qHeader.value = q;
-      elements.aHeader.value = cfg.answerHeader || cfg.questionHeader || '';
+      elements.qHeader.value = cfg.questionHeader || '';
+      elements.aHeader.value = cfg.answerHeader || '';
       elements.rHeader.value = cfg.reasonHeader || '';
       elements.nameHeader.value = cfg.nameHeader || '';
       elements.classHeader.value = cfg.classHeader || '';
@@ -1037,9 +736,10 @@
 
     function clearConfigFields() {
       [elements.qHeader, elements.aHeader, elements.rHeader, elements.nameHeader, elements.classHeader].forEach(sel => {
-        sel.innerHTML = '<option value=""></option>';
+        sel.innerHTML = '<option value="">-- 選択してください --</option>';
         sel.value = '';
       });
+      updateConfigButtons();
     }
 
     function saveConfig() {
@@ -1047,8 +747,17 @@
         showMessage('シートを選択してください。', 'red');
         return;
       }
+      
       const qVal = elements.qHeader.value;
-      const aVal = elements.aHeader.value || qVal;
+      const aVal = elements.aHeader.value;
+      
+      if (!qVal && !aVal) {
+        showMessage('問題文または回答のヘッダーを設定してください。', 'red');
+        addVisualFeedback(elements.qHeader, 'error');
+        addVisualFeedback(elements.aHeader, 'error');
+        return;
+      }
+      
       const cfg = {
         questionHeader: qVal || aVal,
         answerHeader: aVal || qVal,
@@ -1056,54 +765,171 @@
         nameHeader: elements.nameHeader.value,
         classHeader: elements.classHeader.value
       };
+      
       setLoading(true, '設定を保存中...');
+      elements.saveConfigBtn.disabled = true;
+      if (elements.saveConfigText) {
+        elements.saveConfigText.textContent = '保存中...';
+      }
+      
       google.script.run
         .withSuccessHandler((msg) => { 
           showMessage(msg, 'green'); 
+          addVisualFeedback(elements.saveConfigBtn, 'success');
+          if (elements.configStatus) {
+            elements.configStatus.classList.remove('hidden');
+          }
+          if (elements.saveConfigText) {
+            elements.saveConfigText.textContent = '設定を保存';
+          }
+          elements.saveConfigBtn.disabled = false;
+          updateSetupProgress();
           setLoading(false);
-          // 設定保存後もユーザーが確認してから次へ進む
+        })
+        .withFailureHandler((error) => {
+          showError(error);
+          addVisualFeedback(elements.saveConfigBtn, 'error');
+          if (elements.saveConfigText) {
+            elements.saveConfigText.textContent = '設定を保存';
+          }
+          elements.saveConfigBtn.disabled = false;
+          setLoading(false);
+        })
+        .saveSheetConfig(selectedSheet, cfg);
+    }
+
+    function switchToSheet() {
+      if (!selectedSheet) return;
+      
+      setLoading(true, 'シートを切り替え中...');
+      google.script.run
+        .withSuccessHandler((msg) => {
+          showMessage(msg, 'green');
+          loadStatus();
         })
         .withFailureHandler(showError)
-        .saveSheetConfig(selectedSheet, cfg);
+        .switchToSheet(selectedSheet);
+    }
+
+    function clearSheetSelection() {
+      setLoading(true, 'シート選択をクリア中...');
+      google.script.run
+        .withSuccessHandler((msg) => {
+          showMessage(msg, 'green');
+          loadStatus();
+        })
+        .withFailureHandler(showError)
+        .clearActiveSheet();
+    }
+
+    function updateShowDetails(val) {
+      setLoading(true, '表示設定を更新中...');
+      google.script.run
+        .withSuccessHandler((msg) => {
+          showMessage(msg, 'green');
+          setLoading(false);
+        })
+        .withFailureHandler(showError)
+        .setShowDetails(val === 'true');
+    }
+
+    function openPreview() {
+      if (!currentActiveSheet) {
+        showMessage('アクティブなシートがありません。', 'red');
+        return;
+      }
+      const baseUrl = window.location.origin + window.location.pathname;
+      const previewUrl = `${baseUrl}?userId=${userId}`;
+      window.open(previewUrl, '_blank');
+    }
+
+    function copyBoardUrl() {
+      const urlInput = elements.boardUrl;
+      if (urlInput) {
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(urlInput.value);
+          } else {
+            urlInput.select();
+            document.execCommand('copy');
+          }
+          showMessage('URLをコピーしました', 'green');
+        } catch (error) {
+          showMessage('コピーに失敗しました', 'red');
+        }
+      }
     }
 
     function setLoading(isLoading, msg = "") {
       elements.switchSheetBtn.disabled = isLoading;
       elements.clearSelectionBtn.disabled = isLoading;
-      if (isLoading) {
-          showMessage(msg, 'blue');
-      }
-    }
-    
-    function copyBoardUrl() {
-      const url = elements.boardUrl.value;
-      if (url) {
-        navigator.clipboard.writeText(url).then(() => {
-          showMessage('URLをコピーしました', 'green');
-        }).catch(() => {
-          // フォールバック：従来の方法
-          elements.boardUrl.select();
-          document.execCommand('copy');
-          showMessage('URLをコピーしました', 'green');
-        });
+      if (isLoading && msg) {
+        showMessage(msg, 'blue');
       }
     }
 
-    function showMessage(msg, color = 'red') {
-      const colorClasses = { red: 'text-red-600', green: 'text-green-600', blue: 'text-blue-600' };
-      elements.messageArea.className = `mt-4 text-center text-sm h-5 ${colorClasses[color]}`;
-      elements.messageArea.textContent = msg;
+    function showMessage(message, type = 'info', duration = 4000) {
+      const messageArea = document.getElementById('message-area');
+      if (messageArea) {
+        const colors = {
+          success: 'text-green-400',
+          green: 'text-green-400',
+          error: 'text-red-400',
+          red: 'text-red-400',
+          info: 'text-blue-400',
+          blue: 'text-blue-400',
+          warning: 'text-yellow-400',
+          yellow: 'text-yellow-400'
+        };
+        
+        messageArea.className = `mt-6 text-center text-sm h-5 ${colors[type] || 'text-gray-400'}`;
+        messageArea.textContent = message;
+        
+        // Add visual animations based on type
+        if (type === 'success' || type === 'green') {
+          messageArea.classList.add('success-pulse');
+          setTimeout(() => messageArea.classList.remove('success-pulse'), 600);
+        } else if (type === 'error' || type === 'red') {
+          messageArea.classList.add('error-shake');
+          setTimeout(() => messageArea.classList.remove('error-shake'), 500);
+        }
+        
+        if (type !== 'blue' && duration > 0) {
+          setTimeout(() => {
+            messageArea.textContent = '';
+            messageArea.className = 'mt-6 text-center text-sm h-5';
+          }, duration);
+        }
+      }
     }
-    
+
+    function addVisualFeedback(element, type) {
+      if (!element) return;
+      
+      element.classList.remove('success-pulse', 'error-shake');
+      
+      if (type === 'success') {
+        element.classList.add('success-pulse');
+        setTimeout(() => element.classList.remove('success-pulse'), 600);
+      } else if (type === 'error') {
+        element.classList.add('error-shake');
+        setTimeout(() => element.classList.remove('error-shake'), 500);
+      }
+    }
+
     function showError(error) {
-      showMessage(error.message, 'red');
+      console.error('Error:', error);
+      showMessage('エラー: ' + (error.message || '操作に失敗しました'), 'red');
       setLoading(false);
     }
-    
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
+
+    function escapeHtml(unsafe) {
+      return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
     }
   </script>
 </body>
