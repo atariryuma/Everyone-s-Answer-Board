@@ -1,13 +1,22 @@
 function getConfig(sheetName) {
   try {
-    const sheet = getCurrentSpreadsheet().getSheetByName('Config');
+    let sheet = getCurrentSpreadsheet().getSheetByName('Config');
+    
+    // Configシートが存在しない場合は作成
     if (!sheet) {
-      throw new Error('Configシートが見つかりません。新しいスプレッドシートの場合、設定を自動作成します。');
+      console.log('Config sheet not found, creating new one');
+      sheet = getCurrentSpreadsheet().insertSheet('Config');
+      const headers = ['表示シート名','問題文ヘッダー','回答ヘッダー','理由ヘッダー','名前列ヘッダー','クラス列ヘッダー'];
+      sheet.appendRow(headers);
+      
+      // 自動設定を試行
+      return createAutoConfig(sheetName);
     }
     
     const values = sheet.getDataRange().getValues();
     if (values.length < 2) {
-      throw new Error('Configシートにデータがありません。新しいシートの設定を作成してください。');
+      console.log('Config sheet has no data, creating auto config');
+      return createAutoConfig(sheetName);
     }
     
     const headers = values[0];
@@ -16,7 +25,8 @@ function getConfig(sheetName) {
     
     const target = values.find((row, rIdx) => rIdx>0 && row[idx['表示シート名']]===sheetName);
     if(!target) {
-      throw new Error(`シート「${sheetName}」の設定がConfigシートに見つかりません。自動で基本設定を作成します。`);
+      console.log(`No config found for sheet ${sheetName}, creating auto config`);
+      return createAutoConfig(sheetName);
     }
     
     return {
@@ -28,7 +38,56 @@ function getConfig(sheetName) {
     };
   } catch (error) {
     console.error('getConfig error for sheet:', sheetName, error.message);
-    throw error;
+    
+    // エラーが発生した場合も自動設定を試行
+    try {
+      return createAutoConfig(sheetName);
+    } catch (autoError) {
+      console.error('Auto config creation failed:', autoError.message);
+      throw error; // 元のエラーを投げる
+    }
+  }
+}
+
+/**
+ * シートのヘッダーを分析して自動設定を作成
+ */
+function createAutoConfig(sheetName) {
+  try {
+    const targetSheet = getCurrentSpreadsheet().getSheetByName(sheetName);
+    if (!targetSheet) {
+      throw new Error(`シート「${sheetName}」が見つかりません。`);
+    }
+    
+    // ヘッダー行を取得
+    const lastColumn = targetSheet.getLastColumn();
+    if (lastColumn === 0) {
+      throw new Error(`シート「${sheetName}」にデータがありません。`);
+    }
+    
+    const headerRow = targetSheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+    const headers = headerRow.map(v => String(v || '').trim()).filter(h => h !== '');
+    
+    console.log('Creating auto config for headers:', headers);
+    
+    // ヘッダーを推測（Code.gsの関数を使用）
+    if (typeof guessHeadersFromArray === 'undefined') {
+      throw new Error('ヘッダー推測機能が利用できません。');
+    }
+    const guessedConfig = guessHeadersFromArray(headers);
+    
+    // 設定を保存
+    if (guessedConfig.answerHeader) {
+      saveSheetConfig(sheetName, guessedConfig);
+      console.log('Auto-created config saved:', guessedConfig);
+      return guessedConfig;
+    } else {
+      throw new Error('適切なヘッダーを推測できませんでした。手動で設定してください。');
+    }
+    
+  } catch (error) {
+    console.error('createAutoConfig error:', error);
+    throw new Error(`自動設定の作成に失敗しました: ${error.message}`);
   }
 }
 

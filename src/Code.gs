@@ -792,11 +792,79 @@ function guessHeadersFromArray(headers) {
   
   console.log('Available headers:', headers);
   
-  const question = find(['質問', '問題', 'question', 'Q']);
-  const answer = find(['回答', '答え', 'answer', 'A', '意見', 'opinion']);
-  const reason = find(['理由', 'reason', '詳細', 'detail']);
-  const name = find(['名前', '氏名', 'name', '学生', 'student']);
-  const classHeader = find(['クラス', 'class', '組', '学級']);
+  // Googleフォーム特有のヘッダー構造に対応
+  const isGoogleForm = headers.some(h => String(h || '').includes('タイムスタンプ') || String(h || '').includes('メールアドレス'));
+  
+  let question = '';
+  let answer = '';
+  let reason = '';
+  let name = '';
+  let classHeader = '';
+  
+  if (isGoogleForm) {
+    console.log('Detected Google Form response sheet');
+    
+    // Googleフォームの一般的な構造: タイムスタンプ, メールアドレス, [質問1], [質問2], ...
+    const nonMetaHeaders = headers.filter(h => {
+      const hStr = String(h || '').toLowerCase();
+      return !hStr.includes('タイムスタンプ') && 
+             !hStr.includes('timestamp') && 
+             !hStr.includes('メールアドレス') && 
+             !hStr.includes('email');
+    });
+    
+    console.log('Non-meta headers:', nonMetaHeaders);
+    
+    // より柔軟な推測ロジック
+    for (let i = 0; i < nonMetaHeaders.length; i++) {
+      const header = nonMetaHeaders[i];
+      const hStr = String(header || '').toLowerCase();
+      
+      // 質問を含む長いテキストを質問ヘッダーとして推測
+      if (!question && (hStr.includes('だろうか') || hStr.includes('ですか') || hStr.includes('でしょうか') || hStr.length > 20)) {
+        question = header;
+        // 同じ内容が複数列にある場合、回答用として2番目を使用
+        if (i + 1 < nonMetaHeaders.length && nonMetaHeaders[i + 1] === header) {
+          answer = header;
+          continue;
+        }
+      }
+      
+      // 回答・意見に関するヘッダー
+      if (!answer && (hStr.includes('回答') || hStr.includes('答え') || hStr.includes('意見') || hStr.includes('考え'))) {
+        answer = header;
+      }
+      
+      // 理由に関するヘッダー
+      if (!reason && (hStr.includes('理由') || hStr.includes('詳細') || hStr.includes('説明'))) {
+        reason = header;
+      }
+      
+      // 名前に関するヘッダー
+      if (!name && (hStr.includes('名前') || hStr.includes('氏名') || hStr.includes('学生'))) {
+        name = header;
+      }
+      
+      // クラスに関するヘッダー
+      if (!classHeader && (hStr.includes('クラス') || hStr.includes('組') || hStr.includes('学級'))) {
+        classHeader = header;
+      }
+    }
+    
+    // フォールバック: まだ回答が見つからない場合
+    if (!answer && nonMetaHeaders.length > 0) {
+      // 最初の非メタヘッダーを回答として使用
+      answer = nonMetaHeaders[0];
+    }
+    
+  } else {
+    // 通常のシート用の推測ロジック
+    question = find(['質問', '問題', 'question', 'Q']);
+    answer = find(['回答', '答え', 'answer', 'A', '意見', 'opinion']);
+    reason = find(['理由', 'reason', '詳細', 'detail']);
+    name = find(['名前', '氏名', 'name', '学生', 'student']);
+    classHeader = find(['クラス', 'class', '組', '学級']);
+  }
   
   const guessed = {
     questionHeader: question,
@@ -808,13 +876,26 @@ function guessHeadersFromArray(headers) {
   
   console.log('Guessed headers:', guessed);
   
-  // フォールバック: 何も推測できない場合、最初の数列を使用
+  // 最終フォールバック: 何も推測できない場合
   if (!question && !answer && headers.length > 0) {
-    console.log('No specific headers found, using fallback mapping');
-    guessed.answerHeader = headers[Math.min(1, headers.length - 1)] || headers[0] || '';
-    if (headers.length > 2) guessed.reasonHeader = headers[2] || '';
-    if (headers.length > 3) guessed.nameHeader = headers[3] || '';
-    if (headers.length > 4) guessed.classHeader = headers[4] || '';
+    console.log('No specific headers found, using positional mapping');
+    
+    // タイムスタンプとメールを除外して最初の列を回答として使用
+    const usableHeaders = headers.filter(h => {
+      const hStr = String(h || '').toLowerCase();
+      return !hStr.includes('タイムスタンプ') && 
+             !hStr.includes('timestamp') && 
+             !hStr.includes('メールアドレス') && 
+             !hStr.includes('email') &&
+             String(h || '').trim() !== '';
+    });
+    
+    if (usableHeaders.length > 0) {
+      guessed.answerHeader = usableHeaders[0];
+      if (usableHeaders.length > 1) guessed.reasonHeader = usableHeaders[1];
+      if (usableHeaders.length > 2) guessed.nameHeader = usableHeaders[2];
+      if (usableHeaders.length > 3) guessed.classHeader = usableHeaders[3];
+    }
   }
   
   return guessed;

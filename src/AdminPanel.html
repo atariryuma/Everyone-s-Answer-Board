@@ -935,16 +935,98 @@
     }
 
     function guessHeaders(headers) {
-      const find = (keys) => headers.find(h => keys.some(k => h.includes(k))) || '';
-      const question = find(['質問', '問題']);
-      const answer = find(['回答', '答え']);
-      return {
+      console.log('AdminPanel guessing headers:', headers);
+      
+      const find = (keywords) => {
+        return headers.find(h => 
+          keywords.some(k => h && String(h).toLowerCase().includes(k))
+        ) || '';
+      };
+      
+      // Googleフォーム特有のヘッダー構造に対応
+      const isGoogleForm = headers.some(h => String(h || '').includes('タイムスタンプ') || String(h || '').includes('メールアドレス'));
+      
+      let question = '';
+      let answer = '';
+      let reason = '';
+      let name = '';
+      let classHeader = '';
+      
+      if (isGoogleForm) {
+        console.log('Detected Google Form in AdminPanel');
+        
+        // メタデータ以外のヘッダーを抽出
+        const nonMetaHeaders = headers.filter(h => {
+          const hStr = String(h || '').toLowerCase();
+          return !hStr.includes('タイムスタンプ') && 
+                 !hStr.includes('timestamp') && 
+                 !hStr.includes('メールアドレス') && 
+                 !hStr.includes('email') &&
+                 String(h || '').trim() !== '';
+        });
+        
+        console.log('Non-meta headers in AdminPanel:', nonMetaHeaders);
+        
+        // より柔軟な推測ロジック
+        for (let i = 0; i < nonMetaHeaders.length; i++) {
+          const header = nonMetaHeaders[i];
+          const hStr = String(header || '').toLowerCase();
+          
+          // 質問を含む長いテキストを質問ヘッダーとして推測
+          if (!question && (hStr.includes('だろうか') || hStr.includes('ですか') || hStr.includes('でしょうか') || hStr.length > 20)) {
+            question = header;
+            // 同じ内容が複数列にある場合、回答用として2番目を使用
+            if (i + 1 < nonMetaHeaders.length && nonMetaHeaders[i + 1] === header) {
+              answer = header;
+              continue;
+            }
+          }
+          
+          // 回答・意見に関するヘッダー
+          if (!answer && (hStr.includes('回答') || hStr.includes('答え') || hStr.includes('意見') || hStr.includes('考え'))) {
+            answer = header;
+          }
+          
+          // 理由に関するヘッダー
+          if (!reason && (hStr.includes('理由') || hStr.includes('詳細') || hStr.includes('説明'))) {
+            reason = header;
+          }
+          
+          // 名前に関するヘッダー
+          if (!name && (hStr.includes('名前') || hStr.includes('氏名') || hStr.includes('学生'))) {
+            name = header;
+          }
+          
+          // クラスに関するヘッダー
+          if (!classHeader && (hStr.includes('クラス') || hStr.includes('組') || hStr.includes('学級'))) {
+            classHeader = header;
+          }
+        }
+        
+        // フォールバック: まだ回答が見つからない場合
+        if (!answer && nonMetaHeaders.length > 0) {
+          answer = nonMetaHeaders[0];
+        }
+        
+      } else {
+        // 通常のシート用の推測ロジック
+        question = find(['質問', '問題']);
+        answer = find(['回答', '答え']);
+        reason = find(['理由']);
+        name = find(['名前', '氏名']);
+        classHeader = find(['クラス']);
+      }
+      
+      const result = {
         questionHeader: question,
         answerHeader: answer,
-        reasonHeader: find(['理由']),
-        nameHeader: find(['名前', '氏名']),
-        classHeader: find(['クラス'])
+        reasonHeader: reason,
+        nameHeader: name,
+        classHeader: classHeader
       };
+      
+      console.log('AdminPanel guessed result:', result);
+      return result;
     }
 
     function populateConfig(cfg) {
