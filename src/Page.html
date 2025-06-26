@@ -56,6 +56,11 @@ try {
   --color-success: #10b981;
   --color-error: #ef4444;
   --color-warning: #f59e0b;
+  /* Performance variables */
+  --transition-duration: 0.2s;
+  --transition-easing: ease-out;
+  --animation-duration: 0.3s;
+  --backdrop-blur: 12px;
 }
 body {
   color: var(--color-text);
@@ -66,19 +71,20 @@ body {
 .glass-panel { 
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  transition: all 0.2s ease;
+  backdrop-filter: blur(var(--backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--backdrop-blur));
+  transition: border-color var(--transition-duration) var(--transition-easing);
 }
 .glass-panel:hover {
   border-color: rgba(255, 255, 255, 0.2);
-  will-change: border-color;
 }
 .game-font {
   font-family: 'Press Start 2P', cursive;
 }
 .game-btn {
-  transition: all 0.2s ease;
+  transition: transform var(--transition-duration) var(--transition-easing),
+              box-shadow var(--transition-duration) var(--transition-easing),
+              border-bottom-width var(--transition-duration) var(--transition-easing);
   border-radius: 0.75rem;
   border-bottom-width: 4px;
   text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
@@ -88,7 +94,6 @@ body {
 .game-btn:not(:disabled):hover { 
   transform: translate3d(0, -2px, 0); 
   box-shadow: 0 8px 16px rgba(0,0,0,0.3);
-  will-change: transform;
 }
 .game-btn:active:not(:disabled) { 
   transform: translate3d(0, 2px, 0); 
@@ -105,7 +110,8 @@ body {
   color: var(--color-text); 
   border-radius: 0.75rem; 
   padding: 0.5rem 0.75rem; 
-  transition: all 0.2s ease;
+  transition: border-color var(--transition-duration) var(--transition-easing),
+              box-shadow var(--transition-duration) var(--transition-easing);
 }
 #classFilter:focus, #sortOrder:focus {
   border-color: var(--color-primary);
@@ -121,12 +127,12 @@ header {
   top: 0; 
   z-index: 50; 
   contain: layout;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(var(--backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--backdrop-blur));
 }
 .answer-card { 
-  will-change: transform;
-  transition: all 0.3s ease;
+  transition: transform var(--animation-duration) var(--transition-easing),
+              box-shadow var(--animation-duration) var(--transition-easing);
   border-radius: 1rem;
   contain: layout style;
   position: relative;
@@ -146,7 +152,9 @@ header {
   pointer-events: none;
 }
 .reaction-btn {
-  transition: all 0.2s ease;
+  transition: transform var(--transition-duration) var(--transition-easing),
+              background-color var(--transition-duration) var(--transition-easing),
+              box-shadow var(--transition-duration) var(--transition-easing);
   position: relative;
   overflow: hidden;
 }
@@ -178,7 +186,7 @@ header {
   animation: shake 0.5s ease-out;
 }
 .admin-toggle {
-  transition: all 0.3s ease;
+  transition: background-color var(--animation-duration) var(--transition-easing);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -231,10 +239,41 @@ header {
 
 /* Performance optimizations */
 @media (max-width: 768px) and (max-resolution: 150dpi) {
+  :root {
+    --backdrop-blur: 0px;
+    --transition-duration: 0.1s;
+    --animation-duration: 0.15s;
+  }
+  
   .glass-panel {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     background: var(--color-surface);
+  }
+  
+  .answer-card:hover {
+    transform: none;
+  }
+  
+  .reaction-btn:hover {
+    transform: scale(1.05);
+  }
+}
+
+/* Low-end device optimizations */
+@media (max-width: 768px), (max-resolution: 120dpi) {
+  :root {
+    --backdrop-blur: 0px;
+    --transition-duration: 0.1s;
+    --animation-duration: 0.1s;
+  }
+}
+
+/* High refresh rate display optimizations */
+@media (min-resolution: 120dpi) and (min-width: 1200px) {
+  :root {
+    --transition-duration: 0.15s;
+    --animation-duration: 0.2s;
   }
 }
 
@@ -262,10 +301,64 @@ header {
 
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-duration: 0.01ms;
+    --animation-duration: 0.01ms;
+    --backdrop-blur: 0px;
+  }
+  
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transform: none !important;
+  }
+  
+  .answer-card:hover,
+  .reaction-btn:hover,
+  .game-btn:hover {
+    transform: none !important;
+  }
+}
+
+/* Low performance mode styles */
+.low-performance .answer-card {
+  contain: layout style paint;
+}
+
+.low-performance .answer-card:hover {
+  transform: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.low-performance .glass-panel {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Hidden card styles for virtual scrolling */
+.hidden-card {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.visible {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* Optimize grid layout for performance */
+@supports (container-type: inline-size) {
+  #answers {
+    container-type: inline-size;
+  }
+}
+
+/* Optimize for high DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .answer-card {
+    backface-visibility: hidden;
+    perspective: 1000px;
   }
 }
 .answer-card:hover {
@@ -301,7 +394,11 @@ header {
 .reaction-border-2 { border-width: 4px; }
 .reaction-border-3 { border-width: 6px; }
 .answer-preview { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; min-height: 120px; }
-.like-btn svg { transition: all 0.15s ease-in-out; fill: none; }
+.like-btn svg { 
+  transition: fill var(--transition-duration) var(--transition-easing),
+              transform var(--transition-duration) var(--transition-easing);
+  fill: none;
+}
 .like-btn.liked svg { stroke: transparent; fill: currentColor; transform: scale(1.1); }
 .like-btn.loading { opacity: 0.7; position: relative; pointer-events: none; }
 .like-btn.loading::after { 
@@ -317,8 +414,16 @@ header {
   margin: auto; 
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-.highlight-btn { transition: all 0.15s ease; border-radius: 4px; padding: 2px; }
-.highlight-btn:hover { background: rgba(250, 204, 21, 0.1); transform: scale(1.1); }
+.highlight-btn { 
+  transition: background var(--transition-duration) var(--transition-easing),
+              transform var(--transition-duration) var(--transition-easing);
+  border-radius: 4px;
+  padding: 2px;
+}
+.highlight-btn:hover { 
+  background: rgba(250, 204, 21, 0.1);
+  transform: scale(1.1);
+}
 .highlight-btn.liked { color: #facc15; }
 #controlsFooter { pointer-events: none; }
 #controlsFooter > .glass-panel { pointer-events: auto; }
@@ -420,7 +525,7 @@ header {
 </div>
 <div id="answerModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
 <div id="answerModalCard" class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full max-w-5xl h-auto max-h-[85vh] relative" role="document" aria-labelledby="modalAnswer">
-<button type="button" id="answerModalCloseBtn" class="absolute top-2 right-2 bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform" aria-label="閉じる">
+<button type="button" id="answerModalCloseBtn" class="absolute -top-4 -right-4 bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform" aria-label="閉じる">
   <span id="iconClose" class="w-6 h-6"></span>
 </button>
 <div id="modalAnswer" class="flex-grow min-h-[200px] mb-4 overflow-y-auto pr-4"></div>
@@ -459,6 +564,10 @@ header {
 <script>
 // Optimize initial render
 const RENDER_BATCH_SIZE = 10;
+const VIEWPORT_BUFFER = 200; // Viewport buffer for virtual scrolling
+const PERFORMANCE_BUDGET = 16; // Maximum ms per frame
+const CHUNK_SIZE = 5; // DOM operations per chunk
+const IDLE_TIMEOUT = 5000; // Idle timeout for cleanup
 const ICONS = {
   'lightbulb-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
   'lightbulb-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6z M10.5 11.25 L11 13 L13 13 L13.5 11.25 H 10.5 Z"/><path d="M9 16.5h6v1H9z M9 18h6v1H9z M9 19.5h6v1H9z"/></svg>',
@@ -478,6 +587,16 @@ class StudyQuestApp {
     this.simpleCache = new Map();
     this.renderCache = new Map();
     this.iconCache = new Map();
+    this.weakCache = new WeakMap(); // For DOM element caching
+    this.cacheTimestamps = new Map(); // Track cache entry times
+    this.performanceMetrics = { frameTime: 0, domOperations: 0 };
+    this.visibilityObserver = null;
+    this.resizeObserver = null;
+    this.deferredUpdates = new Set();
+    this.animationFrameId = null;
+    this.idleCallbackId = null;
+    this.domFragmentPool = [];
+    this.isLowPerformanceMode = this.detectLowPerformanceDevice();
     this.elements = {
       body: document.body,
       mainContainer: document.getElementById('main-container'),
@@ -560,6 +679,9 @@ class StudyQuestApp {
     this.setupOwnerName();
     this.showMinimalSkeleton();
     
+    // Setup performance monitoring
+    this.setupPerformanceMonitoring();
+    
     // Immediate async loading for data
     this.loadDataImmediate();
     
@@ -569,6 +691,7 @@ class StudyQuestApp {
       this.renderIcons();
       this.adjustLayout();
       this.updateSortOptions();
+      this.setupObservers();
       // Initial admin state setup - 管理者であっても最初は閲覧モードで起動、切り替えボタンのみ表示
       if (window.isAdminUser) {
         this.state.isAdminUser = true;
@@ -601,14 +724,15 @@ class StudyQuestApp {
     if (this.elements.answerModalCloseBtn) {
       this.elements.answerModalCloseBtn.addEventListener('click', this.handlers.onAnswerModalCloseClick);
     }
-    // Size slider for immediate response
+    // Size slider for immediate response with throttling
     const debouncedRender = this.debounce(() => this.renderBoard(true), 200);
-    this.handlers.onSizeSliderInput = () => {
-      localStorage.setItem('boardColumns', this.elements.sizeSlider.value);
+    this.handlers.onSizeSliderInput = this.throttle((e) => {
+      localStorage.setItem('boardColumns', e.target.value);
       debouncedRender();
-    };
+    }, 100); // Throttle to 100ms
+    
     if (this.elements.sizeSlider) {
-      this.elements.sizeSlider.addEventListener('input', this.handlers.onSizeSliderInput);
+      this.elements.sizeSlider.addEventListener('input', this.handlers.onSizeSliderInput, { passive: true });
     }
   }
   
@@ -628,7 +752,14 @@ class StudyQuestApp {
     }
     this.handlers.onModalReactionClick = (e) => {
       const btn = e.target.closest('.reaction-btn');
-      if (btn) {
+      const highlightBtn = e.target.closest('.highlight-btn');
+      
+      if (highlightBtn) {
+        const id = highlightBtn.dataset.rowIndex;
+        if (id) {
+          this.handleHighlight(id);
+        }
+      } else if (btn) {
         const id = btn.dataset.rowIndex;
         const reaction = btn.dataset.reaction;
         if (id && reaction) {
@@ -666,15 +797,17 @@ class StudyQuestApp {
     };
     document.addEventListener('keydown', this.handlers.onDocumentKeydown);
     this.handlers.onWindowResize = this.debounce(() => this.adjustLayout(), 100);
-    window.addEventListener('resize', this.handlers.onWindowResize);
+    window.addEventListener('resize', this.handlers.onWindowResize, { passive: true });
     this.handlers.onVisibilityChange = () => {
       if (document.hidden) {
         this.stopPolling();
+        // Cleanup when page is hidden
+        this.throttledUpdate('hidden-cleanup', () => this.cleanup(), 1000);
       } else {
         this.startPolling();
       }
     };
-    document.addEventListener('visibilitychange', this.handlers.onVisibilityChange);
+    document.addEventListener('visibilitychange', this.handlers.onVisibilityChange, { passive: true });
   }
   setupEventDelegation() {
     this.handlers.onAnswersContainerClick = (e) => {
@@ -682,25 +815,31 @@ class StudyQuestApp {
       if (!answerCard) return;
       const rowIndex = answerCard.dataset.rowIndex;
       if (!rowIndex) return;
+      
       const reactionBtn = e.target.closest('.reaction-btn');
       if (reactionBtn) {
         e.stopPropagation();
         const reactionType = reactionBtn.dataset.reaction;
-        if (reactionType) {
+        if (reactionType && !reactionBtn.disabled) {
           this.handleReaction(rowIndex, reactionType);
         }
         return;
       }
+      
       const highlightBtn = e.target.closest('.highlight-btn');
       if (highlightBtn) {
         e.stopPropagation();
-        this.handleHighlight(rowIndex);
+        if (!highlightBtn.disabled) {
+          this.handleHighlight(rowIndex);
+        }
         return;
       }
+      
       this.showAnswerModal(rowIndex);
     };
+    
     if (this.elements.answersContainer) {
-      this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
+      this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick, { passive: false });
     }
     this.handlers.onDocumentClick = (e) => {
       if (e.target.matches('#retryLoadBtn')) {
@@ -709,7 +848,7 @@ class StudyQuestApp {
         return;
       }
     };
-    document.addEventListener('click', this.handlers.onDocumentClick);
+    document.addEventListener('click', this.handlers.onDocumentClick, { passive: false });
   }
   adjustLayout() {
     if (this.baseBodyPadding === undefined) {
@@ -868,16 +1007,29 @@ class StudyQuestApp {
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
     }
-    this.pollingInterval = setInterval(() => this.loadSheetData(false), 15000);
+    
+    const pollInterval = this.isLowPerformanceMode ? 30000 : 15000;
+    this.pollingInterval = setInterval(() => this.loadSheetData(false), pollInterval);
+    
+    // Start automatic cleanup for memory management
+    this.cleanupInterval = setInterval(() => {
+      this.cleanup();
+    }, 5 * 60 * 1000); // Cleanup every 5 minutes
   }
   stopPolling() {
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
     }
+    
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
   }
   destroy() {
     this.stopPolling();
+    this.cleanup();
     if (this.elements.sizeSlider && this.handlers.onSizeSliderInput) {
       this.elements.sizeSlider.removeEventListener('input', this.handlers.onSizeSliderInput);
     }
@@ -917,6 +1069,26 @@ class StudyQuestApp {
     if (this.handlers.onDocumentClick) {
       document.removeEventListener('click', this.handlers.onDocumentClick);
     }
+    // Cleanup observers
+    if (this.visibilityObserver) {
+      this.visibilityObserver.disconnect();
+    }
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
+    // Cancel any pending callbacks
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+    }
+    if (this.idleCallbackId) {
+      cancelIdleCallback(this.idleCallbackId);
+    }
+    // Clear caches
+    this.simpleCache.clear();
+    this.renderCache.clear();
+    this.iconCache.clear();
+    this.deferredUpdates.clear();
+    this.domFragmentPool.length = 0;
   }
   async loadDataImmediate() {
     // Start loading immediately without waiting
@@ -1105,7 +1277,7 @@ class StudyQuestApp {
     container.querySelectorAll('.skeleton').forEach(el => el.remove());
     const newRows = this.state.currentAnswers;
     
-    // Batch DOM updates
+    // Batch DOM updates using performance-aware batching
     const updates = [];
     if (this.elements.sliderValue && this.elements.sizeSlider && 
         this.elements.sliderValue.textContent !== this.elements.sizeSlider.value) {
@@ -1125,8 +1297,9 @@ class StudyQuestApp {
       }
     }
     
-    // Apply all updates at once
-    updates.forEach(update => update());
+    // Apply updates using performance-aware batching
+    this.batchDOMUpdates(updates);
+    
     if (newRows.length === 0) {
       if (!container.querySelector('.no-answers')) {
         container.innerHTML = '';
@@ -1148,101 +1321,157 @@ class StudyQuestApp {
       });
       const changedItems = [];
       let prevNode = null;
-      // Batch process for better performance
+      // Enhanced batch processing with virtual scrolling for large datasets
       if (newRows.length > RENDER_BATCH_SIZE) {
-        // Process in chunks for large datasets
-        const processBatch = (startIndex = 0) => {
-          const endIndex = Math.min(startIndex + RENDER_BATCH_SIZE, newRows.length);
-          const batch = newRows.slice(startIndex, endIndex);
-          
-          batch.forEach((row) => {
-            const rowId = String(row.rowIndex);
-            let card = existingMap.get(rowId);
-            const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
-            if (!card) {
-              card = this.createAnswerCard(row);
-              card.classList.add('new-card');
-              if (prevNode) {
-                container.insertBefore(card, prevNode.nextSibling);
-              } else {
-                container.insertBefore(card, container.firstChild);
-              }
-              changedItems.push(row);
-            } else {
-              if (prevNode && card.previousSibling !== prevNode) {
-                container.insertBefore(card, prevNode.nextSibling);
-              } else if (!prevNode && card !== container.firstChild) {
-                container.insertBefore(card, container.firstChild);
-              }
-              if (oldData) {
-                if (oldData.opinion !== row.opinion) {
-                  const t = card.querySelector('.opinion-text');
-                  if (t) t.textContent = row.opinion;
-                }
-                if (oldData.reason !== row.reason) {
-                  const p = card.querySelector('.answer-preview p');
-                  if (p) p.textContent = row.reason;
-                }
-                if (oldData.name !== row.name) {
-                  const n = card.querySelector('.font-bold');
-                  if (n) n.textContent = row.name;
-                }
-                if (JSON.stringify(oldData.reactions) !== JSON.stringify(row.reactions) || oldData.highlight !== row.highlight) {
-                  changedItems.push(row);
-                }
-              }
-            }
-            prevNode = card;
-          });
-          
-          if (endIndex < newRows.length) {
-            requestIdleCallback(() => processBatch(endIndex));
-          }
-        };
-        processBatch();
+        this.renderWithVirtualScrolling(newRows, oldRows, container, existingMap, changedItems);
       } else {
+        // Process small datasets normally
+        const fragment = this.getReusableFragment();
+        
         newRows.forEach((row) => {
           const rowId = String(row.rowIndex);
           let card = existingMap.get(rowId);
           const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
+          
           if (!card) {
             card = this.createAnswerCard(row);
             card.classList.add('new-card');
-            if (prevNode) {
-              container.insertBefore(card, prevNode.nextSibling);
-            } else {
-              container.insertBefore(card, container.firstChild);
+            
+            // Add to visibility observer
+            if (this.visibilityObserver) {
+              this.visibilityObserver.observe(card);
             }
+            
             changedItems.push(row);
           } else {
-            if (prevNode && card.previousSibling !== prevNode) {
-              container.insertBefore(card, prevNode.nextSibling);
-            } else if (!prevNode && card !== container.firstChild) {
-              container.insertBefore(card, container.firstChild);
-            }
-            if (oldData) {
-              if (oldData.opinion !== row.opinion) {
-                const t = card.querySelector('.opinion-text');
-                if (t) t.textContent = row.opinion;
-              }
-              if (oldData.reason !== row.reason) {
-                const p = card.querySelector('.answer-preview p');
-                if (p) p.textContent = row.reason;
-              }
-              if (oldData.name !== row.name) {
-                const n = card.querySelector('.font-bold');
-                if (n) n.textContent = row.name;
-              }
-              if (JSON.stringify(oldData.reactions) !== JSON.stringify(row.reactions) || oldData.highlight !== row.highlight) {
-                changedItems.push(row);
-              }
-            }
+            this.updateExistingCard(card, row, oldData, changedItems);
+          }
+          
+          if (prevNode) {
+            fragment.appendChild(card);
+          } else {
+            fragment.insertBefore(card, fragment.firstChild);
           }
           prevNode = card;
         });
+        
+        // Append fragment to container
+        if (fragment.children.length > 0) {
+          container.appendChild(fragment);
+        }
+        
+        // Recycle fragment
+        this.recycleFragment(fragment);
       }
+      // Defer updates for better performance
       if (changedItems.length) {
-        this.applyUpdates(changedItems);
+        this.deferredRender(() => this.applyUpdates(changedItems));
+      }
+    }
+  }
+  
+  renderWithVirtualScrolling(newRows, oldRows, container, existingMap, changedItems) {
+    const batchSize = this.isLowPerformanceMode ? CHUNK_SIZE : RENDER_BATCH_SIZE;
+    let currentIndex = 0;
+    let prevNode = null;
+    
+    const processBatch = () => {
+      const startTime = performance.now();
+      const endIndex = Math.min(currentIndex + batchSize, newRows.length);
+      const batch = newRows.slice(currentIndex, endIndex);
+      
+      // Use document fragment for efficient DOM manipulation
+      const fragment = this.getReusableFragment();
+      
+      batch.forEach((row) => {
+        const rowId = String(row.rowIndex);
+        let card = existingMap.get(rowId);
+        const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
+        
+        if (!card) {
+          card = this.createAnswerCard(row);
+          card.classList.add('new-card');
+          
+          // Add to visibility observer for virtual scrolling
+          if (this.visibilityObserver) {
+            this.visibilityObserver.observe(card);
+          }
+          
+          changedItems.push(row);
+        } else {
+          this.updateExistingCard(card, row, oldData, changedItems);
+        }
+        
+        if (prevNode) {
+          fragment.appendChild(card);
+        } else {
+          fragment.insertBefore(card, fragment.firstChild);
+        }
+        prevNode = card;
+      });
+      
+      // Append fragment to container
+      if (fragment.children.length > 0) {
+        container.appendChild(fragment);
+      }
+      
+      // Recycle fragment
+      this.recycleFragment(fragment);
+      
+      currentIndex = endIndex;
+      
+      // Continue processing if there are more items
+      if (currentIndex < newRows.length) {
+        const elapsed = performance.now() - startTime;
+        
+        if (elapsed < PERFORMANCE_BUDGET && !this.isLowPerformanceMode) {
+          // Continue synchronously if we have time budget
+          processBatch();
+        } else {
+          // Defer to next frame/idle callback
+          this.deferredRender(processBatch);
+        }
+      }
+    };
+    
+    processBatch();
+  }
+  
+  updateExistingCard(card, row, oldData, changedItems) {
+    if (oldData) {
+      let hasChanges = false;
+      
+      if (oldData.opinion !== row.opinion) {
+        const t = card.querySelector('.opinion-text');
+        if (t) {
+          t.textContent = row.opinion;
+          hasChanges = true;
+        }
+      }
+      
+      if (oldData.reason !== row.reason) {
+        const p = card.querySelector('.answer-preview p');
+        if (p) {
+          p.textContent = row.reason;
+          hasChanges = true;
+        }
+      }
+      
+      if (oldData.name !== row.name) {
+        const n = card.querySelector('.font-bold');
+        if (n) {
+          n.textContent = row.name;
+          hasChanges = true;
+        }
+      }
+      
+      if (JSON.stringify(oldData.reactions) !== JSON.stringify(row.reactions) || 
+          oldData.highlight !== row.highlight) {
+        hasChanges = true;
+      }
+      
+      if (hasChanges) {
+        changedItems.push(row);
       }
     }
   }
@@ -1260,8 +1489,9 @@ class StudyQuestApp {
       showHighlightToggle: this.state.showHighlightToggle
     });
     
-    if (this.renderCache.has(cacheKey)) {
-      return this.renderCache.get(cacheKey).cloneNode(true);
+    const cachedCard = this.getCacheWithValidation(this.renderCache, cacheKey);
+    if (cachedCard) {
+      return cachedCard.cloneNode(true);
     }
     
     const card = document.createElement('div');
@@ -1345,8 +1575,9 @@ class StudyQuestApp {
     if (this.renderCache.size > 50) {
       const firstKey = this.renderCache.keys().next().value;
       this.renderCache.delete(firstKey);
+      this.cacheTimestamps.delete(firstKey);
     }
-    this.renderCache.set(cacheKey, card.cloneNode(true));
+    this.setCacheWithTimestamp(this.renderCache, cacheKey, card.cloneNode(true));
     
     return card;
   }
@@ -1360,9 +1591,10 @@ class StudyQuestApp {
   async handleReaction(rowIndex, reaction) {
     const reactionKey = `${rowIndex}-${reaction}`;
     
-    // デバウンス処理 - 同じリアクションの連続実行を防ぐ
+    // Enhanced debounce - prevent rapid consecutive clicks
     if (this.reactionDebounce.has(reactionKey)) {
       clearTimeout(this.reactionDebounce.get(reactionKey));
+      return; // Ignore rapid clicks
     }
     
     // 既に処理中の場合は無視
@@ -1370,7 +1602,16 @@ class StudyQuestApp {
       return;
     }
     
+    // Rate limiting - prevent spam
+    const now = Date.now();
+    const lastReactionTime = this.lastReactionTimes?.get(reactionKey) || 0;
+    if (now - lastReactionTime < 300) { // Minimum 300ms between same reactions
+      return;
+    }
+    
     this.pendingReactions.add(reactionKey);
+    if (!this.lastReactionTimes) this.lastReactionTimes = new Map();
+    this.lastReactionTimes.set(reactionKey, now);
     
     const btns = document.querySelectorAll('[data-row-index="' + rowIndex + '"][data-reaction="' + reaction + '"]');
     const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
@@ -1430,10 +1671,10 @@ class StudyQuestApp {
       // 処理完了
       this.pendingReactions.delete(reactionKey);
       
-      // デバウンス設定 - 200ms後に同じリアクションを許可
+      // Enhanced debounce - 500ms delay to prevent accidental double clicks
       const debounceTimeout = setTimeout(() => {
         this.reactionDebounce.delete(reactionKey);
-      }, 200);
+      }, 500);
       this.reactionDebounce.set(reactionKey, debounceTimeout);
     }
   }
@@ -1457,9 +1698,17 @@ class StudyQuestApp {
   async handleHighlight(rowIndex) {
     const highlightKey = `${rowIndex}-highlight`;
     
-    // デバウンス処理 - 同じハイライト操作の連続実行を防ぐ
+    // Enhanced debounce for highlight operations
     if (this.reactionDebounce.has(highlightKey)) {
       clearTimeout(this.reactionDebounce.get(highlightKey));
+      return; // Ignore rapid highlight clicks
+    }
+    
+    // Rate limiting for highlights
+    const now = Date.now();
+    const lastHighlightTime = this.lastReactionTimes?.get(highlightKey) || 0;
+    if (now - lastHighlightTime < 500) { // Minimum 500ms between highlights
+      return;
     }
     
     // 既に処理中の場合は無視
@@ -1468,6 +1717,8 @@ class StudyQuestApp {
     }
     
     this.pendingReactions.add(highlightKey);
+    if (!this.lastReactionTimes) this.lastReactionTimes = new Map();
+    this.lastReactionTimes.set(highlightKey, now);
     
     const btns = document.querySelectorAll('.highlight-btn[data-row-index="' + rowIndex + '"]');
     const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
@@ -1526,10 +1777,10 @@ class StudyQuestApp {
       // 処理完了
       this.pendingReactions.delete(highlightKey);
       
-      // デバウンス設定 - 200ms後に同じハイライト操作を許可
+      // Enhanced debounce for highlights - 750ms delay
       const debounceTimeout = setTimeout(() => {
         this.reactionDebounce.delete(highlightKey);
-      }, 200);
+      }, 750);
       this.reactionDebounce.set(highlightKey, debounceTimeout);
     }
   }
@@ -1742,7 +1993,52 @@ class StudyQuestApp {
       const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-gray-200">' + info.count + '</span>' : '';
       return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
     }).join('');
-    this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml;
+    
+    // ハイライトボタンを追加
+    let highlightBtnHtml = '';
+    if (this.state.showHighlightToggle) {
+      const data = this.state.filteredData.find(item => item.rowIndex === rowIndex);
+      if (data) {
+        const cls = data.highlight ? 'liked' : '';
+        const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
+        highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-yellow-400 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
+      }
+    }
+    
+    this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
+    
+    // リアクションに基づくカード色の適用
+    const active = this.reactionTypes.filter(rt => data.reactions && data.reactions[rt.key] && data.reactions[rt.key].count > 0).map(rt => rt.key);
+    
+    // 既存のリアクション関連クラスをクリア
+    ['reaction-bg-like', 'reaction-bg-understand', 'reaction-bg-curious', 'reaction-bg-like-understand', 'reaction-bg-like-curious', 'reaction-bg-understand-curious', 'reaction-bg-like-understand-curious', 'reaction-border-1', 'reaction-border-2', 'reaction-border-3'].forEach(cls => 
+      this.elements.answerModalCard.classList.remove(cls)
+    );
+    
+    // リアクションに応じた色クラスを適用
+    if (active.length === 1) {
+      if (active[0] === 'LIKE') this.elements.answerModalCard.classList.add('reaction-bg-like');
+      if (active[0] === 'UNDERSTAND') this.elements.answerModalCard.classList.add('reaction-bg-understand');
+      if (active[0] === 'CURIOUS') this.elements.answerModalCard.classList.add('reaction-bg-curious');
+    } else if (active.length === 2) {
+      const sorted = active.sort();
+      if (sorted[0] === 'CURIOUS' && sorted[1] === 'LIKE') this.elements.answerModalCard.classList.add('reaction-bg-like-curious');
+      else if (sorted[0] === 'LIKE' && sorted[1] === 'UNDERSTAND') this.elements.answerModalCard.classList.add('reaction-bg-like-understand');
+      else if (sorted[0] === 'CURIOUS' && sorted[1] === 'UNDERSTAND') this.elements.answerModalCard.classList.add('reaction-bg-understand-curious');
+    } else if (active.length === 3) {
+      this.elements.answerModalCard.classList.add('reaction-bg-like-understand-curious');
+    }
+    
+    // ボーダー幅の適用
+    const totalReactions = this.reactionTypes.reduce((sum, rt) => sum + (data.reactions?.[rt.key]?.count || 0), 0);
+    if (totalReactions >= 10) {
+      this.elements.answerModalCard.classList.add('reaction-border-3');
+    } else if (totalReactions >= 5) {
+      this.elements.answerModalCard.classList.add('reaction-border-2');
+    } else if (totalReactions > 0) {
+      this.elements.answerModalCard.classList.add('reaction-border-1');
+    }
+    
     this.elements.answerModalContainer.classList.remove('hidden');
     this.elements.answerModalContainer.classList.add('modal-fade');
     this.elements.answerModalCard.classList.add('modal-scale');
@@ -1775,8 +2071,9 @@ class StudyQuestApp {
   getIcon(name, classes = '', solid = false) {
     // Cache icons to avoid repeated string concatenation
     const cacheKey = `${name}-${classes}-${solid}`;
-    if (this.iconCache.has(cacheKey)) {
-      return this.iconCache.get(cacheKey);
+    const cachedIcon = this.getCacheWithValidation(this.iconCache, cacheKey);
+    if (cachedIcon) {
+      return cachedIcon;
     }
     
     let key = name;
@@ -1787,11 +2084,11 @@ class StudyQuestApp {
     if (!icon) {
       console.warn('Icon not found:', key);
       const fallback = '<span aria-hidden="true" class="' + classes + '">⭐</span>';
-      this.iconCache.set(cacheKey, fallback);
+      this.setCacheWithTimestamp(this.iconCache, cacheKey, fallback);
       return fallback;
     }
     const result = '<span aria-hidden="true" class="' + classes + '">' + icon + '</span>';
-    this.iconCache.set(cacheKey, result);
+    this.setCacheWithTimestamp(this.iconCache, cacheKey, result);
     return result;
   }
   renderIcons() {
@@ -1821,6 +2118,25 @@ class StudyQuestApp {
       timeout = setTimeout(() => func.apply(this, args), delay);
     };
   }
+  
+  throttle(func, delay) {
+    let timeoutId;
+    let lastExecTime = 0;
+    return (...args) => {
+      const currentTime = Date.now();
+      
+      if (currentTime - lastExecTime > delay) {
+        func.apply(this, args);
+        lastExecTime = currentTime;
+      } else {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          func.apply(this, args);
+          lastExecTime = Date.now();
+        }, delay - (currentTime - lastExecTime));
+      }
+    };
+  }
   updateSortOptions() {
     if (this.elements.scoreOption) {
       if (this.state.showScoreSort) {
@@ -1845,6 +2161,276 @@ class StudyQuestApp {
   escapeHtml(str) {
     if (!str) return '';
     return str.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+
+  // Performance optimization methods
+  detectLowPerformanceDevice() {
+    const userAgent = navigator.userAgent;
+    const platform = navigator.platform;
+    const memory = navigator.deviceMemory || 4; // Default to 4GB if not available
+    const cores = navigator.hardwareConcurrency || 4;
+    
+    // Detect low-end devices
+    if (memory <= 2 || cores <= 2) return true;
+    if (userAgent.includes('Mobile') && !userAgent.includes('iPad')) return true;
+    if (platform.includes('Win32') && cores <= 4) return true;
+    
+    return false;
+  }
+
+  setupPerformanceMonitoring() {
+    let frameCount = 0;
+    let lastTime = performance.now();
+    
+    const measurePerformance = () => {
+      const now = performance.now();
+      const delta = now - lastTime;
+      
+      if (frameCount > 0) {
+        this.performanceMetrics.frameTime = delta;
+        
+        // If frame time is consistently over 16ms, enable low performance mode
+        if (delta > PERFORMANCE_BUDGET && !this.isLowPerformanceMode) {
+          console.warn('Low performance detected, enabling optimizations');
+          this.isLowPerformanceMode = true;
+          this.optimizeForLowPerformance();
+        }
+      }
+      
+      lastTime = now;
+      frameCount++;
+      
+      if (frameCount < 60) { // Monitor first 60 frames
+        requestAnimationFrame(measurePerformance);
+      }
+    };
+    
+    requestAnimationFrame(measurePerformance);
+  }
+
+  optimizeForLowPerformance() {
+    console.log('Enabling low performance optimizations');
+    
+    // Reduce animation and transition durations
+    document.documentElement.style.setProperty('--transition-duration', '0.05s');
+    document.documentElement.style.setProperty('--animation-duration', '0.1s');
+    document.documentElement.style.setProperty('--backdrop-blur', '0px');
+    
+    // Create comprehensive low-performance stylesheet
+    const style = document.createElement('style');
+    style.id = 'low-performance-optimizations';
+    style.textContent = `
+      /* Disable expensive visual effects */
+      .glass-panel {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background: var(--color-surface) !important;
+      }
+      
+      /* Simplify hover effects */
+      .answer-card:hover {
+        transform: none !important;
+        box-shadow: var(--shadow-sm) !important;
+      }
+      
+      .reaction-btn:hover {
+        transform: scale(1.02) !important;
+      }
+      
+      .game-btn:hover {
+        transform: translateY(-1px) !important;
+      }
+      
+      /* Disable complex animations */
+      .answer-card.highlighted {
+        transform: none !important;
+        box-shadow: 0 0 8px rgba(250,204,21,0.3) !important;
+      }
+      
+      /* Remove will-change to reduce GPU usage */
+      * {
+        will-change: auto !important;
+      }
+      
+      /* Simplify shadows */
+      .answer-card {
+        box-shadow: var(--shadow-sm) !important;
+      }
+      
+      /* Reduce border complexity */
+      .answer-card.reaction-bg-like-understand-curious {
+        border: 2px solid #facc15 !important;
+        border-image: none !important;
+      }
+      
+      .answer-card.reaction-bg-like-understand,
+      .answer-card.reaction-bg-like-curious,
+      .answer-card.reaction-bg-understand-curious {
+        border: 2px solid #8be9fd !important;
+        border-image: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    // Add low-performance class to body for CSS targeting
+    document.body.classList.add('low-performance');
+    
+    // Reduce polling frequency
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = setInterval(() => this.loadSheetData(false), 30000); // 30s instead of 15s
+    }
+  }
+
+  setupObservers() {
+    // Intersection Observer for virtual scrolling
+    if ('IntersectionObserver' in window) {
+      this.visibilityObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          const card = entry.target;
+          if (entry.isIntersecting) {
+            card.classList.add('visible');
+            card.classList.remove('hidden-card');
+          } else {
+            card.classList.remove('visible');
+            card.classList.add('hidden-card');
+          }
+        });
+      }, {
+        rootMargin: `${VIEWPORT_BUFFER}px`,
+        threshold: 0.1
+      });
+    }
+
+    // ResizeObserver for responsive adjustments
+    if ('ResizeObserver' in window) {
+      this.resizeObserver = new ResizeObserver(this.debounce(() => {
+        this.adjustLayout();
+      }, 100));
+      this.resizeObserver.observe(this.elements.answersContainer);
+    }
+  }
+
+  deferredRender(callback, priority = 'normal') {
+    if (this.isLowPerformanceMode) {
+      // Use requestIdleCallback for low priority updates
+      this.idleCallbackId = requestIdleCallback(callback, { timeout: IDLE_TIMEOUT });
+    } else {
+      // Use requestAnimationFrame for normal updates
+      this.animationFrameId = requestAnimationFrame(callback);
+    }
+  }
+
+  batchDOMUpdates(updates) {
+    const startTime = performance.now();
+    let processedCount = 0;
+    
+    const processBatch = () => {
+      while (processedCount < updates.length && (performance.now() - startTime) < PERFORMANCE_BUDGET) {
+        updates[processedCount]();
+        processedCount++;
+      }
+      
+      if (processedCount < updates.length) {
+        // Continue in next frame
+        requestAnimationFrame(processBatch);
+      }
+    };
+    
+    processBatch();
+  }
+
+  getReusableFragment() {
+    if (this.domFragmentPool.length > 0) {
+      return this.domFragmentPool.pop();
+    }
+    return document.createDocumentFragment();
+  }
+
+  recycleFragment(fragment) {
+    // Clear fragment content and reuse
+    while (fragment.firstChild) {
+      fragment.removeChild(fragment.firstChild);
+    }
+    if (this.domFragmentPool.length < 10) { // Limit pool size
+      this.domFragmentPool.push(fragment);
+    }
+  }
+
+  throttledUpdate(key, callback, delay = 100) {
+    if (this.deferredUpdates.has(key)) {
+      return;
+    }
+    
+    this.deferredUpdates.add(key);
+    setTimeout(() => {
+      callback();
+      this.deferredUpdates.delete(key);
+    }, delay);
+  }
+
+  cleanup() {
+    const now = Date.now();
+    const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+    
+    // Garbage collection helper - clean up unused cache entries
+    if (this.renderCache.size > 100) {
+      const entries = Array.from(this.renderCache.entries());
+      entries.slice(0, 50).forEach(([key]) => {
+        this.renderCache.delete(key);
+        this.cacheTimestamps.delete(key);
+      });
+    }
+    
+    // Clean up expired cache entries
+    for (const [key, timestamp] of this.cacheTimestamps.entries()) {
+      if (now - timestamp > CACHE_TTL) {
+        this.renderCache.delete(key);
+        this.iconCache.delete(key);
+        this.simpleCache.delete(key);
+        this.cacheTimestamps.delete(key);
+      }
+    }
+    
+    if (this.iconCache.size > 50) {
+      const entries = Array.from(this.iconCache.entries());
+      entries.slice(0, 25).forEach(([key]) => {
+        this.iconCache.delete(key);
+        this.cacheTimestamps.delete(key);
+      });
+    }
+    
+    // Clear DOM fragment pool
+    this.domFragmentPool.length = 0;
+    
+    // Force garbage collection on WeakMap (happens automatically)
+    // WeakMap entries are automatically cleaned up when references are lost
+    
+    console.log('Cache cleanup completed', {
+      renderCacheSize: this.renderCache.size,
+      iconCacheSize: this.iconCache.size,
+      simpleCacheSize: this.simpleCache.size,
+      timestampCacheSize: this.cacheTimestamps.size
+    });
+  }
+  
+  // Enhanced cache methods with timestamp tracking
+  setCacheWithTimestamp(cache, key, value) {
+    cache.set(key, value);
+    this.cacheTimestamps.set(key, Date.now());
+  }
+  
+  getCacheWithValidation(cache, key, maxAge = 5 * 60 * 1000) { // 5 minutes default
+    if (!cache.has(key)) return null;
+    
+    const timestamp = this.cacheTimestamps.get(key);
+    if (timestamp && Date.now() - timestamp > maxAge) {
+      cache.delete(key);
+      this.cacheTimestamps.delete(key);
+      return null;
+    }
+    
+    return cache.get(key);
   }
 }
 try {
