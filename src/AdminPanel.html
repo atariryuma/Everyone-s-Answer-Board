@@ -635,6 +635,8 @@
 
     function updateConfigButtons() {
       // Enable save button if we have at least question or answer header
+      if (!elements.qHeader || !elements.aHeader || !elements.saveConfigBtn) return;
+      
       const hasConfig = elements.qHeader.value || elements.aHeader.value;
       elements.saveConfigBtn.disabled = !hasConfig;
     }
@@ -1022,17 +1024,21 @@
     }
 
     function populateConfig(cfg) {
-      elements.qHeader.value = cfg.questionHeader || '';
-      elements.aHeader.value = cfg.answerHeader || '';
-      elements.rHeader.value = cfg.reasonHeader || '';
-      elements.nameHeader.value = cfg.nameHeader || '';
-      elements.classHeader.value = cfg.classHeader || '';
+      if (!cfg) return;
+      
+      if (elements.qHeader) elements.qHeader.value = cfg.questionHeader || '';
+      if (elements.aHeader) elements.aHeader.value = cfg.answerHeader || '';
+      if (elements.rHeader) elements.rHeader.value = cfg.reasonHeader || '';
+      if (elements.nameHeader) elements.nameHeader.value = cfg.nameHeader || '';
+      if (elements.classHeader) elements.classHeader.value = cfg.classHeader || '';
     }
 
     function clearConfigFields() {
       [elements.qHeader, elements.aHeader, elements.rHeader, elements.nameHeader, elements.classHeader].forEach(sel => {
-        sel.innerHTML = '<option value="">-- 選択してください --</option>';
-        sel.value = '';
+        if (sel) {
+          sel.innerHTML = '<option value="">-- 選択してください --</option>';
+          sel.value = '';
+        }
       });
       updateConfigButtons();
     }
@@ -1163,40 +1169,54 @@
       }
     }
 
+    // タイマー管理
+    const timers = new Set();
+    
     function showMessage(message, type = 'info', duration = 4000) {
       const messageArea = document.getElementById('message-area');
-      if (messageArea) {
-        const colors = {
-          success: 'text-green-400',
-          green: 'text-green-400',
-          error: 'text-red-400',
-          red: 'text-red-400',
-          info: 'text-blue-400',
-          blue: 'text-blue-400',
-          warning: 'text-yellow-400',
-          yellow: 'text-yellow-400'
-        };
-        
-        messageArea.className = `mt-6 text-center text-sm h-5 ${colors[type] || 'text-gray-400'}`;
-        messageArea.textContent = message;
-        
-        // Add visual animations based on type
-        if (type === 'success' || type === 'green') {
-          messageArea.classList.add('success-pulse');
-          setTimeout(() => messageArea.classList.remove('success-pulse'), 600);
-        } else if (type === 'error' || type === 'red') {
-          messageArea.classList.add('error-shake');
-          setTimeout(() => messageArea.classList.remove('error-shake'), 500);
-        }
-        
-        if (type !== 'blue' && duration > 0) {
-          setTimeout(() => {
+      if (!messageArea) return;
+      
+      const colors = {
+        success: 'text-green-400',
+        green: 'text-green-400',
+        error: 'text-red-400',
+        red: 'text-red-400',
+        info: 'text-blue-400',
+        blue: 'text-blue-400',
+        warning: 'text-yellow-400',
+        yellow: 'text-yellow-400'
+      };
+      
+      messageArea.className = `mt-6 text-center text-sm h-5 ${colors[type] || 'text-gray-400'}`;
+      messageArea.textContent = message;
+      
+      // Add visual animations based on type
+      if (type === 'success' || type === 'green') {
+        messageArea.classList.add('success-pulse');
+        const timer1 = setTimeout(() => messageArea.classList.remove('success-pulse'), 600);
+        timers.add(timer1);
+      } else if (type === 'error' || type === 'red') {
+        messageArea.classList.add('error-shake');
+        const timer2 = setTimeout(() => messageArea.classList.remove('error-shake'), 500);
+        timers.add(timer2);
+      }
+      
+      if (type !== 'blue' && duration > 0) {
+        const timer3 = setTimeout(() => {
+          if (messageArea) {
             messageArea.textContent = '';
             messageArea.className = 'mt-6 text-center text-sm h-5';
-          }, duration);
-        }
+          }
+        }, duration);
+        timers.add(timer3);
       }
     }
+    
+    // ページ離脱時のクリーンアップ
+    window.addEventListener('beforeunload', () => {
+      timers.forEach(timer => clearTimeout(timer));
+      timers.clear();
+    });
 
     function addVisualFeedback(element, type) {
       if (!element) return;
@@ -1218,14 +1238,6 @@
       setLoading(false);
     }
 
-    function escapeHtml(unsafe) {
-      return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-    }
   </script>
 </body>
 </html>
