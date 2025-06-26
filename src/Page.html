@@ -1170,7 +1170,8 @@ class StudyQuestApp {
         this.state.showHighlightToggle = false;
       } else {
         // 管理者の場合はハイライトトグルを有効化
-        this.state.showHighlightToggle = window.showHighlightToggle || this.state.isAdminUser;
+        this.state.showAdminFeatures = true;
+        this.state.showHighlightToggle = true;
       }
       if (isInitialLoad) {
         // Add visual feedback that loading is complete
@@ -1179,6 +1180,9 @@ class StudyQuestApp {
           this.populateClassFilter(data.rows);
           this.elements.sheetNameText.textContent = 'シート: ' + this.escapeHtml(data.sheetName || '不明');
         });
+      } else {
+        // 状態変更時はカードを再描画してハイライトボタンの表示を更新
+        this.renderCards();
       }
       if (JSON.stringify(this.state.currentAnswers) !== JSON.stringify(data.rows)) {
         this.state.currentAnswers = data.rows;
@@ -1285,6 +1289,46 @@ class StudyQuestApp {
     classFilter.innerHTML = uniqueClasses.map(c => '<option value="' + this.escapeHtml(c) + '">' + this.escapeHtml(c) + '</option>').join('');
     classFilter.value = 'すべて';
     classFilter.classList.remove('hidden');
+  }
+  applyReactionStyles(element, data) {
+    if (!element || !data) return;
+    
+    // 既存のリアクション関連クラスをクリア
+    const reactionClasses = [
+      'reaction-bg-like', 'reaction-bg-understand', 'reaction-bg-curious',
+      'reaction-bg-like-understand', 'reaction-bg-like-curious', 'reaction-bg-understand-curious',
+      'reaction-bg-like-understand-curious', 'reaction-border-1', 'reaction-border-2', 'reaction-border-3'
+    ];
+    reactionClasses.forEach(cls => element.classList.remove(cls));
+    
+    // アクティブなリアクションを特定
+    const active = this.reactionTypes.filter(rt => 
+      data.reactions && data.reactions[rt.key] && data.reactions[rt.key].count > 0
+    ).map(rt => rt.key);
+    
+    // 背景色クラスを適用
+    if (active.length === 1) {
+      if (active[0] === 'LIKE') element.classList.add('reaction-bg-like');
+      else if (active[0] === 'UNDERSTAND') element.classList.add('reaction-bg-understand');
+      else if (active[0] === 'CURIOUS') element.classList.add('reaction-bg-curious');
+    } else if (active.length === 2) {
+      const sorted = active.sort();
+      if (sorted[0] === 'CURIOUS' && sorted[1] === 'LIKE') element.classList.add('reaction-bg-like-curious');
+      else if (sorted[0] === 'LIKE' && sorted[1] === 'UNDERSTAND') element.classList.add('reaction-bg-like-understand');
+      else if (sorted[0] === 'CURIOUS' && sorted[1] === 'UNDERSTAND') element.classList.add('reaction-bg-understand-curious');
+    } else if (active.length === 3) {
+      element.classList.add('reaction-bg-like-understand-curious');
+    }
+    
+    // ボーダー幅を適用
+    const totalReactions = this.reactionTypes.reduce((sum, rt) => sum + (data.reactions?.[rt.key]?.count || 0), 0);
+    if (totalReactions >= 10) {
+      element.classList.add('reaction-border-3');
+    } else if (totalReactions >= 5) {
+      element.classList.add('reaction-border-2');
+    } else if (totalReactions > 0) {
+      element.classList.add('reaction-border-1');
+    }
   }
   renderBoard(isLayoutChange = false, oldRows = []) {
     const container = this.elements.answersContainer;
@@ -1515,27 +1559,6 @@ class StudyQuestApp {
     card.setAttribute('role', 'article');
     card.setAttribute('tabindex', '0');
     card.setAttribute('aria-label', '回答カード: ' + (data.opinion || '').substring(0, 50) + (data.opinion && data.opinion.length > 50 ? '...' : ''));
-    const active = this.reactionTypes.filter(rt => data.reactions && data.reactions[rt.key] && data.reactions[rt.key].count > 0).map(rt => rt.key);
-    if (active.length === 1) {
-      if (active[0] === 'LIKE') card.classList.add('reaction-bg-like');
-      if (active[0] === 'UNDERSTAND') card.classList.add('reaction-bg-understand');
-      if (active[0] === 'CURIOUS') card.classList.add('reaction-bg-curious');
-    } else if (active.length === 2) {
-      const sorted = active.sort();
-      if (sorted[0] === 'CURIOUS' && sorted[1] === 'LIKE') card.classList.add('reaction-bg-like-curious');
-      else if (sorted[0] === 'LIKE' && sorted[1] === 'UNDERSTAND') card.classList.add('reaction-bg-like-understand');
-      else if (sorted[0] === 'CURIOUS' && sorted[1] === 'UNDERSTAND') card.classList.add('reaction-bg-understand-curious');
-    } else if (active.length === 3) {
-      card.classList.add('reaction-bg-like-understand-curious');
-    }
-    const totalReactions = this.reactionTypes.reduce((sum, rt) => sum + (data.reactions?.[rt.key]?.count || 0), 0);
-    if (totalReactions >= 10) {
-      card.classList.add('reaction-border-3');
-    } else if (totalReactions >= 5) {
-      card.classList.add('reaction-border-2');
-    } else if (totalReactions > 0) {
-      card.classList.add('reaction-border-1');
-    }
     let highlightBtnHtml = '';
     if (this.state.showHighlightToggle) {
       const cls = data.highlight ? 'liked' : '';
@@ -1584,6 +1607,9 @@ class StudyQuestApp {
       badge.innerHTML = this.getIcon('star', '', true);
       card.appendChild(badge);
     }
+    
+    // 統一されたリアクションスタイルを適用
+    this.applyReactionStyles(card, data);
     
     // Cache the card for reuse (limit cache size)
     if (this.renderCache.size > 50) {
@@ -1661,6 +1687,14 @@ class StudyQuestApp {
         // サーバーからの正確な値で更新
         item.reactions = res.reactions;
         this.applyUpdates([item]);
+        
+        // モーダルが開いている場合は更新
+        if (!this.elements.answerModalContainer.classList.contains('hidden')) {
+          const modalRowIndex = this.elements.modalReactionContainer.querySelector('[data-row-index]')?.dataset.rowIndex;
+          if (modalRowIndex == rowIndex) {
+            this.updateModalContent(item);
+          }
+        }
       } else {
         // エラー時はロールバック
         throw new Error(res?.message || 'リアクションの処理に失敗しました');
@@ -1767,6 +1801,14 @@ class StudyQuestApp {
         // サーバーからの正確な値で更新
         item.highlight = res.highlight;
         this.applyUpdates([item]);
+        
+        // モーダルが開いている場合は更新
+        if (!this.elements.answerModalContainer.classList.contains('hidden')) {
+          const modalRowIndex = this.elements.modalReactionContainer.querySelector('[data-row-index]')?.dataset.rowIndex;
+          if (modalRowIndex == rowIndex) {
+            this.updateModalContent(item);
+          }
+        }
       } else {
         // エラー時はロールバック
         throw new Error(res?.message || 'ハイライトの処理に失敗しました');
@@ -1934,29 +1976,7 @@ class StudyQuestApp {
       const card = document.querySelector('.answer-card[data-row-index="' + item.rowIndex + '"]');
       if (card) {
         card.classList.toggle('highlighted', item.highlight);
-        const active = this.reactionTypes.filter(rt => item.reactions && item.reactions[rt.key] && item.reactions[rt.key].count > 0).map(rt => rt.key);
-        ['reaction-bg-like', 'reaction-bg-understand', 'reaction-bg-curious', 'reaction-bg-like-understand', 'reaction-bg-like-curious', 'reaction-bg-understand-curious', 'reaction-bg-like-understand-curious'].forEach(cls => card.classList.remove(cls));
-        if (active.length === 1) {
-          if (active[0] === 'LIKE') card.classList.add('reaction-bg-like');
-          if (active[0] === 'UNDERSTAND') card.classList.add('reaction-bg-understand');
-          if (active[0] === 'CURIOUS') card.classList.add('reaction-bg-curious');
-        } else if (active.length === 2) {
-          const sorted = active.sort();
-          if (sorted[0] === 'CURIOUS' && sorted[1] === 'LIKE') card.classList.add('reaction-bg-like-curious');
-          else if (sorted[0] === 'LIKE' && sorted[1] === 'UNDERSTAND') card.classList.add('reaction-bg-like-understand');
-          else if (sorted[0] === 'CURIOUS' && sorted[1] === 'UNDERSTAND') card.classList.add('reaction-bg-understand-curious');
-        } else if (active.length === 3) {
-          card.classList.add('reaction-bg-like-understand-curious');
-        }
-        const total = this.reactionTypes.reduce((sum, rt) => sum + (item.reactions?.[rt.key]?.count || 0), 0);
-        ['reaction-border-1', 'reaction-border-2', 'reaction-border-3'].forEach(cls => card.classList.remove(cls));
-        if (total >= 10) {
-          card.classList.add('reaction-border-3');
-        } else if (total >= 5) {
-          card.classList.add('reaction-border-2');
-        } else if (total > 0) {
-          card.classList.add('reaction-border-1');
-        }
+        this.applyReactionStyles(card, item);
         const highlightBtn = card.querySelector('.highlight-btn');
         if (highlightBtn) {
           highlightBtn.classList.toggle('liked', item.highlight);
@@ -1989,7 +2009,11 @@ class StudyQuestApp {
       studentName: this.elements.modalStudentName
     });
     
-    const data = this.state.currentAnswers.find(r => r.rowIndex == rowIndex);
+    // 最新データを取得（filteredDataとcurrentAnswersの両方から）
+    let data = this.state.currentAnswers.find(r => r.rowIndex == rowIndex);
+    if (!data && this.state.filteredData) {
+      data = this.state.filteredData.find(r => r.rowIndex == rowIndex);
+    }
     if (!data) {
       console.error('No data found for rowIndex:', rowIndex);
       return;
@@ -2032,36 +2056,7 @@ class StudyQuestApp {
     this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
     
     // リアクションに基づくカード色の適用
-    const active = this.reactionTypes.filter(rt => data.reactions && data.reactions[rt.key] && data.reactions[rt.key].count > 0).map(rt => rt.key);
-    
-    // 既存のリアクション関連クラスをクリア
-    ['reaction-bg-like', 'reaction-bg-understand', 'reaction-bg-curious', 'reaction-bg-like-understand', 'reaction-bg-like-curious', 'reaction-bg-understand-curious', 'reaction-bg-like-understand-curious', 'reaction-border-1', 'reaction-border-2', 'reaction-border-3'].forEach(cls => 
-      this.elements.answerModalCard.classList.remove(cls)
-    );
-    
-    // リアクションに応じた色クラスを適用
-    if (active.length === 1) {
-      if (active[0] === 'LIKE') this.elements.answerModalCard.classList.add('reaction-bg-like');
-      if (active[0] === 'UNDERSTAND') this.elements.answerModalCard.classList.add('reaction-bg-understand');
-      if (active[0] === 'CURIOUS') this.elements.answerModalCard.classList.add('reaction-bg-curious');
-    } else if (active.length === 2) {
-      const sorted = active.sort();
-      if (sorted[0] === 'CURIOUS' && sorted[1] === 'LIKE') this.elements.answerModalCard.classList.add('reaction-bg-like-curious');
-      else if (sorted[0] === 'LIKE' && sorted[1] === 'UNDERSTAND') this.elements.answerModalCard.classList.add('reaction-bg-like-understand');
-      else if (sorted[0] === 'CURIOUS' && sorted[1] === 'UNDERSTAND') this.elements.answerModalCard.classList.add('reaction-bg-understand-curious');
-    } else if (active.length === 3) {
-      this.elements.answerModalCard.classList.add('reaction-bg-like-understand-curious');
-    }
-    
-    // ボーダー幅の適用
-    const totalReactions = this.reactionTypes.reduce((sum, rt) => sum + (data.reactions?.[rt.key]?.count || 0), 0);
-    if (totalReactions >= 10) {
-      this.elements.answerModalCard.classList.add('reaction-border-3');
-    } else if (totalReactions >= 5) {
-      this.elements.answerModalCard.classList.add('reaction-border-2');
-    } else if (totalReactions > 0) {
-      this.elements.answerModalCard.classList.add('reaction-border-1');
-    }
+    this.applyReactionStyles(this.elements.answerModalCard, data);
     
     console.log('Attempting to show modal...');
     console.log('Modal container classes before:', this.elements.answerModalContainer.className);
@@ -2074,6 +2069,31 @@ class StudyQuestApp {
     console.log('Modal should now be visible');
     
     this.elements.answerModalCloseBtn.focus();
+  }
+  updateModalContent(data) {
+    if (!data) return;
+    
+    // リアクションボタンを更新
+    const reactionButtonsHtml = this.reactionTypes.map(rt => {
+      const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
+      const cls = info.reacted ? 'liked' : '';
+      const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+      const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-gray-200">' + info.count + '</span>' : '';
+      return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
+    }).join('');
+    
+    // ハイライトボタンを更新
+    let highlightBtnHtml = '';
+    if (this.state.showHighlightToggle) {
+      const cls = data.highlight ? 'liked' : '';
+      const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
+      highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-yellow-400 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
+    }
+    
+    this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
+    
+    // モーダルカードのスタイルを更新
+    this.applyReactionStyles(this.elements.answerModalCard, data);
   }
   hideAnswerModal() {
     this.elements.answerModalContainer.classList.add('hidden');
