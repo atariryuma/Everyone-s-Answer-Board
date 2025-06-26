@@ -1121,11 +1121,10 @@ function getSheetData(sheetName, classFilter, sortBy) {
         const likeMultiplier = 1 + (likes * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
         const totalScore = baseScore * likeMultiplier;
         let name = '';
-        if (isAdmin) {
-          name = email ? email.split('@')[0] : '';
-          if (nameHeader && row[headerIndices[nameHeader]]) {
-            name = row[headerIndices[nameHeader]];
-          }
+        if (nameHeader && row[headerIndices[nameHeader]]) {
+          name = row[headerIndices[nameHeader]];
+        } else if (email) {
+          name = email.split('@')[0];
         }
         return {
           rowIndex: index + 2,
@@ -1250,11 +1249,10 @@ function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy)
         const likeMultiplier = 1 + (likes * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
         const totalScore = baseScore * likeMultiplier;
         let name = '';
-        if (isAdmin) {
-          name = email ? email.split('@')[0] : '';
-          if (nameHeader && row[headerIndices[nameHeader]]) {
-            name = row[headerIndices[nameHeader]];
-          }
+        if (nameHeader && row[headerIndices[nameHeader]]) {
+          name = row[headerIndices[nameHeader]];
+        } else if (email) {
+          name = email.split('@')[0];
         }
         return {
           rowIndex: index + 2,
