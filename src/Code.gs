@@ -201,7 +201,8 @@ function getAdminSettings() {
     adminEmails: adminEmails,
     isUserAdmin: adminEmails.includes(currentUserEmail),
     activeSheetName: appSettings.activeSheetName,
-    showDetails: appSettings.showDetails,
+    showNames: appSettings.showNames,
+    showCounts: appSettings.showCounts,
     isAvailable: isAvailable  // 新しい状態：回答ボードが利用可能かどうか
   };
 }
@@ -297,16 +298,46 @@ function setShowDetails(flag) {
   // ユーザー設定を更新
   try {
     updateUserConfig(userId, {
+      showNames: Boolean(flag),
+      showCounts: Boolean(flag),
       showDetails: Boolean(flag)
     });
   } catch (error) {
     console.error('Failed to update user config:', error);
     throw new Error(`設定の更新に失敗しました: ${error.message}`);
   }
-  
-  auditLog('SHOW_DETAILS_UPDATED', userId, { showDetails: Boolean(flag), userEmail: userInfo.adminEmail });
-  
+
+  auditLog('SHOW_DETAILS_UPDATED', userId, { showNames: Boolean(flag), showCounts: Boolean(flag), userEmail: userInfo.adminEmail });
+
   return `詳細表示を${flag ? '有効' : '無効'}にしました。`;
+}
+
+function setDisplayOptions(options) {
+  const props = PropertiesService.getUserProperties();
+  const userId = props.getProperty('CURRENT_USER_ID');
+
+  if (!userId) {
+    throw new Error('ユーザー情報が見つかりません。');
+  }
+
+  const userInfo = getUserInfo(userId);
+  if (!userInfo || userInfo.adminEmail !== Session.getActiveUser().getEmail()) {
+    throw new Error('権限がありません。');
+  }
+
+  try {
+    updateUserConfig(userId, {
+      showNames: Boolean(options.showNames),
+      showCounts: Boolean(options.showCounts)
+    });
+  } catch (error) {
+    console.error('Failed to update user config:', error);
+    throw new Error(`設定の更新に失敗しました: ${error.message}`);
+  }
+
+  auditLog('DISPLAY_OPTIONS_UPDATED', userId, { options, userEmail: userInfo.adminEmail });
+
+  return '表示設定を更新しました。';
 }
 
 
@@ -441,14 +472,17 @@ function doGet(e) {
   
   const isCurrentUserAdmin = userInfo.adminEmail === viewerEmail;
 
+  const cfgShowNames = typeof config.showNames !== 'undefined' ? config.showNames : (config.showDetails || false);
+  const cfgShowCounts = typeof config.showCounts !== 'undefined' ? config.showCounts : (config.showDetails || false);
+
   Object.assign(template, {
     showAdminFeatures: false, // 管理者であっても最初は閲覧モードで起動
-    showHighlightToggle: false, // 管理者であっても最初は閲覧モードで起動
+    showHighlightToggle: isCurrentUserAdmin, // 管理者は閲覧モードでもハイライト可能
     showScoreSort: false, // 管理者であっても最初は閲覧モードで起動
     isStudentMode: true, // 管理者であっても最初は学生モードで起動
     isAdminUser: isCurrentUserAdmin, // 管理者権限の有無はそのまま渡す
-    showCounts: config.showDetails || false,
-    displayMode: config.showDetails ? 'named' : 'anonymous',
+    showCounts: cfgShowCounts,
+    displayMode: cfgShowNames ? 'named' : 'anonymous',
     sheetName: activeSheetName,
     mapping: mapping,
     userId: userId,
@@ -521,11 +555,15 @@ function getPublishedSheetData(requestedSheetName, classFilter, sortBy) {
   const order = sortBy || 'newest';
   const data = getSheetDataForSpreadsheet(spreadsheet, targetSheetName, classFilter, order);
   
+  const cfgShowNames = typeof config.showNames !== 'undefined' ? config.showNames : (config.showDetails || false);
+  const cfgShowCounts = typeof config.showCounts !== 'undefined' ? config.showCounts : (config.showDetails || false);
+
   return {
     sheetName: targetSheetName,
     header: data.header,
     rows: data.rows,
-    showDetails: config.showDetails || false,
+    showNames: cfgShowNames,
+    showCounts: cfgShowCounts,
     isActiveSheet: targetSheetName === activeSheetName
   };
 }
@@ -694,7 +732,8 @@ function getStatus() {
         answerCount: 0,
         totalReactions: 0,
         webAppUrl: getWebAppUrl(),
-        showDetails: false
+        showNames: false,
+        showCounts: false
       };
     }
     
@@ -736,7 +775,8 @@ function getStatus() {
       answerCount: answerCount,
       totalReactions: totalReactions,
       webAppUrl: getWebAppUrl(),
-      showDetails: config.showDetails || false
+      showNames: typeof config.showNames !== 'undefined' ? config.showNames : (config.showDetails || false),
+      showCounts: typeof config.showCounts !== 'undefined' ? config.showCounts : (config.showDetails || false)
     };
   } catch (error) {
     console.error('getStatus error:', error);
@@ -1239,7 +1279,8 @@ function getAppSettingsForUser() {
     // 従来の動作のフォールバック
     return {
       activeSheetName: '',
-      showDetails: false
+      showNames: false,
+      showCounts: false
     };
   }
   
@@ -1248,7 +1289,8 @@ function getAppSettingsForUser() {
   if (!userInfo || !userInfo.configJson) {
     return {
       activeSheetName: '',
-      showDetails: false
+      showNames: false,
+      showCounts: false
     };
   }
   
@@ -1257,7 +1299,8 @@ function getAppSettingsForUser() {
   
   return {
     activeSheetName: activeSheetName,
-    showDetails: userInfo.configJson.showDetails || false
+    showNames: typeof userInfo.configJson.showNames !== 'undefined' ? userInfo.configJson.showNames : (userInfo.configJson.showDetails || false),
+    showCounts: typeof userInfo.configJson.showCounts !== 'undefined' ? userInfo.configJson.showCounts : (userInfo.configJson.showDetails || false)
   };
 }
 
@@ -1674,6 +1717,8 @@ function registerNewUser(spreadsheetUrl) {
     accessToken,
     JSON.stringify({
       activeSheetName: spreadsheetUrl === 'AUTO_CREATE' ? '回答データ' : '',
+      showNames: false,
+      showCounts: false,
       showDetails: false
     }),
     new Date(),
@@ -1923,12 +1968,12 @@ function updateUserConfig(userId, config) {
 
 function sanitizeConfigData(config) {
   // 新しいシステム：isPublishedを削除し、常に利用可能な回答ボード
-  const allowedFields = ['activeSheetName', 'showDetails'];
+  const allowedFields = ['activeSheetName', 'showNames', 'showCounts', 'showDetails'];
   const sanitized = {};
-  
+
   for (const field of allowedFields) {
     if (config.hasOwnProperty(field)) {
-      if (field === 'showDetails') {
+      if (field === 'showDetails' || field === 'showNames' || field === 'showCounts') {
         sanitized[field] = Boolean(config[field]);
       } else if (field === 'activeSheetName') {
         const sheetName = config[field];
@@ -1938,7 +1983,17 @@ function sanitizeConfigData(config) {
       }
     }
   }
-  
+
+  // showDetailsの下位互換
+  if (sanitized.hasOwnProperty('showDetails')) {
+    if (!sanitized.hasOwnProperty('showNames')) {
+      sanitized.showNames = sanitized.showDetails;
+    }
+    if (!sanitized.hasOwnProperty('showCounts')) {
+      sanitized.showCounts = sanitized.showDetails;
+    }
+  }
+
   // 下位互換性のためのマッピング
   if (config.hasOwnProperty('sheetName')) {
     const sheetName = config['sheetName'];
@@ -2162,6 +2217,7 @@ if (typeof module !== 'undefined') {
     addReaction,
     toggleHighlight,
     setShowDetails,
+    setDisplayOptions,
     saveWebAppUrl,
     getWebAppUrl,
     saveDeployId,
