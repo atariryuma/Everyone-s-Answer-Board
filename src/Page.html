@@ -663,7 +663,7 @@ class StudyQuestApp {
       getPublishedSheetData: (sheetName, classFilter, sort) => this.runGas('getPublishedSheetData', sheetName, classFilter, sort),
       getAvailableSheets: () => this.runGas('getAvailableSheets'),
       addReaction: (rowIndex, reaction) => this.runGas('addReaction', rowIndex, reaction, this.state.sheetName),
-      toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', rowIndex, sheetName),
+      toggleHighlight: (rowIndex) => this.runGas('toggleHighlight', rowIndex, this.state.sheetName),
       checkAdmin: () => this.runGas('checkAdmin')
     };
     const savedCols = localStorage.getItem('boardColumns');
@@ -1760,7 +1760,7 @@ class StudyQuestApp {
     
     try {
       console.log('toggleHighlight request', rowIndex, this.state.sheetName);
-      const res = await this.gas.toggleHighlight(rowIndex, this.state.sheetName);
+      const res = await this.gas.toggleHighlight(rowIndex);
       console.log('toggleHighlight response', res);
       
       if (res && res.status === 'ok') {
