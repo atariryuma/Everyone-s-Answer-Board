@@ -1904,7 +1904,7 @@ class StudyQuestApp {
       this.updateConfigFromGlobals();
       
       // キャッシュをクリアして新しい設定で再描画
-      this.renderCache.clear();
+      this.cache.clear();
       
       // 管理モード切り替え時は既存のカードを全て削除して強制再生成
       this.elements.answersContainer.innerHTML = '';
@@ -2420,47 +2420,14 @@ class StudyQuestApp {
   }
 
   cleanup() {
-    const now = Date.now();
-    const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-    
-    // Garbage collection helper - clean up unused cache entries
-    if (this.renderCache.size > 100) {
-      const entries = Array.from(this.renderCache.entries());
-      entries.slice(0, 50).forEach(([key]) => {
-        this.renderCache.delete(key);
-        this.cacheTimestamps.delete(key);
-      });
-    }
-    
-    // Clean up expired cache entries
-    for (const [key, timestamp] of this.cacheTimestamps.entries()) {
-      if (now - timestamp > CACHE_TTL) {
-        this.renderCache.delete(key);
-        this.iconCache.delete(key);
-        this.simpleCache.delete(key);
-        this.cacheTimestamps.delete(key);
-      }
-    }
-    
-    if (this.iconCache.size > 50) {
-      const entries = Array.from(this.iconCache.entries());
-      entries.slice(0, 25).forEach(([key]) => {
-        this.iconCache.delete(key);
-        this.cacheTimestamps.delete(key);
-      });
-    }
-    
+    // Consolidated cache cleanup
+    this.cache.cleanup();
+
     // Clear DOM fragment pool
     this.domFragmentPool.length = 0;
-    
-    // Force garbage collection on WeakMap (happens automatically)
-    // WeakMap entries are automatically cleaned up when references are lost
-    
+
     console.log('Cache cleanup completed', {
-      renderCacheSize: this.renderCache.size,
-      iconCacheSize: this.iconCache.size,
-      simpleCacheSize: this.simpleCache.size,
-      timestampCacheSize: this.cacheTimestamps.size
+      cacheSize: this.cache.size
     });
   }
   
