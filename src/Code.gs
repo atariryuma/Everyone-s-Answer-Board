@@ -141,6 +141,26 @@ function checkAdmin() {
   return isUserAdmin();
 }
 
+function publishApp(sheetName) {
+  if (!checkAdmin()) {
+    throw new Error('権限がありません。');
+  }
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('IS_PUBLISHED', 'true');
+  props.setProperty('PUBLISHED_SHEET_NAME', sheetName);
+  return `「${sheetName}」を公開しました。`;
+}
+
+function unpublishApp() {
+  if (!checkAdmin()) {
+    throw new Error('権限がありません。');
+  }
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('IS_PUBLISHED', 'false');
+  if (props.deleteProperty) props.deleteProperty('PUBLISHED_SHEET_NAME');
+  return 'アプリを非公開にしました。';
+}
+
 function parseReactionString(val) {
   if (!val) return [];
   return val
@@ -191,7 +211,9 @@ function getAdminSettings() {
   
   // 新しいシステム：常に利用可能な回答ボード
   // activeSheetNameがあれば利用可能、なければシート選択が必要
-  const isAvailable = !!(appSettings.activeSheetName);
+  const isPublished = props.getProperty('IS_PUBLISHED') === 'true';
+  const activeSheetName = appSettings.activeSheetName || props.getProperty('ACTIVE_SHEET_NAME') || '';
+  const isAvailable = !!activeSheetName;
   
   return {
     allSheets: allSheets,
@@ -200,10 +222,10 @@ function getAdminSettings() {
     webAppUrl: getWebAppUrl(),
     adminEmails: adminEmails,
     isUserAdmin: adminEmails.includes(currentUserEmail),
-    activeSheetName: appSettings.activeSheetName,
+    activeSheetName: activeSheetName,
     showNames: appSettings.showNames,
     showCounts: appSettings.showCounts,
-    isAvailable: isAvailable  // 新しい状態：回答ボードが利用可能かどうか
+    isPublished: isPublished
   };
 }
 
@@ -374,7 +396,12 @@ function doGet(e) {
     const validatedUserId = validateUserId(userId);
     
     // ユーザー情報を取得
-    const userInfo = getUserInfo(validatedUserId);
+    let userInfo;
+    try {
+      userInfo = getUserInfo(validatedUserId);
+    } catch (e) {
+      userInfo = getUserInfoInternal(validatedUserId);
+    }
     if (!userInfo) {
       return HtmlService.createHtmlOutput('無効なユーザーIDです。')
         .setTitle('エラー');
@@ -385,6 +412,19 @@ function doGet(e) {
     try {
       viewerEmail = safeGetUserEmail();
     } catch (e) {
+      if (userInfo.configJson && userInfo.configJson.isPublished === false) {
+        const template = HtmlService.createTemplateFromFile('Unpublished');
+        template.userId = validatedUserId;
+        template.userInfo = userInfo;
+        template.userEmail = userInfo.adminEmail;
+        template.isOwner = false;
+        template.ownerName = userInfo.adminEmail || 'Unknown';
+        template.boardUrl = `${getWebAppUrl()}?userId=${validatedUserId}`;
+        auditLog('UNPUBLISHED_ACCESS_NO_LOGIN', validatedUserId, { error: e });
+        const output = template.evaluate();
+        if (output.setSandboxMode) output.setSandboxMode(HtmlService.SandboxMode.IFRAME);
+        return output.setTitle('StudyQuest - 回答ボード');
+      }
       if (typeof HtmlService !== 'undefined') {
         return HtmlService.createHtmlOutput('認証が必要です。Googleアカウントでログインしてください。')
           .setTitle('認証エラー');
@@ -396,7 +436,7 @@ function doGet(e) {
     if (!isSameDomain(viewerEmail, userInfo.adminEmail)) {
       auditLog('ACCESS_DENIED', validatedUserId, { viewerEmail, adminEmail: userInfo.adminEmail });
       if (typeof HtmlService !== 'undefined') {
-        return HtmlService.createHtmlOutput('権限がありません。同じドメインのユーザーのみアクセスできます。')
+        return HtmlService.createHtmlOutput('システムエラーが発生しました。管理者にお問い合わせください。')
           .setTitle('エラー');
       }
       throw new Error('権限がありません。同じドメインのユーザーのみアクセスできます。');
@@ -414,9 +454,9 @@ function doGet(e) {
       template.userId = validatedUserId;
       template.userInfo = userInfo;
       auditLog('ADMIN_ACCESS', validatedUserId, { viewerEmail });
-      return template.evaluate()
-        .setTitle('StudyQuest - 管理パネル')
-        .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+      const output = template.evaluate();
+      if (output.setSandboxMode) output.setSandboxMode(HtmlService.SandboxMode.IFRAME);
+      return output.setTitle('StudyQuest - 管理パネル');
     }
   
   // 通常表示モード - 常に回答ボードを表示
@@ -441,21 +481,37 @@ function doGet(e) {
       template.userId = validatedUserId;
       template.userInfo = userInfo;
       auditLog('ADMIN_ACCESS_NO_SHEET', validatedUserId, { viewerEmail });
-      return template.evaluate()
-        .setTitle('StudyQuest - 管理パネル')
-        .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+      const output = template.evaluate();
+      if (output.setSandboxMode) output.setSandboxMode(HtmlService.SandboxMode.IFRAME);
+      return output.setTitle('StudyQuest - 管理パネル');
     } else {
       const template = HtmlService.createTemplateFromFile('Unpublished');
       template.userId = validatedUserId;
       template.userInfo = userInfo;
+      template.userEmail = userInfo.adminEmail;
       template.isOwner = false;
       template.ownerName = userInfo.adminEmail || 'Unknown';
       template.boardUrl = `${getWebAppUrl()}?userId=${validatedUserId}`;
       auditLog('UNPUBLISHED_ACCESS', validatedUserId, { viewerEmail, isOwner: false });
-      return template.evaluate()
-        .setTitle('StudyQuest - 回答ボード')
-        .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+      const output = template.evaluate();
+      if (output.setSandboxMode) output.setSandboxMode(HtmlService.SandboxMode.IFRAME);
+      return output.setTitle('StudyQuest - 回答ボード');
     }
+  }
+
+  // 公開されていない場合は待機画面を表示
+  if (!config.isPublished && userInfo.adminEmail !== viewerEmail) {
+    const template = HtmlService.createTemplateFromFile('Unpublished');
+    template.userId = validatedUserId;
+    template.userInfo = userInfo;
+    template.userEmail = userInfo.adminEmail;
+    template.isOwner = false;
+    template.ownerName = userInfo.adminEmail || 'Unknown';
+    template.boardUrl = `${getWebAppUrl()}?userId=${validatedUserId}`;
+    auditLog('UNPUBLISHED_ACCESS', validatedUserId, { viewerEmail, isOwner: false });
+    const output = template.evaluate();
+    if (output.setSandboxMode) output.setSandboxMode(HtmlService.SandboxMode.IFRAME);
+    return output.setTitle('StudyQuest - 回答ボード');
   }
   
   // 既存のPage.htmlを使用
@@ -941,6 +997,41 @@ function guessHeadersFromArray(headers) {
   return guessed;
 }
 
+/**
+ * Minimal board data builder used in tests
+ */
+function buildBoardData(sheetName) {
+  const sheet = getCurrentSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) throw new Error(`指定されたシート「${sheetName}」が見つかりません。`);
+
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 1) return { header: '', entries: [] };
+
+  const cfgFunc = (typeof global !== 'undefined' && global.getConfig)
+    ? global.getConfig
+    : (typeof getConfig === 'function' ? getConfig : null);
+  const cfg = cfgFunc ? cfgFunc(sheetName) : {};
+
+  const answerHeader = cfg.answerHeader || cfg.questionHeader || COLUMN_HEADERS.OPINION;
+  const reasonHeader = cfg.reasonHeader || COLUMN_HEADERS.REASON;
+  const classHeader = cfg.classHeader || COLUMN_HEADERS.CLASS;
+  const nameHeader = cfg.nameHeader || '';
+
+  const required = [answerHeader, reasonHeader, classHeader, COLUMN_HEADERS.EMAIL];
+  if (nameHeader) required.push(nameHeader);
+
+  const headerIndices = findHeaderIndices(values[0], required);
+
+  const entries = values.slice(1).map(row => ({
+    answer: row[headerIndices[answerHeader]] || '',
+    reason: row[headerIndices[reasonHeader]] || '',
+    name: nameHeader ? row[headerIndices[nameHeader]] || '' : '',
+    class: row[headerIndices[classHeader]] || ''
+  }));
+
+  return { header: cfg.questionHeader || answerHeader, entries: entries };
+}
+
 function getSheetData(sheetName, classFilter, sortBy) {
   try {
     const sheet = getCurrentSpreadsheet().getSheetByName(sheetName);
@@ -978,12 +1069,14 @@ function getSheetData(sheetName, classFilter, sortBy) {
     
     const answerHeader = cfg.answerHeader || cfg.questionHeader || COLUMN_HEADERS.OPINION;
     const reasonHeader = cfg.reasonHeader || COLUMN_HEADERS.REASON;
-    const classHeader = cfg.classHeader || COLUMN_HEADERS.CLASS;
+    const classHeaderGuess = cfg.classHeader || COLUMN_HEADERS.CLASS;
     const nameHeader = cfg.nameHeader || '';
+
+    const sheetHeaders = allValues[0].map(h => String(h || '').replace(/\s+/g,''));
+    const normalized = header => String(header || '').replace(/\s+/g,'');
 
     const required = [
       COLUMN_HEADERS.EMAIL,
-      classHeader,
       answerHeader,
       reasonHeader,
       COLUMN_HEADERS.TIMESTAMP,
@@ -992,15 +1085,23 @@ function getSheetData(sheetName, classFilter, sortBy) {
       COLUMN_HEADERS.CURIOUS,
       COLUMN_HEADERS.HIGHLIGHT
     ];
-    if (nameHeader) required.push(nameHeader);
+    if (nameHeader && sheetHeaders.includes(normalized(nameHeader))) {
+      required.push(nameHeader);
+    }
+
+    if (sheetHeaders.includes(normalized(classHeaderGuess))) {
+      required.splice(1,0,classHeaderGuess);
+    }
 
     const headerIndices = findHeaderIndices(allValues[0], required);
+
+    const classHeader = sheetHeaders.includes(normalized(classHeaderGuess)) ? classHeaderGuess : '';
     const dataRows = allValues.slice(1);
     const userEmail = safeGetUserEmail();
     const isAdmin = isUserAdmin(userEmail);
 
     const rows = dataRows.map((row, index) => {
-      if (classFilter && classFilter !== 'すべて') {
+      if (classHeader && classFilter && classFilter !== 'すべて') {
         const className = row[headerIndices[classHeader]];
         if (className !== classFilter) return null;
       }
@@ -1019,9 +1120,12 @@ function getSheetData(sheetName, classFilter, sortBy) {
         const baseScore = reason.length;
         const likeMultiplier = 1 + (likes * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
         const totalScore = baseScore * likeMultiplier;
-        let name = email ? email.split('@')[0] : '';
-        if (nameHeader && row[headerIndices[nameHeader]]) {
-          name = row[headerIndices[nameHeader]];
+        let name = '';
+        if (isAdmin) {
+          name = email ? email.split('@')[0] : '';
+          if (nameHeader && row[headerIndices[nameHeader]]) {
+            name = row[headerIndices[nameHeader]];
+          }
         }
         return {
           rowIndex: index + 2,
@@ -1094,12 +1198,14 @@ function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy)
     
     const answerHeader = cfg.answerHeader || cfg.questionHeader || COLUMN_HEADERS.OPINION;
     const reasonHeader = cfg.reasonHeader || COLUMN_HEADERS.REASON;
-    const classHeader = cfg.classHeader || COLUMN_HEADERS.CLASS;
+    const classHeaderGuess = cfg.classHeader || COLUMN_HEADERS.CLASS;
     const nameHeader = cfg.nameHeader || '';
+
+    const sheetHeaders = allValues[0].map(h => String(h || '').replace(/\s+/g,''));
+    const normalized = header => String(header || '').replace(/\s+/g,'');
 
     const required = [
       COLUMN_HEADERS.EMAIL,
-      classHeader,
       answerHeader,
       reasonHeader,
       COLUMN_HEADERS.TIMESTAMP,
@@ -1108,15 +1214,23 @@ function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy)
       COLUMN_HEADERS.CURIOUS,
       COLUMN_HEADERS.HIGHLIGHT
     ];
-    if (nameHeader) required.push(nameHeader);
+    if (nameHeader && sheetHeaders.includes(normalized(nameHeader))) {
+      required.push(nameHeader);
+    }
+
+    if (sheetHeaders.includes(normalized(classHeaderGuess))) {
+      required.splice(1,0,classHeaderGuess);
+    }
 
     const headerIndices = findHeaderIndices(allValues[0], required);
+
+    const classHeader = sheetHeaders.includes(normalized(classHeaderGuess)) ? classHeaderGuess : '';
     const dataRows = allValues.slice(1);
     const userEmail = safeGetUserEmail();
     const isAdmin = isUserAdmin(userEmail);
 
     const rows = dataRows.map((row, index) => {
-      if (classFilter && classFilter !== 'すべて') {
+      if (classHeader && classFilter && classFilter !== 'すべて') {
         const className = row[headerIndices[classHeader]];
         if (className !== classFilter) return null;
       }
@@ -1135,9 +1249,12 @@ function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy)
         const baseScore = reason.length;
         const likeMultiplier = 1 + (likes * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
         const totalScore = baseScore * likeMultiplier;
-        let name = email ? email.split('@')[0] : '';
-        if (nameHeader && row[headerIndices[nameHeader]]) {
-          name = row[headerIndices[nameHeader]];
+        let name = '';
+        if (isAdmin) {
+          name = email ? email.split('@')[0] : '';
+          if (nameHeader && row[headerIndices[nameHeader]]) {
+            name = row[headerIndices[nameHeader]];
+          }
         }
         return {
           rowIndex: index + 2,
@@ -2083,7 +2200,7 @@ function generateAccessToken() {
 function auditLog(action, userId, details) {
   try {
     const timestamp = new Date();
-    const currentUser = Session.getActiveUser().getEmail();
+    const currentUser = (typeof Session !== 'undefined' && Session.getActiveUser) ? Session.getActiveUser().getEmail() : '';
 
     // Use cache for temporary audit logging (since we can't create sheets dynamically in all environments)
     const cache = (typeof CacheService !== 'undefined') ? CacheService.getScriptCache() : null;
@@ -2096,7 +2213,8 @@ function auditLog(action, userId, details) {
     };
     
     // Store in cache with 6 hour expiration
-    const cacheKey = `audit_${timestamp.getTime()}_${Utilities.getUuid()}`;
+    const uuid = (typeof Utilities !== 'undefined' && Utilities.getUuid) ? Utilities.getUuid() : Math.random().toString(36).slice(2);
+    const cacheKey = `audit_${timestamp.getTime()}_${uuid}`;
     if (cache) {
       cache.put(cacheKey, JSON.stringify(logEntry), 21600);
     }
@@ -2207,6 +2325,7 @@ if (typeof module !== 'undefined') {
     COLUMN_HEADERS,
     getAdminSettings,
     doGet,
+    buildBoardData,
     getConfig,
     getPublishedSheetData,
     getSheets,
@@ -2232,6 +2351,7 @@ if (typeof module !== 'undefined') {
     prepareSheetForBoard,
     registerNewUser,
     getUserInfo,
+    getUserInfoInternal,
     updateUserConfig,
     getUserDatabase,
     setup,
@@ -2242,11 +2362,14 @@ if (typeof module !== 'undefined') {
     findUserByEmail,
     getExistingBoard,
     updateAdminEmails,
+    publishApp,
+    unpublishApp,
     getActiveUserEmail,
     prepareSpreadsheetForStudyQuest,
     isSameDomain,
     getEmailDomain,
     getUrlOrigin,
-    convertPreviewUrl
+    convertPreviewUrl,
+    buildBoardData
   };
 }
