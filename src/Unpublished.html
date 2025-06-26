@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
     <base target="_top">
     <title>StudyQuest - 回答ボード</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -32,7 +31,7 @@
                 <div class="mb-6 p-4 bg-gray-700 rounded-lg">
                     <p class="text-sm text-gray-400 mb-2">生徒用URL（固定）:</p>
                     <div class="flex gap-2">
-                        <input type="text" id="board-url" readonly value=""
+                        <input type="text" id="board-url" readonly value="<?= boardUrl || '' ?>"
                                class="flex-1 p-2 bg-gray-600 border border-gray-500 rounded text-sm cursor-pointer hover:bg-gray-500"
                                onclick="this.select()">
                         <button type="button" onclick="copyBoardUrl()" 
@@ -115,18 +114,9 @@
     </div>
 
     <script>
-        // Initialize board URL safely
-        document.addEventListener('DOMContentLoaded', function() {
-            const urlInput = document.getElementById('board-url');
-            const boardUrl = <?= JSON.stringify(boardUrl || '') ?>;
-            if (urlInput && boardUrl) {
-                urlInput.value = boardUrl;
-            }
-        });
-        
         function copyBoardUrl() {
             const urlInput = document.getElementById('board-url');
-            if (urlInput && urlInput.value) {
+            if (urlInput) {
                 try {
                     if (navigator.clipboard && window.isSecureContext) {
                         navigator.clipboard.writeText(urlInput.value);

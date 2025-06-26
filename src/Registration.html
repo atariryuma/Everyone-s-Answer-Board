@@ -446,6 +446,17 @@
         .getActiveUserEmail();
     });
     
+    // セットアップ方法の切り替え（統合版では自動セットアップのみ）
+    // document.querySelectorAll('input[name="setup-method"]').forEach(radio => {
+    //   radio.addEventListener('change', (e) => {
+    //     const existingInput = document.getElementById('existing-sheet-input');
+    //     if (e.target.value === 'existing') {
+    //       existingInput.style.display = 'block';
+    //     } else {
+    //       existingInput.style.display = 'none';
+    //     }
+    //   });
+    // });
 
     // Enterキー対応（登録ボタン用）
     document.addEventListener('keypress', (e) => {
@@ -674,6 +685,13 @@
           
           resultArea.classList.remove('hidden');
           btn.style.display = 'none';
+          
+          // 既存スプレッドシート入力を無効化
+          const existingInput = document.getElementById('spreadsheet-url');
+          if (existingInput) {
+            existingInput.disabled = true;
+          }
+
           showMessage('登録が完了しました。管理画面リンクをクリックして設定を確認してください。', 'info');
         })
         .withFailureHandler(error => {
