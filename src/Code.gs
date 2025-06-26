@@ -619,6 +619,25 @@ function addSpreadsheetUrl(spreadsheetUrl) {
       activeSheetName: firstSheetName
     });
     
+    // 新しいシートの基本設定を自動作成
+    try {
+      // シートのヘッダーを取得して推測
+      const firstSheet = testSpreadsheet.getSheetByName(firstSheetName);
+      if (firstSheet && firstSheet.getLastRow() > 0) {
+        const headers = firstSheet.getRange(1, 1, 1, firstSheet.getLastColumn()).getValues()[0];
+        const guessedConfig = guessHeadersFromArray(headers);
+        
+        // 基本設定を保存（少なくとも1つのヘッダーが推測できた場合）
+        if (guessedConfig.questionHeader || guessedConfig.answerHeader) {
+          saveSheetConfig(firstSheetName, guessedConfig);
+          console.log('Auto-created config for new sheet:', firstSheetName, guessedConfig);
+        }
+      }
+    } catch (configError) {
+      console.warn('Failed to auto-create config for new sheet:', configError.message);
+      // 設定作成に失敗してもスプレッドシート追加は成功とする
+    }
+    
     auditLog('SPREADSHEET_ADDED', userId, { 
       spreadsheetId, 
       spreadsheetUrl, 
@@ -662,6 +681,24 @@ function getSheetHeaders(sheetName) {
   if (!sheet) throw new Error(`シート '${sheetName}' が見つかりません。`);
   const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   return headerRow.map(v => (v !== null && v !== undefined) ? String(v) : '');
+}
+
+/**
+ * ヘッダー配列から設定項目を推測する関数
+ * @param {Array} headers - ヘッダー名の配列
+ * @returns {Object} 推測された設定オブジェクト
+ */
+function guessHeadersFromArray(headers) {
+  const find = (keys) => headers.find(h => keys.some(k => String(h).includes(k))) || '';
+  const question = find(['質問', '問題']);
+  const answer = find(['回答', '答え']);
+  return {
+    questionHeader: question,
+    answerHeader: answer,
+    reasonHeader: find(['理由']),
+    nameHeader: find(['名前', '氏名']),
+    classHeader: find(['クラス'])
+  };
 }
 
 function getSheetData(sheetName, classFilter, sortBy) {
