@@ -645,7 +645,7 @@ class StudyQuestApp {
     this.animationFrameId = null;
     this.idleCallbackId = null;
     this.domFragmentPool = [];
-    this.isLowPerformanceMode = this.detectLowPerformanceDevice();
+    this.isLowPerformanceMode = true;
     this.elements = {
       body: document.body,
       mainContainer: document.getElementById('main-container'),
@@ -728,8 +728,8 @@ class StudyQuestApp {
     this.setupOwnerName();
     this.showMinimalSkeleton();
     
-    // Setup performance monitoring
-    this.setupPerformanceMonitoring();
+    // Apply default low performance tweaks
+    this.optimizeForLowPerformance();
     
     // Immediate async loading for data
     this.loadDataImmediate();
@@ -2262,9 +2262,9 @@ class StudyQuestApp {
     console.log('Enabling low performance optimizations');
     
     // Reduce animation and transition durations
-    document.documentElement.style.setProperty('--transition-duration', '0.05s');
+    document.documentElement.style.setProperty('--transition-duration', '0.1s');
     document.documentElement.style.setProperty('--animation-duration', '0.1s');
-    document.documentElement.style.setProperty('--backdrop-blur', '0px');
+    document.documentElement.style.setProperty('--backdrop-blur', '4px');
     
     // Create comprehensive low-performance stylesheet
     const style = document.createElement('style');
@@ -2272,8 +2272,8 @@ class StudyQuestApp {
     style.textContent = `
       /* Disable expensive visual effects */
       .glass-panel {
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
+        backdrop-filter: blur(4px) !important;
+        -webkit-backdrop-filter: blur(4px) !important;
         background: var(--color-surface) !important;
       }
       
@@ -2307,18 +2307,6 @@ class StudyQuestApp {
         box-shadow: var(--shadow-sm) !important;
       }
       
-      /* Reduce border complexity */
-      .answer-card.reaction-bg-like-understand-curious {
-        border: 2px solid #facc15 !important;
-        border-image: none !important;
-      }
-      
-      .answer-card.reaction-bg-like-understand,
-      .answer-card.reaction-bg-like-curious,
-      .answer-card.reaction-bg-understand-curious {
-        border: 2px solid #8be9fd !important;
-        border-image: none !important;
-      }
     `;
     document.head.appendChild(style);
     
