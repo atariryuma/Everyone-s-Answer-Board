@@ -439,16 +439,46 @@ header {
   border: 2px solid #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
-/* モーダルでのハイライト装飾を強化 */
-#answerModalCard.highlighted {
-  border-color: #facc15 !important;
-  border-width: 3px !important;
-  box-shadow: 0 0 20px rgba(250, 204, 21, 0.4) !important;
-}
-/* モーダルでのリアクション装飾を強化 */
+/* モーダルでのリアクション装飾 */
 #answerModalCard.reaction-border-1 { border-width: 3px !important; }
 #answerModalCard.reaction-border-2 { border-width: 4px !important; }
 #answerModalCard.reaction-border-3 { border-width: 5px !important; }
+/* モーダルでのリアクション背景色 */
+#answerModalCard.reaction-bg-like { 
+  border-color: #ef4444 !important; 
+  border-image: none !important;
+}
+#answerModalCard.reaction-bg-understand { 
+  border-color: #fbbf24 !important; 
+  border-image: none !important;
+}
+#answerModalCard.reaction-bg-curious { 
+  border-color: #10b981 !important; 
+  border-image: none !important;
+}
+#answerModalCard.reaction-bg-like-understand { 
+  border-image: linear-gradient(45deg, #ef4444, #fbbf24) 1 !important; 
+  border-color: transparent !important;
+}
+#answerModalCard.reaction-bg-like-curious { 
+  border-image: linear-gradient(45deg, #ef4444, #10b981) 1 !important; 
+  border-color: transparent !important;
+}
+#answerModalCard.reaction-bg-understand-curious { 
+  border-image: linear-gradient(45deg, #fbbf24, #10b981) 1 !important; 
+  border-color: transparent !important;
+}
+#answerModalCard.reaction-bg-like-understand-curious { 
+  border-image: linear-gradient(45deg, #ef4444, #fbbf24, #10b981) 1 !important; 
+  border-color: transparent !important;
+}
+/* モーダルでのハイライト装飾（リアクション装飾より後に配置で優先） */
+#answerModalCard.highlighted {
+  border-color: #facc15 !important;
+  border-image: none !important;
+  border-width: 3px !important;
+  box-shadow: 0 0 20px rgba(250, 204, 21, 0.4) !important;
+}
 .render-optimized { transform: translateZ(0); }
 .modal-fade { animation: modalFade 0.2s ease-out; }
 @keyframes modalFade { from { opacity: 0; will-change: opacity; } to { opacity: 1; } }
@@ -1387,10 +1417,12 @@ class StudyQuestApp {
     ];
     reactionClasses.forEach(cls => element.classList.remove(cls));
     
-    // ハイライト状態を適用
+    // ハイライト状態を適用（リアクション装飾より優先）
     if (data.highlight) {
       element.classList.add('highlighted');
       console.log('ハイライト装飾適用:', { rowIndex: data.rowIndex, element: element.tagName, highlight: data.highlight });
+      // ハイライト時はリアクション装飾をスキップ
+      return;
     } else {
       console.log('ハイライト装飾なし:', { rowIndex: data.rowIndex, element: element.tagName, highlight: data.highlight });
     }
