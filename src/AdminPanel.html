@@ -138,6 +138,9 @@
           <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
             <span class="text-xl">⚙️</span>ボード作成・設定
           </h2>
+          
+          <!-- 既存のコンテンツをここに移動 -->
+          <div id="main-content"></div>
         </div>
       </div>
 
@@ -152,24 +155,24 @@
           <div class="mb-4 p-3 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-lg border border-cyan-400/30">
             <div class="flex items-center justify-between mb-2">
               <span class="text-sm font-semibold text-white">現在の状態</span>
-              <span class="status-indicator status-inactive" id="board-status-indicator"></span>
+              <span class="status-indicator status-inactive" id="dashboard-status-indicator"></span>
             </div>
-            <p class="text-lg font-bold text-cyan-400" id="status-text">準備中</p>
-            <p class="text-xs text-gray-300" id="status-description">スプレッドシートを追加</p>
+            <p class="text-lg font-bold text-cyan-400" id="dashboard-status-text">準備中</p>
+            <p class="text-xs text-gray-300" id="dashboard-status-description">スプレッドシートを追加</p>
           </div>
 
           <!-- アクティブシート情報 -->
           <div class="mb-4 p-3 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg border border-green-400/30">
             <h4 class="text-sm font-semibold text-white mb-2">アクティブなシート</h4>
-            <p class="text-green-400 font-medium" id="active-sheet-name">--</p>
+            <p class="text-green-400 font-medium" id="dashboard-active-sheet">--</p>
             <div class="mt-2 grid grid-cols-2 gap-2 text-xs">
               <div>
                 <span class="text-gray-400">回答数:</span>
-                <span class="text-white font-medium" id="answer-count">0</span>
+                <span class="text-white font-medium" id="dashboard-answer-count">0</span>
               </div>
               <div>
                 <span class="text-gray-400">反応数:</span>
-                <span class="text-white font-medium" id="reaction-count">0</span>
+                <span class="text-white font-medium" id="dashboard-reaction-count">0</span>
               </div>
             </div>
           </div>
@@ -177,7 +180,7 @@
           <!-- 最近のアクティビティ -->
           <div>
             <h4 class="text-sm font-semibold text-white mb-2">最近のアクティビティ</h4>
-            <div id="recent-activities" class="space-y-2 max-h-32 overflow-y-auto">
+            <div id="dashboard-activities" class="space-y-2 max-h-32 overflow-y-auto">
               <div class="text-xs text-gray-400 text-center py-2">アクティビティなし</div>
             </div>
           </div>
@@ -1360,26 +1363,58 @@
     
     // ダッシュボード更新関数
     function updateDashboard(status) {
-      // ステータス更新
-      const statusIndicator = document.getElementById('board-status-indicator');
-      const statusText = document.getElementById('status-text');
-      const statusDescription = document.getElementById('status-description');
+      // ダッシュボードのステータス更新
+      const dashStatusIndicator = document.getElementById('dashboard-status-indicator');
+      const dashStatusText = document.getElementById('dashboard-status-text');
+      const dashStatusDescription = document.getElementById('dashboard-status-description');
       
-      if (status && status.isActive) {
-        statusIndicator.className = 'status-indicator status-active';
-        statusText.textContent = 'アクティブ';
-        statusDescription.textContent = 'ボードが公開中です';
-      } else {
-        statusIndicator.className = 'status-indicator status-inactive';
-        statusText.textContent = '準備中';
-        statusDescription.textContent = 'スプレッドシートを追加';
+      if (dashStatusIndicator && dashStatusText && dashStatusDescription) {
+        if (status && status.isActive) {
+          dashStatusIndicator.className = 'status-indicator status-active';
+          dashStatusText.textContent = 'アクティブ';
+          dashStatusDescription.textContent = 'ボードが公開中です';
+        } else {
+          dashStatusIndicator.className = 'status-indicator status-inactive';
+          dashStatusText.textContent = '準備中';
+          dashStatusDescription.textContent = 'スプレッドシートを追加';
+        }
+      }
+      
+      // メインエリアのステータス更新も同期
+      const mainStatusIndicator = document.getElementById('board-status-indicator');
+      const mainStatusText = document.getElementById('status-text');
+      const mainStatusDescription = document.getElementById('status-description');
+      
+      if (mainStatusIndicator && mainStatusText && mainStatusDescription) {
+        if (status && status.isActive) {
+          mainStatusIndicator.className = 'status-indicator status-active';
+          mainStatusText.textContent = 'アクティブ';
+          mainStatusDescription.textContent = 'ボードが公開中です';
+        } else {
+          mainStatusIndicator.className = 'status-indicator status-inactive';
+          mainStatusText.textContent = '準備中';
+          mainStatusDescription.textContent = 'スプレッドシートを追加';
+        }
       }
       
       // アクティブシート情報更新
       if (status && status.activeSheetName) {
-        document.getElementById('active-sheet-name').textContent = status.activeSheetName;
-        document.getElementById('answer-count').textContent = status.answerCount || 0;
-        document.getElementById('reaction-count').textContent = status.totalReactions || 0;
+        const dashActiveSheet = document.getElementById('dashboard-active-sheet');
+        const dashAnswerCount = document.getElementById('dashboard-answer-count');
+        const dashReactionCount = document.getElementById('dashboard-reaction-count');
+        
+        if (dashActiveSheet) dashActiveSheet.textContent = status.activeSheetName;
+        if (dashAnswerCount) dashAnswerCount.textContent = status.answerCount || 0;
+        if (dashReactionCount) dashReactionCount.textContent = status.totalReactions || 0;
+        
+        // メインエリアも更新
+        const mainActiveSheet = document.getElementById('active-sheet-name');
+        const mainAnswerCount = document.getElementById('answer-count');
+        const mainReactionCount = document.getElementById('reaction-count');
+        
+        if (mainActiveSheet) mainActiveSheet.textContent = status.activeSheetName;
+        if (mainAnswerCount) mainAnswerCount.textContent = status.answerCount || 0;
+        if (mainReactionCount) mainReactionCount.textContent = status.totalReactions || 0;
       }
       
       // アクティビティ更新
@@ -1387,7 +1422,9 @@
     }
     
     function updateRecentActivities(status) {
-      const container = document.getElementById('recent-activities');
+      const container = document.getElementById('dashboard-activities');
+      if (!container) return;
+      
       if (!status || !status.isActive) {
         container.innerHTML = '<div class="text-xs text-gray-400 text-center py-2">アクティビティなし</div>';
         return;
@@ -1410,8 +1447,31 @@
       }
     }
 
+    // 初期化時にメインコンテンツを移動
+    function initializeLayout() {
+      const mainContent = document.getElementById('main-content');
+      const mobileApp = document.getElementById('mobile-app');
+      
+      if (mainContent && mobileApp) {
+        // モバイル用のコンテンツをメインコンテンツエリアに移動
+        const content = mobileApp.innerHTML;
+        mainContent.innerHTML = content;
+        
+        // デスクトップでは元のコンテンツを隠す
+        if (window.innerWidth >= 1024) {
+          const mobileContainer = document.querySelector('.lg\\:hidden');
+          if (mobileContainer) {
+            mobileContainer.style.display = 'none';
+          }
+        }
+      }
+    }
+
     // 初期化時にボード一覧を読み込み
     document.addEventListener('DOMContentLoaded', () => {
+      // レイアウト初期化
+      initializeLayout();
+      
       if (window.innerWidth >= 1024) { // lg以上でのみ読み込み
         refreshBoardList();
       }
