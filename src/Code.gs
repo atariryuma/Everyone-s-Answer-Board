@@ -2624,6 +2624,188 @@ function getExistingBoard() {
   };
 }
 
+// =================================================================
+// 管理パネル用関数
+// =================================================================
+
+/**
+ * ダッシュボード用データを取得
+ */
+function getDashboardData() {
+  try {
+    const userEmail = safeGetUserEmail();
+    console.log(`Getting dashboard data for user: ${userEmail}`);
+    
+    // 管理者権限チェック
+    if (!isUserAdmin(userEmail)) {
+      return {
+        status: 'error',
+        message: '管理者権限が必要です'
+      };
+    }
+    
+    // 現在のスプレッドシートとユーザー情報を取得
+    const props = PropertiesService.getUserProperties();
+    const spreadsheetId = props.getProperty('CURRENT_SPREADSHEET_ID');
+    
+    let dashboardData = {
+      activeBoards: 0,
+      totalAnswers: 0,
+      totalReactions: 0,
+      lastUpdated: null,
+      hasActiveSpreadsheet: false
+    };
+    
+    if (spreadsheetId) {
+      try {
+        const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+        const sheets = spreadsheet.getSheets().filter(sheet => 
+          !sheet.getName().startsWith('Config_') && 
+          !sheet.getName().startsWith('Template_')
+        );
+        
+        dashboardData.activeBoards = sheets.length;
+        dashboardData.hasActiveSpreadsheet = true;
+        
+        // 各シートから統計を計算
+        let totalAnswers = 0;
+        let totalReactions = 0;
+        let latestUpdate = null;
+        
+        sheets.forEach(sheet => {
+          try {
+            const data = sheet.getDataRange().getValues();
+            if (data.length > 1) { // ヘッダー行を除く
+              totalAnswers += data.length - 1;
+              
+              // リアクション列をカウント
+              const headers = data[0];
+              const reactionColumns = [COLUMN_HEADERS.UNDERSTAND, COLUMN_HEADERS.LIKE, COLUMN_HEADERS.CURIOUS];
+              
+              reactionColumns.forEach(reactionHeader => {
+                const colIndex = headers.indexOf(reactionHeader);
+                if (colIndex !== -1) {
+                  for (let i = 1; i < data.length; i++) {
+                    if (data[i][colIndex]) {
+                      totalReactions += String(data[i][colIndex]).split(',').length;
+                    }
+                  }
+                }
+              });
+              
+              // 最新更新日を確認
+              const timestampIndex = headers.indexOf(COLUMN_HEADERS.TIMESTAMP);
+              if (timestampIndex !== -1) {
+                for (let i = 1; i < data.length; i++) {
+                  const timestamp = data[i][timestampIndex];
+                  if (timestamp && (!latestUpdate || new Date(timestamp) > new Date(latestUpdate))) {
+                    latestUpdate = timestamp;
+                  }
+                }
+              }
+            }
+          } catch (sheetError) {
+            console.warn(`Error processing sheet ${sheet.getName()}:`, sheetError);
+          }
+        });
+        
+        dashboardData.totalAnswers = totalAnswers;
+        dashboardData.totalReactions = totalReactions;
+        dashboardData.lastUpdated = latestUpdate ? new Date(latestUpdate).toISOString() : null;
+        
+      } catch (spreadsheetError) {
+        console.warn('Error accessing spreadsheet:', spreadsheetError);
+        // スプレッドシートにアクセスできない場合も継続
+      }
+    }
+    
+    return {
+      status: 'success',
+      data: dashboardData
+    };
+    
+  } catch (error) {
+    console.error('Error in getDashboardData:', error);
+    return {
+      status: 'error',
+      message: `ダッシュボードデータの取得に失敗しました: ${error.message}`
+    };
+  }
+}
+
+/**
+ * シートを切り替える
+ */
+function switchToSheet(sheetName) {
+  try {
+    const userEmail = safeGetUserEmail();
+    console.log(`Switching to sheet: ${sheetName} for user: ${userEmail}`);
+    
+    // 管理者権限チェック
+    if (!isUserAdmin(userEmail)) {
+      return {
+        status: 'error',
+        message: '管理者権限が必要です'
+      };
+    }
+    
+    // switchActiveSheet 関数を呼び出し
+    const result = switchActiveSheet(sheetName);
+    
+    if (result && result.status === 'success') {
+      return {
+        status: 'success',
+        message: `シート '${sheetName}' に切り替えました`
+      };
+    } else {
+      return {
+        status: 'error',
+        message: result?.message || 'シートの切り替えに失敗しました'
+      };
+    }
+    
+  } catch (error) {
+    console.error('Error in switchToSheet:', error);
+    return {
+      status: 'error',
+      message: `シートの切り替え中にエラーが発生しました: ${error.message}`
+    };
+  }
+}
+
+/**
+ * アクティブシートをクリア
+ */
+function clearActiveSheet() {
+  try {
+    const userEmail = safeGetUserEmail();
+    console.log(`Clearing active sheet for user: ${userEmail}`);
+    
+    // 管理者権限チェック
+    if (!isUserAdmin(userEmail)) {
+      return {
+        status: 'error',
+        message: '管理者権限が必要です'
+      };
+    }
+    
+    const props = PropertiesService.getUserProperties();
+    props.deleteProperty('ACTIVE_SHEET_NAME');
+    
+    return {
+      status: 'success',
+      message: 'アクティブシートをクリアしました'
+    };
+    
+  } catch (error) {
+    console.error('Error in clearActiveSheet:', error);
+    return {
+      status: 'error',
+      message: `シートクリア中にエラーが発生しました: ${error.message}`
+    };
+  }
+}
+
 if (typeof module !== 'undefined') {
   handleError = require('./ErrorHandling.gs').handleError;
   const { getConfig, saveSheetConfig, createConfigSheet } = require('./config.gs');
@@ -2678,6 +2860,9 @@ if (typeof module !== 'undefined') {
     convertPreviewUrl,
     buildBoardData,
     guessHeadersFromArray,
-    clearHeaderCache
+    clearHeaderCache,
+    getDashboardData,
+    switchToSheet,
+    clearActiveSheet
   };
 }
