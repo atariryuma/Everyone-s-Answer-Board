@@ -703,6 +703,7 @@ class StudyQuestApp {
     this.handlers = {};
     this.adminModeVerified = false; // 管理モード切り替え時の権限確認フラグ
     this.reactionDebounce = new Map(); // リアクションのデバウンス処理用
+    this.highlightDebounce = new Map(); // ハイライトのデバウンス処理用
     this.pendingReactions = new Set(); // 処理中のリアクション
     this.reactionTypes = [
       { key: 'LIKE', icon: 'hand-thumb-up' },
@@ -869,6 +870,7 @@ class StudyQuestApp {
       
       const highlightBtn = e.target.closest('.highlight-btn');
       if (highlightBtn) {
+        console.log('ハイライトボタンクリック:', { rowIndex, disabled: highlightBtn.disabled, showHighlightToggle: this.state.showHighlightToggle });
         e.stopPropagation();
         if (!highlightBtn.disabled) {
           this.handleHighlight(rowIndex);
@@ -899,28 +901,44 @@ class StudyQuestApp {
     this.elements.body.style.paddingBottom = footerHeight + this.baseBodyPadding + 'px';
   }
   runGas(funcName, ...args) {
-    // Simple request deduplication for identical calls
+    // Simple request deduplication for identical calls (except for state-changing operations)
     const cacheKey = funcName + JSON.stringify(args);
-    const cached = this.cache.get(cacheKey);
-    if (cached) {
-      return Promise.resolve(cached);
+    const isStateChanging = ['toggleHighlight', 'addReaction', 'endPublication'].includes(funcName);
+    
+    if (!isStateChanging) {
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return Promise.resolve(cached);
+      }
     }
+    
+    console.log('GAS API呼び出し:', { funcName, args, userId: USER_ID, isStateChanging });
     
     return new Promise((resolve, reject) => {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         const userId = USER_ID || '';
+        console.log('Google Apps Script環境検出済み、実際にAPI呼び出し実行中...');
         google.script.run
           .withSuccessHandler((result) => {
-            this.cache.set(cacheKey, result, 1000); // 1秒キャッシュ
+            console.log('GAS APIレスポンス受信:', { funcName, args, result, success: true });
+            if (!isStateChanging) {
+              this.cache.set(cacheKey, result, 1000); // 1秒キャッシュ
+            }
             resolve(result);
           })
-          .withFailureHandler(reject)
+          .withFailureHandler((error) => {
+            console.error('GAS APIエラー受信:', { funcName, args, error, success: false });
+            reject(error);
+          })
           .withUserObject({ userId: userId })
           [funcName](...args);
       } else {
         console.warn('Google Apps Script environment not detected.');
         this.getMockData(funcName, ...args).then((result) => {
-          this.cache.set(cacheKey, result, 1000); // 1秒キャッシュ
+          console.log('モックデータ取得:', { funcName, result });
+          if (!isStateChanging) {
+            this.cache.set(cacheKey, result, 1000); // 1秒キャッシュ
+          }
           resolve(result);
         }).catch(reject);
       }
@@ -1585,6 +1603,21 @@ class StudyQuestApp {
       const cls = data.highlight ? 'liked' : '';
       const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
       highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-yellow-400 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
+      console.log('カードハイライトボタン作成:', { 
+        rowIndex: data.rowIndex, 
+        showHighlightToggle: this.state.showHighlightToggle,
+        windowShowHighlightToggle: window.showHighlightToggle,
+        isAdminUser: this.state.isAdminUser,
+        showAdminFeatures: this.state.showAdminFeatures
+      });
+    } else {
+      console.log('カードハイライトボタンをスキップ:', { 
+        rowIndex: data.rowIndex, 
+        showHighlightToggle: this.state.showHighlightToggle,
+        windowShowHighlightToggle: window.showHighlightToggle,
+        isAdminUser: this.state.isAdminUser,
+        showAdminFeatures: this.state.showAdminFeatures
+      });
     }
     const showName = this.state.displayMode === 'named';
     let displayName = '';
@@ -1754,12 +1787,21 @@ class StudyQuestApp {
     }, 2000);
   }
   async handleHighlight(rowIndex) {
+    console.log('handleHighlight開始:', { 
+      rowIndex, 
+      isAdminUser: this.state.isAdminUser, 
+      showHighlightToggle: this.state.showHighlightToggle,
+      windowIsAdminUser: window.isAdminUser,
+      showAdminFeatures: this.state.showAdminFeatures
+    });
+    
     const numericRowIndex = parseInt(rowIndex, 10);
     const highlightKey = `${numericRowIndex}-highlight`;
     
     // Enhanced debounce for highlight operations
-    if (this.reactionDebounce.has(highlightKey)) {
-      clearTimeout(this.reactionDebounce.get(highlightKey));
+    if (this.highlightDebounce.has(highlightKey)) {
+      console.log('デバウンス中、処理をスキップ');
+      clearTimeout(this.highlightDebounce.get(highlightKey));
       return; // Ignore rapid highlight clicks
     }
     
@@ -1767,11 +1809,13 @@ class StudyQuestApp {
     const now = Date.now();
     const lastHighlightTime = this.lastReactionTimes?.get(highlightKey) || 0;
     if (now - lastHighlightTime < 500) { // Minimum 500ms between highlights
+      console.log('レート制限中、処理をスキップ');
       return;
     }
     
     // 既に処理中の場合は無視
     if (this.pendingReactions.has(highlightKey)) {
+      console.log('既に処理中、処理をスキップ');
       return;
     }
     
@@ -1782,7 +1826,10 @@ class StudyQuestApp {
     const btns = document.querySelectorAll('.highlight-btn[data-row-index="' + numericRowIndex + '"]');
     const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
     
+    console.log('ハイライト処理:', { numericRowIndex, btnsFound: btns.length, itemFound: !!item });
+    
     if (!item) {
+      console.log('対象データが見つからない');
       this.pendingReactions.delete(highlightKey);
       return;
     }
@@ -1804,7 +1851,25 @@ class StudyQuestApp {
     this.applyUpdates([item]);
     
     try {
+      // 管理者権限をチェック
+      if (!this.state.isAdminUser && !window.isAdminUser) {
+        throw new Error('管理者権限が必要です。管理モードを有効にしてください。');
+      }
+      
+      // 管理機能が有効かチェック
+      if (!this.state.showAdminFeatures && !window.showAdminFeatures) {
+        throw new Error('管理機能が無効になっています。管理モードボタンをクリックして有効にしてください。');
+      }
+      
+      console.log('ハイライト送信中...', { 
+        numericRowIndex, 
+        sheetName: this.state.sheetName, 
+        isAdminUser: this.state.isAdminUser,
+        windowIsAdminUser: window.isAdminUser,
+        showAdminFeatures: this.state.showAdminFeatures
+      });
       const res = await this.gas.toggleHighlight(numericRowIndex, this.state.sheetName);
+      console.log('ハイライトレスポンス:', res);
       
       if (res && res.status === 'ok') {
         // サーバーからの正確な値で更新
@@ -1886,6 +1951,13 @@ class StudyQuestApp {
       window.showAdminFeatures = enable;
       window.showHighlightToggle = enable && this.state.isAdminUser;
       window.showScoreSort = enable;
+      
+      console.log('toggleAdminMode状態更新:', {
+        enable,
+        isAdminUser: this.state.isAdminUser,
+        showAdminFeatures: window.showAdminFeatures,
+        showHighlightToggle: window.showHighlightToggle
+      });
       if (enable) {
         window.showCounts = true;
         window.displayMode = 'named';
