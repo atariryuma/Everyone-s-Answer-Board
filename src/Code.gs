@@ -836,26 +836,55 @@ function getPublishedSheetData(requestedSheetName, classFilter, sortBy) {
  * 利用可能なシート一覧とアクティブシート情報を取得します。
  */
 function getAvailableSheets() {
-  const props = PropertiesService.getUserProperties();
-  const userId = props.getProperty('CURRENT_USER_ID');
-  
-  if (!userId) {
-    throw new Error('ユーザー情報が見つかりません。');
+  try {
+    const props = PropertiesService.getUserProperties();
+    const spreadsheetId = props.getProperty('CURRENT_SPREADSHEET_ID');
+    
+    if (!spreadsheetId) {
+      return {
+        status: 'error',
+        message: 'スプレッドシートが設定されていません。'
+      };
+    }
+    
+    let allSheets = [];
+    try {
+      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      const sheets = spreadsheet.getSheets();
+      allSheets = sheets
+        .filter(sheet => !sheet.isSheetHidden())
+        .filter(sheet => {
+          const name = sheet.getName();
+          return !name.startsWith('Config_') && !name.startsWith('Template_') && name !== 'Config';
+        })
+        .map(sheet => sheet.getName());
+    } catch (spreadsheetError) {
+      console.error('Error accessing spreadsheet:', spreadsheetError);
+      return {
+        status: 'error',
+        message: 'スプレッドシートにアクセスできません。権限を確認してください。'
+      };
+    }
+    
+    // アクティブシート名を取得
+    const activeSheetName = props.getProperty('ACTIVE_SHEET_NAME') || '';
+    
+    return {
+      status: 'success',
+      sheets: allSheets.map(sheetName => ({
+        name: sheetName,
+        isActive: sheetName === activeSheetName
+      })),
+      activeSheetName: activeSheetName
+    };
+    
+  } catch (error) {
+    console.error('Error in getAvailableSheets:', error);
+    return {
+      status: 'error',
+      message: `シート一覧の取得に失敗しました: ${error.message}`
+    };
   }
-  
-  const userInfo = getUserInfo(userId);
-  const config = userInfo.configJson || {};
-  const activeSheetName = config.activeSheetName || config.sheetName || '';
-  
-  const allSheets = getSheets();
-  
-  return {
-    sheets: allSheets.map(sheetName => ({
-      name: sheetName,
-      isActive: sheetName === activeSheetName
-    })),
-    activeSheetName: activeSheetName
-  };
 }
 
 /**
