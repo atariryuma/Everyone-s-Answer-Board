@@ -693,8 +693,7 @@
       sheetSelect: document.getElementById('sheet-select'),
       configArea: document.getElementById('config-area'),
       configPlaceholder: document.getElementById('config-placeholder'),
-      qHeader: document.getElementById('qHeader'),
-      aHeader: document.getElementById('aHeader'),
+      mainHeader: document.getElementById('mainHeader'),
       rHeader: document.getElementById('rHeader'),
       nameHeader: document.getElementById('nameHeader'),
       classHeader: document.getElementById('classHeader'),
@@ -751,8 +750,7 @@
       document.getElementById('preview-btn').addEventListener('click', openPreview);
 
       // Auto-update config when headers change
-      elements.qHeader.addEventListener('change', updateConfigButtons);
-      elements.aHeader.addEventListener('change', updateConfigButtons);
+      elements.mainHeader.addEventListener('change', updateConfigButtons);
     }
 
     function updateUIForSelectedSheet() {
@@ -816,7 +814,7 @@
 
     function updateConfigButtons() {
       // Enable save button if we have at least question or answer header
-      const hasConfig = elements.qHeader.value || elements.aHeader.value;
+      const hasConfig = elements.mainHeader.value;
       elements.saveConfigBtn.disabled = !hasConfig;
     }
 
@@ -1129,7 +1127,7 @@
     }
 
     function populateHeaderOptions(headers) {
-      const selects = [elements.qHeader, elements.aHeader, elements.rHeader, elements.nameHeader, elements.classHeader];
+      const selects = [elements.mainHeader, elements.rHeader, elements.nameHeader, elements.classHeader];
       selects.forEach(sel => {
         sel.innerHTML = '<option value="">-- 選択してください --</option>';
         headers.forEach(h => {
@@ -1237,15 +1235,14 @@
     }
 
     function populateConfig(cfg) {
-      elements.qHeader.value = cfg.questionHeader || '';
-      elements.aHeader.value = cfg.answerHeader || '';
+      elements.mainHeader.value = cfg.answerHeader || cfg.questionHeader || '';
       elements.rHeader.value = cfg.reasonHeader || '';
       elements.nameHeader.value = cfg.nameHeader || '';
       elements.classHeader.value = cfg.classHeader || '';
     }
 
     function clearConfigFields() {
-      [elements.qHeader, elements.aHeader, elements.rHeader, elements.nameHeader, elements.classHeader].forEach(sel => {
+      [elements.mainHeader, elements.rHeader, elements.nameHeader, elements.classHeader].forEach(sel => {
         sel.innerHTML = '<option value="">-- 選択してください --</option>';
         sel.value = '';
       });
@@ -1258,19 +1255,17 @@
         return;
       }
       
-      const qVal = elements.qHeader.value;
-      const aVal = elements.aHeader.value;
+      const mainVal = elements.mainHeader.value;
       
-      if (!qVal && !aVal) {
-        showMessage('問題文または回答のヘッダーを設定してください。', 'red');
-        addVisualFeedback(elements.qHeader, 'error');
-        addVisualFeedback(elements.aHeader, 'error');
+      if (!mainVal) {
+        showMessage('回答データ列を選択してください。', 'red');
+        addVisualFeedback(elements.mainHeader, 'error');
         return;
       }
-      
+
       const cfg = {
-        questionHeader: qVal || aVal,
-        answerHeader: aVal || qVal,
+        questionHeader: mainVal,
+        answerHeader: mainVal,
         reasonHeader: elements.rHeader.value,
         nameHeader: elements.nameHeader.value,
         classHeader: elements.classHeader.value
