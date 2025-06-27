@@ -347,6 +347,13 @@
           </div>
         </div>
       </div>
+
+      <!-- Activity Timeline -->
+      <div class="glass-panel p-6 rounded-xl fade-in mt-6">
+        <h3 class="text-lg font-semibold text-white mb-4">最近の活動</h3>
+        <div id="activity-list" class="space-y-2"></div>
+        <p id="last-activity" class="text-xs text-gray-400 mt-2"></p>
+      </div>
     </section>
 
     <!-- Student URL Section -->
@@ -695,7 +702,7 @@
       clearSelectionBtn: document.getElementById('clear-selection-btn'),
       saveConfigBtn: document.getElementById('save-config-btn'),
       detailOptions: document.getElementById('detail-options'),
-      statusText: document.querySelector('#board-status'),
+      statusText: document.getElementById('status-text'),
       boardUrl: document.getElementById('board-url'),
       viewBoardLink: document.getElementById('view-board-link'),
       setupProgress: document.getElementById('setup-progress'),
@@ -847,33 +854,49 @@
       const reactionCount = status.totalReactions || 0;
       
       // Main status updates
-      document.getElementById('status-text').textContent = isActive ? 'アクティブ' : '準備中';
-      document.getElementById('status-description').textContent = isActive ? 
-        `現在 "${currentActiveSheet}" が公開中です` : 
-        'スプレッドシートを追加して開始してください';
+      const statusTextEl = document.getElementById('status-text');
+      if (statusTextEl) {
+        statusTextEl.textContent = isActive ? 'アクティブ' : '準備中';
+      }
+      const statusDescEl = document.getElementById('status-description');
+      if (statusDescEl) {
+        statusDescEl.textContent = isActive ?
+          `現在 "${currentActiveSheet}" が公開中です` :
+          'スプレッドシートを追加して開始してください';
+      }
       
       // Update timestamps
       const now = new Date();
-      document.getElementById('last-updated').textContent = `最終更新: ${now.toLocaleTimeString('ja-JP')}`;
+      const lastUpdatedEl = document.getElementById('last-updated');
+      if (lastUpdatedEl) {
+        lastUpdatedEl.textContent = `最終更新: ${now.toLocaleTimeString('ja-JP')}`;
+      }
       
       // Active sheet info
-      document.getElementById('active-sheet-name').textContent = currentActiveSheet || '未設定';
-      document.getElementById('total-sheets').textContent = (status.allSheets || []).length;
+      const activeNameEl = document.getElementById('active-sheet-name');
+      if (activeNameEl) activeNameEl.textContent = currentActiveSheet || '未設定';
+      const totalSheetsEl = document.getElementById('total-sheets');
+      if (totalSheetsEl) totalSheetsEl.textContent = (status.allSheets || []).length;
       
       // Statistics
-      document.getElementById('answer-count').textContent = answerCount;
-      document.getElementById('reaction-count').textContent = reactionCount;
+      const answerCountEl = document.getElementById('answer-count');
+      if (answerCountEl) answerCountEl.textContent = answerCount;
+      const reactionCountEl = document.getElementById('reaction-count');
+      if (reactionCountEl) reactionCountEl.textContent = reactionCount;
       
       // Calculate engagement rate
       const engagementRate = answerCount > 0 ? Math.round((reactionCount / answerCount) * 100) : 0;
-      document.getElementById('engagement-rate').textContent = `${engagementRate}%`;
+      const engagementEl = document.getElementById('engagement-rate');
+      if (engagementEl) engagementEl.textContent = `${engagementRate}%`;
       
       // Last activity
       const lastActivityElement = document.getElementById('last-activity');
-      if (answerCount > 0 || reactionCount > 0) {
-        lastActivityElement.textContent = '本日';
-      } else {
-        lastActivityElement.textContent = '未取得';
+      if (lastActivityElement) {
+        if (answerCount > 0 || reactionCount > 0) {
+          lastActivityElement.textContent = '本日';
+        } else {
+          lastActivityElement.textContent = '未取得';
+        }
       }
       
       // Update status indicator
@@ -1013,7 +1036,9 @@
         `;
       }).join('');
       
-      activityList.innerHTML = activityHtml || '<div class="text-gray-400 text-sm">活動データがありません</div>';
+      if (activityList) {
+        activityList.innerHTML = activityHtml || '<div class="text-gray-400 text-sm">活動データがありません</div>';
+      }
     }
 
     function addSpreadsheet() {
