@@ -120,6 +120,7 @@
     /* Progress bar animation */
     #header-progress {
       transition: width 0.5s ease-out;
+      width: 0%;
     }
     
     /* Card hover effects */
@@ -156,25 +157,25 @@
       
       <!-- ナビゲーションメニュー -->
       <nav class="flex-1 p-4 space-y-2">
-        <button onclick="showSection('overview')" 
+        <button type="button" onclick="showSection('overview')" 
                 class="nav-item w-full text-left p-3 rounded-lg hover:bg-gray-700 flex items-center gap-3 transition-colors"
                 id="nav-overview">
           <span class="text-lg">📊</span>
           <span>概要</span>
         </button>
-        <button onclick="showSection('sheets')" 
+        <button type="button" onclick="showSection('sheets')" 
                 class="nav-item w-full text-left p-3 rounded-lg hover:bg-gray-700 flex items-center gap-3 transition-colors"
                 id="nav-sheets">
           <span class="text-lg">📋</span>
           <span>シート管理</span>
         </button>
-        <button onclick="showSection('settings')" 
+        <button type="button" onclick="showSection('settings')" 
                 class="nav-item w-full text-left p-3 rounded-lg hover:bg-gray-700 flex items-center gap-3 transition-colors"
                 id="nav-settings">
           <span class="text-lg">⚙️</span>
           <span>設定</span>
         </button>
-        <button onclick="showSection('history')" 
+        <button type="button" onclick="showSection('history')" 
                 class="nav-item w-full text-left p-3 rounded-lg hover:bg-gray-700 flex items-center gap-3 transition-colors"
                 id="nav-history">
           <span class="text-lg">📜</span>
@@ -188,7 +189,7 @@
         <div id="sidebar-board-list" class="space-y-1 max-h-32 overflow-y-auto">
           <div class="text-xs text-gray-500 text-center py-2">読み込み中...</div>
         </div>
-        <button onclick="refreshBoardList()" 
+        <button type="button" onclick="refreshBoardList()" 
                 class="w-full mt-2 px-2 py-1 bg-gray-700 hover:bg-gray-600 text-xs rounded transition-colors">
           🔄 更新
         </button>
@@ -233,7 +234,7 @@
           <div class="flex items-center gap-2">
             <div class="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
               <div class="h-full bg-gradient-to-r from-cyan-400 to-purple-400 transition-all duration-500" 
-                   id="header-progress" style="width: 0%"></div>
+                   id="header-progress"></div>
             </div>
             <span class="text-xs text-gray-400" id="header-progress-text">0%</span>
           </div>
@@ -262,7 +263,7 @@
                   </div>
                   <div class="flex items-center justify-between">
                     <span class="text-gray-400">公開URL</span>
-                    <button onclick="copyBoardUrl()" class="text-cyan-400 hover:text-cyan-300 text-sm">コピー</button>
+                    <button type="button" onclick="copyBoardUrl()" class="text-cyan-400 hover:text-cyan-300 text-sm">コピー</button>
                   </div>
                 </div>
               </div>
@@ -294,15 +295,15 @@
                   <span class="text-2xl">⚡</span>クイックアクション
                 </h3>
                 <div class="space-y-2">
-                  <button onclick="openBoard()" 
+                  <button type="button" onclick="openBoard()" 
                           class="w-full p-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg text-sm transition-colors">
                     📖 ボードを開く
                   </button>
-                  <button onclick="showSection('sheets')" 
+                  <button type="button" onclick="showSection('sheets')" 
                           class="w-full p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors">
                     ⚙️ シート管理
                   </button>
-                  <button onclick="exportData()" 
+                  <button type="button" onclick="exportData()" 
                           class="w-full p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors">
                     📊 データ出力
                   </button>
@@ -1474,6 +1475,12 @@
     function displayBoardList(boards) {
       const boardList = document.getElementById('boardList');
       
+      // 要素が存在しない場合は何もしない
+      if (!boardList) {
+        console.warn('boardList element not found');
+        return;
+      }
+      
       if (!boards || boards.length === 0) {
         boardList.innerHTML = '<div class="text-gray-400 text-sm text-center py-4">ボードがありません</div>';
         return;
@@ -1776,15 +1783,19 @@
 
     // ボード一覧更新（サイドバー対応版）
     function refreshBoardList() {
+      const sidebarContainer = document.getElementById('sidebar-board-list');
+      if (sidebarContainer) {
+        sidebarContainer.innerHTML = '<div class="text-xs text-gray-500 text-center py-2">読み込み中...</div>';
+      }
+      
       google.script.run
         .withSuccessHandler((boards) => {
           updateSidebarBoardList(boards);
-          // 従来のボード一覧も更新
-          if (typeof displayBoardList === 'function') {
-            displayBoardList(boards);
-          }
+          // 従来のボード一覧も更新（要素が存在する場合のみ）
+          displayBoardList(boards);
         })
         .withFailureHandler((error) => {
+          console.error('Board list refresh failed:', error);
           const container = document.getElementById('sidebar-board-list');
           if (container) {
             container.innerHTML = '<div class="text-red-400 text-xs text-center py-2">読み込みエラー</div>';
