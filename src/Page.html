@@ -431,7 +431,11 @@ header {
 .skeleton::after { content: ""; position: absolute; inset: 0; background-image: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.2), rgba(255,255,255,0)); animation: skeleton-loading 1.5s infinite; }
 @keyframes skeleton-loading { 0% { transform: translate3d(-100%, 0, 0); will-change: transform; } 100% { transform: translate3d(100%, 0, 0); } }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-.modal-close-btn { transform: translate(50%, -50%); }
+.modal-close-btn { 
+  transform: translate(50%, -50%); 
+  top: 0;
+  right: 0;
+}
 .render-optimized { transform: translateZ(0); }
 .modal-fade { animation: modalFade 0.2s ease-out; }
 @keyframes modalFade { from { opacity: 0; will-change: opacity; } to { opacity: 1; } }
@@ -526,7 +530,7 @@ header {
 </div>
 <div id="answerModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
 <div id="answerModalCard" class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full max-w-5xl h-auto max-h-[85vh] relative" role="document" aria-labelledby="modalAnswer">
-<button type="button" id="answerModalCloseBtn" class="modal-close-btn absolute -top-3 -right-3 bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform z-10" aria-label="閉じる">
+<button type="button" id="answerModalCloseBtn" class="modal-close-btn absolute bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform z-10" aria-label="閉じる">
   <span id="iconClose" class="w-6 h-6"></span>
 </button>
 <div id="modalAnswer" class="flex-grow min-h-[200px] mb-4 overflow-y-auto pr-4"></div>
@@ -949,6 +953,11 @@ class StudyQuestApp {
     // Use server-provided flag first (fast)
     if (window.isAdminUser) {
       this.state.isAdminUser = true;
+      this.state.showHighlightToggle = true; // 管理者なら常に表示
+      console.log('管理者権限確認済み、ハイライトトグル有効化:', {
+        isAdminUser: this.state.isAdminUser,
+        showHighlightToggle: this.state.showHighlightToggle
+      });
       if (this.elements.adminToggleBtn) {
         this.elements.adminToggleBtn.classList.remove('hidden');
         this.elements.adminToggleBtn.removeAttribute('hidden');
@@ -957,27 +966,35 @@ class StudyQuestApp {
       return;
     }
     
-    // Fallback API call (slower) - defer to idle
-    requestIdleCallback(async () => {
-      try {
-        const isAdmin = await this.gas.checkAdmin();
-        if (isAdmin) {
-          window.isAdminUser = true;
-          this.state.isAdminUser = true;
-          if (this.elements.adminToggleBtn) {
-            this.elements.adminToggleBtn.classList.remove('hidden');
-            this.elements.adminToggleBtn.removeAttribute('hidden');
-            this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
-          }
+    // Fallback API call (slower)
+    try {
+      const isAdmin = await this.gas.checkAdmin();
+      if (isAdmin) {
+        window.isAdminUser = true;
+        this.state.isAdminUser = true;
+        this.state.showHighlightToggle = true; // 管理者なら常に表示
+        console.log('API管理者権限確認済み、ハイライトトグル有効化:', {
+          isAdminUser: this.state.isAdminUser,
+          showHighlightToggle: this.state.showHighlightToggle
+        });
+        if (this.elements.adminToggleBtn) {
+          this.elements.adminToggleBtn.classList.remove('hidden');
+          this.elements.adminToggleBtn.removeAttribute('hidden');
+          this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
         }
-      } catch (e) {
-        console.error('Admin check failed', e);
       }
-    });
+    } catch (e) {
+      console.error('Admin check failed', e);
+    }
   }
   
   showAdminControls() {
     this.state.isAdminUser = true;
+    this.state.showHighlightToggle = true; // 管理者なら常に表示
+    console.log('showAdminControls実行、ハイライトトグル有効化:', {
+      isAdminUser: this.state.isAdminUser,
+      showHighlightToggle: this.state.showHighlightToggle
+    });
     
     // 管理者切り替えボタンは常に表示
     if (this.elements.adminToggleBtn) {
@@ -1147,6 +1164,9 @@ class StudyQuestApp {
     this.domFragmentPool.length = 0;
   }
   async loadDataImmediate() {
+    // Verify admin first to ensure proper initialization
+    await this.verifyAdminAsync();
+    
     // Start loading immediately without waiting
     this.loadSheetData(false, true).then(() => {
       this.startPolling();
@@ -1154,9 +1174,6 @@ class StudyQuestApp {
     
     // Load sheets in background
     this.loadAvailableSheets();
-    
-    // Verify admin in background
-    this.verifyAdminAsync();
   }
   
   showMinimalSkeleton() {
@@ -1345,6 +1362,9 @@ class StudyQuestApp {
     // ハイライト状態を適用
     if (data.highlight) {
       element.classList.add('highlighted');
+      console.log('ハイライト装飾適用:', { rowIndex: data.rowIndex, element: element.tagName, highlight: data.highlight });
+    } else {
+      console.log('ハイライト装飾なし:', { rowIndex: data.rowIndex, element: element.tagName, highlight: data.highlight });
     }
     
     // アクティブなリアクションを特定
@@ -1615,7 +1635,9 @@ class StudyQuestApp {
         showHighlightToggle: this.state.showHighlightToggle,
         windowShowHighlightToggle: window.showHighlightToggle,
         isAdminUser: this.state.isAdminUser,
-        showAdminFeatures: this.state.showAdminFeatures
+        windowIsAdminUser: window.isAdminUser,
+        showAdminFeatures: this.state.showAdminFeatures,
+        highlight: data.highlight
       });
     } else {
       console.log('カードハイライトボタンをスキップ:', { 
@@ -1623,6 +1645,7 @@ class StudyQuestApp {
         showHighlightToggle: this.state.showHighlightToggle,
         windowShowHighlightToggle: window.showHighlightToggle,
         isAdminUser: this.state.isAdminUser,
+        windowIsAdminUser: window.isAdminUser,
         showAdminFeatures: this.state.showAdminFeatures
       });
     }
@@ -2272,11 +2295,27 @@ class StudyQuestApp {
     }
   }
   updateConfigFromGlobals() {
+    console.log('updateConfigFromGlobals前の状態:', {
+      isAdminUser: this.state.isAdminUser,
+      showHighlightToggle: this.state.showHighlightToggle,
+      windowShowHighlightToggle: window.showHighlightToggle,
+      showAdminFeatures: this.state.showAdminFeatures,
+      windowShowAdminFeatures: window.showAdminFeatures
+    });
+    
     this.state.isStudentMode = window.isStudentMode;
     this.state.showCounts = window.showCounts;
     this.state.showAdminFeatures = window.showAdminFeatures;
     this.state.showHighlightToggle = this.state.isAdminUser; // 管理者なら常に表示
     this.state.showScoreSort = window.showScoreSort;
+    
+    console.log('updateConfigFromGlobals後の状態:', {
+      isAdminUser: this.state.isAdminUser,
+      showHighlightToggle: this.state.showHighlightToggle,
+      windowShowHighlightToggle: window.showHighlightToggle,
+      showAdminFeatures: this.state.showAdminFeatures,
+      windowShowAdminFeatures: window.showAdminFeatures
+    });
     this.state.showPublishControls = window.showPublishControls;
     this.state.displayMode = window.displayMode;
   }
