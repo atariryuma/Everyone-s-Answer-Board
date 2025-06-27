@@ -429,6 +429,14 @@ function doGet(e) {
     const params = e.parameter || {};
     const userId = params.userId;
     const mode = params.mode;
+
+    // プレビューモードはモックデータを表示
+    if (mode === 'preview') {
+      return HtmlService.createTemplateFromFile('Preview')
+        .evaluate()
+        .setTitle('StudyQuest - プレビュー')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    }
     
     // ユーザーIDがない場合は登録画面を表示
     if (!userId) {
