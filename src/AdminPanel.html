@@ -247,6 +247,37 @@
           <!-- 概要セクション -->
           <div id="section-overview" class="section-content">
             <h2 class="text-2xl font-bold text-white mb-6">概要</h2>
+            
+            <!-- 新規スプレッドシート設定カード -->
+            <div class="glass-panel p-6 rounded-xl mb-6 border-l-4 border-yellow-400">
+              <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <span class="text-2xl">🆕</span>新しいスプレッドシートを設定
+              </h3>
+              <p class="text-gray-300 text-sm mb-4">
+                既存のGoogleスプレッドシートをStudyQuestボードとして設定できます
+              </p>
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-sm font-medium text-gray-300 mb-2">
+                    スプレッドシートURL <span class="text-red-400">*</span>
+                  </label>
+                  <input type="url" id="new-spreadsheet-url" 
+                         placeholder="https://docs.google.com/spreadsheets/d/..."
+                         class="w-full p-3 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400">
+                </div>
+                <div class="flex gap-2">
+                  <button type="button" onclick="setupNewSpreadsheet()" 
+                          class="flex-1 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors font-medium">
+                    🚀 スプレッドシートを設定
+                  </button>
+                  <button type="button" onclick="showSpreadsheetHelp()" 
+                          class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors">
+                    ❓ ヘルプ
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <!-- ステータスカード -->
               <div class="glass-panel p-6 rounded-xl">
@@ -1909,6 +1940,101 @@
     
     function exportData() {
       alert('データ出力機能は近日実装予定です');
+    }
+    
+    // 新規スプレッドシート設定関数
+    function setupNewSpreadsheet() {
+      const url = document.getElementById('new-spreadsheet-url').value.trim();
+      
+      if (!url) {
+        alert('スプレッドシートURLを入力してください');
+        return;
+      }
+      
+      // URLの形式チェック
+      if (!url.includes('docs.google.com/spreadsheets')) {
+        alert('正しいGoogleスプレッドシートのURLを入力してください');
+        return;
+      }
+      
+      // IDを抽出
+      const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      if (!match) {
+        alert('スプレッドシートのIDを取得できませんでした。URLを確認してください');
+        return;
+      }
+      
+      const spreadsheetId = match[1];
+      
+      if (confirm('新しいスプレッドシートを設定しますか？\n現在の設定は上書きされます。')) {
+        setLoading(true, '新しいスプレッドシートを設定中...');
+        
+        google.script.run
+          .withSuccessHandler((result) => {
+            setLoading(false);
+            if (result.success) {
+              showMessage('スプレッドシートの設定が完了しました！', 'green');
+              document.getElementById('new-spreadsheet-url').value = '';
+              
+              // ステータスを更新
+              if (typeof loadStatus === 'function') {
+                loadStatus();
+              }
+              
+              // シート管理セクションに移動
+              showSection('sheets');
+            } else {
+              showMessage('設定に失敗しました: ' + result.message, 'red');
+            }
+          })
+          .withFailureHandler((error) => {
+            setLoading(false);
+            showError(error);
+          })
+          .setupSpreadsheet(spreadsheetId);
+      }
+    }
+    
+    function showSpreadsheetHelp() {
+      const helpContent = `
+        <div class="bg-blue-900/50 border border-blue-400 rounded-lg p-4 mb-4">
+          <h4 class="font-bold text-white mb-2">📚 スプレッドシート設定ヘルプ</h4>
+          
+          <div class="space-y-3 text-sm text-gray-300">
+            <div>
+              <h5 class="font-semibold text-blue-300">1. スプレッドシートURLの取得方法</h5>
+              <p>• Googleスプレッドシートを開く</p>
+              <p>• アドレスバーのURLをコピー</p>
+              <p>• 例: https://docs.google.com/spreadsheets/d/1ABC...xyz/edit</p>
+            </div>
+            
+            <div>
+              <h5 class="font-semibold text-blue-300">2. 必要な権限</h5>
+              <p>• スプレッドシートの編集権限が必要です</p>
+              <p>• 「閲覧のみ」権限では設定できません</p>
+            </div>
+            
+            <div>
+              <h5 class="font-semibold text-blue-300">3. 推奨されるシート構造</h5>
+              <p>• 1行目にヘッダー（列名）</p>
+              <p>• 2行目以降にデータ</p>
+              <p>• Googleフォームの回答シートが最適</p>
+            </div>
+            
+            <div class="bg-yellow-900/30 border border-yellow-600 rounded p-2">
+              <p class="text-yellow-200 text-xs">
+                💡 ヒント: Googleフォームで回答を収集したスプレッドシートを使用すると、
+                列の設定が自動で行われます。
+              </p>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // モーダル表示（簡易版）
+      if (confirm('ヘルプを表示しますか？\n\n1. Googleスプレッドシートを開いてURLをコピー\n2. スプレッドシートの編集権限が必要\n3. 1行目にヘッダー、2行目以降にデータが推奨\n4. Googleフォームの回答シートが最適')) {
+        // より詳細なヘルプは将来的にモーダルで表示
+      }
     }
     
     // サイドバーボード一覧更新

@@ -413,6 +413,103 @@ function setDisplayOptions(options) {
 // =================================================================
 // GAS Webアプリケーションのエントリーポイント
 // =================================================================
+function setupSpreadsheet(spreadsheetId) {
+  try {
+    const userEmail = safeGetUserEmail();
+    console.log(`Setting up spreadsheet: ${spreadsheetId} for user: ${userEmail}`);
+    
+    // スプレッドシートにアクセス可能かチェック
+    let targetSpreadsheet;
+    try {
+      targetSpreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    } catch (error) {
+      return {
+        success: false,
+        message: 'スプレッドシートにアクセスできません。URLが正しいか、編集権限があるか確認してください。'
+      };
+    }
+    
+    // スプレッドシートの基本情報を取得
+    const name = targetSpreadsheet.getName();
+    const url = targetSpreadsheet.getUrl();
+    
+    // 現在使用中のスプレッドシートIDを更新
+    const props = PropertiesService.getUserProperties();
+    props.setProperty('CURRENT_SPREADSHEET_ID', spreadsheetId);
+    
+    // 基本的なシート構造をチェック
+    const sheets = targetSpreadsheet.getSheets();
+    if (sheets.length === 0) {
+      return {
+        success: false,
+        message: 'スプレッドシートにシートが存在しません。'
+      };
+    }
+    
+    // 最初のシートでヘッダーを確認
+    const firstSheet = sheets[0];
+    const sheetName = firstSheet.getName();
+    const lastColumn = firstSheet.getLastColumn();
+    
+    if (lastColumn === 0) {
+      return {
+        success: false,
+        message: 'シートにデータが存在しません。1行目にヘッダーを設定してください。'
+      };
+    }
+    
+    // 自動でコンフィグを作成
+    try {
+      const headerRow = firstSheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+      const headers = headerRow.map(v => String(v || '').trim()).filter(h => h !== '');
+      
+      if (headers.length === 0) {
+        return {
+          success: false,
+          message: '1行目にヘッダー（列名）を設定してください。'
+        };
+      }
+      
+      // 自動検出を実行
+      const detectedConfig = guessHeadersFromArray(headers);
+      
+      if (!detectedConfig.answerHeader) {
+        return {
+          success: false,
+          message: '適切な回答列を検出できませんでした。手動で設定してください。'
+        };
+      }
+      
+      // コンフィグを保存
+      saveSheetConfig(sheetName, detectedConfig);
+      
+      console.log(`Successfully setup spreadsheet: ${name} (${spreadsheetId})`);
+      
+      return {
+        success: true,
+        message: `スプレッドシート「${name}」の設定が完了しました。シート「${sheetName}」が自動設定されました。`,
+        spreadsheetName: name,
+        sheetName: sheetName,
+        detectedConfig: detectedConfig
+      };
+      
+    } catch (configError) {
+      console.error('Config creation failed:', configError);
+      return {
+        success: false,
+        message: '設定の自動作成に失敗しました: ' + configError.message
+      };
+    }
+    
+  } catch (error) {
+    console.error('setupSpreadsheet error:', error);
+    return {
+      success: false,
+      message: 'スプレッドシートの設定に失敗しました: ' + error.message
+    };
+  }
+}
+
 function getUserBoards() {
   try {
     const userEmail = safeGetUserEmail();
