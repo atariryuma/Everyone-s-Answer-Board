@@ -702,6 +702,13 @@ class StudyQuestApp {
       displayMode: window.displayMode,
       sheetName: SHEET_NAME
     };
+    
+    console.log('初期状態設定:', {
+      isAdminUser: this.state.isAdminUser,
+      windowIsAdminUser: window.isAdminUser,
+      showHighlightToggle: this.state.showHighlightToggle,
+      windowShowHighlightToggle: window.showHighlightToggle
+    });
     this.serverShowCounts = window.showCounts;
     this.serverDisplayMode = window.displayMode;
     this.pollingInterval = null;
@@ -1228,8 +1235,13 @@ class StudyQuestApp {
         this.state.showAdminFeatures = false;
         this.state.showHighlightToggle = false;
       } else {
-        // 管理者の場合のハイライトトグルは管理モード時のみ
-        this.state.showHighlightToggle = this.state.showAdminFeatures && this.state.isAdminUser;
+        // 管理者の場合のハイライトトグルは常に表示
+        this.state.showHighlightToggle = true;
+        console.log('loadSheetData管理者設定更新:', {
+          isAdminUser: this.state.isAdminUser,
+          showAdminFeatures: this.state.showAdminFeatures,
+          showHighlightToggle: this.state.showHighlightToggle
+        });
       }
       if (isInitialLoad) {
         // Add visual feedback that loading is complete
@@ -1397,6 +1409,15 @@ class StudyQuestApp {
     }
   }
   renderBoard(isLayoutChange = false, oldRows = []) {
+    // 管理者の場合はハイライトトグルを確実に有効化
+    if (this.state.isAdminUser && !this.state.showHighlightToggle) {
+      this.state.showHighlightToggle = true;
+      console.log('renderBoard中にハイライトトグル強制有効化:', {
+        isAdminUser: this.state.isAdminUser,
+        showHighlightToggle: this.state.showHighlightToggle
+      });
+    }
+    
     const container = this.elements.answersContainer;
     container.querySelectorAll('.skeleton').forEach(el => el.remove());
     const newRows = this.state.currentAnswers;
