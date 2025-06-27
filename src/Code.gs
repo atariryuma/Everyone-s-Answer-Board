@@ -117,12 +117,36 @@ function isSameDomain(emailA, emailB) {
 
 function getAdminEmails(spreadsheetId) {
   const props = PropertiesService.getScriptProperties();
+  let adminEmails = [];
+  
   if (spreadsheetId) {
     const str = props.getProperty(`ADMIN_EMAILS_${spreadsheetId}`);
-    if (str) return str.split(',').map(e => e.trim()).filter(Boolean);
+    if (str) adminEmails = str.split(',').map(e => e.trim()).filter(Boolean);
   }
-  const str = props.getProperty('ADMIN_EMAILS') || '';
-  return str.split(',').map(e => e.trim()).filter(Boolean);
+  
+  if (adminEmails.length === 0) {
+    const str = props.getProperty('ADMIN_EMAILS') || '';
+    adminEmails = str.split(',').map(e => e.trim()).filter(Boolean);
+  }
+  
+  // 管理者が設定されていない場合、スプレッドシートの所有者を管理者とする
+  if (adminEmails.length === 0) {
+    try {
+      const ss = getCurrentSpreadsheet();
+      const owner = ss.getOwner();
+      if (owner) {
+        const ownerEmail = owner.getEmail();
+        if (ownerEmail) {
+          console.log('管理者未設定のため、所有者を管理者に設定:', ownerEmail);
+          adminEmails = [ownerEmail];
+        }
+      }
+    } catch (e) {
+      console.error('所有者情報の取得に失敗:', e);
+    }
+  }
+  
+  return adminEmails;
 }
 
 function isUserAdmin(email) {
@@ -130,14 +154,32 @@ function isUserAdmin(email) {
   const userId = userProps.getProperty('CURRENT_USER_ID');
   const userEmail = email || safeGetUserEmail();
 
+  console.log('isUserAdmin check:', { 
+    email: email, 
+    userEmail: userEmail, 
+    userId: userId 
+  });
+
   if (userId) {
     const userInfo = getUserInfo(userId);
     const spreadsheetId = userInfo && userInfo.spreadsheetId;
     const admins = getAdminEmails(spreadsheetId);
+    console.log('Multi-tenant admin check:', { 
+      spreadsheetId: spreadsheetId, 
+      admins: admins, 
+      userEmail: userEmail, 
+      isAdmin: admins.includes(userEmail) 
+    });
     return admins.includes(userEmail);
   }
 
-  return getAdminEmails().includes(userEmail);
+  const admins = getAdminEmails();
+  console.log('Single-tenant admin check:', { 
+    admins: admins, 
+    userEmail: userEmail, 
+    isAdmin: admins.includes(userEmail) 
+  });
+  return admins.includes(userEmail);
 }
 
 function checkAdmin() {

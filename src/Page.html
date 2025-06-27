@@ -1792,8 +1792,23 @@ class StudyQuestApp {
       isAdminUser: this.state.isAdminUser, 
       showHighlightToggle: this.state.showHighlightToggle,
       windowIsAdminUser: window.isAdminUser,
-      showAdminFeatures: this.state.showAdminFeatures
+      showAdminFeatures: this.state.showAdminFeatures,
+      windowShowAdminFeatures: window.showAdminFeatures,
+      windowShowHighlightToggle: window.showHighlightToggle
     });
+    
+    // 管理者権限の再確認
+    console.log('admin権限再確認中...');
+    try {
+      const adminCheck = await this.gas.checkAdmin();
+      console.log('サーバー側admin確認結果:', adminCheck);
+      if (!adminCheck) {
+        throw new Error('サーバー側で管理者権限が確認できませんでした。スプレッドシートの所有者でログインしているか確認してください。');
+      }
+    } catch (adminError) {
+      console.error('admin権限確認エラー:', adminError);
+      throw new Error('管理者権限の確認に失敗しました: ' + adminError.message);
+    }
     
     const numericRowIndex = parseInt(rowIndex, 10);
     const highlightKey = `${numericRowIndex}-highlight`;
