@@ -413,6 +413,168 @@ function setDisplayOptions(options) {
 // =================================================================
 // GAS Webアプリケーションのエントリーポイント
 // =================================================================
+function setupSpreadsheet(spreadsheetId) {
+  try {
+    const userEmail = safeGetUserEmail();
+    console.log(`Setting up spreadsheet: ${spreadsheetId} for user: ${userEmail}`);
+    
+    // スプレッドシートにアクセス可能かチェック
+    let targetSpreadsheet;
+    try {
+      targetSpreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    } catch (error) {
+      return {
+        success: false,
+        message: 'スプレッドシートにアクセスできません。URLが正しいか、編集権限があるか確認してください。'
+      };
+    }
+    
+    // スプレッドシートの基本情報を取得
+    const name = targetSpreadsheet.getName();
+    const url = targetSpreadsheet.getUrl();
+    
+    // 現在使用中のスプレッドシートIDを更新
+    const props = PropertiesService.getUserProperties();
+    props.setProperty('CURRENT_SPREADSHEET_ID', spreadsheetId);
+    
+    // 基本的なシート構造をチェック
+    const sheets = targetSpreadsheet.getSheets();
+    if (sheets.length === 0) {
+      return {
+        success: false,
+        message: 'スプレッドシートにシートが存在しません。'
+      };
+    }
+    
+    // 最初のシートでヘッダーを確認
+    const firstSheet = sheets[0];
+    const sheetName = firstSheet.getName();
+    const lastColumn = firstSheet.getLastColumn();
+    
+    if (lastColumn === 0) {
+      return {
+        success: false,
+        message: 'シートにデータが存在しません。1行目にヘッダーを設定してください。'
+      };
+    }
+    
+    // 自動でコンフィグを作成
+    try {
+      const headerRow = firstSheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+      const headers = headerRow.map(v => String(v || '').trim()).filter(h => h !== '');
+      
+      if (headers.length === 0) {
+        return {
+          success: false,
+          message: '1行目にヘッダー（列名）を設定してください。'
+        };
+      }
+      
+      // 自動検出を実行
+      const detectedConfig = guessHeadersFromArray(headers);
+      
+      if (!detectedConfig.answerHeader) {
+        return {
+          success: false,
+          message: '適切な回答列を検出できませんでした。手動で設定してください。'
+        };
+      }
+      
+      // コンフィグを保存
+      saveSheetConfig(sheetName, detectedConfig);
+      
+      console.log(`Successfully setup spreadsheet: ${name} (${spreadsheetId})`);
+      
+      return {
+        success: true,
+        message: `スプレッドシート「${name}」の設定が完了しました。シート「${sheetName}」が自動設定されました。`,
+        spreadsheetName: name,
+        sheetName: sheetName,
+        detectedConfig: detectedConfig
+      };
+      
+    } catch (configError) {
+      console.error('Config creation failed:', configError);
+      return {
+        success: false,
+        message: '設定の自動作成に失敗しました: ' + configError.message
+      };
+    }
+    
+  } catch (error) {
+    console.error('setupSpreadsheet error:', error);
+    return {
+      success: false,
+      message: 'スプレッドシートの設定に失敗しました: ' + error.message
+    };
+  }
+}
+
+function getUserBoards() {
+  try {
+    const userEmail = safeGetUserEmail();
+    const spreadsheet = getCurrentSpreadsheet();
+    const sheets = spreadsheet.getSheets();
+    
+    const boards = [];
+    
+    for (const sheet of sheets) {
+      const sheetName = sheet.getName();
+      
+      // システムシートは除外
+      if (['Config', 'Users', 'AdminEmails'].includes(sheetName)) {
+        continue;
+      }
+      
+      try {
+        const mapping = getColumnMapping(sheetName);
+        if (!mapping || !mapping.answerHeader) {
+          continue;
+        }
+        
+        const lastRow = sheet.getLastRow();
+        const answerCount = Math.max(0, lastRow - 1);
+        
+        // 最終更新日を取得
+        let lastUpdated = null;
+        if (lastRow > 1) {
+          const timestampCol = mapping.timestampCol || 1;
+          const lastTimestamp = sheet.getRange(lastRow, timestampCol).getValue();
+          if (lastTimestamp instanceof Date) {
+            lastUpdated = lastTimestamp.toISOString();
+          }
+        }
+        
+        boards.push({
+          id: sheetName,
+          name: sheetName,
+          question: mapping.questionHeader || 'No question',
+          answerCount: answerCount,
+          lastUpdated: lastUpdated
+        });
+        
+      } catch (sheetError) {
+        console.warn(`Error processing sheet ${sheetName}:`, sheetError);
+        continue;
+      }
+    }
+    
+    // 最終更新日でソート
+    boards.sort((a, b) => {
+      if (!a.lastUpdated && !b.lastUpdated) return 0;
+      if (!a.lastUpdated) return 1;
+      if (!b.lastUpdated) return -1;
+      return new Date(b.lastUpdated) - new Date(a.lastUpdated);
+    });
+    
+    return boards;
+    
+  } catch (error) {
+    console.error('getUserBoards error:', error);
+    throw new Error('ボード一覧の取得に失敗しました: ' + error.message);
+  }
+}
+
 function validateUserId(userId) {
   if (!userId || typeof userId !== 'string') {
     throw new Error('ユーザーIDが指定されていません。');
@@ -674,26 +836,55 @@ function getPublishedSheetData(requestedSheetName, classFilter, sortBy) {
  * 利用可能なシート一覧とアクティブシート情報を取得します。
  */
 function getAvailableSheets() {
-  const props = PropertiesService.getUserProperties();
-  const userId = props.getProperty('CURRENT_USER_ID');
-  
-  if (!userId) {
-    throw new Error('ユーザー情報が見つかりません。');
+  try {
+    const props = PropertiesService.getUserProperties();
+    const spreadsheetId = props.getProperty('CURRENT_SPREADSHEET_ID');
+    
+    if (!spreadsheetId) {
+      return {
+        status: 'error',
+        message: 'スプレッドシートが設定されていません。'
+      };
+    }
+    
+    let allSheets = [];
+    try {
+      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      const sheets = spreadsheet.getSheets();
+      allSheets = sheets
+        .filter(sheet => !sheet.isSheetHidden())
+        .filter(sheet => {
+          const name = sheet.getName();
+          return !name.startsWith('Config_') && !name.startsWith('Template_') && name !== 'Config';
+        })
+        .map(sheet => sheet.getName());
+    } catch (spreadsheetError) {
+      console.error('Error accessing spreadsheet:', spreadsheetError);
+      return {
+        status: 'error',
+        message: 'スプレッドシートにアクセスできません。権限を確認してください。'
+      };
+    }
+    
+    // アクティブシート名を取得
+    const activeSheetName = props.getProperty('ACTIVE_SHEET_NAME') || '';
+    
+    return {
+      status: 'success',
+      sheets: allSheets.map(sheetName => ({
+        name: sheetName,
+        isActive: sheetName === activeSheetName
+      })),
+      activeSheetName: activeSheetName
+    };
+    
+  } catch (error) {
+    console.error('Error in getAvailableSheets:', error);
+    return {
+      status: 'error',
+      message: `シート一覧の取得に失敗しました: ${error.message}`
+    };
   }
-  
-  const userInfo = getUserInfo(userId);
-  const config = userInfo.configJson || {};
-  const activeSheetName = config.activeSheetName || config.sheetName || '';
-  
-  const allSheets = getSheets();
-  
-  return {
-    sheets: allSheets.map(sheetName => ({
-      name: sheetName,
-      isActive: sheetName === activeSheetName
-    })),
-    activeSheetName: activeSheetName
-  };
 }
 
 /**
@@ -929,6 +1120,36 @@ function getSheetHeaders(sheetName) {
  * @param {Array} headers - ヘッダー名の配列
  * @returns {Object} 推測された設定オブジェクト
  */
+function getSheetHeaders(sheetName) {
+  try {
+    const sheet = getCurrentSpreadsheet().getSheetByName(sheetName);
+    if (!sheet) {
+      throw new Error(`シート「${sheetName}」が見つかりません。`);
+    }
+    
+    const lastColumn = sheet.getLastColumn();
+    if (lastColumn === 0) {
+      return {};
+    }
+    
+    const headerRow = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+    const headers = headerRow.map(v => String(v || '').trim()).filter(h => h !== '');
+    
+    // すべてのヘッダーをオブジェクトとして返す（自動検出結果 + 全ヘッダー一覧）
+    const detected = guessHeadersFromArray(headers);
+    const allHeaders = {};
+    headers.forEach(header => {
+      allHeaders[header] = header;
+    });
+    
+    return { ...detected, allHeaders };
+    
+  } catch (error) {
+    console.error('getSheetHeaders error:', error);
+    throw new Error(`ヘッダー取得に失敗しました: ${error.message}`);
+  }
+}
+
 function guessHeadersFromArray(headers) {
   // Normalize header strings: convert full-width ASCII, collapse whitespace and lowercase
   const normalize = (str) => String(str || '')
@@ -974,32 +1195,33 @@ function guessHeadersFromArray(headers) {
     
     console.log('Non-meta headers:', nonMetaHeaders.map(h => h.original));
     
-    // より柔軟な推測ロジック
+    // より柔軟な推測ロジック - 問題文と回答を同じ列に統合
     for (let i = 0; i < nonMetaHeaders.length; i++) {
       const { original: header, normalized: hStr } = nonMetaHeaders[i];
       
-      // 質問を含む長いテキストを質問ヘッダーとして推測
-      if (!question && (hStr.includes('だろうか') || hStr.includes('ですか') || hStr.includes('でしょうか') || hStr.length > 20)) {
-        question = header;
-        // 同じ内容が複数列にある場合、回答用として2番目を使用
-        if (i + 1 < nonMetaHeaders.length && nonMetaHeaders[i + 1].original === header) {
+      // 最初の質問列を問題文・回答列として使用
+      if (!answer) {
+        // 質問を含む長いテキストを優先
+        if (hStr.includes('だろうか') || hStr.includes('ですか') || hStr.includes('でしょうか') || hStr.length > 15) {
+          question = header;
+          answer = header; // 同じ列を問題文と回答の両方に使用
+        } else if (hStr.includes('回答') || hStr.includes('答え') || hStr.includes('意見') || hStr.includes('考え')) {
           answer = header;
-          continue;
+          question = header; // 同じ列を問題文と回答の両方に使用
+        } else if (i === 0) {
+          // 最初の非メタヘッダーをデフォルトとして使用
+          answer = header;
+          question = header;
         }
       }
       
-      // 回答・意見に関するヘッダー
-      if (!answer && (hStr.includes('回答') || hStr.includes('答え') || hStr.includes('意見') || hStr.includes('考え'))) {
-        answer = header;
-      }
-      
       // 理由に関するヘッダー
-      if (!reason && (hStr.includes('理由') || hStr.includes('詳細') || hStr.includes('説明'))) {
+      if (!reason && (hStr.includes('理由') || hStr.includes('詳細') || hStr.includes('説明') || hStr.includes('なぜ'))) {
         reason = header;
       }
       
       // 名前に関するヘッダー
-      if (!name && (hStr.includes('名前') || hStr.includes('氏名') || hStr.includes('学生'))) {
+      if (!name && (hStr.includes('名前') || hStr.includes('氏名') || hStr.includes('学生') || hStr.includes('ニックネーム'))) {
         name = header;
       }
       
@@ -1013,13 +1235,19 @@ function guessHeadersFromArray(headers) {
     if (!answer && nonMetaHeaders.length > 0) {
       // 最初の非メタヘッダーを回答として使用
       answer = nonMetaHeaders[0].original;
+      question = nonMetaHeaders[0].original;
     }
     
   } else {
-    // 通常のシート用の推測ロジック
-    // Keyword lists include common variants and full/half-width characters
-    question = find(['質問', '質問内容', '問題', '問い', 'お題', 'question', 'question text', 'q', 'Ｑ']);
-    answer = find(['回答', '解答', '答え', '返答', 'answer', 'a', 'Ａ', '意見', 'コメント', 'opinion', 'response']);
+    // 通常のシート用の推測ロジック - 問題文と回答を統合
+    const answerHeader = find(['回答', '解答', '答え', '返答', 'answer', 'a', 'Ａ', '意見', 'コメント', 'opinion', 'response']) ||
+                        find(['質問', '質問内容', '問題', '問い', 'お題', 'question', 'question text', 'q', 'Ｑ']);
+    
+    if (answerHeader) {
+      question = answerHeader;
+      answer = answerHeader;
+    }
+    
     reason = find(['理由', '訳', 'わけ', '根拠', '詳細', '説明', 'comment', 'why', 'reason', 'detail']);
     name = find(['名前', '氏名', 'name', '学生', 'student', 'ペンネーム', 'ニックネーム', 'author']);
     classHeader = find(['クラス', 'class', 'classroom', '組', '学級', '班', 'グループ']);
@@ -2425,6 +2653,188 @@ function getExistingBoard() {
   };
 }
 
+// =================================================================
+// 管理パネル用関数
+// =================================================================
+
+/**
+ * ダッシュボード用データを取得
+ */
+function getDashboardData() {
+  try {
+    const userEmail = safeGetUserEmail();
+    console.log(`Getting dashboard data for user: ${userEmail}`);
+    
+    // 管理者権限チェック
+    if (!isUserAdmin(userEmail)) {
+      return {
+        status: 'error',
+        message: '管理者権限が必要です'
+      };
+    }
+    
+    // 現在のスプレッドシートとユーザー情報を取得
+    const props = PropertiesService.getUserProperties();
+    const spreadsheetId = props.getProperty('CURRENT_SPREADSHEET_ID');
+    
+    let dashboardData = {
+      activeBoards: 0,
+      totalAnswers: 0,
+      totalReactions: 0,
+      lastUpdated: null,
+      hasActiveSpreadsheet: false
+    };
+    
+    if (spreadsheetId) {
+      try {
+        const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+        const sheets = spreadsheet.getSheets().filter(sheet => 
+          !sheet.getName().startsWith('Config_') && 
+          !sheet.getName().startsWith('Template_')
+        );
+        
+        dashboardData.activeBoards = sheets.length;
+        dashboardData.hasActiveSpreadsheet = true;
+        
+        // 各シートから統計を計算
+        let totalAnswers = 0;
+        let totalReactions = 0;
+        let latestUpdate = null;
+        
+        sheets.forEach(sheet => {
+          try {
+            const data = sheet.getDataRange().getValues();
+            if (data.length > 1) { // ヘッダー行を除く
+              totalAnswers += data.length - 1;
+              
+              // リアクション列をカウント
+              const headers = data[0];
+              const reactionColumns = [COLUMN_HEADERS.UNDERSTAND, COLUMN_HEADERS.LIKE, COLUMN_HEADERS.CURIOUS];
+              
+              reactionColumns.forEach(reactionHeader => {
+                const colIndex = headers.indexOf(reactionHeader);
+                if (colIndex !== -1) {
+                  for (let i = 1; i < data.length; i++) {
+                    if (data[i][colIndex]) {
+                      totalReactions += String(data[i][colIndex]).split(',').length;
+                    }
+                  }
+                }
+              });
+              
+              // 最新更新日を確認
+              const timestampIndex = headers.indexOf(COLUMN_HEADERS.TIMESTAMP);
+              if (timestampIndex !== -1) {
+                for (let i = 1; i < data.length; i++) {
+                  const timestamp = data[i][timestampIndex];
+                  if (timestamp && (!latestUpdate || new Date(timestamp) > new Date(latestUpdate))) {
+                    latestUpdate = timestamp;
+                  }
+                }
+              }
+            }
+          } catch (sheetError) {
+            console.warn(`Error processing sheet ${sheet.getName()}:`, sheetError);
+          }
+        });
+        
+        dashboardData.totalAnswers = totalAnswers;
+        dashboardData.totalReactions = totalReactions;
+        dashboardData.lastUpdated = latestUpdate ? new Date(latestUpdate).toISOString() : null;
+        
+      } catch (spreadsheetError) {
+        console.warn('Error accessing spreadsheet:', spreadsheetError);
+        // スプレッドシートにアクセスできない場合も継続
+      }
+    }
+    
+    return {
+      status: 'success',
+      data: dashboardData
+    };
+    
+  } catch (error) {
+    console.error('Error in getDashboardData:', error);
+    return {
+      status: 'error',
+      message: `ダッシュボードデータの取得に失敗しました: ${error.message}`
+    };
+  }
+}
+
+/**
+ * シートを切り替える
+ */
+function switchToSheet(sheetName) {
+  try {
+    const userEmail = safeGetUserEmail();
+    console.log(`Switching to sheet: ${sheetName} for user: ${userEmail}`);
+    
+    // 管理者権限チェック
+    if (!isUserAdmin(userEmail)) {
+      return {
+        status: 'error',
+        message: '管理者権限が必要です'
+      };
+    }
+    
+    // switchActiveSheet 関数を呼び出し
+    const result = switchActiveSheet(sheetName);
+    
+    if (result && result.status === 'success') {
+      return {
+        status: 'success',
+        message: `シート '${sheetName}' に切り替えました`
+      };
+    } else {
+      return {
+        status: 'error',
+        message: result?.message || 'シートの切り替えに失敗しました'
+      };
+    }
+    
+  } catch (error) {
+    console.error('Error in switchToSheet:', error);
+    return {
+      status: 'error',
+      message: `シートの切り替え中にエラーが発生しました: ${error.message}`
+    };
+  }
+}
+
+/**
+ * アクティブシートをクリア
+ */
+function clearActiveSheet() {
+  try {
+    const userEmail = safeGetUserEmail();
+    console.log(`Clearing active sheet for user: ${userEmail}`);
+    
+    // 管理者権限チェック
+    if (!isUserAdmin(userEmail)) {
+      return {
+        status: 'error',
+        message: '管理者権限が必要です'
+      };
+    }
+    
+    const props = PropertiesService.getUserProperties();
+    props.deleteProperty('ACTIVE_SHEET_NAME');
+    
+    return {
+      status: 'success',
+      message: 'アクティブシートをクリアしました'
+    };
+    
+  } catch (error) {
+    console.error('Error in clearActiveSheet:', error);
+    return {
+      status: 'error',
+      message: `シートクリア中にエラーが発生しました: ${error.message}`
+    };
+  }
+}
+
 if (typeof module !== 'undefined') {
   handleError = require('./ErrorHandling.gs').handleError;
   const { getConfig, saveSheetConfig, createConfigSheet } = require('./config.gs');
@@ -2479,6 +2889,9 @@ if (typeof module !== 'undefined') {
     convertPreviewUrl,
     buildBoardData,
     guessHeadersFromArray,
-    clearHeaderCache
+    clearHeaderCache,
+    getDashboardData,
+    switchToSheet,
+    clearActiveSheet
   };
 }
