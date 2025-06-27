@@ -101,41 +101,93 @@
   </style>
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans p-4">
-  <div class="max-w-7xl mx-auto lg:flex lg:gap-6">
-    <!-- 左側: 既存ボード一覧 (PC時) -->
-    <div class="hidden lg:block lg:w-1/3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)]">
-      <div class="glass-panel rounded-xl p-4 h-full overflow-y-auto">
-        <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
-          <span class="text-2xl">📋</span>既存のボード
-        </h2>
-        <div class="mb-4 p-3 bg-blue-500/10 rounded-lg border border-blue-400/30">
-          <p class="text-xs text-blue-200 text-center">
-            ボードをクリックすると<br>管理者モードでプレビューできます
-          </p>
-        </div>
-        <div id="boardList" class="space-y-2">
-          <div class="text-gray-400 text-sm text-center py-8">読み込み中...</div>
-        </div>
-        <button type="button" onclick="refreshBoardList()" 
-                class="w-full mt-4 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors">
-          🔄 リスト更新
-        </button>
-      </div>
-    </div>
-
-    <!-- 右側: 管理画面 -->
-    <div class="w-full lg:w-2/3">
-      <div id="app" class="glass-panel rounded-xl p-4 lg:p-6 shadow-lg max-h-[calc(100vh-2rem)] overflow-y-auto">
-        <div class="text-center mb-4 lg:mb-6">
-          <h2 class="text-xl lg:text-2xl font-bold text-yellow-300 mb-2">StudyQuest 管理画面</h2>
-      <div class="progress-bar">
+  <div class="max-w-7xl mx-auto">
+    <!-- ヘッダー -->
+    <div class="glass-panel rounded-xl p-4 mb-6 shadow-lg">
+      <h1 class="text-2xl lg:text-3xl font-bold text-yellow-300 text-center">StudyQuest 管理画面</h1>
+      <div class="progress-bar mt-4">
         <div class="progress-fill" id="setup-progress"></div>
       </div>
-      <p class="text-sm text-gray-400" id="setup-status">設定を開始してください</p>
+      <p class="text-sm text-gray-400 text-center mt-2" id="setup-status">設定を開始してください</p>
     </div>
 
-    <!-- Comprehensive Dashboard -->
-    <div class="mb-8 space-y-6">
+    <!-- レイアウト: 3列構成 (PCのみ) -->
+    <div class="lg:grid lg:grid-cols-12 lg:gap-6">
+      <!-- 左側: 既存ボード履歴 -->
+      <div class="lg:col-span-4 mb-6 lg:mb-0">
+        <div class="glass-panel rounded-xl p-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-12rem)] overflow-y-auto">
+          <h2 class="text-lg font-bold text-white mb-3 flex items-center gap-2">
+            <span class="text-xl">📋</span>既存のボード
+          </h2>
+          <div class="mb-3 p-2 bg-blue-500/10 rounded-lg border border-blue-400/30">
+            <p class="text-xs text-blue-200 text-center">クリックで管理モードプレビュー</p>
+          </div>
+          <div id="boardList" class="space-y-2 mb-3">
+            <div class="text-gray-400 text-sm text-center py-4">読み込み中...</div>
+          </div>
+          <button type="button" onclick="refreshBoardList()" 
+                  class="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors">
+            🔄 更新
+          </button>
+        </div>
+      </div>
+
+      <!-- 中央: メイン操作エリア -->
+      <div class="lg:col-span-5">
+        <div id="app" class="glass-panel rounded-xl p-4 shadow-lg lg:max-h-[calc(100vh-12rem)] overflow-y-auto">
+          <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <span class="text-xl">⚙️</span>ボード作成・設定
+          </h2>
+        </div>
+      </div>
+
+      <!-- 右側: 情報・統計エリア -->
+      <div class="lg:col-span-3">
+        <div class="glass-panel rounded-xl p-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-12rem)] overflow-y-auto">
+          <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <span class="text-xl">📊</span>ダッシュボード
+          </h2>
+          
+          <!-- ステータス概要 -->
+          <div class="mb-4 p-3 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-lg border border-cyan-400/30">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-semibold text-white">現在の状態</span>
+              <span class="status-indicator status-inactive" id="board-status-indicator"></span>
+            </div>
+            <p class="text-lg font-bold text-cyan-400" id="status-text">準備中</p>
+            <p class="text-xs text-gray-300" id="status-description">スプレッドシートを追加</p>
+          </div>
+
+          <!-- アクティブシート情報 -->
+          <div class="mb-4 p-3 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg border border-green-400/30">
+            <h4 class="text-sm font-semibold text-white mb-2">アクティブなシート</h4>
+            <p class="text-green-400 font-medium" id="active-sheet-name">--</p>
+            <div class="mt-2 grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span class="text-gray-400">回答数:</span>
+                <span class="text-white font-medium" id="answer-count">0</span>
+              </div>
+              <div>
+                <span class="text-gray-400">反応数:</span>
+                <span class="text-white font-medium" id="reaction-count">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 最近のアクティビティ -->
+          <div>
+            <h4 class="text-sm font-semibold text-white mb-2">最近のアクティビティ</h4>
+            <div id="recent-activities" class="space-y-2 max-h-32 overflow-y-auto">
+              <div class="text-xs text-gray-400 text-center py-2">アクティビティなし</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- メインコンテンツエリア (mobile用) -->
+    <div class="lg:hidden">
+      <div id="mobile-app" class="glass-panel rounded-xl p-4 shadow-lg">
       <!-- Main Status Overview -->
       <div class="glass-panel p-6 rounded-lg fade-in">
         <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
@@ -1306,6 +1358,58 @@
       return date.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
     }
     
+    // ダッシュボード更新関数
+    function updateDashboard(status) {
+      // ステータス更新
+      const statusIndicator = document.getElementById('board-status-indicator');
+      const statusText = document.getElementById('status-text');
+      const statusDescription = document.getElementById('status-description');
+      
+      if (status && status.isActive) {
+        statusIndicator.className = 'status-indicator status-active';
+        statusText.textContent = 'アクティブ';
+        statusDescription.textContent = 'ボードが公開中です';
+      } else {
+        statusIndicator.className = 'status-indicator status-inactive';
+        statusText.textContent = '準備中';
+        statusDescription.textContent = 'スプレッドシートを追加';
+      }
+      
+      // アクティブシート情報更新
+      if (status && status.activeSheetName) {
+        document.getElementById('active-sheet-name').textContent = status.activeSheetName;
+        document.getElementById('answer-count').textContent = status.answerCount || 0;
+        document.getElementById('reaction-count').textContent = status.totalReactions || 0;
+      }
+      
+      // アクティビティ更新
+      updateRecentActivities(status);
+    }
+    
+    function updateRecentActivities(status) {
+      const container = document.getElementById('recent-activities');
+      if (!status || !status.isActive) {
+        container.innerHTML = '<div class="text-xs text-gray-400 text-center py-2">アクティビティなし</div>';
+        return;
+      }
+      
+      const activities = [];
+      if (status.answerCount > 0) {
+        activities.push(`${status.answerCount}件の回答`);
+      }
+      if (status.totalReactions > 0) {
+        activities.push(`${status.totalReactions}件の反応`);
+      }
+      
+      if (activities.length === 0) {
+        container.innerHTML = '<div class="text-xs text-gray-400 text-center py-2">アクティビティなし</div>';
+      } else {
+        container.innerHTML = activities.map(activity => 
+          `<div class="text-xs text-gray-300 bg-gray-800/50 rounded p-2">${activity}</div>`
+        ).join('');
+      }
+    }
+
     // 初期化時にボード一覧を読み込み
     document.addEventListener('DOMContentLoaded', () => {
       if (window.innerWidth >= 1024) { // lg以上でのみ読み込み

@@ -413,6 +413,71 @@ function setDisplayOptions(options) {
 // =================================================================
 // GAS Webアプリケーションのエントリーポイント
 // =================================================================
+function getUserBoards() {
+  try {
+    const userEmail = safeGetUserEmail();
+    const spreadsheet = getCurrentSpreadsheet();
+    const sheets = spreadsheet.getSheets();
+    
+    const boards = [];
+    
+    for (const sheet of sheets) {
+      const sheetName = sheet.getName();
+      
+      // システムシートは除外
+      if (['Config', 'Users', 'AdminEmails'].includes(sheetName)) {
+        continue;
+      }
+      
+      try {
+        const mapping = getColumnMapping(sheetName);
+        if (!mapping || !mapping.answerHeader) {
+          continue;
+        }
+        
+        const lastRow = sheet.getLastRow();
+        const answerCount = Math.max(0, lastRow - 1);
+        
+        // 最終更新日を取得
+        let lastUpdated = null;
+        if (lastRow > 1) {
+          const timestampCol = mapping.timestampCol || 1;
+          const lastTimestamp = sheet.getRange(lastRow, timestampCol).getValue();
+          if (lastTimestamp instanceof Date) {
+            lastUpdated = lastTimestamp.toISOString();
+          }
+        }
+        
+        boards.push({
+          id: sheetName,
+          name: sheetName,
+          question: mapping.questionHeader || 'No question',
+          answerCount: answerCount,
+          lastUpdated: lastUpdated
+        });
+        
+      } catch (sheetError) {
+        console.warn(`Error processing sheet ${sheetName}:`, sheetError);
+        continue;
+      }
+    }
+    
+    // 最終更新日でソート
+    boards.sort((a, b) => {
+      if (!a.lastUpdated && !b.lastUpdated) return 0;
+      if (!a.lastUpdated) return 1;
+      if (!b.lastUpdated) return -1;
+      return new Date(b.lastUpdated) - new Date(a.lastUpdated);
+    });
+    
+    return boards;
+    
+  } catch (error) {
+    console.error('getUserBoards error:', error);
+    throw new Error('ボード一覧の取得に失敗しました: ' + error.message);
+  }
+}
+
 function validateUserId(userId) {
   if (!userId || typeof userId !== 'string') {
     throw new Error('ユーザーIDが指定されていません。');
