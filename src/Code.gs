@@ -994,6 +994,36 @@ function getSheetHeaders(sheetName) {
  * @param {Array} headers - ヘッダー名の配列
  * @returns {Object} 推測された設定オブジェクト
  */
+function getSheetHeaders(sheetName) {
+  try {
+    const sheet = getCurrentSpreadsheet().getSheetByName(sheetName);
+    if (!sheet) {
+      throw new Error(`シート「${sheetName}」が見つかりません。`);
+    }
+    
+    const lastColumn = sheet.getLastColumn();
+    if (lastColumn === 0) {
+      return {};
+    }
+    
+    const headerRow = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+    const headers = headerRow.map(v => String(v || '').trim()).filter(h => h !== '');
+    
+    // すべてのヘッダーをオブジェクトとして返す（自動検出結果 + 全ヘッダー一覧）
+    const detected = guessHeadersFromArray(headers);
+    const allHeaders = {};
+    headers.forEach(header => {
+      allHeaders[header] = header;
+    });
+    
+    return { ...detected, allHeaders };
+    
+  } catch (error) {
+    console.error('getSheetHeaders error:', error);
+    throw new Error(`ヘッダー取得に失敗しました: ${error.message}`);
+  }
+}
+
 function guessHeadersFromArray(headers) {
   // Normalize header strings: convert full-width ASCII, collapse whitespace and lowercase
   const normalize = (str) => String(str || '')
@@ -1039,32 +1069,33 @@ function guessHeadersFromArray(headers) {
     
     console.log('Non-meta headers:', nonMetaHeaders.map(h => h.original));
     
-    // より柔軟な推測ロジック
+    // より柔軟な推測ロジック - 問題文と回答を同じ列に統合
     for (let i = 0; i < nonMetaHeaders.length; i++) {
       const { original: header, normalized: hStr } = nonMetaHeaders[i];
       
-      // 質問を含む長いテキストを質問ヘッダーとして推測
-      if (!question && (hStr.includes('だろうか') || hStr.includes('ですか') || hStr.includes('でしょうか') || hStr.length > 20)) {
-        question = header;
-        // 同じ内容が複数列にある場合、回答用として2番目を使用
-        if (i + 1 < nonMetaHeaders.length && nonMetaHeaders[i + 1].original === header) {
+      // 最初の質問列を問題文・回答列として使用
+      if (!answer) {
+        // 質問を含む長いテキストを優先
+        if (hStr.includes('だろうか') || hStr.includes('ですか') || hStr.includes('でしょうか') || hStr.length > 15) {
+          question = header;
+          answer = header; // 同じ列を問題文と回答の両方に使用
+        } else if (hStr.includes('回答') || hStr.includes('答え') || hStr.includes('意見') || hStr.includes('考え')) {
           answer = header;
-          continue;
+          question = header; // 同じ列を問題文と回答の両方に使用
+        } else if (i === 0) {
+          // 最初の非メタヘッダーをデフォルトとして使用
+          answer = header;
+          question = header;
         }
       }
       
-      // 回答・意見に関するヘッダー
-      if (!answer && (hStr.includes('回答') || hStr.includes('答え') || hStr.includes('意見') || hStr.includes('考え'))) {
-        answer = header;
-      }
-      
       // 理由に関するヘッダー
-      if (!reason && (hStr.includes('理由') || hStr.includes('詳細') || hStr.includes('説明'))) {
+      if (!reason && (hStr.includes('理由') || hStr.includes('詳細') || hStr.includes('説明') || hStr.includes('なぜ'))) {
         reason = header;
       }
       
       // 名前に関するヘッダー
-      if (!name && (hStr.includes('名前') || hStr.includes('氏名') || hStr.includes('学生'))) {
+      if (!name && (hStr.includes('名前') || hStr.includes('氏名') || hStr.includes('学生') || hStr.includes('ニックネーム'))) {
         name = header;
       }
       
@@ -1078,13 +1109,19 @@ function guessHeadersFromArray(headers) {
     if (!answer && nonMetaHeaders.length > 0) {
       // 最初の非メタヘッダーを回答として使用
       answer = nonMetaHeaders[0].original;
+      question = nonMetaHeaders[0].original;
     }
     
   } else {
-    // 通常のシート用の推測ロジック
-    // Keyword lists include common variants and full/half-width characters
-    question = find(['質問', '質問内容', '問題', '問い', 'お題', 'question', 'question text', 'q', 'Ｑ']);
-    answer = find(['回答', '解答', '答え', '返答', 'answer', 'a', 'Ａ', '意見', 'コメント', 'opinion', 'response']);
+    // 通常のシート用の推測ロジック - 問題文と回答を統合
+    const answerHeader = find(['回答', '解答', '答え', '返答', 'answer', 'a', 'Ａ', '意見', 'コメント', 'opinion', 'response']) ||
+                        find(['質問', '質問内容', '問題', '問い', 'お題', 'question', 'question text', 'q', 'Ｑ']);
+    
+    if (answerHeader) {
+      question = answerHeader;
+      answer = answerHeader;
+    }
+    
     reason = find(['理由', '訳', 'わけ', '根拠', '詳細', '説明', 'comment', 'why', 'reason', 'detail']);
     name = find(['名前', '氏名', 'name', '学生', 'student', 'ペンネーム', 'ニックネーム', 'author']);
     classHeader = find(['クラス', 'class', 'classroom', '組', '学級', '班', 'グループ']);

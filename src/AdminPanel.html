@@ -1647,10 +1647,159 @@
     
     function loadSheetsContent() {
       const container = document.getElementById('sheets-content');
-      const mobileApp = document.getElementById('mobile-app');
+      if (!container) return;
       
-      if (container && mobileApp) {
-        container.innerHTML = mobileApp.innerHTML;
+      container.innerHTML = `
+        <!-- シート選択セクション -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <div class="glass-panel p-6 rounded-xl">
+            <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <span class="text-xl">📋</span>シート選択
+            </h3>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">アクティブなシートを選択</label>
+                <div class="relative">
+                  <select id="sheet-select" 
+                          class="w-full p-3 pr-10 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 transition-all"
+                          onchange="switchSheet()"
+                          aria-label="アクティブなシートを選択">
+                    <option>読み込み中...</option>
+                  </select>
+                  <span class="ml-2 text-xs bg-gray-600 px-2 py-1 rounded" id="sheet-count">0 枚</span>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button type="button" onclick="loadSheets()" 
+                        class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                  🔄 シート一覧更新
+                </button>
+                <button type="button" onclick="clearSheetSelection()" 
+                        class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors">
+                  ✖ クリア
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- シート情報 -->
+          <div class="glass-panel p-6 rounded-xl">
+            <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <span class="text-xl">📊</span>シート情報
+            </h3>
+            <div class="space-y-3">
+              <div class="flex justify-between">
+                <span class="text-gray-400">現在のシート:</span>
+                <span class="text-cyan-400 font-medium" id="current-sheet-name">--</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">回答数:</span>
+                <span class="text-white" id="current-answer-count">0</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">最終更新:</span>
+                <span class="text-gray-300 text-sm" id="current-last-update">--</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- コンフィグ設定セクション -->
+        <div class="glass-panel p-6 rounded-xl mb-6">
+          <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <span class="text-xl">⚙️</span>列設定（自動検出）
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-2">
+                問題文・回答列 <span class="text-red-400">*</span>
+                <span class="text-xs text-gray-500 block">問題文と回答が含まれる列</span>
+              </label>
+              <select id="question-answer-header" 
+                      class="w-full p-3 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-cyan-400"
+                      onchange="updateConfig()">
+                <option value="">列を選択してください</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-2">
+                理由列（オプション）
+                <span class="text-xs text-gray-500 block">理由が記載される列</span>
+              </label>
+              <select id="reason-header" 
+                      class="w-full p-3 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-cyan-400"
+                      onchange="updateConfig()">
+                <option value="">選択しない</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-2">
+                名前列（オプション）
+                <span class="text-xs text-gray-500 block">名前が記載される列</span>
+              </label>
+              <select id="name-header" 
+                      class="w-full p-3 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-cyan-400"
+                      onchange="updateConfig()">
+                <option value="">選択しない</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-2">
+                クラス列（オプション）
+                <span class="text-xs text-gray-500 block">クラス情報が記載される列</span>
+              </label>
+              <select id="class-header" 
+                      class="w-full p-3 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-cyan-400"
+                      onchange="updateConfig()">
+                <option value="">選択しない</option>
+              </select>
+            </div>
+          </div>
+          <div class="mt-4 flex gap-2">
+            <button type="button" onclick="autoDetectHeaders()" 
+                    class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors">
+              🤖 自動検出
+            </button>
+            <button type="button" onclick="saveConfig()" 
+                    class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors">
+              💾 設定保存
+            </button>
+          </div>
+        </div>
+
+        <!-- 表示オプション -->
+        <div class="glass-panel p-6 rounded-xl">
+          <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <span class="text-xl">👁️</span>表示オプション
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="flex items-center justify-between">
+              <span class="text-gray-300">名前を表示</span>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="show-names" class="sr-only peer" onchange="updateDisplayOptions()">
+                <div class="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
+              </label>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-gray-300">リアクション数を表示</span>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="show-counts" class="sr-only peer" onchange="updateDisplayOptions()">
+                <div class="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
+              </label>
+            </div>
+          </div>
+          <div class="mt-4">
+            <button type="button" onclick="applyDisplayOptions()" 
+                    class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors">
+              ✅ 表示設定を適用
+            </button>
+          </div>
+        </div>
+      `;
+      
+      // シート一覧を読み込み
+      if (typeof loadSheets === 'function') {
+        loadSheets();
       }
     }
     
@@ -1802,6 +1951,185 @@
           }
         })
         .getUserBoards();
+    }
+
+    // 改善された自動検出機能
+    function autoDetectHeaders() {
+      const selectedSheet = document.getElementById('sheet-select').value;
+      if (!selectedSheet) {
+        alert('まずシートを選択してください');
+        return;
+      }
+      
+      setLoading(true, '列を自動検出中...');
+      google.script.run
+        .withSuccessHandler((headers) => {
+          if (headers && Object.keys(headers).length > 0) {
+            populateHeaderSelectors(headers);
+            showMessage('列を自動検出しました', 'green');
+          } else {
+            showMessage('適切な列が見つかりませんでした', 'orange');
+          }
+          setLoading(false);
+        })
+        .withFailureHandler((error) => {
+          showError(error);
+          setLoading(false);
+        })
+        .getSheetHeaders(selectedSheet);
+    }
+    
+    function populateHeaderSelectors(detectedHeaders) {
+      const selectors = ['question-answer-header', 'reason-header', 'name-header', 'class-header'];
+      
+      // 各セレクターにオプションを追加
+      selectors.forEach(selectorId => {
+        const selector = document.getElementById(selectorId);
+        if (!selector) return;
+        
+        // 既存のオプションをクリア（最初のオプションは残す）
+        while (selector.children.length > 1) {
+          selector.removeChild(selector.lastChild);
+        }
+        
+        // 検出されたヘッダーを追加
+        Object.keys(detectedHeaders).forEach(header => {
+          const option = document.createElement('option');
+          option.value = header;
+          option.textContent = header;
+          selector.appendChild(option);
+        });
+      });
+      
+      // 自動検出結果を適用
+      if (detectedHeaders.questionHeader && detectedHeaders.answerHeader) {
+        // 問題文と回答が同じ列の場合は、その列を選択
+        if (detectedHeaders.questionHeader === detectedHeaders.answerHeader) {
+          document.getElementById('question-answer-header').value = detectedHeaders.questionHeader;
+        }
+      }
+      
+      if (detectedHeaders.reasonHeader) {
+        document.getElementById('reason-header').value = detectedHeaders.reasonHeader;
+      }
+      if (detectedHeaders.nameHeader) {
+        document.getElementById('name-header').value = detectedHeaders.nameHeader;
+      }
+      if (detectedHeaders.classHeader) {
+        document.getElementById('class-header').value = detectedHeaders.classHeader;
+      }
+    }
+    
+    function updateConfig() {
+      // リアルタイムでコンフィグを更新
+      const questionAnswerHeader = document.getElementById('question-answer-header').value;
+      const reasonHeader = document.getElementById('reason-header').value;
+      const nameHeader = document.getElementById('name-header').value;
+      const classHeader = document.getElementById('class-header').value;
+      
+      if (questionAnswerHeader) {
+        // 問題文と回答を同じ列に設定
+        window.currentConfig = {
+          questionHeader: questionAnswerHeader,
+          answerHeader: questionAnswerHeader,
+          reasonHeader: reasonHeader || '',
+          nameHeader: nameHeader || '',
+          classHeader: classHeader || ''
+        };
+      }
+    }
+    
+    function saveConfig() {
+      const selectedSheet = document.getElementById('sheet-select').value;
+      const questionAnswerHeader = document.getElementById('question-answer-header').value;
+      
+      if (!selectedSheet) {
+        alert('まずシートを選択してください');
+        return;
+      }
+      
+      if (!questionAnswerHeader) {
+        alert('問題文・回答列は必須です');
+        return;
+      }
+      
+      const config = {
+        questionHeader: questionAnswerHeader,
+        answerHeader: questionAnswerHeader, // 同じ列を使用
+        reasonHeader: document.getElementById('reason-header').value || '',
+        nameHeader: document.getElementById('name-header').value || '',
+        classHeader: document.getElementById('class-header').value || ''
+      };
+      
+      setLoading(true, '設定を保存中...');
+      google.script.run
+        .withSuccessHandler((message) => {
+          showMessage(message, 'green');
+          setLoading(false);
+          // ステータスを更新
+          if (typeof loadStatus === 'function') {
+            loadStatus();
+          }
+        })
+        .withFailureHandler((error) => {
+          showError(error);
+          setLoading(false);
+        })
+        .saveSheetConfig(selectedSheet, config);
+    }
+    
+    function switchSheet() {
+      const selectedSheet = document.getElementById('sheet-select').value;
+      if (!selectedSheet) return;
+      
+      setLoading(true, 'シートを切り替え中...');
+      google.script.run
+        .withSuccessHandler((message) => {
+          showMessage(message, 'green');
+          loadStatus();
+          updateAllStatusElements(getCurrentStatus());
+        })
+        .withFailureHandler(showError)
+        .switchToSheet(selectedSheet);
+    }
+    
+    function clearSheetSelection() {
+      setLoading(true, 'シート選択をクリア中...');
+      google.script.run
+        .withSuccessHandler((message) => {
+          showMessage(message, 'green');
+          loadStatus();
+        })
+        .withFailureHandler(showError)
+        .clearActiveSheet();
+    }
+    
+    function updateDisplayOptions() {
+      // トグルの状態をリアルタイムで反映
+      const showNames = document.getElementById('show-names')?.checked || false;
+      const showCounts = document.getElementById('show-counts')?.checked || false;
+      
+      window.currentDisplayOptions = {
+        showNames: showNames,
+        showCounts: showCounts
+      };
+    }
+    
+    function applyDisplayOptions() {
+      const showNames = document.getElementById('show-names')?.checked || false;
+      const showCounts = document.getElementById('show-counts')?.checked || false;
+      
+      setLoading(true, '表示設定を適用中...');
+      google.script.run
+        .withSuccessHandler((message) => {
+          showMessage(message, 'green');
+          setLoading(false);
+        })
+        .withFailureHandler((error) => {
+          showError(error);
+          setLoading(false);
+        })
+        .updateDisplayOptions(showNames, showCounts);
     }
 
     // 初期化時にボード一覧を読み込み
