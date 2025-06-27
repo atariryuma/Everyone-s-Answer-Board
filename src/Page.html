@@ -689,6 +689,7 @@ class StudyQuestApp {
       isLoading: false,
       lastFocusedElement: null,
       isStudentMode: window.isStudentMode,
+      isAdminUser: window.isAdminUser,
       showCounts: window.showCounts,
       showAdminFeatures: window.showAdminFeatures,
       showHighlightToggle: window.showHighlightToggle,
@@ -744,12 +745,6 @@ class StudyQuestApp {
       // Initial admin state setup - 管理者であっても最初は閲覧モードで起動、切り替えボタンのみ表示
       if (window.isAdminUser) {
         this.state.isAdminUser = true;
-        console.log('Admin user detected:', {
-          isAdminUser: this.state.isAdminUser,
-          showAdminFeatures: this.state.showAdminFeatures,
-          displayMode: this.state.displayMode,
-          showCounts: this.state.showCounts
-        });
         if (this.elements.adminToggleBtn) {
           this.elements.adminToggleBtn.classList.remove('hidden');
           this.elements.adminToggleBtn.removeAttribute('hidden');
@@ -1197,9 +1192,8 @@ class StudyQuestApp {
         this.state.showAdminFeatures = false;
         this.state.showHighlightToggle = false;
       } else {
-        // 管理者の場合はハイライトトグルを有効化
-        this.state.showAdminFeatures = true;
-        this.state.showHighlightToggle = true;
+        // 管理者の場合のハイライトトグルは管理モード時のみ
+        this.state.showHighlightToggle = this.state.showAdminFeatures && this.state.isAdminUser;
       }
       if (isInitialLoad) {
         // Add visual feedback that loading is complete
@@ -1210,7 +1204,7 @@ class StudyQuestApp {
         });
       } else {
         // 状態変更時はカードを再描画してハイライトボタンの表示を更新
-        this.renderCards();
+        this.renderBoard();
       }
       if (JSON.stringify(this.state.currentAnswers) !== JSON.stringify(data.rows)) {
         this.state.currentAnswers = data.rows;
@@ -1890,7 +1884,7 @@ class StudyQuestApp {
       
       // グローバル設定を更新
       window.showAdminFeatures = enable;
-      window.showHighlightToggle = enable || this.state.isAdminUser;
+      window.showHighlightToggle = enable && this.state.isAdminUser;
       window.showScoreSort = enable;
       if (enable) {
         window.showCounts = true;
@@ -1908,24 +1902,6 @@ class StudyQuestApp {
       
       // 管理モード切り替え時は既存のカードを全て削除して強制再生成
       this.elements.answersContainer.innerHTML = '';
-      
-      // デバッグ用: 管理モード設定の確認
-      console.log('Admin mode toggled:', {
-        enable: enable,
-        beforeToggle: {
-          showAdminFeatures: this.state.showAdminFeatures,
-          showCounts: this.state.showCounts,
-          displayMode: this.state.displayMode,
-          showHighlightToggle: this.state.showHighlightToggle
-        },
-        afterToggle: {
-          showAdminFeatures: window.showAdminFeatures,
-          showCounts: window.showCounts,
-          displayMode: window.displayMode,
-          showHighlightToggle: window.showHighlightToggle
-        },
-        isAdminUser: this.state.isAdminUser
-      });
       
       // UI状態を更新
       this.showAdminControls();
