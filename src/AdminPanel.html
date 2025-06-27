@@ -248,35 +248,6 @@
           <div id="section-overview" class="section-content">
             <h2 class="text-2xl font-bold text-white mb-6">概要</h2>
             
-            <!-- 新規スプレッドシート設定カード -->
-            <div class="glass-panel p-6 rounded-xl mb-6 border-l-4 border-yellow-400">
-              <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <span class="text-2xl">🆕</span>新しいスプレッドシートを設定
-              </h3>
-              <p class="text-gray-300 text-sm mb-4">
-                既存のGoogleスプレッドシートをStudyQuestボードとして設定できます
-              </p>
-              <div class="space-y-3">
-                <div>
-                  <label class="block text-sm font-medium text-gray-300 mb-2">
-                    スプレッドシートURL <span class="text-red-400">*</span>
-                  </label>
-                  <input type="url" id="new-spreadsheet-url" 
-                         placeholder="https://docs.google.com/spreadsheets/d/..."
-                         class="w-full p-3 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400">
-                </div>
-                <div class="flex gap-2">
-                  <button type="button" onclick="setupNewSpreadsheet()" 
-                          class="flex-1 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors font-medium">
-                    🚀 スプレッドシートを設定
-                  </button>
-                  <button type="button" onclick="showSpreadsheetHelp()" 
-                          class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors">
-                    ❓ ヘルプ
-                  </button>
-                </div>
-              </div>
-            </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <!-- ステータスカード -->
@@ -329,6 +300,10 @@
                   <button type="button" onclick="openBoard()" 
                           class="w-full p-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg text-sm transition-colors">
                     📖 ボードを開く
+                  </button>
+                  <button type="button" onclick="showSection('settings')" 
+                          class="w-full p-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-sm transition-colors">
+                    🆕 スプレッドシート設定
                   </button>
                   <button type="button" onclick="showSection('sheets')" 
                           class="w-full p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors">
@@ -1701,7 +1676,7 @@
                 </div>
               </div>
               <div class="flex gap-2">
-                <button type="button" onclick="loadSheets()" 
+                <button type="button" onclick="refreshSheetList()" 
                         class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
                   🔄 シート一覧更新
                 </button>
@@ -1829,14 +1804,43 @@
       `;
       
       // シート一覧を読み込み
-      if (typeof loadSheets === 'function') {
-        loadSheets();
-      }
+      refreshSheetList();
     }
     
     function loadSettingsContent() {
       const container = document.getElementById('settings-content');
       container.innerHTML = `
+        <!-- 新規スプレッドシート設定 -->
+        <div class="glass-panel p-6 rounded-xl mb-6 border-l-4 border-yellow-400">
+          <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <span class="text-2xl">🆕</span>新しいスプレッドシートを設定
+          </h3>
+          <p class="text-gray-300 text-sm mb-4">
+            既存のGoogleスプレッドシートをStudyQuestボードとして設定できます
+          </p>
+          <div class="space-y-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-2">
+                スプレッドシートURL <span class="text-red-400">*</span>
+              </label>
+              <input type="url" id="new-spreadsheet-url" 
+                     placeholder="https://docs.google.com/spreadsheets/d/..."
+                     class="w-full p-3 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400">
+            </div>
+            <div class="flex gap-2">
+              <button type="button" onclick="setupNewSpreadsheet()" 
+                      class="flex-1 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors font-medium">
+                🚀 スプレッドシートを設定
+              </button>
+              <button type="button" onclick="showSpreadsheetHelp()" 
+                      class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors">
+                ❓ ヘルプ
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 表示設定 -->
         <div class="glass-panel p-6 rounded-xl">
           <h3 class="text-lg font-semibold text-white mb-4">表示設定</h3>
           <div class="space-y-4">
@@ -2228,6 +2232,48 @@
         })
         .withFailureHandler(showError)
         .clearActiveSheet();
+    }
+    
+    function refreshSheetList() {
+      setLoading(true, 'シート一覧を更新中...');
+      google.script.run
+        .withSuccessHandler((result) => {
+          if (result.status === 'success') {
+            const sheetSelect = document.getElementById('sheet-select');
+            const sheetCount = document.getElementById('sheet-count');
+            
+            if (sheetSelect) {
+              sheetSelect.innerHTML = '<option value="">シートを選択してください</option>';
+              
+              if (result.sheets && result.sheets.length > 0) {
+                result.sheets.forEach(sheet => {
+                  const option = document.createElement('option');
+                  option.value = sheet.name;
+                  option.textContent = sheet.name;
+                  if (sheet.isActive) {
+                    option.selected = true;
+                  }
+                  sheetSelect.appendChild(option);
+                });
+              }
+            }
+            
+            if (sheetCount) {
+              const count = result.sheets ? result.sheets.length : 0;
+              sheetCount.textContent = `${count} 枚`;
+            }
+            
+            setLoading(false);
+            showMessage('シート一覧を更新しました', 'green');
+          } else {
+            throw new Error(result.message || 'シート一覧の取得に失敗しました');
+          }
+        })
+        .withFailureHandler((error) => {
+          setLoading(false);
+          showError('シート一覧の更新中にエラーが発生しました: ' + error.message);
+        })
+        .getAvailableSheets();
     }
     
     function updateDisplayOptions() {
