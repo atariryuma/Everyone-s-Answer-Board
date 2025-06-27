@@ -1375,12 +1375,26 @@ function addReaction(rowIndex, reactionKey, sheetName) {
   }
 }
 
-function toggleHighlight(rowIndex, sheetName) {
+function toggleHighlight(rowIndex, sheetName, userObject = null) {
+  // フロントエンドから渡されたユーザー情報をログに出力
+  console.log('toggleHighlight request', { 
+    rowIndex: rowIndex, 
+    sheetName: sheetName, 
+    userObject: userObject,
+    sessionUser: Session.getActiveUser().getEmail() 
+  });
+
   if (!checkAdmin()) {
     return { status: 'error', message: '権限がありません。' };
   }
 
-  console.log('toggleHighlight request', { rowIndex: rowIndex, sheetName: sheetName });
+  // ユーザーメール取得（ログチェック用）
+  const userEmail = safeGetUserEmail();
+  if (!userEmail) {
+    return { status: 'error', message: 'ログインしていないため、操作できません。' };
+  }
+
+  console.log('toggleHighlight processing', { rowIndex: rowIndex, sheetName: sheetName, userEmail: userEmail });
 
   const lock = (typeof LockService !== 'undefined') ? LockService.getScriptLock() : null;
   try {

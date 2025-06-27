@@ -1866,7 +1866,9 @@ class StudyQuestApp {
         sheetName: this.state.sheetName, 
         isAdminUser: this.state.isAdminUser,
         windowIsAdminUser: window.isAdminUser,
-        showAdminFeatures: this.state.showAdminFeatures
+        showAdminFeatures: this.state.showAdminFeatures,
+        userId: USER_ID,
+        ownerName: OWNER_NAME
       });
       const res = await this.gas.toggleHighlight(numericRowIndex, this.state.sheetName);
       console.log('ハイライトレスポンス:', res);
