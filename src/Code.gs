@@ -919,6 +919,38 @@ function getSheetHeaders(sheetName) {
 }
 
 /**
+ * シートのヘッダー情報と自動設定を同時に返す新しい関数
+ * フロントエンドでの重複したヘッダー推測ロジックを削除し、バックエンドで統一処理
+ */
+function getSheetHeadersWithAutoConfig(sheetName) {
+  try {
+    console.log('Getting headers and auto config for sheet:', sheetName);
+    
+    const headers = getSheetHeaders(sheetName);
+    if (!headers || headers.length === 0) {
+      return {
+        status: 'error',
+        message: 'ヘッダー情報を取得できませんでした。'
+      };
+    }
+    
+    const autoConfig = guessHeadersFromArray(headers);
+    
+    console.log('Headers:', headers);
+    console.log('Auto config:', autoConfig);
+    
+    return {
+      status: 'success',
+      headers: headers,
+      autoConfig: autoConfig
+    };
+  } catch (error) {
+    console.error('Error in getSheetHeadersWithAutoConfig:', error);
+    return handleError('getSheetHeadersWithAutoConfig', error, true);
+  }
+}
+
+/**
  * ヘッダー配列から設定項目を推測する関数
  *
  * Keywords cover common variants (e.g. コメント vs 回答) and include
