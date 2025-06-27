@@ -241,6 +241,11 @@ header {
 @keyframes spin {
   100% { transform: rotate(360deg); will-change: transform; }
 }
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-10px); }
+  60% { transform: translateY(-5px); }
+}
 
 /* Performance optimizations */
 @media (max-width: 768px) and (max-resolution: 150dpi) {
@@ -579,6 +584,20 @@ header {
     </div>
   </div>
 </header>
+<!-- 新着通知バナー -->
+<div id="newContentBanner" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-40 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-full shadow-lg hidden transition-all duration-300" role="alert" aria-live="polite">
+  <div class="flex items-center gap-3">
+    <span id="newContentIcon" class="w-5 h-5 animate-pulse" aria-hidden="true">📋</span>
+    <span id="newContentText">新しい意見が投稿されました</span>
+    <button type="button" id="refreshContentBtn" class="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-sm font-medium transition-colors" aria-label="新しいコンテンツを更新して表示">
+      更新して表示
+    </button>
+    <button type="button" id="dismissBannerBtn" class="text-white/70 hover:text-white w-5 h-5 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors" aria-label="通知を閉じる">
+      ×
+    </button>
+  </div>
+</div>
+
 <main id="answers" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" role="main" aria-live="polite" aria-label="回答一覧"></main>
 </div>
 <div id="answerModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
@@ -731,6 +750,10 @@ class StudyQuestApp {
       infoIconUnderstand: document.getElementById('infoIconUnderstand'),
       infoIconCurious: document.getElementById('infoIconCurious'),
       infoIconHighlight: document.getElementById('infoIconHighlight'),
+      newContentBanner: document.getElementById('newContentBanner'),
+      newContentText: document.getElementById('newContentText'),
+      refreshContentBtn: document.getElementById('refreshContentBtn'),
+      dismissBannerBtn: document.getElementById('dismissBannerBtn'),
       iconClose: document.getElementById('iconClose'),
       iconGrid: document.getElementById('iconGrid'),
       classFilter: document.getElementById('classFilter'),
@@ -753,7 +776,11 @@ class StudyQuestApp {
       showHighlightToggle: window.isAdminUser, // 管理者なら常に表示
       showScoreSort: window.showScoreSort,
       displayMode: window.displayMode,
-      sheetName: SHEET_NAME
+      sheetName: SHEET_NAME,
+      hasNewContent: false,
+      newContentCount: 0,
+      lastSeenCount: 0,
+      pollingFailureCount: 0
     };
     
     console.log('初期状態設定:', {
@@ -880,8 +907,18 @@ class StudyQuestApp {
     if (this.elements.modalReactionContainer) {
       this.elements.modalReactionContainer.addEventListener('click', this.handlers.onModalReactionClick);
     }
-    this.handlers.onClassFilterChange = () => this.loadSheetData(true);
-    this.handlers.onSortOrderChange = () => this.loadSheetData(true);
+    this.handlers.onClassFilterChange = () => {
+      this.dismissNewContentBanner(); // フィルター変更時は既存の通知を消去
+      this.loadSheetData(true).then(() => {
+        this.state.lastSeenCount = this.state.currentAnswers.length; // 新しいベースラインを設定
+      });
+    };
+    this.handlers.onSortOrderChange = () => {
+      this.dismissNewContentBanner(); // ソート変更時は既存の通知を消去
+      this.loadSheetData(true).then(() => {
+        this.state.lastSeenCount = this.state.currentAnswers.length; // 新しいベースラインを設定
+      });
+    };
     if (this.elements.classFilter) {
       this.elements.classFilter.addEventListener('change', this.handlers.onClassFilterChange);
     }
@@ -895,6 +932,16 @@ class StudyQuestApp {
     if (this.elements.adminToggleBtn) {
       this.handlers.onAdminToggleClick = () => this.toggleAdminMode();
       this.elements.adminToggleBtn.addEventListener('click', this.handlers.onAdminToggleClick);
+    }
+    
+    // 新着通知バナーのイベントハンドラー
+    if (this.elements.refreshContentBtn) {
+      this.handlers.onRefreshContentClick = () => this.refreshContent();
+      this.elements.refreshContentBtn.addEventListener('click', this.handlers.onRefreshContentClick);
+    }
+    if (this.elements.dismissBannerBtn) {
+      this.handlers.onDismissBannerClick = () => this.dismissNewContentBanner();
+      this.elements.dismissBannerBtn.addEventListener('click', this.handlers.onDismissBannerClick);
     }
     this.handlers.onDocumentKeydown = (e) => {
       if (e.key === 'Escape') {
@@ -1078,6 +1125,112 @@ class StudyQuestApp {
       this.elements.modeLabel.textContent = this.state.showAdminFeatures ? '管理モード' : '閲覧モード';
     }
   }
+  
+  // 新着コンテンツチェック（表示は更新しない）
+  async checkForNewContent() {
+    try {
+      const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+      const sortOrder = this.elements.sortOrder.value;
+      const data = await this.gas.getPublishedSheetData(null, selectedClass, sortOrder);
+      
+      // 成功した場合は失敗カウントをリセット
+      this.state.pollingFailureCount = 0;
+      
+      const newCount = data.rows ? data.rows.length : 0;
+      if (newCount > this.state.lastSeenCount && this.state.lastSeenCount > 0) {
+        const newItems = newCount - this.state.lastSeenCount;
+        this.showNewContentBanner(newItems);
+        console.log('新着コンテンツ検出:', { newItems, newCount, lastSeenCount: this.state.lastSeenCount });
+      }
+    } catch (error) {
+      this.state.pollingFailureCount++;
+      console.warn('新着チェックに失敗:', error, 'failureCount:', this.state.pollingFailureCount);
+      
+      // 連続で失敗が続く場合はポーリング間隔を延ばす
+      if (this.state.pollingFailureCount >= 3) {
+        console.log('連続失敗によりポーリング間隔を延長');
+        this.stopPolling();
+        setTimeout(() => {
+          this.startPolling();
+        }, 5000); // 5秒後に再開
+        this.state.pollingFailureCount = 0;
+      }
+    }
+  }
+  
+  // 新着通知バナーを表示
+  showNewContentBanner(newItems) {
+    if (!this.elements.newContentBanner) return;
+    
+    // 既に表示されている場合は内容のみ更新
+    if (!this.elements.newContentBanner.classList.contains('hidden')) {
+      this.state.newContentCount += newItems;
+      const totalItems = this.state.newContentCount;
+      const message = totalItems === 1 ? '新しい意見が投稿されました' : `${totalItems}件の新しい意見が投稿されました`;
+      this.elements.newContentText.textContent = message;
+      return;
+    }
+    
+    this.state.hasNewContent = true;
+    this.state.newContentCount = newItems;
+    
+    const message = newItems === 1 ? '新しい意見が投稿されました' : `${newItems}件の新しい意見が投稿されました`;
+    this.elements.newContentText.textContent = message;
+    
+    this.elements.newContentBanner.classList.remove('hidden');
+    
+    // 自動的に3秒後にアニメーション効果を追加
+    setTimeout(() => {
+      if (!this.elements.newContentBanner.classList.contains('hidden')) {
+        this.elements.newContentBanner.style.animation = 'bounce 1s ease-in-out';
+      }
+    }, 3000);
+  }
+  
+  // 新着バナーを閉じる
+  dismissNewContentBanner() {
+    if (!this.elements.newContentBanner) return;
+    
+    this.elements.newContentBanner.classList.add('hidden');
+    this.elements.newContentBanner.style.animation = '';
+    this.state.hasNewContent = false;
+    this.state.newContentCount = 0;
+  }
+  
+  // コンテンツを更新（手動）
+  async refreshContent() {
+    this.dismissNewContentBanner();
+    
+    try {
+      await this.loadSheetData(true, false);
+      this.state.lastSeenCount = this.state.currentAnswers.length;
+      
+      // 軽い成功フィードバック
+      if (this.elements.refreshContentBtn) {
+        const originalText = this.elements.refreshContentBtn.textContent;
+        this.elements.refreshContentBtn.textContent = '更新完了！';
+        this.elements.refreshContentBtn.style.background = 'rgba(16, 185, 129, 0.3)';
+        setTimeout(() => {
+          this.elements.refreshContentBtn.textContent = originalText;
+          this.elements.refreshContentBtn.style.background = '';
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('コンテンツ更新に失敗:', error);
+      
+      // エラーフィードバック
+      if (this.elements.refreshContentBtn) {
+        const originalText = this.elements.refreshContentBtn.textContent;
+        this.elements.refreshContentBtn.textContent = '更新失敗';
+        this.elements.refreshContentBtn.style.background = 'rgba(239, 68, 68, 0.3)';
+        setTimeout(() => {
+          this.elements.refreshContentBtn.textContent = originalText;
+          this.elements.refreshContentBtn.style.background = '';
+        }, 2000);
+      }
+    }
+  }
+  
   getMockData(funcName, ...args) {
     return new Promise((resolve) => {
       setTimeout(() => {
@@ -1144,7 +1297,8 @@ class StudyQuestApp {
     }
     
     const pollInterval = this.isLowPerformanceMode ? 30000 : 15000;
-    this.pollingInterval = setInterval(() => this.loadSheetData(false), pollInterval);
+    // 新着チェックのみ実行、自動更新はしない
+    this.pollingInterval = setInterval(() => this.checkForNewContent(), pollInterval);
     
     // Start automatic cleanup for memory management
     this.cleanupInterval = setInterval(() => {
@@ -1314,18 +1468,29 @@ class StudyQuestApp {
         this.state.currentAnswers = data.rows;
         this.elements.headingLabel.textContent = this.escapeHtml(data.header || '問題');
         
+        // 初期ロード時にlastSeenCountを設定
+        if (isInitialLoad) {
+          this.state.lastSeenCount = data.rows.length;
+          console.log('初期ロード完了、lastSeenCount設定:', this.state.lastSeenCount);
+        }
+        
         // デバッグ用: 受信したデータの確認
         console.log('Sheet data received:', {
           totalRows: data.rows.length,
           sampleRow: data.rows[0] || null,
           showAdminFeatures: this.state.showAdminFeatures,
-          displayMode: this.state.displayMode
+          displayMode: this.state.displayMode,
+          lastSeenCount: this.state.lastSeenCount
         });
         
         // Use requestAnimationFrame for smooth rendering
         requestAnimationFrame(() => {
           this.renderBoard(false, oldAnswers);
         });
+      } else if (isInitialLoad) {
+        // データに変更がない場合でも初期ロード時はlastSeenCountを設定
+        this.state.lastSeenCount = data.rows.length;
+        console.log('初期ロード（データ変更なし）、lastSeenCount設定:', this.state.lastSeenCount);
       }
     } catch (error) {
       console.error('Error loading sheet data:', error);
