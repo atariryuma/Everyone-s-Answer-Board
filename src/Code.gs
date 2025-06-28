@@ -256,33 +256,7 @@ function isSameDomain(emailA, emailB) {
   return domainA && domainB && domainA === domainB;
 }
 
-/**
- * ウェブアプリのデプロイ者のメールアドレスを取得・保存します。
- * @returns {string} デプロイ者のメールアドレス
- */
-function getWebAppDeployerEmail() {
-  const props = PropertiesService.getScriptProperties();
-  const deployerEmail = props.getProperty('WEB_APP_DEPLOYER_EMAIL');
 
-  if (deployerEmail) {
-    return deployerEmail;
-  }
-
-  // スクリプトプロパティに保存されていない場合、現在のユーザーをデプロイ者として保存
-  try {
-    const newDeployerEmail = Session.getEffectiveUser().getEmail();
-    if (newDeployerEmail) {
-      props.setProperty('WEB_APP_DEPLOYER_EMAIL', newDeployerEmail);
-      debugLog(`ウェブアプリのデプロイ者を ${newDeployerEmail} に設定しました。`);
-      return newDeployerEmail;
-    }
-  } catch (e) {
-    console.error('デプロイ者のメールアドレス取得に失敗しました。', e);
-    // フォールバックとして空文字を返す
-    return '';
-  }
-  return '';
-}
 
 function getAdminEmails(spreadsheetId) {
   const props = PropertiesService.getScriptProperties();
