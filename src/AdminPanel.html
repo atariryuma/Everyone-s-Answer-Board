@@ -423,6 +423,38 @@
       <!-- Setup Workflow -->
       <div class="space-y-6">
         
+        <!-- Step 0: Create New Board -->
+        <div class="glass-panel p-6 rounded-xl slide-up border-l-4 border-yellow-400">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 bg-yellow-500 text-white rounded-full flex items-center justify-center font-bold text-sm">+</div>
+              <h3 class="text-lg font-semibold text-yellow-400">新しいボードを作成</h3>
+            </div>
+            <span class="px-3 py-1 bg-yellow-600 text-xs rounded-full">おすすめ</span>
+          </div>
+          
+          <div class="space-y-4">
+            <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
+              <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                <div>
+                  <p class="text-sm text-yellow-200 font-medium mb-1">新しいGoogleフォームとスプレッドシートを自動作成</p>
+                  <p class="text-xs text-yellow-300">生徒の回答収集用フォームと回答ボード用スプレッドシートを一度に作成できます</p>
+                </div>
+              </div>
+            </div>
+            
+            <button type="button" id="create-new-board-btn" class="btn btn-primary w-full">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+              </svg>
+              <span id="create-new-board-text">新しいボードを作成</span>
+            </button>
+          </div>
+        </div>
+        
         <!-- Step 1: Spreadsheet Management -->
         <div class="glass-panel p-6 rounded-xl slide-up">
           <div class="flex items-center justify-between mb-4">
@@ -713,6 +745,7 @@
     document.addEventListener('DOMContentLoaded', function() {
       loadStatus();
       setupEventListeners();
+      updateFooterInfo();
     });
 
     function setupEventListeners() {
@@ -837,6 +870,27 @@
           showError(new Error(errorMessage));
         })
         .getStatus();
+    }
+    
+    function updateFooterInfo() {
+      // Update footer with environment and URL information
+      const currentUrl = window.location.href;
+      const isDev = currentUrl.includes('/dev');
+      
+      const footerEnvironment = document.getElementById('footer-environment');
+      const footerUrl = document.getElementById('footer-url');
+      
+      if (footerEnvironment) {
+        footerEnvironment.textContent = isDev ? '開発環境 (/dev)' : '本番環境 (/exec)';
+        footerEnvironment.className = isDev ? 'text-yellow-400' : 'text-green-400';
+      }
+      
+      if (footerUrl) {
+        // Show a shortened version of the current URL
+        const urlParts = currentUrl.split('/');
+        const shortUrl = urlParts.length > 5 ? `.../${urlParts.slice(-2).join('/')}` : currentUrl;
+        footerUrl.textContent = shortUrl;
+      }
     }
 
     function updateStatus(status) {
@@ -1049,6 +1103,112 @@
       if (activityList) {
         activityList.innerHTML = activityHtml || '<div class="text-gray-400 text-sm">活動データがありません</div>';
       }
+    }
+
+    function createNewBoard() {
+      const createBtn = document.getElementById('create-new-board-btn');
+      const createText = document.getElementById('create-new-board-text');
+      
+      // Visual loading state
+      setLoading(true, '新しいボードを作成中...');
+      createBtn.disabled = true;
+      if (createText) {
+        createText.textContent = '作成中...';
+      }
+      
+      google.script.run
+        .withSuccessHandler((result) => {
+          showMessage(result.message || '新しいボードが作成されました', 'green');
+          addVisualFeedback(createBtn, 'success');
+          createBtn.disabled = false;
+          if (createText) {
+            createText.textContent = '新しいボードを作成';
+          }
+          
+          // Show created resources info
+          showBoardCreationResults(result);
+          
+          loadStatus(); // Refresh the status
+        })
+        .withFailureHandler((error) => {
+          console.error('createBoardFromAdmin error:', error);
+          let errorMsg = '新しいボードの作成に失敗しました';
+          if (error && error.message) {
+            errorMsg = error.message;
+          }
+          showMessage('エラー: ' + errorMsg, 'red');
+          addVisualFeedback(createBtn, 'error');
+          createBtn.disabled = false;
+          if (createText) {
+            createText.textContent = '新しいボードを作成';
+          }
+          setLoading(false);
+        })
+        .createBoardFromAdmin();
+    }
+    
+    function showBoardCreationResults(result) {
+      if (!result || !result.spreadsheetUrl) return;
+      
+      const messageArea = document.getElementById('message-area');
+      const notification = document.createElement('div');
+      notification.className = 'glass-panel p-6 rounded-lg border border-green-400 bg-green-500/20 text-white font-medium fade-in max-w-md mb-4';
+      
+      let content = `
+        <div class="text-center mb-4">
+          <div class="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-2">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <h3 class="font-bold text-lg text-green-400 mb-2">ボード作成完了！</h3>
+        </div>
+        <div class="space-y-3 text-sm">
+      `;
+      
+      if (result.formUrl) {
+        content += `
+          <div>
+            <label class="text-xs text-gray-400 block mb-1">生徒回答用フォーム:</label>
+            <div class="flex gap-2">
+              <input type="text" value="${result.formUrl}" readonly class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-xs" onclick="this.select()">
+              <a href="${result.formUrl}" target="_blank" class="px-2 py-2 bg-green-600 hover:bg-green-700 rounded text-xs">開く</a>
+            </div>
+          </div>
+        `;
+      }
+      
+      if (result.spreadsheetUrl) {
+        content += `
+          <div>
+            <label class="text-xs text-gray-400 block mb-1">回答データ:</label>
+            <div class="flex gap-2">
+              <input type="text" value="${result.spreadsheetUrl}" readonly class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-xs" onclick="this.select()">
+              <a href="${result.spreadsheetUrl}" target="_blank" class="px-2 py-2 bg-blue-600 hover:bg-blue-700 rounded text-xs">確認</a>
+            </div>
+          </div>
+        `;
+      }
+      
+      content += `
+        </div>
+        <button onclick="this.parentElement.remove()" class="absolute top-2 right-2 text-gray-400 hover:text-white">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      `;
+      
+      notification.innerHTML = content;
+      notification.style.position = 'relative';
+      messageArea.appendChild(notification);
+      
+      // Auto-remove after 15 seconds
+      setTimeout(() => {
+        if (notification.parentElement) {
+          notification.remove();
+        }
+      }, 15000);
     }
 
     function addSpreadsheet() {
@@ -1468,5 +1628,18 @@
         .replace(/'/g, "&#039;");
     }
   </script>
+
+  <!-- フッター -->
+  <footer class="mt-8 pt-6 border-t border-gray-700">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="text-center space-y-2">
+        <p class="text-xs text-gray-500">StudyQuest管理画面 - 教育現場のためのインタラクティブ回答ボード</p>
+        <div class="flex justify-center items-center gap-4 text-xs text-gray-600">
+          <span>環境: <span id="footer-environment" class="text-cyan-400">確認中...</span></span>
+          <span>URL: <span id="footer-url" class="text-cyan-400 font-mono">読み込み中...</span></span>
+        </div>
+      </div>
+    </div>
+  </footer>
 </body>
 </html>
