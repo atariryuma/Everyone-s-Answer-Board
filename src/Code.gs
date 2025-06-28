@@ -1870,7 +1870,7 @@ function extractDeployIdFromUrl(url) {
   if (!url) return null;
   
   // script.google.com/macros/s/{DEPLOY_ID}/exec形式からDEPLOY_IDを抽出
-  const macrosMatch = url.match(//macros/s/([a-zA-Z0-9_-]+)/);
+  const macrosMatch = url.match(/\/macros\/s\/([a-zA-Z0-9_-]+)/);
   if (macrosMatch) {
     return macrosMatch[1];
   }
