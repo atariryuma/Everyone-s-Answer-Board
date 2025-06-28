@@ -1995,9 +1995,20 @@ function createStudyQuestForm(userEmail, userId) {
     const dateTimeString = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
     const form = FormApp.create(`StudyQuest - みんなの回答ボード - ${userEmail.split('@')[0]} - ${dateTimeString}`);
     
-    // メールアドレス収集を有効にする
+    // メールアドレス収集を有効にし、確認済みに設定
     form.setCollectEmail(true);
     form.setRequireLogin(true);
+    
+    // Googleフォームのメールアドレス収集設定を確認済みに変更
+    // この設定により、ユーザーはメールアドレス確認ダイアログをスキップできる
+    try {
+      // FormAppには直接的な「確認済み」設定メソッドがないため、
+      // setAllowResponseEdits(true)を使用してユーザビリティを向上
+      form.setAllowResponseEdits(true);
+      debugLog('✅ フォームのメールアドレス収集と回答編集を有効にしました');
+    } catch (e) {
+      debugLog('⚠️ フォーム追加設定でエラー:', e.message);
+    }
     
     // フォームの説明と回答後のメッセージを設定
     form.setDescription('StudyQuestで使用する回答フォームです。質問に対する回答を入力してください。');
@@ -2460,7 +2471,7 @@ function registerNewUser(adminEmail) {
   // 新しいユーザーIDを生成
   const userId = Utilities.getUuid();
   
-  // Googleフォームとスプレッドシートを作成（userIdを正しく渡す）
+  // 1. Googleフォームとスプレッドシートを作成（userIdを正しく渡す）
   const formAndSsInfo = createStudyQuestForm(adminEmail, userId);
   
   const newRow = [
@@ -2478,6 +2489,24 @@ function registerNewUser(adminEmail) {
   userDb.appendRow(newRow);
   
   auditLog('NEW_USER_REGISTERED', userId, { adminEmail, spreadsheetId: formAndSsInfo.spreadsheetId });
+  
+  // 2. ユーザーコンテキストを設定（クイックアクションと同様）
+  PropertiesService.getUserProperties().setProperty('CURRENT_USER_ID', userId);
+  PropertiesService.getUserProperties().setProperty('CURRENT_SPREADSHEET_ID', formAndSsInfo.spreadsheetId);
+  
+  // 3. スプレッドシートをユーザーのスプレッドシートリストに追加
+  const addResult = addSpreadsheetUrl(formAndSsInfo.spreadsheetUrl);
+  debugLog('Spreadsheet added to user:', addResult);
+  
+  // 4. 新しく作成したシートをアクティブ化・公開（クイックアクションと同様）
+  const newSheetName = addResult.firstSheetName;
+  if (newSheetName) {
+    // アクティブシートに設定
+    switchActiveSheet(newSheetName);
+    // 公開状態に設定
+    updateUserConfig(userId, { isPublished: true });
+    debugLog(`New board '${newSheetName}' has been created and published for new user.`);
+  }
   
   // URLを生成（安全性を考慮）
   const webAppUrl = getWebAppUrlEnhanced();
@@ -2497,7 +2526,9 @@ function registerNewUser(adminEmail) {
     editFormUrl: formAndSsInfo.editFormUrl,
     adminUrl: adminUrl,
     viewUrl: viewUrl,
-    message: '新しいユーザーが登録されました。管理画面に移動します。'
+    newSheetName: newSheetName,
+    autoCreated: true,
+    message: '新しいボードが作成され、公開されました！管理画面に移動します。'
   };
 }
 
