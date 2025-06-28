@@ -7,6 +7,12 @@
 // 定数定義
 // =================================================================
 
+// ユーザー専用フォルダ管理の設定
+const USER_FOLDER_CONFIG = {
+  ROOT_FOLDER_NAME: "StudyQuest - ユーザーデータ",
+  FOLDER_NAME_PATTERN: "StudyQuest - {email} - ファイル"
+};
+
 // マルチテナント用ユーザーデータベース設定
 const USER_DB_CONFIG = {
   SHEET_NAME: 'Users',
@@ -71,6 +77,53 @@ function validateCurrentUser() {
     throw new Error('権限がありません。管理者アカウントでログインしてください。');
   }
   return { userId, userInfo };
+}
+
+/**
+ * ユーザー専用フォルダを取得または作成
+ * @param {string} userEmail - ユーザーのメールアドレス
+ * @return {GoogleAppsScript.Drive.Folder} ユーザー専用フォルダ
+ */
+function getUserFolder(userEmail) {
+  try {
+    // メールアドレスからフォルダ名を生成（セキュリティのため@マークより前のみ使用）
+    const sanitizedEmail = userEmail.split('@')[0];
+    const userFolderName = USER_FOLDER_CONFIG.FOLDER_NAME_PATTERN.replace('{email}', sanitizedEmail);
+    
+    // ルートフォルダを取得または作成
+    let rootFolder;
+    const rootFolders = DriveApp.getFoldersByName(USER_FOLDER_CONFIG.ROOT_FOLDER_NAME);
+    if (rootFolders.hasNext()) {
+      rootFolder = rootFolders.next();
+    } else {
+      rootFolder = DriveApp.createFolder(USER_FOLDER_CONFIG.ROOT_FOLDER_NAME);
+      debugLog(`✅ ルートフォルダを作成しました: ${USER_FOLDER_CONFIG.ROOT_FOLDER_NAME}`);
+    }
+    
+    // ユーザー専用フォルダを取得または作成
+    let userFolder;
+    const userFolders = rootFolder.getFoldersByName(userFolderName);
+    if (userFolders.hasNext()) {
+      userFolder = userFolders.next();
+      debugLog(`✅ 既存のユーザーフォルダを使用: ${userFolderName}`);
+    } else {
+      userFolder = rootFolder.createFolder(userFolderName);
+      
+      // ユーザーにフォルダの編集権限を付与
+      try {
+        userFolder.addEditor(userEmail);
+        debugLog(`✅ ユーザーフォルダを作成し、編集権限を付与: ${userFolderName}`);
+      } catch (e) {
+        debugLog(`⚠️ 編集権限の付与に失敗: ${e.message}`);
+      }
+    }
+    
+    return userFolder;
+    
+  } catch (error) {
+    console.error('ユーザーフォルダの取得/作成に失敗:', error);
+    throw new Error('ユーザー専用フォルダの準備に失敗しました。');
+  }
 }
 
 /**
@@ -1947,6 +2000,9 @@ function createStudyQuestForm(userEmail, userId) {
       throw new Error('Google Forms API または Drive API がこの環境で利用できません。');
     }
     
+    // ユーザー専用フォルダを取得または作成
+    const userFolder = getUserFolder(userEmail);
+    
     // 新しいGoogleフォームを作成（作成日時を含む）
     const now = new Date();
     const dateTimeString = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
@@ -1958,8 +2014,25 @@ function createStudyQuestForm(userEmail, userId) {
     
     // フォームの説明と回答後のメッセージを設定
     form.setDescription('StudyQuestで使用する回答フォームです。質問に対する回答を入力してください。');
-    const boardUrl = `${getWebAppUrlEnhanced()}?userId=${userId}`;
-    form.setConfirmationMessage(`回答ありがとうございます！\n\nみんなの回答ボードで、他の人の意見も見てみましょう。\n${boardUrl}`);
+    
+    // userIdが提供されている場合のみボードURLを生成
+    let boardUrl = '';
+    if (userId) {
+      try {
+        const webAppUrl = getWebAppUrlEnhanced();
+        if (webAppUrl) {
+          boardUrl = `${webAppUrl}?userId=${userId}`;
+        }
+      } catch (e) {
+        debugLog('ボードURL生成に失敗しましたが、フォーム作成は続行します:', e.message);
+      }
+    }
+    
+    const confirmationMessage = boardUrl 
+      ? `回答ありがとうございます！\n\nみんなの回答ボードで、他の人の意見も見てみましょう。\n${boardUrl}`
+      : '回答ありがとうございます！';
+    
+    form.setConfirmationMessage(confirmationMessage);
 
     // クラス入力項目を追加し、入力形式を制限
     const classItem = form.addTextItem();
@@ -1985,14 +2058,28 @@ function createStudyQuestForm(userEmail, userId) {
     const spreadsheet = SpreadsheetApp.create(`StudyQuest - みんなの回答ボード - 回答データ - ${userEmail.split('@')[0]} - ${dateTimeString}`);
     form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheet.getId());
 
+    // ファイルをユーザー専用フォルダに移動
+    const formFile = DriveApp.getFileById(form.getId());
+    const spreadsheetFile = DriveApp.getFileById(spreadsheet.getId());
+    
+    try {
+      formFile.moveTo(userFolder);
+      spreadsheetFile.moveTo(userFolder);
+      debugLog(`✅ フォームとスプレッドシートをユーザーフォルダに移動しました`);
+    } catch (e) {
+      debugLog(`⚠️ ファイル移動に失敗: ${e.message}`);
+    }
+
     // 共有設定を自動化
     const userDomain = getEmailDomain(userEmail);
     if (userDomain) {
-      const formFile = DriveApp.getFileById(form.getId());
-      formFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.EDIT);
-      const spreadsheetFile = DriveApp.getFileById(spreadsheet.getId());
-      spreadsheetFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.EDIT);
-      debugLog(`フォームとスプレッドシートをドメイン「${userDomain}」で共有しました。`);
+      try {
+        formFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.EDIT);
+        spreadsheetFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.EDIT);
+        debugLog(`フォームとスプレッドシートをドメイン「${userDomain}」で共有しました。`);
+      } catch (e) {
+        debugLog(`⚠️ 共有設定に失敗: ${e.message}`);
+      }
     }
 
     const sheet = spreadsheet.getSheets()[0];
@@ -2386,8 +2473,8 @@ function registerNewUser(adminEmail) {
   // 新しいユーザーIDを生成
   const userId = Utilities.getUuid();
   
-  // Googleフォームとスプレッドシートを作成
-  const formAndSsInfo = createStudyQuestForm(adminEmail);
+  // Googleフォームとスプレッドシートを作成（userIdを正しく渡す）
+  const formAndSsInfo = createStudyQuestForm(adminEmail, userId);
   
   const newRow = [
     userId,
@@ -2492,6 +2579,7 @@ if (typeof module !== 'undefined') {
     registerNewUser,
     getSpreadsheetUrlForUser,
     openActiveSpreadsheet,
-    getExistingBoard
+    getExistingBoard,
+    getUserFolder
   };
 }
