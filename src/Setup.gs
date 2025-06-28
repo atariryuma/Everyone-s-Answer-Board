@@ -1,11 +1,91 @@
 /**
  * @fileoverview StudyQuest -みんなの回答ボード- - 統合セットアップスクリプト
  * フォルダ管理、データベース作成、共有設定、プロパティ設定を自動で行う統合セットアップ機能
- *
- * NOTE: このスクリプトは、Code.gsで定義されているグローバル関数と定数に依存しています。
- * (例: USER_DB_CONFIG, debugLog, sanitizeIdForLog, validateDeployId, validateWebAppUrl, secureLogError)。
- * Code.gsが同じApps Scriptプロジェクト内にあり、その関数がグローバルスコープで定義されていることを確認してください。
  */
+
+// =================================================================
+// 定数定義 (Setup.gs内で自己完結させるため、Code.gsからコピー)
+// =================================================================
+const USER_DB_CONFIG = {
+  SHEET_NAME: 'Users',
+  HEADERS: [
+    'userId',
+    'adminEmail',
+    'spreadsheetId', 
+    'spreadsheetUrl',
+    'createdAt',
+    'accessToken',
+    'configJson',
+    'lastAccessedAt',
+    'isActive'
+  ]
+};
+
+// =================================================================
+// ユーティリティ関数 (Setup.gs内で自己完結させるため、Code.gsからコピー)
+// =================================================================
+
+// Debug flag. Set to true to enable verbose logging
+var DEBUG = false;
+
+function debugLog() {
+  if (DEBUG && typeof console !== 'undefined' && console.log) {
+    console.log.apply(console, arguments);
+  }
+}
+
+/**
+ * セキュリティ強化: ID情報をログ用にサニタイズ
+ * @param {string} id - サニタイズするID
+ * @return {string} サニタイズされたID
+ */
+function sanitizeIdForLog(id) {
+  if (!id || typeof id !== 'string') return 'なし';
+  return id.length > 8 ? id.substring(0, 8) + '...' : id;
+}
+
+/**
+ * セキュリティ強化: DEPLOY_IDの厳密な検証
+ * @param {string} deployId - 検証するDEPLOY_ID
+ * @return {boolean} 有効な場合true
+ */
+function validateDeployId(deployId) {
+  if (!deployId || typeof deployId !== 'string') return false;
+  // Google Apps ScriptのDEPLOY_IDの実際の形式に合わせた厳密な検証
+  return /^AKfycb[a-zA-Z0-9_-]{20,}$/.test(deployId);
+}
+
+/**
+ * セキュリティ強化: ウェブアプリURLの検証
+ * @param {string} url - 検証するURL
+ * @return {boolean} 有効な場合true
+ */
+function validateWebAppUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname === 'script.google.com' && 
+           urlObj.pathname.includes('/macros/s/') &&
+           /\/s\/[a-zA-Z0-9_-]+\/exec$/.test(urlObj.pathname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * セキュリティ強化: エラーの安全なログ記録
+ * @param {string} context - エラーのコンテキスト
+ * @param {Error} error - エラーオブジェクト
+ */
+function secureLogError(context, error) {
+  // 本番環境では詳細なエラーログは管理者のみがアクセス可能な場所に記録
+  // ここでは基本的な情報のみをログに記録
+  console.warn(`${context}: エラーが発生しました`);
+
+  // 開発環境でのみ詳細ログを出力（DEBUG フラグがある場合）
+  if (typeof DEBUG !== 'undefined' && DEBUG) {
+    console.error(`Debug - ${context}:`, error.message);
+  }
+}
 
 /**
  * StudyQuestの統合セットアップ関数
@@ -59,7 +139,7 @@ function studyQuestSetup(manualDeployId) {
         const sheet = newDb.getSheets()[0];
         sheet.setName("users");
         // USER_DB_CONFIG.HEADERS は Code.gs で定義されていることを前提
-        sheet.appendRow(USER_DB_CONFIG.HEADERS); // Use USER_DB_CONFIG.HEADERS
+        sheet.appendRow(["userId", "adminEmail", "spreadsheetId", "spreadsheetUrl", "createdAt", "accessToken", "configJson", "lastAccessedAt", "isActive"]);
         debugLog(`✅ データベースファイルを新規作成し、専用フォルダに配置しました。`);
       }
     }
