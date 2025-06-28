@@ -143,10 +143,10 @@ function secureHandleError(prefix, error, returnObject = false) {
 
 function applySecurityHeaders(output) {
   if (output && typeof output.addMetaTag === 'function') {
-    output.addMetaTag(
-      'Content-Security-Policy',
-      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
-    );
+    // NOTE: Apps Script does not allow setting the Content-Security-Policy
+    // header via addMetaTag. Attempting to do so results in
+    // "The specified meta tag cannot be used in this context" errors.
+    // Keep other security related headers only.
     if (typeof output.setXFrameOptionsMode === 'function') {
       // Allow embedding within the same origin by default for enhanced security
       // unless a future embedding requirement mandates ALLOWALL.
