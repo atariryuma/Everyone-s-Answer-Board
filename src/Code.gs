@@ -1809,8 +1809,10 @@ function createStudyQuestForm(userEmail, userId) {
       throw new Error('Google Forms API または Drive API がこの環境で利用できません。');
     }
     
-    // 新しいGoogleフォームを作成
-    const form = FormApp.create(`StudyQuest - 回答フォーム - ${userEmail.split('@')[0]}`);
+    // 新しいGoogleフォームを作成（作成日時を含む）
+    const now = new Date();
+    const dateTimeString = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
+    const form = FormApp.create(`StudyQuest - みんなの回答ボード - ${userEmail.split('@')[0]} - ${dateTimeString}`);
     
     // メールアドレス収集を有効にする
     form.setCollectEmail(true);
@@ -1827,8 +1829,8 @@ function createStudyQuestForm(userEmail, userId) {
     form.addParagraphTextItem().setTitle('回答').setHelpText('質問に対するあなたの回答を入力してください').setRequired(true);
     form.addParagraphTextItem().setTitle('理由').setHelpText('その回答を選んだ理由を教えてください').setRequired(false);
     
-    // フォームの回答先スプレッドシートを作成
-    const spreadsheet = SpreadsheetApp.create(`StudyQuest - 回答データ - ${userEmail.split('@')[0]}`);
+    // フォームの回答先スプレッドシートを作成（作成日時を含む）
+    const spreadsheet = SpreadsheetApp.create(`StudyQuest - みんなの回答ボード - 回答データ - ${userEmail.split('@')[0]} - ${dateTimeString}`);
     form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheet.getId());
 
     // 共有設定を自動化
