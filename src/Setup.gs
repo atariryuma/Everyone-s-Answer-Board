@@ -1,169 +1,123 @@
 /**
  * @fileoverview StudyQuest -みんなの回答ボード- - 統合セットアップスクリプト
- * フォルダ管理、データベース作成、共有設定、プロパティ設定を自動で行う。
+ * フォルダ管理、データベース作成、共有設定、プロパティ設定を自動で行う統合セットアップ機能
  */
 
+// Code.gsで定義されている定数とユーティリティ関数を使用
+// USER_DB_CONFIG, debugLog, sanitizeIdForLog, validateDeployId, validateWebAppUrl, secureLogError
+
 /**
- * StudyQuestの統合セットアップ関数 (エラー報告改善版)
- * フォルダ作成、データベース作成、ファイル移動、プロパティ設定を自動で行います。
+ * StudyQuestの統合セットアップ関数
+ * フォルダ作成、データベース作成、ファイル移動、プロパティ設定を自動で行う
  * @param {string} [manualDeployId] - 手動で設定するデプロイID（任意）
  */
 function studyQuestSetup(manualDeployId) {
-  // セキュリティ強化: 認証チェック
+  // 認証チェック
   const currentUser = Session.getActiveUser().getEmail();
   if (!currentUser) {
     throw new Error('認証が必要です。Googleアカウントでログインしてください。');
   }
-  
+
   const FOLDER_NAME = "StudyQuest - みんなの回答ボード"; // アプリ専用フォルダ名
   const DB_FILENAME = "StudyQuest_UserDatabase";     // データベースファイル名
   const lock = LockService.getScriptLock();
   lock.waitLock(30000); // 30秒待機
 
   try {
-    console.log("🚀 StudyQuest 統合セットアップを開始します...");
+    debugLog("🚀 StudyQuest 統合セットアップを開始します...");
 
     // ステップ1: 専用フォルダの確認と作成
-    console.log("ステップ1: 専用フォルダの確認・作成を開始...");
     let folder;
     const folders = DriveApp.getFoldersByName(FOLDER_NAME);
     if (folders.hasNext()) {
       folder = folders.next();
-      console.log(`✅ 専用フォルダ「${FOLDER_NAME}」が既に存在します。`);
+      debugLog(`✅ 専用フォルダ「${FOLDER_NAME}」が既に存在します。`);
     } else {
       folder = DriveApp.createFolder(FOLDER_NAME);
-      console.log(`✅ 専用フォルダ「${FOLDER_NAME}」を新規作成しました。`);
+      debugLog(`✅ 専用フォルダ「${FOLDER_NAME}」を新規作成しました。`);
     }
 
     // ステップ2: データベース（スプレッドシート）の確認と作成
-    console.log("ステップ2: データベースの確認・作成を開始...");
     let dbFile;
     const files = folder.getFilesByName(DB_FILENAME);
     if (files.hasNext()) {
       dbFile = files.next();
-      console.log(`✅ データベースファイルがフォルダ内に既に存在します。`);
+      debugLog(`✅ データベースファイルがフォルダ内に既に存在します。`);
     } else {
+      // マイドライブ直下も検索して、あれば移動させる
       const rootFiles = DriveApp.getRootFolder().getFilesByName(DB_FILENAME);
       if (rootFiles.hasNext()) {
         dbFile = rootFiles.next();
         dbFile.moveTo(folder);
-        console.log(`✅ 既存のデータベースファイルを専用フォルダに移動しました。`);
+        debugLog(`✅ 既存のデータベースファイルを専用フォルダに移動しました。`);
       } else {
+        // どこにもない場合のみ新規作成
         const newDb = SpreadsheetApp.create(DB_FILENAME);
         dbFile = DriveApp.getFileById(newDb.getId());
         dbFile.moveTo(folder);
         const sheet = newDb.getSheets()[0];
         sheet.setName("users");
+        // USER_DB_CONFIG.HEADERS は Code.gs で定義されていることを前提
         sheet.appendRow(["userId", "adminEmail", "spreadsheetId", "spreadsheetUrl", "createdAt", "accessToken", "configJson", "lastAccessedAt", "isActive"]);
-        console.log(`✅ データベースファイルを新規作成し、専用フォルダに配置しました。`);
+        debugLog(`✅ データベースファイルを新規作成し、専用フォルダに配置しました。`);
       }
     }
     const dbId = dbFile.getId();
     PropertiesService.getScriptProperties().setProperty("DATABASE_ID", dbId);
-    console.log(`✅ データベースIDを設定しました: ${sanitizeIdForLog(dbId)}`);
+    debugLog(`✅ データベースIDを設定しました: ${sanitizeIdForLog(dbId)}`);
 
-    // ステップ2.5: データベースの共有設定（セキュリティ強化）
-    console.log("ステップ2.5: データベースの共有設定を開始...");
+    // ステップ2.5: データベースの共有設定
     try {
       const adminEmail = Session.getActiveUser().getEmail();
+      const userDomain = adminEmail.split('@')[1];
+
+      // データベースファイルを同一ドメイン内で閲覧可能に設定
+      dbFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
+      debugLog(`✅ データベースファイルを同一ドメイン内で閲覧可能に設定しました。`);
+
+      // セットアップ実行ユーザーを編集者として追加
       dbFile.addEditor(adminEmail);
-      console.log(`✅ 管理者に編集権限を付与しました。`);
-      console.log(`ℹ️ セキュリティのため、ドメイン共有は必要に応じて手動で設定してください。`);
-      
+      debugLog(`✅ セットアップ実行ユーザー（${adminEmail}）をデータベースの編集者として追加しました。`);
+
     } catch (e) {
-      console.warn('⚠️ 共有設定の一部に失敗しました。手動で設定してください。');
+      secureLogError('データベース共有設定', e);
     }
 
     // ステップ3: デプロイIDとウェブアプリURLの設定
-    console.log("ステップ3: デプロイIDとURLの設定を開始...");
-    
-    // 【バグ修正】ScriptApp.getDeploymentId() は存在しないため、正しい方法で最新のデプロイIDを取得する
-    let deployId = manualDeployId;
-    if (!deployId) {
-      const deployments = ScriptApp.getProjectDeployments();
-      if (deployments && deployments.length > 0) {
-        // 最新のデプロイメント（通常はリストの最後）のIDを使用する
-        deployId = deployments[deployments.length - 1].getDeploymentId();
-      }
-    }
-    
+    const deployId = manualDeployId || ScriptApp.getDeploymentId();
     if (!deployId || !validateDeployId(deployId)) {
-      console.error("❌ DEPLOY_IDの取得または検証に失敗しました。");
-      throw new Error("DEPLOY_IDの取得に失敗しました。先にウェブアプリとしてデプロイを完了させる必要があります。");
+      throw new Error("DEPLOY_IDの取得または検証に失敗しました。先にウェブアプリとしてデプロイを完了させる必要があります。");
     }
     PropertiesService.getScriptProperties().setProperty("DEPLOY_ID", deployId);
-    console.log(`✅ DEPLOY_IDを設定しました: ${sanitizeIdForLog(deployId)}`);
+    debugLog(`✅ DEPLOY_IDを設定しました: ${sanitizeIdForLog(deployId)}`);
 
     const webAppUrl = `https://script.google.com/macros/s/${deployId}/exec`;
     if (!validateWebAppUrl(webAppUrl)) {
       throw new Error("生成されたウェブアプリURLが無効です。");
     }
     PropertiesService.getScriptProperties().setProperty("WEB_APP_URL", webAppUrl);
-    console.log(`✅ ウェブアプリURLを設定しました。`);
+    debugLog(`✅ ウェブアプリURLを設定しました。`);
 
-    console.log("🎉 すべてのセットアップが正常に完了しました！");
-    console.log("---");
-    console.log("次のステップ:");
-    console.log(`1. 管理画面にアクセスして動作を確認してください: ${webAppUrl}?mode=admin`);
-    console.log(`2. 新規ユーザーとして登録テストを行ってください: ${webAppUrl}`);
+    debugLog("🎉 すべてのセットアップが正常に完了しました！");
+    debugLog("---");
+    debugLog("次のステップ:");
+    debugLog(`1. 管理画面にアクセスして動作を確認してください: ${webAppUrl}?mode=admin`);
+    debugLog(`2. 新規ユーザーとして登録テストを行ってください: ${webAppUrl}`);
 
   } catch (e) {
-    // エラー内容を具体的に表示するように変更
-    console.error(`❌ セットアップ中にエラーが発生しました: ${e.message}`);
-    console.error(`スタックトレース: ${e.stack}`);
-    
-    // 失敗した場合でも、取得できた情報はログに出力
-    const props = PropertiesService.getScriptProperties().getProperties();
-    console.log("現在のプロパティ設定:", props);
-
-    // エラーメッセージに応じたヒントを表示
+    secureLogError('StudyQuest セットアップ', e);
+    debugLog("現在のプロパティ設定:", PropertiesService.getScriptProperties().getProperties());
     if (e.message.includes("DEPLOY_ID")) {
-      console.log("💡 ヒント: このエラーは、ウェブアプリとして「デプロイ」を完了させる前にセットアップを実行した場合に発生します。先にデプロイを完了させてから再度実行してください。");
-    } else if (e.message.includes("server error occurred")) {
-      console.log("💡 ヒント: Googleサーバーの一時的なエラーの可能性があります。数分待ってから再度実行してください。");
+      debugLog("💡 ヒント: このエラーは、ウェブアプリとして「デプロイ」を完了させる前にセットアップを実行した場合に発生します。先にデプロイを完了させてから再度実行してください。");
     }
   } finally {
     lock.releaseLock();
   }
 }
 
-// =================================================================
-// セキュリティユーティリティ関数
-// =================================================================
+// 以下の関数はCode.gsに移動済み、またはSetup.gsの責務外のため削除
+// sanitizeIdForLog, validateDeployId, validateWebAppUrl, secureLogError
+// getEnvironmentInfo, setupDeployId, setupUserDatabase, initializeAppUrls, testConfiguration, migrateDatabaseIdProperty, displaySetupResults, addStep, addError, addWarning
 
-/**
- * セキュリティ強化: ID情報をログ用にサニタイズ
- * @param {string} id - サニタイズするID
- * @return {string} サニタイズされたID
- */
-function sanitizeIdForLog(id) {
-  if (!id || typeof id !== 'string') return 'なし';
-  return id.length > 8 ? id.substring(0, 8) + '...' : id;
-}
-
-/**
- * セキュリティ強化: DEPLOY_IDの厳密な検証
- * @param {string} deployId - 検証するDEPLOY_ID
- * @return {boolean} 有効な場合true
- */
-function validateDeployId(deployId) {
-  if (!deployId || typeof deployId !== 'string') return false;
-  // Google Apps ScriptのDEPLOY_IDの実際の形式に合わせた厳密な検証
-  return /^AKfycb[a-zA-Z0-9_-]{20,}$/.test(deployId);
-}
-
-/**
- * セキュリティ強化: ウェブアプリURLの検証
- * @param {string} url - 検証するURL
- * @return {boolean} 有効な場合true
- */
-function validateWebAppUrl(url) {
-  try {
-    const urlObj = new URL(url);
-    return urlObj.hostname === 'script.google.com' && 
-           urlObj.pathname.includes('/macros/s/') &&
-           /\/s\/[a-zA-Z0-9_-]+\/exec$/.test(urlObj.pathname);
-  } catch {
-    return false;
-  }
-}
+// Code.gsから参照される定数や関数は、Code.gsで定義されているものを使用します。
+// Setup.gsは単独で実行されるセットアップスクリプトとして最適化されています。
