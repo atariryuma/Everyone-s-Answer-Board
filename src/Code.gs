@@ -246,6 +246,73 @@ function getActiveUserEmail() {
 }
 
 /**
+ * メールアドレスからドメインを抽出
+ * @param {string} email - メールアドレス
+ * @return {string} ドメイン名
+ */
+function extractDomain(email) {
+  if (!email || typeof email !== 'string') return '';
+  const parts = email.split('@');
+  return parts.length > 1 ? parts[1] : '';
+}
+
+/**
+ * デプロイユーザーのドメイン情報を取得
+ * @return {Object} ドメイン情報
+ */
+function getDeployUserDomainInfo() {
+  try {
+    // デプロイユーザーのメールアドレスを取得
+    const deployUserEmail = getWebAppDeployerEmail();
+    const deployDomain = extractDomain(deployUserEmail);
+    
+    // 現在のアクセスユーザーのメールアドレスを取得
+    const currentUserEmail = safeGetUserEmail();
+    const currentDomain = extractDomain(currentUserEmail);
+    
+    return {
+      deployUserEmail: deployUserEmail,
+      deployDomain: deployDomain,
+      currentUserEmail: currentUserEmail,
+      currentDomain: currentDomain,
+      isDomainMatch: deployDomain === currentDomain,
+      isValidAccess: deployDomain === currentDomain || deployDomain === ''
+    };
+  } catch (error) {
+    console.error('ドメイン情報の取得に失敗:', error);
+    return {
+      deployUserEmail: '',
+      deployDomain: '',
+      currentUserEmail: '',
+      currentDomain: '',
+      isDomainMatch: false,
+      isValidAccess: false,
+      error: 'ドメイン情報の取得に失敗しました'
+    };
+  }
+}
+
+/**
+ * ウェブアプリをデプロイしたユーザーのメールアドレスを取得
+ * @return {string} デプロイユーザーのメールアドレス
+ */
+function getWebAppDeployerEmail() {
+  try {
+    // ウェブアプリの所有者を取得（通常はデプロイユーザー）
+    return Session.getEffectiveUser().getEmail();
+  } catch (error) {
+    console.error('デプロイユーザーのメール取得に失敗:', error);
+    // フォールバックとして、スクリプトの所有者を試行
+    try {
+      return Session.getActiveUser().getEmail();
+    } catch (fallbackError) {
+      console.error('フォールバック取得も失敗:', fallbackError);
+      return '';
+    }
+  }
+}
+
+/**
  * セキュリティ強化: ユーザー認証状態の検証
  * @return {Object} 認証状態と関連情報
  */

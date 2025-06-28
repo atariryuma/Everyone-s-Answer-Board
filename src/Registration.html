@@ -203,6 +203,34 @@
       <p class="text-gray-400">みんなの回答ボード - 新規登録</p>
     </div>
     
+    <!-- Domain Information -->
+    <div id="domain-info-section" class="mb-6 hidden">
+      <div id="domain-match-panel" class="glass-panel bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-4 border border-green-400/30 mb-4 hidden">
+        <div class="flex items-center">
+          <svg class="w-5 h-5 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <div>
+            <p class="text-green-400 text-sm font-semibold">対応ドメイン</p>
+            <p class="text-green-200 text-xs" id="domain-match-text"></p>
+          </div>
+        </div>
+      </div>
+      
+      <div id="domain-mismatch-panel" class="glass-panel bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg p-4 border border-yellow-400/30 mb-4 hidden">
+        <div class="flex items-start">
+          <svg class="w-5 h-5 text-yellow-400 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+          </svg>
+          <div>
+            <p class="text-yellow-400 text-sm font-semibold">ドメイン不一致の警告</p>
+            <p class="text-yellow-200 text-xs mb-2" id="domain-mismatch-text"></p>
+            <p class="text-yellow-100 text-xs">このウェブアプリは <span id="deploy-domain" class="font-semibold"></span> ドメイン用にデプロイされています。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
     <!-- Hero Section with CTA -->
     <div class="mb-8 text-center fade-in">
       <div class="glass-panel bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-xl p-6 border border-cyan-400/30 mb-6 feature-card">
@@ -379,6 +407,7 @@
   <script>
     let userEmail = '';
     let currentStep = 1;
+    let domainInfo = null;
 
     function escapeHtml(str) {
       if (!str) return '';
@@ -388,6 +417,46 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+    }
+
+    // ドメイン情報を取得して表示
+    function loadDomainInfo() {
+      google.script.run
+        .withSuccessHandler(displayDomainInfo)
+        .withFailureHandler(error => {
+          console.error('ドメイン情報の取得に失敗:', error);
+        })
+        .getDeployUserDomainInfo();
+    }
+
+    // ドメイン情報の表示
+    function displayDomainInfo(info) {
+      domainInfo = info;
+      const section = document.getElementById('domain-info-section');
+      const matchPanel = document.getElementById('domain-match-panel');
+      const mismatchPanel = document.getElementById('domain-mismatch-panel');
+      
+      if (!info || info.error) {
+        console.warn('ドメイン情報の取得エラー:', info?.error);
+        return;
+      }
+
+      section.classList.remove('hidden');
+
+      if (info.isDomainMatch) {
+        // ドメインが一致している場合
+        matchPanel.classList.remove('hidden');
+        mismatchPanel.classList.add('hidden');
+        document.getElementById('domain-match-text').textContent = 
+          `このウェブアプリは ${info.deployDomain} ドメイン用です。あなたのアカウント（${info.currentDomain}）で利用できます。`;
+      } else {
+        // ドメインが不一致の場合
+        matchPanel.classList.add('hidden');
+        mismatchPanel.classList.remove('hidden');
+        document.getElementById('domain-mismatch-text').textContent = 
+          `あなたのアカウントのドメイン（${info.currentDomain}）とは異なります。機能が制限される可能性があります。`;
+        document.getElementById('deploy-domain').textContent = info.deployDomain;
+      }
     }
     
     // Scroll to registration function
@@ -934,6 +1003,11 @@
         }
       }
     }
+
+    // ページ読み込み時にドメイン情報を取得
+    document.addEventListener('DOMContentLoaded', function() {
+      loadDomainInfo();
+    });
   </script>
 </body>
 </html>
