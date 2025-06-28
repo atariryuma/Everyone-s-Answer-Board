@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <base target="_top">
-  <title>StudyQuest 管理画面</title>
+  <title>StudyQuest -みんなの回答ボード- 管理画面</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -233,7 +233,7 @@
             </svg>
           </div>
           <div>
-            <h1 class="text-xl font-bold text-white">StudyQuest</h1>
+            <h1 class="text-xl font-bold text-white">StudyQuest -みんなの回答ボード-</h1>
             <p class="text-sm text-gray-400">管理画面</p>
           </div>
         </div>
@@ -350,7 +350,9 @@
         </div>
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-xl font-bold text-green-400 mb-1" id="active-sheet-name">未設定</p>
+            <p class="text-xl font-bold text-green-400 mb-1">
+              <span id="active-sheet-name" class="transition-colors">未設定</span>
+            </p>
             <p class="text-sm text-gray-400" id="last-updated">最終更新: --</p>
           </div>
         </div>
@@ -458,16 +460,16 @@
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-3">
               <div class="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm">2</div>
-              <h3 class="text-lg font-semibold text-green-400">表示ボードの選択</h3>
+              <h3 class="text-lg font-semibold text-green-400">アクティブシートの選択</h3>
             </div>
           </div>
           
           <div class="space-y-4">
             <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4 text-xs text-green-200">
-              生徒に表示する回答ボード（スプレッドシートのシート）を選択してください。
+              アクティブにする回答ボード（スプレッドシートのシート）を選択してください。
             </div>
             <div class="relative">
-              <select id="sheet-select" class="form-control pr-12" aria-label="アクティブなシートを選択">
+              <select id="sheet-select" class="form-control pr-12" aria-label="アクティブシートを選択">
                 <option>読み込み中...</option>
               </select>
               <svg class="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -477,7 +479,7 @@
             
             <div class="flex gap-3">
               <button type="button" id="switch-sheet-btn" disabled class="btn btn-primary flex-1">
-                <span id="switch-sheet-text">このボードを表示する</span>
+                <span id="switch-sheet-text">このシートをアクティブにする</span>
               </button>
               <button type="button" id="clear-selection-btn" disabled class="btn btn-secondary tooltip" data-tooltip="リセット">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -498,25 +500,89 @@
           </div>
           
           <div class="space-y-4">
-            <div class="bg-orange-900/20 border border-orange-500/30 rounded-lg p-4">
-              <p class="text-sm text-orange-200">生徒画面での表示内容を設定します</p>
+            <!-- Educational note about psychological safety -->
+            <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+              <div class="flex items-start gap-3">
+                <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                </div>
+                <div>
+                  <p class="text-sm font-semibold text-blue-200 mb-2">心理的安全性を重視した設定について</p>
+                  <p class="text-xs text-blue-300 leading-relaxed">
+                    このシステムでは<strong>匿名性</strong>と<strong>数値非表示</strong>をデフォルトとして、生徒が安心して意見を表現できる環境を整えています。<br>
+                    リアクションは色で識別できるため、数を表示しなくても反応の種類を把握できます。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Warning about enabling options -->
+            <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
+              <div class="flex items-start gap-3">
+                <div class="w-6 h-6 bg-yellow-500 text-black rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                  </svg>
+                </div>
+                <div>
+                  <p class="text-sm font-semibold text-yellow-200 mb-2">表示機能を有効にする前の注意点</p>
+                  <p class="text-xs text-yellow-300 leading-relaxed">
+                    名前や数値を表示すると、一部の生徒が発言を控えたり、他者の反応を気にして本音を言いにくくなる可能性があります。<br>
+                    <strong>デジタル・シティズンシップ</strong>の観点から、オンライン空間でも互いを尊重し、多様な意見を受け入れる姿勢を育むことが重要です。
+                  </p>
+                </div>
+              </div>
             </div>
             
             <div id="detail-options" class="space-y-3">
               <label class="flex items-center p-4 glass-panel rounded-lg cursor-pointer hover:border-orange-400/50 transition-all">
                 <input type="checkbox" name="showNames" class="mr-4 w-4 h-4 text-orange-400 rounded" />
-                <div>
-                  <div class="font-medium text-white">名前を表示</div>
-                  <div class="text-sm text-gray-400">生徒名を表示します</div>
+                <div class="flex-1">
+                  <div class="flex items-center gap-2">
+                    <div class="font-medium text-white">名前を表示</div>
+                    <div class="w-5 h-5 bg-yellow-500 text-black rounded-full flex items-center justify-center">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"></path>
+                      </svg>
+                    </div>
+                  </div>
+                  <div class="text-sm text-gray-400">生徒名を表示します（心理的負担が増える可能性があります）</div>
                 </div>
               </label>
               <label class="flex items-center p-4 glass-panel rounded-lg cursor-pointer hover:border-orange-400/50 transition-all">
                 <input type="checkbox" name="showCounts" class="mr-4 w-4 h-4 text-orange-400 rounded" />
-                <div>
-                  <div class="font-medium text-white">リアクション数を表示</div>
-                  <div class="text-sm text-gray-400">各リアクションの数を表示します</div>
+                <div class="flex-1">
+                  <div class="flex items-center gap-2">
+                    <div class="font-medium text-white">リアクション数を表示</div>
+                    <div class="w-5 h-5 bg-yellow-500 text-black rounded-full flex items-center justify-center">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"></path>
+                      </svg>
+                    </div>
+                  </div>
+                  <div class="text-sm text-gray-400">各リアクションの数を表示します（数に左右される発言になる可能性があります）</div>
                 </div>
               </label>
+            </div>
+
+            <!-- Digital citizenship education note -->
+            <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
+              <div class="flex items-start gap-3">
+                <div class="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                </div>
+                <div>
+                  <p class="text-sm font-semibold text-green-200 mb-2">デジタル・シティズンシップ教育として</p>
+                  <p class="text-xs text-green-300 leading-relaxed">
+                    オンライン空間でも、互いの人格を尊重し、建設的な対話を心がけることが大切です。<br>
+                    多様な意見や考え方があることを理解し、自分と異なる立場の人の発言も受け入れる姿勢を身につけましょう。
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -673,6 +739,7 @@
     let selectedSheet = '';
     let currentActiveSheet = '';
     let webAppUrl = '';
+    let currentSpreadsheetUrl = '';
     
     // UI Elements
     const elements = {
@@ -750,6 +817,15 @@
 
       // Auto-update config when headers change
       elements.mainHeader.addEventListener('change', updateConfigButtons);
+      
+      // Active sheet name click event
+      document.getElementById('active-sheet-name').addEventListener('click', function() {
+        if (currentSpreadsheetUrl) {
+          window.open(currentSpreadsheetUrl, '_blank');
+        } else {
+          showMessage('スプレッドシートのURLが見つかりません', 'yellow');
+        }
+      });
     }
 
     function updateUIForSelectedSheet() {
@@ -760,8 +836,8 @@
       
       if (elements.switchSheetText) {
         elements.switchSheetText.textContent = isCurrentActive ? 
-          '現在表示中のボード' : 
-          (hasSelected ? `「${selectedSheet}」を表示する` : '表示するボードを選択');
+          '現在アクティブなシート' : 
+          (hasSelected ? `「${selectedSheet}」をアクティブにする` : 'アクティブシートを選択');
       }
       
       if (hasSelected) {
@@ -844,6 +920,7 @@
 
     function updateStatus(status) {
       currentActiveSheet = status.activeSheetName || '';
+      currentSpreadsheetUrl = status.spreadsheetUrl || '';
       
       // Update comprehensive dashboard
       const isActive = !!status.activeSheetName;
@@ -871,7 +948,17 @@
       
       // Active sheet info
       const activeNameEl = document.getElementById('active-sheet-name');
-      if (activeNameEl) activeNameEl.textContent = currentActiveSheet || '未設定';
+      if (activeNameEl) {
+        activeNameEl.textContent = currentActiveSheet || '未設定';
+        // クリック可能状態の管理
+        if (currentActiveSheet && currentSpreadsheetUrl) {
+          activeNameEl.classList.add('cursor-pointer', 'hover:text-green-300', 'hover:underline');
+          activeNameEl.title = 'クリックでスプレッドシートを開く';
+        } else {
+          activeNameEl.classList.remove('cursor-pointer', 'hover:text-green-300', 'hover:underline');
+          activeNameEl.title = '';
+        }
+      }
       const totalSheetsEl = document.getElementById('total-sheets');
       if (totalSheetsEl) totalSheetsEl.textContent = (status.allSheets || []).length;
       
@@ -913,7 +1000,7 @@
       }
       
       if (status.allSheets && status.allSheets.length > 0) {
-        elements.sheetSelect.innerHTML = '<option value="">-- 表示するボードを選択 --</option>';
+        elements.sheetSelect.innerHTML = '<option value="">-- アクティブシートを選択 --</option>';
         status.allSheets.forEach(name => {
           const opt = document.createElement('option');
           opt.value = name;
