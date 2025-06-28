@@ -653,21 +653,26 @@ function doGet(e) {
     }
 
     // --- 自動非公開タイマーのチェック ---
-    const config = userInfo.configJson || {};
-    if (config.publishedAt) {
-      const publishedDate = new Date(config.publishedAt);
-      const sixHoursLater = new Date(publishedDate.getTime() + 6 * 60 * 60 * 1000);
-      if (new Date() > sixHoursLater) {
-        // セキュリティ向上: 機密情報を含むログは削除
-        console.log('ボードが6時間経過したため自動的に非公開になりました。');
-        clearActiveSheet(); // サーバー側で非公開処理
-        // ユーザーに通知するための専用ページを表示
-        const template = HtmlService.createTemplateFromFile('Unpublished');
-        template.message = 'この回答ボードは、公開から6時間が経過したため、安全のため自動的に非公開になりました。再度利用する場合は、管理者にご連絡ください。';
-        const output = template.evaluate();
-        applySecurityHeaders(output);
-        return output.setTitle('公開期間が終了しました');
+    try {
+      const config = userInfo.configJson || {};
+      if (config && config.publishedAt) {
+        const publishedDate = new Date(config.publishedAt);
+        const sixHoursLater = new Date(publishedDate.getTime() + 6 * 60 * 60 * 1000);
+        if (new Date() > sixHoursLater) {
+          // セキュリティ向上: 機密情報を含むログは削除
+          console.log('ボードが6時間経過したため自動的に非公開になりました。');
+          clearActiveSheet(); // サーバー側で非公開処理
+          // ユーザーに通知するための専用ページを表示
+          const template = HtmlService.createTemplateFromFile('Unpublished');
+          template.message = 'この回答ボードは、公開から6時間が経過したため、安全のため自動的に非公開になりました。再度利用する場合は、管理者にご連絡ください。';
+          const output = template.evaluate();
+          applySecurityHeaders(output);
+          return output.setTitle('公開期間が終了しました');
+        }
       }
+    } catch (configError) {
+      console.error('Config check error:', configError);
+      // 設定チェックでエラーが発生しても処理を続行
     }
 
     // 現在のユーザーを取得（必須）
@@ -730,8 +735,6 @@ function doGet(e) {
       const template = HtmlService.createTemplateFromFile('AdminPanel');
       template.userId = validatedUserId;
       template.userInfo = userInfo;
-      template.adminUserEmail = userInfo.adminEmail;
-      template.webAppAdminEmail = getWebAppDeployerEmail(); // お問い合わせ先メールアドレス
       auditLog('ADMIN_ACCESS', validatedUserId, { viewerEmail });
       const output = template.evaluate();
       applySecurityHeaders(output);
@@ -760,8 +763,6 @@ function doGet(e) {
       const template = HtmlService.createTemplateFromFile('AdminPanel');
       template.userId = validatedUserId;
       template.userInfo = userInfo;
-      template.adminUserEmail = userInfo.adminEmail;
-      template.webAppAdminEmail = getWebAppDeployerEmail(); // お問い合わせ先メールアドレス
       auditLog('ADMIN_ACCESS_NO_SHEET', validatedUserId, { viewerEmail });
       const output = template.evaluate();
       applySecurityHeaders(output);
