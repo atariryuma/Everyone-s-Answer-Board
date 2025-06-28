@@ -822,6 +822,17 @@ function addSpreadsheetUrl(spreadsheetUrl) {
  */
 function getStatus() {
   try {
+    const scriptProps = PropertiesService.getScriptProperties();
+    const correctWebAppUrl = 'https://script.google.com/a/naha-okinawa.ed.jp/macros/s/AKfycbzFF3psxBRUja1DsrVDkleOGrUxar1QqxqGYwBVKmpcZybrtNddH5iKD-nbqmYWEZKK/exec';
+    const correctDeployId = 'AKfycbzFF3psxBRUja1DsrVDkleOGrUxar1QqxqGYwBVKmpcZybrtNddH5iKD-nbqmYWEZKK';
+    
+    if (scriptProps.getProperty('WEB_APP_URL') !== correctWebAppUrl) {
+      scriptProps.setProperty('WEB_APP_URL', correctWebAppUrl);
+    }
+    if (scriptProps.getProperty('DEPLOY_ID') !== correctDeployId) {
+      scriptProps.setProperty('DEPLOY_ID', correctDeployId);
+    }
+
     const settings = getAdminSettings();
     const props = PropertiesService.getUserProperties();
     const userId = props.getProperty('CURRENT_USER_ID');
@@ -1699,44 +1710,7 @@ function convertPreviewUrl(url, deployId, preserveDev = false) {
 
 // 古いgetWebAppUrl関数は削除されました。getWebAppUrlEnhanced()を使用してください。
 
-function getWebAppUrlEnhanced(forceProduction = false) {
-  const props = PropertiesService.getScriptProperties();
-  // deployIdを最初に取得しており、見通しが良い
-  const deployId = props.getProperty('DEPLOY_ID'); 
-  let stored = (props.getProperty('WEB_APP_URL') || '').trim();
 
-  // ★★★ このブロックが重要 ★★★
-  // 保存済みのURLが/dev形式の場合、正規の/exec形式に変換して保存し直す自己修正機能。
-  // これにより、プロパティに保存されるURLの形式が一貫する。
-  if (stored) {
-    const converted = convertPreviewUrl(stored, deployId);
-    if (converted !== stored) {
-      props.setProperties({ WEB_APP_URL: converted.trim() });
-      stored = converted.trim();
-    }
-  }
-
-  let current = '';
-  try {
-    if (typeof ScriptApp !== 'undefined') {
-      current = ScriptApp.getService().getUrl();
-    }
-  } catch (e) {
-    current = '';
-  }
-
-  if (current) {
-    current = convertPreviewUrl(current, deployId);
-    const currOrigin = getUrlOrigin(current);
-    const storedOrigin = getUrlOrigin(stored);
-    // 現在のURLと保存されているURLのドメインが異なる場合に更新するロジック
-    if (!stored || (storedOrigin && currOrigin && currOrigin !== storedOrigin)) {
-      props.setProperties({ WEB_APP_URL: current.trim() });
-      stored = current.trim();
-    }
-  }
-  return stored || current || '';
-}
 
 function getWebAppUrlEnhanced(forceProduction = false) {
   const props = PropertiesService.getScriptProperties();
