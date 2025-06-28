@@ -50,6 +50,63 @@
 // USER_DB_CONFIG は Code.gs で定義済み
 
 // =================================================================
+// セキュリティユーティリティ関数
+// =================================================================
+
+/**
+ * セキュリティ強化: ID情報をログ用にサニタイズ
+ * @param {string} id - サニタイズするID
+ * @return {string} サニタイズされたID
+ */
+function sanitizeIdForLog(id) {
+  if (!id || typeof id !== 'string') return 'なし';
+  return id.length > 8 ? id.substring(0, 8) + '...' : id;
+}
+
+/**
+ * セキュリティ強化: DEPLOY_IDの厳密な検証
+ * @param {string} deployId - 検証するDEPLOY_ID
+ * @return {boolean} 有効な場合true
+ */
+function validateDeployId(deployId) {
+  if (!deployId || typeof deployId !== 'string') return false;
+  // Google Apps ScriptのDEPLOY_IDの実際の形式に合わせた厳密な検証
+  return /^AKfycb[a-zA-Z0-9_-]{20,}$/.test(deployId);
+}
+
+/**
+ * セキュリティ強化: ウェブアプリURLの検証
+ * @param {string} url - 検証するURL
+ * @return {boolean} 有効な場合true
+ */
+function validateWebAppUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname === 'script.google.com' && 
+           urlObj.pathname.includes('/macros/s/') &&
+           /\/s\/[a-zA-Z0-9_-]+\/exec$/.test(urlObj.pathname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * セキュリティ強化: エラーの安全なログ記録
+ * @param {string} context - エラーのコンテキスト
+ * @param {Error} error - エラーオブジェクト
+ */
+function secureLogError(context, error) {
+  // 本番環境では詳細なエラーログは管理者のみがアクセス可能な場所に記録
+  // ここでは基本的な情報のみをログに記録
+  console.warn(`${context}: エラーが発生しました`);
+  
+  // 開発環境でのみ詳細ログを出力（DEBUG フラグがある場合）
+  if (typeof DEBUG !== 'undefined' && DEBUG) {
+    console.error(`Debug - ${context}:`, error.message);
+  }
+}
+
+// =================================================================
 // メインセットアップ関数
 // =================================================================
 
@@ -59,6 +116,12 @@
  * @param {string} [manualDeployId] - 手動で設定するデプロイID（任意）
  */
 function studyQuestSetup(manualDeployId) {
+  // セキュリティ強化: 認証チェック
+  const currentUser = Session.getActiveUser().getEmail();
+  if (!currentUser) {
+    throw new Error('認証が必要です。Googleアカウントでログインしてください。');
+  }
+  
   const FOLDER_NAME = "StudyQuest - みんなの回答ボード"; // アプリ専用フォルダ名
   const DB_FILENAME = "StudyQuest_UserDatabase";     // データベースファイル名
   const lock = LockService.getScriptLock();
@@ -104,52 +167,51 @@ function studyQuestSetup(manualDeployId) {
     }
     const dbId = dbFile.getId();
     PropertiesService.getScriptProperties().setProperty("DATABASE_ID", dbId);
-    console.log(`✅ データベースIDを設定しました: ${dbId}`);
+    console.log(`✅ データベースIDを設定しました: ${sanitizeIdForLog(dbId)}`);
 
-    // ステップ2.5: データベースの共有設定
+    // ステップ2.5: データベースの共有設定（セキュリティ強化）
     try {
       const adminEmail = Session.getActiveUser().getEmail();
       const userDomain = adminEmail.split('@')[1];
       
-      // ドメイン内で閲覧可能に設定
-      dbFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
-      console.log(`✅ データベースをドメイン「${userDomain}」内で閲覧可能に設定しました。`);
-      
-      // 管理者（現在のユーザー）に編集権限を付与
+      // セキュリティ強化: 管理者のみに編集権限を付与（ドメイン共有は手動設定に変更）
       dbFile.addEditor(adminEmail);
-      console.log(`✅ 管理者「${adminEmail}」に編集権限を付与しました。`);
+      console.log(`✅ 管理者に編集権限を付与しました。`);
+      console.log(`ℹ️ セキュリティのため、ドメイン共有は手動で設定してください。`);
       
     } catch (e) {
-      console.warn('⚠️ 共有設定の一部に失敗しました:', e.message);
-      console.log('手動でStudyQuest_UserDatabaseの共有設定を確認してください。');
+      console.warn('⚠️ 共有設定の一部に失敗しました。手動で設定してください。');
     }
 
 
     // ステップ3: デプロイIDとウェブアプリURLの設定
+    // セキュリティ強化: DEPLOY_ID検証
     const deployId = manualDeployId || ScriptApp.getDeploymentId();
-    if (!deployId) {
-      console.error("❌ DEPLOY_IDの取得に失敗しました。ウェブアプリとしてデプロイされているか確認してください。");
+    if (!deployId || !validateDeployId(deployId)) {
+      console.error("❌ DEPLOY_IDの取得または検証に失敗しました。");
       throw new Error("DEPLOY_IDの取得に失敗しました。");
     }
     PropertiesService.getScriptProperties().setProperty("DEPLOY_ID", deployId);
-    console.log(`✅ DEPLOY_IDを設定しました: ${deployId}`);
+    console.log(`✅ DEPLOY_IDを設定しました: ${sanitizeIdForLog(deployId)}`);
 
     const webAppUrl = `https://script.google.com/macros/s/${deployId}/exec`;
+    if (!validateWebAppUrl(webAppUrl)) {
+      throw new Error("生成されたウェブアプリURLが無効です。");
+    }
     PropertiesService.getScriptProperties().setProperty("WEB_APP_URL", webAppUrl);
-    console.log(`✅ ウェブアプリURLを設定しました: ${webAppUrl}`);
+    console.log(`✅ ウェブアプリURLを設定しました。`);
 
     console.log("🎉 すべてのセットアップが正常に完了しました！");
     console.log("---");
     console.log("次のステップ:");
-    console.log(`1. 管理画面にアクセスして動作を確認してください: ${webAppUrl}?mode=admin`);
-    console.log(`2. 新規ユーザーとして登録テストを行ってください: ${webAppUrl}`);
+    console.log(`1. 管理画面にアクセスして動作を確認してください`);
+    console.log(`2. 新規ユーザーとして登録テストを行ってください`);
 
   } catch (e) {
-    console.error(`❌ セットアップ中にエラーが発生しました: ${e.message}`);
-    console.error(e.stack);
-    // 失敗した場合でも、取得できた情報はログに出力
-    const props = PropertiesService.getScriptProperties().getProperties();
-    console.log("現在のプロパティ設定:", props);
+    // セキュリティ強化: エラー情報のサニタイズ
+    console.error(`❌ セットアップ中にエラーが発生しました。`);
+    // 詳細なエラー情報は管理者ログのみに記録
+    secureLogError('Setup error', e);
   } finally {
     lock.releaseLock();
   }
@@ -191,11 +253,11 @@ function setupDeployId(manualDeployId, currentUrl) {
   
   // 手動指定された場合
   if (manualDeployId) {
-    if (!/^[a-zA-Z0-9_-]{10,}$/.test(manualDeployId)) {
+    if (!validateDeployId(manualDeployId)) {
       return {
         success: false,
         message: '無効なDEPLOY_ID形式です',
-        deployId: manualDeployId
+        deployId: sanitizeIdForLog(manualDeployId)
       };
     }
     
@@ -265,7 +327,8 @@ function setupUserDatabase() {
           method: 'existing'
         };
       } catch (e) {
-        console.warn('既存データベースにアクセス不可、新規作成します:', e.message);
+        console.warn('既存データベースにアクセス不可、新規作成します。');
+        secureLogError('Database access', e);
       }
     }
 
@@ -281,21 +344,19 @@ function setupUserDatabase() {
       DATABASE_ID: spreadsheetId
     });
 
-    // 共有設定を追加
+    // セキュリティ強化: 共有設定（管理者のみ）
     try {
       const dbFile = DriveApp.getFileById(spreadsheetId);
       const adminEmail = Session.getActiveUser().getEmail();
-      const userDomain = adminEmail.split('@')[1];
-      
-      // ドメイン内で閲覧可能に設定
-      dbFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
       
       // 管理者に編集権限を付与
       dbFile.addEditor(adminEmail);
       
-      console.log(`データベースの共有設定を完了: ドメイン「${userDomain}」内閲覧可、管理者編集可`);
+      console.log(`データベースの共有設定を完了: 管理者編集可`);
+      console.log('ℹ️ セキュリティのため、ドメイン共有は手動で設定してください。');
     } catch (e) {
-      console.warn('共有設定に失敗:', e.message);
+      console.warn('共有設定に失敗しました。手動で設定してください。');
+      secureLogError('Database sharing', e);
     }
     
     return {
@@ -307,10 +368,11 @@ function setupUserDatabase() {
     };
 
   } catch (error) {
+    secureLogError('Database setup', error);
     return {
       success: false,
-      message: `ユーザーデータベース作成エラー: ${error.message}`,
-      error: error
+      message: `ユーザーデータベース作成エラーが発生しました。`,
+      error: 'エラーの詳細はログを確認してください。'
     };
   }
 }

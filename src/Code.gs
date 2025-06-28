@@ -53,6 +53,94 @@ function debugLog() {
   }
 }
 
+/**
+ * 現在のユーザーの権限を検証するヘルパー関数
+ * @return {Object} {userId, userInfo} - 検証済みのユーザー情報
+ * @throws {Error} 認証失敗時
+ */
+function validateCurrentUser() {
+  const props = PropertiesService.getUserProperties();
+  const userId = props.getProperty('CURRENT_USER_ID');
+  if (!userId) {
+    throw new Error('認証が必要です。ログインし直してください。');
+  }
+  
+  const userInfo = getUserInfo(userId);
+  const currentEmail = Session.getActiveUser().getEmail();
+  if (!userInfo || userInfo.adminEmail !== currentEmail) {
+    throw new Error('権限がありません。管理者アカウントでログインしてください。');
+  }
+  return { userId, userInfo };
+}
+
+/**
+ * XSS攻撃を防ぐための入力サニタイゼーション関数
+ * @param {string} input - サニタイズする入力
+ * @return {string} サニタイズされた文字列
+ */
+function sanitizeInput(input) {
+  if (typeof input !== 'string') return input;
+  return input
+    .replace(/[<>'"&]/g, function(match) {
+      return {
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#x27;',
+        '&': '&amp;'
+      }[match];
+    })
+    .substring(0, 1000); // 長さ制限
+}
+
+/**
+ * レート制限チェック関数
+ * @param {string} action - 実行するアクション
+ * @param {string} userEmail - ユーザーメール
+ */
+function checkRateLimit(action, userEmail) {
+  const cache = CacheService.getScriptCache();
+  const key = `rate_limit_${action}_${userEmail}`;
+  const attempts = parseInt(cache.get(key) || '0');
+  
+  if (attempts >= 30) { // 30回/時間制限
+    throw new Error('操作回数の制限に達しました。しばらく待ってから再試行してください。');
+  }
+  
+  cache.put(key, (attempts + 1).toString(), 3600); // 1時間
+}
+
+/**
+ * セキュアなエラーハンドリング関数
+ * @param {string} prefix - エラープレフィックス
+ * @param {Error} error - 元のエラー
+ * @param {boolean} returnObject - オブジェクトで返すかどうか
+ * @return {Object|void} エラーオブジェクトまたは例外スロー
+ */
+function secureHandleError(prefix, error, returnObject = false) {
+  // ログには詳細を出力（管理者用）
+  console.error(prefix + ':', error);
+  
+  // ユーザーには安全なメッセージのみ表示
+  let userMessage = 'システムエラーが発生しました。管理者にお問い合わせください。';
+  
+  // 特定のエラーパターンに対する安全なメッセージ
+  const errorMsg = error?.message || String(error);
+  
+  if (errorMsg.includes('permission') || errorMsg.includes('Permission')) {
+    userMessage = '権限がありません。管理者にお問い合わせください。';
+  } else if (errorMsg.includes('not found') || errorMsg.includes('見つかりません')) {
+    userMessage = '指定されたデータが見つかりません。';
+  } else if (errorMsg.includes('invalid') || errorMsg.includes('無効')) {
+    userMessage = '無効な操作です。入力内容を確認してください。';
+  }
+  
+  if (returnObject) {
+    return { status: 'error', message: userMessage };
+  }
+  throw new Error(userMessage);
+}
+
 function applySecurityHeaders(output) {
   if (output && typeof output.addMetaTag === 'function') {
     output.addMetaTag(
@@ -114,6 +202,33 @@ function safeGetUserEmail() {
  */
 function getActiveUserEmail() {
   return safeGetUserEmail();
+}
+
+/**
+ * セキュリティ強化: ユーザー認証状態の検証
+ * @return {Object} 認証状態と関連情報
+ */
+function verifyUserAuthentication() {
+  try {
+    const email = safeGetUserEmail();
+    if (!email || !isValidEmail(email)) {
+      return {
+        authenticated: false,
+        error: 'Invalid or missing email'
+      };
+    }
+    
+    return {
+      authenticated: true,
+      email: email,
+      domain: getEmailDomain(email)
+    };
+  } catch (error) {
+    return {
+      authenticated: false,
+      error: 'Authentication failed'
+    };
+  }
 }
 
 function isValidEmail(email) {
@@ -484,14 +599,6 @@ function doGet(e) {
     const userId = params.userId;
     const mode = params.mode;
 
-    // プレビューモードはモックデータを表示
-    if (mode === 'preview') {
-      const output = HtmlService.createTemplateFromFile('Preview').evaluate();
-      applySecurityHeaders(output);
-      return output
-        .setTitle('StudyQuest - プレビュー')
-        .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-    }
 
     // ユーザーIDがない場合は登録画面を表示
     if (!userId) {
@@ -524,7 +631,8 @@ function doGet(e) {
       const publishedDate = new Date(config.publishedAt);
       const sixHoursLater = new Date(publishedDate.getTime() + 6 * 60 * 60 * 1000);
       if (new Date() > sixHoursLater) {
-        console.log(`ボード「${config.activeSheetName}」が6時間経過したため自動的に非公開になりました。`);
+        // セキュリティ向上: 機密情報を含むログは削除
+        console.log('ボードが6時間経過したため自動的に非公開になりました。');
         clearActiveSheet(); // サーバー側で非公開処理
         // ユーザーに通知するための専用ページを表示
         const template = HtmlService.createTemplateFromFile('Unpublished');
@@ -727,15 +835,16 @@ function doGet(e) {
  * @param {string} sortBy - ソート順
  */
 function getPublishedSheetData(requestedSheetName, classFilter, sortBy) {
+  // セキュリティ強化: 権限チェックを最初に実行
+  const { userId, userInfo } = validateCurrentUser();
+  
   const props = PropertiesService.getUserProperties();
   const spreadsheetId = props.getProperty('CURRENT_SPREADSHEET_ID');
-  const userId = props.getProperty('CURRENT_USER_ID');
   
-  if (!spreadsheetId || !userId) {
-    throw new Error('ユーザー情報が見つかりません。');
+  if (!spreadsheetId) {
+    throw new Error('スプレッドシート情報が見つかりません。');
   }
   
-  const userInfo = getUserInfo(userId);
   if (!userInfo) {
     throw new Error('無効なユーザーです。');
   }
@@ -781,14 +890,9 @@ function getPublishedSheetData(requestedSheetName, classFilter, sortBy) {
  * 利用可能なシート一覧とアクティブシート情報を取得します。
  */
 function getAvailableSheets() {
-  const props = PropertiesService.getUserProperties();
-  const userId = props.getProperty('CURRENT_USER_ID');
+  // セキュリティ強化: 権限チェックを最初に実行
+  const { userId, userInfo } = validateCurrentUser();
   
-  if (!userId) {
-    throw new Error('ユーザー情報が見つかりません。');
-  }
-  
-  const userInfo = getUserInfo(userId);
   const config = userInfo.configJson || {};
   const activeSheetName = config.activeSheetName || config.sheetName || '';
   
@@ -808,59 +912,41 @@ function getAvailableSheets() {
  * @param {string} spreadsheetUrl - 追加するスプレッドシートのURL
  */
 function addSpreadsheetUrl(spreadsheetUrl) {
-  debugLog('addSpreadsheetUrl called with:', spreadsheetUrl);
-  
-  const props = PropertiesService.getUserProperties();
-  const userId = props.getProperty('CURRENT_USER_ID');
-  
-  debugLog('Current user ID:', userId);
-  
-  if (!userId) {
-    throw new Error('ユーザー情報が見つかりません。登録プロセスを再実行してください。');
-  }
-  
-  const userInfo = getUserInfo(userId);
-  const currentUserEmail = Session.getActiveUser().getEmail();
-  
-  debugLog('User info:', userInfo);
-  debugLog('Current user email:', currentUserEmail);
-  
-  if (!userInfo) {
-    throw new Error('ユーザー情報が見つかりません。登録プロセスを再実行してください。');
-  }
-  
-  if (userInfo.adminEmail !== currentUserEmail) {
-    throw new Error('権限がありません。管理者アカウントでログインしてください。');
-  }
-  
-  // URLからスプレッドシートIDを抽出
-  let spreadsheetId;
-  const urlPattern = //spreadsheets/d/([a-zA-Z0-9-_]+)/;
-  const match = spreadsheetUrl.match(urlPattern);
+  // セキュリティ強化: 権限チェックを最初に実行
+  const { userId, userInfo } = validateCurrentUser();
 
+  // URLからスプレッドシートIDを抽出（セキュリティ強化）
+  let spreadsheetId;
+  
+  // URL長制限チェック
+  if (!spreadsheetUrl || spreadsheetUrl.length > 500) {
+    throw new Error('無効なURLです。');
+  }
+  
+  // URLサニタイゼーション
+  const sanitizedUrl = spreadsheetUrl.trim();
+  
+  // [修正] 正規表現リテラルのスラッシュを修正し、パターンをより正確にしました。
+  const urlPattern = /^https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]{44})(?:\/.*)?$/;
+  const match = sanitizedUrl.match(urlPattern);
+
+  // [修正] 構文エラーの原因となっていた余分な括弧とelseブロックを削除しました。
   if (match) {
     spreadsheetId = match[1];
   } else {
-    throw new Error(u6709u52B9u306AGoogleu30B9u30D7u30ECu30C3u30C9u30B7u30FCu30C8u306EURLu3067u306Fu3042u308Au307Eu305Bu3093u3002);
+    // [修正] Unicodeエスケープされていたエラーメッセージを通常の文字列にしました。
+    throw new Error('有効なGoogleスプレッドシートのURLではありません。正しい形式: https://docs.google.com/spreadsheets/d/...');
   }
-  }
-  } else {
-    throw new Error('有効なGoogleスプレッドシートのURLではありません。');
-  }
-  
+
   // スプレッドシートにアクセスできるかテスト
   try {
-    debugLog('Attempting to open spreadsheet with ID:', spreadsheetId);
     const testSpreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheets = testSpreadsheet.getSheets();
-    
-    debugLog('Spreadsheet name:', testSpreadsheet.getName());
-    debugLog('Number of sheets:', sheets.length);
-    
+
     if (sheets.length === 0) {
       throw new Error('スプレッドシートにシートが見つかりません。');
     }
-    
+
     // ユーザー設定を更新：新しいスプレッドシートIDを設定
     const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
     const data = userDb.getDataRange().getValues();
@@ -868,7 +954,7 @@ function addSpreadsheetUrl(spreadsheetUrl) {
     const userIdIndex = headers.indexOf('userId');
     const spreadsheetIdIndex = headers.indexOf('spreadsheetId');
     const spreadsheetUrlIndex = headers.indexOf('spreadsheetUrl');
-    
+
     for (let i = 1; i < data.length; i++) {
       if (data[i][userIdIndex] === userId) {
         // スプレッドシートIDとURLを更新
@@ -877,16 +963,16 @@ function addSpreadsheetUrl(spreadsheetUrl) {
         break;
       }
     }
-    
+
     // ユーザープロパティも更新
     props.setProperty('CURRENT_SPREADSHEET_ID', spreadsheetId);
-    
+
     // 最初のシートをアクティブシートとして設定
     const firstSheetName = sheets[0].getName();
     updateUserConfig(userId, {
       activeSheetName: firstSheetName
     });
-    
+
     // 新しいシートの基本設定を自動作成
     try {
       // シートのヘッダーを取得して推測
@@ -894,35 +980,32 @@ function addSpreadsheetUrl(spreadsheetUrl) {
       if (firstSheet && firstSheet.getLastRow() > 0) {
         const headers = firstSheet.getRange(1, 1, 1, firstSheet.getLastColumn()).getValues()[0];
         const guessedConfig = guessHeadersFromArray(headers);
-        
+
         // 基本設定を保存（少なくとも1つのヘッダーが推測できた場合）
         if (guessedConfig.questionHeader || guessedConfig.answerHeader) {
           saveSheetConfig(firstSheetName, guessedConfig);
-          debugLog('Auto-created config for new sheet:', firstSheetName, guessedConfig);
         }
       }
     } catch (configError) {
-      console.warn('Failed to auto-create config for new sheet:', configError.message);
+      // セキュリティ向上: エラー詳細を本番環境では表示しない
+      console.warn('Failed to auto-create config for new sheet');
       // 設定作成に失敗してもスプレッドシート追加は成功とする
     }
-    
+
     auditLog('SPREADSHEET_ADDED', userId, {
-      spreadsheetId, 
-      spreadsheetUrl, 
+      spreadsheetId,
+      spreadsheetUrl,
       firstSheetName,
-      userEmail: userInfo.adminEmail 
+      userEmail: userInfo.adminEmail
     });
-    
-    debugLog('Successfully added spreadsheet:', testSpreadsheet.getName());
-    debugLog('Active sheet set to:', firstSheetName);
-    
+
     return {
       success: true,
       message: `スプレッドシート「${testSpreadsheet.getName()}」が追加され、シート「${firstSheetName}」がアクティブになりました。`,
       spreadsheetId: spreadsheetId,
       firstSheetName: firstSheetName
     };
-    
+
   } catch (error) {
     console.error('Failed to access spreadsheet:', error);
     throw new Error(`スプレッドシートにアクセスできません。URLが正しいか、共有設定を確認してください。エラー: ${error.message}`);
@@ -1343,18 +1426,18 @@ function getSheetData(sheetName, classFilter, sortBy) {
         const totalScore = baseScore * likeMultiplier;
         let name = '';
         if (nameHeader && row[headerIndices[nameHeader]]) {
-          name = row[headerIndices[nameHeader]];
+          name = sanitizeInput(row[headerIndices[nameHeader]]);
         } else if (email) {
-          name = email.split('@')[0];
+          name = sanitizeInput(email.split('@')[0]);
         }
         return {
           rowIndex: index + 2,
           timestamp: timestamp,
           name: name, // 常に名前を含める（クライアント側で制御）
           email: email, // 常にemailを含める（クライアント側で制御）
-          class: row[headerIndices[classHeader]] || '未分類',
-          opinion: opinion,
-          reason: reason,
+          class: sanitizeInput(row[headerIndices[classHeader]] || '未分類'),
+          opinion: sanitizeInput(opinion),
+          reason: sanitizeInput(reason),
           reactions: {
             UNDERSTAND: { count: understandArr.length, reacted: userEmail ? understandArr.includes(userEmail) : false },
             LIKE: { count: likeArr.length, reacted: userEmail ? likeArr.includes(userEmail) : false },
@@ -1516,6 +1599,15 @@ function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy)
 
 
 function addReaction(rowIndex, reactionKey, sheetName) {
+  // セキュリティ強化: 権限チェックを最初に実行
+  try {
+    const { userId, userInfo } = validateCurrentUser();
+    // レート制限チェック
+    checkRateLimit('addReaction', userInfo.adminEmail);
+  } catch (error) {
+    return { status: 'error', message: error.message };
+  }
+  
   if (!rowIndex || !reactionKey || !COLUMN_HEADERS[reactionKey]) {
     return { status: 'error', message: '無効なパラメータです。' };
   }
@@ -1579,14 +1671,7 @@ function addReaction(rowIndex, reactionKey, sheetName) {
 }
 
 function toggleHighlight(rowIndex, sheetName, userObject = null) {
-  // フロントエンドから渡されたユーザー情報をログに出力
-  debugLog('toggleHighlight request', {
-    rowIndex: rowIndex, 
-    sheetName: sheetName, 
-    userObject: userObject,
-    sessionUser: Session.getActiveUser().getEmail() 
-  });
-
+  // セキュリティ強化: 権限チェックと rate limiting
   if (!checkAdmin()) {
     return { status: 'error', message: '権限がありません。' };
   }
@@ -1595,6 +1680,13 @@ function toggleHighlight(rowIndex, sheetName, userObject = null) {
   const userEmail = safeGetUserEmail();
   if (!userEmail) {
     return { status: 'error', message: 'ログインしていないため、操作できません。' };
+  }
+
+  // レート制限チェック
+  try {
+    checkRateLimit('toggleHighlight', userEmail);
+  } catch (error) {
+    return { status: 'error', message: error.message };
   }
 
   debugLog('toggleHighlight processing', { rowIndex: rowIndex, sheetName: sheetName, userEmail: userEmail });
@@ -1634,7 +1726,7 @@ function toggleHighlight(rowIndex, sheetName, userObject = null) {
     return { status: 'ok', highlight: newValue };
   } catch (error) {
     console.error('toggleHighlight failed:', error);
-    return handleError('toggleHighlight', error, true);
+    return secureHandleError('toggleHighlight', error, true);
   } finally {
     if (lock) {
       lock.releaseLock();

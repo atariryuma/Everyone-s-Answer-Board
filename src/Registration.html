@@ -5,6 +5,7 @@
   <base target="_top">
   <title>StudyQuest -みんなの回答ボード- - 新規登録</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- セキュリティ注意: 外部CDN依存。本番環境ではローカル化を推奨 -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root {
@@ -449,64 +450,67 @@
       }
     }
     
-    // ユーザーメールアドレスを取得
-    window.addEventListener('DOMContentLoaded', () => {
-      google.script.run
-        .withSuccessHandler(email => {
-          userEmail = email;
-          document.getElementById('user-email').textContent = email || 'メールアドレスを取得できません';
+    // セキュリティ強化: 認証状態の検証
+    async function verifyAuthentication() {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(result => {
+            if (result && result.authenticated && result.email) {
+              resolve(result);
+            } else {
+              reject(new Error('認証が必要です'));
+            }
+          })
+          .withFailureHandler(reject)
+          .verifyUserAuthentication();
+      });
+    }
 
-          if (email) {
-            updateStep(2); // Account verification step
-            
-            // まず既存ボード情報をチェック
-            google.script.run
-              .withSuccessHandler((existingBoard) => {
-                if (existingBoard) {
-                  // 既存ボードがある場合
-                  updateStep(3);
-                  showExistingBoard(existingBoard);
-                } else {
-                  // 既存ボードがない場合のみボタンを有効化
-                  updateStep(3);
-                  document.getElementById('register-btn').disabled = false;
-                  showMessage('アカウント確認が完了しました。みんなの回答ボードを開始できます。', 'success');
-                }
-              })
-              .withFailureHandler((error) => {
-                console.error('既存ボード確認エラー:', error);
-                let errorMessage = '既存ボード確認で問題が発生しましたが、新規登録を続行できます。';
-                
-                if (error && typeof error === 'object' && error.message) {
-                  errorMessage = `既存ボード確認エラー: ${error.message}`;
-                } else if (typeof error === 'string') {
-                  errorMessage = `既存ボード確認エラー: ${error}`;
-                }
-                
-                console.warn(errorMessage);
-                // エラーが発生した場合もボタンを有効化（新規登録として扱う）
+    // ユーザーメールアドレスを取得
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        // セキュリティ強化: 認証状態を確認
+        const authResult = await verifyAuthentication();
+        const email = authResult.email;
+        
+        userEmail = email;
+        document.getElementById('user-email').textContent = email || 'メールアドレスを取得できません';
+
+        if (email) {
+          updateStep(2); // Account verification step
+          
+          // まず既存ボード情報をチェック
+          google.script.run
+            .withSuccessHandler((existingBoard) => {
+              if (existingBoard) {
+                // 既存ボードがある場合
+                updateStep(3);
+                showExistingBoard(existingBoard);
+              } else {
+                // 既存ボードがない場合のみボタンを有効化
+                updateStep(3);
                 document.getElementById('register-btn').disabled = false;
-                showMessage('アカウント確認が完了しました。StudyQuestを開始できます。', 'success');
-              })
-              .getExistingBoard();
-          } else {
-            showMessage('Googleアカウントでログインしてください。', 'error');
-          }
-        })
-        .withFailureHandler(error => {
-          console.error('User email fetch error:', error);
-          let errorMessage = 'メールアドレスを取得できません';
-          
-          if (error && typeof error === 'object' && error.message) {
-            errorMessage = error.message;
-          } else if (typeof error === 'string') {
-            errorMessage = error;
-          }
-          
-          document.getElementById('user-email').textContent = `エラー: ${errorMessage}`;
-          showMessage('認証エラーが発生しました。Googleアカウントでログインしてください。', 'error');
-        })
-        .getActiveUserEmail();
+                showMessage('アカウント確認が完了しました。みんなの回答ボードを開始できます。', 'success');
+              }
+            })
+            .withFailureHandler((error) => {
+              // セキュリティ強化: エラーメッセージをサニタイズ
+              console.warn('既存ボード確認で問題が発生しました');
+              
+              // エラーが発生した場合もボタンを有効化（新規登録として扱う）
+              document.getElementById('register-btn').disabled = false;
+              showMessage('アカウント確認が完了しました。StudyQuestを開始できます。', 'success');
+            })
+            .getExistingBoard();
+        } else {
+          showMessage('Googleアカウントでログインしてください。', 'error');
+        }
+      } catch (error) {
+        // セキュリティ強化: 認証エラーの安全な処理
+        console.warn('認証確認中にエラーが発生しました');
+        document.getElementById('user-email').textContent = '認証エラー';
+        showMessage('認証が必要です。Googleアカウントでログインしてください。', 'error');
+      }
     });
     
     // セットアップ方法の切り替え（統合版では自動セットアップのみ）
@@ -532,10 +536,31 @@
       }
     });
     
+    // セキュリティ強化: 入力バリデーション関数
+    function validateInput(value, type) {
+      if (!value || typeof value !== 'string') return false;
+      
+      switch (type) {
+        case 'email':
+          return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+        case 'method':
+          return ['auto', 'manual'].includes(value);
+        default:
+          return value.length > 0 && value.length < 1000;
+      }
+    }
+
     // 登録処理
     document.getElementById('register-btn').addEventListener('click', async () => {
       const btn = document.getElementById('register-btn');
       const messageArea = document.getElementById('message-area');
+      
+      // セキュリティ強化: 入力検証
+      if (!userEmail || !validateInput(userEmail, 'email')) {
+        showMessage('有効なメールアドレスが必要です。', 'error');
+        return;
+      }
+      
       // 統合版では常に自動セットアップ
       const setupMethod = 'auto';
       const spreadsheetUrl = 'AUTO_CREATE';
@@ -677,7 +702,7 @@
                     class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
                     コピー
                   </button>
-                  <a href="${escapeHtml(result.formUrl)}" target="_blank"
+                  <a href="${escapeHtml(result.formUrl)}" target="_blank" rel="noopener noreferrer"
                     class="px-3 py-2 bg-blue-700 hover:bg-blue-600 rounded text-sm transition-colors">
                     開く
                   </a>
@@ -700,7 +725,7 @@
                     class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
                     コピー
                   </button>
-                  <a href="${escapeHtml(result.editFormUrl)}" target="_blank"
+                  <a href="${escapeHtml(result.editFormUrl)}" target="_blank" rel="noopener noreferrer"
                     class="px-3 py-2 bg-green-700 hover:bg-green-600 rounded text-sm transition-colors">
                     編集
                   </a>
@@ -723,7 +748,7 @@
                     class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
                     コピー
                   </button>
-                  <a href="${escapeHtml(result.spreadsheetUrl)}" target="_blank"
+                  <a href="${escapeHtml(result.spreadsheetUrl)}" target="_blank" rel="noopener noreferrer"
                     class="px-3 py-2 bg-green-700 hover:bg-green-600 rounded text-sm transition-colors">
                     確認
                   </a>
