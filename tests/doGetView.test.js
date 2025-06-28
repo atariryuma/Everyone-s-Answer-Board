@@ -93,3 +93,11 @@ test('different domain user receives permission error', () => {
   doGet({ parameter: { userId: 'user1234567' } });
   expect(HtmlService.createHtmlOutput).toHaveBeenCalledWith(expect.stringContaining('システムエラー'));
 });
+
+test('non admin requesting admin mode receives permission error', () => {
+  setup({ userEmail: 'viewer@example.com' });
+  const output = { setTitle: jest.fn(() => output) };
+  global.HtmlService.createHtmlOutput = jest.fn(() => output);
+  doGet({ parameter: { userId: 'user1234567', mode: 'admin' } });
+  expect(HtmlService.createHtmlOutput).toHaveBeenCalledWith(expect.stringContaining('権限'));
+});
