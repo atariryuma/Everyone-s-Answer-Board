@@ -1991,7 +1991,532 @@ function createStudyQuestForm(userEmail, userId) {
     const classItem = form.addTextItem();
     classItem.setTitle('クラス名');
     classItem.setRequired(true);
-    const pattern = '^[A-Za-z0-9]+-[A-Za-z0-9]+$';
+    const pattern = '^[A-Za-z0-9]+-[A-Za-z0-9]+
+
+    const helpText = "「G1-1」のように、学年と組を半角ハイフンで区切って入力してください。";
+    const textValidation = FormApp.createTextValidation()
+      .setHelpText(helpText)
+      .requireTextMatchesPattern(pattern)
+      .build();
+    classItem.setValidation(textValidation);
+
+    // その他の項目を追加
+    form.addTextItem().setTitle('名前').setRequired(true);
+    form.addParagraphTextItem().setTitle('回答').setHelpText('質問に対するあなたの回答を入力してください').setRequired(true);
+    form.addParagraphTextItem().setTitle('理由').setHelpText('その回答を選んだ理由を教えてください').setRequired(false);
+    
+    // フォームの回答先スプレッドシートを作成（作成日時を含む）
+    const spreadsheet = SpreadsheetApp.create(`StudyQuest - みんなの回答ボード - 回答データ - ${userEmail.split('@')[0]} - ${dateTimeString}`);
+    form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheet.getId());
+
+    // 共有設定を自動化
+    const userDomain = getEmailDomain(userEmail);
+    if (userDomain) {
+      const formFile = DriveApp.getFileById(form.getId());
+      formFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.EDIT);
+      const spreadsheetFile = DriveApp.getFileById(spreadsheet.getId());
+      spreadsheetFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.EDIT);
+      debugLog(`フォームとスプレッドシートをドメイン「${userDomain}」で共有しました。`);
+    }
+
+    const sheet = spreadsheet.getSheets()[0];
+    
+    // フォームとスプレッドシートの連携を一度確立してからヘッダーを調整
+    // これによりGoogleフォームが自動的に基本ヘッダー（タイムスタンプ、メールアドレス、その他の質問項目）を作成する
+    Utilities.sleep(2000); // フォーム連携の完了を待つ
+    
+    // 現在のヘッダーを取得（Googleフォームによって自動生成されたもの）
+    const currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    debugLog('Current headers after form linking:', currentHeaders);
+    
+    // StudyQuest用の追加列を準備
+    const additionalHeaders = [
+      COLUMN_HEADERS.UNDERSTAND,
+      COLUMN_HEADERS.LIKE,
+      COLUMN_HEADERS.CURIOUS,
+      COLUMN_HEADERS.HIGHLIGHT
+    ];
+    
+    // 追加の列を既存のヘッダーの後に挿入
+    const startCol = currentHeaders.length + 1;
+    sheet.getRange(1, startCol, 1, additionalHeaders.length).setValues([additionalHeaders]);
+    
+    // ヘッダー行のフォーマット
+    const allHeadersRange = sheet.getRange(1, 1, 1, currentHeaders.length + additionalHeaders.length);
+    allHeadersRange.setFontWeight('bold').setBackground('#E3F2FD');
+    
+    // 列幅を調整
+    try {
+      sheet.autoResizeColumns(1, allHeadersRange.getNumColumns());
+    } catch (e) {
+      console.warn('Auto-resize failed:', e);
+    }
+    
+    // Configシートも作成
+    prepareSpreadsheetForStudyQuest(spreadsheet);
+    
+    return {
+      formId: form.getId(),
+      formUrl: form.getPublishedUrl(),
+      spreadsheetId: spreadsheet.getId(),
+      spreadsheetUrl: spreadsheet.getUrl(),
+      editFormUrl: form.getEditUrl()
+    };
+
+  } catch (error) {
+    console.error('Failed to create form and spreadsheet:', error);
+    
+    // FormAppが利用できない場合はスプレッドシートのみ作成
+    if (error.message.includes('Google Forms API is not available') || error.message.includes('FormApp')) {
+      console.warn('FormApp not available, creating spreadsheet only');
+      return createStudyQuestSpreadsheetFallback(userEmail);
+    }
+    
+    // 権限エラーの場合
+    if (error.message.includes('permission') || error.message.includes('Permission')) {
+      throw new Error('Googleフォーム作成の権限がありません。管理者にお問い合わせください。');
+    }
+    
+    // その他のエラー詳細を含める
+    throw new Error(`Googleフォームとスプレッドシートの作成に失敗しました。詳細: ${error.message}`);
+  }
+ * Admin Panel用のボード作成関数
+ * 現在ログイン中のユーザーの新しいボードを作成し、公開・アクティブ化まで行います。
+ */
+function createBoardFromAdmin() {
+  if (!checkAdmin()) {
+    throw new Error('権限がありません。');
+  }
+  try {
+    const currentUserEmail = safeGetUserEmail();
+    const props = PropertiesService.getUserProperties();
+    const userId = props.getProperty('CURRENT_USER_ID');
+
+    if (!userId) {
+      throw new Error('ユーザーIDが見つかりません。ページをリロードして再試行してください。');
+    }
+
+    // 1. Googleフォームとスプレッドシートを作成（共有設定、回答後URL設定済み）
+    const result = createStudyQuestForm(currentUserEmail, userId);
+    
+    // 2. 作成されたスプレッドシートを現在のユーザーのメインスプレッドシートとして設定
+    if (result.spreadsheetId && result.spreadsheetUrl) {
+      const addResult = addSpreadsheetUrl(result.spreadsheetUrl);
+      debugLog('Spreadsheet added to user:', addResult);
+
+      // 3. 新しく作成したシートをアクティブ化・公開
+      const newSheetName = addResult.firstSheetName;
+      if (newSheetName) {
+        // アクティブシートに設定
+        switchActiveSheet(newSheetName);
+        // 公開状態に設定
+        updateUserConfig(userId, { isPublished: true });
+        debugLog(`New board '${newSheetName}' has been created and published.`);
+      }
+
+      return {
+        ...result,
+        message: '新しいボードが作成され、公開されました！管理ページを更新します。',
+        autoCreated: true,
+        newSheetName: newSheetName
+      };
+    }
+
+    throw new Error('スプレッドシートの作成または追加に失敗しました。');
+
+  } catch (error) {
+    console.error('Failed to create board from admin:', error);
+    return handleError('createBoardFromAdmin', error, true);
+  }
+}
+
+function createStudyQuestSpreadsheetFallback(userEmail) {
+  try {
+    const spreadsheet = SpreadsheetApp.create(`StudyQuest - 回答データ - ${userEmail.split('@')[0]}`);
+    const sheet = spreadsheet.getActiveSheet();
+    
+    const headers = [
+      COLUMN_HEADERS.TIMESTAMP,
+      COLUMN_HEADERS.EMAIL,
+      COLUMN_HEADERS.CLASS,
+      COLUMN_HEADERS.NAME,
+      COLUMN_HEADERS.OPINION,
+      COLUMN_HEADERS.REASON,
+      COLUMN_HEADERS.UNDERSTAND,
+      COLUMN_HEADERS.LIKE,
+      COLUMN_HEADERS.CURIOUS,
+      COLUMN_HEADERS.HIGHLIGHT
+    ];
+    sheet.appendRow(headers);
+    
+    const allHeadersRange = sheet.getRange(1, 1, 1, headers.length);
+    allHeadersRange.setFontWeight('bold');
+    allHeadersRange.setBackground('#E3F2FD');
+    
+    try {
+      sheet.autoResizeColumns(1, headers.length);
+    } catch (e) {
+      console.warn('Auto-resize failed:', e);
+    }
+    
+    prepareSpreadsheetForStudyQuest(spreadsheet);
+    
+    return {
+      formId: null, // フォームは作成されない
+      formUrl: null,
+      spreadsheetId: spreadsheet.getId(),
+      spreadsheetUrl: spreadsheet.getUrl(),
+      editFormUrl: null,
+      message: 'Googleフォームの作成に失敗したため、スプレッドシートのみ作成しました。'
+    };
+  } catch (error) {
+    console.error('Failed to create spreadsheet fallback:', error);
+    throw new Error(`スプレッドシートの作成に失敗しました。詳細: ${error.message}`);
+  }
+}
+
+
+function prepareSpreadsheetForStudyQuest(spreadsheet) {
+  // Configシートを作成または取得
+  let configSheet = spreadsheet.getSheetByName('Config');
+  if (!configSheet) {
+    configSheet = spreadsheet.insertSheet('Config');
+  }
+  
+  // Configシートに設定を書き込む
+  const configData = [
+    ['Key', 'Value'],
+    ['WEB_APP_URL', getWebAppUrlEnhanced()], // 本番URLを保存
+    ['DEPLOY_ID', PropertiesService.getScriptProperties().getProperty('DEPLOY_ID') || '']
+  ];
+  
+  configSheet.getRange(1, 1, configData.length, configData[0].length).setValues(configData);
+  
+  // ヘッダーのスタイル設定
+  configSheet.getRange('A1:B1').setFontWeight('bold').setBackground('#E3F2FD');
+  
+  // 列幅の自動調整
+  try {
+    configSheet.autoResizeColumns(1, 2);
+  } catch (e) {
+    console.warn('Config sheet auto-resize failed:', e);
+  }
+  
+  // Configシートを非表示にする
+  configSheet.hideSheet();
+}
+
+function getDatabase() {
+  const props = PropertiesService.getScriptProperties();
+  const dbId = props.getProperty('DATABASE_ID') || props.getProperty('USER_DATABASE_ID'); // 後方互換性
+  if (!dbId) {
+    throw new Error('ユーザーデータベースが設定されていません。管理者に連絡してください。');
+  }
+  return SpreadsheetApp.openById(dbId);
+}
+
+function getUserInfo(userId) {
+  const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
+  const data = userDb.getDataRange().getValues();
+  const headers = data[0];
+  const userIdIndex = headers.indexOf('userId');
+  const adminEmailIndex = headers.indexOf('adminEmail');
+  const spreadsheetIdIndex = headers.indexOf('spreadsheetId');
+  const spreadsheetUrlIndex = headers.indexOf('spreadsheetUrl');
+  const configJsonIndex = headers.indexOf('configJson');
+  const lastAccessedAtIndex = headers.indexOf('lastAccessedAt');
+  const isActiveIndex = headers.indexOf('isActive');
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][userIdIndex] === userId) {
+      const userInfo = {
+        userId: data[i][userIdIndex],
+        adminEmail: data[i][adminEmailIndex],
+        spreadsheetId: data[i][spreadsheetIdIndex],
+        spreadsheetUrl: data[i][spreadsheetUrlIndex],
+        configJson: {},
+        lastAccessedAt: data[i][lastAccessedAtIndex],
+        isActive: data[i][isActiveIndex] === true
+      };
+      try {
+        userInfo.configJson = JSON.parse(data[i][configJsonIndex] || '{}');
+      } catch (e) {
+        console.error('Failed to parse configJson for user:', userId, e);
+        userInfo.configJson = {};
+      }
+      
+      // 最終アクセス日時を更新
+      userDb.getRange(i + 1, lastAccessedAtIndex + 1).setValue(new Date());
+      
+      return userInfo;
+    }
+  }
+  return null;
+}
+
+function getUserInfoInternal(userId) {
+  const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
+  const data = userDb.getDataRange().getValues();
+  const headers = data[0];
+  const userIdIndex = headers.indexOf('userId');
+  const adminEmailIndex = headers.indexOf('adminEmail');
+  const spreadsheetIdIndex = headers.indexOf('spreadsheetId');
+  const spreadsheetUrlIndex = headers.indexOf('spreadsheetUrl');
+  const configJsonIndex = headers.indexOf('configJson');
+  const lastAccessedAtIndex = headers.indexOf('lastAccessedAt');
+  const isActiveIndex = headers.indexOf('isActive');
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][userIdIndex] === userId) {
+      const userInfo = {
+        userId: data[i][userIdIndex],
+        adminEmail: data[i][adminEmailIndex],
+        spreadsheetId: data[i][spreadsheetIdIndex],
+        spreadsheetUrl: data[i][spreadsheetUrlIndex],
+        configJson: {},
+        lastAccessedAt: data[i][lastAccessedAtIndex],
+        isActive: data[i][isActiveIndex] === true
+      };
+      try {
+        userInfo.configJson = JSON.parse(data[i][configJsonIndex] || '{}');
+      } catch (e) {
+        console.error('Failed to parse configJson for user:', userId, e);
+        userInfo.configJson = {};
+      }
+      
+      // 最終アクセス日時を更新
+      userDb.getRange(i + 1, lastAccessedAtIndex + 1).setValue(new Date());
+      
+      return userInfo;
+    }
+  }
+  return null;
+}
+
+
+function updateUserConfig(userId, newConfig) {
+  const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
+  const data = userDb.getDataRange().getValues();
+  const headers = data[0];
+  const userIdIndex = headers.indexOf('userId');
+  const configJsonIndex = headers.indexOf('configJson');
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][userIdIndex] === userId) {
+      let currentConfig = {};
+      try {
+        currentConfig = JSON.parse(data[i][configJsonIndex] || '{}');
+      } catch (e) {
+        console.error('Failed to parse existing configJson for user:', userId, e);
+      }
+      const updatedConfig = Object.assign({}, currentConfig, newConfig);
+      userDb.getRange(i + 1, configJsonIndex + 1).setValue(JSON.stringify(updatedConfig));
+      return true;
+    }
+  }
+  return false;
+}
+
+function saveSheetConfig(sheetName, config) {
+  const props = PropertiesService.getUserProperties();
+  const userId = props.getProperty('CURRENT_USER_ID');
+  
+  if (!userId) {
+    throw new Error('ユーザー情報が見つかりません。');
+  }
+  
+  const userInfo = getUserInfo(userId);
+  if (!userInfo || userInfo.adminEmail !== Session.getActiveUser().getEmail()) {
+    throw new Error('権限がありません。');
+  }
+  
+  // ユーザー設定を更新
+  try {
+    const currentConfig = userInfo.configJson || {};
+    const updatedConfig = Object.assign({}, currentConfig, {
+      sheetConfigs: {
+        ...(currentConfig.sheetConfigs || {}),
+        [sheetName]: config
+      }
+    });
+    updateUserConfig(userId, updatedConfig);
+  } catch (error) {
+    console.error('Failed to update user config with sheet config:', error);
+    throw new Error(`シート設定の保存に失敗しました: ${error.message}`);
+  }
+  
+  auditLog('SHEET_CONFIG_SAVED', userId, { sheetName, config, userEmail: userInfo.adminEmail });
+  
+  return 'シート設定を保存しました。';
+}
+
+function getConfig(sheetName) {
+  const props = PropertiesService.getUserProperties();
+  const userId = props.getProperty('CURRENT_USER_ID');
+  
+  if (!userId) {
+    throw new Error('ユーザー情報が見つかりません。');
+  }
+  
+  const userInfo = getUserInfo(userId);
+  if (!userInfo) {
+    throw new Error('無効なユーザーです。');
+  }
+  
+  const sheetConfigs = userInfo.configJson && userInfo.configJson.sheetConfigs;
+  if (sheetConfigs && sheetConfigs[sheetName]) {
+    return sheetConfigs[sheetName];
+  }
+  
+  throw new Error(`シート「${sheetName}」の設定が見つかりません。`);
+}
+
+function auditLog(action, userId, details = {}) {
+  try {
+    const logSheet = getDatabase().getSheetByName('AuditLog');
+    if (!logSheet) {
+      const ss = getDatabase();
+      const newLogSheet = ss.insertSheet('AuditLog');
+      newLogSheet.appendRow(['Timestamp', 'UserId', 'Action', 'Details']);
+      newLogSheet.getRange('A1:D1').setFontWeight('bold').setBackground('#F0F4C3');
+      newLogSheet.autoResizeColumns(1, 4);
+    }
+    
+    const row = [new Date(), userId, action, JSON.stringify(details)];
+    logSheet.appendRow(row);
+  } catch (e) {
+    console.error('Failed to write audit log:', e);
+  }
+}
+
+function registerNewUser(adminEmail) {
+  checkRateLimit('registerNewUser', adminEmail);
+  
+  const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
+  const data = userDb.getDataRange().getValues();
+  const headers = data[0];
+  const adminEmailIndex = headers.indexOf('adminEmail');
+  
+  // 既に登録済みの管理者メールアドレスかチェック
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][adminEmailIndex] === adminEmail) {
+      throw new Error('このメールアドレスは既に登録されています。');
+    }
+  }
+  
+  // 新しいユーザーIDを生成
+  const userId = Utilities.getUuid();
+  
+  // Googleフォームとスプレッドシートを作成
+  const formAndSsInfo = createStudyQuestForm(adminEmail);
+  
+  const newRow = [
+    userId,
+    adminEmail,
+    formAndSsInfo.spreadsheetId,
+    formAndSsInfo.spreadsheetUrl,
+    new Date(),
+    '', // accessToken (未使用)
+    JSON.stringify({}), // configJson
+    new Date(),
+    true // isActive
+  ];
+  
+  userDb.appendRow(newRow);
+  
+  auditLog('NEW_USER_REGISTERED', userId, { adminEmail, spreadsheetId: formAndSsInfo.spreadsheetId });
+  
+  return {
+    userId: userId,
+    spreadsheetId: formAndSsInfo.spreadsheetId,
+    spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+    message: '新しいユーザーが登録されました。管理画面に移動します。'
+  };
+}
+
+function getSpreadsheetUrlForUser(userId) {
+  const userInfo = getUserInfo(userId);
+  if (userInfo && userInfo.spreadsheetUrl) {
+    return userInfo.spreadsheetUrl;
+  }
+  throw new Error('ユーザーのスプレッドシートURLが見つかりません。');
+}
+
+function openActiveSpreadsheet() {
+  const props = PropertiesService.getUserProperties();
+  const userId = props.getProperty('CURRENT_USER_ID');
+  if (!userId) {
+    throw new Error('ユーザー情報が見つかりません。');
+  }
+  const userInfo = getUserInfo(userId);
+  if (!userInfo || !userInfo.spreadsheetId) {
+    throw new Error('アクティブなスプレッドシートが見つかりません。');
+  }
+  const spreadsheet = SpreadsheetApp.openById(userInfo.spreadsheetId);
+  return spreadsheet.getUrl();
+}
+
+/**
+ * 現在のユーザーに紐づく既存ボード情報を取得
+ * @return {Object|null} 既存ボードがあればURL等を含むオブジェクト、なければnull
+ */
+function getExistingBoard() {
+  const email = safeGetUserEmail();
+  const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
+  const data = userDb.getDataRange().getValues();
+  const headers = data[0];
+  const emailIdx = headers.indexOf('adminEmail');
+  const userIdIdx = headers.indexOf('userId');
+  const urlIdx = headers.indexOf('spreadsheetUrl');
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][emailIdx] === email) {
+      const userId = data[i][userIdIdx];
+      const base = getWebAppUrlEnhanced();
+      return {
+        userId: userId,
+        adminUrl: base ? `${base}?userId=${userId}&mode=admin` : '',
+        viewUrl: base ? `${base}?userId=${userId}` : '',
+        spreadsheetUrl: data[i][urlIdx] || ''
+      };
+    }
+  }
+  return null;
+}
+
+// =================================================================
+// CommonJS exports for unit tests
+// =================================================================
+if (typeof module !== 'undefined') {
+  module.exports = {
+    addReaction,
+    buildBoardData,
+    checkAdmin,
+    COLUMN_HEADERS,
+    doGet,
+    findHeaderIndices,
+    getAdminSettings,
+    getHeaderIndices,
+    getSheetData,
+    getSheetDataForSpreadsheet,
+    getSheetHeaders,
+    getWebAppUrl,
+    getWebAppUrlEnhanced,
+    guessHeadersFromArray,
+    parseReactionString,
+    isUserAdmin,
+    prepareSheetForBoard,
+    saveDeployId,
+    saveSheetConfig,
+    saveWebAppUrl,
+    toggleHighlight,
+    registerNewUser,
+    getSpreadsheetUrlForUser,
+    openActiveSpreadsheet,
+    getExistingBoard
+  };
+}
+;
 
     const helpText = "「G1-1」のように、学年と組を半角ハイフンで区切って入力してください。";
     const textValidation = FormApp.createTextValidation()
