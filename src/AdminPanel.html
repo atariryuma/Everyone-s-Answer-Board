@@ -238,12 +238,15 @@
           </div>
         </div>
         <div class="flex items-center gap-3">
-          <div class="text-right">
-            <div class="flex items-center gap-2">
-              <span class="status-indicator" id="header-status-indicator"></span>
-              <span class="text-sm font-medium" id="header-status-text">準備中</span>
-            </div>
-            <p class="text-xs text-gray-400" id="header-last-updated">--</p>
+          <div class="text-right text-xs">
+            <p>
+              <span class="font-medium text-gray-300">管理者:</span>
+              <span id="admin-user-email" class="text-white"><?= adminUserEmail ?></span>
+            </p>
+            <p>
+              <span class="font-medium text-gray-300">お問い合わせ:</span>
+              <a href="mailto:<?= webAppAdminEmail ?>" class="text-cyan-400 hover:underline"><?= webAppAdminEmail ?></a>
+            </p>
           </div>
         </div>
       </div>
@@ -260,36 +263,6 @@
 
   <!-- Main Content -->
   <main class="max-w-6xl mx-auto px-6 py-8">
-    <!-- Quick Actions -->
-    <section class="mb-8">
-      <div class="glass-panel p-6 rounded-xl slide-up">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="w-8 h-8 bg-cyan-500 text-white rounded-full flex items-center justify-center">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-            </svg>
-          </div>
-          <h3 class="text-lg font-semibold text-cyan-400">クイックアクション</h3>
-        </div>
-        <div class="space-y-4">
-          <button type="button" id="create-board-btn" class="btn btn-primary w-full">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-            </svg>
-            新しいボードを作成
-          </button>
-          <div class="bg-cyan-900/20 border border-cyan-500/30 rounded-lg p-4">
-            <p class="font-semibold text-cyan-200">おすすめ</p>
-            <p class="text-sm text-cyan-200">新しいGoogleフォームとスプレッドシートを自動作成</p>
-            <p class="text-xs text-cyan-200 mt-2">生徒の回答収集用フォームと回答ボード用スプレッドシートを一度に作成できます<br>(共有の設定を適切にしっかり行なって下さい。)</p>
-          </div>
-          <input type="url" id="form-url-input" class="form-control" placeholder="GoogleフォームのURL">
-          <button type="button" id="end-board-btn" class="btn btn-secondary w-full">現在公開されているボードの公開終了</button>
-        </div>
-      </div>
-    </section>
-
-
     <!-- Dashboard Overview -->
     <section class="mb-8">
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
@@ -312,6 +285,12 @@
             </div>
           </div>
           <p class="text-sm text-gray-300" id="status-description">スプレッドシートを追加して開始してください</p>
+          <div class="mt-4">
+            <button type="button" id="end-board-btn" class="btn btn-danger w-full text-sm py-2">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.36 6.64a9 9 0 11-12.73 0M12 2v10"></path></svg>
+              公開終了
+            </button>
+          </div>
         </div>
         
         <!-- Statistics Cards -->
@@ -385,7 +364,36 @@
       </div>
     </section>
 
-    
+    <!-- Quick Actions -->
+    <section class="mb-8">
+      <div class="glass-panel p-6 rounded-xl slide-up">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-8 h-8 bg-cyan-500 text-white rounded-full flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold text-cyan-400">クイックアクション</h3>
+        </div>
+        <div class="space-y-4">
+          <button type="button" id="create-board-btn" class="btn btn-primary w-full">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+            </svg>
+            新しいボードを作成
+          </button>
+          <div class="bg-cyan-900/20 border border-cyan-500/30 rounded-lg p-4">
+            <p class="font-semibold text-cyan-200">おすすめ</p>
+            <p class="text-sm text-cyan-200">新しいGoogleフォームとスプレッドシートを自動作成</p>
+            <p class="text-xs text-cyan-200 mt-2">
+              生徒の回答収集用フォームと回答ボード用スプレッドシートを一度に作成できます。<br>
+              <span class="font-semibold text-yellow-300">【重要】</span>作成されたファイルは、自動的にあなたの組織（ドメイン）内で共有され、誰でも編集できるようになります。個別の共有設定は不要です。
+            </p>
+          </div>
+          <input type="url" id="form-url-input" class="form-control" placeholder="GoogleフォームのURL">
+        </div>
+      </div>
+    </section>
 
     <!-- Main Control Panel -->
     <div class="responsive-grid">
@@ -647,6 +655,8 @@
 
   <script>
     const userId = '<?= userId ?>';
+    const adminUserEmail = '<?= adminUserEmail ?>';
+    const webAppAdminEmail = '<?= webAppAdminEmail ?>';
     let selectedSheet = '';
     let currentActiveSheet = '';
     let webAppUrl = '';

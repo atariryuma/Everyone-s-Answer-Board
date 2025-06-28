@@ -508,6 +508,8 @@ function doGet(e) {
       const template = HtmlService.createTemplateFromFile('AdminPanel');
       template.userId = validatedUserId;
       template.userInfo = userInfo;
+      template.adminUserEmail = userInfo.adminEmail;
+      template.webAppAdminEmail = 'studyquest.jp@gmail.com'; // お問い合わせ先メールアドレス
       auditLog('ADMIN_ACCESS', validatedUserId, { viewerEmail });
       const output = template.evaluate();
       if (output.setSandboxMode) output.setSandboxMode(HtmlService.SandboxMode.IFRAME);
@@ -535,6 +537,8 @@ function doGet(e) {
       const template = HtmlService.createTemplateFromFile('AdminPanel');
       template.userId = validatedUserId;
       template.userInfo = userInfo;
+      template.adminUserEmail = userInfo.adminEmail;
+      template.webAppAdminEmail = 'studyquest.jp@gmail.com'; // お問い合わせ先メールアドレス
       auditLog('ADMIN_ACCESS_NO_SHEET', validatedUserId, { viewerEmail });
       const output = template.evaluate();
       if (output.setSandboxMode) output.setSandboxMode(HtmlService.SandboxMode.IFRAME);
