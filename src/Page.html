@@ -2880,7 +2880,8 @@ try {
   console.error('Error creating StudyQuestApp instance:', error);
   const container = document.getElementById('answers');
   if (container) {
-    container.innerHTML = '<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました: ' + error.message + '</div>';
+    const msg = StudyQuestApp.prototype.escapeHtml(error.message || '');
+    container.innerHTML = '<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました: ' + msg + '</div>';
   }
 }
 </script>

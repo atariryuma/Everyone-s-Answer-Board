@@ -378,6 +378,16 @@
   <script>
     let userEmail = '';
     let currentStep = 1;
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.toString()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
     
     // Scroll to registration function
     function scrollToRegistration() {
@@ -659,7 +669,7 @@
               formContainer.innerHTML = `
                 <label class="text-sm text-gray-400 block mb-1">生徒回答用Googleフォーム:</label>
                 <div class="flex gap-2">
-                  <input type="text" value="${result.formUrl}" readonly
+                  <input type="text" value="${escapeHtml(result.formUrl)}" readonly
                     id="created-form-url"
                     class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
                     onclick="this.select()">
@@ -667,7 +677,7 @@
                     class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
                     コピー
                   </button>
-                  <a href="${result.formUrl}" target="_blank"
+                  <a href="${escapeHtml(result.formUrl)}" target="_blank"
                     class="px-3 py-2 bg-blue-700 hover:bg-blue-600 rounded text-sm transition-colors">
                     開く
                   </a>
@@ -682,7 +692,7 @@
               editFormContainer.innerHTML = `
                 <label class="text-sm text-gray-400 block mb-1">フォーム編集用URL（先生用）:</label>
                 <div class="flex gap-2">
-                  <input type="text" value="${result.editFormUrl}" readonly
+                  <input type="text" value="${escapeHtml(result.editFormUrl)}" readonly
                     id="edit-form-url"
                     class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
                     onclick="this.select()">
@@ -690,7 +700,7 @@
                     class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
                     コピー
                   </button>
-                  <a href="${result.editFormUrl}" target="_blank"
+                  <a href="${escapeHtml(result.editFormUrl)}" target="_blank"
                     class="px-3 py-2 bg-green-700 hover:bg-green-600 rounded text-sm transition-colors">
                     編集
                   </a>
@@ -705,7 +715,7 @@
               spreadsheetContainer.innerHTML = `
                 <label class="text-sm text-gray-400 block mb-1">回答データ（スプレッドシート）:</label>
                 <div class="flex gap-2">
-                  <input type="text" value="${result.spreadsheetUrl}" readonly
+                  <input type="text" value="${escapeHtml(result.spreadsheetUrl)}" readonly
                     id="created-spreadsheet-url"
                     class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
                     onclick="this.select()">
@@ -713,7 +723,7 @@
                     class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
                     コピー
                   </button>
-                  <a href="${result.spreadsheetUrl}" target="_blank"
+                  <a href="${escapeHtml(result.spreadsheetUrl)}" target="_blank"
                     class="px-3 py-2 bg-green-700 hover:bg-green-600 rounded text-sm transition-colors">
                     確認
                   </a>
@@ -847,7 +857,7 @@
       };
       
       messageArea.className = `text-center min-h-[24px] ${colors[type] || 'text-gray-400'} flex items-center justify-center gap-2`;
-      messageArea.innerHTML = `${icons[type] || ''}<span>${message}</span>`;
+      messageArea.innerHTML = `${icons[type] || ''}<span>${escapeHtml(message)}</span>`;
     }
     
     // クリップボードにコピー（現代的なAPIを使用）
