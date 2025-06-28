@@ -910,11 +910,8 @@
       if (status.activeSheetName) {
         const baseUrl = status.webAppUrl || (window.location.origin + window.location.pathname);
         const boardUrl = `${baseUrl}?userId=${userId}`;
-        const adminUrl = `${baseUrl}?userId=${userId}&mode=admin`;
         if (elements.boardUrl) elements.boardUrl.value = boardUrl;
-        if (elements.adminUrl) elements.adminUrl.value = adminUrl;
         if (elements.viewBoardLink) elements.viewBoardLink.href = boardUrl;
-        if (elements.openAdminLink) elements.openAdminLink.href = adminUrl;
         
         // Update URL section title and description based on environment
         const urlTitle = document.getElementById('url-section-title');
