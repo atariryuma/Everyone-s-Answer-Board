@@ -1812,6 +1812,10 @@ function createStudyQuestForm(userEmail, userId) {
     // 新しいGoogleフォームを作成
     const form = FormApp.create(`StudyQuest - 回答フォーム - ${userEmail.split('@')[0]}`);
     
+    // メールアドレス収集を有効にする
+    form.setCollectEmail(true);
+    form.setRequireLogin(true);
+    
     // フォームの説明と回答後のメッセージを設定
     form.setDescription('StudyQuestで使用する回答フォームです。質問に対する回答を入力してください。');
     const boardUrl = `${getWebAppUrlEnhanced()}?userId=${userId}`;
@@ -1839,8 +1843,15 @@ function createStudyQuestForm(userEmail, userId) {
 
     const sheet = spreadsheet.getSheets()[0];
     
-    // スプレッドシートに追加の列を準備
-    const existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    // フォームとスプレッドシートの連携を一度確立してからヘッダーを調整
+    // これによりGoogleフォームが自動的に基本ヘッダー（タイムスタンプ、メールアドレス、その他の質問項目）を作成する
+    Utilities.sleep(2000); // フォーム連携の完了を待つ
+    
+    // 現在のヘッダーを取得（Googleフォームによって自動生成されたもの）
+    const currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    console.log('Current headers after form linking:', currentHeaders);
+    
+    // StudyQuest用の追加列を準備
     const additionalHeaders = [
       COLUMN_HEADERS.UNDERSTAND,
       COLUMN_HEADERS.LIKE,
@@ -1848,12 +1859,12 @@ function createStudyQuestForm(userEmail, userId) {
       COLUMN_HEADERS.HIGHLIGHT
     ];
     
-    // 既存のヘッダーの後に追加の列を挿入
-    const startCol = existingHeaders.length + 1;
+    // 追加の列を既存のヘッダーの後に挿入
+    const startCol = currentHeaders.length + 1;
     sheet.getRange(1, startCol, 1, additionalHeaders.length).setValues([additionalHeaders]);
     
     // ヘッダー行のフォーマット
-    const allHeadersRange = sheet.getRange(1, 1, 1, existingHeaders.length + additionalHeaders.length);
+    const allHeadersRange = sheet.getRange(1, 1, 1, currentHeaders.length + additionalHeaders.length);
     allHeadersRange.setFontWeight('bold').setBackground('#E3F2FD');
     
     // 列幅を調整

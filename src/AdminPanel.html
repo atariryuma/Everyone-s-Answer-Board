@@ -240,12 +240,12 @@
         <div class="flex items-center gap-3">
           <div class="text-right text-xs">
             <p>
-              <span class="font-medium text-gray-300">管理者:</span>
+              <span class="font-medium text-gray-300">ユーザー:</span>
               <span id="admin-user-email" class="text-white"><?= adminUserEmail ?></span>
             </p>
             <p>
-              <span class="font-medium text-gray-300">お問い合わせ:</span>
-              <a href="mailto:<?= webAppAdminEmail ?>" class="text-cyan-400 hover:underline"><?= webAppAdminEmail ?></a>
+              <span class="font-medium text-gray-300">管理者:</span>
+              <a href="mailto:<?= webAppAdminEmail ?>" class="text-cyan-400 hover:underline" title="バグや不具合の報告はこちら"><?= webAppAdminEmail ?></a>
             </p>
           </div>
         </div>
@@ -718,7 +718,7 @@
 
   <!-- Digital Citizenship Education Modal for Teachers -->
   <div id="teacherGuideModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
-    <div class="glass-panel rounded-xl p-6 shadow-2xl border-2 border-green-400/80 w-full max-w-4xl max-h-[90vh] overflow-y-auto relative" role="document">
+    <div class="glass-panel rounded-xl p-8 shadow-2xl border-2 border-green-400/80 w-full max-w-6xl max-h-[90vh] overflow-y-auto relative" role="document">
       <div class="space-y-6 text-gray-200 leading-relaxed">
         
         <!-- Header -->
@@ -728,12 +728,12 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.168 18.477 18.582 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
             </svg>
           </div>
-          <h2 class="text-xl font-bold text-green-300">📚 デジタル・シティズンシップ教育ガイド</h2>
+          <h2 class="text-xl font-bold text-green-300" tabindex="0">📚 デジタル・シティズンシップ教育ガイド</h2>
           <p class="text-sm text-green-200 mt-2">みんなの回答ボードを活用した指導のポイント</p>
         </div>
 
         <!-- Main Content -->
-        <div class="grid md:grid-cols-2 gap-6">
+        <div class="grid lg:grid-cols-2 gap-8">
           
           <!-- Left Column: Teaching Guidelines -->
           <div class="space-y-4">
@@ -966,8 +966,17 @@
 
     function showTeacherGuideModal() {
       const modal = document.getElementById('teacherGuideModal');
+      const modalContent = modal.querySelector('.glass-panel');
       modal.classList.remove('hidden');
-      document.getElementById('teacherGuideConfirmBtn').focus();
+      
+      // Ensure modal starts from the top
+      modalContent.scrollTop = 0;
+      
+      // Focus on the first focusable element (header area) instead of the button
+      setTimeout(() => {
+        const firstFocusable = modalContent.querySelector('h2') || document.getElementById('teacherGuideConfirmBtn');
+        firstFocusable.focus();
+      }, 100);
     }
 
     function hideTeacherGuideModal() {
