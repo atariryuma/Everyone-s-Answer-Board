@@ -650,6 +650,7 @@
     const userId = '<?= userId ?>';
     let selectedSheet = '';
     let currentActiveSheet = '';
+    let webAppUrl = '';
     
     // UI Elements
     const elements = {
@@ -898,6 +899,7 @@
       // Update board URL with enhanced visibility
       if (status.activeSheetName) {
         const baseUrl = status.webAppUrl || (window.location.origin + window.location.pathname);
+        webAppUrl = baseUrl;
         const boardUrl = `${baseUrl}?userId=${userId}`;
         if (elements.boardUrl) elements.boardUrl.value = boardUrl;
         if (elements.viewBoardLink) elements.viewBoardLink.href = boardUrl;
@@ -1315,7 +1317,7 @@
         showMessage('アクティブなシートがありません。', 'red');
         return;
       }
-      const baseUrl = window.location.origin + window.location.pathname;
+      const baseUrl = webAppUrl || (window.location.origin + window.location.pathname);
       const previewUrl = `${baseUrl}?mode=preview`;
       window.open(previewUrl, '_blank');
     }
