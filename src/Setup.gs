@@ -76,7 +76,17 @@ function studyQuestSetup(manualDeployId) {
 
     // ステップ3: デプロイIDとウェブアプリURLの設定
     console.log("ステップ3: デプロイIDとURLの設定を開始...");
-    const deployId = manualDeployId || ScriptApp.getDeploymentId();
+    
+    // 【バグ修正】ScriptApp.getDeploymentId() は存在しないため、正しい方法で最新のデプロイIDを取得する
+    let deployId = manualDeployId;
+    if (!deployId) {
+      const deployments = ScriptApp.getProjectDeployments();
+      if (deployments && deployments.length > 0) {
+        // 最新のデプロイメント（通常はリストの最後）のIDを使用する
+        deployId = deployments[deployments.length - 1].getDeploymentId();
+      }
+    }
+    
     if (!deployId || !validateDeployId(deployId)) {
       console.error("❌ DEPLOY_IDの取得または検証に失敗しました。");
       throw new Error("DEPLOY_IDの取得に失敗しました。先にウェブアプリとしてデプロイを完了させる必要があります。");
@@ -110,7 +120,7 @@ function studyQuestSetup(manualDeployId) {
     if (e.message.includes("DEPLOY_ID")) {
       console.log("💡 ヒント: このエラーは、ウェブアプリとして「デプロイ」を完了させる前にセットアップを実行した場合に発生します。先にデプロイを完了させてから再度実行してください。");
     } else if (e.message.includes("server error occurred")) {
-      console.log("💡 ヒント: Googleサーバーの一時的なエラーの可能性があります。数分待ってから再度実行してください。もし解決しない場合は、手動で「StudyQuest - みんなの回答ボード」という名前のフォルダをGoogleドライブに作成してから、もう一度このセットアップを実行してみてください。");
+      console.log("💡 ヒント: Googleサーバーの一時的なエラーの可能性があります。数分待ってから再度実行してください。");
     }
   } finally {
     lock.releaseLock();
