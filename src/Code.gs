@@ -150,7 +150,9 @@ function applySecurityHeaders(output) {
     if (typeof output.setXFrameOptionsMode === 'function') {
       // Allow embedding within the same origin by default for enhanced security
       // unless a future embedding requirement mandates ALLOWALL.
-      output.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN);
+      // "SAMEORIGIN" isn't a valid constant. Use DEFAULT to enforce
+      // the same-origin policy, which preserves standard security behavior.
+      output.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
     }
   }
   return output;
