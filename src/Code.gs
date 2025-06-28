@@ -256,8 +256,6 @@ function isSameDomain(emailA, emailB) {
   return domainA && domainB && domainA === domainB;
 }
 
-
-
 function getAdminEmails(spreadsheetId) {
   const props = PropertiesService.getScriptProperties();
   let adminEmails = [];

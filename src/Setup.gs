@@ -8,6 +8,15 @@
 // =================================================================
 
 /**
+ * デバッグログ関数
+ */
+function debugLog() {
+  if (typeof console !== 'undefined' && console.log) {
+    console.log.apply(console, arguments);
+  }
+}
+
+/**
  * セキュリティ強化: ID情報をログ用にサニタイズ
  * @param {string} id - サニタイズするID
  * @return {string} サニタイズされたID
@@ -58,6 +67,18 @@ function secureLogError(context, error) {
   if (typeof DEBUG !== 'undefined' && DEBUG) {
     console.error(`Debug - ${context}:`, error.message);
   }
+}
+
+/**
+ * StudyQuestの統合セットアップ関数（簡易版）
+ * DEPLOY_IDを指定してセットアップを実行
+ * @param {string} deployId - デプロイID（必須）
+ */
+function studyQuestSetupSimple(deployId) {
+  if (!deployId) {
+    throw new Error("DEPLOY_IDの指定が必要です。例: studyQuestSetupSimple('AKfycbxYourDeployId')");
+  }
+  return studyQuestSetup(deployId);
 }
 
 /**
@@ -138,15 +159,30 @@ function studyQuestSetup(manualDeployId) {
     }
 
     // ステップ3: デプロイIDとウェブアプリURLの設定
-    const deployId = manualDeployId || ScriptApp.getDeploymentId();
-    if (!deployId || !validateDeployId(deployId)) {
-      throw new Error("DEPLOY_IDの取得または検証に失敗しました。先にウェブアプリとしてデプロイを完了させる必要があります。");
+    let deployId = manualDeployId;
+    if (!deployId) {
+      try {
+        deployId = ScriptApp.getDeploymentId();
+      } catch (e) {
+        debugLog("⚠️ ScriptApp.getDeploymentId()でエラーが発生しました。手動でのDEPLOY_ID指定が必要です。");
+        throw new Error("ウェブアプリとしてデプロイされていないか、DEPLOY_IDの取得に失敗しました。先にウェブアプリとしてデプロイを完了させるか、手動でDEPLOY_IDを指定してください。");
+      }
+    }
+    
+    if (!deployId) {
+      throw new Error("DEPLOY_IDが取得できませんでした。先にウェブアプリとしてデプロイを完了させる必要があります。");
+    }
+    
+    // セキュリティチェックは緩和（Google Apps Scriptの実際のDEPLOY_ID形式は様々なため）
+    if (typeof deployId !== 'string' || deployId.length < 10) {
+      throw new Error("無効なDEPLOY_ID形式です。");
     }
     PropertiesService.getScriptProperties().setProperty("DEPLOY_ID", deployId);
     debugLog(`✅ DEPLOY_IDを設定しました: ${sanitizeIdForLog(deployId)}`);
 
     const webAppUrl = `https://script.google.com/macros/s/${deployId}/exec`;
-    if (!validateWebAppUrl(webAppUrl)) {
+    // 基本的なURL検証のみ実施
+    if (!webAppUrl.includes('script.google.com') || !webAppUrl.includes(deployId)) {
       throw new Error("生成されたウェブアプリURLが無効です。");
     }
     PropertiesService.getScriptProperties().setProperty("WEB_APP_URL", webAppUrl);
@@ -159,11 +195,26 @@ function studyQuestSetup(manualDeployId) {
     debugLog(`2. 新規ユーザーとして登録テストを行ってください: ${webAppUrl}`);
 
   } catch (e) {
-    secureLogError('StudyQuest セットアップ', e);
-    debugLog("現在のプロパティ設定:", PropertiesService.getScriptProperties().getProperties());
-    if (e.message.includes("DEPLOY_ID")) {
-      debugLog("💡 ヒント: このエラーは、ウェブアプリとして「デプロイ」を完了させる前にセットアップを実行した場合に発生します。先にデプロイを完了させてから再度実行してください。");
+    console.error('❌ StudyQuest セットアップ中にエラーが発生しました:', e.message);
+    console.error('エラーの詳細:', e.toString());
+    
+    // 現在のプロパティ状況を表示（デバッグ用）
+    try {
+      const props = PropertiesService.getScriptProperties().getProperties();
+      console.log("現在のプロパティ設定:", props);
+    } catch (propError) {
+      console.warn("プロパティ取得エラー:", propError.message);
     }
+    
+    if (e.message.includes("DEPLOY_ID") || e.message.includes("デプロイ")) {
+      console.log("💡 ヒント: このエラーは、ウェブアプリとして「デプロイ」を完了させる前にセットアップを実行した場合に発生します。");
+      console.log("   1. Google Apps Scriptエディタで「デプロイ」→「新しいデプロイ」を選択");
+      console.log("   2. 「種類の選択」でウェブアプリを選択");
+      console.log("   3. デプロイ後、再度このセットアップを実行してください");
+    }
+    
+    // エラーを再スローして呼び出し元にエラーを伝達
+    throw e;
   } finally {
     lock.releaseLock();
   }

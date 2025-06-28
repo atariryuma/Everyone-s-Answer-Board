@@ -242,11 +242,7 @@
           <div class="text-right text-xs">
             <p>
               <span class="font-medium text-gray-300">ユーザー:</span>
-              <span id="admin-user-email" class="text-white"><?= adminUserEmail ?></span>
-            </p>
-            <p>
-              <span class="font-medium text-gray-300">管理者:</span>
-              <a href="mailto:<?= webAppAdminEmail ?>" class="text-cyan-400 hover:underline" title="バグや不具合の報告はこちら"><?= webAppAdminEmail ?></a>
+              <span id="admin-user-email" class="text-white">認証済み</span>
             </p>
           </div>
         </div>
@@ -853,8 +849,6 @@
     const DEBUG_MODE = false;
     function debugLog(){ if (DEBUG_MODE && console && console.log){ console.log.apply(console, arguments); } }
     const userId = '<?= userId ?>';
-    const adminUserEmail = '<?= adminUserEmail ?>';
-    const webAppAdminEmail = '<?= webAppAdminEmail ?>';
     let selectedSheet = '';
     let currentActiveSheet = '';
     let webAppUrl = '';
