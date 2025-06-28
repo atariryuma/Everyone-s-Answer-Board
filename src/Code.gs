@@ -1889,6 +1889,9 @@ function createStudyQuestForm(userEmail, userId) {
  * 現在ログイン中のユーザーの新しいボードを作成し、公開・アクティブ化まで行います。
  */
 function createBoardFromAdmin() {
+  if (!checkAdmin()) {
+    throw new Error('権限がありません。');
+  }
   try {
     const currentUserEmail = safeGetUserEmail();
     const props = PropertiesService.getUserProperties();
@@ -2413,6 +2416,9 @@ if (typeof module !== 'undefined') {
  * 現在ログイン中のユーザーの新しいボードを作成し、公開・アクティブ化まで行います。
  */
 function createBoardFromAdmin() {
+  if (!checkAdmin()) {
+    throw new Error('権限がありません。');
+  }
   try {
     const currentUserEmail = safeGetUserEmail();
     const props = PropertiesService.getUserProperties();
