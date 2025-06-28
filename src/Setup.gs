@@ -24,6 +24,7 @@ function studyQuestSetup(manualDeployId) {
     console.log("🚀 StudyQuest 統合セットアップを開始します...");
 
     // ステップ1: 専用フォルダの確認と作成
+    console.log("ステップ1: 専用フォルダの確認・作成を開始...");
     let folder;
     const folders = DriveApp.getFoldersByName(FOLDER_NAME);
     if (folders.hasNext()) {
@@ -35,20 +36,19 @@ function studyQuestSetup(manualDeployId) {
     }
 
     // ステップ2: データベース（スプレッドシート）の確認と作成
+    console.log("ステップ2: データベースの確認・作成を開始...");
     let dbFile;
     const files = folder.getFilesByName(DB_FILENAME);
     if (files.hasNext()) {
       dbFile = files.next();
       console.log(`✅ データベースファイルがフォルダ内に既に存在します。`);
     } else {
-      // マイドライブ直下も検索して、あれば移動させる
       const rootFiles = DriveApp.getRootFolder().getFilesByName(DB_FILENAME);
       if (rootFiles.hasNext()) {
         dbFile = rootFiles.next();
         dbFile.moveTo(folder);
         console.log(`✅ 既存のデータベースファイルを専用フォルダに移動しました。`);
       } else {
-        // どこにもない場合のみ新規作成
         const newDb = SpreadsheetApp.create(DB_FILENAME);
         dbFile = DriveApp.getFileById(newDb.getId());
         dbFile.moveTo(folder);
@@ -63,6 +63,7 @@ function studyQuestSetup(manualDeployId) {
     console.log(`✅ データベースIDを設定しました: ${sanitizeIdForLog(dbId)}`);
 
     // ステップ2.5: データベースの共有設定（セキュリティ強化）
+    console.log("ステップ2.5: データベースの共有設定を開始...");
     try {
       const adminEmail = Session.getActiveUser().getEmail();
       dbFile.addEditor(adminEmail);
@@ -73,8 +74,8 @@ function studyQuestSetup(manualDeployId) {
       console.warn('⚠️ 共有設定の一部に失敗しました。手動で設定してください。');
     }
 
-
     // ステップ3: デプロイIDとウェブアプリURLの設定
+    console.log("ステップ3: デプロイIDとURLの設定を開始...");
     const deployId = manualDeployId || ScriptApp.getDeploymentId();
     if (!deployId || !validateDeployId(deployId)) {
       console.error("❌ DEPLOY_IDの取得または検証に失敗しました。");
@@ -97,14 +98,19 @@ function studyQuestSetup(manualDeployId) {
     console.log(`2. 新規ユーザーとして登録テストを行ってください: ${webAppUrl}`);
 
   } catch (e) {
-    // 【改善点】エラー内容を具体的に表示するように変更
+    // エラー内容を具体的に表示するように変更
     console.error(`❌ セットアップ中にエラーが発生しました: ${e.message}`);
     console.error(`スタックトレース: ${e.stack}`);
+    
     // 失敗した場合でも、取得できた情報はログに出力
     const props = PropertiesService.getScriptProperties().getProperties();
     console.log("現在のプロパティ設定:", props);
+
+    // エラーメッセージに応じたヒントを表示
     if (e.message.includes("DEPLOY_ID")) {
       console.log("💡 ヒント: このエラーは、ウェブアプリとして「デプロイ」を完了させる前にセットアップを実行した場合に発生します。先にデプロイを完了させてから再度実行してください。");
+    } else if (e.message.includes("server error occurred")) {
+      console.log("💡 ヒント: Googleサーバーの一時的なエラーの可能性があります。数分待ってから再度実行してください。もし解決しない場合は、手動で「StudyQuest - みんなの回答ボード」という名前のフォルダをGoogleドライブに作成してから、もう一度このセットアップを実行してみてください。");
     }
   } finally {
     lock.releaseLock();
