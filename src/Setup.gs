@@ -1,6 +1,6 @@
 /**
  * @fileoverview StudyQuest -みんなの回答ボード- - 統合セットアップスクリプト
- * デプロイユーザーが1回実行するだけで環境が整う統合セットアップ機能
+ * フォルダ管理、データベース作成、共有設定、プロパティ設定を自動で行う統合セットアップ機能
  * 
  * =================================================================
  * 📚 使用方法（デプロイ管理者向け）
@@ -12,23 +12,33 @@
  *    - 公開後、Apps Scriptエディタで以下を実行：
  *      studyQuestSetup()
  * 
- * 2. 【DEPLOY_ID手動指定が必要な場合】
- *    - 自動抽出に失敗した場合、ウェブアプリURLからDEPLOY_IDを取得
+ * 2. 【手動デプロイID指定が必要な場合】
+ *    - 自動取得に失敗した場合、ウェブアプリURLからDEPLOY_IDを取得
  *    - 例: https://script.google.com/macros/s/AKfycbxExample123/exec
  *    - 以下を実行：
  *      studyQuestSetup("AKfycbxExample123")
  * 
- * 3. 【セットアップ確認】
+ * 3. 【セットアップ内容】
+ *    - 専用フォルダ「StudyQuest - みんなの回答ボード」の作成
+ *    - StudyQuest_UserDatabaseスプレッドシートの作成・移動
+ *    - データベースの共有設定（ドメイン内閲覧可、管理者編集可）
+ *    - DEPLOY_IDとWEB_APP_URLの自動設定
+ *    - 設定の検証とテスト
+ * 
+ * 4. 【セットアップ後の確認】
  *    - 実行後、ログに表示される次のステップに従う
  *    - 管理パネル、新規登録のテストを実行
  * 
- * 🔄 既存のsetup()関数は非推奨になりました。
- *    このstudyQuestSetup()が全機能を統合しています。
+ * 🔧 技術仕様:
+ *    - フォルダ管理: 専用フォルダでファイルを整理
+ *    - ファイル移動: マイドライブ直下のファイルを専用フォルダに自動移動
+ *    - 共有設定: ドメイン内閲覧可、管理者編集可の権限設定
+ *    - 排他制御: LockServiceによる同時実行防止（30秒）
  * 
- * 📖 詳細な使用方法は SETUP_README.md を参照してください。
- * 
- * 💾 データベースID統合: USER_DATABASE_IDは廃止され、DATABASE_IDに統合されました。
- *    既存環境では後方互換性のためフォールバック読み込みを維持しています。
+ * 📋 データベース構造:
+ *    - ファイル名: StudyQuest_UserDatabase
+ *    - シート名: users
+ *    - 列: userId, adminEmail, spreadsheetId, spreadsheetUrl, createdAt, accessToken, configJson, lastAccessedAt, isActive
  * 
  * =================================================================
  */
@@ -95,6 +105,24 @@ function studyQuestSetup(manualDeployId) {
     const dbId = dbFile.getId();
     PropertiesService.getScriptProperties().setProperty("DATABASE_ID", dbId);
     console.log(`✅ データベースIDを設定しました: ${dbId}`);
+
+    // ステップ2.5: データベースの共有設定
+    try {
+      const adminEmail = Session.getActiveUser().getEmail();
+      const userDomain = adminEmail.split('@')[1];
+      
+      // ドメイン内で閲覧可能に設定
+      dbFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
+      console.log(`✅ データベースをドメイン「${userDomain}」内で閲覧可能に設定しました。`);
+      
+      // 管理者（現在のユーザー）に編集権限を付与
+      dbFile.addEditor(adminEmail);
+      console.log(`✅ 管理者「${adminEmail}」に編集権限を付与しました。`);
+      
+    } catch (e) {
+      console.warn('⚠️ 共有設定の一部に失敗しました:', e.message);
+      console.log('手動でStudyQuest_UserDatabaseの共有設定を確認してください。');
+    }
 
 
     // ステップ3: デプロイIDとウェブアプリURLの設定
@@ -252,6 +280,23 @@ function setupUserDatabase() {
     props.setProperties({ 
       DATABASE_ID: spreadsheetId
     });
+
+    // 共有設定を追加
+    try {
+      const dbFile = DriveApp.getFileById(spreadsheetId);
+      const adminEmail = Session.getActiveUser().getEmail();
+      const userDomain = adminEmail.split('@')[1];
+      
+      // ドメイン内で閲覧可能に設定
+      dbFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
+      
+      // 管理者に編集権限を付与
+      dbFile.addEditor(adminEmail);
+      
+      console.log(`データベースの共有設定を完了: ドメイン「${userDomain}」内閲覧可、管理者編集可`);
+    } catch (e) {
+      console.warn('共有設定に失敗:', e.message);
+    }
     
     return {
       success: true,
