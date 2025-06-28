@@ -777,7 +777,29 @@ function doGet(e) {
     try {
       userInfo = getUserInfo(validatedUserId);
     } catch (e) {
-      userInfo = getUserInfoInternal(validatedUserId);
+      console.error('getUserInfo failed:', e);
+      debugLog(`getUserInfo error for userId ${validatedUserId}:`, e.message);
+      
+      // データベースアクセスエラーの場合の詳細処理
+      if (e.message.includes('ユーザーデータベースが設定されていません') || 
+          e.message.includes('権限がありません')) {
+        const output = HtmlService.createHtmlOutput(
+          'データベースにアクセスできません。システムのセットアップが完了していない可能性があります。管理者にお問い合わせください。'
+        );
+        applySecurityHeaders(output);
+        return output.setTitle('データベースエラー');
+      }
+      
+      try {
+        userInfo = getUserInfoInternal(validatedUserId);
+      } catch (e2) {
+        console.error('getUserInfoInternal also failed:', e2);
+        const output = HtmlService.createHtmlOutput(
+          `ユーザー情報の取得に失敗しました。エラー: ${e.message}`
+        );
+        applySecurityHeaders(output);
+        return output.setTitle('ユーザー情報エラー');
+      }
     }
     if (!userInfo) {
       const output = HtmlService.createHtmlOutput('無効なユーザーIDです。');
@@ -975,8 +997,33 @@ function doGet(e) {
         .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   } catch (error) {
     console.error('doGet error:', error);
+    debugLog('doGet full error details:', error);
+    
     if (typeof HtmlService !== 'undefined') {
-      const output = HtmlService.createHtmlOutput('システムエラーが発生しました。管理者にお問い合わせください。');
+      let errorMessage = 'システムエラーが発生しました。';
+      
+      // エラーの種類に応じて具体的なメッセージを提供
+      if (error.message.includes('データベース')) {
+        errorMessage = `データベースエラー: ${error.message}`;
+      } else if (error.message.includes('Permission') || error.message.includes('権限')) {
+        errorMessage = 'アクセス権限がありません。管理者にお問い合わせください。';
+      } else if (error.message.includes('not found')) {
+        errorMessage = '指定されたリソースが見つかりません。URLを確認してください。';
+      } else if (error.message.includes('studyQuestSetup')) {
+        errorMessage = 'システムのセットアップが完了していません。管理者にstudyQuestSetup()の実行を依頼してください。';
+      } else {
+        errorMessage = `エラー詳細: ${error.message}`;
+      }
+      
+      const output = HtmlService.createHtmlOutput(
+        `<div style="padding: 20px; font-family: Arial, sans-serif;">
+          <h2 style="color: #d32f2f;">エラーが発生しました</h2>
+          <p>${errorMessage}</p>
+          <p style="font-size: 0.9em; color: #666;">
+            問題が解決しない場合は、管理者にこのメッセージを共有してください。
+          </p>
+        </div>`
+      );
       applySecurityHeaders(output);
       return output.setTitle('エラー');
     }
@@ -2446,10 +2493,27 @@ function prepareSpreadsheetForStudyQuest(spreadsheet) {
 function getDatabase() {
   const props = PropertiesService.getScriptProperties();
   const dbId = props.getProperty('DATABASE_ID') || props.getProperty('USER_DATABASE_ID'); // 後方互換性
+  
   if (!dbId) {
-    throw new Error('ユーザーデータベースが設定されていません。管理者に連絡してください。');
+    throw new Error('ユーザーデータベースが設定されていません。studyQuestSetup()を実行してセットアップを完了してください。');
   }
-  return SpreadsheetApp.openById(dbId);
+  
+  try {
+    const database = SpreadsheetApp.openById(dbId);
+    debugLog(`✅ データベースアクセス成功: ${dbId}`);
+    return database;
+  } catch (error) {
+    console.error('Database access failed:', error);
+    debugLog(`❌ データベースアクセス失敗: ${dbId}: ${error.message}`);
+    
+    if (error.message.includes('Permission')) {
+      throw new Error('データベースへのアクセス権限がありません。管理者にお問い合わせください。');
+    } else if (error.message.includes('not found')) {
+      throw new Error('データベースが見つかりません。システムの再セットアップが必要な可能性があります。');
+    } else {
+      throw new Error(`データベースアクセスエラー: ${error.message}`);
+    }
+  }
 }
 
 function getUserInfo(userId) {
