@@ -80,43 +80,29 @@ function validateCurrentUser() {
 }
 
 /**
- * ユーザー専用フォルダを取得または作成
+ * ユーザー専用フォルダを取得または作成（シンプル版：ユーザー本人のマイドライブに直接作成）
  * @param {string} userEmail - ユーザーのメールアドレス
  * @return {GoogleAppsScript.Drive.Folder} ユーザー専用フォルダ
  */
 function getUserFolder(userEmail) {
   try {
-    // メールアドレスからフォルダ名を生成（セキュリティのため@マークより前のみ使用）
+    // メールアドレスからフォルダ名を生成
     const sanitizedEmail = userEmail.split('@')[0];
-    const userFolderName = USER_FOLDER_CONFIG.FOLDER_NAME_PATTERN.replace('{email}', sanitizedEmail);
+    const userFolderName = `StudyQuest - ${sanitizedEmail} - マイファイル`;
     
-    // ルートフォルダを取得または作成
-    let rootFolder;
-    const rootFolders = DriveApp.getFoldersByName(USER_FOLDER_CONFIG.ROOT_FOLDER_NAME);
-    if (rootFolders.hasNext()) {
-      rootFolder = rootFolders.next();
-    } else {
-      rootFolder = DriveApp.createFolder(USER_FOLDER_CONFIG.ROOT_FOLDER_NAME);
-      debugLog(`✅ ルートフォルダを作成しました: ${USER_FOLDER_CONFIG.ROOT_FOLDER_NAME}`);
-    }
+    debugLog(`📁 ユーザー専用フォルダを作成/取得開始: ${userFolderName}`);
     
-    // ユーザー専用フォルダを取得または作成
-    let userFolder;
-    const userFolders = rootFolder.getFoldersByName(userFolderName);
-    if (userFolders.hasNext()) {
-      userFolder = userFolders.next();
+    // 既存のフォルダがあるかチェック
+    const folders = DriveApp.getFoldersByName(userFolderName);
+    if (folders.hasNext()) {
+      const existingFolder = folders.next();
       debugLog(`✅ 既存のユーザーフォルダを使用: ${userFolderName}`);
-    } else {
-      userFolder = rootFolder.createFolder(userFolderName);
-      
-      // ユーザーにフォルダの編集権限を付与
-      try {
-        userFolder.addEditor(userEmail);
-        debugLog(`✅ ユーザーフォルダを作成し、編集権限を付与: ${userFolderName}`);
-      } catch (e) {
-        debugLog(`⚠️ 編集権限の付与に失敗: ${e.message}`);
-      }
+      return existingFolder;
     }
+    
+    // ない場合は新規作成（ユーザー本人のマイドライブに直接作成される）
+    const userFolder = DriveApp.createFolder(userFolderName);
+    debugLog(`✅ ユーザー専用フォルダを新規作成: ${userFolderName}`);
     
     return userFolder;
     
