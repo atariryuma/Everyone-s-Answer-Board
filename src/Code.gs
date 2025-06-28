@@ -579,6 +579,17 @@ function doGet(e) {
   
     // 管理モードの場合
     if (mode === 'admin') {
+      // 管理者権限のチェック
+      if (!(viewerEmail === userInfo.adminEmail || isUserAdmin(viewerEmail))) {
+        auditLog('ADMIN_ACCESS_DENIED', validatedUserId, { viewerEmail });
+        if (typeof HtmlService !== 'undefined') {
+          const output = HtmlService.createHtmlOutput('権限がありません。');
+          applySecurityHeaders(output);
+          return output.setTitle('アクセス拒否');
+        }
+        throw new Error('権限がありません。');
+      }
+
       const template = HtmlService.createTemplateFromFile('AdminPanel');
       template.userId = validatedUserId;
       template.userInfo = userInfo;
