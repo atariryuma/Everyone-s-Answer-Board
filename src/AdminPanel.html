@@ -330,7 +330,7 @@
       </div>
       
       <!-- Active Sheet Info -->
-      <div class="glass-panel p-6 rounded-xl fade-in">
+      <div class="glass-panel p-6 rounded-xl fade-in cursor-pointer" onclick="openActiveSpreadsheet()">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-white flex items-center gap-2">
             <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1329,8 +1329,7 @@
         showMessage('アクティブなシートがありません。', 'red');
         return;
       }
-      const baseUrl = window.location.origin + window.location.pathname;
-      const previewUrl = `${baseUrl}?mode=preview`;
+      const previewUrl = `${elements.boardUrl.value}&mode=preview`;
       window.open(previewUrl, '_blank');
     }
 
