@@ -665,10 +665,8 @@
       saveConfigBtn: document.getElementById('save-config-btn'),
       detailOptions: document.getElementById('detail-options'),
       statusText: document.getElementById('status-text'),
-      adminUrl: document.getElementById('admin-url'),
       boardUrl: document.getElementById('board-url'),
       viewBoardLink: document.getElementById('view-board-link'),
-      openAdminLink: document.getElementById('open-admin-link'),
       setupProgress: document.getElementById('setup-progress'),
       setupStatus: document.getElementById('setup-status'),
       boardStatusIndicator: document.getElementById('board-status-indicator'),
@@ -901,11 +899,8 @@
       if (status.activeSheetName) {
         const baseUrl = status.webAppUrl || (window.location.origin + window.location.pathname);
         const boardUrl = `${baseUrl}?userId=${userId}`;
-        const adminUrl = `${baseUrl}?userId=${userId}&mode=admin`;
         if (elements.boardUrl) elements.boardUrl.value = boardUrl;
-        if (elements.adminUrl) elements.adminUrl.value = adminUrl;
         if (elements.viewBoardLink) elements.viewBoardLink.href = boardUrl;
-        if (elements.openAdminLink) elements.openAdminLink.href = adminUrl;
         
         // Update URL section title and description based on environment
         const urlTitle = document.getElementById('url-section-title');
@@ -1342,23 +1337,6 @@
       }
     }
 
-    function copyAdminUrl() {
-      const urlInput = elements.adminUrl;
-      if (urlInput) {
-        try {
-          if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(urlInput.value);
-          } else {
-            urlInput.select();
-            document.execCommand('copy');
-          }
-          showMessage('URLをコピーしました', 'green');
-        } catch (error) {
-          showMessage('コピーに失敗しました', 'red');
-        }
-      }
-    }
-
     function setLoading(isLoading, msg = "") {
       elements.switchSheetBtn.disabled = isLoading;
       elements.clearSelectionBtn.disabled = isLoading;
@@ -1427,14 +1405,6 @@
       setLoading(false);
     }
 
-    function escapeHtml(unsafe) {
-      return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-    }
   </script>
 </body>
 </html>
