@@ -1991,7 +1991,9 @@ function createStudyQuestForm(userEmail, userId) {
     const classItem = form.addTextItem();
     classItem.setTitle('クラス名');
     classItem.setRequired(true);
-    const pattern = '^[A-Za-z0-9]+-[A-Za-z0-9]+
+
+    // クラス名の形式を「G1-1」のような半角英数字とハイフンのみとする
+    const pattern = '^[A-Za-z0-9]+-[A-Za-z0-9]+$';
 
     const helpText = "「G1-1」のように、学年と組を半角ハイフンで区切って入力してください。";
     const textValidation = FormApp.createTextValidation()
@@ -2080,9 +2082,10 @@ function createStudyQuestForm(userEmail, userId) {
     // その他のエラー詳細を含める
     throw new Error(`Googleフォームとスプレッドシートの作成に失敗しました。詳細: ${error.message}`);
   }
- * Admin Panel用のボード作成関数
- * 現在ログイン中のユーザーの新しいボードを作成し、公開・アクティブ化まで行います。
- */
+  /**
+   * Admin Panel用のボード作成関数
+   * 現在ログイン中のユーザーの新しいボードを作成し、公開・アクティブ化まで行います。
+   */
 function createBoardFromAdmin() {
   if (!checkAdmin()) {
     throw new Error('権限がありません。');
@@ -2605,9 +2608,10 @@ if (typeof module !== 'undefined') {
     // その他のエラー詳細を含める
     throw new Error(`Googleフォームとスプレッドシートの作成に失敗しました。詳細: ${error.message}`);
   }
- * Admin Panel用のボード作成関数
- * 現在ログイン中のユーザーの新しいボードを作成し、公開・アクティブ化まで行います。
- */
+  /**
+   * Admin Panel用のボード作成関数
+   * 現在ログイン中のユーザーの新しいボードを作成し、公開・アクティブ化まで行います。
+   */
 function createBoardFromAdmin() {
   if (!checkAdmin()) {
     throw new Error('権限がありません。');
@@ -3130,9 +3134,10 @@ if (typeof module !== 'undefined') {
     // その他のエラー詳細を含める
     throw new Error(`Googleフォームとスプレッドシートの作成に失敗しました。詳細: ${error.message}`);
   }
- * Admin Panel用のボード作成関数
- * 現在ログイン中のユーザーの新しいボードを作成し、公開・アクティブ化まで行います。
- */
+  /**
+   * Admin Panel用のボード作成関数
+   * 現在ログイン中のユーザーの新しいボードを作成し、公開・アクティブ化まで行います。
+   */
 function createBoardFromAdmin() {
   if (!checkAdmin()) {
     throw new Error('権限がありません。');
@@ -3655,9 +3660,10 @@ if (typeof module !== 'undefined') {
     // その他のエラー詳細を含める
     throw new Error(`Googleフォームとスプレッドシートの作成に失敗しました。詳細: ${error.message}`);
   }
- * Admin Panel用のボード作成関数
- * 現在ログイン中のユーザーの新しいボードを作成し、公開・アクティブ化まで行います。
- */
+  /**
+   * Admin Panel用のボード作成関数
+   * 現在ログイン中のユーザーの新しいボードを作成し、公開・アクティブ化まで行います。
+   */
 function createBoardFromAdmin() {
   if (!checkAdmin()) {
     throw new Error('権限がありません。');
