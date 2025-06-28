@@ -44,120 +44,87 @@
 // =================================================================
 
 /**
- * StudyQuest -みんなの回答ボード- 統合セットアップ - これ1つを実行するだけで環境が整います
- * 
- * 使用方法:
- * 1. ウェブアプリとして公開
- * 2. この関数を実行（deployIdは自動抽出を試行、失敗時は手動指定）
- * 
- * @param {string} deployId - オプション：手動でのデプロイID指定
- * @return {Object} セットアップ結果とユーザー向けの詳細情報
+ * StudyQuestの統合セットアップ関数
+ * フォルダ作成、データベース作成、ファイル移動、プロパティ設定を自動で行う
+ * @param {string} [manualDeployId] - 手動で設定するデプロイID（任意）
  */
-function studyQuestSetup(deployId = null) {
-  debugLog('=== StudyQuest統合セットアップ開始 ===');
-  
-  const results = {
-    timestamp: new Date().toISOString(),
-    status: 'success',
-    steps: [],
-    errors: [],
-    warnings: [],
-    urls: {},
-    nextSteps: []
-  };
+function studyQuestSetup(manualDeployId) {
+  const FOLDER_NAME = "StudyQuest - みんなの回答ボード"; // アプリ専用フォルダ名
+  const DB_FILENAME = "StudyQuest_UserDatabase";     // データベースファイル名
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000); // 30秒待機
 
   try {
-    // ステップ1: 現在の環境情報取得
-    addStep(results, '環境情報取得', '現在のスクリプト情報を取得中...');
-    const envInfo = getEnvironmentInfo();
-    addStep(results, '環境情報取得', '完了', envInfo);
+    console.log("🚀 StudyQuest 統合セットアップを開始します...");
 
-    // ステップ2: DEPLOY_ID設定
-    addStep(results, 'DEPLOY_ID設定', 'デプロイIDを設定中...');
-    const deployResult = setupDeployId(deployId, envInfo.currentUrl);
-    if (deployResult.success) {
-      addStep(results, 'DEPLOY_ID設定', '完了', deployResult);
-      results.urls.deployId = deployResult.deployId;
+    // ステップ1: 専用フォルダの確認と作成
+    let folder;
+    const folders = DriveApp.getFoldersByName(FOLDER_NAME);
+    if (folders.hasNext()) {
+      folder = folders.next();
+      console.log(`✅ 専用フォルダ「${FOLDER_NAME}」が既に存在します。`);
     } else {
-      addError(results, 'DEPLOY_ID設定', deployResult.message);
-      results.nextSteps.push({
-        action: 'DEPLOY_ID手動設定',
-        instruction: 'studyQuestSetup("YOUR_DEPLOY_ID_HERE")を実行してください',
-        reference: deployResult.extractionHelp
-      });
+      folder = DriveApp.createFolder(FOLDER_NAME);
+      console.log(`✅ 専用フォルダ「${FOLDER_NAME}」を新規作成しました。`);
     }
 
-    // ステップ3: ユーザーデータベース作成
-    addStep(results, 'データベース作成', 'ユーザーデータベースを作成中...');
-    const dbResult = setupUserDatabase();
-    if (dbResult.success) {
-      addStep(results, 'データベース作成', '完了', dbResult);
-      results.urls.userDatabase = dbResult.spreadsheetUrl;
+    // ステップ2: データベース（スプレッドシート）の確認と作成
+    let dbFile;
+    const files = folder.getFilesByName(DB_FILENAME);
+    if (files.hasNext()) {
+      dbFile = files.next();
+      console.log(`✅ データベースファイルがフォルダ内に既に存在します。`);
     } else {
-      addError(results, 'データベース作成', dbResult.message);
+      // マイドライブ直下も検索して、あれば移動させる
+      const rootFiles = DriveApp.getRootFolder().getFilesByName(DB_FILENAME);
+      if (rootFiles.hasNext()) {
+        dbFile = rootFiles.next();
+        dbFile.moveTo(folder);
+        console.log(`✅ 既存のデータベースファイルを専用フォルダに移動しました。`);
+      } else {
+        // どこにもない場合のみ新規作成
+        const newDb = SpreadsheetApp.create(DB_FILENAME);
+        dbFile = DriveApp.getFileById(newDb.getId());
+        dbFile.moveTo(folder);
+        const sheet = newDb.getSheets()[0];
+        sheet.setName("users");
+        sheet.appendRow(["userId", "adminEmail", "spreadsheetId", "spreadsheetUrl", "createdAt", "accessToken", "configJson", "lastAccessedAt", "isActive"]);
+        console.log(`✅ データベースファイルを新規作成し、専用フォルダに配置しました。`);
+      }
     }
+    const dbId = dbFile.getId();
+    PropertiesService.getScriptProperties().setProperty("DATABASE_ID", dbId);
+    console.log(`✅ データベースIDを設定しました: ${dbId}`);
 
-    // ステップ4: URL設定初期化
-    addStep(results, 'URL設定', 'ウェブアプリURL設定を初期化中...');
-    const urlResult = initializeAppUrls();
-    if (urlResult.success) {
-      addStep(results, 'URL設定', '完了', urlResult);
-      results.urls.webApp = urlResult.webAppUrl;
-      results.urls.production = urlResult.productionUrl;
-    } else {
-      addWarning(results, 'URL設定', urlResult.message);
+
+    // ステップ3: デプロイIDとウェブアプリURLの設定
+    const deployId = manualDeployId || ScriptApp.getDeploymentId();
+    if (!deployId) {
+      console.error("❌ DEPLOY_IDの取得に失敗しました。ウェブアプリとしてデプロイされているか確認してください。");
+      throw new Error("DEPLOY_IDの取得に失敗しました。");
     }
+    PropertiesService.getScriptProperties().setProperty("DEPLOY_ID", deployId);
+    console.log(`✅ DEPLOY_IDを設定しました: ${deployId}`);
 
-    // ステップ5: 設定テスト
-    addStep(results, '設定テスト', '全体設定をテスト中...');
-    const testResult = testConfiguration();
-    if (testResult.success) {
-      addStep(results, '設定テスト', '完了', testResult);
-    } else {
-      addWarning(results, '設定テスト', testResult.message);
-    }
+    const webAppUrl = `https://script.google.com/macros/s/${deployId}/exec`;
+    PropertiesService.getScriptProperties().setProperty("WEB_APP_URL", webAppUrl);
+    console.log(`✅ ウェブアプリURLを設定しました: ${webAppUrl}`);
 
-    // 成功時の次のステップ
-    if (results.errors.length === 0) {
-      results.nextSteps.push(
-        {
-          action: '管理パネルアクセス',
-          instruction: `${results.urls.webApp}?mode=admin にアクセス`,
-          description: '管理画面でスプレッドシートを追加してください'
-        },
-        {
-          action: '新規登録テスト',
-          instruction: `${results.urls.webApp} にアクセス`,
-          description: '「新規登録」をクリックしてテストしてください'
-        },
-        {
-          action: 'ユーザーマニュアル',
-          instruction: 'README.mdまたはドキュメントを確認',
-          description: 'ユーザー向けの使用方法を確認してください'
-        }
-      );
-    }
+    console.log("🎉 すべてのセットアップが正常に完了しました！");
+    console.log("---");
+    console.log("次のステップ:");
+    console.log(`1. 管理画面にアクセスして動作を確認してください: ${webAppUrl}?mode=admin`);
+    console.log(`2. 新規ユーザーとして登録テストを行ってください: ${webAppUrl}`);
 
-  } catch (error) {
-    console.error('セットアップ中に予期しないエラー:', error);
-    addError(results, '全体', `予期しないエラー: ${error.message}`);
-    results.status = 'error';
+  } catch (e) {
+    console.error(`❌ セットアップ中にエラーが発生しました: ${e.message}`);
+    console.error(e.stack);
+    // 失敗した場合でも、取得できた情報はログに出力
+    const props = PropertiesService.getScriptProperties().getProperties();
+    console.log("現在のプロパティ設定:", props);
+  } finally {
+    lock.releaseLock();
   }
-
-  // 最終結果判定
-  if (results.errors.length > 0) {
-    results.status = 'error';
-  } else if (results.warnings.length > 0) {
-    results.status = 'warning';
-  }
-
-  debugLog('=== StudyQuest統合セットアップ完了 ===');
-  debugLog('結果:', JSON.stringify(results, null, 2));
-  
-  // ユーザー向けの見やすい結果表示
-  displaySetupResults(results);
-  
-  return results;
 }
 
 // =================================================================

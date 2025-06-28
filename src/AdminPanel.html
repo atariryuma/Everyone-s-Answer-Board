@@ -338,7 +338,7 @@
       </div>
       
       <!-- Active Sheet Info -->
-      <div class="glass-panel p-6 rounded-xl fade-in">
+      <div id="active-sheet-panel" class="glass-panel p-6 rounded-xl fade-in transition-all duration-200">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-white flex items-center gap-2">
             <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -349,7 +349,7 @@
           <span class="text-xs bg-gray-700 px-2 py-1 rounded-full" id="sheet-count">0 枚</span>
         </div>
         <div class="flex items-center justify-between">
-          <div id="active-sheet-area" class="transition-colors">
+          <div id="active-sheet-area" class="transition-colors flex-1">
             <p class="text-xl font-bold text-green-400 mb-1">
               <span id="active-sheet-name" class="transition-colors">未設定</span>
             </p>
@@ -924,17 +924,8 @@
       // Auto-update config when headers change
       elements.mainHeader.addEventListener('change', updateConfigButtons);
       
-      // Active sheet name click event
-      document.getElementById('active-sheet-name').addEventListener('click', function() {
-        if (currentSpreadsheetUrl) {
-          window.open(currentSpreadsheetUrl, '_blank');
-        } else {
-          showMessage('スプレッドシートのURLが見つかりません', 'yellow');
-        }
-      });
-      
-      // Active sheet area click event (for the whole area)
-      document.getElementById('active-sheet-area').addEventListener('click', function() {
+      // Active sheet panel click event (entire panel clickable)
+      document.getElementById('active-sheet-panel').addEventListener('click', function() {
         if (currentSpreadsheetUrl) {
           window.open(currentSpreadsheetUrl, '_blank');
         } else {
@@ -1122,23 +1113,19 @@
       
       // Active sheet info
       const activeNameEl = document.getElementById('active-sheet-name');
-      const activeSheetAreaEl = document.getElementById('active-sheet-area');
+      const activeSheetPanelEl = document.getElementById('active-sheet-panel');
       if (activeNameEl) {
         activeNameEl.textContent = currentActiveSheet || '未設定';
-        // クリック可能状態の管理
+        // クリック可能状態の管理（パネル全体）
         if (currentActiveSheet && currentSpreadsheetUrl) {
-          activeNameEl.classList.add('cursor-pointer', 'hover:text-green-300', 'hover:underline');
-          activeNameEl.title = 'クリックでスプレッドシートを開く';
-          if (activeSheetAreaEl) {
-            activeSheetAreaEl.classList.add('cursor-pointer', 'hover:bg-green-500/10', 'rounded-lg', 'p-2', '-m-2');
-            activeSheetAreaEl.title = 'クリックでスプレッドシートを開く';
+          if (activeSheetPanelEl) {
+            activeSheetPanelEl.classList.add('cursor-pointer', 'hover:bg-green-500/5', 'hover:border-green-400/30', 'hover:shadow-lg', 'hover:shadow-green-500/10');
+            activeSheetPanelEl.title = 'クリックでスプレッドシートを開く';
           }
         } else {
-          activeNameEl.classList.remove('cursor-pointer', 'hover:text-green-300', 'hover:underline');
-          activeNameEl.title = '';
-          if (activeSheetAreaEl) {
-            activeSheetAreaEl.classList.remove('cursor-pointer', 'hover:bg-green-500/10', 'rounded-lg', 'p-2', '-m-2');
-            activeSheetAreaEl.title = '';
+          if (activeSheetPanelEl) {
+            activeSheetPanelEl.classList.remove('cursor-pointer', 'hover:bg-green-500/5', 'hover:border-green-400/30', 'hover:shadow-lg', 'hover:shadow-green-500/10');
+            activeSheetPanelEl.title = '';
           }
         }
       }
