@@ -2438,8 +2438,16 @@ function sanitizeConfigData(config) {
 // Database initialization and access
 // ===============================================================
 
-// 管理者が一度だけ実行
+/**
+ * @deprecated Setup.gsのstudyQuestSetup()を使用してください
+ * 
+ * 管理者が一度だけ実行 - 新しい統合セットアップに移行済み
+ * 使用方法: Setup.gsのstudyQuestSetup()を実行してください
+ */
 function setup() {
+  console.warn('この関数は非推奨です。Setup.gsのstudyQuestSetup()を使用してください。');
+  console.log('移行のため、旧セットアップを実行します...');
+  
   const props = PropertiesService.getScriptProperties();
   if (props.getProperty('DATABASE_ID')) {
     console.log('Setup already done.');
@@ -2451,6 +2459,7 @@ function setup() {
   sheet.setName(USER_DB_CONFIG.SHEET_NAME);
   sheet.appendRow(USER_DB_CONFIG.HEADERS);
   console.log('Database created. ID: ' + db.getId());
+  console.log('⚠️ 今後はSetup.gsのstudyQuestSetup()をご利用ください。');
 }
 
 // DBアクセスは必ずこの関数を経由させる
