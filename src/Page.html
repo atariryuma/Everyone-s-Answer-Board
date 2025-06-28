@@ -10,6 +10,8 @@
 <link rel="preconnect" href="https://script.google.com" crossorigin>
 <script src="https://cdn.tailwindcss.com" defer></script>
 <script>
+const DEBUG_MODE = false;
+function debugLog(){ if (DEBUG_MODE && console && console.log){ console.log.apply(console, arguments); } }
 const __SHOW_COUNTS__ = '<?= typeof showCounts !== "undefined" ? showCounts : false ?>';
 const __DISPLAY_MODE__ = '<?= typeof displayMode !== "undefined" ? displayMode : "anonymous" ?>';
 const __SHEET_NAME__ = '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>';
@@ -813,7 +815,7 @@ class StudyQuestApp {
       pollingFailureCount: 0
     };
     
-    console.log('初期状態設定:', {
+    debugLog('初期状態設定:', {
       isAdminUser: this.state.isAdminUser,
       windowIsAdminUser: window.isAdminUser,
       showHighlightToggle: this.state.showHighlightToggle,
@@ -1018,7 +1020,7 @@ class StudyQuestApp {
       
       const highlightBtn = e.target.closest('.highlight-btn');
       if (highlightBtn) {
-        console.log('ハイライトボタンクリック:', { rowIndex, disabled: highlightBtn.disabled, showHighlightToggle: this.state.showHighlightToggle });
+        debugLog('ハイライトボタンクリック:', { rowIndex, disabled: highlightBtn.disabled, showHighlightToggle: this.state.showHighlightToggle });
         e.stopPropagation();
         if (!highlightBtn.disabled) {
           this.handleHighlight(rowIndex);
@@ -1060,15 +1062,15 @@ class StudyQuestApp {
       }
     }
     
-    console.log('GAS API呼び出し:', { funcName, args, userId: USER_ID, isStateChanging });
+    debugLog('GAS API呼び出し:', { funcName, args, userId: USER_ID, isStateChanging });
     
     return new Promise((resolve, reject) => {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         const userId = USER_ID || '';
-        console.log('Google Apps Script環境検出済み、実際にAPI呼び出し実行中...');
+        debugLog('Google Apps Script環境検出済み、実際にAPI呼び出し実行中...');
         google.script.run
           .withSuccessHandler((result) => {
-            console.log('GAS APIレスポンス受信:', { funcName, args, result, success: true });
+            debugLog('GAS APIレスポンス受信:', { funcName, args, result, success: true });
             if (!isStateChanging) {
               this.cache.set(cacheKey, result, 1000); // 1秒キャッシュ
             }
@@ -1083,7 +1085,7 @@ class StudyQuestApp {
       } else {
         console.warn('Google Apps Script environment not detected.');
         this.getMockData(funcName, ...args).then((result) => {
-          console.log('モックデータ取得:', { funcName, result });
+          debugLog('モックデータ取得:', { funcName, result });
           if (!isStateChanging) {
             this.cache.set(cacheKey, result, 1000); // 1秒キャッシュ
           }
@@ -1097,7 +1099,7 @@ class StudyQuestApp {
     if (window.isAdminUser) {
       this.state.isAdminUser = true;
       this.state.showHighlightToggle = true; // 管理者なら常に表示
-      console.log('管理者権限確認済み、ハイライトトグル有効化:', {
+      debugLog('管理者権限確認済み、ハイライトトグル有効化:', {
         isAdminUser: this.state.isAdminUser,
         showHighlightToggle: this.state.showHighlightToggle
       });
@@ -1116,7 +1118,7 @@ class StudyQuestApp {
         window.isAdminUser = true;
         this.state.isAdminUser = true;
         this.state.showHighlightToggle = true; // 管理者なら常に表示
-        console.log('API管理者権限確認済み、ハイライトトグル有効化:', {
+        debugLog('API管理者権限確認済み、ハイライトトグル有効化:', {
           isAdminUser: this.state.isAdminUser,
           showHighlightToggle: this.state.showHighlightToggle
         });
@@ -1134,7 +1136,7 @@ class StudyQuestApp {
   showAdminControls() {
     this.state.isAdminUser = true;
     this.state.showHighlightToggle = true; // 管理者なら常に表示
-    console.log('showAdminControls実行、ハイライトトグル有効化:', {
+    debugLog('showAdminControls実行、ハイライトトグル有効化:', {
       isAdminUser: this.state.isAdminUser,
       showHighlightToggle: this.state.showHighlightToggle
     });
@@ -1176,7 +1178,7 @@ class StudyQuestApp {
       if (newCount > this.state.lastSeenCount && this.state.lastSeenCount > 0) {
         const newItems = newCount - this.state.lastSeenCount;
         this.showNewContentBanner(newItems);
-        console.log('新着コンテンツ検出:', { newItems, newCount, lastSeenCount: this.state.lastSeenCount });
+        debugLog('新着コンテンツ検出:', { newItems, newCount, lastSeenCount: this.state.lastSeenCount });
       }
     } catch (error) {
       this.state.pollingFailureCount++;
@@ -1184,7 +1186,7 @@ class StudyQuestApp {
       
       // 連続で失敗が続く場合はポーリング間隔を延ばす
       if (this.state.pollingFailureCount >= 3) {
-        console.log('連続失敗によりポーリング間隔を延長');
+        debugLog('連続失敗によりポーリング間隔を延長');
         this.stopPolling();
         setTimeout(() => {
           this.startPolling();
@@ -1480,14 +1482,14 @@ class StudyQuestApp {
       } else {
         // 管理者の場合のハイライトトグルは常に表示
         this.state.showHighlightToggle = true;
-        console.log('loadSheetData管理者設定更新:', {
+        debugLog('loadSheetData管理者設定更新:', {
           isAdminUser: this.state.isAdminUser,
           showAdminFeatures: this.state.showAdminFeatures,
           showHighlightToggle: this.state.showHighlightToggle
         });
         // ハイライトトグル設定が変更されたのでキャッシュをクリア
         this.cache.clear();
-        console.log('管理者ハイライト設定によりキャッシュクリア実行');
+        debugLog('管理者ハイライト設定によりキャッシュクリア実行');
       }
       if (isInitialLoad) {
         // Add visual feedback that loading is complete
@@ -1507,11 +1509,11 @@ class StudyQuestApp {
         // 初期ロード時にlastSeenCountを設定
         if (isInitialLoad) {
           this.state.lastSeenCount = data.rows.length;
-          console.log('初期ロード完了、lastSeenCount設定:', this.state.lastSeenCount);
+          debugLog('初期ロード完了、lastSeenCount設定:', this.state.lastSeenCount);
         }
         
         // デバッグ用: 受信したデータの確認
-        console.log('Sheet data received:', {
+        debugLog('Sheet data received:', {
           totalRows: data.rows.length,
           sampleRow: data.rows[0] || null,
           showAdminFeatures: this.state.showAdminFeatures,
@@ -1526,7 +1528,7 @@ class StudyQuestApp {
       } else if (isInitialLoad) {
         // データに変更がない場合でも初期ロード時はlastSeenCountを設定
         this.state.lastSeenCount = data.rows.length;
-        console.log('初期ロード（データ変更なし）、lastSeenCount設定:', this.state.lastSeenCount);
+        debugLog('初期ロード（データ変更なし）、lastSeenCount設定:', this.state.lastSeenCount);
       }
     } catch (error) {
       console.error('Error loading sheet data:', error);
@@ -1631,11 +1633,11 @@ class StudyQuestApp {
     // ハイライト状態を適用（リアクション装飾より優先）
     if (data.highlight) {
       element.classList.add('highlighted');
-      console.log('ハイライト装飾適用:', { rowIndex: data.rowIndex, element: element.tagName, highlight: data.highlight });
+      debugLog('ハイライト装飾適用:', { rowIndex: data.rowIndex, element: element.tagName, highlight: data.highlight });
       // ハイライト時はリアクション装飾をスキップ
       return;
     } else {
-      console.log('ハイライト装飾なし:', { rowIndex: data.rowIndex, element: element.tagName, highlight: data.highlight });
+      debugLog('ハイライト装飾なし:', { rowIndex: data.rowIndex, element: element.tagName, highlight: data.highlight });
     }
     
     // アクティブなリアクションを特定
@@ -1671,13 +1673,13 @@ class StudyQuestApp {
     // 管理者の場合はハイライトトグルを確実に有効化
     if (this.state.isAdminUser && !this.state.showHighlightToggle) {
       this.state.showHighlightToggle = true;
-      console.log('renderBoard中にハイライトトグル強制有効化:', {
+      debugLog('renderBoard中にハイライトトグル強制有効化:', {
         isAdminUser: this.state.isAdminUser,
         showHighlightToggle: this.state.showHighlightToggle
       });
       // ハイライトトグル設定が変更されたのでキャッシュをクリア
       this.cache.clear();
-      console.log('renderBoard: ハイライト設定変更によりキャッシュクリア実行');
+      debugLog('renderBoard: ハイライト設定変更によりキャッシュクリア実行');
     }
     
     const container = this.elements.answersContainer;
@@ -1896,7 +1898,7 @@ class StudyQuestApp {
       showHighlightToggle: this.state.showHighlightToggle
     });
     
-    console.log('createAnswerCard キャッシュチェック:', {
+    debugLog('createAnswerCard キャッシュチェック:', {
       rowIndex: data.rowIndex,
       cacheKey: cacheKey.substring(0, 100) + '...',
       showHighlightToggle: this.state.showHighlightToggle,
@@ -1905,7 +1907,7 @@ class StudyQuestApp {
     
     const cachedCard = this.cache.get(`render-${cacheKey}`);
     if (cachedCard) {
-      console.log('キャッシュされたカードを使用:', { rowIndex: data.rowIndex });
+      debugLog('キャッシュされたカードを使用:', { rowIndex: data.rowIndex });
       return cachedCard.cloneNode(true);
     }
     
@@ -1917,7 +1919,7 @@ class StudyQuestApp {
     card.setAttribute('tabindex', '0');
     card.setAttribute('aria-label', '回答カード: ' + (data.opinion || '').substring(0, 50) + (data.opinion && data.opinion.length > 50 ? '...' : ''));
     let highlightBtnHtml = '';
-    console.log('createCard ハイライトボタン条件チェック:', {
+    debugLog('createCard ハイライトボタン条件チェック:', {
       rowIndex: data.rowIndex,
       showHighlightToggle: this.state.showHighlightToggle,
       isAdminUser: this.state.isAdminUser,
@@ -1927,7 +1929,7 @@ class StudyQuestApp {
       const cls = data.highlight ? 'liked' : '';
       const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
       highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
-      console.log('カードハイライトボタン作成:', { 
+      debugLog('カードハイライトボタン作成:', { 
         rowIndex: data.rowIndex, 
         showHighlightToggle: this.state.showHighlightToggle,
         windowShowHighlightToggle: window.showHighlightToggle,
@@ -1937,7 +1939,7 @@ class StudyQuestApp {
         highlight: data.highlight
       });
     } else {
-      console.log('カードハイライトボタンをスキップ:', { 
+      debugLog('カードハイライトボタンをスキップ:', { 
         rowIndex: data.rowIndex, 
         showHighlightToggle: this.state.showHighlightToggle,
         windowShowHighlightToggle: window.showHighlightToggle,
@@ -2114,7 +2116,7 @@ class StudyQuestApp {
     }, 2000);
   }
   async handleHighlight(rowIndex) {
-    console.log('handleHighlight開始:', { 
+    debugLog('handleHighlight開始:', { 
       rowIndex, 
       isAdminUser: this.state.isAdminUser, 
       showHighlightToggle: this.state.showHighlightToggle,
@@ -2125,10 +2127,10 @@ class StudyQuestApp {
     });
     
     // 管理者権限の再確認
-    console.log('admin権限再確認中...');
+    debugLog('admin権限再確認中...');
     try {
       const adminCheck = await this.gas.checkAdmin();
-      console.log('サーバー側admin確認結果:', adminCheck);
+      debugLog('サーバー側admin確認結果:', adminCheck);
       if (!adminCheck) {
         throw new Error('サーバー側で管理者権限が確認できませんでした。スプレッドシートの所有者でログインしているか確認してください。');
       }
@@ -2142,7 +2144,7 @@ class StudyQuestApp {
     
     // Enhanced debounce for highlight operations
     if (this.highlightDebounce.has(highlightKey)) {
-      console.log('デバウンス中、処理をスキップ');
+      debugLog('デバウンス中、処理をスキップ');
       clearTimeout(this.highlightDebounce.get(highlightKey));
       return; // Ignore rapid highlight clicks
     }
@@ -2151,13 +2153,13 @@ class StudyQuestApp {
     const now = Date.now();
     const lastHighlightTime = this.lastReactionTimes?.get(highlightKey) || 0;
     if (now - lastHighlightTime < 500) { // Minimum 500ms between highlights
-      console.log('レート制限中、処理をスキップ');
+      debugLog('レート制限中、処理をスキップ');
       return;
     }
     
     // 既に処理中の場合は無視
     if (this.pendingReactions.has(highlightKey)) {
-      console.log('既に処理中、処理をスキップ');
+      debugLog('既に処理中、処理をスキップ');
       return;
     }
     
@@ -2168,10 +2170,10 @@ class StudyQuestApp {
     const btns = document.querySelectorAll('.highlight-btn[data-row-index="' + numericRowIndex + '"]');
     const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
     
-    console.log('ハイライト処理:', { numericRowIndex, btnsFound: btns.length, itemFound: !!item });
+    debugLog('ハイライト処理:', { numericRowIndex, btnsFound: btns.length, itemFound: !!item });
     
     if (!item) {
-      console.log('対象データが見つからない');
+      debugLog('対象データが見つからない');
       this.pendingReactions.delete(highlightKey);
       return;
     }
@@ -2200,13 +2202,13 @@ class StudyQuestApp {
       
       // ハイライト機能は管理者なら閲覧モードでも使用可能
       // （他の管理機能とは異なり、常に利用可能）
-      console.log('ハイライト権限チェック通過:', {
+      debugLog('ハイライト権限チェック通過:', {
         isAdminUser: this.state.isAdminUser,
         windowIsAdminUser: window.isAdminUser,
         showAdminFeatures: this.state.showAdminFeatures
       });
       
-      console.log('ハイライト送信中...', { 
+      debugLog('ハイライト送信中...', { 
         numericRowIndex, 
         sheetName: this.state.sheetName, 
         isAdminUser: this.state.isAdminUser,
@@ -2216,7 +2218,7 @@ class StudyQuestApp {
         ownerName: OWNER_NAME
       });
       const res = await this.gas.toggleHighlight(numericRowIndex, this.state.sheetName);
-      console.log('ハイライトレスポンス:', res);
+      debugLog('ハイライトレスポンス:', res);
       
       if (res && res.status === 'ok') {
         // サーバーからの正確な値で更新
@@ -2299,7 +2301,7 @@ class StudyQuestApp {
       window.showHighlightToggle = this.state.isAdminUser; // 管理者なら常に表示
       window.showScoreSort = enable;
       
-      console.log('toggleAdminMode状態更新:', {
+      debugLog('toggleAdminMode状態更新:', {
         enable,
         isAdminUser: this.state.isAdminUser,
         showAdminFeatures: window.showAdminFeatures,
@@ -2456,14 +2458,14 @@ class StudyQuestApp {
     this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
     
     // リアクションに基づくカード色の適用
-    console.log('モーダルにリアクション装飾適用:', {
+    debugLog('モーダルにリアクション装飾適用:', {
       rowIndex: data.rowIndex,
       highlight: data.highlight,
       reactions: data.reactions,
       element: this.elements.answerModalCard.className
     });
     this.applyReactionStyles(this.elements.answerModalCard, data);
-    console.log('モーダル装飾適用後:', {
+    debugLog('モーダル装飾適用後:', {
       className: this.elements.answerModalCard.className
     });
     
@@ -2496,7 +2498,7 @@ class StudyQuestApp {
     this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
     
     // モーダルカードのスタイルを更新
-    console.log('updateModalContent装飾適用:', {
+    debugLog('updateModalContent装飾適用:', {
       rowIndex: data.rowIndex,
       highlight: data.highlight,
       reactions: data.reactions
@@ -2625,7 +2627,7 @@ class StudyQuestApp {
     }
   }
   updateConfigFromGlobals() {
-    console.log('updateConfigFromGlobals前の状態:', {
+    debugLog('updateConfigFromGlobals前の状態:', {
       isAdminUser: this.state.isAdminUser,
       showHighlightToggle: this.state.showHighlightToggle,
       windowShowHighlightToggle: window.showHighlightToggle,
@@ -2639,7 +2641,7 @@ class StudyQuestApp {
     this.state.showHighlightToggle = this.state.isAdminUser; // 管理者なら常に表示
     this.state.showScoreSort = window.showScoreSort;
     
-    console.log('updateConfigFromGlobals後の状態:', {
+    debugLog('updateConfigFromGlobals後の状態:', {
       isAdminUser: this.state.isAdminUser,
       showHighlightToggle: this.state.showHighlightToggle,
       windowShowHighlightToggle: window.showHighlightToggle,
@@ -2700,7 +2702,7 @@ class StudyQuestApp {
   }
 
   optimizeForLowPerformance() {
-    console.log('Enabling low performance optimizations');
+    debugLog('Enabling low performance optimizations');
     
     // Reduce animation and transition durations
     document.documentElement.style.setProperty('--transition-duration', '0.1s');
@@ -2857,7 +2859,7 @@ class StudyQuestApp {
     // Clear DOM fragment pool
     this.domFragmentPool.length = 0;
 
-    console.log('Cache cleanup completed', {
+    debugLog('Cache cleanup completed', {
       cacheSize: this.cache.size
     });
   }

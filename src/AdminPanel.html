@@ -836,6 +836,8 @@
   </div>
 
   <script>
+    const DEBUG_MODE = false;
+    function debugLog(){ if (DEBUG_MODE && console && console.log){ console.log.apply(console, arguments); } }
     const userId = '<?= userId ?>';
     const adminUserEmail = '<?= adminUserEmail ?>';
     const webAppAdminEmail = '<?= webAppAdminEmail ?>';
@@ -1403,7 +1405,7 @@
               updateConfigButtons();
             })
             .withFailureHandler((error) => {
-              console.log('Config not found, using guessed headers:', error);
+              debugLog('Config not found, using guessed headers:', error);
               showMessage('新しいシートの設定を自動推測しました。確認してください。', 'blue');
               updateConfigButtons();
             })
@@ -1431,7 +1433,7 @@
     }
 
     function guessHeaders(headers) {
-      console.log('AdminPanel guessing headers:', headers);
+      debugLog('AdminPanel guessing headers:', headers);
       
       const find = (keywords) => {
         return headers.find(h => 
@@ -1449,7 +1451,7 @@
       let classHeader = '';
       
       if (isGoogleForm) {
-        console.log('Detected Google Form in AdminPanel');
+        debugLog('Detected Google Form in AdminPanel');
         
         // メタデータ以外のヘッダーを抽出
         const nonMetaHeaders = headers.filter(h => {
@@ -1461,7 +1463,7 @@
                  String(h || '').trim() !== '';
         });
         
-        console.log('Non-meta headers in AdminPanel:', nonMetaHeaders);
+        debugLog('Non-meta headers in AdminPanel:', nonMetaHeaders);
         
         // より柔軟な推測ロジック
         for (let i = 0; i < nonMetaHeaders.length; i++) {
@@ -1521,7 +1523,7 @@
         classHeader: classHeader
       };
       
-      console.log('AdminPanel guessed result:', result);
+      debugLog('AdminPanel guessed result:', result);
       return result;
     }
 
