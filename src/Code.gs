@@ -83,6 +83,16 @@ function safeGetUserEmail() {
   }
 }
 
+/**
+ * フロントエンドから現在のユーザーのメールアドレスを取得するためのラッパー。
+ * Registration.html などから呼び出される。
+ *
+ * @return {string} ユーザーのメールアドレス
+ */
+function getActiveUserEmail() {
+  return safeGetUserEmail();
+}
+
 function isValidEmail(email) {
   if (!email || typeof email !== 'string') {
     return false;
