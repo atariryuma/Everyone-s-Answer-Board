@@ -1728,6 +1728,32 @@ function createStudyQuestForm(userEmail) {
   }
 }
 
+/**
+ * Admin Panel用のボード作成関数
+ * 現在ログイン中のユーザーの新しいボードを作成します
+ */
+function createBoardFromAdmin() {
+  try {
+    const currentUserEmail = safeGetUserEmail();
+    const result = createStudyQuestForm(currentUserEmail);
+    
+    // 作成されたスプレッドシートを現在のユーザーに追加
+    if (result.spreadsheetId && result.spreadsheetUrl) {
+      const addResult = addSpreadsheetUrl(result.spreadsheetUrl);
+      console.log('Spreadsheet added to user:', addResult);
+    }
+    
+    return {
+      ...result,
+      message: '新しいボードが作成され、自動的に追加されました！',
+      autoCreated: true
+    };
+  } catch (error) {
+    console.error('Failed to create board from admin:', error);
+    throw new Error(`ボード作成に失敗しました: ${error.message}`);
+  }
+}
+
 function createStudyQuestSpreadsheetFallback(userEmail) {
   try {
     const spreadsheet = SpreadsheetApp.create(`StudyQuest - 回答データ - ${userEmail.split('@')[0]}`);
