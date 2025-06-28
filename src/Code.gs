@@ -2434,9 +2434,11 @@ function sanitizeConfigData(config) {
 
 // DBアクセスは必ずこの関数を経由させる
 function getDatabase() {
-  const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_ID');
+  const props = PropertiesService.getScriptProperties();
+  // DATABASE_IDを優先、USER_DATABASE_IDは後方互換性のためのフォールバック
+  const dbId = props.getProperty('DATABASE_ID') || props.getProperty('USER_DATABASE_ID');
   if (!dbId) {
-    throw new Error('Database not initialized. Please run setup().');
+    throw new Error('Database not initialized. Please run studyQuestSetup().');
   }
   return SpreadsheetApp.openById(dbId);
 }
@@ -2448,7 +2450,7 @@ function getUserDatabase() {
   const db = getDatabase();
   const sheet = db.getSheetByName(USER_DB_CONFIG.SHEET_NAME);
   if (!sheet) {
-    throw new Error('Database sheet not found. Please run setup().');
+    throw new Error('Database sheet not found. Please run studyQuestSetup().');
   }
   return sheet;
 }

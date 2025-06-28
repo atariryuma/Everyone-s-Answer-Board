@@ -27,6 +27,9 @@
  * 
  * 📖 詳細な使用方法は SETUP_README.md を参照してください。
  * 
+ * 💾 データベースID統合: USER_DATABASE_IDは廃止され、DATABASE_IDに統合されました。
+ *    既存環境では後方互換性のためフォールバック読み込みを維持しています。
+ * 
  * =================================================================
  */
 
@@ -256,7 +259,7 @@ function setupDeployId(manualDeployId, currentUrl) {
 function setupUserDatabase() {
   try {
     const props = PropertiesService.getScriptProperties();
-    // 既存のプロパティ名に合わせる（DATABASE_ID）
+    // DATABASE_IDを優先、USER_DATABASE_IDは後方互換性のためのフォールバック
     const existingDbId = props.getProperty('DATABASE_ID') || props.getProperty('USER_DATABASE_ID');
     
     if (existingDbId) {
@@ -281,10 +284,9 @@ function setupUserDatabase() {
     sheet.appendRow(USER_DB_CONFIG.HEADERS);
     
     const spreadsheetId = spreadsheet.getId();
-    // 既存のプロパティ名に合わせる
+    // DATABASE_IDを標準として設定（USER_DATABASE_IDは廃止）
     props.setProperties({ 
-      DATABASE_ID: spreadsheetId,
-      USER_DATABASE_ID: spreadsheetId  // 後方互換性
+      DATABASE_ID: spreadsheetId
     });
     
     return {
@@ -366,7 +368,7 @@ function testConfiguration() {
       value: deployId || 'なし'
     });
 
-    // データベースIDテスト
+    // データベースIDテスト（DATABASE_ID優先、USER_DATABASE_IDは後方互換性）
     const dbId = props.getProperty('DATABASE_ID') || props.getProperty('USER_DATABASE_ID');
     tests.push({
       name: 'ユーザーデータベース',
@@ -507,6 +509,42 @@ function addWarning(results, stepName, message) {
 
 // DEPLOY_IDを抽出する関数はCode.gsのextractDeployIdFromUrlを使用
 
+/**
+ * USER_DATABASE_IDからDATABASE_IDへの移行関数（将来のクリーンアップ用）
+ * 既存環境でUSER_DATABASE_IDのみが設定されている場合、DATABASE_IDに移行する
+ */
+function migrateDatabaseIdProperty() {
+  const props = PropertiesService.getScriptProperties();
+  const databaseId = props.getProperty('DATABASE_ID');
+  const userDatabaseId = props.getProperty('USER_DATABASE_ID');
+  
+  // DATABASE_IDが未設定でUSER_DATABASE_IDが設定されている場合のみ移行
+  if (!databaseId && userDatabaseId) {
+    props.setProperties({ DATABASE_ID: userDatabaseId });
+    console.log('Migrated USER_DATABASE_ID to DATABASE_ID:', userDatabaseId);
+    
+    // 移行後、古いプロパティを削除することも可能（コメントアウト）
+    // props.deleteProperty('USER_DATABASE_ID');
+    
+    return {
+      success: true,
+      message: 'USER_DATABASE_IDからDATABASE_IDへ移行しました',
+      migratedId: userDatabaseId
+    };
+  } else if (databaseId) {
+    return {
+      success: true,
+      message: 'DATABASE_IDは既に設定済みです',
+      currentId: databaseId
+    };
+  } else {
+    return {
+      success: false,
+      message: '移行可能なデータベースIDが見つかりません'
+    };
+  }
+}
+
 // =================================================================
 // エクスポート（他のファイルから使用する場合）
 // =================================================================
@@ -518,6 +556,7 @@ if (typeof module !== 'undefined') {
     setupDeployId,
     setupUserDatabase,
     initializeAppUrls,
-    testConfiguration
+    testConfiguration,
+    migrateDatabaseIdProperty
   };
 }

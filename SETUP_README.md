@@ -121,10 +121,22 @@ https://script.google.com/macros/s/YOUR_DEPLOY_ID/exec
 - 実行時に警告が表示されますが、動作は継続
 - 新規デプロイでは`studyQuestSetup()`を使用してください
 
+### データベースID統合について
+- **USER_DATABASE_ID** → **DATABASE_ID** に統合されました
+- 既存環境では自動でフォールバック読み込みされます
+- 新規セットアップでは`DATABASE_ID`のみが設定されます
+
 ### 移行手順
 1. 既存環境での`studyQuestSetup()`実行
-2. 動作確認後、旧関数の削除を検討
-3. 新機能（環境別URL対応など）の活用
+2. データベースIDの自動統合確認
+3. 動作確認後、旧関数の削除を検討
+4. 新機能（環境別URL対応など）の活用
+
+### 手動移行（必要に応じて）
+```javascript
+// 古いUSER_DATABASE_IDからDATABASE_IDへの手動移行
+migrateDatabaseIdProperty()
+```
 
 ## 📚 関連ドキュメント
 
