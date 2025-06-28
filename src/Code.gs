@@ -2492,10 +2492,24 @@ function registerNewUser(adminEmail) {
   
   auditLog('NEW_USER_REGISTERED', userId, { adminEmail, spreadsheetId: formAndSsInfo.spreadsheetId });
   
+  // URLを生成（安全性を考慮）
+  const webAppUrl = getWebAppUrlEnhanced();
+  debugLog('Register new user - webAppUrl:', webAppUrl);
+  debugLog('Register new user - userId:', userId);
+  
+  const adminUrl = webAppUrl ? `${webAppUrl}?userId=${userId}&mode=admin` : '';
+  const viewUrl = webAppUrl ? `${webAppUrl}?userId=${userId}` : '';
+  
+  debugLog('Register new user - generated URLs:', { adminUrl, viewUrl });
+  
   return {
     userId: userId,
     spreadsheetId: formAndSsInfo.spreadsheetId,
     spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+    formUrl: formAndSsInfo.formUrl,
+    editFormUrl: formAndSsInfo.editFormUrl,
+    adminUrl: adminUrl,
+    viewUrl: viewUrl,
     message: '新しいユーザーが登録されました。管理画面に移動します。'
   };
 }

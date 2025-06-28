@@ -586,7 +586,14 @@
           const viewUrl = result.viewUrl || '';
           
           if (!adminUrl || !viewUrl) {
-            showMessage('エラー: 無効なURLが生成されました。', 'error');
+            showMessage('エラー: 無効なURLが生成されました。ページを更新してから再度お試しください。', 'error');
+            console.error('URL generation failed:', { adminUrl, viewUrl, result });
+            
+            // ページを自動的にリロードして再試行
+            setTimeout(() => {
+              showMessage('ページを自動的に更新しています...', 'info');
+              window.location.reload();
+            }, 3000);
             return;
           }
           
