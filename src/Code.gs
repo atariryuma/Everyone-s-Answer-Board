@@ -1653,13 +1653,51 @@ function getUrlOrigin(url) {
   return match ? match[1] : '';
 }
 
+function extractDeployIdFromUrl(url) {
+  if (!url) return null;
+  
+  // script.google.com/macros/s/{DEPLOY_ID}/exec形式からDEPLOY_IDを抽出
+  const macrosMatch = url.match(/\/macros\/s\/([a-zA-Z0-9_-]+)/);
+  if (macrosMatch) {
+    return macrosMatch[1];
+  }
+  
+  // script.googleusercontent.com形式のURLの場合、URL全体から推測を試行
+  if (/script\.googleusercontent\.com/.test(url)) {
+    // URLのハッシュ部分やパラメータからDEPLOY_IDの可能性があるものを探す
+    const hashMatch = url.match(/#gid=([a-zA-Z0-9_-]+)/);
+    if (hashMatch && hashMatch[1].length > 10) {
+      return hashMatch[1];
+    }
+  }
+  
+  return null;
+}
+
 function convertPreviewUrl(url, deployId) {
   if (!url) return url;
-  if (/script\.googleusercontent\.com/.test(url) && deployId) {
+  
+  // より包括的なプレビューURL検出
+  const isPreviewUrl = /script\.googleusercontent\.com/.test(url) || 
+                      /macros\/.*\/dev/.test(url) ||
+                      /-script\.googleusercontent\.com/.test(url);
+  
+  if (isPreviewUrl && deployId) {
     const query = url.split('?')[1] || '';
     const base = `https://script.google.com/macros/s/${deployId}/exec`;
     return query ? `${base}?${query}` : base;
   }
+  
+  // deployIdがない場合でも、URLからdeployIdを抽出を試行
+  if (isPreviewUrl && !deployId) {
+    const extractedId = extractDeployIdFromUrl(url);
+    if (extractedId) {
+      const query = url.split('?')[1] || '';
+      const base = `https://script.google.com/macros/s/${extractedId}/exec`;
+      return query ? `${base}?${query}` : base;
+    }
+  }
+  
   return url;
 }
 
@@ -1704,7 +1742,79 @@ function getWebAppUrl() {
 
 function saveDeployId(id) {
   const props = PropertiesService.getScriptProperties();
-  props.setProperties({ DEPLOY_ID: (id || '').trim() });
+  const cleanId = (id || '').trim();
+  
+  // DEPLOY_ID形式の検証
+  if (cleanId && !/^[a-zA-Z0-9_-]{10,}$/.test(cleanId)) {
+    console.warn('Invalid DEPLOY_ID format:', cleanId);
+    throw new Error('無効なDEPLOY_ID形式です');
+  }
+  
+  if (cleanId) {
+    props.setProperties({ DEPLOY_ID: cleanId });
+    console.log('Saved DEPLOY_ID:', cleanId);
+    
+    // DEPLOY_IDが設定された後、WebAppURLを再評価
+    const currentUrl = getWebAppUrl();
+    console.log('Updated WebApp URL after DEPLOY_ID save:', currentUrl);
+    
+    // 保存されたURLがまだプレビュー形式の場合は再変換
+    const storedUrl = props.getProperty('WEB_APP_URL');
+    if (storedUrl && /script\.googleusercontent\.com/.test(storedUrl)) {
+      const convertedUrl = convertPreviewUrl(storedUrl, cleanId);
+      if (convertedUrl !== storedUrl) {
+        props.setProperties({ WEB_APP_URL: convertedUrl });
+        console.log('Converted stored URL from preview to production:', convertedUrl);
+      }
+    }
+  } else {
+    console.warn('Cannot save empty DEPLOY_ID');
+  }
+}
+
+function forceInitializeUrls() {
+  const props = PropertiesService.getScriptProperties();
+  
+  try {
+    // 現在のURL取得を試行
+    let currentUrl = '';
+    if (typeof ScriptApp !== 'undefined') {
+      currentUrl = ScriptApp.getService().getUrl();
+    }
+    
+    console.log('Current script URL:', currentUrl);
+    
+    // URLからDEPLOY_IDを抽出試行
+    if (currentUrl) {
+      const extractedId = extractDeployIdFromUrl(currentUrl);
+      if (extractedId) {
+        console.log('Extracted DEPLOY_ID from current URL:', extractedId);
+        saveDeployId(extractedId);
+        return {
+          status: 'success',
+          deployId: extractedId,
+          webAppUrl: getWebAppUrl(),
+          message: 'DEPLOY_IDを自動抽出して設定しました'
+        };
+      }
+    }
+    
+    // 手動設定が必要な場合の情報を返す
+    return {
+      status: 'manual_setup_required',
+      currentUrl: currentUrl,
+      storedDeployId: props.getProperty('DEPLOY_ID'),
+      storedWebAppUrl: props.getProperty('WEB_APP_URL'),
+      message: 'DEPLOY_IDの手動設定が必要です。ウェブアプリとして公開後、URLからDEPLOY_IDを抽出してsaveDeployId()を実行してください。'
+    };
+    
+  } catch (error) {
+    console.error('Error in forceInitializeUrls:', error);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
 }
 
 function createTemplateSheet(name) {
@@ -2517,6 +2627,8 @@ if (typeof module !== 'undefined') {
     getEmailDomain,
     getUrlOrigin,
     convertPreviewUrl,
+    extractDeployIdFromUrl,
+    forceInitializeUrls,
     buildBoardData,
     guessHeadersFromArray,
     clearHeaderCache
