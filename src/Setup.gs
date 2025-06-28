@@ -160,12 +160,22 @@ function studyQuestSetup(manualDeployId) {
 
     // ステップ3: デプロイIDとウェブアプリURLの設定
     let deployId = manualDeployId;
+    
+    // 手動指定がない場合、既存のプロパティから取得を試行
     if (!deployId) {
-      try {
-        deployId = ScriptApp.getDeploymentId();
-      } catch (e) {
-        debugLog("⚠️ ScriptApp.getDeploymentId()でエラーが発生しました。手動でのDEPLOY_ID指定が必要です。");
-        throw new Error("ウェブアプリとしてデプロイされていないか、DEPLOY_IDの取得に失敗しました。先にウェブアプリとしてデプロイを完了させるか、手動でDEPLOY_IDを指定してください。");
+      const existingDeployId = PropertiesService.getScriptProperties().getProperty("DEPLOY_ID");
+      if (existingDeployId) {
+        debugLog("ℹ️ 既存のDEPLOY_IDを使用します:", sanitizeIdForLog(existingDeployId));
+        deployId = existingDeployId;
+      } else {
+        // 既存のプロパティにない場合のみScriptApp.getDeploymentId()を試行
+        try {
+          deployId = ScriptApp.getDeploymentId();
+          debugLog("ℹ️ ScriptApp.getDeploymentId()からDEPLOY_IDを取得しました");
+        } catch (e) {
+          debugLog("⚠️ ScriptApp.getDeploymentId()でエラーが発生しました。手動でのDEPLOY_ID指定が必要です。");
+          throw new Error("ウェブアプリとしてデプロイされていないか、DEPLOY_IDの取得に失敗しました。先にウェブアプリとしてデプロイを完了させるか、手動でDEPLOY_IDを指定してください。");
+        }
       }
     }
     
@@ -177,16 +187,29 @@ function studyQuestSetup(manualDeployId) {
     if (typeof deployId !== 'string' || deployId.length < 10) {
       throw new Error("無効なDEPLOY_ID形式です。");
     }
-    PropertiesService.getScriptProperties().setProperty("DEPLOY_ID", deployId);
-    debugLog(`✅ DEPLOY_IDを設定しました: ${sanitizeIdForLog(deployId)}`);
+    // DEPLOY_IDが既存のものと異なる場合のみ更新
+    const currentDeployId = PropertiesService.getScriptProperties().getProperty("DEPLOY_ID");
+    if (currentDeployId !== deployId) {
+      PropertiesService.getScriptProperties().setProperty("DEPLOY_ID", deployId);
+      debugLog(`✅ DEPLOY_IDを更新しました: ${sanitizeIdForLog(deployId)}`);
+    } else {
+      debugLog(`✅ DEPLOY_IDは既に設定済みです: ${sanitizeIdForLog(deployId)}`);
+    }
 
     const webAppUrl = `https://script.google.com/macros/s/${deployId}/exec`;
     // 基本的なURL検証のみ実施
     if (!webAppUrl.includes('script.google.com') || !webAppUrl.includes(deployId)) {
       throw new Error("生成されたウェブアプリURLが無効です。");
     }
-    PropertiesService.getScriptProperties().setProperty("WEB_APP_URL", webAppUrl);
-    debugLog(`✅ ウェブアプリURLを設定しました。`);
+    
+    // WEB_APP_URLも既存のものと異なる場合のみ更新
+    const currentWebAppUrl = PropertiesService.getScriptProperties().getProperty("WEB_APP_URL");
+    if (currentWebAppUrl !== webAppUrl) {
+      PropertiesService.getScriptProperties().setProperty("WEB_APP_URL", webAppUrl);
+      debugLog(`✅ ウェブアプリURLを更新しました。`);
+    } else {
+      debugLog(`✅ ウェブアプリURLは既に設定済みです。`);
+    }
 
     debugLog("🎉 すべてのセットアップが正常に完了しました！");
     debugLog("---");
