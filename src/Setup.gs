@@ -4,35 +4,8 @@
  */
 
 // =================================================================
-// 定数定義 (Setup.gs内で自己完結させるため、Code.gsからコピー)
+// ユーティリティ関数
 // =================================================================
-const USER_DB_CONFIG = {
-  SHEET_NAME: 'Users',
-  HEADERS: [
-    'userId',
-    'adminEmail',
-    'spreadsheetId', 
-    'spreadsheetUrl',
-    'createdAt',
-    'accessToken',
-    'configJson',
-    'lastAccessedAt',
-    'isActive'
-  ]
-};
-
-// =================================================================
-// ユーティリティ関数 (Setup.gs内で自己完結させるため、Code.gsからコピー)
-// =================================================================
-
-// Debug flag. Set to true to enable verbose logging
-var DEBUG = false;
-
-function debugLog() {
-  if (DEBUG && typeof console !== 'undefined' && console.log) {
-    console.log.apply(console, arguments);
-  }
-}
 
 /**
  * セキュリティ強化: ID情報をログ用にサニタイズ
