@@ -262,7 +262,7 @@
   </header>
 
   <!-- Main Content -->
-  <main class="max-w-6xl mx-auto px-6 py-8">
+  <main class="max-w-6xl mx-auto px-6 py-8 pb-32">
     <!-- Dashboard Overview -->
     <section class="mb-8">
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
@@ -284,7 +284,7 @@
               </div>
             </div>
           </div>
-          <p class="text-sm text-gray-300" id="status-description">スプレッドシートを追加して開始してください</p>
+          <p class="text-sm text-gray-300 transition-colors" id="status-description">スプレッドシートを追加して開始してください</p>
           <div class="mt-4">
             <button type="button" id="end-board-btn" class="btn btn-danger w-full text-sm py-2">
               <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.36 6.64a9 9 0 11-12.73 0M12 2v10"></path></svg>
@@ -349,7 +349,7 @@
           <span class="text-xs bg-gray-700 px-2 py-1 rounded-full" id="sheet-count">0 枚</span>
         </div>
         <div class="flex items-center justify-between">
-          <div>
+          <div id="active-sheet-area" class="transition-colors">
             <p class="text-xl font-bold text-green-400 mb-1">
               <span id="active-sheet-name" class="transition-colors">未設定</span>
             </p>
@@ -518,6 +518,7 @@
               </div>
             </div>
 
+
             <!-- Warning about enabling options -->
             <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
               <div class="flex items-start gap-3">
@@ -567,23 +568,6 @@
               </label>
             </div>
 
-            <!-- Digital citizenship education note -->
-            <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
-              <div class="flex items-start gap-3">
-                <div class="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                </div>
-                <div>
-                  <p class="text-sm font-semibold text-green-200 mb-2">デジタル・シティズンシップ教育として</p>
-                  <p class="text-xs text-green-300 leading-relaxed">
-                    オンライン空間でも、互いの人格を尊重し、建設的な対話を心がけることが大切です。<br>
-                    多様な意見や考え方があることを理解し、自分と異なる立場の人の発言も受け入れる姿勢を身につけましょう。
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -732,6 +716,125 @@
   <!-- Message Area -->
   <div id="message-area" class="fixed top-20 right-6 z-50" aria-live="polite" role="status"></div>
 
+  <!-- Digital Citizenship Education Modal for Teachers -->
+  <div id="teacherGuideModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
+    <div class="glass-panel rounded-xl p-6 shadow-2xl border-2 border-green-400/80 w-full max-w-4xl max-h-[90vh] overflow-y-auto relative" role="document">
+      <div class="space-y-6 text-gray-200 leading-relaxed">
+        
+        <!-- Header -->
+        <div class="text-center border-b border-green-400/30 pb-4">
+          <div class="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-3">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.168 18.477 18.582 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+            </svg>
+          </div>
+          <h2 class="text-xl font-bold text-green-300">📚 デジタル・シティズンシップ教育ガイド</h2>
+          <p class="text-sm text-green-200 mt-2">みんなの回答ボードを活用した指導のポイント</p>
+        </div>
+
+        <!-- Main Content -->
+        <div class="grid md:grid-cols-2 gap-6">
+          
+          <!-- Left Column: Teaching Guidelines -->
+          <div class="space-y-4">
+            <h3 class="text-lg font-semibold text-green-300 flex items-center gap-2">
+              <span>🎯</span> 指導における留意点
+            </h3>
+            
+            <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+              <h4 class="font-semibold text-blue-200 mb-3">心理的安全性の確保</h4>
+              <ul class="text-sm text-blue-100 space-y-2">
+                <li>• 匿名表示機能を活用し、生徒が安心して発言できる環境を作る</li>
+                <li>• 間違いを恐れずに意見表明できる雰囲気づくりを心がける</li>
+                <li>• 数値表示をオフにして競争より協働を重視する</li>
+              </ul>
+            </div>
+
+            <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
+              <h4 class="font-semibold text-purple-200 mb-3">多様性の尊重</h4>
+              <ul class="text-sm text-purple-100 space-y-2">
+                <li>• 異なる意見に対する敬意の姿勢をモデリングする</li>
+                <li>• 「正解」よりも「多様な視点」を大切にする授業展開</li>
+                <li>• リアクション機能を通じて共感的コミュニケーションを促す</li>
+              </ul>
+            </div>
+
+            <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
+              <h4 class="font-semibold text-green-200 mb-3">デジタル・シティズンシップの育成</h4>
+              <ul class="text-sm text-green-100 space-y-2">
+                <li>• オンライン空間での責任ある行動について継続的に指導</li>
+                <li>• 相手の気持ちを想像する力を育む声かけを行う</li>
+                <li>• 建設的な対話のモデルを示し、言葉の選び方を指導する</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Right Column: System Features -->
+          <div class="space-y-4">
+            <h3 class="text-lg font-semibold text-green-300 flex items-center gap-2">
+              <span>⚙️</span> システム機能の教育的意図
+            </h3>
+
+            <div class="bg-cyan-900/20 border border-cyan-500/30 rounded-lg p-4">
+              <h4 class="font-semibold text-cyan-200 mb-3">匿名性機能</h4>
+              <p class="text-sm text-cyan-100 leading-relaxed">
+                生徒の名前を非表示にすることで、発言への不安を軽減し、多様な意見が出やすい環境を作ります。評価や批判を恐れず、本音での対話を促進します。
+              </p>
+            </div>
+
+            <div class="bg-orange-900/20 border border-orange-500/30 rounded-lg p-4">
+              <h4 class="font-semibold text-orange-200 mb-3">リアクション機能</h4>
+              <p class="text-sm text-orange-100 leading-relaxed mb-2">
+                色分けされたリアクション（いいね！・なるほど！・もっと知りたい！）により、数値に左右されない共感的なコミュニケーションを育みます。
+              </p>
+              <ul class="text-xs text-orange-200 space-y-1">
+                <li>• 肯定的な反応を可視化</li>
+                <li>• 多様な感情表現の機会提供</li>
+                <li>• 対話のきっかけ作り</li>
+              </ul>
+            </div>
+
+            <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
+              <h4 class="font-semibold text-yellow-200 mb-3">ハイライト機能</h4>
+              <p class="text-sm text-yellow-100 leading-relaxed">
+                教師が重要な発言を強調することで、学習のポイントを明確にし、質の高い議論への発展を支援します。
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Section: Practical Tips -->
+        <div class="border-t border-green-400/30 pt-4">
+          <h3 class="text-lg font-semibold text-green-300 mb-3 flex items-center gap-2">
+            <span>💡</span> 授業での活用のコツ
+          </h3>
+          <div class="bg-gray-800/50 rounded-lg p-4">
+            <ul class="text-sm text-gray-200 space-y-2">
+              <li>• <strong>事前指導：</strong>オンライン上での言葉遣いや相手への思いやりについて話し合う</li>
+              <li>• <strong>振り返り：</strong>「どんな気持ちでリアクションしたか」を共有する時間を設ける</li>
+              <li>• <strong>継続指導：</strong>デジタル・シティズンシップの概念を日常的に取り入れる</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Checkbox and Button -->
+        <div class="border-t border-gray-600 pt-4">
+          <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer mb-4">
+            <input type="checkbox" id="teacherDontShowTodayCheckbox" class="rounded">
+            <span>今日はもう表示しない</span>
+          </label>
+          
+          <div class="text-center">
+            <button type="button" id="teacherGuideConfirmBtn" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+              理解しました
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <script>
     const userId = '<?= userId ?>';
     const adminUserEmail = '<?= adminUserEmail ?>';
@@ -777,6 +880,7 @@
     document.addEventListener('DOMContentLoaded', function() {
       loadStatus();
       setupEventListeners();
+      checkAndShowTeacherGuide();
     });
 
     function setupEventListeners() {
@@ -826,6 +930,56 @@
           showMessage('スプレッドシートのURLが見つかりません', 'yellow');
         }
       });
+      
+      // Active sheet area click event (for the whole area)
+      document.getElementById('active-sheet-area').addEventListener('click', function() {
+        if (currentSpreadsheetUrl) {
+          window.open(currentSpreadsheetUrl, '_blank');
+        } else {
+          showMessage('スプレッドシートのURLが見つかりません', 'yellow');
+        }
+      });
+      
+      // Board status description click event
+      document.getElementById('status-description').addEventListener('click', function() {
+        if (currentActiveSheet && elements.boardUrl && elements.boardUrl.value) {
+          window.open(elements.boardUrl.value, '_blank');
+        } else {
+          showMessage('回答ボードのURLが見つかりません', 'yellow');
+        }
+      });
+      
+      // Teacher guide modal events
+      document.getElementById('teacherGuideConfirmBtn').addEventListener('click', hideTeacherGuideModal);
+    }
+
+    // Teacher Guide Modal Functions
+    function checkAndShowTeacherGuide() {
+      const dontShowToday = localStorage.getItem('teacherGuideDontShowToday');
+      const today = new Date().toDateString();
+      
+      // Show modal if "don't show today" was not set for today
+      if (dontShowToday !== today) {
+        setTimeout(() => showTeacherGuideModal(), 1000);
+      }
+    }
+
+    function showTeacherGuideModal() {
+      const modal = document.getElementById('teacherGuideModal');
+      modal.classList.remove('hidden');
+      document.getElementById('teacherGuideConfirmBtn').focus();
+    }
+
+    function hideTeacherGuideModal() {
+      const modal = document.getElementById('teacherGuideModal');
+      modal.classList.add('hidden');
+      
+      // Check if "don't show today" is checked
+      const dontShowTodayCheckbox = document.getElementById('teacherDontShowTodayCheckbox');
+      if (dontShowTodayCheckbox && dontShowTodayCheckbox.checked) {
+        const today = new Date().toDateString();
+        localStorage.setItem('teacherGuideDontShowToday', today);
+      }
     }
 
     function updateUIForSelectedSheet() {
@@ -937,6 +1091,15 @@
         statusDescEl.textContent = isActive ?
           `現在 "${currentActiveSheet}" が公開中です` :
           'スプレッドシートを追加して開始してください';
+        
+        // クリック可能状態の管理
+        if (isActive && elements.boardUrl && elements.boardUrl.value) {
+          statusDescEl.classList.add('cursor-pointer', 'hover:text-gray-100', 'hover:underline');
+          statusDescEl.title = 'クリックで回答ボードを開く';
+        } else {
+          statusDescEl.classList.remove('cursor-pointer', 'hover:text-gray-100', 'hover:underline');
+          statusDescEl.title = '';
+        }
       }
       
       // Update timestamps
@@ -948,15 +1111,24 @@
       
       // Active sheet info
       const activeNameEl = document.getElementById('active-sheet-name');
+      const activeSheetAreaEl = document.getElementById('active-sheet-area');
       if (activeNameEl) {
         activeNameEl.textContent = currentActiveSheet || '未設定';
         // クリック可能状態の管理
         if (currentActiveSheet && currentSpreadsheetUrl) {
           activeNameEl.classList.add('cursor-pointer', 'hover:text-green-300', 'hover:underline');
           activeNameEl.title = 'クリックでスプレッドシートを開く';
+          if (activeSheetAreaEl) {
+            activeSheetAreaEl.classList.add('cursor-pointer', 'hover:bg-green-500/10', 'rounded-lg', 'p-2', '-m-2');
+            activeSheetAreaEl.title = 'クリックでスプレッドシートを開く';
+          }
         } else {
           activeNameEl.classList.remove('cursor-pointer', 'hover:text-green-300', 'hover:underline');
           activeNameEl.title = '';
+          if (activeSheetAreaEl) {
+            activeSheetAreaEl.classList.remove('cursor-pointer', 'hover:bg-green-500/10', 'rounded-lg', 'p-2', '-m-2');
+            activeSheetAreaEl.title = '';
+          }
         }
       }
       const totalSheetsEl = document.getElementById('total-sheets');

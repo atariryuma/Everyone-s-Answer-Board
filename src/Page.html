@@ -615,6 +615,27 @@ header {
 <div id="infoModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
 <div id="infoModalCard" class="glass-panel rounded-xl p-6 shadow-2xl border-2 border-cyan-400/80 w-full max-w-lg relative" role="document">
 <div class="space-y-4 text-gray-200 text-lg leading-relaxed">
+<!-- Digital Citizenship Education Section -->
+<div class="bg-gradient-to-r from-green-800/40 to-emerald-800/40 border border-green-400/50 rounded-lg p-4 mb-4">
+<div class="flex items-start gap-3">
+<div class="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+<span class="text-lg">📚</span>
+</div>
+<div>
+<p class="text-base font-bold text-green-200 mb-3">デジタル・シティズンシップって何だろう？</p>
+<p class="text-sm text-green-100 leading-relaxed mb-2">
+<span class="text-green-200 font-semibold">デジタル・シティズンシップ</span>とは、コンピューターやタブレットを使うときに、<span class="text-green-200 font-semibold">やさしい心で相手のことを考える</span>ことです。
+</p>
+<p class="text-sm text-green-200 leading-relaxed mb-2">
+みんなの回答ボードでも、<span class="text-green-200 font-semibold">思いやりのある言葉</span>を選んで、みんなが気持ちよく参加できるようにしましょう。
+</p>
+<p class="text-sm text-green-200 leading-relaxed">
+友だちの意見を聞いて「そういう考えもあるんだね」と<span class="text-green-200 font-semibold">多様性を大切にする心</span>を育てましょう。
+</p>
+</div>
+</div>
+</div>
+
 <p>みんなの意見を気持ちよく共有するために、リアクションのしかたをおぼえよう！</p>
 <ul class="space-y-2">
 <li class="flex items-center gap-2"><span id="infoIconLike" class="w-5 h-5 text-red-400"></span>いいね！：すてきだと思ったときに押そう</li>
@@ -623,8 +644,17 @@ header {
 </ul>
 <p class="flex items-center gap-2"><span id="infoIconHighlight" class="w-5 h-5 text-purple-400"></span>先生が注目してほしい意見につけています</p>
 <p>責任あるリアクションで、みんなで学びを深めよう！</p>
+
+<!-- Don't show today checkbox -->
+<div class="border-t border-gray-600 pt-4">
+<label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+<input type="checkbox" id="dontShowTodayCheckbox" class="rounded">
+<span>今日はもう表示しない</span>
+</label>
+</div>
+
 <div class="text-center mt-6">
-<button id="infoModalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">わかった</button>
+<button type="button" id="infoModalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">わかった</button>
 </div>
 </div>
 </div>
@@ -844,7 +874,13 @@ class StudyQuestApp {
           this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
         }
       }
-      if (!localStorage.getItem('introSeen')) {
+      // Check if modal should be shown
+      const introSeen = localStorage.getItem('introSeen');
+      const dontShowToday = localStorage.getItem('dontShowModalToday');
+      const today = new Date().toDateString();
+      
+      // Show modal if never seen before OR if "don't show today" was not set for today
+      if (!introSeen || (dontShowToday !== today)) {
         setTimeout(() => this.showInfoModal(), 500);
       }
     }, { timeout: 50 });
@@ -2486,6 +2522,15 @@ class StudyQuestApp {
     this.elements.infoModalContainer.classList.add('hidden');
     this.elements.infoModalContainer.classList.remove('modal-fade');
     this.elements.infoModalCard.classList.remove('modal-scale');
+    
+    // Check if "don't show today" is checked
+    const dontShowTodayCheckbox = document.getElementById('dontShowTodayCheckbox');
+    if (dontShowTodayCheckbox && dontShowTodayCheckbox.checked) {
+      // Set today's date to not show again today
+      const today = new Date().toDateString();
+      localStorage.setItem('dontShowModalToday', today);
+    }
+    
     localStorage.setItem('introSeen', '1');
     if (this.state.lastFocusedElement) {
       this.state.lastFocusedElement.focus();
