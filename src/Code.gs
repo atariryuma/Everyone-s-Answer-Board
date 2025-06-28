@@ -43,6 +43,7 @@ const TIME_CONSTANTS = {
 };
 
 const REACTION_KEYS = ["UNDERSTAND","LIKE","CURIOUS"];
+const EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
 var getConfig;
 var handleError;
 
@@ -86,11 +87,7 @@ function isValidEmail(email) {
   if (!email || typeof email !== 'string') {
     return false;
   }
-  const emailRegex = /^[^
-@]+@[^
-@]+\.[^
-@]+$/;
-  return emailRegex.test(email);
+  return EMAIL_REGEX.test(email);
 }
 
 function getEmailDomain(email) {
