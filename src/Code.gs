@@ -264,7 +264,7 @@ function getAdminSettings() {
     allSheets: allSheets,
     currentUserEmail: currentUserEmail,
     deployId: props.getProperty('DEPLOY_ID'),
-    webAppUrl: getWebAppUrl(),
+    webAppUrl: getWebAppUrlEnhanced(true),
     adminEmails: adminEmails,
     isUserAdmin: adminEmails.includes(currentUserEmail),
     activeSheetName: activeSheetName,
@@ -841,7 +841,7 @@ function getStatus() {
         allSheets: [],
         answerCount: 0,
         totalReactions: 0,
-        webAppUrl: getWebAppUrl(),
+        webAppUrl: getWebAppUrlEnhanced(true),
         showNames: false,
         showCounts: false
       };
@@ -884,7 +884,7 @@ function getStatus() {
       allSheets: allSheets,
       answerCount: answerCount,
       totalReactions: totalReactions,
-      webAppUrl: getWebAppUrl(),
+      webAppUrl: getWebAppUrlEnhanced(true),
       showNames: typeof config.showNames !== 'undefined' ? config.showNames : (config.showDetails || false),
       showCounts: typeof config.showCounts !== 'undefined' ? config.showCounts : (config.showDetails || false)
     };
@@ -1674,13 +1674,18 @@ function extractDeployIdFromUrl(url) {
   return null;
 }
 
-function convertPreviewUrl(url, deployId) {
+function convertPreviewUrl(url, deployId, preserveDev = false) {
   if (!url) return url;
   
-  // より包括的なプレビューURL検出
+  // 開発環境保持モードの場合、/devを変換しない
+  if (preserveDev && /\/dev(\?|$)/.test(url)) {
+    return url;
+  }
+  
+  // プレビューURL検出（/devは条件付きで対象）
   const isPreviewUrl = /script\.googleusercontent\.com/.test(url) || 
-                      /macros\/.*\/dev/.test(url) ||
-                      /-script\.googleusercontent\.com/.test(url);
+                      /-script\.googleusercontent\.com/.test(url) ||
+                      (!preserveDev && /macros\/.*\/dev/.test(url));
   
   if (isPreviewUrl && deployId) {
     const query = url.split('?')[1] || '';
@@ -1740,6 +1745,56 @@ function getWebAppUrl() {
   return stored || current || '';
 }
 
+function getWebAppUrlEnhanced(forceProduction = false) {
+  const props = PropertiesService.getScriptProperties();
+  const deployId = props.getProperty('DEPLOY_ID'); 
+  let stored = (props.getProperty('WEB_APP_URL') || '').trim();
+  
+  let current = '';
+  try {
+    if (typeof ScriptApp !== 'undefined') {
+      current = ScriptApp.getService().getUrl();
+    }
+  } catch (e) {
+    current = '';
+  }
+  
+  // 現在の実行環境を判定
+  const isCurrentlyDev = current && /\/dev(\?|$)/.test(current);
+  
+  // 本番URL強制取得の場合は、常に/execに変換
+  if (forceProduction) {
+    if (current) {
+      const productionUrl = convertPreviewUrl(current, deployId, false);
+      return productionUrl;
+    }
+    // 保存されたURLも本番形式に変換
+    if (stored) {
+      return convertPreviewUrl(stored, deployId, false);
+    }
+    return '';
+  }
+  
+  // 開発環境では/devを保持、本番環境では/execに変換
+  if (current) {
+    if (isCurrentlyDev) {
+      // 開発環境：/devをそのまま使用
+      return current;
+    } else {
+      // 本番環境：/execに変換
+      current = convertPreviewUrl(current, deployId, false);
+      const currOrigin = getUrlOrigin(current);
+      const storedOrigin = getUrlOrigin(stored);
+      if (!stored || (storedOrigin && currOrigin && currOrigin !== storedOrigin)) {
+        props.setProperties({ WEB_APP_URL: current.trim() });
+        stored = current.trim();
+      }
+    }
+  }
+  
+  return stored || current || '';
+}
+
 function saveDeployId(id) {
   const props = PropertiesService.getScriptProperties();
   const cleanId = (id || '').trim();
@@ -1793,7 +1848,7 @@ function forceInitializeUrls() {
         return {
           status: 'success',
           deployId: extractedId,
-          webAppUrl: getWebAppUrl(),
+          webAppUrl: getWebAppUrlEnhanced(true),
           message: 'DEPLOY_IDを自動抽出して設定しました'
         };
       }
@@ -2627,6 +2682,7 @@ if (typeof module !== 'undefined') {
     getEmailDomain,
     getUrlOrigin,
     convertPreviewUrl,
+    getWebAppUrlEnhanced,
     extractDeployIdFromUrl,
     forceInitializeUrls,
     buildBoardData,
