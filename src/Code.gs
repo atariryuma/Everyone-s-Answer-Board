@@ -116,6 +116,34 @@ function isSameDomain(emailA, emailB) {
   return domainA && domainB && domainA === domainB;
 }
 
+/**
+ * ウェブアプリのデプロイ者のメールアドレスを取得・保存します。
+ * @returns {string} デプロイ者のメールアドレス
+ */
+function getWebAppDeployerEmail() {
+  const props = PropertiesService.getScriptProperties();
+  const deployerEmail = props.getProperty('WEB_APP_DEPLOYER_EMAIL');
+
+  if (deployerEmail) {
+    return deployerEmail;
+  }
+
+  // スクリプトプロパティに保存されていない場合、現在のユーザーをデプロイ者として保存
+  try {
+    const newDeployerEmail = Session.getEffectiveUser().getEmail();
+    if (newDeployerEmail) {
+      props.setProperty('WEB_APP_DEPLOYER_EMAIL', newDeployerEmail);
+      console.log(`ウェブアプリのデプロイ者を ${newDeployerEmail} に設定しました。`);
+      return newDeployerEmail;
+    }
+  } catch (e) {
+    console.error('デプロイ者のメールアドレス取得に失敗しました。', e);
+    // フォールバックとして空文字を返す
+    return '';
+  }
+  return '';
+}
+
 function getAdminEmails(spreadsheetId) {
   const props = PropertiesService.getScriptProperties();
   let adminEmails = [];
@@ -509,7 +537,7 @@ function doGet(e) {
       template.userId = validatedUserId;
       template.userInfo = userInfo;
       template.adminUserEmail = userInfo.adminEmail;
-      template.webAppAdminEmail = 'studyquest.jp@gmail.com'; // お問い合わせ先メールアドレス
+      template.webAppAdminEmail = getWebAppDeployerEmail(); // お問い合わせ先メールアドレス
       auditLog('ADMIN_ACCESS', validatedUserId, { viewerEmail });
       const output = template.evaluate();
       if (output.setSandboxMode) output.setSandboxMode(HtmlService.SandboxMode.IFRAME);
@@ -538,7 +566,7 @@ function doGet(e) {
       template.userId = validatedUserId;
       template.userInfo = userInfo;
       template.adminUserEmail = userInfo.adminEmail;
-      template.webAppAdminEmail = 'studyquest.jp@gmail.com'; // お問い合わせ先メールアドレス
+      template.webAppAdminEmail = getWebAppDeployerEmail(); // お問い合わせ先メールアドレス
       auditLog('ADMIN_ACCESS_NO_SHEET', validatedUserId, { viewerEmail });
       const output = template.evaluate();
       if (output.setSandboxMode) output.setSandboxMode(HtmlService.SandboxMode.IFRAME);
@@ -1774,41 +1802,41 @@ function checkRateLimit(action, userEmail) {
   }
 }
 
-function createStudyQuestForm(userEmail) {
+function createStudyQuestForm(userEmail, userId) {
   try {
-    // FormAppの利用可能性をチェック
-    if (typeof FormApp === 'undefined') {
-      throw new Error('Google Forms API is not available');
+    // FormAppとDriveAppの利用可能性をチェック
+    if (typeof FormApp === 'undefined' || typeof DriveApp === 'undefined') {
+      throw new Error('Google Forms API または Drive API がこの環境で利用できません。');
     }
     
     // 新しいGoogleフォームを作成
     const form = FormApp.create(`StudyQuest - 回答フォーム - ${userEmail.split('@')[0]}`);
     
-    // フォームの説明を設定
+    // フォームの説明と回答後のメッセージを設定
     form.setDescription('StudyQuestで使用する回答フォームです。質問に対する回答を入力してください。');
-    
+    const boardUrl = `${getWebAppUrlEnhanced()}?userId=${userId}`;
+    form.setConfirmationMessage(`回答ありがとうございます！\n\nみんなの回答ボードで、他の人の意見も見てみましょう。\n${boardUrl}`);
+
     // 必要な項目を追加
-    form.addTextItem()
-        .setTitle('クラス')
-        .setRequired(true);
-    
-    form.addTextItem()
-        .setTitle('名前')
-        .setRequired(true);
-    
-    form.addParagraphTextItem()
-        .setTitle('回答')
-        .setHelpText('質問に対するあなたの回答を入力してください')
-        .setRequired(true);
-    
-    form.addParagraphTextItem()
-        .setTitle('理由')
-        .setHelpText('その回答を選んだ理由を教えてください')
-        .setRequired(false);
+    form.addTextItem().setTitle('クラス').setRequired(true);
+    form.addTextItem().setTitle('名前').setRequired(true);
+    form.addParagraphTextItem().setTitle('回答').setHelpText('質問に対するあなたの回答を入力してください').setRequired(true);
+    form.addParagraphTextItem().setTitle('理由').setHelpText('その回答を選んだ理由を教えてください').setRequired(false);
     
     // フォームの回答先スプレッドシートを作成
     const spreadsheet = SpreadsheetApp.create(`StudyQuest - 回答データ - ${userEmail.split('@')[0]}`);
     form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheet.getId());
+
+    // 共有設定を自動化
+    const userDomain = getEmailDomain(userEmail);
+    if (userDomain) {
+      const formFile = DriveApp.getFileById(form.getId());
+      formFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.EDIT);
+      const spreadsheetFile = DriveApp.getFileById(spreadsheet.getId());
+      spreadsheetFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.EDIT);
+      console.log(`フォームとスプレッドシートをドメイン「${userDomain}」で共有しました。`);
+    }
+
     const sheet = spreadsheet.getSheets()[0];
     
     // スプレッドシートに追加の列を準備
@@ -1826,8 +1854,7 @@ function createStudyQuestForm(userEmail) {
     
     // ヘッダー行のフォーマット
     const allHeadersRange = sheet.getRange(1, 1, 1, existingHeaders.length + additionalHeaders.length);
-    allHeadersRange.setFontWeight('bold');
-    allHeadersRange.setBackground('#E3F2FD');
+    allHeadersRange.setFontWeight('bold').setBackground('#E3F2FD');
     
     // 列幅を調整
     try {
@@ -1846,6 +1873,7 @@ function createStudyQuestForm(userEmail) {
       spreadsheetUrl: spreadsheet.getUrl(),
       editFormUrl: form.getEditUrl()
     };
+
   } catch (error) {
     console.error('Failed to create form and spreadsheet:', error);
     
@@ -1867,27 +1895,49 @@ function createStudyQuestForm(userEmail) {
 
 /**
  * Admin Panel用のボード作成関数
- * 現在ログイン中のユーザーの新しいボードを作成します
+ * 現在ログイン中のユーザーの新しいボードを作成し、公開・アクティブ化まで行います。
  */
 function createBoardFromAdmin() {
   try {
     const currentUserEmail = safeGetUserEmail();
-    const result = createStudyQuestForm(currentUserEmail);
+    const props = PropertiesService.getUserProperties();
+    const userId = props.getProperty('CURRENT_USER_ID');
+
+    if (!userId) {
+      throw new Error('ユーザーIDが見つかりません。ページをリロードして再試行してください。');
+    }
+
+    // 1. Googleフォームとスプレッドシートを作成（共有設定、回答後URL設定済み）
+    const result = createStudyQuestForm(currentUserEmail, userId);
     
-    // 作成されたスプレッドシートを現在のユーザーに追加
+    // 2. 作成されたスプレッドシートを現在のユーザーのメインスプレッドシートとして設定
     if (result.spreadsheetId && result.spreadsheetUrl) {
       const addResult = addSpreadsheetUrl(result.spreadsheetUrl);
       console.log('Spreadsheet added to user:', addResult);
+
+      // 3. 新しく作成したシートをアクティブ化・公開
+      const newSheetName = addResult.firstSheetName;
+      if (newSheetName) {
+        // アクティブシートに設定
+        switchActiveSheet(newSheetName);
+        // 公開状態に設定
+        updateUserConfig(userId, { isPublished: true });
+        console.log(`New board '${newSheetName}' has been created and published.`);
+      }
+
+      return {
+        ...result,
+        message: '新しいボードが作成され、公開されました！管理ページを更新します。',
+        autoCreated: true,
+        newSheetName: newSheetName
+      };
     }
-    
-    return {
-      ...result,
-      message: '新しいボードが作成され、自動的に追加されました！',
-      autoCreated: true
-    };
+
+    throw new Error('スプレッドシートの作成または追加に失敗しました。');
+
   } catch (error) {
     console.error('Failed to create board from admin:', error);
-    throw new Error(`ボード作成に失敗しました: ${error.message}`);
+    return handleError('createBoardFromAdmin', error, true);
   }
 }
 

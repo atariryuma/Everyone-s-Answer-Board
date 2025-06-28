@@ -380,17 +380,27 @@
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
             </svg>
-            新しいボードを作成
+            <span id="create-board-text">新しいボードを作成して公開</span>
           </button>
           <div class="bg-cyan-900/20 border border-cyan-500/30 rounded-lg p-4">
             <p class="font-semibold text-cyan-200">おすすめ</p>
-            <p class="text-sm text-cyan-200">新しいGoogleフォームとスプレッドシートを自動作成</p>
+            <p class="text-sm text-cyan-200">新しいGoogleフォームとスプレッドシートを自動作成＆公開</p>
             <p class="text-xs text-cyan-200 mt-2">
               生徒の回答収集用フォームと回答ボード用スプレッドシートを一度に作成できます。<br>
               <span class="font-semibold text-yellow-300">【重要】</span>作成されたファイルは、自動的にあなたの組織（ドメイン）内で共有され、誰でも編集できるようになります。個別の共有設定は不要です。
             </p>
           </div>
-          <input type="url" id="form-url-input" class="form-control" placeholder="GoogleフォームのURL">
+          <div class="relative">
+            <input type="url" id="form-url-input" class="form-control pr-24" placeholder="ここに作成されたGoogleフォームのURLが表示されます" readonly>
+            <div class="absolute inset-y-0 right-0 flex items-center gap-1 pr-2">
+              <button type="button" id="copy-form-url-btn" class="btn btn-secondary p-2 tooltip" data-tooltip="URLをコピー">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+              </button>
+              <a id="open-form-url-link" href="#" target="_blank" class="btn btn-secondary p-2 tooltip" data-tooltip="フォームを開く">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -417,8 +427,8 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
                 <div>
-                  <p class="text-sm text-blue-200 font-medium mb-1">GoogleスプレッドシートのURLを追加してください</p>
-                  <p class="text-xs text-blue-300">回答データが保存されているスプレッドシートのURLをコピーして貼り付けてください</p>
+                  <p class="text-sm text-blue-200 font-medium mb-1">既存のGoogleスプレッドシートを回答ボードとして利用</p>
+                  <p class="text-xs text-blue-300">すでにお持ちの回答データが保存されているスプレッドシートのURLを貼り付けてください。</p>
                 </div>
               </div>
             </div>
@@ -448,11 +458,14 @@
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-3">
               <div class="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm">2</div>
-              <h3 class="text-lg font-semibold text-green-400">シート選択</h3>
+              <h3 class="text-lg font-semibold text-green-400">表示ボードの選択</h3>
             </div>
           </div>
           
           <div class="space-y-4">
+            <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4 text-xs text-green-200">
+              生徒に表示する回答ボード（スプレッドシートのシート）を選択してください。
+            </div>
             <div class="relative">
               <select id="sheet-select" class="form-control pr-12" aria-label="アクティブなシートを選択">
                 <option>読み込み中...</option>
@@ -464,9 +477,9 @@
             
             <div class="flex gap-3">
               <button type="button" id="switch-sheet-btn" disabled class="btn btn-primary flex-1">
-                <span id="switch-sheet-text">シートを選択</span>
+                <span id="switch-sheet-text">このボードを表示する</span>
               </button>
-              <button type="button" id="clear-selection-btn" disabled class="btn btn-secondary" title="リセット" aria-label="シート選択をリセット">
+              <button type="button" id="clear-selection-btn" disabled class="btn btn-secondary tooltip" data-tooltip="リセット">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -686,7 +699,10 @@
       addSpreadsheetText: document.getElementById('add-spreadsheet-text'),
       saveConfigText: document.getElementById('save-config-text'),
       createBoardBtn: document.getElementById('create-board-btn'),
+      createBoardText: document.getElementById('create-board-text'),
       formUrlInput: document.getElementById('form-url-input'),
+      copyFormUrlBtn: document.getElementById('copy-form-url-btn'),
+      openFormUrlLink: document.getElementById('open-form-url-link'),
       endBoardBtn: document.getElementById('end-board-btn')
     };
 
@@ -728,6 +744,9 @@
       if (elements.endBoardBtn) {
         elements.endBoardBtn.addEventListener('click', clearSheetSelection);
       }
+      if (elements.copyFormUrlBtn) {
+        elements.copyFormUrlBtn.addEventListener('click', () => copyUrl(elements.formUrlInput, 'GoogleフォームのURLをコピーしました'));
+      }
 
       // Auto-update config when headers change
       elements.mainHeader.addEventListener('change', updateConfigButtons);
@@ -741,8 +760,8 @@
       
       if (elements.switchSheetText) {
         elements.switchSheetText.textContent = isCurrentActive ? 
-          '現在のアクティブシート' : 
-          (hasSelected ? `「${selectedSheet}」をアクティブ` : 'シートを選択');
+          '現在表示中のボード' : 
+          (hasSelected ? `「${selectedSheet}」を表示する` : '表示するボードを選択');
       }
       
       if (hasSelected) {
@@ -773,7 +792,7 @@
       }
       if (hasSelectedSheet) {
         progress = 50;
-        statusText = 'シートが選択されました';
+        statusText = '表示するボードが選択されました';
       }
       if (hasConfig) {
         progress = 75;
@@ -781,7 +800,7 @@
       }
       if (hasActiveSheet) {
         progress = 100;
-        statusText = '回答ボードが準備完了です';
+        statusText = '回答ボードが公開中です';
       }
       
       if (elements.setupProgress) {
@@ -834,7 +853,7 @@
       // Main status updates
       const statusTextEl = document.getElementById('status-text');
       if (statusTextEl) {
-        statusTextEl.textContent = isActive ? 'アクティブ' : '準備中';
+        statusTextEl.textContent = isActive ? '公開中' : '準備中';
       }
       const statusDescEl = document.getElementById('status-description');
       if (statusDescEl) {
@@ -894,12 +913,12 @@
       }
       
       if (status.allSheets && status.allSheets.length > 0) {
-        elements.sheetSelect.innerHTML = '<option value="">-- シートを選択してください --</option>';
+        elements.sheetSelect.innerHTML = '<option value="">-- 表示するボードを選択 --</option>';
         status.allSheets.forEach(name => {
           const opt = document.createElement('option');
           opt.value = name;
           opt.textContent = name;
-          if (name === currentActiveSheet) opt.textContent += ' (アクティブ)';
+          if (name === currentActiveSheet) opt.textContent += ' (公開中)';
           elements.sheetSelect.appendChild(opt);
         });
         elements.sheetSelect.disabled = false;
@@ -908,7 +927,7 @@
           selectedSheet = status.activeSheetName;
         }
       } else {
-        elements.sheetSelect.innerHTML = '<option value="">表示できるシートがありません</option>';
+        elements.sheetSelect.innerHTML = '<option value="">利用可能なボードがありません</option>';
         elements.sheetSelect.disabled = true;
       }
 
@@ -925,10 +944,10 @@
         const urlDescription = document.getElementById('url-section-description');
 
         if (urlTitle) {
-          urlTitle.textContent = '📋 ご利用中のボード';
+          urlTitle.textContent = '📋 公開中のボード';
         }
         if (urlDescription) {
-          urlDescription.textContent = '以下のURLからいつでも管理画面にアクセスできます';
+          urlDescription.textContent = '生徒にはこのURLを共有してください';
         }
         const studentUrlSection = document.getElementById('student-url-section');
         if (studentUrlSection) {
@@ -963,7 +982,7 @@
       if (status.activeSheetName) {
         activities.push({
           time: '本日',
-          text: `シート "${status.activeSheetName}" がアクティブです`,
+          text: `ボード "${status.activeSheetName}" が公開中です`,
           type: 'active',
           icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
         });
@@ -988,7 +1007,7 @@
       } else {
         activities.push({
           time: '未設定',
-          text: 'スプレッドシートを追加して開始してください',
+          text: '新しいボードを作成するか、既存のスプレッドシートを追加してください',
           type: 'pending',
           icon: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
         });
@@ -1079,19 +1098,22 @@
     function createBoard() {
       const btn = elements.createBoardBtn;
       if (btn) btn.disabled = true;
-      setLoading(true, '新しいボードを作成中...');
+      if (elements.createBoardText) elements.createBoardText.textContent = '作成中...';
+      setLoading(true, '新しいボードを作成し、公開しています...');
       google.script.run
         .withSuccessHandler((result) => {
           showMessage(result.message || 'ボードが作成されました', 'green');
           if (result.formUrl && elements.formUrlInput) {
             elements.formUrlInput.value = result.formUrl;
+            elements.openFormUrlLink.href = result.formUrl;
           }
-          if (btn) btn.disabled = false;
-          loadStatus();
+          // 成功したら3秒後にリロードして新しい状態を反映
+          setTimeout(() => window.location.reload(), 3000);
         })
         .withFailureHandler((error) => {
           showError(error);
           if (btn) btn.disabled = false;
+          if (elements.createBoardText) elements.createBoardText.textContent = '新しいボードを作成して公開';
         })
         .createBoardFromAdmin();
     }
@@ -1307,7 +1329,7 @@
     function switchToSheet() {
       if (!selectedSheet) return;
       
-      setLoading(true, 'シートを切り替え中...');
+      setLoading(true, 'ボードを切り替え中...');
       google.script.run
         .withSuccessHandler((msg) => {
           showMessage(msg, 'green');
@@ -1318,7 +1340,7 @@
     }
 
     function clearSheetSelection() {
-      setLoading(true, 'シート選択をクリア中...');
+      setLoading(true, 'ボードの公開を終了しています...');
       google.script.run
         .withSuccessHandler((msg) => {
           showMessage(msg, 'green');
@@ -1339,22 +1361,24 @@
         .setDisplayOptions({ showNames, showCounts });
     }
 
-
-    function copyBoardUrl() {
-      const urlInput = elements.boardUrl;
-      if (urlInput) {
+    function copyUrl(inputElement, successMessage) {
+      if (inputElement && inputElement.value) {
         try {
           if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(urlInput.value);
+            navigator.clipboard.writeText(inputElement.value);
           } else {
-            urlInput.select();
+            inputElement.select();
             document.execCommand('copy');
           }
-          showMessage('URLをコピーしました', 'green');
+          showMessage(successMessage, 'green');
         } catch (error) {
           showMessage('コピーに失敗しました', 'red');
         }
       }
+    }
+
+    function copyBoardUrl() {
+      copyUrl(elements.boardUrl, 'ボードのURLをコピーしました');
     }
 
     function setLoading(isLoading, msg = "") {
