@@ -104,7 +104,6 @@ function studyQuestSetup(deployId = null) {
       addStep(results, 'URL設定', '完了', urlResult);
       results.urls.webApp = urlResult.webAppUrl;
       results.urls.production = urlResult.productionUrl;
-      results.urls.development = urlResult.developmentUrl;
     } else {
       addWarning(results, 'URL設定', urlResult.message);
     }
@@ -174,13 +173,11 @@ function getEnvironmentInfo() {
     userEmail: Session.getActiveUser().getEmail(),
     timezone: Session.getScriptTimeZone(),
     currentUrl: '',
-    isDevelopment: false,
     hasDeployId: false
   };
 
   try {
     info.currentUrl = ScriptApp.getService().getUrl();
-    info.isDevelopment = /\/dev(\?|$)/.test(info.currentUrl);
   } catch (e) {
     console.warn('現在のURL取得に失敗:', e.message);
   }
@@ -329,7 +326,6 @@ function initializeAppUrls() {
     }
 
     const productionUrl = `https://script.google.com/macros/s/${deployId}/exec`;
-    const developmentUrl = currentUrl && /\/dev(\?|$)/.test(currentUrl) ? currentUrl : `https://script.google.com/macros/s/${deployId}/dev`;
     
     // プロダクションURLを保存
     props.setProperties({ WEB_APP_URL: productionUrl });
@@ -339,7 +335,6 @@ function initializeAppUrls() {
       message: 'アプリURLを設定しました',
       webAppUrl: productionUrl,
       productionUrl: productionUrl,
-      developmentUrl: developmentUrl,
       currentUrl: currentUrl
     };
 
