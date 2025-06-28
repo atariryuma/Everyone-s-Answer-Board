@@ -4,7 +4,7 @@ function getConfig(sheetName) {
     
     // Configシートが存在しない場合は作成
     if (!sheet) {
-      console.log('Config sheet not found, creating new one');
+      debugLog('Config sheet not found, creating new one');
       sheet = getCurrentSpreadsheet().insertSheet('Config');
       const headers = ['表示シート名','問題文ヘッダー','回答ヘッダー','理由ヘッダー','名前列ヘッダー','クラス列ヘッダー'];
       sheet.appendRow(headers);
@@ -15,7 +15,7 @@ function getConfig(sheetName) {
     
     const values = sheet.getDataRange().getValues();
     if (values.length < 2) {
-      console.log('Config sheet has no data, creating auto config');
+      debugLog('Config sheet has no data, creating auto config');
       return createAutoConfig(sheetName);
     }
     
@@ -25,7 +25,7 @@ function getConfig(sheetName) {
     
     const target = values.find((row, rIdx) => rIdx>0 && row[idx['表示シート名']]===sheetName);
     if(!target) {
-      console.log(`No config found for sheet ${sheetName}, creating auto config`);
+      debugLog(`No config found for sheet ${sheetName}, creating auto config`);
       return createAutoConfig(sheetName);
     }
     
@@ -68,7 +68,7 @@ function createAutoConfig(sheetName) {
     const headerRow = targetSheet.getRange(1, 1, 1, lastColumn).getValues()[0];
     const headers = headerRow.map(v => String(v || '').trim()).filter(h => h !== '');
     
-    console.log('Creating auto config for headers:', headers);
+    debugLog('Creating auto config for headers:', headers);
     
     // ヘッダーを推測（Code.gsの関数を使用）
     if (typeof guessHeadersFromArray === 'undefined') {
@@ -79,7 +79,7 @@ function createAutoConfig(sheetName) {
     // 設定を保存
     if (guessedConfig.answerHeader) {
       saveSheetConfig(sheetName, guessedConfig);
-      console.log('Auto-created config saved:', guessedConfig);
+      debugLog('Auto-created config saved:', guessedConfig);
       return guessedConfig;
     } else {
       throw new Error('適切なヘッダーを推測できませんでした。手動で設定してください。');
@@ -96,7 +96,7 @@ function saveSheetConfig(sheetName, cfg) {
     const ss = getCurrentSpreadsheet();
     let sheet = ss.getSheetByName('Config');
     if (!sheet) {
-      console.log('Creating Config sheet for the first time');
+      debugLog('Creating Config sheet for the first time');
       sheet = ss.insertSheet('Config');
     }
     
@@ -107,7 +107,7 @@ function saveSheetConfig(sheetName, cfg) {
     try {
       values = sheet.getDataRange().getValues();
     } catch (error) {
-      console.log('Config sheet appears to be empty, creating header row');
+      debugLog('Config sheet appears to be empty, creating header row');
       values = [];
     }
     
@@ -140,10 +140,10 @@ function saveSheetConfig(sheetName, cfg) {
     // Save data
     if (rowIndex === -1) {
       sheet.appendRow(row);
-      console.log('Added new config row for sheet:', sheetName);
+      debugLog('Added new config row for sheet:', sheetName);
     } else {
       sheet.getRange(rowIndex+1,1,1,row.length).setValues([row]);
-      console.log('Updated existing config row for sheet:', sheetName);
+      debugLog('Updated existing config row for sheet:', sheetName);
     }
     
     return `シート「${sheetName}」の設定を保存しました`;

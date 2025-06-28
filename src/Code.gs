@@ -44,6 +44,27 @@ const TIME_CONSTANTS = {
 
 const REACTION_KEYS = ["UNDERSTAND","LIKE","CURIOUS"];
 const EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
+// Debug flag. Set to true to enable verbose logging
+var DEBUG = false;
+
+function debugLog() {
+  if (DEBUG && typeof console !== 'undefined' && console.log) {
+    console.log.apply(console, arguments);
+  }
+}
+
+function applySecurityHeaders(output) {
+  if (output && typeof output.addMetaTag === 'function') {
+    output.addMetaTag(
+      'Content-Security-Policy',
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    );
+    if (typeof output.setXFrameOptionsMode === 'function') {
+      output.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+  }
+  return output;
+}
 var getConfig;
 var handleError;
 
@@ -133,7 +154,7 @@ function getWebAppDeployerEmail() {
     const newDeployerEmail = Session.getEffectiveUser().getEmail();
     if (newDeployerEmail) {
       props.setProperty('WEB_APP_DEPLOYER_EMAIL', newDeployerEmail);
-      console.log(`ウェブアプリのデプロイ者を ${newDeployerEmail} に設定しました。`);
+      debugLog(`ウェブアプリのデプロイ者を ${newDeployerEmail} に設定しました。`);
       return newDeployerEmail;
     }
   } catch (e) {
@@ -166,7 +187,7 @@ function getAdminEmails(spreadsheetId) {
       if (owner) {
         const ownerEmail = owner.getEmail();
         if (ownerEmail) {
-          console.log('管理者未設定のため、所有者を管理者に設定:', ownerEmail);
+          debugLog('管理者未設定のため、所有者を管理者に設定:', ownerEmail);
           adminEmails = [ownerEmail];
         }
       }
@@ -183,7 +204,7 @@ function isUserAdmin(email) {
   const userId = userProps.getProperty('CURRENT_USER_ID');
   const userEmail = email || safeGetUserEmail();
 
-  console.log('isUserAdmin check:', {
+  debugLog('isUserAdmin check:', {
     email: email, 
     userEmail: userEmail, 
     userId: userId 
@@ -193,7 +214,7 @@ function isUserAdmin(email) {
     const userInfo = getUserInfo(userId);
     const spreadsheetId = userInfo && userInfo.spreadsheetId;
     const admins = getAdminEmails(spreadsheetId);
-    console.log('Multi-tenant admin check:', {
+    debugLog('Multi-tenant admin check:', {
       spreadsheetId: spreadsheetId, 
       admins: admins, 
       userEmail: userEmail, 
@@ -203,7 +224,7 @@ function isUserAdmin(email) {
   }
 
   const admins = getAdminEmails();
-  console.log('Single-tenant admin check:', {
+  debugLog('Single-tenant admin check:', {
     admins: admins, 
     userEmail: userEmail, 
     isAdmin: admins.includes(userEmail) 
@@ -461,16 +482,18 @@ function doGet(e) {
 
     // プレビューモードはモックデータを表示
     if (mode === 'preview') {
-      return HtmlService.createTemplateFromFile('Preview')
-        .evaluate()
+      const output = HtmlService.createTemplateFromFile('Preview').evaluate();
+      applySecurityHeaders(output);
+      return output
         .setTitle('StudyQuest - プレビュー')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1');
     }
 
     // ユーザーIDがない場合は登録画面を表示
     if (!userId) {
-      return HtmlService.createTemplateFromFile('Registration')
-        .evaluate()
+      const output = HtmlService.createTemplateFromFile('Registration').evaluate();
+      applySecurityHeaders(output);
+      return output
         .setTitle('StudyQuest - 新規登録')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1');
     }
@@ -486,8 +509,9 @@ function doGet(e) {
       userInfo = getUserInfoInternal(validatedUserId);
     }
     if (!userInfo) {
-      return HtmlService.createHtmlOutput('無効なユーザーIDです。')
-        .setTitle('エラー');
+      const output = HtmlService.createHtmlOutput('無効なユーザーIDです。');
+      applySecurityHeaders(output);
+      return output.setTitle('エラー');
     }
 
     // 現在のユーザーを取得（必須）
@@ -505,12 +529,14 @@ function doGet(e) {
         template.boardUrl = `${getWebAppUrlEnhanced()}?userId=${validatedUserId}`;
         auditLog('UNPUBLISHED_ACCESS_NO_LOGIN', validatedUserId, { error: e });
         const output = template.evaluate();
+        applySecurityHeaders(output);
         if (output.setSandboxMode) output.setSandboxMode(HtmlService.SandboxMode.IFRAME);
         return output.setTitle('StudyQuest - 回答ボード');
       }
       if (typeof HtmlService !== 'undefined') {
-        return HtmlService.createHtmlOutput('認証が必要です。Googleアカウントでログインしてください。')
-          .setTitle('認証エラー');
+        const output = HtmlService.createHtmlOutput('認証が必要です。Googleアカウントでログインしてください。');
+        applySecurityHeaders(output);
+        return output.setTitle('認証エラー');
       }
       throw e;
     }
@@ -519,8 +545,9 @@ function doGet(e) {
     if (!isSameDomain(viewerEmail, userInfo.adminEmail)) {
       auditLog('ACCESS_DENIED', validatedUserId, { viewerEmail, adminEmail: userInfo.adminEmail });
       if (typeof HtmlService !== 'undefined') {
-        return HtmlService.createHtmlOutput('システムエラーが発生しました。管理者にお問い合わせください。')
-          .setTitle('エラー');
+        const output = HtmlService.createHtmlOutput('システムエラーが発生しました。管理者にお問い合わせください。');
+        applySecurityHeaders(output);
+        return output.setTitle('エラー');
       }
       throw new Error('権限がありません。同じドメインのユーザーのみアクセスできます。');
     }
@@ -540,6 +567,7 @@ function doGet(e) {
       template.webAppAdminEmail = getWebAppDeployerEmail(); // お問い合わせ先メールアドレス
       auditLog('ADMIN_ACCESS', validatedUserId, { viewerEmail });
       const output = template.evaluate();
+      applySecurityHeaders(output);
       if (output.setSandboxMode) output.setSandboxMode(HtmlService.SandboxMode.IFRAME);
       return output.setTitle('StudyQuest - 管理パネル');
     }
@@ -551,7 +579,7 @@ function doGet(e) {
   const activeSheetName = config.activeSheetName || config.sheetName || '';
   
   // デバッグ情報をログに出力
-  console.log('Config debug:', {
+  debugLog('Config debug:', {
     userId: validatedUserId,
     configJson: config,
     activeSheetName: activeSheetName,
@@ -569,6 +597,7 @@ function doGet(e) {
       template.webAppAdminEmail = getWebAppDeployerEmail(); // お問い合わせ先メールアドレス
       auditLog('ADMIN_ACCESS_NO_SHEET', validatedUserId, { viewerEmail });
       const output = template.evaluate();
+      applySecurityHeaders(output);
       if (output.setSandboxMode) output.setSandboxMode(HtmlService.SandboxMode.IFRAME);
       return output.setTitle('StudyQuest - 管理パネル');
     } else {
@@ -581,6 +610,7 @@ function doGet(e) {
       template.boardUrl = `${getWebAppUrlEnhanced()}?userId=${validatedUserId}`;
       auditLog('UNPUBLISHED_ACCESS', validatedUserId, { viewerEmail, isOwner: false });
       const output = template.evaluate();
+      applySecurityHeaders(output);
       if (output.setSandboxMode) output.setSandboxMode(HtmlService.SandboxMode.IFRAME);
       return output.setTitle('StudyQuest - 回答ボード');
     }
@@ -597,6 +627,7 @@ function doGet(e) {
     template.boardUrl = `${getWebAppUrlEnhanced()}?userId=${validatedUserId}`;
     auditLog('UNPUBLISHED_ACCESS', validatedUserId, { viewerEmail, isOwner: false });
     const output = template.evaluate();
+    applySecurityHeaders(output);
     if (output.setSandboxMode) output.setSandboxMode(HtmlService.SandboxMode.IFRAME);
     return output.setTitle('StudyQuest - 回答ボード');
   }
@@ -636,14 +667,17 @@ function doGet(e) {
     
     auditLog('VIEW_ACCESS', validatedUserId, { viewerEmail, sheetName: activeSheetName });
     
-    return template.evaluate()
+    const output = template.evaluate();
+    applySecurityHeaders(output);
+    return output
         .setTitle('StudyQuest - みんなのかいとうボード')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   } catch (error) {
     console.error('doGet error:', error);
     if (typeof HtmlService !== 'undefined') {
-      return HtmlService.createHtmlOutput('システムエラーが発生しました。管理者にお問い合わせください。')
-        .setTitle('エラー');
+      const output = HtmlService.createHtmlOutput('システムエラーが発生しました。管理者にお問い合わせください。');
+      applySecurityHeaders(output);
+      return output.setTitle('エラー');
     }
     throw error;
   }
@@ -742,12 +776,12 @@ function getAvailableSheets() {
  * @param {string} spreadsheetUrl - 追加するスプレッドシートのURL
  */
 function addSpreadsheetUrl(spreadsheetUrl) {
-  console.log('addSpreadsheetUrl called with:', spreadsheetUrl);
+  debugLog('addSpreadsheetUrl called with:', spreadsheetUrl);
   
   const props = PropertiesService.getUserProperties();
   const userId = props.getProperty('CURRENT_USER_ID');
   
-  console.log('Current user ID:', userId);
+  debugLog('Current user ID:', userId);
   
   if (!userId) {
     throw new Error('ユーザー情報が見つかりません。登録プロセスを再実行してください。');
@@ -756,8 +790,8 @@ function addSpreadsheetUrl(spreadsheetUrl) {
   const userInfo = getUserInfo(userId);
   const currentUserEmail = Session.getActiveUser().getEmail();
   
-  console.log('User info:', userInfo);
-  console.log('Current user email:', currentUserEmail);
+  debugLog('User info:', userInfo);
+  debugLog('Current user email:', currentUserEmail);
   
   if (!userInfo) {
     throw new Error('ユーザー情報が見つかりません。登録プロセスを再実行してください。');
@@ -780,12 +814,12 @@ function addSpreadsheetUrl(spreadsheetUrl) {
   
   // スプレッドシートにアクセスできるかテスト
   try {
-    console.log('Attempting to open spreadsheet with ID:', spreadsheetId);
+    debugLog('Attempting to open spreadsheet with ID:', spreadsheetId);
     const testSpreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheets = testSpreadsheet.getSheets();
     
-    console.log('Spreadsheet name:', testSpreadsheet.getName());
-    console.log('Number of sheets:', sheets.length);
+    debugLog('Spreadsheet name:', testSpreadsheet.getName());
+    debugLog('Number of sheets:', sheets.length);
     
     if (sheets.length === 0) {
       throw new Error('スプレッドシートにシートが見つかりません。');
@@ -828,7 +862,7 @@ function addSpreadsheetUrl(spreadsheetUrl) {
         // 基本設定を保存（少なくとも1つのヘッダーが推測できた場合）
         if (guessedConfig.questionHeader || guessedConfig.answerHeader) {
           saveSheetConfig(firstSheetName, guessedConfig);
-          console.log('Auto-created config for new sheet:', firstSheetName, guessedConfig);
+          debugLog('Auto-created config for new sheet:', firstSheetName, guessedConfig);
         }
       }
     } catch (configError) {
@@ -843,8 +877,8 @@ function addSpreadsheetUrl(spreadsheetUrl) {
       userEmail: userInfo.adminEmail 
     });
     
-    console.log('Successfully added spreadsheet:', testSpreadsheet.getName());
-    console.log('Active sheet set to:', firstSheetName);
+    debugLog('Successfully added spreadsheet:', testSpreadsheet.getName());
+    debugLog('Active sheet set to:', firstSheetName);
     
     return {
       success: true,
@@ -976,7 +1010,7 @@ function getSheetHeaders(sheetName) {
  */
 function getSheetHeadersWithAutoConfig(sheetName) {
   try {
-    console.log('Getting headers and auto config for sheet:', sheetName);
+    debugLog('Getting headers and auto config for sheet:', sheetName);
     
     const headers = getSheetHeaders(sheetName);
     if (!headers || headers.length === 0) {
@@ -988,8 +1022,8 @@ function getSheetHeadersWithAutoConfig(sheetName) {
     
     const autoConfig = guessHeadersFromArray(headers);
     
-    console.log('Headers:', headers);
-    console.log('Auto config:', autoConfig);
+    debugLog('Headers:', headers);
+    debugLog('Auto config:', autoConfig);
     
     return {
       status: 'success',
@@ -1030,7 +1064,7 @@ function guessHeadersFromArray(headers) {
     return found ? found.original : '';
   };
   
-  console.log('Available headers:', headers);
+  debugLog('Available headers:', headers);
   
   // Googleフォーム特有のヘッダー構造に対応
   const isGoogleForm = normalizedHeaders.some(h =>
@@ -1045,7 +1079,7 @@ function guessHeadersFromArray(headers) {
   let classHeader = '';
   
   if (isGoogleForm) {
-    console.log('Detected Google Form response sheet');
+    debugLog('Detected Google Form response sheet');
     
     // Googleフォームの一般的な構造: タイムスタンプ, メールアドレス, [質問1], [質問2], ...
     const nonMetaHeaders = normalizedHeaders.filter(h => {
@@ -1056,7 +1090,7 @@ function guessHeadersFromArray(headers) {
              !hStr.includes('email');
     });
     
-    console.log('Non-meta headers:', nonMetaHeaders.map(h => h.original));
+    debugLog('Non-meta headers:', nonMetaHeaders.map(h => h.original));
     
     // より柔軟な推測ロジック
     for (let i = 0; i < nonMetaHeaders.length; i++) {
@@ -1117,11 +1151,11 @@ function guessHeadersFromArray(headers) {
     classHeader: classHeader
   };
   
-  console.log('Guessed headers:', guessed);
+  debugLog('Guessed headers:', guessed);
   
   // 最終フォールバック: 何も推測できない場合
   if (!question && !answer && headers.length > 0) {
-    console.log('No specific headers found, using positional mapping');
+    debugLog('No specific headers found, using positional mapping');
     
     // タイムスタンプとメールを除外して最初の列を回答として使用
     const usableHeaders = normalizedHeaders
@@ -1197,7 +1231,7 @@ function getSheetData(sheetName, classFilter, sortBy) {
     try {
       cfg = cfgFunc ? cfgFunc(sheetName) : {};
     } catch (configError) {
-      console.log(`Config not found for sheet ${sheetName} in getSheetData, creating default config:`, configError.message);
+      debugLog(`Config not found for sheet ${sheetName} in getSheetData, creating default config:`, configError.message);
       
       // ヘッダーから自動推測して基本設定を作成
       const headers = allValues[0] || [];
@@ -1208,7 +1242,7 @@ function getSheetData(sheetName, classFilter, sortBy) {
         try {
           saveSheetConfig(sheetName, guessedConfig);
           cfg = guessedConfig;
-          console.log('Auto-created and saved config for sheet in getSheetData:', sheetName, cfg);
+          debugLog('Auto-created and saved config for sheet in getSheetData:', sheetName, cfg);
         } catch (saveError) {
           console.warn('Failed to save auto-created config in getSheetData:', saveError.message);
           cfg = guessedConfig; // 保存に失敗してもメモリ上のconfigは使用
@@ -1332,7 +1366,7 @@ function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy)
     try {
       cfg = cfgFunc ? cfgFunc(sheetName) : {};
     } catch (configError) {
-      console.log(`Config not found for sheet ${sheetName} in getSheetDataForSpreadsheet, creating default config:`, configError.message);
+      debugLog(`Config not found for sheet ${sheetName} in getSheetDataForSpreadsheet, creating default config:`, configError.message);
 
       const headers = allValues[0] || [];
       const guessedConfig = guessHeadersFromArray(headers);
@@ -1341,7 +1375,7 @@ function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy)
         try {
           saveSheetConfig(sheetName, guessedConfig);
           cfg = guessedConfig;
-          console.log('Auto-created and saved config for sheet in getSheetDataForSpreadsheet:', sheetName, cfg);
+          debugLog('Auto-created and saved config for sheet in getSheetDataForSpreadsheet:', sheetName, cfg);
         } catch (saveError) {
           console.warn('Failed to save auto-created config in getSheetDataForSpreadsheet:', saveError.message);
           cfg = guessedConfig;
@@ -1508,7 +1542,7 @@ function addReaction(rowIndex, reactionKey, sheetName) {
 
 function toggleHighlight(rowIndex, sheetName, userObject = null) {
   // フロントエンドから渡されたユーザー情報をログに出力
-  console.log('toggleHighlight request', {
+  debugLog('toggleHighlight request', {
     rowIndex: rowIndex, 
     sheetName: sheetName, 
     userObject: userObject,
@@ -1525,7 +1559,7 @@ function toggleHighlight(rowIndex, sheetName, userObject = null) {
     return { status: 'error', message: 'ログインしていないため、操作できません。' };
   }
 
-  console.log('toggleHighlight processing', { rowIndex: rowIndex, sheetName: sheetName, userEmail: userEmail });
+  debugLog('toggleHighlight processing', { rowIndex: rowIndex, sheetName: sheetName, userEmail: userEmail });
 
   const lock = (typeof LockService !== 'undefined') ? LockService.getScriptLock() : null;
   try {
@@ -1558,7 +1592,7 @@ function toggleHighlight(rowIndex, sheetName, userObject = null) {
     const current = !!cell.getValue();
     const newValue = !current;
     cell.setValue(newValue);
-    console.log('toggleHighlight updated', { rowIndex: rowIndex, sheetName: targetSheet, highlight: newValue });
+    debugLog('toggleHighlight updated', { rowIndex: rowIndex, sheetName: targetSheet, highlight: newValue });
     return { status: 'ok', highlight: newValue };
   } catch (error) {
     console.error('toggleHighlight failed:', error);
@@ -1761,11 +1795,11 @@ function saveDeployId(id) {
   
   if (cleanId) {
     props.setProperties({ DEPLOY_ID: cleanId });
-    console.log('Saved DEPLOY_ID:', cleanId);
+    debugLog('Saved DEPLOY_ID:', cleanId);
     
     // DEPLOY_IDが設定された後、WebAppURLを再評価
     const currentUrl = getWebAppUrlEnhanced();
-    console.log('Updated WebApp URL after DEPLOY_ID save:', currentUrl);
+    debugLog('Updated WebApp URL after DEPLOY_ID save:', currentUrl);
     
     const storedUrl = props.getProperty('WEB_APP_URL');
     if (storedUrl && /script\.googleusercontent\.com/.test(storedUrl)) {
@@ -1840,7 +1874,7 @@ function createStudyQuestForm(userEmail, userId) {
       formFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.EDIT);
       const spreadsheetFile = DriveApp.getFileById(spreadsheet.getId());
       spreadsheetFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.EDIT);
-      console.log(`フォームとスプレッドシートをドメイン「${userDomain}」で共有しました。`);
+      debugLog(`フォームとスプレッドシートをドメイン「${userDomain}」で共有しました。`);
     }
 
     const sheet = spreadsheet.getSheets()[0];
@@ -1851,7 +1885,7 @@ function createStudyQuestForm(userEmail, userId) {
     
     // 現在のヘッダーを取得（Googleフォームによって自動生成されたもの）
     const currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    console.log('Current headers after form linking:', currentHeaders);
+    debugLog('Current headers after form linking:', currentHeaders);
     
     // StudyQuest用の追加列を準備
     const additionalHeaders = [
@@ -1926,7 +1960,7 @@ function createBoardFromAdmin() {
     // 2. 作成されたスプレッドシートを現在のユーザーのメインスプレッドシートとして設定
     if (result.spreadsheetId && result.spreadsheetUrl) {
       const addResult = addSpreadsheetUrl(result.spreadsheetUrl);
-      console.log('Spreadsheet added to user:', addResult);
+      debugLog('Spreadsheet added to user:', addResult);
 
       // 3. 新しく作成したシートをアクティブ化・公開
       const newSheetName = addResult.firstSheetName;
@@ -1935,7 +1969,7 @@ function createBoardFromAdmin() {
         switchActiveSheet(newSheetName);
         // 公開状態に設定
         updateUserConfig(userId, { isPublished: true });
-        console.log(`New board '${newSheetName}' has been created and published.`);
+        debugLog(`New board '${newSheetName}' has been created and published.`);
       }
 
       return {

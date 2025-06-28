@@ -54,7 +54,7 @@
  * @return {Object} セットアップ結果とユーザー向けの詳細情報
  */
 function studyQuestSetup(deployId = null) {
-  console.log('=== StudyQuest統合セットアップ開始 ===');
+  debugLog('=== StudyQuest統合セットアップ開始 ===');
   
   const results = {
     timestamp: new Date().toISOString(),
@@ -151,8 +151,8 @@ function studyQuestSetup(deployId = null) {
     results.status = 'warning';
   }
 
-  console.log('=== StudyQuest統合セットアップ完了 ===');
-  console.log('結果:', JSON.stringify(results, null, 2));
+  debugLog('=== StudyQuest統合セットアップ完了 ===');
+  debugLog('結果:', JSON.stringify(results, null, 2));
   
   // ユーザー向けの見やすい結果表示
   displaySetupResults(results);
@@ -417,51 +417,51 @@ function testConfiguration() {
  * セットアップ結果をユーザーフレンドリーに表示
  */
 function displaySetupResults(results) {
-  console.log('\n🚀 === StudyQuest セットアップ結果 ===');
+  debugLog('\n🚀 === StudyQuest セットアップ結果 ===');
   
   if (results.status === 'success') {
-    console.log('✅ セットアップが正常に完了しました！');
+    debugLog('✅ セットアップが正常に完了しました！');
   } else if (results.status === 'warning') {
-    console.log('⚠️ セットアップは完了しましたが、警告があります');
+    debugLog('⚠️ セットアップは完了しましたが、警告があります');
   } else {
-    console.log('❌ セットアップ中にエラーが発生しました');
+    debugLog('❌ セットアップ中にエラーが発生しました');
   }
 
-  console.log(`\n📊 実行時刻: ${results.timestamp}`);
+  debugLog(`\n📊 実行時刻: ${results.timestamp}`);
   
   if (Object.keys(results.urls).length > 0) {
-    console.log('\n🔗 生成されたURL:');
+    debugLog('\n🔗 生成されたURL:');
     for (const [key, url] of Object.entries(results.urls)) {
-      console.log(`   ${key}: ${url}`);
+      debugLog(`   ${key}: ${url}`);
     }
   }
 
   if (results.errors.length > 0) {
-    console.log('\n❌ エラー:');
+    debugLog('\n❌ エラー:');
     results.errors.forEach(error => {
-      console.log(`   • ${error.step}: ${error.message}`);
+      debugLog(`   • ${error.step}: ${error.message}`);
     });
   }
 
   if (results.warnings.length > 0) {
-    console.log('\n⚠️ 警告:');
+    debugLog('\n⚠️ 警告:');
     results.warnings.forEach(warning => {
-      console.log(`   • ${warning.step}: ${warning.message}`);
+      debugLog(`   • ${warning.step}: ${warning.message}`);
     });
   }
 
   if (results.nextSteps.length > 0) {
-    console.log('\n📋 次のステップ:');
+    debugLog('\n📋 次のステップ:');
     results.nextSteps.forEach((step, index) => {
-      console.log(`   ${index + 1}. ${step.action}`);
-      console.log(`      ${step.instruction}`);
+      debugLog(`   ${index + 1}. ${step.action}`);
+      debugLog(`      ${step.instruction}`);
       if (step.description) {
-        console.log(`      ${step.description}`);
+        debugLog(`      ${step.description}`);
       }
     });
   }
 
-  console.log('\n🎉 StudyQuestへようこそ！');
+  debugLog('\n🎉 StudyQuestへようこそ！');
 }
 
 /**
@@ -516,7 +516,7 @@ function migrateDatabaseIdProperty() {
   // DATABASE_IDが未設定でUSER_DATABASE_IDが設定されている場合のみ移行
   if (!databaseId && userDatabaseId) {
     props.setProperties({ DATABASE_ID: userDatabaseId });
-    console.log('Migrated USER_DATABASE_ID to DATABASE_ID:', userDatabaseId);
+    debugLog('Migrated USER_DATABASE_ID to DATABASE_ID:', userDatabaseId);
     
     // 移行後、古いプロパティを削除することも可能（コメントアウト）
     // props.deleteProperty('USER_DATABASE_ID');
