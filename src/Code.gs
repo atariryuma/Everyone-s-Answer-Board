@@ -60,7 +60,9 @@ function applySecurityHeaders(output) {
       "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
     );
     if (typeof output.setXFrameOptionsMode === 'function') {
-      output.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      // Allow embedding within the same origin by default for enhanced security
+      // unless a future embedding requirement mandates ALLOWALL.
+      output.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN);
     }
   }
   return output;
