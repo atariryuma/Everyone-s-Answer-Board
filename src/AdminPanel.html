@@ -364,38 +364,6 @@
       <!-- Setup Workflow -->
       <div class="space-y-6">
         
-        <!-- Step 0: Create New Board -->
-        <div class="glass-panel p-6 rounded-xl slide-up border-l-4 border-yellow-400">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-3">
-              <div class="w-8 h-8 bg-yellow-500 text-white rounded-full flex items-center justify-center font-bold text-sm">+</div>
-              <h3 class="text-lg font-semibold text-yellow-400">新しいボードを作成</h3>
-            </div>
-            <span class="px-3 py-1 bg-yellow-600 text-xs rounded-full">おすすめ</span>
-          </div>
-          
-          <div class="space-y-4">
-            <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
-              <div class="flex items-start gap-3">
-                <svg class="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                </svg>
-                <div>
-                  <p class="text-sm text-yellow-200 font-medium mb-1">新しいGoogleフォームとスプレッドシートを自動作成</p>
-                  <p class="text-xs text-yellow-300">生徒の回答収集用フォームと回答ボード用スプレッドシートを一度に作成できます</p>
-                </div>
-              </div>
-            </div>
-            
-            <button type="button" id="create-new-board-btn" class="btn btn-primary w-full">
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-              </svg>
-              <span id="create-new-board-text">新しいボードを作成</span>
-            </button>
-          </div>
-        </div>
-        
         <!-- Step 1: Spreadsheet Management -->
         <div class="glass-panel p-6 rounded-xl slide-up">
           <div class="flex items-center justify-between mb-4">
@@ -642,7 +610,39 @@
 
     </div>
   </main>
-
+  <!-- Student URL Section -->
+  <div class="fixed bottom-0 left-0 right-0 glass-panel border-t border-gray-700 hidden" id="student-url-section">
+    <div class="max-w-6xl mx-auto px-6 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 class="font-semibold text-green-400" id="url-section-title">📋 ご利用中のボード</h3>
+            <p class="text-xs text-gray-400" id="url-section-description">以下のURLからいつでも管理画面にアクセスできます</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <input type="text" id="board-url" readonly
+                 class="px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-sm cursor-pointer hover:bg-gray-700 focus:ring-2 focus:ring-green-400 min-w-[300px]"
+                 onclick="this.select()" placeholder="URLが生成されます">
+          <button type="button" onclick="copyBoardUrl()" class="btn btn-secondary px-4 py-2" title="URLをコピー" aria-label="生徒用URLをコピー">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+            </svg>
+          </button>
+          <a id="view-board-link" href="#" target="_blank" class="btn btn-primary px-4 py-2" title="回答ボードを開く" aria-label="新しいタブで回答ボードを開く">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
   <!-- Message Area -->
   <div id="message-area" class="fixed top-20 right-6 z-50" aria-live="polite" role="status"></div>
 
@@ -684,7 +684,6 @@
     document.addEventListener('DOMContentLoaded', function() {
       loadStatus();
       setupEventListeners();
-      updateFooterInfo();
     });
 
     function setupEventListeners() {
@@ -702,12 +701,6 @@
       
       // Spreadsheet management
       document.getElementById('add-spreadsheet-btn').addEventListener('click', addSpreadsheet);
-      
-      // Board creation
-      const createNewBoardBtn = document.getElementById('create-new-board-btn');
-      if (createNewBoardBtn) {
-        createNewBoardBtn.addEventListener('click', createNewBoard);
-      }
       
       // Display options
       elements.detailOptions.addEventListener('change', function(e) {
@@ -814,27 +807,6 @@
         })
         .getStatus();
     }
-    
-    function updateFooterInfo() {
-      // Update footer with environment and URL information
-      const currentUrl = window.location.href;
-      const isDev = currentUrl.includes('/dev');
-      
-      const footerEnvironment = document.getElementById('footer-environment');
-      const footerUrl = document.getElementById('footer-url');
-      
-      if (footerEnvironment) {
-        footerEnvironment.textContent = isDev ? '開発環境 (/dev)' : '本番環境 (/exec)';
-        footerEnvironment.className = isDev ? 'text-yellow-400' : 'text-green-400';
-      }
-      
-      if (footerUrl) {
-        // Show a shortened version of the current URL
-        const urlParts = currentUrl.split('/');
-        const shortUrl = urlParts.length > 5 ? `.../${urlParts.slice(-2).join('/')}` : currentUrl;
-        footerUrl.textContent = shortUrl;
-      }
-    }
 
     function updateStatus(status) {
       currentActiveSheet = status.activeSheetName || '';
@@ -935,11 +907,32 @@
         if (elements.viewBoardLink) elements.viewBoardLink.href = boardUrl;
         if (elements.openAdminLink) elements.openAdminLink.href = adminUrl;
         
+        // Update URL section title and description based on environment
+        const urlTitle = document.getElementById('url-section-title');
+        const urlDescription = document.getElementById('url-section-description');
+
+        if (urlTitle) {
+          urlTitle.textContent = '📋 ご利用中のボード';
+        }
+        if (urlDescription) {
+          urlDescription.textContent = '以下のURLからいつでも管理画面にアクセスできます';
+        }
+        const studentUrlSection = document.getElementById('student-url-section');
+        if (studentUrlSection) {
+          studentUrlSection.classList.remove('hidden');
+          studentUrlSection.classList.add('fade-in');
+        }
+        
         // Enable preview button
         if (elements.previewBtn) {
           elements.previewBtn.disabled = false;
         }
       } else {
+        const studentUrlSection = document.getElementById('student-url-section');
+        if (studentUrlSection) {
+          studentUrlSection.classList.add('hidden');
+        }
+        
         // Disable preview button
         if (elements.previewBtn) {
           elements.previewBtn.disabled = true;
@@ -1023,16 +1016,6 @@
       if (activityList) {
         activityList.innerHTML = activityHtml || '<div class="text-gray-400 text-sm">活動データがありません</div>';
       }
-    }
-
-    function createNewBoard() {
-      // This feature is temporarily disabled - fallback to spreadsheet addition
-      showMessage('新しいボード作成機能は現在メンテナンス中です。既存のスプレッドシートを追加してご利用ください。', 'yellow');
-    }
-    
-    function showBoardCreationResults(result) {
-      // Board creation results are not available in current version
-      console.log('Board creation results:', result);
     }
 
     function addSpreadsheet() {
@@ -1453,18 +1436,5 @@
         .replace(/'/g, "&#039;");
     }
   </script>
-
-  <!-- フッター -->
-  <footer class="mt-8 pt-6 border-t border-gray-700">
-    <div class="max-w-6xl mx-auto px-6">
-      <div class="text-center space-y-2">
-        <p class="text-xs text-gray-500">StudyQuest管理画面 - 教育現場のためのインタラクティブ回答ボード</p>
-        <div class="flex justify-center items-center gap-4 text-xs text-gray-600">
-          <span>環境: <span id="footer-environment" class="text-cyan-400">確認中...</span></span>
-          <span>URL: <span id="footer-url" class="text-cyan-400 font-mono">読み込み中...</span></span>
-        </div>
-      </div>
-    </div>
-  </footer>
 </body>
 </html>
