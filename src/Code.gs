@@ -1862,7 +1862,7 @@ function saveWebAppUrl(url) {
 }
 
 function getUrlOrigin(url) {
-  const match = String(url).match(/^(https?://[^/]+)/);
+  const match = String(url).match(/^(https?:\/\/[^/]+)/);
   return match ? match[1] : '';
 }
 
