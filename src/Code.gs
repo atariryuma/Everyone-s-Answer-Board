@@ -2082,7 +2082,9 @@ function createStudyQuestForm(userEmail, userId) {
     // その他のエラー詳細を含める
     throw new Error(`Googleフォームとスプレッドシートの作成に失敗しました。詳細: ${error.message}`);
   }
-  /**
+}
+
+/**
    * Admin Panel用のボード作成関数
    * 現在ログイン中のユーザーの新しいボードを作成し、公開・アクティブ化まで行います。
    */
