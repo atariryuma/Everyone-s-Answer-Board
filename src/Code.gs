@@ -1277,6 +1277,139 @@ function getSheetData(sheetName, classFilter, sortBy) {
   }
 }
 
+/**
+ * 指定したスプレッドシートからシートデータを取得します。
+ * @param {SpreadsheetApp.Spreadsheet} spreadsheet 対象スプレッドシート
+ * @param {string} sheetName シート名
+ * @param {string} classFilter クラスフィルター
+ * @param {string} sortBy ソート順
+ */
+function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy) {
+  try {
+    const sheet = spreadsheet.getSheetByName(sheetName);
+    if (!sheet) throw new Error(`指定されたシート「${sheetName}」が見つかりません。`);
+
+    const allValues = sheet.getDataRange().getValues();
+    if (allValues.length < 1) return { header: "シートにデータがありません", rows: [] };
+
+    const cfgFunc = (typeof global !== 'undefined' && global.getConfig)
+      ? global.getConfig
+      : (typeof getConfig === 'function' ? getConfig : null);
+
+    let cfg = {};
+    try {
+      cfg = cfgFunc ? cfgFunc(sheetName) : {};
+    } catch (configError) {
+      console.log(`Config not found for sheet ${sheetName} in getSheetDataForSpreadsheet, creating default config:`, configError.message);
+
+      const headers = allValues[0] || [];
+      const guessedConfig = guessHeadersFromArray(headers);
+
+      if (guessedConfig.questionHeader || guessedConfig.answerHeader) {
+        try {
+          saveSheetConfig(sheetName, guessedConfig);
+          cfg = guessedConfig;
+          console.log('Auto-created and saved config for sheet in getSheetDataForSpreadsheet:', sheetName, cfg);
+        } catch (saveError) {
+          console.warn('Failed to save auto-created config in getSheetDataForSpreadsheet:', saveError.message);
+          cfg = guessedConfig;
+        }
+      }
+    }
+
+    const answerHeader = cfg.answerHeader || cfg.questionHeader || COLUMN_HEADERS.OPINION;
+    const reasonHeader = cfg.reasonHeader || COLUMN_HEADERS.REASON;
+    const classHeaderGuess = cfg.classHeader || COLUMN_HEADERS.CLASS;
+    const nameHeader = cfg.nameHeader || '';
+
+    const sheetHeaders = allValues[0].map(h => String(h || '').replace(/\s+/g,''));
+    const normalized = header => String(header || '').replace(/\s+/g,'');
+
+    const required = [
+      COLUMN_HEADERS.EMAIL,
+      answerHeader,
+      reasonHeader,
+      COLUMN_HEADERS.TIMESTAMP,
+      COLUMN_HEADERS.UNDERSTAND,
+      COLUMN_HEADERS.LIKE,
+      COLUMN_HEADERS.CURIOUS,
+      COLUMN_HEADERS.HIGHLIGHT
+    ];
+    if (nameHeader && sheetHeaders.includes(normalized(nameHeader))) {
+      required.push(nameHeader);
+    }
+
+    if (sheetHeaders.includes(normalized(classHeaderGuess))) {
+      required.splice(1,0,classHeaderGuess);
+    }
+
+    const headerIndices = findHeaderIndices(allValues[0], required);
+
+    const classHeader = sheetHeaders.includes(normalized(classHeaderGuess)) ? classHeaderGuess : '';
+    const dataRows = allValues.slice(1);
+    const userEmail = safeGetUserEmail();
+
+    const rows = dataRows.map((row, index) => {
+      if (classHeader && classFilter && classFilter !== 'すべて') {
+        const className = row[headerIndices[classHeader]];
+        if (className !== classFilter) return null;
+      }
+      const email = row[headerIndices[COLUMN_HEADERS.EMAIL]];
+      const opinion = row[headerIndices[answerHeader]];
+
+      if (email && opinion) {
+        const understandArr = parseReactionString(row[headerIndices[COLUMN_HEADERS.UNDERSTAND]]);
+        const likeArr = parseReactionString(row[headerIndices[COLUMN_HEADERS.LIKE]]);
+        const curiousArr = parseReactionString(row[headerIndices[COLUMN_HEADERS.CURIOUS]]);
+        const reason = row[headerIndices[reasonHeader]] || '';
+        const highlightVal = row[headerIndices[COLUMN_HEADERS.HIGHLIGHT]];
+        const timestampRaw = row[headerIndices[COLUMN_HEADERS.TIMESTAMP]];
+        const timestamp = timestampRaw ? new Date(timestampRaw).toISOString() : '';
+        const likes = likeArr.length;
+        const baseScore = reason.length;
+        const likeMultiplier = 1 + (likes * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR);
+        const totalScore = baseScore * likeMultiplier;
+        let name = '';
+        if (nameHeader && row[headerIndices[nameHeader]]) {
+          name = row[headerIndices[nameHeader]];
+        } else if (email) {
+          name = email.split('@')[0];
+        }
+        return {
+          rowIndex: index + 2,
+          timestamp: timestamp,
+          name: name,
+          email: email,
+          class: row[headerIndices[classHeader]] || '未分類',
+          opinion: opinion,
+          reason: reason,
+          reactions: {
+            UNDERSTAND: { count: understandArr.length, reacted: userEmail ? understandArr.includes(userEmail) : false },
+            LIKE: { count: likeArr.length, reacted: userEmail ? likeArr.includes(userEmail) : false },
+            CURIOUS: { count: curiousArr.length, reacted: userEmail ? curiousArr.includes(userEmail) : false }
+          },
+          highlight: highlightVal === true || String(highlightVal).toLowerCase() === 'true',
+          score: totalScore
+        };
+      }
+      return null;
+    }).filter(Boolean);
+
+    if (sortBy === 'newest') {
+      rows.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    } else if (sortBy === 'random') {
+      rows.sort((a, b) => hashTimestamp(a.timestamp) - hashTimestamp(b.timestamp));
+    } else {
+      rows.sort((a, b) => b.score - a.score);
+    }
+
+    const header = cfg.questionHeader || answerHeader;
+    return { header: header, rows: rows };
+  } catch(e) {
+    handleError(`getSheetDataForSpreadsheet for ${sheetName}`, e);
+  }
+}
+
 
 function addReaction(rowIndex, reactionKey, sheetName) {
   if (!rowIndex || !reactionKey || !COLUMN_HEADERS[reactionKey]) {
@@ -2122,6 +2255,7 @@ if (typeof module !== 'undefined') {
     getAdminSettings,
     getHeaderIndices,
     getSheetData,
+    getSheetDataForSpreadsheet,
     getSheetHeaders,
     getWebAppUrl,
     getWebAppUrlEnhanced,
