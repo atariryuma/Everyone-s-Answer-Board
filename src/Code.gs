@@ -1579,6 +1579,11 @@ function getWebAppUrlEnhanced() {
   return '';
 }
 
+// レガシー互換のためのエイリアス関数
+function getWebAppUrl() {
+  return getWebAppUrlEnhanced();
+}
+
 function saveDeployId(id) {
   const props = PropertiesService.getScriptProperties();
   const cleanId = (id || '').trim();
@@ -2047,4 +2052,64 @@ function openActiveSpreadsheet() {
   }
   const spreadsheet = SpreadsheetApp.openById(userInfo.spreadsheetId);
   return spreadsheet.getUrl();
+}
+
+/**
+ * 現在のユーザーに紐づく既存ボード情報を取得
+ * @return {Object|null} 既存ボードがあればURL等を含むオブジェクト、なければnull
+ */
+function getExistingBoard() {
+  const email = safeGetUserEmail();
+  const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
+  const data = userDb.getDataRange().getValues();
+  const headers = data[0];
+  const emailIdx = headers.indexOf('adminEmail');
+  const userIdIdx = headers.indexOf('userId');
+  const urlIdx = headers.indexOf('spreadsheetUrl');
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][emailIdx] === email) {
+      const userId = data[i][userIdIdx];
+      const base = getWebAppUrlEnhanced();
+      return {
+        userId: userId,
+        adminUrl: base ? `${base}?userId=${userId}&mode=admin` : '',
+        viewUrl: base ? `${base}?userId=${userId}` : '',
+        spreadsheetUrl: data[i][urlIdx] || ''
+      };
+    }
+  }
+  return null;
+}
+
+// =================================================================
+// CommonJS exports for unit tests
+// =================================================================
+if (typeof module !== 'undefined') {
+  module.exports = {
+    addReaction,
+    buildBoardData,
+    checkAdmin,
+    COLUMN_HEADERS,
+    doGet,
+    findHeaderIndices,
+    getAdminSettings,
+    getHeaderIndices,
+    getSheetData,
+    getSheetHeaders,
+    getWebAppUrl,
+    getWebAppUrlEnhanced,
+    guessHeadersFromArray,
+    parseReactionString,
+    isUserAdmin,
+    prepareSheetForBoard,
+    saveDeployId,
+    saveSheetConfig,
+    saveWebAppUrl,
+    toggleHighlight,
+    registerNewUser,
+    getSpreadsheetUrlForUser,
+    openActiveSpreadsheet,
+    getExistingBoard
+  };
 }
