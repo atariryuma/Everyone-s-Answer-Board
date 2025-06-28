@@ -46,16 +46,7 @@ const REACTION_KEYS = ["UNDERSTAND","LIKE","CURIOUS"];
 var getConfig;
 var handleError;
 
-// Default error handler
-if (!handleError) {
-  handleError = function(context, error, returnErrorObj = false) {
-    console.error(`Error in ${context}:`, error);
-    if (returnErrorObj) {
-      return { status: 'error', message: error.message || 'エラーが発生しました。' };
-    }
-    throw error;
-  };
-}
+// handleError関数はErrorHandling.gsで定義されています
 
 if (typeof global !== 'undefined' && global.getConfig) {
   getConfig = global.getConfig;
@@ -473,7 +464,7 @@ function doGet(e) {
         template.userEmail = userInfo.adminEmail;
         template.isOwner = false;
         template.ownerName = userInfo.adminEmail || 'Unknown';
-        template.boardUrl = `${getWebAppUrl()}?userId=${validatedUserId}`;
+        template.boardUrl = `${getWebAppUrlEnhanced(true)}?userId=${validatedUserId}`;
         auditLog('UNPUBLISHED_ACCESS_NO_LOGIN', validatedUserId, { error: e });
         const output = template.evaluate();
         if (output.setSandboxMode) output.setSandboxMode(HtmlService.SandboxMode.IFRAME);
@@ -545,7 +536,7 @@ function doGet(e) {
       template.userEmail = userInfo.adminEmail;
       template.isOwner = false;
       template.ownerName = userInfo.adminEmail || 'Unknown';
-      template.boardUrl = `${getWebAppUrl()}?userId=${validatedUserId}`;
+      template.boardUrl = `${getWebAppUrlEnhanced(true)}?userId=${validatedUserId}`;
       auditLog('UNPUBLISHED_ACCESS', validatedUserId, { viewerEmail, isOwner: false });
       const output = template.evaluate();
       if (output.setSandboxMode) output.setSandboxMode(HtmlService.SandboxMode.IFRAME);
@@ -561,7 +552,7 @@ function doGet(e) {
     template.userEmail = userInfo.adminEmail;
     template.isOwner = false;
     template.ownerName = userInfo.adminEmail || 'Unknown';
-    template.boardUrl = `${getWebAppUrl()}?userId=${validatedUserId}`;
+    template.boardUrl = `${getWebAppUrlEnhanced(true)}?userId=${validatedUserId}`;
     auditLog('UNPUBLISHED_ACCESS', validatedUserId, { viewerEmail, isOwner: false });
     const output = template.evaluate();
     if (output.setSandboxMode) output.setSandboxMode(HtmlService.SandboxMode.IFRAME);
@@ -1706,7 +1697,9 @@ function convertPreviewUrl(url, deployId, preserveDev = false) {
   return url;
 }
 
-function getWebAppUrl() {
+// 古いgetWebAppUrl関数は削除されました。getWebAppUrlEnhanced()を使用してください。
+
+function getWebAppUrlEnhanced(forceProduction = false) {
   const props = PropertiesService.getScriptProperties();
   // deployIdを最初に取得しており、見通しが良い
   const deployId = props.getProperty('DEPLOY_ID'); 
@@ -1810,7 +1803,7 @@ function saveDeployId(id) {
     console.log('Saved DEPLOY_ID:', cleanId);
     
     // DEPLOY_IDが設定された後、WebAppURLを再評価
-    const currentUrl = getWebAppUrl();
+    const currentUrl = getWebAppUrlEnhanced(true);
     console.log('Updated WebApp URL after DEPLOY_ID save:', currentUrl);
     
     // 保存されたURLがまだプレビュー形式の場合は再変換
@@ -2096,8 +2089,8 @@ function registerNewUser(spreadsheetUrl) {
   const existingByEmail = findUserByEmail(userEmail);
   if (existingByEmail) {
     return {
-      adminUrl: `${getWebAppUrl()}?userId=${existingByEmail.userId}&mode=admin`,
-      viewUrl: `${getWebAppUrl()}?userId=${existingByEmail.userId}`,
+      adminUrl: `${getWebAppUrlEnhanced(true)}?userId=${existingByEmail.userId}&mode=admin`,
+      viewUrl: `${getWebAppUrlEnhanced(true)}?userId=${existingByEmail.userId}`,
       userId: existingByEmail.userId,
       spreadsheetUrl: existingByEmail.spreadsheetUrl,
       message: '既に登録済みです。'
@@ -2158,8 +2151,8 @@ function registerNewUser(spreadsheetUrl) {
   updateAdminEmails(spreadsheetId, userEmail);
   
   const result = {
-    adminUrl: `${getWebAppUrl()}?userId=${userId}&mode=admin`,
-    viewUrl: `${getWebAppUrl()}?userId=${userId}`,
+    adminUrl: `${getWebAppUrlEnhanced(true)}?userId=${userId}&mode=admin`,
+    viewUrl: `${getWebAppUrlEnhanced(true)}?userId=${userId}`,
     userId: userId,
     message: spreadsheetUrl === 'AUTO_CREATE' ? 
       '新規登録とGoogleフォーム作成が完了しました！' : 
@@ -2438,29 +2431,6 @@ function sanitizeConfigData(config) {
 // Database initialization and access
 // ===============================================================
 
-/**
- * @deprecated Setup.gsのstudyQuestSetup()を使用してください
- * 
- * 管理者が一度だけ実行 - 新しい統合セットアップに移行済み
- * 使用方法: Setup.gsのstudyQuestSetup()を実行してください
- */
-function setup() {
-  console.warn('この関数は非推奨です。Setup.gsのstudyQuestSetup()を使用してください。');
-  console.log('移行のため、旧セットアップを実行します...');
-  
-  const props = PropertiesService.getScriptProperties();
-  if (props.getProperty('DATABASE_ID')) {
-    console.log('Setup already done.');
-    return;
-  }
-  const db = SpreadsheetApp.create('StudyQuest_UserDatabase');
-  props.setProperty('DATABASE_ID', db.getId());
-  const sheet = db.getSheets()[0];
-  sheet.setName(USER_DB_CONFIG.SHEET_NAME);
-  sheet.appendRow(USER_DB_CONFIG.HEADERS);
-  console.log('Database created. ID: ' + db.getId());
-  console.log('⚠️ 今後はSetup.gsのstudyQuestSetup()をご利用ください。');
-}
 
 // DBアクセスは必ずこの関数を経由させる
 function getDatabase() {
@@ -2632,8 +2602,8 @@ function getExistingBoard() {
   const user = findUserByEmail(email);
   if (!user) return null;
   return {
-    adminUrl: `${getWebAppUrl()}?userId=${user.userId}&mode=admin`,
-    viewUrl: `${getWebAppUrl()}?userId=${user.userId}`,
+    adminUrl: `${getWebAppUrlEnhanced(true)}?userId=${user.userId}&mode=admin`,
+    viewUrl: `${getWebAppUrlEnhanced(true)}?userId=${user.userId}`,
     spreadsheetUrl: user.spreadsheetUrl,
     userId: user.userId
   };
@@ -2666,8 +2636,6 @@ if (typeof module !== 'undefined') {
     checkAdmin,
     isUserAdmin,
     handleError,
-    saveSheetConfig,
-    createConfigSheet,
     createTemplateSheet,
     prepareSheetForBoard,
     registerNewUser,
@@ -2675,7 +2643,6 @@ if (typeof module !== 'undefined') {
     getUserInfoInternal,
     updateUserConfig,
     getUserDatabase,
-    setup,
     getDatabase,
     extractSpreadsheetId,
     generateAccessToken,

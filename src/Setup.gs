@@ -25,28 +25,16 @@
  * 🔄 既存のsetup()関数は非推奨になりました。
  *    このstudyQuestSetup()が全機能を統合しています。
  * 
+ * 📖 詳細な使用方法は SETUP_README.md を参照してください。
+ * 
  * =================================================================
  */
 
 // =================================================================
-// 定数定義（Code.gsから参照）
+// 定数定義（Code.gsの定数を使用）
 // =================================================================
 
-// マルチテナント用ユーザーデータベース設定
-const USER_DB_CONFIG = {
-  SHEET_NAME: 'Users',
-  HEADERS: [
-    'userId',
-    'adminEmail',
-    'spreadsheetId', 
-    'spreadsheetUrl',
-    'createdAt',
-    'accessToken',
-    'configJson',
-    'lastAccessedAt',
-    'isActive'
-  ]
-};
+// USER_DB_CONFIG は Code.gs で定義済み
 
 // =================================================================
 // メインセットアップ関数
@@ -517,29 +505,7 @@ function addWarning(results, stepName, message) {
 // 個別セットアップ関数（既存関数の再利用）
 // =================================================================
 
-/**
- * DEPLOY_IDをURLから抽出する関数（Code.gsから移動）
- */
-function extractDeployIdFromUrl(url) {
-  if (!url) return null;
-  
-  // script.google.com/macros/s/{DEPLOY_ID}/exec形式からDEPLOY_IDを抽出
-  const macrosMatch = url.match(/\/macros\/s\/([a-zA-Z0-9_-]+)/);
-  if (macrosMatch) {
-    return macrosMatch[1];
-  }
-  
-  // script.googleusercontent.com形式のURLの場合、URL全体から推測を試行
-  if (/script\.googleusercontent\.com/.test(url)) {
-    // URLのハッシュ部分やパラメータからDEPLOY_IDの可能性があるものを探す
-    const hashMatch = url.match(/#gid=([a-zA-Z0-9_-]+)/);
-    if (hashMatch && hashMatch[1].length > 10) {
-      return hashMatch[1];
-    }
-  }
-  
-  return null;
-}
+// DEPLOY_IDを抽出する関数はCode.gsのextractDeployIdFromUrlを使用
 
 // =================================================================
 // エクスポート（他のファイルから使用する場合）
