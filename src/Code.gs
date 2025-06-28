@@ -428,7 +428,7 @@ function doGet(e) {
         .setTitle('StudyQuest - プレビュー')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1');
     }
-    
+
     // ユーザーIDがない場合は登録画面を表示
     if (!userId) {
       return HtmlService.createTemplateFromFile('Registration')
@@ -1548,38 +1548,6 @@ function extractDeployIdFromUrl(url) {
   return null;
 }
 
-function convertPreviewUrl(url, deployId, preserveDev = false) {
-  if (!url) return url;
-  
-  // 開発環境保持モードの場合、/devを変換しない
-  if (preserveDev && /\/dev(\?|$)/.test(url)) {
-    return url;
-  }
-  
-  // プレビューURL検出（/devは条件付きで対象）
-  const isPreviewUrl = /script\.googleusercontent\.com/.test(url) || 
-                      /-script\.googleusercontent\.com/.test(url) ||
-                      (!preserveDev && /macros\/.*\/dev/.test(url));
-  
-  if (isPreviewUrl && deployId) {
-    const query = url.split('?')[1] || '';
-    const base = `https://script.google.com/macros/s/${deployId}/exec`;
-    return query ? `${base}?${query}` : base;
-  }
-  
-  // deployIdがない場合でも、URLからdeployIdを抽出を試行
-  if (isPreviewUrl && !deployId) {
-    const extractedId = extractDeployIdFromUrl(url);
-    if (extractedId) {
-      const query = url.split('?')[1] || '';
-      const base = `https://script.google.com/macros/s/${extractedId}/exec`;
-      return query ? `${base}?${query}` : base;
-    }
-  }
-  
-  return url;
-}
-
 // 古いgetWebAppUrl関数は削除されました。getWebAppUrlEnhanced()を使用してください。
 
 
@@ -1619,93 +1587,13 @@ function saveDeployId(id) {
     const currentUrl = getWebAppUrlEnhanced();
     console.log('Updated WebApp URL after DEPLOY_ID save:', currentUrl);
     
-    // 保存されたURLがまだプレビュー形式の場合は再変換
     const storedUrl = props.getProperty('WEB_APP_URL');
     if (storedUrl && /script\.googleusercontent\.com/.test(storedUrl)) {
-      const convertedUrl = convertPreviewUrl(storedUrl, cleanId);
-      if (convertedUrl !== storedUrl) {
-        props.setProperties({ WEB_APP_URL: convertedUrl });
-        console.log('Converted stored URL from preview to production:', convertedUrl);
-      }
+      props.setProperties({ WEB_APP_URL: getWebAppUrlEnhanced() });
     }
   } else {
     console.warn('Cannot save empty DEPLOY_ID');
   }
-}
-
-function forceInitializeUrls() {
-  const props = PropertiesService.getScriptProperties();
-  
-  try {
-    // 現在のURL取得を試行
-    let currentUrl = '';
-    if (typeof ScriptApp !== 'undefined') {
-      currentUrl = ScriptApp.getService().getUrl();
-    }
-    
-    console.log('Current script URL:', currentUrl);
-    
-    // URLからDEPLOY_IDを抽出試行
-    if (currentUrl) {
-      const extractedId = extractDeployIdFromUrl(currentUrl);
-      if (extractedId) {
-        console.log('Extracted DEPLOY_ID from current URL:', extractedId);
-        saveDeployId(extractedId);
-        return {
-          status: 'success',
-          deployId: extractedId,
-          webAppUrl: getWebAppUrlEnhanced(),
-          message: 'DEPLOY_IDを自動抽出して設定しました'
-        };
-      }
-    }
-    
-    // 手動設定が必要な場合の情報を返す
-    return {
-      status: 'manual_setup_required',
-      currentUrl: currentUrl,
-      storedDeployId: props.getProperty('DEPLOY_ID'),
-      storedWebAppUrl: props.getProperty('WEB_APP_URL'),
-      message: 'DEPLOY_IDの手動設定が必要です。ウェブアプリとして公開後、URLからDEPLOY_IDを抽出してsaveDeployId()を実行してください。'
-    };
-    
-  } catch (error) {
-    console.error('Error in forceInitializeUrls:', error);
-    return {
-      status: 'error',
-      message: error.message
-    };
-  }
-}
-
-function createTemplateSheet(name) {
-  if (!checkAdmin()) {
-    throw new Error('権限がありません。');
-  }
-  const ss = getCurrentSpreadsheet();
-  const sheetName = name || 'New Q&A';
-  if (ss.getSheetByName(sheetName)) {
-    throw new Error(`シート '${sheetName}' は既に存在します。`);
-  }
-  const sheet = ss.insertSheet(sheetName);
-  const headers = [
-    COLUMN_HEADERS.EMAIL,
-    COLUMN_HEADERS.CLASS,
-    '質問',
-    '回答',
-    '理由',
-    COLUMN_HEADERS.NAME,
-    'クラス'
-  ];
-  const req = [
-    COLUMN_HEADERS.UNDERSTAND,
-    COLUMN_HEADERS.LIKE,
-    COLUMN_HEADERS.CURIOUS,
-    COLUMN_HEADERS.HIGHLIGHT
-  ];
-  const all = headers.concat(req);
-  sheet.getRange(1, 1, 1, all.length).setValues([all]);
-  return sheet.getName();
 }
 
 // =================================================================
@@ -1732,19 +1620,6 @@ function checkRateLimit(action, userEmail) {
     // Cache service error - continue without rate limiting
     console.warn('Rate limiting failed:', error);
   }
-}
-
-function validateSpreadsheetUrl(url) {
-  if (!url || typeof url !== 'string') {
-    throw new Error('無効なスプレッドシートURLです。');
-  }
-  
-  const sanitizedUrl = url.trim();
-  if (sanitizedUrl.length > 2048) {
-    throw new Error('URLが長すぎます。');
-  }
-  
-  return sanitizedUrl;
 }
 
 function createStudyQuestForm(userEmail) {
@@ -2139,17 +2014,6 @@ function registerNewUser(adminEmail) {
     spreadsheetId: formAndSsInfo.spreadsheetId,
     spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
     message: '新しいユーザーが登録されました。管理画面に移動します。'
-  };
-}
-
-function getRegistrationInfo() {
-  const props = PropertiesService.getScriptProperties();
-  const deployId = props.getProperty('DEPLOY_ID');
-  const webAppUrl = getWebAppUrlEnhanced();
-  
-  return {
-    deployId: deployId,
-    webAppUrl: webAppUrl
   };
 }
 
