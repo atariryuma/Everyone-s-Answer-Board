@@ -1046,6 +1046,7 @@ function addSpreadsheetUrl(spreadsheetUrl) {
     }
 
     // ユーザープロパティも更新
+    const props = PropertiesService.getUserProperties();
     props.setProperty('CURRENT_SPREADSHEET_ID', spreadsheetId);
 
     // 最初のシートをアクティブシートとして設定
@@ -1089,7 +1090,20 @@ function addSpreadsheetUrl(spreadsheetUrl) {
 
   } catch (error) {
     console.error('Failed to access spreadsheet:', error);
-    throw new Error(`スプレッドシートにアクセスできません。URLが正しいか、共有設定を確認してください。エラー: ${error.message}`);
+    
+    // より詳細なエラー情報を提供
+    let errorMessage = 'スプレッドシートにアクセスできませんでした。';
+    
+    if (error.message.includes('Permission')) {
+      errorMessage += '権限が不足している可能性があります。スプレッドシートの共有設定を確認してください。';
+    } else if (error.message.includes('not found')) {
+      errorMessage += 'スプレッドシートが見つかりません。URLが正しいことを確認してください。';
+    } else {
+      errorMessage += `詳細: ${error.message}`;
+    }
+    
+    debugLog(`スプレッドシートアクセスエラー - URL: ${sanitizedUrl}, ID: ${spreadsheetId}, エラー: ${error.message}`);
+    throw new Error(errorMessage);
   }
 }
 
@@ -2137,13 +2151,25 @@ function createStudyQuestForm(userEmail, userId) {
 
     // 共有設定を自動化
     const userDomain = getEmailDomain(userEmail);
+    
+    // まず、作成したユーザー自身に確実にアクセス権限を付与
+    try {
+      formFile.addEditor(userEmail);
+      spreadsheetFile.addEditor(userEmail);
+      debugLog(`✅ ユーザー「${userEmail}」に編集権限を付与しました`);
+    } catch (e) {
+      debugLog(`⚠️ ユーザー権限付与に失敗: ${e.message}`);
+    }
+    
+    // ドメイン共有設定（組織内での利用のため）
     if (userDomain) {
       try {
         formFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.EDIT);
         spreadsheetFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.EDIT);
-        debugLog(`フォームとスプレッドシートをドメイン「${userDomain}」で共有しました。`);
+        debugLog(`✅ フォームとスプレッドシートをドメイン「${userDomain}」で共有しました`);
       } catch (e) {
-        debugLog(`⚠️ 共有設定に失敗: ${e.message}`);
+        debugLog(`⚠️ ドメイン共有設定に失敗: ${e.message}`);
+        // ドメイン共有に失敗してもユーザー個人には権限があるので続行
       }
     }
 
