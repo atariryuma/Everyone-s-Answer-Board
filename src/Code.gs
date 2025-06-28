@@ -313,6 +313,86 @@ function getWebAppDeployerEmail() {
 }
 
 /**
+ * データベース（スプレッドシート）にユーザーを編集者として追加
+ * @param {string} userEmail - 追加するユーザーのメールアドレス
+ * @return {boolean} 成功した場合true
+ */
+function addUserToDatabaseEditors(userEmail) {
+  try {
+    debugLog(`📝 データベースに編集者を追加開始: ${userEmail}`);
+    
+    // データベーススプレッドシートを取得
+    const props = PropertiesService.getScriptProperties();
+    const dbId = props.getProperty('DATABASE_ID') || props.getProperty('USER_DATABASE_ID');
+    
+    if (!dbId) {
+      console.error('データベースIDが見つかりません');
+      return false;
+    }
+    
+    // データベースファイルを取得
+    const dbFile = DriveApp.getFileById(dbId);
+    
+    // ユーザーを編集者として追加
+    dbFile.addEditor(userEmail);
+    debugLog(`✅ データベースに編集者として追加しました: ${userEmail}`);
+    
+    // 少し待機してアクセス権限が反映されるのを待つ
+    Utilities.sleep(1000);
+    
+    return true;
+    
+  } catch (error) {
+    console.error('データベースへの編集者追加に失敗:', error);
+    debugLog(`❌ データベース編集者追加失敗: ${userEmail}: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * 新規登録前のデータベースアクセス権限を確認・付与
+ * @param {string} userEmail - ユーザーのメールアドレス
+ * @return {boolean} アクセス可能かどうか
+ */
+function ensureDatabaseAccess(userEmail) {
+  try {
+    debugLog(`🔐 データベースアクセス権限を確認中: ${userEmail}`);
+    
+    // まずデータベースにアクセスできるかテスト
+    try {
+      const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
+      const testData = userDb.getRange(1, 1, 1, 1).getValue();
+      debugLog(`✅ データベースアクセス確認成功: ${userEmail}`);
+      return true;
+    } catch (accessError) {
+      debugLog(`⚠️ データベースアクセス失敗、権限付与を試行: ${userEmail}`);
+      
+      // アクセスできない場合、編集者として追加
+      const addResult = addUserToDatabaseEditors(userEmail);
+      
+      if (addResult) {
+        // 権限付与後、再度アクセステスト
+        try {
+          const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
+          const testData = userDb.getRange(1, 1, 1, 1).getValue();
+          debugLog(`✅ 権限付与後のデータベースアクセス確認成功: ${userEmail}`);
+          return true;
+        } catch (retestError) {
+          console.error('権限付与後もアクセスできません:', retestError);
+          return false;
+        }
+      } else {
+        return false;
+      }
+    }
+    
+  } catch (error) {
+    console.error('データベースアクセス権限確認でエラー:', error);
+    return false;
+  }
+}
+
+/**
  * セキュリティ強化: ユーザー認証状態の検証
  * @return {Object} 認証状態と関連情報
  */
@@ -2549,6 +2629,15 @@ function auditLog(action, userId, details = {}) {
 function registerNewUser(adminEmail) {
   checkRateLimit('registerNewUser', adminEmail);
   
+  // 📝 ステップ1: データベースアクセス権限を確認・付与
+  debugLog(`🚀 新規登録開始: ${adminEmail}`);
+  const hasAccess = ensureDatabaseAccess(adminEmail);
+  
+  if (!hasAccess) {
+    throw new Error('データベースへのアクセス権限を取得できませんでした。管理者にお問い合わせください。');
+  }
+  
+  // 📝 ステップ2: データベースから既存ユーザーをチェック
   const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
   const data = userDb.getDataRange().getValues();
   const headers = data[0];
@@ -2561,12 +2650,16 @@ function registerNewUser(adminEmail) {
     }
   }
   
-  // 新しいユーザーIDを生成
+  // 📝 ステップ3: 新しいユーザーIDを生成
   const userId = Utilities.getUuid();
+  debugLog(`📋 ユーザーID生成完了: ${userId}`);
   
-  // 1. Googleフォームとスプレッドシートを作成（userIdを正しく渡す）
+  // 📝 ステップ4: Googleフォームとスプレッドシートを作成
+  debugLog(`📝 フォーム・スプレッドシート作成開始: ${adminEmail}`);
   const formAndSsInfo = createStudyQuestForm(adminEmail, userId);
+  debugLog(`✅ フォーム・スプレッドシート作成完了`);
   
+  // 📝 ステップ5: データベースに新規ユーザー情報を追加
   const newRow = [
     userId,
     adminEmail,
@@ -2579,29 +2672,35 @@ function registerNewUser(adminEmail) {
     true // isActive
   ];
   
+  debugLog(`💾 データベースに新規ユーザー登録中: ${adminEmail}`);
   userDb.appendRow(newRow);
+  debugLog(`✅ データベース登録完了`);
   
   auditLog('NEW_USER_REGISTERED', userId, { adminEmail, spreadsheetId: formAndSsInfo.spreadsheetId });
   
-  // 2. ユーザーコンテキストを設定（クイックアクションと同様）
+  // 📝 ステップ6: ユーザーコンテキストを設定（クイックアクションと同様）
+  debugLog(`⚙️ ユーザーコンテキスト設定中`);
   PropertiesService.getUserProperties().setProperty('CURRENT_USER_ID', userId);
   PropertiesService.getUserProperties().setProperty('CURRENT_SPREADSHEET_ID', formAndSsInfo.spreadsheetId);
   
-  // 3. スプレッドシートをユーザーのスプレッドシートリストに追加
+  // 📝 ステップ7: スプレッドシートをユーザーのスプレッドシートリストに追加
+  debugLog(`📊 スプレッドシートリストに追加中`);
   const addResult = addSpreadsheetUrl(formAndSsInfo.spreadsheetUrl);
   debugLog('Spreadsheet added to user:', addResult);
   
-  // 4. 新しく作成したシートをアクティブ化・公開（クイックアクションと同様）
+  // 📝 ステップ8: 新しく作成したシートをアクティブ化・公開（クイックアクションと同様）
   const newSheetName = addResult.firstSheetName;
   if (newSheetName) {
+    debugLog(`🔄 シートをアクティブ化・公開中: ${newSheetName}`);
     // アクティブシートに設定
     switchActiveSheet(newSheetName);
     // 公開状態に設定
     updateUserConfig(userId, { isPublished: true });
-    debugLog(`New board '${newSheetName}' has been created and published for new user.`);
+    debugLog(`✅ シートアクティブ化・公開完了: ${newSheetName}`);
   }
   
-  // URLを生成（安全性を考慮）
+  // 📝 ステップ9: URL生成と最終レスポンス準備
+  debugLog(`🔗 URL生成中`);
   const webAppUrl = getWebAppUrlEnhanced();
   debugLog('Register new user - webAppUrl:', webAppUrl);
   debugLog('Register new user - userId:', userId);
@@ -2610,6 +2709,7 @@ function registerNewUser(adminEmail) {
   const viewUrl = webAppUrl ? `${webAppUrl}?userId=${userId}` : '';
   
   debugLog('Register new user - generated URLs:', { adminUrl, viewUrl });
+  debugLog(`🎉 新規登録完了: ${adminEmail} (ユーザーID: ${userId})`);
   
   return {
     userId: userId,
