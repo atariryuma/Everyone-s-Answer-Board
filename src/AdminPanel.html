@@ -260,6 +260,35 @@
 
   <!-- Main Content -->
   <main class="max-w-6xl mx-auto px-6 py-8">
+    <!-- Quick Actions -->
+    <section class="mb-8">
+      <div class="glass-panel p-6 rounded-xl slide-up">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-8 h-8 bg-cyan-500 text-white rounded-full flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold text-cyan-400">クイックアクション</h3>
+        </div>
+        <div class="space-y-4">
+          <button type="button" id="create-board-btn" class="btn btn-primary w-full">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+            </svg>
+            新しいボードを作成
+          </button>
+          <div class="bg-cyan-900/20 border border-cyan-500/30 rounded-lg p-4">
+            <p class="font-semibold text-cyan-200">おすすめ</p>
+            <p class="text-sm text-cyan-200">新しいGoogleフォームとスプレッドシートを自動作成</p>
+            <p class="text-xs text-cyan-200 mt-2">生徒の回答収集用フォームと回答ボード用スプレッドシートを一度に作成できます<br>(共有の設定を適切にしっかり行なって下さい。)</p>
+          </div>
+          <input type="url" id="form-url-input" class="form-control" placeholder="GoogleフォームのURL">
+          <button type="button" id="end-board-btn" class="btn btn-secondary w-full">現在公開されているボードの公開終了</button>
+        </div>
+      </div>
+    </section>
+
 
     <!-- Dashboard Overview -->
     <section class="mb-8">
@@ -575,36 +604,6 @@
           </div>
         </div>
 
-        <!-- Quick Actions -->
-        <div class="glass-panel p-6 rounded-xl slide-up">
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-8 h-8 bg-cyan-500 text-white rounded-full flex items-center justify-center">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-              </svg>
-            </div>
-            <h3 class="text-lg font-semibold text-cyan-400">クイックアクション</h3>
-          </div>
-          
-          <div class="space-y-4">
-            <button type="button" id="preview-btn" disabled class="btn btn-primary w-full">
-              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-              </svg>
-              回答ボードをプレビュー
-            </button>
-            
-            <div class="bg-cyan-900/20 border border-cyan-500/30 rounded-lg p-4">
-              <div class="flex items-start gap-3">
-                <svg class="w-5 h-5 text-cyan-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <p class="text-sm text-cyan-200">設定が完了すると、回答ボードをプレビューできます</p>
-              </div>
-            </div>
-          </div>
-        </div>
 
       </div>
 
@@ -676,7 +675,9 @@
       configStatus: document.getElementById('config-status'),
       addSpreadsheetText: document.getElementById('add-spreadsheet-text'),
       saveConfigText: document.getElementById('save-config-text'),
-      previewBtn: document.getElementById('preview-btn')
+      createBoardBtn: document.getElementById('create-board-btn'),
+      formUrlInput: document.getElementById('form-url-input'),
+      endBoardBtn: document.getElementById('end-board-btn')
     };
 
     // Initialize
@@ -710,8 +711,13 @@
         }
       });
       
-      // Preview
-      document.getElementById('preview-btn').addEventListener('click', openPreview);
+      // Quick Actions
+      if (elements.createBoardBtn) {
+        elements.createBoardBtn.addEventListener('click', createBoard);
+      }
+      if (elements.endBoardBtn) {
+        elements.endBoardBtn.addEventListener('click', clearSheetSelection);
+      }
 
       // Auto-update config when headers change
       elements.mainHeader.addEventListener('change', updateConfigButtons);
@@ -920,19 +926,10 @@
           studentUrlSection.classList.add('fade-in');
         }
         
-        // Enable preview button
-        if (elements.previewBtn) {
-          elements.previewBtn.disabled = false;
-        }
       } else {
         const studentUrlSection = document.getElementById('student-url-section');
         if (studentUrlSection) {
           studentUrlSection.classList.add('hidden');
-        }
-        
-        // Disable preview button
-        if (elements.previewBtn) {
-          elements.previewBtn.disabled = true;
         }
       }
 
@@ -1067,6 +1064,26 @@
           setLoading(false);
         })
         .addSpreadsheetUrl(url);
+    }
+
+    function createBoard() {
+      const btn = elements.createBoardBtn;
+      if (btn) btn.disabled = true;
+      setLoading(true, '新しいボードを作成中...');
+      google.script.run
+        .withSuccessHandler((result) => {
+          showMessage(result.message || 'ボードが作成されました', 'green');
+          if (result.formUrl && elements.formUrlInput) {
+            elements.formUrlInput.value = result.formUrl;
+          }
+          if (btn) btn.disabled = false;
+          loadStatus();
+        })
+        .withFailureHandler((error) => {
+          showError(error);
+          if (btn) btn.disabled = false;
+        })
+        .createBoardFromAdmin();
     }
 
     function loadConfigForSelected() {
@@ -1312,15 +1329,6 @@
         .setDisplayOptions({ showNames, showCounts });
     }
 
-    function openPreview() {
-      if (!currentActiveSheet) {
-        showMessage('アクティブなシートがありません。', 'red');
-        return;
-      }
-      const baseUrl = webAppUrl || (window.location.origin + window.location.pathname);
-      const previewUrl = `${baseUrl}?mode=preview`;
-      window.open(previewUrl, '_blank');
-    }
 
     function copyBoardUrl() {
       const urlInput = elements.boardUrl;
