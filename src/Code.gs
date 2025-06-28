@@ -358,7 +358,8 @@ function switchActiveSheet(sheetName) {
 
   try {
     updateUserConfig(userId, {
-      activeSheetName: sheetName
+      activeSheetName: sheetName,
+      publishedAt: new Date().toISOString() // 公開日時を記録
     });
   } catch (error) {
     throw new Error(`設定の更新に失敗しました: ${error.message}`);
@@ -384,10 +385,11 @@ function clearActiveSheet() {
     throw new Error('権限がありません。');
   }
   
-  // アクティブシートをクリア
+  // アクティブシートと公開日時をクリア
   try {
     updateUserConfig(userId, {
-      activeSheetName: ''
+      activeSheetName: '',
+      publishedAt: '' // 公開日時をクリア
     });
   } catch (error) {
     console.error('Failed to update user config:', error);
@@ -512,6 +514,23 @@ function doGet(e) {
       const output = HtmlService.createHtmlOutput('無効なユーザーIDです。');
       applySecurityHeaders(output);
       return output.setTitle('エラー');
+    }
+
+    // --- 自動非公開タイマーのチェック ---
+    const config = userInfo.configJson || {};
+    if (config.publishedAt) {
+      const publishedDate = new Date(config.publishedAt);
+      const sixHoursLater = new Date(publishedDate.getTime() + 6 * 60 * 60 * 1000);
+      if (new Date() > sixHoursLater) {
+        console.log(`ボード「${config.activeSheetName}」が6時間経過したため自動的に非公開になりました。`);
+        clearActiveSheet(); // サーバー側で非公開処理
+        // ユーザーに通知するための専用ページを表示
+        const template = HtmlService.createTemplateFromFile('Unpublished');
+        template.message = 'この回答ボードは、公開から6時間が経過したため、安全のため自動的に非公開になりました。再度利用する場合は、管理者にご連絡ください。';
+        const output = template.evaluate();
+        applySecurityHeaders(output);
+        return output.setTitle('公開期間が終了しました');
+      }
     }
 
     // 現在のユーザーを取得（必須）

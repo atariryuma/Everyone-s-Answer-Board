@@ -716,6 +716,19 @@
   <!-- Message Area -->
   <div id="message-area" class="fixed top-20 right-6 z-50" aria-live="polite" role="status"></div>
 
+  <!-- Confirmation Modal -->
+  <div id="confirmation-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 hidden items-center justify-center p-4">
+    <div class="glass-panel p-8 rounded-xl max-w-md w-full slide-up">
+      <h3 id="modal-title" class="text-xl font-bold text-cyan-400 mb-4"></h3>
+      <p id="modal-message" class="text-gray-300 mb-6"></p>
+      <div class="flex justify-end gap-4">
+        <button id="modal-cancel-btn" class="btn btn-secondary">キャンセル</button>
+        <button id="modal-confirm-btn" class="btn btn-primary">はい、実行します</button>
+      </div>
+    </div>
+  </div>
+</body>
+
   <!-- Digital Citizenship Education Modal for Teachers -->
   <div id="teacherGuideModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
     <div class="glass-panel rounded-xl p-8 shadow-2xl border-2 border-green-400/80 w-full max-w-6xl max-h-[90vh] overflow-y-auto relative" role="document">
@@ -894,7 +907,14 @@
       });
 
       // Actions
-      elements.switchSheetBtn.addEventListener('click', switchToSheet);
+      elements.switchSheetBtn.addEventListener('click', () => {
+        if (!selectedSheet) return;
+        showConfirmationModal(
+          '安全のための自動非公開機能について',
+          'このボードはセキュリティ保護のため、公開から6時間後に自動で非公開状態に戻ります。再度公開したい場合は、この管理画面からもう一度設定を行ってください。よろしいですか？',
+          switchToSheet
+        );
+      });
       elements.clearSelectionBtn.addEventListener('click', clearSheetSelection);
       elements.saveConfigBtn.addEventListener('click', saveConfig);
       
@@ -1704,6 +1724,35 @@
       console.error('Error:', error);
       showMessage('エラー: ' + (error.message || '操作に失敗しました'), 'red');
       setLoading(false);
+    }
+
+    function showConfirmationModal(title, message, onConfirm) {
+      const modal = document.getElementById('confirmation-modal');
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-message').textContent = message;
+      
+      const confirmBtn = document.getElementById('modal-confirm-btn');
+      const cancelBtn = document.getElementById('modal-cancel-btn');
+
+      const confirmHandler = () => {
+        hideModal();
+        onConfirm();
+      };
+
+      const cancelHandler = () => {
+        hideModal();
+      };
+
+      const hideModal = () => {
+        modal.classList.add('hidden');
+        confirmBtn.removeEventListener('click', confirmHandler);
+        cancelBtn.removeEventListener('click', cancelHandler);
+      };
+
+      confirmBtn.addEventListener('click', confirmHandler);
+      cancelBtn.addEventListener('click', cancelHandler);
+
+      modal.classList.remove('hidden');
     }
 
   </script>
