@@ -429,16 +429,46 @@ function getDatabaseSheet() {
   }
 
   try {
-    const spreadsheet = SpreadsheetApp.openById(dbSheetId);
+    Logger.log(`Attempting to open spreadsheet with ID: ${dbSheetId}`);
     
-    if (!spreadsheet) {
-      throw new Error(`スプレッドシート(ID: ${dbSheetId})を開けませんでした。`);
+    let spreadsheet;
+    try {
+      spreadsheet = SpreadsheetApp.openById(dbSheetId);
+    } catch (openError) {
+      Logger.log(`Failed to open spreadsheet: ${openError.message}`);
+      throw new Error(`スプレッドシート(ID: ${dbSheetId})を開けませんでした。権限を確認してください。`);
     }
     
-    const sheet = spreadsheet.getSheetByName(TARGET_SHEET_NAME);
+    if (!spreadsheet) {
+      throw new Error(`スプレッドシート(ID: ${dbSheetId})がnullです。`);
+    }
+    
+    Logger.log(`Successfully opened spreadsheet: ${spreadsheet.getName()}`);
+    
+    let sheet;
+    try {
+      sheet = spreadsheet.getSheetByName(TARGET_SHEET_NAME);
+    } catch (sheetError) {
+      Logger.log(`Failed to get sheet '${TARGET_SHEET_NAME}': ${sheetError.message}`);
+      throw new Error(`シート「${TARGET_SHEET_NAME}」の取得に失敗しました。`);
+    }
 
     if (!sheet) {
-      throw new Error(`データベース内に「${TARGET_SHEET_NAME}」という名前のシートが見つかりません。`);
+      // シートが存在しない場合は作成
+      Logger.log(`Sheet '${TARGET_SHEET_NAME}' not found, creating new sheet`);
+      try {
+        sheet = spreadsheet.insertSheet(TARGET_SHEET_NAME);
+        const headers = [
+          'userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 
+          'createdAt', 'accessToken', 'configJson', 'lastAccessedAt', 'isActive'
+        ];
+        sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight("bold");
+        sheet.setFrozenRows(1);
+        Logger.log(`Created new sheet '${TARGET_SHEET_NAME}' with headers`);
+      } catch (createError) {
+        Logger.log(`Failed to create sheet: ${createError.message}`);
+        throw new Error(`シート「${TARGET_SHEET_NAME}」の作成に失敗しました: ${createError.message}`);
+      }
     }
     
     // データ範囲の存在確認
@@ -447,6 +477,7 @@ function getDatabaseSheet() {
       if (!range) {
         throw new Error('シートのデータ範囲を取得できませんでした。');
       }
+      Logger.log(`Sheet data range: ${range.getA1Notation()}, rows: ${range.getNumRows()}`);
     } catch (rangeError) {
       Logger.log(`Data range error: ${rangeError.message}`);
       throw new Error(`シートへのアクセスエラー: ${rangeError.message}`);
@@ -454,7 +485,7 @@ function getDatabaseSheet() {
     
     return sheet;
   } catch (error) {
-    Logger.log(`Failed to open database sheet with ID: ${dbSheetId}. Error: ${error.toString()}`);
+    Logger.log(`getDatabaseSheet error: ${error.toString()}`);
     throw new Error(`データベースアクセスエラー: ${error.message}`);
   }
 }
