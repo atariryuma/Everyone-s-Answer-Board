@@ -18,13 +18,43 @@
 <body>
     <div class="container">
         <h2>みんなの回答ボード - 初回セットアップ</h2>
-        <p>「管理者向けログ記録API」をデプロイした際にコピーした、ウェブアプリのURLを以下に貼り付けてください。</p>
+        
+        <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+            <h3 style="margin-top: 0; color: #856404;">📋 事前準備の確認</h3>
+            <p><strong>Logger API（管理者向けログ記録API）が正しくデプロイされているか確認してください：</strong></p>
+            <ol>
+                <li>Logger APIプロジェクトで「デプロイ」→「新しいデプロイ」を実行</li>
+                <li>「種類」を「ウェブアプリ」に設定</li>
+                <li>「実行者」を「自分」に設定</li>
+                <li>「アクセスできるユーザー」を「組織内のすべてのユーザー」に設定</li>
+                <li>「デプロイ」をクリックしてWeb App URLを取得</li>
+            </ol>
+            <p><strong>重要：</strong> Logger APIが正しくデプロイされていない場合、「Page Not Found」エラーが発生します。</p>
+        </div>
+        
+        <p>Logger APIのウェブアプリURLを以下に貼り付けてください：</p>
         <form id="setupForm">
             <label for="apiUrl">Logger API Web App URL:</label>
-            <input type="url" id="apiUrl" name="apiUrl" required placeholder="https://script.google.com/macros/s/...">
+            <input type="url" id="apiUrl" name="apiUrl" required 
+                   placeholder="例: https://script.google.com/macros/s/AKfycbxXXXXX/exec"
+                   style="font-family: monospace;">
+            
+            <div style="margin-bottom: 15px; font-size: 12px; color: #6c757d;">
+                <strong>有効な形式:</strong><br>
+                • https://script.google.com/macros/s/xxxxx/exec<br>
+                • https://script.google.com/a/macros/domain.com/s/xxxxx/exec
+            </div>
+            
             <button type="submit" id="submitBtn">設定を保存してデータベースを作成</button>
         </form>
         <div id="message"></div>
+        
+        <div style="margin-top: 30px; font-size: 12px; color: #6c757d; border-top: 1px solid #dee2e6; padding-top: 15px;">
+            <strong>トラブルシューティング:</strong><br>
+            • 「Page Not Found」エラー → Logger APIのデプロイ状況を確認<br>
+            • 「権限エラー」→ Logger APIのアクセス設定を「組織内のすべてのユーザー」に変更<br>
+            • 「URL形式エラー」→ 上記の有効な形式に従ってURLを入力
+        </div>
     </div>
 
     <script>
