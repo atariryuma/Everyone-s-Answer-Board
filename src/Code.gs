@@ -1357,15 +1357,35 @@ function getStatus() {
     
     if (activeSheetName) {
       try {
-        const sheetData = getPublishedSheetData(activeSheetName);
-        answerCount = sheetData.rows ? sheetData.rows.length : 0;
-        totalReactions = sheetData.rows ? 
-          sheetData.rows.reduce((sum, row) => {
-            const reactions = row.reactions || {};
-            return sum + (reactions.UNDERSTAND?.count || 0) + 
-                       (reactions.LIKE?.count || 0) + 
-                       (reactions.CURIOUS?.count || 0);
-          }, 0) : 0;
+        const spreadsheet = getCurrentSpreadsheet();
+        const sheet = spreadsheet.getSheetByName(activeSheetName);
+        if (sheet) {
+          answerCount = sheet.getLastRow() > 0 ? sheet.getLastRow() - 1 : 0; // ヘッダー行を除く
+
+          // リアクションの合計数を計算
+          const reactionHeaders = REACTION_KEYS.map(k => COLUMN_HEADERS[k]);
+          const headerIndices = getHeaderIndices(activeSheetName);
+          
+          // リアクション列のデータをまとめて取得
+          const reactionColumnsData = [];
+          for (const header of reactionHeaders) {
+            const colIndex = headerIndices[header];
+            if (colIndex !== undefined) {
+              const range = sheet.getRange(2, colIndex + 1, answerCount, 1); // データ開始行から最終行まで
+              reactionColumnsData.push(range.getValues());
+            }
+          }
+
+          totalReactions = 0;
+          if (reactionColumnsData.length > 0) {
+            for (let i = 0; i < answerCount; i++) {
+              for (let j = 0; j < reactionColumnsData.length; j++) {
+                const cellValue = reactionColumnsData[j][i] ? reactionColumnsData[j][i][0] : '';
+                totalReactions += parseReactionString(cellValue).length;
+              }
+            }
+          }
+        }
       } catch (error) {
         console.warn('Failed to get sheet data for status:', error);
       }
@@ -2533,31 +2553,12 @@ function createStudyQuestSpreadsheetFallback(userEmail) {
 
 
 function prepareSpreadsheetForStudyQuest(spreadsheet) {
-  // Configシートを作成または取得
-  let configSheet = spreadsheet.getSheetByName('Config');
-  if (!configSheet) {
-    configSheet = spreadsheet.insertSheet('Config');
-  }
-  
-  // Configシートに設定を書き込む
-  const configData = [
-    ['Key', 'Value']
-  ];
-  
-  configSheet.getRange(1, 1, configData.length, configData[0].length).setValues(configData);
-  
-  // ヘッダーのスタイル設定
-  configSheet.getRange('A1:B1').setFontWeight('bold').setBackground('#E3F2FD');
-  
-  // 列幅の自動調整
-  try {
-    configSheet.autoResizeColumns(1, 2);
-  } catch (e) {
-    console.warn('Config sheet auto-resize failed:', e);
-  }
-  
+  // この関数はスプレッドシートの作成のみを行い、Configシートの初期化はaddSpreadsheetUrlで行う
   // Configシートを非表示にする
-  configSheet.hideSheet();
+  let configSheet = spreadsheet.getSheetByName('Config');
+  if (configSheet) {
+    configSheet.hideSheet();
+  }
 }
 
 function getDatabase() {
