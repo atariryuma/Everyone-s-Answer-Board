@@ -43,6 +43,61 @@ function handleSetupRequest() {
 }
 
 /**
+ * デバッグ用: 現在の設定状況を確認する関数
+ */
+function debugCurrentSetup() {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    const currentUser = Session.getActiveUser().getEmail();
+    
+    Logger.log('=== デバッグ情報 ===');
+    Logger.log(`現在のユーザー: ${currentUser}`);
+    Logger.log(`MAIN_DB_ID: ${properties.getProperty('MAIN_DB_ID') || 'なし'}`);
+    Logger.log(`LOGGER_API_URL: ${properties.getProperty('LOGGER_API_URL') || 'なし'}`);
+    
+    // データベースファイルの存在確認
+    const dbId = properties.getProperty('MAIN_DB_ID');
+    if (dbId) {
+      try {
+        const dbFile = DriveApp.getFileById(dbId);
+        Logger.log(`データベースファイル名: ${dbFile.getName()}`);
+        Logger.log(`データベースファイルURL: ${dbFile.getUrl()}`);
+        
+        // アクセス権限確認
+        const editors = dbFile.getEditors();
+        Logger.log(`編集者数: ${editors.length}`);
+        editors.forEach((editor, index) => {
+          Logger.log(`編集者${index + 1}: ${editor.getEmail()}`);
+        });
+        
+      } catch (e) {
+        Logger.log(`データベースファイルアクセスエラー: ${e.message}`);
+      }
+    }
+    
+    // 【ログデータベース】みんなの回答ボードの検索
+    try {
+      const files = DriveApp.getFilesByName('【ログデータベース】みんなの回答ボード');
+      let fileCount = 0;
+      while (files.hasNext()) {
+        const file = files.next();
+        fileCount++;
+        Logger.log(`【ログデータベース】${fileCount}: ${file.getId()}`);
+        Logger.log(`URL: ${file.getUrl()}`);
+      }
+      Logger.log(`【ログデータベース】みんなの回答ボード の総数: ${fileCount}`);
+    } catch (e) {
+      Logger.log(`【ログデータベース】検索エラー: ${e.message}`);
+    }
+    
+    return 'デバッグ情報をログに出力しました';
+  } catch (e) {
+    Logger.log(`デバッグ関数エラー: ${e.message}`);
+    return `デバッグエラー: ${e.message}`;
+  }
+}
+
+/**
  * セットアップ用HTMLから呼び出され、設定を保存しDBを作成する関数
  * @param {string} apiUrl - 管理者向けログ記録APIのURL
  * @returns {string} 処理結果のメッセージ
@@ -70,12 +125,52 @@ function saveSettingsAndCreateDb(apiUrl) {
     properties.setProperty('LOGGER_API_URL', apiUrl);
 
     // データベースがなければ作成する（統合されたデータベースを使用）
-    getOrCreateMainDatabase();
+    const mainDb = getOrCreateMainDatabase();
     
     // 重複する古いデータベースをクリーンアップ
     cleanupDuplicateDatabases();
     
-    return '✅ 設定が正常に保存され、【ログデータベース】みんなの回答ボードに統合されました。セットアップが完了しました。';
+    // セットアップ完了の確認とユーザーへの詳細情報提供
+    let setupResult = '✅ 設定が正常に保存され、【ログデータベース】みんなの回答ボードに統合されました。\n\nセットアップが完了しました。\n\n';
+    
+    try {
+      const properties = PropertiesService.getScriptProperties();
+      const dbId = properties.getProperty('MAIN_DB_ID');
+      
+      if (dbId && mainDb) {
+        const dbFile = DriveApp.getFileById(dbId);
+        const dbUrl = dbFile.getUrl();
+        
+        setupResult += `📊 データベース情報:\n`;
+        setupResult += `• ファイル名: ${dbFile.getName()}\n`;
+        setupResult += `• URL: ${dbUrl}\n\n`;
+        
+        // 権限確認
+        try {
+          const editors = dbFile.getEditors();
+          const currentUser = Session.getActiveUser().getEmail();
+          const hasPermission = editors.some(editor => editor.getEmail() === currentUser);
+          
+          if (hasPermission) {
+            setupResult += `✅ データベースアクセス権限: 確認済み\n`;
+          } else {
+            setupResult += `⚠️ データベースアクセス権限: 要確認\n`;
+            setupResult += `上記URLから直接データベースにアクセスして編集権限を確認してください。\n`;
+          }
+        } catch (permError) {
+          setupResult += `⚠️ 権限確認エラー: ${permError.message}\n`;
+        }
+        
+        setupResult += `\n次のステップ:\n`;
+        setupResult += `1. メインアプリで新規ユーザー登録をテストしてください\n`;
+        setupResult += `2. 問題がある場合は上記データベースURLで権限を確認してください`;
+        
+      }
+    } catch (infoError) {
+      setupResult += `\n⚠️ 詳細情報取得エラー: ${infoError.message}`;
+    }
+    
+    return setupResult;
   } catch(e) {
     Logger.log(e);
     return `❌ エラーが発生しました: ${e.message}`;

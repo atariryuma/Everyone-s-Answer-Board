@@ -2834,8 +2834,34 @@ function registerNewUser(adminEmail) {
   }
   
   if (!hasAccess || !userDb) {
-    // より詳細なエラーメッセージを提供
+    // より詳細なエラーメッセージとデバッグ情報を提供
     const currentUser = Session.getActiveUser().getEmail();
+    const properties = PropertiesService.getScriptProperties();
+    const dbId = properties.getProperty('MAIN_DB_ID');
+    
+    let debugInfo = '';
+    if (dbId) {
+      try {
+        const dbFile = DriveApp.getFileById(dbId);
+        debugInfo += `\n📊 データベース詳細:\n`;
+        debugInfo += `• ファイル名: ${dbFile.getName()}\n`;
+        debugInfo += `• ファイルID: ${dbId}\n`;
+        debugInfo += `• URL: ${dbFile.getUrl()}\n`;
+        
+        // 編集者リスト確認
+        const editors = dbFile.getEditors();
+        debugInfo += `• 編集者数: ${editors.length}\n`;
+        if (editors.length > 0) {
+          debugInfo += `• 編集者: ${editors.map(e => e.getEmail()).join(', ')}\n`;
+        }
+        
+      } catch (dbInfoError) {
+        debugInfo += `\n❌ データベース詳細取得エラー: ${dbInfoError.message}\n`;
+      }
+    } else {
+      debugInfo += `\n❌ データベースIDが設定されていません\n`;
+    }
+    
     const errorDetails = [
       'データベースへのアクセス権限を取得できませんでした。',
       '',
@@ -2843,13 +2869,17 @@ function registerNewUser(adminEmail) {
       '1. セットアップが完了していない可能性があります',
       '2. 【ログデータベース】みんなの回答ボードへのアクセス権限が不足しています',
       '3. Googleドライブの権限設定に問題があります',
+      '4. Google Workspaceの組織設定により外部共有が制限されている可能性があります',
       '',
       `現在のユーザー: ${currentUser}`,
       `登録対象ユーザー: ${adminEmail}`,
+      debugInfo,
       '',
       '解決方法:',
       '1. セットアップ画面(?setup=true)から再設定を実行してください',
-      '2. 管理者にお問い合わせください'
+      '2. 上記データベースURLに直接アクセスして編集権限を確認してください',
+      '3. Google Workspaceの管理者に外部共有設定を確認してもらってください',
+      '4. 管理者にお問い合わせください'
     ].join('\n');
     
     throw new Error(errorDetails);
@@ -3129,9 +3159,20 @@ function getOrCreateMainDatabase() {
     const adminEmail = Session.getActiveUser().getEmail();
     const userDomain = adminEmail.split('@')[1];
     
-    // 同一ドメイン内で閲覧・編集可能に設定
-    dbFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.EDIT);
-    Logger.log(`データベースを同一ドメイン内で編集可能に設定しました。ドメイン: ${userDomain}`);
+    // Google Workspaceドメインの場合は特別な設定が必要
+    try {
+      // まず制限付きで編集権限を設定
+      dbFile.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
+      Logger.log(`データベースをドメイン制限付きリンク共有で編集可能に設定しました。ドメイン: ${userDomain}`);
+    } catch (domainError) {
+      Logger.log(`ドメイン制限設定失敗、リンク共有にフォールバック: ${domainError.message}`);
+      try {
+        dbFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.EDIT);
+        Logger.log(`リンクを知っている全員に編集権限を設定しました`);
+      } catch (linkError) {
+        Logger.log(`リンク共有設定も失敗: ${linkError.message}`);
+      }
+    }
     
     // セットアップ実行ユーザーを明示的に編集者として追加
     dbFile.addEditor(adminEmail);
