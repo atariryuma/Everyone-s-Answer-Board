@@ -2960,16 +2960,64 @@ function getOrCreateMainDatabase() {
   const properties = PropertiesService.getScriptProperties();
   let dbId = properties.getProperty(MAIN_DB_ID_KEY);
 
+  // まず既存の【ログデータベース】みんなの回答ボードを検索
+  if (!dbId) {
+    try {
+      const files = DriveApp.getFilesByName('【ログデータベース】みんなの回答ボード');
+      if (files.hasNext()) {
+        const existingDb = files.next();
+        dbId = existingDb.getId();
+        properties.setProperty(MAIN_DB_ID_KEY, dbId);
+        Logger.log(`既存の【ログデータベース】みんなの回答ボードを使用します。ID: ${dbId}`);
+        
+        const spreadsheet = SpreadsheetApp.openById(dbId);
+        let userSheet = null;
+        
+        // Users シートがあるか確認
+        try {
+          userSheet = spreadsheet.getSheetByName('Users');
+        } catch (e) {
+          // Users シートがない場合は作成
+          userSheet = spreadsheet.insertSheet('Users');
+          const headers = ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'createdAt', 'accessToken', 'configJson', 'lastAccessedAt', 'isActive'];
+          userSheet.appendRow(headers);
+          userSheet.setFrozenRows(1);
+          userSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+          Logger.log('【ログデータベース】みんなの回答ボードにUsersシートを作成しました');
+        }
+        
+        return userSheet;
+      }
+    } catch (e) {
+      Logger.log(`既存データベース検索エラー: ${e.message}`);
+    }
+  }
+
+  // プロパティに保存されたIDがある場合
   if (dbId) {
     try {
-      return SpreadsheetApp.openById(dbId).getSheets()[0];
+      const spreadsheet = SpreadsheetApp.openById(dbId);
+      // Users シートを取得または作成
+      try {
+        return spreadsheet.getSheetByName('Users');
+      } catch (e) {
+        // Users シートがない場合は作成
+        const userSheet = spreadsheet.insertSheet('Users');
+        const headers = ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'createdAt', 'accessToken', 'configJson', 'lastAccessedAt', 'isActive'];
+        userSheet.appendRow(headers);
+        userSheet.setFrozenRows(1);
+        userSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+        Logger.log('既存データベースにUsersシートを作成しました');
+        return userSheet;
+      }
     } catch (e) {
       Logger.log(`データベース(ID: ${dbId})へのアクセスに失敗。新規作成します。Error: ${e.message}`);
       properties.deleteProperty(MAIN_DB_ID_KEY);
     }
   }
   
-  const db = SpreadsheetApp.create('StudyQuest - メインデータベース');
+  // 新規作成：【ログデータベース】みんなの回答ボードとして作成
+  const db = SpreadsheetApp.create('【ログデータベース】みんなの回答ボード');
   dbId = db.getId();
   properties.setProperty(MAIN_DB_ID_KEY, dbId);
   
@@ -2991,14 +3039,60 @@ function getOrCreateMainDatabase() {
     Logger.log(`データベース共有設定エラー: ${e.message}`);
   }
   
-  const sheet = db.getSheets()[0];
+  // Users シートを作成
+  const userSheet = db.insertSheet('Users');
   const headers = ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'createdAt', 'accessToken', 'configJson', 'lastAccessedAt', 'isActive'];
-  sheet.appendRow(headers);
-  sheet.setFrozenRows(1);
-  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  userSheet.appendRow(headers);
+  userSheet.setFrozenRows(1);
+  userSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
   
-  Logger.log(`メインデータベースを新規作成しました。ID: ${dbId}`);
-  return sheet;
+  // デフォルトシートを削除
+  const defaultSheet = db.getSheets()[0];
+  if (defaultSheet.getName() === 'シート1' || defaultSheet.getName() === 'Sheet1') {
+    db.deleteSheet(defaultSheet);
+  }
+  
+  Logger.log(`【ログデータベース】みんなの回答ボードを新規作成しました。ID: ${dbId}`);
+  return userSheet;
+}
+
+/**
+ * 重複する古いメインデータベースを削除する関数
+ */
+function cleanupDuplicateDatabases() {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    const currentDbId = properties.getProperty(MAIN_DB_ID_KEY);
+    
+    Logger.log('重複データベースのクリーンアップを開始します...');
+    
+    // 古い「StudyQuest - メインデータベース」を検索して削除
+    const oldMainDbFiles = DriveApp.getFilesByName('StudyQuest - メインデータベース');
+    let deletedCount = 0;
+    
+    while (oldMainDbFiles.hasNext()) {
+      const file = oldMainDbFiles.next();
+      const fileId = file.getId();
+      
+      // 現在使用中のデータベース以外を削除
+      if (fileId !== currentDbId) {
+        try {
+          file.setTrashed(true);
+          deletedCount++;
+          Logger.log(`古いデータベースをゴミ箱に移動しました: ${fileId}`);
+        } catch (e) {
+          Logger.log(`データベース削除エラー (${fileId}): ${e.message}`);
+        }
+      }
+    }
+    
+    Logger.log(`クリーンアップ完了: ${deletedCount}個のファイルを削除しました`);
+    return deletedCount;
+    
+  } catch (e) {
+    Logger.log(`クリーンアップエラー: ${e.message}`);
+    return 0;
+  }
 }
 
 /**
@@ -3018,7 +3112,7 @@ function addUserToMainDatabaseEditors(userEmail) {
     
     const dbFile = DriveApp.getFileById(dbId);
     dbFile.addEditor(userEmail);
-    Logger.log(`ユーザー ${userEmail} をメインデータベースの編集者として追加しました`);
+    Logger.log(`ユーザー ${userEmail} を【ログデータベース】みんなの回答ボードの編集者として追加しました`);
     return true;
     
   } catch (e) {

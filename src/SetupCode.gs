@@ -56,10 +56,13 @@ function saveSettingsAndCreateDb(apiUrl) {
     }
     properties.setProperty('LOGGER_API_URL', apiUrl);
 
-    // データベースがなければ作成する
+    // データベースがなければ作成する（統合されたデータベースを使用）
     getOrCreateMainDatabase();
     
-    return '✅ 設定が正常に保存されました。セットアップが完了しました。';
+    // 重複する古いデータベースをクリーンアップ
+    cleanupDuplicateDatabases();
+    
+    return '✅ 設定が正常に保存され、【ログデータベース】みんなの回答ボードに統合されました。セットアップが完了しました。';
   } catch(e) {
     Logger.log(e);
     return `❌ エラーが発生しました: ${e.message}`;
