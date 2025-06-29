@@ -403,7 +403,7 @@ function ensureDatabaseAccess(userEmail) {
     debugLog(`🔐 API経由でのデータベースアクセス確認: ${userEmail}`);
     
     // 簡単な接続テストを実行
-    const testResult = callDatabaseApi('ping', { userEmail: userEmail });
+    const testResult = callDatabaseApi('ping', { test: true });
     
     if (testResult && (testResult.success || testResult.status === 'ok')) {
       debugLog(`✅ API経由でのデータベースアクセス成功: ${userEmail}`);
