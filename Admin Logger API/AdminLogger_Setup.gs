@@ -164,7 +164,7 @@ function doPost(e) {
     }
 
     const requestData = JSON.parse(e.postData.contents);
-    Logger.log(`Received API request: ${JSON.stringify(requestData, null, 2)}`);
+    
     
     // メインアプリからの構造化されたAPIリクエストを処理
     if (requestData.action) {
@@ -194,7 +194,7 @@ function doPost(e) {
 function handleApiRequest(requestData) {
   const { action, data, timestamp, requestUser, effectiveUser } = requestData;
   
-  Logger.log(`Processing API action: ${action} for user: ${requestUser}`);
+  
   
   switch (action) {
     case 'ping':
@@ -284,8 +284,12 @@ function handleCreateUser(data, requestUser) {
     ];
     
     dbSheet.appendRow(newRow);
-    
-    Logger.log(`User created: ${data.userId} by ${requestUser}`);
+
+    // キャッシュを削除
+    const cache = CacheService.getScriptCache();
+    if (data.adminEmail) {
+      cache.remove(`user_email_${data.adminEmail}`);
+    }
     
     return {
       success: true,
@@ -314,56 +318,49 @@ function handleUpdateUser(data, requestUser) {
     const dbSheet = getDatabaseSheet();
     const { userId } = data;
     
-    Logger.log(`updateUser request: userId=${userId}, data=${JSON.stringify(data)}`);
-    
     if (!userId) {
-      Logger.log('updateUser error: userIdが必要です');
       return { success: false, error: 'userIdが必要です' };
     }
     
     const userRow = findUserRowById(dbSheet, userId);
     
     if (!userRow) {
-      Logger.log(`updateUser error: ユーザーが見つかりません - userId: ${userId}`);
       return { success: false, error: 'ユーザーが見つかりません' };
     }
     
-    Logger.log(`Found user row: ${JSON.stringify(userRow.values)}`);
-    
     // 更新可能なフィールドを更新
     if (data.spreadsheetId) {
-      Logger.log(`Updating spreadsheetId: ${data.spreadsheetId}`);
       userRow.values[2] = data.spreadsheetId;
     }
     if (data.spreadsheetUrl) {
-      Logger.log(`Updating spreadsheetUrl: ${data.spreadsheetUrl}`);
       userRow.values[3] = data.spreadsheetUrl;
     }
     if (data.accessToken) {
-      Logger.log(`Updating accessToken`);
       userRow.values[5] = data.accessToken;
     }
     if (data.configJson) {
-      Logger.log(`Updating configJson: ${data.configJson}`);
       userRow.values[6] = data.configJson;
     }
     if (data.isActive !== undefined) {
-      Logger.log(`Updating isActive: ${data.isActive}`);
       userRow.values[8] = data.isActive;
     }
     
     // lastAccessedAtを更新
     userRow.values[7] = new Date();
     
-    Logger.log(`Writing to sheet: row ${userRow.rowIndex}, values: ${JSON.stringify(userRow.values)}`);
-    
     // シートに書き戻し
     try {
       dbSheet.getRange(userRow.rowIndex, 1, 1, userRow.values.length).setValues([userRow.values]);
-      Logger.log(`Successfully updated user: ${userId} by ${requestUser}`);
     } catch (writeError) {
       Logger.log(`Sheet write error: ${writeError.message}`);
       throw writeError;
+    }
+
+    // キャッシュを削除
+    const cache = CacheService.getScriptCache();
+    cache.remove(`user_id_${userId}`);
+    if (userRow.values[1]) { // adminEmail
+      cache.remove(`user_email_${userRow.values[1]}`);
     }
     
     return {
@@ -456,15 +453,11 @@ function getDatabaseSheet() {
   const dbSheetId = properties.getProperty(DATABASE_ID_KEY);
 
   if (!dbSheetId) {
-    // データベースIDが未設定の場合、現在のスプレッドシートを使用
-    Logger.log('Database ID not set, using current spreadsheet');
     const currentSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     if (currentSpreadsheet) {
       const currentId = currentSpreadsheet.getId();
       properties.setProperty(DATABASE_ID_KEY, currentId);
-      Logger.log(`Auto-initialized database with current spreadsheet ID: ${currentId}`);
       
-      // ログシートを確認・作成
       let sheet = currentSpreadsheet.getSheetByName(TARGET_SHEET_NAME);
       if (!sheet) {
         sheet = currentSpreadsheet.insertSheet(TARGET_SHEET_NAME);
@@ -474,7 +467,6 @@ function getDatabaseSheet() {
         ];
         sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight("bold");
         sheet.setFrozenRows(1);
-        Logger.log(`Auto-created '${TARGET_SHEET_NAME}' sheet with headers`);
       }
       return sheet;
     } else {
@@ -483,21 +475,14 @@ function getDatabaseSheet() {
   }
 
   try {
-    Logger.log(`Attempting to open spreadsheet with ID: ${dbSheetId}`);
-    
     let spreadsheet;
     try {
       spreadsheet = SpreadsheetApp.openById(dbSheetId);
     } catch (openError) {
-      Logger.log(`Failed to open spreadsheet: ${openError.message}`);
-      
-      // 失敗した場合、現在のスプレッドシートで再試行
-      Logger.log('Falling back to current spreadsheet');
       const currentSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
       if (currentSpreadsheet) {
         const currentId = currentSpreadsheet.getId();
         properties.setProperty(DATABASE_ID_KEY, currentId);
-        Logger.log(`Fallback: Reset database to current spreadsheet ID: ${currentId}`);
         spreadsheet = currentSpreadsheet;
       } else {
         throw new Error(`スプレッドシート(ID: ${dbSheetId})を開けませんでした。権限を確認してください。`);
@@ -508,19 +493,14 @@ function getDatabaseSheet() {
       throw new Error(`スプレッドシート(ID: ${dbSheetId})がnullです。`);
     }
     
-    Logger.log(`Successfully opened spreadsheet: ${spreadsheet.getName()}`);
-    
     let sheet;
     try {
       sheet = spreadsheet.getSheetByName(TARGET_SHEET_NAME);
     } catch (sheetError) {
-      Logger.log(`Failed to get sheet '${TARGET_SHEET_NAME}': ${sheetError.message}`);
       sheet = null;
     }
 
     if (!sheet) {
-      // シートが存在しない場合は作成
-      Logger.log(`Sheet '${TARGET_SHEET_NAME}' not found, creating new sheet`);
       try {
         sheet = spreadsheet.insertSheet(TARGET_SHEET_NAME);
         const headers = [
@@ -529,33 +509,22 @@ function getDatabaseSheet() {
         ];
         sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight("bold");
         sheet.setFrozenRows(1);
-        Logger.log(`Created new sheet '${TARGET_SHEET_NAME}' with headers`);
       } catch (createError) {
-        Logger.log(`Failed to create sheet: ${createError.message}`);
         throw new Error(`シート「${TARGET_SHEET_NAME}」の作成に失敗しました: ${createError.message}`);
       }
     }
     
-    // データ範囲の存在確認（より安全に）
     try {
       if (sheet && typeof sheet.getDataRange === 'function') {
         const range = sheet.getDataRange();
-        if (range) {
-          Logger.log(`Sheet data range: ${range.getA1Notation()}, rows: ${range.getNumRows()}`);
-        } else {
-          Logger.log('Data range is null, but sheet exists');
-        }
       } else {
         throw new Error('シートオブジェクトが無効です');
       }
     } catch (rangeError) {
-      Logger.log(`Data range error: ${rangeError.message}`);
-      // データ範囲エラーでも処理を続行（シートは存在する）
     }
     
     return sheet;
   } catch (error) {
-    Logger.log(`getDatabaseSheet error: ${error.toString()}`);
     throw new Error(`データベースアクセスエラー: ${error.message}`);
   }
 }
@@ -702,17 +671,17 @@ function saveDeploymentIdToProperties(id) {
  */
 function handleCheckExistingUser(data) {
   try {
-    Logger.log(`checkExistingUser: request data=${JSON.stringify(data)}`);
+    
     
     const dbSheet = getDatabaseSheet();
     const { adminEmail } = data;
     
     if (!adminEmail) {
-      Logger.log('checkExistingUser error: adminEmailが必要です');
+      
       return { success: false, error: 'adminEmailが必要です' };
     }
     
-    Logger.log(`checkExistingUser: searching for adminEmail="${adminEmail}"`);
+    
     const userData = findUserByEmail(dbSheet, adminEmail);
     
     const result = {
@@ -721,7 +690,7 @@ function handleCheckExistingUser(data) {
       data: userData
     };
     
-    Logger.log(`checkExistingUser: result=${JSON.stringify(result)}`);
+    
     return result;
     
   } catch (error) {
@@ -740,6 +709,13 @@ function handleCheckExistingUser(data) {
  * @returns {Object|null} ユーザーデータ
  */
 function findUserById(sheet, userId) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = `user_id_${userId}`;
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    return JSON.parse(cached);
+  }
+
   try {
     const data = sheet.getDataRange().getValues();
     
@@ -763,10 +739,10 @@ function findUserById(sheet, userId) {
         
         // userIdが無効な場合は無効なユーザーとして扱う
         if (!userData.userId || userData.userId === '' || userData.userId === null || userData.userId === 'undefined') {
-          Logger.log(`WARNING: Found user with invalid userId: "${userData.userId}" - treating as non-existent user`);
           return null;
         }
         
+        cache.put(cacheKey, JSON.stringify(userData), 300); // 5分キャッシュ
         return userData;
       }
     }
@@ -784,41 +760,35 @@ function findUserById(sheet, userId) {
  * @returns {Object|null} ユーザーデータ
  */
 function findUserByEmail(sheet, adminEmail) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = `user_email_${adminEmail}`;
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    return JSON.parse(cached);
+  }
+
   try {
-    Logger.log(`findUserByEmail: searching for adminEmail="${adminEmail}"`);
-    
     if (!sheet || !adminEmail || adminEmail.trim().length === 0) {
-      Logger.log(`findUserByEmail: invalid parameters - sheet=${!!sheet}, adminEmail="${adminEmail}"`);
       return null;
     }
     
     const data = sheet.getDataRange().getValues();
-    Logger.log(`findUserByEmail: got ${data.length} rows from sheet`);
     
     if (!data || data.length <= 1) {
-      Logger.log(`findUserByEmail: no data rows found`);
       return null;
     }
     
     // 正規化された検索対象メールアドレス（大文字小文字を無視、空白を除去）
     const normalizedSearchEmail = adminEmail.trim().toLowerCase();
-    Logger.log(`findUserByEmail: normalized search email="${normalizedSearchEmail}"`);
     
     for (let i = 1; i < data.length; i++) {
-      // 行全体をログ出力してデバッグ
-      Logger.log(`findUserByEmail: row ${i} - full data: ${JSON.stringify(data[i])}`);
-      
       if (data[i] && data[i][1]) {
         const storedEmail = String(data[i][1]).trim().toLowerCase();
-        Logger.log(`findUserByEmail: row ${i} - stored email="${storedEmail}"`);
         
-        // 空文字列やnull/undefinedとのマッチを防ぐ
-        // さらに、有効なメールアドレス形式のチェックも追加
         if (storedEmail && 
             storedEmail.length > 0 && 
             storedEmail.includes('@') && 
             storedEmail === normalizedSearchEmail) {
-          Logger.log(`findUserByEmail: MATCH found at row ${i}`);
           
           const userData = {
             userId: data[i][0],
@@ -832,22 +802,17 @@ function findUserByEmail(sheet, adminEmail) {
             isActive: data[i][8]
           };
           
-          Logger.log(`findUserByEmail: returning userData=${JSON.stringify(userData)}`);
-          
           // userIdが無効な場合は無効なユーザーとして扱う（nullを返す）
           if (!userData.userId || userData.userId === '' || userData.userId === null || userData.userId === 'undefined') {
-            Logger.log(`WARNING: Found user with invalid userId: "${userData.userId}" - treating as non-existent user`);
             return null;
           }
           
+          cache.put(cacheKey, JSON.stringify(userData), 300); // 5分キャッシュ
           return userData;
         }
-      } else {
-        Logger.log(`findUserByEmail: row ${i} - empty row or no email`);
       }
     }
     
-    Logger.log(`findUserByEmail: no match found for "${normalizedSearchEmail}"`);
     return null;
   } catch (error) {
     Logger.log(`findUserByEmail error: ${error.message}`);
@@ -863,14 +828,10 @@ function findUserByEmail(sheet, adminEmail) {
  */
 function findUserRowById(sheet, userId) {
   try {
-    Logger.log(`findUserRowById: searching for userId=${userId}`);
-    
     const data = sheet.getDataRange().getValues();
-    Logger.log(`findUserRowById: got ${data.length} rows from sheet`);
     
     for (let i = 1; i < data.length; i++) {
       if (data[i] && data[i][0] === userId) { // userId column
-        Logger.log(`findUserRowById: found user at row ${i + 1}`);
         return {
           rowIndex: i + 1, // 1-based index for getRange
           values: data[i]
@@ -878,7 +839,6 @@ function findUserRowById(sheet, userId) {
       }
     }
     
-    Logger.log(`findUserRowById: user not found`);
     return null;
   } catch (error) {
     Logger.log(`findUserRowById error: ${error.message}`);

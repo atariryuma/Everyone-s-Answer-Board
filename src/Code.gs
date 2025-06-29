@@ -54,7 +54,7 @@ const TIME_CONSTANTS = {
 const REACTION_KEYS = ["UNDERSTAND","LIKE","CURIOUS"];
 const EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
 // Debug flag. Set to true to enable verbose logging
-var DEBUG = true;
+var DEBUG = false; // パフォーマンス向上のためデバッグログを無効化
 
 function debugLog() {
   if (DEBUG && typeof console !== 'undefined' && console.log) {
