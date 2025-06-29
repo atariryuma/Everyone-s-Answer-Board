@@ -2725,11 +2725,29 @@ function registerNewUser(adminEmail) {
     debugLog(`既存ユーザーチェックを実行中...`);
     const existingCheck = callDatabaseApi('checkExistingUser', { adminEmail: adminEmail });
     
-    if (existingCheck.exists) {
-      throw new Error('このメールアドレスは既に登録されています。');
+    if (existingCheck.success && existingCheck.exists && existingCheck.data) {
+      // 既存ユーザーの場合はURL情報を返す
+      const userData = existingCheck.data;
+      const base = getWebAppUrlEnhanced();
+      
+      debugLog(`既存ユーザーが見つかりました: ${userData.userId}`);
+      
+      // ユーザーコンテキストを設定
+      PropertiesService.getUserProperties().setProperty('CURRENT_USER_ID', userData.userId);
+      PropertiesService.getUserProperties().setProperty('CURRENT_SPREADSHEET_ID', userData.spreadsheetId);
+      
+      return {
+        userId: userData.userId,
+        spreadsheetId: userData.spreadsheetId,
+        spreadsheetUrl: userData.spreadsheetUrl,
+        adminUrl: base ? `${base}?userId=${userData.userId}&mode=admin` : '',
+        viewUrl: base ? `${base}?userId=${userData.userId}` : '',
+        message: '既存のボードが見つかりました。管理画面に移動します。',
+        autoCreated: false
+      };
     }
     
-    debugLog(`✅ 既存ユーザーチェック完了`);
+    debugLog(`✅ 既存ユーザーチェック完了 - 新規ユーザーです`);
     
   } catch (apiError) {
     debugLog(`❌ API経由のデータベースアクセスエラー: ${apiError.message}`);
