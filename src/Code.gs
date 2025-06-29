@@ -63,6 +63,66 @@ function debugLog() {
 }
 
 /**
+ * ユーザー情報キャッシュ（メモリ内キャッシュ、5分間有効）
+ */
+const USER_INFO_CACHE = new Map();
+const USER_CACHE_TTL = 5 * 60 * 1000; // 5分
+
+/**
+ * キャッシュされたユーザー情報を取得
+ * @param {string} userId - ユーザーID
+ * @return {Object|null} キャッシュされたユーザー情報またはnull
+ */
+function getCachedUserInfo(userId) {
+  const cached = USER_INFO_CACHE.get(userId);
+  if (cached && (Date.now() - cached.timestamp) < USER_CACHE_TTL) {
+    return cached.data;
+  }
+  return null;
+}
+
+/**
+ * ユーザー情報をキャッシュに保存
+ * @param {string} userId - ユーザーID
+ * @param {Object} userInfo - ユーザー情報
+ */
+function setCachedUserInfo(userId, userInfo) {
+  USER_INFO_CACHE.set(userId, {
+    data: userInfo,
+    timestamp: Date.now()
+  });
+}
+
+/**
+ * 現在のユーザーの権限を検証するヘルパー関数（読み取り専用・高速版）
+ * @return {Object} {userId, userInfo} - 検証済みのユーザー情報
+ * @throws {Error} 認証失敗時
+ */
+function validateCurrentUserReadOnly() {
+  const props = PropertiesService.getUserProperties();
+  const userId = props.getProperty('CURRENT_USER_ID');
+  if (!userId) {
+    throw new Error('認証が必要です。ログインし直してください。');
+  }
+  
+  // キャッシュから取得を試行
+  let userInfo = getCachedUserInfo(userId);
+  if (!userInfo) {
+    // キャッシュにない場合のみAPI呼び出し
+    userInfo = getUserInfo(userId);
+    if (userInfo) {
+      setCachedUserInfo(userId, userInfo);
+    }
+  }
+  
+  const currentEmail = Session.getActiveUser().getEmail();
+  if (!userInfo || userInfo.adminEmail !== currentEmail) {
+    throw new Error('権限がありません。管理者アカウントでログインしてください。');
+  }
+  return { userId, userInfo };
+}
+
+/**
  * 現在のユーザーの権限を検証するヘルパー関数
  * @return {Object} {userId, userInfo} - 検証済みのユーザー情報
  * @throws {Error} 認証失敗時
@@ -249,6 +309,37 @@ if (typeof global !== 'undefined' && global.getConfig) {
   getConfig = global.getConfig;
 }
 
+/**
+ * スプレッドシートキャッシュ（メモリ内キャッシュ、10分間有効）
+ */
+const SPREADSHEET_CACHE = new Map();
+const SPREADSHEET_CACHE_TTL = 10 * 60 * 1000; // 10分
+
+/**
+ * キャッシュされたスプレッドシートを取得
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @return {GoogleAppsScript.Spreadsheet.Spreadsheet|null} キャッシュされたスプレッドシートまたはnull
+ */
+function getCachedSpreadsheet(spreadsheetId) {
+  const cached = SPREADSHEET_CACHE.get(spreadsheetId);
+  if (cached && (Date.now() - cached.timestamp) < SPREADSHEET_CACHE_TTL) {
+    return cached.data;
+  }
+  return null;
+}
+
+/**
+ * スプレッドシートをキャッシュに保存
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} spreadsheet - スプレッドシート
+ */
+function setCachedSpreadsheet(spreadsheetId, spreadsheet) {
+  SPREADSHEET_CACHE.set(spreadsheetId, {
+    data: spreadsheet,
+    timestamp: Date.now()
+  });
+}
+
 function getCurrentSpreadsheet() {
   const props = PropertiesService.getUserProperties();
   const spreadsheetId = props.getProperty('CURRENT_SPREADSHEET_ID');
@@ -258,8 +349,15 @@ function getCurrentSpreadsheet() {
     return SpreadsheetApp.getActiveSpreadsheet();
   }
   
-  // マルチテナント時は指定されたスプレッドシートを使用
-  return SpreadsheetApp.openById(spreadsheetId);
+  // キャッシュから取得を試行
+  let spreadsheet = getCachedSpreadsheet(spreadsheetId);
+  if (!spreadsheet) {
+    // キャッシュにない場合のみAPI呼び出し
+    spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    setCachedSpreadsheet(spreadsheetId, spreadsheet);
+  }
+  
+  return spreadsheet;
 }
 
 function safeGetUserEmail() {
@@ -1115,8 +1213,8 @@ function doGet(e) {
  * @param {string} sortBy - ソート順
  */
 function getPublishedSheetData(requestedSheetName, classFilter, sortBy) {
-  // セキュリティ強化: 権限チェックを最初に実行
-  const { userId, userInfo } = validateCurrentUser();
+  // セキュリティ強化: 権限チェックを最初に実行（読み取り専用・高速版を使用）
+  const { userId, userInfo } = validateCurrentUserReadOnly();
   
   const props = PropertiesService.getUserProperties();
   const spreadsheetId = props.getProperty('CURRENT_SPREADSHEET_ID');
@@ -1170,8 +1268,8 @@ function getPublishedSheetData(requestedSheetName, classFilter, sortBy) {
  * 利用可能なシート一覧とアクティブシート情報を取得します。
  */
 function getAvailableSheets() {
-  // セキュリティ強化: 権限チェックを最初に実行
-  const { userId, userInfo } = validateCurrentUser();
+  // セキュリティ強化: 権限チェックを最初に実行（読み取り専用・高速版を使用）
+  const { userId, userInfo } = validateCurrentUserReadOnly();
   
   const config = userInfo.configJson || {};
   const activeSheetName = config.activeSheetName || config.sheetName || '';
