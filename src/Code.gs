@@ -402,10 +402,10 @@ function ensureDatabaseAccess(userEmail) {
   try {
     debugLog(`🔐 API経由でのデータベースアクセス確認: ${userEmail}`);
     
-    // API経由でのデータベース接続テスト
-    const testResult = callDatabaseApi('test', { userEmail: userEmail });
+    // 簡単な接続テストを実行
+    const testResult = callDatabaseApi('ping', { userEmail: userEmail });
     
-    if (testResult && testResult.success) {
+    if (testResult && (testResult.success || testResult.status === 'ok')) {
       debugLog(`✅ API経由でのデータベースアクセス成功: ${userEmail}`);
       return true;
     } else {
@@ -416,6 +416,12 @@ function ensureDatabaseAccess(userEmail) {
   } catch (error) {
     console.error('API経由でのデータベースアクセス確認エラー:', error);
     debugLog(`❌ API エラー: ${error.message}`);
+    
+    // 401エラーの場合は、より具体的なガイダンスを提供
+    if (error.message.includes('401')) {
+      debugLog(`🔧 401エラー検出: Logger API設定の確認が必要`);
+    }
+    
     return false;
   }
 }
@@ -3128,37 +3134,110 @@ function callDatabaseApi(action, data = {}) {
     throw new Error('Logger APIのURLが設定されていません。セットアップを完了してください。');
   }
 
+  const requestUser = Session.getActiveUser().getEmail();
+  const effectiveUser = Session.getEffectiveUser().getEmail();
+  
   const payload = {
     action: action,
     data: data,
     timestamp: new Date().toISOString(),
-    requestUser: Session.getActiveUser().getEmail()
+    requestUser: requestUser,
+    effectiveUser: effectiveUser,
+    userAgent: 'StudyQuest-MainApp/1.0'
   };
 
   const options = {
     method: 'post',
     contentType: 'application/json',
     payload: JSON.stringify(payload),
-    muteHttpExceptions: true
+    muteHttpExceptions: true,
+    headers: {
+      'User-Agent': 'StudyQuest-MainApp/1.0',
+      'X-Requested-With': 'StudyQuest',
+      'X-Request-User': requestUser
+    }
   };
+
+  debugLog(`🔗 API呼び出し開始:`);
+  debugLog(`• URL: ${apiUrl}`);
+  debugLog(`• Action: ${action}`);
+  debugLog(`• Request User: ${requestUser}`);
+  debugLog(`• Effective User: ${effectiveUser}`);
 
   try {
     const response = UrlFetchApp.fetch(apiUrl, options);
     const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
+    
+    debugLog(`📡 API応答:`);
+    debugLog(`• ステータスコード: ${responseCode}`);
+    debugLog(`• レスポンステキスト長: ${responseText.length}文字`);
     
     if (responseCode === 200) {
-      const responseText = response.getContentText();
       try {
-        return JSON.parse(responseText);
+        const parsedResponse = JSON.parse(responseText);
+        debugLog(`✅ API呼び出し成功`);
+        return parsedResponse;
       } catch (parseError) {
+        debugLog(`⚠️ JSON解析失敗、テキストとして返却`);
         return { success: true, data: responseText };
       }
     } else {
-      throw new Error(`API呼び出しが失敗しました。ステータスコード: ${responseCode}`);
+      // 詳細なエラー情報を提供
+      debugLog(`❌ API呼び出し失敗:`);
+      debugLog(`• ステータス: ${responseCode}`);
+      debugLog(`• レスポンス: ${responseText.substring(0, 500)}${responseText.length > 500 ? '...' : ''}`);
+      
+      let errorMessage = `API呼び出しが失敗しました。ステータスコード: ${responseCode}`;
+      
+      // 特定のエラーコードに対する詳細説明
+      switch (responseCode) {
+        case 401:
+          errorMessage += '\n\n考えられる原因:\n';
+          errorMessage += '1. Logger APIのアクセス権限設定に問題があります\n';
+          errorMessage += '2. Google Workspaceの認証設定が正しくありません\n';
+          errorMessage += '3. APIのデプロイ設定が間違っています\n\n';
+          errorMessage += '解決方法:\n';
+          errorMessage += '1. Logger APIが「executeAs: USER_DEPLOYING」で設定されているか確認\n';
+          errorMessage += '2. Logger APIが「access: DOMAIN」で設定されているか確認\n';
+          errorMessage += '3. Logger APIを再デプロイしてください';
+          break;
+        case 403:
+          errorMessage += '\n\nアクセス権限が拒否されました。Logger APIのアクセス設定を確認してください。';
+          break;
+        case 404:
+          errorMessage += '\n\nLogger APIのURLが正しくないか、デプロイされていません。';
+          break;
+        case 500:
+          errorMessage += '\n\nLogger API側でエラーが発生しています。Logger APIのログを確認してください。';
+          break;
+      }
+      
+      if (responseText) {
+        errorMessage += `\n\nサーバーレスポンス: ${responseText}`;
+      }
+      
+      throw new Error(errorMessage);
     }
   } catch(e) {
-    Logger.log(`Database API呼び出しエラー: ${e.message}`);
-    throw new Error(`データベースAPIへのアクセスに失敗しました: ${e.message}`);
+    debugLog(`💥 API呼び出し例外: ${e.message}`);
+    
+    if (e.message.includes('ステータスコード:')) {
+      // 既に処理済みのエラー
+      throw e;
+    } else {
+      // ネットワークエラーなど
+      const networkError = `データベースAPIへの接続に失敗しました: ${e.message}\n\n`;
+      const troubleshooting = '考えられる原因:\n';
+      const causes = '1. Logger APIのURLが間違っている\n';
+      const causes2 = '2. ネットワーク接続に問題がある\n';
+      const causes3 = '3. Logger APIがデプロイされていない\n\n';
+      const solution = '解決方法:\n';
+      const solution1 = '1. セットアップ画面でLogger APIのURLを再確認してください\n';
+      const solution2 = '2. Logger APIが正常にデプロイされているか確認してください';
+      
+      throw new Error(networkError + troubleshooting + causes + causes2 + causes3 + solution + solution1 + solution2);
+    }
   }
 }
 

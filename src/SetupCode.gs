@@ -43,6 +43,34 @@ function handleSetupRequest() {
 }
 
 /**
+ * API接続テスト用の関数
+ */
+function testApiConnection() {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    const apiUrl = properties.getProperty('LOGGER_API_URL');
+    
+    Logger.log('=== API接続テスト ===');
+    Logger.log(`API URL: ${apiUrl}`);
+    
+    if (!apiUrl) {
+      Logger.log('❌ API URLが設定されていません');
+      return 'API URLが設定されていません';
+    }
+    
+    // 簡単なping テストを実行
+    const testResult = callDatabaseApi('ping', { test: true });
+    
+    Logger.log(`✅ API接続成功: ${JSON.stringify(testResult)}`);
+    return `API接続成功: ${JSON.stringify(testResult)}`;
+    
+  } catch (e) {
+    Logger.log(`❌ API接続失敗: ${e.message}`);
+    return `API接続失敗: ${e.message}`;
+  }
+}
+
+/**
  * デバッグ用: 現在の設定状況を確認する関数
  */
 function debugCurrentSetup() {
