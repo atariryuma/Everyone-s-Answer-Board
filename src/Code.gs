@@ -1548,16 +1548,26 @@ function getStatus() {
       };
     }
     
-    const userInfo = getUserInfo(userId);
+    // 読み取り専用・高速版でユーザー情報を取得
+    const userInfo = getCachedUserInfo(userId) || getUserInfo(userId);
     const config = userInfo ? userInfo.configJson || {} : {};
     const activeSheetName = config.activeSheetName || '';
     
-    // Get available sheets
+    // Get available sheets（キャッシュ活用で高速化）
     let allSheets = [];
     try {
-      allSheets = getSheets() || [];
+      const spreadsheet = getCurrentSpreadsheet(); // キャッシュされたスプレッドシートを使用
+      allSheets = spreadsheet.getSheets()
+        .filter(sheet => !sheet.isSheetHidden() && sheet.getName() !== 'Config')
+        .map(sheet => sheet.getName());
     } catch (error) {
       console.warn('Failed to get sheets:', error);
+      // フォールバック: 従来の方法
+      try {
+        allSheets = getSheets() || [];
+      } catch (fallbackError) {
+        console.warn('Fallback getSheets also failed:', fallbackError);
+      }
     }
     
     // Get answer count if active sheet exists
@@ -1575,22 +1585,34 @@ function getStatus() {
           const reactionHeaders = REACTION_KEYS.map(k => COLUMN_HEADERS[k]);
           const headerIndices = getHeaderIndices(activeSheetName);
           
-          // リアクション列のデータをまとめて取得
+          // リアクション列のデータをまとめて取得（answerCountが0の場合は処理をスキップ）
           const reactionColumnsData = [];
-          for (const header of reactionHeaders) {
-            const colIndex = headerIndices[header];
-            if (colIndex !== undefined) {
-              const range = sheet.getRange(2, colIndex + 1, answerCount, 1); // データ開始行から最終行まで
-              reactionColumnsData.push(range.getValues());
+          if (answerCount > 0) {
+            for (const header of reactionHeaders) {
+              const colIndex = headerIndices[header];
+              if (colIndex !== undefined) {
+                try {
+                  const range = sheet.getRange(2, colIndex + 1, answerCount, 1); // データ開始行から最終行まで
+                  reactionColumnsData.push(range.getValues());
+                } catch (rangeError) {
+                  console.warn('Failed to get range for header:', header, rangeError);
+                  // 範囲エラーの場合は空配列を追加
+                  reactionColumnsData.push([]);
+                }
+              }
             }
           }
 
           totalReactions = 0;
-          if (reactionColumnsData.length > 0) {
+          if (reactionColumnsData.length > 0 && answerCount > 0) {
             for (let i = 0; i < answerCount; i++) {
               for (let j = 0; j < reactionColumnsData.length; j++) {
-                const cellValue = reactionColumnsData[j][i] ? reactionColumnsData[j][i][0] : '';
-                totalReactions += parseReactionString(cellValue).length;
+                if (reactionColumnsData[j] && reactionColumnsData[j][i]) {
+                  const cellValue = reactionColumnsData[j][i][0] || '';
+                  if (cellValue) {
+                    totalReactions += parseReactionString(cellValue).length;
+                  }
+                }
               }
             }
           }

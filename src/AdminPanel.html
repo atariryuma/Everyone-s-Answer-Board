@@ -944,7 +944,7 @@
         matchPanel.classList.remove('hidden');
         mismatchPanel.classList.add('hidden');
         document.getElementById('admin-domain-match-text').textContent = 
-          'Web app for ' + info.deployDomain + ' domain (Your account: ' + info.currentDomain + ')';
+          info.deployDomain + ' ドメイン用のWebアプリ (あなたのアカウント: ' + info.currentDomain + ')';
       } else {
         // ドメインが不一致の場合
         matchPanel.classList.add('hidden');
@@ -1006,33 +1006,7 @@
         elements.copyFormUrlBtn.addEventListener('click', () => copyUrl(elements.formUrlInput, 'Form URL copied'));
       }
 
-      // Open Form Button
-      const openFormBtn = document.getElementById('open-form-btn');
-      if (openFormBtn) {
-        openFormBtn.addEventListener('click', () => {
-          if (elements.formUrlInput && elements.formUrlInput.value) {
-            // GoogleフォームのURLを編集用URLに変換
-            const formUrl = elements.formUrlInput.value;
-            let editUrl = formUrl;
-            
-            // 回答用URL（/viewform）を編集用URL（/edit）に変換
-            if (formUrl.includes('/viewform')) {
-              editUrl = formUrl.replace('/viewform', '/edit');
-            } else if (formUrl.includes('/d/') && !formUrl.includes('/edit')) {
-              // フォームIDが含まれているが/editがない場合
-              const match = formUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-              if (match) {
-                const formId = match[1];
-                editUrl = 'https://docs.google.com/forms/d/' + formId + '/edit';
-              }
-            }
-            
-            window.open(editUrl, '_blank');
-          } else {
-            showMessage('Google Form not configured', 'yellow');
-          }
-        });
-      }
+      // Open Form Button - イベントリスナーは updateFormInfo() 関数で動的に設定されます
 
       // Open Admin Board Button (管理モードでボードを開く)
       const openAdminBoardBtn = document.getElementById('open-admin-board-btn');
@@ -1130,7 +1104,7 @@
       
       if (elements.switchSheetText) {
         elements.switchSheetText.textContent = isCurrentActive ? 
-          'Currently active sheet' : 
+          '現在のアクティブシート' : 
           (hasSelected ? 'Activate ' + selectedSheet : 'Select active sheet');
       }
       
@@ -1170,7 +1144,7 @@
       }
       if (hasActiveSheet) {
         progress = 100;
-        statusText = 'Board is published';
+        statusText = 'ボードが公開されています';
       }
       
       if (elements.setupProgress) {
@@ -1224,33 +1198,54 @@
     }
 
     function updateFormInfo(formInfo) {
+      const answerCountEl = document.getElementById('answer-count');
+      const formFileNameEl = document.getElementById('form-file-name');
+      const openFormBtn = document.getElementById('open-form-btn');
+      
       if (!formInfo) {
         // フォーム情報がない場合はデフォルト表示
-        const answerCountEl = document.getElementById('answer-count');
-        const formFileNameEl = document.getElementById('form-file-name');
-        
-        if (answerCountEl) answerCountEl.textContent = '開く';
+        if (answerCountEl) answerCountEl.textContent = '未設定';
         if (formFileNameEl) formFileNameEl.textContent = 'Googleフォーム';
+        
+        // フォーム情報がない場合のクリックイベント
+        if (openFormBtn) {
+          openFormBtn.onclick = () => {
+            showMessage('Googleフォームが見つかりません。フォームを作成するか、スプレッドシートとフォームを関連付けてください。', 'yellow');
+          };
+        }
         return;
       }
       
       // 回答数を表示
-      const answerCountEl = document.getElementById('answer-count');
       if (answerCountEl) {
         answerCountEl.textContent = formInfo.responseCount + '件';
       }
       
       // フォーム名を表示
-      const formFileNameEl = document.getElementById('form-file-name');
       if (formFileNameEl) {
         formFileNameEl.textContent = formInfo.title || 'Googleフォーム';
       }
       
       // フォームボタンのクリックイベントを更新
-      const openFormBtn = document.getElementById('open-form-btn');
       if (openFormBtn && formInfo.editUrl) {
         openFormBtn.onclick = () => {
           window.open(formInfo.editUrl, '_blank');
+        };
+      } else if (openFormBtn) {
+        // editUrlがない場合のフォールバック
+        openFormBtn.onclick = () => {
+          if (formInfo.formUrl) {
+            // 回答用URLを編集用URLに変換して開く
+            let editUrl = formInfo.formUrl;
+            if (formInfo.formUrl.includes('/viewform')) {
+              editUrl = formInfo.formUrl.replace('/viewform', '/edit');
+            } else if (formInfo.formId) {
+              editUrl = 'https://docs.google.com/forms/d/' + formInfo.formId + '/edit';
+            }
+            window.open(editUrl, '_blank');
+          } else {
+            showMessage('フォームのURLが取得できませんでした。', 'yellow');
+          }
         };
       }
       
@@ -1274,7 +1269,7 @@
       const statusDescEl = document.getElementById('status-description');
       if (statusDescEl) {
         statusDescEl.textContent = isActive ?
-          'Currently ' + currentActiveSheet + ' is published' :
+          '現在「' + currentActiveSheet + '」が公開中です' :
           'Please add spreadsheet to start';
         
         // クリック可能状態の管理
@@ -1398,10 +1393,10 @@
         const urlDescription = document.getElementById('url-section-description');
 
         if (urlTitle) {
-          urlTitle.textContent = '📋 Published Board';
+          urlTitle.textContent = '📋 公開中のボード';
         }
         if (urlDescription) {
-          urlDescription.textContent = 'Share this URL with students';
+          urlDescription.textContent = 'このURLを生徒と共有してください';
         }
         const studentUrlSection = document.getElementById('student-url-section');
         if (studentUrlSection) {
