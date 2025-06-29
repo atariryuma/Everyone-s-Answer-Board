@@ -975,8 +975,11 @@ function doGet(e) {
   
     // 管理モードの場合
     if (mode === 'admin') {
-      // 管理者権限のチェック
-      if (!(viewerEmail === userInfo.adminEmail || isUserAdmin(viewerEmail))) {
+      // 新規登録直後のユーザーは自身のボードの管理者とみなす
+      if (viewerEmail === userInfo.adminEmail) {
+        // 自身のボードの管理者なのでアクセスを許可
+      } else if (!isUserAdmin(viewerEmail)) {
+        // それ以外のユーザーで管理者権限がない場合は拒否
         auditLog('ADMIN_ACCESS_DENIED', validatedUserId, { viewerEmail });
         if (typeof HtmlService !== 'undefined') {
           const output = HtmlService.createHtmlOutput('権限がありません。');
@@ -1218,9 +1221,8 @@ function getAvailableSheets() {
  * 新しいスプレッドシートURLを追加し、アクティブシートとして設定します。
  * @param {string} spreadsheetUrl - 追加するスプレッドシートのURL
  */
-function addSpreadsheetUrl(spreadsheetUrl) {
-  // セキュリティ強化: 権限チェックを最初に実行
-  const { userId, userInfo } = validateCurrentUser();
+function addSpreadsheetUrl(spreadsheetUrl, userId, userInfo) {
+  // 権限チェックは呼び出し元で行うため、ここでは不要
 
   // URLからスプレッドシートIDを抽出（セキュリティ強化）
   let spreadsheetId;
@@ -2900,7 +2902,7 @@ function registerNewUser(adminEmail) {
   
   // 📝 ステップ7: スプレッドシートをユーザーのスプレッドシートリストに追加
   debugLog(`📊 スプレッドシートリストに追加中`);
-  const addResult = addSpreadsheetUrl(formAndSsInfo.spreadsheetUrl);
+  const addResult = addSpreadsheetUrl(formAndSsInfo.spreadsheetUrl, userId, { adminEmail: adminEmail });
   debugLog('Spreadsheet added to user:', addResult);
   
   // 📝 ステップ8: 新しく作成したシートをアクティブ化・公開（クイックアクションと同様）
