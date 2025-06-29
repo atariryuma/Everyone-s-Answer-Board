@@ -1177,7 +1177,8 @@
       google.script.run
         .withSuccessHandler((status) => {
           updateStatus(status);
-          setLoading(false); // ステータス更新完了後にローディングを終了
+          enableUnderstandButton(); // 「理解しました」ボタンを有効化
+          // setLoading(false); // ユーザーが「理解しました」をクリックするまで待機
         })
         .withFailureHandler((error) => {
           console.error('getStatus error:', error);
@@ -1257,10 +1258,26 @@
       // フォームボタンのクリックイベントを更新
       if (openFormBtn && formInfo.editUrl) {
         console.log('Setting form button click handler with editUrl:', formInfo.editUrl);
-        openFormBtn.onclick = () => {
+        console.log('Form button current state:', {
+          disabled: openFormBtn.disabled,
+          style: openFormBtn.style.cssText,
+          tagName: openFormBtn.tagName
+        });
+        
+        // 既存のイベントリスナーを削除してから新しいものを設定
+        openFormBtn.onclick = null;
+        openFormBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
           console.log('Form button clicked - opening editUrl:', formInfo.editUrl);
           window.open(formInfo.editUrl, '_blank');
-        };
+        });
+        
+        // フォームボタンが確実に有効化されていることを確認
+        openFormBtn.disabled = false;
+        openFormBtn.style.pointerEvents = 'auto';
+        openFormBtn.style.opacity = '1';
+        
         console.log('Set editUrl click handler for form button');
       } else if (openFormBtn) {
         console.log('Setting form button click handler with fallback for formInfo:', formInfo);
@@ -1933,9 +1950,14 @@
       
       // 全体的なローディング状態の管理
       if (isLoading) {
-        // ダッシュボードカードを無効化
+        // ダッシュボードカードを無効化（フォームボタンは除外）
         const dashboardCards = document.querySelectorAll('.glass-panel button, .glass-panel .cursor-pointer');
         dashboardCards.forEach(card => {
+          // open-form-btnは無効化しない（フォーム情報更新後もクリック可能にするため）
+          if (card.id === 'open-form-btn') {
+            return;
+          }
+          
           if (card.tagName === 'BUTTON') {
             card.disabled = true;
           } else {
@@ -1947,9 +1969,14 @@
         // ローディングオーバーレイを表示
         showLoadingOverlay(msg);
       } else {
-        // ダッシュボードカードを再有効化
+        // ダッシュボードカードを再有効化（フォームボタンは既に管理されているため除外）
         const dashboardCards = document.querySelectorAll('.glass-panel button, .glass-panel .cursor-pointer');
         dashboardCards.forEach(card => {
+          // open-form-btnは updateFormInfo で管理されるため除外
+          if (card.id === 'open-form-btn') {
+            return;
+          }
+          
           if (card.tagName === 'BUTTON') {
             card.disabled = false;
           } else {
@@ -1973,16 +2000,63 @@
       
       const overlay = document.createElement('div');
       overlay.id = 'loading-overlay';
-      overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-6';
       overlay.innerHTML = `
-        <div class="glass-panel p-8 rounded-xl text-center">
+        <div class="glass-panel p-8 rounded-xl text-center max-w-2xl max-h-full overflow-y-auto">
           <div class="spinner mx-auto mb-4"></div>
           <p class="text-lg text-white font-medium">${message}</p>
           <p class="text-sm text-gray-400 mt-2">しばらくお待ちください...</p>
+          
+          <!-- デジタルシティズンシップ教育ガイド -->
+          <div class="mt-6 text-left bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-4 border border-green-400/30">
+            <div class="flex items-center mb-3">
+              <div class="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full flex items-center justify-center mr-3">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.168 18.477 18.582 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+              </div>
+              <h3 class="text-lg font-bold text-green-300">📚 デジタル・シティズンシップ教育ガイド</h3>
+            </div>
+            
+            <div class="text-sm text-green-200 space-y-3">
+              <div>
+                <h4 class="font-semibold text-green-300 mb-2">🤝 心理的安全性を重視した設定</h4>
+                <p>このシステムでは匿名性と数値非表示をデフォルトとして、生徒が安心して意見を表現できる環境を整えています。リアクションは色で識別できるため、数を表示しなくても反応の種類を把握できます。</p>
+              </div>
+              
+              <div>
+                <h4 class="font-semibold text-green-300 mb-2">⚠️ 表示機能を有効にする前の注意点</h4>
+                <p>名前や数値を表示すると、一部の生徒が発言を控えたり、他者の反応を気にして本音を言いにくくなる可能性があります。デジタル・シティズンシップの観点から、オンライン空間でも互いを尊重し、多様な意見を受け入れる姿勢を育むことが重要です。</p>
+              </div>
+            </div>
+            
+            <button id="understand-guide-btn" disabled class="w-full mt-4 btn btn-secondary opacity-50 cursor-not-allowed">
+              <span id="understand-btn-text">理解しました（読み込み完了後に有効化）</span>
+            </button>
+          </div>
         </div>
       `;
       
       document.body.appendChild(overlay);
+    }
+    
+    function enableUnderstandButton() {
+      const understandBtn = document.getElementById('understand-guide-btn');
+      const understandBtnText = document.getElementById('understand-btn-text');
+      
+      if (understandBtn && understandBtnText) {
+        understandBtn.disabled = false;
+        understandBtn.className = 'w-full mt-4 btn btn-primary';
+        understandBtnText.textContent = '理解しました';
+        
+        understandBtn.onclick = () => {
+          hideLoadingOverlay();
+          // ローディング終了時にフォームボタンを再有効化
+          setLoading(false);
+        };
+        
+        console.log('Understand button enabled');
+      }
     }
     
     function hideLoadingOverlay() {
