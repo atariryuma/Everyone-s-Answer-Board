@@ -1206,7 +1206,7 @@ function addSpreadsheetUrl(spreadsheetUrl) {
     }
 
     // ユーザー設定を更新：新しいスプレッドシートIDを設定
-    const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
+    const userDb = getOrCreateMainDatabase();
     const data = userDb.getDataRange().getValues();
     const headers = data[0];
     const userIdIndex = headers.indexOf('userId');
@@ -2567,7 +2567,7 @@ function getDatabase() {
 }
 
 function getUserInfo(userId) {
-  const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
+  const userDb = getOrCreateMainDatabase();
   const data = userDb.getDataRange().getValues();
   const headers = data[0];
   const userIdIndex = headers.indexOf('userId');
@@ -2606,7 +2606,7 @@ function getUserInfo(userId) {
 }
 
 function getUserInfoInternal(userId) {
-  const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
+  const userDb = getOrCreateMainDatabase();
   const data = userDb.getDataRange().getValues();
   const headers = data[0];
   const userIdIndex = headers.indexOf('userId');
@@ -2646,7 +2646,7 @@ function getUserInfoInternal(userId) {
 
 
 function updateUserConfig(userId, newConfig) {
-  const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
+  const userDb = getOrCreateMainDatabase();
   const data = userDb.getDataRange().getValues();
   const headers = data[0];
   const userIdIndex = headers.indexOf('userId');
@@ -2724,19 +2724,20 @@ function getConfig(sheetName) {
 
 function auditLog(action, userId, details = {}) {
   try {
-    const logSheet = getDatabase().getSheetByName('AuditLog');
-    if (!logSheet) {
-      const ss = getDatabase();
-      const newLogSheet = ss.insertSheet('AuditLog');
-      newLogSheet.appendRow(['Timestamp', 'UserId', 'Action', 'Details']);
-      newLogSheet.getRange('A1:D1').setFontWeight('bold').setBackground('#F0F4C3');
-      newLogSheet.autoResizeColumns(1, 4);
-    }
+    // 新しいアーキテクチャ: 管理者向けログ記録APIを使用
+    const logData = {
+      timestamp: new Date().toISOString(),
+      userId: userId,
+      action: action,
+      details: details,
+      source: 'mainApp'
+    };
     
-    const row = [new Date(), userId, action, JSON.stringify(details)];
-    logSheet.appendRow(row);
+    logToAdminApi(logData);
+    debugLog(`監査ログ送信: ${action} for ${userId}`);
+    
   } catch (e) {
-    console.error('Failed to write audit log:', e);
+    console.error('監査ログ送信に失敗:', e);
   }
 }
 
@@ -2866,27 +2867,55 @@ function openActiveSpreadsheet() {
  * @return {Object|null} 既存ボードがあればURL等を含むオブジェクト、なければnull
  */
 function getExistingBoard() {
-  const email = safeGetUserEmail();
-  const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
-  const data = userDb.getDataRange().getValues();
-  const headers = data[0];
-  const emailIdx = headers.indexOf('adminEmail');
-  const userIdIdx = headers.indexOf('userId');
-  const urlIdx = headers.indexOf('spreadsheetUrl');
-
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][emailIdx] === email) {
-      const userId = data[i][userIdIdx];
-      const base = getWebAppUrlEnhanced();
-      return {
-        userId: userId,
-        adminUrl: base ? `${base}?userId=${userId}&mode=admin` : '',
-        viewUrl: base ? `${base}?userId=${userId}` : '',
-        spreadsheetUrl: data[i][urlIdx] || ''
-      };
+  try {
+    const email = safeGetUserEmail();
+    if (!email) {
+      debugLog('ユーザーメールアドレスが取得できません');
+      return null;
     }
+    
+    const userDb = getOrCreateMainDatabase();
+    if (!userDb) {
+      debugLog('メインデータベースが取得できません');
+      return null;
+    }
+    
+    const data = userDb.getDataRange().getValues();
+    
+    if (!data || data.length === 0) {
+      debugLog('データベースが空です');
+      return null;
+    }
+    
+    const headers = data[0];
+    const emailIdx = headers.indexOf('adminEmail');
+    const userIdIdx = headers.indexOf('userId');
+    const urlIdx = headers.indexOf('spreadsheetUrl');
+    
+    if (emailIdx === -1 || userIdIdx === -1) {
+      debugLog('必要なヘッダーが見つかりません');
+      return null;
+    }
+
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][emailIdx] === email) {
+        const userId = data[i][userIdIdx];
+        const base = getWebAppUrlEnhanced();
+        return {
+          userId: userId,
+          adminUrl: base ? `${base}?userId=${userId}&mode=admin` : '',
+          viewUrl: base ? `${base}?userId=${userId}` : '',
+          spreadsheetUrl: data[i][urlIdx] || ''
+        };
+      }
+    }
+    return null;
+    
+  } catch (error) {
+    console.error('既存ボード確認で問題が発生しました', error);
+    debugLog(`getExistingBoard エラー: ${error.message}`);
+    return null;
   }
-  return null;
 }
 
 // =================================================================
