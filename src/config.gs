@@ -116,22 +116,11 @@ function saveSheetConfigForSpreadsheet(ss, sheetName, cfg) {
     try {
       values = sheet.getDataRange().getValues();
     } catch (error) {
-      debugLog('Config sheet appears to be empty or inaccessible, creating header row');
+      debugLog('Config sheet appears to be empty, creating header row');
       values = [];
     }
     
-    // Configシートのヘッダーが正しいか確認し、必要であれば再設定
-    const currentHeaders = values.length > 0 ? values[0] : [];
-    const headersMatch = headers.every((h, i) => currentHeaders[i] === h);
-
-    if (!headersMatch) {
-      // ヘッダーが一致しない場合、既存のデータをクリアして正しいヘッダーを設定
-      sheet.clearContents();
-      sheet.appendRow(headers);
-      values = [headers]; // valuesも更新
-      debugLog('Config sheet headers reset to correct format');
-    } else if (values.length === 0) {
-      // ヘッダーは正しいがデータがない場合
+    if (values.length === 0) {
       sheet.appendRow(headers);
       values = [headers];
     }
