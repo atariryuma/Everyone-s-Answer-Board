@@ -59,7 +59,7 @@ function saveSettingsAndCreateDb(apiUrl) {
     // データベースがなければ作成する
     getOrCreateMainDatabase();
     
-    return '✅ 設定が正常に保存されました。このプロジェクトを再度デプロイし直し、発行された新しいURLをご利用ください。';
+    return '✅ 設定が正常に保存されました。セットアップが完了しました。';
   } catch(e) {
     Logger.log(e);
     return `❌ エラーが発生しました: ${e.message}`;

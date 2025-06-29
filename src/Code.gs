@@ -2903,6 +2903,24 @@ function getOrCreateMainDatabase() {
   dbId = db.getId();
   properties.setProperty(MAIN_DB_ID_KEY, dbId);
   
+  // データベースの共有設定を追加
+  try {
+    const dbFile = DriveApp.getFileById(dbId);
+    const adminEmail = Session.getActiveUser().getEmail();
+    const userDomain = adminEmail.split('@')[1];
+    
+    // 同一ドメイン内で閲覧・編集可能に設定
+    dbFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.EDIT);
+    Logger.log(`データベースを同一ドメイン内で編集可能に設定しました。ドメイン: ${userDomain}`);
+    
+    // セットアップ実行ユーザーを明示的に編集者として追加
+    dbFile.addEditor(adminEmail);
+    Logger.log(`セットアップ実行ユーザー（${adminEmail}）をデータベースの編集者として追加しました。`);
+    
+  } catch (e) {
+    Logger.log(`データベース共有設定エラー: ${e.message}`);
+  }
+  
   const sheet = db.getSheets()[0];
   const headers = ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'createdAt', 'accessToken', 'configJson', 'lastAccessedAt', 'isActive'];
   sheet.appendRow(headers);
