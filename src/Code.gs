@@ -3044,7 +3044,20 @@ function getOrCreateMainDatabase() {
           userSheet = spreadsheet.insertSheet('Users');
           const headers = ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'createdAt', 'accessToken', 'configJson', 'lastAccessedAt', 'isActive'];
           userSheet.appendRow(headers);
-          userSheet.setFrozenRows(1);
+    sheet.setFrozenRows(1);
+
+    // ★★★ 修正点: 新規スプレッドシートにConfigシートを作成して設定を保存 ★★★
+    try {
+      const guessedConfig = guessHeadersFromArray(headers);
+      if (typeof saveSheetConfigForSpreadsheet !== 'undefined') {
+        saveSheetConfigForSpreadsheet(spreadsheet, '最初のボード', guessedConfig);
+      }
+    } catch (configError) {
+      console.error(`Failed to create initial config for ${spreadsheetId}: ${configError.message}`);
+      // 設定作成に失敗しても、ユーザー登録処理は続行する
+    }
+    // ★★★ 修正ここまで ★★★
+
           userSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
           Logger.log('【ログデータベース】みんなの回答ボードにUsersシートを作成しました');
         }

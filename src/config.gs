@@ -94,6 +94,15 @@ function createAutoConfig(sheetName) {
 function saveSheetConfig(sheetName, cfg) {
   try {
     const ss = getCurrentSpreadsheet();
+    return saveSheetConfigForSpreadsheet(ss, sheetName, cfg);
+  } catch (error) {
+    console.error('Error saving sheet config:', error);
+    throw new Error(`設定の保存に失敗しました: ${error.message}`);
+  }
+}
+
+function saveSheetConfigForSpreadsheet(ss, sheetName, cfg) {
+  try {
     let sheet = ss.getSheetByName('Config');
     if (!sheet) {
       debugLog('Creating Config sheet for the first time');
@@ -148,8 +157,8 @@ function saveSheetConfig(sheetName, cfg) {
     
     return `シート「${sheetName}」の設定を保存しました`;
   } catch (error) {
-    console.error('Error saving sheet config:', error);
-    throw new Error(`設定の保存に失敗しました: ${error.message}`);
+    // Re-throw with more context
+    throw new Error(`saveSheetConfigForSpreadsheet failed for sheet ${sheetName}: ${error.message}`);
   }
 }
 
