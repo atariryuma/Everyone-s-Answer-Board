@@ -551,12 +551,13 @@
           // まず既存ボード情報をチェック
           google.script.run
             .withSuccessHandler((existingBoard) => {
-              if (existingBoard) {
-                // 既存ボードがある場合
+              // userIdが無効な場合は既存ボードがないとして扱う
+              if (existingBoard && existingBoard.userId && existingBoard.userId !== 'undefined' && existingBoard.userId !== '' && existingBoard.userId !== null) {
+                // 有効な既存ボードがある場合
                 updateStep(3);
                 showExistingBoard(existingBoard);
               } else {
-                // 既存ボードがない場合のみボタンを有効化
+                // 既存ボードがない、または無効なuserIdの場合はボタンを有効化
                 updateStep(3);
                 document.getElementById('register-btn').disabled = false;
                 showMessage('アカウント確認が完了しました。みんなの回答ボードを開始できます。', 'success');

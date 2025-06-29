@@ -54,7 +54,7 @@ const TIME_CONSTANTS = {
 const REACTION_KEYS = ["UNDERSTAND","LIKE","CURIOUS"];
 const EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
 // Debug flag. Set to true to enable verbose logging
-var DEBUG = false;
+var DEBUG = true;
 
 function debugLog() {
   if (DEBUG && typeof console !== 'undefined' && console.log) {
@@ -2954,6 +2954,13 @@ function getExistingBoard() {
     
     if (boardInfo && boardInfo.success && boardInfo.data) {
       const userData = boardInfo.data;
+      
+      // userIdが無効な場合は既存ボードがないとして扱う
+      if (!userData.userId || userData.userId === '' || userData.userId === null || userData.userId === 'undefined') {
+        debugLog(`無効なuserIdが見つかりました: "${userData.userId}" - 既存ボードなしとして扱います`);
+        return null;
+      }
+      
       const base = getWebAppUrlEnhanced();
       
       return {
@@ -3378,7 +3385,10 @@ function updateUserViaApi(userId, updateData) {
  * @returns {object} 既存ボード情報
  */
 function getExistingBoardViaApi(userEmail) {
-  return callDatabaseApi('getExistingBoard', { adminEmail: userEmail });
+  debugLog(`getExistingBoardViaApi: checking for userEmail="${userEmail}"`);
+  const result = callDatabaseApi('getExistingBoard', { adminEmail: userEmail });
+  debugLog(`getExistingBoardViaApi: result=${JSON.stringify(result)}`);
+  return result;
 }
 
 /**
