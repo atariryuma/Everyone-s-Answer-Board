@@ -1007,25 +1007,31 @@
       // Open Form Button - 初期設定（updateFormInfo() 関数で上書きされます）
       const openFormBtn = document.getElementById('open-form-btn');
       if (openFormBtn) {
+        console.log('Setting initial form button click handler');
         openFormBtn.onclick = () => {
           console.log('Default form button clicked - no form info loaded yet');
           showMessage('フォーム情報を読み込み中です。しばらくお待ちください。', 'info');
         };
+        console.log('Initial form button click handler set');
+      } else {
+        console.error('Form button not found: open-form-btn');
       }
 
       // Open Admin Board Button (page.html管理モードでボードを開く)
       const openAdminBoardBtn = document.getElementById('open-admin-board-btn');
       if (openAdminBoardBtn) {
         openAdminBoardBtn.addEventListener('click', () => {
-          // page.htmlの管理モードURLを構築
+          // page.htmlの管理モードURLを構築（正しいパラメータ構造）
           const baseUrl = 'https://script.google.com/a/naha-okinawa.ed.jp/macros/s/AKfycbzFF3psxBRUja1DsrVDkleOGrUxar1QqxqGYwBVKmpcZybrtNddH5iKD-nbqmYWEZKK/exec';
           const url = new URL(baseUrl);
-          url.searchParams.set('page', 'page');
+          
+          // page.htmlアクセス用のパラメータ設定
           url.searchParams.set('userId', userId);
+          url.searchParams.set('page', 'page');  // page.htmlを指定
           url.searchParams.set('mode', 'admin');
           url.searchParams.set('adminModeVerified', 'true');
           
-          console.log('Opening admin board URL:', url.toString());
+          console.log('Opening page.html admin mode URL:', url.toString());
           window.open(url.toString(), '_blank');
         });
       }
@@ -1165,11 +1171,14 @@
     }
 
     function loadStatus() {
-      setLoading(true, 'Loading status...');
+      setLoading(true, 'ダッシュボード情報を読み込み中...');
       
       // ステータスとフォーム情報を並行して取得
       google.script.run
-        .withSuccessHandler(updateStatus)
+        .withSuccessHandler((status) => {
+          updateStatus(status);
+          setLoading(false); // ステータス更新完了後にローディングを終了
+        })
         .withFailureHandler((error) => {
           console.error('getStatus error:', error);
           let errorMessage = 'Failed to get status';
@@ -1187,6 +1196,7 @@
           }
           
           showError(new Error(errorMessage));
+          setLoading(false); // エラー時もローディングを終了
         })
         .getStatus();
       
@@ -1229,6 +1239,7 @@
             console.log('Form button clicked - no form info');
             showMessage('Googleフォームが見つかりません。フォームを作成するか、スプレッドシートとフォームを関連付けてください。', 'yellow');
           };
+          console.log('Set default click handler for form button (no form info)');
         }
         return;
       }
@@ -1250,6 +1261,7 @@
           console.log('Form button clicked - opening editUrl:', formInfo.editUrl);
           window.open(formInfo.editUrl, '_blank');
         };
+        console.log('Set editUrl click handler for form button');
       } else if (openFormBtn) {
         console.log('Setting form button click handler with fallback for formInfo:', formInfo);
         // editUrlがない場合のフォールバック
@@ -1270,6 +1282,7 @@
             showMessage('フォームのURLが取得できませんでした。', 'yellow');
           }
         };
+        console.log('Set fallback click handler for form button');
       }
       
       console.log('Form info updated:', formInfo);
@@ -1914,10 +1927,68 @@
     }
 
     function setLoading(isLoading, msg = "") {
+      // 基本的なボタンの無効化
       elements.switchSheetBtn.disabled = isLoading;
       elements.clearSelectionBtn.disabled = isLoading;
+      
+      // 全体的なローディング状態の管理
+      if (isLoading) {
+        // ダッシュボードカードを無効化
+        const dashboardCards = document.querySelectorAll('.glass-panel button, .glass-panel .cursor-pointer');
+        dashboardCards.forEach(card => {
+          if (card.tagName === 'BUTTON') {
+            card.disabled = true;
+          } else {
+            card.style.pointerEvents = 'none';
+            card.style.opacity = '0.6';
+          }
+        });
+        
+        // ローディングオーバーレイを表示
+        showLoadingOverlay(msg);
+      } else {
+        // ダッシュボードカードを再有効化
+        const dashboardCards = document.querySelectorAll('.glass-panel button, .glass-panel .cursor-pointer');
+        dashboardCards.forEach(card => {
+          if (card.tagName === 'BUTTON') {
+            card.disabled = false;
+          } else {
+            card.style.pointerEvents = 'auto';
+            card.style.opacity = '1';
+          }
+        });
+        
+        // ローディングオーバーレイを非表示
+        hideLoadingOverlay();
+      }
+      
       if (isLoading && msg) {
         showMessage(msg, 'blue');
+      }
+    }
+    
+    function showLoadingOverlay(message = "読み込み中...") {
+      // 既存のオーバーレイを削除
+      hideLoadingOverlay();
+      
+      const overlay = document.createElement('div');
+      overlay.id = 'loading-overlay';
+      overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      overlay.innerHTML = `
+        <div class="glass-panel p-8 rounded-xl text-center">
+          <div class="spinner mx-auto mb-4"></div>
+          <p class="text-lg text-white font-medium">${message}</p>
+          <p class="text-sm text-gray-400 mt-2">しばらくお待ちください...</p>
+        </div>
+      `;
+      
+      document.body.appendChild(overlay);
+    }
+    
+    function hideLoadingOverlay() {
+      const overlay = document.getElementById('loading-overlay');
+      if (overlay) {
+        overlay.remove();
       }
     }
 
