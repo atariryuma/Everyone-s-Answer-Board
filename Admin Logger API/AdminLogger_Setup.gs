@@ -47,6 +47,7 @@ function onOpen() {
     .addItem('2. APIをデプロイする', 'showDeploymentInstructions')
     .addSeparator()
     .addItem('現在の設定情報を表示', 'showCurrentSettings')
+    .addItem('デプロイ状況をテスト', 'testDeployment')
     .addToUi();
 }
 
@@ -443,6 +444,67 @@ function showCurrentSettings() {
   }
 
   ui.alert(message);
+}
+
+/**
+ * デプロイ状況をテストする関数
+ */
+function testDeployment() {
+  const ui = SpreadsheetApp.getUi();
+  const properties = PropertiesService.getScriptProperties();
+  const deploymentId = properties.getProperty(DEPLOYMENT_ID_KEY);
+  
+  if (!deploymentId) {
+    ui.alert('❌ デプロイIDが設定されていません。先にAPIをデプロイしてください。');
+    return;
+  }
+  
+  const webAppUrl = `https://script.google.com/macros/s/${deploymentId}/exec`;
+  
+  try {
+    // GETテスト
+    const getResponse = UrlFetchApp.fetch(webAppUrl, {
+      method: 'get',
+      muteHttpExceptions: true
+    });
+    
+    const getCode = getResponse.getResponseCode();
+    const getText = getResponse.getContentText();
+    
+    let message = `デプロイテスト結果:\n\nURL: ${webAppUrl}\nGETテスト: ${getCode}\n\n`;
+    
+    if (getCode === 200) {
+      message += '✅ GET接続成功\n\n';
+      
+      // POSTテスト
+      const postResponse = UrlFetchApp.fetch(webAppUrl, {
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify({action: 'ping', data: {}}),
+        muteHttpExceptions: true
+      });
+      
+      const postCode = postResponse.getResponseCode();
+      const postText = postResponse.getContentText();
+      
+      message += `POSTテスト: ${postCode}\n`;
+      
+      if (postCode === 200) {
+        message += '✅ API正常動作中';
+      } else {
+        message += `❌ POSTエラー: ${postText.substring(0, 100)}`;
+      }
+      
+    } else {
+      message += `❌ 接続失敗\n詳細: ${getText.substring(0, 200)}\n\n`;
+      message += '解決方法:\n1. Apps Scriptエディタでプロジェクトを再デプロイ\n2. 「実行者」を「自分」に設定\n3. 「アクセスできるユーザー」を組織内に設定';
+    }
+    
+    ui.alert(message);
+    
+  } catch (e) {
+    ui.alert(`テストエラー: ${e.message}`);
+  }
 }
 
 /**
