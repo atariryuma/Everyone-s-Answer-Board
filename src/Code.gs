@@ -400,95 +400,22 @@ function addUserToDatabaseEditors(userEmail) {
  */
 function ensureDatabaseAccess(userEmail) {
   try {
-    debugLog(`🔐 データベースアクセス権限を確認中: ${userEmail}`);
+    debugLog(`🔐 API経由でのデータベースアクセス確認: ${userEmail}`);
     
-    // ステップ1: 現在のユーザー権限を確認
-    const currentUser = Session.getActiveUser().getEmail();
-    if (!currentUser) {
-      debugLog(`❌ 現在のユーザー情報を取得できません`);
+    // API経由でのデータベース接続テスト
+    const testResult = callDatabaseApi('test', { userEmail: userEmail });
+    
+    if (testResult && testResult.success) {
+      debugLog(`✅ API経由でのデータベースアクセス成功: ${userEmail}`);
+      return true;
+    } else {
+      debugLog(`❌ API経由でのデータベースアクセス失敗: ${userEmail}`);
       return false;
     }
     
-    debugLog(`現在のユーザー: ${currentUser}, 対象ユーザー: ${userEmail}`);
-    
-    // ステップ2: メインデータベースの取得/作成を試行
-    let mainDb = null;
-    let retryCount = 0;
-    const maxRetries = 3;
-    
-    while (retryCount < maxRetries) {
-      try {
-        debugLog(`データベース取得試行 ${retryCount + 1}/${maxRetries}`);
-        mainDb = getOrCreateMainDatabase();
-        
-        if (!mainDb) {
-          throw new Error('データベースの取得に失敗しました');
-        }
-        
-        // データベースアクセステスト
-        const testData = mainDb.getRange(1, 1, 1, 1).getValue();
-        debugLog(`✅ メインデータベースアクセス確認成功: ${userEmail} (試行${retryCount + 1})`);
-        return true;
-        
-      } catch (accessError) {
-        debugLog(`⚠️ データベースアクセス失敗 (試行${retryCount + 1}): ${accessError.message}`);
-        
-        // 権限付与を試行
-        if (retryCount === 0) {
-          debugLog(`権限付与を試行中...`);
-          
-          try {
-            // 対象ユーザーを編集者として追加
-            const addResult = addUserToMainDatabaseEditors(userEmail);
-            
-            if (addResult) {
-              debugLog(`権限付与成功、権限反映のため3秒待機...`);
-              Utilities.sleep(3000); // 権限反映を待つ
-            } else {
-              debugLog(`権限付与に失敗しました`);
-            }
-            
-            // 現在のユーザーも編集者として追加（念のため）
-            if (currentUser !== userEmail) {
-              try {
-                addUserToMainDatabaseEditors(currentUser);
-                debugLog(`現在のユーザー(${currentUser})も編集者として追加しました`);
-              } catch (e) {
-                debugLog(`現在ユーザー権限付与エラー: ${e.message}`);
-              }
-            }
-            
-          } catch (permissionError) {
-            debugLog(`権限付与処理エラー: ${permissionError.message}`);
-          }
-        }
-        
-        retryCount++;
-        if (retryCount < maxRetries) {
-          debugLog(`${retryCount * 2}秒後に再試行します...`);
-          Utilities.sleep(retryCount * 2000); // 段階的待機
-        }
-      }
-    }
-    
-    // 全ての試行が失敗した場合
-    debugLog(`❌ ${maxRetries}回の試行後もデータベースアクセスに失敗: ${userEmail}`);
-    
-    // 最後の診断情報を出力
-    try {
-      const properties = PropertiesService.getScriptProperties();
-      const dbId = properties.getProperty(MAIN_DB_ID_KEY);
-      debugLog(`診断情報 - データベースID: ${dbId ? dbId.substring(0, 10) + '...' : 'なし'}`);
-      debugLog(`診断情報 - LOGGER_API_URL: ${properties.getProperty(LOGGER_API_URL_KEY) ? '設定済み' : 'なし'}`);
-    } catch (e) {
-      debugLog(`診断情報取得エラー: ${e.message}`);
-    }
-    
-    return false;
-    
   } catch (error) {
-    console.error('メインデータベースアクセス権限確認で予期しないエラー:', error);
-    debugLog(`❌ 予期しないエラー: ${error.message}`);
+    console.error('API経由でのデータベースアクセス確認エラー:', error);
+    debugLog(`❌ API エラー: ${error.message}`);
     return false;
   }
 }
@@ -2624,42 +2551,24 @@ function getDatabase() {
 }
 
 function getUserInfo(userId) {
-  const userDb = getOrCreateMainDatabase();
-  const data = userDb.getDataRange().getValues();
-  const headers = data[0];
-  const userIdIndex = headers.indexOf('userId');
-  const adminEmailIndex = headers.indexOf('adminEmail');
-  const spreadsheetIdIndex = headers.indexOf('spreadsheetId');
-  const spreadsheetUrlIndex = headers.indexOf('spreadsheetUrl');
-  const configJsonIndex = headers.indexOf('configJson');
-  const lastAccessedAtIndex = headers.indexOf('lastAccessedAt');
-  const isActiveIndex = headers.indexOf('isActive');
-
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][userIdIndex] === userId) {
-      const userInfo = {
-        userId: data[i][userIdIndex],
-        adminEmail: data[i][adminEmailIndex],
-        spreadsheetId: data[i][spreadsheetIdIndex],
-        spreadsheetUrl: data[i][spreadsheetUrlIndex],
-        configJson: {},
-        lastAccessedAt: data[i][lastAccessedAtIndex],
-        isActive: data[i][isActiveIndex] === true
-      };
-      try {
-        userInfo.configJson = JSON.parse(data[i][configJsonIndex] || '{}');
-      } catch (e) {
-        console.error('Failed to parse configJson for user:', userId, e);
-        userInfo.configJson = {};
-      }
-      
-      // 最終アクセス日時を更新
-      userDb.getRange(i + 1, lastAccessedAtIndex + 1).setValue(new Date());
-      
-      return userInfo;
+  try {
+    debugLog(`API経由でユーザー情報を取得中: ${userId}`);
+    
+    const userInfo = getUserInfoViaApi(userId);
+    
+    if (userInfo && userInfo.success && userInfo.data) {
+      // 最終アクセス日時の更新もAPI経由で実行
+      updateUserViaApi(userId, { lastAccessedAt: new Date().toISOString() });
+      return userInfo.data;
     }
+    
+    debugLog(`ユーザー情報が見つかりませんでした: ${userId}`);
+    return null;
+    
+  } catch (error) {
+    debugLog(`getUserInfo API エラー: ${error.message}`);
+    return null;
   }
-  return null;
 }
 
 function getUserInfoInternal(userId) {
@@ -2801,127 +2710,59 @@ function auditLog(action, userId, details = {}) {
 function registerNewUser(adminEmail) {
   checkRateLimit('registerNewUser', adminEmail);
   
-  // 📝 ステップ1: データベースアクセス権限を確認・付与
-  debugLog(`🚀 新規登録開始: ${adminEmail}`);
+  // 📝 ステップ1: API経由でのデータベースアクセス
+  debugLog(`🚀 API経由で新規登録開始: ${adminEmail}`);
+  debugLog(`実行ユーザー: ${Session.getActiveUser().getEmail()}`);
   
-  let userDb = null;
-  let hasAccess = false;
-  
-  // フォールバック付きのデータベースアクセス試行
   try {
-    // まずデータベースの直接取得を試行
-    userDb = getOrCreateMainDatabase();
-    if (userDb) {
-      // 簡単なアクセステスト
-      const testAccess = userDb.getName();
-      hasAccess = true;
-      debugLog(`✅ 直接データベースアクセス成功: ${adminEmail}`);
-    }
-  } catch (directAccessError) {
-    debugLog(`⚠️ 直接アクセス失敗、権限確認を実行: ${directAccessError.message}`);
+    // API経由で既存ユーザーをチェック
+    debugLog(`既存ユーザーチェックを実行中...`);
+    const existingCheck = callDatabaseApi('checkExistingUser', { adminEmail: adminEmail });
     
-    // 権限確認・付与プロセスを実行
-    hasAccess = ensureDatabaseAccess(adminEmail);
-    
-    if (hasAccess) {
-      try {
-        userDb = getOrCreateMainDatabase();
-      } catch (retryError) {
-        debugLog(`❌ 権限付与後もデータベース取得失敗: ${retryError.message}`);
-        hasAccess = false;
-      }
-    }
-  }
-  
-  if (!hasAccess || !userDb) {
-    // より詳細なエラーメッセージとデバッグ情報を提供
-    const currentUser = Session.getActiveUser().getEmail();
-    const properties = PropertiesService.getScriptProperties();
-    const dbId = properties.getProperty('MAIN_DB_ID');
-    
-    let debugInfo = '';
-    if (dbId) {
-      try {
-        const dbFile = DriveApp.getFileById(dbId);
-        debugInfo += `\n📊 データベース詳細:\n`;
-        debugInfo += `• ファイル名: ${dbFile.getName()}\n`;
-        debugInfo += `• ファイルID: ${dbId}\n`;
-        debugInfo += `• URL: ${dbFile.getUrl()}\n`;
-        
-        // 編集者リスト確認
-        const editors = dbFile.getEditors();
-        debugInfo += `• 編集者数: ${editors.length}\n`;
-        if (editors.length > 0) {
-          debugInfo += `• 編集者: ${editors.map(e => e.getEmail()).join(', ')}\n`;
-        }
-        
-      } catch (dbInfoError) {
-        debugInfo += `\n❌ データベース詳細取得エラー: ${dbInfoError.message}\n`;
-      }
-    } else {
-      debugInfo += `\n❌ データベースIDが設定されていません\n`;
-    }
-    
-    const errorDetails = [
-      'データベースへのアクセス権限を取得できませんでした。',
-      '',
-      '考えられる原因:',
-      '1. セットアップが完了していない可能性があります',
-      '2. 【ログデータベース】みんなの回答ボードへのアクセス権限が不足しています',
-      '3. Googleドライブの権限設定に問題があります',
-      '4. Google Workspaceの組織設定により外部共有が制限されている可能性があります',
-      '',
-      `現在のユーザー: ${currentUser}`,
-      `登録対象ユーザー: ${adminEmail}`,
-      debugInfo,
-      '',
-      '解決方法:',
-      '1. セットアップ画面(?setup=true)から再設定を実行してください',
-      '2. 上記データベースURLに直接アクセスして編集権限を確認してください',
-      '3. Google Workspaceの管理者に外部共有設定を確認してもらってください',
-      '4. 管理者にお問い合わせください'
-    ].join('\n');
-    
-    throw new Error(errorDetails);
-  }
-  
-  // 📝 ステップ2: メインデータベースから既存ユーザーをチェック
-  const data = userDb.getDataRange().getValues();
-  const headers = data[0];
-  const adminEmailIndex = headers.indexOf('adminEmail');
-  
-  // 既に登録済みの管理者メールアドレスかチェック
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][adminEmailIndex] === adminEmail) {
+    if (existingCheck.exists) {
       throw new Error('このメールアドレスは既に登録されています。');
     }
+    
+    debugLog(`✅ 既存ユーザーチェック完了`);
+    
+  } catch (apiError) {
+    debugLog(`❌ API経由のデータベースアクセスエラー: ${apiError.message}`);
+    throw new Error(`データベースアクセスに失敗しました: ${apiError.message}`);
   }
   
-  // 📝 ステップ3: 新しいユーザーIDを生成
+  // 📝 ステップ2: 新しいユーザーIDを生成
   const userId = Utilities.getUuid();
   debugLog(`📋 ユーザーID生成完了: ${userId}`);
   
-  // 📝 ステップ4: Googleフォームとスプレッドシートを作成
+  // 📝 ステップ3: Googleフォームとスプレッドシートを作成
   debugLog(`📝 フォーム・スプレッドシート作成開始: ${adminEmail}`);
   const formAndSsInfo = createStudyQuestForm(adminEmail, userId);
   debugLog(`✅ フォーム・スプレッドシート作成完了`);
   
-  // 📝 ステップ5: データベースに新規ユーザー情報を追加
-  const newRow = [
-    userId,
-    adminEmail,
-    formAndSsInfo.spreadsheetId,
-    formAndSsInfo.spreadsheetUrl,
-    new Date(),
-    '', // accessToken (未使用)
-    JSON.stringify({}), // configJson
-    new Date(),
-    true // isActive
-  ];
+  // 📝 ステップ4: API経由でデータベースに新規ユーザー情報を追加
+  const userData = {
+    userId: userId,
+    adminEmail: adminEmail,
+    spreadsheetId: formAndSsInfo.spreadsheetId,
+    spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+    createdAt: new Date().toISOString(),
+    accessToken: '', // 未使用
+    configJson: JSON.stringify({}),
+    lastAccessedAt: new Date().toISOString(),
+    isActive: true
+  };
   
-  debugLog(`💾 データベースに新規ユーザー登録中: ${adminEmail}`);
-  userDb.appendRow(newRow);
-  debugLog(`✅ データベース登録完了`);
+  debugLog(`💾 API経由でデータベースに新規ユーザー登録中: ${adminEmail}`);
+  try {
+    const createResult = createUserViaApi(userData);
+    if (!createResult.success) {
+      throw new Error(createResult.error || 'ユーザー作成に失敗しました');
+    }
+    debugLog(`✅ API経由でのデータベース登録完了`);
+  } catch (createError) {
+    debugLog(`❌ API経由でのユーザー作成エラー: ${createError.message}`);
+    throw new Error(`ユーザー作成に失敗しました: ${createError.message}`);
+  }
   
   auditLog('NEW_USER_REGISTERED', userId, { adminEmail, spreadsheetId: formAndSsInfo.spreadsheetId });
   
@@ -3006,46 +2847,29 @@ function getExistingBoard() {
       return null;
     }
     
-    const userDb = getOrCreateMainDatabase();
-    if (!userDb) {
-      debugLog('メインデータベースが取得できません');
-      return null;
+    debugLog(`API経由で既存ボード情報を取得中: ${email}`);
+    
+    // API経由でボード情報を取得
+    const boardInfo = getExistingBoardViaApi(email);
+    
+    if (boardInfo && boardInfo.success && boardInfo.data) {
+      const userData = boardInfo.data;
+      const base = getWebAppUrlEnhanced();
+      
+      return {
+        userId: userData.userId,
+        adminUrl: base ? `${base}?userId=${userData.userId}&mode=admin` : '',
+        viewUrl: base ? `${base}?userId=${userData.userId}` : '',
+        spreadsheetUrl: userData.spreadsheetUrl || ''
+      };
     }
     
-    const data = userDb.getDataRange().getValues();
-    
-    if (!data || data.length === 0) {
-      debugLog('データベースが空です');
-      return null;
-    }
-    
-    const headers = data[0];
-    const emailIdx = headers.indexOf('adminEmail');
-    const userIdIdx = headers.indexOf('userId');
-    const urlIdx = headers.indexOf('spreadsheetUrl');
-    
-    if (emailIdx === -1 || userIdIdx === -1) {
-      debugLog('必要なヘッダーが見つかりません');
-      return null;
-    }
-
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][emailIdx] === email) {
-        const userId = data[i][userIdIdx];
-        const base = getWebAppUrlEnhanced();
-        return {
-          userId: userId,
-          adminUrl: base ? `${base}?userId=${userId}&mode=admin` : '',
-          viewUrl: base ? `${base}?userId=${userId}` : '',
-          spreadsheetUrl: data[i][urlIdx] || ''
-        };
-      }
-    }
+    debugLog('既存ボードが見つかりませんでした');
     return null;
     
   } catch (error) {
     console.error('既存ボード確認で問題が発生しました', error);
-    debugLog(`getExistingBoard エラー: ${error.message}`);
+    debugLog(`getExistingBoard API エラー: ${error.message}`);
     return null;
   }
 }
@@ -3293,6 +3117,89 @@ function addUserToMainDatabaseEditors(userEmail) {
 }
 
 /**
+ * 管理者向けログ記録APIを通じてデータベース操作を実行する
+ * @param {string} action - 実行するアクション ('getUser', 'createUser', 'updateUser', etc.)
+ * @param {object} data - 送信するデータ
+ * @returns {object} APIからのレスポンス
+ */
+function callDatabaseApi(action, data = {}) {
+  const apiUrl = PropertiesService.getScriptProperties().getProperty(LOGGER_API_URL_KEY);
+  if (!apiUrl) {
+    throw new Error('Logger APIのURLが設定されていません。セットアップを完了してください。');
+  }
+
+  const payload = {
+    action: action,
+    data: data,
+    timestamp: new Date().toISOString(),
+    requestUser: Session.getActiveUser().getEmail()
+  };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(apiUrl, options);
+    const responseCode = response.getResponseCode();
+    
+    if (responseCode === 200) {
+      const responseText = response.getContentText();
+      try {
+        return JSON.parse(responseText);
+      } catch (parseError) {
+        return { success: true, data: responseText };
+      }
+    } else {
+      throw new Error(`API呼び出しが失敗しました。ステータスコード: ${responseCode}`);
+    }
+  } catch(e) {
+    Logger.log(`Database API呼び出しエラー: ${e.message}`);
+    throw new Error(`データベースAPIへのアクセスに失敗しました: ${e.message}`);
+  }
+}
+
+/**
+ * API経由でユーザー情報を取得する
+ * @param {string} userId - ユーザーID
+ * @returns {object} ユーザー情報
+ */
+function getUserInfoViaApi(userId) {
+  return callDatabaseApi('getUser', { userId: userId });
+}
+
+/**
+ * API経由で新規ユーザーを作成する
+ * @param {object} userData - ユーザーデータ
+ * @returns {object} 作成結果
+ */
+function createUserViaApi(userData) {
+  return callDatabaseApi('createUser', userData);
+}
+
+/**
+ * API経由でユーザー情報を更新する
+ * @param {string} userId - ユーザーID
+ * @param {object} updateData - 更新データ
+ * @returns {object} 更新結果
+ */
+function updateUserViaApi(userId, updateData) {
+  return callDatabaseApi('updateUser', { userId: userId, ...updateData });
+}
+
+/**
+ * API経由で既存ボード情報を取得する
+ * @param {string} userEmail - ユーザーメールアドレス
+ * @returns {object} 既存ボード情報
+ */
+function getExistingBoardViaApi(userEmail) {
+  return callDatabaseApi('getExistingBoard', { userEmail: userEmail });
+}
+
+/**
  * 指定されたメタデータを管理者向けログ記録APIに送信する。
  * @param {object} metadata - 送信するログデータ。
  */
@@ -3306,7 +3213,12 @@ function logToAdminApi(metadata) {
   const options = {
     method: 'post',
     contentType: 'application/json',
-    payload: JSON.stringify(metadata),
+    payload: JSON.stringify({
+      action: 'log',
+      data: metadata,
+      timestamp: new Date().toISOString(),
+      requestUser: Session.getActiveUser().getEmail()
+    }),
     muteHttpExceptions: true
   };
 
