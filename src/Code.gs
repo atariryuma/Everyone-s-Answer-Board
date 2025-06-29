@@ -1262,9 +1262,9 @@ function addSpreadsheetUrl(spreadsheetUrl) {
         const headers = firstSheet.getRange(1, 1, 1, firstSheet.getLastColumn()).getValues()[0];
         const guessedConfig = guessHeadersFromArray(headers);
 
-        // 基本設定を保存（少なくとも1つのヘッダーが推測できた場合）
-        if (guessedConfig.questionHeader || guessedConfig.answerHeader) {
-          saveSheetConfig(firstSheetName, guessedConfig);
+        // 基本設定を保存
+        if (typeof saveSheetConfigForSpreadsheet !== 'undefined') {
+          saveSheetConfigForSpreadsheet(testSpreadsheet, firstSheetName, guessedConfig);
         }
       }
     } catch (configError) {
@@ -2541,9 +2541,7 @@ function prepareSpreadsheetForStudyQuest(spreadsheet) {
   
   // Configシートに設定を書き込む
   const configData = [
-    ['Key', 'Value'],
-    ['WEB_APP_URL', getWebAppUrlEnhanced()], // 本番URLを保存
-    ['DEPLOY_ID', PropertiesService.getScriptProperties().getProperty('DEPLOY_ID') || '']
+    ['Key', 'Value']
   ];
   
   configSheet.getRange(1, 1, configData.length, configData[0].length).setValues(configData);
