@@ -179,6 +179,18 @@ function createConfigSheet() {
   }
 }
 
+function createConfigSheetForSpreadsheet(ss) {
+  let cfgSheet = ss.getSheetByName('Config');
+  if (!cfgSheet) {
+    cfgSheet = ss.insertSheet('Config');
+    const headers = ['表示シート名','問題文ヘッダー','回答ヘッダー','理由ヘッダー','名前列ヘッダー','クラス列ヘッダー'];
+    cfgSheet.appendRow(headers);
+    debugLog('Created Config sheet for spreadsheet:', ss.getName());
+  } else {
+    debugLog('Config sheet already exists in spreadsheet:', ss.getName());
+  }
+}
+
 if (typeof module !== 'undefined') {
-  module.exports = { getConfig, saveSheetConfig, createConfigSheet };
+  module.exports = { getConfig, saveSheetConfig, createConfigSheet, createConfigSheetForSpreadsheet };
 }
