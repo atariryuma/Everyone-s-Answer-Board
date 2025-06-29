@@ -138,7 +138,7 @@ let cachedScriptProperties = null;
 
 function getCachedScriptProperties() {
   if (cachedScriptProperties === null) {
-    cachedScriptProperties = getCachedScriptProperties();
+    cachedScriptProperties = PropertiesService.getScriptProperties();
   }
   return cachedScriptProperties;
 }

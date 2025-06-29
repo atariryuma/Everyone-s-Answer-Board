@@ -10,6 +10,8 @@
  * 初期設定用のWebページへのURLをログに出力します。
  * この関数を実行後、ログに表示される指示に従ってください。
  */
+let cachedScriptProperties = null;
+
 function getCachedScriptProperties() {
   if (cachedScriptProperties === null) {
     cachedScriptProperties = PropertiesService.getScriptProperties();
