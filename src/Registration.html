@@ -235,7 +235,7 @@
     <div class="mb-8 text-center fade-in">
       <div class="glass-panel bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-xl p-6 border border-cyan-400/30 mb-6 feature-card">
         <h2 class="text-2xl font-bold text-white mb-2">無料でみんなの回答ボードを始めよう！</h2>
-        <p class="text-cyan-200 mb-4">数ステップであなた専用のボードを作成し、すぐに授業で活用できます。</p>
+        <p class="text-cyan-200 mb-4">数ステップであなた専用のボードを作成。セキュリティを重視した設計で、安心して授業で活用できます。</p>
         <button type="button" onclick="scrollToRegistration()" 
                 class="cta-button px-8 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-bold rounded-lg transition-all transform hover:scale-105 shadow-lg text-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-gray-800"
                 aria-label="新規登録に進む">
@@ -321,6 +321,24 @@
             </div>
           </div>
         </div>
+
+        <!-- StudyQuestのセキュリティ -->
+        <div class="mt-6 p-4 bg-purple-900/20 border border-purple-500/30 rounded-lg glass-panel">
+          <h3 class="font-semibold text-purple-400 mb-2 flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            StudyQuestのセキュリティ
+          </h3>
+          <ul class="text-sm text-purple-200 space-y-2" role="list">
+            <li>• <strong>データ分離</strong>: 生徒の回答データは、メインアプリとは別の安全なデータベースで管理されます。</li>
+            <li>• <strong>厳格なアクセス制御</strong>: あなたのGoogle Workspaceドメイン内からのアクセスに限定し、不正なアクセスを防ぎます。</li>
+            <li>• <strong>XSS対策</strong>: 悪意のあるスクリプトの埋め込みを防ぐため、全てのユーザー入力を厳重にチェックしています。</li>
+            <li>• <strong>レート制限</strong>: 短時間での連続操作を制限し、システムへの負荷や悪用を防ぎます。</li>
+            <li>• <strong>自動非公開機能</strong>: 公開されたボードは一定時間で自動的に非公開になり、意図しない情報公開を防ぎます。</li>
+            <li>• <strong>Googleのセキュリティ機能活用</strong>: Google Apps Scriptの組み込みセキュリティ機能（例: クリックジャッキング対策）を最大限に活用しています。</li>
+          </ul>
+        </div>
       </article>
       
       <!-- ステップ2: セットアップ方法 -->
@@ -335,9 +353,9 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
             </svg>
             <div>
-              <div class="font-semibold text-white mb-2">簡単セットアップ</div>
+              <div class="font-semibold text-white mb-2">安全で簡単なセットアップ</div>
               <div class="text-sm text-gray-300 leading-relaxed">
-                回答ボード用Googleフォームを自動作成します。あなた専用の固定URLの回答ボードが作成され、複数のスプレッドシートを切り替えて使用できます。
+                あなた専用のGoogleフォームとスプレッドシートを自動で作成します。これらの設定には、Googleのセキュリティ機能との連携が含まれるため、<strong>完了まで1分ほどかかる場合があります</strong>。完了後、あなた専用の固定URLの回答ボードが作成され、複数のスプレッドシートを切り替えて使用できます。
               </div>
             </div>
           </div>
