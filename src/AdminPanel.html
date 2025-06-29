@@ -290,9 +290,9 @@
   <main class="max-w-6xl mx-auto px-6 py-8 pb-32">
     <!-- Dashboard Overview -->
     <section class="mb-8">
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
         <!-- Board Status Card -->
-        <div class="glass-panel p-6 rounded-xl card-hover fade-in" id="board-status-card">
+        <div class="glass-panel p-6 rounded-xl card-hover fade-in hover:border-cyan-400/50 transition-all duration-300 cursor-pointer" id="board-status-card">
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-3">
               <div class="w-12 h-12 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-full flex items-center justify-center">
@@ -318,52 +318,42 @@
           </div>
         </div>
         
-        <!-- Statistics Cards -->
-        <div class="glass-panel p-6 rounded-xl card-hover fade-in">
-          <button type="button" id="open-form-btn" class="w-full h-full flex items-center gap-3 mb-4 text-left">
+        <!-- Form Card -->
+        <div class="glass-panel p-6 rounded-xl card-hover fade-in hover:border-purple-400/50 transition-all duration-300">
+          <button type="button" id="open-form-btn" class="w-full h-full flex items-center gap-3 mb-4 text-left hover:bg-purple-500/10 rounded-lg p-2 transition-all duration-300">
             <div class="w-12 h-12 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-full flex items-center justify-center">
               <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M12 15h.01"></path>
               </svg>
             </div>
             <div>
-              <p class="text-sm text-gray-400">回答フォーム</p>
+              <p class="text-sm text-gray-400">フォーム</p>
               <p class="text-2xl font-bold text-purple-400" id="answer-count">開く</p>
+              <p class="text-xs text-purple-300 mt-1" id="form-file-name">Googleフォーム</p>
             </div>
           </button>
         </div>
         
-        <div class="glass-panel p-6 rounded-xl card-hover fade-in">
-          <button type="button" id="open-reactions-btn" class="w-full h-full flex items-center gap-3 mb-4 text-left">
-            <div class="w-12 h-12 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-full flex items-center justify-center">
-              <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-              </svg>
-            </div>
-            <div>
-              <p class="text-sm text-gray-400">リアクション</p>
-              <p class="text-2xl font-bold text-purple-400" id="reaction-count">0</p>
-            </div>
-          </button>
-        </div>
         
-        <div class="glass-panel p-6 rounded-xl card-hover fade-in">
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-12 h-12 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-full flex items-center justify-center">
-              <svg class="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+        <!-- Engagement Card -->
+        <div class="glass-panel p-6 rounded-xl card-hover fade-in hover:border-orange-400/50 transition-all duration-300">
+          <button type="button" id="open-admin-board-btn" class="w-full h-full flex items-center gap-3 mb-4 text-left hover:bg-orange-500/10 rounded-lg p-2 transition-all duration-300">
+            <div class="w-12 h-12 bg-gradient-to-r from-orange-500/20 to-red-500/20 rounded-full flex items-center justify-center">
+              <svg class="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
               </svg>
             </div>
             <div>
               <p class="text-sm text-gray-400">エンゲージメント</p>
-              <p class="text-2xl font-bold text-yellow-400" id="engagement-rate">0%</p>
+              <p class="text-2xl font-bold text-orange-400" id="engagement-rate">管理モード</p>
+              <p class="text-xs text-orange-300 mt-1">名前・数値表示</p>
             </div>
-          </div>
+          </button>
         </div>
       </div>
       
       <!-- Active Sheet Info -->
-      <div id="active-sheet-panel" class="glass-panel p-6 rounded-xl fade-in transition-all duration-200">
+      <div id="active-sheet-panel" class="glass-panel p-6 rounded-xl fade-in transition-all duration-200 hover:border-green-400/50">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-white flex items-center gap-2">
             <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -374,7 +364,7 @@
           <span class="text-xs bg-gray-700 px-2 py-1 rounded-full" id="sheet-count">0 枚</span>
         </div>
         <div class="flex items-center justify-between">
-          <div id="active-sheet-area" class="transition-colors flex-1">
+          <div id="active-sheet-area" class="transition-colors flex-1 hover:bg-green-500/10 rounded-lg p-2 cursor-pointer">
             <p class="text-xl font-bold text-green-400 mb-1">
               <span id="active-sheet-name" class="transition-colors">未設定</span>
             </p>
@@ -383,49 +373,60 @@
         </div>
       </div>
 
-      <!-- Activity Timeline -->
-      <div class="glass-panel p-6 rounded-xl fade-in mt-6">
-        <h3 class="text-lg font-semibold text-white mb-4">最近の活動</h3>
-        <div id="activity-list" class="space-y-2"></div>
-        <p id="last-activity" class="text-xs text-gray-400 mt-2"></p>
-      </div>
     </section>
 
-    <!-- Quick Actions -->
+    <!-- Main Activity and Actions Section -->
     <section class="mb-8">
-      <div class="glass-panel p-6 rounded-xl slide-up">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="w-8 h-8 bg-cyan-500 text-white rounded-full flex items-center justify-center">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-            </svg>
+      <div class="grid md:grid-cols-2 gap-6">
+        <!-- Recent Activity -->
+        <div class="glass-panel p-6 rounded-xl fade-in">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-blue-400">最近の活動</h3>
           </div>
-          <h3 class="text-lg font-semibold text-cyan-400">クイックアクション</h3>
+          <div id="activity-list" class="space-y-2 min-h-[200px]"></div>
+          <p id="last-activity" class="text-xs text-gray-400 mt-2"></p>
         </div>
-        <div class="space-y-4">
-          <button type="button" id="create-board-btn" class="btn btn-primary w-full">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-            </svg>
-            <span id="create-board-text">新しいボードを作成して公開</span>
-          </button>
-          <div class="bg-cyan-900/20 border border-cyan-500/30 rounded-lg p-4">
-            <p class="font-semibold text-cyan-200">おすすめ</p>
-            <p class="text-sm text-cyan-200">新しいGoogleフォームとスプレッドシートを自動作成＆公開</p>
-            <p class="text-xs text-cyan-200 mt-2">
-              生徒の回答収集用フォームと回答ボード用スプレッドシートを一度に作成できます。<br>
-              <span class="font-semibold text-yellow-300">【重要】</span>作成されたファイルは、自動的にあなたの組織（ドメイン）内で共有され、誰でも編集できるようになります。個別の共有設定は不要です。
-            </p>
+
+        <!-- Quick Actions -->
+        <div class="glass-panel p-6 rounded-xl slide-up">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-8 h-8 bg-cyan-500 text-white rounded-full flex items-center justify-center">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+              </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-cyan-400">クイックアクション</h3>
           </div>
-          <div class="relative">
-            <input type="url" id="form-url-input" class="form-control pr-24" placeholder="ここに作成されたGoogleフォームのURLが表示されます" readonly>
-            <div class="absolute inset-y-0 right-0 flex items-center gap-1 pr-2">
-              <button type="button" id="copy-form-url-btn" class="btn btn-secondary p-2 tooltip" data-tooltip="URLをコピー">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-              </button>
-              <a id="open-form-url-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary p-2 tooltip" data-tooltip="フォームを開く">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-              </a>
+          <div class="space-y-4">
+            <button type="button" id="create-board-btn" class="btn btn-primary w-full">
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+              </svg>
+              <span id="create-board-text">新しいボードを作成して公開</span>
+            </button>
+            <div class="bg-cyan-900/20 border border-cyan-500/30 rounded-lg p-4">
+              <p class="font-semibold text-cyan-200">おすすめ</p>
+              <p class="text-sm text-cyan-200">新しいGoogleフォームとスプレッドシートを自動作成＆公開</p>
+              <p class="text-xs text-cyan-200 mt-2">
+                生徒の回答収集用フォームと回答ボード用スプレッドシートを一度に作成できます。<br>
+                <span class="font-semibold text-yellow-300">【重要】</span>作成されたファイルは、自動的にあなたの組織（ドメイン）内で共有され、誰でも編集できるようになります。個別の共有設定は不要です。
+              </p>
+            </div>
+            <div class="relative">
+              <input type="url" id="form-url-input" class="form-control pr-24" placeholder="ここに作成されたGoogleフォームのURLが表示されます" readonly>
+              <div class="absolute inset-y-0 right-0 flex items-center gap-1 pr-2">
+                <button type="button" id="copy-form-url-btn" class="btn btn-secondary p-2 tooltip" data-tooltip="URLをコピー">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                </button>
+                <a id="open-form-url-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary p-2 tooltip" data-tooltip="フォームを開く">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -1017,10 +1018,10 @@
         });
       }
 
-      // Open Reactions Button
-      const openReactionsBtn = document.getElementById('open-reactions-btn');
-      if (openReactionsBtn) {
-        openReactionsBtn.addEventListener('click', () => {
+      // Open Admin Board Button (管理モードでボードを開く)
+      const openAdminBoardBtn = document.getElementById('open-admin-board-btn');
+      if (openAdminBoardBtn) {
+        openAdminBoardBtn.addEventListener('click', () => {
           if (elements.boardUrl && elements.boardUrl.value) {
             window.open(`${elements.boardUrl.value}&mode=admin`, '_blank'); // 管理モードで開く
           } else {
@@ -1537,6 +1538,13 @@
           if (result.formUrl && elements.formUrlInput) {
             elements.formUrlInput.value = result.formUrl;
             elements.openFormUrlLink.href = result.formUrl;
+            // フォーム名を更新
+            const formFileName = document.getElementById('form-file-name');
+            if (formFileName && result.formTitle) {
+              formFileName.textContent = result.formTitle;
+            } else if (formFileName) {
+              formFileName.textContent = 'Googleフォーム';
+            }
           }
           // 成功したら3秒後にリロードして新しい状態を反映
           setTimeout(() => window.location.reload(), 3000);

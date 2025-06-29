@@ -1527,6 +1527,16 @@ function guessHeadersFromArray(headers) {
     
     debugLog('Non-meta headers:', nonMetaHeaders.map(h => h.original));
     
+    // 重複ヘッダーの検出とログ出力
+    const headerCounts = {};
+    nonMetaHeaders.forEach(h => {
+      headerCounts[h.original] = (headerCounts[h.original] || 0) + 1;
+    });
+    const duplicateHeaders = Object.keys(headerCounts).filter(header => headerCounts[header] > 1);
+    if (duplicateHeaders.length > 0) {
+      debugLog('Duplicate headers detected:', duplicateHeaders);
+    }
+    
     // より柔軟な推測ロジック
     for (let i = 0; i < nonMetaHeaders.length; i++) {
       const { original: header, normalized: hStr } = nonMetaHeaders[i];
@@ -1534,9 +1544,11 @@ function guessHeadersFromArray(headers) {
       // 質問を含む長いテキストを質問ヘッダーとして推測
       if (!question && (hStr.includes('だろうか') || hStr.includes('ですか') || hStr.includes('でしょうか') || hStr.length > 20)) {
         question = header;
-        // 同じ内容が複数列にある場合、回答用として2番目を使用
+        // 同じ内容が複数列にある場合、2番目の同じヘッダーを回答用として使用
         if (i + 1 < nonMetaHeaders.length && nonMetaHeaders[i + 1].original === header) {
-          answer = header;
+          answer = header; // 問題文と回答は同じヘッダー名
+          debugLog('Found duplicate header for question and answer:', header);
+          i++; // 次のヘッダーをスキップ
           continue;
         }
       }
@@ -1564,8 +1576,17 @@ function guessHeadersFromArray(headers) {
     
     // フォールバック: まだ回答が見つからない場合
     if (!answer && nonMetaHeaders.length > 0) {
-      // 最初の非メタヘッダーを回答として使用
-      answer = nonMetaHeaders[0].original;
+      // 2回出現するヘッダーがある場合、それを問題文・回答として使用
+      const duplicateHeader = duplicateHeaders.length > 0 ? duplicateHeaders[0] : null;
+      if (duplicateHeader) {
+        if (!question) question = duplicateHeader;
+        answer = duplicateHeader;
+        debugLog('Using duplicate header for question and answer:', duplicateHeader);
+      } else {
+        // 最初の非メタヘッダーを回答として使用
+        answer = nonMetaHeaders[0].original;
+        debugLog('Using first non-meta header as answer:', answer);
+      }
     }
     
   } else {
