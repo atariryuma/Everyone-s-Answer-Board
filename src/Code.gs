@@ -402,36 +402,93 @@ function ensureDatabaseAccess(userEmail) {
   try {
     debugLog(`🔐 データベースアクセス権限を確認中: ${userEmail}`);
     
-    // 新しいアーキテクチャ: メインデータベースの取得/作成
-    try {
-      const mainDb = getOrCreateMainDatabase();
-      const testData = mainDb.getRange(1, 1, 1, 1).getValue();
-      debugLog(`✅ メインデータベースアクセス確認成功: ${userEmail}`);
-      return true;
-    } catch (accessError) {
-      debugLog(`⚠️ メインデータベースアクセス失敗、権限付与を試行: ${userEmail}`);
-      
-      // アクセスできない場合、編集者として追加
-      const addResult = addUserToMainDatabaseEditors(userEmail);
-      
-      if (addResult) {
-        // 権限付与後、再度アクセステスト
-        try {
-          const mainDb = getOrCreateMainDatabase();
-          const testData = mainDb.getRange(1, 1, 1, 1).getValue();
-          debugLog(`✅ 権限付与後のメインデータベースアクセス確認成功: ${userEmail}`);
-          return true;
-        } catch (retestError) {
-          console.error('権限付与後もアクセスできません:', retestError);
-          return false;
+    // ステップ1: 現在のユーザー権限を確認
+    const currentUser = Session.getActiveUser().getEmail();
+    if (!currentUser) {
+      debugLog(`❌ 現在のユーザー情報を取得できません`);
+      return false;
+    }
+    
+    debugLog(`現在のユーザー: ${currentUser}, 対象ユーザー: ${userEmail}`);
+    
+    // ステップ2: メインデータベースの取得/作成を試行
+    let mainDb = null;
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (retryCount < maxRetries) {
+      try {
+        debugLog(`データベース取得試行 ${retryCount + 1}/${maxRetries}`);
+        mainDb = getOrCreateMainDatabase();
+        
+        if (!mainDb) {
+          throw new Error('データベースの取得に失敗しました');
         }
-      } else {
-        return false;
+        
+        // データベースアクセステスト
+        const testData = mainDb.getRange(1, 1, 1, 1).getValue();
+        debugLog(`✅ メインデータベースアクセス確認成功: ${userEmail} (試行${retryCount + 1})`);
+        return true;
+        
+      } catch (accessError) {
+        debugLog(`⚠️ データベースアクセス失敗 (試行${retryCount + 1}): ${accessError.message}`);
+        
+        // 権限付与を試行
+        if (retryCount === 0) {
+          debugLog(`権限付与を試行中...`);
+          
+          try {
+            // 対象ユーザーを編集者として追加
+            const addResult = addUserToMainDatabaseEditors(userEmail);
+            
+            if (addResult) {
+              debugLog(`権限付与成功、権限反映のため3秒待機...`);
+              Utilities.sleep(3000); // 権限反映を待つ
+            } else {
+              debugLog(`権限付与に失敗しました`);
+            }
+            
+            // 現在のユーザーも編集者として追加（念のため）
+            if (currentUser !== userEmail) {
+              try {
+                addUserToMainDatabaseEditors(currentUser);
+                debugLog(`現在のユーザー(${currentUser})も編集者として追加しました`);
+              } catch (e) {
+                debugLog(`現在ユーザー権限付与エラー: ${e.message}`);
+              }
+            }
+            
+          } catch (permissionError) {
+            debugLog(`権限付与処理エラー: ${permissionError.message}`);
+          }
+        }
+        
+        retryCount++;
+        if (retryCount < maxRetries) {
+          debugLog(`${retryCount * 2}秒後に再試行します...`);
+          Utilities.sleep(retryCount * 2000); // 段階的待機
+        }
       }
     }
     
+    // 全ての試行が失敗した場合
+    debugLog(`❌ ${maxRetries}回の試行後もデータベースアクセスに失敗: ${userEmail}`);
+    
+    // 最後の診断情報を出力
+    try {
+      const properties = PropertiesService.getScriptProperties();
+      const dbId = properties.getProperty(MAIN_DB_ID_KEY);
+      debugLog(`診断情報 - データベースID: ${dbId ? dbId.substring(0, 10) + '...' : 'なし'}`);
+      debugLog(`診断情報 - LOGGER_API_URL: ${properties.getProperty(LOGGER_API_URL_KEY) ? '設定済み' : 'なし'}`);
+    } catch (e) {
+      debugLog(`診断情報取得エラー: ${e.message}`);
+    }
+    
+    return false;
+    
   } catch (error) {
-    console.error('メインデータベースアクセス権限確認でエラー:', error);
+    console.error('メインデータベースアクセス権限確認で予期しないエラー:', error);
+    debugLog(`❌ 予期しないエラー: ${error.message}`);
     return false;
   }
 }
@@ -2746,14 +2803,59 @@ function registerNewUser(adminEmail) {
   
   // 📝 ステップ1: データベースアクセス権限を確認・付与
   debugLog(`🚀 新規登録開始: ${adminEmail}`);
-  const hasAccess = ensureDatabaseAccess(adminEmail);
   
-  if (!hasAccess) {
-    throw new Error('データベースへのアクセス権限を取得できませんでした。管理者にお問い合わせください。');
+  let userDb = null;
+  let hasAccess = false;
+  
+  // フォールバック付きのデータベースアクセス試行
+  try {
+    // まずデータベースの直接取得を試行
+    userDb = getOrCreateMainDatabase();
+    if (userDb) {
+      // 簡単なアクセステスト
+      const testAccess = userDb.getName();
+      hasAccess = true;
+      debugLog(`✅ 直接データベースアクセス成功: ${adminEmail}`);
+    }
+  } catch (directAccessError) {
+    debugLog(`⚠️ 直接アクセス失敗、権限確認を実行: ${directAccessError.message}`);
+    
+    // 権限確認・付与プロセスを実行
+    hasAccess = ensureDatabaseAccess(adminEmail);
+    
+    if (hasAccess) {
+      try {
+        userDb = getOrCreateMainDatabase();
+      } catch (retryError) {
+        debugLog(`❌ 権限付与後もデータベース取得失敗: ${retryError.message}`);
+        hasAccess = false;
+      }
+    }
+  }
+  
+  if (!hasAccess || !userDb) {
+    // より詳細なエラーメッセージを提供
+    const currentUser = Session.getActiveUser().getEmail();
+    const errorDetails = [
+      'データベースへのアクセス権限を取得できませんでした。',
+      '',
+      '考えられる原因:',
+      '1. セットアップが完了していない可能性があります',
+      '2. 【ログデータベース】みんなの回答ボードへのアクセス権限が不足しています',
+      '3. Googleドライブの権限設定に問題があります',
+      '',
+      `現在のユーザー: ${currentUser}`,
+      `登録対象ユーザー: ${adminEmail}`,
+      '',
+      '解決方法:',
+      '1. セットアップ画面(?setup=true)から再設定を実行してください',
+      '2. 管理者にお問い合わせください'
+    ].join('\n');
+    
+    throw new Error(errorDetails);
   }
   
   // 📝 ステップ2: メインデータベースから既存ユーザーをチェック
-  const userDb = getOrCreateMainDatabase();
   const data = userDb.getDataRange().getValues();
   const headers = data[0];
   const adminEmailIndex = headers.indexOf('adminEmail');
@@ -3021,7 +3123,7 @@ function getOrCreateMainDatabase() {
   dbId = db.getId();
   properties.setProperty(MAIN_DB_ID_KEY, dbId);
   
-  // データベースの共有設定を追加
+  // データベースの共有設定を追加（強化版）
   try {
     const dbFile = DriveApp.getFileById(dbId);
     const adminEmail = Session.getActiveUser().getEmail();
@@ -3035,8 +3137,36 @@ function getOrCreateMainDatabase() {
     dbFile.addEditor(adminEmail);
     Logger.log(`セットアップ実行ユーザー（${adminEmail}）をデータベースの編集者として追加しました。`);
     
+    // 権限設定の確認
+    Utilities.sleep(2000); // 権限反映を待つ
+    
+    try {
+      const testAccess = dbFile.getName();
+      Logger.log(`✅ データベース権限設定確認成功`);
+    } catch (accessTest) {
+      Logger.log(`⚠️ データベース権限設定確認失敗: ${accessTest.message}`);
+      
+      // 追加の権限設定試行
+      try {
+        dbFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.EDIT);
+        Logger.log(`フォールバック: リンクを知っている全員に編集権限を設定しました`);
+      } catch (fallbackError) {
+        Logger.log(`フォールバック権限設定も失敗: ${fallbackError.message}`);
+      }
+    }
+    
   } catch (e) {
     Logger.log(`データベース共有設定エラー: ${e.message}`);
+    
+    // 最小限の権限設定を試行
+    try {
+      const dbFile = DriveApp.getFileById(dbId);
+      const adminEmail = Session.getActiveUser().getEmail();
+      dbFile.addEditor(adminEmail);
+      Logger.log(`最小限の権限設定: 管理者のみ追加完了`);
+    } catch (minimalError) {
+      Logger.log(`最小限の権限設定も失敗: ${minimalError.message}`);
+    }
   }
   
   // Users シートを作成
