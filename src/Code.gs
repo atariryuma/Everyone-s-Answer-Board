@@ -1570,52 +1570,29 @@ function getStatus() {
       }
     }
     
-    // Get answer count if active sheet exists
+    // Get answer count if active sheet exists（高速化版）
     let answerCount = 0;
     let totalReactions = 0;
     
     if (activeSheetName) {
       try {
-        const spreadsheet = getCurrentSpreadsheet();
-        const sheet = spreadsheet.getSheetByName(activeSheetName);
+        // 既に取得済みのスプレッドシートを再利用（可能な場合）
+        let spreadsheet = null;
+        let sheet = null;
+        
+        // allSheets取得時に使用したスプレッドシートオブジェクトを再利用
+        if (allSheets.length > 0) {
+          spreadsheet = getCurrentSpreadsheet();
+          sheet = spreadsheet.getSheetByName(activeSheetName);
+        }
+        
         if (sheet) {
-          answerCount = sheet.getLastRow() > 0 ? sheet.getLastRow() - 1 : 0; // ヘッダー行を除く
-
-          // リアクションの合計数を計算
-          const reactionHeaders = REACTION_KEYS.map(k => COLUMN_HEADERS[k]);
-          const headerIndices = getHeaderIndices(activeSheetName);
+          // 回答数のみ取得（リアクション計算は省略して高速化）
+          const lastRow = sheet.getLastRow();
+          answerCount = lastRow > 1 ? lastRow - 1 : 0; // ヘッダー行を除く
           
-          // リアクション列のデータをまとめて取得（answerCountが0の場合は処理をスキップ）
-          const reactionColumnsData = [];
-          if (answerCount > 0) {
-            for (const header of reactionHeaders) {
-              const colIndex = headerIndices[header];
-              if (colIndex !== undefined) {
-                try {
-                  const range = sheet.getRange(2, colIndex + 1, answerCount, 1); // データ開始行から最終行まで
-                  reactionColumnsData.push(range.getValues());
-                } catch (rangeError) {
-                  console.warn('Failed to get range for header:', header, rangeError);
-                  // 範囲エラーの場合は空配列を追加
-                  reactionColumnsData.push([]);
-                }
-              }
-            }
-          }
-
+          // リアクション計算は省略（管理画面では表示していないため）
           totalReactions = 0;
-          if (reactionColumnsData.length > 0 && answerCount > 0) {
-            for (let i = 0; i < answerCount; i++) {
-              for (let j = 0; j < reactionColumnsData.length; j++) {
-                if (reactionColumnsData[j] && reactionColumnsData[j][i]) {
-                  const cellValue = reactionColumnsData[j][i][0] || '';
-                  if (cellValue) {
-                    totalReactions += parseReactionString(cellValue).length;
-                  }
-                }
-              }
-            }
-          }
         }
       } catch (error) {
         console.warn('Failed to get sheet data for status:', error);

@@ -281,7 +281,6 @@
         <div class="progress-bar">
           <div class="progress-fill" id="setup-progress"></div>
         </div>
-        <p class="text-sm text-gray-400 text-center" id="setup-status">設定を開始してください</p>
       </div>
     </div>
   </header>
@@ -900,7 +899,6 @@
       boardUrl: document.getElementById('board-url'),
       viewBoardLink: document.getElementById('view-board-link'),
       setupProgress: document.getElementById('setup-progress'),
-      setupStatus: document.getElementById('setup-status'),
       boardStatusIndicator: document.getElementById('board-status-indicator'),
       sheetCount: document.getElementById('sheet-count'),
       switchSheetText: document.getElementById('switch-sheet-text'),
@@ -1015,19 +1013,20 @@
         };
       }
 
-      // Open Admin Board Button (管理モードでボードを開く)
+      // Open Admin Board Button (page.html管理モードでボードを開く)
       const openAdminBoardBtn = document.getElementById('open-admin-board-btn');
       if (openAdminBoardBtn) {
         openAdminBoardBtn.addEventListener('click', () => {
-          if (elements.boardUrl && elements.boardUrl.value) {
-            // adminModeVerified=trueを追加して完全な管理モードで開く
-            const url = new URL(elements.boardUrl.value);
-            url.searchParams.set('mode', 'admin');
-            url.searchParams.set('adminModeVerified', 'true');
-            window.open(url.toString(), '_blank');
-          } else {
-            showMessage('Board URL not found', 'yellow');
-          }
+          // page.htmlの管理モードURLを構築
+          const baseUrl = 'https://script.google.com/a/naha-okinawa.ed.jp/macros/s/AKfycbzFF3psxBRUja1DsrVDkleOGrUxar1QqxqGYwBVKmpcZybrtNddH5iKD-nbqmYWEZKK/exec';
+          const url = new URL(baseUrl);
+          url.searchParams.set('page', 'page');
+          url.searchParams.set('userId', userId);
+          url.searchParams.set('mode', 'admin');
+          url.searchParams.set('adminModeVerified', 'true');
+          
+          console.log('Opening admin board URL:', url.toString());
+          window.open(url.toString(), '_blank');
         });
       }
 
@@ -1156,9 +1155,6 @@
       
       if (elements.setupProgress) {
         elements.setupProgress.style.width = progress + '%';
-      }
-      if (elements.setupStatus) {
-        elements.setupStatus.textContent = statusText;
       }
     }
 
