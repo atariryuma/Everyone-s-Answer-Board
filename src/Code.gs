@@ -3247,7 +3247,7 @@ function callDatabaseApi(action, data = {}) {
  * @returns {object} ユーザー情報
  */
 function getUserInfoViaApi(userId) {
-  return callDatabaseApi('getUser', { userId: userId });
+  return callDatabaseApi('getUserInfo', { userId: userId });
 }
 
 /**
