@@ -509,7 +509,7 @@ function testDeployment() {
       
     } else {
       message += `❌ 接続失敗\n詳細: ${getText.substring(0, 200)}\n\n`;
-      message += '解決方法:\n1. Apps Scriptエディタでプロジェクトを再デプロイ\n2. 「実行者」を「自分」に設定\n3. 「アクセスできるユーザー」を組織内に設定';
+      message += '解決方法:\n1. Apps Scriptエディタでプロジェクトを再デプロイ\n2. 「実行者」を「自分」に設定\n3. 「アクセスできるユーザー」を「すべてのユーザー（匿名ユーザーを含む）」に設定';
     }
     
     ui.alert(message);
