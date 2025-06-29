@@ -67,6 +67,7 @@ function onOpen() {
     .addSeparator()
     .addItem('現在の設定情報を表示', 'showCurrentSettings')
     .addItem('デプロイ状況をテスト', 'testDeployment')
+    .addItem('データベース状況をデバッグ', 'debugDatabaseStatus')
     .addToUi();
 }
 
@@ -567,6 +568,77 @@ function showCurrentSettings() {
 }
 
 /**
+ * データベース状況をデバッグする関数
+ */
+function debugDatabaseStatus() {
+  const ui = SpreadsheetApp.getUi();
+  
+  try {
+    let debugInfo = 'データベースデバッグ情報:\n\n';
+    
+    // 1. プロパティ確認
+    const properties = PropertiesService.getScriptProperties();
+    const dbSheetId = properties.getProperty(DATABASE_ID_KEY);
+    debugInfo += `保存されたDB ID: ${dbSheetId || 'なし'}\n`;
+    
+    // 2. 現在のスプレッドシート確認
+    try {
+      const currentSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+      if (currentSpreadsheet) {
+        const currentId = currentSpreadsheet.getId();
+        const currentName = currentSpreadsheet.getName();
+        debugInfo += `現在のスプレッドシート: ${currentName} (${currentId})\n`;
+        
+        // 3. シート一覧確認
+        const sheets = currentSpreadsheet.getSheets();
+        debugInfo += `シート数: ${sheets.length}\n`;
+        sheets.forEach((sheet, index) => {
+          debugInfo += `  ${index + 1}. ${sheet.getName()}\n`;
+        });
+        
+        // 4. ログシートの存在確認
+        const logSheet = currentSpreadsheet.getSheetByName(TARGET_SHEET_NAME);
+        if (logSheet) {
+          debugInfo += `\n'${TARGET_SHEET_NAME}'シート: 存在します\n`;
+          try {
+            const range = logSheet.getDataRange();
+            debugInfo += `データ範囲: ${range.getA1Notation()}\n`;
+            debugInfo += `行数: ${range.getNumRows()}\n`;
+          } catch (rangeError) {
+            debugInfo += `データ範囲エラー: ${rangeError.message}\n`;
+          }
+        } else {
+          debugInfo += `\n'${TARGET_SHEET_NAME}'シート: 存在しません\n`;
+        }
+        
+      } else {
+        debugInfo += '現在のスプレッドシートを取得できません\n';
+      }
+    } catch (currentError) {
+      debugInfo += `現在のスプレッドシート取得エラー: ${currentError.message}\n`;
+    }
+    
+    // 5. getDatabaseSheet()のテスト
+    debugInfo += '\n--- getDatabaseSheet()テスト ---\n';
+    try {
+      const testSheet = getDatabaseSheet();
+      if (testSheet) {
+        debugInfo += `✅ getDatabaseSheet()成功: ${testSheet.getName()}\n`;
+      } else {
+        debugInfo += `❌ getDatabaseSheet()はnullを返しました\n`;
+      }
+    } catch (dbError) {
+      debugInfo += `❌ getDatabaseSheet()エラー: ${dbError.message}\n`;
+    }
+    
+    ui.alert(debugInfo);
+    
+  } catch (error) {
+    ui.alert(`デバッグエラー: ${error.message}`);
+  }
+}
+
+/**
  * デプロイ状況をテストする関数
  */
 function testDeployment() {
@@ -738,14 +810,40 @@ function findUserById(sheet, userId) {
  */
 function findUserByEmail(sheet, adminEmail) {
   try {
-    const data = sheet.getDataRange().getValues();
+    Logger.log(`findUserByEmail called with sheet: ${sheet ? 'valid' : 'null'}, adminEmail: ${adminEmail}`);
+    
+    if (!sheet) {
+      Logger.log('Sheet is null in findUserByEmail');
+      return null;
+    }
+    
+    if (!adminEmail) {
+      Logger.log('AdminEmail is null in findUserByEmail');
+      return null;
+    }
+    
+    let data;
+    try {
+      data = sheet.getDataRange().getValues();
+      Logger.log(`Got data range with ${data ? data.length : 0} rows`);
+    } catch (rangeError) {
+      Logger.log(`getDataRange failed: ${rangeError.message}`);
+      throw new Error(`データ範囲取得エラー: ${rangeError.message}`);
+    }
     
     if (!data || data.length === 0) {
+      Logger.log('Data is empty or null');
+      return null;
+    }
+    
+    if (data.length === 1) {
+      Logger.log('Only header row exists, no data rows');
       return null;
     }
     
     for (let i = 1; i < data.length; i++) {
       if (data[i] && data[i][1] === adminEmail) { // adminEmail column
+        Logger.log(`Found user at row ${i}: ${data[i][1]}`);
         return {
           userId: data[i][0],
           adminEmail: data[i][1],
@@ -759,9 +857,12 @@ function findUserByEmail(sheet, adminEmail) {
         };
       }
     }
+    
+    Logger.log(`User not found: ${adminEmail}`);
     return null;
   } catch (error) {
     Logger.log(`findUserByEmail error: ${error.message}`);
+    Logger.log(`Error stack: ${error.stack}`);
     throw new Error(`ユーザー検索エラー: ${error.message}`);
   }
 }
