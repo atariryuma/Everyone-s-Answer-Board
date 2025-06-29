@@ -698,23 +698,30 @@ function saveDeploymentIdToProperties(id) {
  */
 function handleCheckExistingUser(data) {
   try {
+    Logger.log(`checkExistingUser: request data=${JSON.stringify(data)}`);
+    
     const dbSheet = getDatabaseSheet();
     const { adminEmail } = data;
     
     if (!adminEmail) {
+      Logger.log('checkExistingUser error: adminEmailが必要です');
       return { success: false, error: 'adminEmailが必要です' };
     }
     
+    Logger.log(`checkExistingUser: searching for adminEmail="${adminEmail}"`);
     const userData = findUserByEmail(dbSheet, adminEmail);
     
-    return {
+    const result = {
       success: true,
       exists: userData !== null,
       data: userData
     };
     
+    Logger.log(`checkExistingUser: result=${JSON.stringify(result)}`);
+    return result;
+    
   } catch (error) {
-    Logger.log(`checkExistingUser error: ${error.message}`);
+    Logger.log(`checkExistingUser error: ${error.message} - Stack: ${error.stack}`);
     return {
       success: false,
       error: error.message
@@ -766,32 +773,51 @@ function findUserById(sheet, userId) {
  */
 function findUserByEmail(sheet, adminEmail) {
   try {
-    if (!sheet || !adminEmail) {
+    Logger.log(`findUserByEmail: searching for adminEmail="${adminEmail}"`);
+    
+    if (!sheet || !adminEmail || adminEmail.trim().length === 0) {
+      Logger.log(`findUserByEmail: invalid parameters - sheet=${!!sheet}, adminEmail="${adminEmail}"`);
       return null;
     }
     
     const data = sheet.getDataRange().getValues();
+    Logger.log(`findUserByEmail: got ${data.length} rows from sheet`);
     
     if (!data || data.length <= 1) {
+      Logger.log(`findUserByEmail: no data rows found`);
       return null;
     }
     
+    // 正規化された検索対象メールアドレス（大文字小文字を無視、空白を除去）
+    const normalizedSearchEmail = adminEmail.trim().toLowerCase();
+    Logger.log(`findUserByEmail: normalized search email="${normalizedSearchEmail}"`);
+    
     for (let i = 1; i < data.length; i++) {
-      if (data[i] && data[i][1] === adminEmail) { // adminEmail column
-        return {
-          userId: data[i][0],
-          adminEmail: data[i][1],
-          spreadsheetId: data[i][2],
-          spreadsheetUrl: data[i][3],
-          createdAt: data[i][4],
-          accessToken: data[i][5],
-          configJson: data[i][6],
-          lastAccessedAt: data[i][7],
-          isActive: data[i][8]
-        };
+      if (data[i] && data[i][1]) {
+        const storedEmail = String(data[i][1]).trim().toLowerCase();
+        Logger.log(`findUserByEmail: row ${i} - stored email="${storedEmail}"`);
+        
+        // 空文字列やnull/undefinedとのマッチを防ぐ
+        if (storedEmail && storedEmail.length > 0 && storedEmail === normalizedSearchEmail) {
+          Logger.log(`findUserByEmail: MATCH found at row ${i}`);
+          return {
+            userId: data[i][0],
+            adminEmail: data[i][1],
+            spreadsheetId: data[i][2],
+            spreadsheetUrl: data[i][3],
+            createdAt: data[i][4],
+            accessToken: data[i][5],
+            configJson: data[i][6],
+            lastAccessedAt: data[i][7],
+            isActive: data[i][8]
+          };
+        }
+      } else {
+        Logger.log(`findUserByEmail: row ${i} - empty row or no email`);
       }
     }
     
+    Logger.log(`findUserByEmail: no match found for "${normalizedSearchEmail}"`);
     return null;
   } catch (error) {
     Logger.log(`findUserByEmail error: ${error.message}`);

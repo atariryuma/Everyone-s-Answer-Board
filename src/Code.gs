@@ -2783,15 +2783,17 @@ function registerNewUser(adminEmail) {
   
   try {
     // API経由で既存ユーザーをチェック
-    debugLog(`既存ユーザーチェックを実行中...`);
+    debugLog(`既存ユーザーチェックを実行中: adminEmail="${adminEmail}"`);
     const existingCheck = callDatabaseApi('checkExistingUser', { adminEmail: adminEmail });
+    
+    debugLog(`既存ユーザーチェック結果: ${JSON.stringify(existingCheck)}`);
     
     if (existingCheck.success && existingCheck.exists && existingCheck.data) {
       // 既存ユーザーの場合はURL情報を返す
       const userData = existingCheck.data;
       const base = getWebAppUrlEnhanced();
       
-      debugLog(`既存ユーザーが見つかりました: ${userData.userId}`);
+      debugLog(`既存ユーザーが見つかりました: userId="${userData.userId}", adminEmail="${userData.adminEmail}"`);
       
       // ユーザーコンテキストを設定
       PropertiesService.getUserProperties().setProperty('CURRENT_USER_ID', userData.userId);
@@ -2806,6 +2808,8 @@ function registerNewUser(adminEmail) {
         message: '既存のボードが見つかりました。管理画面に移動します。',
         autoCreated: false
       };
+    } else {
+      debugLog(`既存ユーザーが見つかりませんでした - 新規登録を継続します`);
     }
     
     debugLog(`✅ 既存ユーザーチェック完了 - 新規ユーザーです`);
