@@ -1195,21 +1195,21 @@ function addSpreadsheetUrl(spreadsheetUrl) {
       throw new Error('スプレッドシートにシートが見つかりません。');
     }
 
-    // ユーザー設定を更新：新しいスプレッドシートIDを設定
-    const userDb = getOrCreateMainDatabase();
-    const data = userDb.getDataRange().getValues();
-    const headers = data[0];
-    const userIdIndex = headers.indexOf('userId');
-    const spreadsheetIdIndex = headers.indexOf('spreadsheetId');
-    const spreadsheetUrlIndex = headers.indexOf('spreadsheetUrl');
-
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][userIdIndex] === userId) {
-        // スプレッドシートIDとURLを更新
-        userDb.getRange(i + 1, spreadsheetIdIndex + 1).setValue(spreadsheetId);
-        userDb.getRange(i + 1, spreadsheetUrlIndex + 1).setValue(spreadsheetUrl);
-        break;
+    // API経由でユーザー設定を更新：新しいスプレッドシートIDを設定
+    try {
+      const updateResult = updateUserViaApi(userId, {
+        spreadsheetId: spreadsheetId,
+        spreadsheetUrl: spreadsheetUrl
+      });
+      
+      if (!updateResult.success) {
+        throw new Error(`ユーザー更新失敗: ${updateResult.error}`);
       }
+      
+      debugLog(`✅ API経由でスプレッドシート情報を更新: ${spreadsheetId}`);
+    } catch (updateError) {
+      debugLog(`❌ API経由でのユーザー更新エラー: ${updateError.message}`);
+      throw new Error(`スプレッドシート情報の更新に失敗しました: ${updateError.message}`);
     }
 
     // ユーザープロパティも更新
@@ -2618,26 +2618,41 @@ function getUserInfoInternal(userId) {
 
 
 function updateUserConfig(userId, newConfig) {
-  const userDb = getOrCreateMainDatabase();
-  const data = userDb.getDataRange().getValues();
-  const headers = data[0];
-  const userIdIndex = headers.indexOf('userId');
-  const configJsonIndex = headers.indexOf('configJson');
-
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][userIdIndex] === userId) {
-      let currentConfig = {};
-      try {
-        currentConfig = JSON.parse(data[i][configJsonIndex] || '{}');
-      } catch (e) {
-        console.error('Failed to parse existing configJson for user:', userId, e);
-      }
-      const updatedConfig = Object.assign({}, currentConfig, newConfig);
-      userDb.getRange(i + 1, configJsonIndex + 1).setValue(JSON.stringify(updatedConfig));
-      return true;
+  try {
+    // 現在の設定を取得
+    const userInfo = getUserInfoViaApi(userId);
+    
+    if (!userInfo.success || !userInfo.data) {
+      throw new Error('ユーザー情報が見つかりません');
     }
+    
+    let currentConfig = {};
+    try {
+      currentConfig = JSON.parse(userInfo.data.configJson || '{}');
+    } catch (e) {
+      console.error('Failed to parse existing configJson for user:', userId, e);
+    }
+    
+    // 設定をマージ
+    const updatedConfig = Object.assign({}, currentConfig, newConfig);
+    
+    // API経由で更新
+    const updateResult = updateUserViaApi(userId, {
+      configJson: JSON.stringify(updatedConfig)
+    });
+    
+    if (!updateResult.success) {
+      throw new Error(`設定更新失敗: ${updateResult.error}`);
+    }
+    
+    debugLog(`✅ API経由で設定更新: ${userId}`, newConfig);
+    return true;
+    
+  } catch (error) {
+    debugLog(`❌ API経由での設定更新エラー: ${error.message}`);
+    console.error('updateUserConfig error:', error);
+    return false;
   }
-  return false;
 }
 
 function saveSheetConfig(sheetName, config) {
