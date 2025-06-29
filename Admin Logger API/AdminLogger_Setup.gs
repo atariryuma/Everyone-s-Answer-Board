@@ -70,6 +70,7 @@ function onOpen() {
     .addSeparator()
     .addItem('🔍 データベース内容を確認', 'debugDatabaseContents')
     .addItem('🧹 データベースをクリア', 'clearDatabase')
+    .addItem('🔧 無効なユーザーデータをクリーンアップ', 'cleanupInvalidUsers')
     .addToUi();
 }
 
@@ -748,7 +749,7 @@ function findUserById(sheet, userId) {
     
     for (let i = 1; i < data.length; i++) {
       if (data[i] && data[i][0] === userId) { // userId column
-        return {
+        const userData = {
           userId: data[i][0],
           adminEmail: data[i][1],
           spreadsheetId: data[i][2],
@@ -759,6 +760,14 @@ function findUserById(sheet, userId) {
           lastAccessedAt: data[i][7],
           isActive: data[i][8]
         };
+        
+        // userIdが無効な場合は無効なユーザーとして扱う
+        if (!userData.userId || userData.userId === '' || userData.userId === null || userData.userId === 'undefined') {
+          Logger.log(`WARNING: Found user with invalid userId: "${userData.userId}" - treating as non-existent user`);
+          return null;
+        }
+        
+        return userData;
       }
     }
     return null;
@@ -825,9 +834,10 @@ function findUserByEmail(sheet, adminEmail) {
           
           Logger.log(`findUserByEmail: returning userData=${JSON.stringify(userData)}`);
           
-          // userIdが無効な場合は警告ログを出力
-          if (!userData.userId || userData.userId === '' || userData.userId === null) {
-            Logger.log(`WARNING: Found user with invalid userId: "${userData.userId}"`);
+          // userIdが無効な場合は無効なユーザーとして扱う（nullを返す）
+          if (!userData.userId || userData.userId === '' || userData.userId === null || userData.userId === 'undefined') {
+            Logger.log(`WARNING: Found user with invalid userId: "${userData.userId}" - treating as non-existent user`);
+            return null;
           }
           
           return userData;
@@ -942,6 +952,59 @@ function clearDatabase() {
     } else {
       ui.alert('ℹ️ データベースは既に空です。');
     }
+    
+  } catch (error) {
+    ui.alert(`エラー: ${error.message}`);
+  }
+}
+
+/**
+ * デバッグ用: 無効なユーザーデータをクリーンアップ
+ */
+function cleanupInvalidUsers() {
+  const ui = SpreadsheetApp.getUi();
+  
+  const confirmation = ui.alert(
+    '🔧 無効ユーザーデータクリーンアップ確認',
+    'userIdが空、null、undefinedの行を削除します。\n\n実行しますか？',
+    ui.ButtonSet.YES_NO
+  );
+  
+  if (confirmation !== ui.Button.YES) {
+    ui.alert('キャンセルされました。');
+    return;
+  }
+  
+  try {
+    const dbSheet = getDatabaseSheet();
+    const data = dbSheet.getDataRange().getValues();
+    
+    if (data.length <= 1) {
+      ui.alert('ℹ️ クリーンアップするデータがありません。');
+      return;
+    }
+    
+    let invalidRows = [];
+    
+    // 無効な行を特定
+    for (let i = 1; i < data.length; i++) {
+      const userId = data[i][0];
+      if (!userId || userId === '' || userId === null || userId === 'undefined') {
+        invalidRows.push(i + 1); // 1-based row index
+      }
+    }
+    
+    if (invalidRows.length === 0) {
+      ui.alert('✅ 無効なユーザーデータは見つかりませんでした。');
+      return;
+    }
+    
+    // 後ろから削除（行インデックスがずれないように）
+    for (let i = invalidRows.length - 1; i >= 0; i--) {
+      dbSheet.deleteRow(invalidRows[i]);
+    }
+    
+    ui.alert(`✅ ${invalidRows.length} 件の無効なユーザーデータをクリーンアップしました。`);
     
   } catch (error) {
     ui.alert(`エラー: ${error.message}`);

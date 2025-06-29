@@ -2791,23 +2791,29 @@ function registerNewUser(adminEmail) {
     if (existingCheck.success && existingCheck.exists && existingCheck.data) {
       // 既存ユーザーの場合はURL情報を返す
       const userData = existingCheck.data;
-      const base = getWebAppUrlEnhanced();
       
-      debugLog(`既存ユーザーが見つかりました: userId="${userData.userId}", adminEmail="${userData.adminEmail}"`);
-      
-      // ユーザーコンテキストを設定
-      PropertiesService.getUserProperties().setProperty('CURRENT_USER_ID', userData.userId);
-      PropertiesService.getUserProperties().setProperty('CURRENT_SPREADSHEET_ID', userData.spreadsheetId);
-      
-      return {
-        userId: userData.userId,
-        spreadsheetId: userData.spreadsheetId,
-        spreadsheetUrl: userData.spreadsheetUrl,
-        adminUrl: base ? `${base}?userId=${userData.userId}&mode=admin` : '',
-        viewUrl: base ? `${base}?userId=${userData.userId}` : '',
-        message: '既存のボードが見つかりました。管理画面に移動します。',
-        autoCreated: false
-      };
+      // userIdが無効な場合は新規登録を継続
+      if (!userData.userId || userData.userId === '' || userData.userId === null || userData.userId === 'undefined') {
+        debugLog(`既存ユーザーが見つかりましたが、userIdが無効です: "${userData.userId}" - 新規登録を継続します`);
+      } else {
+        const base = getWebAppUrlEnhanced();
+        
+        debugLog(`既存ユーザーが見つかりました: userId="${userData.userId}", adminEmail="${userData.adminEmail}"`);
+        
+        // ユーザーコンテキストを設定
+        PropertiesService.getUserProperties().setProperty('CURRENT_USER_ID', userData.userId);
+        PropertiesService.getUserProperties().setProperty('CURRENT_SPREADSHEET_ID', userData.spreadsheetId);
+        
+        return {
+          userId: userData.userId,
+          spreadsheetId: userData.spreadsheetId,
+          spreadsheetUrl: userData.spreadsheetUrl,
+          adminUrl: base ? `${base}?userId=${userData.userId}&mode=admin` : '',
+          viewUrl: base ? `${base}?userId=${userData.userId}` : '',
+          message: '既存のボードが見つかりました。管理画面に移動します。',
+          autoCreated: false
+        };
+      }
     } else {
       debugLog(`既存ユーザーが見つかりませんでした - 新規登録を継続します`);
     }
