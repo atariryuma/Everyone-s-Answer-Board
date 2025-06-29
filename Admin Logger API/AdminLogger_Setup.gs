@@ -67,6 +67,9 @@ function onOpen() {
     .addSeparator()
     .addItem('現在の設定情報を表示', 'showCurrentSettings')
     .addItem('デプロイ状況をテスト', 'testDeployment')
+    .addSeparator()
+    .addItem('🔍 データベース内容を確認', 'debugDatabaseContents')
+    .addItem('🧹 データベースをクリア', 'clearDatabase')
     .addToUi();
 }
 
@@ -793,14 +796,22 @@ function findUserByEmail(sheet, adminEmail) {
     Logger.log(`findUserByEmail: normalized search email="${normalizedSearchEmail}"`);
     
     for (let i = 1; i < data.length; i++) {
+      // 行全体をログ出力してデバッグ
+      Logger.log(`findUserByEmail: row ${i} - full data: ${JSON.stringify(data[i])}`);
+      
       if (data[i] && data[i][1]) {
         const storedEmail = String(data[i][1]).trim().toLowerCase();
         Logger.log(`findUserByEmail: row ${i} - stored email="${storedEmail}"`);
         
         // 空文字列やnull/undefinedとのマッチを防ぐ
-        if (storedEmail && storedEmail.length > 0 && storedEmail === normalizedSearchEmail) {
+        // さらに、有効なメールアドレス形式のチェックも追加
+        if (storedEmail && 
+            storedEmail.length > 0 && 
+            storedEmail.includes('@') && 
+            storedEmail === normalizedSearchEmail) {
           Logger.log(`findUserByEmail: MATCH found at row ${i}`);
-          return {
+          
+          const userData = {
             userId: data[i][0],
             adminEmail: data[i][1],
             spreadsheetId: data[i][2],
@@ -811,6 +822,15 @@ function findUserByEmail(sheet, adminEmail) {
             lastAccessedAt: data[i][7],
             isActive: data[i][8]
           };
+          
+          Logger.log(`findUserByEmail: returning userData=${JSON.stringify(userData)}`);
+          
+          // userIdが無効な場合は警告ログを出力
+          if (!userData.userId || userData.userId === '' || userData.userId === null) {
+            Logger.log(`WARNING: Found user with invalid userId: "${userData.userId}"`);
+          }
+          
+          return userData;
         }
       } else {
         Logger.log(`findUserByEmail: row ${i} - empty row or no email`);
@@ -853,5 +873,77 @@ function findUserRowById(sheet, userId) {
   } catch (error) {
     Logger.log(`findUserRowById error: ${error.message}`);
     throw error;
+  }
+}
+
+/**
+ * デバッグ用: データベース内容を確認
+ */
+function debugDatabaseContents() {
+  const ui = SpreadsheetApp.getUi();
+  
+  try {
+    const dbSheet = getDatabaseSheet();
+    const data = dbSheet.getDataRange().getValues();
+    
+    let message = `データベース内容:\n\n`;
+    message += `総行数: ${data.length}\n\n`;
+    
+    if (data.length === 0) {
+      message += '❌ データベースが空です';
+    } else if (data.length === 1) {
+      message += '✅ ヘッダー行のみ (ユーザーデータなし)\n';
+      message += `ヘッダー: ${JSON.stringify(data[0])}`;
+    } else {
+      message += `✅ ヘッダー行 + ${data.length - 1} 件のユーザーデータ\n\n`;
+      message += `ヘッダー: ${JSON.stringify(data[0])}\n\n`;
+      
+      for (let i = 1; i < Math.min(data.length, 6); i++) {
+        message += `行 ${i}: ${JSON.stringify(data[i])}\n`;
+      }
+      
+      if (data.length > 6) {
+        message += `... (他 ${data.length - 6} 行)`;
+      }
+    }
+    
+    ui.alert(message);
+    
+  } catch (error) {
+    ui.alert(`エラー: ${error.message}`);
+  }
+}
+
+/**
+ * デバッグ用: データベースをクリア
+ */
+function clearDatabase() {
+  const ui = SpreadsheetApp.getUi();
+  
+  const confirmation = ui.alert(
+    '⚠️ データベースクリア確認',
+    'データベースの全ユーザーデータを削除します。この操作は元に戻せません。\n\n実行しますか？',
+    ui.ButtonSet.YES_NO
+  );
+  
+  if (confirmation !== ui.Button.YES) {
+    ui.alert('キャンセルされました。');
+    return;
+  }
+  
+  try {
+    const dbSheet = getDatabaseSheet();
+    
+    // ヘッダー行以外をクリア
+    const data = dbSheet.getDataRange();
+    if (data.getNumRows() > 1) {
+      dbSheet.getRange(2, 1, data.getNumRows() - 1, data.getNumColumns()).clearContent();
+      ui.alert('✅ データベースをクリアしました。ヘッダー行のみ残されています。');
+    } else {
+      ui.alert('ℹ️ データベースは既に空です。');
+    }
+    
+  } catch (error) {
+    ui.alert(`エラー: ${error.message}`);
   }
 }
