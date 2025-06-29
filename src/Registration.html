@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <base target="_top">
-  <title>StudyQuest -みんなの回答ボード- - 新規登録</title>
+  <title>教育現場のためのインタラクティブ回答ボード</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!-- セキュリティ注意: 外部CDN依存。本番環境ではローカル化を推奨 -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -200,7 +200,7 @@
   <div class="glass-panel rounded-xl p-8 max-w-2xl w-full shadow-2xl">
     <div class="text-center mb-8">
       <h1 class="text-3xl font-bold text-yellow-300 mb-2">StudyQuest -みんなの回答ボード-</h1>
-      <p class="text-gray-400">みんなの回答ボード - 新規登録</p>
+      <p class="text-gray-400">教育現場のためのインタラクティブ回答ボード</p>
     </div>
     
     <!-- Domain Information -->
@@ -328,7 +328,8 @@
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
-            StudyQuestのセキュリティ
+            みんなの回答ボードのセキュリティ
+            <button type="button" id="security-info-btn" class="ml-2 text-xs text-blue-300 hover:underline focus:outline-none">詳しくはこちら</button>
           </h3>
           <ul class="text-sm text-purple-200 space-y-2" role="list">
             <li>• <strong>データ分離</strong>: 生徒の回答データは、メインアプリとは別の安全なデータベースで管理されます。</li>
@@ -418,10 +419,497 @@
     
     <!-- フッター -->
     <footer class="text-center mt-8 text-xs text-gray-500 fade-in">
-      <p>StudyQuest -みんなの回答ボード- - 教育現場のためのインタラクティブ回答ボード</p>
+      <p>&copy; 2025 StudyQuest. All rights reserved.</p>
     </footer>
   </div>
   
+  <script>
+    let userEmail = '';
+    let currentStep = 1;
+    let domainInfo = null;
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.toString()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // ドメイン情報を取得して表示
+    function loadDomainInfo() {
+      google.script.run
+        .withSuccessHandler(displayDomainInfo)
+        .withFailureHandler(error => {
+          console.error('ドメイン情報の取得に失敗:', error);
+        })
+        .getDeployUserDomainInfo();
+    }
+
+    // ドメイン情報の表示
+    function displayDomainInfo(info) {
+      domainInfo = info;
+      const section = document.getElementById('domain-info-section');
+      const matchPanel = document.getElementById('domain-match-panel');
+      const mismatchPanel = document.getElementById('domain-mismatch-panel');
+      
+      if (!info || info.error) {
+        console.warn('ドメイン情報の取得エラー:', info?.error);
+        return;
+      }
+
+      section.classList.remove('hidden');
+
+      if (info.isDomainMatch) {
+        // ドメインが一致している場合
+        matchPanel.classList.remove('hidden');
+        mismatchPanel.classList.add('hidden');
+        document.getElementById('domain-match-text').textContent = 
+          `このウェブアプリは ${info.deployDomain} ドメイン用です。あなたのアカウント（${info.currentDomain}）で利用できます。`;
+      } else {
+        // ドメインが不一致の場合
+        matchPanel.classList.add('hidden');
+        mismatchPanel.classList.remove('hidden');
+        document.getElementById('domain-mismatch-text').textContent = 
+          `あなたのアカウントのドメイン（${info.currentDomain}）とは異なります。機能が制限される可能性があります。`;
+        document.getElementById('deploy-domain').textContent = info.deployDomain;
+      }
+    }
+    
+    // Scroll to registration function
+    function scrollToRegistration() {
+      document.getElementById('section-3').scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
+      updateStep(3);
+    }
+    
+    // Update step progress
+    function updateStep(step) {
+      currentStep = step;
+      
+      // Update progress bar with performance optimization
+      const progressBar = document.getElementById('progress-bar');
+      requestAnimationFrame(() => {
+        progressBar.style.width = `${(step / 3) * 100}%`;
+      });
+      
+      // Update step indicators
+      for (let i = 1; i <= 3; i++) {
+        const stepElement = document.getElementById(`step-${i}`);
+        const stepIndicator = document.getElementById(`step-${i}`);
+        
+        if (stepElement) {
+          if (i <= step) {
+            stepElement.classList.add('completed');
+            const stepCircle = stepElement.querySelector('div');
+            if (stepCircle) {
+              stepCircle.className = 'w-8 h-8 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-sm relative z-10';
+            }
+            const stepLabel = stepElement.querySelector('span');
+            if (stepLabel) {
+              stepLabel.className = 'text-xs mt-2 block text-cyan-400';
+            }
+          } else {
+            stepElement.classList.remove('completed');
+            const stepCircle = stepElement.querySelector('div');
+            if (stepCircle) {
+              stepCircle.className = 'w-8 h-8 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm relative z-10';
+            }
+            const stepLabel = stepElement.querySelector('span');
+            if (stepLabel) {
+              stepLabel.className = 'text-xs mt-2 block text-gray-400';
+            }
+          }
+        }
+        
+        // Update section-specific icons (for steps 2 and 3)
+        const iconElement = document.getElementById(`step-${i}-icon`);
+        if (iconElement) {
+          if (i <= step) {
+            iconElement.className = 'w-6 h-6 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-sm';
+          } else {
+            iconElement.className = 'w-6 h-6 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm';
+          }
+        }
+      }
+    }
+    
+    // セキュリティ強化: 認証状態の検証
+    async function verifyAuthentication() {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(result => {
+            if (result && result.authenticated && result.email) {
+              resolve(result);
+            } else {
+              reject(new Error('認証が必要です'));
+            }
+          })
+          .withFailureHandler(reject)
+          .verifyUserAuthentication();
+      });
+    }
+
+    // ユーザーメールアドレスを取得
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        // セキュリティ強化: 認証状態を確認
+        const authResult = await verifyAuthentication();
+        const email = authResult.email;
+        
+        userEmail = email;
+        document.getElementById('user-email').textContent = email || 'メールアドレスを取得できません';
+
+        if (email) {
+          updateStep(2); // Account verification step
+          
+          // まず既存ボード情報をチェック
+          google.script.run
+            .withSuccessHandler((existingBoard) => {
+              // userIdが無効な場合は既存ボードがないとして扱う
+              if (existingBoard && existingBoard.userId && existingBoard.userId !== 'undefined' && existingBoard.userId !== '' && existingBoard.userId !== null) {
+                // 有効な既存ボードがある場合
+                updateStep(3);
+                showExistingBoard(existingBoard);
+              } else {
+                // 既存ボードがない、または無効なuserIdの場合はボタンを有効化
+                updateStep(3);
+                document.getElementById('register-btn').disabled = false;
+                showMessage('アカウント確認が完了しました。みんなの回答ボードを開始できます。', 'success');
+              }
+            })
+            .withFailureHandler((error) => {
+              // セキュリティ強化: エラーメッセージをサニタイズ
+              console.warn('既存ボード確認で問題が発生しました');
+              
+              // エラーが発生した場合もボタンを有効化（新規登録として扱う）
+              document.getElementById('register-btn').disabled = false;
+              showMessage('アカウント確認が完了しました。StudyQuestを開始できます。', 'success');
+            })
+            .getExistingBoard();
+        } else {
+          showMessage('Googleアカウントでログインしてください。', 'error');
+        }
+      } catch (error) {
+        // セキュリティ強化: 認証エラーの安全な処理
+        console.warn('認証確認中にエラーが発生しました');
+        document.getElementById('user-email').textContent = '認証エラー';
+        showMessage('認証が必要です。Googleアカウントでログインしてください。', 'error');
+      }
+    });
+    
+    // セットアップ方法の切り替え（統合版では自動セットアップのみ）
+    // document.querySelectorAll('input[name="setup-method"]').forEach(radio => {
+    //   radio.addEventListener('change', (e) => {
+    //     const existingInput = document.getElementById('existing-sheet-input');
+    //     if (e.target.value === 'existing') {
+    //       existingInput.style.display = 'block';
+    //     } else {
+    //       existingInput.style.display = 'none';
+    //     }
+    //   });
+    // });
+
+    // Enterキー対応（登録ボタン用）
+    document.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !document.getElementById('register-btn').disabled) {
+        // Registration page doesn't have URL input field, so just trigger registration if focused
+        const registerBtn = document.getElementById('register-btn');
+        if (registerBtn && !registerBtn.disabled) {
+          registerBtn.click();
+        }
+      }
+    });
+    
+    // セキュリティ強化: 入力バリデーション関数
+    function validateInput(value, type) {
+      if (!value || typeof value !== 'string') return false;
+      
+      switch (type) {
+        case 'email':
+          return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+        case 'method':
+          return ['auto', 'manual'].includes(value);
+        default:
+          return value.length > 0 && value.length < 1000;
+      }
+    }
+
+    // 登録処理
+    document.getElementById('register-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('register-btn');
+      const messageArea = document.getElementById('message-area');
+      
+      // セキュリティ強化: 入力検証
+      if (!userEmail || !validateInput(userEmail, 'email')) {
+        showMessage('有効なメールアドレスが必要です。', 'error');
+        return;
+      }
+      
+      // 統合版では常に自動セットアップ
+      const setupMethod = 'auto';
+      const spreadsheetUrl = 'AUTO_CREATE';
+      
+      // ボタンを無効化
+      btn.disabled = true;
+      btn.innerHTML = `
+        <svg class="w-5 h-5 spinner inline-block mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
+        </svg>
+        登録処理中...
+      `;
+      showMessage('回答ボードを準備中です...', 'info');
+      
+      // 登録処理を実行
+      google.script.run
+
+        .withSuccessHandler(result => {
+          showMessage(result.message || '登録が完了しました！', 'success');
+
+          const adminUrl = result.adminUrl || '';
+          const viewUrl = result.viewUrl || '';
+          
+          if (!adminUrl || !viewUrl) {
+            showMessage('エラー: 無効なURLが生成されました。ページを更新してから再度お試しください。', 'error');
+            console.error('URL generation failed:', { adminUrl, viewUrl, result });
+            
+            // ページを自動的にリロードして再試行
+            setTimeout(() => {
+              showMessage('ページを自動的に更新しています...', 'info');
+              window.location.reload();
+            }, 3000);
+            return;
+          }
+          
+          // 結果表示エリアにURLを表示
+          const resultArea = document.getElementById('result-area');
+          const adminUrlInput = document.createElement('input');
+          adminUrlInput.type = 'text';
+          adminUrlInput.value = adminUrl;
+          adminUrlInput.readOnly = true;
+          adminUrlInput.id = 'admin-url';
+          adminUrlInput.className = 'flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700';
+          adminUrlInput.onclick = function() { this.select(); };
+          
+          const viewUrlInput = document.createElement('input');
+          viewUrlInput.type = 'text';
+          viewUrlInput.value = viewUrl;
+          viewUrlInput.readOnly = true;
+          viewUrlInput.id = 'view-url';
+          viewUrlInput.className = 'flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700';
+          viewUrlInput.onclick = function() { this.select(); };
+          
+          const adminLink = document.createElement('a');
+          adminLink.href = adminUrl;
+          adminLink.target = '_blank';
+          adminLink.className = 'block w-full text-center px-4 py-3 bg-cyan-600 hover:bg-cyan-700 rounded-lg font-semibold transition-colors';
+          adminLink.textContent = '管理画面を開く →';
+          
+          resultArea.innerHTML = `
+            <div class="glass-panel rounded-lg p-6 space-y-6">
+              <div class="text-center">
+                <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                </div>
+                <h3 class="font-bold text-2xl text-green-400 mb-2">🎉 登録完了！</h3>
+                <p class="text-gray-300">あなた専用の回答ボードが作成されました</p>
+              </div>
+              
+              <div class="bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-lg p-4 border border-green-400/30">
+                <h4 class="font-bold text-white mb-2">✨ 次のステップ</h4>
+                <p class="text-sm text-green-200 mb-3" id="setup-guidance">
+                  まずは、ボードのタイトルや質問を設定しましょう。準備ができたら、生徒にURLを共有して回答を募集できます。
+                </p>
+                <div class="text-center">
+                  <div class="inline-block px-4 py-2 bg-white/10 rounded-lg">
+                    <span class="text-xs text-gray-300">⏱️ セットアップには数秒から数十秒かかる場合があります。</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="space-y-3">
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">管理画面URL（先生用）:</label>
+                  <div class="flex gap-2" id="admin-url-container">
+                    <button onclick="copyToClipboard('admin-url')"
+                      class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
+                      コピー
+                    </button>
+                  </div>
+                </div>
+                
+                <div>
+                  <label class="text-sm text-gray-400 block mb-1">生徒用URL:</label>
+                  <div class="flex gap-2" id="view-url-container">
+                    <button onclick="copyToClipboard('view-url')"
+                      class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
+                      コピー
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="pt-4 space-y-3" id="admin-link-container">
+                <div class="text-center">
+                  <p class="text-sm text-gray-400 mb-3">管理画面を開いて、最初のスプレッドシートを追加しましょう！</p>
+                </div>
+                <button onclick="location.reload()"
+                  class="block w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors">
+                  別のアカウントで登録
+                </button>
+              </div>
+            </div>
+          `;
+          
+          // 安全にDOM要素を追加
+          const adminContainer = document.getElementById('admin-url-container');
+          adminContainer.insertBefore(adminUrlInput, adminContainer.firstChild);
+          
+          const viewContainer = document.getElementById('view-url-container');
+          viewContainer.insertBefore(viewUrlInput, viewContainer.firstChild);
+          
+          const linkContainer = document.getElementById('admin-link-container');
+          linkContainer.insertBefore(adminLink, linkContainer.firstChild);
+          
+          // 自動作成の場合はフォーム・スプレッドシートURLも表示
+          if (result.autoCreated) {
+            const additionalContainer = document.createElement('div');
+            additionalContainer.className = 'space-y-3';
+            
+            // Googleフォーム（生徒回答用）
+            if (result.formUrl) {
+              const formContainer = document.createElement('div');
+              formContainer.innerHTML = `
+                <label class="text-sm text-gray-400 block mb-1">生徒回答用Googleフォーム:</label>
+                <div class="flex gap-2">
+                  <input type="text" value="${escapeHtml(result.formUrl)}" readonly
+                    id="created-form-url"
+                    class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
+                    onclick="this.select()">
+                  <button onclick="copyToClipboard('created-form-url')"
+                    class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
+                    コピー
+                  </button>
+                  <a href="${escapeHtml(result.formUrl)}" target="_blank" rel="noopener noreferrer"
+                    class="px-3 py-2 bg-blue-700 hover:bg-blue-600 rounded text-sm transition-colors">
+                    開く
+                  </a>
+                </div>
+              `;
+              additionalContainer.appendChild(formContainer);
+            }
+            
+            // フォーム編集用URL
+            if (result.editFormUrl) {
+              const editFormContainer = document.createElement('div');
+              editFormContainer.innerHTML = `
+                <label class="text-sm text-gray-400 block mb-1">フォーム編集用URL（先生用）:</label>
+                <div class="flex gap-2">
+                  <input type="text" value="${escapeHtml(result.editFormUrl)}" readonly
+                    id="edit-form-url"
+                    class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
+                    onclick="this.select()">
+                  <button onclick="copyToClipboard('edit-form-url')"
+                    class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
+                    コピー
+                  </button>
+                  <a href="${escapeHtml(result.editFormUrl)}" target="_blank" rel="noopener noreferrer"
+                    class="px-3 py-2 bg-green-700 hover:bg-green-600 rounded text-sm transition-colors">
+                    編集
+                  </a>
+                </div>
+              `;
+              additionalContainer.appendChild(editFormContainer);
+            }
+            
+            // スプレッドシート（データ確認用）
+            if (result.spreadsheetUrl) {
+              const spreadsheetContainer = document.createElement('div');
+              spreadsheetContainer.innerHTML = `
+                <label class="text-sm text-gray-400 block mb-1">回答データ（スプレッドシート）:</label>
+                <div class="flex gap-2">
+                  <input type="text" value="${escapeHtml(result.spreadsheetUrl)}" readonly
+                    id="created-spreadsheet-url"
+                    class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
+                    onclick="this.select()">
+                  <button onclick="copyToClipboard('created-spreadsheet-url')"
+                    class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
+                    コピー
+                  </button>
+                  <a href="${escapeHtml(result.spreadsheetUrl)}" target="_blank" rel="noopener noreferrer"
+                    class="px-3 py-2 bg-green-700 hover:bg-green-600 rounded text-sm transition-colors">
+                    確認
+                  </a>
+                </div>
+              `;
+              additionalContainer.appendChild(spreadsheetContainer);
+            }
+            
+            // 管理画面URLの前に挿入
+            const adminContainer = document.getElementById('admin-url-container').parentElement;
+            adminContainer.parentElement.insertBefore(additionalContainer, adminContainer);
+            
+            // ガイダンスメッセージを更新
+            if (result.formUrl) {
+              document.getElementById('setup-guidance').textContent = 
+                'Googleフォームが自動作成されました！生徒にフォームURLを共有して回答を収集し、回答ボードで結果を確認できます。';
+            } else {
+              document.getElementById('setup-guidance').textContent = 
+                'スプレッドシートが自動作成されました。データを手動で入力するか、別途Googleフォームを作成してご利用ください。';
+            }
+          }
+          
+          resultArea.classList.remove('hidden');
+          btn.style.display = 'none';
+          
+          // 既存スプレッドシート入力を無効化
+          const existingInput = document.getElementById('spreadsheet-url');
+          if (existingInput) {
+            existingInput.disabled = true;
+          }
+
+          </div>
+
+  <!-- Security Info Modal -->
+  <div id="security-info-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 hidden items-center justify-center p-4">
+    <div class="glass-panel p-8 rounded-xl max-w-2xl w-full slide-up max-h-[90vh] overflow-y-auto">
+      <h3 class="text-xl font-bold text-purple-400 mb-4">みんなの回答ボードのセキュリティについて</h3>
+      <div class="text-gray-300 space-y-4">
+        <p>StudyQuest「みんなの回答ボード」は、Google Apps Script (GAS) を基盤とし、教育現場での利用を想定した高いセキュリティ基準で設計されています。</p>
+        
+        <h4 class="font-semibold text-white">アプリのアーキテクチャとデータ管理</h4>
+        <p>本アプリは、大きく分けて2つの主要なコンポーネントで構成されています。</p>
+        <ul class="list-disc list-inside ml-4 space-y-2">
+          <li><strong>メインウェブアプリ (GAS Web App)</strong>: 生徒や先生がアクセスするフロントエンドと、Googleサービス（スプレッドシート、フォーム、Driveなど）と連携するバックエンドロジックを担います。</li>
+          <li><strong>Logger API (GAS Web App)</strong>: ユーザー情報や監査ログなど、機密性の高いデータを管理するための独立したバックエンドAPIです。</li>
+        </ul>
+        <p>これにより、生徒の回答データやユーザー設定は、メインウェブアプリとは分離されたLogger API経由でアクセスされるデータベースに安全に保存されます。万が一、メインウェブアプリに脆弱性が見つかった場合でも、ユーザーデータへの直接的なアクセスを防ぐ多層防御の仕組みを採用しています。</p>
+
+        <h4 class="font-semibold text-white">主なセキュリティ機能</h4>
+        <ul class="list-disc list-inside ml-4 space-y-2">
+          <li><strong>データ分離とAPI連携</strong>: ユーザーデータはメインアプリから独立したデータベースで管理され、API経由でのみアクセスされます。これにより、データの漏洩リスクを最小限に抑えます。</li>
+          <li><strong>厳格なドメインベースのアクセス制御</strong>: アプリケーションは、デプロイされたGoogle Workspaceドメイン内からのアクセスに限定されます。これにより、組織外からの不正なアクセスを防止します。</li>
+          <li><strong>XSS (クロスサイトスクリプティング) 対策</strong>: 全てのユーザー入力は厳重にサニタイズされ、悪意のあるスクリプトの埋め込みを防ぎます。動的に生成されるHTMLコンテンツも適切にエスケープ処理されます。</li>
+          <li><strong>レート制限</strong>: 短時間での連続操作（例: 新規登録、リアクション）を制限することで、システムへの過負荷や悪意のある自動操作を防ぎます。</li>
+          <li><strong>自動非公開機能</strong>: 公開されたボードは一定時間（例: 6時間）経過後に自動的に非公開状態に戻ります。これにより、意図しない情報公開が続くことを防ぎます。</li>
+          <li><strong>Google Apps Scriptのセキュリティ機能活用</strong>: Googleが提供するGASの組み込みセキュリティ機能（例: クリックジャッキング対策のためのX-Frame-Optionsヘッダー設定）を最大限に活用し、一般的なウェブ脆弱性から保護します。</li>
+          <li><strong>Google Driveのアクセス権限管理</strong>: 作成されるスプレッドシートやフォームは、適切なアクセス権限（例: ドメイン内での共有）が自動的に設定され、不必要な外部共有を防ぎます。</li>
+        </ul>
+
+        <p>これらの対策により、「みんなの回答ボード」は教育現場で安心してご利用いただけるよう、データの安全性とプライバシー保護に最大限配慮しています。</p>
+      </div>
+      <div class="flex justify-end mt-6">
+        <button id="security-info-close-btn" class="btn btn-primary">閉じる</button>
+      </div>
+    </div>
+  </div>
   <script>
     let userEmail = '';
     let currentStep = 1;
@@ -1025,6 +1513,26 @@
     // ページ読み込み時にドメイン情報を取得
     document.addEventListener('DOMContentLoaded', function() {
       loadDomainInfo();
+      
+      // セキュリティ情報モーダルのイベントリスナー
+      const securityInfoBtn = document.getElementById('security-info-btn');
+      const securityInfoModal = document.getElementById('security-info-modal');
+      const securityInfoCloseBtn = document.getElementById('security-info-close-btn');
+
+      if (securityInfoBtn && securityInfoModal && securityInfoCloseBtn) {
+        securityInfoBtn.addEventListener('click', () => {
+          securityInfoModal.classList.remove('hidden');
+        });
+        securityInfoCloseBtn.addEventListener('click', () => {
+          securityInfoModal.classList.add('hidden');
+        });
+        // モーダルの外側をクリックで閉じる
+        securityInfoModal.addEventListener('click', (e) => {
+          if (e.target === securityInfoModal) {
+            securityInfoModal.classList.add('hidden');
+          }
+        });
+      }
     });
   </script>
 </body>

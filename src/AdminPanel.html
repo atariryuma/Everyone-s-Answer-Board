@@ -245,6 +245,7 @@
               <span id="admin-user-email" class="text-white">認証済み</span>
             </p>
           </div>
+          <div id="header-board-status" class="hidden px-3 py-1 rounded-full text-xs font-semibold bg-green-500 text-white">公開中</div>
         </div>
       </div>
       
@@ -292,7 +293,7 @@
     <section class="mb-8">
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <!-- Board Status Card -->
-        <div class="glass-panel p-6 rounded-xl card-hover fade-in">
+        <div class="glass-panel p-6 rounded-xl card-hover fade-in" id="board-status-card">
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-3">
               <div class="w-12 h-12 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-full flex items-center justify-center">
@@ -320,21 +321,21 @@
         
         <!-- Statistics Cards -->
         <div class="glass-panel p-6 rounded-xl card-hover fade-in">
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-12 h-12 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-full flex items-center justify-center">
-              <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+          <button type="button" id="open-form-btn" class="w-full h-full flex items-center gap-3 mb-4 text-left">
+            <div class="w-12 h-12 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-full flex items-center justify-center">
+              <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M12 15h.01"></path>
               </svg>
             </div>
             <div>
-              <p class="text-sm text-gray-400">回答数</p>
-              <p class="text-2xl font-bold text-green-400" id="answer-count">0</p>
+              <p class="text-sm text-gray-400">回答フォーム</p>
+              <p class="text-2xl font-bold text-purple-400" id="answer-count">開く</p>
             </div>
-          </div>
+          </button>
         </div>
         
         <div class="glass-panel p-6 rounded-xl card-hover fade-in">
-          <div class="flex items-center gap-3 mb-4">
+          <button type="button" id="open-reactions-btn" class="w-full h-full flex items-center gap-3 mb-4 text-left">
             <div class="w-12 h-12 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-full flex items-center justify-center">
               <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
@@ -344,7 +345,7 @@
               <p class="text-sm text-gray-400">リアクション</p>
               <p class="text-2xl font-bold text-purple-400" id="reaction-count">0</p>
             </div>
-          </div>
+          </button>
         </div>
         
         <div class="glass-panel p-6 rounded-xl card-hover fade-in">
@@ -911,8 +912,9 @@
       formUrlInput: document.getElementById('form-url-input'),
       copyFormUrlBtn: document.getElementById('copy-form-url-btn'),
       openFormUrlLink: document.getElementById('open-form-url-link'),
-      endBoardBtn: document.getElementById('end-board-btn')
-    };
+      endBoardBtn: document.getElementById('end-board-btn'),
+        openFormBtn: document.getElementById('open-form-btn')
+      };
 
     // ドメイン情報を取得して表示
     function loadAdminDomainInfo() {
@@ -1004,6 +1006,30 @@
         elements.copyFormUrlBtn.addEventListener('click', () => copyUrl(elements.formUrlInput, 'GoogleフォームのURLをコピーしました'));
       }
 
+      // Open Form Button
+      const openFormBtn = document.getElementById('open-form-btn');
+      if (openFormBtn) {
+        openFormBtn.addEventListener('click', () => {
+          if (elements.formUrlInput && elements.formUrlInput.value) {
+            window.open(elements.formUrlInput.value, '_blank');
+          } else {
+            showMessage('GoogleフォームのURLが見つかりません', 'yellow');
+          }
+        });
+      }
+
+      // Open Reactions Button
+      const openReactionsBtn = document.getElementById('open-reactions-btn');
+      if (openReactionsBtn) {
+        openReactionsBtn.addEventListener('click', () => {
+          if (elements.boardUrl && elements.boardUrl.value) {
+            window.open(`${elements.boardUrl.value}&mode=admin`, '_blank'); // 管理モードで開く
+          } else {
+            showMessage('回答ボードのURLが見つかりません', 'yellow');
+          }
+        });
+      }
+
       // Auto-update config when headers change
       elements.mainHeader.addEventListener('change', updateConfigButtons);
       
@@ -1013,6 +1039,15 @@
           window.open(currentSpreadsheetUrl, '_blank');
         } else {
           showMessage('スプレッドシートのURLが見つかりません', 'yellow');
+        }
+      });
+      
+      // Board Status Card click event
+      document.getElementById('board-status-card').addEventListener('click', function() {
+        if (currentActiveSheet && elements.boardUrl && elements.boardUrl.value) {
+          window.open(elements.boardUrl.value, '_blank');
+        } else {
+          showMessage('回答ボードのURLが見つかりません', 'yellow');
         }
       });
       
@@ -1186,6 +1221,19 @@
           statusDescEl.title = '';
         }
       }
+
+      // ヘッダーの公開状態表示を更新
+      const headerBoardStatus = document.getElementById('header-board-status');
+      if (headerBoardStatus) {
+        if (isActive) {
+          headerBoardStatus.classList.remove('hidden');
+          headerBoardStatus.textContent = '公開中';
+          headerBoardStatus.classList.remove('bg-red-500');
+          headerBoardStatus.classList.add('bg-green-500');
+        } else {
+          headerBoardStatus.classList.add('hidden');
+        }
+      }
       
       // Update timestamps
       const now = new Date();
@@ -1226,6 +1274,13 @@
       const engagementEl = document.getElementById('engagement-rate');
       if (engagementEl) engagementEl.textContent = `${engagementRate}%`;
       
+      // Form URL for open form button
+      if (status.formUrl && elements.openFormBtn) {
+        elements.openFormBtn.onclick = () => window.open(status.formUrl, '_blank');
+      } else if (elements.openFormBtn) {
+        elements.openFormBtn.onclick = null; // URLがない場合はクリック無効
+      }
+
       // Last activity
       const lastActivityElement = document.getElementById('last-activity');
       if (lastActivityElement) {

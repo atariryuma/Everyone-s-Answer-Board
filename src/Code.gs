@@ -1398,6 +1398,7 @@ function getStatus() {
       totalReactions: totalReactions,
       webAppUrl: getWebAppUrlEnhanced(),
       spreadsheetUrl: userInfo ? userInfo.spreadsheetUrl || '' : '',
+      formUrl: userInfo ? userInfo.formUrl || '' : '',
       showNames: typeof config.showNames !== 'undefined' ? config.showNames : (config.showDetails || false),
       showCounts: typeof config.showCounts !== 'undefined' ? config.showCounts : (config.showDetails || false)
     };
@@ -1584,6 +1585,11 @@ function guessHeadersFromArray(headers) {
     classHeader: classHeader
   };
   
+  // 問題文ヘッダーが空の場合、回答ヘッダーと同じにする
+  if (!guessed.questionHeader && guessed.answerHeader) {
+    guessed.questionHeader = guessed.answerHeader;
+  }
+
   debugLog('Guessed headers:', guessed);
   
   // 最終フォールバック: 何も推測できない場合
