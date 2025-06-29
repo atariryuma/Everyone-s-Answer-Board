@@ -1599,9 +1599,12 @@ function guessHeadersFromArray(headers) {
     classHeader = find(['クラス', 'class', 'classroom', '組', '学級', '班', 'グループ']);
   }
   
+  // 問題文ヘッダーと回答ヘッダーは同じデータを使用
+  const headerForBoth = answer || question || '';
+  
   const guessed = {
-    questionHeader: question,
-    answerHeader: answer,
+    questionHeader: headerForBoth,
+    answerHeader: headerForBoth,
     reasonHeader: reason,
     nameHeader: name,
     classHeader: classHeader
@@ -1626,6 +1629,8 @@ function guessHeadersFromArray(headers) {
       .map(h => h.original);
     
     if (usableHeaders.length > 0) {
+      // 問題文ヘッダーと回答ヘッダーは同じデータを使用
+      guessed.questionHeader = usableHeaders[0];
       guessed.answerHeader = usableHeaders[0];
       if (usableHeaders.length > 1) guessed.reasonHeader = usableHeaders[1];
       if (usableHeaders.length > 2) guessed.nameHeader = usableHeaders[2];

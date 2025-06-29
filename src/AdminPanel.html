@@ -921,7 +921,7 @@
       google.script.run
         .withSuccessHandler(displayAdminDomainInfo)
         .withFailureHandler(error => {
-          console.error('ドメイン情報の取得に失敗:', error);
+          console.error('Failed to get domain info:', error);
         })
         .getDeployUserDomainInfo();
     }
@@ -933,7 +933,7 @@
       const mismatchPanel = document.getElementById('admin-domain-mismatch-panel');
       
       if (!info || info.error) {
-        console.warn('ドメイン情報の取得エラー:', info?.error);
+        console.warn('Domain info error:', info?.error);
         return;
       }
 
@@ -975,8 +975,8 @@
       elements.switchSheetBtn.addEventListener('click', () => {
         if (!selectedSheet) return;
         showConfirmationModal(
-          '安全のための自動非公開機能について',
-          'このボードはセキュリティ保護のため、公開から6時間後に自動で非公開状態に戻ります。再度公開したい場合は、この管理画面からもう一度設定を行ってください。よろしいですか？',
+          'About Auto-Privacy Feature',
+          'This board will automatically become private after 6 hours for security. You can re-publish from this admin panel. Continue?',
           switchToSheet
         );
       });
@@ -1003,7 +1003,7 @@
         elements.endBoardBtn.addEventListener('click', clearSheetSelection);
       }
       if (elements.copyFormUrlBtn) {
-        elements.copyFormUrlBtn.addEventListener('click', () => copyUrl(elements.formUrlInput, 'GoogleフォームのURLをコピーしました'));
+        elements.copyFormUrlBtn.addEventListener('click', () => copyUrl(elements.formUrlInput, 'Form URL copied'));
       }
 
       // Open Form Button
@@ -1029,7 +1029,7 @@
             
             window.open(editUrl, '_blank');
           } else {
-            showMessage('Googleフォームが設定されていません', 'yellow');
+            showMessage('Google Form not configured', 'yellow');
           }
         });
       }
@@ -1045,7 +1045,7 @@
             url.searchParams.set('adminModeVerified', 'true');
             window.open(url.toString(), '_blank');
           } else {
-            showMessage('回答ボードのURLが見つかりません', 'yellow');
+            showMessage('Board URL not found', 'yellow');
           }
         });
       }
@@ -1058,7 +1058,7 @@
         if (currentSpreadsheetUrl) {
           window.open(currentSpreadsheetUrl, '_blank');
         } else {
-          showMessage('スプレッドシートのURLが見つかりません', 'yellow');
+          showMessage('Spreadsheet URL not found', 'yellow');
         }
       });
       
@@ -1067,7 +1067,7 @@
         if (currentActiveSheet && elements.boardUrl && elements.boardUrl.value) {
           window.open(elements.boardUrl.value, '_blank');
         } else {
-          showMessage('回答ボードのURLが見つかりません', 'yellow');
+          showMessage('Board URL not found', 'yellow');
         }
       });
       
@@ -1076,7 +1076,7 @@
         if (currentActiveSheet && elements.boardUrl && elements.boardUrl.value) {
           window.open(elements.boardUrl.value, '_blank');
         } else {
-          showMessage('回答ボードのURLが見つかりません', 'yellow');
+          showMessage('Board URL not found', 'yellow');
         }
       });
       
@@ -1130,8 +1130,8 @@
       
       if (elements.switchSheetText) {
         elements.switchSheetText.textContent = isCurrentActive ? 
-          '現在アクティブなシート' : 
-          (hasSelected ? `「${selectedSheet}」をアクティブにする` : 'アクティブシートを選択');
+          'Currently active sheet' : 
+          (hasSelected ? `Activate "${selectedSheet}"` : 'Select active sheet');
       }
       
       if (hasSelected) {
@@ -1148,7 +1148,7 @@
 
     function updateSetupProgress() {
       let progress = 0;
-      let statusText = '設定を開始してください';
+      let statusText = 'Please start setup';
       
       // Calculate progress based on completion
       const hasSpreadsheet = elements.sheetSelect.options.length > 1;
@@ -1158,19 +1158,19 @@
       
       if (hasSpreadsheet) {
         progress = 25;
-        statusText = 'スプレッドシートが追加されました';
+        statusText = 'Spreadsheet added';
       }
       if (hasSelectedSheet) {
         progress = 50;
-        statusText = '表示するボードが選択されました';
+        statusText = 'Board selected for display';
       }
       if (hasConfig) {
         progress = 75;
-        statusText = '列設定が完了しました';
+        statusText = 'Column setup completed';
       }
       if (hasActiveSheet) {
         progress = 100;
-        statusText = '回答ボードが公開中です';
+        statusText = 'Board is published';
       }
       
       if (elements.setupProgress) {
@@ -1188,18 +1188,18 @@
     }
 
     function loadStatus() {
-      setLoading(true, 'ステータス読み込み中...');
+      setLoading(true, 'Loading status...');
       google.script.run
         .withSuccessHandler(updateStatus)
         .withFailureHandler((error) => {
           console.error('getStatus error:', error);
-          let errorMessage = 'ステータスの取得に失敗しました';
+          let errorMessage = 'Failed to get status';
           
           if (error && typeof error === 'object') {
             if (error.message && typeof error.message === 'string') {
               errorMessage = error.message;
               if (error.message.includes('ユーザー情報')) {
-                showMessage('初回使用の場合は、先に新規登録を完了してください。', 'yellow');
+                showMessage('Please complete registration first.', 'yellow');
                 return;
               }
             }
@@ -1230,12 +1230,12 @@
       if (statusDescEl) {
         statusDescEl.textContent = isActive ?
           `現在 "${currentActiveSheet}" が公開中です` :
-          'スプレッドシートを追加して開始してください';
+          'Please add spreadsheet to start';
         
         // クリック可能状態の管理
         if (isActive && elements.boardUrl && elements.boardUrl.value) {
           statusDescEl.classList.add('cursor-pointer', 'hover:text-gray-100', 'hover:underline');
-          statusDescEl.title = 'クリックで回答ボードを開く';
+          statusDescEl.title = 'Click to open board';
         } else {
           statusDescEl.classList.remove('cursor-pointer', 'hover:text-gray-100', 'hover:underline');
           statusDescEl.title = '';
@@ -1258,7 +1258,7 @@
         if (currentActiveSheet && currentSpreadsheetUrl) {
           if (activeSheetPanelEl) {
             activeSheetPanelEl.classList.add('cursor-pointer', 'hover:bg-green-500/5', 'hover:border-green-400/30', 'hover:shadow-lg', 'hover:shadow-green-500/10');
-            activeSheetPanelEl.title = 'クリックでスプレッドシートを開く';
+            activeSheetPanelEl.title = 'Click to open spreadsheet';
           }
         } else {
           if (activeSheetPanelEl) {
@@ -1318,7 +1318,7 @@
       if (status.allSheets && status.allSheets.length > 0) {
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
-        defaultOption.textContent = '-- アクティブシートを選択 --';
+        defaultOption.textContent = '-- Select active sheet --';
         elements.sheetSelect.appendChild(defaultOption);
         status.allSheets.forEach(name => {
           const opt = document.createElement('option');
@@ -1335,7 +1335,7 @@
       } else {
         const noSheetsOption = document.createElement('option');
         noSheetsOption.value = '';
-        noSheetsOption.textContent = '利用可能なボードがありません';
+        noSheetsOption.textContent = 'No boards available';
         elements.sheetSelect.appendChild(noSheetsOption);
         elements.sheetSelect.disabled = true;
       }
@@ -1353,10 +1353,10 @@
         const urlDescription = document.getElementById('url-section-description');
 
         if (urlTitle) {
-          urlTitle.textContent = '📋 公開中のボード';
+          urlTitle.textContent = '📋 Published Board';
         }
         if (urlDescription) {
-          urlDescription.textContent = '生徒にはこのURLを共有してください';
+          urlDescription.textContent = 'Share this URL with students';
         }
         const studentUrlSection = document.getElementById('student-url-section');
         if (studentUrlSection) {
@@ -1416,7 +1416,7 @@
       } else {
         activities.push({
           time: '未設定',
-          text: '新しいボードを作成するか、既存のスプレッドシートを追加してください',
+          text: 'Create a new board or add existing spreadsheet',
           type: 'pending',
           icon: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
         });
@@ -1487,7 +1487,7 @@
         } else {
           const noDataDiv = document.createElement('div');
           noDataDiv.className = 'text-gray-400 text-sm';
-          noDataDiv.textContent = '活動データがありません';
+          noDataDiv.textContent = 'No activity data';
           activityList.appendChild(noDataDiv);
         }
       }
@@ -1499,21 +1499,21 @@
       const url = urlInput.value.trim();
       
       if (!url) {
-        showMessage('スプレッドシートURLを入力してください。', 'red');
+        showMessage('Please enter spreadsheet URL.', 'red');
         addVisualFeedback(urlInput, 'error');
         urlInput.focus();
         return;
       }
       
       if (!url.includes('docs.google.com/spreadsheets')) {
-        showMessage('有効なGoogleスプレッドシートのURLを入力してください。', 'red');
+        showMessage('Please enter a valid Google Spreadsheet URL.', 'red');
         addVisualFeedback(urlInput, 'error');
         urlInput.focus();
         return;
       }
       
       // Visual loading state
-      setLoading(true, 'スプレッドシートを追加中...');
+      setLoading(true, 'Adding spreadsheet...');
       addBtn.disabled = true;
       if (elements.addSpreadsheetText) {
         elements.addSpreadsheetText.textContent = '追加中...';
@@ -1521,18 +1521,18 @@
       
       google.script.run
         .withSuccessHandler((result) => {
-          showMessage(result.message || 'スプレッドシートが追加されました', 'green');
+          showMessage(result.message || 'Spreadsheet added successfully', 'green');
           addVisualFeedback(urlInput, 'success');
           urlInput.value = '';
           addBtn.disabled = false;
           if (elements.addSpreadsheetText) {
-            elements.addSpreadsheetText.textContent = 'スプレッドシートを追加';
+            elements.addSpreadsheetText.textContent = 'Add Spreadsheet';
           }
           loadStatus(); // Refresh the status
         })
         .withFailureHandler((error) => {
           console.error('addSpreadsheetUrl error:', error);
-          let errorMsg = 'スプレッドシートの追加に失敗しました';
+          let errorMsg = 'Failed to add spreadsheet';
           if (error && error.message) {
             errorMsg = error.message;
           }
@@ -1540,7 +1540,7 @@
           addVisualFeedback(addBtn, 'error');
           addBtn.disabled = false;
           if (elements.addSpreadsheetText) {
-            elements.addSpreadsheetText.textContent = 'スプレッドシートを追加';
+            elements.addSpreadsheetText.textContent = 'Add Spreadsheet';
           }
           setLoading(false);
         })
@@ -1551,10 +1551,10 @@
       const btn = elements.createBoardBtn;
       if (btn) btn.disabled = true;
       if (elements.createBoardText) elements.createBoardText.textContent = '作成中...';
-      setLoading(true, '新しいボードを作成し、公開しています...');
+      setLoading(true, 'Creating and publishing new board...');
       google.script.run
         .withSuccessHandler((result) => {
-          showMessage(result.message || 'ボードが作成されました', 'green');
+          showMessage(result.message || 'Board created successfully', 'green');
           if (result.formUrl && elements.formUrlInput) {
             elements.formUrlInput.value = result.formUrl;
             elements.openFormUrlLink.href = result.formUrl;
@@ -1572,7 +1572,7 @@
         .withFailureHandler((error) => {
           showError(error);
           if (btn) btn.disabled = false;
-          if (elements.createBoardText) elements.createBoardText.textContent = '新しいボードを作成して公開';
+          if (elements.createBoardText) elements.createBoardText.textContent = 'Create and Publish Board';
         })
         .createBoardFromAdmin();
     }
@@ -1595,7 +1595,7 @@
             })
             .withFailureHandler((error) => {
               debugLog('Config not found, using guessed headers:', error);
-              showMessage('新しいシートの設定を自動推測しました。確認してください。', 'blue');
+              showMessage('Auto-configured new sheet settings. Please verify.', 'blue');
               updateConfigButtons();
             })
             .getConfig(selectedSheet);
@@ -1603,7 +1603,7 @@
         .withFailureHandler((error) => {
           console.error('Failed to get sheet headers:', error);
           clearConfigFields();
-          showMessage('シートのヘッダー情報を取得できませんでした。', 'red');
+          showMessage('Failed to get sheet header information.', 'red');
         })
         .getSheetHeaders(selectedSheet);
     }
@@ -1615,7 +1615,7 @@
         sel.replaceChildren();
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
-        defaultOption.textContent = '-- 選択してください --';
+        defaultOption.textContent = '-- Please select --';
         sel.appendChild(defaultOption);
         headers.forEach(h => {
           const opt = document.createElement('option');
@@ -1665,7 +1665,7 @@
           const hStr = String(header || '').toLowerCase();
           
           // 質問を含む長いテキストを質問ヘッダーとして推測
-          if (!question && (hStr.includes('だろうか') || hStr.includes('ですか') || hStr.includes('でしょうか') || hStr.length > 20)) {
+          if (!question && (hStr.includes('question') || hStr.includes('answer') || hStr.length > 20)) {
             question = header;
             // 同じ内容が複数列にある場合、回答用として2番目を使用
             if (i + 1 < nonMetaHeaders.length && nonMetaHeaders[i + 1] === header) {
@@ -1675,7 +1675,7 @@
           }
           
           // 回答・意見に関するヘッダー
-          if (!answer && (hStr.includes('回答') || hStr.includes('答え') || hStr.includes('意見') || hStr.includes('考え'))) {
+          if (!answer && (hStr.includes('answer') || hStr.includes('response') || hStr.includes('opinion'))) {
             answer = header;
           }
           
@@ -1703,7 +1703,7 @@
       } else {
         // 通常のシート用の推測ロジック
         question = find(['質問', '問題']);
-        answer = find(['回答', '答え']);
+        answer = find(['answer', 'response']);
         reason = find(['理由']);
         name = find(['名前', '氏名']);
         classHeader = find(['クラス']);
@@ -1734,7 +1734,7 @@
         sel.replaceChildren();
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
-        defaultOption.textContent = '-- 選択してください --';
+        defaultOption.textContent = '-- Please select --';
         sel.appendChild(defaultOption);
         sel.value = '';
       });
@@ -1743,14 +1743,14 @@
 
     function saveConfig() {
       if (!selectedSheet) {
-        showMessage('シートを選択してください。', 'red');
+        showMessage('Please select a sheet.', 'red');
         return;
       }
       
       const mainVal = elements.mainHeader.value;
       
       if (!mainVal) {
-        showMessage('回答データ列を選択してください。', 'red');
+        showMessage('Please select answer data column.', 'red');
         addVisualFeedback(elements.mainHeader, 'error');
         return;
       }
@@ -1763,7 +1763,7 @@
         classHeader: elements.classHeader.value
       };
       
-      setLoading(true, '設定を保存中...');
+      setLoading(true, 'Saving settings...');
       elements.saveConfigBtn.disabled = true;
       if (elements.saveConfigText) {
         elements.saveConfigText.textContent = '保存中...';
@@ -1777,7 +1777,7 @@
             elements.configStatus.classList.remove('hidden');
           }
           if (elements.saveConfigText) {
-            elements.saveConfigText.textContent = '設定を保存';
+            elements.saveConfigText.textContent = 'Save Settings';
           }
           elements.saveConfigBtn.disabled = false;
           updateSetupProgress();
@@ -1787,7 +1787,7 @@
           showError(error);
           addVisualFeedback(elements.saveConfigBtn, 'error');
           if (elements.saveConfigText) {
-            elements.saveConfigText.textContent = '設定を保存';
+            elements.saveConfigText.textContent = 'Save Settings';
           }
           elements.saveConfigBtn.disabled = false;
           setLoading(false);
@@ -1798,7 +1798,7 @@
     function switchToSheet() {
       if (!selectedSheet) return;
       
-      setLoading(true, 'ボードを切り替え中...');
+      setLoading(true, 'Switching board...');
       google.script.run
         .withSuccessHandler((msg) => {
           showMessage(msg, 'green');
@@ -1809,7 +1809,7 @@
     }
 
     function clearSheetSelection() {
-      setLoading(true, 'ボードの公開を終了しています...');
+      setLoading(true, 'Ending board publication...');
       google.script.run
         .withSuccessHandler((msg) => {
           showMessage(msg, 'green');
@@ -1820,7 +1820,7 @@
     }
 
     function updateDisplayOptions(showNames, showCounts) {
-      setLoading(true, '表示設定を更新中...');
+      setLoading(true, 'Updating display settings...');
       google.script.run
         .withSuccessHandler((msg) => {
           showMessage(msg, 'green');
@@ -1841,13 +1841,13 @@
           }
           showMessage(successMessage, 'green');
         } catch (error) {
-          showMessage('コピーに失敗しました', 'red');
+          showMessage('Copy failed', 'red');
         }
       }
     }
 
     function copyBoardUrl() {
-      copyUrl(elements.boardUrl, 'ボードのURLをコピーしました');
+      copyUrl(elements.boardUrl, 'Board URL copied');
     }
 
     function setLoading(isLoading, msg = "") {
@@ -1914,7 +1914,7 @@
 
     function showError(error) {
       console.error('Error:', error);
-      showMessage('エラー: ' + (error.message || '操作に失敗しました'), 'red');
+      showMessage('Error: ' + (error.message || 'Operation failed'), 'red');
       setLoading(false);
     }
 
