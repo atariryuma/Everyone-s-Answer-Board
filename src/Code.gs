@@ -847,9 +847,41 @@ function doGet(e) {
       return output.setTitle('エラー');
     }
 
+    // ユーザー設定を取得（全体で使用するため外で定義）
+    let config = userInfo.configJson || {};
+    
+    // 新規登録直後などでconfigが空の場合のフォールバック処理
+    if (!config || Object.keys(config).length === 0) {
+      debugLog('Config is empty, attempting to initialize default config');
+      try {
+        // デフォルト設定を適用
+        config = {
+          activeSheetName: '',
+          isPublished: false,
+          showNames: true
+        };
+        
+        // スプレッドシートが存在する場合は最初のシートを設定
+        if (userInfo.spreadsheetId) {
+          try {
+            const spreadsheet = SpreadsheetApp.openById(userInfo.spreadsheetId);
+            const sheets = spreadsheet.getSheets();
+            if (sheets && sheets.length > 0) {
+              config.activeSheetName = sheets[0].getName();
+              debugLog(`Set default activeSheetName: ${config.activeSheetName}`);
+            }
+          } catch (spreadsheetError) {
+            debugLog(`Failed to access spreadsheet for default config: ${spreadsheetError.message}`);
+          }
+        }
+      } catch (configError) {
+        debugLog(`Failed to initialize default config: ${configError.message}`);
+        config = {};
+      }
+    }
+
     // --- 自動非公開タイマーのチェック ---
     try {
-      const config = userInfo.configJson || {};
       if (config && config.publishedAt) {
         const publishedDate = new Date(config.publishedAt);
         const sixHoursLater = new Date(publishedDate.getTime() + 6 * 60 * 60 * 1000);
@@ -2563,6 +2595,20 @@ function getUserInfo(userId) {
     const userInfo = getUserInfoViaApi(userId);
     
     if (userInfo && userInfo.success && userInfo.data) {
+      // configJsonが文字列の場合はオブジェクトに変換
+      if (userInfo.data.configJson) {
+        try {
+          if (typeof userInfo.data.configJson === 'string') {
+            userInfo.data.configJson = JSON.parse(userInfo.data.configJson);
+          }
+        } catch (e) {
+          debugLog(`configJson解析エラー for user ${userId}: ${e.message}`);
+          userInfo.data.configJson = {};
+        }
+      } else {
+        userInfo.data.configJson = {};
+      }
+      
       // 最終アクセス日時の更新もAPI経由で実行
       updateUserViaApi(userId, { lastAccessedAt: new Date().toISOString() });
       return userInfo.data;
@@ -2819,10 +2865,12 @@ function registerNewUser(adminEmail) {
   const newSheetName = addResult.firstSheetName;
   if (newSheetName) {
     debugLog(`🔄 シートをアクティブ化・公開中: ${newSheetName}`);
-    // アクティブシートに設定
-    switchActiveSheet(newSheetName);
-    // 公開状態に設定
-    updateUserConfig(userId, { isPublished: true });
+    // アクティブシートに設定と公開状態を同時に設定（1回のAPI呼び出しで実行）
+    updateUserConfig(userId, {
+      activeSheetName: newSheetName,
+      publishedAt: new Date().toISOString(),
+      isPublished: true
+    });
     debugLog(`✅ シートアクティブ化・公開完了: ${newSheetName}`);
   }
   
