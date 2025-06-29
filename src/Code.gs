@@ -1534,11 +1534,9 @@ function guessHeadersFromArray(headers) {
       // 質問を含む長いテキストを質問ヘッダーとして推測
       if (!question && (hStr.includes('だろうか') || hStr.includes('ですか') || hStr.includes('でしょうか') || hStr.length > 20)) {
         question = header;
-        // 同じ内容が複数列にある場合、回答用として2番目を使用
-        if (i + 1 < nonMetaHeaders.length && nonMetaHeaders[i + 1].original === header) {
-          answer = header;
-          continue;
-        }
+        // 問題文と回答が同じ列にある場合、回答ヘッダーも同じにする
+        answer = header;
+        continue;
       }
       
       // 回答・意見に関するヘッダー
