@@ -38,7 +38,7 @@ function initialSetup() {
  * @returns {HtmlService.HtmlOutput} セットアップページのHTML
  */
 function handleSetupRequest() {
-  return HtmlService.createTemplateFromFile('Setup').evaluate()
+  return HtmlService.createTemplateFromFile('SetupPage').evaluate()
     .setTitle('みんなの回答ボード - 初回セットアップ');
 }
 
