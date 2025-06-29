@@ -51,8 +51,21 @@ function saveSettingsAndCreateDb(apiUrl) {
   try {
     const properties = PropertiesService.getScriptProperties();
     
-    if (!apiUrl || !apiUrl.startsWith('https://script.google.com/macros/s/')) {
+    // URL検証（Google Apps Script の複数の形式に対応）
+    if (!apiUrl || typeof apiUrl !== 'string') {
       throw new Error('入力されたURLが無効です。正しい「管理者向けログ記録API」のウェブアプリURLを入力してください。');
+    }
+    
+    // Google Apps Script の有効なURL形式を確認
+    const validUrlPatterns = [
+      /^https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec$/,  // 標準形式
+      /^https:\/\/script\.google\.com\/a\/macros\/[^\/]+\/s\/[a-zA-Z0-9_-]+\/exec$/  // G Suite/Workspace カスタムドメイン形式
+    ];
+    
+    const isValidUrl = validUrlPatterns.some(pattern => pattern.test(apiUrl));
+    
+    if (!isValidUrl) {
+      throw new Error('入力されたURLが無効です。正しい「管理者向けログ記録API」のウェブアプリURLを入力してください。\n\n有効な形式:\n- https://script.google.com/macros/s/xxxxx/exec\n- https://script.google.com/a/macros/domain.com/s/xxxxx/exec');
     }
     properties.setProperty('LOGGER_API_URL', apiUrl);
 
