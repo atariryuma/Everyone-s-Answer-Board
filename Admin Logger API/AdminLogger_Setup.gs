@@ -217,6 +217,9 @@ function handleApiRequest(requestData) {
     case 'getExistingBoard':
       return handleGetExistingBoard(data);
       
+    case 'checkExistingUser':
+      return handleCheckExistingUser(data);
+      
     default:
       throw new Error(`未知のAPIアクション: ${action}`);
   }
@@ -427,15 +430,32 @@ function getDatabaseSheet() {
 
   try {
     const spreadsheet = SpreadsheetApp.openById(dbSheetId);
+    
+    if (!spreadsheet) {
+      throw new Error(`スプレッドシート(ID: ${dbSheetId})を開けませんでした。`);
+    }
+    
     const sheet = spreadsheet.getSheetByName(TARGET_SHEET_NAME);
 
     if (!sheet) {
       throw new Error(`データベース内に「${TARGET_SHEET_NAME}」という名前のシートが見つかりません。`);
     }
+    
+    // データ範囲の存在確認
+    try {
+      const range = sheet.getDataRange();
+      if (!range) {
+        throw new Error('シートのデータ範囲を取得できませんでした。');
+      }
+    } catch (rangeError) {
+      Logger.log(`Data range error: ${rangeError.message}`);
+      throw new Error(`シートへのアクセスエラー: ${rangeError.message}`);
+    }
+    
     return sheet;
   } catch (error) {
     Logger.log(`Failed to open database sheet with ID: ${dbSheetId}. Error: ${error.toString()}`);
-    throw new Error('データベースのスプレッドシートを開けませんでした。IDが正しいか、アクセス権限があるか確認してください。');
+    throw new Error(`データベースアクセスエラー: ${error.message}`);
   }
 }
 
@@ -576,31 +596,68 @@ function saveDeploymentIdToProperties(id) {
 }
 
 /**
+ * 既存ユーザーチェックAPI
+ */
+function handleCheckExistingUser(data) {
+  try {
+    const dbSheet = getDatabaseSheet();
+    const { adminEmail } = data;
+    
+    if (!adminEmail) {
+      return { success: false, error: 'adminEmailが必要です' };
+    }
+    
+    const userData = findUserByEmail(dbSheet, adminEmail);
+    
+    return {
+      success: true,
+      exists: userData !== null,
+      data: userData
+    };
+    
+  } catch (error) {
+    Logger.log(`checkExistingUser error: ${error.message}`);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
  * ユーザーIDでユーザーを検索
  * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - データベースシート
  * @param {string} userId - ユーザーID
  * @returns {Object|null} ユーザーデータ
  */
 function findUserById(sheet, userId) {
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === userId) { // userId column
-      return {
-        userId: data[i][0],
-        adminEmail: data[i][1],
-        spreadsheetId: data[i][2],
-        spreadsheetUrl: data[i][3],
-        createdAt: data[i][4],
-        accessToken: data[i][5],
-        configJson: data[i][6],
-        lastAccessedAt: data[i][7],
-        isActive: data[i][8]
-      };
+  try {
+    const data = sheet.getDataRange().getValues();
+    
+    if (!data || data.length === 0) {
+      return null;
     }
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i] && data[i][0] === userId) { // userId column
+        return {
+          userId: data[i][0],
+          adminEmail: data[i][1],
+          spreadsheetId: data[i][2],
+          spreadsheetUrl: data[i][3],
+          createdAt: data[i][4],
+          accessToken: data[i][5],
+          configJson: data[i][6],
+          lastAccessedAt: data[i][7],
+          isActive: data[i][8]
+        };
+      }
+    }
+    return null;
+  } catch (error) {
+    Logger.log(`findUserById error: ${error.message}`);
+    throw new Error(`ユーザー検索エラー: ${error.message}`);
   }
-  return null;
 }
 
 /**
@@ -610,24 +667,33 @@ function findUserById(sheet, userId) {
  * @returns {Object|null} ユーザーデータ
  */
 function findUserByEmail(sheet, adminEmail) {
-  const data = sheet.getDataRange().getValues();
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][1] === adminEmail) { // adminEmail column
-      return {
-        userId: data[i][0],
-        adminEmail: data[i][1],
-        spreadsheetId: data[i][2],
-        spreadsheetUrl: data[i][3],
-        createdAt: data[i][4],
-        accessToken: data[i][5],
-        configJson: data[i][6],
-        lastAccessedAt: data[i][7],
-        isActive: data[i][8]
-      };
+  try {
+    const data = sheet.getDataRange().getValues();
+    
+    if (!data || data.length === 0) {
+      return null;
     }
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i] && data[i][1] === adminEmail) { // adminEmail column
+        return {
+          userId: data[i][0],
+          adminEmail: data[i][1],
+          spreadsheetId: data[i][2],
+          spreadsheetUrl: data[i][3],
+          createdAt: data[i][4],
+          accessToken: data[i][5],
+          configJson: data[i][6],
+          lastAccessedAt: data[i][7],
+          isActive: data[i][8]
+        };
+      }
+    }
+    return null;
+  } catch (error) {
+    Logger.log(`findUserByEmail error: ${error.message}`);
+    throw new Error(`ユーザー検索エラー: ${error.message}`);
   }
-  return null;
 }
 
 /**
