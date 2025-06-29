@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body { font-family: sans-serif; margin: 20px; }
+      ol, ul { padding-left: 25px; }
+      li { margin-bottom: 10px; }
+      strong { color: #c00; }
+      code { background-color: #f0f0f0; padding: 2px 5px; border-radius: 4px; }
+      button { padding: 8px 16px; background-color: #4285F4; color: white; border: none; border-radius: 4px; cursor: pointer; }
+      button:hover { background-color: #357ae8; }
+      input { width: 95%; padding: 8px; margin-top: 10px; border: 1px solid #ccc; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <h3>🚀 APIのデプロイ</h3>
+    <p>次に、このAPIをウェブアプリとして公開（デプロイ）します。</p>
+    <ol>
+      <li>Apps Scriptエディタ右上の「<strong>デプロイ</strong>」ボタンを押し、「<strong>新しいデプロイ</strong>」を選択します。</li>
+      <li>
+        「種類の選択」の歯車アイコンをクリックし、「<strong>ウェブアプリ</strong>」を選択します。
+      </li>
+      <li>
+        以下の設定でデプロイしてください:
+        <ul>
+          <li>説明: <code>Admin Logger API</code></li>
+          <li>次のユーザーとして実行: <strong>自分（あなたのアドレス）</strong></li>
+          <li>アクセスできるユーザー: <strong>全員</strong></li>
+        </ul>
+      </li>
+      <li>「デプロイ」ボタンを押します。</li>
+      <li>
+        デプロイが完了すると、「ウェブアプリ」セクションにURLが表示されます。<strong>このURLをコピーしてください。</strong><br>
+        このURLが、メインアプリからログを送信するための宛先になります。
+      </li>
+      <li>
+        「デプロイID」も同じ画面に表示されます。それをコピーして、下の入力欄に貼り付けてください。
+      </li>
+    </ol>
+    <hr>
+    <h4>デプロイIDの保存</h4>
+    <p>コピーしたデプロイIDを下に貼り付けて「設定を保存」ボタンを押してください。</p>
+    <input type="text" id="deploymentIdInput" placeholder="ここにデプロイIDを貼り付け" />
+    <br/><br/>
+    <button onclick="saveDeploymentId()">設定を保存して閉じる</button>
+    <script>
+      function saveDeploymentId() {
+        const id = document.getElementById('deploymentIdInput').value;
+        if (id) {
+          google.script.run
+            .withSuccessHandler(() => google.script.host.close())
+            .saveDeploymentIdToProperties(id);
+        } else {
+          alert('デプロイIDを入力してください。');
+        }
+      }
+    </script>
+  </body>
+</html>
