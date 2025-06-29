@@ -437,7 +437,13 @@ function showCurrentSettings() {
   }
 
   if (deploymentId) {
-    const webAppUrl = `https://script.google.com/macros/s/${deploymentId}/exec`;
+    // deploymentIdからURLを正しく構築
+    let webAppUrl;
+    if (deploymentId.startsWith('https://')) {
+      webAppUrl = deploymentId; // すでに完全なURL
+    } else {
+      webAppUrl = `https://script.google.com/macros/s/${deploymentId}/exec`;
+    }
     message += `✅ APIデプロイ: 設定済み\n   URL: ${webAppUrl}\n`;
   } else {
     message += '❌ APIデプロイ: 未設定\n';
@@ -459,7 +465,13 @@ function testDeployment() {
     return;
   }
   
-  const webAppUrl = `https://script.google.com/macros/s/${deploymentId}/exec`;
+  // deploymentIdからURLを正しく構築
+  let webAppUrl;
+  if (deploymentId.startsWith('https://')) {
+    webAppUrl = deploymentId; // すでに完全なURL
+  } else {
+    webAppUrl = `https://script.google.com/macros/s/${deploymentId}/exec`;
+  }
   
   try {
     // GETテスト
