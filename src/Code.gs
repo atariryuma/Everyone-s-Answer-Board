@@ -361,24 +361,24 @@ function ensureDatabaseAccess(userEmail) {
   try {
     debugLog(`🔐 データベースアクセス権限を確認中: ${userEmail}`);
     
-    // まずデータベースにアクセスできるかテスト
+    // 新しいアーキテクチャ: メインデータベースの取得/作成
     try {
-      const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
-      const testData = userDb.getRange(1, 1, 1, 1).getValue();
-      debugLog(`✅ データベースアクセス確認成功: ${userEmail}`);
+      const mainDb = getOrCreateMainDatabase();
+      const testData = mainDb.getRange(1, 1, 1, 1).getValue();
+      debugLog(`✅ メインデータベースアクセス確認成功: ${userEmail}`);
       return true;
     } catch (accessError) {
-      debugLog(`⚠️ データベースアクセス失敗、権限付与を試行: ${userEmail}`);
+      debugLog(`⚠️ メインデータベースアクセス失敗、権限付与を試行: ${userEmail}`);
       
       // アクセスできない場合、編集者として追加
-      const addResult = addUserToDatabaseEditors(userEmail);
+      const addResult = addUserToMainDatabaseEditors(userEmail);
       
       if (addResult) {
         // 権限付与後、再度アクセステスト
         try {
-          const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
-          const testData = userDb.getRange(1, 1, 1, 1).getValue();
-          debugLog(`✅ 権限付与後のデータベースアクセス確認成功: ${userEmail}`);
+          const mainDb = getOrCreateMainDatabase();
+          const testData = mainDb.getRange(1, 1, 1, 1).getValue();
+          debugLog(`✅ 権限付与後のメインデータベースアクセス確認成功: ${userEmail}`);
           return true;
         } catch (retestError) {
           console.error('権限付与後もアクセスできません:', retestError);
@@ -390,7 +390,7 @@ function ensureDatabaseAccess(userEmail) {
     }
     
   } catch (error) {
-    console.error('データベースアクセス権限確認でエラー:', error);
+    console.error('メインデータベースアクセス権限確認でエラー:', error);
     return false;
   }
 }
@@ -2710,8 +2710,8 @@ function registerNewUser(adminEmail) {
     throw new Error('データベースへのアクセス権限を取得できませんでした。管理者にお問い合わせください。');
   }
   
-  // 📝 ステップ2: データベースから既存ユーザーをチェック
-  const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
+  // 📝 ステップ2: メインデータベースから既存ユーザーをチェック
+  const userDb = getOrCreateMainDatabase();
   const data = userDb.getDataRange().getValues();
   const headers = data[0];
   const adminEmailIndex = headers.indexOf('adminEmail');
@@ -2929,6 +2929,32 @@ function getOrCreateMainDatabase() {
   
   Logger.log(`メインデータベースを新規作成しました。ID: ${dbId}`);
   return sheet;
+}
+
+/**
+ * メインデータベースにユーザーを編集者として追加する
+ * @param {string} userEmail - 追加するユーザーのメールアドレス
+ * @returns {boolean} 成功した場合true
+ */
+function addUserToMainDatabaseEditors(userEmail) {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    const dbId = properties.getProperty(MAIN_DB_ID_KEY);
+    
+    if (!dbId) {
+      Logger.log('メインデータベースIDが設定されていません');
+      return false;
+    }
+    
+    const dbFile = DriveApp.getFileById(dbId);
+    dbFile.addEditor(userEmail);
+    Logger.log(`ユーザー ${userEmail} をメインデータベースの編集者として追加しました`);
+    return true;
+    
+  } catch (e) {
+    Logger.log(`メインデータベースへのユーザー追加エラー: ${e.message}`);
+    return false;
+  }
 }
 
 /**
