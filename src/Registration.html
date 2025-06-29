@@ -575,8 +575,14 @@
           // まず既存ボード情報をチェック
           google.script.run
             .withSuccessHandler((existingBoard) => {
-              // userIdが無効な場合は既存ボードがないとして扱う
-              if (existingBoard && existingBoard.userId && existingBoard.userId !== 'undefined' && existingBoard.userId !== '' && existingBoard.userId !== null) {
+              // userIdが有効かどうかを厳密にチェック
+              if (existingBoard && existingBoard.userId && 
+                  typeof existingBoard.userId === 'string' && 
+                  existingBoard.userId.trim() !== '' && 
+                  existingBoard.userId !== 'undefined' && 
+                  existingBoard.userId !== 'null' &&
+                  existingBoard.userId !== null &&
+                  existingBoard.userId !== undefined) {
                 // 有効な既存ボードがある場合
                 updateStep(3);
                 showExistingBoard(existingBoard);

@@ -1011,9 +1011,25 @@
       if (openFormBtn) {
         openFormBtn.addEventListener('click', () => {
           if (elements.formUrlInput && elements.formUrlInput.value) {
-            window.open(elements.formUrlInput.value, '_blank');
+            // GoogleフォームのURLを編集用URLに変換
+            const formUrl = elements.formUrlInput.value;
+            let editUrl = formUrl;
+            
+            // 回答用URL（/viewform）を編集用URL（/edit）に変換
+            if (formUrl.includes('/viewform')) {
+              editUrl = formUrl.replace('/viewform', '/edit');
+            } else if (formUrl.includes('/d/') && !formUrl.includes('/edit')) {
+              // フォームIDが含まれているが/editがない場合
+              const match = formUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+              if (match) {
+                const formId = match[1];
+                editUrl = `https://docs.google.com/forms/d/${formId}/edit`;
+              }
+            }
+            
+            window.open(editUrl, '_blank');
           } else {
-            showMessage('GoogleフォームのURLが見つかりません', 'yellow');
+            showMessage('Googleフォームが設定されていません', 'yellow');
           }
         });
       }
@@ -1023,7 +1039,11 @@
       if (openAdminBoardBtn) {
         openAdminBoardBtn.addEventListener('click', () => {
           if (elements.boardUrl && elements.boardUrl.value) {
-            window.open(`${elements.boardUrl.value}&mode=admin`, '_blank'); // 管理モードで開く
+            // adminModeVerified=trueを追加して完全な管理モードで開く
+            const url = new URL(elements.boardUrl.value);
+            url.searchParams.set('mode', 'admin');
+            url.searchParams.set('adminModeVerified', 'true');
+            window.open(url.toString(), '_blank');
           } else {
             showMessage('回答ボードのURLが見つかりません', 'yellow');
           }

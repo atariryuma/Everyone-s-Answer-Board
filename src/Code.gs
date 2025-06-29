@@ -2812,9 +2812,13 @@ function registerNewUser(adminEmail) {
       // 既存ユーザーの場合はURL情報を返す
       const userData = existingCheck.data;
       
-      // userIdが無効な場合は新規登録を継続
-      if (!userData.userId || userData.userId === '' || userData.userId === null || userData.userId === 'undefined') {
-        debugLog(`既存ユーザーが見つかりましたが、userIdが無効です: "${userData.userId}" - 新規登録を継続します`);
+      // userIdが有効かどうかを厳密にチェック
+      if (!userData.userId || 
+          typeof userData.userId !== 'string' ||
+          userData.userId.trim() === '' || 
+          userData.userId === 'null' ||
+          userData.userId === 'undefined') {
+        debugLog(`既存ユーザーが見つかりましたが、userIdが無効です: "${userData.userId}" (type: ${typeof userData.userId}) - 新規登録を継続します`);
       } else {
         const base = getWebAppUrlEnhanced();
         
@@ -2975,9 +2979,13 @@ function getExistingBoard() {
     if (boardInfo && boardInfo.success && boardInfo.data) {
       const userData = boardInfo.data;
       
-      // userIdが無効な場合は既存ボードがないとして扱う
-      if (!userData.userId || userData.userId === '' || userData.userId === null || userData.userId === 'undefined') {
-        debugLog(`無効なuserIdが見つかりました: "${userData.userId}" - 既存ボードなしとして扱います`);
+      // userIdが有効かどうかを厳密にチェック
+      if (!userData.userId || 
+          typeof userData.userId !== 'string' ||
+          userData.userId.trim() === '' || 
+          userData.userId === 'null' ||
+          userData.userId === 'undefined') {
+        debugLog(`無効なuserIdが見つかりました: "${userData.userId}" (type: ${typeof userData.userId}) - 既存ボードなしとして扱います`);
         return null;
       }
       
