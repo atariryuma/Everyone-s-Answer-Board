@@ -794,11 +794,13 @@ function doGet(e) {
   // ▲▲▲ ここまで挿入 ▲▲▲
 
   try {
+    try {
     e = e || {};
     const params = e.parameter || {};
     const userId = params.userId;
     const mode = params.mode;
 
+    debugLog('doGet called with params:', params);
 
     // ユーザーIDがない場合は登録画面を表示
     if (!userId) {
