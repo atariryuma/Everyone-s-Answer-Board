@@ -10,17 +10,8 @@
  * 初期設定用のWebページへのURLをログに出力します。
  * この関数を実行後、ログに表示される指示に従ってください。
  */
-let cachedScriptProperties = null;
-
-function getCachedScriptProperties() {
-  if (cachedScriptProperties === null) {
-    cachedScriptProperties = getCachedScriptProperties();
-  }
-  return cachedScriptProperties;
-}
-
 function initialSetup() {
-  const properties = getCachedScriptProperties();
+  const properties = PropertiesService.getScriptProperties();
   if (properties.getProperty('MAIN_DB_ID') && properties.getProperty('LOGGER_API_URL')) {
     Logger.log('✅ セットアップは既に完了しています。再度行う必要はありません。');
     try {
@@ -56,7 +47,7 @@ function handleSetupRequest() {
  */
 function testApiConnection() {
   try {
-    const properties = getCachedScriptProperties();
+    const properties = PropertiesService.getScriptProperties();
     const apiUrl = properties.getProperty('LOGGER_API_URL');
     
     Logger.log('=== 詳細API接続テスト ===');
@@ -151,7 +142,7 @@ function validateApiUrl(url) {
  */
 function diagnoseLoggerApi() {
   try {
-    const properties = getCachedScriptProperties();
+    const properties = PropertiesService.getScriptProperties();
     const apiUrl = properties.getProperty('LOGGER_API_URL');
     
     Logger.log('=== Logger API 詳細診断 ===');
@@ -240,7 +231,7 @@ function diagnoseLoggerApi() {
  */
 function debugCurrentSetup() {
   try {
-    const properties = getCachedScriptProperties();
+    const properties = PropertiesService.getScriptProperties();
     const currentUser = Session.getActiveUser().getEmail();
     
     Logger.log('=== デバッグ情報 ===');
@@ -297,7 +288,7 @@ function debugCurrentSetup() {
  */
 function saveSettingsAndCreateDb(apiUrl) {
   try {
-    const properties = getCachedScriptProperties();
+    const properties = PropertiesService.getScriptProperties();
     
     // 強化されたURL検証を使用
     const urlValidation = validateApiUrl(apiUrl);
@@ -350,7 +341,7 @@ function saveSettingsAndCreateDb(apiUrl) {
     let setupResult = '✅ 設定が正常に保存され、【ログデータベース】みんなの回答ボードに統合されました。\n\nセットアップが完了しました。\n\n';
     
     try {
-      const properties = getCachedScriptProperties();
+      const properties = PropertiesService.getScriptProperties();
       const dbId = properties.getProperty('MAIN_DB_ID');
       
       if (dbId && mainDb) {

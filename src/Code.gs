@@ -68,7 +68,7 @@ function debugLog() {
  * @throws {Error} 認証失敗時
  */
 function validateCurrentUser() {
-  const props = getCachedUserProperties();
+  const props = PropertiesService.getUserProperties();
   const userId = props.getProperty('CURRENT_USER_ID');
   if (!userId) {
     throw new Error('認証が必要です。ログインし直してください。');
@@ -242,24 +242,6 @@ function applySecurityHeaders(output) {
 }
 var getConfig;
 var handleError;
-var createConfigSheetForSpreadsheet;
-
-let cachedScriptProperties = null;
-let cachedUserProperties = null;
-
-function getCachedScriptProperties() {
-  if (cachedScriptProperties === null) {
-    cachedScriptProperties = PropertiesService.getScriptProperties();
-  }
-  return cachedScriptProperties;
-}
-
-function getCachedUserProperties() {
-  if (cachedUserProperties === null) {
-    cachedUserProperties = PropertiesService.getUserProperties();
-  }
-  return cachedUserProperties;
-}
 
 // handleError関数はErrorHandling.gsで定義されています
 
@@ -267,26 +249,17 @@ if (typeof global !== 'undefined' && global.getConfig) {
   getConfig = global.getConfig;
 }
 
-if (typeof global !== 'undefined' && global.createConfigSheetForSpreadsheet) {
-  createConfigSheetForSpreadsheet = global.createConfigSheetForSpreadsheet;
-}
-
-let currentSpreadsheet = null;
-
 function getCurrentSpreadsheet() {
-  if (currentSpreadsheet === null) {
-    const props = getCachedUserProperties();
-    const spreadsheetId = props.getProperty('CURRENT_SPREADSHEET_ID');
-    
-    if (!spreadsheetId) {
-      // 従来の動作（単一テナント時）
-      currentSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    } else {
-      // マルチテナント時は指定されたスプレッドシートを使用
-      currentSpreadsheet = SpreadsheetApp.openById(spreadsheetId);
-    }
+  const props = PropertiesService.getUserProperties();
+  const spreadsheetId = props.getProperty('CURRENT_SPREADSHEET_ID');
+  
+  if (!spreadsheetId) {
+    // 従来の動作（単一テナント時）
+    return SpreadsheetApp.getActiveSpreadsheet();
   }
-  return currentSpreadsheet;
+  
+  // マルチテナント時は指定されたスプレッドシートを使用
+  return SpreadsheetApp.openById(spreadsheetId);
 }
 
 function safeGetUserEmail() {
@@ -393,7 +366,7 @@ function addUserToDatabaseEditors(userEmail) {
     debugLog(`📝 データベースに編集者を追加開始: ${userEmail}`);
     
     // データベーススプレッドシートを取得
-    const props = getCachedScriptProperties();
+    const props = PropertiesService.getScriptProperties();
     const dbId = props.getProperty('DATABASE_ID') || props.getProperty('USER_DATABASE_ID');
     
     if (!dbId) {
@@ -504,7 +477,7 @@ function isSameDomain(emailA, emailB) {
 }
 
 function getAdminEmails(spreadsheetId) {
-  const props = getCachedScriptProperties();
+  const props = PropertiesService.getScriptProperties();
   let adminEmails = [];
   
   if (spreadsheetId) {
@@ -538,7 +511,7 @@ function getAdminEmails(spreadsheetId) {
 }
 
 function isUserAdmin(email) {
-  const userProps = getCachedUserProperties();
+  const userProps = PropertiesService.getUserProperties();
   const userId = userProps.getProperty('CURRENT_USER_ID');
   const userEmail = email || safeGetUserEmail();
 
@@ -578,7 +551,7 @@ function publishApp(sheetName) {
   if (!checkAdmin()) {
     throw new Error('権限がありません。');
   }
-  const props = getCachedScriptProperties();
+  const props = PropertiesService.getScriptProperties();
   props.setProperty('IS_PUBLISHED', 'true');
   props.setProperty('PUBLISHED_SHEET_NAME', sheetName);
   return `「${sheetName}」を公開しました。`;
@@ -588,7 +561,7 @@ function unpublishApp() {
   if (!checkAdmin()) {
     throw new Error('権限がありません。');
   }
-  const props = getCachedScriptProperties();
+  const props = PropertiesService.getScriptProperties();
   props.setProperty('IS_PUBLISHED', 'false');
   if (props.deleteProperty) props.deleteProperty('PUBLISHED_SHEET_NAME');
   return 'アプリを非公開にしました。';
@@ -619,8 +592,8 @@ function hashTimestamp(ts) {
  * @returns {object} - 現在のアクティブシート情報とシートのリスト
  */
 function getAdminSettings() {
-  const props = getCachedScriptProperties();
-  const userProps = getCachedUserProperties();
+  const props = PropertiesService.getScriptProperties();
+  const userProps = PropertiesService.getUserProperties();
   const userId = userProps.getProperty('CURRENT_USER_ID');
   
   let adminEmails = [];
@@ -667,7 +640,7 @@ function getAdminSettings() {
  * @param {string} sheetName - アクティブにするシート名。
  */
 function switchActiveSheet(sheetName) {
-  const props = getCachedUserProperties();
+  const props = PropertiesService.getUserProperties();
   const userId = props.getProperty('CURRENT_USER_ID');
   
   if (!userId) {
@@ -711,7 +684,7 @@ function switchActiveSheet(sheetName) {
  * アクティブシートの選択をクリアします。
  */
 function clearActiveSheet() {
-  const props = getCachedUserProperties();
+  const props = PropertiesService.getUserProperties();
   const userId = props.getProperty('CURRENT_USER_ID');
   
   if (!userId) {
@@ -741,7 +714,7 @@ function clearActiveSheet() {
 
 
 function setShowDetails(flag) {
-  const props = getCachedUserProperties();
+  const props = PropertiesService.getUserProperties();
   const userId = props.getProperty('CURRENT_USER_ID');
   
   if (!userId) {
@@ -771,7 +744,7 @@ function setShowDetails(flag) {
 }
 
 function setDisplayOptions(options) {
-  const props = getCachedUserProperties();
+  const props = PropertiesService.getUserProperties();
   const userId = props.getProperty('CURRENT_USER_ID');
 
   if (!userId) {
@@ -968,7 +941,7 @@ function doGet(e) {
     }
 
     // 現在のコンテキストを設定
-    getCachedUserProperties().setProperties({
+    PropertiesService.getUserProperties().setProperties({
       CURRENT_USER_ID: validatedUserId,
       CURRENT_SPREADSHEET_ID: userInfo.spreadsheetId
     });
@@ -1145,7 +1118,7 @@ function getPublishedSheetData(requestedSheetName, classFilter, sortBy) {
   // セキュリティ強化: 権限チェックを最初に実行
   const { userId, userInfo } = validateCurrentUser();
   
-  const props = getCachedUserProperties();
+  const props = PropertiesService.getUserProperties();
   const spreadsheetId = props.getProperty('CURRENT_SPREADSHEET_ID');
   
   if (!spreadsheetId) {
@@ -1250,18 +1223,9 @@ function addSpreadsheetUrl(spreadsheetUrl) {
     const testSpreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheets = testSpreadsheet.getSheets();
 
-    const sheets = testSpreadsheet.getSheets();
-
-      if (sheets.length === 0) {
-        throw new Error('スプレッドシートにシートが見つかりません。');
-      }
-
-      // Configシートが存在しない場合は作成
-      if (typeof createConfigSheetForSpreadsheet !== 'undefined') {
-        createConfigSheetForSpreadsheet(testSpreadsheet);
-      } else {
-        console.warn('createConfigSheetForSpreadsheet is not defined. Config sheet might not be created automatically.');
-      }
+    if (sheets.length === 0) {
+      throw new Error('スプレッドシートにシートが見つかりません。');
+    }
 
     // API経由でユーザー設定を更新：新しいスプレッドシートIDを設定
     try {
@@ -1281,7 +1245,7 @@ function addSpreadsheetUrl(spreadsheetUrl) {
     }
 
     // ユーザープロパティも更新
-    const props = getCachedUserProperties();
+    const props = PropertiesService.getUserProperties();
     props.setProperty('CURRENT_SPREADSHEET_ID', spreadsheetId);
 
     // 最初のシートをアクティブシートとして設定
@@ -1300,9 +1264,7 @@ function addSpreadsheetUrl(spreadsheetUrl) {
 
         // 基本設定を保存（少なくとも1つのヘッダーが推測できた場合）
         if (guessedConfig.questionHeader || guessedConfig.answerHeader) {
-          if (typeof saveSheetConfigForSpreadsheet !== 'undefined') {
-            saveSheetConfigForSpreadsheet(testSpreadsheet, firstSheetName, guessedConfig);
-          }
+          saveSheetConfig(firstSheetName, guessedConfig);
         }
       }
     } catch (configError) {
@@ -1349,10 +1311,19 @@ function addSpreadsheetUrl(spreadsheetUrl) {
  */
 function getStatus() {
   try {
-    const scriptProps = getCachedScriptProperties();
+    const scriptProps = PropertiesService.getScriptProperties();
+    const correctWebAppUrl = 'https://script.google.com/a/naha-okinawa.ed.jp/macros/s/AKfycbzFF3psxBRUja1DsrVDkleOGrUxar1QqxqGYwBVKmpcZybrtNddH5iKD-nbqmYWEZKK/exec';
+    const correctDeployId = 'AKfycbzFF3psxBRUja1DsrVDkleOGrUxar1QqxqGYwBVKmpcZybrtNddH5iKD-nbqmYWEZKK';
+    
+    if (scriptProps.getProperty('WEB_APP_URL') !== correctWebAppUrl) {
+      scriptProps.setProperty('WEB_APP_URL', correctWebAppUrl);
+    }
+    if (scriptProps.getProperty('DEPLOY_ID') !== correctDeployId) {
+      scriptProps.setProperty('DEPLOY_ID', correctDeployId);
+    }
 
     const settings = getAdminSettings();
-    const props = getCachedUserProperties();
+    const props = PropertiesService.getUserProperties();
     const userId = props.getProperty('CURRENT_USER_ID');
     
     if (!userId) {
@@ -1375,7 +1346,7 @@ function getStatus() {
     // Get available sheets
     let allSheets = [];
     try {
-      allSheets = getAvailableSheets().sheets.map(s => s.name) || [];
+      allSheets = getSheets() || [];
     } catch (error) {
       console.warn('Failed to get sheets:', error);
     }
@@ -2060,7 +2031,7 @@ function toggleHighlight(rowIndex, sheetName, userObject = null) {
 
 
 function getAppSettingsForUser() {
-  const props = getCachedUserProperties();
+  const props = PropertiesService.getUserProperties();
   const userId = props.getProperty('CURRENT_USER_ID');
   
   if (!userId) {
@@ -2180,7 +2151,7 @@ function findHeaderIndices(sheetHeaders, requiredHeaders) {
 }
 
 function saveWebAppUrl(url) {
-  const props = getCachedScriptProperties();
+  const props = PropertiesService.getScriptProperties();
   props.setProperties({ WEB_APP_URL: (url || '').trim() });
 }
 
@@ -2215,16 +2186,14 @@ function extractDeployIdFromUrl(url) {
 
 
 function getWebAppUrlEnhanced() {
-  const props = getCachedScriptProperties();
+  const props = PropertiesService.getScriptProperties();
   let stored = (props.getProperty('WEB_APP_URL') || '').trim();
   if (stored) {
     return stored;
   }
   try {
     if (typeof ScriptApp !== 'undefined') {
-      const url = ScriptApp.getService().getUrl();
-      props.setProperty('WEB_APP_URL', url); // 取得したURLを保存
-      return url;
+      return ScriptApp.getService().getUrl();
     }
   } catch (e) {
     // ScriptAppが利用できない環境（例: テスト環境）の場合
@@ -2239,7 +2208,7 @@ function getWebAppUrl() {
 }
 
 function saveDeployId(id) {
-  const props = getCachedScriptProperties();
+  const props = PropertiesService.getScriptProperties();
   const cleanId = (id || '').trim();
   
   // DEPLOY_ID形式の検証
@@ -2476,7 +2445,7 @@ function createBoardFromAdmin() {
   }
   try {
     const currentUserEmail = safeGetUserEmail();
-    const props = getCachedUserProperties();
+    const props = PropertiesService.getUserProperties();
     const userId = props.getProperty('CURRENT_USER_ID');
 
     if (!userId) {
@@ -2574,7 +2543,7 @@ function prepareSpreadsheetForStudyQuest(spreadsheet) {
   const configData = [
     ['Key', 'Value'],
     ['WEB_APP_URL', getWebAppUrlEnhanced()], // 本番URLを保存
-    ['DEPLOY_ID', getCachedScriptProperties().getProperty('DEPLOY_ID') || '']
+    ['DEPLOY_ID', PropertiesService.getScriptProperties().getProperty('DEPLOY_ID') || '']
   ];
   
   configSheet.getRange(1, 1, configData.length, configData[0].length).setValues(configData);
@@ -2594,7 +2563,7 @@ function prepareSpreadsheetForStudyQuest(spreadsheet) {
 }
 
 function getDatabase() {
-  const props = getCachedScriptProperties();
+  const props = PropertiesService.getScriptProperties();
   const dbId = props.getProperty('DATABASE_ID') || props.getProperty('USER_DATABASE_ID'); // 後方互換性
   
   if (!dbId) {
@@ -2733,7 +2702,7 @@ function updateUserConfig(userId, newConfig) {
 }
 
 function saveSheetConfig(sheetName, config) {
-  const props = getCachedUserProperties();
+  const props = PropertiesService.getUserProperties();
   const userId = props.getProperty('CURRENT_USER_ID');
   
   if (!userId) {
@@ -2766,7 +2735,7 @@ function saveSheetConfig(sheetName, config) {
 }
 
 function getConfig(sheetName) {
-  const props = getCachedUserProperties();
+  const props = PropertiesService.getUserProperties();
   const userId = props.getProperty('CURRENT_USER_ID');
   
   if (!userId) {
@@ -2832,8 +2801,8 @@ function registerNewUser(adminEmail) {
         debugLog(`既存ユーザーが見つかりました: userId="${userData.userId}", adminEmail="${userData.adminEmail}"`);
         
         // ユーザーコンテキストを設定
-        getCachedUserProperties().setProperty('CURRENT_USER_ID', userData.userId);
-        getCachedUserProperties().setProperty('CURRENT_SPREADSHEET_ID', userData.spreadsheetId);
+        PropertiesService.getUserProperties().setProperty('CURRENT_USER_ID', userData.userId);
+        PropertiesService.getUserProperties().setProperty('CURRENT_SPREADSHEET_ID', userData.spreadsheetId);
         
         return {
           userId: userData.userId,
@@ -2897,8 +2866,8 @@ function registerNewUser(adminEmail) {
   
   // 📝 ステップ6: ユーザーコンテキストを設定（クイックアクションと同様）
   debugLog(`⚙️ ユーザーコンテキスト設定中`);
-  getCachedUserProperties().setProperty('CURRENT_USER_ID', userId);
-  getCachedUserProperties().setProperty('CURRENT_SPREADSHEET_ID', formAndSsInfo.spreadsheetId);
+  PropertiesService.getUserProperties().setProperty('CURRENT_USER_ID', userId);
+  PropertiesService.getUserProperties().setProperty('CURRENT_SPREADSHEET_ID', formAndSsInfo.spreadsheetId);
   
   // 📝 ステップ7: スプレッドシートをユーザーのスプレッドシートリストに追加
   debugLog(`📊 スプレッドシートリストに追加中`);
@@ -2953,7 +2922,7 @@ function getSpreadsheetUrlForUser(userId) {
 }
 
 function openActiveSpreadsheet() {
-  const props = getCachedUserProperties();
+  const props = PropertiesService.getUserProperties();
   const userId = props.getProperty('CURRENT_USER_ID');
   if (!userId) {
     throw new Error('ユーザー情報が見つかりません。');
@@ -3051,7 +3020,7 @@ if (typeof module !== 'undefined') {
  * @returns {GoogleAppsScript.Spreadsheet.Sheet} データベースのシートオブジェクト。
  */
 function getOrCreateMainDatabase() {
-  const properties = getCachedScriptProperties();
+  const properties = PropertiesService.getScriptProperties();
   let dbId = properties.getProperty(MAIN_DB_ID_KEY);
 
   // まず既存の【ログデータベース】みんなの回答ボードを検索
@@ -3207,7 +3176,7 @@ function getOrCreateMainDatabase() {
  */
 function cleanupDuplicateDatabases() {
   try {
-    const properties = getCachedScriptProperties();
+    const properties = PropertiesService.getScriptProperties();
     const currentDbId = properties.getProperty(MAIN_DB_ID_KEY);
     
     Logger.log('重複データベースのクリーンアップを開始します...');
@@ -3248,7 +3217,7 @@ function cleanupDuplicateDatabases() {
  */
 function addUserToMainDatabaseEditors(userEmail) {
   try {
-    const properties = getCachedScriptProperties();
+    const properties = PropertiesService.getScriptProperties();
     const dbId = properties.getProperty(MAIN_DB_ID_KEY);
     
     if (!dbId) {
@@ -3274,7 +3243,7 @@ function addUserToMainDatabaseEditors(userEmail) {
  * @returns {object} APIからのレスポンス
  */
 function callDatabaseApi(action, data = {}) {
-  const apiUrl = getCachedScriptProperties().getProperty(LOGGER_API_URL_KEY);
+  const apiUrl = PropertiesService.getScriptProperties().getProperty(LOGGER_API_URL_KEY);
   if (!apiUrl) {
     throw new Error('Logger APIのURLが設定されていません。セットアップを完了してください。');
   }
@@ -3440,7 +3409,7 @@ function getExistingBoardViaApi(userEmail) {
  * @param {object} metadata - 送信するログデータ。
  */
 function logToAdminApi(metadata) {
-  const apiUrl = getCachedScriptProperties().getProperty(LOGGER_API_URL_KEY);
+  const apiUrl = PropertiesService.getScriptProperties().getProperty(LOGGER_API_URL_KEY);
   if (!apiUrl) {
     Logger.log('Logger APIのURLが設定されていないため、ログ送信をスキップしました。');
     return;

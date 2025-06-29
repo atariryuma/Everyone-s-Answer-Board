@@ -79,7 +79,7 @@ function onOpen() {
  */
 function initializeDatabase() {
   const ui = SpreadsheetApp.getUi();
-  const properties = getCachedScriptProperties();
+  const properties = PropertiesService.getScriptProperties();
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   const sheetId = spreadsheet.getId();
 
@@ -134,15 +134,6 @@ function initializeDatabase() {
 /**
  * GET リクエストハンドラー - 基本的な接続テスト用
  */
-let cachedScriptProperties = null;
-
-function getCachedScriptProperties() {
-  if (cachedScriptProperties === null) {
-    cachedScriptProperties = getCachedScriptProperties();
-  }
-  return cachedScriptProperties;
-}
-
 function doGet(e) {
   Logger.log('GET request received');
   
@@ -458,7 +449,7 @@ function logMetadataToDatabase(data) {
  * @returns {GoogleAppsScript.Spreadsheet.Sheet} データベースのシート。
  */
 function getDatabaseSheet() {
-  const properties = getCachedScriptProperties();
+  const properties = PropertiesService.getScriptProperties();
   const dbSheetId = properties.getProperty(DATABASE_ID_KEY);
 
   if (!dbSheetId) {
@@ -543,7 +534,7 @@ function getDatabaseSheet() {
  */
 function showCurrentSettings() {
   const ui = SpreadsheetApp.getUi();
-  const properties = getCachedScriptProperties();
+  const properties = PropertiesService.getScriptProperties();
   const dbSheetId = properties.getProperty(DATABASE_ID_KEY);
   const deploymentId = properties.getProperty(DEPLOYMENT_ID_KEY);
 
@@ -581,7 +572,7 @@ function showCurrentSettings() {
  */
 function testDeployment() {
   const ui = SpreadsheetApp.getUi();
-  const properties = getCachedScriptProperties();
+  const properties = PropertiesService.getScriptProperties();
   const deploymentId = properties.getProperty(DEPLOYMENT_ID_KEY);
   
   if (!deploymentId) {
@@ -649,7 +640,7 @@ function testDeployment() {
 function showDeploymentInstructions() {
   const ui = SpreadsheetApp.getUi();
   
-  if (!getCachedScriptProperties().getProperty(DATABASE_ID_KEY)) {
+  if (!PropertiesService.getScriptProperties().getProperty(DATABASE_ID_KEY)) {
     ui.alert('エラー: 先に「1. このシートをデータベースとして初期化」を実行してください。');
     return;
   }
@@ -666,7 +657,7 @@ function showDeploymentInstructions() {
  */
 function saveDeploymentIdToProperties(id) {
   if (id && typeof id === 'string' && id.trim().length > 0) {
-    getCachedScriptProperties().setProperty(DEPLOYMENT_ID_KEY, id.trim());
+    PropertiesService.getScriptProperties().setProperty(DEPLOYMENT_ID_KEY, id.trim());
     SpreadsheetApp.getUi().alert('✅ デプロイIDを保存しました。');
     return 'OK';
   } else {
