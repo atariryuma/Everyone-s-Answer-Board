@@ -3293,7 +3293,7 @@ function updateUserViaApi(userId, updateData) {
  * @returns {object} 既存ボード情報
  */
 function getExistingBoardViaApi(userEmail) {
-  return callDatabaseApi('getExistingBoard', { userEmail: userEmail });
+  return callDatabaseApi('getExistingBoard', { adminEmail: userEmail });
 }
 
 /**
