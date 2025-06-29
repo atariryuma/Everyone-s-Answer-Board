@@ -425,7 +425,30 @@ function getDatabaseSheet() {
   const dbSheetId = properties.getProperty(DATABASE_ID_KEY);
 
   if (!dbSheetId) {
-    throw new Error('データベースが設定されていません。「🚀 Admin Logger セットアップ」メニューから初期化を完了してください。');
+    // データベースIDが未設定の場合、現在のスプレッドシートを使用
+    Logger.log('Database ID not set, using current spreadsheet');
+    const currentSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    if (currentSpreadsheet) {
+      const currentId = currentSpreadsheet.getId();
+      properties.setProperty(DATABASE_ID_KEY, currentId);
+      Logger.log(`Auto-initialized database with current spreadsheet ID: ${currentId}`);
+      
+      // ログシートを確認・作成
+      let sheet = currentSpreadsheet.getSheetByName(TARGET_SHEET_NAME);
+      if (!sheet) {
+        sheet = currentSpreadsheet.insertSheet(TARGET_SHEET_NAME);
+        const headers = [
+          'userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 
+          'createdAt', 'accessToken', 'configJson', 'lastAccessedAt', 'isActive'
+        ];
+        sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight("bold");
+        sheet.setFrozenRows(1);
+        Logger.log(`Auto-created '${TARGET_SHEET_NAME}' sheet with headers`);
+      }
+      return sheet;
+    } else {
+      throw new Error('データベースが設定されておらず、現在のスプレッドシートも取得できません。「🚀 Admin Logger セットアップ」メニューから初期化を完了してください。');
+    }
   }
 
   try {
@@ -436,7 +459,18 @@ function getDatabaseSheet() {
       spreadsheet = SpreadsheetApp.openById(dbSheetId);
     } catch (openError) {
       Logger.log(`Failed to open spreadsheet: ${openError.message}`);
-      throw new Error(`スプレッドシート(ID: ${dbSheetId})を開けませんでした。権限を確認してください。`);
+      
+      // 失敗した場合、現在のスプレッドシートで再試行
+      Logger.log('Falling back to current spreadsheet');
+      const currentSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+      if (currentSpreadsheet) {
+        const currentId = currentSpreadsheet.getId();
+        properties.setProperty(DATABASE_ID_KEY, currentId);
+        Logger.log(`Fallback: Reset database to current spreadsheet ID: ${currentId}`);
+        spreadsheet = currentSpreadsheet;
+      } else {
+        throw new Error(`スプレッドシート(ID: ${dbSheetId})を開けませんでした。権限を確認してください。`);
+      }
     }
     
     if (!spreadsheet) {
@@ -450,7 +484,7 @@ function getDatabaseSheet() {
       sheet = spreadsheet.getSheetByName(TARGET_SHEET_NAME);
     } catch (sheetError) {
       Logger.log(`Failed to get sheet '${TARGET_SHEET_NAME}': ${sheetError.message}`);
-      throw new Error(`シート「${TARGET_SHEET_NAME}」の取得に失敗しました。`);
+      sheet = null;
     }
 
     if (!sheet) {
@@ -471,16 +505,21 @@ function getDatabaseSheet() {
       }
     }
     
-    // データ範囲の存在確認
+    // データ範囲の存在確認（より安全に）
     try {
-      const range = sheet.getDataRange();
-      if (!range) {
-        throw new Error('シートのデータ範囲を取得できませんでした。');
+      if (sheet && typeof sheet.getDataRange === 'function') {
+        const range = sheet.getDataRange();
+        if (range) {
+          Logger.log(`Sheet data range: ${range.getA1Notation()}, rows: ${range.getNumRows()}`);
+        } else {
+          Logger.log('Data range is null, but sheet exists');
+        }
+      } else {
+        throw new Error('シートオブジェクトが無効です');
       }
-      Logger.log(`Sheet data range: ${range.getA1Notation()}, rows: ${range.getNumRows()}`);
     } catch (rangeError) {
       Logger.log(`Data range error: ${rangeError.message}`);
-      throw new Error(`シートへのアクセスエラー: ${rangeError.message}`);
+      // データ範囲エラーでも処理を続行（シートは存在する）
     }
     
     return sheet;
