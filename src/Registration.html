@@ -877,39 +877,7 @@
 
           </div>
 
-  <!-- Security Info Modal -->
-  <div id="security-info-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 hidden items-center justify-center p-4">
-    <div class="glass-panel p-8 rounded-xl max-w-2xl w-full slide-up max-h-[90vh] overflow-y-auto">
-      <h3 class="text-xl font-bold text-purple-400 mb-4">みんなの回答ボードのセキュリティについて</h3>
-      <div class="text-gray-300 space-y-4">
-        <p>StudyQuest「みんなの回答ボード」は、Google Apps Script (GAS) を基盤とし、教育現場での利用を想定した高いセキュリティ基準で設計されています。</p>
-        
-        <h4 class="font-semibold text-white">アプリのアーキテクチャとデータ管理</h4>
-        <p>本アプリは、大きく分けて2つの主要なコンポーネントで構成されています。</p>
-        <ul class="list-disc list-inside ml-4 space-y-2">
-          <li><strong>メインウェブアプリ (GAS Web App)</strong>: 生徒や先生がアクセスするフロントエンドと、Googleサービス（スプレッドシート、フォーム、Driveなど）と連携するバックエンドロジックを担います。</li>
-          <li><strong>Logger API (GAS Web App)</strong>: ユーザー情報や監査ログなど、機密性の高いデータを管理するための独立したバックエンドAPIです。</li>
-        </ul>
-        <p>これにより、生徒の回答データやユーザー設定は、メインウェブアプリとは分離されたLogger API経由でアクセスされるデータベースに安全に保存されます。万が一、メインウェブアプリに脆弱性が見つかった場合でも、ユーザーデータへの直接的なアクセスを防ぐ多層防御の仕組みを採用しています。</p>
 
-        <h4 class="font-semibold text-white">主なセキュリティ機能</h4>
-        <ul class="list-disc list-inside ml-4 space-y-2">
-          <li><strong>データ分離とAPI連携</strong>: ユーザーデータはメインアプリから独立したデータベースで管理され、API経由でのみアクセスされます。これにより、データの漏洩リスクを最小限に抑えます。</li>
-          <li><strong>厳格なドメインベースのアクセス制御</strong>: アプリケーションは、デプロイされたGoogle Workspaceドメイン内からのアクセスに限定されます。これにより、組織外からの不正なアクセスを防止します。</li>
-          <li><strong>XSS (クロスサイトスクリプティング) 対策</strong>: 全てのユーザー入力は厳重にサニタイズされ、悪意のあるスクリプトの埋め込みを防ぎます。動的に生成されるHTMLコンテンツも適切にエスケープ処理されます。</li>
-          <li><strong>レート制限</strong>: 短時間での連続操作（例: 新規登録、リアクション）を制限することで、システムへの過負荷や悪意のある自動操作を防ぎます。</li>
-          <li><strong>自動非公開機能</strong>: 公開されたボードは一定時間（例: 6時間）経過後に自動的に非公開状態に戻ります。これにより、意図しない情報公開が続くことを防ぎます。</li>
-          <li><strong>Google Apps Scriptのセキュリティ機能活用</strong>: Googleが提供するGASの組み込みセキュリティ機能（例: クリックジャッキング対策のためのX-Frame-Optionsヘッダー設定）を最大限に活用し、一般的なウェブ脆弱性から保護します。</li>
-          <li><strong>Google Driveのアクセス権限管理</strong>: 作成されるスプレッドシートやフォームは、適切なアクセス権限（例: ドメイン内での共有）が自動的に設定され、不必要な外部共有を防ぎます。</li>
-        </ul>
-
-        <p>これらの対策により、「みんなの回答ボード」は教育現場で安心してご利用いただけるよう、データの安全性とプライバシー保護に最大限配慮しています。</p>
-      </div>
-      <div class="flex justify-end mt-6">
-        <button id="security-info-close-btn" class="btn btn-primary">閉じる</button>
-      </div>
-    </div>
-  </div>
   <script>
     let userEmail = '';
     let currentStep = 1;
@@ -1364,39 +1332,7 @@
 
           </div>
 
-  <!-- Security Info Modal -->
-  <div id="security-info-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 hidden items-center justify-center p-4">
-    <div class="glass-panel p-8 rounded-xl max-w-2xl w-full slide-up max-h-[90vh] overflow-y-auto">
-      <h3 class="text-xl font-bold text-purple-400 mb-4">みんなの回答ボードのセキュリティについて</h3>
-      <div class="text-gray-300 space-y-4">
-        <p>StudyQuest「みんなの回答ボード」は、Google Apps Script (GAS) を基盤とし、教育現場での利用を想定した高いセキュリティ基準で設計されています。</p>
-        
-        <h4 class="font-semibold text-white">アプリのアーキテクチャとデータ管理</h4>
-        <p>本アプリは、大きく分けて2つの主要なコンポーネントで構成されています。</p>
-        <ul class="list-disc list-inside ml-4 space-y-2">
-          <li><strong>メインウェブアプリ (GAS Web App)</strong>: 生徒や先生がアクセスするフロントエンドと、Googleサービス（スプレッドシート、フォーム、Driveなど）と連携するバックエンドロジックを担います。</li>
-          <li><strong>Logger API (GAS Web App)</strong>: ユーザー情報や監査ログなど、機密性の高いデータを管理するための独立したバックエンドAPIです。</li>
-        </ul>
-        <p>これにより、生徒の回答データやユーザー設定は、メインウェブアプリとは分離されたLogger API経由でアクセスされるデータベースに安全に保存されます。万が一、メインウェブアプリに脆弱性が見つかった場合でも、ユーザーデータへの直接的なアクセスを防ぐ多層防御の仕組みを採用しています。</p>
 
-        <h4 class="font-semibold text-white">主なセキュリティ機能</h4>
-        <ul class="list-disc list-inside ml-4 space-y-2">
-          <li><strong>データ分離とAPI連携</strong>: ユーザーデータはメインアプリから独立したデータベースで管理され、API経由でのみアクセスされます。これにより、データの漏洩リスクを最小限に抑えます。</li>
-          <li><strong>厳格なドメインベースのアクセス制御</strong>: アプリケーションは、デプロイされたGoogle Workspaceドメイン内からのアクセスに限定されます。これにより、組織外からの不正なアクセスを防止します。</li>
-          <li><strong>XSS (クロスサイトスクリプティング) 対策</strong>: 全てのユーザー入力は厳重にサニタイズされ、悪意のあるスクリプトの埋め込みを防ぎます。動的に生成されるHTMLコンテンツも適切にエスケープ処理されます。</li>
-          <li><strong>レート制限</strong>: 短時間での連続操作（例: 新規登録、リアクション）を制限することで、システムへの過負荷や悪意のある自動操作を防ぎます。</li>
-          <li><strong>自動非公開機能</strong>: 公開されたボードは一定時間（例: 6時間）経過後に自動的に非公開状態に戻ります。これにより、意図しない情報公開が続くことを防ぎます。</li>
-          <li><strong>Google Apps Scriptのセキュリティ機能活用</strong>: Googleが提供するGASの組み込みセキュリティ機能（例: クリックジャッキング対策のためのX-Frame-Optionsヘッダー設定）を最大限に活用し、一般的なウェブ脆弱性から保護します。</li>
-          <li><strong>Google Driveのアクセス権限管理</strong>: 作成されるスプレッドシートやフォームは、適切なアクセス権限（例: ドメイン内での共有）が自動的に設定され、不必要な外部共有を防ぎます。</li>
-        </ul>
-
-        <p>これらの対策により、「みんなの回答ボード」は教育現場で安心してご利用いただけるよう、データの安全性とプライバシー保護に最大限配慮しています。</p>
-      </div>
-      <div class="flex justify-end mt-6">
-        <button id="security-info-close-btn" class="btn btn-primary">閉じる</button>
-      </div>
-    </div>
-  </div>
   <script>
     let userEmail = '';
     let currentStep = 1;
@@ -2000,30 +1936,6 @@
     // ページ読み込み時にドメイン情報を取得
     document.addEventListener('DOMContentLoaded', function() {
       loadDomainInfo();
-      
-      // セキュリティ情報モーダルのイベントリスナー
-      const securityInfoBtn = document.getElementById('security-info-btn');
-      const securityInfoModal = document.getElementById('security-info-modal');
-      const securityInfoCloseBtn = document.getElementById('security-info-close-btn');
-
-      console.log('securityInfoBtn:', securityInfoBtn);
-      console.log('securityInfoModal:', securityInfoModal);
-      console.log('securityInfoCloseBtn:', securityInfoCloseBtn);
-
-      if (securityInfoBtn && securityInfoModal && securityInfoCloseBtn) {
-        securityInfoBtn.addEventListener('click', () => {
-          securityInfoModal.classList.remove('hidden');
-        });
-        securityInfoCloseBtn.addEventListener('click', () => {
-          securityInfoModal.classList.add('hidden');
-        });
-        // モーダルの外側をクリックで閉じる
-        securityInfoModal.addEventListener('click', (e) => {
-          if (e.target === securityInfoModal) {
-            securityInfoModal.classList.add('hidden');
-          }
-        });
-      }
     });
   </script>
 </body>
