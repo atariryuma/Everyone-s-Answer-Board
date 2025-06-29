@@ -1006,7 +1006,14 @@
         elements.copyFormUrlBtn.addEventListener('click', () => copyUrl(elements.formUrlInput, 'Form URL copied'));
       }
 
-      // Open Form Button - イベントリスナーは updateFormInfo() 関数で動的に設定されます
+      // Open Form Button - 初期設定（updateFormInfo() 関数で上書きされます）
+      const openFormBtn = document.getElementById('open-form-btn');
+      if (openFormBtn) {
+        openFormBtn.onclick = () => {
+          console.log('Default form button clicked - no form info loaded yet');
+          showMessage('フォーム情報を読み込み中です。しばらくお待ちください。', 'info');
+        };
+      }
 
       // Open Admin Board Button (管理モードでボードを開く)
       const openAdminBoardBtn = document.getElementById('open-admin-board-btn');
@@ -1189,20 +1196,33 @@
       
       // フォーム情報を取得
       google.script.run
-        .withSuccessHandler(updateFormInfo)
+        .withSuccessHandler((formInfo) => {
+          console.log('Received form info:', formInfo);
+          updateFormInfo(formInfo);
+        })
         .withFailureHandler((error) => {
           console.warn('getActiveFormInfo error:', error);
-          // フォーム情報の取得に失敗してもエラーは表示しない（オプション機能のため）
+          // フォーム情報の取得に失敗した場合、デフォルトの updateFormInfo を呼び出し
+          updateFormInfo(null);
         })
         .getActiveFormInfo();
     }
 
     function updateFormInfo(formInfo) {
+      console.log('updateFormInfo called with:', formInfo);
+      
       const answerCountEl = document.getElementById('answer-count');
       const formFileNameEl = document.getElementById('form-file-name');
       const openFormBtn = document.getElementById('open-form-btn');
       
+      console.log('Elements found:', {
+        answerCountEl: !!answerCountEl,
+        formFileNameEl: !!formFileNameEl,
+        openFormBtn: !!openFormBtn
+      });
+      
       if (!formInfo) {
+        console.log('No form info - setting default handlers');
         // フォーム情報がない場合はデフォルト表示
         if (answerCountEl) answerCountEl.textContent = '未設定';
         if (formFileNameEl) formFileNameEl.textContent = 'Googleフォーム';
@@ -1210,6 +1230,7 @@
         // フォーム情報がない場合のクリックイベント
         if (openFormBtn) {
           openFormBtn.onclick = () => {
+            console.log('Form button clicked - no form info');
             showMessage('Googleフォームが見つかりません。フォームを作成するか、スプレッドシートとフォームを関連付けてください。', 'yellow');
           };
         }
@@ -1228,12 +1249,16 @@
       
       // フォームボタンのクリックイベントを更新
       if (openFormBtn && formInfo.editUrl) {
+        console.log('Setting form button click handler with editUrl:', formInfo.editUrl);
         openFormBtn.onclick = () => {
+          console.log('Form button clicked - opening editUrl:', formInfo.editUrl);
           window.open(formInfo.editUrl, '_blank');
         };
       } else if (openFormBtn) {
+        console.log('Setting form button click handler with fallback for formInfo:', formInfo);
         // editUrlがない場合のフォールバック
         openFormBtn.onclick = () => {
+          console.log('Form button clicked - using fallback');
           if (formInfo.formUrl) {
             // 回答用URLを編集用URLに変換して開く
             let editUrl = formInfo.formUrl;
@@ -1242,8 +1267,10 @@
             } else if (formInfo.formId) {
               editUrl = 'https://docs.google.com/forms/d/' + formInfo.formId + '/edit';
             }
+            console.log('Opening fallback URL:', editUrl);
             window.open(editUrl, '_blank');
           } else {
+            console.log('No form URL available');
             showMessage('フォームのURLが取得できませんでした。', 'yellow');
           }
         };
