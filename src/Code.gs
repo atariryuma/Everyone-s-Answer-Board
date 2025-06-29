@@ -1286,6 +1286,117 @@ function getAvailableSheets() {
 }
 
 /**
+ * アクティブスプレッドシートに対応するGoogleフォームの編集リンクを取得
+ * @return {Object} フォーム情報 {formUrl: string, editUrl: string, responseCount: number} または null
+ */
+function getActiveFormInfo() {
+  try {
+    // 権限チェック（読み取り専用・高速版）
+    const { userId, userInfo } = validateCurrentUserReadOnly();
+    
+    const props = PropertiesService.getUserProperties();
+    const spreadsheetId = props.getProperty('CURRENT_SPREADSHEET_ID');
+    
+    if (!spreadsheetId) {
+      debugLog('No active spreadsheet ID found');
+      return null;
+    }
+    
+    // スプレッドシートを取得
+    const spreadsheet = getCurrentSpreadsheet();
+    
+    // フォームを検索（複数の方法で試行）
+    let formId = null;
+    let form = null;
+    
+    // 方法1: スプレッドシートに直接リンクされたフォームを探す
+    try {
+      const formUrl = spreadsheet.getFormUrl();
+      if (formUrl) {
+        // フォームURLからフォームIDを抽出
+        const match = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+        if (match) {
+          formId = match[1];
+          form = FormApp.openById(formId);
+        }
+      }
+    } catch (e) {
+      debugLog('Method 1 failed (direct form link):', e.message);
+    }
+    
+    // 方法2: スプレッドシートと同じフォルダ内のフォームを探す（名前で判定）
+    if (!form) {
+      try {
+        const spreadsheetFile = DriveApp.getFileById(spreadsheetId);
+        const parents = spreadsheetFile.getParents();
+        
+        if (parents.hasNext()) {
+          const folder = parents.next();
+          const forms = folder.getFilesByType(DriveApp.FileType.GOOGLE_FORMS);
+          
+          const spreadsheetName = spreadsheet.getName();
+          
+          while (forms.hasNext() && !form) {
+            const formFile = forms.next();
+            const formName = formFile.getName();
+            
+            // フォーム名にスプレッドシート名の一部が含まれているかチェック
+            if (formName.includes('StudyQuest') && 
+                (formName.includes(spreadsheetName.split(' - ')[0]) || 
+                 spreadsheetName.includes(formName.split(' - ')[0]))) {
+              try {
+                formId = formFile.getId();
+                form = FormApp.openById(formId);
+                break;
+              } catch (e) {
+                debugLog('Failed to open form:', formFile.getName(), e.message);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugLog('Method 2 failed (folder search):', e.message);
+      }
+    }
+    
+    // 方法3: ユーザー情報からフォームURLを取得
+    if (!form && userInfo.configJson && userInfo.configJson.formUrl) {
+      try {
+        const formUrl = userInfo.configJson.formUrl;
+        const match = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+        if (match) {
+          formId = match[1];
+          form = FormApp.openById(formId);
+        }
+      } catch (e) {
+        debugLog('Method 3 failed (user config):', e.message);
+      }
+    }
+    
+    if (!form) {
+      debugLog('No associated form found for spreadsheet:', spreadsheetId);
+      return null;
+    }
+    
+    // フォーム情報を取得
+    const responses = form.getResponses();
+    const responseCount = responses.length;
+    
+    return {
+      formUrl: form.getPublishedUrl(),
+      editUrl: 'https://docs.google.com/forms/d/' + formId + '/edit',
+      responseCount: responseCount,
+      formId: formId,
+      title: form.getTitle()
+    };
+    
+  } catch (error) {
+    debugLog('Error getting active form info:', error.message);
+    return null;
+  }
+}
+
+/**
  * 新しいスプレッドシートURLを追加し、アクティブシートとして設定します。
  * @param {string} spreadsheetUrl - 追加するスプレッドシートのURL
  */

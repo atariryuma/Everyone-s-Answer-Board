@@ -327,8 +327,8 @@
               </svg>
             </div>
             <div>
-              <p class="text-sm text-gray-400">フォーム</p>
-              <p class="text-2xl font-bold text-purple-400" id="answer-count">開く</p>
+              <p class="text-sm text-gray-400">フォーム回答数</p>
+              <p class="text-2xl font-bold text-purple-400" id="answer-count">読み込み中...</p>
               <p class="text-xs text-purple-300 mt-1" id="form-file-name">Googleフォーム</p>
             </div>
           </button>
@@ -1189,6 +1189,8 @@
 
     function loadStatus() {
       setLoading(true, 'Loading status...');
+      
+      // ステータスとフォーム情報を並行して取得
       google.script.run
         .withSuccessHandler(updateStatus)
         .withFailureHandler((error) => {
@@ -1210,6 +1212,49 @@
           showError(new Error(errorMessage));
         })
         .getStatus();
+      
+      // フォーム情報を取得
+      google.script.run
+        .withSuccessHandler(updateFormInfo)
+        .withFailureHandler((error) => {
+          console.warn('getActiveFormInfo error:', error);
+          // フォーム情報の取得に失敗してもエラーは表示しない（オプション機能のため）
+        })
+        .getActiveFormInfo();
+    }
+
+    function updateFormInfo(formInfo) {
+      if (!formInfo) {
+        // フォーム情報がない場合はデフォルト表示
+        const answerCountEl = document.getElementById('answer-count');
+        const formFileNameEl = document.getElementById('form-file-name');
+        
+        if (answerCountEl) answerCountEl.textContent = '開く';
+        if (formFileNameEl) formFileNameEl.textContent = 'Googleフォーム';
+        return;
+      }
+      
+      // 回答数を表示
+      const answerCountEl = document.getElementById('answer-count');
+      if (answerCountEl) {
+        answerCountEl.textContent = formInfo.responseCount + '件';
+      }
+      
+      // フォーム名を表示
+      const formFileNameEl = document.getElementById('form-file-name');
+      if (formFileNameEl) {
+        formFileNameEl.textContent = formInfo.title || 'Googleフォーム';
+      }
+      
+      // フォームボタンのクリックイベントを更新
+      const openFormBtn = document.getElementById('open-form-btn');
+      if (openFormBtn && formInfo.editUrl) {
+        openFormBtn.onclick = () => {
+          window.open(formInfo.editUrl, '_blank');
+        };
+      }
+      
+      console.log('Form info updated:', formInfo);
     }
 
     function updateStatus(status) {
