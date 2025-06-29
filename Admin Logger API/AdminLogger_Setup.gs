@@ -310,30 +310,57 @@ function handleUpdateUser(data, requestUser) {
     const dbSheet = getDatabaseSheet();
     const { userId } = data;
     
+    Logger.log(`updateUser request: userId=${userId}, data=${JSON.stringify(data)}`);
+    
     if (!userId) {
+      Logger.log('updateUser error: userIdが必要です');
       return { success: false, error: 'userIdが必要です' };
     }
     
     const userRow = findUserRowById(dbSheet, userId);
     
     if (!userRow) {
+      Logger.log(`updateUser error: ユーザーが見つかりません - userId: ${userId}`);
       return { success: false, error: 'ユーザーが見つかりません' };
     }
     
+    Logger.log(`Found user row: ${JSON.stringify(userRow.values)}`);
+    
     // 更新可能なフィールドを更新
-    if (data.spreadsheetId) userRow.values[2] = data.spreadsheetId;
-    if (data.spreadsheetUrl) userRow.values[3] = data.spreadsheetUrl;
-    if (data.accessToken) userRow.values[5] = data.accessToken;
-    if (data.configJson) userRow.values[6] = data.configJson;
-    if (data.isActive !== undefined) userRow.values[8] = data.isActive;
+    if (data.spreadsheetId) {
+      Logger.log(`Updating spreadsheetId: ${data.spreadsheetId}`);
+      userRow.values[2] = data.spreadsheetId;
+    }
+    if (data.spreadsheetUrl) {
+      Logger.log(`Updating spreadsheetUrl: ${data.spreadsheetUrl}`);
+      userRow.values[3] = data.spreadsheetUrl;
+    }
+    if (data.accessToken) {
+      Logger.log(`Updating accessToken`);
+      userRow.values[5] = data.accessToken;
+    }
+    if (data.configJson) {
+      Logger.log(`Updating configJson: ${data.configJson}`);
+      userRow.values[6] = data.configJson;
+    }
+    if (data.isActive !== undefined) {
+      Logger.log(`Updating isActive: ${data.isActive}`);
+      userRow.values[8] = data.isActive;
+    }
     
     // lastAccessedAtを更新
     userRow.values[7] = new Date();
     
-    // シートに書き戻し
-    dbSheet.getRange(userRow.rowIndex, 1, 1, userRow.values.length).setValues([userRow.values]);
+    Logger.log(`Writing to sheet: row ${userRow.rowIndex}, values: ${JSON.stringify(userRow.values)}`);
     
-    Logger.log(`User updated: ${userId} by ${requestUser}`);
+    // シートに書き戻し
+    try {
+      dbSheet.getRange(userRow.rowIndex, 1, 1, userRow.values.length).setValues([userRow.values]);
+      Logger.log(`Successfully updated user: ${userId} by ${requestUser}`);
+    } catch (writeError) {
+      Logger.log(`Sheet write error: ${writeError.message}`);
+      throw writeError;
+    }
     
     return {
       success: true,
@@ -345,7 +372,7 @@ function handleUpdateUser(data, requestUser) {
     };
     
   } catch (error) {
-    Logger.log(`updateUser error: ${error.message}`);
+    Logger.log(`updateUser error: ${error.message} - Stack: ${error.stack}`);
     return {
       success: false,
       error: error.message
@@ -779,15 +806,26 @@ function findUserByEmail(sheet, adminEmail) {
  * @returns {Object|null} 行データと行インデックス
  */
 function findUserRowById(sheet, userId) {
-  const data = sheet.getDataRange().getValues();
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === userId) { // userId column
-      return {
-        rowIndex: i + 1, // 1-based index for getRange
-        values: data[i]
-      };
+  try {
+    Logger.log(`findUserRowById: searching for userId=${userId}`);
+    
+    const data = sheet.getDataRange().getValues();
+    Logger.log(`findUserRowById: got ${data.length} rows from sheet`);
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i] && data[i][0] === userId) { // userId column
+        Logger.log(`findUserRowById: found user at row ${i + 1}`);
+        return {
+          rowIndex: i + 1, // 1-based index for getRange
+          values: data[i]
+        };
+      }
     }
+    
+    Logger.log(`findUserRowById: user not found`);
+    return null;
+  } catch (error) {
+    Logger.log(`findUserRowById error: ${error.message}`);
+    throw error;
   }
-  return null;
 }

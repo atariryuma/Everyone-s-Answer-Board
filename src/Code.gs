@@ -3194,6 +3194,7 @@ function callDatabaseApi(action, data = {}) {
   debugLog(`🔗 API呼び出し開始:`);
   debugLog(`• URL: ${apiUrl}`);
   debugLog(`• Action: ${action}`);
+  debugLog(`• Data: ${JSON.stringify(data)}`);
   debugLog(`• Request User: ${requestUser}`);
   debugLog(`• Effective User: ${effectiveUser}`);
 
@@ -3209,10 +3210,18 @@ function callDatabaseApi(action, data = {}) {
     if (responseCode === 200) {
       try {
         const parsedResponse = JSON.parse(responseText);
-        debugLog(`✅ API呼び出し成功`);
+        debugLog(`✅ API呼び出し成功: ${JSON.stringify(parsedResponse)}`);
+        
+        // APIレベルでのエラーをチェック
+        if (parsedResponse.success === false) {
+          debugLog(`❌ API応答内エラー: ${parsedResponse.error || parsedResponse.message || 'Unknown error'}`);
+          throw new Error(`API応答エラー: ${parsedResponse.error || parsedResponse.message || 'Unknown error'}`);
+        }
+        
         return parsedResponse;
       } catch (parseError) {
-        debugLog(`⚠️ JSON解析失敗、テキストとして返却`);
+        debugLog(`⚠️ JSON解析失敗、テキストとして返却: ${parseError.message}`);
+        debugLog(`レスポンステキスト: ${responseText}`);
         return { success: true, data: responseText };
       }
     } else {
