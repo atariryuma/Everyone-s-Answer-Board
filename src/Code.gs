@@ -3,6 +3,9 @@
  * スプレッドシートのカスタムメニューを使用しない独立版。
  */
 
+const MAIN_DB_ID_KEY = 'MAIN_DB_ID';
+const LOGGER_API_URL_KEY = 'LOGGER_API_URL';
+
 // =================================================================
 // 定数定義
 // =================================================================
@@ -753,6 +756,12 @@ function validateUserId(userId) {
 }
 
 function doGet(e) {
+  // ▼▼▼ このifブロックを挿入 ▼▼▼
+  if (e && e.parameter && e.parameter.setup === 'true') {
+    return handleSetupRequest();
+  }
+  // ▲▲▲ ここまで挿入 ▲▲▲
+
   try {
     e = e || {};
     const params = e.parameter || {};
@@ -2871,4 +2880,61 @@ if (typeof module !== 'undefined') {
     getExistingBoard,
     getUserFolder
   };
+}
+
+/**
+ * メインのユーザーデータベースを取得または新規作成する。
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet} データベースのシートオブジェクト。
+ */
+function getOrCreateMainDatabase() {
+  const properties = PropertiesService.getScriptProperties();
+  let dbId = properties.getProperty(MAIN_DB_ID_KEY);
+
+  if (dbId) {
+    try {
+      return SpreadsheetApp.openById(dbId).getSheets()[0];
+    } catch (e) {
+      Logger.log(`データベース(ID: ${dbId})へのアクセスに失敗。新規作成します。Error: ${e.message}`);
+      properties.deleteProperty(MAIN_DB_ID_KEY);
+    }
+  }
+  
+  const db = SpreadsheetApp.create('StudyQuest - メインデータベース');
+  dbId = db.getId();
+  properties.setProperty(MAIN_DB_ID_KEY, dbId);
+  
+  const sheet = db.getSheets()[0];
+  const headers = ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'createdAt', 'accessToken', 'configJson', 'lastAccessedAt', 'isActive'];
+  sheet.appendRow(headers);
+  sheet.setFrozenRows(1);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  
+  Logger.log(`メインデータベースを新規作成しました。ID: ${dbId}`);
+  return sheet;
+}
+
+/**
+ * 指定されたメタデータを管理者向けログ記録APIに送信する。
+ * @param {object} metadata - 送信するログデータ。
+ */
+function logToAdminApi(metadata) {
+  const apiUrl = PropertiesService.getScriptProperties().getProperty(LOGGER_API_URL_KEY);
+  if (!apiUrl) {
+    Logger.log('Logger APIのURLが設定されていないため、ログ送信をスキップしました。');
+    return;
+  }
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(metadata),
+    muteHttpExceptions: true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(apiUrl, options);
+    Logger.log(`Logger APIへの送信結果: ${response.getResponseCode()}`);
+  } catch(e) {
+    Logger.log(`Logger APIへの送信中にエラーが発生しました: ${e.message}`);
+  }
 }
