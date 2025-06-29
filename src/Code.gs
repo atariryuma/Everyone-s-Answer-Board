@@ -83,35 +83,76 @@ function validateCurrentUser() {
 }
 
 /**
- * ユーザー専用フォルダを取得または作成（シンプル版：ユーザー本人のマイドライブに直接作成）
+ * ユーザー専用フォルダを取得または作成（改良版：詳細なエラーハンドリング付き）
  * @param {string} userEmail - ユーザーのメールアドレス
  * @return {GoogleAppsScript.Drive.Folder} ユーザー専用フォルダ
  */
 function getUserFolder(userEmail) {
   try {
+    // 入力検証
+    if (!userEmail || typeof userEmail !== 'string') {
+      throw new Error('有効なユーザーメールアドレスが必要です');
+    }
+    
     // メールアドレスからフォルダ名を生成
-    const sanitizedEmail = userEmail.split('@')[0];
+    const sanitizedEmail = userEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_');
+    const timestamp = new Date().getTime();
     const userFolderName = `StudyQuest - ${sanitizedEmail} - マイファイル`;
     
     debugLog(`📁 ユーザー専用フォルダを作成/取得開始: ${userFolderName}`);
     
-    // 既存のフォルダがあるかチェック
-    const folders = DriveApp.getFoldersByName(userFolderName);
-    if (folders.hasNext()) {
-      const existingFolder = folders.next();
-      debugLog(`✅ 既存のユーザーフォルダを使用: ${userFolderName}`);
-      return existingFolder;
+    // Driveアクセス権限をテスト
+    try {
+      const testFolder = DriveApp.getRootFolder();
+      debugLog(`✅ Driveアクセス権限確認成功`);
+    } catch (driveError) {
+      debugLog(`❌ Driveアクセス権限エラー: ${driveError.message}`);
+      throw new Error(`Googleドライブにアクセスできません: ${driveError.message}`);
     }
     
-    // ない場合は新規作成（ユーザー本人のマイドライブに直接作成される）
-    const userFolder = DriveApp.createFolder(userFolderName);
-    debugLog(`✅ ユーザー専用フォルダを新規作成: ${userFolderName}`);
+    // 既存のフォルダがあるかチェック
+    let existingFolder = null;
+    try {
+      const folders = DriveApp.getFoldersByName(userFolderName);
+      if (folders.hasNext()) {
+        existingFolder = folders.next();
+        // フォルダが正常にアクセス可能かテスト
+        const testAccess = existingFolder.getName();
+        debugLog(`✅ 既存のユーザーフォルダを使用: ${userFolderName}`);
+        return existingFolder;
+      }
+    } catch (folderCheckError) {
+      debugLog(`⚠️ 既存フォルダチェック時にエラー: ${folderCheckError.message}`);
+    }
     
-    return userFolder;
+    // ない場合は新規作成
+    try {
+      const userFolder = DriveApp.createFolder(userFolderName);
+      debugLog(`✅ ユーザー専用フォルダを新規作成: ${userFolderName}`);
+      
+      // フォルダ作成確認テスト
+      const createdFolderName = userFolder.getName();
+      if (createdFolderName !== userFolderName) {
+        throw new Error('フォルダ名が期待値と異なります');
+      }
+      
+      return userFolder;
+      
+    } catch (createError) {
+      debugLog(`❌ フォルダ作成エラー: ${createError.message}`);
+      throw new Error(`フォルダの作成に失敗しました: ${createError.message}`);
+    }
     
   } catch (error) {
-    console.error('ユーザーフォルダの取得/作成に失敗:', error);
-    throw new Error('ユーザー専用フォルダの準備に失敗しました。');
+    console.error(`ユーザーフォルダの取得/作成に失敗 (${userEmail}):`, error);
+    // より詳細なエラーメッセージを提供
+    if (error.message.includes('権限')) {
+      throw new Error('Googleドライブへのアクセス権限が不足しています。管理者にお問い合わせください。');
+    } else if (error.message.includes('容量')) {
+      throw new Error('Googleドライブの容量が不足しています。');
+    } else {
+      throw new Error(`ユーザー専用フォルダの準備に失敗しました: ${error.message}`);
+    }
   }
 }
 
