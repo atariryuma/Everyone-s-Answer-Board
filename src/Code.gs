@@ -1250,6 +1250,8 @@ function addSpreadsheetUrl(spreadsheetUrl) {
     const testSpreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheets = testSpreadsheet.getSheets();
 
+    const sheets = testSpreadsheet.getSheets();
+
       if (sheets.length === 0) {
         throw new Error('スプレッドシートにシートが見つかりません。');
       }
