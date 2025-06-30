@@ -189,6 +189,27 @@ function invalidateUserCache(userId) {
 }
 
 /**
+ * ユーザーキャッシュをメールアドレスで無効化
+ * @param {string} email - ユーザーのメールアドレス
+ */
+function invalidateUserCacheByEmail(email) {
+  if (!email) return;
+  
+  try {
+    // メモリキャッシュから削除
+    USER_INFO_CACHE.delete(`user_info_by_email_${email}`);
+    
+    // CacheServiceからも削除
+    const cache = CacheService.getScriptCache();
+    cache.remove(`user_info_by_email_${email}`);
+    
+    debugLog(`Cache invalidated for user email: ${email}`);
+  } catch (e) {
+    debugLog(`Failed to invalidate cache for user email ${email}:`, e.message);
+  }
+}
+
+/**
  * すべてのユーザーキャッシュをクリア
  */
 function clearAllUserCache() {
@@ -1154,6 +1175,8 @@ function doGet(e) {
     e = e || {};
     const params = e.parameter || {};
     const userId = params.userId;
+    // URLパラメータから取得したuserIdに余分な引用符が含まれている場合があるため除去
+    const cleanedUserId = userId ? userId.replace(/^"|"$/g, '') : userId;
     const mode = params.mode;
 
 
@@ -3647,6 +3670,7 @@ function auditLog(action, userId, details = {}) {
 
 function registerNewUser(adminEmail) {
   checkRateLimit('registerNewUser', adminEmail);
+  invalidateUserCacheByEmail(adminEmail); // キャッシュをクリアして最新のユーザー情報を取得
   
   // 最適化メモ: 将来の改善案
   // 1. API呼び出しの統合エンドポイント化
