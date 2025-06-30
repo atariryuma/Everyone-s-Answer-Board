@@ -648,13 +648,6 @@ header {
 <p class="flex items-center gap-2"><span id="infoIconHighlight" class="w-5 h-5 text-purple-400"></span>先生が注目してほしい意見につけています</p>
 <p>責任あるリアクションで、みんなで学びを深めよう！</p>
 
-<!-- Don't show today checkbox -->
-<div class="border-t border-gray-600 pt-4">
-<label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-<input type="checkbox" id="dontShowTodayCheckbox" class="rounded">
-<span>今日はもう表示しない</span>
-</label>
-</div>
 
 <div class="text-center mt-6">
 <button type="button" id="infoModalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">わかった</button>
@@ -879,11 +872,9 @@ class StudyQuestApp {
       }
       // Check if modal should be shown
       const introSeen = localStorage.getItem('introSeen');
-      const dontShowToday = localStorage.getItem('dontShowModalToday');
-      const today = new Date().toDateString();
       
-      // Show modal if never seen before OR if "don't show today" was not set for today
-      if (!introSeen || (dontShowToday !== today)) {
+      // Show modal if never seen before
+      if (!introSeen) {
         setTimeout(() => this.showInfoModal(), 500);
       }
     }, { timeout: 50 });
@@ -2532,14 +2523,6 @@ class StudyQuestApp {
     this.elements.infoModalContainer.classList.add('hidden');
     this.elements.infoModalContainer.classList.remove('modal-fade');
     this.elements.infoModalCard.classList.remove('modal-scale');
-    
-    // Check if "don't show today" is checked
-    const dontShowTodayCheckbox = document.getElementById('dontShowTodayCheckbox');
-    if (dontShowTodayCheckbox && dontShowTodayCheckbox.checked) {
-      // Set today's date to not show again today
-      const today = new Date().toDateString();
-      localStorage.setItem('dontShowModalToday', today);
-    }
     
     localStorage.setItem('introSeen', '1');
     if (this.state.lastFocusedElement) {
