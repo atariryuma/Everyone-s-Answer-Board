@@ -75,8 +75,18 @@ const CACHE_CONFIG = {
   USER_INFO_TTL: 300,        // 5分（ユーザー情報）
   SPREADSHEET_DATA_TTL: 120, // 2分（スプレッドシートデータ）
   FORM_INFO_TTL: 600,        // 10分（フォーム情報）
-  SHEET_LIST_TTL: 180        // 3分（シート一覧）
+  SHEET_LIST_TTL: 180,       // 3分（シート一覧）
+  FORM_ID_TTL: 1800,         // 30分（フォームID）
+  RESPONSE_COUNT_TTL: 60,    // 1分（回答数）
+  CONFIG_TTL: 900,           // 15分（設定情報）
+  ADMIN_SETTINGS_TTL: 300    // 5分（管理者設定）
 };
+
+/**
+ * スプレッドシートオブジェクトキャッシュ（メモリ内）
+ */
+const SPREADSHEET_CACHE = new Map();
+const SPREADSHEET_CACHE_TTL = 5 * 60 * 1000; // 5分
 
 /**
  * キャッシュされたユーザー情報を取得（CacheService併用）
@@ -163,6 +173,32 @@ function getCachedData(key, fetchFunction, ttlSeconds = 300) {
     debugLog(`Cache error for key ${key}:`, e.message);
     // キャッシュエラー時は直接データを取得
     return fetchFunction();
+  }
+}
+
+/**
+ * スプレッドシートオブジェクトのキャッシュ取得（メモリ）
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @return {Spreadsheet|null} キャッシュされたスプレッドシートまたはnull
+ */
+function getCachedSpreadsheet(spreadsheetId) {
+  const cached = SPREADSHEET_CACHE.get(spreadsheetId);
+  if (cached && (Date.now() - cached.timestamp) < SPREADSHEET_CACHE_TTL) {
+    debugLog(`Spreadsheet cache hit: ${spreadsheetId}`);
+    return cached.data;
+  }
+  
+  debugLog(`Spreadsheet cache miss: ${spreadsheetId}`);
+  try {
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    SPREADSHEET_CACHE.set(spreadsheetId, {
+      data: spreadsheet,
+      timestamp: Date.now()
+    });
+    return spreadsheet;
+  } catch (e) {
+    debugLog(`Failed to open spreadsheet ${spreadsheetId}:`, e.message);
+    return null;
   }
 }
 
@@ -1041,10 +1077,15 @@ function doGet(e) {
     // ユーザーIDを検証
     const validatedUserId = validateUserId(userId);
     
-    // ユーザー情報を取得
-    let userInfo;
-    try {
-      userInfo = getUserInfo(validatedUserId);
+    // 最適化: ユーザー情報をキャッシュから取得
+    let userInfo = getCachedUserInfo(validatedUserId);
+    
+    if (!userInfo) {
+      try {
+        userInfo = getUserInfo(validatedUserId);
+        if (userInfo) {
+          setCachedUserInfo(validatedUserId, userInfo);
+        }
     } catch (e) {
       console.error('getUserInfo failed:', e);
       debugLog(`getUserInfo error for userId ${validatedUserId}:`, e.message);
@@ -1370,8 +1411,8 @@ function getPublishedSheetData(requestedSheetName, classFilter, sortBy) {
     throw new Error('表示するシートが設定されていません。');
   }
   
-  // ユーザーのスプレッドシートを開く
-  const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+  // 最適化: キャッシュされたスプレッドシートを使用
+  const spreadsheet = getCachedSpreadsheet(spreadsheetId);
   const sheet = spreadsheet.getSheetByName(targetSheetName);
   
   if (!sheet) {
@@ -1405,6 +1446,7 @@ function getAvailableSheets() {
   const config = userInfo.configJson || {};
   const activeSheetName = config.activeSheetName || config.sheetName || '';
   
+  // 最適化: キャッシュされたgetSheets()を使用
   const allSheets = getSheets();
   
   return {
@@ -1529,26 +1571,43 @@ function getActiveFormInfo() {
           return null;
         }
         
-        // フォーム情報を取得（回答数のみ効率的に取得）
-        let responseCount = 0;
-        try {
-          responseCount = form.getResponses().length;
-          debugLog(`getActiveFormInfo: Form has ${responseCount} responses`);
-        } catch (e) {
-          debugLog('Failed to get response count:', e.message);
-          responseCount = 0;
+        // 最適化: フォームIDを永続化（次回から検索をスキップ）
+        if (formId && !persistedFormId) {
+          props.setProperty(`FORM_ID_${spreadsheetId}`, formId);
+          debugLog('Persisted form ID for future use:', formId);
         }
         
         return {
           formUrl: form.getPublishedUrl(),
           editUrl: 'https://docs.google.com/forms/d/' + formId + '/edit',
-          responseCount: responseCount,
           formId: formId,
           title: form.getTitle()
         };
       },
       CACHE_CONFIG.FORM_INFO_TTL
     );
+    
+    // 最適化: 回答数を別途キャッシュ（更新频度が高いため）
+    if (formInfo && formInfo.formId) {
+      const responseCountCacheKey = `response_count_${formInfo.formId}`;
+      const responseCount = getCachedData(
+        responseCountCacheKey,
+        () => {
+          try {
+            const form = FormApp.openById(formInfo.formId);
+            const count = form.getResponses().length;
+            debugLog(`getActiveFormInfo: Fresh response count: ${count}`);
+            return count;
+          } catch (e) {
+            debugLog('Failed to get response count:', e.message);
+            return 0;
+          }
+        },
+        CACHE_CONFIG.RESPONSE_COUNT_TTL
+      );
+      
+      formInfo.responseCount = responseCount;
+    }
     
     const executionTime = Date.now() - startTime;
     debugLog(`getActiveFormInfo: Completed in ${executionTime}ms`);
@@ -1727,10 +1786,8 @@ function getStatus() {
       {
         key: `sheet_list_${userId}`,
         fetchFunction: () => {
-          const spreadsheet = getCurrentSpreadsheet();
-          return spreadsheet.getSheets()
-            .filter(sheet => !sheet.isSheetHidden() && sheet.getName() !== 'Config')
-            .map(sheet => sheet.getName());
+          // 最適化: キャッシュされたgetSheets()を使用
+          return getSheets();
         }
       }
     ];
@@ -1755,7 +1812,9 @@ function getStatus() {
         sheetDataCacheKey,
         () => {
           try {
-            const spreadsheet = getCurrentSpreadsheet();
+            // 最適化: キャッシュされたスプレッドシートを使用
+            const spreadsheetId = userInfo.spreadsheetId;
+            const spreadsheet = getCachedSpreadsheet(spreadsheetId) || getCurrentSpreadsheet();
             const sheet = spreadsheet.getSheetByName(activeSheetName);
             if (!sheet) return { answerCount: 0, totalReactions: 0 };
             
@@ -1809,17 +1868,30 @@ function switchToSheet(sheetName) {
 // 内部処理関数
 // =================================================================
 function getSheets() {
-  try {
-    const allSheets = getCurrentSpreadsheet().getSheets();
-    const visibleSheets = allSheets.filter(sheet => !sheet.isSheetHidden());
-    const filtered = visibleSheets.filter(sheet => {
-      const name = sheet.getName();
-      return name !== 'Config';
-    });
-    return filtered.map(sheet => sheet.getName());
-  } catch (error) {
-    handleError('getSheets', error);
-  }
+  const { userId, userInfo } = validateCurrentUserReadOnly();
+  const spreadsheetId = userInfo.spreadsheetId;
+  
+  // シート一覧をキャッシュから取得（最適化）
+  return getCachedData(
+    `sheet_list_${spreadsheetId}`,
+    () => {
+      try {
+        debugLog('Fetching fresh sheet list...');
+        const spreadsheet = getCachedSpreadsheet(spreadsheetId) || getCurrentSpreadsheet();
+        const allSheets = spreadsheet.getSheets();
+        const visibleSheets = allSheets.filter(sheet => !sheet.isSheetHidden());
+        const filtered = visibleSheets.filter(sheet => {
+          const name = sheet.getName();
+          return name !== 'Config';
+        });
+        return filtered.map(sheet => sheet.getName());
+      } catch (error) {
+        handleError('getSheets', error);
+        return [];
+      }
+    },
+    CACHE_CONFIG.SHEET_LIST_TTL
+  );
 }
 
 function getSheetHeaders(sheetName) {
@@ -3254,6 +3326,11 @@ function auditLog(action, userId, details = {}) {
 function registerNewUser(adminEmail) {
   checkRateLimit('registerNewUser', adminEmail);
   
+  // 最適化メモ: 将来の改善案
+  // 1. API呼び出しの統合エンドポイント化
+  // 2. フォルダ作成の非同期実行
+  // 3. スプレッドシート初期設定のバッチ処理
+  
   // 📝 ステップ1: API経由でのデータベースアクセス
   debugLog(`🚀 API経由で新規登録開始: ${adminEmail}`);
   debugLog(`実行ユーザー: ${Session.getActiveUser().getEmail()}`);
@@ -3430,8 +3507,12 @@ function getExistingBoard() {
     
     debugLog(`API経由で既存ボード情報を取得中: ${email}`);
     
-    // API経由でボード情報を取得
-    const boardInfo = getExistingBoardViaApi(email);
+    // 最適化: ユーザールックアップをキャッシュ
+    const boardInfo = getCachedData(
+      `existing_board_${email}`,
+      () => getExistingBoardViaApi(email),
+      CACHE_CONFIG.USER_INFO_TTL
+    );
     
     if (boardInfo && boardInfo.success && boardInfo.data) {
       const userData = boardInfo.data;
