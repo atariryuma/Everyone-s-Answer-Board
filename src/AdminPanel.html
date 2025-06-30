@@ -1484,15 +1484,15 @@
       if (status.activeSheetName) {
         activities.push({
           time: '本日',
-          text: 'Board ' + status.activeSheetName + ' is published',
+          text: 'ボード「' + status.activeSheetName + '」が公開されました',
           type: 'active',
           icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
         });
         
         if (status.answerCount > 0) {
           activities.push({
-            time: 'Today',
-            text: status.answerCount + ' answers submitted',
+            time: '本日',
+            text: status.answerCount + '件の回答が投稿されました',
             type: 'response',
             icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z'
           });
@@ -1500,8 +1500,8 @@
         
         if (status.totalReactions > 0) {
           activities.push({
-            time: 'Today',
-            text: status.totalReactions + ' reactions received',
+            time: '本日',
+            text: status.totalReactions + '件のリアクションがありました',
             type: 'reaction',
             icon: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z'
           });
@@ -2013,13 +2013,6 @@
       overlay.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
       overlay.innerHTML = `
         <div class="glass-panel p-6 rounded-xl max-w-4xl max-h-full overflow-y-auto">
-          <!-- Loading Header -->
-          <div class="text-center mb-6">
-            <div class="spinner mx-auto mb-4"></div>
-            <p class="text-lg text-white font-medium">${message}</p>
-            <p class="text-sm text-gray-400 mt-2">しばらくお待ちください...</p>
-          </div>
-          
           <!-- Education Guide Content -->
           <div class="text-center mb-6">
             <div class="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-3">
@@ -2124,8 +2117,8 @@
             </label>
             
             <div class="text-center">
-              <button type="button" id="loading-understand-btn" disabled class="px-6 py-3 bg-gray-600 text-gray-400 rounded-lg cursor-not-allowed transition-colors">
-                <span id="loading-understand-text">理解しました（読み込み完了後に有効化）</span>
+              <button type="button" id="loading-understand-btn" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                <span id="loading-understand-text">理解しました</span>
               </button>
             </div>
           </div>
@@ -2133,6 +2126,24 @@
       `;
       
       document.body.appendChild(overlay);
+      
+      // すぐに理解ボタンのクリックイベントを設定
+      const understandBtn = document.getElementById('loading-understand-btn');
+      if (understandBtn) {
+        understandBtn.onclick = () => {
+          // 「今日はもう表示しない」のチェック状態を確認
+          const dontShowCheckbox = document.getElementById('loadingDontShowTodayCheckbox');
+          if (dontShowCheckbox && dontShowCheckbox.checked) {
+            const today = new Date().toDateString();
+            localStorage.setItem('teacherGuideDontShowToday', today);
+            console.log('Teacher guide set to not show today');
+          }
+          
+          hideLoadingOverlay();
+          // ローディング終了時にフォームボタンを再有効化
+          setLoading(false);
+        };
+      }
     }
     
     function enableUnderstandButton() {
@@ -2140,11 +2151,7 @@
       const understandBtnText = document.getElementById('loading-understand-text');
       
       if (understandBtn && understandBtnText) {
-        // 詳細な教育ガイドが表示されている場合
-        understandBtn.disabled = false;
-        understandBtn.className = 'px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors';
-        understandBtnText.textContent = '理解しました';
-        
+        // 詳細な教育ガイドが表示されている場合 - 手動クリックイベントを設定
         understandBtn.onclick = () => {
           // 「今日はもう表示しない」のチェック状態を確認
           const dontShowCheckbox = document.getElementById('loadingDontShowTodayCheckbox');
@@ -2159,9 +2166,9 @@
           setLoading(false);
         };
         
-        console.log('Understand button enabled');
+        console.log('Understand button click handler set');
       } else {
-        // シンプルローディングの場合（教育ガイドボタンが存在しない）
+        // シンプルローディングの場合 - 自動で閉じる
         console.log('Simple loading mode - auto closing overlay');
         setTimeout(() => {
           hideLoadingOverlay();
