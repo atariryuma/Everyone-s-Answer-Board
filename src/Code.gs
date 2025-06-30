@@ -2544,8 +2544,23 @@ function createStudyQuestForm(userEmail, userId) {
       debugLog('⚠️ フォーム追加設定でエラー:', e.message);
     }
     
-    // フォームの説明と回答後のメッセージを設定
-    form.setDescription('StudyQuestで使用する回答フォームです。質問に対する回答を入力してください。');
+    // フォームの説明と回答後のメッセージを設定（デジタル・シティズンシップ教育の観点から）
+    const formDescription = `
+📚 みんなの回答ボードへようこそ！
+
+このフォームは、みんなで意見を出し合い、お互いの考えを尊重し合う場です。
+デジタル空間でも、現実と同じように相手を思いやる気持ちを大切にしましょう。
+
+🌟 回答するときの大切なポイント：
+• 自分の考えを正直に、分かりやすく書きましょう
+• 他の人が読んでも気持ちよくなるような言葉を選びましょう
+• 間違いを恐れず、自分らしい意見を大切にしましょう
+• みんなの考えの違いを楽しみ、新しい発見を大切にしましょう
+
+あなたの大切な意見をお聞かせください！
+`.trim();
+    
+    form.setDescription(formDescription);
     
     // userIdが提供されている場合のみボードURLを生成
     let boardUrl = '';
@@ -2561,8 +2576,8 @@ function createStudyQuestForm(userEmail, userId) {
     }
     
     const confirmationMessage = boardUrl 
-      ? `回答ありがとうございます！\n\nみんなの回答ボードで、他の人の意見も見てみましょう。\n${boardUrl}`
-      : '回答ありがとうございます！';
+      ? `🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。\nみんなの回答ボードで、お友達の色々な考えも見てみましょう。\n新しい発見があるかもしれませんね！\n\n${boardUrl}`
+      : '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。';
     
     form.setConfirmationMessage(confirmationMessage);
 
@@ -2574,17 +2589,28 @@ function createStudyQuestForm(userEmail, userId) {
     // クラス名の形式を「G1-1」のような半角英数字とハイフンのみとする
     const pattern = '^[A-Za-z0-9]+-[A-Za-z0-9]+$';
 
-    const helpText = "「G1-1」のように、学年と組を半角ハイフンで区切って入力してください。";
+    const helpText = "あなたのクラスを半角英数字で入力してください。例：6年1組→「6-1」、5年2組→「5-2」、中学1年A組→「1-A」";
     const textValidation = FormApp.createTextValidation()
       .setHelpText(helpText)
       .requireTextMatchesPattern(pattern)
       .build();
     classItem.setValidation(textValidation);
 
-    // その他の項目を追加
-    form.addTextItem().setTitle('名前').setRequired(true);
-    form.addParagraphTextItem().setTitle('回答').setHelpText('質問に対するあなたの回答を入力してください').setRequired(true);
-    form.addParagraphTextItem().setTitle('理由').setHelpText('その回答を選んだ理由を教えてください').setRequired(false);
+    // その他の項目を追加（子供向けの分かりやすい説明付き）
+    const nameItem = form.addTextItem();
+    nameItem.setTitle('名前');
+    nameItem.setHelpText('あなたの名前を入力してください。この名前は先生だけが見ることができ、みんなには表示されません。');
+    nameItem.setRequired(true);
+    
+    const answerItem = form.addParagraphTextItem();
+    answerItem.setTitle('回答');
+    answerItem.setHelpText('質問に対するあなたの考えを、自分の言葉で書いてください。正解・不正解はありません。思ったことを素直に表現しましょう。');
+    answerItem.setRequired(true);
+    
+    const reasonItem = form.addParagraphTextItem();
+    reasonItem.setTitle('理由');
+    reasonItem.setHelpText('なぜそう思ったのか、理由を教えてください。「なんとなく」でも大丈夫です。あなたの気持ちや体験を聞かせてください。（書かなくても大丈夫です）');
+    reasonItem.setRequired(false);
     
     // フォームの回答先スプレッドシートを作成（作成日時を含む）
     const spreadsheet = SpreadsheetApp.create(`StudyQuest - みんなの回答ボード - 回答データ - ${userEmail.split('@')[0]} - ${dateTimeString}`);

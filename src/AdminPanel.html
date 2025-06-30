@@ -2117,8 +2117,8 @@
             </label>
             
             <div class="text-center">
-              <button type="button" id="loading-understand-btn" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-                <span id="loading-understand-text">理解しました</span>
+              <button type="button" id="loading-understand-btn" disabled class="px-6 py-3 bg-gray-600 text-gray-400 rounded-lg cursor-not-allowed transition-colors">
+                <span id="loading-understand-text">ロード中...</span>
               </button>
             </div>
           </div>
@@ -2126,24 +2126,6 @@
       `;
       
       document.body.appendChild(overlay);
-      
-      // すぐに理解ボタンのクリックイベントを設定
-      const understandBtn = document.getElementById('loading-understand-btn');
-      if (understandBtn) {
-        understandBtn.onclick = () => {
-          // 「今日はもう表示しない」のチェック状態を確認
-          const dontShowCheckbox = document.getElementById('loadingDontShowTodayCheckbox');
-          if (dontShowCheckbox && dontShowCheckbox.checked) {
-            const today = new Date().toDateString();
-            localStorage.setItem('teacherGuideDontShowToday', today);
-            console.log('Teacher guide set to not show today');
-          }
-          
-          hideLoadingOverlay();
-          // ローディング終了時にフォームボタンを再有効化
-          setLoading(false);
-        };
-      }
     }
     
     function enableUnderstandButton() {
@@ -2151,7 +2133,11 @@
       const understandBtnText = document.getElementById('loading-understand-text');
       
       if (understandBtn && understandBtnText) {
-        // 詳細な教育ガイドが表示されている場合 - 手動クリックイベントを設定
+        // 詳細な教育ガイドが表示されている場合 - ボタンを有効化してクリックイベントを設定
+        understandBtn.disabled = false;
+        understandBtn.className = 'px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors';
+        understandBtnText.textContent = '理解しました';
+        
         understandBtn.onclick = () => {
           // 「今日はもう表示しない」のチェック状態を確認
           const dontShowCheckbox = document.getElementById('loadingDontShowTodayCheckbox');
@@ -2166,7 +2152,7 @@
           setLoading(false);
         };
         
-        console.log('Understand button click handler set');
+        console.log('Understand button enabled and click handler set');
       } else {
         // シンプルローディングの場合 - 自動で閉じる
         console.log('Simple loading mode - auto closing overlay');
