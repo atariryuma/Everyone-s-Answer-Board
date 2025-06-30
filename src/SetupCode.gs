@@ -364,7 +364,7 @@ function saveSettingsAndCreateDb(apiUrl) {
         
         setupResult += `📊 データベース情報:\n`;
         setupResult += `• ファイル名: ${dbFile.getName()}\n`;
-        setupResult += `• URL: ${dbUrl}\n\n`;
+        
         
         // 権限確認
         try {
@@ -375,8 +375,8 @@ function saveSettingsAndCreateDb(apiUrl) {
           if (hasPermission) {
             setupResult += `✅ データベースアクセス権限: 確認済み\n`;
           } else {
-            setupResult += `⚠️ データベースアクセス権限: 要確認\n`;
-            setupResult += `上記URLから直接データベースにアクセスして編集権限を確認してください。\n`;
+            setupResult += `⚠️ データベースアクセス権限: 不足している可能性があります。
+`;
           }
         } catch (permError) {
           setupResult += `⚠️ 権限確認エラー: ${permError.message}\n`;
@@ -384,7 +384,7 @@ function saveSettingsAndCreateDb(apiUrl) {
         
         setupResult += `\n次のステップ:\n`;
         setupResult += `1. メインアプリで新規ユーザー登録をテストしてください\n`;
-        setupResult += `2. 問題がある場合は上記データベースURLで権限を確認してください`;
+        setupResult += `2. 問題がある場合は、Apps Scriptプロジェクトの「プロジェクトの設定」からデータベースのアクセス権限を確認してください。`;
         
       }
     } catch (infoError) {
