@@ -1,71 +1,101 @@
-# AIエージェントの理念とシステム概要
+Here is the generalized developer documentation for creating a web application, formatted in Markdown for easy use.
 
-このドキュメントは、「みんなの回答ボード」システムの全体像を理解し、開発者が円滑に開発を進めるための指針を提供します。
+-----
 
-## 1. 理念と教育的価値
+# Developer Documentation: Building Modern Web Applications
 
-「みんなの回答ボード」は、生徒たちが安心して多様な意見を共有し、活発な議論を通じて学びを深めることを目的としたウェブアプリケーションです。以下の教育的価値を重視しています。
+This document provides a comprehensive guide for developers aiming to build robust, user-friendly, and scalable web applications. It covers core design principles, a recommended technology stack, and best practices for coding and architecture, using the provided project as a reference.
 
-*   **心理的安全性**: 匿名での意見表明を可能にし、生徒が評価や批判を恐れずに本音で発言できる環境を提供します。
-*   **多様性の尊重**: さまざまな意見や視点に触れることで、生徒が他者を理解し、多様な価値観を受け入れる姿勢を育みます。
-*   **共感的コミュニケーション**: 「いいね！」「なるほど！」といったリアクション機能を通じて、言葉だけでなく非言語的な共感や関心を表現する機会を提供します。
-*   **デジタル・シティズンシップの育成**: オンライン空間での責任ある行動、建設的な対話、情報リテラシーの重要性を実践的に学びます。
+## 1\. Core Philosophy & Design Principles
 
-## 2. デザインの方向性とカラーパレット
+The foundation of a successful application lies in a strong philosophy that prioritizes the user.
 
-ユーザーインターフェース（UI）は、モダンでクリーンなデザインを基調としています。
+  * **User Safety & Trust**: Create a secure environment where users feel safe to interact and share information.
+  * **Inclusivity**: Design for a diverse audience, ensuring accessibility and ease of use for everyone.
+  * **Empathetic Interaction**: Implement features that allow for clear, positive, and nuanced communication.
+  * **Intuitive UI/UX**:
+      * **Simplicity**: Avoid unnecessary complexity. The user interface should be clean and straightforward.
+      * **Visual Hierarchy**: Use modern design techniques like "glassmorphism" to create a sense of depth and guide the user's focus. The `.glass-panel` class in the project is a good example of this.
+      * **Accessibility**: Ensure high contrast, readable fonts, and keyboard navigability to support all users.
 
-### デザイン原則
+## 2\. Color Palette & Usage
 
-*   **シンプルさと直感性**: 複雑な操作を排除し、誰でも簡単に利用できる直感的なUIを目指します。
-*   **視覚的な奥行きと透明感**: 「ガラスモーフィズム」のスタイルを多用し、要素間に視覚的な階層と奥行きを与えます。`glass-panel` クラスがその代表です。
-*   **アクセシビリティ**: 視認性の高い配色と適切なコントラストを確保し、多様なユーザーが利用しやすいデザインを心がけます。
+A consistent color palette is key to a professional look and feel. This palette is defined using CSS variables for easy theming and maintenance.
 
-### カラーパレット
+**Copy-paste this CSS to use the color palette in your project:**
 
-主要なカラーはCSS変数として定義されており、一貫したデザインを保ちます。
+```css
+:root {
+  --color-primary: #8be9fd;
+  --color-background: #1a1b26;
+  --color-surface: rgba(26, 27, 38, 0.7);
+  --color-text: #c0caf5;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-accent: #facc15;
+  --color-success: #10b981;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+  --color-info: #3b82f6;
+}
+```
 
-*   `--color-primary`: `#8be9fd` (シアン系) - アプリケーションの主要なインタラクティブ要素や強調色に使用されます。
-*   `--color-background`: `#1a1b26` (ダーク系) - 全体の背景色として、コンテンツの視認性を高めます。
-*   `--color-surface`: `rgba(26,27,38,0.7)` - ガラスモーフィズムの背景色として、透明感と奥行きを表現します。
-*   `--color-text`: `#c0caf5` (ライトグレー系) - 主要なテキスト色として、ダークな背景とのコントラストを確保します。
-*   `--color-border`: `rgba(255,255,255,0.1)` - 要素の境界線に使用され、ガラスモーフィズムの質感を強調します。
-*   `--color-accent`: `#facc15` (イエロー系) - 特定の要素やハイライトに使用されるアクセントカラーです。
-*   **セマンティックカラー**:
-    *   `--color-success`: `#10b981` (緑) - 成功メッセージや肯定的なアクション。
-    *   `--color-error`: `#ef4444` (赤) - エラーメッセージや危険なアクション。
-    *   `--color-warning`: `#f59e0b` (黄) - 警告メッセージや注意喚起。
-    *   `--color-info`: `#3b82f6` (青) - 情報提供や中立的なメッセージ。
+### Color Usage Guide
 
-## 3. 技術スタックと主要な仕様
+| Variable              | Hex/RGBA               | Usage Example & Description                                                                                                                                     |
+| :-------------------- | :--------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--color-primary`     | `#8be9fd` (Cyan)        | **Primary Actions & Highlights:** Used for main buttons, active states, and important interactive elements to draw user attention. (e.g., "Submit" button) |
+| `--color-background`  | `#1a1b26` (Dark Blue)   | **Main App Background:** Provides a dark, modern backdrop that helps content and interactive elements stand out clearly.                                |
+| `--color-surface`     | `rgba(26,27,38,0.7)`   | **Panel & Card Backgrounds:** Used for "glassmorphism" panels (`.glass-panel`) to create a translucent, layered effect.                            |
+| `--color-text`        | `#c0caf5` (Light Gray)  | **Primary Text Color:** Ensures readability against the dark background for all main text content.                                                   |
+| `--color-border`      | `rgba(255,255,255,0.1)`| **Borders:** Defines the edges of panels and other UI elements, enhancing the "glass" effect.                                                     |
+| `--color-accent`      | `#facc15` (Yellow)     | **Accent & Attention:** Used for secondary highlights, titles, or important icons to provide visual contrast. (e.g., Main Title)               |
+| `--color-success`     | `#10b981` (Green)      | **Success Feedback:** For success messages, confirmation indicators, and positive actions. (e.g., "Saved successfully" message)                  |
+| `--color-error`       | `#ef4444` (Red)         | **Error Feedback:** For error messages, warnings about destructive actions, and validation failures. (e.g., "Invalid URL" error)                |
+| `--color-warning`     | `#f59e0b` (Yellow)      | **Warnings:** Used for non-critical warnings or to draw attention to important information that requires user consideration.                           |
+| `--color-info`        | `#3b82f6` (Blue)        | **Informational Messages:** For neutral, informational messages, tips, and guidance within the UI.                                                   |
 
-本システムは、Google Workspace環境に深く統合されたGoogle Apps Script (GAS) を中心に構築されています。
+## 3\. Architecture and Technology Stack
 
-### 技術スタック
+This application is built on the Google Workspace platform, making it highly integrated and scalable.
 
-*   **フロントエンド**:
-    *   **HTML**: ユーザーインターフェースの構造を定義します。
-    *   **CSS**: [Tailwind CSS](https://tailwindcss.com/) を利用し、ユーティリティファーストのアプローチで迅速なスタイリングを実現しています。カスタムCSS変数も多用されています。
-    *   **JavaScript**: Google Apps Scriptの `HtmlService` を通じて提供され、クライアントサイドのインタラクティブな挙動を制御します。
-*   **バックエンド**:
-    *   **Google Apps Script (GAS)**: Googleのサーバーレスプラットフォーム上で動作し、スプレッドシートとの連携、ユーザー管理、認証、API連携などの主要なビジネスロジックを担います。
-*   **データ永続化**:
-    *   **Google スプレッドシート**: 回答データ、ユーザー情報、アプリケーション設定など、すべてのデータがGoogleスプレッドシートに保存されます。これにより、非開発者でもデータの確認や編集が容易になります。
-*   **認証・認可**:
-    *   **Googleアカウント認証**: GASの `Session` サービスを利用し、Googleアカウントによる認証を行います。
-    *   **ドメインベースのアクセス制御**: アプリケーションは特定のGoogle Workspaceドメイン内での利用を想定しており、ドメインが一致しないユーザーからのアクセスを制限します。
-    *   **マルチテナント対応**: ユーザーごとに異なるスプレッドシートを管理し、独立した回答ボードを提供します。
-*   **開発ツール**:
-    *   **`clasp`**: Google Apps Scriptプロジェクトをローカル環境で開発・管理するためのCLIツールです。
-    *   **`jest`**: JavaScriptのテストフレームワークで、バックエンド（GAS）ロジックの単体テストに使用されます。
-*   **API連携**:
-    *   **Admin Logger API**: 監査ログの記録やキャッシュの無効化など、管理機能の補助として利用される外部API（GASで実装されている可能性が高い）。
+  * **Backend**: **Google Apps Script (GAS)** serves as the serverless backend, handling all business logic, data processing, and API integrations.
+  * **Frontend**:
+      * **HTML/CSS/JavaScript**: Standard web technologies are used to build the user interface.
+      * **Tailwind CSS**: A utility-first CSS framework is recommended for rapid and consistent styling.
+      * **Client-Server Communication**: The frontend communicates with the GAS backend via the `google.script.run` asynchronous API.
+  * **Data Storage**: **Google Sheets** is used as a simple and accessible database for storing application data, user information, and configurations.
+  * **Development Tools**:
+      * **`clasp`**: The official command-line tool for managing GAS projects locally.
+      * **`jest`**: A JavaScript testing framework for ensuring the reliability of backend logic.
 
-### 主要な仕様
+## 4\. Coding Standards and Best Practices
 
-*   **ウェブアプリ形式でのデプロイ**: アプリケーションはGoogle Apps Scriptのウェブアプリとしてデプロイされ、特定のURLを通じてアクセスされます。
-*   **自動非公開タイマー**: 公開された回答ボードは、セキュリティとプライバシー保護のため、6時間経過すると自動的に非公開になります。管理画面から再公開が可能です。
-*   **リアルタイム更新**: Googleスプレッドシートの変更がリアルタイムでフロントエンドに反映されるよう、ポーリングなどの仕組みが導入されています。
-*   **設定の柔軟性**: 管理者は、表示するシートの選択、列のマッピング、名前やリアクション数の表示/非表示など、ボードの表示設定を柔軟にカスタマイズできます。
-*   **パフォーマンス最適化**: キャッシュメカニズム（メモリ内キャッシュ、`CacheService`）やDOM操作の最適化（仮想スクロール、デバウンス、スロットリング）により、大規模なデータセットでもスムーズな動作を目指しています。
-*   **エラーハンドリング**: ユーザーには安全なメッセージを表示し、詳細なエラー情報はサーバーサイドのログに記録されます。
+### 4.1. The Manifest File (`appsscript.json`)
+
+The manifest is a JSON file that configures your Apps Script project.
+
+  * **`timeZone`**: Set the script's timezone (e.g., `"Asia/Tokyo"`).
+  * **`oauthScopes`**: List the *minimum* required OAuth scopes for your script to function. Avoid overly permissive scopes.
+  * **`webapp`**: Configure the web app deployment settings.
+      * `executeAs`: Defines whether the script runs as the user accessing it (`USER_ACCESSING`) or the developer who deployed it (`USER_DEPLOYING`).
+      * `access`: Controls who can access the app (`MYSELF`, `DOMAIN`, or `ANYONE`).
+  * **`runtimeVersion`**: Use `V8` for the modern JavaScript runtime.
+
+### 4.2. Server-Side Script (`.gs` Files)
+
+  * **Performance**:
+      * **Batch Operations**: Minimize calls to services like `SpreadsheetApp`. Read and write data in batches using `getValues()` and `setValues()` to reduce execution time.
+      * **Cache Service**: Use `CacheService` to cache frequently accessed, infrequently changing data to avoid redundant service calls.
+  * **Organization**:
+      * **Modularity**: Separate concerns by splitting code into different `.gs` files (e.g., `API.gs`, `Database.gs`, `Utils.gs`).
+  * **Security**:
+      * **Secrets Management**: Store API keys and other secrets in `PropertiesService`, not in the code itself.
+
+### 4.3. Client-Side HTML (`.html` Files)
+
+  * **Separation of Concerns**: Keep HTML, CSS, and JavaScript in separate files and include them using server-side functions and scriptlets (`<?!= include('Stylesheet.html'); ?>`).
+  * **Asynchronous Loading**: Load data dynamically with `google.script.run` after the initial page load to keep the UI responsive.
+  * **Scriptlets (`<?...?>`)**: Use scriptlets sparingly for simple, one-time server-side tasks. They are executed before the page is served and can slow down the initial load if overused.
+      * `<?= ... ?>` (Printing Scriptlet): Outputs data into the HTML with contextual escaping.
+      * `<? ... ?>` (Standard Scriptlet): Executes server-side code like loops or conditionals.
+  * **Security**: Trust the contextual escaping of printing scriptlets to prevent XSS. Sanitize any user data you manually place in the HTML. For all external links, use `rel="noopener noreferrer"`.

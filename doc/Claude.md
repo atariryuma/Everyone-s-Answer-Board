@@ -1,45 +1,101 @@
-# Claude APIの利用（将来的な展望）
+Here is the generalized developer documentation for creating a web application, formatted in Markdown for easy use.
 
-このプロジェクトでは現在、Anthropic Claude APIを直接利用していませんが、将来的な機能拡張において、Claudeのような大規模言語モデル（LLM）を統合することで、システムの価値を大幅に向上させる可能性があります。
+-----
 
-## 1. Claudeの潜在的な役割と機能拡張
+# Developer Documentation: Building Modern Web Applications
 
-Claude APIを統合することで、以下のような高度なAI機能を実現できます。これらの機能は、Gemini APIで実現可能なものと類似していますが、モデルの特性や性能に応じて使い分けが可能です。
+This document provides a comprehensive guide for developers aiming to build robust, user-friendly, and scalable web applications. It covers core design principles, a recommended technology stack, and best practices for coding and architecture, using the provided project as a reference.
 
-*   **回答の自動要約とキーワード抽出**:
-    *   生徒の長文回答を自動で要約し、主要なポイントやキーワードを抽出して表示することで、教師や他の生徒が多数の意見を効率的に把握できるようにします。
-*   **生徒の意見に対するAIによる建設的なフィードバック生成**:
-    *   生徒が投稿した意見に対して、AIが個別最適化された、思慮深く、安全なフィードバックを提供します。
-*   **教師向けの回答分析と洞察**:
-    *   AIが回答データ全体を分析し、意見の傾向、感情分析、議論の構造などを特定し、教師に詳細なレポートとして提供します。
-*   **不適切な発言の自動検出とモデレーション**:
-    *   有害なコンテンツや不適切な表現をリアルタイムで検出し、フィルタリングまたは警告を発することで、安全な学習環境を維持します。Claudeは特に安全性と倫理に重点を置いた設計がされています。
-*   **特定の教育シナリオに特化した対話型AIエージェント**:
-    *   例えば、特定の科目の質問応答、ディベートのファシリテーション、ロールプレイングなど、教育現場のニーズに合わせたカスタムエージェントを構築します。
+## 1\. Core Philosophy & Design Principles
 
-## 2. 技術スタックと統合方法
+The foundation of a successful application lies in a strong philosophy that prioritizes the user.
 
-Claude APIを統合する場合、Google Apps Script (GAS) から直接APIを呼び出す形が考えられます。
+  * **User Safety & Trust**: Create a secure environment where users feel safe to interact and share information.
+  * **Inclusivity**: Design for a diverse audience, ensuring accessibility and ease of use for everyone.
+  * **Empathetic Interaction**: Implement features that allow for clear, positive, and nuanced communication.
+  * **Intuitive UI/UX**:
+      * **Simplicity**: Avoid unnecessary complexity. The user interface should be clean and straightforward.
+      * **Visual Hierarchy**: Use modern design techniques like "glassmorphism" to create a sense of depth and guide the user's focus. The `.glass-panel` class in the project is a good example of this.
+      * **Accessibility**: Ensure high contrast, readable fonts, and keyboard navigability to support all users.
 
-*   **主要技術**:
-    *   **Google Apps Script (GAS)**: バックエンドロジックとして、`UrlFetchApp` サービスを利用してAnthropicのAPIエンドポイントにHTTPリクエストを送信します。
-*   **認証**:
-    *   Anthropic APIキーを利用して、GASからClaude APIへのセキュアな認証を行います。APIキーは、GASのスクリプトプロパティやSecret Managerなど、安全な方法で管理する必要があります。
+## 2\. Color Palette & Usage
 
-## 3. 統合における考慮事項
+A consistent color palette is key to a professional look and feel. This palette is defined using CSS variables for easy theming and maintenance.
 
-Claude APIをシステムに統合する際には、以下の点を慎重に考慮する必要があります。
+**Copy-paste this CSS to use the color palette in your project:**
 
-*   **APIキーの管理とセキュリティ**:
-    *   APIキーや認証情報は、GASのスクリプトプロパティなど、安全な方法で管理し、コードに直接埋め込まないようにします。
-*   **レートリミットとコスト管理**:
-    *   Claude APIには利用制限（レートリミット）と費用が発生します。利用頻度やデータ量に応じた適切な設計と、コスト監視メカニズムの導入が必要です。
-*   **生成AIの倫理的利用と安全性**:
-    *   Claudeは安全性に重点を置いていますが、AIが生成するコンテンツのバイアス、ハルシネーション、不正確さのリスクは依然として存在します。適切なヒューマンレビュープロセスや免責事項の表示を検討します。
-    *   特に教育現場での利用においては、生徒への影響を考慮した慎重な導入が求められます。
-*   **データプライバシーとセキュリティ**:
-    *   生徒の回答データなど、機密性の高い情報をAIに送信する際のプライバシー保護とデータセキュリティ対策を徹底します。Anthropicのデータ処理規約を遵守します。
-*   **パフォーマンス**:
-    *   API呼び出しにはネットワーク遅延が伴うため、非同期処理やキャッシュ戦略を適切に設計し、ユーザー体験を損なわないようにします。
-*   **エラーハンドリングとフォールバック**:
-    *   APIエラーや予期せぬ応答に対する堅牢なエラーハンドリングを実装し、AIサービスが利用できない場合でもシステムが正常に機能するようなフォールバックメカニズムを検討します。
+```css
+:root {
+  --color-primary: #8be9fd;
+  --color-background: #1a1b26;
+  --color-surface: rgba(26, 27, 38, 0.7);
+  --color-text: #c0caf5;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-accent: #facc15;
+  --color-success: #10b981;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+  --color-info: #3b82f6;
+}
+```
+
+### Color Usage Guide
+
+| Variable              | Hex/RGBA               | Usage Example & Description                                                                                                                                     |
+| :-------------------- | :--------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--color-primary`     | `#8be9fd` (Cyan)        | **Primary Actions & Highlights:** Used for main buttons, active states, and important interactive elements to draw user attention. (e.g., "Submit" button) |
+| `--color-background`  | `#1a1b26` (Dark Blue)   | **Main App Background:** Provides a dark, modern backdrop that helps content and interactive elements stand out clearly.                                |
+| `--color-surface`     | `rgba(26,27,38,0.7)`   | **Panel & Card Backgrounds:** Used for "glassmorphism" panels (`.glass-panel`) to create a translucent, layered effect.                            |
+| `--color-text`        | `#c0caf5` (Light Gray)  | **Primary Text Color:** Ensures readability against the dark background for all main text content.                                                   |
+| `--color-border`      | `rgba(255,255,255,0.1)`| **Borders:** Defines the edges of panels and other UI elements, enhancing the "glass" effect.                                                     |
+| `--color-accent`      | `#facc15` (Yellow)     | **Accent & Attention:** Used for secondary highlights, titles, or important icons to provide visual contrast. (e.g., Main Title)               |
+| `--color-success`     | `#10b981` (Green)      | **Success Feedback:** For success messages, confirmation indicators, and positive actions. (e.g., "Saved successfully" message)                  |
+| `--color-error`       | `#ef4444` (Red)         | **Error Feedback:** For error messages, warnings about destructive actions, and validation failures. (e.g., "Invalid URL" error)                |
+| `--color-warning`     | `#f59e0b` (Yellow)      | **Warnings:** Used for non-critical warnings or to draw attention to important information that requires user consideration.                           |
+| `--color-info`        | `#3b82f6` (Blue)        | **Informational Messages:** For neutral, informational messages, tips, and guidance within the UI.                                                   |
+
+## 3\. Architecture and Technology Stack
+
+This application is built on the Google Workspace platform, making it highly integrated and scalable.
+
+  * **Backend**: **Google Apps Script (GAS)** serves as the serverless backend, handling all business logic, data processing, and API integrations.
+  * **Frontend**:
+      * **HTML/CSS/JavaScript**: Standard web technologies are used to build the user interface.
+      * **Tailwind CSS**: A utility-first CSS framework is recommended for rapid and consistent styling.
+      * **Client-Server Communication**: The frontend communicates with the GAS backend via the `google.script.run` asynchronous API.
+  * **Data Storage**: **Google Sheets** is used as a simple and accessible database for storing application data, user information, and configurations.
+  * **Development Tools**:
+      * **`clasp`**: The official command-line tool for managing GAS projects locally.
+      * **`jest`**: A JavaScript testing framework for ensuring the reliability of backend logic.
+
+## 4\. Coding Standards and Best Practices
+
+### 4.1. The Manifest File (`appsscript.json`)
+
+The manifest is a JSON file that configures your Apps Script project.
+
+  * **`timeZone`**: Set the script's timezone (e.g., `"Asia/Tokyo"`).
+  * **`oauthScopes`**: List the *minimum* required OAuth scopes for your script to function. Avoid overly permissive scopes.
+  * **`webapp`**: Configure the web app deployment settings.
+      * `executeAs`: Defines whether the script runs as the user accessing it (`USER_ACCESSING`) or the developer who deployed it (`USER_DEPLOYING`).
+      * `access`: Controls who can access the app (`MYSELF`, `DOMAIN`, or `ANYONE`).
+  * **`runtimeVersion`**: Use `V8` for the modern JavaScript runtime.
+
+### 4.2. Server-Side Script (`.gs` Files)
+
+  * **Performance**:
+      * **Batch Operations**: Minimize calls to services like `SpreadsheetApp`. Read and write data in batches using `getValues()` and `setValues()` to reduce execution time.
+      * **Cache Service**: Use `CacheService` to cache frequently accessed, infrequently changing data to avoid redundant service calls.
+  * **Organization**:
+      * **Modularity**: Separate concerns by splitting code into different `.gs` files (e.g., `API.gs`, `Database.gs`, `Utils.gs`).
+  * **Security**:
+      * **Secrets Management**: Store API keys and other secrets in `PropertiesService`, not in the code itself.
+
+### 4.3. Client-Side HTML (`.html` Files)
+
+  * **Separation of Concerns**: Keep HTML, CSS, and JavaScript in separate files and include them using server-side functions and scriptlets (`<?!= include('Stylesheet.html'); ?>`).
+  * **Asynchronous Loading**: Load data dynamically with `google.script.run` after the initial page load to keep the UI responsive.
+  * **Scriptlets (`<?...?>`)**: Use scriptlets sparingly for simple, one-time server-side tasks. They are executed before the page is served and can slow down the initial load if overused.
+      * `<?= ... ?>` (Printing Scriptlet): Outputs data into the HTML with contextual escaping.
+      * `<? ... ?>` (Standard Scriptlet): Executes server-side code like loops or conditionals.
+  * **Security**: Trust the contextual escaping of printing scriptlets to prevent XSS. Sanitize any user data you manually place in the HTML. For all external links, use `rel="noopener noreferrer"`.
