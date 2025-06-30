@@ -2975,6 +2975,23 @@ function createStudyQuestFormFromTemplate(userEmail, userId) {
   }
 }
 
+function generateStudentBoardUrl(userId) {
+  if (!userId) {
+    return '';
+  }
+  
+  try {
+    const webAppUrl = getWebAppUrlEnhanced();
+    if (webAppUrl) {
+      return `${webAppUrl}?userId=${userId}`;
+    }
+  } catch (e) {
+    console.warn('学生ボードURL生成に失敗しました:', e.message);
+  }
+  
+  return '';
+}
+
 function getTemplateIds(loggerApiUrl) {
   try {
     console.log('テンプレートID取得開始:', loggerApiUrl);
