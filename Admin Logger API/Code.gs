@@ -51,6 +51,9 @@ function onOpen() {
     .addItem('Test Deployment', 'testDeployment')
     .addSeparator()
     .addItem('🔍 View Database Contents', 'debugDatabaseContents')
+    .addItem('📝 Check Template Status', 'checkTemplateStatus')
+    .addItem('🔄 Create Missing Templates', 'createMissingTemplates')
+    .addSeparator()
     .addItem('🧹 Clear Database', 'clearDatabase')
     .addItem('🔧 Cleanup Invalid Users', 'cleanupInvalidUsers')
     .addItem('🗑️ Clear All Caches', 'clearAllCaches')
@@ -67,7 +70,22 @@ function initializeDatabase() {
   const sheetId = spreadsheet.getId();
 
   if (properties.getProperty(CONFIG.DATABASE_ID_KEY) === sheetId) {
-    ui.alert('✅ Database already initialized.');
+    // Database is already initialized, but check if templates exist
+    const existingTemplateFormId = properties.getProperty(CONFIG.TEMPLATE_FORM_ID_KEY);
+    const existingTemplateSpreadsheetId = properties.getProperty(CONFIG.TEMPLATE_SPREADSHEET_ID_KEY);
+    
+    if (!existingTemplateFormId || !existingTemplateSpreadsheetId) {
+      // Templates don't exist, create them
+      try {
+        createTemplateFormAndSpreadsheet();
+        ui.alert('✅ Database already initialized. Missing templates have been created.');
+      } catch (error) {
+        console.error('Template creation error:', error);
+        ui.alert(`Template creation failed: ${error.message}`);
+      }
+    } else {
+      ui.alert('✅ Database already initialized. Templates already exist.');
+    }
     return;
   }
 
@@ -981,6 +999,16 @@ function showCurrentSettings() {
     message += '❌ Database: Not configured\n\n';
   }
 
+  // Check templates
+  const templateFormId = properties.getProperty(CONFIG.TEMPLATE_FORM_ID_KEY);
+  const templateSpreadsheetId = properties.getProperty(CONFIG.TEMPLATE_SPREADSHEET_ID_KEY);
+  
+  if (templateFormId && templateSpreadsheetId) {
+    message += `✅ Templates: Configured\n   Form ID: ${templateFormId}\n   Spreadsheet ID: ${templateSpreadsheetId}\n\n`;
+  } else {
+    message += '❌ Templates: Not configured (use "Create Missing Templates")\n\n';
+  }
+
   if (deploymentId) {
     const webAppUrl = deploymentId.startsWith('https://') 
       ? deploymentId 
@@ -1311,5 +1339,79 @@ function setupTemplateSpreadsheet(spreadsheet) {
   } catch (error) {
     console.error('Template spreadsheet setup error:', error);
     throw error;
+  }
+}
+
+/**
+ * Check template status and display information
+ */
+function checkTemplateStatus() {
+  const ui = SpreadsheetApp.getUi();
+  const properties = PropertiesService.getScriptProperties();
+  
+  try {
+    const templateFormId = properties.getProperty(CONFIG.TEMPLATE_FORM_ID_KEY);
+    const templateSpreadsheetId = properties.getProperty(CONFIG.TEMPLATE_SPREADSHEET_ID_KEY);
+    
+    let message = 'Template Status Report:\n\n';
+    
+    if (!templateFormId) {
+      message += '❌ Template Form: Not found\n';
+    } else {
+      try {
+        const formFile = DriveApp.getFileById(templateFormId);
+        message += `✅ Template Form: Found\n   Name: ${formFile.getName()}\n   ID: ${templateFormId}\n\n`;
+      } catch (e) {
+        message += `❌ Template Form: ID stored but file not accessible\n   ID: ${templateFormId}\n\n`;
+      }
+    }
+    
+    if (!templateSpreadsheetId) {
+      message += '❌ Template Spreadsheet: Not found\n';
+    } else {
+      try {
+        const spreadsheetFile = DriveApp.getFileById(templateSpreadsheetId);
+        message += `✅ Template Spreadsheet: Found\n   Name: ${spreadsheetFile.getName()}\n   ID: ${templateSpreadsheetId}\n\n`;
+      } catch (e) {
+        message += `❌ Template Spreadsheet: ID stored but file not accessible\n   ID: ${templateSpreadsheetId}\n\n`;
+      }
+    }
+    
+    if (!templateFormId || !templateSpreadsheetId) {
+      message += '\n💡 Use "Create Missing Templates" to create missing templates.';
+    } else {
+      message += '🎉 All templates are properly configured!';
+    }
+    
+    ui.alert(message);
+    
+  } catch (error) {
+    ui.alert(`Error checking templates: ${error.message}`);
+  }
+}
+
+/**
+ * Create missing templates
+ */
+function createMissingTemplates() {
+  const ui = SpreadsheetApp.getUi();
+  
+  const confirmation = ui.alert(
+    'Create Missing Templates',
+    'This will create missing template form and spreadsheet. Continue?',
+    ui.ButtonSet.YES_NO
+  );
+  
+  if (confirmation !== ui.Button.YES) {
+    ui.alert('Operation cancelled.');
+    return;
+  }
+  
+  try {
+    createTemplateFormAndSpreadsheet();
+    ui.alert('✅ Missing templates have been created successfully.');
+  } catch (error) {
+    console.error('Template creation error:', error);
+    ui.alert(`Template creation failed: ${error.message}`);
   }
 }
