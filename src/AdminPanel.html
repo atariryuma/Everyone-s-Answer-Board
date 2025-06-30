@@ -1180,86 +1180,74 @@
       const answerCountEl = document.getElementById('answer-count');
       const formFileNameEl = document.getElementById('form-file-name');
       const openFormBtn = document.getElementById('open-form-btn');
-      const formUrlInput = document.getElementById('form-url-input'); // 追加
-      const openFormUrlLink = document.getElementById('open-form-url-link'); // 追加
+      const formUrlInput = document.getElementById('form-url-input');
+      const openFormUrlLink = document.getElementById('open-form-url-link');
       
+      // 既存のイベントリスナーをすべて削除
+      if (openFormBtn) {
+        const newOpenFormBtn = openFormBtn.cloneNode(true);
+        openFormBtn.parentNode.replaceChild(newOpenFormBtn, openFormBtn);
+        elements.openFormBtn = newOpenFormBtn; // elementsオブジェクトも更新
+      }
+
       if (!formInfo) {
-        // フォーム情報がない場合はデフォルト表示
         if (answerCountEl) answerCountEl.textContent = '未設定';
         if (formFileNameEl) formFileNameEl.textContent = 'Googleフォーム';
-        if (formUrlInput) formUrlInput.value = ''; // URLをクリア
-        if (openFormUrlLink) openFormUrlLink.href = '#'; // リンクを無効化
+        if (formUrlInput) formUrlInput.value = '';
+        if (openFormUrlLink) openFormUrlLink.href = '#';
         
-        // フォーム情報がない場合のクリックイベント
-        if (openFormBtn) {
-          openFormBtn.onclick = () => {
+        if (elements.openFormBtn) {
+          elements.openFormBtn.addEventListener('click', () => {
             showMessage('Googleフォームが見つかりません。フォームを作成するか、スプレッドシートとフォームを関連付けてください。', 'yellow');
-          };
+          });
         }
         return;
       }
       
-      // 回答数を表示
       if (answerCountEl) {
         answerCountEl.textContent = formInfo.responseCount + '件';
       }
       
-      // フォーム名を表示
       if (formFileNameEl) {
         formFileNameEl.textContent = formInfo.title || 'Googleフォーム';
       }
       
-      // フォームURL入力欄にURLを設定
       if (formUrlInput) {
         formUrlInput.value = formInfo.formUrl || '';
       }
       
-      // フォームを開くリンクを設定
       if (openFormUrlLink) {
         openFormUrlLink.href = formInfo.editUrl || formInfo.formUrl || '#';
       }
       
-      // フォームボタンのクリックイベントを更新
-      if (openFormBtn && formInfo.editUrl) {
+      if (elements.openFormBtn) {
         console.log('editUrlでフォームボタンのクリックハンドラを設定中:', formInfo.editUrl);
         console.log('フォームボタンの現在の状態:', {
-          disabled: openFormBtn.disabled,
-          style: openFormBtn.style.cssText,
-          tagName: openFormBtn.tagName
+          disabled: elements.openFormBtn.disabled,
+          style: elements.openFormBtn.style.cssText,
+          tagName: elements.openFormBtn.tagName
         });
         
-        // 既存のイベントリスナーを削除してから新しいものを設定
-        openFormBtn.onclick = null;
-        openFormBtn.addEventListener('click', (e) => {
+        elements.openFormBtn.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          window.open(formInfo.editUrl, '_blank');
-        });
-        
-        // フォームボタンが確実に有効化されていることを確認
-        openFormBtn.disabled = false;
-        openFormBtn.style.pointerEvents = 'auto';
-        openFormBtn.style.opacity = '1';
-        
-      } else if (openFormBtn) {
-        // editUrlがない場合のフォールバック
-        openFormBtn.onclick = () => {
-          if (formInfo.formUrl) {
-            // 回答用URLを編集用URLに変換して開く
-            let editUrl = formInfo.formUrl;
-            // Google Forms URL変換: viewform -> edit (編集モード用)
-            if (formInfo.formUrl.includes('/viewform')) {
-              editUrl = formInfo.formUrl.replace('/viewform', '/edit');
-            } else if (formInfo.formId) {
-              editUrl = 'https://docs.google.com/forms/d/' + formInfo.formId + '/edit';
-            }
-            window.open(editUrl, '_blank');
+          let targetUrl = formInfo.editUrl || formInfo.formUrl;
+          if (targetUrl && targetUrl.includes('/viewform') && !targetUrl.includes('/edit')) {
+            targetUrl = targetUrl.replace('/viewform', '/edit');
+          } else if (formInfo.formId && !targetUrl) {
+            targetUrl = 'https://docs.google.com/forms/d/' + formInfo.formId + '/edit';
+          }
+          if (targetUrl) {
+            window.open(targetUrl, '_blank');
           } else {
             showMessage('フォームのURLが取得できませんでした。', 'yellow');
           }
-        };
+        });
+        
+        elements.openFormBtn.disabled = false;
+        elements.openFormBtn.style.pointerEvents = 'auto';
+        elements.openFormBtn.style.opacity = '1';
       }
-      
     }
 
     function updateStatus(status) {
