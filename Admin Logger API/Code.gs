@@ -1287,7 +1287,7 @@ function createTemplateFormAndSpreadsheet() {
     const templateSpreadsheet = SpreadsheetApp.create(`StudyQuest Template Spreadsheet - ${dateTimeString}`);
     
     // Connect form to spreadsheet
-    templateForm.setDestination(FormApp.DestinationType.SPREADSHEET, templateSpreadsheet.getId());
+    
     
     // Move template files to database folder
     const templateFormFile = DriveApp.getFileById(templateForm.getId());

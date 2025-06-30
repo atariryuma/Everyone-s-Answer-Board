@@ -337,7 +337,7 @@
         
         <!-- Engagement Card -->
         <div class="glass-panel p-6 rounded-xl card-hover fade-in hover:border-orange-400/50 transition-all duration-300">
-          <button type="button" id="open-admin-board-btn" class="w-full h-full flex items-center gap-3 mb-4 text-left hover:bg-orange-500/10 rounded-lg p-2 transition-all duration-300">
+          <div class="w-full h-full flex items-center gap-3 mb-4 text-left">
             <div class="w-12 h-12 bg-gradient-to-r from-orange-500/20 to-red-500/20 rounded-full flex items-center justify-center">
               <svg class="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
@@ -348,7 +348,7 @@
               <p class="text-2xl font-bold text-orange-400" id="engagement-rate">管理モード</p>
               <p class="text-xs text-orange-300 mt-1">名前・数値表示</p>
             </div>
-          </button>
+          </div>
         </div>
       </div>
       
@@ -1008,23 +1008,7 @@
       } else {
       }
 
-      // Open Admin Board Button (page.html管理モードでボードを開く)
-      const openAdminBoardBtn = document.getElementById('open-admin-board-btn');
-      if (openAdminBoardBtn) {
-        openAdminBoardBtn.addEventListener('click', () => {
-          // page.htmlの管理モードURLを構築（正しいパラメータ構造）
-          const baseUrl = webAppUrl;
-          const url = new URL(baseUrl);
-          
-          // page.htmlアクセス用のパラメータ設定
-          url.searchParams.set('userId', userId);
-          url.searchParams.set('page', 'page');  // page.htmlを指定
-          url.searchParams.set('mode', 'admin');
-          url.searchParams.set('adminModeVerified', 'true');
-          
-          window.open(url.toString(), '_blank');
-        });
-      }
+      
 
       // Auto-update config when headers change
       elements.mainHeader.addEventListener('change', updateConfigButtons);

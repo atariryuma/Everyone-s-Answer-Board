@@ -1436,18 +1436,21 @@ function doGet(e) {
     
     if (typeof HtmlService !== 'undefined') {
       let errorMessage = 'システムエラーが発生しました。';
-      
+      const errorMsg = error.message || ''; // エラーメッセージがnull/undefinedの場合に備える
+
       // エラーの種類に応じて具体的なメッセージを提供
-      if (error.message.includes('データベース')) {
-        errorMessage = `データベースエラー: ${error.message}`;
-      } else if (error.message.includes('Permission') || error.message.includes('権限')) {
+      if (errorMsg.includes('データベース')) {
+        errorMessage = `データベースエラー: ${errorMsg}`;
+      } else if (errorMsg.includes('Permission') || errorMsg.includes('権限')) {
         errorMessage = 'アクセス権限がありません。管理者にお問い合わせください。';
-      } else if (error.message.includes('not found')) {
+      } else if (errorMsg.includes('not found')) {
         errorMessage = '指定されたリソースが見つかりません。URLを確認してください。';
-      } else if (error.message.includes('studyQuestSetup')) {
+      } else if (errorMsg.includes('studyQuestSetup')) {
         errorMessage = 'システムのセットアップが完了していません。管理者にstudyQuestSetup()の実行を依頼してください。';
+      } else if (errorMsg.includes('無効なユーザーIDの形式です。') || errorMsg.includes('ユーザーIDが指定されていません。')) {
+        errorMessage = 'URLが正しくないか、ユーザーIDが不足しています。正しいURLでアクセスしてください。';
       } else {
-        errorMessage = `エラー詳細: ${error.message}`;
+        errorMessage = `エラー詳細: ${errorMsg}`;
       }
       
       const output = HtmlService.createHtmlOutput(
@@ -1584,35 +1587,37 @@ function getActiveFormInfo() {
         let formId = null;
         let form = null;
         
-        // 方法1: スプレッドシートに直接リンクされたフォームを探す（最も高速）
-        try {
-          const formUrl = spreadsheet.getFormUrl();
-          if (formUrl) {
-            const match = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
-            if (match) {
-              formId = match[1];
-              form = FormApp.openById(formId);
-              debugLog('getActiveFormInfo: Found form via direct link');
-            }
-          }
-        } catch (e) {
-          debugLog('Method 1 failed (direct form link):', e.message);
+        // 方法1: ユーザー設定からフォームURLを取得（最も高速）
+    if (userInfo.configJson && userInfo.configJson.formUrl) {
+      try {
+        const formUrl = userInfo.configJson.formUrl;
+        const match = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+        if (match) {
+          formId = match[1];
+          form = FormApp.openById(formId);
+          debugLog('getActiveFormInfo: Found form via user config');
         }
-        
-        // 方法2: ユーザー設定からフォームURLを取得（2番目に高速）
-        if (!form && userInfo.configJson && userInfo.configJson.formUrl) {
-          try {
-            const formUrl = userInfo.configJson.formUrl;
-            const match = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
-            if (match) {
-              formId = match[1];
-              form = FormApp.openById(formId);
-              debugLog('getActiveFormInfo: Found form via user config');
-            }
-          } catch (e) {
-            debugLog('Method 2 failed (user config):', e.message);
+      } catch (e) {
+        debugLog('Method 1 failed (user config):', e.message);
+      }
+    }
+    
+    // 方法2: スプレッドシートに直接リンクされたフォームを探す（フォールバック）
+    if (!form) {
+      try {
+        const formUrl = spreadsheet.getFormUrl();
+        if (formUrl) {
+          const match = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+          if (match) {
+            formId = match[1];
+            form = FormApp.openById(formId);
+            debugLog('getActiveFormInfo: Found form via direct link');
           }
         }
+      } catch (e) {
+        debugLog('Method 2 failed (direct form link):', e.message);
+      }
+    }
         
         // 方法3: DriveApp検索（最も時間がかかるため最後に実行）
         if (!form) {
@@ -3756,8 +3761,10 @@ function registerNewUser(adminEmail) {
     // アクティブシートに設定と公開状態を同時に設定（1回のAPI呼び出しで実行）
     updateUserConfig(userId, {
       activeSheetName: newSheetName,
-      publishedAt: new Date().toISOString(),
-      isPublished: true
+              publishedAt: new Date().toISOString(),
+        isPublished: true,
+        formUrl: formAndSsInfo.formUrl, // 追加
+        editFormUrl: formAndSsInfo.editFormUrl // 追加
     });
     debugLog(`✅ シートアクティブ化・公開完了: ${newSheetName}`);
   }
