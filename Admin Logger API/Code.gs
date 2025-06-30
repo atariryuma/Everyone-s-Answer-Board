@@ -1299,6 +1299,15 @@ function createTemplateFormAndSpreadsheet() {
     // Remove from root folder
     DriveApp.getRootFolder().removeFile(templateFormFile);
     DriveApp.getRootFolder().removeFile(templateSpreadsheetFile);
+
+    // テンプレートファイルの共有設定を同一ドメイン内で編集可にする
+    try {
+      templateFormFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.EDIT);
+      templateSpreadsheetFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.EDIT);
+      console.log('テンプレートファイルの共有設定を同一ドメイン内で編集可にしました。');
+    } catch (e) {
+      console.warn('テンプレートファイルの共有設定に失敗しました:', e.message);
+    }
     
     // Setup template spreadsheet
     setupTemplateSpreadsheet(templateSpreadsheet);

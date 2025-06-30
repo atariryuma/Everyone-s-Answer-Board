@@ -2888,17 +2888,52 @@ function createStudyQuestFormFromTemplate(userEmail, userId) {
     const dateTimeString = timestamp.toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const userDisplayName = userEmail.split('@')[0];
     
-    // フォームを複製
+    // フォームを複製（直接ユーザーフォルダに作成）
     const templateFormFile = DriveApp.getFileById(templateIds.formId);
     const formName = `StudyQuest - みんなの回答ボード - ${userDisplayName} - ${dateTimeString}`;
     const duplicatedFormFile = templateFormFile.makeCopy(formName, userFolder);
     const form = FormApp.openById(duplicatedFormFile.getId());
     
-    // スプレッドシートを複製
+    // スプレッドシートを複製（直接ユーザーフォルダに作成）
     const templateSpreadsheetFile = DriveApp.getFileById(templateIds.spreadsheetId);
     const spreadsheetName = `StudyQuest - みんなの回答ボード - 回答データ - ${userDisplayName} - ${dateTimeString}`;
     const duplicatedSpreadsheetFile = templateSpreadsheetFile.makeCopy(spreadsheetName, userFolder);
     const spreadsheet = SpreadsheetApp.openById(duplicatedSpreadsheetFile.getId());
+    
+    // データベースフォルダにコピーが作成された場合、それらを削除
+    try {
+      const templateFormParents = templateFormFile.getParents();
+      while (templateFormParents.hasNext()) {
+        const templateFolder = templateFormParents.next();
+        // テンプレートが存在するフォルダ内で同名のファイルを検索
+        const potentialDuplicates = templateFolder.getFilesByName(formName);
+        while (potentialDuplicates.hasNext()) {
+          const potentialDuplicate = potentialDuplicates.next();
+          // ユーザーフォルダに作成したものと異なるIDの場合は削除
+          if (potentialDuplicate.getId() !== duplicatedFormFile.getId()) {
+            console.log('データベースフォルダから不要なフォームコピーを削除:', potentialDuplicate.getId());
+            DriveApp.removeFile(potentialDuplicate);
+          }
+        }
+      }
+      
+      const templateSpreadsheetParents = templateSpreadsheetFile.getParents();
+      while (templateSpreadsheetParents.hasNext()) {
+        const templateFolder = templateSpreadsheetParents.next();
+        // テンプレートが存在するフォルダ内で同名のファイルを検索
+        const potentialDuplicates = templateFolder.getFilesByName(spreadsheetName);
+        while (potentialDuplicates.hasNext()) {
+          const potentialDuplicate = potentialDuplicates.next();
+          // ユーザーフォルダに作成したものと異なるIDの場合は削除
+          if (potentialDuplicate.getId() !== duplicatedSpreadsheetFile.getId()) {
+            console.log('データベースフォルダから不要なスプレッドシートコピーを削除:', potentialDuplicate.getId());
+            DriveApp.removeFile(potentialDuplicate);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('データベースフォルダのクリーンアップ中にエラー:', e.message);
+    }
     
     // フォームの説明を更新（ユーザー固有の内容に変更）
     const customDescription = `
