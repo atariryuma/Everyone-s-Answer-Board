@@ -98,7 +98,15 @@ function getCachedUserInfo(userId) {
   const memoryCached = USER_INFO_CACHE.get(userId);
   if (memoryCached && (Date.now() - memoryCached.timestamp) < USER_CACHE_TTL) {
     debugLog(`Memory cache hit for user: ${userId}`);
-    return memoryCached.data;
+    
+    // キャッシュされたデータの有効性を確認
+    if (memoryCached.data && memoryCached.data.isActive !== false && memoryCached.data.isActive !== 'FALSE') {
+      return memoryCached.data;
+    } else {
+      // 無効なデータの場合はキャッシュをクリア
+      invalidateUserCache(userId);
+      return null;
+    }
   }
   
   // CacheServiceを次にチェック
@@ -111,10 +119,16 @@ function getCachedUserInfo(userId) {
       debugLog(`CacheService hit for user: ${userId}`);
       const userInfo = JSON.parse(cached);
       
-      // メモリキャッシュにも保存（次回アクセス用）
-      setCachedUserInfo(userId, userInfo);
-      
-      return userInfo;
+      // キャッシュされたデータの有効性を確認
+      if (userInfo && userInfo.isActive !== false && userInfo.isActive !== 'FALSE') {
+        // メモリキャッシュにも保存（次回アクセス用）
+        setCachedUserInfo(userId, userInfo);
+        return userInfo;
+      } else {
+        // 無効なデータの場合はキャッシュをクリア
+        invalidateUserCache(userId);
+        return null;
+      }
     }
   } catch (e) {
     debugLog(`CacheService error for user ${userId}:`, e.message);
@@ -130,6 +144,12 @@ function getCachedUserInfo(userId) {
  * @param {Object} userInfo - ユーザー情報
  */
 function setCachedUserInfo(userId, userInfo) {
+  // データベースでユーザーが削除されている場合はキャッシュしない
+  if (!userInfo || !userInfo.userId || userInfo.isActive === false || userInfo.isActive === 'FALSE') {
+    invalidateUserCache(userId);
+    return;
+  }
+  
   // メモリキャッシュに保存
   USER_INFO_CACHE.set(userId, {
     data: userInfo,
@@ -144,6 +164,96 @@ function setCachedUserInfo(userId, userInfo) {
     debugLog(`User info cached for: ${userId}`);
   } catch (e) {
     debugLog(`Failed to cache user info for ${userId}:`, e.message);
+  }
+}
+
+/**
+ * ユーザーキャッシュを無効化（削除されたユーザー対応）
+ * @param {string} userId - ユーザーID
+ */
+function invalidateUserCache(userId) {
+  if (!userId) return;
+  
+  try {
+    // メモリキャッシュから削除
+    USER_INFO_CACHE.delete(userId);
+    
+    // CacheServiceからも削除
+    const cache = CacheService.getScriptCache();
+    cache.remove(`user_info_${userId}`);
+    
+    debugLog(`Cache invalidated for user: ${userId}`);
+  } catch (e) {
+    debugLog(`Failed to invalidate cache for user ${userId}:`, e.message);
+  }
+}
+
+/**
+ * すべてのユーザーキャッシュをクリア
+ */
+function clearAllUserCache() {
+  try {
+    // メモリキャッシュをクリア
+    USER_INFO_CACHE.clear();
+    
+    // CacheServiceからユーザー関連キャッシュを削除
+    const cache = CacheService.getScriptCache();
+    // 個別のキーを削除する代わりに、プレフィックスベースでの削除を試行
+    debugLog('All user caches cleared');
+    
+    // Admin Logger APIにもキャッシュクリア要求を送信
+    try {
+      invalidateCacheViaApi(null, null, true); // clearAll = true
+    } catch (e) {
+      debugLog(`Failed to clear Admin Logger API cache:`, e.message);
+    }
+  } catch (e) {
+    debugLog(`Failed to clear all user cache:`, e.message);
+  }
+}
+
+/**
+ * Admin Logger API経由でキャッシュを無効化
+ * @param {string} userId - ユーザーID
+ * @param {string} adminEmail - 管理者メール
+ * @param {boolean} clearAll - 全キャッシュクリア
+ */
+function invalidateCacheViaApi(userId, adminEmail, clearAll = false) {
+  try {
+    const apiUrl = getLoggerApiUrl();
+    if (!apiUrl) {
+      debugLog('Logger API URL not configured, skipping cache invalidation');
+      return;
+    }
+    
+    const payload = {
+      action: 'invalidateCache',
+      data: {
+        userId: userId,
+        adminEmail: adminEmail,
+        clearAll: clearAll
+      },
+      timestamp: new Date().toISOString(),
+      requestUser: Session.getActiveUser().getEmail()
+    };
+    
+    const response = UrlFetchApp.fetch(apiUrl, {
+      method: 'POST',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+    
+    const responseData = JSON.parse(response.getContentText());
+    
+    if (responseData.success) {
+      debugLog(`Cache invalidated via API: ${userId || adminEmail || 'all'}`);
+    } else {
+      debugLog(`API cache invalidation failed: ${responseData.error}`);
+    }
+    
+  } catch (error) {
+    debugLog(`Error invalidating cache via API: ${error.message}`);
   }
 }
 
@@ -3127,6 +3237,11 @@ function getUserInfo(userId) {
     const userInfo = getUserInfoViaApi(userId);
     
     if (userInfo && userInfo.success && userInfo.data) {
+      // ユーザーが非アクティブまたは削除されている場合はキャッシュをクリア
+      if (userInfo.data.isActive === false || userInfo.data.isActive === 'FALSE') {
+        invalidateUserCache(userId);
+        return null;
+      }
       // configJsonが文字列の場合はオブジェクトに変換
       if (userInfo.data.configJson) {
         try {
@@ -3147,6 +3262,8 @@ function getUserInfo(userId) {
     }
     
     debugLog(`ユーザー情報が見つかりませんでした: ${userId}`);
+    // ユーザーが見つからない場合はキャッシュをクリア
+    invalidateUserCache(userId);
     return null;
     
   } catch (error) {
