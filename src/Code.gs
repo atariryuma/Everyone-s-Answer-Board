@@ -2993,9 +2993,19 @@ function generateStudentBoardUrl(userId) {
 }
 
 function getTemplateIds(loggerApiUrl) {
+  const scriptProps = PropertiesService.getScriptProperties();
+  const formIdProp = scriptProps.getProperty('TEMPLATE_FORM_ID');
+  const spreadsheetIdProp = scriptProps.getProperty('TEMPLATE_SPREADSHEET_ID');
+
+  if (formIdProp && spreadsheetIdProp) {
+    console.log('スクリプトプロパティからテンプレートIDを取得しました。');
+    return { formId: formIdProp, spreadsheetId: spreadsheetIdProp };
+  }
+
+  // Fallback to external API if properties are not set
   try {
-    console.log('テンプレートID取得開始:', loggerApiUrl);
-    
+    console.log('スクリプトプロパティにテンプレートIDがないため、外部APIから取得開始:', loggerApiUrl);
+
     const response = UrlFetchApp.fetch(loggerApiUrl, {
       method: 'POST',
       contentType: 'application/json',
@@ -3005,19 +3015,22 @@ function getTemplateIds(loggerApiUrl) {
       }),
       muteHttpExceptions: true
     });
-    
+
     console.log('API レスポンスコード:', response.getResponseCode());
     console.log('API レスポンス内容:', response.getContentText());
-    
+
     if (response.getResponseCode() !== 200) {
       throw new Error(`Logger API エラー: ${response.getResponseCode()}`);
     }
-    
+
     const result = JSON.parse(response.getContentText());
     console.log('パース結果:', result);
-    
+
     if (result.success === true && result.data) {
       console.log('テンプレートID取得成功:', result.data);
+      // Store in Script Properties for future use
+      scriptProps.setProperty('TEMPLATE_FORM_ID', result.data.formId);
+      scriptProps.setProperty('TEMPLATE_SPREADSHEET_ID', result.data.spreadsheetId);
       return result.data;
     } else {
       const errorMessage = result.error || 'テンプレートIDの取得に失敗しました';
@@ -3208,7 +3221,7 @@ function createStudyQuestForm(userEmail, userId) {
     
     // フォームとスプレッドシートの連携を一度確立してからヘッダーを調整
     // これによりGoogleフォームが自動的に基本ヘッダー（タイムスタンプ、メールアドレス、その他の質問項目）を作成する
-    Utilities.sleep(2000); // フォーム連携の完了を待つ
+    
     
     // 現在のヘッダーを取得（Googleフォームによって自動生成されたもの）
     const currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
