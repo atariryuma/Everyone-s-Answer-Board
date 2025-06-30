@@ -2544,20 +2544,28 @@ function createStudyQuestForm(userEmail, userId) {
       debugLog('⚠️ フォーム追加設定でエラー:', e.message);
     }
     
-    // フォームの説明と回答後のメッセージを設定（デジタル・シティズンシップ教育の観点から）
+    // フォームの説明と回答後のメッセージを設定（教育的観点とデジタル・シティズンシップを両立）
     const formDescription = `
 📚 みんなの回答ボードへようこそ！
 
-このフォームは、みんなで意見を出し合い、お互いの考えを尊重し合う場です。
-デジタル空間でも、現実と同じように相手を思いやる気持ちを大切にしましょう。
+このフォームを通して、以下の力を育てることを目指します：
 
-🌟 回答するときの大切なポイント：
-• 自分の考えを正直に、分かりやすく書きましょう
-• 他の人が読んでも気持ちよくなるような言葉を選びましょう
-• 間違いを恐れず、自分らしい意見を大切にしましょう
-• みんなの考えの違いを楽しみ、新しい発見を大切にしましょう
+🎯 【学習目標】
+• 論理的思考力：根拠をもって自分の考えを説明する
+• 表現力：相手に分かりやすく伝える文章を書く
+• 批判的思考力：物事を多角的に考え、判断する
+• 共感力：相手の立場や気持ちを理解し尊重する
 
-あなたの大切な意見をお聞かせください！
+💻 【デジタル空間での学び】
+オンラインでも教室と同じように、お互いを大切にしながら学び合いましょう。
+画面の向こうには、あなたと同じように一生懸命考えている仲間がいます。
+
+✏️ 【回答のポイント】
+• 自分の考えをしっかりと持ち、根拠とともに説明しましょう
+• 相手が読んで理解しやすい言葉で表現しましょう
+• 多様な意見があることを理解し、違いを大切にしましょう
+
+一人ひとりの意見が、みんなの学びを豊かにします。
 `.trim();
     
     form.setDescription(formDescription);
@@ -2589,27 +2597,27 @@ function createStudyQuestForm(userEmail, userId) {
     // クラス名の形式を「G1-1」のような半角英数字とハイフンのみとする
     const pattern = '^[A-Za-z0-9]+-[A-Za-z0-9]+$';
 
-    const helpText = "あなたのクラスを半角英数字で入力してください。例：6年1組→「6-1」、5年2組→「5-2」、中学1年A組→「1-A」";
+    const helpText = "【重要】クラス名は決められた形式で入力してください。\n\n✅ 正しい例：\n• 6年1組 → 6-1\n• 5年2組 → 5-2  \n• 中1年A組 → 1-A\n• 中3年B組 → 3-B\n\n❌ 間違いの例：6年1組、6-1組、６－１\n\n※ 半角英数字とハイフン（-）のみ使用可能です";
     const textValidation = FormApp.createTextValidation()
       .setHelpText(helpText)
       .requireTextMatchesPattern(pattern)
       .build();
     classItem.setValidation(textValidation);
 
-    // その他の項目を追加（子供向けの分かりやすい説明付き）
+    // その他の項目を追加（教育的観点から子供の成長につながる説明付き）
     const nameItem = form.addTextItem();
     nameItem.setTitle('名前');
-    nameItem.setHelpText('あなたの名前を入力してください。この名前は先生だけが見ることができ、みんなには表示されません。');
+    nameItem.setHelpText('あなたの名前を入力してください。この名前は先生だけが見ることができ、みんなには表示されません。一人ひとりの意見を大切にするために必要です。');
     nameItem.setRequired(true);
     
     const answerItem = form.addParagraphTextItem();
     answerItem.setTitle('回答');
-    answerItem.setHelpText('質問に対するあなたの考えを、自分の言葉で書いてください。正解・不正解はありません。思ったことを素直に表現しましょう。');
+    answerItem.setHelpText('質問に対するあなたの考えを、自分の言葉で表現してください。正解はありません。あなたらしい考えや感じ方を大切にして、思考力を育てましょう。');
     answerItem.setRequired(true);
     
     const reasonItem = form.addParagraphTextItem();
     reasonItem.setTitle('理由');
-    reasonItem.setHelpText('なぜそう思ったのか、理由を教えてください。「なんとなく」でも大丈夫です。あなたの気持ちや体験を聞かせてください。（書かなくても大丈夫です）');
+    reasonItem.setHelpText('なぜそう思ったのか、根拠や理由を説明してください。論理的に考える力を身につけ、自分の意見に責任を持つ習慣を育てましょう。');
     reasonItem.setRequired(false);
     
     // フォームの回答先スプレッドシートを作成（作成日時を含む）
