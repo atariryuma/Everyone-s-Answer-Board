@@ -2529,23 +2529,51 @@ function createStudyQuestForm(userEmail, userId) {
     const dateTimeString = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
     const form = FormApp.create(`StudyQuest - みんなの回答ボード - ${userEmail.split('@')[0]} - ${dateTimeString}`);
     
-    // メールアドレス収集を有効にし、確認済みに設定
+    // メールアドレス収集を有効にし、確認済み（自動取得）に設定
     form.setCollectEmail(true);
     form.setRequireLogin(true);
     
-    // Googleフォームのメールアドレス収集設定を「確認済み」に変更
+    // 未公開メソッドを使用して「確認済み」設定を試行
     try {
-      // Google Workspaceドメインの場合、自動的に確認済み状態になる
-      // setRequireLogin(true)により、ログイン済みユーザーのメールアドレスが自動取得される
-      form.setAllowResponseEdits(true);
-      
-      // フォームの公開設定を組織内に限定（確認済みメールアドレスのため）
-      // 注：この設定により、ログイン済みユーザーのメールアドレスは自動的に「確認済み」として扱われる
+      // 注意：これは未公開のメソッドです（2024年に発見された方法）
+      if (typeof form.setEmailCollectionType === 'function') {
+        form.setEmailCollectionType(FormApp.EmailCollectionType.VERIFIED);
+        debugLog('✅ setEmailCollectionType(VERIFIED)を適用しました');
+      } else {
+        debugLog('⚠️ setEmailCollectionType メソッドが利用できません');
+      }
+    } catch (undocumentedError) {
+      debugLog('⚠️ 未公開メソッド使用エラー:', undocumentedError.message);
+    }
+    
+    // Googleフォームのメールアドレス収集設定を「確認済み」（自動取得）に変更
+    try {
+      // ユーザー1人1回の回答制限を設定（これにより確認済みモードが有効になる）
       form.setLimitOneResponsePerUser(true);
       
-      debugLog('✅ フォームのメールアドレス収集を確認済み状態で設定しました');
+      // 回答の編集を許可
+      form.setAllowResponseEdits(true);
+      
+      // 2024年発見の未公開メソッド情報
+      debugLog('ℹ️ メールアドレス「確認済み」設定の状況:');
+      debugLog('  - 未公開メソッド setEmailCollectionType(VERIFIED) を試行済み');
+      debugLog('  - setCollectEmail(true) + setRequireLogin(true) で基本設定完了');
+      debugLog('  - 未公開メソッドが無効な場合は手動設定が必要です');
+      
+      debugLog('✅ フォームのメールアドレス収集設定を完了しました');
+      debugLog('setCollectEmail: true, setRequireLogin: true, setLimitOneResponsePerUser: true');
+      
+      // メールアドレス「確認済み」設定の手動確認手順
+      debugLog('');
+      debugLog('📝 【重要】メールアドレスを「確認済み」にするため、以下を確認してください：');
+      debugLog('1. 作成されたフォームを開く');
+      debugLog('2. 設定（⚙️）→「回答」タブ');
+      debugLog('3. 「メールアドレスを収集する」で「確認済み」を選択');
+      debugLog(`4. フォーム編集URL: https://docs.google.com/forms/d/${form.getId()}/edit`);
+      debugLog('');
+      
     } catch (e) {
-      debugLog('⚠️ フォーム追加設定でエラー:', e.message);
+      debugLog('⚠️ フォーム設定でエラー:', e.message);
     }
     
     // フォームの説明と回答後のメッセージを設定（小中学生向けの分かりやすい言葉）
