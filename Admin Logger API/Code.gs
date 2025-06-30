@@ -604,11 +604,16 @@ function handleInvalidateCache(data) {
  */
 function handleGetTemplateIds(data) {
   try {
+    console.log('getTemplateIds API called');
     const properties = PropertiesService.getScriptProperties();
     const templateFormId = properties.getProperty(CONFIG.TEMPLATE_FORM_ID_KEY);
     const templateSpreadsheetId = properties.getProperty(CONFIG.TEMPLATE_SPREADSHEET_ID_KEY);
     
+    console.log('Template Form ID from properties:', templateFormId);
+    console.log('Template Spreadsheet ID from properties:', templateSpreadsheetId);
+    
     if (!templateFormId || !templateSpreadsheetId) {
+      console.log('Templates not found in properties');
       return {
         success: false,
         error: 'Templates not found. Please initialize database first.'
@@ -617,8 +622,11 @@ function handleGetTemplateIds(data) {
     
     // Verify templates still exist
     try {
-      DriveApp.getFileById(templateFormId);
-      DriveApp.getFileById(templateSpreadsheetId);
+      const formFile = DriveApp.getFileById(templateFormId);
+      const spreadsheetFile = DriveApp.getFileById(templateSpreadsheetId);
+      console.log('Template verification successful');
+      console.log('Form file name:', formFile.getName());
+      console.log('Spreadsheet file name:', spreadsheetFile.getName());
     } catch (error) {
       console.error('Template verification failed:', error);
       return {
@@ -627,13 +635,16 @@ function handleGetTemplateIds(data) {
       };
     }
     
-    return {
+    const result = {
       success: true,
       data: {
         formId: templateFormId,
         spreadsheetId: templateSpreadsheetId
       }
     };
+    
+    console.log('Returning template IDs:', result);
+    return result;
     
   } catch (error) {
     console.error(`getTemplateIds error: ${error.message}`);

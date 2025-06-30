@@ -2977,6 +2977,8 @@ function createStudyQuestFormFromTemplate(userEmail, userId) {
 
 function getTemplateIds(loggerApiUrl) {
   try {
+    console.log('テンプレートID取得開始:', loggerApiUrl);
+    
     const response = UrlFetchApp.fetch(loggerApiUrl, {
       method: 'POST',
       contentType: 'application/json',
@@ -2987,15 +2989,23 @@ function getTemplateIds(loggerApiUrl) {
       muteHttpExceptions: true
     });
     
+    console.log('API レスポンスコード:', response.getResponseCode());
+    console.log('API レスポンス内容:', response.getContentText());
+    
     if (response.getResponseCode() !== 200) {
       throw new Error(`Logger API エラー: ${response.getResponseCode()}`);
     }
     
     const result = JSON.parse(response.getContentText());
-    if (result.status === 'success' && result.data) {
+    console.log('パース結果:', result);
+    
+    if (result.success === true && result.data) {
+      console.log('テンプレートID取得成功:', result.data);
       return result.data;
     } else {
-      throw new Error('テンプレートIDの取得に失敗しました');
+      const errorMessage = result.error || 'テンプレートIDの取得に失敗しました';
+      console.log('テンプレートID取得失敗:', errorMessage);
+      throw new Error(errorMessage);
     }
   } catch (error) {
     console.error('テンプレートID取得エラー:', error);
