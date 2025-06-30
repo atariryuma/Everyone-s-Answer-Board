@@ -1181,7 +1181,8 @@ function doGet(e) {
 
 
     // ユーザーIDがない場合は登録画面を表示
-    if (!userId) {
+    // ユーザーIDがない場合は登録画面を表示
+    if (!cleanedUserId) {
       const output = HtmlService.createTemplateFromFile('Registration').evaluate();
       applySecurityHeaders(output);
       return output
@@ -1190,7 +1191,7 @@ function doGet(e) {
     }
     
     // ユーザーIDを検証
-    const validatedUserId = validateUserId(userId);
+    const validatedUserId = validateUserId(cleanedUserId);
     
     // 最適化: ユーザー情報をキャッシュから取得
     let userInfo = getCachedUserInfo(validatedUserId);
@@ -2438,13 +2439,21 @@ function getSheetDataForSpreadsheet(spreadsheet, sheetName, classFilter, sortBy)
     const required = [
       COLUMN_HEADERS.EMAIL,
       answerHeader,
+      COLUMN_HEADERS.TIMESTAMP
+    ];
+    // Optional headers for reactions and highlight
+    const optionalHeaders = [
       reasonHeader,
-      COLUMN_HEADERS.TIMESTAMP,
       COLUMN_HEADERS.UNDERSTAND,
       COLUMN_HEADERS.LIKE,
       COLUMN_HEADERS.CURIOUS,
       COLUMN_HEADERS.HIGHLIGHT
     ];
+    optionalHeaders.forEach(optHeader => {
+      if (sheetHeaders.includes(normalized(optHeader))) {
+        required.push(optHeader);
+      }
+    });
     if (nameHeader && sheetHeaders.includes(normalized(nameHeader))) {
       required.push(nameHeader);
     }
