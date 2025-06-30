@@ -857,8 +857,8 @@
         <!-- Button (without checkbox) -->
         <div class="border-t border-gray-600 pt-4">
           <div class="text-center">
-            <button type="button" id="teacherGuideConfirmBtn" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-              理解しました
+            <button type="button" id="teacherGuideConfirmBtn" class="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-green-700 transition-colors" disabled>
+              読み込み中...
             </button>
           </div>
         </div>
@@ -1146,12 +1146,14 @@
     }
 
     function loadStatus() {
-      setLoading(true, 'ダッシュボード情報を読み込み中...');
+      // ダッシュボード情報読み込み中にデジタル・シティズンシップモーダルを表示
+      showTeacherGuideModal();
       
       // ステータスとフォーム情報を並行して取得
       google.script.run
         .withSuccessHandler((status) => {
           updateStatus(status);
+          // モーダルは既に表示されているので、ボタンのみ有効化
           enableUnderstandButton();
         })
         .withFailureHandler((error) => {
@@ -1171,6 +1173,8 @@
           }
           
           showError(new Error(errorMessage));
+          // エラー時もモーダルのボタンを有効化
+          enableUnderstandButton();
           setLoading(false); // エラー時もローディングを終了
         })
         .getStatus();
@@ -1967,9 +1971,14 @@
     }
     
     function enableUnderstandButton() {
-      // シンプルローディングを隙して、教育ガイドモーダルを表示
-      hideLoadingOverlay();
-      showTeacherGuideModal();
+      // ダッシュボード情報の読み込みが完了したので、モーダルの理解ボタンを有効化
+      // (モーダルは既に表示されているため、ボタンを有効化するだけ)
+      const confirmBtn = document.getElementById('teacherGuideConfirmBtn');
+      if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = '理解しました';
+        confirmBtn.className = 'px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors';
+      }
     }
     
     

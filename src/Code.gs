@@ -476,24 +476,6 @@ if (typeof global !== 'undefined' && global.getConfig) {
   getConfig = global.getConfig;
 }
 
-/**
- * スプレッドシートキャッシュ（メモリ内キャッシュ、10分間有効）
- */
-const SPREADSHEET_CACHE = new Map();
-const SPREADSHEET_CACHE_TTL = 10 * 60 * 1000; // 10分
-
-/**
- * キャッシュされたスプレッドシートを取得
- * @param {string} spreadsheetId - スプレッドシートID
- * @return {GoogleAppsScript.Spreadsheet.Spreadsheet|null} キャッシュされたスプレッドシートまたはnull
- */
-function getCachedSpreadsheet(spreadsheetId) {
-  const cached = SPREADSHEET_CACHE.get(spreadsheetId);
-  if (cached && (Date.now() - cached.timestamp) < SPREADSHEET_CACHE_TTL) {
-    return cached.data;
-  }
-  return null;
-}
 
 /**
  * スプレッドシートをキャッシュに保存
@@ -1086,29 +1068,30 @@ function doGet(e) {
         if (userInfo) {
           setCachedUserInfo(validatedUserId, userInfo);
         }
-    } catch (e) {
-      console.error('getUserInfo failed:', e);
-      debugLog(`getUserInfo error for userId ${validatedUserId}:`, e.message);
-      
-      // データベースアクセスエラーの場合の詳細処理
-      if (e.message.includes('ユーザーデータベースが設定されていません') || 
-          e.message.includes('権限がありません')) {
-        const output = HtmlService.createHtmlOutput(
-          'データベースにアクセスできません。システムのセットアップが完了していない可能性があります。管理者にお問い合わせください。'
-        );
-        applySecurityHeaders(output);
-        return output.setTitle('データベースエラー');
-      }
-      
-      try {
-        userInfo = getUserInfoInternal(validatedUserId);
-      } catch (e2) {
-        console.error('getUserInfoInternal also failed:', e2);
-        const output = HtmlService.createHtmlOutput(
-          `ユーザー情報の取得に失敗しました。エラー: ${e.message}`
-        );
-        applySecurityHeaders(output);
-        return output.setTitle('ユーザー情報エラー');
+      } catch (e) {
+        console.error('getUserInfo failed:', e);
+        debugLog(`getUserInfo error for userId ${validatedUserId}:`, e.message);
+        
+        // データベースアクセスエラーの場合の詳細処理
+        if (e.message.includes('ユーザーデータベースが設定されていません') || 
+            e.message.includes('権限がありません')) {
+          const output = HtmlService.createHtmlOutput(
+            'データベースにアクセスできません。システムのセットアップが完了していない可能性があります。管理者にお問い合わせください。'
+          );
+          applySecurityHeaders(output);
+          return output.setTitle('データベースエラー');
+        }
+        
+        try {
+          userInfo = getUserInfoInternal(validatedUserId);
+        } catch (e2) {
+          console.error('getUserInfoInternal also failed:', e2);
+          const output = HtmlService.createHtmlOutput(
+            `ユーザー情報の取得に失敗しました。エラー: ${e.message}`
+          );
+          applySecurityHeaders(output);
+          return output.setTitle('ユーザー情報エラー');
+        }
       }
     }
     if (!userInfo) {
