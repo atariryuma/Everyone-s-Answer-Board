@@ -1335,7 +1335,7 @@ function setupTemplateSpreadsheet(spreadsheet) {
     const sheet = spreadsheet.getSheets()[0];
     
     // Wait for form responses sheet to be created
-    Utilities.sleep(2000);
+    
     
     // Add StudyQuest columns
     const lastColumn = sheet.getLastColumn();
@@ -1354,7 +1354,9 @@ function setupTemplateSpreadsheet(spreadsheet) {
     configSheet.hideSheet();
     
     // Auto-resize columns
-    sheet.autoResizeColumns(1, sheet.getLastColumn());
+    if (sheet.getLastColumn() > 0) {
+      sheet.autoResizeColumns(1, sheet.getLastColumn());
+    }
     
   } catch (error) {
     console.error('Template spreadsheet setup error:', error);
