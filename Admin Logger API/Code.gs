@@ -20,6 +20,8 @@
 const CONFIG = {
   DATABASE_ID_KEY: 'DATABASE_ID',
   DEPLOYMENT_ID_KEY: 'DEPLOYMENT_ID',
+  TEMPLATE_FORM_ID_KEY: 'TEMPLATE_FORM_ID',
+  TEMPLATE_SPREADSHEET_ID_KEY: 'TEMPLATE_SPREADSHEET_ID',
   TARGET_SHEET_NAME: 'Users',
   CACHE_TTL: 300, // 5 minutes
   LOCK_TIMEOUT: 15000, // 15 seconds
@@ -99,7 +101,10 @@ function initializeDatabase() {
 
     spreadsheet.rename('StudyQuest Admin Logger Database');
 
-    ui.alert('✅ Database initialized successfully. Next: Deploy API from menu.');
+    // Create template form and spreadsheet
+    createTemplateFormAndSpreadsheet();
+
+    ui.alert('✅ Database initialized successfully. Template form and spreadsheet created. Next: Deploy API from menu.');
 
   } catch (e) {
     console.error('Database initialization error:', e);
@@ -237,6 +242,9 @@ function handleApiRequest(requestData) {
       
     case 'invalidateCache':
       return handleInvalidateCache(data);
+      
+    case 'getTemplateIds':
+      return handleGetTemplateIds(data);
       
     default:
       throw new Error(`Unknown API action: ${action}`);
@@ -569,6 +577,51 @@ function handleInvalidateCache(data) {
     return {
       success: false,
       error: `Cache invalidation failed: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Get template IDs for form and spreadsheet duplication
+ */
+function handleGetTemplateIds(data) {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    const templateFormId = properties.getProperty(CONFIG.TEMPLATE_FORM_ID_KEY);
+    const templateSpreadsheetId = properties.getProperty(CONFIG.TEMPLATE_SPREADSHEET_ID_KEY);
+    
+    if (!templateFormId || !templateSpreadsheetId) {
+      return {
+        success: false,
+        error: 'Templates not found. Please initialize database first.'
+      };
+    }
+    
+    // Verify templates still exist
+    try {
+      DriveApp.getFileById(templateFormId);
+      DriveApp.getFileById(templateSpreadsheetId);
+    } catch (error) {
+      console.error('Template verification failed:', error);
+      return {
+        success: false,
+        error: 'Template files not accessible or deleted'
+      };
+    }
+    
+    return {
+      success: true,
+      data: {
+        formId: templateFormId,
+        spreadsheetId: templateSpreadsheetId
+      }
+    };
+    
+  } catch (error) {
+    console.error(`getTemplateIds error: ${error.message}`);
+    return {
+      success: false,
+      error: `Template ID retrieval failed: ${error.message}`
     };
   }
 }
@@ -1131,5 +1184,132 @@ function cleanupInvalidUsers() {
     
   } catch (error) {
     ui.alert(`Error: ${error.message}`);
+  }
+}
+
+/**
+ * Create template form and spreadsheet for duplication
+ */
+function createTemplateFormAndSpreadsheet() {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const databaseFolder = DriveApp.getFileById(spreadsheet.getId()).getParents().next();
+    
+    // Check if templates already exist
+    const existingTemplateFormId = properties.getProperty(CONFIG.TEMPLATE_FORM_ID_KEY);
+    const existingTemplateSpreadsheetId = properties.getProperty(CONFIG.TEMPLATE_SPREADSHEET_ID_KEY);
+    
+    if (existingTemplateFormId && existingTemplateSpreadsheetId) {
+      console.log('Templates already exist, skipping creation');
+      return;
+    }
+    
+    const timestamp = new Date();
+    const dateTimeString = timestamp.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    
+    // Create template form
+    const templateForm = FormApp.create(`StudyQuest Template Form - ${dateTimeString}`);
+    
+    // Configure form settings
+    templateForm.setCollectEmail(true);
+    templateForm.setRequireLogin(true);
+    templateForm.setLimitOneResponsePerUser(true);
+    templateForm.setAllowResponseEdits(true);
+    templateForm.setTitle('StudyQuest - みんなの回答ボード');
+    templateForm.setDescription('このフォームは、みんなの回答ボードシステムで使用されるテンプレートです。');
+    
+    // Add form items
+    const classItem = templateForm.addTextItem()
+      .setTitle('クラス名')
+      .setHelpText('例: 3-A, 2-B など（半角英数字とハイフンのみ使用可能）')
+      .setRequired(true);
+    classItem.setValidation(FormApp.createTextValidation()
+      .setHelpText('クラス名は「数字-英字」の形式で入力してください（例: 3-A）')
+      .requireTextMatchesPattern('^[A-Za-z0-9]+-[A-Za-z0-9]+$')
+      .build());
+    
+    templateForm.addTextItem()
+      .setTitle('名前')
+      .setHelpText('あなたの名前を入力してください')
+      .setRequired(true);
+    
+    templateForm.addParagraphTextItem()
+      .setTitle('回答')
+      .setHelpText('問題に対するあなたの回答を書いてください')
+      .setRequired(true);
+    
+    templateForm.addParagraphTextItem()
+      .setTitle('理由')
+      .setHelpText('なぜその答えになったのか、理由を説明してください（任意）')
+      .setRequired(false);
+    
+    // Create template spreadsheet
+    const templateSpreadsheet = SpreadsheetApp.create(`StudyQuest Template Spreadsheet - ${dateTimeString}`);
+    
+    // Connect form to spreadsheet
+    templateForm.setDestination(FormApp.DestinationType.SPREADSHEET, templateSpreadsheet.getId());
+    
+    // Move template files to database folder
+    const templateFormFile = DriveApp.getFileById(templateForm.getId());
+    const templateSpreadsheetFile = DriveApp.getFileById(templateSpreadsheet.getId());
+    
+    databaseFolder.addFile(templateFormFile);
+    databaseFolder.addFile(templateSpreadsheetFile);
+    
+    // Remove from root folder
+    DriveApp.getRootFolder().removeFile(templateFormFile);
+    DriveApp.getRootFolder().removeFile(templateSpreadsheetFile);
+    
+    // Setup template spreadsheet
+    setupTemplateSpreadsheet(templateSpreadsheet);
+    
+    // Save template IDs to properties
+    properties.setProperties({
+      [CONFIG.TEMPLATE_FORM_ID_KEY]: templateForm.getId(),
+      [CONFIG.TEMPLATE_SPREADSHEET_ID_KEY]: templateSpreadsheet.getId()
+    });
+    
+    console.log(`Template form created: ${templateForm.getId()}`);
+    console.log(`Template spreadsheet created: ${templateSpreadsheet.getId()}`);
+    
+  } catch (error) {
+    console.error('Template creation error:', error);
+    throw new Error(`Template creation failed: ${error.message}`);
+  }
+}
+
+/**
+ * Setup template spreadsheet with StudyQuest columns
+ */
+function setupTemplateSpreadsheet(spreadsheet) {
+  try {
+    const sheet = spreadsheet.getSheets()[0];
+    
+    // Wait for form responses sheet to be created
+    Utilities.sleep(2000);
+    
+    // Add StudyQuest columns
+    const lastColumn = sheet.getLastColumn();
+    if (lastColumn > 0) {
+      const studyQuestHeaders = ['UNDERSTAND', 'LIKE', 'CURIOUS', 'HIGHLIGHT'];
+      const headerRange = sheet.getRange(1, lastColumn + 1, 1, studyQuestHeaders.length);
+      headerRange.setValues([studyQuestHeaders]);
+      headerRange.setFontWeight('bold');
+      headerRange.setBackground('#e8f4fd');
+    }
+    
+    // Create Config sheet
+    const configSheet = spreadsheet.insertSheet('Config');
+    configSheet.getRange('A1').setValue('StudyQuest Configuration');
+    configSheet.getRange('A2').setValue('Template created at: ' + new Date().toISOString());
+    configSheet.hideSheet();
+    
+    // Auto-resize columns
+    sheet.autoResizeColumns(1, sheet.getLastColumn());
+    
+  } catch (error) {
+    console.error('Template spreadsheet setup error:', error);
+    throw error;
   }
 }
