@@ -955,9 +955,9 @@
 
     // Initialize
     document.addEventListener('DOMContentLoaded', function() {
-      loadStatus();
+      loadStatus(); // ローディング中に教師ガイドが表示されるため、checkAndShowTeacherGuideは無効化
       setupEventListeners();
-      checkAndShowTeacherGuide();
+      // checkAndShowTeacherGuide(); // ローディング中に表示するため無効化
       loadAdminDomainInfo();
     });
 
@@ -1995,44 +1995,139 @@
     }
     
     function showLoadingOverlay(message = "読み込み中...") {
+      // 「今日はもう表示しない」設定を確認
+      const dontShowToday = localStorage.getItem('teacherGuideDontShowToday');
+      const today = new Date().toDateString();
+      
+      if (dontShowToday === today) {
+        // 今日は表示しない設定の場合、シンプルなローディング表示のみ
+        showSimpleLoadingOverlay(message);
+        return;
+      }
+      
       // 既存のオーバーレイを削除
       hideLoadingOverlay();
       
       const overlay = document.createElement('div');
       overlay.id = 'loading-overlay';
-      overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-6';
+      overlay.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
       overlay.innerHTML = `
-        <div class="glass-panel p-8 rounded-xl text-center max-w-2xl max-h-full overflow-y-auto">
-          <div class="spinner mx-auto mb-4"></div>
-          <p class="text-lg text-white font-medium">${message}</p>
-          <p class="text-sm text-gray-400 mt-2">しばらくお待ちください...</p>
+        <div class="glass-panel p-6 rounded-xl max-w-4xl max-h-full overflow-y-auto">
+          <!-- Loading Header -->
+          <div class="text-center mb-6">
+            <div class="spinner mx-auto mb-4"></div>
+            <p class="text-lg text-white font-medium">${message}</p>
+            <p class="text-sm text-gray-400 mt-2">しばらくお待ちください...</p>
+          </div>
           
-          <!-- デジタルシティズンシップ教育ガイド -->
-          <div class="mt-6 text-left bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-4 border border-green-400/30">
-            <div class="flex items-center mb-3">
-              <div class="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full flex items-center justify-center mr-3">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.168 18.477 18.582 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                </svg>
-              </div>
-              <h3 class="text-lg font-bold text-green-300">📚 デジタル・シティズンシップ教育ガイド</h3>
+          <!-- Education Guide Content -->
+          <div class="text-center mb-6">
+            <div class="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-3">
+              <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.168 18.477 18.582 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+              </svg>
             </div>
+            <h2 class="text-xl font-bold text-green-300">📚 デジタル・シティズンシップ教育ガイド</h2>
+            <p class="text-sm text-green-200 mt-2">みんなの回答ボードを活用した指導のポイント</p>
+          </div>
+
+          <!-- Main Content -->
+          <div class="grid lg:grid-cols-2 gap-6 text-sm">
             
-            <div class="text-sm text-green-200 space-y-3">
-              <div>
-                <h4 class="font-semibold text-green-300 mb-2">🤝 心理的安全性を重視した設定</h4>
-                <p>このシステムでは匿名性と数値非表示をデフォルトとして、生徒が安心して意見を表現できる環境を整えています。リアクションは色で識別できるため、数を表示しなくても反応の種類を把握できます。</p>
-              </div>
+            <!-- Left Column: Teaching Guidelines -->
+            <div class="space-y-4">
+              <h3 class="text-lg font-semibold text-green-300 flex items-center gap-2">
+                <span>🎯</span> 指導における留意点
+              </h3>
               
-              <div>
-                <h4 class="font-semibold text-green-300 mb-2">⚠️ 表示機能を有効にする前の注意点</h4>
-                <p>名前や数値を表示すると、一部の生徒が発言を控えたり、他者の反応を気にして本音を言いにくくなる可能性があります。デジタル・シティズンシップの観点から、オンライン空間でも互いを尊重し、多様な意見を受け入れる姿勢を育むことが重要です。</p>
+              <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+                <h4 class="font-semibold text-blue-200 mb-3">心理的安全性の確保</h4>
+                <ul class="text-sm text-blue-100 space-y-2">
+                  <li>• 匿名表示機能を活用し、生徒が安心して発言できる環境を作る</li>
+                  <li>• 間違いを恐れずに意見表明できる雰囲気づくりを心がける</li>
+                  <li>• 数値表示をオフにして競争より協働を重視する</li>
+                </ul>
+              </div>
+
+              <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
+                <h4 class="font-semibold text-purple-200 mb-3">多様性の尊重</h4>
+                <ul class="text-sm text-purple-100 space-y-2">
+                  <li>• 異なる意見に対する敬意の姿勢をモデリングする</li>
+                  <li>• 「正解」よりも「多様な視点」を大切にする授業展開</li>
+                  <li>• リアクション機能を通じて共感的コミュニケーションを促す</li>
+                </ul>
+              </div>
+
+              <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
+                <h4 class="font-semibold text-green-200 mb-3">デジタル・シティズンシップの育成</h4>
+                <ul class="text-sm text-green-100 space-y-2">
+                  <li>• オンライン空間での責任ある行動について継続的に指導</li>
+                  <li>• 相手の気持ちを想像する力を育む声かけを行う</li>
+                  <li>• 建設的な対話のモデルを示し、言葉の選び方を指導する</li>
+                </ul>
               </div>
             </div>
+
+            <!-- Right Column: System Features -->
+            <div class="space-y-4">
+              <h3 class="text-lg font-semibold text-green-300 flex items-center gap-2">
+                <span>⚙️</span> システム機能の教育的意図
+              </h3>
+
+              <div class="bg-cyan-900/20 border border-cyan-500/30 rounded-lg p-4">
+                <h4 class="font-semibold text-cyan-200 mb-3">匿名性機能</h4>
+                <p class="text-sm text-cyan-100 leading-relaxed">
+                  生徒の名前を非表示にすることで、発言への不安を軽減し、多様な意見が出やすい環境を作ります。評価や批判を恐れず、本音での対話を促進します。
+                </p>
+              </div>
+
+              <div class="bg-orange-900/20 border border-orange-500/30 rounded-lg p-4">
+                <h4 class="font-semibold text-orange-200 mb-3">リアクション機能</h4>
+                <p class="text-sm text-orange-100 leading-relaxed mb-2">
+                  色分けされたリアクション（いいね！・なるほど！・もっと知りたい！）により、数値に左右されない共感的なコミュニケーションを育みます。
+                </p>
+                <ul class="text-xs text-orange-200 space-y-1">
+                  <li>• 肯定的な反応を可視化</li>
+                  <li>• 多様な感情表現の機会提供</li>
+                  <li>• 対話のきっかけ作り</li>
+                </ul>
+              </div>
+
+              <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
+                <h4 class="font-semibold text-yellow-200 mb-3">ハイライト機能</h4>
+                <p class="text-sm text-yellow-100 leading-relaxed">
+                  教師が重要な発言を強調することで、学習のポイントを明確にし、質の高い議論への発展を支援します。
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Section: Practical Tips -->
+          <div class="border-t border-green-400/30 pt-4 mt-6">
+            <h3 class="text-lg font-semibold text-green-300 mb-3 flex items-center gap-2">
+              <span>💡</span> 授業での活用のコツ
+            </h3>
+            <div class="bg-gray-800/50 rounded-lg p-4">
+              <ul class="text-sm text-gray-200 space-y-2">
+                <li>• <strong>事前指導：</strong>オンライン上での言葉遣いや相手への思いやりについて話し合う</li>
+                <li>• <strong>振り返り：</strong>「どんな気持ちでリアクションしたか」を共有する時間を設ける</li>
+                <li>• <strong>継続指導：</strong>デジタル・シティズンシップの概念を日常的に取り入れる</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Checkbox and Buttons -->
+          <div class="border-t border-gray-600 pt-4 mt-6">
+            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer mb-4">
+              <input type="checkbox" id="loadingDontShowTodayCheckbox" class="rounded">
+              <span>今日はもう表示しない</span>
+            </label>
             
-            <button id="understand-guide-btn" disabled class="w-full mt-4 btn btn-secondary opacity-50 cursor-not-allowed">
-              <span id="understand-btn-text">理解しました（読み込み完了後に有効化）</span>
-            </button>
+            <div class="text-center">
+              <button type="button" id="loading-understand-btn" disabled class="px-6 py-3 bg-gray-600 text-gray-400 rounded-lg cursor-not-allowed transition-colors">
+                <span id="loading-understand-text">理解しました（読み込み完了後に有効化）</span>
+              </button>
+            </div>
           </div>
         </div>
       `;
@@ -2041,22 +2136,56 @@
     }
     
     function enableUnderstandButton() {
-      const understandBtn = document.getElementById('understand-guide-btn');
-      const understandBtnText = document.getElementById('understand-btn-text');
+      const understandBtn = document.getElementById('loading-understand-btn');
+      const understandBtnText = document.getElementById('loading-understand-text');
       
       if (understandBtn && understandBtnText) {
+        // 詳細な教育ガイドが表示されている場合
         understandBtn.disabled = false;
-        understandBtn.className = 'w-full mt-4 btn btn-primary';
+        understandBtn.className = 'px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors';
         understandBtnText.textContent = '理解しました';
         
         understandBtn.onclick = () => {
+          // 「今日はもう表示しない」のチェック状態を確認
+          const dontShowCheckbox = document.getElementById('loadingDontShowTodayCheckbox');
+          if (dontShowCheckbox && dontShowCheckbox.checked) {
+            const today = new Date().toDateString();
+            localStorage.setItem('teacherGuideDontShowToday', today);
+            console.log('Teacher guide set to not show today');
+          }
+          
           hideLoadingOverlay();
           // ローディング終了時にフォームボタンを再有効化
           setLoading(false);
         };
         
         console.log('Understand button enabled');
+      } else {
+        // シンプルローディングの場合（教育ガイドボタンが存在しない）
+        console.log('Simple loading mode - auto closing overlay');
+        setTimeout(() => {
+          hideLoadingOverlay();
+          setLoading(false);
+        }, 1000); // 1秒後に自動で閉じる
       }
+    }
+    
+    function showSimpleLoadingOverlay(message = "読み込み中...") {
+      // 既存のオーバーレイを削除
+      hideLoadingOverlay();
+      
+      const overlay = document.createElement('div');
+      overlay.id = 'loading-overlay';
+      overlay.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50';
+      overlay.innerHTML = `
+        <div class="glass-panel p-8 rounded-xl text-center">
+          <div class="spinner mx-auto mb-4"></div>
+          <p class="text-lg text-white font-medium">${message}</p>
+          <p class="text-sm text-gray-400 mt-2">しばらくお待ちください...</p>
+        </div>
+      `;
+      
+      document.body.appendChild(overlay);
     }
     
     function hideLoadingOverlay() {
