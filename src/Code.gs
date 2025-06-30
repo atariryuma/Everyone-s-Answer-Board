@@ -69,28 +69,159 @@ const USER_INFO_CACHE = new Map();
 const USER_CACHE_TTL = 5 * 60 * 1000; // 5分
 
 /**
- * キャッシュされたユーザー情報を取得
+ * パフォーマンス最適化用のCacheService設定
+ */
+const CACHE_CONFIG = {
+  USER_INFO_TTL: 300,        // 5分（ユーザー情報）
+  SPREADSHEET_DATA_TTL: 120, // 2分（スプレッドシートデータ）
+  FORM_INFO_TTL: 600,        // 10分（フォーム情報）
+  SHEET_LIST_TTL: 180        // 3分（シート一覧）
+};
+
+/**
+ * キャッシュされたユーザー情報を取得（CacheService併用）
  * @param {string} userId - ユーザーID
  * @return {Object|null} キャッシュされたユーザー情報またはnull
  */
 function getCachedUserInfo(userId) {
-  const cached = USER_INFO_CACHE.get(userId);
-  if (cached && (Date.now() - cached.timestamp) < USER_CACHE_TTL) {
-    return cached.data;
+  // メモリキャッシュを最初にチェック（最高速）
+  const memoryCached = USER_INFO_CACHE.get(userId);
+  if (memoryCached && (Date.now() - memoryCached.timestamp) < USER_CACHE_TTL) {
+    debugLog(`Memory cache hit for user: ${userId}`);
+    return memoryCached.data;
   }
+  
+  // CacheServiceを次にチェック
+  try {
+    const cache = CacheService.getScriptCache();
+    const cacheKey = `user_info_${userId}`;
+    const cached = cache.get(cacheKey);
+    
+    if (cached) {
+      debugLog(`CacheService hit for user: ${userId}`);
+      const userInfo = JSON.parse(cached);
+      
+      // メモリキャッシュにも保存（次回アクセス用）
+      setCachedUserInfo(userId, userInfo);
+      
+      return userInfo;
+    }
+  } catch (e) {
+    debugLog(`CacheService error for user ${userId}:`, e.message);
+  }
+  
+  debugLog(`No cache found for user: ${userId}`);
   return null;
 }
 
 /**
- * ユーザー情報をキャッシュに保存
+ * ユーザー情報をキャッシュに保存（メモリ＋CacheService）
  * @param {string} userId - ユーザーID
  * @param {Object} userInfo - ユーザー情報
  */
 function setCachedUserInfo(userId, userInfo) {
+  // メモリキャッシュに保存
   USER_INFO_CACHE.set(userId, {
     data: userInfo,
     timestamp: Date.now()
   });
+  
+  // CacheServiceにも保存（より長期間保持）
+  try {
+    const cache = CacheService.getScriptCache();
+    const cacheKey = `user_info_${userId}`;
+    cache.put(cacheKey, JSON.stringify(userInfo), CACHE_CONFIG.USER_INFO_TTL);
+    debugLog(`User info cached for: ${userId}`);
+  } catch (e) {
+    debugLog(`Failed to cache user info for ${userId}:`, e.message);
+  }
+}
+
+/**
+ * CacheServiceを使った高速データキャッシュ（JSON対応）
+ */
+function getCachedData(key, fetchFunction, ttlSeconds = 300) {
+  try {
+    const cache = CacheService.getScriptCache();
+    const cached = cache.get(key);
+    
+    if (cached) {
+      debugLog(`Cache hit for key: ${key}`);
+      return JSON.parse(cached);
+    }
+    
+    debugLog(`Cache miss for key: ${key}, fetching data...`);
+    const data = fetchFunction();
+    
+    if (data) {
+      cache.put(key, JSON.stringify(data), ttlSeconds);
+      debugLog(`Data cached for key: ${key} (TTL: ${ttlSeconds}s)`);
+    }
+    
+    return data;
+  } catch (e) {
+    debugLog(`Cache error for key ${key}:`, e.message);
+    // キャッシュエラー時は直接データを取得
+    return fetchFunction();
+  }
+}
+
+/**
+ * 複数のキーを一括でキャッシュから取得（バッチ処理）
+ */
+function getBatchCachedData(keyFunctionPairs, defaultTtl = 300) {
+  try {
+    const cache = CacheService.getScriptCache();
+    const keys = keyFunctionPairs.map(pair => pair.key);
+    const cachedData = cache.getAll(keys);
+    const results = {};
+    const toFetch = [];
+    
+    // キャッシュヒット/ミスを判定
+    keyFunctionPairs.forEach(({ key, fetchFunction }) => {
+      if (cachedData[key]) {
+        results[key] = JSON.parse(cachedData[key]);
+        debugLog(`Batch cache hit: ${key}`);
+      } else {
+        toFetch.push({ key, fetchFunction });
+        debugLog(`Batch cache miss: ${key}`);
+      }
+    });
+    
+    // キャッシュミスしたデータを一括取得
+    const newCacheData = {};
+    toFetch.forEach(({ key, fetchFunction }) => {
+      try {
+        const data = fetchFunction();
+        if (data) {
+          results[key] = data;
+          newCacheData[key] = JSON.stringify(data);
+        }
+      } catch (e) {
+        debugLog(`Batch fetch error for ${key}:`, e.message);
+      }
+    });
+    
+    // 新しいデータを一括でキャッシュに保存
+    if (Object.keys(newCacheData).length > 0) {
+      cache.putAll(newCacheData, defaultTtl);
+      debugLog(`Batch cached ${Object.keys(newCacheData).length} items`);
+    }
+    
+    return results;
+  } catch (e) {
+    debugLog('Batch cache error:', e.message);
+    // エラー時は全て直接取得
+    const results = {};
+    keyFunctionPairs.forEach(({ key, fetchFunction }) => {
+      try {
+        results[key] = fetchFunction();
+      } catch (fetchError) {
+        debugLog(`Direct fetch error for ${key}:`, fetchError.message);
+      }
+    });
+    return results;
+  }
 }
 
 /**
@@ -1291,6 +1422,9 @@ function getAvailableSheets() {
  */
 function getActiveFormInfo() {
   try {
+    const startTime = Date.now();
+    debugLog('getActiveFormInfo: Starting execution');
+    
     // 権限チェック（読み取り専用・高速版）
     const { userId, userInfo } = validateCurrentUserReadOnly();
     
@@ -1302,93 +1436,124 @@ function getActiveFormInfo() {
       return null;
     }
     
-    // スプレッドシートを取得
-    const spreadsheet = getCurrentSpreadsheet();
+    // キャッシュからフォーム情報を取得
+    const formCacheKey = `form_info_${userId}_${spreadsheetId}`;
     
-    // フォームを検索（複数の方法で試行）
-    let formId = null;
-    let form = null;
-    
-    // 方法1: スプレッドシートに直接リンクされたフォームを探す
-    try {
-      const formUrl = spreadsheet.getFormUrl();
-      if (formUrl) {
-        // フォームURLからフォームIDを抽出
-        const match = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
-        if (match) {
-          formId = match[1];
-          form = FormApp.openById(formId);
-        }
-      }
-    } catch (e) {
-      debugLog('Method 1 failed (direct form link):', e.message);
-    }
-    
-    // 方法2: スプレッドシートと同じフォルダ内のフォームを探す（名前で判定）
-    if (!form) {
-      try {
-        const spreadsheetFile = DriveApp.getFileById(spreadsheetId);
-        const parents = spreadsheetFile.getParents();
+    const formInfo = getCachedData(
+      formCacheKey,
+      () => {
+        debugLog('getActiveFormInfo: Cache miss, searching for form...');
         
-        if (parents.hasNext()) {
-          const folder = parents.next();
-          const forms = folder.getFilesByType(DriveApp.FileType.GOOGLE_FORMS);
-          
-          const spreadsheetName = spreadsheet.getName();
-          
-          while (forms.hasNext() && !form) {
-            const formFile = forms.next();
-            const formName = formFile.getName();
-            
-            // フォーム名にスプレッドシート名の一部が含まれているかチェック
-            if (formName.includes('StudyQuest') && 
-                (formName.includes(spreadsheetName.split(' - ')[0]) || 
-                 spreadsheetName.includes(formName.split(' - ')[0]))) {
-              try {
-                formId = formFile.getId();
-                form = FormApp.openById(formId);
-                break;
-              } catch (e) {
-                debugLog('Failed to open form:', formFile.getName(), e.message);
-              }
+        // スプレッドシートを取得
+        const spreadsheet = getCurrentSpreadsheet();
+        let formId = null;
+        let form = null;
+        
+        // 方法1: スプレッドシートに直接リンクされたフォームを探す（最も高速）
+        try {
+          const formUrl = spreadsheet.getFormUrl();
+          if (formUrl) {
+            const match = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+            if (match) {
+              formId = match[1];
+              form = FormApp.openById(formId);
+              debugLog('getActiveFormInfo: Found form via direct link');
             }
           }
+        } catch (e) {
+          debugLog('Method 1 failed (direct form link):', e.message);
         }
-      } catch (e) {
-        debugLog('Method 2 failed (folder search):', e.message);
-      }
-    }
-    
-    // 方法3: ユーザー情報からフォームURLを取得
-    if (!form && userInfo.configJson && userInfo.configJson.formUrl) {
-      try {
-        const formUrl = userInfo.configJson.formUrl;
-        const match = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
-        if (match) {
-          formId = match[1];
-          form = FormApp.openById(formId);
+        
+        // 方法2: ユーザー設定からフォームURLを取得（2番目に高速）
+        if (!form && userInfo.configJson && userInfo.configJson.formUrl) {
+          try {
+            const formUrl = userInfo.configJson.formUrl;
+            const match = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+            if (match) {
+              formId = match[1];
+              form = FormApp.openById(formId);
+              debugLog('getActiveFormInfo: Found form via user config');
+            }
+          } catch (e) {
+            debugLog('Method 2 failed (user config):', e.message);
+          }
         }
-      } catch (e) {
-        debugLog('Method 3 failed (user config):', e.message);
-      }
-    }
+        
+        // 方法3: DriveApp検索（最も時間がかかるため最後に実行）
+        if (!form) {
+          try {
+            debugLog('getActiveFormInfo: Attempting DriveApp search (slow)...');
+            const spreadsheetFile = DriveApp.getFileById(spreadsheetId);
+            const parents = spreadsheetFile.getParents();
+            
+            if (parents.hasNext()) {
+              const folder = parents.next();
+              const forms = folder.getFilesByType(DriveApp.FileType.GOOGLE_FORMS);
+              const spreadsheetName = spreadsheet.getName();
+              
+              // 効率化：最大10個のフォームのみチェック（無限ループ防止）
+              let formCount = 0;
+              const maxFormsToCheck = 10;
+              
+              while (forms.hasNext() && !form && formCount < maxFormsToCheck) {
+                const formFile = forms.next();
+                const formName = formFile.getName();
+                formCount++;
+                
+                // StudyQuestフォームのみをチェック
+                if (formName.includes('StudyQuest') && 
+                    (formName.includes(spreadsheetName.split(' - ')[0]) || 
+                     spreadsheetName.includes(formName.split(' - ')[0]))) {
+                  try {
+                    formId = formFile.getId();
+                    form = FormApp.openById(formId);
+                    debugLog(`getActiveFormInfo: Found form via folder search (${formCount} forms checked)`);
+                    break;
+                  } catch (e) {
+                    debugLog('Failed to open form:', formFile.getName(), e.message);
+                  }
+                }
+              }
+              
+              if (formCount >= maxFormsToCheck) {
+                debugLog('getActiveFormInfo: Reached max forms check limit');
+              }
+            }
+          } catch (e) {
+            debugLog('Method 3 failed (folder search):', e.message);
+          }
+        }
+        
+        if (!form) {
+          debugLog('No associated form found for spreadsheet:', spreadsheetId);
+          return null;
+        }
+        
+        // フォーム情報を取得（回答数のみ効率的に取得）
+        let responseCount = 0;
+        try {
+          responseCount = form.getResponses().length;
+          debugLog(`getActiveFormInfo: Form has ${responseCount} responses`);
+        } catch (e) {
+          debugLog('Failed to get response count:', e.message);
+          responseCount = 0;
+        }
+        
+        return {
+          formUrl: form.getPublishedUrl(),
+          editUrl: 'https://docs.google.com/forms/d/' + formId + '/edit',
+          responseCount: responseCount,
+          formId: formId,
+          title: form.getTitle()
+        };
+      },
+      CACHE_CONFIG.FORM_INFO_TTL
+    );
     
-    if (!form) {
-      debugLog('No associated form found for spreadsheet:', spreadsheetId);
-      return null;
-    }
+    const executionTime = Date.now() - startTime;
+    debugLog(`getActiveFormInfo: Completed in ${executionTime}ms`);
     
-    // フォーム情報を取得
-    const responses = form.getResponses();
-    const responseCount = responses.length;
-    
-    return {
-      formUrl: form.getPublishedUrl(),
-      editUrl: 'https://docs.google.com/forms/d/' + formId + '/edit',
-      responseCount: responseCount,
-      formId: formId,
-      title: form.getTitle()
-    };
+    return formInfo;
     
   } catch (error) {
     debugLog('Error getting active form info:', error.message);
@@ -1520,6 +1685,9 @@ function addSpreadsheetUrl(spreadsheetUrl) {
  */
 function getStatus() {
   try {
+    const startTime = Date.now();
+    debugLog('getStatus: Starting execution');
+    
     const scriptProps = PropertiesService.getScriptProperties();
     const correctWebAppUrl = 'https://script.google.com/a/naha-okinawa.ed.jp/macros/s/AKfycbzFF3psxBRUja1DsrVDkleOGrUxar1QqxqGYwBVKmpcZybrtNddH5iKD-nbqmYWEZKK/exec';
     const correctDeployId = 'AKfycbzFF3psxBRUja1DsrVDkleOGrUxar1QqxqGYwBVKmpcZybrtNddH5iKD-nbqmYWEZKK';
@@ -1531,11 +1699,11 @@ function getStatus() {
       scriptProps.setProperty('DEPLOY_ID', correctDeployId);
     }
 
-    const settings = getAdminSettings();
     const props = PropertiesService.getUserProperties();
     const userId = props.getProperty('CURRENT_USER_ID');
     
     if (!userId) {
+      debugLog('getStatus: No userId found, returning default');
       return {
         activeSheetName: '',
         allSheets: [],
@@ -1548,58 +1716,67 @@ function getStatus() {
       };
     }
     
-    // 読み取り専用・高速版でユーザー情報を取得
-    const userInfo = getCachedUserInfo(userId) || getUserInfo(userId);
+    debugLog(`getStatus: Processing for userId: ${userId}`);
+    
+    // バッチキャッシュ処理で複数データを同時取得
+    const cacheKeys = [
+      {
+        key: `user_info_${userId}`,
+        fetchFunction: () => getUserInfo(userId)
+      },
+      {
+        key: `sheet_list_${userId}`,
+        fetchFunction: () => {
+          const spreadsheet = getCurrentSpreadsheet();
+          return spreadsheet.getSheets()
+            .filter(sheet => !sheet.isSheetHidden() && sheet.getName() !== 'Config')
+            .map(sheet => sheet.getName());
+        }
+      }
+    ];
+    
+    const cachedResults = getBatchCachedData(cacheKeys, CACHE_CONFIG.SPREADSHEET_DATA_TTL);
+    const userInfo = cachedResults[`user_info_${userId}`];
+    const allSheets = cachedResults[`sheet_list_${userId}`] || [];
+    
+    debugLog(`getStatus: Retrieved ${allSheets.length} sheets from cache/fetch`);
+    
     const config = userInfo ? userInfo.configJson || {} : {};
     const activeSheetName = config.activeSheetName || '';
     
-    // Get available sheets（キャッシュ活用で高速化）
-    let allSheets = [];
-    try {
-      const spreadsheet = getCurrentSpreadsheet(); // キャッシュされたスプレッドシートを使用
-      allSheets = spreadsheet.getSheets()
-        .filter(sheet => !sheet.isSheetHidden() && sheet.getName() !== 'Config')
-        .map(sheet => sheet.getName());
-    } catch (error) {
-      console.warn('Failed to get sheets:', error);
-      // フォールバック: 従来の方法
-      try {
-        allSheets = getSheets() || [];
-      } catch (fallbackError) {
-        console.warn('Fallback getSheets also failed:', fallbackError);
-      }
-    }
-    
-    // Get answer count if active sheet exists（高速化版）
+    // アクティブシートの情報を高速取得
     let answerCount = 0;
     let totalReactions = 0;
     
     if (activeSheetName) {
-      try {
-        // 既に取得済みのスプレッドシートを再利用（可能な場合）
-        let spreadsheet = null;
-        let sheet = null;
-        
-        // allSheets取得時に使用したスプレッドシートオブジェクトを再利用
-        if (allSheets.length > 0) {
-          spreadsheet = getCurrentSpreadsheet();
-          sheet = spreadsheet.getSheetByName(activeSheetName);
-        }
-        
-        if (sheet) {
-          // 回答数のみ取得（リアクション計算は省略して高速化）
-          const lastRow = sheet.getLastRow();
-          answerCount = lastRow > 1 ? lastRow - 1 : 0; // ヘッダー行を除く
-          
-          // リアクション計算は省略（管理画面では表示していないため）
-          totalReactions = 0;
-        }
-      } catch (error) {
-        console.warn('Failed to get sheet data for status:', error);
-      }
+      const sheetDataCacheKey = `sheet_data_${userId}_${activeSheetName}`;
+      
+      const sheetData = getCachedData(
+        sheetDataCacheKey,
+        () => {
+          try {
+            const spreadsheet = getCurrentSpreadsheet();
+            const sheet = spreadsheet.getSheetByName(activeSheetName);
+            if (!sheet) return { answerCount: 0, totalReactions: 0 };
+            
+            const lastRow = sheet.getLastRow();
+            const count = lastRow > 1 ? lastRow - 1 : 0;
+            
+            debugLog(`getStatus: Sheet ${activeSheetName} has ${count} answers`);
+            return { answerCount: count, totalReactions: 0 };
+          } catch (error) {
+            debugLog('Sheet data fetch error:', error);
+            return { answerCount: 0, totalReactions: 0 };
+          }
+        },
+        CACHE_CONFIG.SPREADSHEET_DATA_TTL
+      );
+      
+      answerCount = sheetData.answerCount;
+      totalReactions = sheetData.totalReactions;
     }
     
-    return {
+    const result = {
       activeSheetName: activeSheetName,
       allSheets: allSheets,
       answerCount: answerCount,
@@ -1609,6 +1786,11 @@ function getStatus() {
       showNames: typeof config.showNames !== 'undefined' ? config.showNames : (config.showDetails || false),
       showCounts: typeof config.showCounts !== 'undefined' ? config.showCounts : (config.showDetails || false)
     };
+    
+    const executionTime = Date.now() - startTime;
+    debugLog(`getStatus: Completed in ${executionTime}ms`);
+    
+    return result;
   } catch (error) {
     console.error('getStatus error:', error);
     throw new Error('ステータスの取得に失敗しました: ' + error.message);
