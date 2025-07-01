@@ -586,30 +586,49 @@
           
           // まず既存ボード情報をチェック
           google.script.run
-            .withSuccessHandler((existingBoard) => {
-              // userIdが有効かどうかを厳密にチェック
-              if (existingBoard && existingBoard.userId && 
-                  typeof existingBoard.userId === 'string' && 
-                  existingBoard.userId.trim() !== '' && 
-                  existingBoard.userId !== 'undefined' && 
-                  existingBoard.userId !== 'null' &&
-                  existingBoard.userId !== null &&
-                  existingBoard.userId !== undefined) {
-                // 有効な既存ボードがある場合
-                updateStep(3);
-                showExistingBoard(existingBoard);
+            .withSuccessHandler((result) => {
+              if (result && result.status) {
+                switch (result.status) {
+                  case 'setup_required':
+                    updateStep(3);
+                    showMessage('セットアップが必要です。管理者にセットアップページでの初期設定を依頼してください。', 'warning');
+                    // セットアップページへのリンクを表示
+                    const setupUrl = window.location.href.split('?')[0] + '?setup=true';
+                    showMessage(`セットアップページ: <a href="${setupUrl}" target="_blank" style="color: #8be9fd;">こちら</a>`, 'info');
+                    break;
+                  case 'existing_user':
+                    updateStep(3);
+                    showExistingBoard(result);
+                    break;
+                  case 'new_user':
+                    updateStep(3);
+                    document.getElementById('register-btn').disabled = false;
+                    showMessage('アカウント確認が完了しました。みんなの回答ボードを開始できます。', 'success');
+                    break;
+                  case 'auth_required':
+                    showMessage('Googleアカウントでログインしてください。', 'error');
+                    break;
+                  default:
+                    updateStep(3);
+                    document.getElementById('register-btn').disabled = false;
+                    showMessage('アカウント確認が完了しました。StudyQuestを開始できます。', 'success');
+                    break;
+                }
               } else {
-                // 既存ボードがない、または無効なuserIdの場合はボタンを有効化
-                updateStep(3);
-                document.getElementById('register-btn').disabled = false;
-                showMessage('アカウント確認が完了しました。みんなの回答ボードを開始できます。', 'success');
+                // レガシー形式の対応
+                if (result && result.userId) {
+                  updateStep(3);
+                  showExistingBoard(result);
+                } else {
+                  updateStep(3);
+                  document.getElementById('register-btn').disabled = false;
+                  showMessage('アカウント確認が完了しました。みんなの回答ボードを開始できます。', 'success');
+                }
               }
             })
             .withFailureHandler((error) => {
-              // セキュリティ強化: エラーメッセージをサニタイズ
-              console.warn('既存ボード確認で問題が発生しました');
-              
-              // エラーが発生した場合もボタンを有効化（新規登録として扱う）
+              console.warn('既存ボード確認で問題が発生しました:', error);
+              updateStep(3);
               document.getElementById('register-btn').disabled = false;
               showMessage('アカウント確認が完了しました。StudyQuestを開始できます。', 'success');
             })

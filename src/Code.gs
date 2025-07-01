@@ -1609,3 +1609,58 @@ function safeSpreadsheetOperation(operation, fallbackValue) {
     return fallbackValue || null;
   }
 }
+
+/**
+ * 現在のユーザーの既存回答ボード情報を取得
+ * Registration.htmlから呼び出される
+ */
+function getExistingBoard() {
+  try {
+    // サービスアカウント設定の確認
+    var props = PropertiesService.getScriptProperties();
+    var serviceAccountCreds = props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
+    var databaseSpreadsheetId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    
+    if (!serviceAccountCreds || !databaseSpreadsheetId) {
+      // セットアップが未完了の場合
+      return {
+        status: 'setup_required',
+        message: 'サービスアカウントのセットアップが必要です'
+      };
+    }
+    
+    // 現在のユーザーのメールアドレスを取得
+    var activeUser = Session.getActiveUser();
+    var userEmail = activeUser.getEmail();
+    
+    if (!userEmail) {
+      return {
+        status: 'auth_required',
+        message: 'Googleアカウントでログインしてください'
+      };
+    }
+    
+    // 既存ユーザーの検索
+    var existingUser = findUserByEmail(userEmail);
+    
+    if (existingUser) {
+      return {
+        status: 'existing_user',
+        userId: existingUser.userId,
+        userInfo: existingUser
+      };
+    } else {
+      return {
+        status: 'new_user',
+        message: '新規ユーザーとして登録できます'
+      };
+    }
+    
+  } catch (e) {
+    console.error('既存ボード確認エラー: ' + e.message);
+    return {
+      status: 'error',
+      message: 'アカウント確認中にエラーが発生しました'
+    };
+  }
+}
