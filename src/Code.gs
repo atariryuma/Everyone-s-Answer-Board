@@ -47,6 +47,35 @@ var REACTION_KEYS = ["UNDERSTAND", "LIKE", "CURIOUS"];
 var EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
 var DEBUG = true;
 
+// アプリケーション設定用の追加定数
+var APP_PROPERTIES = {
+  PUBLISHED_SHEET: 'PUBLISHED_SHEET',
+  DISPLAY_MODE: 'DISPLAY_MODE', // 'anonymous' or 'named'
+  APP_PUBLISHED: 'APP_PUBLISHED'
+};
+
+var DISPLAY_MODES = {
+  ANONYMOUS: 'anonymous',
+  NAMED: 'named'
+};
+
+var SCORING_CONFIG = {
+  LIKE_MULTIPLIER_FACTOR: 0.05, // 1いいね！ごとにスコアが5%増加
+  RANDOM_SCORE_FACTOR: 0.1 // ランダム要素の重み
+};
+
+var ROSTER_CONFIG = {
+  SHEET_NAME: '名簿',
+  EMAIL_COLUMN: 'メールアドレス',
+  NAME_COLUMN: '名前',
+  CLASS_COLUMN: 'クラス'
+};
+
+var TIME_CONSTANTS = {
+  LOCK_WAIT_MS: 10000,
+  CACHE_TTL: 300000 // 5分
+};
+
 function debugLog() {
   if (DEBUG && typeof console !== 'undefined' && console.log) {
     console.log.apply(console, arguments);
@@ -770,5 +799,807 @@ function getResponsesData(userId, sheetName) {
   } catch (e) {
     console.error('回答データの取得に失敗: ' + e.message);
     return { status: 'error', message: '回答データの取得に失敗しました: ' + e.message };
+  }
+}
+
+// =================================================================
+// キャッシュ管理関数
+// =================================================================
+
+/**
+ * ユーザーキャッシュ（メモリ内）
+ */
+var USER_INFO_CACHE = new Map();
+var HEADER_CACHE = new Map();
+var ROSTER_CACHE = new Map();
+var CACHE_TIMESTAMPS = new Map();
+
+/**
+ * キャッシュされたユーザー情報を取得
+ */
+function getCachedUserInfo(userId) {
+  var cacheKey = 'user_' + userId;
+  var cached = USER_INFO_CACHE.get(cacheKey);
+  var timestamp = CACHE_TIMESTAMPS.get(cacheKey);
+  
+  if (cached && timestamp && (Date.now() - timestamp) < TIME_CONSTANTS.CACHE_TTL) {
+    debugLog('Memory cache hit for user: ' + userId);
+    return cached;
+  }
+  
+  return null;
+}
+
+/**
+ * ユーザー情報をキャッシュに保存
+ */
+function setCachedUserInfo(userId, userInfo) {
+  var cacheKey = 'user_' + userId;
+  USER_INFO_CACHE.set(cacheKey, userInfo);
+  CACHE_TIMESTAMPS.set(cacheKey, Date.now());
+}
+
+/**
+ * ヘッダーインデックスをキャッシュから取得
+ */
+function getAndCacheHeaderIndices(spreadsheetId, sheetName, headerRow) {
+  var cacheKey = spreadsheetId + '_' + sheetName + '_headers';
+  var cached = HEADER_CACHE.get(cacheKey);
+  var timestamp = CACHE_TIMESTAMPS.get(cacheKey);
+  
+  if (cached && timestamp && (Date.now() - timestamp) < TIME_CONSTANTS.CACHE_TTL) {
+    debugLog('Header cache hit for: ' + sheetName);
+    return cached;
+  }
+  
+  try {
+    var service = getSheetsService();
+    var range = sheetName + '!' + (headerRow || 1) + ':' + (headerRow || 1);
+    var response = service.spreadsheets.values.get(spreadsheetId, range);
+    var headers = response.values ? response.values[0] : [];
+    
+    var indices = findHeaderIndices(headers, Object.values(COLUMN_HEADERS));
+    
+    HEADER_CACHE.set(cacheKey, indices);
+    CACHE_TIMESTAMPS.set(cacheKey, Date.now());
+    
+    return indices;
+  } catch (e) {
+    console.error('ヘッダー取得エラー: ' + e.message);
+    return {};
+  }
+}
+
+/**
+ * ヘッダーインデックスを検索
+ */
+function findHeaderIndices(headers, requiredHeaders) {
+  var indices = {};
+  
+  requiredHeaders.forEach(function(header) {
+    var index = headers.indexOf(header);
+    if (index !== -1) {
+      indices[header] = index;
+    }
+  });
+  
+  return indices;
+}
+
+/**
+ * 名簿データをキャッシュから取得（名前とクラスのマッピング）
+ */
+function getRosterMap(spreadsheetId) {
+  var cacheKey = spreadsheetId + '_roster';
+  var cached = ROSTER_CACHE.get(cacheKey);
+  var timestamp = CACHE_TIMESTAMPS.get(cacheKey);
+  
+  if (cached && timestamp && (Date.now() - timestamp) < TIME_CONSTANTS.CACHE_TTL) {
+    debugLog('Roster cache hit');
+    return cached;
+  }
+  
+  try {
+    var service = getSheetsService();
+    var range = ROSTER_CONFIG.SHEET_NAME + '!A:Z';
+    var response = service.spreadsheets.values.get(spreadsheetId, range);
+    var values = response.values || [];
+    
+    if (values.length === 0) {
+      return {};
+    }
+    
+    var headers = values[0];
+    var emailIndex = headers.indexOf(ROSTER_CONFIG.EMAIL_COLUMN);
+    var nameIndex = headers.indexOf(ROSTER_CONFIG.NAME_COLUMN);
+    var classIndex = headers.indexOf(ROSTER_CONFIG.CLASS_COLUMN);
+    
+    var rosterMap = {};
+    
+    for (var i = 1; i < values.length; i++) {
+      var row = values[i];
+      if (emailIndex !== -1 && row[emailIndex]) {
+        rosterMap[row[emailIndex]] = {
+          name: nameIndex !== -1 ? row[nameIndex] : '',
+          class: classIndex !== -1 ? row[classIndex] : ''
+        };
+      }
+    }
+    
+    ROSTER_CACHE.set(cacheKey, rosterMap);
+    CACHE_TIMESTAMPS.set(cacheKey, Date.now());
+    
+    return rosterMap;
+  } catch (e) {
+    console.error('名簿データ取得エラー: ' + e.message);
+    return {};
+  }
+}
+
+/**
+ * キャッシュをクリア
+ */
+function clearAllCaches() {
+  USER_INFO_CACHE.clear();
+  HEADER_CACHE.clear();
+  ROSTER_CACHE.clear();
+  CACHE_TIMESTAMPS.clear();
+  debugLog('全キャッシュをクリアしました');
+}
+
+function clearRosterCache() {
+  var keysToDelete = [];
+  ROSTER_CACHE.forEach(function(value, key) {
+    if (key.includes('_roster')) {
+      keysToDelete.push(key);
+    }
+  });
+  
+  keysToDelete.forEach(function(key) {
+    ROSTER_CACHE.delete(key);
+    CACHE_TIMESTAMPS.delete(key);
+  });
+  
+  debugLog('名簿キャッシュをクリアしました');
+}
+
+// =================================================================
+// データ処理とソート機能
+// =================================================================
+
+/**
+ * 公開されたシートのデータを取得（Page.htmlから呼び出される）
+ */
+function getPublishedSheetData(classFilter, sortMode) {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+    
+    var userInfo = findUserById(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    // 設定から公開シートを取得
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var publishedSheet = configJson.publishedSheet || 'フォームの回答 1';
+    
+    return getSheetData(currentUserId, publishedSheet, classFilter, sortMode);
+  } catch (e) {
+    console.error('公開シートデータ取得エラー: ' + e.message);
+    return {
+      status: 'error',
+      message: 'データの取得に失敗しました: ' + e.message,
+      data: [],
+      headers: []
+    };
+  }
+}
+
+/**
+ * 指定されたシートのデータを取得し、フィルタリング・ソートを適用
+ */
+function getSheetData(userId, sheetName, classFilter, sortMode) {
+  try {
+    var userInfo = findUserById(userId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    var spreadsheetId = userInfo.spreadsheetId;
+    var service = getSheetsService();
+    var range = sheetName + '!A:Z';
+    
+    var response = service.spreadsheets.values.get(spreadsheetId, range);
+    var values = response.values || [];
+    
+    if (values.length === 0) {
+      return {
+        status: 'success',
+        data: [],
+        headers: [],
+        totalCount: 0
+      };
+    }
+    
+    var headers = values[0];
+    var dataRows = values.slice(1);
+    
+    // ヘッダーインデックスを取得
+    var headerIndices = getAndCacheHeaderIndices(spreadsheetId, sheetName);
+    
+    // 名簿データを取得（名前表示用）
+    var rosterMap = getRosterMap(spreadsheetId);
+    
+    // 表示モードを取得
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
+    
+    // データを処理
+    var processedData = dataRows.map(function(row, index) {
+      return processRowData(row, headers, headerIndices, rosterMap, displayMode, index + 2); // +2 for header row and 1-based indexing
+    });
+    
+    // クラスフィルタを適用
+    if (classFilter && classFilter !== 'all') {
+      var classIndex = headerIndices[COLUMN_HEADERS.CLASS];
+      if (classIndex !== undefined) {
+        processedData = processedData.filter(function(row) {
+          return row.originalData[classIndex] === classFilter;
+        });
+      }
+    }
+    
+    // ソートを適用
+    processedData = applySortMode(processedData, sortMode || 'newest');
+    
+    return {
+      status: 'success',
+      data: processedData,
+      headers: headers,
+      totalCount: processedData.length,
+      displayMode: displayMode
+    };
+    
+  } catch (e) {
+    console.error('シートデータ取得エラー: ' + e.message);
+    return {
+      status: 'error',
+      message: 'データの取得に失敗しました: ' + e.message,
+      data: [],
+      headers: []
+    };
+  }
+}
+
+/**
+ * 行データを処理（スコア計算、名前変換など）
+ */
+function processRowData(row, headers, headerIndices, rosterMap, displayMode, rowNumber) {
+  var processedRow = {
+    rowNumber: rowNumber,
+    originalData: row,
+    score: 0,
+    likeCount: 0,
+    understandCount: 0,
+    curiousCount: 0,
+    isHighlighted: false
+  };
+  
+  // 各リアクションのカウントを計算
+  REACTION_KEYS.forEach(function(reactionKey) {
+    var columnName = COLUMN_HEADERS[reactionKey];
+    var columnIndex = headerIndices[columnName];
+    
+    if (columnIndex !== undefined && row[columnIndex]) {
+      var reactions = parseReactionString(row[columnIndex]);
+      var count = reactions.length;
+      
+      switch (reactionKey) {
+        case 'LIKE':
+          processedRow.likeCount = count;
+          break;
+        case 'UNDERSTAND':
+          processedRow.understandCount = count;
+          break;
+        case 'CURIOUS':
+          processedRow.curiousCount = count;
+          break;
+      }
+    }
+  });
+  
+  // ハイライト状態をチェック
+  var highlightIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT];
+  if (highlightIndex !== undefined && row[highlightIndex]) {
+    processedRow.isHighlighted = row[highlightIndex].toString().toLowerCase() === 'true';
+  }
+  
+  // スコアを計算
+  processedRow.score = calculateRowScore(processedRow);
+  
+  // 名前の表示処理
+  var emailIndex = headerIndices[COLUMN_HEADERS.EMAIL];
+  if (emailIndex !== undefined && row[emailIndex] && displayMode === DISPLAY_MODES.NAMED) {
+    var email = row[emailIndex];
+    var rosterInfo = rosterMap[email];
+    if (rosterInfo && rosterInfo.name) {
+      // 名簿に名前がある場合は名前を表示
+      var nameIndex = headerIndices[COLUMN_HEADERS.NAME];
+      if (nameIndex !== undefined) {
+        processedRow.displayName = rosterInfo.name;
+      }
+    }
+  }
+  
+  return processedRow;
+}
+
+/**
+ * 行のスコアを計算
+ */
+function calculateRowScore(rowData) {
+  var baseScore = 1.0;
+  
+  // いいね！による加算
+  var likeBonus = rowData.likeCount * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR;
+  
+  // その他のリアクションも軽微な加算
+  var reactionBonus = (rowData.understandCount + rowData.curiousCount) * 0.01;
+  
+  // ハイライトによる大幅加算
+  var highlightBonus = rowData.isHighlighted ? 0.5 : 0;
+  
+  // ランダム要素（同じスコアの項目をランダムに並べるため）
+  var randomFactor = Math.random() * SCORING_CONFIG.RANDOM_SCORE_FACTOR;
+  
+  return baseScore + likeBonus + reactionBonus + highlightBonus + randomFactor;
+}
+
+/**
+ * データにソートを適用
+ */
+function applySortMode(data, sortMode) {
+  switch (sortMode) {
+    case 'score':
+      return data.sort(function(a, b) { return b.score - a.score; });
+    case 'newest':
+      return data.reverse(); // 最新が上に来るように
+    case 'oldest':
+      return data; // 元の順序（古い順）
+    case 'random':
+      return shuffleArray(data.slice()); // コピーをシャッフル
+    case 'likes':
+      return data.sort(function(a, b) { return b.likeCount - a.likeCount; });
+    default:
+      return data;
+  }
+}
+
+/**
+ * 配列をシャッフル（Fisher-Yates shuffle）
+ */
+function shuffleArray(array) {
+  for (var i = array.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var temp = array[i];
+    array[i] = array[j];
+    array[j] = temp;
+  }
+  return array;
+}
+
+// =================================================================
+// 管理機能
+// =================================================================
+
+/**
+ * スプレッドシートのメニューを作成（onOpen）
+ */
+function onOpen() {
+  try {
+    var ui = SpreadsheetApp.getUi();
+    ui.createMenu('📋 みんなの回答ボード')
+      .addItem('📊 管理パネルを開く', 'showAdminSidebar')
+      .addSeparator()
+      .addItem('🔄 キャッシュをクリア', 'clearAllCaches')
+      .addItem('📝 名簿キャッシュをクリア', 'clearRosterCache')
+      .addToUi();
+  } catch (e) {
+    console.error('メニュー作成エラー: ' + e.message);
+  }
+}
+
+/**
+ * 管理サイドバーを表示
+ */
+function showAdminSidebar() {
+  try {
+    var template = HtmlService.createTemplateFromFile('AdminSidebar');
+    var html = template.evaluate()
+      .setTitle('みんなの回答ボード - 管理パネル')
+      .setWidth(400);
+    
+    SpreadsheetApp.getUi().showSidebar(html);
+  } catch (e) {
+    console.error('管理サイドバー表示エラー: ' + e.message);
+    SpreadsheetApp.getUi().alert('管理パネルの表示に失敗しました: ' + e.message);
+  }
+}
+
+/**
+ * 管理者設定を取得
+ */
+function getAdminSettings() {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      // コンテキストが設定されていない場合、現在のユーザーで検索
+      var activeUser = Session.getActiveUser().getEmail();
+      var userInfo = findUserByEmail(activeUser);
+      if (userInfo) {
+        currentUserId = userInfo.userId;
+        props.setProperty('CURRENT_USER_ID', currentUserId);
+      } else {
+        throw new Error('ユーザー情報が見つかりません');
+      }
+    }
+    
+    var userInfo = findUserById(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var sheets = getSheets(currentUserId);
+    
+    return {
+      status: 'success',
+      userId: currentUserId,
+      adminEmail: userInfo.adminEmail,
+      publishedSheet: configJson.publishedSheet || '',
+      displayMode: configJson.displayMode || DISPLAY_MODES.ANONYMOUS,
+      isPublished: configJson.appPublished || false,
+      availableSheets: sheets,
+      spreadsheetUrl: userInfo.spreadsheetUrl,
+      formUrl: configJson.formUrl || '',
+      editFormUrl: configJson.editFormUrl || ''
+    };
+  } catch (e) {
+    console.error('管理者設定取得エラー: ' + e.message);
+    return {
+      status: 'error',
+      message: '設定の取得に失敗しました: ' + e.message
+    };
+  }
+}
+
+/**
+ * 利用可能なシート一覧を取得
+ */
+function getSheets(userId) {
+  try {
+    var userInfo = findUserById(userId);
+    if (!userInfo) {
+      return [];
+    }
+    
+    var service = getSheetsService();
+    var spreadsheet = service.spreadsheets.get(userInfo.spreadsheetId);
+    
+    return spreadsheet.sheets.map(function(sheet) {
+      return {
+        name: sheet.properties.title,
+        id: sheet.properties.sheetId
+      };
+    });
+  } catch (e) {
+    console.error('シート一覧取得エラー: ' + e.message);
+    return [];
+  }
+}
+
+/**
+ * アプリを公開
+ */
+function publishApp(sheetName) {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+    
+    var userInfo = findUserById(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    configJson.publishedSheet = sheetName;
+    configJson.appPublished = true;
+    
+    updateUserInDb(currentUserId, {
+      configJson: JSON.stringify(configJson)
+    });
+    
+    debugLog('アプリを公開しました: ' + sheetName);
+    
+    return {
+      status: 'success',
+      message: 'アプリが公開されました',
+      publishedSheet: sheetName
+    };
+  } catch (e) {
+    console.error('アプリ公開エラー: ' + e.message);
+    return {
+      status: 'error',
+      message: 'アプリの公開に失敗しました: ' + e.message
+    };
+  }
+}
+
+/**
+ * アプリの公開を停止
+ */
+function unpublishApp() {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+    
+    var userInfo = findUserById(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    configJson.appPublished = false;
+    
+    updateUserInDb(currentUserId, {
+      configJson: JSON.stringify(configJson)
+    });
+    
+    debugLog('アプリの公開を停止しました');
+    
+    return {
+      status: 'success',
+      message: 'アプリの公開を停止しました'
+    };
+  } catch (e) {
+    console.error('アプリ公開停止エラー: ' + e.message);
+    return {
+      status: 'error',
+      message: 'アプリの公開停止に失敗しました: ' + e.message
+    };
+  }
+}
+
+/**
+ * 表示モードを保存
+ */
+function saveDisplayMode(mode) {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+    
+    if (!Object.values(DISPLAY_MODES).includes(mode)) {
+      throw new Error('無効な表示モードです: ' + mode);
+    }
+    
+    var userInfo = findUserById(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    configJson.displayMode = mode;
+    
+    updateUserInDb(currentUserId, {
+      configJson: JSON.stringify(configJson)
+    });
+    
+    debugLog('表示モードを保存しました: ' + mode);
+    
+    return {
+      status: 'success',
+      message: '表示モードを保存しました',
+      displayMode: mode
+    };
+  } catch (e) {
+    console.error('表示モード保存エラー: ' + e.message);
+    return {
+      status: 'error',
+      message: '表示モードの保存に失敗しました: ' + e.message
+    };
+  }
+}
+
+/**
+ * アプリ設定を取得
+ */
+function getAppSettings() {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      return {
+        status: 'error',
+        message: 'ユーザーコンテキストが設定されていません'
+      };
+    }
+    
+    var userInfo = findUserById(currentUserId);
+    if (!userInfo) {
+      return {
+        status: 'error',
+        message: 'ユーザー情報が見つかりません'
+      };
+    }
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    
+    return {
+      status: 'success',
+      publishedSheet: configJson.publishedSheet || '',
+      displayMode: configJson.displayMode || DISPLAY_MODES.ANONYMOUS,
+      isPublished: configJson.appPublished || false
+    };
+  } catch (e) {
+    console.error('アプリ設定取得エラー: ' + e.message);
+    return {
+      status: 'error',
+      message: 'アプリ設定の取得に失敗しました: ' + e.message
+    };
+  }
+}
+
+/**
+ * ハイライト状態を切り替え
+ */
+function toggleHighlight(rowIndex) {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+    
+    var userInfo = findUserById(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var sheetName = configJson.publishedSheet || 'フォームの回答 1';
+    
+    var service = getSheetsService();
+    var spreadsheetId = userInfo.spreadsheetId;
+    
+    // ヘッダーを取得してハイライト列を特定
+    var headerResponse = service.spreadsheets.values.get(spreadsheetId, sheetName + '!1:1');
+    var headers = headerResponse.values ? headerResponse.values[0] : [];
+    var highlightIndex = headers.indexOf(COLUMN_HEADERS.HIGHLIGHT);
+    
+    if (highlightIndex === -1) {
+      throw new Error('ハイライト列が見つかりません');
+    }
+    
+    // 現在の値を取得
+    var cellRange = sheetName + '!' + String.fromCharCode(65 + highlightIndex) + rowIndex;
+    var currentResponse = service.spreadsheets.values.get(spreadsheetId, cellRange);
+    var currentValue = currentResponse.values && currentResponse.values[0] ? currentResponse.values[0][0] : '';
+    
+    // 値を切り替え
+    var newValue = (currentValue.toString().toLowerCase() === 'true') ? 'false' : 'true';
+    
+    service.spreadsheets.values.update(
+      spreadsheetId,
+      cellRange,
+      { values: [[newValue]] },
+      { valueInputOption: 'RAW' }
+    );
+    
+    debugLog('ハイライト状態を切り替えました: 行' + rowIndex + ' → ' + newValue);
+    
+    return {
+      status: 'success',
+      message: 'ハイライト状態を更新しました',
+      isHighlighted: newValue === 'true',
+      rowIndex: rowIndex
+    };
+  } catch (e) {
+    console.error('ハイライト切り替えエラー: ' + e.message);
+    return {
+      status: 'error',
+      message: 'ハイライトの切り替えに失敗しました: ' + e.message
+    };
+  }
+}
+
+/**
+ * WebアプリのURLを取得
+ */
+function getWebAppUrl() {
+  try {
+    return ScriptApp.getService().getUrl();
+  } catch (e) {
+    console.error('WebアプリURL取得エラー: ' + e.message);
+    return '';
+  }
+}
+
+/**
+ * デプロイ・ユーザー・ドメイン情報を取得（AdminPanel.htmlから呼び出される）
+ */
+function getDeployUserDomainInfo() {
+  try {
+    var webAppUrl = getWebAppUrl();
+    var activeUser = Session.getActiveUser().getEmail();
+    var domain = getEmailDomain(activeUser);
+    
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    var userInfo = null;
+    
+    if (currentUserId) {
+      userInfo = findUserById(currentUserId);
+    }
+    
+    return {
+      status: 'success',
+      webAppUrl: webAppUrl,
+      activeUser: activeUser,
+      domain: domain,
+      userId: currentUserId,
+      userInfo: userInfo,
+      deploymentTimestamp: new Date().toISOString()
+    };
+  } catch (e) {
+    console.error('デプロイ情報取得エラー: ' + e.message);
+    return {
+      status: 'error',
+      message: 'デプロイ情報の取得に失敗しました: ' + e.message
+    };
+  }
+}
+
+// =================================================================
+// 互換性とエラーハンドリング
+// =================================================================
+
+/**
+ * 旧関数名との互換性を保つためのエイリアス
+ */
+function addLike(rowIndex, reactionKey, sheetName) {
+  // addReaction関数を呼び出し
+  return addReaction(rowIndex, reactionKey, sheetName);
+}
+
+/**
+ * エラーハンドリング付きのSpreadsheetApp操作
+ */
+function safeSpreadsheetOperation(operation, fallbackValue) {
+  try {
+    return operation();
+  } catch (e) {
+    console.error('スプレッドシート操作エラー: ' + e.message);
+    return fallbackValue || null;
   }
 }
