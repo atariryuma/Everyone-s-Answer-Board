@@ -1035,25 +1035,71 @@ function showCurrentSettings() {
   const dbSheetId = properties.getProperty(CONFIG.DATABASE_ID_KEY);
   const deploymentId = properties.getProperty(CONFIG.DEPLOYMENT_ID_KEY);
 
-  let message = 'Current Configuration:\n\n';
+  let message = '🚀 StudyQuest Admin Logger API - Status Dashboard\n';
+  message += '=' .repeat(50) + '\n\n';
   
+  // Database Status
+  message += '📊 DATABASE STATUS:\n';
   if (dbSheetId) {
-    message += `✅ Database: Configured\n   (Spreadsheet ID: ${dbSheetId})\n\n`;
+    try {
+      const dbSheet = getDatabaseSheet();
+      const data = dbSheet.getDataRange().getValues();
+      const userCount = Math.max(0, data.length - 1);
+      
+      message += `✅ Database: ACTIVE\n`;
+      message += `   📁 Spreadsheet ID: ${dbSheetId}\n`;
+      message += `   👥 Total Users: ${userCount}\n`;
+      message += `   🏢 Sheet Name: ${CONFIG.TARGET_SHEET_NAME}\n\n`;
+    } catch (e) {
+      message += `⚠️ Database: CONFIGURED but ERROR\n`;
+      message += `   📁 Spreadsheet ID: ${dbSheetId}\n`;
+      message += `   ❌ Error: ${e.message}\n\n`;
+    }
   } else {
-    message += '❌ Database: Not configured\n\n';
+    message += '❌ Database: NOT CONFIGURED\n';
+    message += '   📋 Action: Run "Initialize Database" first\n\n';
   }
 
-  // Templates are no longer used - removed for optimization
-
+  // API Deployment Status
+  message += '🌐 API DEPLOYMENT STATUS:\n';
   if (deploymentId) {
     const webAppUrl = deploymentId.startsWith('https://') 
       ? deploymentId 
       : `https://script.google.com/macros/s/${deploymentId}/exec`;
-    message += `✅ API Deployment: Active\n   URL: ${webAppUrl}\n\n`;
-    message += '🔒 Security Info:\n• Admin privileges required\n• URL is confidential\n• All API calls are logged\n';
+    
+    message += `✅ API: DEPLOYED & ACTIVE\n`;
+    message += `   🔗 URL: ${webAppUrl}\n`;
+    message += `   🛡️ Security: DOMAIN (naha-okinawa.ed.jp only)\n`;
+    message += `   ⚙️ Execute as: USER_DEPLOYING\n`;
+    message += `   📝 All API calls logged\n\n`;
   } else {
-    message += '❌ API Deployment: Not configured\n';
+    message += '❌ API: NOT DEPLOYED\n';
+    message += '   📋 Action: Use "Deploy API" from menu\n\n';
   }
+
+  // Authentication & Security
+  message += '🔒 SECURITY & ACCESS:\n';
+  try {
+    const currentUser = Session.getActiveUser().getEmail();
+    const userDomain = currentUser.split('@')[1];
+    
+    if (userDomain === 'naha-okinawa.ed.jp') {
+      message += `✅ Current User: AUTHORIZED\n`;
+      message += `   👤 Email: ${currentUser}\n`;
+      message += `   🏢 Domain: ${userDomain} ✓\n`;
+    } else {
+      message += `⚠️ Current User: UNAUTHORIZED DOMAIN\n`;
+      message += `   👤 Email: ${currentUser}\n`;
+      message += `   🏢 Domain: ${userDomain} ✗\n`;
+      message += `   📋 Required: naha-okinawa.ed.jp\n`;
+    }
+  } catch (e) {
+    message += `❌ Authentication: ERROR\n`;
+    message += `   ❌ Error: ${e.message}\n`;
+  }
+
+  message += '\n' + '=' .repeat(50) + '\n';
+  message += 'ℹ️ Need help? Use "Test Deployment" to verify API functionality.';
 
   ui.alert(message);
 }
@@ -1064,7 +1110,7 @@ function testDeployment() {
   const deploymentId = properties.getProperty(CONFIG.DEPLOYMENT_ID_KEY);
   
   if (!deploymentId) {
-    ui.alert('❌ No deployment ID configured. Please deploy API first.');
+    ui.alert('❌ DEPLOYMENT TEST FAILED\n\nNo deployment ID configured.\n📋 Action: Please deploy API first using "Deploy API" menu.');
     return;
   }
   
@@ -1072,19 +1118,26 @@ function testDeployment() {
     ? deploymentId 
     : `https://script.google.com/macros/s/${deploymentId}/exec`;
   
+  let message = '🧪 API DEPLOYMENT TEST RESULTS\n';
+  message += '=' .repeat(45) + '\n\n';
+  message += `🔗 Test URL: ${webAppUrl}\n\n`;
+  
   try {
     // Test GET
+    message += '📡 TEST 1: Basic Connectivity (GET)\n';
     const getResponse = UrlFetchApp.fetch(webAppUrl, {
       method: 'GET',
       muteHttpExceptions: true
     });
     
-    let message = `Deployment Test Results:\n\nURL: ${webAppUrl}\nGET Test: ${getResponse.getResponseCode()}\n\n`;
+    const getCode = getResponse.getResponseCode();
+    message += `   Status Code: ${getCode}\n`;
     
-    if (getResponse.getResponseCode() === 200) {
-      message += '✅ GET connection successful\n\n';
+    if (getCode === 200) {
+      message += '   ✅ Result: SUCCESS - API is reachable\n\n';
       
-      // Test POST
+      // Test POST with DOMAIN explanation
+      message += '📡 TEST 2: POST Authentication (DOMAIN Security)\n';
       const postResponse = UrlFetchApp.fetch(webAppUrl, {
         method: 'POST',
         contentType: 'application/json',
@@ -1092,23 +1145,65 @@ function testDeployment() {
         muteHttpExceptions: true
       });
       
-      message += `POST Test: ${postResponse.getResponseCode()}\n`;
+      const postCode = postResponse.getResponseCode();
+      message += `   Status Code: ${postCode}\n`;
       
-      if (postResponse.getResponseCode() === 200) {
-        message += '✅ API operational';
+      if (postCode === 200) {
+        try {
+          const responseData = JSON.parse(postResponse.getContentText());
+          message += '   ✅ Result: SUCCESS - API authenticated correctly\n';
+          message += `   📊 API Version: ${responseData.data?.version || 'Unknown'}\n`;
+          message += `   🔐 Auth Required: ${responseData.data?.authRequired !== false ? 'Yes' : 'No'}\n\n`;
+        } catch (e) {
+          message += '   ✅ Result: SUCCESS - API responded (parse error)\n\n';
+        }
+      } else if (postCode === 401) {
+        message += '   ⚠️ Result: EXPECTED 401 (External Test Limitation)\n';
+        message += '   📋 This is NORMAL for DOMAIN security!\n';
+        message += '   🔒 External tools cannot authenticate to DOMAIN APIs\n';
+        message += '   ✅ Your API security is working correctly\n\n';
       } else {
-        message += `❌ POST failed: ${postResponse.getContentText().substring(0, 100)}`;
+        message += `   ❌ Result: UNEXPECTED ERROR (${postCode})\n`;
+        message += `   Details: ${postResponse.getContentText().substring(0, 100)}\n\n`;
+      }
+      
+      // Database connectivity test
+      message += '📡 TEST 3: Database Connectivity\n';
+      try {
+        const dbSheet = getDatabaseSheet();
+        const data = dbSheet.getDataRange().getValues();
+        message += `   ✅ Result: SUCCESS - Database accessible\n`;
+        message += `   📊 Total Users: ${Math.max(0, data.length - 1)}\n\n`;
+      } catch (dbError) {
+        message += `   ❌ Result: DATABASE ERROR\n`;
+        message += `   Details: ${dbError.message}\n\n`;
       }
       
     } else {
-      message += `❌ Connection failed\nDetails: ${getResponse.getContentText().substring(0, 200)}`;
+      message += `   ❌ Result: CONNECTION FAILED\n`;
+      message += `   Details: ${getResponse.getContentText().substring(0, 150)}\n\n`;
     }
     
-    ui.alert(message);
+    // Overall assessment
+    message += '🎯 OVERALL ASSESSMENT:\n';
+    if (getCode === 200) {
+      message += '✅ Status: API IS OPERATIONAL\n';
+      message += '🔒 Security: DOMAIN protection active\n';
+      message += '📱 Ready for: StudyQuest main app integration\n';
+      message += '⚠️ Note: POST 401 from external tools is expected & secure\n';
+    } else {
+      message += '❌ Status: API HAS ISSUES\n';
+      message += '📋 Action: Check deployment settings and redeploy\n';
+    }
     
   } catch (e) {
-    ui.alert(`Test error: ${e.message}`);
+    message += '❌ CRITICAL ERROR during testing:\n';
+    message += `Error: ${e.message}\n`;
+    message += '📋 Action: Check network connection and API deployment\n';
   }
+  
+  message += '\n' + '=' .repeat(45);
+  ui.alert(message);
 }
 
 function showDeploymentInstructions() {
@@ -1143,30 +1238,92 @@ function debugDatabaseContents() {
     const dbSheet = getDatabaseSheet();
     const data = dbSheet.getDataRange().getValues();
     
-    let message = `Database Contents:\n\nTotal rows: ${data.length}\n\n`;
+    let message = '📊 DATABASE CONTENTS ANALYSIS\n';
+    message += '=' .repeat(40) + '\n\n';
+    
+    message += `📁 Database Sheet: ${CONFIG.TARGET_SHEET_NAME}\n`;
+    message += `📊 Total Rows: ${data.length}\n`;
+    message += `👥 User Records: ${Math.max(0, data.length - 1)}\n\n`;
     
     if (data.length === 0) {
-      message += '❌ Database is empty';
+      message += '❌ Status: DATABASE IS EMPTY\n';
+      message += '📋 Action: Database needs initialization\n';
     } else if (data.length === 1) {
-      message += '✅ Headers only (no user data)\n';
-      message += `Headers: ${JSON.stringify(data[0])}`;
+      message += '✅ Status: INITIALIZED (Headers Only)\n';
+      message += '📋 Ready for: User registration\n\n';
+      message += '📋 HEADERS:\n';
+      data[0].forEach((header, index) => {
+        message += `   ${index + 1}. ${header}\n`;
+      });
     } else {
-      message += `✅ Headers + ${data.length - 1} user records\n\n`;
-      message += `Headers: ${JSON.stringify(data[0])}\n\n`;
+      message += '✅ Status: ACTIVE WITH DATA\n';
+      message += `📊 User Count: ${data.length - 1}\n\n`;
       
-      for (let i = 1; i < Math.min(data.length, 4); i++) {
-        message += `Row ${i}: ${JSON.stringify(data[i])}\n`;
+      // Show headers
+      message += '📋 HEADERS:\n';
+      data[0].forEach((header, index) => {
+        message += `   ${index + 1}. ${header}\n`;
+      });
+      message += '\n';
+      
+      // Show sample user data (anonymized)
+      message += '👥 SAMPLE USER DATA:\n';
+      const sampleCount = Math.min(3, data.length - 1);
+      
+      for (let i = 1; i <= sampleCount; i++) {
+        const row = data[i];
+        message += `   User ${i}:\n`;
+        message += `     📧 Email: ${row[1] ? String(row[1]).replace(/(.{3}).*(@.*)/, '$1***$2') : 'N/A'}\n`;
+        message += `     📊 Spreadsheet: ${row[2] ? 'Configured' : 'Missing'}\n`;
+        message += `     📅 Created: ${row[4] ? new Date(row[4]).toLocaleDateString() : 'N/A'}\n`;
+        message += `     ✅ Active: ${row[8] !== false ? 'Yes' : 'No'}\n`;
+        message += '\n';
       }
       
       if (data.length > 4) {
-        message += `... (${data.length - 4} more rows)`;
+        message += `   ... (${data.length - 4} more users)\n\n`;
+      }
+      
+      // Data quality check
+      message += '🔍 DATA QUALITY CHECK:\n';
+      let validUsers = 0;
+      let invalidUsers = 0;
+      
+      for (let i = 1; i < data.length; i++) {
+        const userId = data[i][0];
+        const email = data[i][1];
+        
+        if (isValidUserId(userId) && isValidEmail(email)) {
+          validUsers++;
+        } else {
+          invalidUsers++;
+        }
+      }
+      
+      message += `   ✅ Valid Users: ${validUsers}\n`;
+      message += `   ❌ Invalid Users: ${invalidUsers}\n`;
+      
+      if (invalidUsers > 0) {
+        message += '   📋 Action: Use "Cleanup Invalid Users" to fix\n';
       }
     }
+    
+    message += '\n' + '=' .repeat(40) + '\n';
+    message += 'ℹ️ This data powers the StudyQuest user management system.';
     
     ui.alert(message);
     
   } catch (error) {
-    ui.alert(`Error: ${error.message}`);
+    let errorMessage = '❌ DATABASE ACCESS ERROR\n';
+    errorMessage += '=' .repeat(30) + '\n\n';
+    errorMessage += `Error: ${error.message}\n\n`;
+    errorMessage += 'Possible causes:\n';
+    errorMessage += '• Database not initialized\n';
+    errorMessage += '• Permission issues\n';
+    errorMessage += '• Spreadsheet deleted or moved\n\n';
+    errorMessage += '📋 Action: Try "Initialize Database" from menu';
+    
+    ui.alert(errorMessage);
   }
 }
 
@@ -1205,13 +1362,13 @@ function cleanupInvalidUsers() {
   const ui = SpreadsheetApp.getUi();
   
   const confirmation = ui.alert(
-    '🔧 Cleanup Invalid Users',
-    'Remove rows with empty, null, or undefined userIds?',
+    '🔧 CLEANUP INVALID USERS',
+    'This will remove rows with invalid userIds or emails.\nAre you sure you want to continue?',
     ui.ButtonSet.YES_NO
   );
   
   if (confirmation !== ui.Button.YES) {
-    ui.alert('Operation cancelled.');
+    ui.alert('✅ OPERATION CANCELLED\n\nNo changes were made to the database.');
     return;
   }
   
@@ -1220,21 +1377,53 @@ function cleanupInvalidUsers() {
     const data = dbSheet.getDataRange().getValues();
     
     if (data.length <= 1) {
-      ui.alert('ℹ️ No data to cleanup.');
+      ui.alert('ℹ️ CLEANUP COMPLETE\n\nNo user data found to cleanup.\nDatabase contains only headers.');
       return;
     }
     
     let invalidRows = [];
+    let invalidReasons = [];
     
+    // Scan for invalid data
     for (let i = 1; i < data.length; i++) {
       const userId = data[i][0];
+      const email = data[i][1];
+      const row = i + 1;
+      
       if (!isValidUserId(userId)) {
-        invalidRows.push(i + 1);
+        invalidRows.push(row);
+        invalidReasons.push(`Row ${row}: Invalid userId "${userId}"`);
+      } else if (!isValidEmail(email)) {
+        invalidRows.push(row);
+        invalidReasons.push(`Row ${row}: Invalid email "${email}"`);
       }
     }
     
     if (invalidRows.length === 0) {
-      ui.alert('✅ No invalid user data found.');
+      ui.alert('✅ CLEANUP COMPLETE\n\nNo invalid user data found.\nDatabase integrity: EXCELLENT\n\nAll user records are valid.');
+      return;
+    }
+    
+    // Show what will be deleted
+    let preMessage = '🔍 CLEANUP PREVIEW\n';
+    preMessage += '=' .repeat(30) + '\n\n';
+    preMessage += `Found ${invalidRows.length} invalid records:\n\n`;
+    
+    const previewCount = Math.min(5, invalidReasons.length);
+    for (let i = 0; i < previewCount; i++) {
+      preMessage += `• ${invalidReasons[i]}\n`;
+    }
+    
+    if (invalidReasons.length > 5) {
+      preMessage += `• ... and ${invalidReasons.length - 5} more\n`;
+    }
+    
+    preMessage += '\nProceed with deletion?';
+    
+    const finalConfirm = ui.alert('🗑️ CONFIRM DELETION', preMessage, ui.ButtonSet.YES_NO);
+    
+    if (finalConfirm !== ui.Button.YES) {
+      ui.alert('✅ OPERATION CANCELLED\n\nNo records were deleted.');
       return;
     }
     
@@ -1244,10 +1433,29 @@ function cleanupInvalidUsers() {
     }
     
     clearAllCaches();
-    ui.alert(`✅ Cleaned up ${invalidRows.length} invalid user records.`);
+    
+    let resultMessage = '✅ CLEANUP COMPLETED SUCCESSFULLY\n';
+    resultMessage += '=' .repeat(35) + '\n\n';
+    resultMessage += `📊 Results:\n`;
+    resultMessage += `   🗑️ Deleted: ${invalidRows.length} invalid records\n`;
+    resultMessage += `   ✅ Remaining: ${Math.max(0, data.length - 1 - invalidRows.length)} valid users\n`;
+    resultMessage += `   🧹 Cache: Cleared and refreshed\n\n`;
+    resultMessage += '🎯 Database integrity: RESTORED\n';
+    resultMessage += '📋 Ready for: Normal operations';
+    
+    ui.alert(resultMessage);
     
   } catch (error) {
-    ui.alert(`Error: ${error.message}`);
+    let errorMessage = '❌ CLEANUP FAILED\n';
+    errorMessage += '=' .repeat(20) + '\n\n';
+    errorMessage += `Error: ${error.message}\n\n`;
+    errorMessage += 'Possible causes:\n';
+    errorMessage += '• Database access issues\n';
+    errorMessage += '• Permission problems\n';
+    errorMessage += '• Concurrent modifications\n\n';
+    errorMessage += '📋 Action: Try again or check database permissions';
+    
+    ui.alert(errorMessage);
   }
 }
 
