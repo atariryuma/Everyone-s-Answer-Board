@@ -1485,9 +1485,24 @@
 
       // Update board URL with enhanced visibility
       if (status.activeSheetName) {
-        const baseUrl = status.webAppUrl || (window.location.origin + window.location.pathname);
+        let baseUrl = status.webAppUrl;
+        
+        // webAppUrlが取得できない場合のフォールバック処理を改善
+        if (!baseUrl) {
+          console.warn('webAppUrlが取得できませんでした。フォールバック処理を実行します。');
+          baseUrl = window.location.origin + window.location.pathname;
+          
+          // URLの末尾を正規化
+          if (baseUrl.endsWith('/')) {
+            baseUrl = baseUrl.slice(0, -1);
+          }
+        }
+        
         webAppUrl = baseUrl;
-        const boardUrl = baseUrl + '?userId=' + userId;
+        const boardUrl = baseUrl + '?userId=' + encodeURIComponent(userId);
+        
+        // デバッグ情報をコンソールに出力
+        console.log('URL生成完了:', { baseUrl, boardUrl, userId });
         if (elements.boardUrl) elements.boardUrl.value = boardUrl;
         if (elements.viewBoardLink) elements.viewBoardLink.href = boardUrl;
         

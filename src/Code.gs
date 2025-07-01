@@ -509,7 +509,7 @@ function registerNewUser(adminEmail) {
   }
 
   // 成功レスポンスを返す
-  var webAppUrl = ScriptApp.getService().getUrl();
+  var webAppUrl = getWebAppUrl();
   return {
     userId: userId,
     spreadsheetId: formAndSsInfo.spreadsheetId,
@@ -613,7 +613,7 @@ function addReaction(rowIndex, reactionKey, sheetName) {
 // =================================================================
 
 function getWebAppUrlEnhanced() {
-  return ScriptApp.getService().getUrl();
+  return getWebAppUrl();
 }
 
 function createStudyQuestForm(userEmail, userId) {
@@ -1266,6 +1266,7 @@ function getAdminSettings() {
     
     var configJson = JSON.parse(userInfo.configJson || '{}');
     var sheets = getSheets(currentUserId);
+    var webAppUrl = getWebAppUrl(); // WebアプリURLを取得
     
     return {
       status: 'success',
@@ -1277,7 +1278,9 @@ function getAdminSettings() {
       availableSheets: sheets,
       spreadsheetUrl: userInfo.spreadsheetUrl,
       formUrl: configJson.formUrl || '',
-      editFormUrl: configJson.editFormUrl || ''
+      editFormUrl: configJson.editFormUrl || '',
+      webAppUrl: webAppUrl, // WebアプリURLを追加
+      activeSheetName: configJson.publishedSheet || ''
     };
   } catch (e) {
     console.error('管理者設定取得エラー: ' + e.message);
@@ -1286,6 +1289,14 @@ function getAdminSettings() {
       message: '設定の取得に失敗しました: ' + e.message
     };
   }
+}
+
+/**
+ * 管理画面用のステータス情報を取得（AdminPanel.htmlから呼び出される）
+ * getAdminSettingsのエイリアス関数
+ */
+function getStatus() {
+  return getAdminSettings();
 }
 
 /**
@@ -1546,9 +1557,29 @@ function toggleHighlight(rowIndex) {
  */
 function getWebAppUrl() {
   try {
-    return ScriptApp.getService().getUrl();
+    var url = ScriptApp.getService().getUrl();
+    if (!url) {
+      console.warn('ScriptApp.getService().getUrl()がnullまたは空文字を返しました');
+      return '';
+    }
+    
+    // URLの正規化（末尾のスラッシュを削除）
+    if (url.endsWith('/')) {
+      url = url.slice(0, -1);
+    }
+    
+    return url;
   } catch (e) {
     console.error('WebアプリURL取得エラー: ' + e.message);
+    // フォールバック処理（可能な限りURLを推測）
+    try {
+      var scriptId = ScriptApp.getScriptId();
+      if (scriptId) {
+        return 'https://script.google.com/macros/s/' + scriptId + '/exec';
+      }
+    } catch (fallbackError) {
+      console.error('フォールバックURL生成エラー: ' + fallbackError.message);
+    }
     return '';
   }
 }
@@ -1689,10 +1720,17 @@ function getExistingBoard() {
     var existingUser = findUserByEmail(userEmail);
     
     if (existingUser) {
+      // ウェブアプリURLを取得
+      var webAppUrl = getWebAppUrl();
+      var adminUrl = webAppUrl + '?userId=' + existingUser.userId + '&mode=admin';
+      var viewUrl = webAppUrl + '?userId=' + existingUser.userId;
+      
       return {
         status: 'existing_user',
         userId: existingUser.userId,
-        userInfo: existingUser
+        userInfo: existingUser,
+        adminUrl: adminUrl,
+        viewUrl: viewUrl
       };
     } else {
       return {
