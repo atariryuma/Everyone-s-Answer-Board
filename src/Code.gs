@@ -2898,154 +2898,6 @@ function checkRateLimit(action, userEmail) {
   }
 }
 
-function createStudyQuestFormFromTemplate(userEmail, userId) {
-  try {
-    // DriveAppの利用可能性をチェック
-    if (typeof DriveApp === 'undefined' || typeof FormApp === 'undefined' || typeof SpreadsheetApp === 'undefined') {
-      throw new Error('Google Drive API, Forms API, または Sheets API がこの環境で利用できません。');
-    }
-
-    // Logger APIからテンプレートIDを取得
-    const loggerApiUrl = PropertiesService.getScriptProperties().getProperty(LOGGER_API_URL_KEY);
-    if (!loggerApiUrl) {
-      throw new Error('Logger API URL が設定されていません。');
-    }
-
-    const templateIds = getTemplateIds(loggerApiUrl);
-    if (!templateIds.formId || !templateIds.spreadsheetId) {
-      console.log('テンプレートが見つからないため、従来の方法でフォームを作成します。');
-      return createStudyQuestForm(userEmail, userId);
-    }
-
-    // ユーザーフォルダを取得
-    const userFolder = getUserFolder(userEmail);
-    
-    // ファイル名用の日時文字列を生成
-    const timestamp = new Date();
-    const dateTimeString = timestamp.toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const userDisplayName = userEmail.split('@')[0];
-    
-    // フォームを複製（直接ユーザーフォルダに作成）
-    const templateFormFile = DriveApp.getFileById(templateIds.formId);
-    const formName = `StudyQuest - みんなの回答ボード - ${userDisplayName} - ${dateTimeString}`;
-    const duplicatedFormFile = templateFormFile.makeCopy(formName, userFolder);
-    const form = FormApp.openById(duplicatedFormFile.getId());
-    
-    // スプレッドシートを複製（直接ユーザーフォルダに作成）
-    const templateSpreadsheetFile = DriveApp.getFileById(templateIds.spreadsheetId);
-    const spreadsheetName = `StudyQuest - みんなの回答ボード - 回答データ - ${userDisplayName} - ${dateTimeString}`;
-    const duplicatedSpreadsheetFile = templateSpreadsheetFile.makeCopy(spreadsheetName, userFolder);
-    const spreadsheet = SpreadsheetApp.openById(duplicatedSpreadsheetFile.getId());
-    
-    // データベースフォルダにコピーが作成された場合、それらを削除
-    try {
-      const templateFormParents = templateFormFile.getParents();
-      while (templateFormParents.hasNext()) {
-        const templateFolder = templateFormParents.next();
-        // テンプレートが存在するフォルダ内で同名のファイルを検索
-        const potentialDuplicates = templateFolder.getFilesByName(formName);
-        while (potentialDuplicates.hasNext()) {
-          const potentialDuplicate = potentialDuplicates.next();
-          // ユーザーフォルダに作成したものと異なるIDの場合は削除
-          if (potentialDuplicate.getId() !== duplicatedFormFile.getId()) {
-            console.log('データベースフォルダから不要なフォームコピーを削除:', potentialDuplicate.getId());
-            DriveApp.removeFile(potentialDuplicate);
-          }
-        }
-      }
-      
-      const templateSpreadsheetParents = templateSpreadsheetFile.getParents();
-      while (templateSpreadsheetParents.hasNext()) {
-        const templateFolder = templateSpreadsheetParents.next();
-        // テンプレートが存在するフォルダ内で同名のファイルを検索
-        const potentialDuplicates = templateFolder.getFilesByName(spreadsheetName);
-        while (potentialDuplicates.hasNext()) {
-          const potentialDuplicate = potentialDuplicates.next();
-          // ユーザーフォルダに作成したものと異なるIDの場合は削除
-          if (potentialDuplicate.getId() !== duplicatedSpreadsheetFile.getId()) {
-            console.log('データベースフォルダから不要なスプレッドシートコピーを削除:', potentialDuplicate.getId());
-            DriveApp.removeFile(potentialDuplicate);
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('データベースフォルダのクリーンアップ中にエラー:', e.message);
-    }
-    
-    // フォームの説明を更新（ユーザー固有の内容に変更）
-    const customDescription = `
-📚 みんなの回答ボード 📚
-
-このフォームで、みんなで学び合う楽しい時間を始めましょう！
-
-🌟 身につけたい力 🌟
-• 考える力（自分の頭で考えてみよう）
-• 伝える力（相手にわかりやすく説明しよう）
-• 相手を思う気持ち（みんなの気持ちを大切にしよう）
-
-💻 パソコン・タブレットを使うときの約束 💻
-• 個人情報は書かない
-• 友達を傷つける言葉は使わない
-• 分からないことは先生に聞く
-
-✨ 上手に答えるポイント ✨
-• 具体的に書く（例：「面白い」ではなく「どこが面白いか」）
-• 理由も書く（「なぜそう思うか」）
-• 相手の立場になって考える
-
-あなたの素晴らしい考えを聞かせてください！
-`;
-    
-    form.setDescription(customDescription);
-    
-    // 確認メッセージを設定
-    let confirmationMessage = `
-🎉 回答ありがとうございました！🎉
-
-あなたの考えがみんなの学びにつながります。
-
-✨ 他の人の回答も見てみよう！ ✨
-みんなの回答ボード: ${generateStudentBoardUrl(userId)}
-
-📝 もっと詳しく知りたいときは先生に聞いてみてね！
-
-✨ あなたの学びを大切に ✨
-`;
-    
-    form.setConfirmationMessage(confirmationMessage);
-    
-    // フォームとスプレッドシートを再連携
-    form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheet.getId());
-    
-    // 作成者に編集権限を付与
-    duplicatedFormFile.addEditor(userEmail);
-    duplicatedSpreadsheetFile.addEditor(userEmail);
-    
-    // ドメイン共有を設定（組織内のみ）
-    try {
-      duplicatedFormFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
-      duplicatedSpreadsheetFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
-    } catch (e) {
-      console.warn('ドメイン共有設定に失敗しました（権限不足の可能性）:', e.message);
-    }
-    
-    // スプレッドシートの追加設定
-    prepareSpreadsheetForStudyQuest(spreadsheet);
-    
-    return {
-      formId: form.getId(),
-      formUrl: form.getPublishedUrl(),
-      spreadsheetId: spreadsheet.getId(),
-      spreadsheetUrl: spreadsheet.getUrl(),
-      editFormUrl: form.getEditUrl()
-    };
-    
-  } catch (error) {
-    console.error('テンプレートからのフォーム作成エラー:', error);
-    console.log('フォールバック: 従来の方法でフォームを作成します。');
-    return createStudyQuestForm(userEmail, userId);
-  }
-}
 
 function generateStudentBoardUrl(userId) {
   if (!userId) {
@@ -3065,54 +2917,8 @@ function generateStudentBoardUrl(userId) {
 }
 
 function getTemplateIds(loggerApiUrl) {
-  const scriptProps = PropertiesService.getScriptProperties();
-  const formIdProp = scriptProps.getProperty('TEMPLATE_FORM_ID');
-  const spreadsheetIdProp = scriptProps.getProperty('TEMPLATE_SPREADSHEET_ID');
-
-  if (formIdProp && spreadsheetIdProp) {
-    console.log('スクリプトプロパティからテンプレートIDを取得しました。');
-    return { formId: formIdProp, spreadsheetId: spreadsheetIdProp };
-  }
-
-  // Fallback to external API if properties are not set
-  try {
-    console.log('スクリプトプロパティにテンプレートIDがないため、外部APIから取得開始:', loggerApiUrl);
-
-    const response = UrlFetchApp.fetch(loggerApiUrl, {
-      method: 'POST',
-      contentType: 'application/json',
-      payload: JSON.stringify({
-        action: 'getTemplateIds',
-        data: {}
-      }),
-      muteHttpExceptions: true
-    });
-
-    console.log('API レスポンスコード:', response.getResponseCode());
-    console.log('API レスポンス内容:', response.getContentText());
-
-    if (response.getResponseCode() !== 200) {
-      throw new Error(`Logger API エラー: ${response.getResponseCode()}`);
-    }
-
-    const result = JSON.parse(response.getContentText());
-    console.log('パース結果:', result);
-
-    if (result.success === true && result.data) {
-      console.log('テンプレートID取得成功:', result.data);
-      // Store in Script Properties for future use
-      scriptProps.setProperty('TEMPLATE_FORM_ID', result.data.formId);
-      scriptProps.setProperty('TEMPLATE_SPREADSHEET_ID', result.data.spreadsheetId);
-      return result.data;
-    } else {
-      const errorMessage = result.error || 'テンプレートIDの取得に失敗しました';
-      console.log('テンプレートID取得失敗:', errorMessage);
-      throw new Error(errorMessage);
-    }
-  } catch (error) {
-    console.error('テンプレートID取得エラー:', error);
-    return { formId: null, spreadsheetId: null };
-  }
+  // Template functionality has been removed - always return null to use original form creation
+  return { formId: null, spreadsheetId: null };
 }
 
 function createStudyQuestForm(userEmail, userId) {
@@ -3370,7 +3176,7 @@ function createBoardFromAdmin() {
     }
 
     // 1. Googleフォームとスプレッドシートを作成（テンプレートから複製、共有設定、回答後URL設定済み）
-    const result = createStudyQuestFormFromTemplate(currentUserEmail, userId);
+    const result = createStudyQuestForm(currentUserEmail, userId);
     
     // 2. 作成されたスプレッドシートを現在のユーザーのメインスプレッドシートとして設定
     if (result.spreadsheetId && result.spreadsheetUrl) {
@@ -3747,7 +3553,7 @@ function registerNewUser(adminEmail) {
   
   // 📝 ステップ3: Googleフォームとスプレッドシートを作成（テンプレートから複製）
   debugLog(`📝 フォーム・スプレッドシート作成開始（テンプレート使用）: ${adminEmail}`);
-  const formAndSsInfo = createStudyQuestFormFromTemplate(adminEmail, userId);
+  const formAndSsInfo = createStudyQuestForm(adminEmail, userId);
   debugLog(`✅ フォーム・スプレッドシート作成完了`);
   
   // 📝 ステップ4: API経由でデータベースに新規ユーザー情報を追加

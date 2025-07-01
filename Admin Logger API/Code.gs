@@ -20,8 +20,6 @@
 const CONFIG = {
   DATABASE_ID_KEY: 'DATABASE_ID',
   DEPLOYMENT_ID_KEY: 'DEPLOYMENT_ID',
-  TEMPLATE_FORM_ID_KEY: 'TEMPLATE_FORM_ID',
-  TEMPLATE_SPREADSHEET_ID_KEY: 'TEMPLATE_SPREADSHEET_ID',
   TARGET_SHEET_NAME: 'Users',
   CACHE_TTL: 300, // 5 minutes
   LOCK_TIMEOUT: 15000, // 15 seconds
@@ -51,8 +49,6 @@ function onOpen() {
     .addItem('Test Deployment', 'testDeployment')
     .addSeparator()
     .addItem('🔍 View Database Contents', 'debugDatabaseContents')
-    .addItem('📝 Check Template Status', 'checkTemplateStatus')
-    .addItem('🔄 Create Missing Templates', 'createMissingTemplates')
     .addSeparator()
     .addItem('🧹 Clear Database', 'clearDatabase')
     .addItem('🔧 Cleanup Invalid Users', 'cleanupInvalidUsers')
@@ -70,22 +66,7 @@ function initializeDatabase() {
   const sheetId = spreadsheet.getId();
 
   if (properties.getProperty(CONFIG.DATABASE_ID_KEY) === sheetId) {
-    // Database is already initialized, but check if templates exist
-    const existingTemplateFormId = properties.getProperty(CONFIG.TEMPLATE_FORM_ID_KEY);
-    const existingTemplateSpreadsheetId = properties.getProperty(CONFIG.TEMPLATE_SPREADSHEET_ID_KEY);
-    
-    if (!existingTemplateFormId || !existingTemplateSpreadsheetId) {
-      // Templates don't exist, create them
-      try {
-        createTemplateFormAndSpreadsheet();
-        ui.alert('✅ Database already initialized. Missing templates have been created.');
-      } catch (error) {
-        console.error('Template creation error:', error);
-        ui.alert(`Template creation failed: ${error.message}`);
-      }
-    } else {
-      ui.alert('✅ Database already initialized. Templates already exist.');
-    }
+    ui.alert('✅ Database already initialized.');
     return;
   }
 
@@ -119,8 +100,6 @@ function initializeDatabase() {
 
     spreadsheet.rename('StudyQuest Admin Logger Database');
 
-    // Create template form and spreadsheet
-    createTemplateFormAndSpreadsheet();
 
     ui.alert('✅ Database initialized successfully. Template form and spreadsheet created. Next: Deploy API from menu.');
 
@@ -261,8 +240,6 @@ function handleApiRequest(requestData) {
     case 'invalidateCache':
       return handleInvalidateCache(data);
       
-    case 'getTemplateIds':
-      return handleGetTemplateIds(data);
       
     default:
       throw new Error(`Unknown API action: ${action}`);
@@ -599,61 +576,6 @@ function handleInvalidateCache(data) {
   }
 }
 
-/**
- * Get template IDs for form and spreadsheet duplication
- */
-function handleGetTemplateIds(data) {
-  try {
-    console.log('getTemplateIds API called');
-    const properties = PropertiesService.getScriptProperties();
-    const templateFormId = properties.getProperty(CONFIG.TEMPLATE_FORM_ID_KEY);
-    const templateSpreadsheetId = properties.getProperty(CONFIG.TEMPLATE_SPREADSHEET_ID_KEY);
-    
-    console.log('Template Form ID from properties:', templateFormId);
-    console.log('Template Spreadsheet ID from properties:', templateSpreadsheetId);
-    
-    if (!templateFormId || !templateSpreadsheetId) {
-      console.log('Templates not found in properties');
-      return {
-        success: false,
-        error: 'Templates not found. Please initialize database first.'
-      };
-    }
-    
-    // Verify templates still exist
-    try {
-      const formFile = DriveApp.getFileById(templateFormId);
-      const spreadsheetFile = DriveApp.getFileById(templateSpreadsheetId);
-      console.log('Template verification successful');
-      console.log('Form file name:', formFile.getName());
-      console.log('Spreadsheet file name:', spreadsheetFile.getName());
-    } catch (error) {
-      console.error('Template verification failed:', error);
-      return {
-        success: false,
-        error: 'Template files not accessible or deleted'
-      };
-    }
-    
-    const result = {
-      success: true,
-      data: {
-        formId: templateFormId,
-        spreadsheetId: templateSpreadsheetId
-      }
-    };
-    
-    console.log('Returning template IDs:', result);
-    return result;
-    
-  } catch (error) {
-    console.error(`getTemplateIds error: ${error.message}`);
-    return {
-      success: false,
-      error: `Template ID retrieval failed: ${error.message}`
-    };
-  }
-}
 
 /**
  * Enhanced user search by ID with multi-level caching
@@ -1226,214 +1148,3 @@ function cleanupInvalidUsers() {
   }
 }
 
-/**
- * Create template form and spreadsheet for duplication
- */
-function createTemplateFormAndSpreadsheet() {
-  try {
-    const properties = PropertiesService.getScriptProperties();
-    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    const databaseFolder = DriveApp.getFileById(spreadsheet.getId()).getParents().next();
-    
-    // Check if templates already exist
-    const existingTemplateFormId = properties.getProperty(CONFIG.TEMPLATE_FORM_ID_KEY);
-    const existingTemplateSpreadsheetId = properties.getProperty(CONFIG.TEMPLATE_SPREADSHEET_ID_KEY);
-    
-    if (existingTemplateFormId && existingTemplateSpreadsheetId) {
-      console.log('Templates already exist, skipping creation');
-      return;
-    }
-    
-    const timestamp = new Date();
-    const dateTimeString = timestamp.toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    
-    // Create template form
-    const templateForm = FormApp.create(`StudyQuest Template Form - ${dateTimeString}`);
-    
-    // Configure form settings
-    templateForm.setCollectEmail(true);
-    templateForm.setRequireLogin(true);
-    templateForm.setLimitOneResponsePerUser(true);
-    templateForm.setAllowResponseEdits(true);
-    templateForm.setTitle('StudyQuest - みんなの回答ボード');
-    templateForm.setDescription('このフォームは、みんなの回答ボードシステムで使用されるテンプレートです。');
-    
-    // Add form items
-    const classItem = templateForm.addTextItem()
-      .setTitle('クラス名')
-      .setHelpText('例: 3-A, 2-B など（半角英数字とハイフンのみ使用可能）')
-      .setRequired(true);
-    classItem.setValidation(FormApp.createTextValidation()
-      .setHelpText('クラス名は「数字-英字」の形式で入力してください（例: 3-A）')
-      .requireTextMatchesPattern('^[A-Za-z0-9]+-[A-Za-z0-9]+$')
-      .build());
-    
-    templateForm.addTextItem()
-      .setTitle('名前')
-      .setHelpText('あなたの名前を入力してください')
-      .setRequired(true);
-    
-    templateForm.addParagraphTextItem()
-      .setTitle('回答')
-      .setHelpText('問題に対するあなたの回答を書いてください')
-      .setRequired(true);
-    
-    templateForm.addParagraphTextItem()
-      .setTitle('理由')
-      .setHelpText('なぜその答えになったのか、理由を説明してください（任意）')
-      .setRequired(false);
-    
-    // Create template spreadsheet
-    const templateSpreadsheet = SpreadsheetApp.create(`StudyQuest Template Spreadsheet - ${dateTimeString}`);
-    
-    // Connect form to spreadsheet
-    
-    
-    // Move template files to database folder
-    const templateFormFile = DriveApp.getFileById(templateForm.getId());
-    const templateSpreadsheetFile = DriveApp.getFileById(templateSpreadsheet.getId());
-    
-    databaseFolder.addFile(templateFormFile);
-    databaseFolder.addFile(templateSpreadsheetFile);
-    
-    // Remove from root folder
-    DriveApp.getRootFolder().removeFile(templateFormFile);
-    DriveApp.getRootFolder().removeFile(templateSpreadsheetFile);
-
-    // テンプレートファイルの共有設定を同一ドメイン内で編集可にする
-    try {
-      templateFormFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.EDIT);
-      templateSpreadsheetFile.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.EDIT);
-      console.log('テンプレートファイルの共有設定を同一ドメイン内で編集可にしました。');
-    } catch (e) {
-      console.warn('テンプレートファイルの共有設定に失敗しました:', e.message);
-    }
-    
-    // Setup template spreadsheet
-    setupTemplateSpreadsheet(templateSpreadsheet);
-    
-    // Save template IDs to properties
-    properties.setProperties({
-      [CONFIG.TEMPLATE_FORM_ID_KEY]: templateForm.getId(),
-      [CONFIG.TEMPLATE_SPREADSHEET_ID_KEY]: templateSpreadsheet.getId()
-    });
-    
-    console.log(`Template form created: ${templateForm.getId()}`);
-    console.log(`Template spreadsheet created: ${templateSpreadsheet.getId()}`);
-    
-  } catch (error) {
-    console.error('Template creation error:', error);
-    throw new Error(`Template creation failed: ${error.message}`);
-  }
-}
-
-/**
- * Setup template spreadsheet with StudyQuest columns
- */
-function setupTemplateSpreadsheet(spreadsheet) {
-  try {
-    const sheet = spreadsheet.getSheets()[0];
-    
-    // Wait for form responses sheet to be created
-    
-    
-    // Add StudyQuest columns
-    const lastColumn = sheet.getLastColumn();
-    if (lastColumn > 0) {
-      const studyQuestHeaders = ['UNDERSTAND', 'LIKE', 'CURIOUS', 'HIGHLIGHT'];
-      const headerRange = sheet.getRange(1, lastColumn + 1, 1, studyQuestHeaders.length);
-      headerRange.setValues([studyQuestHeaders]);
-      headerRange.setFontWeight('bold');
-      headerRange.setBackground('#e8f4fd');
-    }
-    
-    // Create Config sheet
-    const configSheet = spreadsheet.insertSheet('Config');
-    configSheet.getRange('A1').setValue('StudyQuest Configuration');
-    configSheet.getRange('A2').setValue('Template created at: ' + new Date().toISOString());
-    configSheet.hideSheet();
-    
-    // Auto-resize columns
-    if (sheet.getLastColumn() > 0) {
-      sheet.autoResizeColumns(1, sheet.getLastColumn());
-    }
-    
-  } catch (error) {
-    console.error('Template spreadsheet setup error:', error);
-    throw error;
-  }
-}
-
-/**
- * Check template status and display information
- */
-function checkTemplateStatus() {
-  const ui = SpreadsheetApp.getUi();
-  const properties = PropertiesService.getScriptProperties();
-  
-  try {
-    const templateFormId = properties.getProperty(CONFIG.TEMPLATE_FORM_ID_KEY);
-    const templateSpreadsheetId = properties.getProperty(CONFIG.TEMPLATE_SPREADSHEET_ID_KEY);
-    
-    let message = 'Template Status Report:\n\n';
-    
-    if (!templateFormId) {
-      message += '❌ Template Form: Not found\n';
-    } else {
-      try {
-        const formFile = DriveApp.getFileById(templateFormId);
-        message += `✅ Template Form: Found\n   Name: ${formFile.getName()}\n   ID: ${templateFormId}\n\n`;
-      } catch (e) {
-        message += `❌ Template Form: ID stored but file not accessible\n   ID: ${templateFormId}\n\n`;
-      }
-    }
-    
-    if (!templateSpreadsheetId) {
-      message += '❌ Template Spreadsheet: Not found\n';
-    } else {
-      try {
-        const spreadsheetFile = DriveApp.getFileById(templateSpreadsheetId);
-        message += `✅ Template Spreadsheet: Found\n   Name: ${spreadsheetFile.getName()}\n   ID: ${templateSpreadsheetId}\n\n`;
-      } catch (e) {
-        message += `❌ Template Spreadsheet: ID stored but file not accessible\n   ID: ${templateSpreadsheetId}\n\n`;
-      }
-    }
-    
-    if (!templateFormId || !templateSpreadsheetId) {
-      message += '\n💡 Use "Create Missing Templates" to create missing templates.';
-    } else {
-      message += '🎉 All templates are properly configured!';
-    }
-    
-    ui.alert(message);
-    
-  } catch (error) {
-    ui.alert(`Error checking templates: ${error.message}`);
-  }
-}
-
-/**
- * Create missing templates
- */
-function createMissingTemplates() {
-  const ui = SpreadsheetApp.getUi();
-  
-  const confirmation = ui.alert(
-    'Create Missing Templates',
-    'This will create missing template form and spreadsheet. Continue?',
-    ui.ButtonSet.YES_NO
-  );
-  
-  if (confirmation !== ui.Button.YES) {
-    ui.alert('Operation cancelled.');
-    return;
-  }
-  
-  try {
-    createTemplateFormAndSpreadsheet();
-    ui.alert('✅ Missing templates have been created successfully.');
-  } catch (error) {
-    console.error('Template creation error:', error);
-    ui.alert(`Template creation failed: ${error.message}`);
-  }
-}

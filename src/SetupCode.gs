@@ -299,19 +299,6 @@ function saveSettingsAndCreateDb(apiUrl) {
     // URLを保存
     properties.setProperty('LOGGER_API_URL', apiUrl);
 
-    // テンプレートIDを取得し、スクリプトプロパティに保存
-    try {
-      const templateIds = getTemplateIds(apiUrl); // apiUrlはここで取得済み
-      if (templateIds.formId && templateIds.spreadsheetId) {
-        properties.setProperty('TEMPLATE_FORM_ID', templateIds.formId);
-        properties.setProperty('TEMPLATE_SPREADSHEET_ID', templateIds.spreadsheetId);
-        Logger.log('✅ テンプレートIDをスクリプトプロパティに保存しました。');
-      } else {
-        Logger.log('⚠️ テンプレートIDの取得に失敗しました。手動で設定が必要な場合があります。');
-      }
-    } catch (templateError) {
-      Logger.log(`❌ テンプレートID保存エラー: ${templateError.message}`);
-    }
     
     // Logger APIの接続テストを実行
     Logger.log('=== Logger API 接続確認 ===');
