@@ -277,6 +277,11 @@ function getSheetsService() {
  * @returns {object|null} ユーザー情報オブジェクトまたはnull
  */
 function findUserById(userId) {
+  var cachedUser = getCachedUserInfo(userId);
+  if (cachedUser) {
+    return cachedUser;
+  }
+
   var props = PropertiesService.getScriptProperties();
   var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
   var service = getSheetsService();
@@ -295,6 +300,7 @@ function findUserById(userId) {
         headers.forEach(function(header, index) { 
           user[header] = data[i][index] || ''; 
         });
+        setCachedUserInfo(userId, user); // Cache the user info
         return user;
       }
     }
@@ -311,6 +317,13 @@ function findUserById(userId) {
  * @returns {object|null} ユーザー情報オブジェクトまたはnull
  */
 function findUserByEmail(email) {
+  var cacheKey = 'email_' + email;
+  var cachedUser = USER_INFO_CACHE.get(cacheKey);
+  if (cachedUser) {
+    debugLog('Memory cache hit for email: ' + email);
+    return cachedUser;
+  }
+
   var props = PropertiesService.getScriptProperties();
   var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
   var service = getSheetsService();
@@ -329,6 +342,8 @@ function findUserByEmail(email) {
         headers.forEach(function(header, index) { 
           user[header] = data[i][index] || ''; 
         });
+        USER_INFO_CACHE.set(cacheKey, user);
+        CACHE_TIMESTAMPS.set(cacheKey, Date.now());
         return user;
       }
     }
@@ -360,6 +375,9 @@ function createUserInDb(userData) {
     { values: [newRow] },
     { valueInputOption: 'RAW' }
   );
+  // Invalidate cache for the newly created user
+  USER_INFO_CACHE.delete('user_' + userData.userId);
+  USER_INFO_CACHE.delete('email_' + userData.adminEmail);
   return userData;
 }
 
@@ -409,6 +427,12 @@ function updateUserInDb(userId, updateData) {
       data: requests,
       valueInputOption: 'RAW'
     });
+  }
+  // Invalidate cache for the updated user
+  USER_INFO_CACHE.delete('user_' + userId);
+  // If adminEmail is part of updateData, also invalidate email cache
+  if (updateData.adminEmail) {
+    USER_INFO_CACHE.delete('email_' + updateData.adminEmail);
   }
   return { success: true };
 }
@@ -508,13 +532,13 @@ function registerNewUser(adminEmail) {
     throw new Error('ユーザー登録に失敗しました。システム管理者に連絡してください。');
   }
 
-  // 成功レスポンスを返す
-  var webAppUrl = getWebAppUrl();
+  // 成功レスポンスを返す（統一されたURL生成機能を使用）
+  var appUrls = generateAppUrls(userId);
   return {
     userId: userId,
     spreadsheetId: formAndSsInfo.spreadsheetId,
-    adminUrl: webAppUrl + '?userId=' + userId + '&mode=admin',
-    viewUrl: webAppUrl + '?userId=' + userId,
+    adminUrl: appUrls.adminUrl,
+    viewUrl: appUrls.viewUrl,
     message: '新しいボードが作成されました！'
   };
 }
@@ -651,7 +675,7 @@ function createFormFactory(options) {
     }
     
     // 質問設定
-    addFormQuestions(form, questions);
+    addUnifiedQuestions(form, questions);
     
     // スプレッドシート連携
     var spreadsheetInfo;
@@ -684,64 +708,150 @@ function createFormFactory(options) {
 }
 
 /**
- * フォーム質問項目追加（設定可能）
+ * フォーム質問項目追加（後方互換性のため）
+ * @deprecated addUnifiedQuestionsを使用してください
  */
 function addFormQuestions(form, questionType) {
-  if (questionType === 'simple') {
-    addSimpleQuestions(form);
-  } else {
-    addDefaultQuestions(form); // 'default'またはその他
+  addUnifiedQuestions(form, questionType);
+}
+
+/**
+ * 統一された質問設定関数
+ * デフォルト、シンプル、カスタマイズされた質問を統一的に管理
+ */
+function addUnifiedQuestions(form, questionType, customConfig) {
+  questionType = questionType || 'default';
+  customConfig = customConfig || {};
+  
+  var questions = getQuestionConfig(questionType, customConfig);
+  
+  questions.forEach(function(questionData) {
+    var item;
+    
+    // 質問タイプに応じてアイテムを作成
+    switch (questionData.type) {
+      case 'text':
+        item = form.addTextItem();
+        break;
+      case 'paragraph':
+        item = form.addParagraphTextItem();
+        break;
+      case 'multipleChoice':
+        item = form.addMultipleChoiceItem();
+        if (questionData.choices) {
+          item.setChoiceValues(questionData.choices);
+        }
+        break;
+      case 'scale':
+        item = form.addScaleItem();
+        if (questionData.lowerBound && questionData.upperBound) {
+          item.setBounds(questionData.lowerBound, questionData.upperBound);
+        }
+        break;
+      default:
+        item = form.addTextItem();
+    }
+    
+    // 共通設定を適用
+    item.setTitle(questionData.title);
+    if (questionData.helpText) {
+      item.setHelpText(questionData.helpText);
+    }
+    item.setRequired(questionData.required || false);
+    
+    // バリデーション設定（テキストアイテムの場合）
+    if (questionData.type === 'text' && questionData.validation) {
+      var validation = FormApp.createTextValidation()
+        .requireTextMatchesPattern(questionData.validation.pattern)
+        .setHelpText(questionData.validation.helpText)
+        .build();
+      item.setValidation(validation);
+    }
+  });
+}
+
+/**
+ * 質問設定を取得
+ */
+function getQuestionConfig(questionType, customConfig) {
+  switch (questionType) {
+    case 'simple':
+      return [
+        {
+          type: 'text',
+          title: 'あなたのクラス',
+          helpText: '例: 6-1, A組など',
+          required: true
+        },
+        {
+          type: 'text',
+          title: 'あなたの名前',
+          helpText: 'ニックネーム可（表示設定により匿名になる場合があります）',
+          required: true
+        },
+        {
+          type: 'paragraph',
+          title: 'あなたの回答・意見',
+          helpText: '質問に対するあなたの考えや意見を自由に書いてください',
+          required: true
+        },
+        {
+          type: 'paragraph',
+          title: '理由・根拠',
+          helpText: 'その回答になった理由や根拠があれば書いてください',
+          required: false
+        }
+      ];
+    
+    case 'default':
+    default:
+      return [
+        {
+          type: 'text',
+          title: 'クラス名',
+          helpText: 'あなたのクラスを入力してください（例: 6-1, A組）',
+          required: true,
+          validation: {
+            pattern: '^[A-Za-z0-9]+-[A-Za-z0-9]+$',
+            helpText: '【重要】クラス名は決められた形式で入力してください。\n\n✅ 正しい例：\n• 6年1組 → 6-1\n• 5年2組 → 5-2\n• 中1年A組 → 1-A\n• 中3年B組 → 3-B\n\n❌ 間違いの例：6年1組、6-1組、６－１\n\n※ 半角英数字とハイフン（-）のみ使用可能です'
+          }
+        },
+        {
+          type: 'text',
+          title: '名前',
+          helpText: 'あなたの名前を入力してください（ニックネーム可）',
+          required: true
+        },
+        {
+          type: 'paragraph',
+          title: 'あなたの回答・意見',
+          helpText: '質問に対するあなたの考えや意見を自由に書いてください',
+          required: true
+        },
+        {
+          type: 'paragraph',
+          title: '理由・根拠',
+          helpText: 'その回答になった理由や根拠があれば書いてください',
+          required: false
+        }
+      ];
   }
 }
 
 /**
- * デフォルト質問設定（従来のcreateStudyQuestForm用）
+ * デフォルト質問設定（後方互換性のため）
+ * @deprecated addUnifiedQuestionsを使用してください
  */
 function addDefaultQuestions(form) {
-  var classItem = form.addTextItem();
-  classItem.setTitle('クラス名');
-  classItem.setHelpText('あなたのクラスを入力してください（例: 6-1, A組）');
-  classItem.setRequired(true);
-  
-  var nameItem = form.addTextItem();
-  nameItem.setTitle('名前');
-  nameItem.setHelpText('あなたの名前を入力してください（ニックネーム可）');
-  nameItem.setRequired(true);
-  
-  var answerItem = form.addParagraphTextItem();
-  answerItem.setTitle('あなたの回答・意見');
-  answerItem.setHelpText('質問に対するあなたの考えや意見を自由に書いてください');
-  answerItem.setRequired(true);
-  
-  var reasonItem = form.addParagraphTextItem();
-  reasonItem.setTitle('理由・根拠');
-  reasonItem.setHelpText('その回答になった理由や根拠があれば書いてください');
-  reasonItem.setRequired(false);
+  addUnifiedQuestions(form, 'default');
 }
 
 /**
- * シンプル質問設定（quickStartSetup用）
+ * シンプル質問設定（後方互換性のため）
+ * @deprecated addUnifiedQuestionsを使用してください
  */
 function addSimpleQuestions(form) {
-  form.addTextItem()
-    .setTitle('あなたのクラス')
-    .setHelpText('例: 6-1, A組など')
-    .setRequired(true);
-    
-  form.addTextItem()
-    .setTitle('あなたの名前')
-    .setHelpText('ニックネーム可（表示設定により匿名になる場合があります）')
-    .setRequired(true);
-    
-  form.addParagraphTextItem()
-    .setTitle('あなたの回答・意見')
-    .setHelpText('質問に対するあなたの考えや意見を自由に書いてください')
-    .setRequired(true);
-    
-  form.addParagraphTextItem()
-    .setTitle('理由・根拠')
-    .setHelpText('その回答になった理由や根拠があれば書いてください')
-    .setRequired(false);
+  addUnifiedQuestions(form, 'simple');
 }
 
 /**
@@ -781,38 +891,14 @@ function createStudyQuestForm(userEmail, userId) {
       // ignore
     }
     
-    // 確認メッセージの設定
-    var boardUrl = '';
-    try {
-      var webAppUrl = getWebAppUrl();
-      if (webAppUrl) {
-        boardUrl = webAppUrl + '?userId=' + userId;
-      }
-    } catch (e) {
-      // ignore
-    }
-    
-    var confirmationMessage = boardUrl 
-      ? '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。\nみんなの回答ボードで、お友達の色々な考えも見てみましょう。\n新しい発見があるかもしれませんね！\n\n' + boardUrl
+    // 確認メッセージの設定（統一されたURL生成機能を使用）
+    var appUrls = generateAppUrls(userId);
+    var confirmationMessage = appUrls.viewUrl 
+      ? '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。\nみんなの回答ボードで、お友達の色々な考えも見てみましょう。\n新しい発見があるかもしれませんね！\n\n' + appUrls.viewUrl
       : '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。';
     form.setConfirmationMessage(confirmationMessage);
     
-    // クラス名フィールドにバリデーションを追加
-    var items = form.getItems();
-    for (var i = 0; i < items.length; i++) {
-      var item = items[i];
-      if (item.getTitle() === 'クラス名') {
-        var textItem = item.asTextItem();
-        var pattern = '^[A-Za-z0-9]+-[A-Za-z0-9]+$';
-        var helpText = "【重要】クラス名は決められた形式で入力してください。\n\n✅ 正しい例：\n• 6年1組 → 6-1\n• 5年2組 → 5-2  \n• 中1年A組 → 1-A\n• 中3年B組 → 3-B\n\n❌ 間違いの例：6年1組、6-1組、６－１\n\n※ 半角英数字とハイフン（-）のみ使用可能です";
-        var textValidation = FormApp.createTextValidation()
-          .setHelpText(helpText)
-          .requireTextMatchesPattern(pattern)
-          .build();
-        textItem.setValidation(textValidation);
-        break;
-      }
-    }
+    // バリデーションは統一された質問設定で処理済み
     
     // サービスアカウントをスプレッドシートに追加
     addServiceAccountToSpreadsheet(formResult.spreadsheetId);
@@ -1400,9 +1486,10 @@ function showAdminSidebar() {
 }
 
 /**
- * 管理者設定を取得
+ * 統合されたアプリケーション設定を取得
+ * 管理者設定、ステータス情報、URL情報を統一的に提供
  */
-function getAdminSettings() {
+function getAppConfig() {
   try {
     var props = PropertiesService.getUserProperties();
     var currentUserId = props.getProperty('CURRENT_USER_ID');
@@ -1426,7 +1513,7 @@ function getAdminSettings() {
     
     var configJson = JSON.parse(userInfo.configJson || '{}');
     var sheets = getSheets(currentUserId);
-    var webAppUrl = getWebAppUrl(); // WebアプリURLを取得
+    var appUrls = generateAppUrls(currentUserId); // 拡張されたURL生成を使用
     
     return {
       status: 'success',
@@ -1439,11 +1526,14 @@ function getAdminSettings() {
       spreadsheetUrl: userInfo.spreadsheetUrl,
       formUrl: configJson.formUrl || '',
       editFormUrl: configJson.editFormUrl || '',
-      webAppUrl: webAppUrl, // WebアプリURLを追加
-      activeSheetName: configJson.publishedSheet || ''
+      webAppUrl: appUrls.webAppUrl,
+      adminUrl: appUrls.adminUrl,
+      viewUrl: appUrls.viewUrl,
+      activeSheetName: configJson.publishedSheet || '',
+      appUrls: appUrls // 全URL情報をオブジェクトとして提供
     };
   } catch (e) {
-    console.error('管理者設定取得エラー: ' + e.message);
+    console.error('アプリ設定取得エラー: ' + e.message);
     return {
       status: 'error',
       message: '設定の取得に失敗しました: ' + e.message
@@ -1452,11 +1542,19 @@ function getAdminSettings() {
 }
 
 /**
- * 管理画面用のステータス情報を取得（AdminPanel.htmlから呼び出される）
- * getAdminSettingsのエイリアス関数
+ * 管理者設定を取得（後方互換性のため）
+ * @deprecated getAppConfigを使用してください
+ */
+function getAdminSettings() {
+  return getAppConfig();
+}
+
+/**
+ * 管理画面用のステータス情報を取得（後方互換性のため）
+ * @deprecated getAppConfigを使用してください
  */
 function getStatus() {
-  return getAdminSettings();
+  return getAppConfig();
 }
 
 /**
@@ -1745,6 +1843,49 @@ function getWebAppUrl() {
 }
 
 /**
+ * アプリケーション用のURL群を生成
+ * 基本WebアプリURL、管理画面URL、ビューURLなどを統一的に生成
+ */
+function generateAppUrls(userId) {
+  try {
+    var webAppUrl = getWebAppUrl();
+    
+    if (!webAppUrl) {
+      return {
+        webAppUrl: '',
+        adminUrl: '',
+        viewUrl: '',
+        setupUrl: '',
+        status: 'error',
+        message: 'WebアプリURLが取得できませんでした'
+      };
+    }
+    
+    var adminUrl = webAppUrl + '?userId=' + userId + '&mode=admin';
+    var viewUrl = webAppUrl + '?userId=' + userId;
+    var setupUrl = webAppUrl + '?setup=true';
+    
+    return {
+      webAppUrl: webAppUrl,
+      adminUrl: adminUrl,
+      viewUrl: viewUrl,
+      setupUrl: setupUrl,
+      status: 'success'
+    };
+  } catch (e) {
+    console.error('URL生成エラー: ' + e.message);
+    return {
+      webAppUrl: '',
+      adminUrl: '',
+      viewUrl: '',
+      setupUrl: '',
+      status: 'error',
+      message: 'URLの生成に失敗しました: ' + e.message
+    };
+  }
+}
+
+/**
  * デプロイ・ユーザー・ドメイン情報を取得（AdminPanel.htmlとRegistration.htmlから呼び出される）
  */
 function getDeployUserDomainInfo() {
@@ -1879,10 +2020,8 @@ function quickStartSetup(userId) {
       lastAccessedAt: new Date().toISOString()
     });
     
-    // 4. WebアプリURLを生成
-    var webAppUrl = getWebAppUrl();
-    var adminUrl = webAppUrl + '?userId=' + userId + '&mode=admin';
-    var viewUrl = webAppUrl + '?userId=' + userId;
+    // 4. 統一されたURL群を生成
+    var appUrls = generateAppUrls(userId);
     
     debugLog('クイックスタートセットアップ完了');
     
@@ -1891,8 +2030,8 @@ function quickStartSetup(userId) {
       message: 'クイックスタートが完了しました',
       formUrl: formUrl,
       editFormUrl: editFormUrl,
-      adminUrl: adminUrl,
-      viewUrl: viewUrl,
+      adminUrl: appUrls.adminUrl,
+      viewUrl: appUrls.viewUrl,
       sheetName: sheetName,
       quickStartCompleted: true
     };
@@ -1973,17 +2112,15 @@ function getExistingBoard() {
     var existingUser = findUserByEmail(userEmail);
     
     if (existingUser) {
-      // ウェブアプリURLを取得
-      var webAppUrl = getWebAppUrl();
-      var adminUrl = webAppUrl + '?userId=' + existingUser.userId + '&mode=admin';
-      var viewUrl = webAppUrl + '?userId=' + existingUser.userId;
+      // 統一されたURL群を生成
+      var appUrls = generateAppUrls(existingUser.userId);
       
       return {
         status: 'existing_user',
         userId: existingUser.userId,
         userInfo: existingUser,
-        adminUrl: adminUrl,
-        viewUrl: viewUrl
+        adminUrl: appUrls.adminUrl,
+        viewUrl: appUrls.viewUrl
       };
     } else {
       return {
