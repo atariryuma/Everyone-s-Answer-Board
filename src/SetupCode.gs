@@ -141,7 +141,7 @@ function validateApiUrl(url) {
  * 新しいAdmin Logger API URLを自動設定（DOMAIN対応版）
  */
 function setNewLoggerApiUrl() {
-  const newApiUrl = 'https://script.google.com/macros/s/AKfycbwH55G3O92Gqqj5VNLbmiBBKl7cbZ8DtKh4g2IhFt-iw4lXMEyr5um2q9SvP61kU2XZ/exec';
+  const newApiUrl = 'https://script.google.com/macros/s/AKfycbwpigWU3Sw8qh6FZRixYz5WCT8O-L_eIdJTge3kryCzcDgUM94Kzjw-pNvGLj4elc0_/exec';
   return updateLoggerApiUrl(newApiUrl);
 }
 

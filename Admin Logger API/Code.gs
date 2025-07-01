@@ -132,6 +132,20 @@ function doPost(e) {
   let lock;
 
   try {
+    // DOMAIN認証チェック（最初に実行）
+    const authResult = validateDomainAccess();
+    if (!authResult.valid) {
+      console.log(`❌ doPost Access Denied: ${authResult.reason}`);
+      return ContentService.createTextOutput(JSON.stringify({
+        success: false,
+        error: 'DOMAIN_ACCESS_DENIED',
+        message: authResult.reason,
+        timestamp: new Date().toISOString()
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    console.log(`✅ doPost Access Granted for: ${authResult.userEmail}`);
+
     // Enhanced lock acquisition with retry
     lock = acquireLock();
 
@@ -246,19 +260,9 @@ function acquireLock() {
 function handleApiRequest(requestData) {
   const { action, data, timestamp, requestUser, effectiveUser } = requestData;
   
-  // DOMAIN認証チェック
-  const authResult = validateDomainAccess();
-  if (!authResult.valid) {
-    console.log(`❌ API Access Denied: ${authResult.reason}`);
-    return {
-      success: false,
-      error: 'DOMAIN_ACCESS_DENIED',
-      message: authResult.reason
-    };
-  }
-  
+  // 認証は doPost で既に完了済み
   // Log API access for monitoring
-  console.log(`API Request: ${action} from ${requestUser || 'anonymous'} (Domain: ${authResult.domain})`);
+  console.log(`API Request: ${action} from ${requestUser || 'anonymous'}`);
   
   switch (action) {
     case 'ping':
