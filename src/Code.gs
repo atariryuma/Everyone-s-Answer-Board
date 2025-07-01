@@ -44,11 +44,404 @@ var COLUMN_HEADERS = {
 };
 
 var REACTION_KEYS = ["UNDERSTAND", "LIKE", "CURIOUS"];
-// 正規表現を直接リテラルで定義し、エスケープを最小限に
-var EMAIL_REGEX = /^[^
+var EMAIL_REGEX = new RegExp("^[^
 @]+@[^
 @]+\.[^
-@]+$/;
+@]+$");
+var DEBUG = true;
+
+function debugLog() {
+  if (DEBUG && typeof console !== 'undefined' && console.log) {
+    console.log.apply(console, arguments);
+  }
+}
+
+// =================================================================
+// セットアップ＆管理用関数
+// =================================================================
+
+/**
+ * アプリケーションの初期セットアップ（管理者が手動で実行）
+ * サービスアカウントの認証情報とデータベースのスプレッドシートIDを設定する。
+ * @param {string} credsJson - ダウンロードしたサービスアカウントのJSONキーファイルの内容
+ * @param {string} dbId - 中央データベースとして使用するスプレッドシートのID
+ */
+function setupApplication(credsJson, dbId) {
+  try {
+    JSON.parse(credsJson);
+    // ★正規表現による検証を文字列長チェックに置き換え
+    if (typeof dbId !== 'string' || dbId.length !== 44) {
+      throw new Error('無効なスプレッドシートIDです。IDは44文字の文字列である必要があります。');
+    }
+
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS, credsJson);
+    props.setProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID, dbId);
+
+    // データベースシートの初期化
+    initializeDatabaseSheet(dbId);
+
+    console.log('✅ セットアップが正常に完了しました。');
+  } catch (e) {
+    console.error('セットアップエラー:', e);
+    throw new Error('セットアップに失敗しました: ' + e.message);
+  }
+}
+
+/**
+ * データベースシートに必要なヘッダーを作成する。
+ * @param {string} spreadsheetId - データベースのスプレッドシートID
+ */
+function initializeDatabaseSheet(spreadsheetId) {
+  var service = getSheetsService();
+  var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+
+  try {
+    // シートが存在するか確認
+    var spreadsheet = service.spreadsheets.get(spreadsheetId);
+    var sheetExists = spreadsheet.sheets.some(function(s) { return s.properties.title === sheetName; });
+
+    if (!sheetExists) {
+      // シートが存在しない場合は作成
+      service.spreadsheets.batchUpdate(spreadsheetId, {
+        requests: [{ addSheet: { properties: { title: sheetName } } }]
+      });
+    }
+    
+    // ヘッダーを書き込み
+    var headerRange = sheetName + '!A1:' + String.fromCharCode(65 + DB_SHEET_CONFIG.HEADERS.length - 1) + '1';
+    service.spreadsheets.values.update(
+      spreadsheetId,
+      headerRange,
+      { values: [DB_SHEET_CONFIG.HEADERS] },
+      { valueInputOption: 'RAW' }
+    );
+
+    debugLog('データベースシート「' + sheetName + '」の初期化が完了しました。');
+  } catch (e) {
+    console.error('データベースシートの初期化に失敗: ' + e.message);
+    throw new Error('データベースシートの初期化に失敗しました。サービスアカウントに編集者権限があるか確認してください。詳細: ' + e.message);
+  }
+}
+
+
+// =================================================================
+// サービスアカウント認証 & Sheets API ラッパー
+// =================================================================
+
+/**
+ * サービスアカウントの認証トークンを取得する。
+ * @returns {string} アクセストークン
+ */
+function getServiceAccountToken() {
+  var props = PropertiesService.getScriptProperties();
+  var serviceAccountCreds = JSON.parse(props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
+
+  var privateKey = serviceAccountCreds.private_key;
+  var clientEmail = serviceAccountCreds.client_email;
+  var tokenUrl = "https://www.googleapis.com/oauth2/v4/token";
+
+  var jwtHeader = {
+    alg: "RS256",
+    typ: "JWT"
+  };
+
+  var now = Math.floor(Date.now() / 1000);
+  var jwtClaimSet = {
+    iss: clientEmail,
+    scope: "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive",
+    aud: tokenUrl,
+    exp: now + 3600,
+    iat: now
+  };
+
+  var encodedHeader = Utilities.base64EncodeWebSafe(JSON.stringify(jwtHeader));
+  var encodedClaimSet = Utilities.base64EncodeWebSafe(JSON.stringify(jwtClaimSet));
+  var signatureInput = encodedHeader + '.' + encodedClaimSet;
+  var signature = Utilities.computeRsaSha256Signature(signatureInput, privateKey);
+  var encodedSignature = Utilities.base64EncodeWebSafe(signature);
+  var jwt = signatureInput + '.' + encodedSignature;
+
+  var response = UrlFetchApp.fetch(tokenUrl, {
+    method: "post",
+    contentType: "application/x-www-form-urlencoded",
+    payload: {
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt
+    }
+  });
+
+  return JSON.parse(response.getContentText()).access_token;
+}
+
+/**
+ * Google Sheets API v4 のための認証済みサービスオブジェクトを返す。
+ * @returns {object} Sheets APIサービス
+ */
+function getSheetsService() {
+  var accessToken = getServiceAccountToken();
+  
+  return {
+    spreadsheets: {
+      get: function(spreadsheetId) {
+        var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId;
+        var response = UrlFetchApp.fetch(url, {
+          headers: { 'Authorization': 'Bearer ' + accessToken }
+        });
+        return JSON.parse(response.getContentText());
+      },
+      values: {
+        get: function(spreadsheetId, range) {
+          var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values/' + range;
+          var response = UrlFetchApp.fetch(url, {
+            headers: { 'Authorization': 'Bearer ' + accessToken }
+          });
+          return JSON.parse(response.getContentText());
+        },
+        update: function(spreadsheetId, range, body, params) {
+          var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values/' + range + '?valueInputOption=' + params.valueInputOption;
+          var response = UrlFetchApp.fetch(url, {
+            method: 'put',
+            contentType: 'application/json',
+            headers: { 'Authorization': 'Bearer ' + accessToken },
+            payload: JSON.stringify(body)
+          });
+          return JSON.parse(response.getContentText());
+        },
+        append: function(spreadsheetId, range, body, params) {
+          var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values/' + range + ':append?valueInputOption=' + params.valueInputOption + '&insertDataOption=INSERT_ROWS';
+           var response = UrlFetchApp.fetch(url, {
+            method: 'post',
+            contentType: 'application/json',
+            headers: { 'Authorization': 'Bearer ' + accessToken },
+            payload: JSON.stringify(body)
+          });
+          return JSON.parse(response.getContentText());
+        }
+      },
+      batchUpdate: function(spreadsheetId, body) {
+        var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + ':batchUpdate';
+        var response = UrlFetchApp.fetch(url, {
+          method: 'post',
+          contentType: 'application/json',
+          headers: { 'Authorization': 'Bearer ' + accessToken },
+          payload: JSON.stringify(body)
+        });
+        return JSON.parse(response.getContentText());
+      }
+    }
+  };
+}
+
+
+// =================================================================
+// データベース操作関数 (サービスアカウント経由)
+// =================================================================
+
+/**
+ * ユーザーIDでユーザー情報をデータベースから検索する。
+ * @param {string} userId - 検索するユーザーID
+ * @returns {object|null} ユーザー情報オブジェクトまたはnull
+ */
+function findUserById(userId) {
+  var props = PropertiesService.getScriptProperties();
+  var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+  var service = getSheetsService();
+  var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+
+  try {
+    var data = service.spreadsheets.values.get(dbId, sheetName + '!A:H').values || [];
+    var headers = data[0];
+    var userIdIndex = headers.indexOf('userId');
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][userIdIndex] === userId) {
+        var user = {};
+        headers.forEach(function(header, index) { user[header] = data[i][index]; });
+        return user;
+      }
+    }
+    return null;
+  } catch (e) {
+    console.error('findUserByIdエラー: ' + e.message);
+    return null;
+  }
+}
+
+/**
+ * メールアドレスでユーザー情報をデータベースから検索する。
+ * @param {string} email - 検索するメールアドレス
+ * @returns {object|null} ユーザー情報オブジェクトまたはnull
+ */
+function findUserByEmail(email) {
+  var props = PropertiesService.getScriptProperties();
+  var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+  var service = getSheetsService();
+  var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+
+  try {
+    var data = service.spreadsheets.values.get(dbId, sheetName + '!A:H').values || [];
+    var headers = data[0];
+    var emailIndex = headers.indexOf('adminEmail');
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][emailIndex] === email) {
+        var user = {};
+        headers.forEach(function(header, index) { user[header] = data[i][index]; });
+        return user;
+      }
+    }
+    return null;
+  } catch (e) {
+    console.error('findUserByEmailエラー: ' + e.message);
+    return null;
+  }
+}
+
+/**
+ * 新規ユーザーをデータベースに作成する。
+ * @param {object} userData - 作成するユーザーデータ
+ * @returns {object} 作成されたユーザーデータ
+ */
+function createUserInDb(userData) {
+  var props = PropertiesService.getScriptProperties();
+  var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+  var service = getSheetsService();
+  var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+
+  var newRow = DB_SHEET_CONFIG.HEADERS.map(function(header) { return userData[header] || ''; });
+  
+  service.spreadsheets.values.append(
+    dbId,
+    sheetName + '!A1',
+    { values: [newRow] },
+    { valueInputOption: 'RAW' }
+  );
+  return userData;
+}
+
+/**
+ * ユーザー情報をデータベースで更新する。
+ * @param {string} userId - 更新するユーザーのID
+ * @param {object} updateData - 更新するデータ
+ * @returns {object} 更新結果
+ */
+function updateUserInDb(userId, updateData) {
+    var props = PropertiesService.getScriptProperties();
+    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    var service = getSheetsService();
+    var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+
+    var data = service.spreadsheets.values.get(dbId, sheetName + '!A:H').values || [];
+    var headers = data[0];
+    var userIdIndex = headers.indexOf('userId');
+    var rowIndex = -1;
+
+    for (var i = 1; i < data.length; i++) {
+        if (data[i][userIdIndex] === userId) {
+            rowIndex = i + 1;
+            break;
+        }
+    }
+
+    if (rowIndex === -1) {
+        throw new Error('更新対象のユーザーが見つかりません。');
+    }
+
+    var requests = Object.keys(updateData).map(function(key) {
+        var colIndex = headers.indexOf(key);
+        if (colIndex === -1) return null;
+        return {
+            range: sheetName + '!' + String.fromCharCode(65 + colIndex) + rowIndex,
+            values: [[updateData[key]]]
+        };
+    }).filter(Boolean);
+
+    if (requests.length > 0) {
+        service.spreadsheets.values.batchUpdate(dbId, {
+            data: requests,
+            valueInputOption: 'RAW'
+        });
+    }
+    return { success: true };
+}
+
+
+// =================================================================
+// メインロジック (旧Code.gsの関数群を新アーキテクチャに適応)
+// =================================================================
+
+function doGet(e) {
+  var userId = e.parameter.userId;
+  if (!userId) {
+    return HtmlService.createTemplateFromFile('Registration').evaluate().setTitle('新規登録');
+  }
+
+  var userInfo = findUserById(userId);
+  if (!userInfo) {
+    return HtmlService.createHtmlOutput('無効なユーザーIDです。');
+  }
+  
+  // ユーザーの最終アクセス日時を更新
+  updateUserInDb(userId, { lastAccessedAt: new Date().toISOString() });
+
+  // ここから先のロジックは元のdoGetとほぼ同じ
+  // AdminPanelやPage.htmlをユーザー情報に基づいて表示する
+  var template = HtmlService.createTemplateFromFile('Page');
+  // ... テンプレートに変数を渡す処理 ...
+  return template.evaluate().setTitle('みんなの回答ボード');
+}
+
+/**
+ * 新規ユーザーを登録する。
+ * 実行者: アクセスしたユーザー本人
+ * 処理: により、Workspace管理者の設定変更を不要にし、403エラーを回避する。
+ */
+
+// =================================================================
+// グローバル設定
+// =================================================================
+
+// スクリプトプロパティに保存されるキー
+var SCRIPT_PROPS_KEYS = {
+  SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
+  DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID'
+};
+
+// ユーザー専用フォルダ管理の設定
+var USER_FOLDER_CONFIG = {
+  ROOT_FOLDER_NAME: "StudyQuest - ユーザーデータ",
+  FOLDER_NAME_PATTERN: "StudyQuest - {email} - ファイル"
+};
+
+// 中央データベースのシート設定
+var DB_SHEET_CONFIG = {
+  SHEET_NAME: 'Users',
+  HEADERS: [
+    'userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 
+    'createdAt', 'configJson', 'lastAccessedAt', 'isActive'
+  ]
+};
+
+// 回答ボードのスプレッドシートの列ヘッダー
+var COLUMN_HEADERS = {
+  TIMESTAMP: 'タイムスタンプ',
+  EMAIL: 'メールアドレス',
+  CLASS: 'クラス',
+  OPINION: '回答',
+  REASON: '理由',
+  NAME: '名前',
+  UNDERSTAND: 'なるほど！',
+  LIKE: 'いいね！',
+  CURIOUS: 'もっと知りたい！',
+  HIGHLIGHT: 'ハイライト'
+};
+
+var REACTION_KEYS = ["UNDERSTAND", "LIKE", "CURIOUS"];
+var EMAIL_REGEX = new RegExp("^[^
+@]+@[^
+@]+\.[^
+@]+$");
 var DEBUG = true;
 
 function debugLog() {
