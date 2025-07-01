@@ -449,10 +449,12 @@ function doGet(e) {
   if (mode === 'admin') {
     var template = HtmlService.createTemplateFromFile('AdminPanel');
     template.userInfo = userInfo;
+    template.userId = userId;
     return template.evaluate().setTitle('管理パネル - みんなの回答ボード');
   } else {
     var template = HtmlService.createTemplateFromFile('Page');
     template.userInfo = userInfo;
+    template.userId = userId;
     return template.evaluate().setTitle('みんなの回答ボード');
   }
 }
@@ -1552,13 +1554,26 @@ function getWebAppUrl() {
 }
 
 /**
- * デプロイ・ユーザー・ドメイン情報を取得（AdminPanel.htmlから呼び出される）
+ * デプロイ・ユーザー・ドメイン情報を取得（AdminPanel.htmlとRegistration.htmlから呼び出される）
  */
 function getDeployUserDomainInfo() {
   try {
     var webAppUrl = getWebAppUrl();
     var activeUser = Session.getActiveUser().getEmail();
-    var domain = getEmailDomain(activeUser);
+    var currentDomain = getEmailDomain(activeUser);
+    
+    // デプロイドメインを特定（URLから推測またはハードコード）
+    var deployDomain = 'naha-okinawa.ed.jp'; // 実際のデプロイドメインに合わせて調整
+    if (webAppUrl && webAppUrl.includes('/a/macros/')) {
+      // Google Workspace環境の場合、URLからドメインを抽出
+      var match = webAppUrl.match(/\/a\/macros\/([^\/]+)\//);
+      if (match && match[1]) {
+        deployDomain = match[1];
+      }
+    }
+    
+    // ドメイン一致の確認
+    var isDomainMatch = currentDomain === deployDomain;
     
     var props = PropertiesService.getUserProperties();
     var currentUserId = props.getProperty('CURRENT_USER_ID');
@@ -1572,7 +1587,10 @@ function getDeployUserDomainInfo() {
       status: 'success',
       webAppUrl: webAppUrl,
       activeUser: activeUser,
-      domain: domain,
+      domain: currentDomain,
+      currentDomain: currentDomain,
+      deployDomain: deployDomain,
+      isDomainMatch: isDomainMatch,
       userId: currentUserId,
       userInfo: userInfo,
       deploymentTimestamp: new Date().toISOString()

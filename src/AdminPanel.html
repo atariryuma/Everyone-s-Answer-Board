@@ -977,7 +977,7 @@
     }
 
     // セキュリティ強化: userIdのエスケープ処理
-    const userId = <?= JSON.stringify(userId || '') ?>;
+    const userId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
     let selectedSheet = '';
     let currentActiveSheet = '';
     let webAppUrl = '';
