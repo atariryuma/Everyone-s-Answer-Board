@@ -2,91 +2,111 @@
 <html>
 <head>
     <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>みんなの回答ボード - セットアップ</title>
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif; padding: 30px; background-color: #f8f9fa; color: #333; }
-        .container { max-width: 700px; margin: 0 auto; background-color: #fff; border: 1px solid #dee2e6; padding: 20px 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        h2 { color: #495057; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input[type="url"] { width: 100%; padding: 10px; margin-bottom: 20px; box-sizing: border-box; border: 1px solid #ced4da; border-radius: 4px; }
-        button { padding: 12px 22px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        button:disabled { background-color: #6c757d; }
-        #message { margin-top: 20px; font-weight: bold; padding: 10px; border-radius: 4px; }
-        .success { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb;}
-        .error { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb;}
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif; background-color: #1a1b26; color: #c0caf5; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 1rem; }
+        .container { max-width: 600px; width: 100%; background-color: rgba(26, 27, 38, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); padding: 2rem; border-radius: 0.75rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        h2 { color: #8be9fd; margin-bottom: 1.5rem; text-align: center; font-size: 1.875rem; font-weight: bold; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; color: #c0caf5; }
+        input[type="url"] { width: 100%; padding: 0.75rem; margin-bottom: 1.25rem; box-sizing: border-box; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 0.375rem; background-color: rgba(255, 255, 255, 0.05); color: #c0caf5; transition: all 0.2s ease; }
+        input[type="url"]:focus { outline: none; border-color: #8be9fd; box-shadow: 0 0 0 3px rgba(139, 233, 253, 0.2); }
+        button { padding: 0.75rem 1.5rem; background-color: #8be9fd; color: #1a1b26; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 1rem; font-weight: 600; width: 100%; transition: all 0.2s ease; }
+        button:hover:not(:disabled) { background-color: #50fa7b; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        button:disabled { background-color: #6c757d; opacity: 0.7; cursor: not-allowed; }
+        #message { margin-top: 1.25rem; padding: 0.75rem; border-radius: 0.375rem; font-weight: bold; text-align: center; }
+        .success { background-color: #10b981; color: white; }
+        .error { background-color: #ef4444; color: white; }
+        .info { background-color: #3b82f6; color: white; }
+        .spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid #8be9fd; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 0.5rem; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .info-box { background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; }
+        .info-box h3 { color: #facc15; margin-top: 0; font-size: 1.125rem; font-weight: bold; margin-bottom: 0.75rem; }
+        .info-box p { font-size: 0.875rem; color: #c0caf5; }
+        .info-box ul { list-style: disc; margin-left: 1.25rem; font-size: 0.875rem; color: #c0caf5; }
+        .info-box ul li { margin-bottom: 0.25rem; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>みんなの回答ボード - 初回セットアップ</h2>
+        <h2>みんなの回答ボード - セットアップ</h2>
         
-        <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
-            <h3 style="margin-top: 0; color: #856404;">📋 事前準備の確認</h3>
-            <p><strong>Logger API（管理者向けログ記録API）が正しくデプロイされているか確認してください：</strong></p>
-            <ol>
-                <li>Logger APIプロジェクトで「デプロイ」→「新しいデプロイ」を実行</li>
-                <li>「種類」を「ウェブアプリ」に設定</li>
-                <li>「実行者」を「自分」に設定</li>
-                <li>「アクセスできるユーザー」を「すべてのユーザー（匿名ユーザーを含む）」に設定</li>
-                <li>「デプロイ」をクリックしてWeb App URLを取得</li>
-            </ol>
-            <p><strong>重要：</strong> Logger APIが正しくデプロイされていない場合、「Page Not Found」エラーが発生します。</p>
+        <div class="info-box">
+            <h3>Logger API URLを設定</h3>
+            <p class="mb-3">メインアプリケーションが利用するLogger APIのWeb App URLを入力してください。</p>
+            <p class="text-red-400 font-bold">注意: Logger APIは事前にデプロイし、アクセス権限を「全員（匿名ユーザーを含む）」に設定してください。</p>
         </div>
         
-        <p>Logger APIのウェブアプリURLを以下に貼り付けてください：</p>
         <form id="setupForm">
             <label for="apiUrl">Logger API Web App URL:</label>
             <input type="url" id="apiUrl" name="apiUrl" required 
                    placeholder="例: https://script.google.com/macros/s/AKfycbxXXXXX/exec"
-                   style="font-family: monospace;">
+                   class="font-mono">
             
-            <div style="margin-bottom: 15px; font-size: 12px; color: #6c757d;">
+            <div class="text-sm text-gray-400 mb-4">
                 <strong>有効な形式:</strong><br>
-                • https://script.google.com/macros/s/xxxxx/exec<br>
-                • https://script.google.com/a/macros/domain.com/s/xxxxx/exec
+                <ul>
+                    <li>https://script.google.com/macros/s/xxxxx/exec</li>
+                    <li>https://script.google.com/a/macros/domain.com/s/xxxxx/exec</li>
+                </ul>
             </div>
             
-            <button type="submit" id="submitBtn">設定を保存してデータベースを作成</button>
+            <button type="submit" id="submitBtn">設定を保存</button>
         </form>
         <div id="message"></div>
         
-        <div style="margin-top: 30px; font-size: 12px; color: #6c757d; border-top: 1px solid #dee2e6; padding-top: 15px;">
-            <strong>トラブルシューティング:</strong><br>
-            • 「Page Not Found」エラー → Logger APIのデプロイ状況を確認<br>
-            • 「権限エラー」→ Logger APIのアクセス設定を「すべてのユーザー（匿名ユーザーを含む）」に変更<br>
-            • 「URL形式エラー」→ 上記の有効な形式に従ってURLを入力
+        <div class="info-box mt-6">
+            <h3>トラブルシューティング:</h3>
+            <ul class="list-disc list-inside text-sm">
+                <li>「Page Not Found」エラー → Logger APIのデプロイ状況を確認してください。</li>
+                <li>「権限エラー」→ Logger APIのアクセス設定を「全員（匿名ユーザーを含む）」に変更してください。</li>
+                <li>「URL形式エラー」→ 上記の有効な形式に従ってURLを入力してください。</li>
+                <li>「データベースアクセス権限: 不足している可能性があります。」→ Logger APIのプロジェクト設定で、デプロイしたユーザーがGoogle Driveへのアクセス権限を持っているか確認してください。</li>
+            </ul>
         </div>
     </div>
 
     <script>
+        function showMessage(msg, type) {
+            const msgDiv = document.getElementById('message');
+            msgDiv.textContent = msg;
+            msgDiv.className = ''; // Clear existing classes
+            msgDiv.classList.add('message', type);
+        }
+
         document.getElementById('setupForm').addEventListener('submit', function(e) {
             e.preventDefault();
             const apiUrl = document.getElementById('apiUrl').value;
             const btn = document.getElementById('submitBtn');
-            const msgDiv = document.getElementById('message');
-
+            
             btn.disabled = true;
-            btn.textContent = '処理中...';
-            msgDiv.textContent = '';
-            msgDiv.className = '';
+            btn.innerHTML = '<span class="spinner"></span> 処理中...';
+            showMessage('', ''); // Clear previous messages
 
             google.script.run
                 .withSuccessHandler(function(message) {
-                    msgDiv.textContent = message;
-                    if (message.startsWith('✅')) {
-                        msgDiv.className = 'success';
-                        btn.style.backgroundColor = '#28a745';
+                    if (message.includes('✅ 設定が正常に保存され')) {
+                        showMessage('✅ 設定が正常に保存されました。セットアップ完了。', 'success');
+                        btn.style.backgroundColor = '#10b981'; // Green
                         btn.textContent = '完了';
-                    } else {
-                        msgDiv.className = 'error';
+                        console.log(message); // 詳細情報をコンソールに出力
+                    } else if (message.includes('エラーが発生しました')) {
+                        showMessage(message, 'error');
                         btn.disabled = false;
-                        btn.textContent = '設定を保存してデータベースを作成';
+                        btn.innerHTML = '設定を保存';
+                    } else {
+                        showMessage(message, 'info');
+                        btn.disabled = false;
+                        btn.innerHTML = '設定を保存';
                     }
                 })
                 .withFailureHandler(function(error) {
-                    msgDiv.className = 'error';
-                    msgDiv.textContent = 'エラー: ' + error.message;
+                    showMessage('エラー: ' + error.message, 'error');
                     btn.disabled = false;
-                    btn.textContent = '設定を保存してデータベースを作成';
+                    btn.innerHTML = '設定を保存';
                 })
                 .saveSettingsAndCreateDb(apiUrl);
         });

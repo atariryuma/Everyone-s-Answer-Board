@@ -4320,7 +4320,8 @@ function callDatabaseApi(action, data = {}) {
     headers: {
       'User-Agent': 'StudyQuest-MainApp/1.0',
       'X-Requested-With': 'StudyQuest',
-      'X-Request-User': requestUser
+      'X-Request-User': requestUser,
+      'Authorization': 'Bearer ' + ScriptApp.getOAuthToken()
     }
   };
 
