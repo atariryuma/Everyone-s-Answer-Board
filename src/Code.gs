@@ -3787,7 +3787,7 @@ function registerNewUser(adminEmail) {
   
   
   // 📝 ステップ2: 新しいユーザーIDを生成
-  const userId = Utilities.getUuid();
+  let userId = Utilities.getUuid();
   if (!userId || typeof userId !== 'string' || userId.trim() === '') {
     throw new Error('ユーザーID生成に失敗しました。再度お試しください。');
   }
