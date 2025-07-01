@@ -44,10 +44,11 @@ var COLUMN_HEADERS = {
 };
 
 var REACTION_KEYS = ["UNDERSTAND", "LIKE", "CURIOUS"];
-var EMAIL_REGEX = new RegExp("^[^
+// 正規表現を直接リテラルで定義し、エスケープを最小限に
+var EMAIL_REGEX = /^[^
 @]+@[^
 @]+\.[^
-@]+$");
+@]+$/;
 var DEBUG = true;
 
 function debugLog() {
@@ -69,9 +70,9 @@ function debugLog() {
 function setupApplication(credsJson, dbId) {
   try {
     JSON.parse(credsJson);
-    var sheetIdRegex = new RegExp("^[a-zA-Z0-9-_]{44}$");
-    if (!sheetIdRegex.test(dbId)) {
-      throw new Error('無効なスプレッドシートIDです。');
+    // ★正規表現による検証を文字列長チェックに置き換え
+    if (typeof dbId !== 'string' || dbId.length !== 44) {
+      throw new Error('無効なスプレッドシートIDです。IDは44文字の文字列である必要があります。');
     }
 
     var props = PropertiesService.getScriptProperties();
@@ -395,10 +396,90 @@ function doGet(e) {
 /**
  * 新規ユーザーを登録する。
  * 実行者: アクセスしたユーザー本人
- * 処理: そのスプレッドシートに
- * サービスアカウントのメールアドレスを「編集者」として追加する処理が必要です。
- * ここでは、その処理が実装済みであると仮定して進めます。
- * ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+ * 処理:
+ * 1. ユーザー自身の権限でフォームとスプレッドシートを作成する。
+ * 2. サービスアカウント経由で中央データベースにユーザー情報を登録する。
+ */
+function registerNewUser(adminEmail) {
+  var activeUser = Session.getActiveUser();
+  if (adminEmail !== activeUser.getEmail()) {
+    throw new Error('認証エラー: 操作を実行しているユーザーとメールアドレスが一致しません。');
+  }
+
+  // ステップ1: ユーザー自身の権限でファイル作成
+  var userId = Utilities.getUuid();
+  var formAndSsInfo = createStudyQuestForm(adminEmail, userId); // この関数は元のままでOK
+
+  // ステップ2: サービスアカウント経由でDBに登録
+  var initialConfig = {
+    formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl,
+    editFormUrl: formAndSsInfo.editFormUrl,
+    createdAt: new Date().toISOString()
+  };
+  
+  var userData = {
+    userId: userId,
+    adminEmail: adminEmail,
+    spreadsheetId: formAndSsInfo.spreadsheetId,
+    spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+    createdAt: new Date().toISOString(),
+    configJson: JSON.stringify(initialConfig),
+    lastAccessedAt: new Date().toISOString(),
+    isActive: true
+  };
+
+  try {
+    createUserInDb(userData);
+    debugLog('✅ データベースに新規ユーザーを登録しました: ' + adminEmail);
+  } catch (e) {
+    console.error('データベースへのユーザー登録に失敗: ' + e.message);
+    // ここで作成したフォームなどを削除するクリーンアップ処理を入れるのが望ましい
+    throw new Error('ユーザー登録に失敗しました。システム管理者に連絡してください。');
+  }
+
+  // 成功レスポンスを返す (元のコードと同様)
+  var webAppUrl = ScriptApp.getService().getUrl();
+  return {
+    userId: userId,
+    spreadsheetId: formAndSsInfo.spreadsheetId,
+    adminUrl: webAppUrl + '?userId=' + userId + '&mode=admin',
+    viewUrl: webAppUrl + '?userId=' + userId,
+    message: '新しいボードが作成されました！'
+  };
+}
+
+/**
+ * リアクションを追加/削除する。
+ * 実行者: アクセスしたユーザー本人
+ * 処理:
+ * 1. リアクションしたユーザーのメールアドレスを取得する。
+ * 2. サービスアカウント経由で、対象のユーザーのスプレッドシートを更新する。
+ *    (注意: この実装は簡略化しています。実際にはユーザーのスプレッドシートに
+ *     サービスアカウントを編集者として追加するフローが必要になります)
+ */
+function addReaction(rowIndex, reactionKey, sheetName) {
+  var reactingUserEmail = Session.getActiveUser().getEmail();
+  var props = PropertiesService.getUserProperties(); // doGetで設定されたコンテキストから取得
+  var ownerUserId = props.getProperty('CURRENT_USER_ID');
+
+  if (!ownerUserId) {
+    throw new Error('ボードのオーナー情報が見つかりません。');
+  }
+
+  // ボードオーナーの情報をDBから取得
+  var boardOwnerInfo = findUserById(ownerUserId);
+  if (!boardOwnerInfo) {
+    throw new Error('無効なボードです。');
+  }
+
+  // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+  // 重要：このアーキテクチャの課題点
+  // サービスアカウントは、ユーザーが作成した個々のスプレッドシートに
+  // アクセスする権限をデフォルトでは持っていません。
+  // この問題を解決するには、ユーザーがボードを作成した際に、そのスプレッドシートに
+  // サービスアカウントのメールアドレスを「編集者」として追加する処理が必要です。
+  // ここでは、その処理が実装済みであると仮定して進めます。
+  // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
   var targetSpreadsheetId = boardOwnerInfo.spreadsheetId;
   
