@@ -85,7 +85,8 @@ function setupApplication() {
   try {
     // 入力値を検証
     JSON.parse(credsJson);
-    if (!dbId.match(/^[a-zA-Z0-9-_]{44}$/)) {
+    const sheetIdRegex = new RegExp("^[a-zA-Z0-9-_]{44}$");
+    if (!sheetIdRegex.test(dbId)) {
       throw new Error('無効なスプレッドシートIDです。');
     }
 
