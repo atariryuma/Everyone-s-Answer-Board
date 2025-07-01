@@ -227,12 +227,15 @@ function handleApiRequest(requestData) {
       
     case 'updateUser':
       return handleUpdateUser(data, requestUser);
-      
+
     case 'getExistingBoard':
       return handleGetExistingBoard(data);
-      
+
     case 'checkExistingUser':
       return handleCheckExistingUser(data);
+
+    case 'createOrFetchUser':
+      return handleCreateOrFetchUser(data, requestUser);
 
     case 'deleteUser':
       return handleDeleteUser(data, requestUser);
@@ -484,6 +487,53 @@ function handleCheckExistingUser(data) {
     return {
       success: false,
       error: `Check failed: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Check for an existing user by email or create a new one in a single call
+ */
+function handleCreateOrFetchUser(data, requestUser) {
+  try {
+    const { adminEmail } = data;
+
+    if (!adminEmail) {
+      return { success: false, error: 'adminEmail is required' };
+    }
+
+    const existingUser = findUserByEmail(adminEmail);
+
+    if (existingUser) {
+      return {
+        success: true,
+        created: false,
+        data: existingUser
+      };
+    }
+
+    // Require userId when creating a new user
+    if (!data.userId) {
+      return { success: false, error: 'userId is required for creation' };
+    }
+
+    const createResult = handleCreateUser(data, requestUser);
+
+    if (createResult.success) {
+      const newUser = findUserById(data.userId);
+      return {
+        success: true,
+        created: true,
+        data: newUser
+      };
+    }
+
+    return createResult;
+  } catch (error) {
+    console.error(`createOrFetchUser error: ${error.message}`);
+    return {
+      success: false,
+      error: `createOrFetchUser failed: ${error.message}`
     };
   }
 }
