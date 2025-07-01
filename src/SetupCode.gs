@@ -141,8 +141,58 @@ function validateApiUrl(url) {
  * 新しいAdmin Logger API URLを自動設定（DOMAIN対応版）
  */
 function setNewLoggerApiUrl() {
-  const newApiUrl = 'https://script.google.com/macros/s/AKfycbwq70cx_9vZgTFJd5BggoPs3aCcZTFrTE8UJk58DtKNf5fawpZuyaMHfycOBWsDuarf/exec';
+  const newApiUrl = 'https://script.google.com/macros/s/AKfycbwegbxnDdYoTSQXKtHTjJlhBu6ahnH5y4VPum0xo4jKMoRaBbASRihKqxBk7duxaMKM/exec';
   return updateLoggerApiUrl(newApiUrl);
+}
+
+/**
+ * 認証付きAdmin Logger API実動作テスト
+ */
+function testLoggerApiWithAuth() {
+  try {
+    Logger.log('=== 認証付きAdmin Logger APIテスト ===');
+    
+    // API URL設定確認
+    const properties = PropertiesService.getScriptProperties();
+    const apiUrl = properties.getProperty('LOGGER_API_URL');
+    
+    if (!apiUrl) {
+      Logger.log('❌ API URLが設定されていません');
+      return 'API URLが設定されていません。setNewLoggerApiUrl()を実行してください。';
+    }
+    
+    Logger.log(`API URL: ${apiUrl}`);
+    Logger.log(`テストユーザー: ${Session.getActiveUser().getEmail()}`);
+    
+    // Ping テスト
+    Logger.log('--- Ping テスト ---');
+    try {
+      const pingResult = callDatabaseApi('ping', { test: true });
+      Logger.log(`✅ Ping成功: ${JSON.stringify(pingResult)}`);
+    } catch (pingError) {
+      Logger.log(`❌ Ping失敗: ${pingError.message}`);
+      return `Ping失敗: ${pingError.message}`;
+    }
+    
+    // 既存ボード確認テスト
+    Logger.log('--- 既存ボード確認テスト ---');
+    try {
+      const boardResult = callDatabaseApi('getExistingBoard', { 
+        adminEmail: Session.getActiveUser().getEmail() 
+      });
+      Logger.log(`✅ ボード確認成功: ${JSON.stringify(boardResult)}`);
+    } catch (boardError) {
+      Logger.log(`❌ ボード確認失敗: ${boardError.message}`);
+      return `ボード確認失敗: ${boardError.message}`;
+    }
+    
+    Logger.log('✅ 全テスト完了 - Admin Logger APIは正常に動作しています');
+    return '✅ Admin Logger APIテスト成功 - DOMAIN認証が正常に動作しています';
+    
+  } catch (e) {
+    Logger.log(`❌ テストエラー: ${e.message}`);
+    return `テストエラー: ${e.message}`;
+  }
 }
 
 /**
