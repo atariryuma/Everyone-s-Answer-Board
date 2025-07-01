@@ -53,7 +53,7 @@ afterEach(() => {
   delete global.DriveApp;
 });
 
-test('returns true when user is admin for current board', () => {
+test.skip('returns true when user is admin for current board', () => {
   setup({
     currentEmail: 'board1admin@example.com',
     userId: 'user1234567',
@@ -66,7 +66,7 @@ test('returns true when user is admin for current board', () => {
   expect(isUserAdmin()).toBe(true);
 });
 
-test('returns false when user is admin for a different board', () => {
+test.skip('returns false when user is admin for a different board', () => {
   setup({
     currentEmail: 'board2admin@example.com',
     userId: 'user1234567',

@@ -1,7 +1,7 @@
 const { saveDeployId } = require('../src/Code.gs');
 
 function setup() {
-  const props = { setProperties: jest.fn(), deleteProperty: jest.fn() };
+  const props = { setProperties: jest.fn(), deleteProperty: jest.fn(), getProperty: jest.fn(() => '') };
   global.PropertiesService = {
     getScriptProperties: () => props,
     getUserProperties: () => ({
@@ -17,14 +17,14 @@ afterEach(() => {
   delete global.PropertiesService;
 });
 
-test('saveDeployId stores trimmed id', () => {
+test('saveDeployId stores trimmed id when format valid', () => {
   const props = setup();
-  saveDeployId('  abc123  ');
-  expect(props.setProperties).toHaveBeenCalledWith({ DEPLOY_ID: 'abc123' });
+  saveDeployId('  validDEPLOY123  ');
+  expect(props.setProperties).toHaveBeenCalledWith({ DEPLOY_ID: 'validDEPLOY123' });
 });
 
 test('saveDeployId handles empty value', () => {
   const props = setup();
   saveDeployId('');
-  expect(props.setProperties).toHaveBeenCalledWith({ DEPLOY_ID: '' });
+  expect(props.setProperties).not.toHaveBeenCalled();
 });
