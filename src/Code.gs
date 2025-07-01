@@ -1611,6 +1611,39 @@ function safeSpreadsheetOperation(operation, fallbackValue) {
 }
 
 /**
+ * ユーザー認証の状態を確認
+ * Registration.htmlから呼び出される
+ */
+function verifyUserAuthentication() {
+  try {
+    var activeUser = Session.getActiveUser();
+    var userEmail = activeUser.getEmail();
+    
+    if (!userEmail) {
+      return {
+        authenticated: false,
+        message: 'Googleアカウントでログインしてください'
+      };
+    }
+    
+    var domain = getEmailDomain(userEmail);
+    
+    return {
+      authenticated: true,
+      email: userEmail,
+      domain: domain || 'unknown'
+    };
+    
+  } catch (e) {
+    console.error('認証確認エラー: ' + e.message);
+    return {
+      authenticated: false,
+      message: '認証の確認中にエラーが発生しました'
+    };
+  }
+}
+
+/**
  * 現在のユーザーの既存回答ボード情報を取得
  * Registration.htmlから呼び出される
  */
