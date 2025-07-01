@@ -2,7 +2,7 @@
 
 ## 🚀 デプロイ管理者向け：1コマンドセットアップ
 
-StudyQuestを新しい環境にデプロイする際は、**Setup.gs**の`studyQuestSetup()`関数を1回実行するだけで、すべての環境設定が完了します。
+StudyQuestを新しい環境にデプロイする際は、**SetupCode.gs**の`studyQuestSetup()`関数を1回実行するだけで、すべての環境設定が完了します。
 
 ## 📋 セットアップ手順
 
