@@ -12,7 +12,10 @@ function setup() {
       }
     }),
     getUserProperties: () => ({
-      getProperty: jest.fn(),
+      getProperty: jest.fn((key) => {
+        if (key === 'CURRENT_USER_ID') return 'test-user-id';
+        return null;
+      }),
       setProperty: jest.fn(),
       setProperties: jest.fn()
     })
@@ -23,12 +26,26 @@ function setup() {
         { getName: () => 'SheetA', isSheetHidden: () => false },
         { getName: () => 'SheetB', isSheetHidden: () => false },
         { getName: () => 'Config', isSheetHidden: () => false }
-      ]
+      ],
+      getOwner: () => ({
+        getEmail: () => 'owner@example.com'
+      })
     })
   };
   global.getCurrentSpreadsheet = () => global.SpreadsheetApp.getActiveSpreadsheet();
   global.Session = { getActiveUser: () => ({ getEmail: () => 'a@example.com' }) };
   global.getActiveUserEmail = () => 'a@example.com';
+  global.getUserInfo = jest.fn((userId) => {
+    if (userId === 'test-user-id') {
+      return {
+        userId: 'test-user-id',
+        adminEmail: 'a@example.com',
+        spreadsheetId: 'spreadsheet-id-123',
+        configJson: { showNames: false, showCounts: false }
+      };
+    }
+    return null;
+  });
 }
 afterEach(() => {
   delete global.PropertiesService;

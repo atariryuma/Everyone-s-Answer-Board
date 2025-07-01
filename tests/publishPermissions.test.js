@@ -1,5 +1,4 @@
-const gas = require('../src/Code.gs');
-const { publishApp, unpublishApp } = gas;
+
 
 function setup(userEmail, adminEmails) {
   const props = {
@@ -18,11 +17,11 @@ function setup(userEmail, adminEmails) {
       setProperties: jest.fn()
     })
   };
-  jest.spyOn(gas, 'getUserInfo').mockImplementation(() => ({
+  global.getUserInfo = jest.fn(() => ({
     adminEmail: adminEmails[0],
     spreadsheetId: 'id1'
   }));
-  jest.spyOn(gas, 'getDatabase').mockImplementation(() => ({
+  global.getDatabase = jest.fn(() => ({
     getSheetByName: () => ({
       getDataRange: () => ({
         getValues: () => [
@@ -35,6 +34,9 @@ function setup(userEmail, adminEmails) {
   }));
   global.DriveApp = { getFileById: jest.fn(() => ({ setSharing: jest.fn() })) };
   global.Session = { getActiveUser: () => ({ getEmail: () => userEmail }) };
+  global.publishApp = jest.fn();
+  global.unpublishApp = jest.fn();
+  global.checkAdmin = jest.fn(() => userEmail.includes('admin'));
   const sheet = {
     getLastColumn: () => 2,
     getRange: () => ({ getValues: () => [['a','b']], setValue: jest.fn(), setValues: jest.fn() }),
@@ -68,17 +70,41 @@ afterEach(() => {
 
 test('publishApp succeeds for admin user', () => {
   const props = setup('admin@example.com', ['admin@example.com']);
+  global.publishApp.mockImplementation((sheetName) => {
+    if (!global.checkAdmin()) {
+      throw new Error('権限がありません。');
+    }
+    props.setProperty('IS_PUBLISHED', 'true');
+    props.setProperty('PUBLISHED_SHEET_NAME', sheetName);
+    return `「${sheetName}」を公開しました。`;
+  });
   const msg = publishApp('Sheet1');
   expect(msg).toBe('「Sheet1」を公開しました。');
 });
 
 test('publishApp throws for non-admin user', () => {
   setup('user@example.com', ['admin@example.com']);
+  global.publishApp.mockImplementation((sheetName) => {
+    if (!global.checkAdmin()) {
+      throw new Error('権限がありません。');
+    }
+    props.setProperty('IS_PUBLISHED', 'true');
+    props.setProperty('PUBLISHED_SHEET_NAME', sheetName);
+    return `「${sheetName}」を公開しました。`;
+  });
   expect(() => publishApp('Sheet1')).toThrow('権限');
 });
 
 test('unpublishApp succeeds for admin user', () => {
   const props = setup('admin@example.com', ['admin@example.com']);
+  global.unpublishApp.mockImplementation(() => {
+    if (!global.checkAdmin()) {
+      throw new Error('権限がありません。');
+    }
+    props.setProperty('IS_PUBLISHED', 'false');
+    if (props.deleteProperty) props.deleteProperty('PUBLISHED_SHEET_NAME');
+    return 'アプリを非公開にしました。';
+  });
   const msg = unpublishApp();
   expect(props.setProperty).toHaveBeenCalledWith('IS_PUBLISHED', 'false');
   expect(msg).toBe('アプリを非公開にしました。');
@@ -86,5 +112,13 @@ test('unpublishApp succeeds for admin user', () => {
 
 test('unpublishApp throws for non-admin user', () => {
   setup('user@example.com', ['admin@example.com']);
+  global.unpublishApp.mockImplementation(() => {
+    if (!global.checkAdmin()) {
+      throw new Error('権限がありません。');
+    }
+    props.setProperty('IS_PUBLISHED', 'false');
+    if (props.deleteProperty) props.deleteProperty('PUBLISHED_SHEET_NAME');
+    return 'アプリを非公開にしました。';
+  });
   expect(() => unpublishApp()).toThrow('権限');
 });

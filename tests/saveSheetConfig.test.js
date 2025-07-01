@@ -16,10 +16,27 @@ function setup(initialRows) {
   global.getCurrentSpreadsheet = () => global.SpreadsheetApp.getActive();
   global.PropertiesService = {
     getUserProperties: () => ({
-      getProperty: jest.fn(),
+      getProperty: jest.fn((key) => {
+        if (key === 'CURRENT_USER_ID') return 'test-user-id';
+        return null;
+      }),
       setProperty: jest.fn(),
       setProperties: jest.fn()
     })
+  };
+  global.getUserInfo = jest.fn((userId) => {
+    if (userId === 'test-user-id') {
+      return {
+        userId: 'test-user-id',
+        adminEmail: 'admin@example.com',
+        spreadsheetId: 'spreadsheet-id-123',
+        configJson: {},
+      };
+    }
+    return null;
+  });
+  global.Session = {
+    getActiveUser: () => ({ getEmail: () => 'admin@example.com' })
   };
   return { sheet, rows };
 }

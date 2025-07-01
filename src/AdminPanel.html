@@ -870,6 +870,112 @@
 
 
   <script>
+    // Message Area Functions
+    function showMessage(message, type = 'info') {
+      const messageArea = document.getElementById('message-area');
+      if (!messageArea) return;
+
+      const messageId = 'msg-' + Date.now();
+      const messageElement = document.createElement('div');
+      messageElement.id = messageId;
+      messageElement.className = `p-4 mb-3 rounded-lg shadow-md flex items-center justify-between text-white transform transition-all duration-300 ease-out slide-up`;
+
+      let bgColor = 'bg-gray-700';
+      let icon = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+
+      switch (type) {
+        case 'success':
+          bgColor = 'bg-green-500';
+          icon = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+          messageElement.classList.add('success-pulse');
+          break;
+        case 'error':
+          bgColor = 'bg-red-500';
+          icon = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+          messageElement.classList.add('error-shake');
+          break;
+        case 'warning':
+        case 'yellow':
+          bgColor = 'bg-yellow-500';
+          icon = `<svg class="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>`;
+          messageElement.classList.add('text-black');
+          break;
+        case 'info':
+        case 'blue':
+          bgColor = 'bg-blue-500';
+          icon = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+          break;
+        case 'green':
+          bgColor = 'bg-green-500';
+          icon = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+          break;
+      }
+
+      messageElement.classList.add(bgColor);
+      messageElement.innerHTML = `
+        <div class="flex items-center">
+          ${icon}
+          <span class="ml-2 text-sm font-medium">${message}</span>
+        </div>
+        <button class="ml-4 text-white opacity-70 hover:opacity-100 focus:outline-none" onclick="document.getElementById('${messageId}').remove()">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      `;
+
+      messageArea.appendChild(messageElement);
+
+      // Auto-remove after 5 seconds
+      setTimeout(() => {
+        const msgEl = document.getElementById(messageId);
+        if (msgEl) {
+          msgEl.classList.remove('slide-up');
+          msgEl.classList.add('fade-out'); // Assuming a fade-out animation class exists
+          msgEl.addEventListener('transitionend', () => msgEl.remove());
+        }
+      }, 5000);
+    }
+
+    function addVisualFeedback(element, type) {
+      if (!element) return;
+      element.classList.remove('success-pulse', 'error-shake');
+      void element.offsetWidth; // Trigger reflow
+      element.classList.add(type === 'success' ? 'success-pulse' : 'error-shake');
+    }
+
+    // Confirmation Modal Functions
+    function showConfirmationModal(title, message, onConfirm) {
+      const modal = document.getElementById('confirmation-modal');
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-message').textContent = message;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      const confirmBtn = document.getElementById('modal-confirm-btn');
+      const cancelBtn = document.getElementById('modal-cancel-btn');
+
+      const confirmHandler = () => {
+        onConfirm();
+        hideConfirmationModal();
+        confirmBtn.removeEventListener('click', confirmHandler);
+        cancelBtn.removeEventListener('click', cancelHandler);
+      };
+
+      const cancelHandler = () => {
+        hideConfirmationModal();
+        confirmBtn.removeEventListener('click', confirmHandler);
+        cancelBtn.removeEventListener('click', cancelHandler);
+      };
+
+      confirmBtn.addEventListener('click', confirmHandler);
+      cancelBtn.addEventListener('click', cancelHandler);
+    }
+
+    function hideConfirmationModal() {
+      const modal = document.getElementById('confirmation-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
     // セキュリティ強化: userIdのエスケープ処理
     const userId = <?= JSON.stringify(userId || '') ?>;
     let selectedSheet = '';
