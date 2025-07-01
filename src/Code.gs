@@ -1608,13 +1608,6 @@ function getDeployUserDomainInfo() {
 // 互換性とエラーハンドリング
 // =================================================================
 
-/**
- * 旧関数名との互換性を保つためのエイリアス
- */
-function addLike(rowIndex, reactionKey, sheetName) {
-  // addReaction関数を呼び出し
-  return addReaction(rowIndex, reactionKey, sheetName);
-}
 
 /**
  * エラーハンドリング付きのSpreadsheetApp操作
@@ -1627,6 +1620,7 @@ function safeSpreadsheetOperation(operation, fallbackValue) {
     return fallbackValue || null;
   }
 }
+
 
 /**
  * ユーザー認証の状態を確認
