@@ -420,6 +420,12 @@ function updateUserInDb(userId, updateData) {
 function doGet(e) {
   var userId = e.parameter.userId;
   var mode = e.parameter.mode;
+  var setup = e.parameter.setup;
+  
+  // セットアップページの表示
+  if (setup === 'true') {
+    return HtmlService.createTemplateFromFile('SetupPage').evaluate().setTitle('StudyQuest - サービスアカウント セットアップ');
+  }
   
   if (!userId) {
     return HtmlService.createTemplateFromFile('Registration').evaluate().setTitle('新規登録');
