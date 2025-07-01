@@ -1585,17 +1585,29 @@ function getAvailableSheets() {
 function getActiveFormInfo() {
   try {
     const startTime = Date.now();
-    debugLog('getActiveFormInfo: Starting execution');
+    debugLog('🔍 getActiveFormInfo: Starting execution');
     
     // 権限チェック（読み取り専用・高速版）
     const { userId, userInfo } = validateCurrentUserReadOnly();
+    debugLog('👤 User ID:', userId);
+    debugLog('📄 User Info:', userInfo);
     
     const props = PropertiesService.getUserProperties();
     const spreadsheetId = props.getProperty('CURRENT_SPREADSHEET_ID');
+    debugLog('📊 Current Spreadsheet ID:', spreadsheetId);
     
     if (!spreadsheetId) {
-      debugLog('No active spreadsheet ID found');
+      debugLog('❌ No active spreadsheet ID found');
       return null;
+    }
+    
+    // ユーザー設定のフォーム情報をログ出力
+    if (userInfo.configJson) {
+      debugLog('📋 User config contains:', Object.keys(userInfo.configJson));
+      debugLog('🔗 Form URL in config:', userInfo.configJson.formUrl);
+      debugLog('✏️ Edit Form URL in config:', userInfo.configJson.editFormUrl);
+    } else {
+      debugLog('❌ No user config found');
     }
     
     // キャッシュからフォーム情報を取得
@@ -1612,36 +1624,50 @@ function getActiveFormInfo() {
         let form = null;
         
         // 方法1: ユーザー設定からフォームURLを取得（最も高速）
-    if (userInfo.configJson && userInfo.configJson.formUrl) {
-      try {
-        const formUrl = userInfo.configJson.formUrl;
-        const match = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
-        if (match) {
-          formId = match[1];
-          form = FormApp.openById(formId);
-          debugLog('getActiveFormInfo: Found form via user config');
+        debugLog('🔍 Method 1: Checking user config for form URL...');
+        if (userInfo.configJson && userInfo.configJson.formUrl) {
+          try {
+            const formUrl = userInfo.configJson.formUrl;
+            debugLog('📋 Found form URL in config:', formUrl);
+            const match = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+            if (match) {
+              formId = match[1];
+              debugLog('🆔 Extracted form ID:', formId);
+              form = FormApp.openById(formId);
+              debugLog('✅ Method 1 SUCCESS: Found form via user config');
+            } else {
+              debugLog('❌ Method 1 FAILED: Invalid form URL format');
+            }
+          } catch (e) {
+            debugLog('❌ Method 1 FAILED (user config):', e.message);
+          }
+        } else {
+          debugLog('❌ Method 1 SKIPPED: No form URL in user config');
         }
-      } catch (e) {
-        debugLog('Method 1 failed (user config):', e.message);
-      }
-    }
-    
-    // 方法2: スプレッドシートに直接リンクされたフォームを探す（フォールバック）
-    if (!form) {
-      try {
-        const formUrl = spreadsheet.getFormUrl();
-        if (formUrl) {
-          const match = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
-          if (match) {
-            formId = match[1];
-            form = FormApp.openById(formId);
-            debugLog('getActiveFormInfo: Found form via direct link');
+        
+        // 方法2: スプレッドシートに直接リンクされたフォームを探す（フォールバック）
+        if (!form) {
+          debugLog('🔍 Method 2: Checking spreadsheet direct form link...');
+          try {
+            const formUrl = spreadsheet.getFormUrl();
+            debugLog('📊 Spreadsheet form URL:', formUrl);
+            if (formUrl) {
+              const match = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+              if (match) {
+                formId = match[1];
+                debugLog('🆔 Extracted form ID from spreadsheet:', formId);
+                form = FormApp.openById(formId);
+                debugLog('✅ Method 2 SUCCESS: Found form via direct link');
+              } else {
+                debugLog('❌ Method 2 FAILED: Invalid form URL format from spreadsheet');
+              }
+            } else {
+              debugLog('❌ Method 2 FAILED: No form URL in spreadsheet');
+            }
+          } catch (e) {
+            debugLog('❌ Method 2 FAILED (direct form link):', e.message);
           }
         }
-      } catch (e) {
-        debugLog('Method 2 failed (direct form link):', e.message);
-      }
-    }
         
         // 方法3: DriveApp検索（最も時間がかかるため最後に実行）
         if (!form) {
@@ -2937,6 +2963,67 @@ function testFormCreation() {
   }
 }
 
+/**
+ * フォーム情報キャッシュをクリアする関数
+ * 管理者がフォーム表示問題をトラブルシュートする際に使用
+ */
+function clearFormInfoCache() {
+  try {
+    console.log('=== フォーム情報キャッシュクリア開始 ===');
+    
+    // 現在のユーザー情報を取得
+    const { userId } = validateCurrentUserReadOnly();
+    const props = PropertiesService.getUserProperties();
+    const spreadsheetId = props.getProperty('CURRENT_SPREADSHEET_ID');
+    
+    console.log('User ID:', userId);
+    console.log('Spreadsheet ID:', spreadsheetId);
+    
+    // 関連するキャッシュキーをクリア
+    const cache = CacheService.getScriptCache();
+    const cacheKeys = [
+      `form_info_${userId}_${spreadsheetId}`,
+      `user_info_${userId}`,
+      `form_id_${spreadsheetId}`,
+      `spreadsheet_${spreadsheetId}`
+    ];
+    
+    cacheKeys.forEach(key => {
+      cache.remove(key);
+      console.log('Cleared cache key:', key);
+    });
+    
+    // メモリキャッシュもクリア
+    USER_INFO_CACHE.clear();
+    SPREADSHEET_CACHE.clear();
+    
+    console.log('✅ All form-related caches cleared');
+    return '✅ フォーム情報キャッシュをクリアしました。ページをリロードして再試行してください。';
+    
+  } catch (error) {
+    console.error('キャッシュクリアエラー:', error);
+    return `❌ キャッシュクリアに失敗しました: ${error.message}`;
+  }
+}
+
+/**
+ * 現在のユーザーのフォーム情報をデバッグ出力する関数
+ */
+function debugCurrentUserFormInfo() {
+  try {
+    console.log('=== 現在のユーザーフォーム情報デバッグ ===');
+    
+    const formInfo = getActiveFormInfo();
+    console.log('Form Info Result:', formInfo);
+    
+    return formInfo ? '✅ フォーム情報が正常に取得されました。' : '❌ フォーム情報が見つかりませんでした。';
+    
+  } catch (error) {
+    console.error('フォーム情報デバッグエラー:', error);
+    return `❌ フォーム情報デバッグエラー: ${error.message}`;
+  }
+}
+
 function generateStudentBoardUrl(userId) {
   if (!userId) {
     return '';
@@ -3258,9 +3345,14 @@ function createBoardFromAdmin() {
       if (newSheetName) {
         // アクティブシートに設定
         switchActiveSheet(newSheetName);
-        // 公開状態に設定
-        updateUserConfig(userId, { isPublished: true });
+        // 公開状態に設定とフォームURL保存を同時実行
+        updateUserConfig(userId, { 
+          isPublished: true,
+          formUrl: result.formUrl,
+          editFormUrl: result.editFormUrl
+        });
         debugLog(`New board '${newSheetName}' has been created and published.`);
+        debugLog(`Form URL saved: ${result.formUrl}`);
       }
 
       return {
@@ -3644,6 +3736,12 @@ function registerNewUser(adminEmail) {
   }
   
   // 📝 ステップ4: API経由でデータベースに新規ユーザー情報を追加
+  const initialConfig = {
+    formUrl: formAndSsInfo.formUrl,
+    editFormUrl: formAndSsInfo.editFormUrl,
+    createdAt: new Date().toISOString()
+  };
+  
   const userData = {
     userId: userId,
     adminEmail: adminEmail,
@@ -3651,10 +3749,12 @@ function registerNewUser(adminEmail) {
     spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
     createdAt: new Date().toISOString(),
     accessToken: '', // 未使用
-    configJson: JSON.stringify({}),
+    configJson: JSON.stringify(initialConfig),
     lastAccessedAt: new Date().toISOString(),
     isActive: true
   };
+  
+  debugLog('📋 Initial config being saved:', initialConfig);
   
   debugLog(`💾 API経由でデータベースに新規ユーザー登録中: ${adminEmail}`);
   try {
