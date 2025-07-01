@@ -1761,13 +1761,31 @@ function getActiveFormInfo() {
         let formId = null;
         let form = null;
         
+        // 永続化されたフォームIDを確認
+        const persistedFormId = props.getProperty(`FORM_ID_${spreadsheetId}`);
+        debugLog('🔍 Persisted form ID:', persistedFormId);
+        
+        // 方法0: 永続化されたフォームIDがあれば直接使用（最高速）
+        if (persistedFormId) {
+          try {
+            debugLog('🚀 Method 0: Using persisted form ID...');
+            form = FormApp.openById(persistedFormId);
+            formId = persistedFormId;
+            debugLog('✅ Method 0 SUCCESS: Found form via persisted ID');
+          } catch (e) {
+            debugLog('❌ Method 0 FAILED: Persisted form ID invalid, clearing:', e.message);
+            props.deleteProperty(`FORM_ID_${spreadsheetId}`);
+          }
+        }
+        
         // 方法1: ユーザー設定からフォームURLを取得（最も高速）
-        debugLog('🔍 Method 1: Checking user config for form URL...');
-        if (userInfo.configJson && userInfo.configJson.formUrl) {
+        if (!form) {
+          debugLog('🔍 Method 1: Checking user config for form URL...');
+          if (userInfo.configJson && userInfo.configJson.formUrl) {
           try {
             const formUrl = userInfo.configJson.formUrl;
             debugLog('📋 Found form URL in config:', formUrl);
-            const match = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+            const match = formUrl.match(/\/forms\/d\/(?:e\/)?([a-zA-Z0-9-_]+)/);
             if (match) {
               formId = match[1];
               debugLog('🆔 Extracted form ID:', formId);
@@ -1779,8 +1797,9 @@ function getActiveFormInfo() {
           } catch (e) {
             debugLog('❌ Method 1 FAILED (user config):', e.message);
           }
-        } else {
-          debugLog('❌ Method 1 SKIPPED: No form URL in user config');
+          } else {
+            debugLog('❌ Method 1 SKIPPED: No form URL in user config');
+          }
         }
         
         // 方法2: スプレッドシートに直接リンクされたフォームを探す（フォールバック）
@@ -1790,7 +1809,7 @@ function getActiveFormInfo() {
             const formUrl = spreadsheet.getFormUrl();
             debugLog('📊 Spreadsheet form URL:', formUrl);
             if (formUrl) {
-              const match = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+              const match = formUrl.match(/\/forms\/d\/(?:e\/)?([a-zA-Z0-9-_]+)/);
               if (match) {
                 formId = match[1];
                 debugLog('🆔 Extracted form ID from spreadsheet:', formId);
