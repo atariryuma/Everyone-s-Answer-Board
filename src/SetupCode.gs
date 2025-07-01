@@ -138,6 +138,14 @@ function validateApiUrl(url) {
 }
 
 /**
+ * 新しいAdmin Logger API URLを自動設定（DOMAIN対応版）
+ */
+function setNewLoggerApiUrl() {
+  const newApiUrl = 'https://script.google.com/macros/s/AKfycbwH55G3O92Gqqj5VNLbmiBBKl7cbZ8DtKh4g2IhFt-iw4lXMEyr5um2q9SvP61kU2XZ/exec';
+  return updateLoggerApiUrl(newApiUrl);
+}
+
+/**
  * Logger APIの詳細診断 - デプロイ状況とアクセス権限をチェック
  */
 function diagnoseLoggerApi() {

@@ -172,6 +172,50 @@ function doPost(e) {
 }
 
 /**
+ * Validate domain access for DOMAIN authentication
+ */
+function validateDomainAccess() {
+  try {
+    const activeUser = Session.getActiveUser();
+    const effectiveUser = Session.getEffectiveUser();
+    
+    // Check if user is authenticated
+    if (!activeUser || !activeUser.getEmail()) {
+      return {
+        valid: false,
+        reason: 'No authenticated user found'
+      };
+    }
+    
+    const userEmail = activeUser.getEmail();
+    const userDomain = userEmail.split('@')[1];
+    
+    // Check if user is from allowed domain
+    const allowedDomain = 'naha-okinawa.ed.jp';
+    if (userDomain !== allowedDomain) {
+      return {
+        valid: false,
+        reason: `Access denied. Expected domain: ${allowedDomain}, Got: ${userDomain}`
+      };
+    }
+    
+    return {
+      valid: true,
+      domain: userDomain,
+      userEmail: userEmail,
+      effectiveEmail: effectiveUser?.getEmail()
+    };
+    
+  } catch (e) {
+    console.error('Domain validation error:', e);
+    return {
+      valid: false,
+      reason: `Authentication error: ${e.message}`
+    };
+  }
+}
+
+/**
  * Acquire lock with retry mechanism
  */
 function acquireLock() {
@@ -197,13 +241,24 @@ function acquireLock() {
 }
 
 /**
- * Enhanced API request handler with performance optimizations
+ * Enhanced API request handler with performance optimizations and DOMAIN authentication
  */
 function handleApiRequest(requestData) {
   const { action, data, timestamp, requestUser, effectiveUser } = requestData;
   
+  // DOMAIN認証チェック
+  const authResult = validateDomainAccess();
+  if (!authResult.valid) {
+    console.log(`❌ API Access Denied: ${authResult.reason}`);
+    return {
+      success: false,
+      error: 'DOMAIN_ACCESS_DENIED',
+      message: authResult.reason
+    };
+  }
+  
   // Log API access for monitoring
-  console.log(`API Request: ${action} from ${requestUser || 'anonymous'}`);
+  console.log(`API Request: ${action} from ${requestUser || 'anonymous'} (Domain: ${authResult.domain})`);
   
   switch (action) {
     case 'ping':
@@ -982,15 +1037,7 @@ function showCurrentSettings() {
     message += '❌ Database: Not configured\n\n';
   }
 
-  // Check templates
-  const templateFormId = properties.getProperty(CONFIG.TEMPLATE_FORM_ID_KEY);
-  const templateSpreadsheetId = properties.getProperty(CONFIG.TEMPLATE_SPREADSHEET_ID_KEY);
-  
-  if (templateFormId && templateSpreadsheetId) {
-    message += `✅ Templates: Configured\n   Form ID: ${templateFormId}\n   Spreadsheet ID: ${templateSpreadsheetId}\n\n`;
-  } else {
-    message += '❌ Templates: Not configured (use "Create Missing Templates")\n\n';
-  }
+  // Templates are no longer used - removed for optimization
 
   if (deploymentId) {
     const webAppUrl = deploymentId.startsWith('https://') 
