@@ -441,9 +441,11 @@ function validateCurrentUser() {
 }
 
 /**
- * ユーザー専用フォルダを取得または作成（改良版：詳細なエラーハンドリング付き）
+ * ユーザー専用フォルダを取得する。
+ * フォルダが存在しない場合は null を返す。
+ * 実際の作成は非同期トリガーで行う。
  * @param {string} userEmail - ユーザーのメールアドレス
- * @return {GoogleAppsScript.Drive.Folder} ユーザー専用フォルダ
+ * @return {GoogleAppsScript.Drive.Folder|null} ユーザー専用フォルダ
  */
 function getUserFolder(userEmail) {
   try {
@@ -457,7 +459,7 @@ function getUserFolder(userEmail) {
     const timestamp = new Date().getTime();
     const userFolderName = `StudyQuest - ${sanitizedEmail} - マイファイル`;
     
-    debugLog(`📁 ユーザー専用フォルダを作成/取得開始: ${userFolderName}`);
+    debugLog(`📁 ユーザー専用フォルダを取得開始: ${userFolderName}`);
     
     // Driveアクセス権限をテスト
     try {
@@ -482,24 +484,10 @@ function getUserFolder(userEmail) {
     } catch (folderCheckError) {
       debugLog(`⚠️ 既存フォルダチェック時にエラー: ${folderCheckError.message}`);
     }
-    
-    // ない場合は新規作成
-    try {
-      const userFolder = DriveApp.createFolder(userFolderName);
-      debugLog(`✅ ユーザー専用フォルダを新規作成: ${userFolderName}`);
-      
-      // フォルダ作成確認テスト
-      const createdFolderName = userFolder.getName();
-      if (createdFolderName !== userFolderName) {
-        throw new Error('フォルダ名が期待値と異なります');
-      }
-      
-      return userFolder;
-      
-    } catch (createError) {
-      debugLog(`❌ フォルダ作成エラー: ${createError.message}`);
-      throw new Error(`フォルダの作成に失敗しました: ${createError.message}`);
-    }
+
+    // フォルダが存在しなければ null を返す
+    debugLog(`ℹ️ ユーザーフォルダが存在しません: ${userFolderName}`);
+    return null;
     
   } catch (error) {
     console.error(`ユーザーフォルダの取得/作成に失敗 (${userEmail}):`, error);
@@ -512,6 +500,76 @@ function getUserFolder(userEmail) {
       throw new Error(`ユーザー専用フォルダの準備に失敗しました: ${error.message}`);
     }
   }
+}
+
+/**
+ * ユーザーフォルダを作成し、指定ファイルを移動するタスクをキューに追加する。
+ * @param {string} userEmail
+ * @param {string[]} fileIds
+ */
+function queueFolderSetup(userEmail, fileIds) {
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty('FOLDER_SETUP_QUEUE') || '[]';
+  const queue = JSON.parse(raw);
+  queue.push({ userEmail: userEmail, fileIds: fileIds });
+  props.setProperty('FOLDER_SETUP_QUEUE', JSON.stringify(queue));
+
+  if (!isFolderSetupTriggerExists()) {
+    ScriptApp.newTrigger('runQueuedFolderSetup')
+      .timeBased()
+      .after(1 * 60 * 1000)
+      .create();
+  }
+}
+
+function isFolderSetupTriggerExists() {
+  return ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'runQueuedFolderSetup');
+}
+
+/**
+ * キュー内のフォルダ作成とファイル移動タスクを実行する。
+ * 実行成功後はAdmin Logger APIに記録する。
+ */
+function runQueuedFolderSetup() {
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty('FOLDER_SETUP_QUEUE');
+  if (!raw) return;
+
+  const queue = JSON.parse(raw);
+  const remaining = [];
+
+  queue.forEach(task => {
+    try {
+      const folder = findOrCreateUserFolder(task.userEmail);
+      task.fileIds.forEach(id => {
+        DriveApp.getFileById(id).moveTo(folder);
+      });
+      logToAdminApi({ action: 'FOLDER_MOVE_COMPLETED', userEmail: task.userEmail, fileIds: task.fileIds });
+    } catch (e) {
+      console.error('Folder setup failed:', e);
+      remaining.push(task);
+    }
+  });
+
+  if (remaining.length > 0) {
+    props.setProperty('FOLDER_SETUP_QUEUE', JSON.stringify(remaining));
+    if (!isFolderSetupTriggerExists()) {
+      ScriptApp.newTrigger('runQueuedFolderSetup')
+        .timeBased()
+        .after(5 * 60 * 1000)
+        .create();
+    }
+  } else {
+    props.deleteProperty('FOLDER_SETUP_QUEUE');
+  }
+}
+
+function findOrCreateUserFolder(userEmail) {
+  const existing = getUserFolder(userEmail);
+  if (existing) return existing;
+  const sanitizedEmail = userEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_');
+  const name = `StudyQuest - ${sanitizedEmail} - マイファイル`;
+  return DriveApp.createFolder(name);
 }
 
 /**
@@ -3053,10 +3111,7 @@ function createStudyQuestForm(userEmail, userId) {
       throw new Error('Google Forms API または Drive API がこの環境で利用できません。');
     }
     
-    // ユーザー専用フォルダを取得または作成
-    debugLog('📁 ユーザーフォルダ取得開始:', userEmail);
-    const userFolder = getUserFolder(userEmail);
-    debugLog('✅ ユーザーフォルダ取得完了:', userFolder.getName());
+    // ユーザーフォルダ作成はトリガーで行うためここでは取得しない
     
     // 新しいGoogleフォームを作成（作成日時を含む）
     const now = new Date();
@@ -3195,19 +3250,11 @@ function createStudyQuestForm(userEmail, userId) {
     form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheet.getId());
     debugLog('✅ フォーム-スプレッドシート連携完了');
 
-    // ファイルをユーザー専用フォルダに移動
-    debugLog('📁 ファイル移動開始');
+    // 後続のトリガーで移動するためファイルIDを取得
     const formFile = DriveApp.getFileById(form.getId());
     const spreadsheetFile = DriveApp.getFileById(spreadsheet.getId());
     debugLog('✅ ファイルオブジェクト取得完了');
-    
-    try {
-      formFile.moveTo(userFolder);
-      spreadsheetFile.moveTo(userFolder);
-      debugLog(`✅ フォームとスプレッドシートをユーザーフォルダに移動しました`);
-    } catch (e) {
-      debugLog(`⚠️ ファイル移動に失敗: ${e.message}`);
-    }
+    queueFolderSetup(userEmail, [form.getId(), spreadsheet.getId()]);
 
     // 共有設定を自動化
     const userDomain = getEmailDomain(userEmail);
@@ -3902,7 +3949,10 @@ if (typeof module !== 'undefined') {
     getSpreadsheetUrlForUser,
     openActiveSpreadsheet,
     getExistingBoard,
-    getUserFolder
+    getUserFolder,
+    queueFolderSetup,
+    runQueuedFolderSetup,
+    findOrCreateUserFolder
   };
 }
 
