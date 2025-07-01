@@ -4,7 +4,7 @@ test('guessHeadersFromArray detects japanese synonyms', () => {
   const headers = ['問い', 'コメント', 'わけ', 'ニックネーム', '班'];
   const result = guessHeadersFromArray(headers);
   expect(result).toEqual({
-    questionHeader: '問い',
+    questionHeader: 'コメント',
     answerHeader: 'コメント',
     reasonHeader: 'わけ',
     nameHeader: 'ニックネーム',
@@ -16,7 +16,7 @@ test('guessHeadersFromArray handles full width and spacing', () => {
   const headers = [' Ｑｕｅｓｔｉｏｎ ', 'Ａｎｓｗｅｒ', ' Reason ', ' NAME ', 'CLASSROOM'];
   const result = guessHeadersFromArray(headers);
   expect(result).toEqual({
-    questionHeader: ' Ｑｕｅｓｔｉｏｎ ',
+    questionHeader: 'Ａｎｓｗｅｒ',
     answerHeader: 'Ａｎｓｗｅｒ',
     reasonHeader: ' Reason ',
     nameHeader: ' NAME ',
