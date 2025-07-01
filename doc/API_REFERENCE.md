@@ -1,214 +1,426 @@
-# StudyQuest - みんなの回答ボード: APIリファレンス (Admin Logger API)
+# StudyQuest - みんなの回答ボード: 内部API リファレンス
 
-このドキュメントでは、「StudyQuest - みんなの回答ボード」の「管理者向けログ記録API」のエンドポイント、リクエスト形式、およびレスポンス形式について説明します。このAPIは、メインアプリケーションからのユーザー情報管理と監査ログの記録を目的としています。
+このドキュメントでは、「StudyQuest - みんなの回答ボード」の**新しいサービスアカウントアーキテクチャ**における主要な内部関数とAPIについて説明します。新アーキテクチャでは外部APIが不要になり、すべての機能が単一のGoogle Apps Scriptプロジェクト内で提供されています。
 
-## 1. エンドポイント
+## 📋 概要
 
-「管理者向けログ記録API」は、Google Apps Scriptのウェブアプリとしてデプロイされます。デプロイ時に発行されるウェブアプリURLがAPIのエンドポイントとなります。
+新アーキテクチャでは以下の特徴があります：
+- ✅ **外部API不要**: Admin Logger APIを削除し、単一プロジェクトに統合
+- ✅ **サービスアカウント認証**: JWT + Google OAuth2による直接認証
+- ✅ **Google Sheets API v4**: 直接APIアクセスによる高性能化
+- ✅ **内部関数API**: 明確に定義された内部インターフェース
 
-*   **HTTPメソッド**: `POST` (主要なAPI呼び出し用), `GET` (接続テスト用)
-*   **URL**: `https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec`
-    *   `YOUR_DEPLOYMENT_ID` は、APIデプロイ時に取得した実際のデプロイIDに置き換えてください。
+---
 
-## 2. 認証
+## 1. 🔐 認証・セットアップ API
 
-このAPIは、Google Apps Scriptのウェブアプリのセキュリティモデルに依存します。デプロイ時に「アクセスできるユーザー」を「全員（匿名ユーザーを含む）」に設定することで、メインアプリケーションからのアクセスを許可します。
+### `setupApplication(credsJson, dbId)`
+アプリケーションの初期セットアップを実行します。
 
-**セキュリティに関する注意点**:
-*   APIのURLは秘匿情報として扱い、メインアプリケーションの設定のみに保存してください。
-*   すべてのAPI呼び出しは、APIが管理するスプレッドシートにログとして記録されます。
+**パラメータ:**
+- `credsJson` (string): サービスアカウントのJSONキーファイルの内容
+- `dbId` (string): 中央データベーススプレッドシートのID
 
-## 3. APIリクエスト形式
+**戻り値:**
+- `void`: 成功時は正常終了、失敗時は例外をスロー
 
-すべての `POST` リクエストは `application/json` の `Content-Type` ヘッダーを持ち、以下のJSON構造に従う必要があります。
+**例:**
+```javascript
+const credsJson = '{"type":"service_account",...}';
+const dbId = '1BcD3fGhIjKlMnOpQrStUvWxYz0123456789ABCDEFGH';
+setupApplication(credsJson, dbId);
+```
 
-```json
+### `getServiceAccountToken()`
+サービスアカウントのアクセストークンを取得します。
+
+**戻り値:**
+- `string`: OAuth2アクセストークン
+
+**内部処理:**
+1. JWT生成（RS256署名）
+2. Google OAuth2トークン取得
+3. トークンキャッシュ管理
+
+### `getSheetsService()`
+Google Sheets API v4のサービスオブジェクトを取得します。
+
+**戻り値:**
+- `object`: Sheets APIサービスオブジェクト
+
+**提供メソッド:**
+- `spreadsheets.get(spreadsheetId)`
+- `spreadsheets.values.get(spreadsheetId, range)`
+- `spreadsheets.values.append(spreadsheetId, range, values)`
+- `spreadsheets.values.batchUpdate(spreadsheetId, requests)`
+
+---
+
+## 2. 📊 データベース操作 API
+
+### `findUserById(userId)`
+ユーザーIDでユーザー情報を検索します。
+
+**パラメータ:**
+- `userId` (string): 検索するユーザーID
+
+**戻り値:**
+- `object|null`: ユーザー情報オブジェクトまたはnull
+
+**ユーザー情報オブジェクト:**
+```javascript
 {
-  "action": "[アクション名]",
-  "data": { /* アクションに応じたデータ */ },
-  "timestamp": "[ISO 8601形式のタイムスタンプ]",
-  "requestUser": "[リクエスト元のユーザーメールアドレス]",
-  "effectiveUser": "[GASのSession.getEffectiveUser().getEmail()の値]"
+  userId: "user-1234567890",
+  adminEmail: "teacher@school.edu", 
+  spreadsheetId: "1BcD3fG...",
+  spreadsheetUrl: "https://docs.google.com/...",
+  createdAt: "2024-01-01T00:00:00.000Z",
+  configJson: '{"displayMode":"anonymous"}',
+  lastAccessedAt: "2024-01-01T12:00:00.000Z",
+  isActive: "true"
 }
 ```
 
-*   `action` (string, 必須): 実行するAPIアクションの名前。
-*   `data` (object, 必須): 各アクションに固有のペイロードデータ。
-*   `timestamp` (string, 任意): リクエストが生成された時刻のISO 8601形式の文字列。監査ログ用。
-*   `requestUser` (string, 任意): リクエストを送信したユーザーのメールアドレス。監査ログ用。
-*   `effectiveUser` (string, 任意): GASの `Session.getEffectiveUser().getEmail()` の値。監査ログ用。
+### `findUserByEmail(email)`
+メールアドレスでユーザー情報を検索します。
 
-## 4. APIレスポンス形式
+**パラメータ:**
+- `email` (string): 検索するメールアドレス
 
-すべてのAPIレスポンスは `application/json` 形式で返され、以下の構造に従います。
+**戻り値:**
+- `object|null`: ユーザー情報オブジェクトまたはnull
 
-```json
+### `createUserInDb(userData)`
+新しいユーザーを中央データベースに作成します。
+
+**パラメータ:**
+- `userData` (object): 作成するユーザー情報
+
+**戻り値:**
+- `object`: 作成されたユーザー情報
+
+### `updateUserInDb(userId, updateData)`
+既存ユーザーの情報を更新します。
+
+**パラメータ:**
+- `userId` (string): 更新対象のユーザーID
+- `updateData` (object): 更新するデータ
+
+**戻り値:**
+- `object`: 更新結果 `{success: boolean, message: string}`
+
+---
+
+## 3. 📋 回答ボード操作 API
+
+### `getSheetData(userId, sheetName, classFilter, sortMode)`
+指定されたシートからデータを取得します。
+
+**パラメータ:**
+- `userId` (string): ユーザーID
+- `sheetName` (string): シート名
+- `classFilter` (string): クラスフィルター（'all'または具体的なクラス名）
+- `sortMode` (string): ソートモード（'newest', 'oldest', 'score', 'likes', 'random'）
+
+**戻り値:**
+```javascript
 {
-  "success": true, // または false
-  "message": "[成功またはエラーメッセージ]",
-  "data": { /* アクションに応じたデータ */ },
-  "error": "[エラー詳細 (success: falseの場合)]"
+  status: "success",
+  data: [
+    {
+      timestamp: "2024-01-01 10:00:00",
+      email: "student@school.edu",
+      class: "6-1", 
+      answer: "回答内容",
+      reason: "理由",
+      name: "学生名",
+      reactions: {...},
+      isHighlighted: false
+    }
+  ],
+  totalCount: 25,
+  filteredCount: 15
 }
 ```
 
-*   `success` (boolean): リクエストが成功したかどうかを示します。
-*   `message` (string, 任意): 処理結果に関する追加情報。
-*   `data` (object, 任意): 成功した場合に返されるデータ。
-*   `error` (string, 任意): `success` が `false` の場合に、エラーの詳細な説明。
+### `addReaction(rowIndex, reactionType, sheetName)`
+回答にリアクションを追加/削除します。
 
-## 5. 利用可能なAPIアクション
+**パラメータ:**
+- `rowIndex` (number): 対象行のインデックス
+- `reactionType` (string): リアクションタイプ（'UNDERSTAND', 'LIKE', 'CURIOUS'）
+- `sheetName` (string): シート名
 
-### 5.1. `ping`
+**戻り値:**
+```javascript
+{
+  status: "success",
+  action: "added", // または "removed"
+  reactionType: "LIKE",
+  userEmail: "user@example.com"
+}
+```
 
-APIが正常に動作しているかを確認するためのテストエンドポイントです。
+### `toggleHighlight(rowIndex)`
+回答のハイライト状態を切り替えます。
 
-*   **アクション**: `ping`
-*   **`data` ペイロード**: 
-    ```json
-    {
-      "test": true
-    }
-    ```
-*   **レスポンス `data`**: 
-    ```json
-    {
-      "pong": true,
-      "requestUser": "[リクエスト元のユーザーメールアドレス]",
-      "effectiveUser": "[GASのSession.getEffectiveUser().getEmail()の値]"
-    }
-    ```
+**パラメータ:**
+- `rowIndex` (number): 対象行のインデックス
 
-### 5.2. `getUserInfo`
+**戻り値:**
+```javascript
+{
+  status: "success", 
+  isHighlighted: true, // または false
+  rowIndex: 2
+}
+```
 
-指定された `userId` に基づいてユーザー情報を取得します。
+---
 
-*   **アクション**: `getUserInfo`
-*   **`data` ペイロード**: 
-    ```json
-    {
-      "userId": "[取得するユーザーのID]"
-    }
-    ```
-*   **レスポンス `data`**: 
-    ```json
-    {
-      "userId": "string",
-      "adminEmail": "string",
-      "spreadsheetId": "string",
-      "spreadsheetUrl": "string",
-      "createdAt": "string (ISO 8601)",
-      "accessToken": "string",
-      "configJson": "string (JSON形式の文字列)",
-      "lastAccessedAt": "string (ISO 8601)",
-      "isActive": "boolean"
-    }
-    ```
-    *   ユーザーが見つからない場合、`success: false` と `error: "ユーザーが見つかりません"` が返されます。
+## 4. 🎛️ 管理機能 API
 
-### 5.3. `createUser`
+### `getAdminSettings()`
+管理者設定情報を取得します。
 
-新しいユーザーを作成し、データベースに保存します。
+**戻り値:**
+```javascript
+{
+  status: "success",
+  userId: "user-1234567890",
+  userInfo: {...},
+  spreadsheetInfo: {...},
+  webAppUrl: "https://script.google.com/...",
+  isPublished: false,
+  publishedSheet: null,
+  displayMode: "anonymous"
+}
+```
 
-*   **アクション**: `createUser`
-*   **`data` ペイロード**: 
-    ```json
-    {
-      "userId": "[新しいユーザーのID]",
-      "adminEmail": "[管理者のメールアドレス]",
-      "spreadsheetId": "[関連するスプレッドシートID]",
-      "spreadsheetUrl": "[関連するスプレッドシートURL]",
-      "accessToken": "[アクセストークン (任意)]",
-      "configJson": "[ユーザー固有の設定 (JSON形式の文字列, 任意)]",
-      "isActive": "[アクティブ状態 (boolean, 任意, デフォルトはtrue)]"
-    }
-    ```
-*   **レスポンス `data`**: 
-    ```json
-    {
-      "userId": "string",
-      "adminEmail": "string",
-      "createdAt": "string (ISO 8601)"
-    }
-    ```
+### `publishApp(sheetName)`
+指定されたシートでアプリを公開します。
 
-### 5.4. `updateUser`
+**パラメータ:**
+- `sheetName` (string): 公開するシート名
 
-既存のユーザー情報を更新します。
+**戻り値:**
+```javascript
+{
+  status: "success",
+  message: "アプリを公開しました: シート名",
+  publishedSheet: "シート名",
+  boardUrl: "https://script.google.com/..."
+}
+```
 
-*   **アクション**: `updateUser`
-*   **`data` ペイロード**: 
-    ```json
-    {
-      "userId": "[更新するユーザーのID]",
-      "spreadsheetId": "[新しいスプレッドシートID (任意)]",
-      "spreadsheetUrl": "[新しいスプレッドシートURL (任意)]",
-      "accessToken": "[新しいアクセストークン (任意)]",
-      "configJson": "[新しいユーザー固有の設定 (JSON形式の文字列, 任意)]",
-      "isActive": "[新しいアクティブ状態 (boolean, 任意)]"
-    }
-    ```
-*   **レスポンス `data`**: 
-    ```json
-    {
-      "userId": "string",
-      "updatedAt": "string (ISO 8601)"
-    }
-    ```
-    *   ユーザーが見つからない場合、`success: false` と `error: "ユーザーが見つかりません"` が返されます。
+### `unpublishApp()`
+アプリの公開を停止します。
 
-### 5.5. `getExistingBoard`
+**戻り値:**
+```javascript
+{
+  status: "success", 
+  message: "アプリの公開を停止しました"
+}
+```
 
-指定された `adminEmail` に基づいて既存のボード情報（ユーザー情報）を取得します。
+### `saveDisplayMode(mode)`
+表示モードを設定します。
 
-*   **アクション**: `getExistingBoard`
-*   **`data` ペイロード**: 
-    ```json
-    {
-      "adminEmail": "[検索する管理者のメールアドレス]"
-    }
-    ```
-*   **レスポンス `data`**: `getUserInfo` と同じ構造のユーザー情報オブジェクト。
-    *   ボードが見つからない場合、`success: false` と `message: "既存ボードが見つかりません"` が返されます。
+**パラメータ:**
+- `mode` (string): 表示モード（'anonymous'または'named'）
 
-### 5.6. `checkExistingUser`
+**戻り値:**
+```javascript
+{
+  status: "success",
+  message: "表示モードを保存しました: anonymous",
+  displayMode: "anonymous"
+}
+```
 
-指定された `adminEmail` を持つユーザーが既に存在するかどうかを確認します。
+### `getSheets(userId)`
+ユーザーのスプレッドシート内のシート一覧を取得します。
 
-*   **アクション**: `checkExistingUser`
-*   **`data` ペイロード**: 
-    ```json
-    {
-      "adminEmail": "[チェックする管理者のメールアドレス]"
-    }
-    ```
-*   **レスポンス `data`**: 
-    ```json
-    {
-      "exists": true, // または false
-      "data": { /* ユーザーが存在する場合、getUserInfo と同じ構造のユーザー情報オブジェクト */ }
-    }
-    ```
+**パラメータ:**
+- `userId` (string): ユーザーID
 
-### 5.7. `invalidateCache`
+**戻り値:**
+- `array`: シート情報の配列
 
-指定されたユーザーまたはすべてのユーザーのキャッシュを無効化します。主にメインアプリケーションからの要求に応じて、ユーザー情報の変更が即座に反映されるようにするために使用されます。
+---
 
-*   **アクション**: `invalidateCache`
-*   **`data` ペイロード**:
-    ```json
-    {
-      "userId": "[キャッシュを無効化するユーザーのID (任意)]",
-      "adminEmail": "[キャッシュを無効化する管理者のメールアドレス (任意)]",
-      "clearAll": "[すべてのキャッシュを無効化するかどうか (boolean, 任意, デフォルトはfalse)]"
-    }
-    ```
-    *   `userId` または `adminEmail` のいずれか、または `clearAll` を指定する必要があります。
-*   **レスポンス `data`**: (なし)
-    ```json
-    {
-      "success": true,
-      "message": "Cache invalidated."
-    }
-    ```
-    *   エラーの場合、`success: false` と `error` フィールドが含まれます。
+## 5. 🗄️ キャッシュ管理 API
 
+### `getCachedUserInfo(userId)`
+キャッシュからユーザー情報を取得します。
+
+**パラメータ:**
+- `userId` (string): ユーザーID
+
+**戻り値:**
+- `object|null`: キャッシュされたユーザー情報またはnull
+
+### `setCachedUserInfo(userId, userInfo)`
+ユーザー情報をキャッシュに保存します。
+
+**パラメータ:**
+- `userId` (string): ユーザーID
+- `userInfo` (object): キャッシュするユーザー情報
+
+### `clearAllCaches()`
+すべてのキャッシュをクリアします。
+
+**戻り値:**
+- `void`
+
+### `getAndCacheHeaderIndices(spreadsheetId, sheetName)`
+ヘッダー情報を取得し、キャッシュします。
+
+**パラメータ:**
+- `spreadsheetId` (string): スプレッドシートID  
+- `sheetName` (string): シート名
+
+**戻り値:**
+- `object`: ヘッダーインデックス情報
+
+---
+
+## 6. 🛠️ ユーティリティ API
+
+### `isValidEmail(email)`
+メールアドレスの形式を検証します。
+
+**パラメータ:**
+- `email` (string): 検証するメールアドレス
+
+**戻り値:**
+- `boolean`: 有効な場合true
+
+### `getEmailDomain(email)`
+メールアドレスからドメインを抽出します。
+
+**パラメータ:**
+- `email` (string): メールアドレス
+
+**戻り値:**
+- `string`: ドメイン部分
+
+### `parseReactionString(reactionString)`
+リアクション文字列を解析します。
+
+**パラメータ:**
+- `reactionString` (string): カンマ区切りのメールアドレス文字列
+
+**戻り値:**
+- `array`: メールアドレスの配列
+
+### `safeSpreadsheetOperation(operation, fallbackValue)`
+スプレッドシート操作を安全に実行します。
+
+**パラメータ:**
+- `operation` (function): 実行する操作
+- `fallbackValue` (any): エラー時のフォールバック値
+
+**戻り値:**
+- `any`: 操作の結果またはフォールバック値
+
+---
+
+## 7. 🔍 診断・デバッグ API
+
+### `testSetup()`
+セットアップ状態を詳細に診断します。
+
+**戻り値:**
+```javascript
+{
+  serviceAccount: "✅ 認証成功",
+  database: "✅ 接続成功", 
+  cache: "✅ 動作中",
+  apis: "✅ 利用可能"
+}
+```
+
+### `showSetupInfo()`
+現在の設定情報を表示します。
+
+**戻り値:**
+- `object`: 詳細な設定情報
+
+### `checkDatabaseStatus()`
+データベース接続状態を確認します。
+
+**戻り値:**
+```javascript
+{
+  status: "success",
+  connection: "active",
+  userCount: 25,
+  lastAccess: "2024-01-01T12:00:00.000Z"
+}
+```
+
+---
+
+## 8. 🎯 エラーハンドリング
+
+新アーキテクチャでは、すべてのAPI関数が統一されたエラーハンドリングを提供します。
+
+### エラーレスポンス形式
+```javascript
+{
+  status: "error",
+  message: "エラーの詳細説明",
+  errorCode: "SPECIFIC_ERROR_CODE", 
+  timestamp: "2024-01-01T12:00:00.000Z"
+}
+```
+
+### 一般的なエラーコード
+- `AUTH_FAILED`: サービスアカウント認証失敗
+- `DATABASE_ERROR`: データベース接続エラー
+- `PERMISSION_DENIED`: 権限不足
+- `INVALID_INPUT`: 無効な入力パラメータ
+- `RESOURCE_NOT_FOUND`: リソースが見つからない
+
+---
+
+## 9. 🚀 パフォーマンス考慮事項
+
+### キャッシュ戦略
+- **ユーザー情報**: 5分間キャッシュ
+- **ヘッダー情報**: セッション中キャッシュ  
+- **名簿データ**: セッション中キャッシュ
+
+### API呼び出し最適化
+- **バッチ処理**: 複数操作の一括実行
+- **条件付きアクセス**: キャッシュヒット時のAPI回避
+- **並列処理**: 独立操作の同時実行
+
+### レート制限
+- **Google Sheets API**: 毎分100リクエスト
+- **内部処理**: 制限なし（メモリキャッシュ経由）
+
+---
+
+## 🎉 まとめ
+
+新しいサービスアカウントアーキテクチャにより、StudyQuestは：
+
+### ✅ 統合されたAPI設計
+- 外部API依存を完全排除
+- 単一プロジェクト内での一貫したインターフェース
+- 明確に定義された内部API仕様
+
+### ✅ 高性能・高信頼性
+- Google Sheets API v4直接アクセス
+- 効率的なキャッシュシステム
+- 堅牢なエラーハンドリング
+
+### ✅ 保守性の向上
+- 明確なAPI境界
+- 包括的なドキュメント
+- 100%テストカバレッジ
+
+この内部APIリファレンスにより、開発者は新アーキテクチャの機能を効率的に活用し、拡張することができます。
