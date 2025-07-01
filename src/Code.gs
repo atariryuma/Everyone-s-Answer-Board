@@ -54,7 +54,7 @@ const TIME_CONSTANTS = {
 const REACTION_KEYS = ["UNDERSTAND","LIKE","CURIOUS"];
 const EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
 // Debug flag. Set to true to enable verbose logging
-var DEBUG = false; // パフォーマンス向上のためデバッグログを無効化
+var DEBUG = true; // デバッグモードを有効化してフォーム作成の問題を調査
 
 function debugLog() {
   if (DEBUG && typeof console !== 'undefined' && console.log) {
@@ -2898,6 +2898,44 @@ function checkRateLimit(action, userEmail) {
   }
 }
 
+/**
+ * フォーム作成機能のテスト関数
+ * 管理者がコンソールから実行して問題を特定できます
+ */
+function testFormCreation() {
+  try {
+    console.log('=== フォーム作成テスト開始 ===');
+    
+    // 現在のユーザー情報を取得
+    const currentUser = Session.getActiveUser().getEmail();
+    console.log('現在のユーザー:', currentUser);
+    
+    // API利用可能性をチェック
+    console.log('API利用可能性チェック:');
+    console.log('- FormApp:', typeof FormApp !== 'undefined');
+    console.log('- DriveApp:', typeof DriveApp !== 'undefined');
+    console.log('- SpreadsheetApp:', typeof SpreadsheetApp !== 'undefined');
+    
+    // テスト用ユーザーIDを生成
+    const testUserId = Utilities.getUuid();
+    console.log('テスト用ユーザーID:', testUserId);
+    
+    // フォーム作成をテスト
+    console.log('フォーム作成テスト開始...');
+    const result = createStudyQuestForm(currentUser, testUserId);
+    console.log('フォーム作成テスト成功:', result);
+    
+    return '✅ フォーム作成テストが成功しました。詳細はログを確認してください。';
+    
+  } catch (error) {
+    console.error('フォーム作成テストエラー:', error);
+    console.error('エラータイプ:', error.name);
+    console.error('エラーメッセージ:', error.message);
+    console.error('スタックトレース:', error.stack);
+    
+    return `❌ フォーム作成テストが失敗しました: ${error.message}`;
+  }
+}
 
 function generateStudentBoardUrl(userId) {
   if (!userId) {
@@ -2929,12 +2967,17 @@ function createStudyQuestForm(userEmail, userId) {
     }
     
     // ユーザー専用フォルダを取得または作成
+    debugLog('📁 ユーザーフォルダ取得開始:', userEmail);
     const userFolder = getUserFolder(userEmail);
+    debugLog('✅ ユーザーフォルダ取得完了:', userFolder.getName());
     
     // 新しいGoogleフォームを作成（作成日時を含む）
     const now = new Date();
     const dateTimeString = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
-    const form = FormApp.create(`StudyQuest - みんなの回答ボード - ${userEmail.split('@')[0]} - ${dateTimeString}`);
+    const formTitle = `StudyQuest - みんなの回答ボード - ${userEmail.split('@')[0]} - ${dateTimeString}`;
+    debugLog('📝 Googleフォーム作成開始:', formTitle);
+    const form = FormApp.create(formTitle);
+    debugLog('✅ Googleフォーム作成完了:', form.getId());
     
     // メールアドレス収集を有効にし、確認済み（自動取得）に設定
     form.setCollectEmail(true);
@@ -3056,12 +3099,20 @@ function createStudyQuestForm(userEmail, userId) {
     reasonItem.setRequired(false);
     
     // フォームの回答先スプレッドシートを作成（作成日時を含む）
-    const spreadsheet = SpreadsheetApp.create(`StudyQuest - みんなの回答ボード - 回答データ - ${userEmail.split('@')[0]} - ${dateTimeString}`);
+    const spreadsheetTitle = `StudyQuest - みんなの回答ボード - 回答データ - ${userEmail.split('@')[0]} - ${dateTimeString}`;
+    debugLog('📊 スプレッドシート作成開始:', spreadsheetTitle);
+    const spreadsheet = SpreadsheetApp.create(spreadsheetTitle);
+    debugLog('✅ スプレッドシート作成完了:', spreadsheet.getId());
+    
+    debugLog('🔗 フォーム-スプレッドシート連携開始');
     form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheet.getId());
+    debugLog('✅ フォーム-スプレッドシート連携完了');
 
     // ファイルをユーザー専用フォルダに移動
+    debugLog('📁 ファイル移動開始');
     const formFile = DriveApp.getFileById(form.getId());
     const spreadsheetFile = DriveApp.getFileById(spreadsheet.getId());
+    debugLog('✅ ファイルオブジェクト取得完了');
     
     try {
       formFile.moveTo(userFolder);
@@ -3141,6 +3192,14 @@ function createStudyQuestForm(userEmail, userId) {
 
   } catch (error) {
     console.error('Failed to create form and spreadsheet:', error);
+    console.error('Error type:', error.name);
+    console.error('Error stack:', error.stack);
+    
+    // API利用可能性チェック
+    console.log('API availability check:');
+    console.log('- FormApp available:', typeof FormApp !== 'undefined');
+    console.log('- DriveApp available:', typeof DriveApp !== 'undefined');
+    console.log('- SpreadsheetApp available:', typeof SpreadsheetApp !== 'undefined');
     
     // FormAppが利用できない場合はスプレッドシートのみ作成
     if (error.message.includes('Google Forms API is not available') || error.message.includes('FormApp')) {
@@ -3149,12 +3208,17 @@ function createStudyQuestForm(userEmail, userId) {
     }
     
     // 権限エラーの場合
-    if (error.message.includes('permission') || error.message.includes('Permission')) {
+    if (error.message.includes('permission') || error.message.includes('Permission') || error.message.includes('権限')) {
       throw new Error('Googleフォーム作成の権限がありません。管理者にお問い合わせください。');
     }
     
+    // スコープエラーの場合
+    if (error.message.includes('scope') || error.message.includes('authorization')) {
+      throw new Error('OAuth認証スコープの問題です。アプリケーションの権限設定を確認してください。');
+    }
+    
     // その他のエラー詳細を含める
-    throw new Error(`Googleフォームとスプレッドシートの作成に失敗しました。詳細: ${error.message}`);
+    throw new Error(`Googleフォームとスプレッドシートの作成に失敗しました。詳細: ${error.message} (Type: ${error.name})`);
   }
 }
 
@@ -3163,20 +3227,26 @@ function createStudyQuestForm(userEmail, userId) {
    * 現在ログイン中のユーザーの新しいボードを作成し、公開・アクティブ化まで行います。
    */
 function createBoardFromAdmin() {
+  debugLog('🚀 管理者用ボード作成開始');
   if (!checkAdmin()) {
     throw new Error('権限がありません。');
   }
   try {
     const currentUserEmail = safeGetUserEmail();
+    debugLog('👤 現在のユーザー:', currentUserEmail);
+    
     const props = PropertiesService.getUserProperties();
     const userId = props.getProperty('CURRENT_USER_ID');
+    debugLog('🆔 ユーザーID:', userId);
 
     if (!userId) {
       throw new Error('ユーザーIDが見つかりません。ページをリロードして再試行してください。');
     }
 
-    // 1. Googleフォームとスプレッドシートを作成（テンプレートから複製、共有設定、回答後URL設定済み）
+    // 1. Googleフォームとスプレッドシートを作成
+    debugLog('📝 管理者用フォーム作成開始');
     const result = createStudyQuestForm(currentUserEmail, userId);
+    debugLog('✅ 管理者用フォーム作成完了:', result);
     
     // 2. 作成されたスプレッドシートを現在のユーザーのメインスプレッドシートとして設定
     if (result.spreadsheetId && result.spreadsheetUrl) {
@@ -3551,10 +3621,27 @@ function registerNewUser(adminEmail) {
   }
   debugLog(`📋 ユーザーID生成完了: ${userId}`);
   
-  // 📝 ステップ3: Googleフォームとスプレッドシートを作成（テンプレートから複製）
-  debugLog(`📝 フォーム・スプレッドシート作成開始（テンプレート使用）: ${adminEmail}`);
-  const formAndSsInfo = createStudyQuestForm(adminEmail, userId);
-  debugLog(`✅ フォーム・スプレッドシート作成完了`);
+  // 📝 ステップ3: Googleフォームとスプレッドシートを作成
+  debugLog(`📝 フォーム・スプレッドシート作成開始: ${adminEmail}`);
+  debugLog(`📝 使用するユーザーID: ${userId}`);
+  let formAndSsInfo;
+  try {
+    formAndSsInfo = createStudyQuestForm(adminEmail, userId);
+    debugLog(`✅ フォーム・スプレッドシート作成完了:`, formAndSsInfo);
+    
+    // 作成されたファイルの詳細をログ出力
+    if (formAndSsInfo.formId) {
+      debugLog(`📝 作成されたフォームID: ${formAndSsInfo.formId}`);
+      debugLog(`📝 フォームURL: ${formAndSsInfo.formUrl}`);
+    }
+    if (formAndSsInfo.spreadsheetId) {
+      debugLog(`📊 作成されたスプレッドシートID: ${formAndSsInfo.spreadsheetId}`);
+      debugLog(`📊 スプレッドシートURL: ${formAndSsInfo.spreadsheetUrl}`);
+    }
+  } catch (formCreationError) {
+    console.error('フォーム作成中にエラーが発生しました:', formCreationError);
+    throw new Error(`フォーム作成エラー: ${formCreationError.message}`);
+  }
   
   // 📝 ステップ4: API経由でデータベースに新規ユーザー情報を追加
   const userData = {
