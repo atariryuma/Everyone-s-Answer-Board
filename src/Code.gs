@@ -508,22 +508,102 @@ function getUserFolder(userEmail) {
  * @param {string[]} fileIds
  */
 function queueFolderSetup(userEmail, fileIds) {
-  const props = PropertiesService.getScriptProperties();
-  const raw = props.getProperty('FOLDER_SETUP_QUEUE') || '[]';
-  const queue = JSON.parse(raw);
-  queue.push({ userEmail: userEmail, fileIds: fileIds });
-  props.setProperty('FOLDER_SETUP_QUEUE', JSON.stringify(queue));
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const raw = props.getProperty('FOLDER_SETUP_QUEUE') || '[]';
+    const queue = JSON.parse(raw);
+    queue.push({ userEmail: userEmail, fileIds: fileIds });
+    props.setProperty('FOLDER_SETUP_QUEUE', JSON.stringify(queue));
 
-  if (!isFolderSetupTriggerExists()) {
-    ScriptApp.newTrigger('runQueuedFolderSetup')
-      .timeBased()
-      .after(1 * 60 * 1000)
-      .create();
+    if (!isFolderSetupTriggerExists()) {
+      ScriptApp.newTrigger('runQueuedFolderSetup')
+        .timeBased()
+        .after(1 * 60 * 1000)
+        .create();
+    }
+    debugLog('✅ フォルダセットアップをキューに追加しました');
+  } catch (error) {
+    if (error.message.includes('script.scriptapp') || error.message.includes('ScriptApp.getProjectTriggers')) {
+      debugLog('⚠️ トリガー権限不足のため、フォルダセットアップを即座に実行します');
+      // 権限不足の場合は即座に実行
+      try {
+        performFolderSetup(userEmail, fileIds);
+      } catch (immediateError) {
+        debugLog('❌ 即座実行も失敗:', immediateError.message);
+        // フォルダセットアップエラーはファイル作成の成功に影響しないため、警告のみ
+        console.warn('Folder setup failed but file creation succeeded:', immediateError.message);
+      }
+    } else {
+      throw error; // 他のエラーは再スロー
+    }
   }
 }
 
 function isFolderSetupTriggerExists() {
-  return ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'runQueuedFolderSetup');
+  try {
+    return ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'runQueuedFolderSetup');
+  } catch (error) {
+    if (error.message.includes('script.scriptapp') || error.message.includes('ScriptApp.getProjectTriggers')) {
+      debugLog('⚠️ トリガー確認権限不足 - false を返します');
+      return false; // 権限不足の場合はトリガーが存在しないものとして扱う
+    }
+    throw error;
+  }
+}
+
+/**
+ * フォルダセットアップを即座に実行（トリガー権限がない場合のフォールバック）
+ */
+function performFolderSetup(userEmail, fileIds) {
+  try {
+    debugLog('📁 即座フォルダセットアップ開始:', userEmail, fileIds);
+    
+    // ユーザーフォルダの取得（存在しない場合は作成スキップ）
+    const userFolder = getUserFolder(userEmail);
+    
+    if (!userFolder) {
+      debugLog('⚠️ ユーザーフォルダが存在しないため、ファイル移動をスキップします');
+      return;
+    }
+    
+    // ファイルをユーザーフォルダに移動
+    for (const fileId of fileIds) {
+      try {
+        const file = DriveApp.getFileById(fileId);
+        const fileName = file.getName();
+        
+        // 既にユーザーフォルダにある場合はスキップ
+        const parents = file.getParents();
+        let alreadyInUserFolder = false;
+        while (parents.hasNext()) {
+          const parent = parents.next();
+          if (parent.getId() === userFolder.getId()) {
+            alreadyInUserFolder = true;
+            break;
+          }
+        }
+        
+        if (alreadyInUserFolder) {
+          debugLog(`✅ ファイルは既にユーザーフォルダにあります: ${fileName}`);
+          continue;
+        }
+        
+        // ファイルをユーザーフォルダに移動
+        file.moveTo(userFolder);
+        debugLog(`✅ ファイルをユーザーフォルダに移動: ${fileName}`);
+        
+      } catch (fileError) {
+        debugLog(`❌ ファイル移動エラー (${fileId}):`, fileError.message);
+        // 個別ファイルのエラーは全体の処理を停止しない
+      }
+    }
+    
+    debugLog('✅ フォルダセットアップ完了');
+    
+  } catch (error) {
+    debugLog('❌ フォルダセットアップエラー:', error.message);
+    throw error;
+  }
 }
 
 /**
