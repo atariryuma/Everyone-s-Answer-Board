@@ -1781,22 +1781,31 @@ function getActiveFormInfo() {
         // 方法1: ユーザー設定からフォームURLを取得（最も高速）
         if (!form) {
           debugLog('🔍 Method 1: Checking user config for form URL...');
-          if (userInfo.configJson && userInfo.configJson.formUrl) {
-          try {
-            const formUrl = userInfo.configJson.formUrl;
-            debugLog('📋 Found form URL in config:', formUrl);
-            const match = formUrl.match(/\/forms\/d\/(?:e\/)?([a-zA-Z0-9-_]+)/);
-            if (match) {
-              formId = match[1];
-              debugLog('🆔 Extracted form ID:', formId);
-              form = FormApp.openById(formId);
-              debugLog('✅ Method 1 SUCCESS: Found form via user config');
-            } else {
-              debugLog('❌ Method 1 FAILED: Invalid form URL format');
+          if (userInfo.configJson && (userInfo.configJson.formUrl || userInfo.configJson.editFormUrl)) {
+            // editFormUrl を優先（より確実なフォームID）
+            const urlsToTry = [
+              { url: userInfo.configJson.editFormUrl, name: 'editFormUrl' },
+              { url: userInfo.configJson.formUrl, name: 'formUrl' }
+            ].filter(item => item.url);
+            
+            for (const { url, name } of urlsToTry) {
+              try {
+                debugLog(`📋 Trying ${name}:`, url);
+                const match = url.match(/\/forms\/d\/(?:e\/)?([a-zA-Z0-9-_]+)/);
+                if (match) {
+                  formId = match[1];
+                  debugLog(`🆔 Extracted form ID from ${name}:`, formId);
+                  form = FormApp.openById(formId);
+                  debugLog(`✅ Method 1 SUCCESS: Found form via ${name}`);
+                  break;
+                } else {
+                  debugLog(`❌ Invalid ${name} format:`, url);
+                }
+              } catch (e) {
+                debugLog(`❌ Method 1 FAILED with ${name}:`, e.message);
+                // 次のURLを試す
+              }
             }
-          } catch (e) {
-            debugLog('❌ Method 1 FAILED (user config):', e.message);
-          }
           } else {
             debugLog('❌ Method 1 SKIPPED: No form URL in user config');
           }
@@ -1883,8 +1892,9 @@ function getActiveFormInfo() {
         }
         
         return {
-          formUrl: form.getPublishedUrl(),
-          editUrl: 'https://docs.google.com/forms/d/' + formId + '/edit',
+          formUrl: `https://docs.google.com/forms/d/${formId}/viewform`, // 一貫性のためformIdベースのURL
+          publishedUrl: form.getPublishedUrl(), // 元のpublished URLも保持
+          editUrl: `https://docs.google.com/forms/d/${formId}/edit`,
           formId: formId,
           title: form.getTitle()
         };
@@ -3420,7 +3430,9 @@ function createStudyQuestForm(userEmail, userId) {
       formUrl: form.getPublishedUrl(),
       spreadsheetId: spreadsheet.getId(),
       spreadsheetUrl: spreadsheet.getUrl(),
-      editFormUrl: form.getEditUrl()
+      editFormUrl: form.getEditUrl(),
+      // 一貫性のためフォームIDベースのURLも提供
+      viewFormUrl: `https://docs.google.com/forms/d/${form.getId()}/viewform`
     };
 
   } catch (error) {
@@ -3836,7 +3848,7 @@ function registerNewUser(adminEmail) {
   
   // 📝 ステップ4: API経由でデータベースに新規ユーザー情報を追加
   const initialConfig = {
-    formUrl: formAndSsInfo.formUrl,
+    formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl, // 一貫性のためviewFormUrlを優先
     editFormUrl: formAndSsInfo.editFormUrl,
     createdAt: new Date().toISOString()
   };
