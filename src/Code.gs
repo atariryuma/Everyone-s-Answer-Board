@@ -85,6 +85,7 @@ function setupApplication() {
   try {
     // 入力値を検証
     JSON.parse(credsJson);
+    // 安全なRegExpコンストラクタを使用
     const sheetIdRegex = new RegExp("^[a-zA-Z0-9-_]{44}$");
     if (!sheetIdRegex.test(dbId)) {
       throw new Error('無効なスプレッドシートIDです。');
@@ -102,7 +103,7 @@ function setupApplication() {
     ui.alert('✅ セットアップが正常に完了しました。');
   } catch (e) {
     console.error('セットアップエラー:', e);
-    ui.alert(`セットアップに失敗しました: ${e.message}`);
+    ui.alert('セットアップに失敗しました: ' + e.message);
   }
 }
 
