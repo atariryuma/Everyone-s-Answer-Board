@@ -63,30 +63,10 @@ function debugLog() {
 /**
  * アプリケーションの初期セットアップ（管理者が手動で実行）
  * サービスアカウントの認証情報とデータベースのスプレッドシートIDを設定する。
+ * @param {string} credsJson - ダウンロードしたサービスアカウントのJSONキーファイルの内容
+ * @param {string} dbId - 中央データベースとして使用するスプレッドシートのID
  */
-function setupApplication() {
-  var ui = SpreadsheetApp.getUi();
-  
-  var credsPrompt = ui.prompt(
-    'サービスアカウント認証情報の設定',
-    'ダウンロードしたサービスアカウントのJSONキーファイルの内容を貼り付けてください。',
-    ui.ButtonSet.OK_CANCEL
-  );
-  if (credsPrompt.getSelectedButton() !== ui.Button.OK) {
-    return;
-  }
-  var credsJson = credsPrompt.getResponseText();
-  
-  var dbIdPrompt = ui.prompt(
-    'データベースのスプレッドシートIDの設定',
-    '中央データベースとして使用するスプレッドシートのIDを入力してください。',
-    ui.ButtonSet.OK_CANCEL
-  );
-  if (dbIdPrompt.getSelectedButton() !== ui.Button.OK) {
-    return;
-  }
-  var dbId = dbIdPrompt.getResponseText();
-
+function setupApplication(credsJson, dbId) {
   try {
     JSON.parse(credsJson);
     var sheetIdRegex = new RegExp("^[a-zA-Z0-9-_]{44}$");
@@ -101,10 +81,10 @@ function setupApplication() {
     // データベースシートの初期化
     initializeDatabaseSheet(dbId);
 
-    ui.alert('✅ セットアップが正常に完了しました。');
+    console.log('✅ セットアップが正常に完了しました。');
   } catch (e) {
     console.error('セットアップエラー:', e);
-    ui.alert('セットアップに失敗しました: ' + e.message);
+    throw new Error('セットアップに失敗しました: ' + e.message);
   }
 }
 
