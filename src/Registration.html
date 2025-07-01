@@ -196,6 +196,22 @@
       }
     }
     
+    /* クイックスタート用スタイル */
+    .spinner-small {
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top: 2px solid #10b981;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+    }
+    
+    #quickstart-option:hover, #manual-option:hover {
+      transform: scale(1.02);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+    }
+    
   </style>
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans min-h-screen flex items-center justify-center p-4">
@@ -753,14 +769,71 @@
                 <p class="text-gray-300">あなた専用の回答ボードが作成されました</p>
               </div>
               
-              <div class="bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-lg p-4 border border-green-400/30">
-                <h4 class="font-bold text-white mb-2">✨ 次のステップ</h4>
-                <p class="text-sm text-green-200 mb-3" id="setup-guidance">
-                  まずは、ボードのタイトルや質問を設定しましょう。準備ができたら、生徒にURLを共有して回答を募集できます。
-                </p>
+              <!-- セットアップ選択画面 -->
+              <div class="bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-lg p-6 border border-purple-400/30">
+                <h4 class="font-bold text-white mb-4 text-center">🚀 次のステップを選択してください</h4>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <!-- クイックスタートオプション -->
+                  <div class="bg-gradient-to-br from-green-500/30 to-cyan-500/30 rounded-lg p-4 border border-green-400/50 hover:border-green-400 transition-all cursor-pointer" id="quickstart-option">
+                    <div class="text-center">
+                      <div class="text-3xl mb-2">🚀</div>
+                      <h5 class="font-bold text-green-300 mb-2">クイックスタート</h5>
+                      <div class="bg-green-500/20 px-2 py-1 rounded text-xs text-green-200 mb-3">推奨・簡単</div>
+                    </div>
+                    <ul class="text-sm text-green-200 space-y-1 mb-4">
+                      <li>✓ Googleフォーム自動作成</li>
+                      <li>✓ スプレッドシート連携</li>
+                      <li>✓ ボード即座公開</li>
+                      <li>✓ デフォルト設定適用</li>
+                    </ul>
+                    <div class="text-center">
+                      <div class="text-xs text-green-300 mb-2">⏱️ 約30秒で完了</div>
+                      <button class="w-full px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition-colors" onclick="startQuickSetup()">
+                        クイックスタート開始
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <!-- 手動セットアップオプション -->
+                  <div class="bg-gradient-to-br from-blue-500/30 to-purple-500/30 rounded-lg p-4 border border-blue-400/50 hover:border-blue-400 transition-all cursor-pointer" id="manual-option">
+                    <div class="text-center">
+                      <div class="text-3xl mb-2">🔧</div>
+                      <h5 class="font-bold text-blue-300 mb-2">手動セットアップ</h5>
+                      <div class="bg-blue-500/20 px-2 py-1 rounded text-xs text-blue-200 mb-3">上級者向け</div>
+                    </div>
+                    <ul class="text-sm text-blue-200 space-y-1 mb-4">
+                      <li>✓ 詳細設定の調整</li>
+                      <li>✓ カスタマイズ可能</li>
+                      <li>✓ 段階的な設定</li>
+                      <li>✓ 完全コントロール</li>
+                    </ul>
+                    <div class="text-center">
+                      <div class="text-xs text-blue-300 mb-2">⏱️ 設定次第</div>
+                      <button class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors" onclick="openManualSetup()">
+                        管理画面を開く
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
                 <div class="text-center">
-                  <div class="inline-block px-4 py-2 bg-white/10 rounded-lg">
-                    <span class="text-xs text-gray-300">⏱️ セットアップには数秒から数十秒かかる場合があります。</span>
+                  <p class="text-xs text-gray-400">
+                    💡 後からいつでも設定変更可能です
+                  </p>
+                </div>
+              </div>
+              
+              <!-- 進行状況表示（初期は非表示） -->
+              <div id="quickstart-progress" class="bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-lg p-4 border border-green-400/30 hidden">
+                <h4 class="font-bold text-white mb-2">🚀 クイックスタート実行中...</h4>
+                <div class="space-y-3">
+                  <div class="flex items-center space-x-3">
+                    <div class="spinner-small"></div>
+                    <span class="text-sm text-green-200" id="progress-text">セットアップを準備中...</span>
+                  </div>
+                  <div class="w-full bg-gray-700 rounded-full h-2">
+                    <div class="bg-green-500 h-2 rounded-full transition-all duration-500" style="width: 0%" id="progress-bar"></div>
                   </div>
                 </div>
               </div>
@@ -906,6 +979,9 @@
             existingInput.disabled = true;
           }
 
+          // グローバル変数に登録結果を保存（クイックスタート用）
+          window.lastRegistrationResult = result;
+          
           showMessage('登録が完了しました。管理画面を開いて設定を確認してください。', 'info');
         })
         .withFailureHandler(error => {
@@ -1058,6 +1134,101 @@
     document.addEventListener('DOMContentLoaded', function() {
       loadDomainInfo();
     });
+
+    // クイックスタート機能
+    function startQuickSetup() {
+      // 選択画面を非表示にして進行状況を表示
+      document.querySelector('.bg-gradient-to-r.from-purple-500\\/20').style.display = 'none';
+      document.getElementById('quickstart-progress').classList.remove('hidden');
+      
+      // グローバル変数から必要な情報を取得
+      const userId = window.lastRegistrationResult?.userId;
+      if (!userId) {
+        showMessage('ユーザーIDが見つかりません。ページを再読み込みしてください。', 'error');
+        return;
+      }
+      
+      // 進行状況の更新
+      updateProgress(10, 'Googleフォームを作成中...');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.status === 'success') {
+            updateProgress(100, 'セットアップ完了！');
+            setTimeout(() => {
+              showQuickSetupComplete(result);
+            }, 1000);
+          } else {
+            showMessage('クイックスタートに失敗しました: ' + result.message, 'error');
+            showFallbackOptions();
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('クイックスタートエラー:', error);
+          showMessage('クイックスタートに失敗しました。手動セットアップをお試しください。', 'error');
+          showFallbackOptions();
+        })
+        .quickStartSetup(userId);
+    }
+    
+    function openManualSetup() {
+      const userId = window.lastRegistrationResult?.userId;
+      const adminUrl = window.lastRegistrationResult?.adminUrl;
+      
+      if (adminUrl) {
+        window.open(adminUrl, '_blank');
+      } else {
+        showMessage('管理画面URLが見つかりません。ページを再読み込みしてください。', 'error');
+      }
+    }
+    
+    function updateProgress(percentage, text) {
+      document.getElementById('progress-bar').style.width = percentage + '%';
+      document.getElementById('progress-text').textContent = text;
+    }
+    
+    function showQuickSetupComplete(result) {
+      const progressDiv = document.getElementById('quickstart-progress');
+      progressDiv.innerHTML = `
+        <div class="text-center space-y-4">
+          <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+          </div>
+          <h4 class="font-bold text-green-400 text-xl">🎉 クイックスタート完了！</h4>
+          <p class="text-green-200">回答ボードの準備が整いました</p>
+          
+          <div class="bg-green-500/20 rounded-lg p-4 space-y-3">
+            <h5 class="font-semibold text-green-300">📋 作成されたもの</h5>
+            <ul class="text-sm text-green-200 space-y-1">
+              <li>✓ 生徒回答用Googleフォーム</li>
+              <li>✓ 自動連携スプレッドシート</li>
+              <li>✓ 公開済み回答ボード</li>
+              <li>✓ 基本設定の適用</li>
+            </ul>
+          </div>
+          
+          <div class="space-y-2">
+            <a href="${result.adminUrl}" target="_blank" 
+               class="block w-full px-4 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition-colors">
+              🚀 回答ボードを開く
+            </a>
+            <a href="${result.formUrl}" target="_blank" 
+               class="block w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors">
+              📝 Googleフォームを開く
+            </a>
+          </div>
+        </div>
+      `;
+    }
+    
+    function showFallbackOptions() {
+      // エラー時のフォールバックオプションを表示
+      document.getElementById('quickstart-progress').classList.add('hidden');
+      document.querySelector('.bg-gradient-to-r.from-purple-500\\/20').style.display = 'block';
+      showMessage('手動セットアップをお試しください。', 'info');
+    }
   </script>
 </body>
 </html>

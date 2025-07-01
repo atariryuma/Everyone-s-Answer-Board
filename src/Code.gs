@@ -616,108 +616,268 @@ function getWebAppUrlEnhanced() {
   return getWebAppUrl();
 }
 
-function createStudyQuestForm(userEmail, userId) {
-  var now = new Date();
-  var dateTimeString = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
-  var formTitle = 'StudyQuest - みんなの回答ボード - ' + userEmail.split('@')[0] + ' - ' + dateTimeString;
-  var form = FormApp.create(formTitle);
+// =================================================================
+// 共通ファクトリ関数 - 重複削減とコード効率化
+// =================================================================
+
+/**
+ * 共通フォーム作成ファクトリ
+ * createStudyQuestFormとquickStartSetupの重複を統一
+ */
+function createFormFactory(options) {
+  var userEmail = options.userEmail;
+  var userId = options.userId;
+  var formTitle = options.formTitle || null;
+  var formDescription = options.formDescription || null;
+  var questions = options.questions || 'default';
+  var linkedSpreadsheet = options.linkedSpreadsheet || null;
   
-  form.setCollectEmail(true);
-  form.setRequireLogin(true);
   try {
-    if (typeof form.setEmailCollectionType === 'function') {
-      form.setEmailCollectionType(FormApp.EmailCollectionType.VERIFIED);
+    var now = new Date();
+    var dateTimeString = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
+    var finalTitle = formTitle || 'StudyQuest - みんなの回答ボード - ' + userEmail.split('@')[0] + ' - ' + dateTimeString;
+    
+    var form = FormApp.create(finalTitle);
+    
+    // 共通設定
+    form.setCollectEmail(true);
+    form.setRequireLogin(true);
+    form.setLimitOneResponsePerUser(true);
+    form.setAllowResponseEdits(true);
+    
+    // 説明設定
+    if (formDescription) {
+      form.setDescription(formDescription);
     }
-  } catch (undocumentedError) {
-    // ignore
-  }
-  form.setLimitOneResponsePerUser(true);
-  form.setAllowResponseEdits(true);
-
-  var boardUrl = '';
-  try {
-    var webAppUrl = getWebAppUrlEnhanced();
-    if (webAppUrl) {
-      boardUrl = webAppUrl + '?userId=' + userId;
+    
+    // 質問設定
+    addFormQuestions(form, questions);
+    
+    // スプレッドシート連携
+    var spreadsheetInfo;
+    if (linkedSpreadsheet) {
+      // 既存のスプレッドシートに連携
+      form.setDestination(FormApp.DestinationType.SPREADSHEET, linkedSpreadsheet);
+      spreadsheetInfo = {
+        spreadsheetId: linkedSpreadsheet,
+        sheetName: 'フォームの回答 1' // デフォルトシート名
+      };
+    } else {
+      // 新しいスプレッドシートを作成
+      spreadsheetInfo = createLinkedSpreadsheet(userEmail, form, dateTimeString);
     }
+    
+    return {
+      formId: form.getId(),
+      formUrl: form.getPublishedUrl(),
+      editFormUrl: form.getEditUrl(),
+      viewFormUrl: 'https://docs.google.com/forms/d/e/' + form.getId() + '/viewform',
+      spreadsheetId: spreadsheetInfo.spreadsheetId,
+      spreadsheetUrl: spreadsheetInfo.spreadsheetUrl,
+      sheetName: spreadsheetInfo.sheetName || 'フォームの回答 1'
+    };
+    
   } catch (e) {
-    // ignore
+    console.error('フォーム作成ファクトリエラー: ' + e.message);
+    throw new Error('フォームの作成に失敗しました: ' + e.message);
   }
-  var confirmationMessage = boardUrl 
-    ? '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。\nみんなの回答ボードで、お友達の色々な考えも見てみましょう。\n新しい発見があるかもしれませんね！\n\n' + boardUrl
-    : '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。';
-  form.setConfirmationMessage(confirmationMessage);
+}
 
+/**
+ * フォーム質問項目追加（設定可能）
+ */
+function addFormQuestions(form, questionType) {
+  if (questionType === 'simple') {
+    addSimpleQuestions(form);
+  } else {
+    addDefaultQuestions(form); // 'default'またはその他
+  }
+}
+
+/**
+ * デフォルト質問設定（従来のcreateStudyQuestForm用）
+ */
+function addDefaultQuestions(form) {
   var classItem = form.addTextItem();
   classItem.setTitle('クラス名');
+  classItem.setHelpText('あなたのクラスを入力してください（例: 6-1, A組）');
   classItem.setRequired(true);
-  var pattern = '^[A-Za-z0-9]+-[A-Za-z0-9]+$';
-  var helpText = "【重要】クラス名は決められた形式で入力してください。\n\n✅ 正しい例：\n• 6年1組 → 6-1\n• 5年2組 → 5-2  \n• 中1年A組 → 1-A\n• 中3年B組 → 3-B\n\n❌ 間違いの例：6年1組、6-1組、６－１\n\n※ 半角英数字とハイフン（-）のみ使用可能です";
-  var textValidation = FormApp.createTextValidation()
-    .setHelpText(helpText)
-    .requireTextMatchesPattern(pattern)
-    .build();
-  classItem.setValidation(textValidation);
-
+  
   var nameItem = form.addTextItem();
   nameItem.setTitle('名前');
-  nameItem.setHelpText('あなたの名前を入力してください。この名前は先生だけが見ることができ、みんなには表示されません。一人ひとりの意見を大切にするために必要です。');
+  nameItem.setHelpText('あなたの名前を入力してください（ニックネーム可）');
   nameItem.setRequired(true);
   
   var answerItem = form.addParagraphTextItem();
-  answerItem.setTitle('回答');
-  answerItem.setHelpText('質問に対するあなたの考えを、自分の言葉で表現してください。正解はありません。あなたらしい考えや感じ方を大切にして、思考力を育てましょう。');
+  answerItem.setTitle('あなたの回答・意見');
+  answerItem.setHelpText('質問に対するあなたの考えや意見を自由に書いてください');
   answerItem.setRequired(true);
   
   var reasonItem = form.addParagraphTextItem();
-  reasonItem.setTitle('理由');
-  reasonItem.setHelpText('なぜそう思ったのか、根拠や理由を説明してください。論理的に考える力を身につけ、自分の意見に責任を持つ習慣を育てましょう。');
+  reasonItem.setTitle('理由・根拠');
+  reasonItem.setHelpText('その回答になった理由や根拠があれば書いてください');
   reasonItem.setRequired(false);
-  
-  var spreadsheetTitle = 'StudyQuest - みんなの回答ボード - 回答データ - ' + userEmail.split('@')[0] + ' - ' + dateTimeString;
-  var spreadsheet = SpreadsheetApp.create(spreadsheetTitle);
-  form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheet.getId());
+}
 
-  // 作成したスプレッドシートにサービスアカウントを編集者として追加
+/**
+ * シンプル質問設定（quickStartSetup用）
+ */
+function addSimpleQuestions(form) {
+  form.addTextItem()
+    .setTitle('あなたのクラス')
+    .setHelpText('例: 6-1, A組など')
+    .setRequired(true);
+    
+  form.addTextItem()
+    .setTitle('あなたの名前')
+    .setHelpText('ニックネーム可（表示設定により匿名になる場合があります）')
+    .setRequired(true);
+    
+  form.addParagraphTextItem()
+    .setTitle('あなたの回答・意見')
+    .setHelpText('質問に対するあなたの考えや意見を自由に書いてください')
+    .setRequired(true);
+    
+  form.addParagraphTextItem()
+    .setTitle('理由・根拠')
+    .setHelpText('その回答になった理由や根拠があれば書いてください')
+    .setRequired(false);
+}
+
+/**
+ * 新しいスプレッドシート作成と連携
+ */
+function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
+  var spreadsheetTitle = 'StudyQuest - みんなの回答ボード - ' + userEmail.split('@')[0] + ' - ' + dateTimeString;
+  var spreadsheet = SpreadsheetApp.create(spreadsheetTitle);
+  
+  form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheet.getId());
+  
+  return {
+    spreadsheetId: spreadsheet.getId(),
+    spreadsheetUrl: spreadsheet.getUrl(),
+    sheetName: 'フォームの回答 1'
+  };
+}
+
+function createStudyQuestForm(userEmail, userId) {
+  try {
+    // 共通ファクトリを使用してフォーム作成
+    var formResult = createFormFactory({
+      userEmail: userEmail,
+      userId: userId,
+      questions: 'default'
+    });
+    
+    // カスタマイズされた設定を追加
+    var form = FormApp.openById(formResult.formId);
+    
+    // Email収集タイプの設定（可能な場合）
+    try {
+      if (typeof form.setEmailCollectionType === 'function') {
+        form.setEmailCollectionType(FormApp.EmailCollectionType.VERIFIED);
+      }
+    } catch (undocumentedError) {
+      // ignore
+    }
+    
+    // 確認メッセージの設定
+    var boardUrl = '';
+    try {
+      var webAppUrl = getWebAppUrl();
+      if (webAppUrl) {
+        boardUrl = webAppUrl + '?userId=' + userId;
+      }
+    } catch (e) {
+      // ignore
+    }
+    
+    var confirmationMessage = boardUrl 
+      ? '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。\nみんなの回答ボードで、お友達の色々な考えも見てみましょう。\n新しい発見があるかもしれませんね！\n\n' + boardUrl
+      : '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。';
+    form.setConfirmationMessage(confirmationMessage);
+    
+    // クラス名フィールドにバリデーションを追加
+    var items = form.getItems();
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      if (item.getTitle() === 'クラス名') {
+        var textItem = item.asTextItem();
+        var pattern = '^[A-Za-z0-9]+-[A-Za-z0-9]+$';
+        var helpText = "【重要】クラス名は決められた形式で入力してください。\n\n✅ 正しい例：\n• 6年1組 → 6-1\n• 5年2組 → 5-2  \n• 中1年A組 → 1-A\n• 中3年B組 → 3-B\n\n❌ 間違いの例：6年1組、6-1組、６－１\n\n※ 半角英数字とハイフン（-）のみ使用可能です";
+        var textValidation = FormApp.createTextValidation()
+          .setHelpText(helpText)
+          .requireTextMatchesPattern(pattern)
+          .build();
+        textItem.setValidation(textValidation);
+        break;
+      }
+    }
+    
+    // サービスアカウントをスプレッドシートに追加
+    addServiceAccountToSpreadsheet(formResult.spreadsheetId);
+    
+    // リアクション列をスプレッドシートに追加
+    addReactionColumnsToSpreadsheet(formResult.spreadsheetId, formResult.sheetName);
+    
+    return formResult;
+    
+  } catch (e) {
+    console.error('createStudyQuestFormエラー: ' + e.message);
+    throw new Error('フォームの作成に失敗しました: ' + e.message);
+  }
+}
+
+/**
+ * サービスアカウントをスプレッドシートに追加
+ */
+function addServiceAccountToSpreadsheet(spreadsheetId) {
   try {
     var props = PropertiesService.getScriptProperties();
     var serviceAccountCreds = JSON.parse(props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
     var serviceAccountEmail = serviceAccountCreds.client_email;
     if (serviceAccountEmail) {
+      var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
       spreadsheet.addEditor(serviceAccountEmail);
       debugLog('サービスアカウント (' + serviceAccountEmail + ') をスプレッドシートの編集者として追加しました。');
     }
   } catch (e) {
     console.error('サービスアカウントの追加に失敗: ' + e.message);
   }
+}
 
-  var sheet = spreadsheet.getSheets()[0];
-  var additionalHeaders = [
-    COLUMN_HEADERS.UNDERSTAND,
-    COLUMN_HEADERS.LIKE,
-    COLUMN_HEADERS.CURIOUS,
-    COLUMN_HEADERS.HIGHLIGHT
-  ];
-  var currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var startCol = currentHeaders.length + 1;
-  sheet.getRange(1, startCol, 1, additionalHeaders.length).setValues([additionalHeaders]);
-  
-  var allHeadersRange = sheet.getRange(1, 1, 1, currentHeaders.length + additionalHeaders.length);
-  allHeadersRange.setFontWeight('bold').setBackground('#E3F2FD');
+/**
+ * スプレッドシートにリアクション列を追加
+ */
+function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName) {
   try {
-    sheet.autoResizeColumns(1, allHeadersRange.getNumColumns());
+    var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    var sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
+    
+    var additionalHeaders = [
+      COLUMN_HEADERS.UNDERSTAND,
+      COLUMN_HEADERS.LIKE,
+      COLUMN_HEADERS.CURIOUS,
+      COLUMN_HEADERS.HIGHLIGHT
+    ];
+    
+    var currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var startCol = currentHeaders.length + 1;
+    sheet.getRange(1, startCol, 1, additionalHeaders.length).setValues([additionalHeaders]);
+    
+    var allHeadersRange = sheet.getRange(1, 1, 1, currentHeaders.length + additionalHeaders.length);
+    allHeadersRange.setFontWeight('bold').setBackground('#E3F2FD');
+    
+    try {
+      sheet.autoResizeColumns(1, allHeadersRange.getNumColumns());
+    } catch (e) {
+      console.warn('Auto-resize failed:', e);
+    }
+    
+    debugLog('リアクション列を追加しました: ' + sheetName);
   } catch (e) {
-    console.warn('Auto-resize failed:', e);
+    console.error('リアクション列追加エラー: ' + e.message);
   }
-
-  return {
-    formId: form.getId(),
-    formUrl: form.getPublishedUrl(),
-    spreadsheetId: spreadsheet.getId(),
-    spreadsheetUrl: spreadsheet.getUrl(),
-    editFormUrl: form.getEditUrl(),
-    viewFormUrl: 'https://docs.google.com/forms/d/e/' + form.getId() + '/viewform'
-  };
 }
 
 function isValidEmail(email) {
@@ -1652,6 +1812,99 @@ function safeSpreadsheetOperation(operation, fallbackValue) {
   }
 }
 
+
+/**
+ * クイックスタートセットアップ
+ * Registration.htmlから呼び出される
+ */
+function quickStartSetup(userId) {
+  try {
+    debugLog('クイックスタートセットアップ開始: ' + userId);
+    
+    // ユーザー情報の取得
+    var userInfo = findUserById(userId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var userEmail = userInfo.adminEmail;
+    
+    // 1. Googleフォームの作成（既に作成済みの場合はスキップ）
+    var formUrl = configJson.formUrl;
+    var editFormUrl = configJson.editFormUrl;
+    var sheetName = 'フォームの回答 1';
+    
+    if (!formUrl) {
+      // ファクトリを使用してフォームを作成
+      var formResult = createFormFactory({
+        userEmail: userEmail,
+        userId: userId,
+        formTitle: null, // デフォルトタイトルを使用
+        formDescription: 'このフォームは「みんなの回答ボード」で表示されます。回答内容は匿名で表示されます。',
+        questions: 'default',
+        linkedSpreadsheet: userInfo.spreadsheetId
+      });
+      
+      formUrl = formResult.formUrl;
+      editFormUrl = formResult.editFormUrl;
+      sheetName = formResult.sheetName;
+      
+      debugLog('Googleフォーム作成完了: ' + formUrl);
+    }
+    
+    // 2. リアクション列をスプレッドシートに追加
+    try {
+      addReactionColumnsToSpreadsheet(userInfo.spreadsheetId, sheetName);
+    } catch (e) {
+      console.error('リアクション列追加エラー: ' + e.message);
+    }
+    
+    // 3. 設定情報を更新
+    var updatedConfig = {
+      formUrl: formUrl,
+      editFormUrl: editFormUrl,
+      publishedSheet: sheetName,
+      appPublished: true,
+      displayMode: DISPLAY_MODES.ANONYMOUS,
+      autoCreated: true,
+      quickStartCompleted: true,
+      createdAt: configJson.createdAt || new Date().toISOString(),
+      quickStartAt: new Date().toISOString()
+    };
+    
+    // データベースの設定を更新
+    updateUserInDb(userId, { 
+      configJson: JSON.stringify(updatedConfig),
+      lastAccessedAt: new Date().toISOString()
+    });
+    
+    // 4. WebアプリURLを生成
+    var webAppUrl = getWebAppUrl();
+    var adminUrl = webAppUrl + '?userId=' + userId + '&mode=admin';
+    var viewUrl = webAppUrl + '?userId=' + userId;
+    
+    debugLog('クイックスタートセットアップ完了');
+    
+    return {
+      status: 'success',
+      message: 'クイックスタートが完了しました',
+      formUrl: formUrl,
+      editFormUrl: editFormUrl,
+      adminUrl: adminUrl,
+      viewUrl: viewUrl,
+      sheetName: sheetName,
+      quickStartCompleted: true
+    };
+    
+  } catch (e) {
+    console.error('クイックスタートセットアップエラー: ' + e.message);
+    return {
+      status: 'error',
+      message: 'クイックスタートに失敗しました: ' + e.message
+    };
+  }
+}
 
 /**
  * ユーザー認証の状態を確認
