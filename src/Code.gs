@@ -3658,53 +3658,6 @@ function registerNewUser(adminEmail) {
   debugLog(`🚀 API経由で新規登録開始: ${adminEmail}`);
   debugLog(`実行ユーザー: ${Session.getActiveUser().getEmail()}`);
   
-  try {
-    // API経由で既存ユーザーをチェック
-    debugLog(`既存ユーザーチェックを実行中: adminEmail="${adminEmail}"`);
-    const existingCheck = callDatabaseApi('checkExistingUser', { adminEmail: adminEmail });
-    
-    debugLog(`既存ユーザーチェック結果: ${JSON.stringify(existingCheck)}`);
-    
-    if (existingCheck.success && existingCheck.exists && existingCheck.data) {
-      // 既存ユーザーの場合はURL情報を返す
-      const userData = existingCheck.data;
-      
-      // userIdが有効かどうかを厳密にチェック
-      if (!userData.userId || 
-          typeof userData.userId !== 'string' ||
-          userData.userId.trim() === '' || 
-          userData.userId === 'null' ||
-          userData.userId === 'undefined') {
-        debugLog(`既存ユーザーが見つかりましたが、userIdが無効です: "${userData.userId}" (type: ${typeof userData.userId}) - 新規登録を継続します`);
-      } else {
-        const base = getWebAppUrlEnhanced();
-        
-        debugLog(`既存ユーザーが見つかりました: userId="${userData.userId}", adminEmail="${userData.adminEmail}"`);
-        
-        // ユーザーコンテキストを設定
-        PropertiesService.getUserProperties().setProperty('CURRENT_USER_ID', userData.userId);
-        PropertiesService.getUserProperties().setProperty('CURRENT_SPREADSHEET_ID', userData.spreadsheetId);
-        
-        return {
-          userId: userData.userId,
-          spreadsheetId: userData.spreadsheetId,
-          spreadsheetUrl: userData.spreadsheetUrl,
-          adminUrl: base ? `${base}?userId=${userData.userId}&mode=admin` : '',
-          viewUrl: base ? `${base}?userId=${userData.userId}` : '',
-          message: '既存のボードが見つかりました。管理画面に移動します。',
-          autoCreated: false
-        };
-      }
-    } else {
-      debugLog(`既存ユーザーが見つかりませんでした - 新規登録を継続します`);
-    }
-    
-    debugLog(`✅ 既存ユーザーチェック完了 - 新規ユーザーです`);
-    
-  } catch (apiError) {
-    debugLog(`❌ API経由のデータベースアクセスエラー: ${apiError.message}`);
-    throw new Error(`データベースアクセスに失敗しました: ${apiError.message}`);
-  }
   
   // 📝 ステップ2: 新しいユーザーIDを生成
   const userId = Utilities.getUuid();
@@ -3755,20 +3708,42 @@ function registerNewUser(adminEmail) {
   };
   
   debugLog('📋 Initial config being saved:', initialConfig);
-  
-  debugLog(`💾 API経由でデータベースに新規ユーザー登録中: ${adminEmail}`);
+
+  debugLog(`💾 API経由でユーザー情報を登録または取得中: ${adminEmail}`);
+  let apiResult;
   try {
-    const createResult = createUserViaApi(userData);
-    if (!createResult.success) {
-      throw new Error(createResult.error || 'ユーザー作成に失敗しました');
+    apiResult = callDatabaseApi('createOrFetchUser', userData);
+    if (!apiResult.success) {
+      throw new Error(apiResult.error || 'ユーザー登録に失敗しました');
     }
-    debugLog(`✅ API経由でのデータベース登録完了`);
+    debugLog(`✅ API応答: ${JSON.stringify(apiResult)}`);
   } catch (createError) {
-    debugLog(`❌ API経由でのユーザー作成エラー: ${createError.message}`);
-    throw new Error(`ユーザー作成に失敗しました: ${createError.message}`);
+    debugLog(`❌ API経由のユーザー登録エラー: ${createError.message}`);
+    throw new Error(`ユーザー登録に失敗しました: ${createError.message}`);
   }
   
-  auditLog('NEW_USER_REGISTERED', userId, { adminEmail, spreadsheetId: formAndSsInfo.spreadsheetId });
+  const isNewUser = apiResult.created !== false;
+  const savedData = apiResult.data || userData;
+  userId = savedData.userId;
+
+  if (!isNewUser) {
+    const base = getWebAppUrlEnhanced();
+
+    PropertiesService.getUserProperties().setProperty('CURRENT_USER_ID', savedData.userId);
+    PropertiesService.getUserProperties().setProperty('CURRENT_SPREADSHEET_ID', savedData.spreadsheetId);
+
+    return {
+      userId: savedData.userId,
+      spreadsheetId: savedData.spreadsheetId,
+      spreadsheetUrl: savedData.spreadsheetUrl,
+      adminUrl: base ? `${base}?userId=${savedData.userId}&mode=admin` : '',
+      viewUrl: base ? `${base}?userId=${savedData.userId}` : '',
+      message: '既存のボードが見つかりました。管理画面に移動します。',
+      autoCreated: false
+    };
+  }
+
+  auditLog('NEW_USER_REGISTERED', savedData.userId, { adminEmail, spreadsheetId: formAndSsInfo.spreadsheetId });
   
   // 📝 ステップ6: ユーザーコンテキストを設定（クイックアクションと同様）
   debugLog(`⚙️ ユーザーコンテキスト設定中`);
