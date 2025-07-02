@@ -222,25 +222,6 @@ function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
-function getActiveFormInfo(userId) {
-  var userInfo = findUserByIdOptimized(userId);
-  if (!userInfo) {
-    return { status: 'error', message: 'ユーザー情報が見つかりません' };
-  }
-
-  try {
-    var configJson = JSON.parse(userInfo.configJson || '{}');
-    return {
-      status: 'success',
-      formUrl: configJson.formUrl || '',
-      editFormUrl: configJson.editFormUrl || '',
-      spreadsheetUrl: userInfo.spreadsheetUrl || ''
-    };
-  } catch (e) {
-    console.error('設定情報の取得に失敗: ' + e.message);
-    return { status: 'error', message: '設定情報の取得に失敗しました' };
-  }
-}
 
 function getResponsesData(userId, sheetName) {
   var userInfo = findUserByIdOptimized(userId);
@@ -285,25 +266,58 @@ function getStatus() {
 
 /**
  * アクティブなフォーム情報を取得
- * AdminPanel.htmlから呼び出される
+ * AdminPanel.htmlから呼び出される（パラメータなし）
  */
 function getActiveFormInfo(userId) {
-  var userInfo = findUserByIdOptimized(userId);
-  if (!userInfo) {
-    return { status: 'error', message: 'ユーザー情報が見つかりません' };
-  }
-
   try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = userId || props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      // コンテキストが設定されていない場合、現在のユーザーで検索
+      var activeUser = Session.getActiveUser().getEmail();
+      var userInfo = findUserByEmailOptimized(activeUser);
+      if (userInfo) {
+        currentUserId = userInfo.userId;
+        props.setProperty('CURRENT_USER_ID', currentUserId);
+      } else {
+        return { status: 'error', message: 'ユーザー情報が見つかりません' };
+      }
+    }
+    
+    var userInfo = findUserByIdOptimized(currentUserId);
+    if (!userInfo) {
+      return { status: 'error', message: 'ユーザー情報が見つかりません' };
+    }
+
     var configJson = JSON.parse(userInfo.configJson || '{}');
+    
+    // フォーム回答数を取得
+    var answerCount = 0;
+    try {
+      if (userInfo.spreadsheetId && configJson.publishedSheet) {
+        var responseData = getResponsesData(currentUserId, configJson.publishedSheet);
+        if (responseData.status === 'success') {
+          answerCount = responseData.data.length;
+        }
+      }
+    } catch (countError) {
+      console.warn('回答数の取得に失敗: ' + countError.message);
+    }
+    
     return {
       status: 'success',
       formUrl: configJson.formUrl || '',
       editFormUrl: configJson.editFormUrl || '',
-      spreadsheetUrl: userInfo.spreadsheetUrl || ''
+      editUrl: configJson.editFormUrl || '',  // AdminPanel.htmlが期待するフィールド名
+      formId: extractFormIdFromUrl(configJson.formUrl || configJson.editFormUrl || ''),
+      spreadsheetUrl: userInfo.spreadsheetUrl || '',
+      answerCount: answerCount,
+      isFormActive: !!(configJson.formUrl && configJson.formCreated)
     };
   } catch (e) {
-    console.error('設定情報の取得に失敗: ' + e.message);
-    return { status: 'error', message: '設定情報の取得に失敗しました' };
+    console.error('フォーム情報の取得に失敗: ' + e.message);
+    return { status: 'error', message: 'フォーム情報の取得に失敗しました: ' + e.message };
   }
 }
 
@@ -362,30 +376,6 @@ function checkAdmin() {
   }
 }
 
-/**
- * アクティブシートのクリア（公開終了）
- * Page.htmlから呼び出される
- */
-function clearActiveSheet() {
-  try {
-    var props = PropertiesService.getUserProperties();
-    var currentUserId = props.getProperty('CURRENT_USER_ID');
-    
-    if (!currentUserId) {
-      throw new Error('ユーザーコンテキストが設定されていません');
-    }
-    
-    return updateUserOptimized(currentUserId, {
-      configJson: JSON.stringify({
-        appPublished: false,
-        publishedSheet: ''
-      })
-    });
-  } catch (e) {
-    console.error('公開終了エラー: ' + e.message);
-    return { status: 'error', message: e.message };
-  }
-}
 
 /**
  * 利用可能なシート一覧を取得
@@ -627,6 +617,32 @@ function clearAllCaches() {
 function debugLog() {
   if (DEBUG && typeof console !== 'undefined' && console.log) {
     console.log.apply(console, arguments);
+  }
+}
+
+/**
+ * GoogleフォームURLからフォームIDを抽出
+ */
+function extractFormIdFromUrl(url) {
+  if (!url) return '';
+  
+  try {
+    // Regular expression to extract form ID from Google Forms URLs
+    var formIdMatch = url.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+    if (formIdMatch && formIdMatch[1]) {
+      return formIdMatch[1];
+    }
+    
+    // Alternative pattern for e/ URLs  
+    var eFormIdMatch = url.match(/\/forms\/d\/e\/([a-zA-Z0-9-_]+)/);
+    if (eFormIdMatch && eFormIdMatch[1]) {
+      return eFormIdMatch[1];
+    }
+    
+    return '';
+  } catch (e) {
+    console.warn('フォームID抽出エラー: ' + e.message);
+    return '';
   }
 }
 

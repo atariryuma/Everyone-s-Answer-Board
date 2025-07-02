@@ -46,10 +46,11 @@ function openActiveSpreadsheet() {
 }
 
 /**
- * 簡易設定取得関数（AdminPanel.htmlとの互換性のため）
+ * 設定取得関数（AdminPanel.htmlとの互換性のため）
  * 新アーキテクチャでは基本的にデフォルト設定を使用
+ * @param {string} sheetName - シート名（AdminPanelから渡される、オプション）
  */
-function getConfig() {
+function getConfig(sheetName) {
   try {
     var spreadsheet = getCurrentSpreadsheet();
     var configSheet = spreadsheet.getSheetByName(CONFIG_SHEET_NAME);
@@ -60,7 +61,12 @@ function getConfig() {
       reasonHeader: '理由',
       nameHeader: '名前',
       classHeader: 'クラス',
-      rosterSheetName: '名簿'
+      rosterSheetName: '名簿',
+      // AdminPanel用の追加設定
+      mainHeader: '回答',  // AdminPanelで期待される名前
+      rHeader: '理由',     // AdminPanelで期待される名前
+      nameHeader: '名前',
+      classHeader: 'クラス'
     };
 
     if (configSheet) {
@@ -73,6 +79,13 @@ function getConfig() {
         }
       }
     }
+    
+    // シート固有の設定がある場合はここで追加処理を行う
+    if (sheetName) {
+      console.log('設定を取得中: シート名 = ' + sheetName);
+      // 将来的にシート固有の設定を実装する場合はここに追加
+    }
+    
     return config;
   } catch (error) {
     console.error('getConfig error:', error.message);
@@ -82,7 +95,11 @@ function getConfig() {
       reasonHeader: '理由',
       nameHeader: '名前',
       classHeader: 'クラス',
-      rosterSheetName: '名簿'
+      rosterSheetName: '名簿',
+      mainHeader: '回答',
+      rHeader: '理由',
+      nameHeader: '名前',
+      classHeader: 'クラス'
     };
   }
 }
