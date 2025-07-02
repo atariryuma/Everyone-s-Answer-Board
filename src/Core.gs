@@ -616,7 +616,7 @@ function getSheetDataOptimized(userId, sheetName, classFilter, sortMode) {
     // バッチでデータ、ヘッダー、名簿を取得
     var ranges = [
       sheetName + '!A:Z',
-      getConfig().rosterSheetName + '!A:Z'
+      getRosterSheetName() + '!A:Z'
     ];
     
     var responses = batchGetSheetsData(service, spreadsheetId, ranges);
