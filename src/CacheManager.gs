@@ -233,14 +233,19 @@ function clearAllCache() {
   // PropertiesServiceのキャッシュデータクリア
   var props = PropertiesService.getScriptProperties();
   var properties = props.getProperties();
+  var cacheKeys = [];
   Object.keys(properties).forEach(function(key) {
     if (key.indexOf('CACHE_') === 0) {
       props.deleteProperty(key);
+      cacheKeys.push(key.replace('CACHE_', ''));
     }
   });
-  
+
   // CacheServiceのキャッシュデータクリア
-  CacheService.getScriptCache().removeAll();
+  var cache = CacheService.getScriptCache();
+  if (cacheKeys.length > 0) {
+    cache.removeAll(cacheKeys);
+  }
 
   debugLog('全キャッシュをクリアしました: PropertiesServiceとCacheService');
 }
