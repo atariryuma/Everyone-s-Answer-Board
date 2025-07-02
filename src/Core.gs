@@ -10,8 +10,8 @@
 // doGetLegacy function removed - consolidated into main doGet in UltraOptimizedCore.gs
 
 /**
- * 新規ユーザーを登録する
- * 最適化された実装：キャッシュ利用、エラーハンドリング強化、パフォーマンス改善
+ * 新規ユーザーを登録する（データベース登録のみ）
+ * フォーム作成はクイックスタートで実行される
  */
 function registerNewUser(adminEmail) {
   var activeUser = Session.getActiveUser();
@@ -25,22 +25,21 @@ function registerNewUser(adminEmail) {
     throw new Error('このメールアドレスは既に登録されています。');
   }
 
-  // ステップ1: ユーザー自身の権限でファイル作成
+  // ユーザーIDを生成してデータベースに登録（フォーム作成は後回し）
   var userId = Utilities.getUuid();
-  var formAndSsInfo = createStudyQuestFormOptimized(adminEmail, userId);
-
-  // ステップ2: サービスアカウント経由でDBに登録
+  
   var initialConfig = {
-    formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl,
-    editFormUrl: formAndSsInfo.editFormUrl,
-    createdAt: new Date().toISOString()
+    setupStatus: 'pending', // セットアップ待ち状態
+    createdAt: new Date().toISOString(),
+    formCreated: false,
+    appPublished: false
   };
   
   var userData = {
     userId: userId,
     adminEmail: adminEmail,
-    spreadsheetId: formAndSsInfo.spreadsheetId,
-    spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+    spreadsheetId: '', // クイックスタートで設定
+    spreadsheetUrl: '', // クイックスタートで設定
     createdAt: new Date().toISOString(),
     configJson: JSON.stringify(initialConfig),
     lastAccessedAt: new Date().toISOString(),
@@ -55,15 +54,14 @@ function registerNewUser(adminEmail) {
     throw new Error('ユーザー登録に失敗しました。システム管理者に連絡してください。');
   }
 
-  // 成功レスポンスを返す
+  // 成功レスポンスを返す（フォーム情報はまだなし）
   var appUrls = generateAppUrlsOptimized(userId);
   return {
     userId: userId,
-    spreadsheetId: formAndSsInfo.spreadsheetId,
-    spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
     adminUrl: appUrls.adminUrl,
     viewUrl: appUrls.viewUrl,
-    message: '新しいボードが作成されました！'
+    setupRequired: true,
+    message: 'ユーザー登録が完了しました！次にクイックスタートでフォームを作成してください。'
   };
 }
 
@@ -410,6 +408,152 @@ function getAvailableSheets() {
 }
 
 /**
+ * クイックスタートセットアップ（完全版）
+ * フォルダ作成、フォーム作成、スプレッドシート作成、ボード公開まで一括実行
+ */
+function quickStartSetup(userId) {
+  try {
+    debugLog('🚀 クイックスタートセットアップ開始: ' + userId);
+    
+    // ユーザー情報の取得
+    var userInfo = findUserByIdOptimized(userId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var userEmail = userInfo.adminEmail;
+    
+    // 既にセットアップ済みかチェック
+    if (configJson.formCreated && userInfo.spreadsheetId) {
+      return {
+        status: 'already_completed',
+        message: 'クイックスタートは既に完了しています。',
+        urls: generateAppUrlsOptimized(userId)
+      };
+    }
+    
+    // ステップ1: ユーザー専用フォルダを作成
+    debugLog('📁 ステップ1: フォルダ作成中...');
+    var folder = createUserFolder(userEmail);
+    
+    // ステップ2: Googleフォームとスプレッドシートを作成
+    debugLog('📝 ステップ2: フォーム作成中...');
+    var formAndSsInfo = createStudyQuestFormOptimized(userEmail, userId);
+    
+    // 作成したファイルをフォルダに移動
+    if (folder) {
+      try {
+        var formFile = DriveApp.getFileById(formAndSsInfo.formId);
+        var ssFile = DriveApp.getFileById(formAndSsInfo.spreadsheetId);
+        
+        folder.addFile(formFile);
+        folder.addFile(ssFile);
+        
+        // 元の場所から削除（Myドライブから移動）
+        DriveApp.getRootFolder().removeFile(formFile);
+        DriveApp.getRootFolder().removeFile(ssFile);
+        
+        debugLog('📁 ファイルをフォルダに移動しました: ' + folder.getName());
+      } catch (moveError) {
+        // フォルダ移動に失敗しても処理は継続
+        console.warn('ファイル移動に失敗しましたが、処理を継続します: ' + moveError.message);
+      }
+    }
+    
+    // ステップ3: データベースを更新
+    debugLog('💾 ステップ3: データベース更新中...');
+    var updatedConfig = {
+      ...configJson,
+      setupStatus: 'completed',
+      formCreated: true,
+      formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl,
+      editFormUrl: formAndSsInfo.editFormUrl,
+      publishedSheet: formAndSsInfo.sheetName || 'フォームの回答 1',
+      appPublished: true,
+      folderId: folder ? folder.getId() : '',
+      folderUrl: folder ? folder.getUrl() : '',
+      completedAt: new Date().toISOString()
+    };
+    
+    updateUserOptimized(userId, {
+      spreadsheetId: formAndSsInfo.spreadsheetId,
+      spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+      configJson: JSON.stringify(updatedConfig)
+    });
+    
+    // ステップ4: 回答ボードを公開状態に設定
+    debugLog('🌐 ステップ4: 回答ボード公開中...');
+    
+    debugLog('✅ クイックスタートセットアップ完了: ' + userId);
+    
+    var appUrls = generateAppUrlsOptimized(userId);
+    return {
+      status: 'success',
+      message: 'クイックスタートが完了しました！回答ボードをお楽しみください。',
+      urls: appUrls,
+      formUrl: updatedConfig.formUrl,
+      editFormUrl: updatedConfig.editFormUrl,
+      spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+      folderUrl: updatedConfig.folderUrl
+    };
+    
+  } catch (e) {
+    console.error('❌ クイックスタートセットアップエラー: ' + e.message);
+    
+    // エラー時はセットアップ状態をリセット
+    try {
+      var currentConfig = JSON.parse(userInfo.configJson || '{}');
+      currentConfig.setupStatus = 'error';
+      currentConfig.lastError = e.message;
+      currentConfig.errorAt = new Date().toISOString();
+      
+      updateUserOptimized(userId, {
+        configJson: JSON.stringify(currentConfig)
+      });
+    } catch (updateError) {
+      console.error('エラー状態の更新に失敗: ' + updateError.message);
+    }
+    
+    return {
+      status: 'error',
+      message: 'クイックスタートセットアップに失敗しました: ' + e.message
+    };
+  }
+}
+
+/**
+ * ユーザー専用フォルダを作成
+ */
+function createUserFolder(userEmail) {
+  try {
+    var rootFolderName = "StudyQuest - ユーザーデータ";
+    var userFolderName = "StudyQuest - " + userEmail + " - ファイル";
+    
+    // ルートフォルダを検索または作成
+    var rootFolder;
+    var folders = DriveApp.getFoldersByName(rootFolderName);
+    if (folders.hasNext()) {
+      rootFolder = folders.next();
+    } else {
+      rootFolder = DriveApp.createFolder(rootFolderName);
+    }
+    
+    // ユーザー専用フォルダを作成
+    var userFolders = rootFolder.getFoldersByName(userFolderName);
+    if (userFolders.hasNext()) {
+      return userFolders.next(); // 既存フォルダを返す
+    } else {
+      return rootFolder.createFolder(userFolderName);
+    }
+    
+  } catch (e) {
+    console.error('フォルダ作成エラー: ' + e.message);
+    return null; // フォルダ作成に失敗してもnullを返して処理を継続
+  }
+}
+
+/**
  * ハイライト切り替えの最適化処理
  */
 function processHighlightToggleOptimized(spreadsheetId, sheetName, rowIndex) {
@@ -519,10 +663,20 @@ function createStudyQuestFormOptimized(userEmail, userId) {
       console.warn('Email collection type setting failed:', undocumentedError.message);
     }
     
-    // 確認メッセージの設定
-    var confirmationMessage = form.getPublishedUrl()
-      ? '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。\nみんなの回答ボードで、お友達の色々な考えも見てみましょう。\n新しい発見があるかもしれませんね！\n\n' + form.getPublishedUrl()
-      : '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。';
+    // 確認メッセージの設定（回答ボードURLを含む）
+    var appUrls = generateAppUrlsOptimized(userId);
+    var boardUrl = appUrls.viewUrl || (appUrls.webAppUrl + '?userId=' + userId);
+    
+    var confirmationMessage = '🎉 回答ありがとうございます！\n\n' +
+      'あなたの大切な意見が届きました。\n' +
+      'みんなの回答ボードで、お友達の色々な考えも見てみましょう。\n' +
+      '新しい発見があるかもしれませんね！\n\n' +
+      '📋 みんなの回答ボード:\n' + boardUrl;
+      
+    if (form.getPublishedUrl()) {
+      confirmationMessage += '\n\n✏️ 回答を編集:\n' + form.getPublishedUrl();
+    }
+    
     form.setConfirmationMessage(confirmationMessage);
     
     // サービスアカウントをスプレッドシートに追加（最適化版）
@@ -613,22 +767,15 @@ function getSheetDataOptimized(userId, sheetName, classFilter, sortMode) {
     var spreadsheetId = userInfo.spreadsheetId;
     var service = getOptimizedSheetsService();
     
-    // バッチでデータ、ヘッダー、名簿を取得
-    var ranges = [
-      sheetName + '!A:Z',
-      getConfig().rosterSheetName + '!A:Z'
-    ];
+    // フォーム回答データのみを取得（名簿機能は使用しない）
+    var ranges = [sheetName + '!A:Z'];
     
     var responses = batchGetSheetsData(service, spreadsheetId, ranges);
     var sheetData = responses.valueRanges[0].values || [];
     
-    // 「名簿」シートの存在を確認し、存在しない場合は空の配列を返す
+    // 名簿機能は使用せず、空の配列を設定
     var rosterData = [];
-    if (responses.valueRanges[1] && responses.valueRanges[1].values) {
-      rosterData = responses.valueRanges[1].values;
-    } else {
-      debugLog('「名簿」シートが見つからないか、データがありません。');
-    }
+    debugLog('名簿機能は無効化されています。名前はフォーム入力を使用します。');
     
     if (sheetData.length === 0) {
       return {
@@ -716,31 +863,14 @@ function getSheetsListOptimized(userId) {
 }
 
 /**
- * 名簿マップを構築
- * @param {array} rosterData - 名簿データ
- * @returns {object} 名簿マップ
+ * 名簿マップを構築（名簿機能無効化のため空のマップを返す）
+ * @param {array} rosterData - 名簿データ（使用されません）
+ * @returns {object} 空の名簿マップ
  */
 function buildRosterMap(rosterData) {
-  if (rosterData.length === 0) return {};
-  
-  var headers = rosterData[0];
-  var emailIndex = headers.indexOf(ROSTER_CONFIG.EMAIL_COLUMN);
-  var nameIndex = headers.indexOf(ROSTER_CONFIG.NAME_COLUMN);
-  var classIndex = headers.indexOf(ROSTER_CONFIG.CLASS_COLUMN);
-  
-  var rosterMap = {};
-  
-  for (var i = 1; i < rosterData.length; i++) {
-    var row = rosterData[i];
-    if (emailIndex !== -1 && row[emailIndex]) {
-      rosterMap[row[emailIndex]] = {
-        name: nameIndex !== -1 ? row[nameIndex] : '',
-        class: classIndex !== -1 ? row[classIndex] : ''
-      };
-    }
-  }
-  
-  return rosterMap;
+  // 名簿機能は使用しないため、常に空のマップを返す
+  // 名前はフォーム入力から直接取得
+  return {};
 }
 
 /**
@@ -789,14 +919,13 @@ function processRowDataOptimized(row, headers, headerIndices, rosterMap, display
   // スコア計算
   processedRow.score = calculateRowScoreOptimized(processedRow);
   
-  // 名前の表示処理
-  var emailIndex = headerIndices[COLUMN_HEADERS.EMAIL];
-  if (emailIndex !== undefined && row[emailIndex] && displayMode === DISPLAY_MODES.NAMED) {
-    var email = row[emailIndex];
-    var rosterInfo = rosterMap[email];
-    if (rosterInfo && rosterInfo.name) {
-      processedRow.displayName = rosterInfo.name;
-    }
+  // 名前の表示処理（フォーム入力の名前を使用）
+  var nameIndex = headerIndices[COLUMN_HEADERS.NAME];
+  if (nameIndex !== undefined && row[nameIndex] && displayMode === DISPLAY_MODES.NAMED) {
+    processedRow.displayName = row[nameIndex];
+  } else if (displayMode === DISPLAY_MODES.NAMED) {
+    // 名前入力がない場合のフォールバック
+    processedRow.displayName = '匿名';
   }
   
   return processedRow;
