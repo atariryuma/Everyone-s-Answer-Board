@@ -468,17 +468,258 @@ function addReactionColumnsToSpreadsheetOptimized(spreadsheetId, sheetName) {
 }
 
 /**
- * シートデータ取得（プレースホルダー）
+ * シートデータ取得（最適化版）
  */
 function getSheetDataOptimized(userId, sheetName, classFilter, sortMode) {
-  // DataProcessorの機能を関数ベースで実装
-  throw new Error('getSheetDataOptimized is not implemented yet');
+  try {
+    var userInfo = findUserByIdOptimized(userId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    var spreadsheetId = userInfo.spreadsheetId;
+    var service = getOptimizedSheetsService();
+    
+    // バッチでデータ、ヘッダー、名簿を取得
+    var ranges = [
+      sheetName + '!A:Z',
+      ROSTER_CONFIG.SHEET_NAME + '!A:Z'
+    ];
+    
+    var responses = batchGetSheetsData(service, spreadsheetId, ranges);
+    var sheetData = responses.valueRanges[0].values || [];
+    var rosterData = responses.valueRanges[1].values || [];
+    
+    if (sheetData.length === 0) {
+      return {
+        status: 'success',
+        data: [],
+        headers: [],
+        totalCount: 0
+      };
+    }
+    
+    var headers = sheetData[0];
+    var dataRows = sheetData.slice(1);
+    
+    // ヘッダーインデックスを取得（キャッシュ利用）
+    var headerIndices = getHeaderIndicesCached(spreadsheetId, sheetName);
+    
+    // 名簿マップを作成（キャッシュ利用）
+    var rosterMap = buildRosterMap(rosterData);
+    
+    // 表示モードを取得
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
+    
+    // データを処理
+    var processedData = dataRows.map(function(row, index) {
+      return processRowDataOptimized(row, headers, headerIndices, rosterMap, displayMode, index + 2);
+    });
+    
+    // フィルタリング
+    var filteredData = processedData;
+    if (classFilter && classFilter !== 'all') {
+      var classIndex = headerIndices[COLUMN_HEADERS.CLASS];
+      if (classIndex !== undefined) {
+        filteredData = processedData.filter(function(row) {
+          return row.originalData[classIndex] === classFilter;
+        });
+      }
+    }
+    
+    // ソート適用
+    var sortedData = applySortModeOptimized(filteredData, sortMode || 'newest');
+    
+    return {
+      status: 'success',
+      data: sortedData,
+      headers: headers,
+      totalCount: sortedData.length,
+      displayMode: displayMode
+    };
+    
+  } catch (e) {
+    console.error('シートデータ取得エラー: ' + e.message);
+    return {
+      status: 'error',
+      message: 'データの取得に失敗しました: ' + e.message,
+      data: [],
+      headers: []
+    };
+  }
 }
 
 /**
- * シート一覧取得（プレースホルダー）
+ * シート一覧取得（最適化版）
  */
 function getSheetsListOptimized(userId) {
-  // シート一覧取得の最適化版を実装
-  throw new Error('getSheetsListOptimized is not implemented yet');
+  try {
+    var userInfo = findUserByIdOptimized(userId);
+    if (!userInfo) {
+      return [];
+    }
+    
+    var service = getOptimizedSheetsService();
+    var spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
+    
+    return spreadsheet.sheets.map(function(sheet) {
+      return {
+        name: sheet.properties.title,
+        id: sheet.properties.sheetId
+      };
+    });
+  } catch (e) {
+    console.error('シート一覧取得エラー: ' + e.message);
+    return [];
+  }
+}
+
+/**
+ * 名簿マップを構築
+ * @param {array} rosterData - 名簿データ
+ * @returns {object} 名簿マップ
+ */
+function buildRosterMap(rosterData) {
+  if (rosterData.length === 0) return {};
+  
+  var headers = rosterData[0];
+  var emailIndex = headers.indexOf(ROSTER_CONFIG.EMAIL_COLUMN);
+  var nameIndex = headers.indexOf(ROSTER_CONFIG.NAME_COLUMN);
+  var classIndex = headers.indexOf(ROSTER_CONFIG.CLASS_COLUMN);
+  
+  var rosterMap = {};
+  
+  for (var i = 1; i < rosterData.length; i++) {
+    var row = rosterData[i];
+    if (emailIndex !== -1 && row[emailIndex]) {
+      rosterMap[row[emailIndex]] = {
+        name: nameIndex !== -1 ? row[nameIndex] : '',
+        class: classIndex !== -1 ? row[classIndex] : ''
+      };
+    }
+  }
+  
+  return rosterMap;
+}
+
+/**
+ * 行データを処理（スコア計算、名前変換など）
+ */
+function processRowDataOptimized(row, headers, headerIndices, rosterMap, displayMode, rowNumber) {
+  var processedRow = {
+    rowNumber: rowNumber,
+    originalData: row,
+    score: 0,
+    likeCount: 0,
+    understandCount: 0,
+    curiousCount: 0,
+    isHighlighted: false
+  };
+  
+  // リアクションカウント計算
+  REACTION_KEYS.forEach(function(reactionKey) {
+    var columnName = COLUMN_HEADERS[reactionKey];
+    var columnIndex = headerIndices[columnName];
+    
+    if (columnIndex !== undefined && row[columnIndex]) {
+      var reactions = parseReactionStringOptimized(row[columnIndex]);
+      var count = reactions.length;
+      
+      switch (reactionKey) {
+        case 'LIKE':
+          processedRow.likeCount = count;
+          break;
+        case 'UNDERSTAND':
+          processedRow.understandCount = count;
+          break;
+        case 'CURIOUS':
+          processedRow.curiousCount = count;
+          break;
+      }
+    }
+  });
+  
+  // ハイライト状態チェック
+  var highlightIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT];
+  if (highlightIndex !== undefined && row[highlightIndex]) {
+    processedRow.isHighlighted = row[highlightIndex].toString().toLowerCase() === 'true';
+  }
+  
+  // スコア計算
+  processedRow.score = calculateRowScoreOptimized(processedRow);
+  
+  // 名前の表示処理
+  var emailIndex = headerIndices[COLUMN_HEADERS.EMAIL];
+  if (emailIndex !== undefined && row[emailIndex] && displayMode === DISPLAY_MODES.NAMED) {
+    var email = row[emailIndex];
+    var rosterInfo = rosterMap[email];
+    if (rosterInfo && rosterInfo.name) {
+      processedRow.displayName = rosterInfo.name;
+    }
+  }
+  
+  return processedRow;
+}
+
+/**
+ * 行のスコアを計算
+ */
+function calculateRowScoreOptimized(rowData) {
+  var baseScore = 1.0;
+  
+  // いいね！による加算
+  var likeBonus = rowData.likeCount * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR;
+  
+  // その他のリアクションも軽微な加算
+  var reactionBonus = (rowData.understandCount + rowData.curiousCount) * 0.01;
+  
+  // ハイライトによる大幅加算
+  var highlightBonus = rowData.isHighlighted ? 0.5 : 0;
+  
+  // ランダム要素（同じスコアの項目をランダムに並べるため）
+  var randomFactor = Math.random() * SCORING_CONFIG.RANDOM_SCORE_FACTOR;
+  
+  return baseScore + likeBonus + reactionBonus + highlightBonus + randomFactor;
+}
+
+/**
+ * データにソートを適用
+ */
+function applySortModeOptimized(data, sortMode) {
+  switch (sortMode) {
+    case 'score':
+      return data.sort(function(a, b) { return b.score - a.score; });
+    case 'newest':
+      return data.reverse();
+    case 'oldest':
+      return data; // 元の順序（古い順）
+    case 'random':
+      return shuffleArrayOptimized(data.slice()); // コピーをシャッフル
+    case 'likes':
+      return data.sort(function(a, b) { return b.likeCount - a.likeCount; });
+    default:
+      return data;
+  }
+}
+
+/**
+ * 配列をシャッフル（Fisher-Yates shuffle）
+ */
+function shuffleArrayOptimized(array) {
+  for (var i = array.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var temp = array[i];
+    array[i] = array[j];
+    array[j] = temp;
+  }
+  return array;
+}
+
+/**
+ * リアクション文字列をパース
+ */
+function parseReactionStringOptimized(val) {
+  if (!val) return [];
+  return val.toString().split(',').map(function(s) { return s.trim(); }).filter(Boolean);
 }
