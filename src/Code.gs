@@ -34,9 +34,15 @@ var USER_FOLDER_CONFIG = {
 var DB_SHEET_CONFIG = {
   SHEET_NAME: 'Users',
   HEADERS: [
-    'userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 
+    'userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl',
     'createdAt', 'configJson', 'lastAccessedAt', 'isActive'
   ]
+};
+
+// 監査ログシート設定
+var LOG_SHEET_CONFIG = {
+  SHEET_NAME: 'Logs',
+  HEADERS: ['timestamp', 'userId', 'action', 'details']
 };
 
 // 回答ボードのスプレッドシートの列ヘッダー
@@ -130,17 +136,23 @@ function setupApplication(credsJson, dbId) {
 function initializeDatabaseSheet(spreadsheetId) {
   var service = getSheetsService();
   var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+  var logSheet = LOG_SHEET_CONFIG.SHEET_NAME;
 
   try {
     // シートが存在するか確認
     var spreadsheet = service.spreadsheets.get(spreadsheetId);
     var sheetExists = spreadsheet.sheets.some(function(s) { return s.properties.title === sheetName; });
+    var logExists = spreadsheet.sheets.some(function(s) { return s.properties.title === logSheet; });
 
+    var requests = [];
     if (!sheetExists) {
-      // シートが存在しない場合は作成
-      service.spreadsheets.batchUpdate(spreadsheetId, {
-        requests: [{ addSheet: { properties: { title: sheetName } } }]
-      });
+      requests.push({ addSheet: { properties: { title: sheetName } } });
+    }
+    if (!logExists) {
+      requests.push({ addSheet: { properties: { title: logSheet } } });
+    }
+    if (requests.length > 0) {
+      service.spreadsheets.batchUpdate(spreadsheetId, { requests: requests });
     }
     
     // ヘッダーを書き込み
@@ -149,6 +161,14 @@ function initializeDatabaseSheet(spreadsheetId) {
       spreadsheetId,
       headerRange,
       { values: [DB_SHEET_CONFIG.HEADERS] },
+      { valueInputOption: 'RAW' }
+    );
+
+    var logHeader = logSheet + '!A1:' + String.fromCharCode(65 + LOG_SHEET_CONFIG.HEADERS.length - 1) + '1';
+    service.spreadsheets.values.update(
+      spreadsheetId,
+      logHeader,
+      { values: [LOG_SHEET_CONFIG.HEADERS] },
       { valueInputOption: 'RAW' }
     );
 
@@ -1626,10 +1646,13 @@ function publishApp(sheetName) {
     var configJson = JSON.parse(userInfo.configJson || '{}');
     configJson.publishedSheet = sheetName;
     configJson.appPublished = true;
+    configJson.publishedAt = new Date().toISOString();
     
     updateUserInDb(currentUserId, {
       configJson: JSON.stringify(configJson)
     });
+
+    auditLog('PUBLISH', currentUserId, { sheet: sheetName });
     
     debugLog('アプリを公開しました: ' + sheetName);
     
@@ -1666,10 +1689,13 @@ function unpublishApp() {
     
     var configJson = JSON.parse(userInfo.configJson || '{}');
     configJson.appPublished = false;
+    configJson.publishedAt = '';
     
     updateUserInDb(currentUserId, {
       configJson: JSON.stringify(configJson)
     });
+
+    auditLog('UNPUBLISH', currentUserId, {});
     
     debugLog('アプリの公開を停止しました');
     
@@ -2125,4 +2151,57 @@ function getExistingBoard() {
       message: 'アカウント確認中にエラーが発生しました'
     };
   }
+}
+
+/**
+ * アクションをログシートに記録する
+ * @param {string} action - 実行した操作
+ * @param {string} userId - 対象ユーザーID
+ * @param {object} [details] - 追加情報
+ */
+function auditLog(action, userId, details) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    if (!dbId) return;
+
+    var service = getSheetsService();
+    var range = LOG_SHEET_CONFIG.SHEET_NAME + '!A:D';
+    service.spreadsheets.values.append(
+      dbId,
+      range,
+      { values: [[new Date().toISOString(), userId, action, JSON.stringify(details || {})]] },
+      { valueInputOption: 'USER_ENTERED' }
+    );
+  } catch (e) {
+    console.error('auditLog error: ' + e.message);
+  }
+}
+
+/**
+ * 公開から6時間経過していれば自動的に非公開にする
+ * @param {Object} userInfo
+ * @param {string} userId
+ * @returns {HtmlOutput|null}
+ */
+function checkAutoUnpublish(userInfo, userId) {
+  try {
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    if (configJson.appPublished && configJson.publishedAt) {
+      var published = new Date(configJson.publishedAt);
+      if (Date.now() - published.getTime() > 6 * 60 * 60 * 1000) {
+        configJson.appPublished = false;
+        configJson.publishedAt = '';
+        updateUserInDb(userId, { configJson: JSON.stringify(configJson) });
+        auditLog('AUTO_UNPUBLISH', userId, { reason: 'timeout' });
+
+        var template = HtmlService.createTemplateFromFile('Unpublished');
+        template.message = 'この回答ボードは、公開から6時間が経過したため、安全のため自動的に非公開になりました。再度利用する場合は、管理者にご連絡ください。';
+        return template.evaluate().setTitle('公開期間が終了しました');
+      }
+    }
+  } catch (e) {
+    console.error('auto unpublish check failed: ' + e.message);
+  }
+  return null;
 }
