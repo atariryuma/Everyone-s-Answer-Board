@@ -77,7 +77,7 @@ Google Sheets API v4のサービスオブジェクトを取得します。
   createdAt: "2024-01-01T00:00:00.000Z",
   configJson: '{"displayMode":"anonymous"}',
   lastAccessedAt: "2024-01-01T12:00:00.000Z",
-  isActive: "true"
+  isActive: "true" // または "false"
 }
 ```
 

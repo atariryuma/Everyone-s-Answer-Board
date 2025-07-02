@@ -103,6 +103,7 @@ function registerNewUser(adminEmail) {
   return {
     userId: userId,
     spreadsheetId: formAndSsInfo.spreadsheetId,
+    spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
     adminUrl: appUrls.adminUrl,
     viewUrl: appUrls.viewUrl,
     message: '新しいボードが作成されました！'

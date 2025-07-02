@@ -85,7 +85,7 @@ function findUserById(userId) {
 | `createdAt` | 作成日時 | `2024-01-01T00:00:00.000Z` |
 | `configJson` | 設定情報（JSON） | `{"displayMode":"anonymous","publishedSheet":"フォームの回答 1"}` |
 | `lastAccessedAt` | 最終アクセス日時 | `2024-01-01T12:00:00.000Z` |
-| `isActive` | アクティブ状態 | `true` / `false` |
+| `isActive` | アクティブ状態 (`true` / `false`) | `true` / `false` |
 
 ## 4. データフローと相互作用
 

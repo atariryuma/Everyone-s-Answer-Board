@@ -85,8 +85,7 @@
 - `Code.gs` → GASエディタの `コード.gs` に貼り付け
 - `SetupCode.gs` → 新しいスクリプトファイルとして作成
 - `config.gs` → 新しいスクリプトファイルとして作成
-- `ErrorHandling.gs` → 新しいスクリプトファイルとして作成
-- `ErrorHandling.gs` → 新しいスクリプトファイルとして作成
+   - `ErrorHandling.gs` → 新しいスクリプトファイルとして作成
 
 #### **HTMLファイル (.html)**
 - `AdminPanel.html` → 新しいHTMLファイルとして作成
