@@ -1082,26 +1082,7 @@
       }
 
       // New Action Buttons
-      const viewBoardBtn = document.getElementById('view-board-btn');
-      if (viewBoardBtn) {
-        viewBoardBtn.addEventListener('click', () => {
-          if (currentActiveSheet && elements.boardUrl && elements.boardUrl.value) {
-            window.open(elements.boardUrl.value, '_blank');
-          } else {
-            showMessage('回答ボードが利用できません。まずボードを公開してください。', 'yellow');
-          }
-        });
-      }
-
-      const configSettingsBtn = document.getElementById('config-settings-btn');
-      if (configSettingsBtn) {
-        configSettingsBtn.addEventListener('click', () => {
-          // Scroll to config section
-          document.getElementById('config-section').scrollIntoView({ behavior: 'smooth' });
-        });
-      }
-
-      
+      // viewBoardBtn と configSettingsBtn は削除されたため、関連するイベントリスナーも削除
 
       // Auto-update config when headers change
       elements.mainHeader.addEventListener('change', updateConfigButtons);
