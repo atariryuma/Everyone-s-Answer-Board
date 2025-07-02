@@ -241,13 +241,23 @@ function checkAdmin() {
     var service = getSheetsService();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
-    var data = service.spreadsheets.values.get(dbId, sheetName + '!A:H').values || [];
-    if (data.length === 0) return false;
+    var response = service.spreadsheets.values.get(dbId, sheetName + '!A:H');
+    var data = response.values || []; // Check if values property exists
+    
+    if (data.length === 0) {
+      debugLog('checkAdmin: No data found in Users sheet or sheet is empty.');
+      return false;
+    }
     
     var headers = data[0];
     var emailIndex = headers.indexOf('adminEmail');
     var isActiveIndex = headers.indexOf('isActive');
     
+    if (emailIndex === -1 || isActiveIndex === -1) {
+      console.warn('checkAdmin: Missing required headers in Users sheet.');
+      return false;
+    }
+
     for (var i = 1; i < data.length; i++) {
       if (data[i][emailIndex] === activeUserEmail && data[i][isActiveIndex] === 'true') {
         return true;

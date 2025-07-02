@@ -488,7 +488,14 @@ function getSheetDataOptimized(userId, sheetName, classFilter, sortMode) {
     
     var responses = batchGetSheetsData(service, spreadsheetId, ranges);
     var sheetData = responses.valueRanges[0].values || [];
-    var rosterData = responses.valueRanges[1].values || [];
+    
+    // 「名簿」シートの存在を確認し、存在しない場合は空の配列を返す
+    var rosterData = [];
+    if (responses.valueRanges[1] && responses.valueRanges[1].values) {
+      rosterData = responses.valueRanges[1].values;
+    } else {
+      debugLog('「名簿」シートが見つからないか、データがありません。');
+    }
     
     if (sheetData.length === 0) {
       return {

@@ -903,8 +903,9 @@ function createStudyQuestForm(userEmail, userId) {
     }
     
     // 確認メッセージの設定
-    var confirmationMessage = form.getPublishedUrl()
-      ? '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。\nみんなの回答ボードで、お友達の色々な考えも見てみましょう。\n新しい発見があるかもしれませんね！\n\n' + form.getPublishedUrl()
+    var appUrls = generateAppUrls(userId); // userIdを使ってURLを生成
+    var confirmationMessage = appUrls.viewUrl
+      ? '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。\nみんなの回答ボードで、お友達の色々な考えも見てみましょう。\n新しい発見があるかもしれませんね！\n\n' + appUrls.viewUrl
       : '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。';
     form.setConfirmationMessage(confirmationMessage);
     
