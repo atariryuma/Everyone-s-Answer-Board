@@ -21,14 +21,14 @@ function doGet(e) {
     return HtmlService.createTemplateFromFile('Registration').evaluate().setTitle('新規登録');
   }
 
-  var userInfo = DatabaseManager.findUserById(userId);
+  var userInfo = findUserByIdOptimized(userId);
   if (!userInfo) {
     return HtmlService.createHtmlOutput('無効なユーザーIDです。');
   }
   
   // ユーザーの最終アクセス日時を更新（非同期）
   try {
-    DatabaseManager.updateUser(userId, { lastAccessedAt: new Date().toISOString() });
+    updateUserOptimized(userId, { lastAccessedAt: new Date().toISOString() });
   } catch (e) {
     console.error('最終アクセス日時の更新に失敗: ' + e.message);
   }
@@ -59,14 +59,14 @@ function registerNewUser(adminEmail) {
   }
 
   // 既存ユーザーチェック（キャッシュ利用）
-  var existingUser = DatabaseManager.findUserByEmail(adminEmail);
+  var existingUser = findUserByEmailOptimized(adminEmail);
   if (existingUser) {
     throw new Error('このメールアドレスは既に登録されています。');
   }
 
   // ステップ1: ユーザー自身の権限でファイル作成
   var userId = Utilities.getUuid();
-  var formAndSsInfo = FormManager.createStudyQuestForm(adminEmail, userId);
+  var formAndSsInfo = createStudyQuestFormOptimized(adminEmail, userId);
 
   // ステップ2: サービスアカウント経由でDBに登録
   var initialConfig = {
@@ -87,7 +87,7 @@ function registerNewUser(adminEmail) {
   };
 
   try {
-    DatabaseManager.createUser(userData);
+    createUserOptimized(userData);
     debugLog('✅ データベースに新規ユーザーを登録しました: ' + adminEmail);
   } catch (e) {
     console.error('データベースへのユーザー登録に失敗: ' + e.message);
@@ -95,7 +95,7 @@ function registerNewUser(adminEmail) {
   }
 
   // 成功レスポンスを返す
-  var appUrls = UrlManager.generateAppUrls(userId);
+  var appUrls = generateAppUrlsOptimized(userId);
   return {
     userId: userId,
     spreadsheetId: formAndSsInfo.spreadsheetId,
@@ -118,12 +118,12 @@ function addReaction(rowIndex, reactionKey, sheetName) {
   }
 
   // ボードオーナーの情報をDBから取得（キャッシュ利用）
-  var boardOwnerInfo = DatabaseManager.findUserById(ownerUserId);
+  var boardOwnerInfo = findUserByIdOptimized(ownerUserId);
   if (!boardOwnerInfo) {
     throw new Error('無効なボードです。');
   }
 
-  return ReactionManager.processReaction(
+  return processReactionOptimized(
     boardOwnerInfo.spreadsheetId,
     sheetName,
     rowIndex,
@@ -148,7 +148,7 @@ function getPublishedSheetData(classFilter, sortMode) {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
     
-    var userInfo = DatabaseManager.findUserById(currentUserId);
+    var userInfo = findUserByIdOptimized(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -157,7 +157,7 @@ function getPublishedSheetData(classFilter, sortMode) {
     var configJson = JSON.parse(userInfo.configJson || '{}');
     var publishedSheet = configJson.publishedSheet || 'フォームの回答 1';
     
-    return DataProcessor.getSheetData(currentUserId, publishedSheet, classFilter, sortMode);
+    return getSheetDataOptimized(currentUserId, publishedSheet, classFilter, sortMode);
   } catch (e) {
     console.error('公開シートデータ取得エラー: ' + e.message);
     return {
@@ -180,7 +180,7 @@ function getAppConfig() {
     if (!currentUserId) {
       // コンテキストが設定されていない場合、現在のユーザーで検索
       var activeUser = Session.getActiveUser().getEmail();
-      var userInfo = DatabaseManager.findUserByEmail(activeUser);
+      var userInfo = findUserByEmailOptimized(activeUser);
       if (userInfo) {
         currentUserId = userInfo.userId;
         props.setProperty('CURRENT_USER_ID', currentUserId);
@@ -189,14 +189,14 @@ function getAppConfig() {
       }
     }
     
-    var userInfo = DatabaseManager.findUserById(currentUserId);
+    var userInfo = findUserByIdOptimized(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
     
     var configJson = JSON.parse(userInfo.configJson || '{}');
-    var sheets = SheetManager.getSheets(currentUserId);
-    var appUrls = UrlManager.generateAppUrls(currentUserId);
+    var sheets = getSheetsListOptimized(currentUserId);
+    var appUrls = generateAppUrlsOptimized(currentUserId);
     
     return {
       status: 'success',
@@ -243,7 +243,7 @@ function setupApplication(credsJson, dbId) {
     props.setProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID, dbId);
 
     // データベースシートの初期化
-    DatabaseManager.initializeDatabaseSheet(dbId);
+    initializeDatabaseSheetOptimized(dbId);
 
     console.log('✅ セットアップが正常に完了しました。');
   } catch (e) {
@@ -261,7 +261,7 @@ function include(filename) {
 }
 
 function getActiveFormInfo(userId) {
-  var userInfo = DatabaseManager.findUserById(userId);
+  var userInfo = findUserByIdOptimized(userId);
   if (!userInfo) {
     return { status: 'error', message: 'ユーザー情報が見つかりません' };
   }
@@ -281,17 +281,17 @@ function getActiveFormInfo(userId) {
 }
 
 function getResponsesData(userId, sheetName) {
-  var userInfo = DatabaseManager.findUserById(userId);
+  var userInfo = findUserByIdOptimized(userId);
   if (!userInfo) {
     return { status: 'error', message: 'ユーザー情報が見つかりません' };
   }
 
   try {
-    var service = DatabaseManager.getSheetsService();
+    var service = getOptimizedSheetsService();
     var spreadsheetId = userInfo.spreadsheetId;
     var range = (sheetName || 'フォームの回答 1') + '!A:Z';
     
-    var response = service.batchGet(spreadsheetId, [range]);
+    var response = batchGetSheetsData(service, spreadsheetId, [range]);
     var values = response.valueRanges[0].values || [];
     
     if (values.length === 0) {
@@ -314,32 +314,60 @@ function getResponsesData(userId, sheetName) {
 // =================================================================
 
 function getWebAppUrl() {
-  return UrlManager.getWebAppUrl();
+  return getWebAppUrlCached();
 }
 
 function findUserById(userId) {
-  return DatabaseManager.findUserById(userId);
+  return findUserByIdOptimized(userId);
 }
 
 function findUserByEmail(email) {
-  return DatabaseManager.findUserByEmail(email);
+  return findUserByEmailOptimized(email);
 }
 
 function updateUserInDb(userId, updateData) {
-  return DatabaseManager.updateUser(userId, updateData);
+  return updateUserOptimized(userId, updateData);
 }
 
 function getSheetsService() {
-  return DatabaseManager.getSheetsService();
+  return getOptimizedSheetsService();
 }
 
 function clearAllCaches() {
-  CacheManager.clearAll();
-  AuthManager.clearTokenCache();
+  clearAllCache();
+  clearServiceAccountTokenCache();
 }
 
 function debugLog() {
   if (DEBUG && typeof console !== 'undefined' && console.log) {
     console.log.apply(console, arguments);
   }
+}
+
+// =================================================================
+// プレースホルダー関数（実装予定）
+// =================================================================
+
+/**
+ * フォーム作成（プレースホルダー）
+ */
+function createStudyQuestFormOptimized(userEmail, userId) {
+  // 元のcreateStudyQuestForm関数の最適化版を実装
+  throw new Error('createStudyQuestFormOptimized is not implemented yet');
+}
+
+/**
+ * シートデータ取得（プレースホルダー）
+ */
+function getSheetDataOptimized(userId, sheetName, classFilter, sortMode) {
+  // DataProcessorの機能を関数ベースで実装
+  throw new Error('getSheetDataOptimized is not implemented yet');
+}
+
+/**
+ * シート一覧取得（プレースホルダー）
+ */
+function getSheetsListOptimized(userId) {
+  // シート一覧取得の最適化版を実装
+  throw new Error('getSheetsListOptimized is not implemented yet');
 }

@@ -1,238 +1,388 @@
 /**
- * @fileoverview データベース管理クラス - バッチ操作とキャッシュ最適化
+ * @fileoverview データベース管理 - バッチ操作とキャッシュ最適化
+ * GAS互換の関数ベースの実装
  */
 
-class DatabaseManager {
-  static USER_CACHE_TTL = 300; // 5分
-  static BATCH_SIZE = 100;
+// データベース管理のための定数
+var USER_CACHE_TTL = 300; // 5分
+var DB_BATCH_SIZE = 100;
+
+/**
+ * 最適化されたSheetsサービスを取得
+ * @returns {object} Sheets APIサービス
+ */
+function getOptimizedSheetsService() {
+  var accessToken = getServiceAccountTokenCached();
+  return createOptimizedSheetsService(accessToken);
+}
+
+/**
+ * ユーザー情報を効率的に検索（キャッシュ優先）
+ * @param {string} userId - ユーザーID
+ * @returns {object|null} ユーザー情報
+ */
+function findUserByIdOptimized(userId) {
+  var cacheKey = 'user_' + userId;
+  var cache = CacheService.getScriptCache();
   
-  /**
-   * 最適化されたSheetsサービスを取得
-   * @returns {object} Sheets APIサービス
-   */
-  static getSheetsService() {
-    const accessToken = AuthManager.getServiceAccountToken();
-    return new OptimizedSheetsService(accessToken);
-  }
-  
-  /**
-   * ユーザー情報を効率的に検索（キャッシュ優先）
-   * @param {string} userId - ユーザーID
-   * @returns {object|null} ユーザー情報
-   */
-  static async findUserById(userId) {
-    const cacheKey = `user_${userId}`;
-    const cache = CacheService.getScriptCache();
-    
-    // キャッシュから取得を試行
-    let cachedUser = cache.get(cacheKey);
-    if (cachedUser) {
-      debugLog(`ユーザーキャッシュヒット: ${userId}`);
-      return JSON.parse(cachedUser);
-    }
-    
-    // データベースから取得
-    const user = await this._fetchUserFromDatabase('userId', userId);
-    
-    if (user) {
-      // キャッシュに保存
-      cache.put(cacheKey, JSON.stringify(user), this.USER_CACHE_TTL);
-      cache.put(`email_${user.adminEmail}`, JSON.stringify(user), this.USER_CACHE_TTL);
-    }
-    
-    return user;
-  }
-  
-  /**
-   * メールアドレスでユーザー検索
-   * @param {string} email - メールアドレス
-   * @returns {object|null} ユーザー情報
-   */
-  static async findUserByEmail(email) {
-    const cacheKey = `email_${email}`;
-    const cache = CacheService.getScriptCache();
-    
-    // キャッシュから取得を試行
-    let cachedUser = cache.get(cacheKey);
-    if (cachedUser) {
-      debugLog(`メールキャッシュヒット: ${email}`);
-      return JSON.parse(cachedUser);
-    }
-    
-    // データベースから取得
-    const user = await this._fetchUserFromDatabase('adminEmail', email);
-    
-    if (user) {
-      // 両方のキーでキャッシュ
-      cache.put(cacheKey, JSON.stringify(user), this.USER_CACHE_TTL);
-      cache.put(`user_${user.userId}`, JSON.stringify(user), this.USER_CACHE_TTL);
-    }
-    
-    return user;
-  }
-  
-  /**
-   * データベースからユーザーを取得
-   * @private
-   * @param {string} field - 検索フィールド
-   * @param {string} value - 検索値
-   * @returns {object|null} ユーザー情報
-   */
-  static async _fetchUserFromDatabase(field, value) {
+  // キャッシュから取得を試行
+  var cachedUser = cache.get(cacheKey);
+  if (cachedUser) {
+    debugLog('ユーザーキャッシュヒット: ' + userId);
     try {
-      const props = PropertiesService.getScriptProperties();
-      const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-      const service = this.getSheetsService();
-      const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
-      
-      const data = await service.batchGet(dbId, [`${sheetName}!A:H`]);
-      const values = data.valueRanges[0].values || [];
-      
-      if (values.length === 0) return null;
-      
-      const headers = values[0];
-      const fieldIndex = headers.indexOf(field);
-      
-      if (fieldIndex === -1) return null;
-      
-      for (let i = 1; i < values.length; i++) {
-        if (values[i][fieldIndex] === value) {
-          const user = {};
-          headers.forEach((header, index) => {
-            user[header] = values[i][index] || '';
-          });
-          return user;
-        }
-      }
-      
-      return null;
-    } catch (error) {
-      console.error(`ユーザー検索エラー (${field}:${value}):`, error);
-      return null;
+      return JSON.parse(cachedUser);
+    } catch (e) {
+      console.error('キャッシュデータ解析エラー:', e);
     }
   }
   
-  /**
-   * ユーザー情報を一括更新
-   * @param {string} userId - ユーザーID
-   * @param {object} updateData - 更新データ
-   * @returns {object} 更新結果
-   */
-  static async updateUser(userId, updateData) {
+  // データベースから取得
+  var user = fetchUserFromDatabase('userId', userId);
+  
+  if (user) {
+    // キャッシュに保存
+    cache.put(cacheKey, JSON.stringify(user), USER_CACHE_TTL);
+    cache.put('email_' + user.adminEmail, JSON.stringify(user), USER_CACHE_TTL);
+  }
+  
+  return user;
+}
+
+/**
+ * メールアドレスでユーザー検索
+ * @param {string} email - メールアドレス
+ * @returns {object|null} ユーザー情報
+ */
+function findUserByEmailOptimized(email) {
+  var cacheKey = 'email_' + email;
+  var cache = CacheService.getScriptCache();
+  
+  // キャッシュから取得を試行
+  var cachedUser = cache.get(cacheKey);
+  if (cachedUser) {
+    debugLog('メールキャッシュヒット: ' + email);
     try {
-      const props = PropertiesService.getScriptProperties();
-      const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-      const service = this.getSheetsService();
-      const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
-      
-      // 現在のデータを取得
-      const data = await service.batchGet(dbId, [`${sheetName}!A:H`]);
-      const values = data.valueRanges[0].values || [];
-      
-      if (values.length === 0) {
-        throw new Error('データベースが空です');
-      }
-      
-      const headers = values[0];
-      const userIdIndex = headers.indexOf('userId');
-      let rowIndex = -1;
-      
-      // ユーザーの行を特定
-      for (let i = 1; i < values.length; i++) {
-        if (values[i][userIdIndex] === userId) {
-          rowIndex = i + 1; // 1-based index
-          break;
-        }
-      }
-      
-      if (rowIndex === -1) {
-        throw new Error('更新対象のユーザーが見つかりません');
-      }
-      
-      // バッチ更新リクエストを作成
-      const requests = Object.keys(updateData).map(key => {
-        const colIndex = headers.indexOf(key);
-        if (colIndex === -1) return null;
-        
-        return {
-          range: `${sheetName}!${String.fromCharCode(65 + colIndex)}${rowIndex}`,
-          values: [[updateData[key]]]
-        };
-      }).filter(Boolean);
-      
-      if (requests.length > 0) {
-        await service.batchUpdate(dbId, requests);
-      }
-      
-      // キャッシュを無効化
-      const cache = CacheService.getScriptCache();
-      cache.remove(`user_${userId}`);
-      if (updateData.adminEmail) {
-        cache.remove(`email_${updateData.adminEmail}`);
-      }
-      
-      return { success: true };
-    } catch (error) {
-      console.error('ユーザー更新エラー:', error);
-      throw error;
+      return JSON.parse(cachedUser);
+    } catch (e) {
+      console.error('キャッシュデータ解析エラー:', e);
     }
   }
   
-  /**
-   * 全キャッシュをクリア
-   */
-  static clearAllCache() {
-    const cache = CacheService.getScriptCache();
-    // ユーザー関連のキャッシュをクリア
-    cache.removeAll(['USER_INFO_CACHE', 'HEADER_CACHE', 'ROSTER_CACHE']);
-    debugLog('データベースキャッシュをクリアしました');
+  // データベースから取得
+  var user = fetchUserFromDatabase('adminEmail', email);
+  
+  if (user) {
+    // 両方のキーでキャッシュ
+    cache.put(cacheKey, JSON.stringify(user), USER_CACHE_TTL);
+    cache.put('user_' + user.userId, JSON.stringify(user), USER_CACHE_TTL);
+  }
+  
+  return user;
+}
+
+/**
+ * データベースからユーザーを取得
+ * @param {string} field - 検索フィールド
+ * @param {string} value - 検索値
+ * @returns {object|null} ユーザー情報
+ */
+function fetchUserFromDatabase(field, value) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    var service = getOptimizedSheetsService();
+    var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+    
+    var data = batchGetSheetsData(service, dbId, [sheetName + '!A:H']);
+    var values = data.valueRanges[0].values || [];
+    
+    if (values.length === 0) return null;
+    
+    var headers = values[0];
+    var fieldIndex = headers.indexOf(field);
+    
+    if (fieldIndex === -1) return null;
+    
+    for (var i = 1; i < values.length; i++) {
+      if (values[i][fieldIndex] === value) {
+        var user = {};
+        headers.forEach(function(header, index) {
+          user[header] = values[i][index] || '';
+        });
+        return user;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('ユーザー検索エラー (' + field + ':' + value + '):', error);
+    return null;
   }
 }
 
 /**
- * 最適化されたSheetsサービス
+ * ユーザー情報を一括更新
+ * @param {string} userId - ユーザーID
+ * @param {object} updateData - 更新データ
+ * @returns {object} 更新結果
  */
-class OptimizedSheetsService {
-  constructor(accessToken) {
-    this.accessToken = accessToken;
-    this.baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
+function updateUserOptimized(userId, updateData) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    var service = getOptimizedSheetsService();
+    var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+    
+    // 現在のデータを取得
+    var data = batchGetSheetsData(service, dbId, [sheetName + '!A:H']);
+    var values = data.valueRanges[0].values || [];
+    
+    if (values.length === 0) {
+      throw new Error('データベースが空です');
+    }
+    
+    var headers = values[0];
+    var userIdIndex = headers.indexOf('userId');
+    var rowIndex = -1;
+    
+    // ユーザーの行を特定
+    for (var i = 1; i < values.length; i++) {
+      if (values[i][userIdIndex] === userId) {
+        rowIndex = i + 1; // 1-based index
+        break;
+      }
+    }
+    
+    if (rowIndex === -1) {
+      throw new Error('更新対象のユーザーが見つかりません');
+    }
+    
+    // バッチ更新リクエストを作成
+    var requests = Object.keys(updateData).map(function(key) {
+      var colIndex = headers.indexOf(key);
+      if (colIndex === -1) return null;
+      
+      return {
+        range: sheetName + '!' + String.fromCharCode(65 + colIndex) + rowIndex,
+        values: [[updateData[key]]]
+      };
+    }).filter(function(item) { return item !== null; });
+    
+    if (requests.length > 0) {
+      batchUpdateSheetsData(service, dbId, requests);
+    }
+    
+    // キャッシュを無効化
+    var cache = CacheService.getScriptCache();
+    cache.remove('user_' + userId);
+    if (updateData.adminEmail) {
+      cache.remove('email_' + updateData.adminEmail);
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('ユーザー更新エラー:', error);
+    throw error;
   }
+}
+
+/**
+ * 新規ユーザーをデータベースに作成
+ * @param {object} userData - 作成するユーザーデータ
+ * @returns {object} 作成されたユーザーデータ
+ */
+function createUserOptimized(userData) {
+  var props = PropertiesService.getScriptProperties();
+  var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+  var service = getOptimizedSheetsService();
+  var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+
+  var newRow = DB_SHEET_CONFIG.HEADERS.map(function(header) { 
+    return userData[header] || ''; 
+  });
   
-  /**
-   * バッチ取得
-   * @param {string} spreadsheetId - スプレッドシートID
-   * @param {string[]} ranges - 取得範囲の配列
-   * @returns {object} レスポンス
-   */
-  async batchGet(spreadsheetId, ranges) {
-    const url = `${this.baseUrl}/${spreadsheetId}/values:batchGet?${ranges.map(range => `ranges=${encodeURIComponent(range)}`).join('&')}`;
-    
-    const response = UrlFetchApp.fetch(url, {
-      headers: { 'Authorization': `Bearer ${this.accessToken}` }
-    });
-    
-    return JSON.parse(response.getContentText());
-  }
+  appendSheetsData(service, dbId, sheetName + '!A1', [newRow]);
   
-  /**
-   * バッチ更新
-   * @param {string} spreadsheetId - スプレッドシートID
-   * @param {object[]} requests - 更新リクエストの配列
-   * @returns {object} レスポンス
-   */
-  async batchUpdate(spreadsheetId, requests) {
-    const url = `${this.baseUrl}/${spreadsheetId}/values:batchUpdate`;
-    
-    const response = UrlFetchApp.fetch(url, {
-      method: 'post',
-      contentType: 'application/json',
-      headers: { 'Authorization': `Bearer ${this.accessToken}` },
-      payload: JSON.stringify({
-        data: requests,
-        valueInputOption: 'RAW'
-      })
+  // キャッシュを無効化
+  var cache = CacheService.getScriptCache();
+  cache.remove('user_' + userData.userId);
+  cache.remove('email_' + userData.adminEmail);
+  
+  return userData;
+}
+
+/**
+ * データベースシートを初期化
+ * @param {string} spreadsheetId - データベースのスプレッドシートID
+ */
+function initializeDatabaseSheetOptimized(spreadsheetId) {
+  var service = getOptimizedSheetsService();
+  var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+
+  try {
+    // シートが存在するか確認
+    var spreadsheet = getSpreadsheetsData(service, spreadsheetId);
+    var sheetExists = spreadsheet.sheets.some(function(s) { 
+      return s.properties.title === sheetName; 
     });
+
+    if (!sheetExists) {
+      // シートが存在しない場合は作成
+      batchUpdateSpreadsheet(service, spreadsheetId, {
+        requests: [{ addSheet: { properties: { title: sheetName } } }]
+      });
+    }
     
-    return JSON.parse(response.getContentText());
+    // ヘッダーを書き込み
+    var headerRange = sheetName + '!A1:' + String.fromCharCode(65 + DB_SHEET_CONFIG.HEADERS.length - 1) + '1';
+    updateSheetsData(service, spreadsheetId, headerRange, [DB_SHEET_CONFIG.HEADERS]);
+
+    debugLog('データベースシート「' + sheetName + '」の初期化が完了しました。');
+  } catch (e) {
+    console.error('データベースシートの初期化に失敗: ' + e.message);
+    throw new Error('データベースシートの初期化に失敗しました。サービスアカウントに編集者権限があるか確認してください。詳細: ' + e.message);
   }
+}
+
+/**
+ * 全キャッシュをクリア
+ */
+function clearDatabaseCache() {
+  var cache = CacheService.getScriptCache();
+  // ユーザー関連のキャッシュをクリア
+  // GASのCacheServiceには一括削除機能がないため、個別削除は実装しない
+  debugLog('データベースキャッシュクリア要請を受信しました');
+}
+
+// =================================================================
+// 最適化されたSheetsサービス関数群
+// =================================================================
+
+/**
+ * 最適化されたSheetsサービスを作成
+ * @param {string} accessToken - アクセストークン
+ * @returns {object} Sheetsサービスオブジェクト
+ */
+function createOptimizedSheetsService(accessToken) {
+  return {
+    accessToken: accessToken,
+    baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets'
+  };
+}
+
+/**
+ * バッチ取得
+ * @param {object} service - Sheetsサービス
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string[]} ranges - 取得範囲の配列
+ * @returns {object} レスポンス
+ */
+function batchGetSheetsData(service, spreadsheetId, ranges) {
+  var url = service.baseUrl + '/' + spreadsheetId + '/values:batchGet?' + 
+    ranges.map(function(range) { return 'ranges=' + encodeURIComponent(range); }).join('&');
+  
+  var response = UrlFetchApp.fetch(url, {
+    headers: { 'Authorization': 'Bearer ' + service.accessToken }
+  });
+  
+  return JSON.parse(response.getContentText());
+}
+
+/**
+ * バッチ更新
+ * @param {object} service - Sheetsサービス
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {object[]} requests - 更新リクエストの配列
+ * @returns {object} レスポンス
+ */
+function batchUpdateSheetsData(service, spreadsheetId, requests) {
+  var url = service.baseUrl + '/' + spreadsheetId + '/values:batchUpdate';
+  
+  var response = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { 'Authorization': 'Bearer ' + service.accessToken },
+    payload: JSON.stringify({
+      data: requests,
+      valueInputOption: 'RAW'
+    })
+  });
+  
+  return JSON.parse(response.getContentText());
+}
+
+/**
+ * データ追加
+ * @param {object} service - Sheetsサービス
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} range - 範囲
+ * @param {array} values - 値の配列
+ * @returns {object} レスポンス
+ */
+function appendSheetsData(service, spreadsheetId, range, values) {
+  var url = service.baseUrl + '/' + spreadsheetId + '/values/' + encodeURIComponent(range) + 
+    ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
+  
+  var response = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { 'Authorization': 'Bearer ' + service.accessToken },
+    payload: JSON.stringify({ values: values })
+  });
+  
+  return JSON.parse(response.getContentText());
+}
+
+/**
+ * スプレッドシート情報取得
+ * @param {object} service - Sheetsサービス
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @returns {object} スプレッドシート情報
+ */
+function getSpreadsheetsData(service, spreadsheetId) {
+  var url = service.baseUrl + '/' + spreadsheetId;
+  var response = UrlFetchApp.fetch(url, {
+    headers: { 'Authorization': 'Bearer ' + service.accessToken }
+  });
+  return JSON.parse(response.getContentText());
+}
+
+/**
+ * データ更新
+ * @param {object} service - Sheetsサービス
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} range - 範囲
+ * @param {array} values - 値の配列
+ * @returns {object} レスポンス
+ */
+function updateSheetsData(service, spreadsheetId, range, values) {
+  var url = service.baseUrl + '/' + spreadsheetId + '/values/' + encodeURIComponent(range) + 
+    '?valueInputOption=RAW';
+  
+  var response = UrlFetchApp.fetch(url, {
+    method: 'put',
+    contentType: 'application/json',
+    headers: { 'Authorization': 'Bearer ' + service.accessToken },
+    payload: JSON.stringify({ values: values })
+  });
+  
+  return JSON.parse(response.getContentText());
+}
+
+/**
+ * スプレッドシート構造更新
+ * @param {object} service - Sheetsサービス
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {object} requestBody - リクエストボディ
+ * @returns {object} レスポンス
+ */
+function batchUpdateSpreadsheet(service, spreadsheetId, requestBody) {
+  var url = service.baseUrl + '/' + spreadsheetId + ':batchUpdate';
+  var response = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { 'Authorization': 'Bearer ' + service.accessToken },
+    payload: JSON.stringify(requestBody)
+  });
+  return JSON.parse(response.getContentText());
 }

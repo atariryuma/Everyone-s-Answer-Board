@@ -1,100 +1,103 @@
 /**
- * @fileoverview 認証管理クラス - JWTトークンキャッシュと最適化
+ * @fileoverview 認証管理 - JWTトークンキャッシュと最適化
+ * GAS互換の関数ベースの実装
  */
 
-class AuthManager {
-  static CACHE_KEY = 'SA_TOKEN_CACHE';
-  static TOKEN_EXPIRY_BUFFER = 300; // 5分のバッファ
+// 認証管理のための定数
+var AUTH_CACHE_KEY = 'SA_TOKEN_CACHE';
+var TOKEN_EXPIRY_BUFFER = 300; // 5分のバッファ
+
+/**
+ * キャッシュされたサービスアカウントトークンを取得
+ * @returns {string} アクセストークン
+ */
+function getServiceAccountTokenCached() {
+  var cache = CacheService.getScriptCache();
+  var tokenData = cache.get(AUTH_CACHE_KEY);
   
-  /**
-   * キャッシュされたサービスアカウントトークンを取得
-   * @returns {string} アクセストークン
-   */
-  static getServiceAccountToken() {
-    const cache = CacheService.getScriptCache();
-    let tokenData = cache.get(this.CACHE_KEY);
-    
-    if (tokenData) {
+  if (tokenData) {
+    try {
       tokenData = JSON.parse(tokenData);
-      const now = Math.floor(Date.now() / 1000);
+      var now = Math.floor(Date.now() / 1000);
       
       // トークンがまだ有効な場合は再利用
-      if (tokenData.expiresAt > now + this.TOKEN_EXPIRY_BUFFER) {
+      if (tokenData.expiresAt > now + TOKEN_EXPIRY_BUFFER) {
         debugLog('キャッシュされたトークンを使用');
         return tokenData.token;
       }
+    } catch (e) {
+      console.error('トークンキャッシュ解析エラー:', e);
     }
-    
-    // 新しいトークンを生成
-    const newToken = this._generateNewToken();
-    return newToken;
   }
   
-  /**
-   * 新しいJWTトークンを生成
-   * @private
-   * @returns {string} アクセストークン
-   */
-  static _generateNewToken() {
-    const props = PropertiesService.getScriptProperties();
-    const serviceAccountCreds = JSON.parse(props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
-    
-    const privateKey = serviceAccountCreds.private_key;
-    const clientEmail = serviceAccountCreds.client_email;
-    const tokenUrl = "https://www.googleapis.com/oauth2/v4/token";
-    
-    const now = Math.floor(Date.now() / 1000);
-    const expiresAt = now + 3600; // 1時間後
-    
-    // JWT生成
-    const jwtHeader = { alg: "RS256", typ: "JWT" };
-    const jwtClaimSet = {
-      iss: clientEmail,
-      scope: "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive",
-      aud: tokenUrl,
-      exp: expiresAt,
-      iat: now
-    };
-    
-    const encodedHeader = Utilities.base64EncodeWebSafe(JSON.stringify(jwtHeader));
-    const encodedClaimSet = Utilities.base64EncodeWebSafe(JSON.stringify(jwtClaimSet));
-    const signatureInput = encodedHeader + '.' + encodedClaimSet;
-    const signature = Utilities.computeRsaSha256Signature(signatureInput, privateKey);
-    const encodedSignature = Utilities.base64EncodeWebSafe(signature);
-    const jwt = signatureInput + '.' + encodedSignature;
-    
-    // トークンリクエスト
-    const response = UrlFetchApp.fetch(tokenUrl, {
-      method: "post",
-      contentType: "application/x-www-form-urlencoded",
-      payload: {
-        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-        assertion: jwt
-      }
-    });
-    
-    const responseData = JSON.parse(response.getContentText());
-    const accessToken = responseData.access_token;
-    
-    // キャッシュに保存
-    const tokenData = {
-      token: accessToken,
-      expiresAt: expiresAt - this.TOKEN_EXPIRY_BUFFER
-    };
-    
-    const cache = CacheService.getScriptCache();
-    cache.put(this.CACHE_KEY, JSON.stringify(tokenData), 3600); // 1時間キャッシュ
-    
-    debugLog('新しいトークンを生成・キャッシュしました');
-    return accessToken;
-  }
+  // 新しいトークンを生成
+  var newToken = generateNewServiceAccountToken();
+  return newToken;
+}
   
-  /**
-   * トークンキャッシュをクリア
-   */
-  static clearTokenCache() {
-    const cache = CacheService.getScriptCache();
-    cache.remove(this.CACHE_KEY);
-    debugLog('トークンキャッシュをクリアしました');
-  }
+/**
+ * 新しいJWTトークンを生成
+ * @returns {string} アクセストークン
+ */
+function generateNewServiceAccountToken() {
+  var props = PropertiesService.getScriptProperties();
+  var serviceAccountCreds = JSON.parse(props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
+  
+  var privateKey = serviceAccountCreds.private_key;
+  var clientEmail = serviceAccountCreds.client_email;
+  var tokenUrl = "https://www.googleapis.com/oauth2/v4/token";
+  
+  var now = Math.floor(Date.now() / 1000);
+  var expiresAt = now + 3600; // 1時間後
+  
+  // JWT生成
+  var jwtHeader = { alg: "RS256", typ: "JWT" };
+  var jwtClaimSet = {
+    iss: clientEmail,
+    scope: "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive",
+    aud: tokenUrl,
+    exp: expiresAt,
+    iat: now
+  };
+  
+  var encodedHeader = Utilities.base64EncodeWebSafe(JSON.stringify(jwtHeader));
+  var encodedClaimSet = Utilities.base64EncodeWebSafe(JSON.stringify(jwtClaimSet));
+  var signatureInput = encodedHeader + '.' + encodedClaimSet;
+  var signature = Utilities.computeRsaSha256Signature(signatureInput, privateKey);
+  var encodedSignature = Utilities.base64EncodeWebSafe(signature);
+  var jwt = signatureInput + '.' + encodedSignature;
+  
+  // トークンリクエスト
+  var response = UrlFetchApp.fetch(tokenUrl, {
+    method: "post",
+    contentType: "application/x-www-form-urlencoded",
+    payload: {
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt
+    }
+  });
+  
+  var responseData = JSON.parse(response.getContentText());
+  var accessToken = responseData.access_token;
+  
+  // キャッシュに保存
+  var tokenData = {
+    token: accessToken,
+    expiresAt: expiresAt - TOKEN_EXPIRY_BUFFER
+  };
+  
+  var cache = CacheService.getScriptCache();
+  cache.put(AUTH_CACHE_KEY, JSON.stringify(tokenData), 3600); // 1時間キャッシュ
+  
+  debugLog('新しいトークンを生成・キャッシュしました');
+  return accessToken;
+}
+
+/**
+ * トークンキャッシュをクリア
+ */
+function clearServiceAccountTokenCache() {
+  var cache = CacheService.getScriptCache();
+  cache.remove(AUTH_CACHE_KEY);
+  debugLog('トークンキャッシュをクリアしました');
 }
