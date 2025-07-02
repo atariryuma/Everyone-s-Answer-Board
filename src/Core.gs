@@ -100,30 +100,51 @@ function registerNewUser(adminEmail) {
 
 /**
  * リアクションを追加/削除する
- * 最適化された実装：パフォーマンス改善、エラーハンドリング強化
+ * Page.htmlから呼び出される - フロントエンド期待形式に対応
  */
 function addReaction(rowIndex, reactionKey, sheetName) {
-  var reactingUserEmail = Session.getActiveUser().getEmail();
-  var props = PropertiesService.getUserProperties();
-  var ownerUserId = props.getProperty('CURRENT_USER_ID');
+  try {
+    var reactingUserEmail = Session.getActiveUser().getEmail();
+    var props = PropertiesService.getUserProperties();
+    var ownerUserId = props.getProperty('CURRENT_USER_ID');
 
-  if (!ownerUserId) {
-    throw new Error('ボードのオーナー情報が見つかりません。');
+    if (!ownerUserId) {
+      throw new Error('ボードのオーナー情報が見つかりません。');
+    }
+
+    // ボードオーナーの情報をDBから取得（キャッシュ利用）
+    var boardOwnerInfo = findUserByIdOptimized(ownerUserId);
+    if (!boardOwnerInfo) {
+      throw new Error('無効なボードです。');
+    }
+
+    var result = processReactionOptimized(
+      boardOwnerInfo.spreadsheetId,
+      sheetName,
+      rowIndex,
+      reactionKey,
+      reactingUserEmail
+    );
+    
+    // Page.html期待形式に変換
+    if (result && result.status === 'success') {
+      // 更新後のリアクション情報を取得
+      var updatedReactions = getRowReactions(boardOwnerInfo.spreadsheetId, sheetName, rowIndex, reactingUserEmail);
+      
+      return {
+        status: "ok",
+        reactions: updatedReactions
+      };
+    } else {
+      throw new Error(result.message || 'リアクションの処理に失敗しました');
+    }
+  } catch (e) {
+    console.error('addReaction エラー: ' + e.message);
+    return {
+      status: "error",
+      message: e.message
+    };
   }
-
-  // ボードオーナーの情報をDBから取得（キャッシュ利用）
-  var boardOwnerInfo = findUserByIdOptimized(ownerUserId);
-  if (!boardOwnerInfo) {
-    throw new Error('無効なボードです。');
-  }
-
-  return processReactionOptimized(
-    boardOwnerInfo.spreadsheetId,
-    sheetName,
-    rowIndex,
-    reactionKey,
-    reactingUserEmail
-  );
 }
 
 // =================================================================
@@ -132,9 +153,9 @@ function addReaction(rowIndex, reactionKey, sheetName) {
 
 /**
  * 公開されたシートのデータを取得
- * 最適化された実装：キャッシュ利用、エラーハンドリング強化
+ * Page.htmlから呼び出される - フロントエンド期待形式に対応
  */
-function getPublishedSheetData(classFilter, sortMode) {
+function getPublishedSheetData(sheetName, classFilter, sortOrder) {
   try {
     var props = PropertiesService.getUserProperties();
     var currentUserId = props.getProperty('CURRENT_USER_ID');
@@ -148,18 +169,52 @@ function getPublishedSheetData(classFilter, sortMode) {
       throw new Error('ユーザー情報が見つかりません');
     }
     
-    // 設定から公開シートを取得
     var configJson = JSON.parse(userInfo.configJson || '{}');
-    var publishedSheet = configJson.publishedSheet || 'フォームの回答 1';
     
-    return getSheetDataOptimized(currentUserId, publishedSheet, classFilter, sortMode);
+    // シート名の決定（パラメータまたは設定から）
+    var targetSheet = sheetName || configJson.publishedSheet || 'フォームの回答 1';
+    
+    // データ取得
+    var sheetData = getSheetDataOptimized(currentUserId, targetSheet, classFilter, sortOrder);
+    
+    if (sheetData.status === 'error') {
+      throw new Error(sheetData.message);
+    }
+    
+    // Page.html期待形式に変換
+    var formattedData = sheetData.data.map(function(row, index) {
+      return {
+        rowIndex: row.rowNumber || (index + 2), // 実際の行番号
+        name: (sheetData.displayMode === 'named' && row.displayName) ? row.displayName : '',
+        class: row.originalData[getHeaderIndex(sheetData.headers, 'クラス')] || '',
+        opinion: row.originalData[getHeaderIndex(sheetData.headers, '回答')] || '',
+        reason: row.originalData[getHeaderIndex(sheetData.headers, '理由')] || '',
+        reactions: {
+          UNDERSTAND: { count: row.understandCount || 0, reacted: false },
+          LIKE: { count: row.likeCount || 0, reacted: false },
+          CURIOUS: { count: row.curiousCount || 0, reacted: false }
+        },
+        highlight: row.isHighlighted || false
+      };
+    });
+    
+    return {
+      header: getHeaderIndex(sheetData.headers, '問題') !== -1 ? 
+        sheetData.headers[getHeaderIndex(sheetData.headers, '問題')] : '回答ボード',
+      sheetName: targetSheet,
+      showCounts: configJson.showCounts !== false,
+      displayMode: sheetData.displayMode || 'anonymous',
+      data: formattedData,
+      rows: formattedData // 後方互換性のため
+    };
+    
   } catch (e) {
     console.error('公開シートデータ取得エラー: ' + e.message);
     return {
       status: 'error',
       message: 'データの取得に失敗しました: ' + e.message,
       data: [],
-      headers: []
+      rows: []
     };
   }
 }
@@ -392,7 +447,7 @@ function getActiveFormInfo(userId) {
 
 /**
  * ハイライト状態の切り替え
- * Page.htmlから呼び出される
+ * Page.htmlから呼び出される - フロントエンド期待形式に対応
  */
 function toggleHighlight(rowIndex, sheetName) {
   try {
@@ -408,14 +463,27 @@ function toggleHighlight(rowIndex, sheetName) {
       throw new Error('ユーザー情報が見つかりません');
     }
     
-    return processHighlightToggleOptimized(
+    var result = processHighlightToggleOptimized(
       userInfo.spreadsheetId,
       sheetName || 'フォームの回答 1',
       rowIndex
     );
+    
+    // Page.html期待形式に変換
+    if (result && result.status === 'success') {
+      return {
+        status: "ok",
+        highlight: result.highlighted || false
+      };
+    } else {
+      throw new Error(result.message || 'ハイライト切り替えに失敗しました');
+    }
   } catch (e) {
     console.error('ハイライト切り替えエラー: ' + e.message);
-    return { status: 'error', message: e.message };
+    return { 
+      status: "error", 
+      message: e.message 
+    };
   }
 }
 
@@ -448,7 +516,7 @@ function checkAdmin() {
 
 /**
  * 利用可能なシート一覧を取得
- * Page.htmlではgetAvailableSheetsとして呼び出される
+ * Page.htmlから呼び出される - フロントエンド期待形式に対応
  */
 function getAvailableSheets() {
   try {
@@ -459,7 +527,14 @@ function getAvailableSheets() {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
     
-    return getSheetsListOptimized(currentUserId);
+    var sheets = getSheetsListOptimized(currentUserId);
+    
+    // Page.html期待形式に変換: [{name: string}]
+    return sheets.map(function(sheet) {
+      return {
+        name: typeof sheet === 'string' ? sheet : (sheet.name || sheet.title || sheet)
+      };
+    });
   } catch (e) {
     console.error('シート一覧取得エラー: ' + e.message);
     return [];
@@ -1080,4 +1155,59 @@ function shuffleArrayOptimized(array) {
 function parseReactionStringOptimized(val) {
   if (!val) return [];
   return val.toString().split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+}
+
+/**
+ * ヘルパー関数：ヘッダー配列から指定した名前のインデックスを取得
+ */
+function getHeaderIndex(headers, headerName) {
+  if (!headers || !headerName) return -1;
+  return headers.indexOf(headerName);
+}
+
+/**
+ * 特定の行のリアクション情報を取得
+ */
+function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
+  try {
+    var service = getOptimizedSheetsService();
+    var headerIndices = getHeaderIndicesCached(spreadsheetId, sheetName);
+    
+    var reactionData = {
+      UNDERSTAND: { count: 0, reacted: false },
+      LIKE: { count: 0, reacted: false },
+      CURIOUS: { count: 0, reacted: false }
+    };
+    
+    // 各リアクション列からデータを取得
+    ['UNDERSTAND', 'LIKE', 'CURIOUS'].forEach(function(reactionKey) {
+      var columnName = COLUMN_HEADERS[reactionKey];
+      var columnIndex = headerIndices[columnName];
+      
+      if (columnIndex !== undefined) {
+        var range = sheetName + '!' + String.fromCharCode(65 + columnIndex) + rowIndex;
+        try {
+          var response = service.spreadsheets.values.get(spreadsheetId, range);
+          var cellValue = response.values && response.values[0] && response.values[0][0];
+          
+          if (cellValue) {
+            var reactions = parseReactionStringOptimized(cellValue);
+            reactionData[reactionKey].count = reactions.length;
+            reactionData[reactionKey].reacted = reactions.indexOf(userEmail) !== -1;
+          }
+        } catch (cellError) {
+          console.warn('リアクション取得エラー(' + reactionKey + '): ' + cellError.message);
+        }
+      }
+    });
+    
+    return reactionData;
+  } catch (e) {
+    console.error('getRowReactions エラー: ' + e.message);
+    return {
+      UNDERSTAND: { count: 0, reacted: false },
+      LIKE: { count: 0, reacted: false },
+      CURIOUS: { count: 0, reacted: false }
+    };
+  }
 }
