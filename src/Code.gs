@@ -200,13 +200,11 @@ function getSheetsService() {
 // Deleted: Use doGet() in UltraOptimizedCore.gs instead
 
 /**
- * 新規ユーザーを登録する。
- * 実行者: アクセスしたユーザー本人
- * 処理:
- * 1. ユーザー自身の権限でフォームとスプレッドシートを作成する。
- * 2. サービスアカウント経由で中央データベースにユーザー情報を登録する。
+ * 新規ユーザーを登録する（レガシー実装）
+ * 注意: この関数は非推奨です。Core.gsの最適化版が標準名で提供されています。
+ * @deprecated Core.gsのregisterNewUser()を使用してください
  */
-function registerNewUser(adminEmail) {
+function registerNewUserLegacy(adminEmail) {
   var activeUser = Session.getActiveUser();
   if (adminEmail !== activeUser.getEmail()) {
     throw new Error('認証エラー: 操作を実行しているユーザーとメールアドレスが一致しません。');
@@ -260,13 +258,10 @@ function registerNewUser(adminEmail) {
 }
 
 /**
- * リアクションを追加/削除する。
- * 実行者: アクセスしたユーザー本人
- * 処理:
- * 1. リアクションしたユーザーのメールアドレスを取得する。
- * 2. サービスアカウント経由で、対象のユーザーのスプレッドシートを更新する。
+ * リアクションを追加/削除する（レガシー実装）
+ * @deprecated Core.gsのaddReaction()を使用してください
  */
-function addReaction(rowIndex, reactionKey, sheetName) {
+function addReactionLegacy(rowIndex, reactionKey, sheetName) {
   var reactingUserEmail = Session.getActiveUser().getEmail();
   var props = PropertiesService.getUserProperties();
   var ownerUserId = props.getProperty('CURRENT_USER_ID');
@@ -946,7 +941,7 @@ function clearRosterCache() {
 /**
  * 公開されたシートのデータを取得（Page.htmlから呼び出される）
  */
-function getPublishedSheetData(classFilter, sortMode) {
+function getPublishedSheetDataLegacy(classFilter, sortMode) {
   try {
     var props = PropertiesService.getUserProperties();
     var currentUserId = props.getProperty('CURRENT_USER_ID');
@@ -1270,10 +1265,10 @@ function getAppConfig() {
 // Deleted: Use getAppConfig() directly instead
 
 /**
- * 管理画面用のステータス情報を取得（後方互換性のため）
- * @deprecated getAppConfigを使用してください
+ * 管理画面用のステータス情報を取得（レガシー実装）
+ * @deprecated Core.gsのgetStatus()を使用してください
  */
-function getStatus() {
+function getStatusLegacy() {
   return getAppConfig();
 }
 

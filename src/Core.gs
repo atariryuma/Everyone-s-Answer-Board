@@ -10,7 +10,8 @@
 // doGetLegacy function removed - consolidated into main doGet in UltraOptimizedCore.gs
 
 /**
- * 新規ユーザーを登録する（最適化版）
+ * 新規ユーザーを登録する
+ * 最適化された実装：キャッシュ利用、エラーハンドリング強化、パフォーマンス改善
  */
 function registerNewUser(adminEmail) {
   var activeUser = Session.getActiveUser();
@@ -67,7 +68,8 @@ function registerNewUser(adminEmail) {
 }
 
 /**
- * リアクションを追加/削除する（最適化版）
+ * リアクションを追加/削除する
+ * 最適化された実装：パフォーマンス改善、エラーハンドリング強化
  */
 function addReaction(rowIndex, reactionKey, sheetName) {
   var reactingUserEmail = Session.getActiveUser().getEmail();
@@ -98,7 +100,8 @@ function addReaction(rowIndex, reactionKey, sheetName) {
 // =================================================================
 
 /**
- * 公開されたシートのデータを取得（最適化版）
+ * 公開されたシートのデータを取得
+ * 最適化された実装：キャッシュ利用、エラーハンドリング強化
  */
 function getPublishedSheetData(classFilter, sortMode) {
   try {
@@ -267,6 +270,180 @@ function getResponsesData(userId, sheetName) {
   } catch (e) {
     console.error('回答データの取得に失敗: ' + e.message);
     return { status: 'error', message: '回答データの取得に失敗しました: ' + e.message };
+  }
+}
+
+// =================================================================
+// HTML依存関数（UI連携）
+// =================================================================
+
+/**
+ * 管理画面用のステータス情報を取得
+ * AdminPanel.htmlから呼び出される
+ */
+function getStatus() {
+  return getAppConfig();
+}
+
+/**
+ * アクティブなフォーム情報を取得
+ * AdminPanel.htmlから呼び出される
+ */
+function getActiveFormInfo(userId) {
+  var userInfo = findUserByIdOptimized(userId);
+  if (!userInfo) {
+    return { status: 'error', message: 'ユーザー情報が見つかりません' };
+  }
+
+  try {
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    return {
+      status: 'success',
+      formUrl: configJson.formUrl || '',
+      editFormUrl: configJson.editFormUrl || '',
+      spreadsheetUrl: userInfo.spreadsheetUrl || ''
+    };
+  } catch (e) {
+    console.error('設定情報の取得に失敗: ' + e.message);
+    return { status: 'error', message: '設定情報の取得に失敗しました' };
+  }
+}
+
+/**
+ * ハイライト状態の切り替え
+ * Page.htmlから呼び出される
+ */
+function toggleHighlight(rowIndex, sheetName) {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+    
+    var userInfo = findUserByIdOptimized(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    return processHighlightToggleOptimized(
+      userInfo.spreadsheetId,
+      sheetName || 'フォームの回答 1',
+      rowIndex
+    );
+  } catch (e) {
+    console.error('ハイライト切り替えエラー: ' + e.message);
+    return { status: 'error', message: e.message };
+  }
+}
+
+/**
+ * 管理者権限の確認
+ * Page.htmlから呼び出される
+ */
+function checkAdmin() {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      return false;
+    }
+    
+    var userInfo = findUserByIdOptimized(currentUserId);
+    if (!userInfo) {
+      return false;
+    }
+    
+    var activeUser = Session.getActiveUser().getEmail();
+    return activeUser === userInfo.adminEmail;
+  } catch (e) {
+    console.error('管理者確認エラー: ' + e.message);
+    return false;
+  }
+}
+
+/**
+ * アクティブシートのクリア（公開終了）
+ * Page.htmlから呼び出される
+ */
+function clearActiveSheet() {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+    
+    return updateUserOptimized(currentUserId, {
+      configJson: JSON.stringify({
+        appPublished: false,
+        publishedSheet: ''
+      })
+    });
+  } catch (e) {
+    console.error('公開終了エラー: ' + e.message);
+    return { status: 'error', message: e.message };
+  }
+}
+
+/**
+ * 利用可能なシート一覧を取得
+ * Page.htmlではgetAvailableSheetsとして呼び出される
+ */
+function getAvailableSheets() {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+    
+    return getSheetsListOptimized(currentUserId);
+  } catch (e) {
+    console.error('シート一覧取得エラー: ' + e.message);
+    return [];
+  }
+}
+
+/**
+ * ハイライト切り替えの最適化処理
+ */
+function processHighlightToggleOptimized(spreadsheetId, sheetName, rowIndex) {
+  try {
+    var service = getOptimizedSheetsService();
+    var headerIndices = getHeaderIndicesCached(spreadsheetId, sheetName);
+    var highlightColumnIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT];
+    
+    if (highlightColumnIndex === undefined) {
+      throw new Error('ハイライト列が見つかりません');
+    }
+    
+    // 現在の値を取得
+    var range = sheetName + '!' + String.fromCharCode(65 + highlightColumnIndex) + rowIndex;
+    var currentValue = service.spreadsheets.values.get(spreadsheetId, range).values;
+    var isHighlighted = currentValue && currentValue[0] && currentValue[0][0] === 'true';
+    
+    // 値を切り替え
+    var newValue = isHighlighted ? 'false' : 'true';
+    service.spreadsheets.values.update(
+      spreadsheetId,
+      range,
+      { values: [[newValue]] },
+      { valueInputOption: 'RAW' }
+    );
+    
+    return {
+      status: 'success',
+      highlighted: !isHighlighted,
+      message: isHighlighted ? 'ハイライトを解除しました' : 'ハイライトしました'
+    };
+  } catch (e) {
+    console.error('ハイライト処理エラー: ' + e.message);
+    return { status: 'error', message: e.message };
   }
 }
 
