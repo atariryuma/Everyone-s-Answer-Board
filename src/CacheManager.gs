@@ -238,6 +238,9 @@ function clearAllCache() {
     }
   });
   
+  // CacheServiceのキャッシュデータクリア
+  CacheService.getScriptCache().removeAll();
+
   debugLog('全キャッシュをクリアしました');
 }
 

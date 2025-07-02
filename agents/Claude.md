@@ -2,7 +2,7 @@
 
 This document provides a comprehensive guide for developers aiming to build robust, user-friendly, and scalable web applications. It covers core design principles, a recommended technology stack, and best practices for coding and architecture, using the provided project as a reference.
 
-## 1\. Core Philosophy & Design Principles
+## 1. Core Philosophy & Design Principles
 
 The foundation of a successful application lies in a strong philosophy that prioritizes the user.
 
@@ -14,7 +14,7 @@ The foundation of a successful application lies in a strong philosophy that prio
       * **Visual Hierarchy**: Use modern design techniques like "glassmorphism" to create a sense of depth and guide the user's focus. The `.glass-panel` class in the project is a good example of this.
       * **Accessibility**: Ensure high contrast, readable fonts, and keyboard navigability to support all users.
 
-## 2\. Color Palette & Usage
+## 2. Color Palette & Usage
 
 A consistent color palette is key to a professional look and feel. This palette is defined using CSS variables for easy theming and maintenance.
 
@@ -50,7 +50,7 @@ A consistent color palette is key to a professional look and feel. This palette 
 | `--color-warning`     | `#f59e0b` (Yellow)      | **Warnings:** Used for non-critical warnings or to draw attention to important information that requires user consideration.                           |
 | `--color-info`        | `#3b82f6` (Blue)        | **Informational Messages:** For neutral, informational messages, tips, and guidance within the UI.                                                   |
 
-## 3\. Architecture and Technology Stack
+## 3. Architecture and Technology Stack
 
 This application is built on the Google Workspace platform, making it highly integrated and scalable.
 
@@ -67,7 +67,7 @@ This application is built on the Google Workspace platform, making it highly int
       * **`clasp`**: The official command-line tool for managing GAS projects locally.
       * **`jest`**: A JavaScript testing framework for ensuring the reliability of backend logic.
 
-## 4\. Coding Standards and Best Practices
+## 4. Coding Standards and Best Practices
 
 ### 4.1. The Manifest File (`appsscript.json`)
 
@@ -100,7 +100,7 @@ The manifest file is a critical JSON file that configures your Apps Script proje
       * `<? ... ?>` (Standard Scriptlet): Executes server-side code like loops or conditionals.
   * **Security**: Trust the contextual escaping of printing scriptlets to prevent XSS. Sanitize any user data you manually place in the HTML. For all external links, use `rel="noopener noreferrer"`.
 
-## 5\. AI/ML Integration (Future Outlook)
+## 5. AI/ML Integration (Future Outlook)
 
 Integrating with large language models can significantly enhance the application's capabilities.
 
@@ -115,3 +115,56 @@ Integrating with large language models can significantly enhance the application
 
   * The backend (GAS) can use the `UrlFetchApp` service to make HTTP requests to external AI model APIs.
   * Careful consideration must be given to API key management, rate limits, cost control, data privacy, and robust error handling.
+
+## 6. Current Project Status and Development Context
+
+### 6.1. Project Overview (StudyQuest - みんなの回答ボード)
+
+This application provides an interactive answer board for educational settings, leveraging Google Sheets as a data store. Its core purpose is to facilitate real-time answer sharing from Google Forms to a dynamic web board, enabling student reactions and teacher highlights. The project has recently undergone a significant architectural shift to a **Service Account Model** within a **single Google Apps Script (GAS) project**, which has resolved previous 403 errors and streamlined deployment.
+
+### 6.2. Key Features Implemented
+
+*   **Real-time Answer Sharing**: Displays student responses from Google Forms on a web board.
+*   **Reaction Features**: Students can react with "Understand!", "Like!", and "Curious!".
+*   **Highlighting**: Teachers can highlight important answers.
+*   **Admin Panel**: Comprehensive management interface for:
+    *   Board publication/unpublication.
+    *   Switching between different sheets.
+    *   Configuring display modes (anonymous/named).
+    *   Sorting options (score, newest, oldest, likes, random).
+    *   Creating new boards and utilizing existing spreadsheets.
+    *   Displaying the database's `isActive` status with a direct link to the associated spreadsheet.
+*   **Robust Security**: Implements JWT + Google OAuth2 for authentication, domain-based access control, XSS prevention, and robust error handling.
+
+### 6.3. Recent Improvements and Bug Fixes
+
+The project has seen several critical enhancements and bug fixes:
+
+*   **Unified Configuration Management**: Replaced redundant `getStatus()` and `getAdminSettings()` calls with a centralized `getAppConfig()` in `src/Core.gs`.
+*   **Optimized URL Generation**: Corrected form URL generation in `src/Code.gs` to consistently use `form.getPublishedUrl()` and ensured the `Page.html` link is correctly displayed in Google Form confirmation messages.
+*   **Database Operation Optimization**: Implemented and integrated caching mechanisms (`USER_INFO_CACHE`, `HEADER_CACHE`, `ROSTER_CACHE`) within `findUserById()`, `findUserByEmail()`, `createUserInDb()`, and `updateUserInDb()` for improved efficiency.
+*   **Frontend Display Logic**: Streamlined the post-registration experience in `src/Registration.html` for clearer initial messages and delayed display of specific URLs until quick setup is complete.
+*   **Admin Panel `isActive` Status**: Added the display of the database's `isActive` status and a direct link to the associated spreadsheet in `src/AdminPanel.html`.
+*   **Duplicate Column Prevention**: Modified `addReactionColumnsToSpreadsheet` in `src/Code.gs` to prevent the creation of duplicate reaction columns in the spreadsheet.
+*   **Refactored Data Fetching**: Key data processing and sheet management functions (`buildRosterMap`, `processRowDataOptimized`, `applySortModeOptimized`, `parseReactionStringOptimized`) have been moved from `src/DataProcessor.gs` and `src/ReactionManager.gs` to `src/Core.gs` for better modularity and performance. The original `DataProcessor.gs` and `ReactionManager.gs` files are now deprecated.
+*   **Enhanced Error Handling**: Improved error handling for missing "名簿" (roster) sheet in `getSheetDataOptimized` within `src/Core.gs`.
+*   **Corrected Google Form Confirmation URL**: Ensured the URL in the Google Form confirmation message correctly points to `Page.html`.
+
+### 6.4. Current Known Issues and Future Work
+
+*   **Client-Side Function Call Mismatch (`TypeError: ...[funcName] is not a function`)**: This error, observed in `src/Page.html` for functions like `checkAdmin`, `getAvailableSheets` (which maps to `getSheetsListOptimized`), and `getPublishedSheetData`, is primarily a deployment/caching issue. The server-side functions are correctly defined and exposed. **To resolve this, ensure the Apps Script project is properly redeployed and the browser's cache is cleared after any code changes.**
+*   **Future Enhancements**:
+    *   Further optimize client-side rendering performance.
+    *   Implement more advanced analytics for board usage.
+    *   Explore AI/ML integrations for content summarization or feedback generation.
+
+### 6.5. Coding Practices and Conventions
+
+*   **Modularity**: Code is strictly organized into logical `.gs` files, with `Core.gs` serving as the central hub for optimized business logic.
+*   **Performance-First**: Emphasis on batch operations, strategic caching (both `CacheService` and in-memory `Map`), and efficient Google Sheets API calls.
+*   **Robust Error Handling**: All functions include comprehensive error handling with user-friendly messages for the frontend and detailed logs for debugging.
+*   **Security**: Adherence to Google Apps Script security best practices, including proper OAuth scopes, input sanitization, and secure property management.
+*   **Frontend Development**: Standard HTML/CSS/JavaScript practices are followed, with Tailwind CSS CDN for styling. `google.script.run` is the primary method for asynchronous client-server communication.
+*   **Testing**: Unit tests are in place to ensure code reliability and prevent regressions. Developers should maintain high test coverage.
+
+---
