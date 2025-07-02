@@ -1683,6 +1683,7 @@ function quickStartSetup(userId) {
     var configJson = JSON.parse(userInfo.configJson || '{}');
     var userEmail = userInfo.adminEmail;
     var spreadsheetId = userInfo.spreadsheetId;
+    var spreadsheetUrl = userInfo.spreadsheetUrl;
 
     // 1. Googleフォームの作成（既に作成済みの場合はスキップ）
     var formUrl = configJson.formUrl;
@@ -1694,6 +1695,7 @@ function quickStartSetup(userId) {
       formUrl = formAndSsInfo.formUrl;
       editFormUrl = formAndSsInfo.editFormUrl;
       spreadsheetId = formAndSsInfo.spreadsheetId;
+      spreadsheetUrl = formAndSsInfo.spreadsheetUrl;
       sheetName = formAndSsInfo.sheetName;
 
       // Update user info with new form/spreadsheet details
@@ -1713,8 +1715,16 @@ function quickStartSetup(userId) {
     // 2. Configシートの作成と初期化
     createAndInitializeConfigSheet(spreadsheetId);
 
+    var appUrls = generateAppUrlsOptimized(userId);
     debugLog('クイックスタートセットアップ完了: ' + userId);
-    return { status: 'success', message: 'クイックスタートセットアップが完了しました。' };
+    return {
+      status: 'success',
+      message: 'クイックスタートセットアップが完了しました。',
+      adminUrl: appUrls.adminUrl,
+      viewUrl: appUrls.viewUrl,
+      formUrl: formUrl,
+      spreadsheetUrl: spreadsheetUrl
+    };
 
   } catch (e) {
     console.error('クイックスタートセットアップエラー: ' + e.message);
