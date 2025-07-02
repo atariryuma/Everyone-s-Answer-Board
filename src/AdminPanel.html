@@ -1256,40 +1256,40 @@
     }
 
     function updateFormInfo(formInfo) {
-      const answerCountEl = document.getElementById('answer-count');
-      const formFileNameEl = document.getElementById('form-file-name');
-      const openFormBtn = document.getElementById('open-form-btn');
-      const formUrlInput = document.getElementById('form-url-input');
-      const openFormUrlLink = document.getElementById('open-form-url-link');
+      // フォーム回答数とファイル名はダッシュボードから削除されたため、更新しない
+      // const answerCountEl = document.getElementById('answer-count');
+      // const formFileNameEl = document.getElementById('form-file-name');
+      // const openFormBtn = document.getElementById('open-form-btn'); // ローカル変数は不要
+      const formUrlInput = elements.formUrlInput; // elementsから取得
+      const openFormUrlLink = elements.openFormUrlLink; // elementsから取得
       
-      // 既存のイベントリスナーをすべて削除
-      if (openFormBtn) {
-        const newOpenFormBtn = openFormBtn.cloneNode(true);
-        openFormBtn.parentNode.replaceChild(newOpenFormBtn, openFormBtn);
-        elements.openFormBtn = newOpenFormBtn; // elementsオブジェクトも更新
+      // 既存のイベントリスナーをすべて削除 (elements.openFormBtn を直接使用)
+      if (elements.openFormBtn) {
+        // elements.openFormBtn.cloneNode(true) と replaceChild は不要
+        // イベントリスナーは setupEventListeners で一度だけ設定されるべき
       }
 
       if (!formInfo) {
-        if (answerCountEl) answerCountEl.textContent = '未設定';
-        if (formFileNameEl) formFileNameEl.textContent = 'Googleフォーム';
+        // if (answerCountEl) answerCountEl.textContent = '未設定';
+        // if (formFileNameEl) formFileNameEl.textContent = 'Googleフォーム';
         if (formUrlInput) formUrlInput.value = '';
         if (openFormUrlLink) openFormUrlLink.href = '#';
         
         if (elements.openFormBtn) {
-          elements.openFormBtn.addEventListener('click', () => {
+          elements.openFormBtn.onclick = () => {
             showMessage('Googleフォームが見つかりません。フォームを作成するか、スプレッドシートとフォームを関連付けてください。', 'yellow');
-          });
+          };
         }
         return;
       }
       
-      if (answerCountEl) {
-        answerCountEl.textContent = formInfo.responseCount + '件';
-      }
+      // if (answerCountEl) {
+      //   answerCountEl.textContent = formInfo.responseCount + '件';
+      // }
       
-      if (formFileNameEl) {
-        formFileNameEl.textContent = formInfo.title || 'Googleフォーム';
-      }
+      // if (formFileNameEl) {
+      //   formFileNameEl.textContent = formInfo.title || 'Googleフォーム';
+      // }
       
       if (formUrlInput) {
         formUrlInput.value = formInfo.formUrl || '';
@@ -1307,7 +1307,7 @@
           tagName: elements.openFormBtn.tagName
         });
         
-        elements.openFormBtn.addEventListener('click', (e) => {
+        elements.openFormBtn.onclick = (e) => { // addEventListener ではなく onclick を使用
           e.preventDefault();
           e.stopPropagation();
           let targetUrl = formInfo.editUrl || formInfo.formUrl;
@@ -1321,7 +1321,7 @@
           } else {
             showMessage('フォームのURLが取得できませんでした。', 'yellow');
           }
-        });
+        };
         
         elements.openFormBtn.disabled = false;
         elements.openFormBtn.style.pointerEvents = 'auto';
@@ -1335,30 +1335,30 @@
       
       // Update comprehensive dashboard
       const isActive = !!status.activeSheetName;
-      const answerCount = status.answerCount || 0;
-      const reactionCount = status.totalReactions || 0;
+      // const answerCount = status.answerCount || 0; // ダッシュボード削除のため不要
+      // const reactionCount = status.totalReactions || 0; // ダッシュボード削除のため不要
 
       
       // Main status updates
-      const statusTextEl = document.getElementById('status-text');
-      if (statusTextEl) {
-        statusTextEl.textContent = isActive ? '公開中' : '準備中';
-      }
-      const statusDescEl = document.getElementById('status-description');
-      if (statusDescEl) {
-        statusDescEl.textContent = isActive ?
-          '現在「' + currentActiveSheet + '」が公開中です' :
-          '開始するにはスプレッドシートを追加してください';
+      // const statusTextEl = document.getElementById('status-text'); // ダッシュボード削除のため不要
+      // if (statusTextEl) {
+      //   statusTextEl.textContent = isActive ? '公開中' : '準備中';
+      // }
+      // const statusDescEl = document.getElementById('status-description'); // ダッシュボード削除のため不要
+      // if (statusDescEl) {
+      //   statusDescEl.textContent = isActive ?
+      //     '現在「' + currentActiveSheet + '」が公開中です' :
+      //     '開始するにはスプレッドシートを追加してください';
         
-        // クリック可能状態の管理
-        if (isActive && elements.boardUrl && elements.boardUrl.value) {
-          statusDescEl.classList.add('cursor-pointer', 'hover:text-gray-100', 'hover:underline');
-          statusDescEl.title = 'ボードを開くにはクリック';
-        } else {
-          statusDescEl.classList.remove('cursor-pointer', 'hover:text-gray-100', 'hover:underline');
-          statusDescEl.title = '';
-        }
-      }
+      //   // クリック可能状態の管理
+      //   if (isActive && elements.boardUrl && elements.boardUrl.value) {
+      //     statusDescEl.classList.add('cursor-pointer', 'hover:text-gray-100', 'hover:underline');
+      //     statusDescEl.title = 'ボードを開くにはクリック';
+      //   } else {
+      //     statusDescEl.classList.remove('cursor-pointer', 'hover:text-gray-100', 'hover:underline');
+      //     statusDescEl.title = '';
+      //   }
+      // }
       
       // Update timestamps
       const now = new Date();
@@ -1385,14 +1385,14 @@
           }
         }
       }
-      const totalSheetsEl = document.getElementById('total-sheets');
-      if (totalSheetsEl) totalSheetsEl.textContent = (status.allSheets || []).length;
+      // const totalSheetsEl = document.getElementById('total-sheets'); // ダッシュボード削除のため不要
+      // if (totalSheetsEl) totalSheetsEl.textContent = (status.allSheets || []).length;
       
       // Statistics
-      const answerCountEl = document.getElementById('answer-count');
-      if (answerCountEl) answerCountEl.textContent = answerCount;
-      const reactionCountEl = document.getElementById('reaction-count');
-      if (reactionCountEl) reactionCountEl.textContent = reactionCount;
+      // const answerCountEl = document.getElementById('answer-count'); // ダッシュボード削除のため不要
+      // if (answerCountEl) answerCountEl.textContent = answerCount;
+      // const reactionCountEl = document.getElementById('reaction-count'); // ダッシュボード削除のため不要
+      // if (reactionCountEl) reactionCountEl.textContent = reactionCount;
       
       // Update header elements
       const headerUserIdEl = document.getElementById('header-user-id');
@@ -1400,12 +1400,12 @@
         headerUserIdEl.textContent = status.userId.substring(0, 8) + '...';
       }
       const headerAnswerCountEl = document.getElementById('header-answer-count');
-      if (headerAnswerCountEl) headerAnswerCountEl.textContent = answerCount;
+      if (headerAnswerCountEl) headerAnswerCountEl.textContent = status.answerCount || 0;
       
       // Calculate engagement rate
-      const engagementRate = answerCount > 0 ? Math.round((reactionCount / answerCount) * 100) : 0;
-      const engagementEl = document.getElementById('engagement-rate');
-      if (engagementEl) engagementEl.textContent = engagementRate + '%';
+      // const engagementRate = answerCount > 0 ? Math.round((reactionCount / answerCount) * 100) : 0; // ダッシュボード削除のため不要
+      // const engagementEl = document.getElementById('engagement-rate'); // ダッシュボード削除のため不要
+      // if (engagementEl) engagementEl.textContent = engagementRate + '%';
       
       // Form URL for open form button
       if (status.formUrl && elements.openFormBtn) {
@@ -1415,23 +1415,23 @@
       }
 
       // Last activity
-      const lastActivityElement = document.getElementById('last-activity');
-      if (lastActivityElement) {
-        if (answerCount > 0 || reactionCount > 0) {
-          lastActivityElement.textContent = '本日';
-        } else {
-          lastActivityElement.textContent = '未取得';
-        }
-      }
+      // const lastActivityElement = document.getElementById('last-activity'); // ダッシュボード削除のため不要
+      // if (lastActivityElement) {
+      //   if (answerCount > 0 || reactionCount > 0) {
+      //     lastActivityElement.textContent = '本日';
+      //   } else {
+      //     lastActivityElement.textContent = '未取得';
+      //   }
+      // }
       
       
       // Update status indicator
-      if (elements.boardStatusIndicator) {
-        elements.boardStatusIndicator.className = 'status-indicator ' + (isActive ? 'status-active' : 'status-inactive');
-      }
+      // if (elements.boardStatusIndicator) { // ダッシュボード削除のため不要
+      //   elements.boardStatusIndicator.className = 'status-indicator ' + (isActive ? 'status-active' : 'status-inactive');
+      // }
       
       // Update activity timeline
-      updateActivityTimeline(status);
+      // updateActivityTimeline(status); // ダッシュボード削除のため不要
       
       // Update sheet options with count
       // セキュリティ強化: innerHTML使用を避ける
