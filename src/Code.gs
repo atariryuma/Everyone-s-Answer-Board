@@ -81,7 +81,8 @@ var SCORING_CONFIG = {
 };
 
 var ROSTER_CONFIG = {
-  SHEET_NAME: (typeof getConfig === 'function' ? getConfig().rosterSheetName : '名簿'),
+  // デフォルト値のみ定義し、実際のシート名は getRosterSheetName() で取得
+  SHEET_NAME: '名簿',
   EMAIL_COLUMN: 'メールアドレス',
   NAME_COLUMN: '名前',
   CLASS_COLUMN: 'クラス'
@@ -872,7 +873,7 @@ function getRosterMap(spreadsheetId) {
   
   try {
     var service = getSheetsService();
-    var range = ROSTER_CONFIG.SHEET_NAME + '!A:Z';
+    var range = getRosterSheetName() + '!A:Z';
     var response = service.spreadsheets.values.get(spreadsheetId, range);
     var values = response.values || [];
     
@@ -1682,6 +1683,7 @@ function quickStartSetup(userId) {
     var configJson = JSON.parse(userInfo.configJson || '{}');
     var userEmail = userInfo.adminEmail;
     var spreadsheetId = userInfo.spreadsheetId;
+    var spreadsheetUrl = userInfo.spreadsheetUrl;
 
     // 1. Googleフォームの作成（既に作成済みの場合はスキップ）
     var formUrl = configJson.formUrl;
@@ -1693,6 +1695,7 @@ function quickStartSetup(userId) {
       formUrl = formAndSsInfo.formUrl;
       editFormUrl = formAndSsInfo.editFormUrl;
       spreadsheetId = formAndSsInfo.spreadsheetId;
+      spreadsheetUrl = formAndSsInfo.spreadsheetUrl;
       sheetName = formAndSsInfo.sheetName;
 
       // Update user info with new form/spreadsheet details
@@ -1712,8 +1715,16 @@ function quickStartSetup(userId) {
     // 2. Configシートの作成と初期化
     createAndInitializeConfigSheet(spreadsheetId);
 
+    var appUrls = generateAppUrlsOptimized(userId);
     debugLog('クイックスタートセットアップ完了: ' + userId);
-    return { status: 'success', message: 'クイックスタートセットアップが完了しました。' };
+    return {
+      status: 'success',
+      message: 'クイックスタートセットアップが完了しました。',
+      adminUrl: appUrls.adminUrl,
+      viewUrl: appUrls.viewUrl,
+      formUrl: formUrl,
+      spreadsheetUrl: spreadsheetUrl
+    };
 
   } catch (e) {
     console.error('クイックスタートセットアップエラー: ' + e.message);

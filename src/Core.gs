@@ -607,6 +607,10 @@ function findUserByEmail(email) {
   return findUserByEmailOptimized(email);
 }
 
+function createUserInDb(userData) {
+  return createUserOptimized(userData);
+}
+
 function updateUserInDb(userId, updateData) {
   return updateUserOptimized(userId, updateData);
 }
