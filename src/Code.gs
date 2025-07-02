@@ -950,27 +950,38 @@ function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName) {
     var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     var sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
     
-    var additionalHeaders = [
+    var existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var headersToAdd = [];
+
+    var reactionHeaders = [
       COLUMN_HEADERS.UNDERSTAND,
       COLUMN_HEADERS.LIKE,
       COLUMN_HEADERS.CURIOUS,
       COLUMN_HEADERS.HIGHLIGHT
     ];
+
+    reactionHeaders.forEach(function(header) {
+      if (existingHeaders.indexOf(header) === -1) {
+        headersToAdd.push(header);
+      }
+    });
     
-    var currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    var startCol = currentHeaders.length + 1;
-    sheet.getRange(1, startCol, 1, additionalHeaders.length).setValues([additionalHeaders]);
-    
-    var allHeadersRange = sheet.getRange(1, 1, 1, currentHeaders.length + additionalHeaders.length);
-    allHeadersRange.setFontWeight('bold').setBackground('#E3F2FD');
-    
-    try {
-      sheet.autoResizeColumns(1, allHeadersRange.getNumColumns());
-    } catch (e) {
-      console.warn('Auto-resize failed:', e);
+    if (headersToAdd.length > 0) {
+      var startCol = existingHeaders.length + 1;
+      sheet.getRange(1, startCol, 1, headersToAdd.length).setValues([headersToAdd]);
+      
+      var allHeadersRange = sheet.getRange(1, 1, 1, existingHeaders.length + headersToAdd.length);
+      allHeadersRange.setFontWeight('bold').setBackground('#E3F2FD');
+      
+      try {
+        sheet.autoResizeColumns(1, allHeadersRange.getNumColumns());
+      } catch (e) {
+        console.warn('Auto-resize failed:', e);
+      }
+      debugLog('リアクション列を追加しました: ' + sheetName);
+    } else {
+      debugLog('リアクション列は既に存在します: ' + sheetName);
     }
-    
-    debugLog('リアクション列を追加しました: ' + sheetName);
   } catch (e) {
     console.error('リアクション列追加エラー: ' + e.message);
   }
