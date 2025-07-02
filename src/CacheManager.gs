@@ -195,7 +195,8 @@ function getRosterMapCached(spreadsheetId) {
   return getCachedValue(key, function() {
     try {
       var service = getOptimizedSheetsService();
-      var response = batchGetSheetsData(service, spreadsheetId, [ROSTER_CONFIG.SHEET_NAME + '!A:Z']);
+      var rosterRange = getRosterSheetName() + '!A:Z';
+      var response = batchGetSheetsData(service, spreadsheetId, [rosterRange]);
       var values = response.valueRanges[0].values || [];
       
       if (values.length === 0) return {};

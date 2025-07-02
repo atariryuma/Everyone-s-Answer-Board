@@ -81,7 +81,8 @@ var SCORING_CONFIG = {
 };
 
 var ROSTER_CONFIG = {
-  SHEET_NAME: (typeof getConfig === 'function' ? getConfig().rosterSheetName : '名簿'),
+  // デフォルト値のみ定義し、実際のシート名は getRosterSheetName() で取得
+  SHEET_NAME: '名簿',
   EMAIL_COLUMN: 'メールアドレス',
   NAME_COLUMN: '名前',
   CLASS_COLUMN: 'クラス'
@@ -872,7 +873,7 @@ function getRosterMap(spreadsheetId) {
   
   try {
     var service = getSheetsService();
-    var range = ROSTER_CONFIG.SHEET_NAME + '!A:Z';
+    var range = getRosterSheetName() + '!A:Z';
     var response = service.spreadsheets.values.get(spreadsheetId, range);
     var values = response.values || [];
     

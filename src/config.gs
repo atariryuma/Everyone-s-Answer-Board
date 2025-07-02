@@ -88,6 +88,20 @@ function getConfig() {
 }
 
 /**
+ * 名簿シート名を取得
+ * @returns {string} 名簿シート名
+ */
+function getRosterSheetName() {
+  try {
+    var cfg = getConfig();
+    return cfg.rosterSheetName || '名簿';
+  } catch (e) {
+    console.warn('getRosterSheetName error: ' + e.message);
+    return '名簿';
+  }
+}
+
+/**
  * 簡易設定保存関数（AdminPanel.htmlとの互換性のため）
  * 新アーキテクチャでは実際の保存は行わない
  */
