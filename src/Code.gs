@@ -451,7 +451,7 @@ function updateUserInDb(userId, updateData) {
 // メインロジック
 // =================================================================
 
-function doGet(e) {
+function doGetObsolete(e) {
   var userId = e.parameter.userId;
   var mode = e.parameter.mode;
   var setup = e.parameter.setup;

@@ -418,6 +418,43 @@ class UltraOptimizedController {
   }
   
   /**
+   * 同期的な初期化（doGet用）
+   */
+  _initializeSync() {
+    if (this.isInitialized) return;
+    
+    try {
+      // 簡単な健康状態チェック（同期版）
+      const props = PropertiesService.getScriptProperties();
+      const emergencyState = props.getProperty('EMERGENCY_STOP');
+      
+      if (emergencyState === 'true') {
+        throw new Error('System in emergency state');
+      }
+      
+      // AutoRecoveryServiceが利用可能かチェック
+      if (typeof AutoRecoveryService !== 'undefined') {
+        try {
+          const recoveryCheck = AutoRecoveryService.performRecoveryCheck();
+          if (recoveryCheck.overallStatus === 'EMERGENCY') {
+            console.warn('System in emergency state, continuing with degraded mode');
+          }
+        } catch (e) {
+          console.warn('Recovery check failed:', e.message);
+        }
+      }
+      
+      this.isInitialized = true;
+      console.log('Ultra-optimized system initialized successfully');
+      
+    } catch (error) {
+      console.error('Sync initialization failed:', error.message);
+      // 初期化失敗時もアプリケーションは動作を継続
+      this.isInitialized = false;
+    }
+  }
+  
+  /**
    * 超高速doGet処理
    */
   async doGetOptimized(e) {
@@ -519,11 +556,78 @@ class UltraOptimizedController {
 // グローバルインスタンス
 const ultraController = new UltraOptimizedController();
 
+// グローバルプロファイラーが存在しない場合のフォールバック
+if (typeof globalProfiler === 'undefined') {
+  var globalProfiler = {
+    start: function() {},
+    end: function() {},
+    getReport: function() { return {}; }
+  };
+}
+
 /**
  * 公開エントリーポイント（超最適化版）
+ * 同期的に実行してHTMLServiceオブジェクトを返す
  */
 function doGet(e) {
-  return ultraController.doGetOptimized(e);
+  const profiler = (typeof globalProfiler !== 'undefined') ? globalProfiler : {
+    start: () => {},
+    end: () => {}
+  };
+  profiler.start('doGet');
+  
+  try {
+    // 同期的な初期化
+    ultraController._initializeSync();
+    
+    const { userId, mode, setup } = e.parameter;
+    
+    // セットアップページ（キャッシュ対象外）
+    if (setup === 'true') {
+      return HtmlService.createTemplateFromFile('SetupPage')
+        .evaluate()
+        .setTitle('StudyQuest - Setup');
+    }
+    
+    // 新規登録ページ
+    if (!userId) {
+      return HtmlService.createTemplateFromFile('Registration')
+        .evaluate()
+        .setTitle('新規登録');
+    }
+    
+    // ユーザー情報取得（同期版の最適化関数使用）
+    const userInfo = findUserByIdOptimized(userId);
+    
+    if (!userInfo) {
+      return HtmlService.createHtmlOutput('無効なユーザーIDです。');
+    }
+    
+    // 非同期で最終アクセス日時更新（レスポンス遅延なし）
+    try {
+      updateUserOptimized(userId, { lastAccessedAt: new Date().toISOString() });
+    } catch (e) {
+      console.warn('Last access update failed:', e.message);
+    }
+    
+    // ユーザーコンテキスト設定
+    PropertiesService.getUserProperties().setProperty('CURRENT_USER_ID', userId);
+    
+    // テンプレート生成とレスポンス
+    const template = mode === 'admin' ? 
+      ultraController._createAdminTemplate(userInfo, userId) :
+      ultraController._createUserTemplate(userInfo, userId);
+    
+    profiler.end('doGet');
+    return template;
+    
+  } catch (error) {
+    profiler.end('doGet');
+    console.error('doGet error:', error.message);
+    
+    // フォールバック：エラー時は元の実装を使用
+    return HtmlService.createHtmlOutput('システムエラーが発生しました。しばらく待ってから再度お試しください。');
+  }
 }
 
 /**

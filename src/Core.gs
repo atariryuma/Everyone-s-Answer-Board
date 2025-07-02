@@ -7,7 +7,11 @@
 // メインロジック
 // =================================================================
 
-function doGet(e) {
+/**
+ * 旧バージョンのdoGet関数（後方互換性のため保持）
+ * 注意: UltraOptimizedCore.gsのdoGet関数が優先されます
+ */
+function doGetLegacy(e) {
   var userId = e.parameter.userId;
   var mode = e.parameter.mode;
   var setup = e.parameter.setup;
