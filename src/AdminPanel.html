@@ -411,89 +411,95 @@
   </style>
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans">  <header class="glass-panel border-b border-gray-700 sticky top-0 z-50">
-    <div class="max-w-6xl mx-auto px-6 py-4">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
       <div class="flex items-center justify-between">
+        <!-- ロゴとタイトル -->
         <div class="flex items-center gap-3">
-          <div class="w-8 h-8 bg-gradient-to-r from-cyan-400 to-purple-400 rounded-lg flex items-center justify-center">
+          <div class="w-8 h-8 bg-gradient-to-r from-cyan-400 to-purple-400 rounded-lg flex items-center justify-center flex-shrink-0">
             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
             </svg>
           </div>
-          <div>
-            <h1 class="text-xl font-bold text-white">StudyQuest -みんなの回答ボード-</h1>
-            <p class="text-sm text-gray-400">管理画面</p>
+          <div class="hidden sm:block">
+            <h1 class="text-lg sm:text-xl font-bold text-white leading-tight">StudyQuest 管理パネル</h1>
+            <p class="text-xs text-gray-400">みんなの回答ボード</p>
           </div>
-        </div>
-        <div class="flex items-center gap-3">
-          <div class="text-right text-xs">
-            <p>
-              <span class="font-medium text-gray-300">ID:</span>
-              <span id="header-user-id" class="text-white font-mono">-</span>
-            </p>
-            <p>
-              <span class="font-medium text-gray-300">回答:</span>
-              <span id="header-answer-count" class="text-white">-</span>
-              <span class="text-gray-400">件</span>
-            </p>
-          </div>
-        </div>
-      </div>      <div id="admin-domain-info-section" class="mt-4 hidden">
-        <div id="admin-domain-match-panel" class="glass-panel bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-3 border border-green-400/30 mb-3 hidden">
-          <div class="flex items-center text-sm">
-            <svg class="w-4 h-4 text-green-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <div>
-              <span class="text-green-400 font-medium">対応ドメイン:</span>
-              <span class="text-green-200 ml-2" id="admin-domain-match-text"></span>
-            </div>
+          <div class="sm:hidden">
+            <h1 class="text-lg font-bold text-white">StudyQuest</h1>
           </div>
         </div>
         
-        <div id="admin-domain-mismatch-panel" class="glass-panel bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg p-3 border border-yellow-400/30 mb-3 hidden">
-          <div class="flex items-start text-sm">
-            <svg class="w-4 h-4 text-yellow-400 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-            </svg>
-            <div>
-              <div class="text-yellow-400 font-medium">ドメイン不一致の警告</div>
-              <div class="text-yellow-200 mt-1" id="admin-domain-mismatch-text"></div>
-              <div class="text-yellow-100 text-xs mt-1">デプロイドメイン: <span id="admin-deploy-domain" class="font-medium"></span></div>
+        <!-- ドメイン・ステータス情報 -->
+        <div class="flex items-center gap-2 sm:gap-3">
+          <!-- ドメイン情報（メイン表示） -->
+          <div id="header-domain-info" class="text-right">
+            <div class="flex items-center gap-2 text-xs">
+              <div id="header-status-dot" class="w-2 h-2 bg-gray-500 rounded-full flex-shrink-0"></div>
+              <div>
+                <div class="text-white font-medium" id="header-domain-name">ドメイン確認中...</div>
+                <div class="text-gray-400" id="header-status-text">セットアップ中</div>
+              </div>
             </div>
+          </div>
+        </div>
+      </div>      
+      <!-- ドメイン不一致の警告（コンパクト版） -->
+      <div id="admin-domain-mismatch-banner" class="mt-2 hidden">
+        <div class="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-lg p-2 border border-yellow-400/30">
+          <div class="flex items-center text-xs">
+            <svg class="w-3 h-3 text-yellow-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"></path>
+            </svg>
+            <span class="text-yellow-200" id="admin-domain-mismatch-compact"></span>
           </div>
         </div>
       </div>
     </div>
   </header>  <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8 pb-32">
-    <!-- ユーザーガイダンスセクション -->
-    <section class="mb-6" id="user-guidance-section">
-      <div class="glass-panel p-4 sm:p-6">
-        <div class="text-center mb-4 sm:mb-6">
-          <div class="flex items-center justify-center mb-4">
-            <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <!-- シンプルステータスバー -->
+    <section class="mb-6" id="status-bar-section">
+      <div class="glass-panel p-3 sm:p-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
               </svg>
             </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-medium text-white" id="guidance-text">セットアップを開始してください</span>
+                <div id="header-status-indicator" class="flex items-center gap-1">
+                  <div class="w-2 h-2 bg-gray-500 rounded-full"></div>
+                </div>
+              </div>
+              <div class="text-xs text-gray-400">Google Workspace連携教育ツール</div>
+            </div>
           </div>
-          <h1 class="text-xl sm:text-2xl font-bold text-white mb-2">回答ボード管理パネル</h1>
-          <p class="text-gray-400 text-sm sm:text-base">Google Workspaceと連携した直感的な教育ツール</p>
+          
+          <!-- プログレスインジケーター -->
+          <div class="hidden sm:flex items-center gap-3">
+            <div class="text-right">
+              <div class="text-xs text-gray-400">進行状況</div>
+              <div class="text-sm font-semibold text-white" id="setup-progress-text">0%</div>
+            </div>
+            <div class="w-24">
+              <div class="progress-bar h-2">
+                <div id="setup-progress" class="progress-fill" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
         </div>
         
-        <!-- プログレスインジケーター -->
-        <div class="mb-6">
-          <div class="flex items-center justify-between text-xs sm:text-sm text-gray-400 mb-2">
-            <span>セットアップ進行状況</span>
-            <span id="setup-progress-text">0%</span>
+        <!-- モバイル用プログレスバー -->
+        <div class="sm:hidden mt-3">
+          <div class="flex items-center justify-between text-xs text-gray-400 mb-1">
+            <span>進行状況</span>
+            <span id="setup-progress-text-mobile">0%</span>
           </div>
-          <div class="progress-bar">
-            <div id="setup-progress" class="progress-fill" style="width: 0%"></div>
+          <div class="progress-bar h-2">
+            <div id="setup-progress-mobile" class="progress-fill" style="width: 0%"></div>
           </div>
-        </div>
-        
-        <!-- 現在のステータス -->
-        <div id="user-guidance" class="text-center">
-          <p class="text-sm text-gray-300" id="guidance-text">セットアップを開始してください</p>
         </div>
       </div>
     </section>
@@ -1114,6 +1120,12 @@
         boardUrl: document.getElementById('board-url'),
         viewBoardLink: document.getElementById('view-board-link'),
         setupProgress: document.getElementById('setup-progress'),
+        setupProgressMobile: document.getElementById('setup-progress-mobile'),
+        setupProgressText: document.getElementById('setup-progress-text'),
+        setupProgressTextMobile: document.getElementById('setup-progress-text-mobile'),
+        headerDomainName: document.getElementById('header-domain-name'),
+        headerStatusDot: document.getElementById('header-status-dot'),
+        headerStatusText: document.getElementById('header-status-text'),
         switchSheetText: document.getElementById('switch-sheet-text'),
         configStatus: document.getElementById('config-status'),
         addSpreadsheetText: document.getElementById('add-spreadsheet-text'),
@@ -1142,28 +1154,37 @@
     }
 
     function displayAdminDomainInfo(info) {
-      const section = document.getElementById('admin-domain-info-section');
-      const matchPanel = document.getElementById('admin-domain-match-panel');
-      const mismatchPanel = document.getElementById('admin-domain-mismatch-panel');
+      const headerDomainName = document.getElementById('header-domain-name');
+      const mismatchBanner = document.getElementById('admin-domain-mismatch-banner');
+      const mismatchText = document.getElementById('admin-domain-mismatch-compact');
       
       if (!info || info.error) {
         console.warn('ドメイン情報エラー:', info?.error);
+        if (headerDomainName) {
+          headerDomainName.textContent = 'ドメイン情報取得エラー';
+        }
         return;
       }
 
-      section.classList.remove('hidden');
-
       if (info.isDomainMatch) {
-        matchPanel.classList.remove('hidden');
-        mismatchPanel.classList.add('hidden');
-        document.getElementById('admin-domain-match-text').textContent = 
-          info.deployDomain + ' ドメイン用のWebアプリ (あなたのアカウント: ' + info.currentDomain + ')';
+        // ドメインが一致している場合
+        if (headerDomainName) {
+          headerDomainName.textContent = `${info.deployDomain} ドメイン`;
+          headerDomainName.className = 'text-green-300 font-medium';
+        }
+        if (mismatchBanner) {
+          mismatchBanner.classList.add('hidden');
+        }
       } else {
-        matchPanel.classList.add('hidden');
-        mismatchPanel.classList.remove('hidden');
-        document.getElementById('admin-domain-mismatch-text').textContent = 
-          'あなたのアカウントのドメイン(' + info.currentDomain + ')とは異なります。一部の機能が制限される可能性があります。';
-        document.getElementById('admin-deploy-domain').textContent = info.deployDomain;
+        // ドメイン不一致の場合
+        if (headerDomainName) {
+          headerDomainName.textContent = `${info.currentDomain} (不一致)`;
+          headerDomainName.className = 'text-yellow-300 font-medium';
+        }
+        if (mismatchBanner && mismatchText) {
+          mismatchBanner.classList.remove('hidden');
+          mismatchText.textContent = `ご利用のドメイン: ${info.currentDomain} | 対応ドメイン: ${info.deployDomain}`;
+        }
       }
     }
 
@@ -1434,20 +1455,43 @@
         currentStep = 4;
       }
       
+      // プログレスバーの更新（デスクトップとモバイル両方）
       if (elements.setupProgress) {
         elements.setupProgress.style.width = progress + '%';
       }
+      if (elements.setupProgressMobile) {
+        elements.setupProgressMobile.style.width = progress + '%';
+      }
       
-      const progressText = document.getElementById('setup-progress-text');
-      if (progressText) {
-        progressText.textContent = Math.round(progress) + '%';
+      // プログレステキストの更新（デスクトップとモバイル両方）
+      const progressPercent = Math.round(progress) + '%';
+      if (elements.setupProgressText) {
+        elements.setupProgressText.textContent = progressPercent;
+      }
+      if (elements.setupProgressTextMobile) {
+        elements.setupProgressTextMobile.textContent = progressPercent;
       }
 
-      const guidanceEl = document.getElementById('user-guidance');
-      const guidanceTextEl = document.getElementById('guidance-text');
-      if (guidanceEl && guidanceTextEl) {
-        guidanceTextEl.textContent = statusText;
-        guidanceEl.classList.remove('hidden');
+      // ガイダンステキストの更新
+      if (elements.guidanceText) {
+        elements.guidanceText.textContent = statusText;
+      }
+      
+      // ヘッダーステータスの更新
+      if (elements.headerStatusDot && elements.headerStatusText) {
+        if (progress === 100) {
+          elements.headerStatusDot.className = 'w-2 h-2 bg-green-400 rounded-full flex-shrink-0';
+          elements.headerStatusText.textContent = '公開中';
+          elements.headerStatusText.className = 'text-green-400';
+        } else if (progress > 0) {
+          elements.headerStatusDot.className = 'w-2 h-2 bg-yellow-400 rounded-full flex-shrink-0';
+          elements.headerStatusText.textContent = 'セットアップ中';
+          elements.headerStatusText.className = 'text-yellow-400';
+        } else {
+          elements.headerStatusDot.className = 'w-2 h-2 bg-gray-500 rounded-full flex-shrink-0';
+          elements.headerStatusText.textContent = '未設定';
+          elements.headerStatusText.className = 'text-gray-400';
+        }
       }
       
       updateStepIndicators(currentStep);
