@@ -26,6 +26,7 @@ StudyQuestの**新しいサービスアカウントアーキテクチャ**を新
 ### ステップ3: GASプロジェクト作成
 1. Google Apps Scriptで新しいプロジェクト作成
 2. `src/` ディレクトリから全ファイル（`.gs`, `.html`, `appsscript.json`）をコピー
+   - 特に `ErrorHandling.gs` も含めてください。
 3. **appsscript.json** で `executeAs: "USER_ACCESSING"` を確認
 
 ### ステップ4: アプリケーション初期化

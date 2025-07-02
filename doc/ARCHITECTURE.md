@@ -160,9 +160,9 @@ sequenceDiagram
 ```javascript
 // メモリキャッシュ + TTL管理
 const cache = {
-  userInfo: new Map(),
-  headerIndices: new Map(),
-  rosterData: new Map(),
+  userInfo: new Map(), // USER_INFO_CACHE
+  headerIndices: new Map(), // HEADER_CACHE
+  rosterData: new Map(), // ROSTER_CACHE
   timestamps: new Map()
 };
 
