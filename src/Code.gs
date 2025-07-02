@@ -695,7 +695,7 @@ function createFormFactory(options) {
       formId: form.getId(),
       formUrl: form.getPublishedUrl(),
       editFormUrl: form.getEditUrl(),
-      viewFormUrl: 'https://docs.google.com/forms/d/e/' + form.getId() + '/viewform',
+      
       spreadsheetId: spreadsheetInfo.spreadsheetId,
       spreadsheetUrl: spreadsheetInfo.spreadsheetUrl,
       sheetName: spreadsheetInfo.sheetName || 'フォームの回答 1'
@@ -819,7 +819,7 @@ function getQuestionConfig(questionType, customConfig) {
         {
           type: 'text',
           title: '名前',
-          helpText: 'あなたの名前を入力してください（ニックネーム可）',
+          helpText: 'あなたの名前を入力してください',
           required: true
         },
         {
@@ -876,7 +876,8 @@ function createStudyQuestForm(userEmail, userId) {
     var formResult = createFormFactory({
       userEmail: userEmail,
       userId: userId,
-      questions: 'default'
+      questions: 'default',
+      formDescription: 'このフォームは「みんなの回答ボード」で表示されます。デジタル・シティズンシップの観点から、オンライン空間での責任ある行動と建設的な対話を育むことを目的としています。回答内容は匿名で表示されます。'
     });
     
     // カスタマイズされた設定を追加
@@ -891,10 +892,9 @@ function createStudyQuestForm(userEmail, userId) {
       // ignore
     }
     
-    // 確認メッセージの設定（統一されたURL生成機能を使用）
-    var appUrls = generateAppUrls(userId);
-    var confirmationMessage = appUrls.viewUrl 
-      ? '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。\nみんなの回答ボードで、お友達の色々な考えも見てみましょう。\n新しい発見があるかもしれませんね！\n\n' + appUrls.viewUrl
+    // 確認メッセージの設定
+    var confirmationMessage = form.getPublishedUrl()
+      ? '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。\nみんなの回答ボードで、お友達の色々な考えも見てみましょう。\n新しい発見があるかもしれませんね！\n\n' + form.getPublishedUrl()
       : '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。';
     form.setConfirmationMessage(confirmationMessage);
     
@@ -1982,7 +1982,7 @@ function quickStartSetup(userId) {
         userEmail: userEmail,
         userId: userId,
         formTitle: null, // デフォルトタイトルを使用
-        formDescription: 'このフォームは「みんなの回答ボード」で表示されます。回答内容は匿名で表示されます。',
+        formDescription: 'このフォームは「みんなの回答ボード」で表示されます。デジタル・シティズンシップの観点から、オンライン空間での責任ある行動と建設的な対話を育むことを目的としています。回答内容は匿名で表示されます。',
         questions: 'default',
         linkedSpreadsheet: userInfo.spreadsheetId
       });
