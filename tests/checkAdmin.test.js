@@ -1,4 +1,5 @@
-const { checkAdmin } = require('../src/Code.gs');
+const { loadCode } = require('./shared-mocks');
+const { checkAdmin } = loadCode();
 
 function setup(admins, currentEmail) {
   global.PropertiesService = {

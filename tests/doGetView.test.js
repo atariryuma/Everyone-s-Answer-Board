@@ -1,4 +1,5 @@
-const { doGet } = require('../src/Code.gs');
+const { loadCode } = require('./shared-mocks');
+const { doGet } = loadCode();
 
 afterEach(() => {
   delete global.HtmlService;

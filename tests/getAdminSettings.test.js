@@ -1,4 +1,5 @@
-const { getAdminSettings } = require('../src/Code.gs');
+const { loadCode } = require('./shared-mocks');
+const { getAdminSettings } = loadCode();
 function setup() {
   global.PropertiesService = {
     getScriptProperties: () => ({

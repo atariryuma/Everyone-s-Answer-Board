@@ -81,7 +81,7 @@ var SCORING_CONFIG = {
 };
 
 var ROSTER_CONFIG = {
-  SHEET_NAME: getConfig().rosterSheetName,
+  SHEET_NAME: (typeof getConfig === 'function' ? getConfig().rosterSheetName : '名簿'),
   EMAIL_COLUMN: 'メールアドレス',
   NAME_COLUMN: '名前',
   CLASS_COLUMN: 'クラス'
@@ -117,7 +117,7 @@ function debugLog() {
  * @returns {object} Sheets APIサービス
  */
 function getSheetsService() {
-  var accessToken = getServiceAccountToken();
+  var accessToken = getServiceAccountTokenCached();
   
   return {
     spreadsheets: {

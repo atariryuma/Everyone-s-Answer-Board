@@ -1,4 +1,5 @@
-const { guessHeadersFromArray } = require('../src/Code.gs');
+const { loadCode } = require('./shared-mocks');
+const { guessHeadersFromArray } = loadCode();
 
 test('guessHeadersFromArray detects japanese synonyms', () => {
   const headers = ['問い', 'コメント', 'わけ', 'ニックネーム', '班'];

@@ -1,4 +1,5 @@
-const { getHeaderIndices, COLUMN_HEADERS } = require('../src/Code.gs');
+const { loadCode } = require('./shared-mocks');
+const { getHeaderIndices, COLUMN_HEADERS } = loadCode();
 
 function setup(headers) {
   const sheet = {

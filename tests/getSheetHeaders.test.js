@@ -1,4 +1,5 @@
-const { getSheetHeaders } = require('../src/Code.gs');
+const { loadCode } = require('./shared-mocks');
+const { getSheetHeaders } = loadCode();
 
 function setup(headers) {
   const sheet = {

@@ -1,4 +1,5 @@
-const { getWebAppUrl } = require('../src/Code.gs');
+const { loadCode } = require('./shared-mocks');
+const { getWebAppUrl } = loadCode();
 
 function setup(stored, current) {
   const propsObj = {

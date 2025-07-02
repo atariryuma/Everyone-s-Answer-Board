@@ -218,16 +218,24 @@ let codeEvaluated = false;
 
 function ensureCodeEvaluated() {
   if (!codeEvaluated) {
-    console.log('🔧 Evaluating Code.gs...');
-    const codeGsPath = path.join(__dirname, '../src/Code.gs');
-    const codeContent = fs.readFileSync(codeGsPath, 'utf8');
-    
-    // Use eval in global context to ensure functions are globally available
-    (1, eval)(codeContent);
-    
+    console.log('🔧 Evaluating GAS source files...');
+
+    const srcDir = path.join(__dirname, '../src');
+    const files = fs.readdirSync(srcDir).filter(f => f.endsWith('.gs'));
+    files.forEach(file => {
+      const content = fs.readFileSync(path.join(srcDir, file), 'utf8');
+      (1, eval)(content);
+    });
+
     codeEvaluated = true;
-    console.log('✅ Code.gs evaluation completed');
+    console.log('✅ GAS source evaluation completed');
   }
+}
+
+function loadCode() {
+  setupGlobalMocks();
+  ensureCodeEvaluated();
+  return global;
 }
 
 function resetMocks() {
@@ -241,6 +249,7 @@ function resetMocks() {
 module.exports = {
   setupGlobalMocks,
   ensureCodeEvaluated,
+  loadCode,
   resetMocks,
   mockDatabase,
   mockSpreadsheetData
