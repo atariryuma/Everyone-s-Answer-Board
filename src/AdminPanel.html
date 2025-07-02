@@ -432,6 +432,12 @@
                 </a>
               </div>
             </div>
+            <button type="button" id="open-spreadsheet-btn" class="btn btn-secondary w-full">
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-6h13v6M9 9V7a2 2 0 012-2h8a2 2 0 012 2v2" />
+              </svg>
+              スプレッドシートを開く
+            </button>
           </div>
         </div>
       </div>
@@ -1017,7 +1023,8 @@
       copyFormUrlBtn: document.getElementById('copy-form-url-btn'),
       openFormUrlLink: document.getElementById('open-form-url-link'),
       endBoardBtn: document.getElementById('end-board-btn'),
-      openFormBtn: document.getElementById('open-form-btn')
+      openFormBtn: document.getElementById('open-form-btn'),
+      openSpreadsheetBtn: document.getElementById('open-spreadsheet-btn')
       };
 
     // ドメイン情報を取得して表示
@@ -1107,6 +1114,20 @@
       }
       if (elements.copyFormUrlBtn) {
         elements.copyFormUrlBtn.addEventListener('click', () => copyUrl(elements.formUrlInput, 'フォームURLをコピーしました'));
+      }
+      if (elements.openSpreadsheetBtn) {
+        elements.openSpreadsheetBtn.addEventListener('click', () => {
+          google.script.run
+            .withSuccessHandler(url => {
+              if (url) {
+                window.open(url, '_blank');
+              } else {
+                showMessage('スプレッドシートURLが取得できません', 'yellow');
+              }
+            })
+            .withFailureHandler(showError)
+            .openActiveSpreadsheet();
+        });
       }
 
       // Open Form Button - 初期設定（updateFormInfo() 関数で上書きされます）
