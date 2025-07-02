@@ -31,6 +31,21 @@ function getCurrentSpreadsheet() {
 }
 
 /**
+ * アクティブなスプレッドシートのURLを取得
+ * AdminPanel.htmlから呼び出される
+ * @returns {string} スプレッドシートURL
+ */
+function openActiveSpreadsheet() {
+  try {
+    var ss = getCurrentSpreadsheet();
+    return ss.getUrl();
+  } catch (e) {
+    console.error('openActiveSpreadsheet エラー: ' + e.message);
+    throw new Error('スプレッドシートのURL取得に失敗しました: ' + e.message);
+  }
+}
+
+/**
  * 簡易設定取得関数（AdminPanel.htmlとの互換性のため）
  * 新アーキテクチャでは基本的にデフォルト設定を使用
  */
