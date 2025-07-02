@@ -353,11 +353,117 @@ function debugLog() {
 // =================================================================
 
 /**
- * フォーム作成（プレースホルダー）
+ * フォーム作成（最適化版）
  */
 function createStudyQuestFormOptimized(userEmail, userId) {
-  // 元のcreateStudyQuestForm関数の最適化版を実装
-  throw new Error('createStudyQuestFormOptimized is not implemented yet');
+  try {
+    // パフォーマンス測定開始
+    var profiler = (typeof globalProfiler !== 'undefined') ? globalProfiler : {
+      start: function() {},
+      end: function() {}
+    };
+    profiler.start('createForm');
+    
+    // 共通ファクトリを使用してフォーム作成
+    var formResult = createFormFactory({
+      userEmail: userEmail,
+      userId: userId,
+      questions: 'default',
+      formDescription: 'このフォームは「みんなの回答ボード」で表示されます。デジタル・シティズンシップの観点から、オンライン空間での責任ある行動と建設的な対話を育むことを目的としています。回答内容は匿名で表示されます。'
+    });
+    
+    // カスタマイズされた設定を追加
+    var form = FormApp.openById(formResult.formId);
+    
+    // Email収集タイプの設定（可能な場合）
+    try {
+      if (typeof form.setEmailCollectionType === 'function') {
+        form.setEmailCollectionType(FormApp.EmailCollectionType.VERIFIED);
+      }
+    } catch (undocumentedError) {
+      // 失敗しても続行
+      console.warn('Email collection type setting failed:', undocumentedError.message);
+    }
+    
+    // 確認メッセージの設定
+    var confirmationMessage = form.getPublishedUrl()
+      ? '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。\nみんなの回答ボードで、お友達の色々な考えも見てみましょう。\n新しい発見があるかもしれませんね！\n\n' + form.getPublishedUrl()
+      : '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。';
+    form.setConfirmationMessage(confirmationMessage);
+    
+    // サービスアカウントをスプレッドシートに追加（最適化版）
+    addServiceAccountToSpreadsheetOptimized(formResult.spreadsheetId);
+    
+    // リアクション列をスプレッドシートに追加（最適化版）
+    addReactionColumnsToSpreadsheetOptimized(formResult.spreadsheetId, formResult.sheetName);
+    
+    profiler.end('createForm');
+    return formResult;
+    
+  } catch (e) {
+    console.error('createStudyQuestFormOptimizedエラー: ' + e.message);
+    throw new Error('フォームの作成に失敗しました: ' + e.message);
+  }
+}
+
+/**
+ * サービスアカウントをスプレッドシートに追加（最適化版）
+ */
+function addServiceAccountToSpreadsheetOptimized(spreadsheetId) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var serviceAccountCreds = JSON.parse(props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
+    var serviceAccountEmail = serviceAccountCreds.client_email;
+    
+    if (serviceAccountEmail) {
+      var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      spreadsheet.addEditor(serviceAccountEmail);
+      console.log('サービスアカウント (' + serviceAccountEmail + ') をスプレッドシートの編集者として追加しました。');
+    }
+  } catch (e) {
+    console.error('サービスアカウントの追加に失敗: ' + e.message);
+    // エラーでも処理は継続
+  }
+}
+
+/**
+ * スプレッドシートにリアクション列を追加（最適化版）
+ */
+function addReactionColumnsToSpreadsheetOptimized(spreadsheetId, sheetName) {
+  try {
+    var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    var sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
+    
+    var additionalHeaders = [
+      COLUMN_HEADERS.UNDERSTAND,
+      COLUMN_HEADERS.LIKE,
+      COLUMN_HEADERS.CURIOUS,
+      COLUMN_HEADERS.HIGHLIGHT
+    ];
+    
+    // 効率的にヘッダー情報を取得
+    var currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var startCol = currentHeaders.length + 1;
+    
+    // バッチでヘッダーを追加
+    sheet.getRange(1, startCol, 1, additionalHeaders.length).setValues([additionalHeaders]);
+    
+    // スタイリングを一括適用
+    var allHeadersRange = sheet.getRange(1, 1, 1, currentHeaders.length + additionalHeaders.length);
+    allHeadersRange.setFontWeight('bold').setBackground('#E3F2FD');
+    
+    // 自動リサイズ（エラーが出ても続行）
+    try {
+      sheet.autoResizeColumns(1, allHeadersRange.getNumColumns());
+    } catch (resizeError) {
+      console.warn('Auto-resize failed:', resizeError.message);
+    }
+    
+    console.log('リアクション列を追加しました: ' + sheetName);
+  } catch (e) {
+    console.error('リアクション列追加エラー: ' + e.message);
+    // エラーでも処理は継続
+  }
 }
 
 /**
