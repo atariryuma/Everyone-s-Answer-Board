@@ -1025,40 +1025,48 @@
     let webAppUrl = '';
     let currentSpreadsheetUrl = '';
     
-    // UI Elements
-    const elements = {
-      sheetSelect: document.getElementById('sheet-select'),
-      configArea: document.getElementById('config-area'),
-      configPlaceholder: document.getElementById('config-placeholder'),
-      mainHeader: document.getElementById('mainHeader'),
-      rHeader: document.getElementById('rHeader'),
-      nameHeader: document.getElementById('nameHeader'),
-      classHeader: document.getElementById('classHeader'),
-      switchSheetBtn: document.getElementById('switch-sheet-btn'),
-      clearSelectionBtn: document.getElementById('clear-selection-btn'),
-      saveConfigBtn: document.getElementById('save-config-btn'),
-      detailOptions: document.getElementById('detail-options'),
-      statusText: document.getElementById('status-text'),
-      boardUrl: document.getElementById('board-url'),
-      viewBoardLink: document.getElementById('view-board-link'),
-      setupProgress: document.getElementById('setup-progress'),
-      boardStatusIndicator: document.getElementById('board-status-indicator'),
-      sheetCount: document.getElementById('sheet-count'),
-      switchSheetText: document.getElementById('switch-sheet-text'),
-      configStatus: document.getElementById('config-status'),
-      addSpreadsheetText: document.getElementById('add-spreadsheet-text'),
-      saveConfigText: document.getElementById('save-config-text'),
-      createBoardBtn: document.getElementById('create-board-btn'),
-      createBoardText: document.getElementById('create-board-text'),
-      formUrlInput: document.getElementById('form-url-input'),
-      copyFormUrlBtn: document.getElementById('copy-form-url-btn'),
-      openFormUrlLink: document.getElementById('open-form-url-link'),
-      endBoardBtn: document.getElementById('end-board-btn'),
-      openFormBtn: document.getElementById('open-form-btn'),
-      openSpreadsheetBtn: document.getElementById('open-spreadsheet-btn')
-      };
-
     // ドメイン情報を取得して表示
+
+    let elements = {}; // elementsオブジェクトを初期化
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+      // UI Elements
+      elements = {
+        sheetSelect: document.getElementById('sheet-select'),
+        configArea: document.getElementById('config-area'),
+        configPlaceholder: document.getElementById('config-placeholder'),
+        mainHeader: document.getElementById('mainHeader'),
+        rHeader: document.getElementById('rHeader'),
+        nameHeader: document.getElementById('nameHeader'),
+        classHeader: document.getElementById('classHeader'),
+        switchSheetBtn: document.getElementById('switch-sheet-btn'),
+        clearSelectionBtn: document.getElementById('clear-selection-btn'),
+        saveConfigBtn: document.getElementById('save-config-btn'),
+        detailOptions: document.getElementById('detail-options'),
+        statusText: document.getElementById('status-text'),
+        boardUrl: document.getElementById('board-url'),
+        viewBoardLink: document.getElementById('view-board-link'),
+        setupProgress: document.getElementById('setup-progress'),
+        boardStatusIndicator: document.getElementById('board-status-indicator'),
+        sheetCount: document.getElementById('sheet-count'),
+        switchSheetText: document.getElementById('switch-sheet-text'),
+        configStatus: document.getElementById('config-status'),
+        addSpreadsheetText: document.getElementById('add-spreadsheet-text'),
+        saveConfigText: document.getElementById('save-config-text'),
+        createBoardBtn: document.getElementById('create-board-btn'),
+        createBoardText: document.getElementById('create-board-text'),
+        formUrlInput: document.getElementById('form-url-input'),
+        copyFormUrlBtn: document.getElementById('copy-form-url-btn'),
+        openFormUrlLink: document.getElementById('open-form-url-link'),
+        endBoardBtn: document.getElementById('end-board-btn'),
+        openFormBtn: document.getElementById('open-form-btn'),
+        openSpreadsheetBtn: document.getElementById('open-spreadsheet-btn')
+      };
+      loadStatus();
+      setupEventListeners();
+      loadAdminDomainInfo();
+    });
     function loadAdminDomainInfo() {
       google.script.run
         .withSuccessHandler(displayAdminDomainInfo)
