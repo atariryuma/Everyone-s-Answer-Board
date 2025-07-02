@@ -94,20 +94,6 @@
       box-shadow: 0 0 0 3px rgba(139, 233, 253, 0.1);
     }
     
-    /* Status indicators */
-    .status-indicator { 
-      width: 8px; 
-      height: 8px; 
-      border-radius: 50%; 
-      display: inline-block; 
-      margin-right: 8px;
-    }
-    .status-active { 
-      background-color: var(--color-success); 
-      box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); 
-    }
-    .status-inactive { background-color: var(--color-warning); }
-    .status-error { background-color: var(--color-error); }
     
     /* Animations */
     .success-pulse { animation: successPulse 0.6s ease-out; }
@@ -303,18 +289,12 @@
               <div>
                 <p class="text-sm text-gray-400">ボード状態</p>
                 <div class="flex items-center gap-2">
-                  <span class="status-indicator status-inactive" id="board-status-indicator"></span>
                   <span class="font-semibold text-white" id="status-text">準備中</span>
                 </div>
               </div>
             </div>
           </div>
           <p class="text-sm text-gray-300 transition-colors" id="status-description">スプレッドシートを追加して開始してください</p>
-          <div id="is-active-status" class="text-xs text-gray-400 mt-2 hidden">
-            <span class="font-medium">データベース状態:</span>
-            <span id="is-active-text" class="font-semibold"></span>
-            <a id="is-active-link" href="#" target="_blank" rel="noopener noreferrer" class="ml-2 text-blue-400 hover:underline hidden">スプレッドシートを開く</a>
-          </div>
           
         </div>
         
@@ -1011,7 +991,6 @@
       boardUrl: document.getElementById('board-url'),
       viewBoardLink: document.getElementById('view-board-link'),
       setupProgress: document.getElementById('setup-progress'),
-      boardStatusIndicator: document.getElementById('board-status-indicator'),
       sheetCount: document.getElementById('sheet-count'),
       switchSheetText: document.getElementById('switch-sheet-text'),
       configStatus: document.getElementById('config-status'),
@@ -1153,23 +1132,6 @@
         }
       });
       
-      // Board Status Card click event
-      document.getElementById('board-status-card').addEventListener('click', function() {
-        if (currentActiveSheet && elements.boardUrl && elements.boardUrl.value) {
-          window.open(elements.boardUrl.value, '_blank');
-        } else {
-          showMessage('ボードのURLが見つかりません', 'yellow');
-        }
-      });
-      
-      // Board status description click event
-      document.getElementById('status-description').addEventListener('click', function() {
-        if (currentActiveSheet && elements.boardUrl && elements.boardUrl.value) {
-          window.open(elements.boardUrl.value, '_blank');
-        } else {
-          showMessage('ボードのURLが見つかりません', 'yellow');
-        }
-      });
       
       // Teacher guide modal events
       document.getElementById('teacherGuideConfirmBtn').addEventListener('click', hideTeacherGuideModal);
@@ -1390,25 +1352,6 @@
       const answerCount = status.answerCount || 0;
       const reactionCount = status.totalReactions || 0;
 
-      // Update isActive status
-      const isActiveStatusDiv = document.getElementById('is-active-status');
-      const isActiveTextSpan = document.getElementById('is-active-text');
-      const isActiveLink = document.getElementById('is-active-link');
-
-      if (status.userInfo && status.userInfo.isActive === 'true') {
-        isActiveTextSpan.textContent = 'アクティブ';
-        isActiveTextSpan.classList.remove('text-yellow-400');
-        isActiveTextSpan.classList.add('text-green-400');
-        isActiveLink.href = status.spreadsheetUrl;
-        isActiveLink.classList.remove('hidden');
-        isActiveStatusDiv.classList.remove('hidden');
-      } else {
-        isActiveTextSpan.textContent = '非アクティブ';
-        isActiveTextSpan.classList.remove('text-green-400');
-        isActiveTextSpan.classList.add('text-yellow-400');
-        isActiveLink.classList.add('hidden');
-        isActiveStatusDiv.classList.remove('hidden');
-      }
       
       // Main status updates
       const statusTextEl = document.getElementById('status-text');
@@ -1487,10 +1430,6 @@
         }
       }
       
-      // Update status indicator
-      if (elements.boardStatusIndicator) {
-        elements.boardStatusIndicator.className = 'status-indicator ' + (isActive ? 'status-active' : 'status-inactive');
-      }
       
       // Update activity timeline
       updateActivityTimeline(status);
