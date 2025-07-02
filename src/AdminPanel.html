@@ -1209,6 +1209,20 @@
       document.getElementById('teacherGuideConfirmBtn').addEventListener('click', hideTeacherGuideModal);
     }
 
+    function enableUnderstandButton() {
+      const btn = document.getElementById('teacherGuideConfirmBtn');
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '理解しました';
+      }
+    }
+
+    function setLoading(isLoading, message = '') {
+      // This function is not currently implemented or is handled differently.
+      // It is left as a placeholder for future implementation.
+      console.log(`setLoading called with: ${isLoading}, message: ${message}`);
+    }
+
 
     // Teacher Guide Modal Functions
     function showTeacherGuideModal() {
