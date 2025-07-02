@@ -1,5 +1,5 @@
-const { buildBoardData } = require('../src/Code.gs');
-const { COLUMN_HEADERS } = require('../src/Code.gs');
+const { loadCode } = require('./shared-mocks');
+const { buildBoardData, COLUMN_HEADERS } = loadCode();
 
 function setup({configRows, dataRows}) {
   global.SpreadsheetApp = {

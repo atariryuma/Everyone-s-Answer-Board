@@ -1,4 +1,5 @@
-const { prepareSheetForBoard, COLUMN_HEADERS } = require('../src/Code.gs');
+const { loadCode } = require('./shared-mocks');
+const { prepareSheetForBoard, COLUMN_HEADERS } = loadCode();
 
 function setup(headers) {
   const sheet = {

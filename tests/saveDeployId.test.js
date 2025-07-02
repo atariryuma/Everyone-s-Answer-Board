@@ -1,4 +1,5 @@
-const { saveDeployId } = require('../src/Code.gs');
+const { loadCode } = require('./shared-mocks');
+const { saveDeployId } = loadCode();
 
 function setup() {
   const props = { setProperties: jest.fn(), deleteProperty: jest.fn(), getProperty: jest.fn(() => '') };

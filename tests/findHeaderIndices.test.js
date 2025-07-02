@@ -1,4 +1,5 @@
-const { findHeaderIndices } = require('../src/Code.gs');
+const { loadCode } = require('./shared-mocks');
+const { findHeaderIndices } = loadCode();
 
 test('findHeaderIndices returns indices for existing headers', () => {
   const headers = ['A', 'B', 'C'];

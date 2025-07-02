@@ -1,4 +1,5 @@
-const { isUserAdmin } = require('../src/Code.gs');
+const { loadCode } = require('./shared-mocks');
+const { isUserAdmin } = loadCode();
 
 function setup({ currentEmail, userId, boardId, adminLists }) {
   const scriptProps = {

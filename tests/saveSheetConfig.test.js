@@ -1,4 +1,5 @@
-const { saveSheetConfig } = require('../src/Code.gs');
+const { loadCode } = require('./shared-mocks');
+const { saveSheetConfig } = loadCode();
 
 function setup(initialRows) {
   const rows = initialRows.slice();

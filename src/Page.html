@@ -827,7 +827,7 @@ class StudyQuestApp {
     ];
     this.gas = {
       getPublishedSheetData: (sheetName, classFilter, sort) => this.runGas('getPublishedSheetData', sheetName, classFilter, sort),
-      getAvailableSheets: () => this.runGas('getSheetsListOptimized'),
+      getAvailableSheets: () => this.runGas('getAvailableSheets'),
       addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', rowIndex, reaction, sheetName),
       toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', rowIndex, sheetName),
       checkAdmin: () => this.runGas('checkAdmin')

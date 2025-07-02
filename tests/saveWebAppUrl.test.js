@@ -1,4 +1,5 @@
-const { saveWebAppUrl } = require('../src/Code.gs');
+const { loadCode } = require('./shared-mocks');
+const { saveWebAppUrl } = loadCode();
 
 function setup() {
   const props = { setProperties: jest.fn(), deleteProperty: jest.fn() };

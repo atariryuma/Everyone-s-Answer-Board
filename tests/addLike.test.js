@@ -1,4 +1,5 @@
-const { addReaction, COLUMN_HEADERS } = require('../src/Code.gs');
+const { loadCode } = require('./shared-mocks');
+const { addReaction, COLUMN_HEADERS } = loadCode();
 
 function buildSheet() {
   const headerRow = [

@@ -1,4 +1,5 @@
-const { parseReactionString } = require('../src/Code.gs');
+const { loadCode } = require('./shared-mocks');
+const { parseReactionString } = loadCode();
 
 test('parseReactionString trims spaces and filters empties', () => {
   expect(parseReactionString(' a@example.com , b@example.com  ')).toEqual([

@@ -1,4 +1,5 @@
-const { toggleHighlight, COLUMN_HEADERS } = require('../src/Code.gs');
+const { loadCode } = require('./shared-mocks');
+const { toggleHighlight, COLUMN_HEADERS } = loadCode();
 
 function buildSheet(name = 'Sheet1') {
   const headerRow = [

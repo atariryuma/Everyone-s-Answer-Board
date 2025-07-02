@@ -1,3 +1,4 @@
+const { loadCode } = require('./shared-mocks');
 let getSheetData;
 let COLUMN_HEADERS;
 
@@ -53,7 +54,7 @@ afterEach(() => {
 });
 
 test('getSheetData filters and scores rows', () => {
-  ({ getSheetData, COLUMN_HEADERS } = require('../src/Code.gs'));
+  ({ getSheetData, COLUMN_HEADERS } = require('./shared-mocks').loadCode());
   const data = [
     [
       COLUMN_HEADERS.EMAIL,
@@ -72,7 +73,7 @@ test('getSheetData filters and scores rows', () => {
   ];
   setupMocks(data, 'b@example.com', 'b@example.com');
 
-  ({ getSheetData, COLUMN_HEADERS } = require('../src/Code.gs'));
+  ({ getSheetData, COLUMN_HEADERS } = require('./shared-mocks').loadCode());
 
   const result = getSheetData('Sheet1', undefined, 'score');
 
@@ -85,7 +86,7 @@ test('getSheetData filters and scores rows', () => {
 });
 
 test('getSheetData sorts by newest when specified', () => {
-  ({ getSheetData, COLUMN_HEADERS } = require('../src/Code.gs'));
+  ({ getSheetData, COLUMN_HEADERS } = require('./shared-mocks').loadCode());
   const data = [
     [
       COLUMN_HEADERS.EMAIL,
@@ -103,7 +104,7 @@ test('getSheetData sorts by newest when specified', () => {
   ];
   setupMocks(data, '', '');
 
-  ({ getSheetData, COLUMN_HEADERS } = require('../src/Code.gs'));
+  ({ getSheetData, COLUMN_HEADERS } = require('./shared-mocks').loadCode());
 
   const result = getSheetData('Sheet1', undefined, 'newest');
 
@@ -111,7 +112,7 @@ test('getSheetData sorts by newest when specified', () => {
 });
 
 test('getSheetData supports random sort', () => {
-  ({ getSheetData, COLUMN_HEADERS } = require('../src/Code.gs'));
+  ({ getSheetData, COLUMN_HEADERS } = require('./shared-mocks').loadCode());
   const data = [
     [
       COLUMN_HEADERS.EMAIL,
@@ -129,7 +130,7 @@ test('getSheetData supports random sort', () => {
   ];
   setupMocks(data, '', '');
 
-  ({ getSheetData, COLUMN_HEADERS } = require('../src/Code.gs'));
+  ({ getSheetData, COLUMN_HEADERS } = require('./shared-mocks').loadCode());
 
   const result = getSheetData('Sheet1', undefined, 'random');
 
@@ -138,7 +139,7 @@ test('getSheetData supports random sort', () => {
 });
 
 test('getSheetData derives name from email for non-admin', () => {
-  ({ getSheetData, COLUMN_HEADERS } = require('../src/Code.gs'));
+  ({ getSheetData, COLUMN_HEADERS } = require('./shared-mocks').loadCode());
   const data = [
     [
       COLUMN_HEADERS.EMAIL,
@@ -155,7 +156,7 @@ test('getSheetData derives name from email for non-admin', () => {
   ];
   setupMocks(data, 'a@example.com', '');
 
-  ({ getSheetData, COLUMN_HEADERS } = require('../src/Code.gs'));
+  ({ getSheetData, COLUMN_HEADERS } = require('./shared-mocks').loadCode());
 
   const result = getSheetData('Sheet1');
 
@@ -163,7 +164,7 @@ test('getSheetData derives name from email for non-admin', () => {
 });
 
 test('getSheetData returns names for admin users', () => {
-  ({ getSheetData, COLUMN_HEADERS } = require('../src/Code.gs'));
+  ({ getSheetData, COLUMN_HEADERS } = require('./shared-mocks').loadCode());
   const data = [
     [
       COLUMN_HEADERS.EMAIL,
@@ -180,7 +181,7 @@ test('getSheetData returns names for admin users', () => {
   ];
   setupMocks(data, 'a@example.com', 'a@example.com');
 
-  ({ getSheetData, COLUMN_HEADERS } = require('../src/Code.gs'));
+  ({ getSheetData, COLUMN_HEADERS } = require('./shared-mocks').loadCode());
 
   const result = getSheetData('Sheet1');
 
@@ -188,7 +189,7 @@ test('getSheetData returns names for admin users', () => {
 });
 
 test('reaction lists trim spaces and ignore empties', () => {
-  ({ getSheetData, COLUMN_HEADERS } = require('../src/Code.gs'));
+  ({ getSheetData, COLUMN_HEADERS } = require('./shared-mocks').loadCode());
   const data = [
     [
       COLUMN_HEADERS.EMAIL,
@@ -215,7 +216,7 @@ test('reaction lists trim spaces and ignore empties', () => {
   ];
   setupMocks(data, 'a@example.com', 'a@example.com');
 
-  ({ getSheetData, COLUMN_HEADERS } = require('../src/Code.gs'));
+  ({ getSheetData, COLUMN_HEADERS } = require('./shared-mocks').loadCode());
 
   const result = getSheetData('Sheet1');
 
@@ -235,7 +236,7 @@ test('getSheetData supports custom headers from config for non-admin', () => {
     nameHeader: 'Name',
     classHeader: 'Class'
   });
-  ({ getSheetData, COLUMN_HEADERS } = require('../src/Code.gs'));
+  ({ getSheetData, COLUMN_HEADERS } = require('./shared-mocks').loadCode());
   const data = [
     [
       COLUMN_HEADERS.EMAIL,
@@ -269,7 +270,7 @@ test('getSheetData uses question column when answer header missing', () => {
     classHeader: 'Class'
   });
 
-  ({ getSheetData, COLUMN_HEADERS } = require('../src/Code.gs'));
+  ({ getSheetData, COLUMN_HEADERS } = require('./shared-mocks').loadCode());
   const data = [
     [
       COLUMN_HEADERS.EMAIL,
@@ -302,7 +303,7 @@ test('getSheetData uses answer column when question header missing', () => {
     classHeader: 'Class'
   });
 
-  ({ getSheetData, COLUMN_HEADERS } = require('../src/Code.gs'));
+  ({ getSheetData, COLUMN_HEADERS } = require('./shared-mocks').loadCode());
   const data = [
     [
       COLUMN_HEADERS.EMAIL,
