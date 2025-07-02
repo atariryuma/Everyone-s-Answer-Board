@@ -1224,16 +1224,8 @@
 
 
     function showTeacherGuideModal() {
-      const modal = document.getElementById('teacherGuideModal');
-      const modalContent = modal.querySelector('.glass-panel');
-      modal.classList.remove('hidden');
-      
-      modalContent.scrollTop = 0;
-      
-      setTimeout(() => {
-        const firstFocusable = modalContent.querySelector('h2') || document.getElementById('teacherGuideConfirmBtn');
-        firstFocusable.focus();
-      }, 100);
+      // 教育ガイドモーダルは削除されました
+      console.log('教育ガイドモーダルはRegistration.htmlに移動されました');
     }
 
     function hideTeacherGuideModal() {
@@ -1385,7 +1377,7 @@
     }
 
     function loadStatus() {
-      showTeacherGuideModal();
+      // 教育ガイドモーダルは削除されました
       
       google.script.run
         .withSuccessHandler((status) => {
