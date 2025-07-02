@@ -3,6 +3,8 @@
  * 新サービスアカウントアーキテクチャで必要最小限の関数のみ
  */
 
+const CONFIG_SHEET_NAME = 'Config';
+
 /**
  * 現在のユーザーのスプレッドシートを取得
  * AdminPanel.htmlから呼び出される
@@ -32,23 +34,40 @@ function getCurrentSpreadsheet() {
  * 簡易設定取得関数（AdminPanel.htmlとの互換性のため）
  * 新アーキテクチャでは基本的にデフォルト設定を使用
  */
-function getConfig(sheetName) {
+function getConfig() {
   try {
+    var spreadsheet = getCurrentSpreadsheet();
+    var configSheet = spreadsheet.getSheetByName(CONFIG_SHEET_NAME);
+    
+    var config = {
+      questionHeader: '問題',
+      answerHeader: '回答',
+      reasonHeader: '理由',
+      nameHeader: '名前',
+      classHeader: 'クラス',
+      rosterSheetName: '名簿'
+    };
+
+    if (configSheet) {
+      var data = configSheet.getDataRange().getValues();
+      for (var i = 0; i < data.length; i++) {
+        var key = data[i][0];
+        var value = data[i][1];
+        if (key && value !== undefined) {
+          config[key] = value;
+        }
+      }
+    }
+    return config;
+  } catch (error) {
+    console.error('getConfig error:', error.message);
     return {
       questionHeader: '問題',
       answerHeader: '回答',
       reasonHeader: '理由',
       nameHeader: '名前',
-      classHeader: 'クラス'
-    };
-  } catch (error) {
-    console.error('getConfig error for sheet:', sheetName, error.message);
-    return {
-      questionHeader: '',
-      answerHeader: '回答',
-      reasonHeader: '',
-      nameHeader: '',
-      classHeader: ''
+      classHeader: 'クラス',
+      rosterSheetName: '名簿'
     };
   }
 }
@@ -242,7 +261,7 @@ function checkAdmin() {
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
     var response = service.spreadsheets.values.get(dbId, sheetName + '!A:H');
-    var data = response.values || []; // Check if values property exists
+    var data = (response && response.values) ? response.values : [];
     
     if (data.length === 0) {
       debugLog('checkAdmin: No data found in Users sheet or sheet is empty.');

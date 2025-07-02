@@ -241,7 +241,7 @@ function clearAllCache() {
   // CacheServiceのキャッシュデータクリア
   CacheService.getScriptCache().removeAll();
 
-  debugLog('全キャッシュをクリアしました');
+  debugLog('全キャッシュをクリアしました: PropertiesServiceとCacheService');
 }
 
 /**

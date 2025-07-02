@@ -75,7 +75,7 @@ var SCORING_CONFIG = {
 };
 
 var ROSTER_CONFIG = {
-  SHEET_NAME: '名簿',
+  SHEET_NAME: getConfig().rosterSheetName,
   EMAIL_COLUMN: 'メールアドレス',
   NAME_COLUMN: '名前',
   CLASS_COLUMN: 'クラス'
@@ -903,6 +903,8 @@ function createStudyQuestForm(userEmail, userId) {
     }
     
     // 確認メッセージの設定
+    // 注意: Googleフォームの確認メッセージはHTMLをサポートせず、自動リダイレクトはできません。
+    // ユーザーを特定のページにリダイレクトするには、カスタムWebアプリをフォームの送信先として使用する必要があります。
     var appUrls = generateAppUrls(userId); // userIdを使ってURLを生成
     var confirmationMessage = appUrls.viewUrl
       ? '🎉 回答ありがとうございます！\n\nあなたの大切な意見が届きました。\nみんなの回答ボードで、お友達の色々な考えも見てみましょう。\n新しい発見があるかもしれませんね！\n\n' + appUrls.viewUrl
@@ -1992,10 +1994,45 @@ function quickStartSetup(userId) {
     
     var configJson = JSON.parse(userInfo.configJson || '{}');
     var userEmail = userInfo.adminEmail;
-    
+    var spreadsheetId = userInfo.spreadsheetId;
+
     // 1. Googleフォームの作成（既に作成済みの場合はスキップ）
     var formUrl = configJson.formUrl;
     var editFormUrl = configJson.editFormUrl;
+    var sheetName = 'フォームの回答 1'; // Default sheet name for form responses
+
+    if (!formUrl) {
+      var formAndSsInfo = createStudyQuestForm(userEmail, userId);
+      formUrl = formAndSsInfo.formUrl;
+      editFormUrl = formAndSsInfo.editFormUrl;
+      spreadsheetId = formAndSsInfo.spreadsheetId;
+      sheetName = formAndSsInfo.sheetName;
+
+      // Update user info with new form/spreadsheet details
+      updateUserInDb(userId, {
+        spreadsheetId: spreadsheetId,
+        spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+        configJson: JSON.stringify({
+          ...configJson,
+          formUrl: formUrl,
+          editFormUrl: editFormUrl,
+          publishedSheet: sheetName, // Set initial published sheet
+          appPublished: true // Publish app on quick start
+        })
+      });
+    }
+
+    // 2. Configシートの作成と初期化
+    createAndInitializeConfigSheet(spreadsheetId);
+
+    debugLog('クイックスタートセットアップ完了: ' + userId);
+    return { status: 'success', message: 'クイックスタートセットアップが完了しました。' };
+
+  } catch (e) {
+    console.error('クイックスタートセットアップエラー: ' + e.message);
+    return { status: 'error', message: 'クイックスタートセットアップに失敗しました: ' + e.message };
+  }
+}
     var sheetName = 'フォームの回答 1';
     
     if (!formUrl) {

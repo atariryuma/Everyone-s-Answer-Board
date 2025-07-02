@@ -1,270 +1,267 @@
 /**
- * ===================================================================================
- * アプリケーション初期設定用スクリプト (サービスアカウントモデル対応)
- * ===================================================================================
- * このファイルには、管理者が最初の一度だけ実行するセットアップ関連の関数を格納します。
- * 新アーキテクチャでは、サービスアカウント認証情報と中央データベースIDの設定が必要です。
+ * SetupCode.gs
+ * アプリケーションの初期設定とデプロイ関連の関数
  */
 
+// =================================================================
+// セットアップ関数
+// =================================================================
+
 /**
- * 【管理者が最初に一度だけ実行する関数】
- * セットアップの状況を確認し、必要に応じて初期設定の手順を表示します。
+ * アプリケーションの初期セットアップ（管理者が手動で実行）
+ * サービスアカウントの認証情報とデータベースのスプレッドシートIDを設定する。
+ * @param {string} credsJson - ダウンロードしたサービスアカウントのJSONキーファイルの内容
+ * @param {string} dbId - 中央データベースとして使用するスプレッドシートのID
  */
-function initialSetup() {
-  var properties = PropertiesService.getScriptProperties();
-  var serviceAccountCreds = properties.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
-  var databaseId = properties.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-  
-  if (serviceAccountCreds && databaseId) {
-    Logger.log('✅ セットアップは既に完了しています。');
-    try {
-      var url = ScriptApp.getService().getUrl();
-      if (url) {
-        Logger.log('アプリケーションURL: ' + url);
-        Logger.log('新規登録ページ: ' + url);
-      } else {
-        Logger.log('プロジェクトをデプロイすると、ここにアプリケーションURLが表示されます。');
+function setupApplication(credsJson, dbId) {
+  try {
+    JSON.parse(credsJson);
+    if (typeof dbId !== 'string' || dbId.length !== 44) {
+      throw new Error('無効なスプレッドシートIDです。IDは44文字の文字列である必要があります。');
+    }
+
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS, credsJson);
+    props.setProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID, dbId);
+
+    // データベースシートの初期化
+    initializeDatabaseSheet(dbId);
+
+    console.log('✅ セットアップが正常に完了しました。');
+  } catch (e) {
+    console.error('セットアップエラー:', e);
+    throw new Error('セットアップに失敗しました: ' + e.message);
+  }
+}
+
+/**
+ * データベースシートに必要なヘッダーを作成する。
+ * @param {string} spreadsheetId - データベースのスプレッドシートID
+ */
+function initializeDatabaseSheet(spreadsheetId) {
+  var service = getSheetsService();
+  var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+
+  try {
+    // シートが存在するか確認
+    var spreadsheet = service.spreadsheets.get(spreadsheetId);
+    var sheetExists = spreadsheet.sheets.some(function(s) { return s.properties.title === sheetName; });
+
+    if (!sheetExists) {
+      // シートが存在しない場合は作成
+      service.spreadsheets.batchUpdate(spreadsheetId, {
+        requests: [{ addSheet: { properties: { title: sheetName } } }]
+      });
+    }
+    
+    // ヘッダーを書き込み
+    var headerRange = sheetName + '!A1:' + String.fromCharCode(65 + DB_SHEET_CONFIG.HEADERS.length - 1) + '1';
+    service.spreadsheets.values.update(
+      spreadsheetId,
+      headerRange,
+      { values: [DB_SHEET_CONFIG.HEADERS] },
+      { valueInputOption: 'RAW' }
+    );
+
+    debugLog('データベースシート「' + sheetName + '」の初期化が完了しました。');
+  } catch (e) {
+    console.error('データベースシートの初期化に失敗: ' + e.message);
+    throw new Error('データベースシートの初期化に失敗しました。サービスアカウントに編集者権限があるか確認してください。詳細: ' + e.message);
+  }
+}
+
+/**
+ * クイックスタートセットアップ
+ * Registration.htmlから呼び出される
+ */
+function quickStartSetup(userId) {
+  try {
+    debugLog('クイックスタートセットアップ開始: ' + userId);
+    
+    // ユーザー情報の取得
+    var userInfo = findUserById(userId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var userEmail = userInfo.adminEmail;
+    var spreadsheetId = userInfo.spreadsheetId;
+
+    // 1. Googleフォームの作成（既に作成済みの場合はスキップ）
+    var formUrl = configJson.formUrl;
+    var editFormUrl = configJson.editFormUrl;
+    var sheetName = 'フォームの回答 1'; // Default sheet name for form responses
+
+    if (!formUrl) {
+      var formAndSsInfo = createStudyQuestForm(userEmail, userId);
+      formUrl = formAndSsInfo.formUrl;
+      editFormUrl = formAndSsInfo.editFormUrl;
+      spreadsheetId = formAndSsInfo.spreadsheetId;
+      sheetName = formAndSsInfo.sheetName;
+
+      // Update user info with new form/spreadsheet details
+      updateUserInDb(userId, {
+        spreadsheetId: spreadsheetId,
+        spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+        configJson: JSON.stringify({
+          ...configJson,
+          formUrl: formUrl,
+          editFormUrl: editFormUrl,
+          publishedSheet: sheetName, // Set initial published sheet
+          appPublished: true // Publish app on quick start
+        })
+      });
+    }
+
+    // 2. Configシートの作成と初期化
+    createAndInitializeConfigSheet(spreadsheetId);
+
+    debugLog('クイックスタートセットアップ完了: ' + userId);
+    return { status: 'success', message: 'クイックスタートセットアップが完了しました。' };
+
+  } catch (e) {
+    console.error('クイックスタートセットアップエラー: ' + e.message);
+    return { status: 'error', message: 'クイックスタートセットアップに失敗しました: ' + e.message };
+  }
+}
+
+/**
+ * Configシートを作成し、デフォルト設定で初期化する。
+ * @param {string} spreadsheetId - 対象のスプレッドシートID
+ */
+function createAndInitializeConfigSheet(spreadsheetId) {
+  try {
+    var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    var configSheet = spreadsheet.getSheetByName(CONFIG_SHEET_NAME);
+
+    if (!configSheet) {
+      configSheet = spreadsheet.insertSheet(CONFIG_SHEET_NAME);
+      debugLog('Configシートを作成しました。');
+    }
+
+    // デフォルト設定を書き込む
+    var defaultConfigs = [
+      ['questionHeader', '問題'],
+      ['answerHeader', '回答'],
+      ['reasonHeader', '理由'],
+      ['nameHeader', '名前'],
+      ['classHeader', 'クラス'],
+      ['rosterSheetName', '名簿']
+    ];
+
+    var existingData = configSheet.getDataRange().getValues();
+    var existingKeys = existingData.map(row => row[0]);
+
+    var dataToWrite = [];
+    defaultConfigs.forEach(config => {
+      if (!existingKeys.includes(config[0])) {
+        dataToWrite.push(config);
       }
-    } catch(e) {
-      Logger.log('プロジェクトをデプロイすると、アプリケーションURLが利用可能になります。');
-    }
-    return;
-  }
-  
-  Logger.log('🚀 新アーキテクチャのセットアップが必要です。');
-  Logger.log('');
-  Logger.log('セットアップ手順:');
-  Logger.log('1. Google Cloud Platform (GCP) でサービスアカウントを作成');
-  Logger.log('2. サービスアカウントのJSONキーをダウンロード');
-  Logger.log('3. 中央データベース用のスプレッドシートを作成');
-  Logger.log('4. サービスアカウントを中央データベースの編集者として追加');
-  Logger.log('5. setupApplication(credsJson, dbId) 関数を実行');
-  Logger.log('');
-  Logger.log('詳細な手順については、要件定義書を参照してください。');
-}
-
-/**
- * セットアップ完了後のテスト関数
- * サービスアカウント認証とデータベースアクセスをテストします。
- */
-function testSetup() {
-  try {
-    var properties = PropertiesService.getScriptProperties();
-    var serviceAccountCreds = properties.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
-    var databaseId = properties.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    
-    if (!serviceAccountCreds || !databaseId) {
-      throw new Error('セットアップが完了していません。setupApplication() を実行してください。');
-    }
-    
-    Logger.log('=== セットアップテスト ===');
-    
-    // サービスアカウント認証テスト
-    Logger.log('1. サービスアカウント認証テスト...');
-    var token = getServiceAccountToken();
-    if (token) {
-      Logger.log('✅ サービスアカウント認証: 成功');
-    } else {
-      throw new Error('サービスアカウント認証に失敗');
-    }
-    
-    // データベースアクセステスト
-    Logger.log('2. データベースアクセステスト...');
-    var service = getSheetsService();
-    var spreadsheet = service.spreadsheets.get(databaseId);
-    if (spreadsheet) {
-      Logger.log('✅ データベースアクセス: 成功');
-      Logger.log('データベース名: ' + spreadsheet.properties.title);
-    } else {
-      throw new Error('データベースアクセスに失敗');
-    }
-    
-    // テストユーザー検索
-    Logger.log('3. テストクエリ実行...');
-    var testUser = findUserByEmail('test@example.com'); // 存在しないユーザー
-    Logger.log('✅ テストクエリ: 成功 (結果: ' + (testUser ? 'あり' : 'なし') + ')');
-    
-    Logger.log('');
-    Logger.log('🎉 すべてのテストが成功しました！アプリケーションは正常に動作する準備ができています。');
-    
-    return {
-      status: 'success',
-      message: 'セットアップテストが成功しました',
-      databaseName: spreadsheet.properties.title
-    };
-    
-  } catch (e) {
-    Logger.log('❌ テスト失敗: ' + e.message);
-    return {
-      status: 'error',
-      message: 'セットアップテストに失敗しました: ' + e.message
-    };
-  }
-}
-
-/**
- * セットアップ情報を表示する
- */
-function showSetupInfo() {
-  var properties = PropertiesService.getScriptProperties();
-  var serviceAccountCreds = properties.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
-  var databaseId = properties.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-  
-  Logger.log('=== 現在のセットアップ状況 ===');
-  Logger.log('サービスアカウント設定: ' + (serviceAccountCreds ? '✅ あり' : '❌ なし'));
-  Logger.log('データベースID設定: ' + (databaseId ? '✅ あり' : '❌ なし'));
-  
-  if (serviceAccountCreds) {
-    try {
-      var creds = JSON.parse(serviceAccountCreds);
-      Logger.log('サービスアカウントメール: ' + creds.client_email);
-      Logger.log('プロジェクトID: ' + creds.project_id);
-    } catch (e) {
-      Logger.log('⚠️ サービスアカウント情報の解析に失敗: ' + e.message);
-    }
-  }
-  
-  if (databaseId) {
-    Logger.log('データベースID: ' + databaseId);
-    try {
-      var service = getSheetsService();
-      var spreadsheet = service.spreadsheets.get(databaseId);
-      Logger.log('データベース名: ' + spreadsheet.properties.title);
-      Logger.log('データベースURL: https://docs.google.com/spreadsheets/d/' + databaseId);
-    } catch (e) {
-      Logger.log('⚠️ データベース情報の取得に失敗: ' + e.message);
-    }
-  }
-  
-  var url = ScriptApp.getService().getUrl();
-  if (url) {
-    Logger.log('アプリケーションURL: ' + url);
-  }
-}
-
-/**
- * データベースの状況を確認する
- */
-function checkDatabaseStatus() {
-  try {
-    var properties = PropertiesService.getScriptProperties();
-    var databaseId = properties.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    
-    if (!databaseId) {
-      Logger.log('❌ データベースIDが設定されていません');
-      return { status: 'error', message: 'データベースIDが設定されていません' };
-    }
-    
-    var service = getSheetsService();
-    var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
-    
-    // データベースの基本情報
-    var spreadsheet = service.spreadsheets.get(databaseId);
-    Logger.log('=== データベース状況 ===');
-    Logger.log('名前: ' + spreadsheet.properties.title);
-    Logger.log('シート数: ' + spreadsheet.sheets.length);
-    
-    // Usersシートの存在確認
-    var usersSheet = spreadsheet.sheets.find(function(s) { 
-      return s.properties.title === sheetName; 
     });
-    
-    if (!usersSheet) {
-      Logger.log('⚠️ Usersシートが見つかりません');
-      return { status: 'warning', message: 'Usersシートがありません' };
-    }
-    
-    Logger.log('✅ Usersシート: 存在確認');
-    
-    // データの確認
-    var data = service.spreadsheets.values.get(databaseId, sheetName + '!A:H').values || [];
-    Logger.log('データ行数: ' + data.length + ' (ヘッダー含む)');
-    
-    if (data.length > 0) {
-      Logger.log('ヘッダー: ' + JSON.stringify(data[0]));
-      Logger.log('ユーザー数: ' + (data.length - 1));
-    }
-    
-    return {
-      status: 'success',
-      message: 'データベースは正常です',
-      userCount: data.length > 0 ? data.length - 1 : 0
-    };
-    
-  } catch (e) {
-    Logger.log('❌ データベース確認エラー: ' + e.message);
-    return { status: 'error', message: 'データベース確認に失敗: ' + e.message };
-  }
-}
 
-/**
- * 新規ユーザー登録のテスト（実際には登録しない）
- */
-function testUserRegistration() {
-  try {
-    var testEmail = Session.getActiveUser().getEmail();
-    Logger.log('=== ユーザー登録テスト ===');
-    Logger.log('テスト対象メール: ' + testEmail);
-    
-    // 既存ユーザーチェックのテスト
-    var existingUser = findUserByEmail(testEmail);
-    if (existingUser) {
-      Logger.log('✅ 既存ユーザー検索: 成功 (ユーザーが見つかりました)');
-      Logger.log('既存ユーザーID: ' + existingUser.userId);
-      Logger.log('作成日時: ' + existingUser.createdAt);
+    if (dataToWrite.length > 0) {
+      var startRow = existingData.length + 1;
+      configSheet.getRange(startRow, 1, dataToWrite.length, dataToWrite[0].length).setValues(dataToWrite);
+      debugLog('Configシートにデフォルト設定を書き込みました。');
     } else {
-      Logger.log('✅ 既存ユーザー検索: 成功 (新規ユーザーです)');
+      debugLog('Configシートは既に最新です。');
     }
-    
-    // サービスアカウント情報の確認
-    var properties = PropertiesService.getScriptProperties();
-    var serviceAccountCreds = JSON.parse(properties.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
-    Logger.log('サービスアカウントメール: ' + serviceAccountCreds.client_email);
-    
-    Logger.log('🎉 ユーザー登録テストが成功しました（実際の登録は行われていません）');
-    
-    return {
-      status: 'success',
-      message: 'ユーザー登録テストが成功しました',
-      isExistingUser: !!existingUser
-    };
-    
+
+    // ヘッダーのスタイル設定
+    configSheet.getRange('A1:B1').setFontWeight('bold').setBackground('#E3F2FD');
+    configSheet.autoResizeColumns(1, 2);
+
   } catch (e) {
-    Logger.log('❌ ユーザー登録テストエラー: ' + e.message);
-    return { status: 'error', message: 'ユーザー登録テストに失敗: ' + e.message };
+    console.error('Configシートの作成と初期化に失敗しました: ' + e.message);
+    throw new Error('Configシートの作成と初期化に失敗しました: ' + e.message);
   }
 }
 
+// =================================================================
+// デプロイ関連関数
+// =================================================================
+
 /**
- * 全体的な診断を実行する
+ * WebアプリのURLを保存する
+ * @param {string} url - WebアプリのURL
  */
-function runDiagnostics() {
-  Logger.log('🔍 アプリケーション診断を開始します...');
-  Logger.log('');
-  
-  var results = {
-    setup: testSetup(),
-    database: checkDatabaseStatus(),
-    userRegistration: testUserRegistration()
-  };
-  
-  Logger.log('');
-  Logger.log('=== 診断結果サマリー ===');
-  Logger.log('セットアップ: ' + (results.setup.status === 'success' ? '✅' : '❌'));
-  Logger.log('データベース: ' + (results.database.status === 'success' ? '✅' : (results.database.status === 'warning' ? '⚠️' : '❌')));
-  Logger.log('ユーザー登録: ' + (results.userRegistration.status === 'success' ? '✅' : '❌'));
-  
-  var allGood = results.setup.status === 'success' && 
-                results.database.status === 'success' && 
-                results.userRegistration.status === 'success';
-  
-  if (allGood) {
-    Logger.log('');
-    Logger.log('🎉 すべての診断項目が正常です！アプリケーションは本番環境で使用できます。');
-  } else {
-    Logger.log('');
-    Logger.log('⚠️ 一部の診断項目で問題が検出されました。詳細を確認してください。');
+function saveWebAppUrl(url) {
+  PropertiesService.getScriptProperties().setProperty('WEB_APP_URL', url);
+  console.log('WebアプリURLを保存しました: ' + url);
+}
+
+/**
+ * 保存されたWebアプリのURLを取得する
+ * @returns {string} WebアプリのURL
+ */
+function getSavedWebAppUrl() {
+  return PropertiesService.getScriptProperties().getProperty('WEB_APP_URL');
+}
+
+/**
+ * デプロイIDを保存する
+ * @param {string} deployId - デプロイID
+ */
+function saveDeployId(deployId) {
+  PropertiesService.getScriptProperties().setProperty('DEPLOY_ID', deployId);
+  console.log('デプロイIDを保存しました: ' + deployId);
+}
+
+/**
+ * 保存されたデプロイIDを取得する
+ * @returns {string} デプロイID
+ */
+function getSavedDeployId() {
+  return PropertiesService.getScriptProperties().getProperty('DEPLOY_ID');
+}
+
+/**
+ * スクリプトIDを保存する
+ * @param {string} scriptId - スクリプトID
+ */
+function saveScriptId(scriptId) {
+  PropertiesService.getScriptProperties().setProperty('SCRIPT_ID', scriptId);
+  console.log('スクリプトIDを保存しました: ' + scriptId);
+}
+
+/**
+ * 保存されたスクリプトIDを取得する
+ * @returns {string} スクリプトID
+ */
+function getSavedScriptId() {
+  return PropertiesService.getScriptProperties().getProperty('SCRIPT_ID');
+}
+
+/**
+ * スクリプトプロパティをクリアする
+ */
+function clearScriptProperties() {
+  PropertiesService.getScriptProperties().deleteAllProperties();
+  console.log('スクリプトプロパティをすべてクリアしました。');
+}
+
+/**
+ * 現在のデプロイ情報を取得
+ */
+function getDeploymentInfo() {
+  try {
+    var scriptId = ScriptApp.getScriptId();
+    var webAppUrl = ScriptApp.getService().getUrl();
+    var deployId = ScriptApp.getCurrentVersion().getDeploymentId(); // This might not work as expected for all deployments
+
+    return {
+      scriptId: scriptId,
+      webAppUrl: webAppUrl,
+      deployId: deployId || 'N/A' // Fallback if not available
+    };
+  } catch (e) {
+    console.error('デプロイ情報取得エラー: ' + e.message);
+    return {
+      scriptId: 'Error',
+      webAppUrl: 'Error',
+      deployId: 'Error',
+      error: e.message
+    };
   }
-  
-  return results;
 }
