@@ -960,7 +960,8 @@
         formUrlInput: document.getElementById('form-url-input'),
         copyFormUrlBtn: document.getElementById('copy-form-url-btn'),
         openFormUrlLink: document.getElementById('open-form-url-link'),
-        openSpreadsheetBtn: document.getElementById('open-spreadsheet-btn')
+        openSpreadsheetBtn: document.getElementById('open-spreadsheet-btn'),
+        activeSheetPanel: document.getElementById('active-sheet-panel')
       };
       loadStatus();
       setupEventListeners();
@@ -1013,55 +1014,75 @@
 
     function setupEventListeners() {
       // Sheet selection
-      elements.sheetSelect.addEventListener('change', function() {
-        selectedSheet = this.value;
-        updateUIForSelectedSheet();
-        loadConfigForSelected();
-      });
+      if (elements.sheetSelect) {
+        elements.sheetSelect.addEventListener('change', function() {
+          selectedSheet = this.value;
+          updateUIForSelectedSheet();
+          loadConfigForSelected();
+        });
+      }
 
       // Actions
-      elements.switchSheetBtn.addEventListener('click', () => {
-        if (!selectedSheet) return;
-        showConfirmationModal(
-          '自動プライバシー機能について',
-          'このボードはセキュリティのため6時間後に自動的に非公開になります。この管理パネルから再公開できます。続行しますか？',
-          switchToSheet
-        );
-      });
-      elements.clearSelectionBtn.addEventListener('click', clearSheetSelection);
-      elements.saveConfigBtn.addEventListener('click', saveConfig);
+      if (elements.switchSheetBtn) {
+        elements.switchSheetBtn.addEventListener('click', () => {
+          if (!selectedSheet) return;
+          showConfirmationModal(
+            '自動プライバシー機能について',
+            'このボードはセキュリティのため6時間後に自動的に非公開になります。この管理パネルから再公開できます。続行しますか？',
+            switchToSheet
+          );
+        });
+      }
+      if (elements.clearSelectionBtn) {
+        elements.clearSelectionBtn.addEventListener('click', clearSheetSelection);
+      }
+      if (elements.saveConfigBtn) {
+        elements.saveConfigBtn.addEventListener('click', saveConfig);
+      }
       
       // Spreadsheet management
-      document.getElementById('add-spreadsheet-btn').addEventListener('click', addSpreadsheet);
+      const addSpreadsheetBtn = document.getElementById('add-spreadsheet-btn');
+      if (addSpreadsheetBtn) {
+        addSpreadsheetBtn.addEventListener('click', addSpreadsheet);
+      }
       
       // Display options
-      elements.detailOptions.addEventListener('change', function(e) {
-        if (e.target.name === 'showNames' || e.target.name === 'showCounts') {
-          const showNames = elements.detailOptions.querySelector('input[name="showNames"]').checked;
-          const showCounts = elements.detailOptions.querySelector('input[name="showCounts"]').checked;
-          updateDisplayOptions(showNames, showCounts);
-        }
-      });
+      if (elements.detailOptions) {
+        elements.detailOptions.addEventListener('change', function(e) {
+          if (e.target.name === 'showNames' || e.target.name === 'showCounts') {
+            const showNames = elements.detailOptions.querySelector('input[name="showNames"]').checked;
+            const showCounts = elements.detailOptions.querySelector('input[name="showCounts"]').checked;
+            updateDisplayOptions(showNames, showCounts);
+          }
+        });
+      }
       
       // Quick Actions
       // elements.createBoardBtn, elements.endBoardBtn, elements.copyFormUrlBtn, elements.openSpreadsheetBtn, elements.openFormBtn は
       // HTMLから削除されたか、別のセクションに移動されたため、関連するイベントリスナーは削除または調整済み
 
       // Auto-update config when headers change
-      elements.mainHeader.addEventListener('change', updateConfigButtons);
+      if (elements.mainHeader) {
+        elements.mainHeader.addEventListener('change', updateConfigButtons);
+      }
       
       // Active sheet panel click event (entire panel clickable)
-      document.getElementById('active-sheet-panel').addEventListener('click', function() {
-        if (currentSpreadsheetUrl) {
-          window.open(currentSpreadsheetUrl, '_blank');
-        } else {
-          showMessage('スプレッドシートのURLが見つかりません', 'yellow');
-        }
-      });
+      if (elements.activeSheetPanel) {
+        elements.activeSheetPanel.addEventListener('click', function() {
+          if (currentSpreadsheetUrl) {
+            window.open(currentSpreadsheetUrl, '_blank');
+          } else {
+            showMessage('スプレッドシートのURLが見つかりません', 'yellow');
+          }
+        });
+      }
       
       
       // Teacher guide modal events
-      document.getElementById('teacherGuideConfirmBtn').addEventListener('click', hideTeacherGuideModal);
+      const teacherGuideConfirmBtn = document.getElementById('teacherGuideConfirmBtn');
+      if (teacherGuideConfirmBtn) {
+        teacherGuideConfirmBtn.addEventListener('click', hideTeacherGuideModal);
+      }
     }
 
     function enableUnderstandButton() {
