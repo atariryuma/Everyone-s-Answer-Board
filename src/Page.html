@@ -827,7 +827,7 @@ class StudyQuestApp {
     ];
     this.gas = {
       getPublishedSheetData: (sheetName, classFilter, sort) => this.runGas('getPublishedSheetData', sheetName, classFilter, sort),
-      getAvailableSheets: () => this.runGas('getAvailableSheets'),
+      getAvailableSheets: () => this.runGas('getSheetsListOptimized'),
       addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', rowIndex, reaction, sheetName),
       toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', rowIndex, sheetName),
       checkAdmin: () => this.runGas('checkAdmin')
@@ -1163,7 +1163,7 @@ class StudyQuestApp {
       // 成功した場合は失敗カウントをリセット
       this.state.pollingFailureCount = 0;
       
-      const newCount = data.rows ? data.rows.length : 0;
+      const newCount = data.data ? data.data.length : 0;
       if (newCount > this.state.lastSeenCount && this.state.lastSeenCount > 0) {
         const newItems = newCount - this.state.lastSeenCount;
         this.showNewContentBanner(newItems);
@@ -1456,8 +1456,8 @@ class StudyQuestApp {
       if (typeof data.showCounts !== 'undefined') {
         this.serverShowCounts = data.showCounts;
       }
-      if (typeof data.showNames !== 'undefined') {
-        this.serverDisplayMode = data.showNames ? 'named' : 'anonymous';
+      if (typeof data.displayMode !== 'undefined') { // Use displayMode from server
+        this.serverDisplayMode = data.displayMode;
       }
       if (!this.state.showAdminFeatures) {
         window.showCounts = this.serverShowCounts;
@@ -1484,27 +1484,27 @@ class StudyQuestApp {
         // Add visual feedback that loading is complete
         this.elements.answersContainer.classList.add('render-optimized');
         requestIdleCallback(() => {
-          this.populateClassFilter(data.rows);
+          this.populateClassFilter(data.data); // Use data.data
           this.elements.sheetNameText.textContent = 'シート: ' + this.escapeHtml(data.sheetName || '不明');
         });
       } else {
         // 状態変更時はカードを再描画してハイライトボタンの表示を更新
         this.renderBoard();
       }
-      if (JSON.stringify(this.state.currentAnswers) !== JSON.stringify(data.rows)) {
-        this.state.currentAnswers = data.rows;
+      if (JSON.stringify(this.state.currentAnswers) !== JSON.stringify(data.data)) { // Use data.data
+        this.state.currentAnswers = data.data; // Use data.data
         this.elements.headingLabel.textContent = this.escapeHtml(data.header || '問題');
         
         // 初期ロード時にlastSeenCountを設定
         if (isInitialLoad) {
-          this.state.lastSeenCount = data.rows.length;
+          this.state.lastSeenCount = data.data.length; // Use data.data
           debugLog('初期ロード完了、lastSeenCount設定:', this.state.lastSeenCount);
         }
         
         // デバッグ用: 受信したデータの確認
         debugLog('Sheet data received:', {
-          totalRows: data.rows.length,
-          sampleRow: data.rows[0] || null,
+          totalRows: data.data.length, // Use data.data
+          sampleRow: data.data[0] || null, // Use data.data
           showAdminFeatures: this.state.showAdminFeatures,
           displayMode: this.state.displayMode,
           lastSeenCount: this.state.lastSeenCount
@@ -1516,7 +1516,7 @@ class StudyQuestApp {
         });
       } else if (isInitialLoad) {
         // データに変更がない場合でも初期ロード時はlastSeenCountを設定
-        this.state.lastSeenCount = data.rows.length;
+        this.state.lastSeenCount = data.data.length; // Use data.data
         debugLog('初期ロード（データ変更なし）、lastSeenCount設定:', this.state.lastSeenCount);
       }
     } catch (error) {
@@ -1531,31 +1531,36 @@ class StudyQuestApp {
   async loadAvailableSheets() {
     try {
       const sheetsData = await this.gas.getAvailableSheets();
+      this.populateSheetSelector(sheetsData);
     } catch (error) {
       console.error('Failed to load available sheets:', error);
-      this.elements.sheetSelector.innerHTML = '<option value="">エラー: シート読み込み失敗</option>';
+      if (this.elements.sheetSelector) {
+        this.elements.sheetSelector.innerHTML = '<option value="">エラー: シート読み込み失敗</option>';
+      }
     }
   }
-  populateSheetSelector(sheetsData) {
+  populateSheetSelector(sheets) {
     const selector = this.elements.sheetSelector;
     
-    if (!sheetsData || !sheetsData.sheets || sheetsData.sheets.length === 0) {
+    if (!selector) return;
+
+    if (!sheets || sheets.length === 0) {
       selector.innerHTML = '<option value="">利用可能なシートがありません</option>';
       selector.disabled = true;
       return;
     }
     
     // シート選択肢を構築
-    if (!sheetsData.sheets || !Array.isArray(sheetsData.sheets)) {
-      console.error('Invalid sheets data:', sheetsData);
+    if (!Array.isArray(sheets)) {
+      console.error('Invalid sheets data:', sheets);
       selector.innerHTML = '<option>シートデータが無効です</option>';
       selector.disabled = true;
       return;
     }
     
-    const options = sheetsData.sheets.map(sheet => {
-      const selected = sheet.isActive ? 'selected' : '';
-      const activeLabel = sheet.isActive ? ' (現在のアクティブシート)' : '';
+    const options = sheets.map(sheet => {
+      const selected = sheet.name === this.state.sheetName ? 'selected' : ''; // Use sheet.name for comparison
+      const activeLabel = sheet.name === this.state.sheetName ? ' (現在のアクティブシート)' : '';
       return `<option value="${this.escapeHtml(sheet.name)}" ${selected}>${this.escapeHtml(sheet.name)}${activeLabel}</option>`;
     }).join('');
     
@@ -1563,7 +1568,7 @@ class StudyQuestApp {
     selector.disabled = false;
     
     // 現在のアクティブシートを記録
-    this.state.currentActiveSheet = sheetsData.activeSheetName;
+    // this.state.currentActiveSheet is already set by loadSheetData
   }
   async switchSheet() {
     const selectedSheet = this.elements.sheetSelector.value;
@@ -1602,7 +1607,8 @@ class StudyQuestApp {
   }
   populateClassFilter(rows) {
     const classFilter = this.elements.classFilter;
-    const uniqueClasses = ['すべて', ...new Set(rows.map(r => r.class).filter(Boolean))];
+    // Ensure rows is an array before mapping
+    const uniqueClasses = ['すべて', ...new Set(Array.isArray(rows) ? rows.map(r => r.class).filter(Boolean) : [])];
     classFilter.innerHTML = uniqueClasses.map(c => '<option value="' + this.escapeHtml(c) + '">' + this.escapeHtml(c) + '</option>').join('');
     classFilter.value = 'すべて';
     classFilter.classList.remove('hidden');
