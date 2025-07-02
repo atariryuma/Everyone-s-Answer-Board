@@ -947,11 +947,9 @@
         clearSelectionBtn: document.getElementById('clear-selection-btn'),
         saveConfigBtn: document.getElementById('save-config-btn'),
         detailOptions: document.getElementById('detail-options'),
-        statusText: document.getElementById('status-text'),
         boardUrl: document.getElementById('board-url'),
         viewBoardLink: document.getElementById('view-board-link'),
         setupProgress: document.getElementById('setup-progress'),
-        boardStatusIndicator: document.getElementById('board-status-indicator'),
         sheetCount: document.getElementById('sheet-count'),
         switchSheetText: document.getElementById('switch-sheet-text'),
         configStatus: document.getElementById('config-status'),
@@ -962,8 +960,6 @@
         formUrlInput: document.getElementById('form-url-input'),
         copyFormUrlBtn: document.getElementById('copy-form-url-btn'),
         openFormUrlLink: document.getElementById('open-form-url-link'),
-        endBoardBtn: document.getElementById('end-board-btn'),
-        openFormBtn: document.getElementById('open-form-btn'),
         openSpreadsheetBtn: document.getElementById('open-spreadsheet-btn')
       };
       loadStatus();
@@ -1048,41 +1044,8 @@
       });
       
       // Quick Actions
-      if (elements.createBoardBtn) {
-        elements.createBoardBtn.addEventListener('click', createBoard);
-      }
-      if (elements.endBoardBtn) {
-        elements.endBoardBtn.addEventListener('click', clearSheetSelection);
-      }
-      if (elements.copyFormUrlBtn) {
-        elements.copyFormUrlBtn.addEventListener('click', () => copyUrl(elements.formUrlInput, 'フォームURLをコピーしました'));
-      }
-      if (elements.openSpreadsheetBtn) {
-        elements.openSpreadsheetBtn.addEventListener('click', () => {
-          google.script.run
-            .withSuccessHandler(url => {
-              if (url) {
-                window.open(url, '_blank');
-              } else {
-                showMessage('スプレッドシートURLが取得できません', 'yellow');
-              }
-            })
-            .withFailureHandler(showError)
-            .openActiveSpreadsheet();
-        });
-      }
-
-      // Open Form Button - 初期設定（updateFormInfo() 関数で上書きされます）
-      const openFormBtn = document.getElementById('open-form-btn');
-      if (openFormBtn) {
-        openFormBtn.onclick = () => {
-          showMessage('フォーム情報を読み込み中です。しばらくお待ちください。', 'info');
-        };
-      } else {
-      }
-
-      // New Action Buttons
-      // viewBoardBtn と configSettingsBtn は削除されたため、関連するイベントリスナーも削除
+      // elements.createBoardBtn, elements.endBoardBtn, elements.copyFormUrlBtn, elements.openSpreadsheetBtn, elements.openFormBtn は
+      // HTMLから削除されたか、別のセクションに移動されたため、関連するイベントリスナーは削除または調整済み
 
       // Auto-update config when headers change
       elements.mainHeader.addEventListener('change', updateConfigButtons);
@@ -1275,11 +1238,7 @@
         if (formUrlInput) formUrlInput.value = '';
         if (openFormUrlLink) openFormUrlLink.href = '#';
         
-        if (elements.openFormBtn) {
-          elements.openFormBtn.onclick = () => {
-            showMessage('Googleフォームが見つかりません。フォームを作成するか、スプレッドシートとフォームを関連付けてください。', 'yellow');
-          };
-        }
+        // elements.openFormBtn はHTMLから削除されたため、関連する処理は不要
         return;
       }
       
@@ -1299,34 +1258,7 @@
         openFormUrlLink.href = formInfo.editUrl || formInfo.formUrl || '#';
       }
       
-      if (elements.openFormBtn) {
-        console.log('editUrlでフォームボタンのクリックハンドラを設定中:', formInfo.editUrl);
-        console.log('フォームボタンの現在の状態:', {
-          disabled: elements.openFormBtn.disabled,
-          style: elements.openFormBtn.style.cssText,
-          tagName: elements.openFormBtn.tagName
-        });
-        
-        elements.openFormBtn.onclick = (e) => { // addEventListener ではなく onclick を使用
-          e.preventDefault();
-          e.stopPropagation();
-          let targetUrl = formInfo.editUrl || formInfo.formUrl;
-          if (targetUrl && targetUrl.includes('/viewform') && !targetUrl.includes('/edit')) {
-            targetUrl = targetUrl.replace('/viewform', '/edit');
-          } else if (formInfo.formId && !targetUrl) {
-            targetUrl = 'https://docs.google.com/forms/d/' + formInfo.formId + '/edit';
-          }
-          if (targetUrl) {
-            window.open(targetUrl, '_blank');
-          } else {
-            showMessage('フォームのURLが取得できませんでした。', 'yellow');
-          }
-        };
-        
-        elements.openFormBtn.disabled = false;
-        elements.openFormBtn.style.pointerEvents = 'auto';
-        elements.openFormBtn.style.opacity = '1';
-      }
+      // elements.openFormBtn はHTMLから削除されたため、関連する処理は不要
     }
 
     function updateStatus(status) {
@@ -1335,31 +1267,7 @@
       
       // Update comprehensive dashboard
       const isActive = !!status.activeSheetName;
-      // const answerCount = status.answerCount || 0; // ダッシュボード削除のため不要
-      // const reactionCount = status.totalReactions || 0; // ダッシュボード削除のため不要
 
-      
-      // Main status updates
-      // const statusTextEl = document.getElementById('status-text'); // ダッシュボード削除のため不要
-      // if (statusTextEl) {
-      //   statusTextEl.textContent = isActive ? '公開中' : '準備中';
-      // }
-      // const statusDescEl = document.getElementById('status-description'); // ダッシュボード削除のため不要
-      // if (statusDescEl) {
-      //   statusDescEl.textContent = isActive ?
-      //     '現在「' + currentActiveSheet + '」が公開中です' :
-      //     '開始するにはスプレッドシートを追加してください';
-        
-      //   // クリック可能状態の管理
-      //   if (isActive && elements.boardUrl && elements.boardUrl.value) {
-      //     statusDescEl.classList.add('cursor-pointer', 'hover:text-gray-100', 'hover:underline');
-      //     statusDescEl.title = 'ボードを開くにはクリック';
-      //   } else {
-      //     statusDescEl.classList.remove('cursor-pointer', 'hover:text-gray-100', 'hover:underline');
-      //     statusDescEl.title = '';
-      //   }
-      // }
-      
       // Update timestamps
       const now = new Date();
       const lastUpdatedEl = document.getElementById('last-updated');
@@ -1385,14 +1293,6 @@
           }
         }
       }
-      // const totalSheetsEl = document.getElementById('total-sheets'); // ダッシュボード削除のため不要
-      // if (totalSheetsEl) totalSheetsEl.textContent = (status.allSheets || []).length;
-      
-      // Statistics
-      // const answerCountEl = document.getElementById('answer-count'); // ダッシュボード削除のため不要
-      // if (answerCountEl) answerCountEl.textContent = answerCount;
-      // const reactionCountEl = document.getElementById('reaction-count'); // ダッシュボード削除のため不要
-      // if (reactionCountEl) reactionCountEl.textContent = reactionCount;
       
       // Update header elements
       const headerUserIdEl = document.getElementById('header-user-id');
@@ -1402,37 +1302,8 @@
       const headerAnswerCountEl = document.getElementById('header-answer-count');
       if (headerAnswerCountEl) headerAnswerCountEl.textContent = status.answerCount || 0;
       
-      // Calculate engagement rate
-      // const engagementRate = answerCount > 0 ? Math.round((reactionCount / answerCount) * 100) : 0; // ダッシュボード削除のため不要
-      // const engagementEl = document.getElementById('engagement-rate'); // ダッシュボード削除のため不要
-      // if (engagementEl) engagementEl.textContent = engagementRate + '%';
       
-      // Form URL for open form button
-      if (status.formUrl && elements.openFormBtn) {
-        elements.openFormBtn.onclick = () => window.open(status.formUrl, '_blank');
-      } else if (elements.openFormBtn) {
-        elements.openFormBtn.onclick = null; // URLがない場合はクリック無効
-      }
 
-      // Last activity
-      // const lastActivityElement = document.getElementById('last-activity'); // ダッシュボード削除のため不要
-      // if (lastActivityElement) {
-      //   if (answerCount > 0 || reactionCount > 0) {
-      //     lastActivityElement.textContent = '本日';
-      //   } else {
-      //     lastActivityElement.textContent = '未取得';
-      //   }
-      // }
-      
-      
-      // Update status indicator
-      // if (elements.boardStatusIndicator) { // ダッシュボード削除のため不要
-      //   elements.boardStatusIndicator.className = 'status-indicator ' + (isActive ? 'status-active' : 'status-inactive');
-      // }
-      
-      // Update activity timeline
-      // updateActivityTimeline(status); // ダッシュボード削除のため不要
-      
       // Update sheet options with count
       // セキュリティ強化: innerHTML使用を避ける
       elements.sheetSelect.replaceChildren();
