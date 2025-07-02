@@ -243,8 +243,13 @@
         <div class="flex items-center gap-3">
           <div class="text-right text-xs">
             <p>
-              <span class="font-medium text-gray-300">ユーザー:</span>
-              <span id="admin-user-email" class="text-white">認証済み</span>
+              <span class="font-medium text-gray-300">ID:</span>
+              <span id="header-user-id" class="text-white font-mono">-</span>
+            </p>
+            <p>
+              <span class="font-medium text-gray-300">回答:</span>
+              <span id="header-answer-count" class="text-white">-</span>
+              <span class="text-gray-400">件</span>
             </p>
           </div>
         </div>
@@ -291,9 +296,9 @@
   <main class="max-w-6xl mx-auto px-6 py-8 pb-32">
     <!-- Dashboard Overview -->
     <section class="mb-8">
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <!-- Board Status Card -->
-        <div class="glass-panel p-6 rounded-xl card-hover fade-in hover:border-cyan-400/50 transition-all duration-300 cursor-pointer" id="board-status-card">
+        <div class="glass-panel p-6 rounded-xl fade-in" id="board-status-card">
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-3">
               <div class="w-12 h-12 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-full flex items-center justify-center">
@@ -330,22 +335,34 @@
           </button>
         </div>
         
-        
-        <!-- Engagement Card -->
-        <div class="glass-panel p-6 rounded-xl card-hover fade-in hover:border-orange-400/50 transition-all duration-300">
-          <div class="w-full h-full flex items-center gap-3 mb-4 text-left">
-            <div class="w-12 h-12 bg-gradient-to-r from-orange-500/20 to-red-500/20 rounded-full flex items-center justify-center">
-              <svg class="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+        <!-- Quick Actions -->
+        <div class="glass-panel p-6 rounded-xl fade-in">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-8 h-8 bg-cyan-500 text-white rounded-full flex items-center justify-center">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
               </svg>
             </div>
-            <div>
-              <p class="text-sm text-gray-400">エンゲージメント</p>
-              <p class="text-2xl font-bold text-orange-400" id="engagement-rate">管理モード</p>
-              <p class="text-xs text-orange-300 mt-1">名前・数値表示</p>
-            </div>
+            <h3 class="text-lg font-semibold text-cyan-400">管理機能</h3>
+          </div>
+          <div class="space-y-3">
+            <button type="button" id="view-board-btn" class="btn btn-primary w-full">
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+              </svg>
+              回答ボードにアクセス
+            </button>
+            <button type="button" id="config-settings-btn" class="btn btn-secondary w-full">
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+              列設定
+            </button>
           </div>
         </div>
+        
       </div>
       
       <!-- Active Sheet Info -->
@@ -404,10 +421,6 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
               </svg>
               <span id="create-board-text">新しいボードを作成して公開</span>
-            </button>
-            <button type="button" id="end-board-btn" class="btn btn-danger w-full">
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.36 6.64a9 9 0 11-12.73 0M12 2v10"></path></svg>
-              公開終了
             </button>
             <div class="bg-cyan-900/20 border border-cyan-500/30 rounded-lg p-4">
               <p class="font-semibold text-cyan-200">おすすめ</p>
@@ -522,86 +535,6 @@
           </div>
         </div>
 
-        <!-- Step 4: Display Options -->
-        <div class="glass-panel p-6 rounded-xl slide-up">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-3">
-              <div class="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold text-sm">4</div>
-              <h3 class="text-lg font-semibold text-orange-400">表示設定</h3>
-            </div>
-          </div>
-          
-          <div class="space-y-4">
-            <!-- Educational note about psychological safety -->
-            <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-              <div class="flex items-start gap-3">
-                <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                </div>
-                <div>
-                  <p class="text-sm font-semibold text-blue-200 mb-2">心理的安全性を重視した設定について</p>
-                  <p class="text-xs text-blue-300 leading-relaxed">
-                    このシステムでは<strong>匿名性</strong>と<strong>数値非表示</strong>をデフォルトとして、生徒が安心して意見を表現できる環境を整えています。<br>
-                    リアクションは色で識別できるため、数を表示しなくても反応の種類を把握できます。
-                  </p>
-                </div>
-              </div>
-            </div>
-
-
-            <!-- Warning about enabling options -->
-            <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
-              <div class="flex items-start gap-3">
-                <div class="w-6 h-6 bg-yellow-500 text-black rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                  </svg>
-                </div>
-                <div>
-                  <p class="text-sm font-semibold text-yellow-200 mb-2">表示機能を有効にする前の注意点</p>
-                  <p class="text-xs text-yellow-300 leading-relaxed">
-                    名前や数値を表示すると、一部の生徒が発言を控えたり、他者の反応を気にして本音を言いにくくなる可能性があります。<br>
-                    <strong>デジタル・シティズンシップ</strong>の観点から、オンライン空間でも互いを尊重し、多様な意見を受け入れる姿勢を育むことが重要です。
-                  </p>
-                </div>
-              </div>
-            </div>
-            
-            <div id="detail-options" class="space-y-3">
-              <label class="flex items-center p-4 glass-panel rounded-lg cursor-pointer hover:border-orange-400/50 transition-all">
-                <input type="checkbox" name="showNames" class="mr-4 w-4 h-4 text-orange-400 rounded" />
-                <div class="flex-1">
-                  <div class="flex items-center gap-2">
-                    <div class="font-medium text-white">名前を表示</div>
-                    <div class="w-5 h-5 bg-yellow-500 text-black rounded-full flex items-center justify-center">
-                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"></path>
-                      </svg>
-                    </div>
-                  </div>
-                  <div class="text-sm text-gray-400">生徒名を表示します（心理的負担が増える可能性があります）</div>
-                </div>
-              </label>
-              <label class="flex items-center p-4 glass-panel rounded-lg cursor-pointer hover:border-orange-400/50 transition-all">
-                <input type="checkbox" name="showCounts" class="mr-4 w-4 h-4 text-orange-400 rounded" />
-                <div class="flex-1">
-                  <div class="flex items-center gap-2">
-                    <div class="font-medium text-white">リアクション数を表示</div>
-                    <div class="w-5 h-5 bg-yellow-500 text-black rounded-full flex items-center justify-center">
-                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"></path>
-                      </svg>
-                    </div>
-                  </div>
-                  <div class="text-sm text-gray-400">各リアクションの数を表示します（数に左右される発言になる可能性があります）</div>
-                </div>
-              </label>
-            </div>
-
-          </div>
-        </div>
 
       </div>
 
@@ -1237,6 +1170,26 @@
       } else {
       }
 
+      // New Action Buttons
+      const viewBoardBtn = document.getElementById('view-board-btn');
+      if (viewBoardBtn) {
+        viewBoardBtn.addEventListener('click', () => {
+          if (currentActiveSheet && elements.boardUrl && elements.boardUrl.value) {
+            window.open(elements.boardUrl.value, '_blank');
+          } else {
+            showMessage('回答ボードが利用できません。まずボードを公開してください。', 'yellow');
+          }
+        });
+      }
+
+      const configSettingsBtn = document.getElementById('config-settings-btn');
+      if (configSettingsBtn) {
+        configSettingsBtn.addEventListener('click', () => {
+          // Scroll to config section
+          document.getElementById('config-section').scrollIntoView({ behavior: 'smooth' });
+        });
+      }
+
       
 
       // Auto-update config when headers change
@@ -1526,6 +1479,14 @@
       if (answerCountEl) answerCountEl.textContent = answerCount;
       const reactionCountEl = document.getElementById('reaction-count');
       if (reactionCountEl) reactionCountEl.textContent = reactionCount;
+      
+      // Update header elements
+      const headerUserIdEl = document.getElementById('header-user-id');
+      if (headerUserIdEl && status.userId) {
+        headerUserIdEl.textContent = status.userId.substring(0, 8) + '...';
+      }
+      const headerAnswerCountEl = document.getElementById('header-answer-count');
+      if (headerAnswerCountEl) headerAnswerCountEl.textContent = answerCount;
       
       // Calculate engagement rate
       const engagementRate = answerCount > 0 ? Math.round((reactionCount / answerCount) * 100) : 0;
