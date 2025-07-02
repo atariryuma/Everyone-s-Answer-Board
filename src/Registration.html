@@ -718,45 +718,7 @@
         .withSuccessHandler(result => {
           showMessage(result.message || '登録が完了しました！', 'success');
 
-          const adminUrl = result.adminUrl || '';
-          const viewUrl = result.viewUrl || '';
-          
-          if (!adminUrl || !viewUrl) {
-            showMessage('エラー: 無効なURLが生成されました。ページを更新してから再度お試しください。', 'error');
-            console.error('URL generation failed:', { adminUrl, viewUrl, result });
-            
-            // ページを自動的にリロードして再試行
-            setTimeout(() => {
-              showMessage('ページを自動的に更新しています...', 'info');
-              window.location.reload();
-            }, 3000);
-            return;
-          }
-          
-          // 結果表示エリアにURLを表示
           const resultArea = document.getElementById('result-area');
-          const adminUrlInput = document.createElement('input');
-          adminUrlInput.type = 'text';
-          adminUrlInput.value = adminUrl;
-          adminUrlInput.readOnly = true;
-          adminUrlInput.id = 'admin-url';
-          adminUrlInput.className = 'flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700';
-          adminUrlInput.onclick = function() { this.select(); };
-          
-          const viewUrlInput = document.createElement('input');
-          viewUrlInput.type = 'text';
-          viewUrlInput.value = viewUrl;
-          viewUrlInput.readOnly = true;
-          viewUrlInput.id = 'view-url';
-          viewUrlInput.className = 'flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700';
-          viewUrlInput.onclick = function() { this.select(); };
-          
-          const adminLink = document.createElement('a');
-          adminLink.href = adminUrl;
-          adminLink.target = '_blank';
-          adminLink.className = 'block w-full text-center px-4 py-3 bg-cyan-600 hover:bg-cyan-700 rounded-lg font-semibold transition-colors';
-          adminLink.textContent = '管理画面を開く →';
-          
           resultArea.innerHTML = `
             <div class="glass-panel rounded-lg p-6 space-y-6">
               <div class="text-center">
@@ -837,138 +799,8 @@
                   </div>
                 </div>
               </div>
-              
-              <div class="space-y-3">
-                <div>
-                  <label class="text-sm text-gray-400 block mb-1">管理画面URL（先生用）:</label>
-                  <div class="flex gap-2" id="admin-url-container">
-                    <button onclick="copyToClipboard('admin-url')"
-                      class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
-                      コピー
-                    </button>
-                  </div>
-                </div>
-                
-                <div>
-                  <label class="text-sm text-gray-400 block mb-1">生徒用URL:</label>
-                  <div class="flex gap-2" id="view-url-container">
-                    <button onclick="copyToClipboard('view-url')"
-                      class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
-                      コピー
-                    </button>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="pt-4 space-y-3" id="admin-link-container">
-                <div class="text-center">
-                  <p class="text-sm text-gray-400 mb-3">管理画面を開いて、最初のスプレッドシートを追加しましょう！</p>
-                </div>
-                <button onclick="location.reload()"
-                  class="block w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors">
-                  別のアカウントで登録
-                </button>
-              </div>
             </div>
           `;
-          
-          // 安全にDOM要素を追加
-          const adminContainer = document.getElementById('admin-url-container');
-          adminContainer.insertBefore(adminUrlInput, adminContainer.firstChild);
-          
-          const viewContainer = document.getElementById('view-url-container');
-          viewContainer.insertBefore(viewUrlInput, viewContainer.firstChild);
-          
-          const linkContainer = document.getElementById('admin-link-container');
-          linkContainer.insertBefore(adminLink, linkContainer.firstChild);
-          
-          // 自動作成の場合はフォーム・スプレッドシートURLも表示
-          if (result.autoCreated) {
-            const additionalContainer = document.createElement('div');
-            additionalContainer.className = 'space-y-3';
-            
-            // Googleフォーム（生徒回答用）
-            if (result.formUrl) {
-              const formContainer = document.createElement('div');
-              formContainer.innerHTML = `
-                <label class="text-sm text-gray-400 block mb-1">生徒回答用Googleフォーム:</label>
-                <div class="flex gap-2">
-                  <input type="text" value="${escapeHtml(result.formUrl)}" readonly
-                    id="created-form-url"
-                    class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
-                    onclick="this.select()">
-                  <button onclick="copyToClipboard('created-form-url')"
-                    class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
-                    コピー
-                  </button>
-                  <a href="${escapeHtml(result.formUrl)}" target="_blank" rel="noopener noreferrer"
-                    class="px-3 py-2 bg-blue-700 hover:bg-blue-600 rounded text-sm transition-colors">
-                    開く
-                  </a>
-                </div>
-              `;
-              additionalContainer.appendChild(formContainer);
-            }
-            
-            // フォーム編集用URL
-            if (result.editFormUrl) {
-              const editFormContainer = document.createElement('div');
-              editFormContainer.innerHTML = `
-                <label class="text-sm text-gray-400 block mb-1">フォーム編集用URL（先生用）:</label>
-                <div class="flex gap-2">
-                  <input type="text" value="${escapeHtml(result.editFormUrl)}" readonly
-                    id="edit-form-url"
-                    class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
-                    onclick="this.select()">
-                  <button onclick="copyToClipboard('edit-form-url')"
-                    class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
-                    コピー
-                  </button>
-                  <a href="${escapeHtml(result.editFormUrl)}" target="_blank" rel="noopener noreferrer"
-                    class="px-3 py-2 bg-green-700 hover:bg-green-600 rounded text-sm transition-colors">
-                    編集
-                  </a>
-                </div>
-              `;
-              additionalContainer.appendChild(editFormContainer);
-            }
-            
-            // スプレッドシート（データ確認用）
-            if (result.spreadsheetUrl) {
-              const spreadsheetContainer = document.createElement('div');
-              spreadsheetContainer.innerHTML = `
-                <label class="text-sm text-gray-400 block mb-1">回答データ（スプレッドシート）:</label>
-                <div class="flex gap-2">
-                  <input type="text" value="${escapeHtml(result.spreadsheetUrl)}" readonly
-                    id="created-spreadsheet-url"
-                    class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700"
-                    onclick="this.select()">
-                  <button onclick="copyToClipboard('created-spreadsheet-url')"
-                    class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">
-                    コピー
-                  </button>
-                  <a href="${escapeHtml(result.spreadsheetUrl)}" target="_blank" rel="noopener noreferrer"
-                    class="px-3 py-2 bg-green-700 hover:bg-green-600 rounded text-sm transition-colors">
-                    確認
-                  </a>
-                </div>
-              `;
-              additionalContainer.appendChild(spreadsheetContainer);
-            }
-            
-            // 管理画面URLの前に挿入
-            const adminContainer = document.getElementById('admin-url-container').parentElement;
-            adminContainer.parentElement.insertBefore(additionalContainer, adminContainer);
-            
-            // ガイダンスメッセージを更新
-            if (result.formUrl) {
-              document.getElementById('setup-guidance').textContent = 
-                'Googleフォームが自動作成されました！生徒にフォームURLを共有して回答を収集し、回答ボードで結果を確認できます。';
-            } else {
-              document.getElementById('setup-guidance').textContent = 
-                'スプレッドシートが自動作成されました。データを手動で入力するか、別途Googleフォームを作成してご利用ください。';
-            }
-          }
           
           resultArea.classList.remove('hidden');
           btn.style.display = 'none';
@@ -982,7 +814,7 @@
           // グローバル変数に登録結果を保存（クイックスタート用）
           window.lastRegistrationResult = result;
           
-          showMessage('登録が完了しました。管理画面を開いて設定を確認してください。', 'info');
+          
         })
         .withFailureHandler(error => {
           showMessage(`エラー: ${error.message || '登録に失敗しました'}`, 'error');
@@ -1001,21 +833,6 @@
       registerBtn.style.display = 'none';
       
       const area = document.getElementById('existing-board-area');
-      const adminInput = document.createElement('input');
-      adminInput.type = 'text';
-      adminInput.value = data.adminUrl;
-      adminInput.readOnly = true;
-      adminInput.id = 'existing-admin-url';
-      adminInput.className = 'flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700';
-      adminInput.onclick = function() { this.select(); };
-
-      const viewInput = document.createElement('input');
-      viewInput.type = 'text';
-      viewInput.value = data.viewUrl;
-      viewInput.readOnly = true;
-      viewInput.id = 'existing-view-url';
-      viewInput.className = 'flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm cursor-pointer hover:bg-gray-700';
-      viewInput.onclick = function() { this.select(); };
 
       const adminLink = document.createElement('a');
       adminLink.href = data.adminUrl;
@@ -1039,27 +856,9 @@
             <h4 class="font-bold text-white mb-2">📋 ご利用中のボード</h4>
             <p class="text-sm text-blue-200">以下のURLからいつでも管理画面にアクセスできます</p>
           </div>
-          <div class="space-y-3">
-            <div>
-              <label class="text-sm text-gray-400 block mb-1">管理画面URL（先生用）:</label>
-              <div class="flex gap-2" id="existing-admin-container">
-                <button onclick="copyToClipboard('existing-admin-url')" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">コピー</button>
-              </div>
-            </div>
-            <div>
-              <label class="text-sm text-gray-400 block mb-1">生徒用URL:</label>
-              <div class="flex gap-2" id="existing-view-container">
-                <button onclick="copyToClipboard('existing-view-url')" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors">コピー</button>
-              </div>
-            </div>
-          </div>
           <div id="existing-admin-link-container"></div>
         </div>`;
 
-      const adminContainer = document.getElementById('existing-admin-container');
-      adminContainer.insertBefore(adminInput, adminContainer.firstChild);
-      const viewContainer = document.getElementById('existing-view-container');
-      viewContainer.insertBefore(viewInput, viewContainer.firstChild);
       const linkContainer = document.getElementById('existing-admin-link-container');
       linkContainer.appendChild(adminLink);
 
@@ -1212,11 +1011,19 @@
           <div class="space-y-2">
             <a href="${result.adminUrl}" target="_blank" 
                class="block w-full px-4 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition-colors">
-              🚀 回答ボードを開く
+              🚀 管理画面を開く
+            </a>
+            <a href="${result.viewUrl}" target="_blank" 
+               class="block w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors">
+              👀 回答ボードを見る
             </a>
             <a href="${result.formUrl}" target="_blank" 
-               class="block w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors">
+               class="block w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-semibold transition-colors">
               📝 Googleフォームを開く
+            </a>
+            <a href="${result.spreadsheetUrl}" target="_blank" 
+               class="block w-full px-4 py-3 bg-yellow-600 hover:bg-yellow-700 rounded-lg font-semibold transition-colors">
+              📊 スプレッドシートを開く
             </a>
           </div>
         </div>
