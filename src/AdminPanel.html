@@ -95,6 +95,21 @@
     }
     
     
+    /* Status indicators */
+    .status-indicator { 
+      width: 8px; 
+      height: 8px; 
+      border-radius: 50%; 
+      display: inline-block; 
+      margin-right: 8px;
+    }
+    .status-active { 
+      background-color: var(--color-success); 
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); 
+    }
+    .status-inactive { background-color: var(--color-warning); }
+    .status-error { background-color: var(--color-error); }
+    
     /* Animations */
     .success-pulse { animation: successPulse 0.6s ease-out; }
     .error-shake { animation: errorShake 0.5s ease-out; }
@@ -289,6 +304,7 @@
               <div>
                 <p class="text-sm text-gray-400">ボード状態</p>
                 <div class="flex items-center gap-2">
+                  <span class="status-indicator status-inactive" id="board-status-indicator"></span>
                   <span class="font-semibold text-white" id="status-text">準備中</span>
                 </div>
               </div>
@@ -695,6 +711,108 @@
       </div>
 
     </div>
+    
+    <!-- Database Information Section -->
+    <div id="database-info-section" class="glass-panel p-6 rounded-xl card-hover hidden">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 1.79 4 4 4h8c2.21 0 4-1.79 4-4V7M4 7c0-2.21 1.79-4 4-4h8c2.21 0 4-1.79 4-4M4 7h16"></path>
+          </svg>
+        </div>
+        <div>
+          <h3 class="font-semibold text-blue-400">📊 データベース情報</h3>
+          <p class="text-xs text-gray-400">システムの詳細情報とステータス</p>
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- User Info -->
+        <div class="bg-gray-800/50 rounded-lg p-4">
+          <h4 class="text-sm font-medium text-gray-300 mb-2">ユーザー情報</h4>
+          <div class="space-y-1 text-xs">
+            <div class="flex justify-between">
+              <span class="text-gray-400">ユーザーID:</span>
+              <span class="text-white font-mono" id="db-user-id">-</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">メールアドレス:</span>
+              <span class="text-white" id="db-admin-email">-</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">作成日時:</span>
+              <span class="text-white" id="db-created-at">-</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">最終アクセス:</span>
+              <span class="text-white" id="db-last-accessed">-</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- System Status -->
+        <div class="bg-gray-800/50 rounded-lg p-4">
+          <h4 class="text-sm font-medium text-gray-300 mb-2">システム状態</h4>
+          <div class="space-y-1 text-xs">
+            <div class="flex justify-between">
+              <span class="text-gray-400">セットアップ:</span>
+              <span class="text-white" id="db-setup-status">-</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">フォーム作成:</span>
+              <span class="text-white" id="db-form-created">-</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">アプリ公開:</span>
+              <span class="text-white" id="db-app-published">-</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">最終更新:</span>
+              <span class="text-white" id="db-last-updated">-</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Statistics -->
+        <div class="bg-gray-800/50 rounded-lg p-4">
+          <h4 class="text-sm font-medium text-gray-300 mb-2">統計情報</h4>
+          <div class="space-y-1 text-xs">
+            <div class="flex justify-between">
+              <span class="text-gray-400">回答数:</span>
+              <span class="text-white" id="db-answer-count">-</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">リアクション数:</span>
+              <span class="text-white" id="db-reaction-count">-</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">利用可能シート:</span>
+              <span class="text-white" id="db-sheet-count">-</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">公開シート:</span>
+              <span class="text-white" id="db-published-sheet">-</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Resources -->
+        <div class="bg-gray-800/50 rounded-lg p-4">
+          <h4 class="text-sm font-medium text-gray-300 mb-2">リソース</h4>
+          <div class="space-y-1 text-xs">
+            <div class="flex justify-between">
+              <span class="text-gray-400">スプレッドシートID:</span>
+              <span class="text-white font-mono text-xs" id="db-spreadsheet-id">-</span>
+            </div>
+            <div class="mt-2">
+              <button type="button" onclick="openDatabaseSpreadsheet()" class="btn btn-secondary w-full text-xs py-1">
+                スプレッドシートを開く
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
   <!-- Student URL Section -->
   <div class="fixed bottom-0 left-0 right-0 glass-panel border-t border-gray-700 hidden" id="student-url-section">
@@ -991,6 +1109,7 @@
       boardUrl: document.getElementById('board-url'),
       viewBoardLink: document.getElementById('view-board-link'),
       setupProgress: document.getElementById('setup-progress'),
+      boardStatusIndicator: document.getElementById('board-status-indicator'),
       sheetCount: document.getElementById('sheet-count'),
       switchSheetText: document.getElementById('switch-sheet-text'),
       configStatus: document.getElementById('config-status'),
@@ -1431,6 +1550,11 @@
       }
       
       
+      // Update status indicator
+      if (elements.boardStatusIndicator) {
+        elements.boardStatusIndicator.className = 'status-indicator ' + (isActive ? 'status-active' : 'status-inactive');
+      }
+      
       // Update activity timeline
       updateActivityTimeline(status);
       
@@ -1525,9 +1649,86 @@
         if (countCb) countCb.checked = !!status.showCounts;
       }
       
+      // Update database information display
+      updateDatabaseInfo(status);
+      
       updateUIForSelectedSheet();
       loadConfigForSelected();
       setLoading(false);
+    }
+    
+    // Database information update function
+    function updateDatabaseInfo(status) {
+      try {
+        const dbSection = document.getElementById('database-info-section');
+        
+        if (status && status.userInfo) {
+          // Show database section
+          dbSection.classList.remove('hidden');
+          
+          // Update user information
+          document.getElementById('db-user-id').textContent = status.userInfo.userId || '-';
+          document.getElementById('db-admin-email').textContent = status.userInfo.adminEmail || '-';
+          document.getElementById('db-created-at').textContent = formatDateTime(status.userInfo.createdAt) || '-';
+          document.getElementById('db-last-accessed').textContent = formatDateTime(status.userInfo.lastAccessedAt) || '-';
+          
+          // Update system status
+          if (status.systemStatus) {
+            document.getElementById('db-setup-status').textContent = status.systemStatus.setupStatus || '-';
+            document.getElementById('db-form-created').textContent = status.systemStatus.formCreated ? '✅ 作成済み' : '❌ 未作成';
+            document.getElementById('db-app-published').textContent = status.systemStatus.appPublished ? '✅ 公開中' : '❌ 非公開';
+            document.getElementById('db-last-updated').textContent = formatDateTime(status.systemStatus.lastUpdated) || '-';
+          }
+          
+          // Update statistics
+          document.getElementById('db-answer-count').textContent = status.answerCount || '0';
+          document.getElementById('db-reaction-count').textContent = status.totalReactions || '0';
+          document.getElementById('db-sheet-count').textContent = (status.availableSheets ? status.availableSheets.length : 0) + ' 枚';
+          document.getElementById('db-published-sheet').textContent = status.publishedSheet || '未設定';
+          
+          // Update spreadsheet ID (truncated for display)
+          const spreadsheetId = status.userInfo.spreadsheetId || '';
+          document.getElementById('db-spreadsheet-id').textContent = spreadsheetId ? 
+            spreadsheetId.substring(0, 20) + '...' : '-';
+        } else {
+          // Hide database section if no data
+          dbSection.classList.add('hidden');
+        }
+      } catch (e) {
+        console.warn('Database info update failed:', e);
+      }
+    }
+    
+    // Helper function to format datetime
+    function formatDateTime(dateString) {
+      if (!dateString) return '';
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleString('ja-JP', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch (e) {
+        return dateString;
+      }
+    }
+    
+    // Function to open database spreadsheet
+    function openDatabaseSpreadsheet() {
+      try {
+        const spreadsheetUrl = currentSpreadsheetUrl;
+        if (spreadsheetUrl) {
+          window.open(spreadsheetUrl, '_blank');
+        } else {
+          showMessage('スプレッドシートのURLが見つかりません', 'yellow');
+        }
+      } catch (e) {
+        console.error('Failed to open spreadsheet:', e);
+        showMessage('スプレッドシートを開けませんでした', 'red');
+      }
     }
     
     function updateActivityTimeline(status) {

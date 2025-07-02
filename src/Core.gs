@@ -19,17 +19,49 @@ function registerNewUser(adminEmail) {
     throw new Error('認証エラー: 操作を実行しているユーザーとメールアドレスが一致しません。');
   }
 
-  // 既存ユーザーチェック（キャッシュ利用）
+  // 既存ユーザーチェック（1ユーザー1行の原則）
   var existingUser = findUserByEmailOptimized(adminEmail);
+  var userId, appUrls;
+  
   if (existingUser) {
-    throw new Error('このメールアドレスは既に登録されています。');
+    // 既存ユーザーの場合は情報を更新
+    userId = existingUser.userId;
+    var existingConfig = JSON.parse(existingUser.configJson || '{}');
+    
+    // 設定をリセット（新規登録状態に戻す）
+    var updatedConfig = {
+      ...existingConfig,
+      setupStatus: 'pending',
+      lastRegistration: new Date().toISOString(),
+      formCreated: false,
+      appPublished: false
+    };
+    
+    // 既存ユーザー情報を更新
+    updateUserOptimized(userId, {
+      lastAccessedAt: new Date().toISOString(),
+      isActive: 'true',
+      configJson: JSON.stringify(updatedConfig)
+    });
+    
+    debugLog('✅ 既存ユーザー情報を更新しました: ' + adminEmail);
+    appUrls = generateAppUrlsOptimized(userId);
+    
+    return {
+      userId: userId,
+      adminUrl: appUrls.adminUrl,
+      viewUrl: appUrls.viewUrl,
+      setupRequired: true,
+      message: '既存ユーザーの情報を更新しました。クイックスタートで新しいフォームを作成してください。',
+      isExistingUser: true
+    };
   }
 
-  // ユーザーIDを生成してデータベースに登録（フォーム作成は後回し）
-  var userId = Utilities.getUuid();
+  // 新規ユーザーの場合
+  userId = Utilities.getUuid();
   
   var initialConfig = {
-    setupStatus: 'pending', // セットアップ待ち状態
+    setupStatus: 'pending',
     createdAt: new Date().toISOString(),
     formCreated: false,
     appPublished: false
@@ -38,8 +70,8 @@ function registerNewUser(adminEmail) {
   var userData = {
     userId: userId,
     adminEmail: adminEmail,
-    spreadsheetId: '', // クイックスタートで設定
-    spreadsheetUrl: '', // クイックスタートで設定
+    spreadsheetId: '',
+    spreadsheetUrl: '',
     createdAt: new Date().toISOString(),
     configJson: JSON.stringify(initialConfig),
     lastAccessedAt: new Date().toISOString(),
@@ -54,14 +86,15 @@ function registerNewUser(adminEmail) {
     throw new Error('ユーザー登録に失敗しました。システム管理者に連絡してください。');
   }
 
-  // 成功レスポンスを返す（フォーム情報はまだなし）
-  var appUrls = generateAppUrlsOptimized(userId);
+  // 成功レスポンスを返す
+  appUrls = generateAppUrlsOptimized(userId);
   return {
     userId: userId,
     adminUrl: appUrls.adminUrl,
     viewUrl: appUrls.viewUrl,
     setupRequired: true,
-    message: 'ユーザー登録が完了しました！次にクイックスタートでフォームを作成してください。'
+    message: 'ユーザー登録が完了しました！次にクイックスタートでフォームを作成してください。',
+    isExistingUser: false
   };
 }
 
@@ -160,6 +193,22 @@ function getAppConfig() {
     var sheets = getSheetsListOptimized(currentUserId);
     var appUrls = generateAppUrlsOptimized(currentUserId);
     
+    // 回答数を取得
+    var answerCount = 0;
+    var totalReactions = 0;
+    try {
+      if (userInfo.spreadsheetId && configJson.publishedSheet) {
+        var responseData = getResponsesData(currentUserId, configJson.publishedSheet);
+        if (responseData.status === 'success') {
+          answerCount = responseData.data.length;
+          // リアクション数の概算計算（詳細実装は後回し）
+          totalReactions = answerCount * 2; // 暫定値
+        }
+      }
+    } catch (countError) {
+      console.warn('回答数の取得に失敗: ' + countError.message);
+    }
+    
     return {
       status: 'success',
       userId: currentUserId,
@@ -175,7 +224,27 @@ function getAppConfig() {
       adminUrl: appUrls.adminUrl,
       viewUrl: appUrls.viewUrl,
       activeSheetName: configJson.publishedSheet || '',
-      appUrls: appUrls
+      appUrls: appUrls,
+      // データベース詳細情報
+      userInfo: {
+        userId: currentUserId,
+        adminEmail: userInfo.adminEmail,
+        spreadsheetId: userInfo.spreadsheetId || '',
+        spreadsheetUrl: userInfo.spreadsheetUrl || '',
+        createdAt: userInfo.createdAt || '',
+        lastAccessedAt: userInfo.lastAccessedAt || '',
+        isActive: userInfo.isActive || 'false'
+      },
+      // 統計情報
+      answerCount: answerCount,
+      totalReactions: totalReactions,
+      // システム状態
+      systemStatus: {
+        setupStatus: configJson.setupStatus || 'unknown',
+        formCreated: configJson.formCreated || false,
+        appPublished: configJson.appPublished || false,
+        lastUpdated: new Date().toISOString()
+      }
     };
   } catch (e) {
     console.error('アプリ設定取得エラー: ' + e.message);
