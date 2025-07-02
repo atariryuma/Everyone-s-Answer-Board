@@ -55,18 +55,21 @@ function getConfig(sheetName) {
     var spreadsheet = getCurrentSpreadsheet();
     var configSheet = spreadsheet.getSheetByName(CONFIG_SHEET_NAME);
     
+    // Code.gsのCOLUMN_HEADERSと統一された設定
     var config = {
-      questionHeader: '問題',
-      answerHeader: '回答',
-      reasonHeader: '理由',
-      nameHeader: '名前',
-      classHeader: 'クラス',
+      questionHeader: COLUMN_HEADERS.TIMESTAMP,  // 問題は通常フォームにないため、タイムスタンプを使用
+      answerHeader: COLUMN_HEADERS.OPINION,
+      reasonHeader: COLUMN_HEADERS.REASON,
+      nameHeader: COLUMN_HEADERS.NAME,
+      classHeader: COLUMN_HEADERS.CLASS,
       rosterSheetName: '名簿',
-      // AdminPanel用の追加設定
-      mainHeader: '回答',  // AdminPanelで期待される名前
-      rHeader: '理由',     // AdminPanelで期待される名前
-      nameHeader: '名前',
-      classHeader: 'クラス'
+      // AdminPanel用の統一設定（Code.gsのCOLUMN_HEADERSと一致）
+      mainHeader: COLUMN_HEADERS.OPINION,   // '回答'
+      rHeader: COLUMN_HEADERS.REASON,       // '理由'
+      // 既存のフィールドは保持（後方互換性のため）
+      opinionHeader: COLUMN_HEADERS.OPINION,
+      timestampHeader: COLUMN_HEADERS.TIMESTAMP,
+      emailHeader: COLUMN_HEADERS.EMAIL
     };
 
     if (configSheet) {
@@ -89,17 +92,19 @@ function getConfig(sheetName) {
     return config;
   } catch (error) {
     console.error('getConfig error:', error.message);
+    // エラー時のデフォルト設定（Code.gsのCOLUMN_HEADERSと統一）
     return {
-      questionHeader: '問題',
-      answerHeader: '回答',
-      reasonHeader: '理由',
-      nameHeader: '名前',
-      classHeader: 'クラス',
+      questionHeader: 'タイムスタンプ',  // COLUMN_HEADERS.TIMESTAMPの値
+      answerHeader: '回答',            // COLUMN_HEADERS.OPINIONの値
+      reasonHeader: '理由',            // COLUMN_HEADERS.REASONの値
+      nameHeader: '名前',             // COLUMN_HEADERS.NAMEの値
+      classHeader: 'クラス',           // COLUMN_HEADERS.CLASSの値
       rosterSheetName: '名簿',
-      mainHeader: '回答',
-      rHeader: '理由',
-      nameHeader: '名前',
-      classHeader: 'クラス'
+      mainHeader: '回答',             // AdminPanel用
+      rHeader: '理由',               // AdminPanel用
+      opinionHeader: '回答',
+      timestampHeader: 'タイムスタンプ',
+      emailHeader: 'メールアドレス'
     };
   }
 }

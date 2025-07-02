@@ -5,6 +5,8 @@
   <base target="_top">
   <title>StudyQuest -みんなの回答ボード- 管理画面</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#1a1b26" />
+  <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
 
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -18,13 +20,20 @@
       --color-error: #ef4444;
       --color-warning: #f59e0b;
       --color-info: #3b82f6;
+      --color-google-blue: #4285f4;
+      --color-google-green: #34a853;
+      --color-google-yellow: #fbbc05;
+      --color-google-red: #ea4335;
     }
     
     body { 
       margin: 0; 
       color: var(--color-text);
       background: var(--color-background);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Google Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
     
     .glass-panel { 
@@ -33,25 +42,66 @@
       backdrop-filter: blur(12px); 
       border: 1px solid var(--color-border); 
       transition: all 0.2s ease;
+      border-radius: 1rem;
     }
     .glass-panel:hover { 
       border-color: rgba(255,255,255,0.2); 
       will-change: border-color; 
     }
     
-    /* Button styles */
+    /* Google Workspace Integration Styles */
+    .google-integration {
+      background: linear-gradient(135deg, var(--color-google-blue), var(--color-google-green));
+      border: 1px solid rgba(66, 133, 244, 0.3);
+    }
+    
+    .google-integration:hover {
+      border-color: rgba(66, 133, 244, 0.5);
+      box-shadow: 0 4px 20px rgba(66, 133, 244, 0.2);
+    }
+    
+    /* Button styles with improved touch targets */
     .btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       padding: 0.75rem 1.5rem;
-      border-radius: 0.5rem;
+      border-radius: 0.75rem;
       font-weight: 600;
       transition: all 0.2s ease;
       cursor: pointer;
       border: none;
       text-decoration: none;
+      min-height: 44px; /* iOS touch target */
+      min-width: 44px;
+      position: relative;
+      overflow: hidden;
     }
+    
+    .btn::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      transition: all 0.3s ease;
+      transform: translate(-50%, -50%);
+      z-index: 0;
+    }
+    
+    .btn:not(:disabled):active::before {
+      width: 100%;
+      height: 100%;
+    }
+    
+    .btn > * {
+      position: relative;
+      z-index: 1;
+    }
+    
     .btn:disabled { 
       opacity: 0.5; 
       cursor: not-allowed; 
@@ -60,6 +110,7 @@
     .btn:not(:disabled):hover { 
       transform: translate3d(0, -2px, 0); 
       will-change: transform; 
+      box-shadow: 0 8px 25px rgba(0,0,0,0.15);
     }
     .btn:not(:disabled):active { 
       transform: translate3d(0, 0, 0); 
@@ -68,30 +119,47 @@
     .btn-primary { 
       background: linear-gradient(135deg, var(--color-primary), #50fa7b);
       color: #000;
+      font-weight: 700;
     }
     .btn-secondary { 
       background: rgba(255,255,255,0.1);
       color: var(--color-text);
+      border: 1px solid rgba(255,255,255,0.2);
     }
     .btn-danger { 
       background: var(--color-error);
       color: white;
     }
     
-    /* Form controls */
+    .btn-google {
+      background: linear-gradient(135deg, var(--color-google-blue), var(--color-google-green));
+      color: white;
+      font-weight: 700;
+    }
+    
+    /* Form controls with improved UX */
     .form-control {
       width: 100%;
-      padding: 0.75rem;
+      padding: 0.875rem 1rem;
       background: rgba(255,255,255,0.05);
       border: 1px solid var(--color-border);
-      border-radius: 0.5rem;
+      border-radius: 0.75rem;
       color: var(--color-text);
       transition: all 0.2s ease;
+      font-size: 16px; /* Prevent zoom on iOS */
+      min-height: 44px; /* Touch target */
     }
     .form-control:focus {
       outline: none;
       border-color: var(--color-primary);
       box-shadow: 0 0 0 3px rgba(139, 233, 253, 0.1);
+      background: rgba(255,255,255,0.08);
+    }
+    .form-control:hover {
+      border-color: rgba(255,255,255,0.3);
+    }
+    .form-control::placeholder {
+      color: rgba(192, 202, 245, 0.5);
     }
     
     
@@ -189,11 +257,85 @@
     }
     
     
+    /* Progressive Disclosure Styles */
+    .progressive-section {
+      transition: all 0.3s ease;
+    }
+    
+    .progressive-section.collapsed {
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+    }
+    
+    .progressive-section.expanded {
+      max-height: 1000px;
+      opacity: 1;
+    }
+    
+    .toggle-section {
+      cursor: pointer;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    
+    .toggle-section:hover {
+      background: rgba(255,255,255,0.05);
+    }
+    
+    /* Loading States */
+    .loading-skeleton {
+      background: linear-gradient(90deg, 
+        rgba(255,255,255,0.1) 25%, 
+        rgba(255,255,255,0.2) 50%, 
+        rgba(255,255,255,0.1) 75%);
+      background-size: 200% 100%;
+      animation: loading-skeleton 1.5s infinite;
+      border-radius: 0.5rem;
+      height: 20px;
+    }
+    
+    @keyframes loading-skeleton {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top: 3px solid var(--color-primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* Error States */
+    .error-state {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      color: #f87171;
+    }
+    
+    .success-state {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      color: #34d399;
+    }
+    
     /* Performance optimizations */
     @media (max-width: 768px) and (max-resolution: 150dpi) {
       .glass-panel {
-        backdrop-filter: none;
         -webkit-backdrop-filter: none;
+        backdrop-filter: none;
         background: rgba(26, 27, 38, 0.95);
       }
     }
@@ -206,20 +348,64 @@
       }
     }
     
-    /* Responsive grid */
+    /* Enhanced Responsive Design */
     .responsive-grid {
       display: grid;
-      gap: 1.5rem;
+      gap: 1rem;
       grid-template-columns: 1fr;
+      padding: 1rem;
     }
+    
+    @media (min-width: 640px) {
+      .responsive-grid {
+        gap: 1.5rem;
+        padding: 1.5rem;
+      }
+    }
+    
     @media (min-width: 768px) {
       .responsive-grid {
         grid-template-columns: 1fr 1fr;
+        gap: 2rem;
       }
     }
+    
     @media (min-width: 1024px) {
       .responsive-grid {
         grid-template-columns: 2fr 1fr;
+        gap: 2rem;
+        padding: 2rem;
+      }
+    }
+    
+    /* Mobile-first touch optimizations */
+    @media (max-width: 768px) {
+      .btn {
+        min-height: 48px; /* Larger touch targets on mobile */
+        padding: 1rem 1.5rem;
+        font-size: 16px;
+      }
+      
+      .form-control {
+        padding: 1rem;
+        font-size: 16px;
+      }
+      
+      .glass-panel {
+        margin: 0.5rem;
+        padding: 1rem;
+      }
+      
+      .responsive-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+      
+      /* Stack navigation elements vertically on mobile */
+      header .flex {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
       }
     }
   </style>
@@ -278,234 +464,438 @@
         </div>
       </div>
     </div>
-  </header>  <main class="max-w-6xl mx-auto px-6 py-8 pb-32">
-    <!-- ステップ表示と説明 -->
-    <section class="mb-8">
-      <div class="glass-panel p-6 rounded-xl">
-        <div class="text-center mb-6">
-          <h2 class="text-2xl font-bold text-white mb-2">回答ボード管理パネル</h2>
-          <p class="text-gray-400">以下の手順に従って回答ボードをセットアップしてください</p>
+  </header>  <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8 pb-32">
+    <!-- ユーザーガイダンスセクション -->
+    <section class="mb-6" id="user-guidance-section">
+      <div class="glass-panel p-4 sm:p-6">
+        <div class="text-center mb-4 sm:mb-6">
+          <div class="flex items-center justify-center mb-4">
+            <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
+            </div>
+          </div>
+          <h1 class="text-xl sm:text-2xl font-bold text-white mb-2">回答ボード管理パネル</h1>
+          <p class="text-gray-400 text-sm sm:text-base">Google Workspaceと連携した直感的な教育ツール</p>
         </div>
         
-        <!-- ステップインジケーター -->
-        <div class="flex items-center justify-center space-x-4 mb-6">
-          <div class="flex items-center">
-            <div class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-sm">1</div>
-            <span class="ml-2 text-sm text-gray-300">スプレッドシート</span>
+        <!-- プログレスインジケーター -->
+        <div class="mb-6">
+          <div class="flex items-center justify-between text-xs sm:text-sm text-gray-400 mb-2">
+            <span>セットアップ進行状況</span>
+            <span id="setup-progress-text">0%</span>
           </div>
-          <div class="w-8 h-px bg-gray-600"></div>
-          <div class="flex items-center">
-            <div class="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm">2</div>
+          <div class="progress-bar">
+            <div id="setup-progress" class="progress-fill" style="width: 0%"></div>
+          </div>
+        </div>
+        
+        <!-- 現在のステータス -->
+        <div id="user-guidance" class="text-center">
+          <p class="text-sm text-gray-300" id="guidance-text">セットアップを開始してください</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ステップナビゲーション -->
+    <section class="mb-6">
+      <div class="glass-panel p-4">
+        <div class="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+          <div class="flex items-center" id="step-1-indicator">
+            <div class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-sm transition-all">1</div>
+            <span class="ml-2 text-sm text-gray-300">データ準備</span>
+          </div>
+          <div class="hidden sm:block w-8 h-px bg-gray-600"></div>
+          <div class="flex items-center" id="step-2-indicator">
+            <div class="w-8 h-8 bg-gray-600 text-white rounded-full flex items-center justify-center font-bold text-sm transition-all">2</div>
             <span class="ml-2 text-sm text-gray-300">シート選択</span>
           </div>
-          <div class="w-8 h-px bg-gray-600"></div>
-          <div class="flex items-center">
-            <div class="w-8 h-8 bg-purple-500 text-white rounded-full flex items-center justify-center font-bold text-sm">3</div>
-            <span class="ml-2 text-sm text-gray-300">列設定</span>
+          <div class="hidden sm:block w-8 h-px bg-gray-600"></div>
+          <div class="flex items-center" id="step-3-indicator">
+            <div class="w-8 h-8 bg-gray-600 text-white rounded-full flex items-center justify-center font-bold text-sm transition-all">3</div>
+            <span class="ml-2 text-sm text-gray-300">設定・公開</span>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- メインコンテンツ -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <!-- 左側：設定パネル -->
-      <div class="space-y-6">
-        <!-- ステップ1: スプレッドシート設定 -->
-        <div class="glass-panel p-6 rounded-xl">
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-sm">1</div>
-            <h3 class="text-lg font-semibold text-blue-400">スプレッドシート設定</h3>
+    <!-- メインコンテンツエリア -->
+    <div class="responsive-grid">
+      <!-- 左側：セットアップフロー -->
+      <div class="space-y-4 sm:space-y-6">
+        
+        <!-- ステップ1: データ準備 -->
+        <div class="glass-panel p-4 sm:p-6" id="data-setup-section">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-lg">
+                1
+              </div>
+              <div>
+                <h2 class="text-lg font-semibold text-white">データ準備</h2>
+                <p class="text-xs text-gray-400">スプレッドシートまたはフォームを準備</p>
+              </div>
+            </div>
+            <button type="button" class="toggle-section" onclick="toggleSection('step1-content')" aria-expanded="true" aria-label="セクションを展開/折りたたみ">
+              <svg class="w-5 h-5 text-gray-400 transition-transform" id="step1-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
           </div>
           
-          <div class="space-y-4">
-            <!-- 既存スプレッドシート追加 -->
-            <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-              <h4 class="text-sm font-medium text-blue-200 mb-2">既存のスプレッドシートを使用</h4>
-              <div class="space-y-3">
-                <input type="url" id="spreadsheet-url-input" 
-                       placeholder="https://docs.google.com/spreadsheets/d/..."
-                       class="form-control">
-                <button type="button" id="add-spreadsheet-btn" class="btn btn-primary w-full">
-                  <span id="add-spreadsheet-text">スプレッドシートを追加</span>
+          <div id="step1-content" class="progressive-section expanded">
+            <!-- 初心者向け：簡単作成 -->
+            <div class="mb-6">
+              <div class="google-integration p-4 rounded-xl text-white">
+                <div class="flex items-center gap-3 mb-3">
+                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                  <h3 class="font-semibold">推奨：自動セットアップ</h3>
+                </div>
+                <p class="text-sm mb-4 opacity-90">GoogleフォームとスプレッドシートをWorkspace上で自動作成します</p>
+                <button type="button" id="create-board-btn" class="btn btn-google w-full">
+                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                  </svg>
+                  <span id="create-board-text">新しいボードを作成</span>
                 </button>
               </div>
             </div>
             
-            <!-- 新規作成 -->
-            <div class="bg-cyan-900/20 border border-cyan-500/30 rounded-lg p-4">
-              <h4 class="text-sm font-medium text-cyan-200 mb-2">新しいボードを作成（推奨）</h4>
-              <p class="text-xs text-cyan-300 mb-3">Googleフォームとスプレッドシートを自動作成</p>
-              <button type="button" id="create-board-btn" class="btn btn-primary w-full">
-                <span id="create-board-text">新しいボードを作成</span>
-              </button>
-            </div>
+            <!-- 上級者向け：既存スプレッドシート -->
+            <details class="bg-gray-800/30 border border-gray-600/30 rounded-xl">
+              <summary class="p-4 cursor-pointer text-sm font-medium text-gray-300 hover:text-white flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                上級者向け：既存のスプレッドシートを使用
+              </summary>
+              <div class="p-4 pt-0 space-y-4">
+                <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+                  <label class="block text-sm font-medium text-blue-200 mb-2">
+                    スプレッドシートURL
+                  </label>
+                  <div class="space-y-3">
+                    <input type="url" 
+                           id="spreadsheet-url-input" 
+                           placeholder="https://docs.google.com/spreadsheets/d/..."
+                           class="form-control"
+                           aria-describedby="url-help">
+                    <p id="url-help" class="text-xs text-blue-300">
+                      既存のGoogleスプレッドシートのURLを貼り付けてください
+                    </p>
+                    <button type="button" id="add-spreadsheet-btn" class="btn btn-primary w-full">
+                      <span id="add-spreadsheet-text">スプレッドシートを追加</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </details>
             
-            <!-- 作成されたフォームURL -->
-            <div class="space-y-2 hidden" id="form-url-section">
-              <label class="text-sm text-gray-300">作成されたフォームURL:</label>
-              <div class="flex gap-2">
-                <input type="url" id="form-url-input" class="form-control flex-1" readonly placeholder="フォームURLが生成されます" title="作成されたフォームURL">
-                <button type="button" id="copy-form-url-btn" class="btn btn-secondary" title="URLをコピー">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+            <!-- 作成されたリソース表示 -->
+            <div class="space-y-3 hidden" id="form-url-section">
+              <div class="success-state">
+                <div class="flex items-center gap-2 mb-2">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                   </svg>
-                </button>
-                <a id="open-form-url-link" href="#" target="_blank" class="btn btn-secondary" title="フォームを開く">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                  </svg>
-                </a>
+                  <span class="font-medium">フォームが作成されました</span>
+                </div>
+                <div class="flex gap-2">
+                  <input type="url" id="form-url-input" class="form-control flex-1 text-sm" readonly placeholder="フォームURLが生成されます">
+                  <button type="button" id="copy-form-url-btn" class="btn btn-secondary" title="URLをコピー">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                  </button>
+                  <a id="open-form-url-link" href="#" target="_blank" class="btn btn-secondary" title="フォームを開く">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                  </a>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         <!-- ステップ2: シート選択 -->
-        <div class="glass-panel p-6 rounded-xl">
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm">2</div>
-            <h3 class="text-lg font-semibold text-green-400">シート選択</h3>
+        <div class="glass-panel p-4 sm:p-6" id="sheet-selection-section">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-lg">
+                2
+              </div>
+              <div>
+                <h2 class="text-lg font-semibold text-white">シート選択</h2>
+                <p class="text-xs text-gray-400">表示したいシートを選択</p>
+              </div>
+            </div>
+            <button type="button" class="toggle-section" onclick="toggleSection('step2-content')" aria-expanded="false" aria-label="セクションを展開/折りたたみ">
+              <svg class="w-5 h-5 text-gray-400 transition-transform" id="step2-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+            </button>
           </div>
           
-          <div class="space-y-4">
-            <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-3">
-              <p class="text-sm text-green-200">アクティブにするシートを選択してください</p>
+          <div id="step2-content" class="progressive-section collapsed">
+            <div class="space-y-4">
+              <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
+                <div class="flex items-center gap-2 mb-2">
+                  <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
+                  <span class="text-sm font-medium text-green-200">利用可能なシート</span>
+                </div>
+                <p class="text-xs text-green-300">公開するシートを選択してください</p>
+              </div>
+              
+              <div class="space-y-3">
+                <label for="sheet-select" class="block text-sm font-medium text-white">
+                  アクティブシート
+                </label>
+                <select id="sheet-select" class="form-control" aria-describedby="sheet-help">
+                  <option>読み込み中...</option>
+                </select>
+                <p id="sheet-help" class="text-xs text-gray-400">
+                  選択したシートの内容が回答ボードに表示されます
+                </p>
+                
+                <button type="button" id="switch-sheet-btn" disabled class="btn btn-primary w-full">
+                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                  </svg>
+                  <span id="switch-sheet-text">このシートをアクティブにする</span>
+                </button>
+              </div>
             </div>
-            <select id="sheet-select" class="form-control" title="アクティブシートを選択">
-              <option>読み込み中...</option>
-            </select>
-            <button type="button" id="switch-sheet-btn" disabled class="btn btn-primary w-full">
-              <span id="switch-sheet-text">このシートをアクティブにする</span>
-            </button>
           </div>
         </div>
 
-        <!-- ステップ3: 列設定 -->
-        <div class="glass-panel p-6 rounded-xl" id="config-section">
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-8 h-8 bg-purple-500 text-white rounded-full flex items-center justify-center font-bold text-sm">3</div>
-            <h3 class="text-lg font-semibold text-purple-400">列設定</h3>
-          </div>
-          
-          <div id="config-area" class="space-y-4 hidden">
-            <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-3">
-              <p class="text-sm text-purple-200">スプレッドシートの列を設定してください</p>
+        <!-- ステップ3: 設定・公開 -->
+        <div class="glass-panel p-4 sm:p-6" id="config-section">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-lg">
+                3
+              </div>
+              <div>
+                <h2 class="text-lg font-semibold text-white">設定・公開</h2>
+                <p class="text-xs text-gray-400">列設定を行い公開</p>
+              </div>
             </div>
-            
-            <!-- 必須設定 -->
-            <div class="space-y-4">
-              <label class="block">
-                <span class="text-sm font-medium text-white mb-2 block">回答データ列（必須）</span>
-                <select id="mainHeader" class="form-control"></select>
-              </label>
-              
-              <!-- オプション設定 -->
-              <details class="bg-gray-800/30 rounded-lg">
-                <summary class="p-3 cursor-pointer text-sm font-medium text-gray-300 hover:text-white">
-                  オプション設定（クリックして展開）
-                </summary>
-                <div class="p-3 pt-0 space-y-4">
-                  <label class="block">
-                    <span class="text-sm text-gray-300 mb-2 block">理由・詳細列</span>
-                    <select id="rHeader" class="form-control"></select>
-                  </label>
-                  <label class="block">
-                    <span class="text-sm text-gray-300 mb-2 block">名前列</span>
-                    <select id="nameHeader" class="form-control"></select>
-                  </label>
-                  <label class="block">
-                    <span class="text-sm text-gray-300 mb-2 block">クラス列</span>
-                    <select id="classHeader" class="form-control"></select>
-                  </label>
-                </div>
-              </details>
-            </div>
-            
-            <button type="button" id="save-config-btn" disabled class="btn btn-primary w-full">
-              <span id="save-config-text">設定を保存</span>
+            <button type="button" class="toggle-section" onclick="toggleSection('step3-content')" aria-expanded="false" aria-label="セクションを展開/折りたたみ">
+              <svg class="w-5 h-5 text-gray-400 transition-transform" id="step3-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+              </svg>
             </button>
           </div>
           
-          <div id="config-placeholder" class="text-center py-8">
-            <div class="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-3">
-              <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
-              </svg>
+          <div id="step3-content" class="progressive-section collapsed">
+            <div id="config-area" class="space-y-4 hidden">
+              <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
+                <div class="flex items-center gap-2 mb-2">
+                  <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  </svg>
+                  <span class="text-sm font-medium text-purple-200">列マッピング設定</span>
+                </div>
+                <p class="text-xs text-purple-300">スプレッドシートの列を回答ボードの項目に割り当てます</p>
+              </div>
+              
+              <!-- 必須設定 -->
+              <div class="space-y-4">
+                <div class="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
+                  <label class="block">
+                    <div class="flex items-center gap-2 mb-2">
+                      <span class="text-sm font-medium text-white">回答データ列</span>
+                      <span class="px-2 py-1 bg-red-500 text-white text-xs rounded-full">必須</span>
+                    </div>
+                    <select id="mainHeader" class="form-control" aria-describedby="main-help"></select>
+                    <p id="main-help" class="text-xs text-red-300 mt-1">
+                      回答内容が含まれる列を選択してください
+                    </p>
+                  </label>
+                </div>
+                
+                <!-- オプション設定 -->
+                <details class="bg-gray-800/30 border border-gray-600/30 rounded-xl">
+                  <summary class="p-4 cursor-pointer text-sm font-medium text-gray-300 hover:text-white flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+                    </svg>
+                    オプション設定（任意）
+                  </summary>
+                  <div class="p-4 pt-0 space-y-4">
+                    <label class="block">
+                      <span class="text-sm text-gray-300 mb-2 block">理由・詳細列</span>
+                      <select id="rHeader" class="form-control"></select>
+                    </label>
+                    <label class="block">
+                      <span class="text-sm text-gray-300 mb-2 block">名前列</span>
+                      <select id="nameHeader" class="form-control"></select>
+                    </label>
+                    <label class="block">
+                      <span class="text-sm text-gray-300 mb-2 block">クラス列</span>
+                      <select id="classHeader" class="form-control"></select>
+                    </label>
+                  </div>
+                </details>
+              </div>
+              
+              <button type="button" id="save-config-btn" disabled class="btn btn-primary w-full">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                </svg>
+                <span id="save-config-text">設定を保存して公開</span>
+              </button>
             </div>
-            <p class="text-gray-400 text-sm">シートを選択すると列設定が表示されます</p>
+            
+            <div id="config-placeholder" class="text-center py-8">
+              <div class="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-3">
+                <div class="loading-skeleton w-full h-full rounded-full hidden" id="config-loading"></div>
+                <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+                </svg>
+              </div>
+              <p class="text-gray-400 text-sm">シートを選択すると列設定が表示されます</p>
+            </div>
           </div>
         </div>
       </div>
       
-      <!-- 右側：情報パネル -->
-      <div class="space-y-6">
-        <!-- データベース情報 -->
-        <div id="database-info-section" class="glass-panel p-6 rounded-xl hidden">
+      <!-- 右側：情報・ヘルプパネル -->
+      <div class="space-y-4 sm:space-y-6">
+        
+        <!-- クイックアクション -->
+        <div class="glass-panel p-4 sm:p-6">
           <div class="flex items-center gap-3 mb-4">
-            <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+            <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
               <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 1.79 4 4 4h8c2.21 0 4-1.79 4-4V7M4 7c0-2.21 1.79-4 4-4h8c2.21 0 4-1.79 4-4M4 7h16"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
               </svg>
             </div>
-            <h3 class="font-semibold text-blue-400">システム情報</h3>
+            <h3 class="text-lg font-semibold text-white">クイックアクション</h3>
+          </div>
+          
+          <div class="space-y-3">
+            <button type="button" id="quick-create-board-btn" class="btn btn-google w-full text-sm" title="新しい回答ボードを作成">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+              </svg>
+              新規ボード作成
+            </button>
+            
+            <button type="button" onclick="openDatabaseSpreadsheet()" class="btn btn-secondary w-full text-sm" title="現在のスプレッドシートを開く">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              スプレッドシートを開く
+            </button>
+          </div>
+        </div>
+        
+        <!-- システム情報 -->
+        <div id="database-info-section" class="glass-panel p-4 sm:p-6 hidden">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+              </svg>
+            </div>
+            <h3 class="font-semibold text-blue-400">システム状況</h3>
           </div>
           
           <div class="space-y-4">
-            <div class="bg-gray-800/50 rounded-lg p-4">
-              <h4 class="text-sm font-medium text-gray-300 mb-3">基本情報</h4>
+            <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+              <h4 class="text-sm font-medium text-blue-200 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                </svg>
+                ユーザー情報
+              </h4>
               <div class="space-y-2 text-xs">
-                <div class="flex justify-between">
-                  <span class="text-gray-400">ユーザーID:</span>
-                  <span class="text-white font-mono" id="db-user-id">-</span>
+                <div class="flex justify-between items-center">
+                  <span class="text-blue-300">ユーザーID:</span>
+                  <span class="text-white font-mono bg-blue-800/50 px-2 py-1 rounded" id="db-user-id">-</span>
                 </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-400">回答数:</span>
-                  <span class="text-white" id="db-answer-count">-</span>
+                <div class="flex justify-between items-center">
+                  <span class="text-blue-300">回答数:</span>
+                  <span class="text-white font-semibold" id="db-answer-count">-</span>
                 </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-400">最終更新:</span>
+                <div class="flex justify-between items-center">
+                  <span class="text-blue-300">最終更新:</span>
                   <span class="text-white" id="db-last-updated">-</span>
                 </div>
               </div>
             </div>
-            
-            <div class="bg-gray-800/50 rounded-lg p-4">
-              <h4 class="text-sm font-medium text-gray-300 mb-3">リソース</h4>
-              <button type="button" onclick="openDatabaseSpreadsheet()" class="btn btn-secondary w-full text-sm" title="データベーススプレッドシートを開く">
-                スプレッドシートを開く
-              </button>
-            </div>
           </div>
         </div>
         
-        <!-- ヘルプ情報 -->
-        <div class="glass-panel p-6 rounded-xl">
+        <!-- 使い方ガイド -->
+        <div class="glass-panel p-4 sm:p-6">
           <div class="flex items-center gap-3 mb-4">
-            <div class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center">
+            <div class="w-8 h-8 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center">
               <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
               </svg>
             </div>
-            <h3 class="font-semibold text-yellow-400">使い方ガイド</h3>
+            <h3 class="font-semibold text-amber-400">使い方ガイド</h3>
           </div>
           
-          <div class="space-y-3 text-sm text-gray-300">
-            <div class="bg-yellow-900/20 border border-yellow-500/20 rounded-lg p-3">
-              <h4 class="font-medium text-yellow-200 mb-2">初回セットアップ</h4>
-              <ol class="list-decimal list-inside space-y-1 text-xs">
-                <li>新しいボードを作成（推奨）</li>
-                <li>作成されたシートを選択</li>
-                <li>列設定を行い保存</li>
+          <div class="space-y-4">
+            <!-- 基本フロー -->
+            <div class="bg-amber-900/20 border border-amber-500/30 rounded-lg p-4">
+              <h4 class="font-medium text-amber-200 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+                基本の流れ
+              </h4>
+              <ol class="list-decimal list-inside space-y-2 text-xs text-amber-100">
+                <li>データ準備：フォーム作成またはスプレッドシート追加</li>
+                <li>シート選択：表示したいシートを選択</li>
+                <li>設定・公開：列設定を行い回答ボードを公開</li>
               </ol>
             </div>
             
-            <div class="bg-gray-800/50 rounded-lg p-3">
-              <h4 class="font-medium text-gray-200 mb-2">注意事項</h4>
+            <!-- Google連携の利点 -->
+            <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
+              <h4 class="font-medium text-green-200 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                </svg>
+                Google連携の利点
+              </h4>
+              <ul class="list-disc list-inside space-y-1 text-xs text-green-100">
+                <li>自動でフォームとシートを作成</li>
+                <li>リアルタイムでデータを同期</li>
+                <li>組織内で安全に共有</li>
+                <li>モバイルデバイスからもアクセス可能</li>
+              </ul>
+            </div>
+            
+            <!-- 注意事項 -->
+            <div class="bg-gray-800/50 rounded-lg p-4">
+              <h4 class="font-medium text-gray-200 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>
+                注意事項
+              </h4>
               <ul class="list-disc list-inside space-y-1 text-xs text-gray-400">
-                <li>作成されたファイルは組織内で共有されます</li>
-                <li>回答データ列は必須項目です</li>
+                <li>回答データ列の設定は必須です</li>
                 <li>設定変更後は必ず保存してください</li>
+                <li>ボードは6時間後に自動非公開になります</li>
+                <li>管理パネルから再公開できます</li>
               </ul>
             </div>
           </div>
@@ -548,8 +938,8 @@
       <h3 id="modal-title" class="text-xl font-bold text-cyan-400 mb-4"></h3>
       <p id="modal-message" class="text-gray-300 mb-6"></p>
       <div class="flex justify-end gap-4">
-        <button id="modal-cancel-btn" class="btn btn-secondary">キャンセル</button>
-        <button id="modal-confirm-btn" class="btn btn-primary">はい、実行します</button>
+        <button type="button" id="modal-cancel-btn" class="btn btn-secondary">キャンセル</button>
+        <button type="button" id="modal-confirm-btn" class="btn btn-primary">はい、実行します</button>
       </div>
     </div>
   </div></body>
@@ -775,6 +1165,16 @@
         addSpreadsheetBtn.addEventListener('click', addSpreadsheet);
       }
       
+      // Create board events
+      if (elements.createBoardBtn) {
+        elements.createBoardBtn.addEventListener('click', createBoard);
+      }
+      
+      const quickCreateBtn = document.getElementById('quick-create-board-btn');
+      if (quickCreateBtn) {
+        quickCreateBtn.addEventListener('click', createBoard);
+      }
+      
       // Display options
       if (elements.detailOptions) {
         elements.detailOptions.addEventListener('change', function(e) {
@@ -866,34 +1266,90 @@
       updateSetupProgress();
     }
 
+    // Progressive Disclosure Functions
+    function toggleSection(sectionId) {
+      const section = document.getElementById(sectionId);
+      const icon = document.getElementById(sectionId.replace('content', 'icon'));
+      
+      if (!section) return;
+      
+      const isExpanded = section.classList.contains('expanded');
+      
+      if (isExpanded) {
+        section.classList.remove('expanded');
+        section.classList.add('collapsed');
+        if (icon) icon.style.transform = 'rotate(0deg)';
+      } else {
+        section.classList.remove('collapsed');
+        section.classList.add('expanded');
+        if (icon) icon.style.transform = 'rotate(90deg)';
+      }
+    }
+    
+    function updateStepIndicators(currentStep) {
+      const steps = [
+        { id: 'step-1-indicator', step: 1 },
+        { id: 'step-2-indicator', step: 2 },
+        { id: 'step-3-indicator', step: 3 }
+      ];
+      
+      steps.forEach(({ id, step }) => {
+        const indicator = document.getElementById(id);
+        if (!indicator) return;
+        
+        const circle = indicator.querySelector('div');
+        if (!circle) return;
+        
+        circle.classList.remove('bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-gray-600');
+        
+        if (step < currentStep) {
+          circle.classList.add('bg-green-500'); // Completed
+        } else if (step === currentStep) {
+          circle.classList.add('bg-blue-500'); // Current
+        } else {
+          circle.classList.add('bg-gray-600'); // Pending
+        }
+      });
+    }
+
     function updateSetupProgress() {
       let progress = 0;
       let statusText = 'セットアップを開始してください';
+      let currentStep = 1;
       
       const hasSpreadsheet = elements.sheetSelect.options.length > 1;
       const hasSelectedSheet = !!selectedSheet;
       const hasActiveSheet = !!currentActiveSheet;
-      const hasConfig = elements.mainHeader.value;
+      const hasConfig = elements.mainHeader && elements.mainHeader.value;
       
       if (hasSpreadsheet) {
         progress = 25;
         statusText = 'スプレッドシートが追加されました';
+        currentStep = 2;
       }
       if (hasSelectedSheet) {
         progress = 50;
         statusText = '表示するボードが選択されました';
+        currentStep = 2;
       }
       if (hasConfig) {
         progress = 75;
         statusText = '列設定が完了しました';
+        currentStep = 3;
       }
       if (hasActiveSheet) {
         progress = 100;
         statusText = 'ボードが公開されています';
+        currentStep = 4;
       }
       
       if (elements.setupProgress) {
         elements.setupProgress.style.width = progress + '%';
+      }
+      
+      const progressText = document.getElementById('setup-progress-text');
+      if (progressText) {
+        progressText.textContent = Math.round(progress) + '%';
       }
 
       const guidanceEl = document.getElementById('user-guidance');
@@ -901,6 +1357,25 @@
       if (guidanceEl && guidanceTextEl) {
         guidanceTextEl.textContent = statusText;
         guidanceEl.classList.remove('hidden');
+      }
+      
+      updateStepIndicators(currentStep);
+      
+      // Auto-expand relevant sections based on progress
+      if (hasSpreadsheet && !hasSelectedSheet) {
+        // Auto-expand step 2 if spreadsheet is ready but no sheet selected
+        const step2Content = document.getElementById('step2-content');
+        if (step2Content && step2Content.classList.contains('collapsed')) {
+          toggleSection('step2-content');
+        }
+      }
+      
+      if (hasSelectedSheet && !hasConfig) {
+        // Auto-expand step 3 if sheet is selected but no config
+        const step3Content = document.getElementById('step3-content');
+        if (step3Content && step3Content.classList.contains('collapsed')) {
+          toggleSection('step3-content');
+        }
       }
     }
 
@@ -1681,6 +2156,44 @@
         overlay.style.display = 'none';
       }
     }
+    
+    // Enhanced error handling with user-friendly messages
+    function showError(error) {
+      console.error('エラーが発生しました:', error);
+      let errorMessage = 'エラーが発生しました';
+      
+      if (error && typeof error === 'object') {
+        if (error.message && typeof error.message === 'string') {
+          errorMessage = error.message;
+        }
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      showMessage('エラー: ' + errorMessage, 'error');
+      setLoading(false);
+    }
+    
+    // Initialize progressive disclosure on page load
+    window.addEventListener('DOMContentLoaded', function() {
+      // Set initial states for progressive sections
+      const step1Content = document.getElementById('step1-content');
+      const step2Content = document.getElementById('step2-content');
+      const step3Content = document.getElementById('step3-content');
+      
+      if (step1Content) step1Content.classList.add('expanded');
+      if (step2Content) step2Content.classList.add('collapsed');
+      if (step3Content) step3Content.classList.add('collapsed');
+      
+      // Initialize step icons
+      const step1Icon = document.getElementById('step1-icon');
+      const step2Icon = document.getElementById('step2-icon');
+      const step3Icon = document.getElementById('step3-icon');
+      
+      if (step1Icon) step1Icon.style.transform = 'rotate(90deg)';
+      if (step2Icon) step2Icon.style.transform = 'rotate(0deg)';
+      if (step3Icon) step3Icon.style.transform = 'rotate(0deg)';
+    });
     
   </script>
 </body>

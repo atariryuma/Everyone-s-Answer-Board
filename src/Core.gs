@@ -186,9 +186,9 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
       return {
         rowIndex: row.rowNumber || (index + 2), // 実際の行番号
         name: (sheetData.displayMode === 'named' && row.displayName) ? row.displayName : '',
-        class: row.originalData[getHeaderIndex(sheetData.headers, 'クラス')] || '',
-        opinion: row.originalData[getHeaderIndex(sheetData.headers, '回答')] || '',
-        reason: row.originalData[getHeaderIndex(sheetData.headers, '理由')] || '',
+        class: row.originalData[getHeaderIndex(sheetData.headers, COLUMN_HEADERS.CLASS)] || '',
+        opinion: row.originalData[getHeaderIndex(sheetData.headers, COLUMN_HEADERS.OPINION)] || '',
+        reason: row.originalData[getHeaderIndex(sheetData.headers, COLUMN_HEADERS.REASON)] || '',
         reactions: {
           UNDERSTAND: { count: row.understandCount || 0, reacted: false },
           LIKE: { count: row.likeCount || 0, reacted: false },
@@ -198,9 +198,18 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
       };
     });
     
+    // ヘッダー情報を取得（問題列があれば使用、なければデフォルト）
+    var questionHeaderIndex = getHeaderIndex(sheetData.headers, COLUMN_HEADERS.TIMESTAMP); // 問題列は通常ないので、タイムスタンプ列を確認
+    var headerTitle = '回答ボード'; // デフォルト
+    
+    // より適切なヘッダータイトルを設定
+    if (sheetData.headers && sheetData.headers.length > 0) {
+      // フォームの質問タイトルなどがあれば使用する場合の処理を将来的に追加可能
+      headerTitle = '回答ボード';
+    }
+    
     return {
-      header: getHeaderIndex(sheetData.headers, '問題') !== -1 ? 
-        sheetData.headers[getHeaderIndex(sheetData.headers, '問題')] : '回答ボード',
+      header: headerTitle,
       sheetName: targetSheet,
       showCounts: configJson.showCounts !== false,
       displayMode: sheetData.displayMode || 'anonymous',
@@ -1159,10 +1168,31 @@ function parseReactionStringOptimized(val) {
 
 /**
  * ヘルパー関数：ヘッダー配列から指定した名前のインデックスを取得
+ * COLUMN_HEADERSと統一された方式を使用
  */
 function getHeaderIndex(headers, headerName) {
   if (!headers || !headerName) return -1;
   return headers.indexOf(headerName);
+}
+
+/**
+ * COLUMN_HEADERSキーから適切なヘッダー名を取得
+ * @param {string} columnKey - COLUMN_HEADERSのキー（例：'OPINION', 'CLASS'）
+ * @returns {string} ヘッダー名
+ */
+function getColumnHeaderName(columnKey) {
+  return COLUMN_HEADERS[columnKey] || '';
+}
+
+/**
+ * 統一されたヘッダーインデックス取得関数
+ * @param {array} headers - ヘッダー配列
+ * @param {string} columnKey - COLUMN_HEADERSのキー
+ * @returns {number} インデックス（見つからない場合は-1）
+ */
+function getColumnIndex(headers, columnKey) {
+  var headerName = getColumnHeaderName(columnKey);
+  return getHeaderIndex(headers, headerName);
 }
 
 /**
