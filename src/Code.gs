@@ -110,50 +110,7 @@ function debugLog() {
 // サービスアカウント認証 & Sheets API ラッパー
 // =================================================================
 
-/**
- * サービスアカウントの認証トークンを取得する。
- * @returns {string} アクセストークン
- */
-function getServiceAccountToken() {
-  var props = PropertiesService.getScriptProperties();
-  var serviceAccountCreds = JSON.parse(props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
-
-  var privateKey = serviceAccountCreds.private_key;
-  var clientEmail = serviceAccountCreds.client_email;
-  var tokenUrl = "https://www.googleapis.com/oauth2/v4/token";
-
-  var jwtHeader = {
-    alg: "RS256",
-    typ: "JWT"
-  };
-
-  var now = Math.floor(Date.now() / 1000);
-  var jwtClaimSet = {
-    iss: clientEmail,
-    scope: "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive",
-    aud: tokenUrl,
-    exp: now + 3600,
-    iat: now
-  };
-
-  var encodedHeader = Utilities.base64EncodeWebSafe(JSON.stringify(jwtHeader));
-  var encodedClaimSet = Utilities.base64EncodeWebSafe(JSON.stringify(jwtClaimSet));
-  var signatureInput = encodedHeader + '.' + encodedClaimSet;
-  var signature = Utilities.computeRsaSha256Signature(signatureInput, privateKey);
-  var encodedSignature = Utilities.base64EncodeWebSafe(signature);
-  var jwt = signatureInput + '.' + encodedSignature;
-
-  var response = UrlFetchApp.fetch(tokenUrl, {
-    method: "post",
-    contentType: "application/x-www-form-urlencoded",
-    payload: {
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion: jwt
-    }
-  });
-
-  return JSON.parse(response.getContentText()).access_token;
-}
+// Deleted: Use getServiceAccountTokenCached() in AuthManager.gs instead
 
 /**
  * Google Sheets API v4 のための認証済みサービスオブジェクトを返す。
@@ -240,47 +197,7 @@ function getSheetsService() {
 // メインロジック
 // =================================================================
 
-function doGetObsolete(e) {
-  var userId = e.parameter.userId;
-  var mode = e.parameter.mode;
-  var setup = e.parameter.setup;
-  
-  // セットアップページの表示
-  if (setup === 'true') {
-    return HtmlService.createTemplateFromFile('SetupPage').evaluate().setTitle('StudyQuest - サービスアカウント セットアップ');
-  }
-  
-  if (!userId) {
-    return HtmlService.createTemplateFromFile('Registration').evaluate().setTitle('新規登録');
-  }
-
-  var userInfo = findUserById(userId);
-  if (!userInfo) {
-    return HtmlService.createHtmlOutput('無効なユーザーIDです。');
-  }
-  
-  // ユーザーの最終アクセス日時を更新
-  try {
-    updateUserInDb(userId, { lastAccessedAt: new Date().toISOString() });
-  } catch (e) {
-    console.error('最終アクセス日時の更新に失敗: ' + e.message);
-  }
-
-  // ユーザー情報をプロパティに保存（リアクション機能で使用）
-  PropertiesService.getUserProperties().setProperty('CURRENT_USER_ID', userId);
-
-  if (mode === 'admin') {
-    var template = HtmlService.createTemplateFromFile('AdminPanel');
-    template.userInfo = userInfo;
-    template.userId = userId;
-    return template.evaluate().setTitle('管理パネル - みんなの回答ボード');
-  } else {
-    var template = HtmlService.createTemplateFromFile('Page');
-    template.userInfo = userInfo;
-    template.userId = userId;
-    return template.evaluate().setTitle('みんなの回答ボード');
-  }
-}
+// Deleted: Use doGet() in UltraOptimizedCore.gs instead
 
 /**
  * 新規ユーザーを登録する。
@@ -435,9 +352,7 @@ function addReaction(rowIndex, reactionKey, sheetName) {
 // ヘルパー関数
 // =================================================================
 
-function getWebAppUrlEnhanced() {
-  return getWebAppUrl();
-}
+// Deleted: Use getWebAppUrlCached() in UrlManager.gs instead
 
 // =================================================================
 // 共通ファクトリ関数 - 重複削減とコード効率化
@@ -510,9 +425,7 @@ function createFormFactory(options) {
  * フォーム質問項目追加（後方互換性のため）
  * @deprecated addUnifiedQuestionsを使用してください
  */
-function addFormQuestions(form, questionType) {
-  addUnifiedQuestions(form, questionType);
-}
+// Deleted: Use addUnifiedQuestions() directly instead
 
 /**
  * 統一された質問設定関数
@@ -641,17 +554,13 @@ function getQuestionConfig(questionType, customConfig) {
  * デフォルト質問設定（後方互換性のため）
  * @deprecated addUnifiedQuestionsを使用してください
  */
-function addDefaultQuestions(form) {
-  addUnifiedQuestions(form, 'default');
-}
+// Deleted: Use addUnifiedQuestions() directly instead
 
 /**
  * シンプル質問設定（後方互換性のため）
  * @deprecated addUnifiedQuestionsを使用してください
  */
-function addSimpleQuestions(form) {
-  addUnifiedQuestions(form, 'simple');
-}
+// Deleted: Use addUnifiedQuestions() directly instead
 
 /**
  * 新しいスプレッドシート作成と連携
@@ -1358,9 +1267,7 @@ function getAppConfig() {
  * 管理者設定を取得（後方互換性のため）
  * @deprecated getAppConfigを使用してください
  */
-function getAdminSettings() {
-  return getAppConfig();
-}
+// Deleted: Use getAppConfig() directly instead
 
 /**
  * 管理画面用のステータス情報を取得（後方互換性のため）
@@ -1760,17 +1667,7 @@ function getDeployUserDomainInfo() {
 // =================================================================
 
 
-/**
- * エラーハンドリング付きのSpreadsheetApp操作
- */
-function safeSpreadsheetOperation(operation, fallbackValue) {
-  try {
-    return operation();
-  } catch (e) {
-    console.error('スプレッドシート操作エラー: ' + e.message);
-    return fallbackValue || null;
-  }
-}
+// Deleted: Function was unused
 
 
 /**
