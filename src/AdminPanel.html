@@ -827,8 +827,48 @@
                   <span class="text-white font-mono bg-blue-800/50 px-2 py-1 rounded" id="db-user-id">-</span>
                 </div>
                 <div class="flex justify-between items-center">
+                  <span class="text-blue-300">メールアドレス:</span>
+                  <span class="text-white" id="db-admin-email">-</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-blue-300">作成日時:</span>
+                  <span class="text-white" id="db-created-at">-</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-blue-300">最終アクセス:</span>
+                  <span class="text-white" id="db-last-accessed">-</span>
+                </div>
+                <div class="flex justify-between items-center">
                   <span class="text-blue-300">回答数:</span>
                   <span class="text-white font-semibold" id="db-answer-count">-</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-blue-300">リアクション数:</span>
+                  <span class="text-white" id="db-reaction-count">-</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-blue-300">利用可能シート:</span>
+                  <span class="text-white" id="db-sheet-count">-</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-blue-300">公開シート:</span>
+                  <span class="text-white" id="db-published-sheet">-</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-blue-300">スプレッドシートID:</span>
+                  <span class="text-white font-mono text-xs" id="db-spreadsheet-id">-</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-blue-300">セットアップ:</span>
+                  <span class="text-white" id="db-setup-status">-</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-blue-300">フォーム作成:</span>
+                  <span class="text-white" id="db-form-created">-</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-blue-300">アプリ公開:</span>
+                  <span class="text-white" id="db-app-published">-</span>
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-blue-300">最終更新:</span>
@@ -1084,7 +1124,9 @@
         copyFormUrlBtn: document.getElementById('copy-form-url-btn'),
         openFormUrlLink: document.getElementById('open-form-url-link'),
         openSpreadsheetBtn: document.getElementById('open-spreadsheet-btn'),
-        activeSheetPanel: document.getElementById('active-sheet-panel')
+        activeSheetPanel: document.getElementById('active-sheet-panel'),
+        addSpreadsheetBtn: document.getElementById('add-spreadsheet-btn'),
+        guidanceText: document.getElementById('guidance-text')
       };
       loadStatus();
       setupEventListeners();
@@ -1220,6 +1262,26 @@
 
     function setLoading(isLoading, message = '') {
       console.log(`setLoading called with: ${isLoading}, message: ${message}`);
+      
+      // 安全にボタンの disabled 状態を更新
+      const buttons = [
+        elements.switchSheetBtn,
+        elements.clearSelectionBtn,
+        elements.saveConfigBtn,
+        elements.addSpreadsheetBtn,
+        elements.createBoardBtn
+      ];
+      
+      buttons.forEach(btn => {
+        if (btn) {
+          btn.disabled = isLoading;
+        }
+      });
+      
+      // ローディングメッセージの表示
+      if (message && elements.guidanceText) {
+        elements.guidanceText.textContent = message;
+      }
     }
 
 
@@ -1562,30 +1624,43 @@
     function updateDatabaseInfo(status) {
       try {
         const dbSection = document.getElementById('database-info-section');
+        if (!dbSection) {
+          console.warn('Database info section not found');
+          return;
+        }
         
         if (status && status.userInfo) {
           dbSection.classList.remove('hidden');
           
-          document.getElementById('db-user-id').textContent = status.userInfo.userId || '-';
-          document.getElementById('db-admin-email').textContent = status.userInfo.adminEmail || '-';
-          document.getElementById('db-created-at').textContent = formatDateTime(status.userInfo.createdAt) || '-';
-          document.getElementById('db-last-accessed').textContent = formatDateTime(status.userInfo.lastAccessedAt) || '-';
+          // 安全にDOM要素を更新する関数
+          const safeSetText = (id, value) => {
+            const element = document.getElementById(id);
+            if (element) {
+              element.textContent = value || '-';
+            } else {
+              console.warn(`Element with id '${id}' not found`);
+            }
+          };
+          
+          safeSetText('db-user-id', status.userInfo.userId);
+          safeSetText('db-admin-email', status.userInfo.adminEmail);
+          safeSetText('db-created-at', formatDateTime(status.userInfo.createdAt));
+          safeSetText('db-last-accessed', formatDateTime(status.userInfo.lastAccessedAt));
           
           if (status.systemStatus) {
-            document.getElementById('db-setup-status').textContent = status.systemStatus.setupStatus || '-';
-            document.getElementById('db-form-created').textContent = status.systemStatus.formCreated ? '✅ 作成済み' : '❌ 未作成';
-            document.getElementById('db-app-published').textContent = status.systemStatus.appPublished ? '✅ 公開中' : '❌ 非公開';
-            document.getElementById('db-last-updated').textContent = formatDateTime(status.systemStatus.lastUpdated) || '-';
+            safeSetText('db-setup-status', status.systemStatus.setupStatus);
+            safeSetText('db-form-created', status.systemStatus.formCreated ? '✅ 作成済み' : '❌ 未作成');
+            safeSetText('db-app-published', status.systemStatus.appPublished ? '✅ 公開中' : '❌ 非公開');
+            safeSetText('db-last-updated', formatDateTime(status.systemStatus.lastUpdated));
           }
           
-          document.getElementById('db-answer-count').textContent = status.answerCount || '0';
-          document.getElementById('db-reaction-count').textContent = status.totalReactions || '0';
-          document.getElementById('db-sheet-count').textContent = (status.availableSheets ? status.availableSheets.length : 0) + ' 枚';
-          document.getElementById('db-published-sheet').textContent = status.publishedSheet || '未設定';
+          safeSetText('db-answer-count', status.answerCount || '0');
+          safeSetText('db-reaction-count', status.totalReactions || '0');
+          safeSetText('db-sheet-count', (status.availableSheets ? status.availableSheets.length : 0) + ' 枚');
+          safeSetText('db-published-sheet', status.publishedSheet || '未設定');
           
           const spreadsheetId = status.userInfo.spreadsheetId || '';
-          document.getElementById('db-spreadsheet-id').textContent = spreadsheetId ? 
-            spreadsheetId.substring(0, 20) + '...' : '-';
+          safeSetText('db-spreadsheet-id', spreadsheetId ? spreadsheetId.substring(0, 20) + '...' : '-');
         } else {
           dbSection.classList.add('hidden');
         }
