@@ -1278,9 +1278,46 @@
         }
       });
       
+      // 全体的なボタンの無効化（安全版）
+      if (isLoading) {
+        const dashboardCards = document.querySelectorAll('.glass-panel button, .glass-panel .cursor-pointer');
+        dashboardCards.forEach(card => {
+          if (card && card.id !== 'open-form-btn') {
+            if (card.tagName === 'BUTTON') {
+              card.disabled = true;
+            } else {
+              card.style.pointerEvents = 'none';
+              card.style.opacity = '0.6';
+            }
+          }
+        });
+        
+        if (message) {
+          showLoadingOverlay(message);
+        }
+      } else {
+        const dashboardCards = document.querySelectorAll('.glass-panel button, .glass-panel .cursor-pointer');
+        dashboardCards.forEach(card => {
+          if (card && card.id !== 'open-form-btn') {
+            if (card.tagName === 'BUTTON') {
+              card.disabled = false;
+            } else {
+              card.style.pointerEvents = 'auto';
+              card.style.opacity = '1';
+            }
+          }
+        });
+        
+        hideLoadingOverlay();
+      }
+      
       // ローディングメッセージの表示
       if (message && elements.guidanceText) {
         elements.guidanceText.textContent = message;
+      }
+      
+      if (isLoading && message) {
+        showMessage(message, 'blue');
       }
     }
 
@@ -2147,48 +2184,7 @@
       copyUrl(elements.boardUrl, 'ボードURLをコピーしました');
     }
 
-    function setLoading(isLoading, msg = "") {
-      elements.switchSheetBtn.disabled = isLoading;
-      elements.clearSelectionBtn.disabled = isLoading;
-      
-      if (isLoading) {
-        const dashboardCards = document.querySelectorAll('.glass-panel button, .glass-panel .cursor-pointer');
-        dashboardCards.forEach(card => {
-          if (card.id === 'open-form-btn') {
-            return;
-          }
-          
-          if (card.tagName === 'BUTTON') {
-            card.disabled = true;
-          } else {
-            card.style.pointerEvents = 'none';
-            card.style.opacity = '0.6';
-          }
-        });
-        
-        showLoadingOverlay(msg);
-      } else {
-        const dashboardCards = document.querySelectorAll('.glass-panel button, .glass-panel .cursor-pointer');
-        dashboardCards.forEach(card => {
-          if (card.id === 'open-form-btn') {
-            return;
-          }
-          
-          if (card.tagName === 'BUTTON') {
-            card.disabled = false;
-          } else {
-            card.style.pointerEvents = 'auto';
-            card.style.opacity = '1';
-          }
-        });
-        
-        hideLoadingOverlay();
-      }
-      
-      if (isLoading && msg) {
-        showMessage(msg, 'blue');
-      }
-    }
+    // 重複したsetLoading関数は削除されました - 安全なバージョンのみ使用
     
     function showLoadingOverlay(message = "読み込み中...") {
       hideLoadingOverlay();
