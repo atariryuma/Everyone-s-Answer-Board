@@ -7,51 +7,7 @@
 // メインロジック
 // =================================================================
 
-/**
- * 旧バージョンのdoGet関数（後方互換性のため保持）
- * 注意: UltraOptimizedCore.gsのdoGet関数が優先されます
- */
-function doGetLegacy(e) {
-  var userId = e.parameter.userId;
-  var mode = e.parameter.mode;
-  var setup = e.parameter.setup;
-  
-  // セットアップページの表示
-  if (setup === 'true') {
-    return HtmlService.createTemplateFromFile('SetupPage').evaluate().setTitle('StudyQuest - サービスアカウント セットアップ');
-  }
-  
-  if (!userId) {
-    return HtmlService.createTemplateFromFile('Registration').evaluate().setTitle('新規登録');
-  }
-
-  var userInfo = findUserByIdOptimized(userId);
-  if (!userInfo) {
-    return HtmlService.createHtmlOutput('無効なユーザーIDです。');
-  }
-  
-  // ユーザーの最終アクセス日時を更新（非同期）
-  try {
-    updateUserOptimized(userId, { lastAccessedAt: new Date().toISOString() });
-  } catch (e) {
-    console.error('最終アクセス日時の更新に失敗: ' + e.message);
-  }
-
-  // ユーザー情報をプロパティに保存（リアクション機能で使用）
-  PropertiesService.getUserProperties().setProperty('CURRENT_USER_ID', userId);
-
-  if (mode === 'admin') {
-    var template = HtmlService.createTemplateFromFile('AdminPanel');
-    template.userInfo = userInfo;
-    template.userId = userId;
-    return template.evaluate().setTitle('管理パネル - みんなの回答ボード');
-  } else {
-    var template = HtmlService.createTemplateFromFile('Page');
-    template.userInfo = userInfo;
-    template.userId = userId;
-    return template.evaluate().setTitle('みんなの回答ボード');
-  }
-}
+// doGetLegacy function removed - consolidated into main doGet in UltraOptimizedCore.gs
 
 /**
  * 新規ユーザーを登録する（最適化版）
