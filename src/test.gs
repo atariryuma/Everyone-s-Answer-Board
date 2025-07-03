@@ -19,7 +19,34 @@ class UltraTestSuite {
     this.results = [];
     this.profiler = new PerformanceProfiler();
     this.healthMonitor = StabilityEnhancer.createHealthMonitor();
+    this.originalFunctions = {}; // 元の関数を保存するオブジェクト
     this.setupMockProperties();
+  }
+
+  /**
+   * モックを設定
+   */
+  setupMocks() {
+    // getServiceAccountTokenCachedをモック化
+    this.originalFunctions.getServiceAccountTokenCached = getServiceAccountTokenCached;
+    getServiceAccountTokenCached = () => {
+      console.log('MOCK: getServiceAccountTokenCached called');
+      return 'mock_token';
+    };
+
+    // getSheetsServiceをモック化（必要に応じて追加）
+    // this.originalFunctions.getSheetsService = getSheetsService;
+    // getSheetsService = () => { ... };
+  }
+
+  /**
+   * モックを解除し、元の関数に復元
+   */
+  restoreMocks() {
+    if (this.originalFunctions.getServiceAccountTokenCached) {
+      getServiceAccountTokenCached = this.originalFunctions.getServiceAccountTokenCached;
+    }
+    // 他のモックもここで復元
   }
 
   /**
@@ -47,6 +74,8 @@ class UltraTestSuite {
     const startTime = Date.now();
     
     try {
+      this.setupMocks(); // モックを設定
+
       // Phase 0: アーキテクチャ存在確認テスト
       await this._runArchitectureExistenceTests();
 
@@ -91,6 +120,8 @@ class UltraTestSuite {
     } catch (error) {
       console.error('❌ テストスイート全体の実行エラー:', error.message);
       throw error;
+    } finally {
+      this.restoreMocks(); // モックを解除
     }
   }
 
