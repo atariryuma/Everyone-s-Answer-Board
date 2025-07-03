@@ -1102,7 +1102,7 @@
     
     // 別のアカウントでの登録機能
     function switchToAnotherAccount() {
-      showMessage('別のアカウントに切り替え中...', 'info');
+      showMessage('Googleアカウント選択画面に移動します...', 'info');
       
       // ローディングオーバーレイを表示
       const overlay = document.createElement('div');
@@ -1111,50 +1111,28 @@
         <div class="glass-panel p-8 rounded-xl text-center max-w-md">
           <div class="spinner mx-auto mb-4"></div>
           <h3 class="text-lg font-bold text-white mb-2">アカウント切り替え中</h3>
-          <p class="text-sm text-gray-400 mb-4">キャッシュをクリアして新しいアカウントでの登録を準備中...</p>
+          <p class="text-sm text-gray-400 mb-4">Googleアカウント選択画面に移動中...</p>
           <div class="text-xs text-gray-500">
-            数秒後に自動的にページが再読み込みされます
+            数秒後にGoogleのアカウント選択画面に移動します
           </div>
         </div>
       `;
       document.body.appendChild(overlay);
       
-      try {
-        // GAS側のキャッシュクリア API を呼び出し
-        google.script.run
-          .withSuccessHandler(() => {
-            // サーバーサイドキャッシュクリア完了後、クライアントサイドもクリア
-            clearClientSideCache();
-            
-            // 新規アカウント扱いフラグを設定
-            sessionStorage.setItem('treat_as_new_account', 'true');
-            
-            // 短い遅延後にページをリロードして認証状態をリセット
-            setTimeout(() => {
-              window.location.reload(true); // 強制リロード
-            }, 1500);
-          })
-          .withFailureHandler((error) => {
-            console.warn('サーバーサイドキャッシュクリアに失敗:', error);
-            // サーバーサイドクリアが失敗してもクライアントサイドクリアは実行
-            clearClientSideCache();
-            sessionStorage.setItem('treat_as_new_account', 'true');
-            setTimeout(() => {
-              window.location.reload(true);
-            }, 1500);
-          })
-          .clearAllCache(); // CacheManager.gsのclearAllCache関数を呼び出し
+      // クライアントサイドキャッシュをクリア
+      clearClientSideCache();
+      
+      // アカウント切り替えフラグを設定
+      sessionStorage.setItem('account_switch_requested', 'true');
+      
+      // Googleアカウント選択画面にリダイレクト
+      setTimeout(() => {
+        const returnUrl = encodeURIComponent(window.location.href + '?new_account=true');
+        const accountChooserUrl = `https://accounts.google.com/AccountChooser?continue=${returnUrl}`;
         
-      } catch (error) {
-        console.error('アカウント切り替えエラー:', error);
-        // フォールバック: 直接クライアントサイドクリアとリロード
-        clearClientSideCache();
-        sessionStorage.setItem('treat_as_new_account', 'true');
-        setTimeout(() => {
-          document.body.removeChild(overlay);
-          window.location.reload(true);
-        }, 1000);
-      }
+        // Google アカウント選択画面に移動
+        window.location.href = accountChooserUrl;
+      }, 1500);
     }
     
     // クライアントサイドキャッシュクリア関数
