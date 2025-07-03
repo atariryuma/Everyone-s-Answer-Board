@@ -693,6 +693,26 @@
                     <p class="text-sm text-white font-semibold" id="current-active-sheet-name">-</p>
                   </div>
                   
+                  
+                  <!-- 関連URL -->
+                  <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-3">
+                    <div class="flex items-center gap-2 mb-2">
+                      <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                      </svg>
+                      <span class="text-sm font-medium text-purple-200">関連リンク</span>
+                    </div>
+                    <div class="space-y-1 text-xs">
+                      <div>
+                        <span class="text-purple-300">スプレッドシート:</span>
+                        <a href="#" id="spreadsheet-link" class="text-purple-100 hover:text-white underline ml-1" target="_blank">開く</a>
+                      </div>
+                      <div>
+                        <span class="text-purple-300">フォーム:</span>
+                        <a href="#" id="form-link" class="text-purple-100 hover:text-white underline ml-1" target="_blank">開く</a>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1178,7 +1198,10 @@
         guidanceText: document.getElementById('guidance-text'),
         // 新しいシート詳細要素
         sheetDetails: document.getElementById('sheet-details'),
-        currentActiveSheetName: document.getElementById('current-active-sheet-name')
+        currentActiveSheetName: document.getElementById('current-active-sheet-name'),
+        sheetColumns: document.getElementById('sheet-columns'),
+        spreadsheetLink: document.getElementById('spreadsheet-link'),
+        formLink: document.getElementById('form-link')
       };
       loadStatus();
       setupEventListeners();
@@ -2105,12 +2128,8 @@
       
       google.script.run
         .withSuccessHandler((headers) => {
-          console.log('loadConfigForSelected: Received headers from backend:', headers);
-          console.log('loadConfigForSelected: Headers type:', typeof headers, 'Array?', Array.isArray(headers));
-          
           populateHeaderOptions(headers);
           const guesses = guessHeaders(headers);
-          console.log('loadConfigForSelected: Guessed headers:', guesses);
           populateConfig(guesses);
           
           // シート詳細情報を更新
@@ -2149,6 +2168,20 @@
         elements.currentActiveSheetName.textContent = currentActiveSheet || '未設定';
       }
       
+      
+      // スプレッドシートリンクを更新
+      if (elements.spreadsheetLink && currentSpreadsheetUrl) {
+        elements.spreadsheetLink.href = currentSpreadsheetUrl;
+        elements.spreadsheetLink.classList.remove('hidden');
+      }
+      
+      // フォームリンクを更新（currentStatusから取得）
+      if (elements.formLink && currentStatus && currentStatus.formUrl) {
+        elements.formLink.href = currentStatus.formUrl;
+        elements.formLink.classList.remove('hidden');
+      } else if (elements.formLink) {
+        elements.formLink.classList.add('hidden');
+      }
     }
     
     // シート詳細情報を非表示にする関数
@@ -2159,44 +2192,19 @@
     }
 
     function populateHeaderOptions(headers) {
-      console.log('populateHeaderOptions called with headers:', headers);
-      
-      // 入力値の検証
-      if (!headers || !Array.isArray(headers)) {
-        console.error('populateHeaderOptions: Invalid headers data', headers);
-        return;
-      }
-      
       const selects = [elements.mainHeader, elements.rHeader, elements.nameHeader, elements.classHeader];
-      const selectNames = ['mainHeader', 'rHeader', 'nameHeader', 'classHeader'];
-      
-      selects.forEach((sel, index) => {
-        if (!sel) {
-          console.error(`populateHeaderOptions: ${selectNames[index]} element not found`);
-          return;
-        }
-        
-        console.log(`Populating ${selectNames[index]} with ${headers.length} headers`);
-        
+      selects.forEach(sel => {
         sel.replaceChildren();
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
         defaultOption.textContent = '-- 選択してください --';
         sel.appendChild(defaultOption);
-        
-        headers.forEach((h, headerIndex) => {
-          if (h !== null && h !== undefined && String(h).trim() !== '') {
-            const opt = document.createElement('option');
-            opt.value = h;
-            opt.textContent = h;
-            sel.appendChild(opt);
-            console.log(`Added option "${h}" to ${selectNames[index]}`);
-          } else {
-            console.warn(`Skipped invalid header at index ${headerIndex}:`, h);
-          }
+        headers.forEach(h => {
+          const opt = document.createElement('option');
+          opt.value = h;
+          opt.textContent = h;
+          sel.appendChild(opt);
         });
-        
-        console.log(`${selectNames[index]} now has ${sel.options.length} options (including default)`);
       });
     }
 

@@ -49,9 +49,9 @@ var LOG_SHEET_CONFIG = {
 var COLUMN_HEADERS = {
   TIMESTAMP: 'タイムスタンプ',
   EMAIL: 'メールアドレス',
-  CLASS: 'クラス名',  // 'クラス' → 'クラス名' に変更
-  OPINION: 'あなたの回答・意見',  // '回答' → 'あなたの回答・意見' に変更
-  REASON: '理由・根拠',  // '理由' → '理由・根拠' に変更
+  CLASS: 'クラス',
+  OPINION: '回答',
+  REASON: '理由',
   NAME: '名前',
   UNDERSTAND: 'なるほど！',
   LIKE: 'いいね！',
