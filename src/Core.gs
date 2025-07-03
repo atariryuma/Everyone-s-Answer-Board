@@ -254,6 +254,29 @@ function getAppConfig() {
     }
     
     var configJson = JSON.parse(userInfo.configJson || '{}');
+
+    // --- Auto-healing for inconsistent setup states ---
+    var needsUpdate = false;
+    if (configJson.formUrl && !configJson.formCreated) {
+      configJson.formCreated = true;
+      needsUpdate = true;
+    }
+    if (configJson.formCreated && configJson.setupStatus !== 'completed') {
+      configJson.setupStatus = 'completed';
+      needsUpdate = true;
+    }
+    if (configJson.publishedSheet && !configJson.appPublished) {
+      configJson.appPublished = true;
+      needsUpdate = true;
+    }
+    if (needsUpdate) {
+      try {
+        updateUserOptimized(currentUserId, { configJson: JSON.stringify(configJson) });
+      } catch (updateErr) {
+        console.warn('Config auto-heal failed: ' + updateErr.message);
+      }
+    }
+
     var sheets = getSheetsListOptimized(currentUserId);
     var appUrls = generateAppUrlsOptimized(currentUserId);
     
