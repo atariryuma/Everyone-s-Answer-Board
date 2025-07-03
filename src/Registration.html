@@ -449,9 +449,9 @@
   </div>
   
   <script>
-    let userEmail = '';
-    let currentStep = 1;
-    let domainInfo = null;
+    var userEmail = '';
+    var currentStep = 1;
+    var domainInfo = null;
 
     function escapeHtml(str) {
       if (!str) return '';
@@ -492,13 +492,13 @@
         matchPanel.classList.remove('hidden');
         mismatchPanel.classList.add('hidden');
         document.getElementById('domain-match-text').textContent = 
-          `このウェブアプリは ${info.deployDomain} ドメイン用です。あなたのアカウント（${info.currentDomain}）で利用できます。`;
+          'このウェブアプリは ' + info.deployDomain + ' ドメイン用です。あなたのアカウント（' + info.currentDomain + '）で利用できます。';
       } else {
         // ドメインが不一致の場合
         matchPanel.classList.add('hidden');
         mismatchPanel.classList.remove('hidden');
         document.getElementById('domain-mismatch-text').textContent = 
-          `あなたのアカウントのドメイン（${info.currentDomain}）とは異なります。機能が制限される可能性があります。`;
+          'あなたのアカウントのドメイン（' + info.currentDomain + '）とは異なります。機能が制限される可能性があります。';
         document.getElementById('deploy-domain').textContent = info.deployDomain;
       }
     }
@@ -519,13 +519,13 @@
       // Update progress bar with performance optimization
       const progressBar = document.getElementById('progress-bar');
       requestAnimationFrame(() => {
-        progressBar.style.width = `${(step / 3) * 100}%`;
+        progressBar.style.width = ((step / 3) * 100) + '%';
       });
       
       // Update step indicators
-      for (let i = 1; i <= 3; i++) {
-        const stepElement = document.getElementById(`step-${i}`);
-        const stepIndicator = document.getElementById(`step-${i}`);
+      for (var i = 1; i <= 3; i++) {
+        var stepElement = document.getElementById('step-' + i);
+        var stepIndicator = document.getElementById('step-' + i);
         
         if (stepElement) {
           if (i <= step) {
@@ -552,7 +552,7 @@
         }
         
         // Update section-specific icons (for steps 2 and 3)
-        const iconElement = document.getElementById(`step-${i}-icon`);
+        const iconElement = document.getElementById('step-' + i + '-icon');
         if (iconElement) {
           if (i <= step) {
             iconElement.className = 'w-6 h-6 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-sm';
@@ -627,7 +627,7 @@
                       showMessage('セットアップが必要です。管理者にセットアップページでの初期設定を依頼してください。', 'warning');
                       // セットアップページへのリンクを表示
                       const setupUrl = window.location.href.split('?')[0] + '?setup=true';
-                      showMessage(`セットアップページ: <a href="${setupUrl}" target="_blank" style="color: #8be9fd;">こちら</a>`, 'info');
+                      showMessage('セットアップページ: <a href="' + setupUrl + '" target="_blank" style="color: #8be9fd;">こちら</a>', 'info');
                       break;
                     case 'existing_user':
                       updateStep(3);
@@ -834,7 +834,7 @@
           
         })
         .withFailureHandler(error => {
-          showMessage(`エラー: ${error.message || '登録に失敗しました'}`, 'error');
+          showMessage('エラー: ' + (error.message || '登録に失敗しました'), 'error');
           btn.disabled = false;
           btn.textContent = 'みんなの回答ボードを開始する';
         })
@@ -919,8 +919,8 @@
         info: 'text-blue-400'
       };
       
-      messageArea.className = `text-center min-h-[24px] ${colors[type] || 'text-gray-400'} flex items-center justify-center gap-2`;
-      messageArea.innerHTML = `${icons[type] || ''}<span>${escapeHtml(message)}</span>`;
+      messageArea.className = 'text-center min-h-[24px] ' + (colors[type] || 'text-gray-400') + ' flex items-center justify-center gap-2';
+      messageArea.innerHTML = (icons[type] || '') + '<span>' + escapeHtml(message) + '</span>';
     }
     
     // クリップボードにコピー（現代的なAPIを使用）
