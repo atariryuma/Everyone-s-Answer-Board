@@ -840,42 +840,50 @@ class StudyQuestApp {
     this.init();
   }
   init() {
-    // Critical path only - non-blocking
-    this.setupCriticalElements();
-    this.setupOwnerName();
-    this.showMinimalSkeleton();
-    
-    // Apply default low performance tweaks
-    this.optimizeForLowPerformance();
-    
-    // Immediate async loading for data
-    this.loadDataImmediate();
-    
-    // Defer all non-critical operations
-    requestIdleCallback(() => {
-      this.setupNonCriticalEventListeners();
-      this.renderIcons();
-      this.adjustLayout();
-      this.updateSortOptions();
-      this.setupObservers();
-      // Initial admin state setup - 管理者であっても最初は閲覧モードで起動、切り替えボタンのみ表示
-      if (window.isAdminUser) {
-        this.state.isAdminUser = true;
-        if (this.elements.adminToggleBtn) {
-          this.elements.adminToggleBtn.classList.remove('hidden');
-          this.elements.adminToggleBtn.removeAttribute('hidden');
-          this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
-        }
-      }
-      // Check if modal should be shown
-      const introSeen = localStorage.getItem('introSeen');
+      // Critical path only - non-blocking
+      this.setupCriticalElements();
+      this.setupOwnerName();
+      this.showMinimalSkeleton();
       
-      // Show modal if never seen before
-      if (!introSeen) {
-        setTimeout(() => this.showInfoModal(), 500);
-      }
-    }, { timeout: 50 });
-  }
+      // Apply default low performance tweaks
+      this.optimizeForLowPerformance();
+      
+      // Immediate async loading for data
+      this.loadDataImmediate();
+      
+      // Defer all non-critical operations
+      requestIdleCallback(() => {
+        this.setupNonCriticalEventListeners();
+        this.renderIcons();
+        this.adjustLayout();
+        this.updateSortOptions();
+        this.setupObservers();
+        // Initial admin state setup - 管理者であっても最初は閲覧モードで起動、切り替えボタンのみ表示
+        if (window.isAdminUser) {
+          this.state.isAdminUser = true;
+          if (this.elements.adminToggleBtn) {
+            this.elements.adminToggleBtn.classList.remove('hidden');
+            this.elements.adminToggleBtn.removeAttribute('hidden');
+            this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
+          }
+        }
+        // Check if modal should be shown
+        const introSeen = localStorage.getItem('introSeen');
+        
+        // Show modal if never seen before
+        if (!introSeen) {
+          setTimeout(() => this.showInfoModal(), 500);
+        }
+      }, { timeout: 50 });
+
+      // AdminPanelからのメッセージをリッスン
+      window.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'REFRESH_BOARD_DATA') {
+          debugLog('REFRESH_BOARD_DATAメッセージを受信しました。ボードを再読み込みします。');
+          this.loadSheetData(true);
+        }
+      });
+    }
   setupOwnerName() {
     if (OWNER_NAME && this.elements.ownerNameText) {
       this.elements.ownerNameText.textContent = `管理者: ${OWNER_NAME}`;

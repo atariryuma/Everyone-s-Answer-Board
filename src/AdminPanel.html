@@ -834,6 +834,13 @@
               </svg>
               キャッシュクリア
             </button>
+            
+            <button type="button" id="refresh-board-btn" class="btn btn-secondary w-full text-sm" title="回答ボードのデータを最新の状態に更新">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+              </svg>
+              ボードを更新
+            </button>
           </div>
         </div>
         
@@ -1277,6 +1284,11 @@
       const quickCreateBtn = document.getElementById('quick-create-board-btn');
       if (quickCreateBtn) {
         quickCreateBtn.addEventListener('click', createBoard);
+      }
+
+      const refreshBoardBtn = document.getElementById('refresh-board-btn');
+      if (refreshBoardBtn) {
+        refreshBoardBtn.addEventListener('click', refreshBoardDataFromAdmin);
       }
       
       // Display options
@@ -1986,6 +1998,49 @@
       }
       
       google.script.run
+        .withSuccessHandler((result) => {
+          showMessage(result.message || 'スプレッドシートが正常に追加されました', 'green');
+          addVisualFeedback(urlInput, 'success');
+          urlInput.value = '';
+          addBtn.disabled = false;
+          if (elements.addSpreadsheetText) {
+            elements.addSpreadsheetText.textContent = 'スプレッドシートを追加';
+          }
+          loadStatus(); // Refresh the status
+        })
+        .withFailureHandler((error) => {
+          console.error('addSpreadsheetUrl error:', error);
+          showMessage('スプレッドシートの追加に失敗しました: ' + error.message, 'error');
+          addVisualFeedback(urlInput, 'error');
+          addBtn.disabled = false;
+          if (elements.addSpreadsheetText) {
+            elements.addSpreadsheetText.textContent = 'スプレッドシートを追加';
+          }
+        })
+        .addSpreadsheetUrl(url);
+    }
+
+    function refreshBoardDataFromAdmin() {
+      setLoading(true, '回答ボードを更新中...');
+      google.script.run
+        .withSuccessHandler((result) => {
+          showMessage(result.message, 'success');
+          setLoading(false);
+          // クライアントサイドのボードを再読み込みするために、親ウィンドウにメッセージを送信
+          // これは、AdminPanelがサイドバーやモーダルとして開かれている場合に有効
+          if (window.opener && typeof window.opener.postMessage === 'function') {
+            window.opener.postMessage({ type: 'REFRESH_BOARD_DATA' }, '*');
+          } else if (window.parent && typeof window.parent.postMessage === 'function') {
+            window.parent.postMessage({ type: 'REFRESH_BOARD_DATA' }, '*');
+          }
+        })
+        .withFailureHandler((error) => {
+          console.error('refreshBoardData error:', error);
+          showMessage('回答ボードの更新に失敗しました: ' + error.message, 'error');
+          setLoading(false);
+        })
+        .refreshBoardData();
+    }
         .withSuccessHandler((result) => {
           showMessage(result.message || 'スプレッドシートが正常に追加されました', 'green');
           addVisualFeedback(urlInput, 'success');

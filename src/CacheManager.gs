@@ -143,18 +143,40 @@ function removeCachedValue(key) {
  */
 function removeCachedPattern(pattern) {
   var props = PropertiesService.getScriptProperties();
+  var cache = CacheService.getScriptCache();
   
-  // PropertiesServiceからパターンマッチするキーを削除
+  var keysToRemoveFromCache = [];
   var properties = props.getProperties();
+  
+  // PropertiesServiceからパターンマッチするキーを削除し、対応するCacheServiceキーも収集
   Object.keys(properties).forEach(function(key) {
     if (key.indexOf('CACHE_') === 0 && key.indexOf(pattern) !== -1) {
       props.deleteProperty(key);
-      var cacheKey = key.replace('CACHE_', '');
-      var cache = CacheService.getScriptCache();
-      cache.remove(cacheKey);
-      debugLog('パターン削除: ' + cacheKey);
+      keysToRemoveFromCache.push(key.replace('CACHE_', ''));
+      debugLog('PropertiesServiceパターン削除: ' + key);
     }
   });
+
+  // CacheServiceから直接パターンマッチするキーを削除 (CacheServiceには直接パターンマッチ機能がないため、これは概念的なもの)
+  // 実際には、CacheServiceのキーはPropertiesServiceのキーと連動しているか、
+  // または明示的にキーを知っている必要がある。
+  // ここでは、PropertiesServiceから収集したキーを元にCacheServiceからも削除する。
+  if (keysToRemoveFromCache.length > 0) {
+    cache.removeAll(keysToRemoveFromCache);
+  }
+  
+  // さらに、CacheServiceに直接保存されている可能性のあるパターンマッチするキーを削除
+  // (例: getHeaderIndicesCachedでCACHE_プレフィックスなしで保存されるキー)
+  // CacheServiceにはキーの一覧を取得するAPIがないため、これは限定的。
+  // 既知のパターンを明示的に削除する。
+  if (pattern.includes('headers_')) {
+    cache.remove(pattern); // 例: 'headers_spreadsheetId_sheetName'
+  }
+  if (pattern.includes('roster_')) {
+    cache.remove(pattern); // 例: 'roster_spreadsheetId'
+  }
+  
+  debugLog('キャッシュパターン削除完了: ' + pattern);
 }
 
 /**
@@ -247,14 +269,10 @@ function clearAllCache() {
     cache.removeAll(cacheKeys);
   }
 
-  // ヘッダーインデックスキャッシュを明示的にクリア
-  var allKeys = Object.keys(properties);
-  allKeys.forEach(function(key) {
-    if (key.indexOf('headers_') === 0 || key.indexOf('hdr_') === 0 || key.indexOf('CACHE_headers_') === 0) {
-      props.deleteProperty(key);
-      debugLog('ヘッダーキャッシュクリア: ' + key);
-    }
-  });
+  // ヘッダーインデックスキャッシュを明示的にクリア (PropertiesServiceにCACHE_プレフィックスなしで保存される可能性のあるもの)
+  // およびCacheServiceに直接保存される可能性のあるもの
+  removeCachedPattern('headers_'); // headers_spreadsheetId_sheetName
+  removeCachedPattern('roster_');  // roster_spreadsheetId
   
   debugLog('全キャッシュをクリアしました: PropertiesServiceとCacheService');
   

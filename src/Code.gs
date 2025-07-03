@@ -1869,7 +1869,7 @@ function auditLog(action, userId, details) {
       dbId,
       range,
       { values: [[new Date().toISOString(), userId, action, JSON.stringify(details || {})]] },
-      { valueInputOption: 'USER_ENTERED' }
+      { valueInputOption: 'USER_ENTERED'
     );
   } catch (e) {
     console.error('auditLog error: ' + e.message);
@@ -1902,4 +1902,20 @@ function checkAutoUnpublish(userInfo, userId) {
     console.error('auto unpublish check failed: ' + e.message);
   }
   return null;
+}
+
+/**
+ * 回答ボードのデータを強制的に再読み込みするための関数。
+ * 管理パネルから呼び出され、キャッシュをクリアし、クライアントサイドに再読み込みを促す。
+ * @returns {object} 成功ステータスとメッセージ
+ */
+function refreshBoardData() {
+  try {
+    clearAllCache(); // 全キャッシュをクリア
+    debugLog('回答ボードのデータ強制再読み込みをトリガーしました。');
+    return { status: 'success', message: '回答ボードのデータを更新しました。' };
+  } catch (e) {
+    console.error('回答ボードのデータ再読み込みエラー: ' + e.message);
+    return { status: 'error', message: '回答ボードのデータ更新に失敗しました: ' + e.message };
+  }
 }
