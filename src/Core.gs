@@ -20,7 +20,7 @@ function registerNewUser(adminEmail) {
   }
 
   // 既存ユーザーチェック（1ユーザー1行の原則）
-  var existingUser = findUserByEmailOptimized(adminEmail);
+  var existingUser = findUserByEmail(adminEmail);
   var userId, appUrls;
   
   if (existingUser) {
@@ -38,14 +38,14 @@ function registerNewUser(adminEmail) {
     };
     
     // 既存ユーザー情報を更新
-    updateUserOptimized(userId, {
+    updateUser(userId, {
       lastAccessedAt: new Date().toISOString(),
       isActive: 'true',
       configJson: JSON.stringify(updatedConfig)
     });
     
     debugLog('✅ 既存ユーザー情報を更新しました: ' + adminEmail);
-    appUrls = generateAppUrlsOptimized(userId);
+    appUrls = generateAppUrls(userId);
     
     return {
       userId: userId,
@@ -79,7 +79,7 @@ function registerNewUser(adminEmail) {
   };
 
   try {
-    createUserOptimized(userData);
+    createUser(userData);
     debugLog('✅ データベースに新規ユーザーを登録しました: ' + adminEmail);
   } catch (e) {
     console.error('データベースへのユーザー登録に失敗: ' + e.message);
@@ -87,7 +87,7 @@ function registerNewUser(adminEmail) {
   }
 
   // 成功レスポンスを返す
-  appUrls = generateAppUrlsOptimized(userId);
+  appUrls = generateAppUrls(userId);
   return {
     userId: userId,
     adminUrl: appUrls.adminUrl,
@@ -113,12 +113,12 @@ function addReaction(rowIndex, reactionKey, sheetName) {
     }
 
     // ボードオーナーの情報をDBから取得（キャッシュ利用）
-    var boardOwnerInfo = findUserByIdOptimized(ownerUserId);
+    var boardOwnerInfo = findUserById(ownerUserId);
     if (!boardOwnerInfo) {
       throw new Error('無効なボードです。');
     }
 
-    var result = processReactionOptimized(
+    var result = processReaction(
       boardOwnerInfo.spreadsheetId,
       sheetName,
       rowIndex,
@@ -164,7 +164,7 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
     
-    var userInfo = findUserByIdOptimized(currentUserId);
+    var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -175,7 +175,7 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
     var targetSheet = sheetName || configJson.publishedSheet || 'フォームの回答 1';
     
     // データ取得
-    var sheetData = getSheetDataOptimized(currentUserId, targetSheet, classFilter, sortOrder);
+    var sheetData = getSheetData(currentUserId, targetSheet, classFilter, sortOrder);
     
     if (sheetData.status === 'error') {
       throw new Error(sheetData.message);
@@ -239,7 +239,7 @@ function getAppConfig() {
     if (!currentUserId) {
       // コンテキストが設定されていない場合、現在のユーザーで検索
       var activeUser = Session.getActiveUser().getEmail();
-      var userInfo = findUserByEmailOptimized(activeUser);
+      var userInfo = findUserByEmail(activeUser);
       if (userInfo) {
         currentUserId = userInfo.userId;
         props.setProperty('CURRENT_USER_ID', currentUserId);
@@ -248,7 +248,7 @@ function getAppConfig() {
       }
     }
     
-    var userInfo = findUserByIdOptimized(currentUserId);
+    var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -271,14 +271,14 @@ function getAppConfig() {
     }
     if (needsUpdate) {
       try {
-        updateUserOptimized(currentUserId, { configJson: JSON.stringify(configJson) });
+        updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
       } catch (updateErr) {
         console.warn('Config auto-heal failed: ' + updateErr.message);
       }
     }
 
-    var sheets = getSheetsListOptimized(currentUserId);
-    var appUrls = generateAppUrlsOptimized(currentUserId);
+    var sheets = getSheetsList(currentUserId);
+    var appUrls = generateAppUrls(currentUserId);
     
     // 回答数を取得
     var answerCount = 0;
@@ -362,7 +362,7 @@ function setupApplication(credsJson, dbId) {
     props.setProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID, dbId);
 
     // データベースシートの初期化
-    initializeDatabaseSheetOptimized(dbId);
+    initializeDatabaseSheet(dbId);
 
     console.log('✅ セットアップが正常に完了しました。');
   } catch (e) {
@@ -381,13 +381,13 @@ function include(filename) {
 
 
 function getResponsesData(userId, sheetName) {
-  var userInfo = findUserByIdOptimized(userId);
+  var userInfo = findUserById(userId);
   if (!userInfo) {
     return { status: 'error', message: 'ユーザー情報が見つかりません' };
   }
 
   try {
-    var service = getOptimizedSheetsService();
+    var service = getSheetsService();
     var spreadsheetId = userInfo.spreadsheetId;
     var range = (sheetName || 'フォームの回答 1') + '!A:Z';
     
@@ -433,7 +433,7 @@ function getActiveFormInfo(userId) {
     if (!currentUserId) {
       // コンテキストが設定されていない場合、現在のユーザーで検索
       var activeUser = Session.getActiveUser().getEmail();
-      var userInfo = findUserByEmailOptimized(activeUser);
+      var userInfo = findUserByEmail(activeUser);
       if (userInfo) {
         currentUserId = userInfo.userId;
         props.setProperty('CURRENT_USER_ID', currentUserId);
@@ -442,7 +442,7 @@ function getActiveFormInfo(userId) {
       }
     }
     
-    var userInfo = findUserByIdOptimized(currentUserId);
+    var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       return { status: 'error', message: 'ユーザー情報が見つかりません' };
     }
@@ -491,12 +491,12 @@ function toggleHighlight(rowIndex, sheetName) {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
     
-    var userInfo = findUserByIdOptimized(currentUserId);
+    var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
     
-    var result = processHighlightToggleOptimized(
+    var result = processHighlightToggle(
       userInfo.spreadsheetId,
       sheetName || 'フォームの回答 1',
       rowIndex
@@ -533,7 +533,7 @@ function checkAdmin() {
       return false;
     }
     
-    var userInfo = findUserByIdOptimized(currentUserId);
+    var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       return false;
     }
@@ -560,7 +560,7 @@ function getAvailableSheets() {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
     
-    var sheets = getSheetsListOptimized(currentUserId);
+    var sheets = getSheetsList(currentUserId);
     
     // Page.html期待形式に変換: [{name: string}]
     return sheets.map(function(sheet) {
@@ -583,7 +583,7 @@ function quickStartSetup(userId) {
     debugLog('🚀 クイックスタートセットアップ開始: ' + userId);
     
     // ユーザー情報の取得
-    var userInfo = findUserByIdOptimized(userId);
+    var userInfo = findUserById(userId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -596,7 +596,7 @@ function quickStartSetup(userId) {
       return {
         status: 'already_completed',
         message: 'クイックスタートは既に完了しています。',
-        urls: generateAppUrlsOptimized(userId)
+        urls: generateAppUrls(userId)
       };
     }
     
@@ -606,7 +606,7 @@ function quickStartSetup(userId) {
     
     // ステップ2: Googleフォームとスプレッドシートを作成
     debugLog('📝 ステップ2: フォーム作成中...');
-    var formAndSsInfo = createStudyQuestFormOptimized(userEmail, userId);
+    var formAndSsInfo = createStudyQuestForm(userEmail, userId);
     
     // 作成したファイルをフォルダに移動
     if (folder) {
@@ -643,7 +643,7 @@ function quickStartSetup(userId) {
       completedAt: new Date().toISOString()
     };
     
-    updateUserOptimized(userId, {
+    updateUser(userId, {
       spreadsheetId: formAndSsInfo.spreadsheetId,
       spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
       configJson: JSON.stringify(updatedConfig)
@@ -654,7 +654,7 @@ function quickStartSetup(userId) {
     
     debugLog('✅ クイックスタートセットアップ完了: ' + userId);
     
-    var appUrls = generateAppUrlsOptimized(userId);
+    var appUrls = generateAppUrls(userId);
     return {
       status: 'success',
       message: 'クイックスタートが完了しました！回答ボードをお楽しみください。',
@@ -675,7 +675,7 @@ function quickStartSetup(userId) {
       currentConfig.lastError = e.message;
       currentConfig.errorAt = new Date().toISOString();
       
-      updateUserOptimized(userId, {
+      updateUser(userId, {
         configJson: JSON.stringify(currentConfig)
       });
     } catch (updateError) {
@@ -721,12 +721,12 @@ function createUserFolder(userEmail) {
 }
 
 /**
- * ハイライト切り替えの最適化処理
+ * ハイライト切り替え処理
  */
-function processHighlightToggleOptimized(spreadsheetId, sheetName, rowIndex) {
+function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
   try {
-    var service = getOptimizedSheetsService();
-    var headerIndices = getHeaderIndicesCached(spreadsheetId, sheetName);
+    var service = getSheetsService();
+    var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
     var highlightColumnIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT];
     
     if (highlightColumnIndex === undefined) {
@@ -782,7 +782,7 @@ function updateUserInDb(userId, updateData) {
   return updateUserOptimized(userId, updateData);
 }
 
-function getOptimizedSheetsService() {
+function getSheetsService() {
   return getOptimizedSheetsService();
 }
 
@@ -824,13 +824,85 @@ function extractFormIdFromUrl(url) {
 }
 
 // =================================================================
+// リアクション処理関数
+// =================================================================
+
+/**
+ * リアクション処理
+ */
+function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reactingUserEmail) {
+  try {
+    // LockServiceを使って競合を防ぐ
+    var lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(10000);
+      
+      var service = getSheetsService();
+      var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
+      
+      var reactionColumnName = COLUMN_HEADERS[reactionKey];
+      var reactionColumnIndex = headerIndices[reactionColumnName];
+      
+      if (reactionColumnIndex === undefined) {
+        throw new Error('リアクション列が見つかりません: ' + reactionColumnName);
+      }
+      
+      // 現在のリアクション文字列を取得
+      var cellRange = sheetName + '!' + String.fromCharCode(65 + reactionColumnIndex) + rowIndex;
+      var response = service.spreadsheets.values.get(spreadsheetId, cellRange);
+      var currentReactionString = (response.values && response.values[0] && response.values[0][0]) || '';
+      
+      // リアクションの追加/削除処理
+      var currentReactions = parseReactionString(currentReactionString);
+      var userIndex = currentReactions.indexOf(reactingUserEmail);
+      
+      if (userIndex >= 0) {
+        // 既にリアクション済み → 削除
+        currentReactions.splice(userIndex, 1);
+      } else {
+        // 未リアクション → 追加
+        currentReactions.push(reactingUserEmail);
+      }
+      
+      // 更新された値を書き戻す
+      var updatedReactionString = currentReactions.join(', ');
+      service.spreadsheets.values.update(
+        spreadsheetId,
+        cellRange,
+        { values: [[updatedReactionString]] },
+        { valueInputOption: 'RAW' }
+      );
+      
+      debugLog('リアクション更新完了: ' + reactingUserEmail + ' → ' + reactionKey + ' (' + (userIndex >= 0 ? '削除' : '追加') + ')');
+      
+      return { 
+        status: 'success', 
+        message: 'リアクションを更新しました。',
+        action: userIndex >= 0 ? 'removed' : 'added',
+        count: currentReactions.length
+      };
+      
+    } finally {
+      lock.releaseLock();
+    }
+    
+  } catch (e) {
+    console.error('リアクション処理エラー: ' + e.message);
+    return { 
+      status: 'error', 
+      message: 'リアクションの処理に失敗しました: ' + e.message 
+    };
+  }
+}
+
+// =================================================================
 // プレースホルダー関数（実装予定）
 // =================================================================
 
 /**
- * フォーム作成（最適化版）
+ * フォーム作成
  */
-function createStudyQuestFormOptimized(userEmail, userId) {
+function createStudyQuestForm(userEmail, userId) {
   try {
     // パフォーマンス測定開始
     var profiler = (typeof globalProfiler !== 'undefined') ? globalProfiler : {
@@ -861,7 +933,7 @@ function createStudyQuestFormOptimized(userEmail, userId) {
     }
     
     // 確認メッセージの設定（回答ボードURLを含む）
-    var appUrls = generateAppUrlsOptimized(userId);
+    var appUrls = generateAppUrls(userId);
     var boardUrl = appUrls.viewUrl || (appUrls.webAppUrl + '?userId=' + userId);
     
     var confirmationMessage = '🎉 回答ありがとうございます！\n\n' +
@@ -876,25 +948,25 @@ function createStudyQuestFormOptimized(userEmail, userId) {
     
     form.setConfirmationMessage(confirmationMessage);
     
-    // サービスアカウントをスプレッドシートに追加（最適化版）
-    addServiceAccountToSpreadsheetOptimized(formResult.spreadsheetId);
+    // サービスアカウントをスプレッドシートに追加
+    addServiceAccountToSpreadsheet(formResult.spreadsheetId);
     
-    // リアクション列をスプレッドシートに追加（最適化版）
-    addReactionColumnsToSpreadsheetOptimized(formResult.spreadsheetId, formResult.sheetName);
+    // リアクション列をスプレッドシートに追加
+    addReactionColumnsToSpreadsheet(formResult.spreadsheetId, formResult.sheetName);
     
     profiler.end('createForm');
     return formResult;
     
   } catch (e) {
-    console.error('createStudyQuestFormOptimizedエラー: ' + e.message);
+    console.error('createStudyQuestFormエラー: ' + e.message);
     throw new Error('フォームの作成に失敗しました: ' + e.message);
   }
 }
 
 /**
- * サービスアカウントをスプレッドシートに追加（最適化版）
+ * サービスアカウントをスプレッドシートに追加
  */
-function addServiceAccountToSpreadsheetOptimized(spreadsheetId) {
+function addServiceAccountToSpreadsheet(spreadsheetId) {
   try {
     var props = PropertiesService.getScriptProperties();
     var serviceAccountCreds = JSON.parse(props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
@@ -912,9 +984,9 @@ function addServiceAccountToSpreadsheetOptimized(spreadsheetId) {
 }
 
 /**
- * スプレッドシートにリアクション列を追加（最適化版）
+ * スプレッドシートにリアクション列を追加
  */
-function addReactionColumnsToSpreadsheetOptimized(spreadsheetId, sheetName) {
+function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName) {
   try {
     var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     var sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
@@ -952,17 +1024,17 @@ function addReactionColumnsToSpreadsheetOptimized(spreadsheetId, sheetName) {
 }
 
 /**
- * シートデータ取得（最適化版）
+ * シートデータ取得
  */
-function getSheetDataOptimized(userId, sheetName, classFilter, sortMode) {
+function getSheetData(userId, sheetName, classFilter, sortMode) {
   try {
-    var userInfo = findUserByIdOptimized(userId);
+    var userInfo = findUserById(userId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
     
     var spreadsheetId = userInfo.spreadsheetId;
-    var service = getOptimizedSheetsService();
+    var service = getSheetsService();
     
     // フォーム回答データのみを取得（名簿機能は使用しない）
     var ranges = [sheetName + '!A:Z'];
@@ -987,7 +1059,7 @@ function getSheetDataOptimized(userId, sheetName, classFilter, sortMode) {
     var dataRows = sheetData.slice(1);
     
     // ヘッダーインデックスを取得（キャッシュ利用）
-    var headerIndices = getHeaderIndicesCached(spreadsheetId, sheetName);
+    var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
     
     // 名簿マップを作成（キャッシュ利用）
     var rosterMap = buildRosterMap(rosterData);
@@ -998,7 +1070,7 @@ function getSheetDataOptimized(userId, sheetName, classFilter, sortMode) {
     
     // データを処理
     var processedData = dataRows.map(function(row, index) {
-      return processRowDataOptimized(row, headers, headerIndices, rosterMap, displayMode, index + 2);
+      return processRowData(row, headers, headerIndices, rosterMap, displayMode, index + 2);
     });
     
     // フィルタリング
@@ -1013,7 +1085,7 @@ function getSheetDataOptimized(userId, sheetName, classFilter, sortMode) {
     }
     
     // ソート適用
-    var sortedData = applySortModeOptimized(filteredData, sortMode || 'newest');
+    var sortedData = applySortMode(filteredData, sortMode || 'newest');
     
     return {
       status: 'success',
@@ -1035,16 +1107,16 @@ function getSheetDataOptimized(userId, sheetName, classFilter, sortMode) {
 }
 
 /**
- * シート一覧取得（最適化版）
+ * シート一覧取得
  */
-function getSheetsListOptimized(userId) {
+function getSheetsList(userId) {
   try {
-    var userInfo = findUserByIdOptimized(userId);
+    var userInfo = findUserById(userId);
     if (!userInfo) {
       return [];
     }
     
-    var service = getOptimizedSheetsService();
+    var service = getSheetsService();
     var spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
     
     return spreadsheet.sheets.map(function(sheet) {
@@ -1073,7 +1145,7 @@ function buildRosterMap(rosterData) {
 /**
  * 行データを処理（スコア計算、名前変換など）
  */
-function processRowDataOptimized(row, headers, headerIndices, rosterMap, displayMode, rowNumber) {
+function processRowData(row, headers, headerIndices, rosterMap, displayMode, rowNumber) {
   var processedRow = {
     rowNumber: rowNumber,
     originalData: row,
@@ -1090,7 +1162,7 @@ function processRowDataOptimized(row, headers, headerIndices, rosterMap, display
     var columnIndex = headerIndices[columnName];
     
     if (columnIndex !== undefined && row[columnIndex]) {
-      var reactions = parseReactionStringOptimized(row[columnIndex]);
+      var reactions = parseReactionString(row[columnIndex]);
       var count = reactions.length;
       
       switch (reactionKey) {
@@ -1114,7 +1186,7 @@ function processRowDataOptimized(row, headers, headerIndices, rosterMap, display
   }
   
   // スコア計算
-  processedRow.score = calculateRowScoreOptimized(processedRow);
+  processedRow.score = calculateRowScore(processedRow);
   
   // 名前の表示処理（フォーム入力の名前を使用）
   var nameIndex = headerIndices[COLUMN_HEADERS.NAME];
@@ -1131,7 +1203,7 @@ function processRowDataOptimized(row, headers, headerIndices, rosterMap, display
 /**
  * 行のスコアを計算
  */
-function calculateRowScoreOptimized(rowData) {
+function calculateRowScore(rowData) {
   var baseScore = 1.0;
   
   // いいね！による加算
@@ -1152,7 +1224,7 @@ function calculateRowScoreOptimized(rowData) {
 /**
  * データにソートを適用
  */
-function applySortModeOptimized(data, sortMode) {
+function applySortMode(data, sortMode) {
   switch (sortMode) {
     case 'score':
       return data.sort(function(a, b) { return b.score - a.score; });
@@ -1161,7 +1233,7 @@ function applySortModeOptimized(data, sortMode) {
     case 'oldest':
       return data; // 元の順序（古い順）
     case 'random':
-      return shuffleArrayOptimized(data.slice()); // コピーをシャッフル
+      return shuffleArray(data.slice()); // コピーをシャッフル
     case 'likes':
       return data.sort(function(a, b) { return b.likeCount - a.likeCount; });
     default:
@@ -1172,7 +1244,7 @@ function applySortModeOptimized(data, sortMode) {
 /**
  * 配列をシャッフル（Fisher-Yates shuffle）
  */
-function shuffleArrayOptimized(array) {
+function shuffleArray(array) {
   for (var i = array.length - 1; i > 0; i--) {
     var j = Math.floor(Math.random() * (i + 1));
     var temp = array[i];
@@ -1185,7 +1257,7 @@ function shuffleArrayOptimized(array) {
 /**
  * リアクション文字列をパース
  */
-function parseReactionStringOptimized(val) {
+function parseReactionString(val) {
   if (!val) return [];
   return val.toString().split(',').map(function(s) { return s.trim(); }).filter(Boolean);
 }
@@ -1224,8 +1296,8 @@ function getColumnIndex(headers, columnKey) {
  */
 function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
   try {
-    var service = getOptimizedSheetsService();
-    var headerIndices = getHeaderIndicesCached(spreadsheetId, sheetName);
+    var service = getSheetsService();
+    var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
     
     var reactionData = {
       UNDERSTAND: { count: 0, reacted: false },
@@ -1245,7 +1317,7 @@ function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
           var cellValue = response.values && response.values[0] && response.values[0][0];
           
           if (cellValue) {
-            var reactions = parseReactionStringOptimized(cellValue);
+            var reactions = parseReactionString(cellValue);
             reactionData[reactionKey].count = reactions.length;
             reactionData[reactionKey].reacted = reactions.indexOf(userEmail) !== -1;
           }
