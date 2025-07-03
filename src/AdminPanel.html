@@ -185,22 +185,23 @@
     .slide-up { animation: slideUp 0.3s ease-out; }
     
     @keyframes successPulse {
-      0% { will-change: transform; }
+      0% { transform: scale3d(1, 1, 1); will-change: transform; }
       50% { transform: scale3d(1.05, 1.05, 1); }
-      100% { transform: scale3d(1, 1, 1); }
+      100% { transform: scale3d(1, 1, 1); will-change: auto; }
     }
     @keyframes errorShake {
-      0%, 100% { will-change: transform; }
+      0% { transform: translate3d(0, 0, 0); will-change: transform; }
       25% { transform: translate3d(-5px, 0, 0); }
       75% { transform: translate3d(5px, 0, 0); }
+      100% { transform: translate3d(0, 0, 0); will-change: auto; }
     }
     @keyframes fadeIn {
-      from { opacity: 0; will-change: opacity; }
-      to { opacity: 1; }
+      0% { opacity: 0; will-change: opacity; }
+      100% { opacity: 1; will-change: auto; }
     }
     @keyframes slideUp {
-      from { opacity: 0; transform: translateY(20px); will-change: opacity, transform; }
-      to { opacity: 1; transform: translateY(0); }
+      0% { opacity: 0; transform: translateY(20px); will-change: opacity, transform; }
+      100% { opacity: 1; transform: translateY(0); will-change: auto; }
     }
     
     /* Progress */
@@ -296,8 +297,8 @@
     }
     
     @keyframes loading-skeleton {
-      0% { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
+      0% { background-position: 200% 0; will-change: background-position; }
+      100% { background-position: -200% 0; will-change: auto; }
     }
     
     .spinner {
@@ -310,8 +311,8 @@
     }
     
     @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+      0% { transform: rotate(0deg); will-change: transform; }
+      100% { transform: rotate(360deg); will-change: auto; }
     }
     
     /* Error States */
@@ -1167,6 +1168,26 @@
 
     let elements = {}; // elementsオブジェクトを初期化
 
+    // Progressive Disclosure Functions - 早期定義
+    function toggleSection(sectionId) {
+      const section = document.getElementById(sectionId);
+      const icon = document.getElementById(sectionId.replace('content', 'icon'));
+      
+      if (!section) return;
+      
+      const isExpanded = section.classList.contains('expanded');
+      
+      if (isExpanded) {
+        section.classList.remove('expanded');
+        section.classList.add('collapsed');
+        if (icon) icon.style.transform = 'rotate(0deg)';
+      } else {
+        section.classList.remove('collapsed');
+        section.classList.add('expanded');
+        if (icon) icon.style.transform = 'rotate(90deg)';
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
       elements = {
         sheetSelect: document.getElementById('sheet-select'),
@@ -1460,26 +1481,6 @@
       updateSetupProgress();
     }
 
-    // Progressive Disclosure Functions
-    function toggleSection(sectionId) {
-      const section = document.getElementById(sectionId);
-      const icon = document.getElementById(sectionId.replace('content', 'icon'));
-      
-      if (!section) return;
-      
-      const isExpanded = section.classList.contains('expanded');
-      
-      if (isExpanded) {
-        section.classList.remove('expanded');
-        section.classList.add('collapsed');
-        if (icon) icon.style.transform = 'rotate(0deg)';
-      } else {
-        section.classList.remove('collapsed');
-        section.classList.add('expanded');
-        if (icon) icon.style.transform = 'rotate(90deg)';
-      }
-    }
-    
     function updateStepIndicators(currentStep) {
       const steps = [
         { id: 'step-1-indicator', step: 1 },
