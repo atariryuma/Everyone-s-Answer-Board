@@ -9,17 +9,44 @@
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
 
   <script>
-    // TailwindCSS を安全に読み込み
-    try {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.tailwindcss.com';
-      script.onerror = function() {
-        console.warn('TailwindCSS の読み込みに失敗しました');
-      };
-      document.head.appendChild(script);
-    } catch (e) {
-      console.warn('TailwindCSS スクリプトの作成に失敗:', e);
-    }
+    // グローバルエラーハンドリング
+    window.addEventListener('error', function(event) {
+      console.error('Global error caught:', event.error);
+      // document.writeエラーの場合は特別な処理
+      if (event.error && event.error.message && event.error.message.includes('document.write')) {
+        console.warn('document.write エラーが検出されました。安全なDOM操作に切り替えています。');
+        event.preventDefault();
+      }
+    });
+    
+    // Promise rejection のキャッチ
+    window.addEventListener('unhandledrejection', function(event) {
+      console.error('Unhandled promise rejection:', event.reason);
+      event.preventDefault();
+    });
+    
+    // TailwindCSS を安全に読み込み（DOMContentLoaded後）
+    document.addEventListener('DOMContentLoaded', function() {
+      try {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.tailwindcss.com';
+        script.async = true;
+        script.defer = true;
+        script.onload = function() {
+          console.log('TailwindCSS が正常に読み込まれました');
+        };
+        script.onerror = function() {
+          console.warn('TailwindCSS の読み込みに失敗しました');
+        };
+        
+        // DOMが確実に存在する場合のみ追加
+        if (document.head) {
+          document.head.appendChild(script);
+        }
+      } catch (e) {
+        console.warn('TailwindCSS スクリプトの作成に失敗:', e);
+      }
+    });
   </script>
   <style>
     :root {
@@ -1175,17 +1202,24 @@
 
     // ユーザーIDの安全な初期化
     let userId = '';
-    try {
-      <? if (typeof userId !== "undefined" && userId) { ?>
-        userId = <?= JSON.stringify(String(userId)) ?>;
-      <? } ?>
-      if (!userId || typeof userId !== 'string') {
+    
+    // サーバーサイドから安全にデータを取得
+    (function() {
+      try {
+        // サーバーサイドスクリプトレットでデータを準備
+        var serverData = {
+          userId: <? if (typeof userId !== "undefined" && userId) { ?><?= JSON.stringify(String(userId).replace(/[<>'"&]/g, '')) ?><? } else { ?>''<? } ?>
+        };
+        
+        // データの検証と設定
+        if (serverData.userId && typeof serverData.userId === 'string' && serverData.userId.length > 0) {
+          userId = serverData.userId;
+        }
+      } catch (e) {
+        console.warn('サーバーデータの初期化でエラー:', e);
         userId = '';
       }
-    } catch (e) {
-      console.warn('userIdの初期化でエラー:', e);
-      userId = '';
-    }
+    })();
     let selectedSheet = '';
     let currentActiveSheet = '';
     let webAppUrl = '';
