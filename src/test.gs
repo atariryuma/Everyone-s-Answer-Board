@@ -10,6 +10,15 @@ const SCRIPT_PROPS_KEYS = {
   DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID'
 };
 
+// DB_SHEET_CONFIGの定義 (shared-mocks.jsから移植)
+const DB_SHEET_CONFIG = {
+    SHEET_NAME: 'Users',
+    HEADERS: [
+      'userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl',
+      'createdAt', 'configJson', 'lastAccessedAt', 'isActive'
+    ]
+  };
+
 /**
  * 統合テストマネージャー
  */
@@ -34,9 +43,29 @@ class UltraTestSuite {
       return 'mock_token';
     };
 
-    // getSheetsServiceをモック化（必要に応じて追加）
-    // this.originalFunctions.getSheetsService = getSheetsService;
-    // getSheetsService = () => { ... };
+    // findUserByIdをモック化 (API通信を回避)
+    this.originalFunctions.findUserById = findUserById;
+    findUserById = (userId) => {
+        console.log(`MOCK: findUserById called for ${userId}`);
+        if (userId === 'test_user_l1') {
+            return { userId: 'test_user_l1', adminEmail: 'test@example.com' };
+        }
+        return null;
+    };
+
+    // getHeadersCachedをモック化 (API通信を回避)
+    this.originalFunctions.getHeadersCached = getHeadersCached;
+    getHeadersCached = (spreadsheetId, sheetName) => {
+        console.log(`MOCK: getHeadersCached called for ${spreadsheetId}, ${sheetName}`);
+        return ['Header1', 'Header2', 'Header3'];
+    };
+
+    // getUserCachedをモック化 (findUserByIdに依存するため)
+    this.originalFunctions.getUserCached = getUserCached;
+    getUserCached = (userId) => {
+        console.log(`MOCK: getUserCached called for ${userId}`);
+        return findUserById(userId); // モック化されたfindUserByIdを呼ぶ
+    };
   }
 
   /**
@@ -46,7 +75,15 @@ class UltraTestSuite {
     if (this.originalFunctions.getServiceAccountTokenCached) {
       getServiceAccountTokenCached = this.originalFunctions.getServiceAccountTokenCached;
     }
-    // 他のモックもここで復元
+    if (this.originalFunctions.findUserById) {
+        findUserById = this.originalFunctions.findUserById;
+    }
+    if (this.originalFunctions.getHeadersCached) {
+        getHeadersCached = this.originalFunctions.getHeadersCached;
+    }
+    if (this.originalFunctions.getUserCached) {
+        getUserCached = this.originalFunctions.getUserCached;
+    }
   }
 
   /**
