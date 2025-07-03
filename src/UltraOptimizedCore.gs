@@ -99,7 +99,7 @@ function doGet(e) {
         .setTitle('新規登録');
     }
 
-    var userInfo = findUserByIdOptimized(userId);
+    var userInfo = findUserById(userId);
     if (!userInfo) {
       return HtmlService.createHtmlOutput('無効なユーザーIDです。');
     }
@@ -111,7 +111,7 @@ function doGet(e) {
     
     // ユーザーの最終アクセス日時を更新（非同期）
     try {
-      updateUserOptimized(userId, { lastAccessedAt: new Date().toISOString() });
+      updateUser(userId, { lastAccessedAt: new Date().toISOString() });
     } catch (e) {
       console.error('最終アクセス日時の更新に失敗: ' + e.message);
     }

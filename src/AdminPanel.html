@@ -1151,7 +1151,13 @@
       modal.classList.remove('flex');
     }
 
-    const userId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
+    let userId = '';
+    try {
+      userId = '<?= userId ?>' || '';
+    } catch (e) {
+      console.warn('userIdの初期化に失敗:', e);
+      userId = '';
+    }
     let selectedSheet = '';
     let currentActiveSheet = '';
     let webAppUrl = '';
@@ -1657,6 +1663,11 @@
     }
 
     function updateStatus(status) {
+      if (!status) {
+        console.error('updateStatus: statusパラメータが無効です');
+        return;
+      }
+      
       currentStatus = status; // ステータス情報を保存
       currentActiveSheet = status.activeSheetName || '';
       currentSpreadsheetUrl = status.spreadsheetUrl || '';
@@ -1687,24 +1698,24 @@
       }
       
       const headerUserIdEl = document.getElementById('header-user-id');
-      if (headerUserIdEl && status.userId) {
+      if (headerUserIdEl && status && status.userId) {
         headerUserIdEl.textContent = status.userId.substring(0, 8) + '...';
       }
       const headerAnswerCountEl = document.getElementById('header-answer-count');
-      if (headerAnswerCountEl) headerAnswerCountEl.textContent = status.answerCount || 0;
+      if (headerAnswerCountEl) headerAnswerCountEl.textContent = (status && status.answerCount) || 0;
       
       
 
       elements.sheetSelect.replaceChildren();
       
       // デバッグ情報を追加
-      console.log('allSheets received:', status.allSheets);
-      console.log('allSheets type:', typeof status.allSheets);
-      if (status.allSheets && status.allSheets.length > 0) {
+      console.log('allSheets received:', status && status.allSheets);
+      console.log('allSheets type:', status && typeof status.allSheets);
+      if (status && status.allSheets && status.allSheets.length > 0) {
         console.log('First sheet item:', status.allSheets[0], 'type:', typeof status.allSheets[0]);
       }
       
-      if (status.allSheets && status.allSheets.length > 0) {
+      if (status && status.allSheets && status.allSheets.length > 0) {
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
         defaultOption.textContent = '-- アクティブシートを選択 --';
