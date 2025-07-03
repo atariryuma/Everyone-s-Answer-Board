@@ -246,7 +246,7 @@ class UltraTestSuite {
       
       // URL生成テスト
       const testUserId = 'test_user_123';
-      const urls = generateAppUrlsOptimized(testUserId);
+      const urls = generateAppUrls(testUserId);
       
       // URLキャッシュクリアテスト
       clearUrlCache();

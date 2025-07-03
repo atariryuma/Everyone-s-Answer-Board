@@ -23,7 +23,7 @@ var ULTRA_CONFIG = {
  */
 
 // ログ出力の最適化
-function logOptimized(level, message, details) {
+function log(level, message, details) {
   try {
     if (typeof globalProfiler !== 'undefined') {
       globalProfiler.start('logging');

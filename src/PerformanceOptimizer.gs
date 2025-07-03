@@ -161,7 +161,7 @@ class OptimizedSheetsAPI {
   /**
    * 超高速バッチ取得（並列処理対応）
    */
-  async batchGetOptimized(spreadsheetId, ranges) {
+  async batchGet(spreadsheetId, ranges) {
     // 100範囲制限を考慮してチャンク分割
     const chunks = this._chunkArray(ranges, 100);
     const allResults = [];
@@ -180,7 +180,7 @@ class OptimizedSheetsAPI {
   /**
    * 超高速バッチ更新
    */
-  async batchUpdateOptimized(spreadsheetId, requests) {
+  async batchUpdate(spreadsheetId, requests) {
     // リクエストサイズ制限を考慮
     const chunks = this._chunkArray(requests, 1000);
     const results = [];

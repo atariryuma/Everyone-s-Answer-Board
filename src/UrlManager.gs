@@ -11,7 +11,7 @@ var URL_CACHE_TTL = 3600; // 1時間
  * @returns {string} WebアプリURL
  */
 function getWebAppUrlCached() {
-  return getCachedValue(URL_CACHE_KEY, function() {
+  return AdvancedCacheManager.smartGet(URL_CACHE_KEY, function() {
     try {
       var url = ScriptApp.getService().getUrl();
       if (!url) {
@@ -49,7 +49,7 @@ function getFallbackUrl() {
  * @param {string} userId - ユーザーID
  * @returns {object} URL群
  */
-function generateAppUrlsOptimized(userId) {
+function generateAppUrls(userId) {
   try {
     var webAppUrl = getWebAppUrlCached();
     

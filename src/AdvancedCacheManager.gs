@@ -326,7 +326,7 @@ function getHeadersCached(spreadsheetId, sheetName) {
   return AdvancedCacheManager.smartGet(
     `${CACHE_CONFIG.PATTERNS.HEADERS}${spreadsheetId}_${sheetName}`,
     () => {
-      const service = getOptimizedSheetsService();
+      const service = getSheetsService();
       const response = batchGetSheetsData(service, spreadsheetId, [`${sheetName}!1:1`]);
       const headers = response.valueRanges[0].values?.[0] || [];
       

@@ -766,28 +766,21 @@ function getWebAppUrl() {
   return getWebAppUrlCached();
 }
 
-function findUserById(userId) {
-  return findUserByIdOptimized(userId);
-}
-
-function findUserByEmail(email) {
-  return findUserByEmailOptimized(email);
-}
-
+// Legacy wrapper functions - これらの関数は実際の実装がDatabaseManager.gsとUrlManager.gsに移動されました
 function createUserInDb(userData) {
-  return createUserOptimized(userData);
+  return createUser(userData);
 }
 
 function updateUserInDb(userId, updateData) {
-  return updateUserOptimized(userId, updateData);
+  return updateUser(userId, updateData);
 }
 
-function getSheetsService() {
-  return getOptimizedSheetsService();
+function getHeaderIndices(spreadsheetId, sheetName) {
+  return getHeadersCached(spreadsheetId, sheetName);
 }
 
 function clearAllCaches() {
-  clearAllCache();
+  performCacheCleanup();
   clearServiceAccountTokenCache();
 }
 
@@ -1335,5 +1328,97 @@ function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
       LIKE: { count: 0, reacted: false },
       CURIOUS: { count: 0, reacted: false }
     };
+  }
+}
+
+// =================================================================
+// 追加のコアファンクション（Code.gsから移行）
+// =================================================================
+
+/**
+ * スプレッドシートが開かれた際に実行される
+ */
+function onOpen() {
+  try {
+    var ui = SpreadsheetApp.getUi();
+    ui.createMenu('📋 みんなの回答ボード')
+      .addItem('📊 管理パネルを開く', 'showAdminSidebar')
+      .addSeparator()
+      .addItem('🔄 キャッシュをクリア', 'clearAllCaches')
+      .addItem('📝 名簿キャッシュをクリア', 'clearRosterCache')
+      .addToUi();
+  } catch (e) {
+    console.error('メニュー作成エラー: ' + e.message);
+  }
+}
+
+/**
+ * 監査ログを記録
+ * @param {string} action - 実行されたアクション
+ * @param {string} userId - ユーザーID
+ * @param {object} details - 詳細情報
+ */
+function auditLog(action, userId, details) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    if (!dbId) return;
+
+    var service = getSheetsService();
+    var range = LOG_SHEET_CONFIG.SHEET_NAME + '!A:D';
+    service.spreadsheets.values.append(
+      dbId,
+      range,
+      { values: [[new Date().toISOString(), userId, action, JSON.stringify(details || {})]] },
+      { valueInputOption: 'USER_ENTERED' }
+    );
+  } catch (e) {
+    console.error('監査ログ記録エラー: ' + e.message);
+  }
+}
+
+/**
+ * 回答ボードのデータを強制的に再読み込み
+ */
+function refreshBoardData() {
+  try {
+    performCacheCleanup(); // 全キャッシュをクリア
+    debugLog('回答ボードのデータ強制再読み込みをトリガーしました。');
+    return { status: 'success', message: '回答ボードのデータを更新しました。' };
+  } catch (e) {
+    console.error('回答ボードのデータ再読み込みエラー: ' + e.message);
+    return { status: 'error', message: '回答ボードのデータ更新に失敗しました: ' + e.message };
+  }
+}
+
+/**
+ * 管理サイドバーを表示
+ */
+function showAdminSidebar() {
+  try {
+    var template = HtmlService.createTemplateFromFile('AdminSidebar');
+    var html = template.evaluate()
+      .setTitle('みんなの回答ボード - 管理パネル')
+      .setWidth(400);
+    
+    SpreadsheetApp.getUi().showSidebar(html);
+  } catch (e) {
+    console.error('管理サイドバー表示エラー: ' + e.message);
+    SpreadsheetApp.getUi().alert('管理パネルの表示に失敗しました: ' + e.message);
+  }
+}
+
+/**
+ * 名簿キャッシュをクリア
+ */
+function clearRosterCache() {
+  try {
+    // AdvancedCacheManagerを使用してキャッシュクリア
+    if (typeof AdvancedCacheManager !== 'undefined') {
+      AdvancedCacheManager.conditionalClear('roster');
+    }
+    debugLog('名簿キャッシュをクリアしました');
+  } catch (e) {
+    console.error('名簿キャッシュクリアエラー: ' + e.message);
   }
 }

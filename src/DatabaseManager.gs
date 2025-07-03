@@ -11,9 +11,9 @@ var DB_BATCH_SIZE = 100;
  * 最適化されたSheetsサービスを取得
  * @returns {object} Sheets APIサービス
  */
-function getOptimizedSheetsService() {
+function getSheetsService() {
   var accessToken = getServiceAccountTokenCached();
-  return createOptimizedSheetsService(accessToken);
+  return createSheetsService(accessToken);
 }
 
 /**
@@ -21,7 +21,7 @@ function getOptimizedSheetsService() {
  * @param {string} userId - ユーザーID
  * @returns {object|null} ユーザー情報
  */
-function findUserByIdOptimized(userId) {
+function findUserById(userId) {
   var cacheKey = 'user_' + userId;
   var cache = CacheService.getScriptCache();
   
@@ -53,7 +53,7 @@ function findUserByIdOptimized(userId) {
  * @param {string} email - メールアドレス
  * @returns {object|null} ユーザー情報
  */
-function findUserByEmailOptimized(email) {
+function findUserByEmail(email) {
   var cacheKey = 'email_' + email;
   var cache = CacheService.getScriptCache();
   
@@ -90,7 +90,7 @@ function fetchUserFromDatabase(field, value) {
   try {
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    var service = getOptimizedSheetsService();
+    var service = getSheetsService();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
     var data = batchGetSheetsData(service, dbId, [sheetName + '!A:H']);
@@ -126,11 +126,11 @@ function fetchUserFromDatabase(field, value) {
  * @param {object} updateData - 更新データ
  * @returns {object} 更新結果
  */
-function updateUserOptimized(userId, updateData) {
+function updateUser(userId, updateData) {
   try {
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    var service = getOptimizedSheetsService();
+    var service = getSheetsService();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
     // 現在のデータを取得
@@ -191,10 +191,10 @@ function updateUserOptimized(userId, updateData) {
  * @param {object} userData - 作成するユーザーデータ
  * @returns {object} 作成されたユーザーデータ
  */
-function createUserOptimized(userData) {
+function createUser(userData) {
   var props = PropertiesService.getScriptProperties();
   var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-  var service = getOptimizedSheetsService();
+  var service = getSheetsService();
   var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
   var newRow = DB_SHEET_CONFIG.HEADERS.map(function(header) { 
@@ -215,8 +215,8 @@ function createUserOptimized(userData) {
  * データベースシートを初期化
  * @param {string} spreadsheetId - データベースのスプレッドシートID
  */
-function initializeDatabaseSheetOptimized(spreadsheetId) {
-  var service = getOptimizedSheetsService();
+function initializeDatabaseSheet(spreadsheetId) {
+  var service = getSheetsService();
   var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
   try {
@@ -263,7 +263,7 @@ function clearDatabaseCache() {
  * @param {string} accessToken - アクセストークン
  * @returns {object} Sheetsサービスオブジェクト
  */
-function createOptimizedSheetsService(accessToken) {
+function createSheetsService(accessToken) {
   return {
     accessToken: accessToken,
     baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets'

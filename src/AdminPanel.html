@@ -7,6 +7,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#1a1b26" />
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
+  <? if (typeof userId !== "undefined" && userId) { ?>
+  <meta name="user-id" content="<?= Utilities.htmlEncode(String(userId)) ?>">
+  <? } ?>
 
   <script>
     // グローバルエラーハンドリング
@@ -1203,20 +1206,16 @@
     // ユーザーIDの安全な初期化
     let userId = '';
     
-    // サーバーサイドから安全にデータを取得
+    // HTMLデータ属性から安全にデータを取得（スクリプトレットを使わない方法）
     (function() {
       try {
-        // サーバーサイドスクリプトレットでデータを準備
-        var serverData = {
-          userId: <? if (typeof userId !== "undefined" && userId) { ?><?= JSON.stringify(String(userId).replace(/[<>'"&]/g, '')) ?><? } else { ?>''<? } ?>
-        };
-        
-        // データの検証と設定
-        if (serverData.userId && typeof serverData.userId === 'string' && serverData.userId.length > 0) {
-          userId = serverData.userId;
+        // metaタグからデータを取得
+        const userIdMeta = document.querySelector('meta[name="user-id"]');
+        if (userIdMeta && userIdMeta.content) {
+          userId = userIdMeta.content;
         }
       } catch (e) {
-        console.warn('サーバーデータの初期化でエラー:', e);
+        console.warn('ユーザーIDの初期化でエラー:', e);
         userId = '';
       }
     })();
