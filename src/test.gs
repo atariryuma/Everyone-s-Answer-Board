@@ -583,14 +583,19 @@ class UltraTestSuite {
     this.profiler.start(testName);
     
     try {
+      // Level 1 ユーザーキャッシュテスト
       const l1Data = getUserCached('test_user_l1');
-      const authToken = getAuthTokenCached();
+      
+      // Level 2 認証トークンキャッシュテスト
+      const authToken = getServiceAccountTokenCached();
+      
+      // Level 3 ヘッダーキャッシュテスト
       const headers = getHeadersCached('test_spreadsheet', 'test_sheet');
       
       this._recordSuccess(testName, {
-        level1Cache: l1Data !== undefined,
-        authTokenCache: typeof authToken === 'string' || authToken === null,
-        headerCache: headers !== undefined
+        level1Cache: l1Data !== undefined && l1Data.userId === 'test_user_l1',
+        authTokenCache: authToken === 'mock_token',
+        headerCache: Array.isArray(headers) && headers.length > 0
       });
       
     } catch (error) {

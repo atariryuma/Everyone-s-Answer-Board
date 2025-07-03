@@ -88,5 +88,6 @@ function generateAppUrls(userId) {
  * URLキャッシュをクリア
  */
 function clearUrlCache() {
-  removeCachedValue(URL_CACHE_KEY);
+  AdvancedCacheManager.conditionalClear(URL_CACHE_KEY);
+  debugLog('URLキャッシュをクリアしました。');
 }
