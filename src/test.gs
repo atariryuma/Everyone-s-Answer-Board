@@ -29,13 +29,34 @@ class UltraTestSuite {
     this.profiler = new PerformanceProfiler();
     this.healthMonitor = StabilityEnhancer.createHealthMonitor();
     this.originalFunctions = {}; // 元の関数を保存するオブジェクト
-    this.setupMockProperties();
+    this.originalProperties = {}; // 元のプロパティを保存するオブジェクト
   }
 
   /**
-   * モックを設定
+   * モックと一時的なプロパティを設定
    */
-  setupMocks() {
+  setupMocksAndProperties() {
+    // --- プロパティのモック化 ---
+    const props = PropertiesService.getScriptProperties();
+    const keysToMock = [
+        SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS,
+        SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID
+    ];
+
+    // 元のプロパティを保存
+    keysToMock.forEach(key => {
+        this.originalProperties[key] = props.getProperty(key);
+    });
+
+    // ダミーのプロパティを設定
+    props.setProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS, JSON.stringify({
+      "private_key": "-----BEGIN PRIVATE KEY-----\nFAKE_KEY\n-----END PRIVATE KEY-----\n",
+      "client_email": "test@example.iam.gserviceaccount.com"
+    }));
+    props.setProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID, 'mock_db_id_safe');
+    console.log('テスト用に一時的なスクリプトプロパティを設定しました。');
+
+    // --- 関数のモック化 ---
     // getServiceAccountTokenCachedをモック化
     this.originalFunctions.getServiceAccountTokenCached = getServiceAccountTokenCached;
     getServiceAccountTokenCached = () => {
@@ -69,9 +90,20 @@ class UltraTestSuite {
   }
 
   /**
-   * モックを解除し、元の関数に復元
+   * モックとプロパティを復元
    */
-  restoreMocks() {
+  restoreMocksAndProperties() {
+    // --- 関数の復元 ---
+    Object.keys(this.originalFunctions).forEach(key => {
+        // グローバルスコープの関数を元の関数に戻す
+        // このアプローチはevalを必要とする可能性があるため、より安全な方法を検討
+        // 今回は直接代入で試みる
+        if (this.originalFunctions[key]) {
+            // 例: getServiceAccountTokenCached = this.originalFunctions.getServiceAccountTokenCached;
+            // 動的に行うのは困難なため、静的に記述
+        }
+    });
+    // 静的な復元
     if (this.originalFunctions.getServiceAccountTokenCached) {
       getServiceAccountTokenCached = this.originalFunctions.getServiceAccountTokenCached;
     }
@@ -84,21 +116,20 @@ class UltraTestSuite {
     if (this.originalFunctions.getUserCached) {
         getUserCached = this.originalFunctions.getUserCached;
     }
+
+    // --- プロパティの復元 ---
+    const props = PropertiesService.getScriptProperties();
+    Object.keys(this.originalProperties).forEach(key => {
+        const originalValue = this.originalProperties[key];
+        if (originalValue !== null && originalValue !== undefined) {
+            props.setProperty(key, originalValue);
+        } else {
+            props.deleteProperty(key);
+        }
+    });
+    console.log('スクリプトプロパティを元の状態に復元しました。');
   }
 
-  /**
-   * テスト用のプロパティを設定
-   */
-  setupMockProperties() {
-    const props = PropertiesService.getScriptProperties();
-    // ダミーの認証情報を設定（テスト実行に必要）
-    props.setProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS, JSON.stringify({
-      "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC...\n-----END PRIVATE KEY-----\n",
-      "client_email": "test@example.iam.gserviceaccount.com"
-    }));
-    // ダミーのデータベースIDを設定
-    props.setProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID, 'mock_db_id');
-  }
   
   /**
    * 全機能統合テスト実行
@@ -111,7 +142,7 @@ class UltraTestSuite {
     const startTime = Date.now();
     
     try {
-      this.setupMocks(); // モックを設定
+      this.setupMocksAndProperties(); // モックとプロパティを安全に設定
 
       // Phase 0: アーキテクチャ存在確認テスト
       await this._runArchitectureExistenceTests();
@@ -158,7 +189,7 @@ class UltraTestSuite {
       console.error('❌ テストスイート全体の実行エラー:', error.message);
       throw error;
     } finally {
-      this.restoreMocks(); // モックを解除
+      this.restoreMocksAndProperties(); // モックとプロパティを復元
     }
   }
 
