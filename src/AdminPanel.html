@@ -681,7 +681,7 @@
                 </button>
                 
                 <!-- シート詳細情報 -->
-                <div id="sheet-details" class="mt-4 space-y-3" style="display: none;">
+                <div id="sheet-details" class="mt-4 space-y-3 hidden">
                   <!-- 現在のアクティブシート -->
                   <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3">
                     <div class="flex items-center gap-2 mb-2">
@@ -1154,6 +1154,7 @@
     let currentActiveSheet = '';
     let webAppUrl = '';
     let currentSpreadsheetUrl = '';
+    let currentStatus = null; // 現在のステータス情報を保存
     
 
     let elements = {}; // elementsオブジェクトを初期化
@@ -1646,6 +1647,7 @@
     }
 
     function updateStatus(status) {
+      currentStatus = status; // ステータス情報を保存
       currentActiveSheet = status.activeSheetName || '';
       currentSpreadsheetUrl = status.spreadsheetUrl || '';
       
@@ -2096,7 +2098,7 @@
       if (!elements.sheetDetails) return;
       
       // シート詳細コンテナを表示
-      elements.sheetDetails.style.display = 'block';
+      elements.sheetDetails.classList.remove('hidden');
       
       // 現在のアクティブシート名を更新
       if (elements.currentActiveSheetName) {
@@ -2116,22 +2118,22 @@
       // スプレッドシートリンクを更新
       if (elements.spreadsheetLink && currentSpreadsheetUrl) {
         elements.spreadsheetLink.href = currentSpreadsheetUrl;
-        elements.spreadsheetLink.style.display = 'inline';
+        elements.spreadsheetLink.classList.remove('hidden');
       }
       
       // フォームリンクを更新（currentStatusから取得）
       if (elements.formLink && currentStatus && currentStatus.formUrl) {
         elements.formLink.href = currentStatus.formUrl;
-        elements.formLink.style.display = 'inline';
+        elements.formLink.classList.remove('hidden');
       } else if (elements.formLink) {
-        elements.formLink.style.display = 'none';
+        elements.formLink.classList.add('hidden');
       }
     }
     
     // シート詳細情報を非表示にする関数
     function hideSheetDetails() {
       if (elements.sheetDetails) {
-        elements.sheetDetails.style.display = 'none';
+        elements.sheetDetails.classList.add('hidden');
       }
     }
 
