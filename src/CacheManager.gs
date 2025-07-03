@@ -247,6 +247,15 @@ function clearAllCache() {
     cache.removeAll(cacheKeys);
   }
 
+  // ヘッダーインデックスキャッシュを明示的にクリア
+  var allKeys = Object.keys(properties);
+  allKeys.forEach(function(key) {
+    if (key.indexOf('headers_') === 0 || key.indexOf('hdr_') === 0 || key.indexOf('CACHE_headers_') === 0) {
+      props.deleteProperty(key);
+      debugLog('ヘッダーキャッシュクリア: ' + key);
+    }
+  });
+  
   debugLog('全キャッシュをクリアしました: PropertiesServiceとCacheService');
   
   // ユーザープロパティもクリア（認証関連のキャッシュ）
