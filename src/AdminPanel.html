@@ -8,7 +8,19 @@
   <meta name="theme-color" content="#1a1b26" />
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
 
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // TailwindCSS を安全に読み込み
+    try {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.tailwindcss.com';
+      script.onerror = function() {
+        console.warn('TailwindCSS の読み込みに失敗しました');
+      };
+      document.head.appendChild(script);
+    } catch (e) {
+      console.warn('TailwindCSS スクリプトの作成に失敗:', e);
+    }
+  </script>
   <style>
     :root {
       --color-primary: #8be9fd;
@@ -1152,13 +1164,11 @@
       modal.classList.remove('flex');
     }
 
+    // ユーザーIDの安全な初期化
     let userId = '';
-    try {
-      userId = '<?= userId ?>' || '';
-    } catch (e) {
-      console.warn('userIdの初期化に失敗:', e);
-      userId = '';
-    }
+    <? if (typeof userId !== "undefined" && userId) { ?>
+      userId = <?= JSON.stringify(userId) ?>;
+    <? } ?>
     let selectedSheet = '';
     let currentActiveSheet = '';
     let webAppUrl = '';
