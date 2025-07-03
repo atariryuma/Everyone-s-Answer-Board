@@ -157,9 +157,7 @@ function getPerformanceMetrics() {
     }
     
     // キャッシュ健康状態
-    if (typeof AdvancedCacheManager !== 'undefined') {
-      metrics.cache = AdvancedCacheManager.getHealth();
-    }
+    metrics.cache = cacheManager.getHealth();
     
     // 基本システム情報
     metrics.system = {

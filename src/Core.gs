@@ -780,7 +780,7 @@ function getHeaderIndices(spreadsheetId, sheetName) {
 }
 
 function clearAllCaches() {
-  performCacheCleanup();
+  cacheManager.clearExpired();
   clearServiceAccountTokenCache();
 }
 
@@ -1382,7 +1382,7 @@ function auditLog(action, userId, details) {
  */
 function refreshBoardData() {
   try {
-    performCacheCleanup(); // 全キャッシュをクリア
+    cacheManager.clearExpired(); // 全キャッシュをクリア
     debugLog('回答ボードのデータ強制再読み込みをトリガーしました。');
     return { status: 'success', message: '回答ボードのデータを更新しました。' };
   } catch (e) {
@@ -1413,10 +1413,8 @@ function showAdminSidebar() {
  */
 function clearRosterCache() {
   try {
-    // AdvancedCacheManagerを使用してキャッシュクリア
-    if (typeof AdvancedCacheManager !== 'undefined') {
-      AdvancedCacheManager.conditionalClear('roster');
-    }
+    // CacheManagerを使用してキャッシュクリア
+    cacheManager.clearByPattern('roster');
     debugLog('名簿キャッシュをクリアしました');
   } catch (e) {
     console.error('名簿キャッシュクリアエラー: ' + e.message);

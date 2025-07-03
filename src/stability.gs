@@ -428,7 +428,8 @@ class AutoRecoveryService {
     
     // キャッシュ健康状態チェック
     try {
-      const cacheHealth = AdvancedCacheManager.getHealth();
+      // キャッシュの健全性をチェック
+  const cacheHealth = cacheManager.getHealth();
       results.checks.cache = cacheHealth;
       
       if (cacheHealth.healthScore < 70) {
@@ -477,7 +478,7 @@ class AutoRecoveryService {
     
     try {
       // 期限切れキャッシュクリーンアップ
-      performCacheCleanup();
+      cacheManager.clearExpired();
       repairLog.push('Cache cleanup completed');
       
       // 古い緊急状態クリア（24時間以上前）

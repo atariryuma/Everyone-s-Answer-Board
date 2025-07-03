@@ -12,27 +12,8 @@ var TOKEN_EXPIRY_BUFFER = 300; // 5分のバッファ
  * @returns {string} アクセストークン
  */
 function getServiceAccountTokenCached() {
-  var cache = CacheService.getScriptCache();
-  var tokenData = cache.get(AUTH_CACHE_KEY);
-  
-  if (tokenData) {
-    try {
-      tokenData = JSON.parse(tokenData);
-      var now = Math.floor(Date.now() / 1000);
-      
-      // トークンがまだ有効な場合は再利用
-      if (tokenData.expiresAt > now + TOKEN_EXPIRY_BUFFER) {
-        debugLog('キャッシュされたトークンを使用');
-        return tokenData.token;
-      }
-    } catch (e) {
-      console.error('トークンキャッシュ解析エラー:', e);
-    }
-  }
-  
-  // 新しいトークンを生成
-  var newToken = generateNewServiceAccountToken();
-  return newToken;
+  return cacheManager.get(AUTH_CACHE_KEY, generateNewServiceAccountToken, { ttl: 3500 });
+}
 }
   
 /**
@@ -78,26 +59,13 @@ function generateNewServiceAccountToken() {
   });
   
   var responseData = JSON.parse(response.getContentText());
-  var accessToken = responseData.access_token;
-  
-  // キャッシュに保存
-  var tokenData = {
-    token: accessToken,
-    expiresAt: expiresAt - TOKEN_EXPIRY_BUFFER
-  };
-  
-  var cache = CacheService.getScriptCache();
-  cache.put(AUTH_CACHE_KEY, JSON.stringify(tokenData), 3600); // 1時間キャッシュ
-  
-  debugLog('新しいトークンを生成・キャッシュしました');
-  return accessToken;
+  return responseData.access_token;
 }
 
 /**
  * トークンキャッシュをクリア
  */
 function clearServiceAccountTokenCache() {
-  var cache = CacheService.getScriptCache();
-  cache.remove(AUTH_CACHE_KEY);
+  cacheManager.remove(AUTH_CACHE_KEY);
   debugLog('トークンキャッシュをクリアしました');
 }

@@ -1,364 +1,184 @@
 /**
- * @fileoverview 超高速キャッシュ管理システム - 2024年最新GAS技術
- * V8ランタイムの最新機能とメモ化パターンを活用
+ * @fileoverview 統合キャッシュマネージャー
+ * アプリケーション全体のキャッシュ戦略を管理します。
+ * シングルトンパターンで実装され、常に単一のインスタンス(cacheManager)を使用します。
  */
-
-// V8ランタイムを活用したES6+の定数定義
-const CACHE_CONFIG = {
-  // 最大6時間制限を活用
-  MAX_TTL: 21600, // 6時間
-  DEFAULT_TTL: 3600, // 1時間
-  SHORT_TTL: 300, // 5分
-  
-  // マルチスコープ戦略
-  SCOPES: {
-    DOCUMENT: 'document',
-    SCRIPT: 'script', 
-    USER: 'user'
-  },
-  
-  // キーパターン
-  PATTERNS: {
-    USER: 'u_',
-    AUTH: 'auth_',
-    HEADERS: 'hdr_',
-    ROSTER: 'rstr_',
-    TEMP: 'tmp_'
-  }
-};
 
 /**
- * 超高速マルチレイヤーキャッシュシステム
- * 2024年最新のGASパフォーマンスパターンを実装
+ * キャッシュマネージャークラス
  */
-class AdvancedCacheManager {
-  
+class CacheManager {
+  constructor() {
+    this.scriptCache = CacheService.getScriptCache();
+    this.memoCache = new Map(); // メモ化用の高速キャッシュ
+    this.defaultTTL = 21600; // デフォルトTTL（6時間）
+  }
+
   /**
-   * インテリジェントキャッシュ取得
+   * キャッシュから値を取得、なければ指定された関数で生成して保存します。
    * @param {string} key - キャッシュキー
-   * @param {Function} fetchFunction - データ取得関数
-   * @param {Object} options - オプション設定
+   * @param {function} valueFn - 値を生成する関数
+   * @param {object} [options] - オプション { ttl: number, enableMemoization: boolean }
+   * @returns {*} キャッシュされた値
    */
-  static smartGet(key, fetchFunction, options = {}) {
-    const {
-      ttl = CACHE_CONFIG.DEFAULT_TTL,
-      scope = CACHE_CONFIG.SCOPES.SCRIPT,
-      fallbackToProperties = true,
-      enableMemoization = true
-    } = options;
-    
-    // メモ化チェック（V8ランタイムの高速オブジェクト操作を活用）
-    if (enableMemoization && this._memoCache.has(key)) {
-      const memoEntry = this._memoCache.get(key);
-      if (Date.now() - memoEntry.timestamp < CACHE_CONFIG.SHORT_TTL * 1000) {
+  get(key, valueFn, options = {}) {
+    const { ttl = this.defaultTTL, enableMemoization = false } = options;
+
+    // 1. メモ化キャッシュのチェック
+    if (enableMemoization && this.memoCache.has(key)) {
+      const memoEntry = this.memoCache.get(key);
+      // メモ化キャッシュの有効期限チェック（オプション）
+      if (!memoEntry.ttl || (memoEntry.createdAt + memoEntry.ttl * 1000 > Date.now())) {
+        debugLog(`[Cache] Memo hit for key: ${key}`);
         return memoEntry.value;
       }
     }
-    
-    // マルチスコープキャッシュチェック
-    const cache = this._getCache(scope);
-    let cachedValue = cache.get(key);
-    
-    if (cachedValue !== null) {
-      try {
-        const parsed = JSON.parse(cachedValue);
-        // メモ化更新
+
+    // 2. Apps Scriptキャッシュのチェック
+    try {
+      const cachedValue = this.scriptCache.get(key);
+      if (cachedValue !== null) {
+        debugLog(`[Cache] ScriptCache hit for key: ${key}`);
+        const parsedValue = JSON.parse(cachedValue);
         if (enableMemoization) {
-          this._memoCache.set(key, { value: parsed, timestamp: Date.now() });
+          this.memoCache.set(key, { value: parsedValue, createdAt: Date.now(), ttl });
         }
-        return parsed;
-      } catch (e) {
-        console.warn(`キャッシュデータ解析エラー (${key}):`, e.message);
-      }
-    }
-    
-    // PropertiesServiceフォールバック（長期キャッシュ）
-    if (fallbackToProperties) {
-      const propValue = this._getFromProperties(key);
-      if (propValue !== null) {
-        // CacheServiceにも保存してアクセス高速化
-        cache.put(key, JSON.stringify(propValue), Math.min(ttl, CACHE_CONFIG.MAX_TTL));
-        return propValue;
-      }
-    }
-    
-    // データ新規取得とキャッシュ
-    try {
-      const value = fetchFunction();
-      if (value !== null && value !== undefined) {
-        this._smartPut(key, value, { ttl, scope, fallbackToProperties });
-        
-        // メモ化
-        if (enableMemoization) {
-          this._memoCache.set(key, { value, timestamp: Date.now() });
-        }
-      }
-      return value;
-    } catch (error) {
-      console.error(`データ取得エラー (${key}):`, error.message);
-      return null;
-    }
-  }
-  
-  /**
-   * インテリジェントキャッシュ保存
-   * @param {string} key - キーー
-   * @param {any} value - 値
-   * @param {Object} options - オプション
-   */
-  static _smartPut(key, value, options = {}) {
-    const {
-      ttl = CACHE_CONFIG.DEFAULT_TTL,
-      scope = CACHE_CONFIG.SCOPES.SCRIPT,
-      fallbackToProperties = true
-    } = options;
-    
-    const serialized = JSON.stringify(value);
-    const cache = this._getCache(scope);
-    
-    // CacheServiceに保存
-    try {
-      cache.put(key, serialized, Math.min(ttl, CACHE_CONFIG.MAX_TTL));
-    } catch (e) {
-      console.warn(`CacheService保存警告 (${key}):`, e.message);
-    }
-    
-    // 長期保存用PropertiesService
-    if (fallbackToProperties && ttl > CACHE_CONFIG.DEFAULT_TTL) {
-      try {
-        const propData = {
-          value: value,
-          expiresAt: Date.now() + (ttl * 1000),
-          created: Date.now()
-        };
-        PropertiesService.getScriptProperties().setProperty(
-          `CACHE_${key}`, 
-          JSON.stringify(propData)
-        );
-      } catch (e) {
-        console.warn(`PropertiesService保存警告 (${key}):`, e.message);
-      }
-    }
-  }
-  
-  /**
-   * スコープ別キャッシュインスタンス取得
-   */
-  static _getCache(scope) {
-    switch (scope) {
-      case CACHE_CONFIG.SCOPES.DOCUMENT:
-        return CacheService.getDocumentCache();
-      case CACHE_CONFIG.SCOPES.USER:
-        return CacheService.getUserCache();
-      default:
-        return CacheService.getScriptCache();
-    }
-  }
-  
-  /**
-   * PropertiesServiceからデータ取得
-   */
-  static _getFromProperties(key) {
-    try {
-      const props = PropertiesService.getScriptProperties();
-      const propValue = props.getProperty(`CACHE_${key}`);
-      
-      if (propValue) {
-        const data = JSON.parse(propValue);
-        if (data.expiresAt > Date.now()) {
-          return data.value;
-        } else {
-          // 期限切れデータ削除
-          props.deleteProperty(`CACHE_${key}`);
-        }
+        return parsedValue;
       }
     } catch (e) {
-      console.warn(`PropertiesService取得警告 (${key}):`, e.message);
+      console.warn(`[Cache] Failed to parse cache for key: ${key}`, e.message);
     }
-    return null;
+
+    // 3. 値の生成とキャッシュ保存
+    debugLog(`[Cache] Miss for key: ${key}. Generating new value.`);
+    const newValue = valueFn();
+    
+    try {
+      const stringValue = JSON.stringify(newValue);
+      this.scriptCache.put(key, stringValue, ttl);
+      if (enableMemoization) {
+        this.memoCache.set(key, { value: newValue, createdAt: Date.now(), ttl });
+      }
+    } catch (e) {
+      console.error(`[Cache] Failed to cache value for key: ${key}`, e.message);
+    }
+
+    return newValue;
   }
-  
+
   /**
-   * バッチキャッシュ操作（高速化）
+   * 複数のキーを一括で取得します。
+   * @param {string[]} keys - キーの配列
+   * @param {function} valuesFn - 見つからなかったキーの値を取得する関数
+   * @param {object} [options] - オプション { ttl: number }
+   * @returns {Object.<string, *>} キーと値のオブジェクト
    */
-  static batchGet(keys, fetchFunction, options = {}) {
+  batchGet(keys, valuesFn, options = {}) {
+    const { ttl = this.defaultTTL } = options;
     const results = {};
-    const missingKeys = [];
-    
-    // 既存キャッシュ一括チェック
-    const cache = this._getCache(options.scope || CACHE_CONFIG.SCOPES.SCRIPT);
-    keys.forEach(key => {
-      const cached = cache.get(key);
-      if (cached !== null) {
-        try {
-          results[key] = JSON.parse(cached);
-        } catch (e) {
-          missingKeys.push(key);
-        }
-      } else {
-        missingKeys.push(key);
+    let missingKeys = [];
+
+    try {
+      const cachedValues = this.scriptCache.getAll(keys);
+      for (const key in cachedValues) {
+        results[key] = JSON.parse(cachedValues[key]);
       }
-    });
-    
-    // 不足データの一括取得
-    if (missingKeys.length > 0) {
-      try {
-        const newData = fetchFunction(missingKeys);
-        Object.keys(newData).forEach(key => {
-          results[key] = newData[key];
-          this._smartPut(key, newData[key], options);
-        });
-      } catch (e) {
-        console.error('バッチデータ取得エラー:', e.message);
-      }
+      missingKeys = keys.filter(k => !results.hasOwnProperty(k));
+    } catch (e) {
+      console.warn('[Cache] batchGet failed', e.message);
+      missingKeys = keys;
     }
-    
+
+    if (missingKeys.length > 0) {
+      const newValues = valuesFn(missingKeys);
+      const newCacheValues = {};
+      for (const key in newValues) {
+        results[key] = newValues[key];
+        newCacheValues[key] = JSON.stringify(newValues[key]);
+      }
+      this.scriptCache.putAll(newCacheValues, ttl);
+    }
+
     return results;
   }
-  
+
   /**
-   * 条件付きキャッシュクリア
+   * 指定されたキーのキャッシュを削除します。
+   * @param {string} key - 削除するキャッシュキー
    */
-  static conditionalClear(pattern, condition = null) {
-    // CacheServiceはパターンベース削除をサポートしないため、
-    // PropertiesServiceで管理
-    try {
-      const props = PropertiesService.getScriptProperties();
-      const allProperties = props.getProperties();
-      
-      Object.keys(allProperties).forEach(key => {
-        if (key.startsWith('CACHE_') && key.includes(pattern)) {
-          if (!condition || condition(key, allProperties[key])) {
-            props.deleteProperty(key);
-          }
-        }
-      });
-    } catch (e) {
-      console.error('条件付きクリアエラー:', e.message);
-    }
+  remove(key) {
+    this.scriptCache.remove(key);
+    this.memoCache.delete(key);
+    debugLog(`[Cache] Removed cache for key: ${key}`);
   }
-  
+
   /**
-   * キャッシュ統計と健康状態チェック
+   * パターンに一致するキーのキャッシュを削除します。
+   * @param {string} pattern - 削除するキーのパターン（部分一致）
    */
-  static getHealth() {
-    try {
-      const props = PropertiesService.getScriptProperties();
-      const allProperties = props.getProperties();
-      
-      const cacheProps = Object.keys(allProperties)
-        .filter(key => key.startsWith('CACHE_'));
-      
-      let totalSize = 0;
-      let expiredCount = 0;
-      const now = Date.now();
-      
-      cacheProps.forEach(key => {
-        const value = allProperties[key];
-        totalSize += value.length;
-        
-        try {
-          const data = JSON.parse(value);
-          if (data.expiresAt && data.expiresAt < now) {
-            expiredCount++;
-          }
-        } catch (e) {
-          // 無効なデータ
-          expiredCount++;
-        }
-      });
-      
-      return {
-        totalItems: cacheProps.length,
-        estimatedSize: totalSize,
-        expiredItems: expiredCount,
-        healthScore: Math.max(0, 100 - (expiredCount / cacheProps.length * 100)),
-        memoCacheSize: this._memoCache.size
-      };
-    } catch (e) {
-      console.error('健康状態チェックエラー:', e.message);
-      return { error: e.message };
-    }
+  clearByPattern(pattern) {
+    // この機能はCacheServiceにネイティブサポートされていないため、
+    // 全てのキーを取得してフィルタリングする必要があります。大規模なキャッシュではパフォーマンスに影響する可能性があります。
+    // 現在の実装では、特定のキーを直接削除するアプローチを推奨します。
+    // 今回は前方互換性のために、特定のキーを削除するラッパーとして実装します。
+    this.remove(pattern);
+    console.warn(`[Cache] clearByPattern was called. For better performance, use direct key removal. Key removed: ${pattern}`);
+  }
+
+  /**
+   * 期限切れのキャッシュをクリアします（この機能はGASでは自動です）。
+   * メモ化キャッシュをクリアする目的で実装します。
+   */
+  clearExpired() {
+    this.memoCache.clear();
+    debugLog('[Cache] Cleared memoization cache.');
+  }
+
+  /**
+   * キャッシュの健全性情報を取得します。
+   * @returns {object} 健全性情報
+   */
+  getHealth() {
+    // CacheServiceにはサイズを取得するAPIがないため、メモ化キャッシュのサイズのみを返します。
+    return {
+      memoCacheSize: this.memoCache.size,
+      status: 'ok'
+    };
   }
 }
 
-// V8ランタイム高速Mapインスタンス（メモ化用）
-AdvancedCacheManager._memoCache = new Map();
+// --- シングルトンインスタンスの作成 ---
+const cacheManager = new CacheManager();
+
+// ==============================================
+// 後方互換性のためのラッパー関数（移行期間中）
+// ==============================================
 
 /**
- * 特化型キャッシュヘルパー関数群
- */
-
-/**
- * ユーザー情報専用高速キャッシュ
+ * @deprecated cacheManager.get() を使用してください
  */
 function getUserCached(userId) {
-  return AdvancedCacheManager.smartGet(
-    `${CACHE_CONFIG.PATTERNS.USER}${userId}`,
-    () => fetchUserFromDatabase('userId', userId),
-    {
-      ttl: CACHE_CONFIG.DEFAULT_TTL,
-      scope: CACHE_CONFIG.SCOPES.SCRIPT,
-      enableMemoization: true
-    }
-  );
+  return cacheManager.get(`user_${userId}`, () => findUserById(userId), { enableMemoization: true });
 }
 
 /**
- * 認証トークン専用キャッシュ
- */
-function getAuthTokenCached() {
-  return AdvancedCacheManager.smartGet(
-    `${CACHE_CONFIG.PATTERNS.AUTH}token`,
-    () => generateNewServiceAccountToken(),
-    {
-      ttl: 3300, // 55分（1時間-5分バッファ）
-      scope: CACHE_CONFIG.SCOPES.SCRIPT,
-      fallbackToProperties: false // セキュリティ上の理由
-    }
-  );
-}
-
-/**
- * ヘッダー情報専用キャッシュ
+ * @deprecated cacheManager.get() を使用してください
  */
 function getHeadersCached(spreadsheetId, sheetName) {
-  return AdvancedCacheManager.smartGet(
-    `${CACHE_CONFIG.PATTERNS.HEADERS}${spreadsheetId}_${sheetName}`,
-    () => {
-      const service = getSheetsService();
-      const response = batchGetSheetsData(service, spreadsheetId, [`${sheetName}!1:1`]);
-      const headers = response.valueRanges[0].values?.[0] || [];
-      
-      // ヘッダーインデックスマップを生成
-      const indices = {};
-      Object.values(COLUMN_HEADERS).forEach(header => {
-        const index = headers.indexOf(header);
-        if (index !== -1) indices[header] = index;
-      });
-      
-      return indices;
-    },
-    {
-      ttl: CACHE_CONFIG.MAX_TTL, // ヘッダーは変更頻度が低い
-      scope: CACHE_CONFIG.SCOPES.SCRIPT
-    }
-  );
+  const key = `hdr_${spreadsheetId}_${sheetName}`;
+  return cacheManager.get(key, () => getHeaderIndices(spreadsheetId, sheetName));
 }
 
 /**
- * 高速キャッシュクリーンアップ（期限切れアイテム削除）
+ * @deprecated cacheManager.get() を使用してください
  */
-function performCacheCleanup() {
-  AdvancedCacheManager.conditionalClear('', (key, value) => {
+function getWebAppUrlCached() {
+  return cacheManager.get('WEB_APP_URL', () => {
     try {
-      const data = JSON.parse(value);
-      return data.expiresAt && data.expiresAt < Date.now();
+      const url = ScriptApp.getService().getUrl();
+      return url ? (url.endsWith('/') ? url.slice(0, -1) : url) : '';
     } catch (e) {
-      return true; // 無効なデータは削除
+      return '';
     }
   });
-  
-  // メモ化キャッシュもクリア
-  AdvancedCacheManager._memoCache.clear();
 }

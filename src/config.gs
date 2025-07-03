@@ -468,7 +468,7 @@ function addSpreadsheetUrl(url) {
     }
     
     // キャッシュをクリアして最新の状態を確保
-    removeCachedPattern(spreadsheetId);
+    cacheManager.clearByPattern(spreadsheetId);
     
     return { 
       status: 'success', 
@@ -525,7 +525,7 @@ function switchToSheet(sheetName) {
     });
     
     // キャッシュをクリア（シート切り替え時に最新情報を取得するため）
-    removeCachedPattern(userInfo.spreadsheetId);
+    cacheManager.clearByPattern(userInfo.spreadsheetId);
     
     console.log('シート切り替え完了:', {
       userId: currentUserId,

@@ -11,7 +11,7 @@ var URL_CACHE_TTL = 3600; // 1時間
  * @returns {string} WebアプリURL
  */
 function getWebAppUrlCached() {
-  return AdvancedCacheManager.smartGet(URL_CACHE_KEY, function() {
+  return cacheManager.get(URL_CACHE_KEY, function() {
     try {
       var url = ScriptApp.getService().getUrl();
       if (!url) {
@@ -25,7 +25,7 @@ function getWebAppUrlCached() {
       console.error('WebアプリURL取得エラー: ' + e.message);
       return getFallbackUrl();
     }
-  }, 'medium');
+  }, { ttl: 3600 });
 }
 
 /**
@@ -88,6 +88,6 @@ function generateAppUrls(userId) {
  * URLキャッシュをクリア
  */
 function clearUrlCache() {
-  AdvancedCacheManager.conditionalClear(URL_CACHE_KEY);
+  cacheManager.remove(URL_CACHE_KEY);
   debugLog('URLキャッシュをクリアしました。');
 }

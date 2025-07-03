@@ -19,6 +19,9 @@ const DB_SHEET_CONFIG = {
     ]
   };
 
+// デバッグモードの定義
+const DEBUG = true;
+
 /**
  * 統合テストマネージャー
  */
@@ -212,8 +215,8 @@ class UltraTestSuite {
       { name: 'DB_updateUser', check: () => typeof updateUser === 'function' },
       { name: 'DB_createUser', check: () => typeof createUser === 'function' },
       // キャッシュ管理
-      { name: 'Cache_AdvancedCacheManager', check: () => typeof AdvancedCacheManager !== 'undefined' },
-      { name: 'Cache_performCacheCleanup', check: () => typeof performCacheCleanup === 'function' },
+      { name: 'Cache_AdvancedCacheManager', check: () => typeof CacheManager !== 'undefined' },
+      { name: 'Cache_performCacheCleanup', check: () => typeof cacheManager.clearExpired === 'function' },
       // URL管理
       { name: 'URL_getWebAppUrlCached', check: () => typeof getWebAppUrlCached === 'function' },
       { name: 'URL_generateAppUrls', check: () => typeof generateAppUrls === 'function' },
@@ -294,26 +297,48 @@ class UltraTestSuite {
    * 高度キャッシュマネージャーテスト
    */
   async _testAdvancedCacheManager() {
-    const testName = 'AdvancedCacheManager';
+    const testName = 'CacheManager';
     this.profiler.start(testName);
     
     try {
+      // 基本キャッシュテスト
       const testData = { timestamp: Date.now(), data: 'test_value' };
       const testKey = 'ultra_test_key';
-      const cached = AdvancedCacheManager.smartGet(testKey, () => testData, { ttl: 300, enableMemoization: true });
-      const memoCached = AdvancedCacheManager.smartGet(testKey, () => ({ error: 'should not be called' }), { enableMemoization: true });
-      const batchResults = AdvancedCacheManager.batchGet(['key1', 'key2', 'key3'], (keys) => {
-        const results = {};
-        keys.forEach(key => { results[key] = { key, timestamp: Date.now() }; });
-        return results;
-      });
-      const health = AdvancedCacheManager.getHealth();
+      
+      // キャッシュ保存テスト
+      const cached = cacheManager.get(
+        testKey,
+        () => testData,
+        { ttl: 300, enableMemoization: true }
+      );
+      
+      // 即座に取得（メモ化テスト）
+      const memoCached = cacheManager.get(
+        testKey,
+        () => ({ error: 'should not be called' }),
+        { enableMemoization: true }
+      );
+      
+      // バッチ操作テスト
+      const batchResults = cacheManager.batchGet(
+        ['key1', 'key2', 'key3'],
+        (keys) => {
+          const results = {};
+          keys.forEach(key => {
+            results[key] = { key, timestamp: Date.now() };
+          });
+          return results;
+        }
+      );
+      
+      // 健康状態チェック
+      const health = cacheManager.getHealth();
       
       this._recordSuccess(testName, {
         basicCache: cached && cached.data === 'test_value',
         memoization: memoCached && memoCached.data === 'test_value',
         batchOperation: Object.keys(batchResults).length === 3,
-        healthCheck: health && typeof health.totalItems === 'number'
+        healthCheck: health && typeof health.memoCacheSize === 'number'
       });
       
     } catch (error) {
@@ -613,8 +638,11 @@ class UltraTestSuite {
     this.profiler.start(testName);
     
     try {
-      performCacheCleanup();
-      AdvancedCacheManager.conditionalClear('test_pattern');
+      // 期限切れキャッシュクリーンアップテスト
+      cacheManager.clearExpired();
+      
+      // 条件付きクリアテスト
+      cacheManager.clearByPattern('test_pattern');
       
       this._recordSuccess(testName, {
         cleanupExecution: true,
@@ -638,7 +666,7 @@ class UltraTestSuite {
     try {
       const startTime = Date.now();
       for (let i = 0; i < 100; i++) {
-        AdvancedCacheManager.smartGet(`perf_test_${i}`, () => ({ data: `test_data_${i}`, timestamp: Date.now() }), { ttl: 300 });
+        cacheManager.get(`perf_test_${i}`, () => ({ data: `test_data_${i}`, timestamp: Date.now() }), { ttl: 300 });
       }
       const operationTime = Date.now() - startTime;
       
