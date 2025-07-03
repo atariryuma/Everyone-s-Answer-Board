@@ -782,7 +782,7 @@ function updateUserInDb(userId, updateData) {
   return updateUserOptimized(userId, updateData);
 }
 
-function getSheetsService() {
+function getOptimizedSheetsService() {
   return getOptimizedSheetsService();
 }
 

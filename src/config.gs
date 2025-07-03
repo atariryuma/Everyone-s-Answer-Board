@@ -18,7 +18,7 @@ function getCurrentSpreadsheet() {
       throw new Error('ユーザーIDが設定されていません');
     }
     
-    var userInfo = findUserById(currentUserId);
+    var userInfo = findUserByIdOptimized(currentUserId);
     if (!userInfo || !userInfo.spreadsheetId) {
       throw new Error('ユーザー情報またはスプレッドシートIDが見つかりません');
     }
@@ -85,7 +85,7 @@ function getConfig(sheetName) {
           var props = PropertiesService.getUserProperties();
           var currentUserId = props.getProperty('CURRENT_USER_ID');
           if (currentUserId) {
-            var userInfo = findUserById(currentUserId);
+            var userInfo = findUserByIdOptimized(currentUserId);
             if (userInfo && userInfo.configJson) {
               var userConfig = JSON.parse(userInfo.configJson);
               var sheetConfig = userConfig['sheet_' + sheetName] || {};
@@ -191,7 +191,7 @@ function saveSheetConfig(sheetName, cfg) {
       throw new Error('ユーザーコンテキストが設定されていません。');
     }
     
-    var userInfo = findUserById(currentUserId);
+    var userInfo = findUserByIdOptimized(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません。');
     }
@@ -210,7 +210,7 @@ function saveSheetConfig(sheetName, cfg) {
     };
     
     // データベースに更新
-    updateUserInDb(currentUserId, {
+    updateUserOptimized(currentUserId, {
       configJson: JSON.stringify(configJson)
     });
     
@@ -251,7 +251,7 @@ function getSheetHeaders(sheetName) {
 }
 
 /**
- * スプレッドシートURLを追加
+ * スプレッドシートURLを追加してシート検出を実行
  * Unpublished.htmlから呼び出される
  */
 function addSpreadsheetUrl(url) {
@@ -268,7 +268,7 @@ function addSpreadsheetUrl(url) {
       throw new Error('ユーザーコンテキストが設定されていません。');
     }
     
-    var userInfo = findUserById(currentUserId);
+    var userInfo = findUserByIdOptimized(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません。');
     }
@@ -277,12 +277,36 @@ function addSpreadsheetUrl(url) {
     addServiceAccountToSpreadsheet(spreadsheetId);
     
     // ユーザー情報にスプレッドシートIDとURLを更新
-    updateUserInDb(currentUserId, {
+    updateUserOptimized(currentUserId, {
       spreadsheetId: spreadsheetId,
       spreadsheetUrl: url
     });
     
-    return { status: 'success', message: 'スプレッドシートが正常に追加されました。' };
+    // シートリストを即座に取得
+    var sheets = [];
+    try {
+      sheets = getSheetsListOptimized(currentUserId);
+      console.log('シート検出完了:', {
+        spreadsheetId: spreadsheetId,
+        sheetCount: sheets.length,
+        sheets: sheets.map(s => s.name)
+      });
+    } catch (sheetError) {
+      console.warn('シートリスト取得でエラー:', sheetError.message);
+      // シートリスト取得に失敗してもスプレッドシート追加は成功とする
+    }
+    
+    // キャッシュをクリアして最新の状態を確保
+    removeCachedPattern(spreadsheetId);
+    
+    return { 
+      status: 'success', 
+      message: 'スプレッドシートが正常に追加されました。', 
+      sheets: sheets,
+      spreadsheetId: spreadsheetId,
+      autoSelectFirst: sheets.length > 0 ? sheets[0].name : null,
+      needsRefresh: true // UI側でのリフレッシュが必要
+    };
   } catch (e) {
     console.error('addSpreadsheetUrl エラー: ' + e.message);
     throw new Error('スプレッドシートの追加に失敗しました: ' + e.message);
@@ -302,7 +326,7 @@ function switchToSheet(sheetName) {
       throw new Error('ユーザーコンテキストが設定されていません。');
     }
     
-    var userInfo = findUserById(currentUserId);
+    var userInfo = findUserByIdOptimized(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません。');
     }
@@ -325,7 +349,7 @@ function switchToSheet(sheetName) {
       console.log(`シート「${sheetName}」の列設定がありません。デフォルト設定を使用します。`);
     }
     
-    updateUserInDb(currentUserId, {
+    updateUserOptimized(currentUserId, {
       configJson: JSON.stringify(configJson)
     });
     
@@ -358,7 +382,7 @@ function clearActiveSheet() {
       throw new Error('ユーザーコンテキストが設定されていません。');
     }
     
-    var userInfo = findUserById(currentUserId);
+    var userInfo = findUserByIdOptimized(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません。');
     }
@@ -367,7 +391,7 @@ function clearActiveSheet() {
     configJson.publishedSheet = ''; // アクティブシートをクリア
     configJson.appPublished = false; // 公開停止
     
-    updateUserInDb(currentUserId, {
+    updateUserOptimized(currentUserId, {
       configJson: JSON.stringify(configJson)
     });
     
@@ -391,7 +415,7 @@ function setDisplayOptions(options) {
       throw new Error('ユーザーコンテキストが設定されていません。');
     }
     
-    var userInfo = findUserById(currentUserId);
+    var userInfo = findUserByIdOptimized(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません。');
     }
@@ -400,7 +424,7 @@ function setDisplayOptions(options) {
     configJson.showNames = options.showNames;
     configJson.showCounts = options.showCounts;
     
-    updateUserInDb(currentUserId, {
+    updateUserOptimized(currentUserId, {
       configJson: JSON.stringify(configJson)
     });
     
@@ -485,7 +509,7 @@ function createBoardFromAdmin() {
       isActive: 'true'
     };
     
-    createUserInDb(userData);
+    createUserOptimized(userData);
     
     // 成功レスポンスを返す
     var appUrls = generateAppUrls(userId);
@@ -511,10 +535,10 @@ function createBoardFromAdmin() {
 function getExistingBoard() {
   try {
     var activeUserEmail = Session.getActiveUser().getEmail();
-    var userInfo = findUserByEmail(activeUserEmail);
+    var userInfo = findUserByEmailOptimized(activeUserEmail);
     
     if (userInfo && userInfo.isActive === 'true') {
-      var appUrls = generateAppUrls(userInfo.userId);
+      var appUrls = generateAppUrlsOptimized(userInfo.userId);
       return {
         status: 'existing_user',
         userId: userInfo.userId,

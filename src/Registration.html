@@ -426,9 +426,9 @@
         id="register-btn"
         class="cta-button w-full py-3 px-6 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-bold rounded-lg transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-gray-800 fade-in"
         disabled
-        aria-label="みんなの回答ボードの登録を開始する"
+        aria-label="ログインしてみんなの回答ボードを開始する"
       >
-        みんなの回答ボードを開始する
+        ログインして開始する
       </button>
       
       <!-- メッセージエリア -->
@@ -835,7 +835,7 @@
         .withFailureHandler(error => {
           showMessage(`エラー: ${error.message || '登録に失敗しました'}`, 'error');
           btn.disabled = false;
-          btn.textContent = 'みんなの回答ボードを開始する';
+          btn.textContent = 'ログインして開始する';
         })
         .registerNewUser(userEmail);
     });
