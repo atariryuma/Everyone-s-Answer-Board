@@ -69,7 +69,7 @@ function getConfig(sheetName) {
       emailHeader: COLUMN_HEADERS.EMAIL
     };
 
-    // シート固有の設定を取得
+    // シート固有の設定を取得（簡素化版）
     if (sheetName) {
       console.log('設定を取得中: シート名 = ' + sheetName);
       
@@ -77,41 +77,31 @@ function getConfig(sheetName) {
         var sheet = spreadsheet.getSheetByName(sheetName);
         if (sheet && sheet.getLastRow() > 0) {
           var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-          
-          // 実際のヘッダーに基づいて設定を調整
           var availableHeaders = headers.filter(function(h) { return h && h.toString().trim() !== ''; });
-          
-          // 現在のユーザー設定から保存済みの列設定を取得
-          var props = PropertiesService.getUserProperties();
-          var currentUserId = props.getProperty('CURRENT_USER_ID');
-          if (currentUserId) {
-            var userInfo = findUserByIdOptimized(currentUserId);
-            if (userInfo && userInfo.configJson) {
-              var userConfig = JSON.parse(userInfo.configJson);
-              var sheetConfig = userConfig['sheet_' + sheetName] || {};
-              
-              // 保存済みの設定があれば使用
-              if (sheetConfig.mainHeader && availableHeaders.indexOf(sheetConfig.mainHeader) !== -1) {
-                config.mainHeader = sheetConfig.mainHeader;
-                config.answerHeader = sheetConfig.mainHeader;
-                config.opinionHeader = sheetConfig.mainHeader;
-              }
-              if (sheetConfig.rHeader && availableHeaders.indexOf(sheetConfig.rHeader) !== -1) {
-                config.rHeader = sheetConfig.rHeader;
-                config.reasonHeader = sheetConfig.rHeader;
-              }
-              if (sheetConfig.nameHeader && availableHeaders.indexOf(sheetConfig.nameHeader) !== -1) {
-                config.nameHeader = sheetConfig.nameHeader;
-              }
-              if (sheetConfig.classHeader && availableHeaders.indexOf(sheetConfig.classHeader) !== -1) {
-                config.classHeader = sheetConfig.classHeader;
-              }
-            }
-          }
           
           // 利用可能なヘッダー情報を追加
           config.availableHeaders = availableHeaders;
           config.sheetName = sheetName;
+          
+          // デフォルトマッピング（簡素化）
+          availableHeaders.forEach(function(header) {
+            var headerLower = header.toString().toLowerCase();
+            if (headerLower.includes('回答') || headerLower.includes('意見') || headerLower.includes('answer')) {
+              config.mainHeader = header;
+              config.answerHeader = header;
+              config.opinionHeader = header;
+            }
+            if (headerLower.includes('理由') || headerLower.includes('reason')) {
+              config.rHeader = header;
+              config.reasonHeader = header;
+            }
+            if (headerLower.includes('名前') || headerLower.includes('name')) {
+              config.nameHeader = header;
+            }
+            if (headerLower.includes('クラス') || headerLower.includes('class')) {
+              config.classHeader = header;
+            }
+          });
           
           console.log('シート設定を取得しました:', {
             sheetName: sheetName,
@@ -121,6 +111,8 @@ function getConfig(sheetName) {
         }
       } catch (sheetError) {
         console.warn('シート固有設定の取得でエラー:', sheetError.message);
+        config.availableHeaders = [];
+        config.sheetName = sheetName || '';
       }
     }
 
