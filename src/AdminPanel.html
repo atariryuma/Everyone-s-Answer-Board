@@ -1133,8 +1133,17 @@
 
     function showConfirmationModal(title, message, onConfirm) {
       const modal = document.getElementById('confirmation-modal');
-      document.getElementById('modal-title').textContent = title;
-      document.getElementById('modal-message').textContent = message;
+      const modalTitle = document.getElementById('modal-title');
+      const modalMessage = document.getElementById('modal-message');
+      
+      if (modalTitle) modalTitle.textContent = title;
+      if (modalMessage) modalMessage.textContent = message;
+      
+      if (!modal) {
+        console.error('確認モーダルが見つかりません');
+        return;
+      }
+      
       modal.classList.remove('hidden');
       modal.classList.add('flex');
 
@@ -1166,9 +1175,17 @@
 
     // ユーザーIDの安全な初期化
     let userId = '';
-    <? if (typeof userId !== "undefined" && userId) { ?>
-      userId = <?= JSON.stringify(userId) ?>;
-    <? } ?>
+    try {
+      <? if (typeof userId !== "undefined" && userId) { ?>
+        userId = <?= JSON.stringify(String(userId)) ?>;
+      <? } ?>
+      if (!userId || typeof userId !== 'string') {
+        userId = '';
+      }
+    } catch (e) {
+      console.warn('userIdの初期化でエラー:', e);
+      userId = '';
+    }
     let selectedSheet = '';
     let currentActiveSheet = '';
     let webAppUrl = '';
