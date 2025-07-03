@@ -23,7 +23,7 @@ function generateNewServiceAccountToken() {
   var props = PropertiesService.getScriptProperties();
   var serviceAccountCreds = JSON.parse(props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
   
-  var privateKey = serviceAccountCreds.private_key;
+  var privateKey = serviceAccountCreds.private_key.replace(/\n/g, '\n'); // 改行文字を正規化
   var clientEmail = serviceAccountCreds.client_email;
   var tokenUrl = "https://www.googleapis.com/oauth2/v4/token";
   
