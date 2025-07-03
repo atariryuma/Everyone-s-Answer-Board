@@ -4,6 +4,12 @@
  * このファイルは architecture-test.gs と test.gs を統合し、最適化したものです。
  */
 
+// SCRIPT_PROPS_KEYSの定義 (shared-mocks.jsから移植)
+const SCRIPT_PROPS_KEYS = {
+  SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
+  DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID'
+};
+
 /**
  * 統合テストマネージャー
  */
@@ -13,11 +19,27 @@ class UltraTestSuite {
     this.results = [];
     this.profiler = new PerformanceProfiler();
     this.healthMonitor = StabilityEnhancer.createHealthMonitor();
+    this.setupMockProperties();
+  }
+
+  /**
+   * テスト用のプロパティを設定
+   */
+  setupMockProperties() {
+    const props = PropertiesService.getScriptProperties();
+    // ダミーの認証情報を設定（テスト実行に必要）
+    props.setProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS, JSON.stringify({
+      "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC...\n-----END PRIVATE KEY-----\n",
+      "client_email": "test@example.iam.gserviceaccount.com"
+    }));
+    // ダミーのデータベースIDを設定
+    props.setProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID, 'mock_db_id');
   }
   
   /**
    * 全機能統合テスト実行
    */
+
   async runCompleteTestSuite() {
     console.log('🚀 Ultra-Optimized Integrated Test Suite 開始');
     console.log('================================================');
