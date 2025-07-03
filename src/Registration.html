@@ -606,48 +606,58 @@
         if (email) {
           updateStep(2); // Account verification step
           
-          // まず既存ボード情報をチェック
-          google.script.run
-            .withSuccessHandler((result) => {
-              if (result && result.status) {
-                switch (result.status) {
-                  case 'setup_required':
-                    updateStep(3);
-                    showMessage('セットアップが必要です。管理者にセットアップページでの初期設定を依頼してください。', 'warning');
-                    // セットアップページへのリンクを表示
-                    const setupUrl = window.location.href.split('?')[0] + '?setup=true';
-                    showMessage(`セットアップページ: <a href="${setupUrl}" target="_blank" style="color: #8be9fd;">こちら</a>`, 'info');
-                    break;
-                  case 'existing_user':
+          // 新規アカウント扱いフラグをチェック
+          const treatAsNewAccount = sessionStorage.getItem('treat_as_new_account') === 'true';
+          
+          if (treatAsNewAccount) {
+            // 新規アカウント扱いの場合は既存ボードチェックをスキップ
+            sessionStorage.removeItem('treat_as_new_account'); // フラグをクリア
+            updateStep(3);
+            document.getElementById('register-btn').disabled = false;
+            showMessage('新しいアカウントでの登録を開始できます。', 'success');
+          } else {
+            // 通常の既存ボード情報をチェック
+            google.script.run
+              .withSuccessHandler((result) => {
+                if (result && result.status) {
+                  switch (result.status) {
+                    case 'setup_required':
+                      updateStep(3);
+                      showMessage('セットアップが必要です。管理者にセットアップページでの初期設定を依頼してください。', 'warning');
+                      // セットアップページへのリンクを表示
+                      const setupUrl = window.location.href.split('?')[0] + '?setup=true';
+                      showMessage(`セットアップページ: <a href="${setupUrl}" target="_blank" style="color: #8be9fd;">こちら</a>`, 'info');
+                      break;
+                    case 'existing_user':
+                      updateStep(3);
+                      showExistingBoard(result);
+                      break;
+                    case 'new_user':
+                      updateStep(3);
+                      document.getElementById('register-btn').disabled = false;
+                      showMessage('アカウント確認が完了しました。みんなの回答ボードを開始できます。', 'success');
+                      break;
+                    case 'auth_required':
+                      showMessage('Googleアカウントでログインしてください。', 'error');
+                      break;
+                    default:
+                      updateStep(3);
+                      document.getElementById('register-btn').disabled = false;
+                      showMessage('アカウント確認が完了しました。StudyQuestを開始できます。', 'success');
+                      break;
+                  }
+                } else {
+                  // レガシー形式の対応
+                  if (result && result.userId) {
                     updateStep(3);
                     showExistingBoard(result);
-                    break;
-                  case 'new_user':
+                  } else {
                     updateStep(3);
                     document.getElementById('register-btn').disabled = false;
                     showMessage('アカウント確認が完了しました。みんなの回答ボードを開始できます。', 'success');
-                    break;
-                  case 'auth_required':
-                    showMessage('Googleアカウントでログインしてください。', 'error');
-                    break;
-                  default:
-                    updateStep(3);
-                    document.getElementById('register-btn').disabled = false;
-                    showMessage('アカウント確認が完了しました。StudyQuestを開始できます。', 'success');
-                    break;
+                  }
                 }
-              } else {
-                // レガシー形式の対応
-                if (result && result.userId) {
-                  updateStep(3);
-                  showExistingBoard(result);
-                } else {
-                  updateStep(3);
-                  document.getElementById('register-btn').disabled = false;
-                  showMessage('アカウント確認が完了しました。みんなの回答ボードを開始できます。', 'success');
-                }
-              }
-            })
+              })
             .withFailureHandler((error) => {
               console.warn('既存ボード確認で問題が発生しました:', error);
               updateStep(3);
@@ -863,6 +873,26 @@
             <p class="text-sm text-blue-200">以下のURLからいつでも管理画面にアクセスできます</p>
           </div>
           <div id="existing-admin-link-container"></div>
+          
+          <!-- 別のアカウントで登録オプション -->
+          <div class="mt-6 p-4 bg-gray-800/50 border border-gray-600 rounded-lg">
+            <h5 class="font-semibold text-gray-300 mb-2 flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+              </svg>
+              別のアカウントで登録する場合
+            </h5>
+            <p class="text-sm text-gray-400 mb-3">
+              違うGoogleアカウントで新しいボードを作成したい場合は、以下のボタンをクリックしてください。
+            </p>
+            <button type="button" onclick="switchToAnotherAccount()" 
+                    class="btn btn-secondary w-full flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path>
+              </svg>
+              別のアカウントでログイン
+            </button>
+          </div>
         </div>`;
 
       const linkContainer = document.getElementById('existing-admin-link-container');
@@ -1068,6 +1098,115 @@
           hideTeacherGuideModal();
         }
       }
+    });
+    
+    // 別のアカウントでの登録機能
+    function switchToAnotherAccount() {
+      showMessage('別のアカウントに切り替え中...', 'info');
+      
+      // ローディングオーバーレイを表示
+      const overlay = document.createElement('div');
+      overlay.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50';
+      overlay.innerHTML = `
+        <div class="glass-panel p-8 rounded-xl text-center max-w-md">
+          <div class="spinner mx-auto mb-4"></div>
+          <h3 class="text-lg font-bold text-white mb-2">アカウント切り替え中</h3>
+          <p class="text-sm text-gray-400 mb-4">キャッシュをクリアして新しいアカウントでの登録を準備中...</p>
+          <div class="text-xs text-gray-500">
+            数秒後に自動的にページが再読み込みされます
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      
+      try {
+        // GAS側のキャッシュクリア API を呼び出し
+        google.script.run
+          .withSuccessHandler(() => {
+            // サーバーサイドキャッシュクリア完了後、クライアントサイドもクリア
+            clearClientSideCache();
+            
+            // 新規アカウント扱いフラグを設定
+            sessionStorage.setItem('treat_as_new_account', 'true');
+            
+            // 短い遅延後にページをリロードして認証状態をリセット
+            setTimeout(() => {
+              window.location.reload(true); // 強制リロード
+            }, 1500);
+          })
+          .withFailureHandler((error) => {
+            console.warn('サーバーサイドキャッシュクリアに失敗:', error);
+            // サーバーサイドクリアが失敗してもクライアントサイドクリアは実行
+            clearClientSideCache();
+            sessionStorage.setItem('treat_as_new_account', 'true');
+            setTimeout(() => {
+              window.location.reload(true);
+            }, 1500);
+          })
+          .clearAllCache(); // CacheManager.gsのclearAllCache関数を呼び出し
+        
+      } catch (error) {
+        console.error('アカウント切り替えエラー:', error);
+        // フォールバック: 直接クライアントサイドクリアとリロード
+        clearClientSideCache();
+        sessionStorage.setItem('treat_as_new_account', 'true');
+        setTimeout(() => {
+          document.body.removeChild(overlay);
+          window.location.reload(true);
+        }, 1000);
+      }
+    }
+    
+    // クライアントサイドキャッシュクリア関数
+    function clearClientSideCache() {
+      try {
+        // ローカルストレージをクリア（treat_as_new_account以外）
+        const treatAsNewAccount = sessionStorage.getItem('treat_as_new_account');
+        sessionStorage.clear();
+        localStorage.clear();
+        if (treatAsNewAccount) {
+          sessionStorage.setItem('treat_as_new_account', treatAsNewAccount);
+        }
+        
+        // Service Worker キャッシュをクリア
+        if ('caches' in window) {
+          caches.keys().then(names => {
+            names.forEach(name => {
+              caches.delete(name);
+            });
+          });
+        }
+        
+        // Cookie のクリア（可能な範囲）
+        document.cookie.split(";").forEach(function(c) { 
+          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+        });
+        
+        console.log('クライアントサイドキャッシュをクリアしました');
+      } catch (error) {
+        console.warn('クライアントサイドキャッシュクリアでエラーが発生:', error);
+      }
+    }
+    
+    // URLパラメータをチェックして新規アカウント扱いにする
+    function checkForNewAccountFlag() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const isNewAccount = urlParams.get('new_account') === 'true' || urlParams.get('force_account_selection') === 'true';
+      
+      if (isNewAccount) {
+        // URLパラメータをクリーンアップ
+        const cleanUrl = window.location.href.split('?')[0];
+        history.replaceState({}, document.title, cleanUrl);
+        
+        // 新規アカウント扱いフラグを設定
+        sessionStorage.setItem('treat_as_new_account', 'true');
+        showMessage('新しいアカウントでの登録準備が整いました。', 'success');
+      }
+    }
+    
+    // ページ読み込み時にフラグをチェック
+    document.addEventListener('DOMContentLoaded', function() {
+      checkForNewAccountFlag();
     });
   </script>
   

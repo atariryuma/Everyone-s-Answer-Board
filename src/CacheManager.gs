@@ -248,6 +248,14 @@ function clearAllCache() {
   }
 
   debugLog('全キャッシュをクリアしました: PropertiesServiceとCacheService');
+  
+  // ユーザープロパティもクリア（認証関連のキャッシュ）
+  var userProps = PropertiesService.getUserProperties();
+  userProps.deleteAll();
+  
+  // アカウント切り替え用のタイムスタンプを記録
+  var scriptProps = PropertiesService.getScriptProperties();
+  scriptProps.setProperty('CACHE_LAST_CLEARED', new Date().toISOString());
 }
 
 /**
