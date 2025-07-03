@@ -476,9 +476,9 @@
     // ドメイン情報の表示
     function displayDomainInfo(info) {
       domainInfo = info;
-      const section = document.getElementById('domain-info-section');
-      const matchPanel = document.getElementById('domain-match-panel');
-      const mismatchPanel = document.getElementById('domain-mismatch-panel');
+      var section = document.getElementById('domain-info-section');
+      var matchPanel = document.getElementById('domain-match-panel');
+      var mismatchPanel = document.getElementById('domain-mismatch-panel');
       
       if (!info || info.error) {
         console.warn('ドメイン情報の取得エラー:', info && info.error ? info.error : 'Unknown error');
@@ -530,21 +530,21 @@
         if (stepElement) {
           if (i <= step) {
             stepElement.classList.add('completed');
-            const stepCircle = stepElement.querySelector('div');
+            var stepCircle = stepElement.querySelector('div');
             if (stepCircle) {
               stepCircle.className = 'w-8 h-8 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-sm relative z-10';
             }
-            const stepLabel = stepElement.querySelector('span');
+            var stepLabel = stepElement.querySelector('span');
             if (stepLabel) {
               stepLabel.className = 'text-xs mt-2 block text-cyan-400';
             }
           } else {
             stepElement.classList.remove('completed');
-            const stepCircle = stepElement.querySelector('div');
+            var stepCircle = stepElement.querySelector('div');
             if (stepCircle) {
               stepCircle.className = 'w-8 h-8 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm relative z-10';
             }
-            const stepLabel = stepElement.querySelector('span');
+            var stepLabel = stepElement.querySelector('span');
             if (stepLabel) {
               stepLabel.className = 'text-xs mt-2 block text-gray-400';
             }
@@ -552,7 +552,7 @@
         }
         
         // Update section-specific icons (for steps 2 and 3)
-        const iconElement = document.getElementById('step-' + i + '-icon');
+        var iconElement = document.getElementById('step-' + i + '-icon');
         if (iconElement) {
           if (i <= step) {
             iconElement.className = 'w-6 h-6 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-sm';
@@ -607,7 +607,7 @@
           updateStep(2); // Account verification step
           
           // 新規アカウント扱いフラグをチェック
-          const treatAsNewAccount = sessionStorage.getItem('treat_as_new_account') === 'true';
+          var treatAsNewAccount = sessionStorage.getItem('treat_as_new_account') === 'true';
           
           if (treatAsNewAccount) {
             // 新規アカウント扱いの場合は既存ボードチェックをスキップ
@@ -728,7 +728,7 @@
       // 登録処理を実行
       google.script.run
 
-        .withSuccessHandler(result => {
+        .withSuccessHandler(function(result) {
           showMessage(result.message || '登録が完了しました！', 'success');
 
           const resultArea = document.getElementById('result-area');
@@ -943,7 +943,7 @@
           button.textContent = '✓ コピー済み';
           button.classList.add('bg-green-700');
           
-          setTimeout(() => {
+          setTimeout(function() {
             button.textContent = originalText;
             button.classList.remove('bg-green-700');
           }, 2000);
@@ -954,7 +954,7 @@
           button.textContent = '✗ コピー失敗';
           button.classList.add('bg-red-700');
           
-          setTimeout(() => {
+          setTimeout(function() {
             button.textContent = originalText;
             button.classList.remove('bg-red-700');
           }, 2000);
@@ -987,7 +987,7 @@
         .withSuccessHandler(function(result) {
           if (result.status === 'success') {
             updateProgress(100, 'セットアップ完了！');
-            setTimeout(() => {
+            setTimeout(function() {
               showQuickSetupComplete(result);
             }, 1000);
           } else {
@@ -1076,7 +1076,7 @@
       modal.classList.remove('hidden');
       
       // フォーカス管理
-      setTimeout(() => {
+      setTimeout(function() {
         const firstFocusable = modal.querySelector('h2') || modal.querySelector('button');
         if (firstFocusable) firstFocusable.focus();
       }, 100);
@@ -1088,9 +1088,9 @@
     }
     
     // ESCキーでモーダルを閉じる
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') {
-        const modal = document.getElementById('teacherGuideModal');
+        var modal = document.getElementById('teacherGuideModal');
         if (!modal.classList.contains('hidden')) {
           hideTeacherGuideModal();
         }
@@ -1119,7 +1119,7 @@
       try {
         // GAS側のキャッシュクリア API を呼び出し
         google.script.run
-          .withSuccessHandler(() => {
+          .withSuccessHandler(function() {
             // サーバーサイドキャッシュクリア完了後、クライアントサイドもクリア
             clearClientSideCache();
             
@@ -1127,7 +1127,7 @@
             sessionStorage.setItem('treat_as_new_account', 'true');
             
             // 短い遅延後にページをリロードして認証状態をリセット
-            setTimeout(() => {
+            setTimeout(function() {
               window.location.reload(true); // 強制リロード
             }, 1500);
           })
@@ -1136,7 +1136,7 @@
             // サーバーサイドクリアが失敗してもクライアントサイドクリアは実行
             clearClientSideCache();
             sessionStorage.setItem('treat_as_new_account', 'true');
-            setTimeout(() => {
+            setTimeout(function() {
               window.location.reload(true);
             }, 1500);
           })
@@ -1147,7 +1147,7 @@
         // フォールバック: 直接クライアントサイドクリアとリロード
         clearClientSideCache();
         sessionStorage.setItem('treat_as_new_account', 'true');
-        setTimeout(() => {
+        setTimeout(function() {
           document.body.removeChild(overlay);
           window.location.reload(true);
         }, 1000);
@@ -1167,8 +1167,8 @@
         
         // Service Worker キャッシュをクリア
         if ('caches' in window) {
-          caches.keys().then(names => {
-            names.forEach(name => {
+          caches.keys().then(function(names) {
+            names.forEach(function(name) {
               caches.delete(name);
             });
           });
@@ -1187,12 +1187,12 @@
     
     // URLパラメータをチェックして新規アカウント扱いにする
     function checkForNewAccountFlag() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const isNewAccount = urlParams.get('new_account') === 'true' || urlParams.get('force_account_selection') === 'true';
+      var urlParams = new URLSearchParams(window.location.search);
+      var isNewAccount = urlParams.get('new_account') === 'true' || urlParams.get('force_account_selection') === 'true';
       
       if (isNewAccount) {
         // URLパラメータをクリーンアップ
-        const cleanUrl = window.location.href.split('?')[0];
+        var cleanUrl = window.location.href.split('?')[0];
         history.replaceState({}, document.title, cleanUrl);
         
         // 新規アカウント扱いフラグを設定
