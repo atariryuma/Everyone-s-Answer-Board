@@ -69,9 +69,42 @@ function getConfig(sheetName) {
       emailHeader: COLUMN_HEADERS.EMAIL
     };
 
-    // シート固有の設定を取得（簡素化版）
+    // シート固有の設定を取得
     if (sheetName) {
       console.log('設定を取得中: シート名 = ' + sheetName);
+      
+      // 保存済みの設定があるかチェック
+      var hasExistingConfig = false;
+      try {
+        var props = PropertiesService.getUserProperties();
+        var currentUserId = props.getProperty('CURRENT_USER_ID');
+        
+        if (currentUserId) {
+          var userInfo = findUserByIdOptimized(currentUserId);
+          if (userInfo && userInfo.configJson) {
+            var configJson = JSON.parse(userInfo.configJson);
+            var sheetConfigKey = 'sheet_' + sheetName;
+            
+            if (configJson[sheetConfigKey]) {
+              hasExistingConfig = true;
+              var savedConfig = configJson[sheetConfigKey];
+              
+              // 保存された設定を適用
+              config.mainHeader = savedConfig.mainHeader || config.mainHeader;
+              config.rHeader = savedConfig.rHeader || config.rHeader;
+              config.nameHeader = savedConfig.nameHeader || config.nameHeader;
+              config.classHeader = savedConfig.classHeader || config.classHeader;
+              config.answerHeader = savedConfig.mainHeader || config.answerHeader;
+              config.opinionHeader = savedConfig.mainHeader || config.opinionHeader;
+              config.reasonHeader = savedConfig.rHeader || config.reasonHeader;
+              
+              console.log('保存済み設定を適用しました:', savedConfig);
+            }
+          }
+        }
+      } catch (configCheckError) {
+        console.warn('設定チェックでエラー:', configCheckError.message);
+      }
       
       try {
         var sheet = spreadsheet.getSheetByName(sheetName);
@@ -83,30 +116,64 @@ function getConfig(sheetName) {
           config.availableHeaders = availableHeaders;
           config.sheetName = sheetName;
           
-          // デフォルトマッピング（簡素化）
-          availableHeaders.forEach(function(header) {
-            var headerLower = header.toString().toLowerCase();
-            if (headerLower.includes('回答') || headerLower.includes('意見') || headerLower.includes('answer')) {
-              config.mainHeader = header;
-              config.answerHeader = header;
-              config.opinionHeader = header;
+          // 保存済み設定がない場合、自動マッピングを適用
+          if (!hasExistingConfig && availableHeaders.length > 0) {
+            console.log('保存済み設定がないため、自動マッピングを実行します');
+            
+            // より高度な自動マッピングを使用
+            var autoMapping = autoMapSheetHeaders(sheetName);
+            if (autoMapping) {
+              config.mainHeader = autoMapping.mainHeader || config.mainHeader;
+              config.rHeader = autoMapping.rHeader || config.rHeader;
+              config.nameHeader = autoMapping.nameHeader || config.nameHeader;
+              config.classHeader = autoMapping.classHeader || config.classHeader;
+              config.answerHeader = autoMapping.mainHeader || config.answerHeader;
+              config.opinionHeader = autoMapping.mainHeader || config.opinionHeader;
+              config.reasonHeader = autoMapping.rHeader || config.reasonHeader;
+              
+              console.log('自動マッピングを適用しました:', autoMapping);
+              
+              // 自動マッピングが成功した場合、設定を保存
+              try {
+                var saveResult = saveSheetConfig(sheetName, {
+                  mainHeader: config.mainHeader,
+                  rHeader: config.rHeader,
+                  nameHeader: config.nameHeader,
+                  classHeader: config.classHeader
+                });
+                console.log('自動マッピング設定を保存しました:', saveResult);
+              } catch (saveError) {
+                console.warn('自動マッピング設定の保存でエラー:', saveError.message);
+              }
+            } else {
+              // autoMapSheetHeaders が失敗した場合、従来のマッピングを使用
+              console.log('autoMapSheetHeaders失敗、従来のマッピングを使用');
+              availableHeaders.forEach(function(header) {
+                var headerLower = header.toString().toLowerCase();
+                if (headerLower.includes('回答') || headerLower.includes('意見') || headerLower.includes('answer')) {
+                  config.mainHeader = header;
+                  config.answerHeader = header;
+                  config.opinionHeader = header;
+                }
+                if (headerLower.includes('理由') || headerLower.includes('reason')) {
+                  config.rHeader = header;
+                  config.reasonHeader = header;
+                }
+                if (headerLower.includes('名前') || headerLower.includes('name')) {
+                  config.nameHeader = header;
+                }
+                if (headerLower.includes('クラス') || headerLower.includes('class')) {
+                  config.classHeader = header;
+                }
+              });
             }
-            if (headerLower.includes('理由') || headerLower.includes('reason')) {
-              config.rHeader = header;
-              config.reasonHeader = header;
-            }
-            if (headerLower.includes('名前') || headerLower.includes('name')) {
-              config.nameHeader = header;
-            }
-            if (headerLower.includes('クラス') || headerLower.includes('class')) {
-              config.classHeader = header;
-            }
-          });
+          }
           
           console.log('シート設定を取得しました:', {
             sheetName: sheetName,
             availableHeaders: availableHeaders.length,
-            mainHeader: config.mainHeader
+            mainHeader: config.mainHeader,
+            hasExistingConfig: hasExistingConfig
           });
         }
       } catch (sheetError) {
@@ -262,6 +329,82 @@ function getSheetHeaders(sheetName) {
   } catch (e) {
     console.error('getSheetHeaders エラー: ' + e.message);
     throw new Error('シートヘッダーの取得に失敗しました: ' + e.message);
+  }
+}
+
+/**
+ * スプレッドシートの列名から自動的にconfig設定を推測する
+ */
+function autoMapSheetHeaders(sheetName) {
+  try {
+    var headers = getSheetHeaders(sheetName);
+    if (!headers || headers.length === 0) {
+      return null;
+    }
+    
+    var mapping = {
+      mainHeader: '',
+      rHeader: '',
+      nameHeader: '',
+      classHeader: ''
+    };
+    
+    // 各ヘッダーを小文字で比較してマッピング
+    headers.forEach(function(header) {
+      var lowerHeader = header.toLowerCase();
+      
+      // 回答/意見/コメント系の列を探す
+      if (!mapping.mainHeader && (
+        lowerHeader.includes('回答') || 
+        lowerHeader.includes('意見') || 
+        lowerHeader.includes('コメント') ||
+        lowerHeader.includes('質問') ||
+        lowerHeader.includes('内容') ||
+        lowerHeader.includes('回答内容')
+      )) {
+        mapping.mainHeader = header;
+      }
+      
+      // 理由/根拠系の列を探す
+      if (!mapping.rHeader && (
+        lowerHeader.includes('理由') || 
+        lowerHeader.includes('根拠') || 
+        lowerHeader.includes('説明') ||
+        lowerHeader.includes('詳細')
+      )) {
+        mapping.rHeader = header;
+      }
+      
+      // 名前系の列を探す
+      if (!mapping.nameHeader && (
+        lowerHeader.includes('名前') || 
+        lowerHeader.includes('氏名') || 
+        lowerHeader.includes('name') ||
+        lowerHeader.includes('ニックネーム') ||
+        lowerHeader.includes('呼び名')
+      )) {
+        mapping.nameHeader = header;
+      }
+      
+      // クラス/組/学年系の列を探す
+      if (!mapping.classHeader && (
+        lowerHeader.includes('クラス') || 
+        lowerHeader.includes('組') || 
+        lowerHeader.includes('学年') ||
+        lowerHeader.includes('class') ||
+        lowerHeader.includes('グループ') ||
+        lowerHeader.includes('チーム')
+      )) {
+        mapping.classHeader = header;
+      }
+    });
+    
+    debugLog('自動マッピング結果 for ' + sheetName + ': ' + JSON.stringify(mapping));
+    return mapping;
+    
+  } catch (e) {
+    console.error('autoMapSheetHeaders エラー: ' + e.message);
+    return null;
   }
 }
 
