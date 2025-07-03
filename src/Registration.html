@@ -467,7 +467,7 @@
     function loadDomainInfo() {
       google.script.run
         .withSuccessHandler(displayDomainInfo)
-        .withFailureHandler(function(error) {
+        .withFailureHandler(error => {
           console.error('ドメイン情報の取得に失敗:', error);
         })
         .getDeployUserDomainInfo();
@@ -517,8 +517,8 @@
       currentStep = step;
       
       // Update progress bar with performance optimization
-      var progressBar = document.getElementById('progress-bar');
-      requestAnimationFrame(function() {
+      const progressBar = document.getElementById('progress-bar');
+      requestAnimationFrame(() => {
         progressBar.style.width = ((step / 3) * 100) + '%';
       });
       
@@ -564,15 +564,15 @@
     }
     
     // セキュリティ強化: 認証状態の検証
-    function verifyAuthentication() {
-      return new Promise(function(resolve, reject) {
+    async function verifyAuthentication() {
+      return new Promise((resolve, reject) => {
         // タイムアウト処理を追加
-        var timeoutId = setTimeout(function() {
+        const timeoutId = setTimeout(() => {
           reject(new Error('認証確認がタイムアウトしました'));
         }, 10000); // 10秒でタイムアウト
 
         google.script.run
-          .withSuccessHandler(function(result) {
+          .withSuccessHandler(result => {
             clearTimeout(timeoutId);
             if (result && result.authenticated && result.email) {
               resolve(result);
@@ -580,7 +580,7 @@
               reject(new Error('認証が必要です'));
             }
           })
-          .withFailureHandler(function(error) {
+          .withFailureHandler(error => {
             clearTimeout(timeoutId);
             reject(error);
           })
@@ -589,16 +589,17 @@
     }
 
     // ユーザーメールアドレスを取得
-    window.addEventListener('DOMContentLoaded', function() {
+    window.addEventListener('DOMContentLoaded', async () => {
       // scrollToRegistrationのイベントリスナーを設定  
-      var startNowBtn = document.getElementById('start-now-btn');
+      const startNowBtn = document.getElementById('start-now-btn');
       if (startNowBtn) {
         startNowBtn.addEventListener('click', scrollToRegistration);
       }
 
-      // セキュリティ強化: 認証状態を確認
-      verifyAuthentication().then(function(authResult) {
-        var email = authResult.email;
+      try {
+        // セキュリティ強化: 認証状態を確認
+        const authResult = await verifyAuthentication();
+        const email = authResult.email;
         
         userEmail = email;
         document.getElementById('user-email').textContent = email || 'メールアドレスを取得できません';
@@ -618,7 +619,7 @@
           } else {
             // 通常の既存ボード情報をチェック
             google.script.run
-              .withSuccessHandler(function(result) {
+              .withSuccessHandler((result) => {
                 if (result && result.status) {
                   switch (result.status) {
                     case 'setup_required':
@@ -658,7 +659,7 @@
                   }
                 }
               })
-            .withFailureHandler(function(error) {
+            .withFailureHandler((error) => {
               console.warn('既存ボード確認で問題が発生しました:', error);
               updateStep(3);
               document.getElementById('register-btn').disabled = false;
@@ -668,20 +669,20 @@
         } else {
           showMessage('Googleアカウントでログインしてください。', 'error');
         }
-      }).catch(function(error) {
+      } catch (error) {
         // セキュリティ強化: 認証エラーの安全な処理
         console.warn('認証確認中にエラーが発生しました');
         document.getElementById('user-email').textContent = '認証エラー';
         showMessage('認証が必要です。Googleアカウントでログインしてください。', 'error');
-      });
+      }
     });
     
 
     // Enterキー対応（登録ボタン用）
-    document.addEventListener('keypress', function(e) {
+    document.addEventListener('keypress', (e) => {
       if (e.key === 'Enter' && !document.getElementById('register-btn').disabled) {
         // Registration page doesn't have URL input field, so just trigger registration if focused
-        var registerBtn = document.getElementById('register-btn');
+        const registerBtn = document.getElementById('register-btn');
         if (registerBtn && !registerBtn.disabled) {
           registerBtn.click();
         }
@@ -703,9 +704,9 @@
     }
 
     // 登録処理
-    document.getElementById('register-btn').addEventListener('click', function() {
-      var btn = document.getElementById('register-btn');
-      var messageArea = document.getElementById('message-area');
+    document.getElementById('register-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('register-btn');
+      const messageArea = document.getElementById('message-area');
       
       // セキュリティ強化: 入力検証
       if (!userEmail || !validateInput(userEmail, 'email')) {
@@ -714,15 +715,18 @@
       }
       
       // 統合版では常に自動セットアップ
-      var setupMethod = 'auto';
-      var spreadsheetUrl = 'AUTO_CREATE';
+      const setupMethod = 'auto';
+      const spreadsheetUrl = 'AUTO_CREATE';
       
       // ボタンを無効化
       btn.disabled = true;
-      btn.innerHTML = '<svg class="w-5 h-5 spinner inline-block mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-        '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>' +
-        '<path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>' +
-        '</svg>登録処理中...';
+      btn.innerHTML = `
+        <svg class="w-5 h-5 spinner inline-block mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
+        </svg>
+        登録処理中...
+      `;
       showMessage('回答ボードを準備中です...', 'info');
       
       // 登録処理を実行
@@ -829,7 +833,7 @@
           
           
         })
-        .withFailureHandler(function(error) {
+        .withFailureHandler(error => {
           showMessage('エラー: ' + (error.message || '登録に失敗しました'), 'error');
           btn.disabled = false;
           btn.textContent = 'みんなの回答ボードを開始する';
