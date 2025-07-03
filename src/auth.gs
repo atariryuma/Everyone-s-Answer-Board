@@ -14,7 +14,6 @@ var TOKEN_EXPIRY_BUFFER = 300; // 5分のバッファ
 function getServiceAccountTokenCached() {
   return cacheManager.get(AUTH_CACHE_KEY, generateNewServiceAccountToken, { ttl: 3500 });
 }
-}
   
 /**
  * 新しいJWTトークンを生成
