@@ -567,10 +567,36 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
   
   form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheet.getId());
   
+  // フォーム連携後に実際に作成されたシート名を取得
+  var actualSheetName = 'フォームの回答 1'; // デフォルト値
+  try {
+    // 少し待ってからシート名を取得（Google Formsがシートを作成するまで待機）
+    Utilities.sleep(2000);
+    var sheets = spreadsheet.getSheets();
+    if (sheets.length > 0) {
+      // 最初のシートまたは回答シートを取得
+      for (var i = 0; i < sheets.length; i++) {
+        var currentSheetName = sheets[i].getName();
+        if (currentSheetName.indexOf('フォームの回答') !== -1 || 
+            currentSheetName.indexOf('Form Responses') !== -1) {
+          actualSheetName = currentSheetName;
+          break;
+        }
+      }
+      // 回答シートが見つからない場合は最初のシートを使用
+      if (actualSheetName === 'フォームの回答 1' && sheets.length > 0) {
+        actualSheetName = sheets[0].getName();
+      }
+    }
+    debugLog('実際に作成されたシート名: ' + actualSheetName);
+  } catch (e) {
+    console.warn('シート名取得エラー（デフォルトを使用）: ' + e.message);
+  }
+  
   return {
     spreadsheetId: spreadsheet.getId(),
     spreadsheetUrl: spreadsheet.getUrl(),
-    sheetName: 'フォームの回答 1'
+    sheetName: actualSheetName
   };
 }
 

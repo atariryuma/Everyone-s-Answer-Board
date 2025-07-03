@@ -114,6 +114,45 @@ function quickStartSetup(userId) {
           appPublished: true // Publish app on quick start
         })
       });
+    } else {
+      // フォームが既に存在する場合、実際のシート名を取得
+      try {
+        var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+        var sheets = spreadsheet.getSheets();
+        if (sheets.length > 0) {
+          // 最初のシートまたは回答シートを探す
+          var responseSheet = null;
+          for (var i = 0; i < sheets.length; i++) {
+            var currentSheet = sheets[i];
+            var currentSheetName = currentSheet.getName();
+            if (currentSheetName.indexOf('フォームの回答') !== -1 || 
+                currentSheetName.indexOf('Form Responses') !== -1) {
+              responseSheet = currentSheet;
+              break;
+            }
+          }
+          
+          if (responseSheet) {
+            sheetName = responseSheet.getName();
+          } else {
+            // 回答シートが見つからない場合は最初のシートを使用
+            sheetName = sheets[0].getName();
+          }
+          
+          // publishedSheetを実際のシート名に更新
+          updateUserInDb(userId, {
+            configJson: JSON.stringify({
+              ...configJson,
+              publishedSheet: sheetName,
+              appPublished: true
+            })
+          });
+          
+          debugLog('実際のシート名を設定: ' + sheetName);
+        }
+      } catch (e) {
+        console.warn('シート名取得エラー（デフォルトを使用）: ' + e.message);
+      }
     }
 
     // 2. Configシートの作成と初期化

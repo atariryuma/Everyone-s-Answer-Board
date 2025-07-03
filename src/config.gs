@@ -226,10 +226,33 @@ function saveSheetConfig(sheetName, cfg) {
 function getSheetHeaders(sheetName) {
   try {
     var spreadsheet = getCurrentSpreadsheet();
+    
+    // シート名が指定されていない場合、利用可能なシートを表示
+    if (!sheetName) {
+      var allSheets = spreadsheet.getSheets();
+      var sheetNames = allSheets.map(function(sheet) { return sheet.getName(); });
+      console.log('利用可能なシート:', sheetNames);
+      throw new Error('シート名が指定されていません。利用可能なシート: ' + sheetNames.join(', '));
+    }
+    
     var sheet = spreadsheet.getSheetByName(sheetName);
     if (!sheet) {
-      throw new Error('シートが見つかりません: ' + sheetName);
+      // シートが見つからない場合、利用可能なシートを表示
+      var allSheets = spreadsheet.getSheets();
+      var sheetNames = allSheets.map(function(sheet) { return sheet.getName(); });
+      console.log('要求されたシート「' + sheetName + '」が見つかりません');
+      console.log('利用可能なシート:', sheetNames);
+      
+      // デフォルトシートを試行
+      if (sheetNames.length > 0) {
+        var firstSheet = allSheets[0];
+        console.log('デフォルトシート「' + firstSheet.getName() + '」を使用します');
+        sheet = firstSheet;
+      } else {
+        throw new Error('シートが見つかりません: ' + sheetName + '. 利用可能なシート: ' + sheetNames.join(', '));
+      }
     }
+    
     var lastColumn = sheet.getLastColumn();
     if (lastColumn === 0) {
       return [];
@@ -568,5 +591,43 @@ function verifyUserAuthentication() {
   } catch (e) {
     console.error('verifyUserAuthentication エラー: ' + e.message);
     return { authenticated: false, email: null, error: e.message };
+  }
+}
+
+/**
+ * デバッグ用：現在のスプレッドシートとシートの状態を確認
+ */
+function debugCurrentSpreadsheetState() {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      return { error: 'ユーザーIDが設定されていません' };
+    }
+    
+    var userInfo = findUserByIdOptimized(currentUserId);
+    if (!userInfo) {
+      return { error: 'ユーザー情報が見つかりません' };
+    }
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var spreadsheet = SpreadsheetApp.openById(userInfo.spreadsheetId);
+    var sheets = spreadsheet.getSheets();
+    var sheetNames = sheets.map(function(sheet) { return sheet.getName(); });
+    
+    return {
+      userId: currentUserId,
+      spreadsheetId: userInfo.spreadsheetId,
+      spreadsheetUrl: userInfo.spreadsheetUrl,
+      publishedSheet: configJson.publishedSheet,
+      availableSheets: sheetNames,
+      sheetCount: sheets.length,
+      hasPublishedSheetInSpreadsheet: sheetNames.indexOf(configJson.publishedSheet) !== -1
+    };
+    
+  } catch (e) {
+    console.error('debugCurrentSpreadsheetState エラー: ' + e.message);
+    return { error: e.message };
   }
 }
