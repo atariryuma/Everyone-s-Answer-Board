@@ -281,6 +281,7 @@ function getAppConfig() {
       displayMode: configJson.displayMode || DISPLAY_MODES.ANONYMOUS,
       isPublished: configJson.appPublished || false,
       availableSheets: sheets,
+      allSheets: sheets, // AdminPanel.htmlで使用される
       spreadsheetUrl: userInfo.spreadsheetUrl,
       formUrl: configJson.formUrl || '',
       editFormUrl: configJson.editFormUrl || '',

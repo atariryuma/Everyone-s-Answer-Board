@@ -47,64 +47,118 @@ function openActiveSpreadsheet() {
 
 /**
  * 設定取得関数（AdminPanel.htmlとの互換性のため）
- * 新アーキテクチャでは基本的にデフォルト設定を使用
+ * 実際のシートヘッダーに基づいた設定を返す
  * @param {string} sheetName - シート名（AdminPanelから渡される、オプション）
  */
 function getConfig(sheetName) {
   try {
     var spreadsheet = getCurrentSpreadsheet();
-    var configSheet = spreadsheet.getSheetByName(CONFIG_SHEET_NAME);
     
-    // Code.gsのCOLUMN_HEADERSと統一された設定
+    // デフォルト設定（COLUMN_HEADERSと統一）
     var config = {
-      questionHeader: COLUMN_HEADERS.TIMESTAMP,  // 問題は通常フォームにないため、タイムスタンプを使用
+      questionHeader: COLUMN_HEADERS.TIMESTAMP,
       answerHeader: COLUMN_HEADERS.OPINION,
       reasonHeader: COLUMN_HEADERS.REASON,
       nameHeader: COLUMN_HEADERS.NAME,
       classHeader: COLUMN_HEADERS.CLASS,
       rosterSheetName: '名簿',
-      // AdminPanel用の統一設定（Code.gsのCOLUMN_HEADERSと一致）
-      mainHeader: COLUMN_HEADERS.OPINION,   // '回答'
-      rHeader: COLUMN_HEADERS.REASON,       // '理由'
-      // 既存のフィールドは保持（後方互換性のため）
+      mainHeader: COLUMN_HEADERS.OPINION,
+      rHeader: COLUMN_HEADERS.REASON,
       opinionHeader: COLUMN_HEADERS.OPINION,
       timestampHeader: COLUMN_HEADERS.TIMESTAMP,
       emailHeader: COLUMN_HEADERS.EMAIL
     };
 
-    if (configSheet) {
-      var data = configSheet.getDataRange().getValues();
-      for (var i = 0; i < data.length; i++) {
-        var key = data[i][0];
-        var value = data[i][1];
-        if (key && value !== undefined) {
-          config[key] = value;
-        }
-      }
-    }
-    
-    // シート固有の設定がある場合はここで追加処理を行う
+    // シート固有の設定を取得
     if (sheetName) {
       console.log('設定を取得中: シート名 = ' + sheetName);
-      // 将来的にシート固有の設定を実装する場合はここに追加
+      
+      try {
+        var sheet = spreadsheet.getSheetByName(sheetName);
+        if (sheet && sheet.getLastRow() > 0) {
+          var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+          
+          // 実際のヘッダーに基づいて設定を調整
+          var availableHeaders = headers.filter(function(h) { return h && h.toString().trim() !== ''; });
+          
+          // 現在のユーザー設定から保存済みの列設定を取得
+          var props = PropertiesService.getUserProperties();
+          var currentUserId = props.getProperty('CURRENT_USER_ID');
+          if (currentUserId) {
+            var userInfo = findUserById(currentUserId);
+            if (userInfo && userInfo.configJson) {
+              var userConfig = JSON.parse(userInfo.configJson);
+              var sheetConfig = userConfig['sheet_' + sheetName] || {};
+              
+              // 保存済みの設定があれば使用
+              if (sheetConfig.mainHeader && availableHeaders.indexOf(sheetConfig.mainHeader) !== -1) {
+                config.mainHeader = sheetConfig.mainHeader;
+                config.answerHeader = sheetConfig.mainHeader;
+                config.opinionHeader = sheetConfig.mainHeader;
+              }
+              if (sheetConfig.rHeader && availableHeaders.indexOf(sheetConfig.rHeader) !== -1) {
+                config.rHeader = sheetConfig.rHeader;
+                config.reasonHeader = sheetConfig.rHeader;
+              }
+              if (sheetConfig.nameHeader && availableHeaders.indexOf(sheetConfig.nameHeader) !== -1) {
+                config.nameHeader = sheetConfig.nameHeader;
+              }
+              if (sheetConfig.classHeader && availableHeaders.indexOf(sheetConfig.classHeader) !== -1) {
+                config.classHeader = sheetConfig.classHeader;
+              }
+            }
+          }
+          
+          // 利用可能なヘッダー情報を追加
+          config.availableHeaders = availableHeaders;
+          config.sheetName = sheetName;
+          
+          console.log('シート設定を取得しました:', {
+            sheetName: sheetName,
+            availableHeaders: availableHeaders.length,
+            mainHeader: config.mainHeader
+          });
+        }
+      } catch (sheetError) {
+        console.warn('シート固有設定の取得でエラー:', sheetError.message);
+      }
+    }
+
+    // Configシートからの追加設定を読み込み
+    var configSheet = spreadsheet.getSheetByName(CONFIG_SHEET_NAME);
+    if (configSheet) {
+      try {
+        var data = configSheet.getDataRange().getValues();
+        for (var i = 0; i < data.length; i++) {
+          var key = data[i][0];
+          var value = data[i][1];
+          if (key && value !== undefined) {
+            config[key] = value;
+          }
+        }
+      } catch (configSheetError) {
+        console.warn('Configシートの読み込みでエラー:', configSheetError.message);
+      }
     }
     
     return config;
   } catch (error) {
     console.error('getConfig error:', error.message);
-    // エラー時のデフォルト設定（Code.gsのCOLUMN_HEADERSと統一）
+    // エラー時のデフォルト設定
     return {
-      questionHeader: 'タイムスタンプ',  // COLUMN_HEADERS.TIMESTAMPの値
-      answerHeader: '回答',            // COLUMN_HEADERS.OPINIONの値
-      reasonHeader: '理由',            // COLUMN_HEADERS.REASONの値
-      nameHeader: '名前',             // COLUMN_HEADERS.NAMEの値
-      classHeader: 'クラス',           // COLUMN_HEADERS.CLASSの値
+      questionHeader: 'タイムスタンプ',
+      answerHeader: '回答',
+      reasonHeader: '理由',
+      nameHeader: '名前',
+      classHeader: 'クラス',
       rosterSheetName: '名簿',
-      mainHeader: '回答',             // AdminPanel用
-      rHeader: '理由',               // AdminPanel用
+      mainHeader: '回答',
+      rHeader: '理由',
       opinionHeader: '回答',
       timestampHeader: 'タイムスタンプ',
-      emailHeader: 'メールアドレス'
+      emailHeader: 'メールアドレス',
+      availableHeaders: [],
+      sheetName: sheetName || ''
     };
   }
 }
@@ -124,16 +178,52 @@ function getRosterSheetName() {
 }
 
 /**
- * 簡易設定保存関数（AdminPanel.htmlとの互換性のため）
- * 新アーキテクチャでは実際の保存は行わない
+ * シート固有の設定を保存
+ * @param {string} sheetName - シート名
+ * @param {object} cfg - 設定オブジェクト
  */
 function saveSheetConfig(sheetName, cfg) {
   try {
-    console.log('設定保存（新アーキテクチャでは無操作）:', sheetName, cfg);
-    return `シート「${sheetName}」の設定を確認しました`;
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません。');
+    }
+    
+    var userInfo = findUserById(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません。');
+    }
+    
+    // 現在の設定を取得
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    
+    // シート固有の設定を保存
+    var sheetConfigKey = 'sheet_' + sheetName;
+    configJson[sheetConfigKey] = {
+      mainHeader: cfg.mainHeader || '',
+      rHeader: cfg.rHeader || '',
+      nameHeader: cfg.nameHeader || '',
+      classHeader: cfg.classHeader || '',
+      savedAt: new Date().toISOString()
+    };
+    
+    // データベースに更新
+    updateUserInDb(currentUserId, {
+      configJson: JSON.stringify(configJson)
+    });
+    
+    console.log('シート設定を保存しました:', {
+      sheetName: sheetName,
+      userId: currentUserId,
+      config: configJson[sheetConfigKey]
+    });
+    
+    return `シート「${sheetName}」の設定を保存しました`;
   } catch (error) {
-    console.error('Error in saveSheetConfig:', error);
-    return `設定の確認中にエラーが発生しました: ${error.message}`;
+    console.error('saveSheetConfig エラー:', error);
+    return `設定の保存中にエラーが発生しました: ${error.message}`;
   }
 }
 
@@ -217,12 +307,35 @@ function switchToSheet(sheetName) {
       throw new Error('ユーザー情報が見つかりません。');
     }
     
+    // シートの存在確認
+    var spreadsheet = getCurrentSpreadsheet();
+    var sheet = spreadsheet.getSheetByName(sheetName);
+    if (!sheet) {
+      throw new Error(`指定されたシート「${sheetName}」が見つかりません。`);
+    }
+    
     var configJson = JSON.parse(userInfo.configJson || '{}');
     configJson.publishedSheet = sheetName;
-    configJson.appPublished = true; // 公開状態にする
+    configJson.appPublished = true;
+    configJson.lastSheetSwitch = new Date().toISOString();
+    
+    // シート固有の設定があるかチェック
+    var sheetConfigKey = 'sheet_' + sheetName;
+    if (!configJson[sheetConfigKey]) {
+      console.log(`シート「${sheetName}」の列設定がありません。デフォルト設定を使用します。`);
+    }
     
     updateUserInDb(currentUserId, {
       configJson: JSON.stringify(configJson)
+    });
+    
+    // キャッシュをクリア（シート切り替え時に最新情報を取得するため）
+    removeCachedPattern(userInfo.spreadsheetId);
+    
+    console.log('シート切り替え完了:', {
+      userId: currentUserId,
+      sheetName: sheetName,
+      hasSheetConfig: !!configJson[sheetConfigKey]
     });
     
     return 'シートが正常に切り替わり、公開されました。';
