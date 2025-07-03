@@ -693,18 +693,6 @@
                     <p class="text-sm text-white font-semibold" id="current-active-sheet-name">-</p>
                   </div>
                   
-                  <!-- 選択シートの列名一覧 -->
-                  <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-3">
-                    <div class="flex items-center gap-2 mb-2">
-                      <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
-                      </svg>
-                      <span class="text-sm font-medium text-green-200">列名一覧</span>
-                    </div>
-                    <div id="sheet-columns" class="text-xs text-green-300">
-                      シートを選択すると列名が表示されます
-                    </div>
-                  </div>
                   
                   <!-- 関連URL -->
                   <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-3">
@@ -1257,11 +1245,14 @@
       if (elements.sheetSelect) {
         elements.sheetSelect.addEventListener('change', function(e) {
           selectedSheet = e.target.value;
-          console.log('シート選択:', selectedSheet, typeof selectedSheet);
+          console.log('シート選択:', selectedSheet, 'type:', typeof selectedSheet);
+          console.log('e.target.selectedIndex:', e.target.selectedIndex);
+          console.log('e.target.options[selectedIndex]:', e.target.options[e.target.selectedIndex]);
           
           // selectedSheetが文字列であることを確認
-          if (typeof selectedSheet !== 'string') {
-            console.error('selectedSheetが文字列ではありません:', selectedSheet);
+          if (typeof selectedSheet !== 'string' || selectedSheet === '[object Object]') {
+            console.error('selectedSheetが無効です:', selectedSheet);
+            console.error('選択されたオプション:', e.target.options[e.target.selectedIndex]);
             return;
           }
           
@@ -1687,16 +1678,26 @@
 
       elements.sheetSelect.replaceChildren();
       
+      // デバッグ情報を追加
+      console.log('allSheets received:', status.allSheets);
+      console.log('allSheets type:', typeof status.allSheets);
+      if (status.allSheets && status.allSheets.length > 0) {
+        console.log('First sheet item:', status.allSheets[0], 'type:', typeof status.allSheets[0]);
+      }
+      
       if (status.allSheets && status.allSheets.length > 0) {
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
         defaultOption.textContent = '-- アクティブシートを選択 --';
         elements.sheetSelect.appendChild(defaultOption);
-        status.allSheets.forEach(name => {
+        status.allSheets.forEach(sheetItem => {
+          // シートアイテムが文字列かオブジェクトかを確認
+          const sheetName = typeof sheetItem === 'string' ? sheetItem : (sheetItem.name || sheetItem.toString());
+          
           const opt = document.createElement('option');
-          opt.value = name;
-          opt.textContent = name;
-          if (name === currentActiveSheet) opt.textContent += ' (公開中)';
+          opt.value = sheetName;
+          opt.textContent = sheetName;
+          if (sheetName === currentActiveSheet) opt.textContent += ' (公開中)';
           elements.sheetSelect.appendChild(opt);
         });
         elements.sheetSelect.disabled = false;
@@ -2105,15 +2106,6 @@
         elements.currentActiveSheetName.textContent = currentActiveSheet || '未設定';
       }
       
-      // 列名一覧を更新
-      if (elements.sheetColumns && headers) {
-        const columnText = headers.length > 0 ? 
-          headers.map(header => `・${header}`).join('\n') : 
-          '列名が見つかりません';
-        elements.sheetColumns.innerHTML = headers.length > 0 ?
-          headers.map(header => `<span class="inline-block bg-green-800/30 px-2 py-1 rounded text-xs mr-1 mb-1">${header}</span>`).join('') :
-          '列名が見つかりません';
-      }
       
       // スプレッドシートリンクを更新
       if (elements.spreadsheetLink && currentSpreadsheetUrl) {

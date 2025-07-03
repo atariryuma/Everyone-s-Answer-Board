@@ -349,53 +349,66 @@ function autoMapSheetHeaders(sheetName) {
       classHeader: ''
     };
     
-    // 各ヘッダーを小文字で比較してマッピング
-    headers.forEach(function(header) {
-      var lowerHeader = header.toLowerCase();
+    // 優先度付きマッピングルール
+    var mappingRules = {
+      mainHeader: [
+        // 高優先度
+        ['あなたの回答・意見', '回答・意見', '回答内容', '意見・回答'],
+        // 中優先度  
+        ['回答', '意見', 'コメント', '内容', '質問', '答え', 'answer', 'opinion', 'comment'],
+        // 低優先度
+        ['テキスト', 'text', '記述', '入力']
+      ],
+      rHeader: [
+        // 高優先度
+        ['理由・根拠', '根拠・理由', '理由や根拠'],
+        // 中優先度
+        ['理由', '根拠', '説明', '詳細', 'reason', '理由説明'],
+        // 低優先度
+        ['なぜ', 'why', '背景']
+      ],
+      nameHeader: [
+        // 高優先度
+        ['名前', '氏名', 'name'],
+        // 中優先度
+        ['ニックネーム', '呼び名', '表示名', 'nickname'],
+        // 低優先度
+        ['ユーザー', 'user', '投稿者']
+      ],
+      classHeader: [
+        // 高優先度
+        ['クラス名', 'クラス', '組', 'class'],
+        // 中優先度
+        ['学年', 'グループ', 'チーム', 'group', 'team'],
+        // 低優先度
+        ['所属', '部門', 'section']
+      ]
+    };
+    
+    // 各マッピングルールを適用
+    Object.keys(mappingRules).forEach(function(mappingKey) {
+      if (mapping[mappingKey]) return; // 既にマッピング済み
       
-      // 回答/意見/コメント系の列を探す
-      if (!mapping.mainHeader && (
-        lowerHeader.includes('回答') || 
-        lowerHeader.includes('意見') || 
-        lowerHeader.includes('コメント') ||
-        lowerHeader.includes('質問') ||
-        lowerHeader.includes('内容') ||
-        lowerHeader.includes('回答内容')
-      )) {
-        mapping.mainHeader = header;
-      }
+      var rules = mappingRules[mappingKey];
       
-      // 理由/根拠系の列を探す
-      if (!mapping.rHeader && (
-        lowerHeader.includes('理由') || 
-        lowerHeader.includes('根拠') || 
-        lowerHeader.includes('説明') ||
-        lowerHeader.includes('詳細')
-      )) {
-        mapping.rHeader = header;
-      }
-      
-      // 名前系の列を探す
-      if (!mapping.nameHeader && (
-        lowerHeader.includes('名前') || 
-        lowerHeader.includes('氏名') || 
-        lowerHeader.includes('name') ||
-        lowerHeader.includes('ニックネーム') ||
-        lowerHeader.includes('呼び名')
-      )) {
-        mapping.nameHeader = header;
-      }
-      
-      // クラス/組/学年系の列を探す
-      if (!mapping.classHeader && (
-        lowerHeader.includes('クラス') || 
-        lowerHeader.includes('組') || 
-        lowerHeader.includes('学年') ||
-        lowerHeader.includes('class') ||
-        lowerHeader.includes('グループ') ||
-        lowerHeader.includes('チーム')
-      )) {
-        mapping.classHeader = header;
+      // 優先度順にチェック
+      for (var priority = 0; priority < rules.length && !mapping[mappingKey]; priority++) {
+        var patterns = rules[priority];
+        
+        for (var i = 0; i < headers.length && !mapping[mappingKey]; i++) {
+          var header = headers[i];
+          var lowerHeader = header.toLowerCase();
+          
+          // 完全一致または部分一致をチェック
+          for (var j = 0; j < patterns.length; j++) {
+            var pattern = patterns[j].toLowerCase();
+            if (lowerHeader === pattern || lowerHeader.includes(pattern)) {
+              mapping[mappingKey] = header;
+              debugLog('マッピング成功: ' + mappingKey + ' = "' + header + '" (パターン: "' + pattern + '", 優先度: ' + priority + ')');
+              break;
+            }
+          }
+        }
       }
     });
     
