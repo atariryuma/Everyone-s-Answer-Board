@@ -1869,7 +1869,7 @@ function auditLog(action, userId, details) {
       dbId,
       range,
       { values: [[new Date().toISOString(), userId, action, JSON.stringify(details || {})]] },
-      { valueInputOption: 'USER_ENTERED'
+      { valueInputOption: 'USER_ENTERED' }
     );
   } catch (e) {
     console.error('auditLog error: ' + e.message);
