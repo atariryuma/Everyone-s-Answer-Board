@@ -229,7 +229,8 @@
         <p class="text-cyan-200 mb-4">数ステップであなた専用のボードを作成。セキュリティを重視した設計で、安心して授業で活用できます。</p>
         <button type="button" 
                 class="cta-button px-8 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-bold rounded-lg transition-all transform hover:scale-105 shadow-lg text-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-gray-800"
-                aria-label="新規登録に進む">
+                aria-label="いますぐ始める"
+                id="start-now-btn">
           いますぐ始める →
         </button>
       </div>
@@ -589,10 +590,10 @@
 
     // ユーザーメールアドレスを取得
     window.addEventListener('DOMContentLoaded', async () => {
-      // scrollToRegistrationのイベントリスナーを設定
-      const scrollToRegistrationBtn = document.querySelector('button[aria-label="新規登録に進む"]');
-      if (scrollToRegistrationBtn) {
-        scrollToRegistrationBtn.addEventListener('click', scrollToRegistration);
+      // scrollToRegistrationのイベントリスナーを設定  
+      const startNowBtn = document.getElementById('start-now-btn');
+      if (startNowBtn) {
+        startNowBtn.addEventListener('click', scrollToRegistration);
       }
 
       try {
