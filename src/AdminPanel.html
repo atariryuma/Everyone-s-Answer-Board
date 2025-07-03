@@ -1159,7 +1159,7 @@
       const mismatchText = document.getElementById('admin-domain-mismatch-compact');
       
       if (!info || info.error) {
-        console.warn('ドメイン情報エラー:', info?.error);
+        console.warn('ドメイン情報エラー:', info && info.error ? info.error : 'Unknown error');
         if (headerDomainName) {
           headerDomainName.textContent = 'ドメイン情報取得エラー';
         }
