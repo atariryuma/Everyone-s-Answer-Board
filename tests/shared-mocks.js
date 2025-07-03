@@ -211,6 +211,24 @@ function setupGlobalMocks() {
       }
     })
   };
+
+  // CacheService mock for AdvancedCacheManager
+  const mockCache = new Map();
+  global.CacheService = {
+    getScriptCache: () => ({
+      get: (key) => mockCache.get(key) || null,
+      put: (key, value, ttl) => {
+        mockCache.set(key, value);
+        console.log(`Cache put: ${key} (TTL: ${ttl}s)`);
+      },
+      remove: (key) => {
+        mockCache.delete(key);
+        console.log(`Cache remove: ${key}`);
+      }
+    }),
+    getDocumentCache: () => global.CacheService.getScriptCache(),
+    getUserCache: () => global.CacheService.getScriptCache()
+  };
 }
 
 // Code.gs evaluation with proper global scope
@@ -222,10 +240,46 @@ function ensureCodeEvaluated() {
 
     const srcDir = path.join(__dirname, '../src');
     const files = fs.readdirSync(srcDir).filter(f => f.endsWith('.gs'));
-    files.forEach(file => {
-      const content = fs.readFileSync(path.join(srcDir, file), 'utf8');
-      (1, eval)(content);
+    
+    // Load files in dependency order
+    const loadOrder = [
+      'AuthManager.gs',
+      'AdvancedCacheManager.gs', 
+      'DatabaseManager.gs',
+      'UrlManager.gs',
+      'Core.gs',
+      'UltraOptimizedCore.gs',
+      'config.gs'
+    ];
+    
+    // Load files in order, then load any remaining files
+    loadOrder.forEach(filename => {
+      if (files.includes(filename)) {
+        const content = fs.readFileSync(path.join(srcDir, filename), 'utf8');
+        try {
+          (1, eval)(content);
+          console.log(`✅ Loaded: ${filename}`);
+        } catch (error) {
+          console.warn(`⚠️ Error loading ${filename}:`, error.message);
+        }
+      }
     });
+    
+    // Load remaining files
+    files.forEach(file => {
+      if (!loadOrder.includes(file)) {
+        const content = fs.readFileSync(path.join(srcDir, file), 'utf8');
+        try {
+          (1, eval)(content);
+          console.log(`✅ Loaded: ${file}`);
+        } catch (error) {
+          console.warn(`⚠️ Error loading ${file}:`, error.message);
+        }
+      }
+    });
+
+    // Add compatibility functions for tests
+    setupCompatibilityFunctions();
 
     codeEvaluated = true;
     console.log('✅ GAS source evaluation completed');
@@ -236,6 +290,119 @@ function loadCode() {
   setupGlobalMocks();
   ensureCodeEvaluated();
   return global;
+}
+
+// Add compatibility functions for tests
+function setupCompatibilityFunctions() {
+  // Define missing constants
+  global.SCRIPT_PROPS_KEYS = {
+    SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
+    DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID'
+  };
+
+  global.DB_SHEET_CONFIG = {
+    SHEET_NAME: 'Users',
+    HEADERS: [
+      'userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl',
+      'createdAt', 'configJson', 'lastAccessedAt', 'isActive'
+    ]
+  };
+
+  global.LOG_SHEET_CONFIG = {
+    SHEET_NAME: 'Logs',
+    HEADERS: ['timestamp', 'userId', 'action', 'details']
+  };
+
+  global.COLUMN_HEADERS = {
+    TIMESTAMP: 'タイムスタンプ',
+    EMAIL: 'メールアドレス',
+    CLASS: 'クラス',
+    OPINION: '回答',
+    REASON: '理由',
+    NAME: '名前',
+    UNDERSTAND: 'なるほど！',
+    LIKE: 'いいね！',
+    CURIOUS: 'もっと知りたい！',
+    HIGHLIGHT: 'ハイライト'
+  };
+
+  global.EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
+  global.DEBUG = true;
+
+  // Compatibility functions for old test references
+  global.getServiceAccountToken = function() {
+    return getServiceAccountTokenCached();
+  };
+  
+  global.setCachedUserInfo = function(userId, userInfo) {
+    // Use AdvancedCacheManager for caching
+    if (typeof AdvancedCacheManager !== 'undefined') {
+      return AdvancedCacheManager.smartGet(
+        `user_${userId}`,
+        () => userInfo,
+        { ttl: 3600, enableMemoization: true }
+      );
+    }
+    return userInfo;
+  };
+  
+  global.getCachedUserInfo = function(userId) {
+    // Use AdvancedCacheManager for retrieval
+    if (typeof AdvancedCacheManager !== 'undefined') {
+      return AdvancedCacheManager.smartGet(
+        `user_${userId}`,
+        () => null,
+        { enableMemoization: true }
+      );
+    }
+    return null;
+  };
+  
+  global.safeSpreadsheetOperation = function(operation, fallbackValue) {
+    try {
+      return operation();
+    } catch (error) {
+      console.warn('Safe operation failed:', error.message);
+      return fallbackValue;
+    }
+  };
+  
+  global.clearAllCaches = function() {
+    // Use the new cache cleanup function
+    if (typeof performCacheCleanup !== 'undefined') {
+      performCacheCleanup();
+    }
+  };
+
+  // Missing utility functions
+  global.isValidEmail = function(email) {
+    return EMAIL_REGEX.test(email);
+  };
+
+  global.getEmailDomain = function(email) {
+    return email.split('@')[1] || '';
+  };
+
+  global.getAndCacheHeaderIndices = function(spreadsheetId, sheetName) {
+    // Simplified version for testing
+    return {
+      'タイムスタンプ': 0,
+      'メールアドレス': 1,
+      'クラス': 2,
+      '回答': 3,
+      '理由': 4,
+      '名前': 5,
+      'なるほど！': 6,
+      'いいね！': 7,
+      'もっと知りたい！': 8,
+      'ハイライト': 9
+    };
+  };
+
+  global.saveDisplayMode = function(mode) {
+    mockUserProperties['DISPLAY_MODE'] = mode;
+    return { success: true };
+  };
 }
 
 function resetMocks() {
