@@ -679,6 +679,53 @@
                   </svg>
                   <span id="switch-sheet-text">このシートをアクティブにする</span>
                 </button>
+                
+                <!-- シート詳細情報 -->
+                <div id="sheet-details" class="mt-4 space-y-3" style="display: none;">
+                  <!-- 現在のアクティブシート -->
+                  <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3">
+                    <div class="flex items-center gap-2 mb-2">
+                      <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                      </svg>
+                      <span class="text-sm font-medium text-blue-200">現在のアクティブシート</span>
+                    </div>
+                    <p class="text-sm text-white font-semibold" id="current-active-sheet-name">-</p>
+                  </div>
+                  
+                  <!-- 選択シートの列名一覧 -->
+                  <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-3">
+                    <div class="flex items-center gap-2 mb-2">
+                      <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                      </svg>
+                      <span class="text-sm font-medium text-green-200">列名一覧</span>
+                    </div>
+                    <div id="sheet-columns" class="text-xs text-green-300">
+                      シートを選択すると列名が表示されます
+                    </div>
+                  </div>
+                  
+                  <!-- 関連URL -->
+                  <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-3">
+                    <div class="flex items-center gap-2 mb-2">
+                      <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                      </svg>
+                      <span class="text-sm font-medium text-purple-200">関連リンク</span>
+                    </div>
+                    <div class="space-y-1 text-xs">
+                      <div>
+                        <span class="text-purple-300">スプレッドシート:</span>
+                        <a href="#" id="spreadsheet-link" class="text-purple-100 hover:text-white underline ml-1" target="_blank">開く</a>
+                      </div>
+                      <div>
+                        <span class="text-purple-300">フォーム:</span>
+                        <a href="#" id="form-link" class="text-purple-100 hover:text-white underline ml-1" target="_blank">開く</a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -804,6 +851,13 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
               </svg>
               スプレッドシートを開く
+            </button>
+            
+            <button type="button" onclick="openForm()" class="btn btn-secondary w-full text-sm" title="関連するGoogleフォームを開く">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+              </svg>
+              フォームを開く
             </button>
           </div>
         </div>
@@ -1138,7 +1192,13 @@
         openSpreadsheetBtn: document.getElementById('open-spreadsheet-btn'),
         activeSheetPanel: document.getElementById('active-sheet-panel'),
         addSpreadsheetBtn: document.getElementById('add-spreadsheet-btn'),
-        guidanceText: document.getElementById('guidance-text')
+        guidanceText: document.getElementById('guidance-text'),
+        // 新しいシート詳細要素
+        sheetDetails: document.getElementById('sheet-details'),
+        currentActiveSheetName: document.getElementById('current-active-sheet-name'),
+        sheetColumns: document.getElementById('sheet-columns'),
+        spreadsheetLink: document.getElementById('spreadsheet-link'),
+        formLink: document.getElementById('form-link')
       };
       loadStatus();
       setupEventListeners();
@@ -1188,17 +1248,22 @@
       }
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
-      loadStatus();
-      setupEventListeners();
-      loadAdminDomainInfo();
-    });
+    // 重複していたDOMContentLoadedイベントリスナーを削除
+    // 既に上記で設定済み
 
     function setupEventListeners() {
       // Sheet selection
       if (elements.sheetSelect) {
-        elements.sheetSelect.addEventListener('change', function() {
-          selectedSheet = this.value;
+        elements.sheetSelect.addEventListener('change', function(e) {
+          selectedSheet = e.target.value;
+          console.log('シート選択:', selectedSheet, typeof selectedSheet);
+          
+          // selectedSheetが文字列であることを確認
+          if (typeof selectedSheet !== 'string') {
+            console.error('selectedSheetが文字列ではありません:', selectedSheet);
+            return;
+          }
+          
           updateUIForSelectedSheet();
           loadConfigForSelected();
         });
@@ -1780,6 +1845,27 @@
       }
     }
     
+    function openForm() {
+      try {
+        // フォームURLを取得（elements.formUrlInputまたはcurrentStatus.formUrlから）
+        let formUrl = '';
+        if (elements.formUrlInput && elements.formUrlInput.value) {
+          formUrl = elements.formUrlInput.value;
+        } else if (currentStatus && currentStatus.formUrl) {
+          formUrl = currentStatus.formUrl;
+        }
+        
+        if (formUrl && formUrl !== '') {
+          window.open(formUrl, '_blank');
+        } else {
+          showMessage('フォームのURLが見つかりません。フォームが作成されていない可能性があります。', 'yellow');
+        }
+      } catch (e) {
+        console.error('Failed to open form:', e);
+        showMessage('フォームを開けませんでした', 'red');
+      }
+    }
+    
     function updateActivityTimeline(status) {
       const activityList = document.getElementById('activity-list');
       const activities = [];
@@ -1971,6 +2057,7 @@
     function loadConfigForSelected() {
       if (!selectedSheet) {
         clearConfigFields();
+        hideSheetDetails();
         return;
       }
       
@@ -1979,6 +2066,10 @@
           populateHeaderOptions(headers);
           const guesses = guessHeaders(headers);
           populateConfig(guesses);
+          
+          // シート詳細情報を更新
+          updateSheetDetails(headers);
+          
           google.script.run
             .withSuccessHandler(cfg => {
               populateConfig(Object.assign({}, guesses, cfg));
@@ -1994,9 +2085,54 @@
         .withFailureHandler((error) => {
           console.error('Failed to get sheet headers:', error);
           clearConfigFields();
+          hideSheetDetails();
           showMessage('シートヘッダー情報の取得に失敗しました。', 'red');
         })
         .getSheetHeaders(selectedSheet);
+    }
+    
+    // シート詳細情報を更新する関数
+    function updateSheetDetails(headers) {
+      if (!elements.sheetDetails) return;
+      
+      // シート詳細コンテナを表示
+      elements.sheetDetails.style.display = 'block';
+      
+      // 現在のアクティブシート名を更新
+      if (elements.currentActiveSheetName) {
+        elements.currentActiveSheetName.textContent = currentActiveSheet || '未設定';
+      }
+      
+      // 列名一覧を更新
+      if (elements.sheetColumns && headers) {
+        const columnText = headers.length > 0 ? 
+          headers.map(header => `・${header}`).join('\n') : 
+          '列名が見つかりません';
+        elements.sheetColumns.innerHTML = headers.length > 0 ?
+          headers.map(header => `<span class="inline-block bg-green-800/30 px-2 py-1 rounded text-xs mr-1 mb-1">${header}</span>`).join('') :
+          '列名が見つかりません';
+      }
+      
+      // スプレッドシートリンクを更新
+      if (elements.spreadsheetLink && currentSpreadsheetUrl) {
+        elements.spreadsheetLink.href = currentSpreadsheetUrl;
+        elements.spreadsheetLink.style.display = 'inline';
+      }
+      
+      // フォームリンクを更新（currentStatusから取得）
+      if (elements.formLink && currentStatus && currentStatus.formUrl) {
+        elements.formLink.href = currentStatus.formUrl;
+        elements.formLink.style.display = 'inline';
+      } else if (elements.formLink) {
+        elements.formLink.style.display = 'none';
+      }
+    }
+    
+    // シート詳細情報を非表示にする関数
+    function hideSheetDetails() {
+      if (elements.sheetDetails) {
+        elements.sheetDetails.style.display = 'none';
+      }
     }
 
     function populateHeaderOptions(headers) {
