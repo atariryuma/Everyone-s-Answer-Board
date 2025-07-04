@@ -183,7 +183,10 @@ function getHeadersCached(spreadsheetId, sheetName) {
       var range = sheetName + '!1:1';
       console.log(`[getHeadersCached] Fetching range: ${range}`);
       
-      var response = service.spreadsheets.values.get(spreadsheetId, range);
+      var response = service.spreadsheets.values.get({
+        spreadsheetId: spreadsheetId,
+        range: range
+      });
       console.log(`[getHeadersCached] API response:`, JSON.stringify(response, null, 2));
       
       if (!response) {

@@ -1589,12 +1589,12 @@
       
       // Create board events
       if (elements.createBoardBtn) {
-        elements.createBoardBtn.addEventListener('click', createBoardAndOpenForm);
+        elements.createBoardBtn.addEventListener('click', createBoard);
       }
       
       const quickCreateBtn = document.getElementById('quick-create-board-btn');
       if (quickCreateBtn) {
-        quickCreateBtn.addEventListener('click', createBoardAndOpenForm);
+        quickCreateBtn.addEventListener('click', createBoard);
       }
 
       const refreshBoardBtn = document.getElementById('refresh-board-btn');
