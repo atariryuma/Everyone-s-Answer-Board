@@ -51,6 +51,19 @@ function getFallbackUrl() {
  */
 function generateAppUrls(userId) {
   try {
+    // userIdの妥当性チェック
+    if (!userId || userId === 'undefined' || typeof userId !== 'string' || userId.trim() === '') {
+      console.error('generateAppUrls: 無効なuserIdが渡されました: ' + userId);
+      return {
+        webAppUrl: '',
+        adminUrl: '',
+        viewUrl: '',
+        setupUrl: '',
+        status: 'error',
+        message: '無効なユーザーIDです。有効なIDを指定してください。'
+      };
+    }
+    
     var webAppUrl = getWebAppUrlCached();
     
     if (!webAppUrl) {
@@ -64,10 +77,13 @@ function generateAppUrls(userId) {
       };
     }
     
+    // URLエンコードして安全にユーザーIDを追加
+    var encodedUserId = encodeURIComponent(userId.trim());
+    
     return {
       webAppUrl: webAppUrl,
-      adminUrl: webAppUrl + '?userId=' + userId + '&mode=admin',
-      viewUrl: webAppUrl + '?userId=' + userId,
+      adminUrl: webAppUrl + '?userId=' + encodedUserId + '&mode=admin',
+      viewUrl: webAppUrl + '?userId=' + encodedUserId,
       setupUrl: webAppUrl + '?setup=true',
       status: 'success'
     };

@@ -1094,7 +1094,7 @@ function createStudyQuestForm(userEmail, userId) {
     
     // 確認メッセージの設定（回答ボードURLを含む）
     var appUrls = generateAppUrls(userId);
-    var boardUrl = appUrls.viewUrl || (appUrls.webAppUrl + '?userId=' + userId);
+    var boardUrl = appUrls.viewUrl || (appUrls.webAppUrl + '?userId=' + encodeURIComponent(userId || ''));
     
     var confirmationMessage = '🎉 素晴らしい！あなたの声が届きました！\n\n' +
       '✨ あなたの考えを共有してくれて、ありがとうございます。\n' +

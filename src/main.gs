@@ -138,11 +138,6 @@ function doGet(e) {
     if (!userInfo) {
       return HtmlService.createHtmlOutput('無効なユーザーIDです。');
     }
-
-    var autoOutput = checkAutoUnpublish(userInfo, userId);
-    if (autoOutput) {
-      return autoOutput;
-    }
     
     // ユーザーの最終アクセス日時を更新（非同期）
     try {
