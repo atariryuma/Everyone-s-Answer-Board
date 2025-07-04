@@ -90,13 +90,13 @@ function getConfig(sheetName) {
               var savedConfig = configJson[sheetConfigKey];
               
               // 保存された設定を適用
-              config.mainHeader = savedConfig.mainHeader || config.mainHeader;
-              config.rHeader = savedConfig.rHeader || config.rHeader;
-              config.nameHeader = savedConfig.nameHeader || config.nameHeader;
-              config.classHeader = savedConfig.classHeader || config.classHeader;
-              config.answerHeader = savedConfig.mainHeader || config.answerHeader;
-              config.opinionHeader = savedConfig.mainHeader || config.opinionHeader;
-              config.reasonHeader = savedConfig.rHeader || config.reasonHeader;
+              config.mainHeader = savedConfig.mainHeader !== undefined ? savedConfig.mainHeader : config.mainHeader;
+              config.rHeader = savedConfig.rHeader !== undefined ? savedConfig.rHeader : config.rHeader;
+              config.nameHeader = savedConfig.nameHeader !== undefined ? savedConfig.nameHeader : config.nameHeader;
+              config.classHeader = savedConfig.classHeader !== undefined ? savedConfig.classHeader : config.classHeader;
+              config.answerHeader = savedConfig.mainHeader !== undefined ? savedConfig.mainHeader : config.answerHeader;
+              config.opinionHeader = savedConfig.mainHeader !== undefined ? savedConfig.mainHeader : config.opinionHeader;
+              config.reasonHeader = savedConfig.rHeader !== undefined ? savedConfig.rHeader : config.reasonHeader;
               
               console.log('保存済み設定を適用しました:', savedConfig);
             }

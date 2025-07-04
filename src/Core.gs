@@ -170,10 +170,10 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
     }
     
     var configJson = JSON.parse(userInfo.configJson || '{}');
-    var sheetConfig = configJson['sheet_' + targetSheet] || {}; // シート固有の設定を取得
     
     // シート名の決定（パラメータまたは設定から）
     var targetSheet = sheetName || configJson.publishedSheet || 'フォームの回答 1';
+    var sheetConfig = configJson['sheet_' + targetSheet] || {}; // シート固有の設定を取得
     
     // データ取得
     var sheetData = getSheetData(currentUserId, targetSheet, classFilter, sortOrder);
@@ -183,13 +183,18 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
     }
     
     // Page.html期待形式に変換
+    // 設定からヘッダー名を取得。未定義の場合のみデフォルト値を使用。
+    var mainHeaderName = sheetConfig.mainHeader !== undefined ? sheetConfig.mainHeader : (sheetConfig.opinionHeader || COLUMN_HEADERS.OPINION);
+    var reasonHeaderName = sheetConfig.rHeader !== undefined ? sheetConfig.rHeader : (sheetConfig.reasonHeader || COLUMN_HEADERS.REASON);
+    var classHeaderName = sheetConfig.classHeader !== undefined ? sheetConfig.classHeader : COLUMN_HEADERS.CLASS;
+    
     var formattedData = sheetData.data.map(function(row, index) {
       return {
         rowIndex: row.rowNumber || (index + 2), // 実際の行番号
         name: (sheetData.displayMode === 'named' && row.displayName) ? row.displayName : '',
-        class: row.originalData[getHeaderIndex(sheetData.headers, sheetConfig.classHeader || COLUMN_HEADERS.CLASS)] || '',
-        opinion: row.originalData[getHeaderIndex(sheetData.headers, sheetConfig.mainHeader || sheetConfig.opinionHeader || COLUMN_HEADERS.OPINION)] || '',
-        reason: row.originalData[getHeaderIndex(sheetData.headers, sheetConfig.rHeader || sheetConfig.reasonHeader || COLUMN_HEADERS.REASON)] || '',
+        class: row.originalData[getHeaderIndex(sheetData.headers, classHeaderName)] || '',
+        opinion: row.originalData[getHeaderIndex(sheetData.headers, mainHeaderName)] || '',
+        reason: row.originalData[getHeaderIndex(sheetData.headers, reasonHeaderName)] || '',
         reactions: {
           UNDERSTAND: { count: row.understandCount || 0, reacted: false },
           LIKE: { count: row.likeCount || 0, reacted: false },
