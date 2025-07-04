@@ -38,6 +38,21 @@ var COLUMN_HEADERS = {
 var EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
 var DEBUG = true;
 
+/**
+ * HTMLエスケープ関数（Utilities.htmlEncodeの代替）
+ * @param {string} text - エスケープするテキスト
+ * @returns {string} エスケープされたテキスト
+ */
+function htmlEncode(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // 安定性を重視してvarを使用
 var ULTRA_CONFIG = {
   EXECUTION_LIMITS: {

@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#1a1b26" />
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
   <? if (typeof userId !== "undefined" && userId) { ?>
-  <meta name="user-id" content="<?= Utilities.htmlEncode(String(userId)) ?>">
+  <meta name="user-id" content="<?= htmlEncode(String(userId)) ?>">
   <? } ?>
 
   <script>
