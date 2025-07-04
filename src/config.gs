@@ -224,19 +224,7 @@ function getConfig(sheetName) {
   }
 }""
 
-/**
- * 名簿シート名を取得
- * @returns {string} 名簿シート名
- */
-function getRosterSheetName() {
-  try {
-    var cfg = getConfig();
-    return cfg.rosterSheetName || '名簿';
-  } catch (e) {
-    console.warn('getRosterSheetName error: ' + e.message);
-    return '名簿';
-  }
-}
+
 
 /**
  * シート固有の設定を保存

@@ -159,6 +159,7 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
   try {
     var props = PropertiesService.getUserProperties();
     var currentUserId = props.getProperty('CURRENT_USER_ID');
+    debugLog('getPublishedSheetData: userId=%s, sheetName=%s, classFilter=%s, sortOrder=%s', currentUserId, sheetName, classFilter, sortOrder);
     
     if (!currentUserId) {
       throw new Error('ユーザーコンテキストが設定されていません');
@@ -168,16 +169,22 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
+    debugLog('getPublishedSheetData: userInfo=%s', JSON.stringify(userInfo));
     
     var configJson = JSON.parse(userInfo.configJson || '{}');
-    
+    debugLog('getPublishedSheetData: configJson=%s', JSON.stringify(configJson));
+
     // シート名の決定（パラメータまたは設定から）
     var targetSheet = sheetName || configJson.publishedSheet || 'フォームの回答 1';
+    debugLog('getPublishedSheetData: targetSheet=%s', targetSheet);
+
     var sheetConfig = configJson['sheet_' + targetSheet] || {}; // シート固有の設定を取得
+    debugLog('getPublishedSheetData: sheetConfig=%s', JSON.stringify(sheetConfig));
     
     // データ取得
     var sheetData = getSheetData(currentUserId, targetSheet, classFilter, sortOrder);
-    
+    debugLog('getPublishedSheetData: sheetData status=%s, totalCount=%s', sheetData.status, sheetData.totalCount);
+
     if (sheetData.status === 'error') {
       throw new Error(sheetData.message);
     }
@@ -187,7 +194,8 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
     var mainHeaderName = sheetConfig.mainHeader !== undefined ? sheetConfig.mainHeader : (sheetConfig.opinionHeader || COLUMN_HEADERS.OPINION);
     var reasonHeaderName = sheetConfig.rHeader !== undefined ? sheetConfig.rHeader : (sheetConfig.reasonHeader || COLUMN_HEADERS.REASON);
     var classHeaderName = sheetConfig.classHeader !== undefined ? sheetConfig.classHeader : COLUMN_HEADERS.CLASS;
-    
+    debugLog('getPublishedSheetData: Mapped Headers - mainHeaderName=%s, reasonHeaderName=%s, classHeaderName=%s', mainHeaderName, reasonHeaderName, classHeaderName);
+
     var formattedData = sheetData.data.map(function(row, index) {
       return {
         rowIndex: row.rowNumber || (index + 2), // 実際の行番号
@@ -203,7 +211,8 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
         highlight: row.isHighlighted || false
       };
     });
-    
+    debugLog('getPublishedSheetData: formattedData length=%s', formattedData.length);
+
     // ヘッダー情報を取得（問題列があれば使用、なければデフォルト）
     var questionHeaderIndex = getHeaderIndex(sheetData.headers, COLUMN_HEADERS.TIMESTAMP); // 問題列は通常ないので、タイムスタンプ列を確認
     var headerTitle = '回答ボード'; // デフォルト
@@ -213,8 +222,9 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
       // フォームの質問タイトルなどがあれば使用する場合の処理を将来的に追加可能
       headerTitle = '回答ボード';
     }
-    
-    return {
+    debugLog('getPublishedSheetData: headerTitle=%s', headerTitle);
+
+    var result = {
       header: headerTitle,
       sheetName: targetSheet,
       showCounts: configJson.showCounts !== false,
@@ -222,6 +232,8 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
       data: formattedData,
       rows: formattedData // 後方互換性のため
     };
+    debugLog('getPublishedSheetData: Returning result=%s', JSON.stringify(result));
+    return result;
     
   } catch (e) {
     console.error('公開シートデータ取得エラー: ' + e.message);
