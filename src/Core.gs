@@ -593,10 +593,14 @@ function quickStartSetup(userId) {
     
     // 既にセットアップ済みかチェック
     if (configJson.formCreated && userInfo.spreadsheetId) {
+      var appUrls = generateAppUrls(userId);
       return {
         status: 'already_completed',
         message: 'クイックスタートは既に完了しています。',
-        urls: generateAppUrls(userId)
+        webAppUrl: appUrls.webAppUrl,
+        adminUrl: appUrls.adminUrl,
+        viewUrl: appUrls.viewUrl,
+        setupUrl: appUrls.setupUrl
       };
     }
     
@@ -658,7 +662,10 @@ function quickStartSetup(userId) {
     return {
       status: 'success',
       message: 'クイックスタートが完了しました！回答ボードをお楽しみください。',
-      urls: appUrls,
+      webAppUrl: appUrls.webAppUrl,
+      adminUrl: appUrls.adminUrl,
+      viewUrl: appUrls.viewUrl,
+      setupUrl: appUrls.setupUrl,
       formUrl: updatedConfig.formUrl,
       editFormUrl: updatedConfig.editFormUrl,
       spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
@@ -684,7 +691,11 @@ function quickStartSetup(userId) {
     
     return {
       status: 'error',
-      message: 'クイックスタートセットアップに失敗しました: ' + e.message
+      message: 'クイックスタートセットアップに失敗しました: ' + e.message,
+      webAppUrl: '',
+      adminUrl: '',
+      viewUrl: '',
+      setupUrl: ''
     };
   }
 }
