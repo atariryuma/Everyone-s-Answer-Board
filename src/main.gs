@@ -6,7 +6,8 @@
 // グローバル定数の定義
 var SCRIPT_PROPS_KEYS = {
   SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
-  DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID'
+  DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID',
+  DEPLOY_DOMAIN: 'DEPLOY_DOMAIN'
 };
 
 var DB_SHEET_CONFIG = {
@@ -109,17 +110,21 @@ function getDeployUserDomainInfo() {
 
     var webAppUrl = ScriptApp.getService().getUrl();
     var deployDomain = '';
+    var webAppUrl = ScriptApp.getService().getUrl();
     if (webAppUrl) {
-      var match = webAppUrl.match(/https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_\-]+\/exec/);
-      if (match) {
-        // デプロイされたWebアプリのURLからドメインを推測
-        // 厳密なドメイン取得は困難なため、ここではスクリプトのホストドメインを使用
-        deployDomain = 'script.google.com'; // または、より具体的なデプロイドメイン
+      var domainMatch = webAppUrl.match(/\/a\/([a-zA-Z0-9\-\.]+)\/macros/);
+      if (domainMatch && domainMatch[1]) {
+        deployDomain = domainMatch[1]; // URLからドメインを抽出
+      } else {
+        // URLから抽出できない場合はスクリプトプロパティをフォールバックとして使用
+        var props = PropertiesService.getScriptProperties();
+        deployDomain = props.getProperty(SCRIPT_PROPS_KEYS.DEPLOY_DOMAIN) || '';
       }
     }
-    
+
     // ユーザーのメールアドレスのドメインとデプロイされたWebアプリのドメインを比較
-    var isDomainMatch = (currentDomain === deployDomain) || (deployDomain === 'script.google.com'); // Google Apps Scriptのデフォルトドメインも考慮
+    // deployDomainが空の場合は、ドメインが特定できないため不一致としない
+    var isDomainMatch = (currentDomain === deployDomain) || (deployDomain === '');
 
     return {
       currentDomain: currentDomain,
