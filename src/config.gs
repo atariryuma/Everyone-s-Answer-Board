@@ -136,10 +136,10 @@ function getConfig(sheetName) {
               // 自動マッピングが成功した場合、設定を保存
               try {
                 var saveResult = saveSheetConfig(sheetName, {
-                  mainHeader: config.mainHeader,
-                  rHeader: config.rHeader,
-                  nameHeader: config.nameHeader,
-                  classHeader: config.classHeader
+                  mainHeader: autoMapping.mainHeader,
+                  rHeader: autoMapping.rHeader,
+                  nameHeader: autoMapping.nameHeader,
+                  classHeader: autoMapping.classHeader
                 });
                 console.log('自動マッピング設定を保存しました:', saveResult);
               } catch (saveError) {
