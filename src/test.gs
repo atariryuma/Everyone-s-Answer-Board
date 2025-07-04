@@ -4,23 +4,7 @@
  * このファイルは architecture-test.gs と test.gs を統合し、最適化したものです。
  */
 
-// SCRIPT_PROPS_KEYSの定義 (shared-mocks.jsから移植)
-const SCRIPT_PROPS_KEYS = {
-  SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
-  DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID'
-};
-
-// DB_SHEET_CONFIGの定義 (shared-mocks.jsから移植)
-const DB_SHEET_CONFIG = {
-    SHEET_NAME: 'Users',
-    HEADERS: [
-      'userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl',
-      'createdAt', 'configJson', 'lastAccessedAt', 'isActive'
-    ]
-  };
-
-// デバッグモードの定義
-const DEBUG = true;
+// グローバル定数は main.gs で定義済み
 
 /**
  * 統合テストマネージャー

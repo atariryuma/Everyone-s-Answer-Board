@@ -318,18 +318,18 @@ function runComprehensiveTests() {
   console.log('✅ Cache system unification: COMPLETED');
   console.log('✅ Optimized suffix removal: COMPLETED');
 
-  console.log('\n🗂️ Current File Structure (11 files):');
-  console.log('• UltraOptimizedCore.gs - Entry point');
-  console.log('• Core.gs - Business logic');
-  console.log('• DatabaseManager.gs - Data operations');
-  console.log('• AuthManager.gs - Authentication');
-  console.log('• UrlManager.gs - URL management');
-  console.log('• AdvancedCacheManager.gs - Caching');
+  console.log('\n🗂️ Current File Structure (11 files) - Standard Naming:');
+  console.log('• main.gs - Entry point & global constants');
+  console.log('• core.gs - Business logic');
+  console.log('• database.gs - Data operations');
+  console.log('• auth.gs - Authentication');
+  console.log('• url.gs - URL management');
+  console.log('• cache.gs - Caching');
   console.log('• config.gs - Configuration');
-  console.log('• PerformanceMonitor.gs - Monitoring');
-  console.log('• PerformanceOptimizer.gs - Optimization');
-  console.log('• UltraTestSuite.gs - Testing');
-  console.log('• StabilityEnhancer.gs - Stability');
+  console.log('• monitor.gs - Monitoring');
+  console.log('• optimizer.gs - Optimization');
+  console.log('• test.gs - Testing');
+  console.log('• stability.gs - Stability');
 
   return {
     passed: testResults.passed,

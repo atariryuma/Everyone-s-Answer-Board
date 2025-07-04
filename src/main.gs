@@ -1,7 +1,42 @@
 /**
- * @fileoverview 超最適化コアシステム - 2024年最新技術の結集
+ * @fileoverview メインエントリーポイント - 2024年最新技術の結集
  * V8ランタイム、最新パフォーマンス技術、安定性強化を統合
  */
+
+// グローバル定数の定義
+var SCRIPT_PROPS_KEYS = {
+  SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
+  DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID'
+};
+
+var DB_SHEET_CONFIG = {
+  SHEET_NAME: 'Users',
+  HEADERS: [
+    'userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl',
+    'createdAt', 'configJson', 'lastAccessedAt', 'isActive'
+  ]
+};
+
+var LOG_SHEET_CONFIG = {
+  SHEET_NAME: 'Logs',
+  HEADERS: ['timestamp', 'userId', 'action', 'details']
+};
+
+var COLUMN_HEADERS = {
+  TIMESTAMP: 'タイムスタンプ',
+  EMAIL: 'メールアドレス',
+  CLASS: 'クラス',
+  OPINION: '回答',
+  REASON: '理由',
+  NAME: '名前',
+  UNDERSTAND: 'なるほど！',
+  LIKE: 'いいね！',
+  CURIOUS: 'もっと知りたい！',
+  HIGHLIGHT: 'ハイライト'
+};
+
+var EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
+var DEBUG = true;
 
 // 安定性を重視してvarを使用
 var ULTRA_CONFIG = {

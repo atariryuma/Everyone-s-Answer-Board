@@ -1420,3 +1420,25 @@ function clearRosterCache() {
     console.error('名簿キャッシュクリアエラー: ' + e.message);
   }
 }
+
+// =================================================================
+// ユーティリティ関数
+// =================================================================
+
+/**
+ * メールアドレスの妥当性をチェック
+ * @param {string} email - チェックするメールアドレス
+ * @returns {boolean} 妥当な場合true
+ */
+function isValidEmail(email) {
+  return EMAIL_REGEX.test(email);
+}
+
+/**
+ * メールアドレスからドメインを抽出
+ * @param {string} email - メールアドレス
+ * @returns {string} ドメイン部分
+ */
+function getEmailDomain(email) {
+  return email.split('@')[1] || '';
+}

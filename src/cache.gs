@@ -150,6 +150,11 @@ class CacheManager {
 // --- シングルトンインスタンスの作成 ---
 const cacheManager = new CacheManager();
 
+// Google Apps Script環境でグローバルにアクセス可能にする
+if (typeof global !== 'undefined') {
+  global.cacheManager = cacheManager;
+}
+
 // ==============================================
 // 後方互換性のためのラッパー関数（移行期間中）
 // ==============================================

@@ -243,12 +243,12 @@ function ensureCodeEvaluated() {
     
     // Load files in dependency order
     const loadOrder = [
-      'AuthManager.gs',
-      'AdvancedCacheManager.gs', 
-      'DatabaseManager.gs',
-      'UrlManager.gs',
-      'Core.gs',
-      'UltraOptimizedCore.gs',
+      'main.gs',
+      'cache.gs',
+      'auth.gs', 
+      'database.gs',
+      'url.gs',
+      'core.gs',
       'config.gs'
     ];
     
@@ -294,11 +294,15 @@ function loadCode() {
 
 // Add compatibility functions for tests
 function setupCompatibilityFunctions() {
-  // Define missing constants
-  global.SCRIPT_PROPS_KEYS = {
-    SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
-    DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID'
-  };
+  // Note: Constants are now defined in main.gs, so we don't need to redefine them
+  // unless they're missing in the test environment
+  
+  if (typeof SCRIPT_PROPS_KEYS === 'undefined') {
+    global.SCRIPT_PROPS_KEYS = {
+      SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
+      DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID'
+    };
+  }
 
   global.DB_SHEET_CONFIG = {
     SHEET_NAME: 'Users',
@@ -369,8 +373,15 @@ function setupCompatibilityFunctions() {
   
   global.clearAllCaches = function() {
     // Use the new cache cleanup function
-    if (typeof performCacheCleanup !== 'undefined') {
-      performCacheCleanup();
+    if (typeof cacheManager !== 'undefined' && cacheManager.clearExpired) {
+      cacheManager.clearExpired();
+    }
+  };
+
+  // Add performCacheCleanup compatibility
+  global.performCacheCleanup = function() {
+    if (typeof cacheManager !== 'undefined' && cacheManager.clearExpired) {
+      cacheManager.clearExpired();
     }
   };
 
@@ -402,6 +413,27 @@ function setupCompatibilityFunctions() {
   global.saveDisplayMode = function(mode) {
     mockUserProperties['DISPLAY_MODE'] = mode;
     return { success: true };
+  };
+
+  // Add AdvancedCacheManager compatibility for old tests
+  global.AdvancedCacheManager = {
+    smartGet: function(key, fetchFunction, options) {
+      if (typeof cacheManager !== 'undefined') {
+        return cacheManager.get(key, fetchFunction, options);
+      }
+      return fetchFunction ? fetchFunction() : null;
+    },
+    getHealth: function() {
+      if (typeof cacheManager !== 'undefined') {
+        return cacheManager.getHealth();
+      }
+      return { status: 'ok', memoCacheSize: 0 };
+    },
+    conditionalClear: function(pattern) {
+      if (typeof cacheManager !== 'undefined') {
+        cacheManager.clearByPattern(pattern);
+      }
+    }
   };
 }
 
