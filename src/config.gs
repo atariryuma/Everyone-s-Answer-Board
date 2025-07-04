@@ -50,7 +50,7 @@ function openActiveSpreadsheet() {
  * 実際のシートヘッダーに基づいた設定を返す
  * @param {string} sheetName - シート名（AdminPanelから渡される、オプション）
  */
-"""function getConfig(sheetName) {
+function getConfig(sheetName) {
   try {
     var spreadsheet = getCurrentSpreadsheet();
     var props = PropertiesService.getUserProperties();
