@@ -1188,9 +1188,36 @@
 
 
   <script>
+    // デバウンス機能
+    const debounceMap = new Map();
+    function debounce(func, key, delay = 1000) {
+      if (debounceMap.has(key)) {
+        clearTimeout(debounceMap.get(key));
+      }
+      const timeoutId = setTimeout(func, delay);
+      debounceMap.set(key, timeoutId);
+    }
+
     function showMessage(message, type = 'info') {
       const messageArea = document.getElementById('message-area');
       if (!messageArea) return;
+
+      // 同じメッセージの重複を防ぐ
+      const existingMessages = Array.from(messageArea.children);
+      for (const existing of existingMessages) {
+        const existingText = existing.querySelector('span')?.textContent;
+        if (existingText === message) {
+          // 既存のメッセージを一瞬ハイライト
+          existing.style.transform = 'scale(1.05)';
+          setTimeout(() => existing.style.transform = 'scale(1)', 200);
+          return;
+        }
+      }
+
+      // 古いメッセージが5個以上ある場合は古いものを削除
+      while (messageArea.children.length >= 5) {
+        messageArea.children[0].remove();
+      }
 
       const messageId = 'msg-' + Date.now();
       const messageElement = document.createElement('div');
@@ -1241,14 +1268,16 @@
 
       messageArea.appendChild(messageElement);
 
+      // エラーメッセージは長く表示、それ以外は短く表示
+      const timeout = type === 'error' ? 5000 : 2500;
       setTimeout(() => {
         const msgEl = document.getElementById(messageId);
         if (msgEl) {
           msgEl.classList.remove('slide-up');
-          msgEl.classList.add('fade-out'); // Assuming a fade-out animation class exists
+          msgEl.classList.add('fade-out');
           msgEl.addEventListener('transitionend', () => msgEl.remove());
         }
-      }, 3000); // Reduced timeout to 3 seconds
+      }, timeout);
     }
 
     function addVisualFeedback(element, type) {
@@ -1874,6 +1903,10 @@
     }
 
     function loadStatus() {
+      debounce(_loadStatusInternal, 'loadStatus', 300);
+    }
+
+    function _loadStatusInternal() {
       // 教育ガイドモーダルは削除されました
       
       google.script.run
@@ -2363,7 +2396,7 @@
       setLoading(true, '回答ボードを更新中...');
       google.script.run
         .withSuccessHandler((result) => {
-          showMessage(result.message, 'success');
+          showMessage(result.message || result || 'データが正常に更新されました', 'success');
           setLoading(false);
           // クライアントサイドのボードを再読み込みするために、親ウィンドウにメッセージを送信
           // これは、AdminPanelがサイドバーやモーダルとして開かれている場合に有効
@@ -2420,6 +2453,10 @@
     }
 
     function loadConfigForSelected() {
+      debounce(_loadConfigForSelectedInternal, 'loadConfigForSelected', 200);
+    }
+
+    function _loadConfigForSelectedInternal() {
       if (!selectedSheet) {
         clearConfigFields();
         hideSheetDetails();
@@ -2488,7 +2525,7 @@
           showMessage('シートヘッダー情報の取得に失敗しました。', 'red');
           setLoading(false); // Added here
         })
-        .getSheetHeaders(currentStatus.userInfo.spreadsheetId, selectedSheet)
+        .getSheetHeaders(selectedSheet)
     }
     
     // シート詳細情報を更新する関数
@@ -2693,7 +2730,7 @@
       
       google.script.run
         .withSuccessHandler((msg) => { 
-          showMessage(msg, 'green'); 
+          showMessage(typeof msg === 'string' ? msg : msg.message || '設定が正常に保存されました', 'green'); 
           addVisualFeedback(elements.saveConfigBtn, 'success');
           if (elements.configStatus) {
             elements.configStatus.classList.remove('hidden');
@@ -2712,7 +2749,7 @@
           // Call switchToSheet after saving config
           google.script.run
             .withSuccessHandler((switchMsg) => {
-              showMessage(switchMsg, 'green');
+              showMessage(typeof switchMsg === 'string' ? switchMsg : switchMsg.message || 'シートが正常に切り替わりました', 'green');
               loadStatus(); // Reload status to reflect published state
             })
             .withFailureHandler(showError)
@@ -2736,7 +2773,7 @@
       setLoading(true, 'ボードを切り替え中...');
       google.script.run
         .withSuccessHandler((msg) => {
-          showMessage(msg, 'green');
+          showMessage(typeof msg === 'string' ? msg : msg.message || 'シートが正常に切り替わりました', 'green');
           loadStatus();
           setLoading(false);
         })
@@ -2751,7 +2788,7 @@
       setLoading(true, 'ボードの公開を終了中...');
       google.script.run
         .withSuccessHandler((msg) => {
-          showMessage(msg, 'green');
+          showMessage(typeof msg === 'string' ? msg : msg.message || 'シートの公開が正常に終了しました', 'green');
           loadStatus();
           setLoading(false);
         })
@@ -2766,7 +2803,7 @@
       setLoading(true, '表示設定を更新中...');
       google.script.run
         .withSuccessHandler((msg) => {
-          showMessage(msg, 'green');
+          showMessage(typeof msg === 'string' ? msg : msg.message || '表示オプションが正常に保存されました', 'green');
           setLoading(false);
         })
         .withFailureHandler((error) => {
