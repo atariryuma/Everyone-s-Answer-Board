@@ -273,6 +273,9 @@ function saveSheetConfig(sheetName, cfg) {
       configJson: JSON.stringify(configJson)
     });
     
+    // ユーザー情報のキャッシュをクリア
+    cacheManager.remove('user_' + currentUserId);
+    
     console.log('シート設定を保存しました:', {
       sheetName: sheetName,
       userId: currentUserId,
