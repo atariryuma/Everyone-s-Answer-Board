@@ -557,14 +557,14 @@
                 <p class="text-xs text-gray-400">スプレッドシートまたはフォームを準備</p>
               </div>
             </div>
-            <button type="button" class="toggle-section" onclick="toggleSection('step1-content')" aria-expanded="true" aria-label="セクションを展開/折りたたみ">
+            <button type="button" class="toggle-section" onclick="toggleSection('step1-content')" aria-expanded="false" aria-label="セクションを展開/折りたたみ">
               <svg class="w-5 h-5 text-gray-400 transition-transform" id="step1-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
               </svg>
             </button>
           </div>
           
-          <div id="step1-content" class="progressive-section expanded">
+          <div id="step1-content" class="progressive-section collapsed">
             <!-- 初心者向け：簡単作成 -->
             <div class="mb-6">
               <div class="google-integration p-4 rounded-xl text-white">
@@ -657,14 +657,14 @@
                 <p class="text-xs text-gray-400">表示したいシートを選択</p>
               </div>
             </div>
-            <button type="button" class="toggle-section" onclick="toggleSection('step2-content')" aria-expanded="false" aria-label="セクションを展開/折りたたみ">
+            <button type="button" class="toggle-section" onclick="toggleSection('step2-content')" aria-expanded="true" aria-label="セクションを展開/折りたたみ">
               <svg class="w-5 h-5 text-gray-400 transition-transform" id="step2-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
               </svg>
             </button>
           </div>
           
-          <div id="step2-content" class="progressive-section collapsed">
+          <div id="step2-content" class="progressive-section expanded">
             <div class="space-y-4">
               <div class="space-y-3">
                 <!-- シート選択の説明 -->
@@ -686,12 +686,7 @@
                   <option>読み込み中...</option>
                 </select>
 
-                <button type="button" id="switch-sheet-btn" disabled class="btn btn-primary w-full">
-                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                  </svg>
-                  <span id="switch-sheet-text">このシートをアクティブにする</span>
-                </button>
+                
               </div>
             </div>
           </div>
@@ -1435,11 +1430,23 @@
       if (isExpanded) {
         section.classList.remove('expanded');
         section.classList.add('collapsed');
-        if (icon) icon.style.transform = 'rotate(0deg)';
+        if (icon) {
+          if (sectionId === 'step1-content') {
+            icon.style.transform = 'rotate(0deg)'; // Down arrow
+          } else if (sectionId === 'step2-content' || sectionId === 'step3-content') {
+            icon.style.transform = 'rotate(90deg)'; // Right arrow
+          }
+        }
       } else {
         section.classList.remove('collapsed');
         section.classList.add('expanded');
-        if (icon) icon.style.transform = 'rotate(90deg)';
+        if (icon) {
+          if (sectionId === 'step1-content') {
+            icon.style.transform = 'rotate(180deg)'; // Up arrow
+          } else if (sectionId === 'step2-content' || sectionId === 'step3-content') {
+            icon.style.transform = 'rotate(0deg)'; // Down arrow
+          }
+        }
       }
     }
 
@@ -1452,8 +1459,6 @@
         rHeader: document.getElementById('rHeader'),
         nameHeader: document.getElementById('nameHeader'),
         classHeader: document.getElementById('classHeader'),
-        switchSheetBtn: document.getElementById('switch-sheet-btn'),
-        
         saveConfigBtn: document.getElementById('save-config-btn'),
         detailOptions: document.getElementById('detail-options'),
         boardUrl: document.getElementById('board-url'),
@@ -1465,7 +1470,6 @@
         headerDomainName: document.getElementById('header-domain-name'),
         headerStatusDot: document.getElementById('header-status-dot'),
         headerStatusText: document.getElementById('header-status-text'),
-        switchSheetText: document.getElementById('switch-sheet-text'),
         configStatus: document.getElementById('config-status'),
         addSpreadsheetText: document.getElementById('add-spreadsheet-text'),
         saveConfigText: document.getElementById('save-config-text'),
@@ -1584,16 +1588,7 @@
       }
 
       // Actions
-      if (elements.switchSheetBtn) {
-        elements.switchSheetBtn.addEventListener('click', () => {
-          if (!selectedSheet) return;
-          showConfirmationModal(
-            'シートをアクティブ化',
-            '選択したシートをアクティブにします。これにより、現在の列設定はリセットされます。続行しますか？',
-            switchToSheet
-          );
-        });
-      }
+      
       if (elements.clearSelectionBtn) {
         elements.clearSelectionBtn.addEventListener('click', clearSheetSelection);
       }
@@ -1672,7 +1667,6 @@
       
       // 安全にボタンの disabled 状態を更新
       const buttons = [
-        elements.switchSheetBtn,
         elements.clearSelectionBtn,
         elements.saveConfigBtn,
         elements.addSpreadsheetBtn,
@@ -1744,13 +1738,13 @@
       const hasSelected = !!selectedSheet;
       const isCurrentActive = selectedSheet === currentActiveSheet;
       
-      elements.switchSheetBtn.disabled = !hasSelected || isCurrentActive;
+      // elements.switchSheetBtn.disabled = !hasSelected || isCurrentActive;
       
-      if (elements.switchSheetText) {
-        elements.switchSheetText.textContent = isCurrentActive ? 
-          '現在のアクティブシート' : 
-          (hasSelected ? selectedSheet + 'をアクティブ化' : '-- アクティブシートを選択 --');
-      }
+      // if (elements.switchSheetText) {
+      //   elements.switchSheetText.textContent = isCurrentActive ? 
+      //     '現在のアクティブシート' : 
+      //     (hasSelected ? selectedSheet + 'をアクティブ化' : '-- アクティブシートを選択 --');
+      // }
       
       if (hasSelected) {
         elements.configArea.classList.remove('hidden');
@@ -1846,18 +1840,29 @@
       updateStepIndicators(currentStep);
       
       // Auto-expand relevant sections based on progress
-      if (hasSpreadsheet && !hasSelectedSheet) {
-        // Auto-expand step 2 if spreadsheet is ready but no sheet selected
-        const step2Content = document.getElementById('step2-content');
-        if (step2Content && step2Content.classList.contains('collapsed')) {
+      // Auto-expand relevant sections based on progress
+      const step1Content = document.getElementById('step1-content');
+      const step2Content = document.getElementById('step2-content');
+      const step3Content = document.getElementById('step3-content');
+
+      if (hasSpreadsheet) {
+        // If spreadsheet is added, collapse step 1
+        if (step1Content && step1Content.classList.contains('expanded')) {
+          toggleSection('step1-content');
+        }
+        // If spreadsheet is added but no sheet selected, expand step 2
+        if (!hasSelectedSheet && step2Content && step2Content.classList.contains('collapsed')) {
           toggleSection('step2-content');
         }
       }
       
-      if (hasSelectedSheet && !hasConfig) {
-        // Auto-expand step 3 if sheet is selected but no config
-        const step3Content = document.getElementById('step3-content');
-        if (step3Content && step3Content.classList.contains('collapsed')) {
+      if (hasSelectedSheet) {
+        // If sheet is selected, collapse step 2
+        if (step2Content && step2Content.classList.contains('expanded')) {
+          toggleSection('step2-content');
+        }
+        // If sheet is selected but no config, expand step 3
+        if (!hasConfig && step3Content && step3Content.classList.contains('collapsed')) {
           toggleSection('step3-content');
         }
       }
