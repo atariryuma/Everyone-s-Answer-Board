@@ -943,7 +943,7 @@ class StudyQuestApp {
       { key: 'CURIOUS', icon: 'magnifying-glass-plus' }
     ];
     this.gas = {
-      getPublishedSheetData: (spreadsheetId, sheetName, classFilter, sort) => this.runGas('getPublishedSheetData', spreadsheetId, sheetName, classFilter, sort),
+      getPublishedSheetData: (sheetName, classFilter, sort) => this.runGas('getPublishedSheetData', sheetName, classFilter, sort),
       getAvailableSheets: () => this.runGas('getAvailableSheets'),
       addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', rowIndex, reaction, sheetName),
       toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', rowIndex, sheetName),
@@ -1283,7 +1283,7 @@ class StudyQuestApp {
     try {
       const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
       const sortOrder = this.elements.sortOrder.value;
-      const data = await     this.gas.getPublishedSheetData(__SPREADSHEET_ID__, selectedClass, sortOrder);
+      const data = await     this.gas.getPublishedSheetData(selectedClass, sortOrder);
       
       // 成功した場合は失敗カウントをリセット
       this.state.pollingFailureCount = 0;
@@ -1576,7 +1576,7 @@ class StudyQuestApp {
     }
     try {
       const sortOrder = this.elements.sortOrder.value;
-      const data = await this.gas.getPublishedSheetData(__SPREADSHEET_ID__, requestedSheetName, selectedClass, sortOrder);
+      const data = await this.gas.getPublishedSheetData(requestedSheetName, selectedClass, sortOrder);
       this.state.sheetName = data.sheetName;
       if (typeof data.showCounts !== 'undefined') {
         this.serverShowCounts = data.showCounts;
