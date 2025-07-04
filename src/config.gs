@@ -50,10 +50,13 @@ function openActiveSpreadsheet() {
  * 実際のシートヘッダーに基づいた設定を返す
  * @param {string} sheetName - シート名（AdminPanelから渡される、オプション）
  */
-function getConfig(sheetName) {
+"""function getConfig(sheetName) {
   try {
     var spreadsheet = getCurrentSpreadsheet();
-    
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    console.log('getConfig: userId=%s, sheetName=%s', currentUserId, sheetName);
+
     // デフォルト設定（COLUMN_HEADERSと統一）
     var config = {
       questionHeader: COLUMN_HEADERS.TIMESTAMP,
@@ -76,13 +79,11 @@ function getConfig(sheetName) {
       // 保存済みの設定があるかチェック
       var hasExistingConfig = false;
       try {
-        var props = PropertiesService.getUserProperties();
-        var currentUserId = props.getProperty('CURRENT_USER_ID');
-        
         if (currentUserId) {
           var userInfo = findUserById(currentUserId);
           if (userInfo && userInfo.configJson) {
             var configJson = JSON.parse(userInfo.configJson);
+            console.log('getConfig: Loaded configJson: %s', userInfo.configJson);
             var sheetConfigKey = 'sheet_' + sheetName;
             
             if (configJson[sheetConfigKey]) {
@@ -200,6 +201,7 @@ function getConfig(sheetName) {
       }
     }
     
+    console.log('getConfig: Returning config: %s', JSON.stringify(config));
     return config;
   } catch (error) {
     console.error('getConfig error:', error.message);
@@ -220,7 +222,7 @@ function getConfig(sheetName) {
       sheetName: sheetName || ''
     };
   }
-}
+}""
 
 /**
  * 名簿シート名を取得
@@ -275,9 +277,6 @@ function saveSheetConfig(sheetName, cfg) {
     
     // ユーザー情報のキャッシュをクリア
     cacheManager.remove('user_' + currentUserId);
-    if (userInfo.adminEmail) {
-      cacheManager.remove('email_' + userInfo.adminEmail);
-    }
     
     console.log('シート設定を保存しました:', {
       sheetName: sheetName,
