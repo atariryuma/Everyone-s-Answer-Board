@@ -54,18 +54,19 @@ A consistent color palette is key to a professional look and feel. This palette 
 
 This application is built on the Google Workspace platform, making it highly integrated and scalable.
 
-  * **Backend**: **Google Apps Script (GAS)** serves as the serverless backend, handling all business logic, data processing, and API integrations.
+  * **Backend**: **Google Apps Script (GAS)** serves as the serverless backend, handling all business logic, data processing, and API integrations. It leverages the **V8 runtime** for modern JavaScript features and improved performance.
   * **Frontend**:
       * **HTML/CSS/JavaScript**: Standard web technologies are used to build the user interface.
-      * **Tailwind CSS**: A utility-first CSS framework is recommended for rapid and consistent styling. For simplicity in a GAS environment, **it is highly recommended to use the Tailwind CSS CDN**. This avoids the need for a complex local build process. Include the following script tag in the `<head>` of your HTML files:
+      * **Tailwind CSS**: A utility-first CSS framework is used for rapid and consistent styling. For simplicity in a GAS environment, the **Tailwind CSS CDN** is used. Include the following script tag in the `<head>` of your HTML files:
         ```html
         <script src="https://cdn.tailwindcss.com"></script>
         ```
-      * **Client-Server Communication**: The frontend communicates with the GAS backend via the `google.script.run` asynchronous API.
-  * **Data Storage**: **Google Sheets** is used as a simple and accessible database for storing application data, user information, and configurations.
+      * **Client-Server Communication**: The frontend communicates with the GAS backend via the `google.script.run` asynchronous API, further optimized by `ClientOptimizer.html`.
+  * **Data Storage**: **Google Sheets** is used as the primary data store for application data, user information, and configurations. It is accessed efficiently via **Google Sheets API v4** direct calls.
+  * **Authentication**: Implements a **Service Account Model** using JWT for secure and efficient access to Google APIs, resolving previous 403 errors and simplifying deployment to a **single GAS project**.
   * **Development Tools**:
       * **`clasp`**: The official command-line tool for managing GAS projects locally.
-      * **`jest`**: A JavaScript testing framework for ensuring the reliability of backend logic.
+      * **`jest`**: A JavaScript testing framework for ensuring the reliability of client-side logic. Backend logic is tested via `src/test.gs`.
 
 ## 4. Coding Standards and Best Practices
 
@@ -74,7 +75,14 @@ This application is built on the Google Workspace platform, making it highly int
 The manifest file is a critical JSON file that configures your Apps Script project.
 
   * **`timeZone`**: Set the script's timezone (e.g., `"Asia/Tokyo"`).
-  * **`oauthScopes`**: List the *minimum* required OAuth scopes for your script to function. Avoid overly permissive scopes.
+  * **`oauthScopes`**: List the *minimum* required OAuth scopes for your script to function. Avoid overly permissive scopes. Current scopes include:
+    * `https://www.googleapis.com/auth/script.external_request`
+    * `https://www.googleapis.com/auth/forms`
+    * `https://www.googleapis.com/auth/spreadsheets`
+    * `https://www.googleapis.com/auth/drive`
+    * `https://www.googleapis.com/auth/userinfo.email`
+    * `https://www.googleapis.com/auth/script.scriptapp`
+    * `https://www.googleapis.com/auth/script.container.ui`
   * **`webapp`**: Configure the web app deployment settings.
       * `executeAs`: Defines whether the script runs as the user accessing it (`USER_ACCESSING`) or the developer who deployed it (`USER_DEPLOYING`).
       * `access`: Controls who can access the app (`MYSELF`, `DOMAIN`, or `ANYONE_ANONYMOUS`).
@@ -85,16 +93,17 @@ The manifest file is a critical JSON file that configures your Apps Script proje
 
   * **Performance**:
       * **Batch Operations**: Minimize calls to services like `SpreadsheetApp`. Instead of reading or writing cell by cell in a loop, read a whole range of data into an array with `getValues()`, manipulate the array in your script, and write it back with `setValues()`.
-      * **Cache Service**: Use `CacheService` to cache frequently accessed, infrequently changing data to avoid redundant service calls.
+      * **Cache Service**: Use `CacheService` (`cache.gs`) to cache frequently accessed, infrequently changing data to avoid redundant service calls.
+      * **Advanced Optimizations**: Leverage `optimizer.gs` for time-bounded batching, exponential backoff, Sheets API rate limiting, memory optimization, and time-sliced parallel processing.
   * **Organization**:
-      * **Modularity**: Separate concerns by splitting code into different `.gs` files (e.g., `API.gs`, `Database.gs`, `Utils.gs`).
+      * **Modularity**: Separate concerns by splitting code into different `.gs` files (e.g., `main.gs`, `core.gs`, `database.gs`, `auth.gs`, `cache.gs`, `config.gs`, `url.gs`, `monitor.gs`, `optimizer.gs`, `stability.gs`, `test.gs`).
   * **Security**:
       * **Secrets Management**: Store API keys and other secrets in `PropertiesService`, not in the code itself.
 
 ### 4.3. Client-Side HTML (`.html` Files)
 
   * **Separation of Concerns**: Keep HTML structure, CSS styling, and JavaScript logic in separate files to make your project easier to read and maintain.
-  * **Asynchronous Loading**: Load data dynamically with `google.script.run` after the initial page load to keep the UI responsive.
+  * **Asynchronous Loading**: Load data dynamically with `google.script.run` after the initial page load to keep the UI responsive. The `ClientOptimizer.html` provides a `GASOptimizer` class for enhanced client-side call management (concurrency, caching, error handling).
   * **Use of Scriptlets (`<?...?>`)**: Use scriptlets sparingly for simple, one-time server-side tasks. They are executed before the page is served and can slow down the initial load if overused.
       * `<?= ... ?>` (Printing Scriptlet): Outputs data into the HTML with contextual escaping.
       * `<? ... ?>` (Standard Scriptlet): Executes server-side code like loops or conditionals.
@@ -127,32 +136,37 @@ This application provides an interactive answer board for educational settings, 
 *   **Real-time Answer Sharing**: Displays student responses from Google Forms on a web board.
 *   **Reaction Features**: Students can react with "Understand!", "Like!", and "Curious!".
 *   **Highlighting**: Teachers can highlight important answers.
-*   **Admin Panel**: Comprehensive management interface for:
+*   **Admin Panel (`AdminPanel.html`)**: Comprehensive management interface for:
     *   Board publication/unpublication.
     *   Switching between different sheets.
     *   Configuring display modes (anonymous/named).
     *   Sorting options (score, newest, oldest, likes, random).
     *   Creating new boards and utilizing existing spreadsheets.
     *   Displaying the database's `isActive` status with a direct link to the associated spreadsheet.
+*   **User Registration (`Registration.html`)**: Streamlined quick-start setup for new users.
+*   **Service Account Setup (`SetupPage.html`)**: Dedicated page for initial service account and central database configuration.
 *   **Robust Security**: Implements JWT + Google OAuth2 for authentication, domain-based access control, XSS prevention, and robust error handling.
+*   **Performance Optimizations**: Includes advanced caching, batch processing, and efficient API calls.
+*   **Stability Enhancements**: Incorporates circuit breakers, retry mechanisms, and health monitoring.
 
 ### 6.3. Recent Improvements and Bug Fixes
 
 The project has seen several critical enhancements and bug fixes:
 
-*   **Unified Configuration Management**: Replaced redundant `getStatus()` and `getAdminSettings()` calls with a centralized `getAppConfig()` in `src/Core.gs`.
-*   **Optimized URL Generation**: Corrected form URL generation in `src/Code.gs` to consistently use `form.getPublishedUrl()` and ensured the `Page.html` link is correctly displayed in Google Form confirmation messages.
-*   **Database Operation Optimization**: Implemented and integrated caching mechanisms (`USER_INFO_CACHE`, `HEADER_CACHE`, `ROSTER_CACHE`) within `findUserById()`, `findUserByEmail()`, `createUserInDb()`, and `updateUserInDb()` for improved efficiency.
-*   **Frontend Display Logic**: Streamlined the post-registration experience in `src/Registration.html` for clearer initial messages and delayed display of specific URLs until quick setup is complete.
-*   **Admin Panel `isActive` Status**: Added the display of the database's `isActive` status and a direct link to the associated spreadsheet in `src/AdminPanel.html`.
-*   **Duplicate Column Prevention**: Modified `addReactionColumnsToSpreadsheet` in `src/Code.gs` to prevent the creation of duplicate reaction columns in the spreadsheet.
-*   **Refactored Data Fetching**: Key data processing and sheet management functions (`buildRosterMap`, `processRowDataOptimized`, `applySortModeOptimized`, `parseReactionStringOptimized`) have been moved from `src/DataProcessor.gs` and `src/ReactionManager.gs` to `src/Core.gs` for better modularity and performance. The original `DataProcessor.gs` and `ReactionManager.gs` files are now deprecated.
-*   **Enhanced Error Handling**: Improved error handling for missing "名簿" (roster) sheet in `getSheetDataOptimized` within `src/Core.gs`.
-*   **Corrected Google Form Confirmation URL**: Ensured the URL in the Google Form confirmation message correctly points to `Page.html`.
+*   **New Service Account Architecture**: Full transition to a service account model within a single GAS project, eliminating 403 errors and simplifying setup.
+*   **Comprehensive Performance Optimizations**: Integration of `optimizer.gs` and `cache.gs` for multi-level caching, time-bounded batching, Sheets API rate limiting, memory optimization, and time-sliced parallel processing.
+*   **Enhanced Stability System**: Implementation of `stability.gs` for circuit breakers, resilient execution, health monitoring, failsafe data access, data integrity checks, and auto-recovery.
+*   **Modular Codebase Refinement**: Further separation of concerns across `.gs` files, with core logic consolidated in `core.gs` and deprecated files (`DataProcessor.gs`, `ReactionManager.gs`) removed.
+*   **Optimized Client-Side Communication**: `ClientOptimizer.html` provides a robust `GASOptimizer` class for managing `google.script.run` calls, including concurrency limits, caching, and enhanced error handling.
+*   **Improved Admin Panel (`AdminPanel.html`)**: Enhanced UI/UX, better status indicators, and more intuitive setup flow.
+*   **Refined Registration Flow (`Registration.html`)**: Clearer steps for new user registration and quick setup, with immediate feedback.
+*   **Corrected Highlight Logic**: `processHighlightToggle` in `core.gs` now correctly uses `TRUE`/`FALSE` strings for boolean values in Google Sheets.
+*   **Updated `getAppConfig`**: Now provides more comprehensive status information, including `spreadsheetUrl` and `systemStatus` details.
+*   **Frontend Display Logic**: `Page.html` now includes a `StudyQuestApp` class for managing client-side state, rendering, and interactions, incorporating virtual scrolling and performance tweaks.
 
 ### 6.4. Current Known Issues and Future Work
 
-*   **Client-Side Function Call Mismatch (`TypeError: ...[funcName] is not a function`)**: This error, observed in `src/Page.html` for functions like `checkAdmin`, `getAvailableSheets` (which maps to `getSheetsListOptimized`), and `getPublishedSheetData`, is primarily a deployment/caching issue. The server-side functions are correctly defined and exposed. **To resolve this, ensure the Apps Script project is properly redeployed and the browser's cache is cleared after any code changes.**
+*   **Client-Side Function Call Mismatch (`TypeError: ...[funcName] is not a function`)**: This error, observed in `src/Page.html` for functions like `checkAdmin`, `getAvailableSheets`, and `getPublishedSheetData`, is typically a deployment/caching issue. The server-side functions are correctly defined and exposed. **To resolve this, ensure the Apps Script project is properly redeployed and the browser's cache is cleared after any code changes.**
 *   **Future Enhancements**:
     *   Further optimize client-side rendering performance.
     *   Implement more advanced analytics for board usage.
@@ -160,11 +174,9 @@ The project has seen several critical enhancements and bug fixes:
 
 ### 6.5. Coding Practices and Conventions
 
-*   **Modularity**: Code is strictly organized into logical `.gs` files, with `Core.gs` serving as the central hub for optimized business logic.
+*   **Modularity**: Code is strictly organized into logical `.gs` files, with `core.gs` serving as the central hub for optimized business logic.
 *   **Performance-First**: Emphasis on batch operations, strategic caching (both `CacheService` and in-memory `Map`), and efficient Google Sheets API calls.
 *   **Robust Error Handling**: All functions include comprehensive error handling with user-friendly messages for the frontend and detailed logs for debugging.
 *   **Security**: Adherence to Google Apps Script security best practices, including proper OAuth scopes, input sanitization, and secure property management.
 *   **Frontend Development**: Standard HTML/CSS/JavaScript practices are followed, with Tailwind CSS CDN for styling. `google.script.run` is the primary method for asynchronous client-server communication.
-*   **Testing**: Unit tests are in place to ensure code reliability and prevent regressions. Developers should maintain high test coverage.
-
----
+*   **Testing**: Unit tests are in place (`src/test.gs`) to ensure code reliability and prevent regressions. Developers should maintain high test coverage.
