@@ -192,6 +192,12 @@ function updateUser(userId, updateData) {
  * @returns {object} 作成されたユーザーデータ
  */
 function createUser(userData) {
+  // メールアドレスの重複チェック
+  var existingUser = findUserByEmail(userData.adminEmail);
+  if (existingUser) {
+    throw new Error('このメールアドレスは既に登録されています。');
+  }
+
   var props = PropertiesService.getScriptProperties();
   var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
   var service = getSheetsService();

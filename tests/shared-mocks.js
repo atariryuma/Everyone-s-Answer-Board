@@ -109,13 +109,45 @@ function setupGlobalMocks() {
           };
         }
         
-        if (url.includes('/values/')) {
+        if (url.includes('/values:batchGet')) {
+          const spreadsheetId = url.match(/\/spreadsheets\/([^\/]+)\/values:batchGet/)?.[1];
+          const rangesParam = url.split('?')[1];
+          const ranges = rangesParam.split('&').map(p => decodeURIComponent(p.split('=')[1]));
+          
+          const valueRanges = ranges.map(range => {
+            if (range.includes('Users!')) {
+              return { range: range, values: mockDatabase };
+            } else if (range.includes('フォームの回答 1!')) {
+              const data = mockSpreadsheetData[spreadsheetId] || [['No data']];
+              return { range: range, values: data };
+            } else if (range.includes('NonExistentSheet!')) {
+              return { range: range, values: [] };
+            } else if (range.includes('名簿!')) {
+              return { range: range, values: [
+                ['メールアドレス', '名前', 'クラス'],
+                ['student1@school.edu', '田中太郎', '6-1'],
+                ['student2@school.edu', '佐藤花子', '6-1'],
+                ['student3@school.edu', '鈴木次郎', '6-2'],
+                ['teacher1@school.edu', '山田先生', '教員']
+              ] };
+            }
+            return { range: range, values: [] };
+          });
+
+          return {
+            getContentText: () => JSON.stringify({
+              valueRanges: valueRanges
+            })
+          };
+        } else if (url.includes('/values/')) {
           const range = url.match(/\/values\/([^?]+)/)?.[1];
           
           if (range && range.includes('Users!')) {
             return {
               getContentText: () => JSON.stringify({
-                values: mockDatabase
+                valueRanges: [{
+                  values: mockDatabase
+                }]
               })
             };
           }
