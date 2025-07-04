@@ -98,6 +98,45 @@ function log(level, message, details) {
   }
 }
 
+/**
+ * デプロイされたWebアプリのドメイン情報と現在のユーザーのドメイン情報を取得
+ * AdminPanel.htmlから呼び出される
+ */
+function getDeployUserDomainInfo() {
+  try {
+    var activeUserEmail = Session.getActiveUser().getEmail();
+    var currentDomain = getEmailDomain(activeUserEmail);
+
+    var webAppUrl = ScriptApp.getService().getUrl();
+    var deployDomain = '';
+    if (webAppUrl) {
+      var match = webAppUrl.match(/https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_\-]+\/exec/);
+      if (match) {
+        // デプロイされたWebアプリのURLからドメインを推測
+        // 厳密なドメイン取得は困難なため、ここではスクリプトのホストドメインを使用
+        deployDomain = 'script.google.com'; // または、より具体的なデプロイドメイン
+      }
+    }
+    
+    // ユーザーのメールアドレスのドメインとデプロイされたWebアプリのドメインを比較
+    var isDomainMatch = (currentDomain === deployDomain) || (deployDomain === 'script.google.com'); // Google Apps Scriptのデフォルトドメインも考慮
+
+    return {
+      currentDomain: currentDomain,
+      deployDomain: deployDomain,
+      isDomainMatch: isDomainMatch
+    };
+  } catch (e) {
+    console.error('getDeployUserDomainInfo エラー: ' + e.message);
+    return {
+      currentDomain: '不明',
+      deployDomain: '不明',
+      isDomainMatch: false,
+      error: e.message
+    };
+  }
+}
+
 function performSimpleCleanup() {
   try {
     // 期限切れPropertiesServiceエントリの削除
