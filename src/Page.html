@@ -5,41 +5,95 @@
 <title>StudyQuest -みんなの回答ボード- - みんなのかいとうボード</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
+<!-- Content Security Policy for enhanced security -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://fonts.googleapis.com https://script.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https:; img-src 'self' data: https:;">
 <!-- Permissions Policy to silence console warnings -->
 <meta http-equiv="Permissions-Policy" content="ambient-light-sensor=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), speaker=(), vibrate=(), vr=()">
 <!-- Preload Google Fonts for better performance -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-<!-- TailwindCSS CDN with error handling -->
+<!-- Enhanced error handling and CSS loading -->
 <script>
-// Global error handling for document.write and other issues
-window.addEventListener('error', function(event) {
-  if (event.error && event.error.message) {
-    if (event.error.message.includes('document.write') || 
-        event.error.message.includes('Unexpected token')) {
-      console.warn('Document.write or syntax error caught and handled:', event.error.message);
-      event.preventDefault();
-      return false;
+// Aggressive document.write prevention
+(function() {
+  'use strict';
+  
+  // Store original document.write
+  const originalWrite = document.write;
+  const originalWriteln = document.writeln;
+  
+  // Override document.write methods to prevent errors
+  document.write = function(content) {
+    console.warn('document.write() call intercepted and blocked:', content);
+    return false;
+  };
+  
+  document.writeln = function(content) {
+    console.warn('document.writeln() call intercepted and blocked:', content);
+    return false;
+  };
+  
+  // Global error handling
+  window.addEventListener('error', function(event) {
+    if (event.error && event.error.message) {
+      const errorMsg = event.error.message;
+      if (errorMsg.includes('document.write') || 
+          errorMsg.includes('Unexpected token') ||
+          errorMsg.includes('Failed to execute') ||
+          errorMsg.includes('mae_html_user')) {
+        console.warn('Google Apps Script error caught and handled:', errorMsg);
+        event.preventDefault();
+        return false;
+      }
     }
-  }
-});
+  });
 
-// Handle unhandled promise rejections
-window.addEventListener('unhandledrejection', function(event) {
-  console.warn('Unhandled promise rejection:', event.reason);
-  event.preventDefault();
-});
+  // Handle unhandled promise rejections
+  window.addEventListener('unhandledrejection', function(event) {
+    console.warn('Unhandled promise rejection:', event.reason);
+    event.preventDefault();
+  });
 
-// TailwindCSS configuration to suppress production warnings
+  // Prevent Google Apps Script internal errors from disrupting the page
+  window.addEventListener('DOMContentLoaded', function() {
+    // Re-enable document.write after initial load if needed
+    setTimeout(function() {
+      if (typeof originalWrite === 'function') {
+        // Keep blocking for safety
+        console.log('document.write remains blocked for security');
+      }
+    }, 1000);
+  });
+})();
+
+// TailwindCSS configuration
 window.tailwind = { 
   config: { 
     mode: 'jit',
-    corePlugins: { preflight: false }
+    corePlugins: { preflight: false },
+    important: true
   } 
 };
 </script>
-<script src="https://cdn.tailwindcss.com" defer onload="console.log('TailwindCSS loaded successfully')" onerror="console.warn('TailwindCSS failed to load')"></script>
+
+<!-- Load TailwindCSS with fallback -->
+<script>
+(function() {
+  const script = document.createElement('script');
+  script.src = 'https://cdn.tailwindcss.com';
+  script.defer = true;
+  script.onload = function() {
+    console.log('TailwindCSS loaded successfully');
+    document.body.classList.add('tailwind-loaded');
+  };
+  script.onerror = function() {
+    console.warn('TailwindCSS failed to load, using fallback styles');
+    document.body.classList.add('tailwind-fallback');
+  };
+  document.head.appendChild(script);
+})();
+</script>
 <script>
 const DEBUG_MODE = false;
 function debugLog(){ if (DEBUG_MODE && console && console.log){ console.log.apply(console, arguments); } }
@@ -486,6 +540,43 @@ header {
 .skeleton::after { content: ""; position: absolute; inset: 0; background-image: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.2), rgba(255,255,255,0)); animation: skeleton-loading 1.5s infinite; }
 @keyframes skeleton-loading { 0% { transform: translate3d(-100%, 0, 0); will-change: transform; } 100% { transform: translate3d(100%, 0, 0); } }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* Fallback styles when TailwindCSS fails to load */
+.tailwind-fallback .bg-gradient-to-br { background: linear-gradient(135deg, var(--color-background), #2a2b3c); }
+.tailwind-fallback .text-white { color: white; }
+.tailwind-fallback .text-center { text-align: center; }
+.tailwind-fallback .p-4 { padding: 1rem; }
+.tailwind-fallback .p-6 { padding: 1.5rem; }
+.tailwind-fallback .m-4 { margin: 1rem; }
+.tailwind-fallback .mb-4 { margin-bottom: 1rem; }
+.tailwind-fallback .mt-4 { margin-top: 1rem; }
+.tailwind-fallback .flex { display: flex; }
+.tailwind-fallback .flex-col { flex-direction: column; }
+.tailwind-fallback .flex-wrap { flex-wrap: wrap; }
+.tailwind-fallback .items-center { align-items: center; }
+.tailwind-fallback .justify-center { justify-content: center; }
+.tailwind-fallback .justify-between { justify-content: space-between; }
+.tailwind-fallback .gap-4 { gap: 1rem; }
+.tailwind-fallback .grid { display: grid; }
+.tailwind-fallback .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.tailwind-fallback .rounded-lg { border-radius: 0.5rem; }
+.tailwind-fallback .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+.tailwind-fallback .w-full { width: 100%; }
+.tailwind-fallback .h-full { height: 100%; }
+.tailwind-fallback .min-h-screen { min-height: 100vh; }
+.tailwind-fallback .relative { position: relative; }
+.tailwind-fallback .absolute { position: absolute; }
+.tailwind-fallback .fixed { position: fixed; }
+.tailwind-fallback .top-0 { top: 0; }
+.tailwind-fallback .bottom-0 { bottom: 0; }
+.tailwind-fallback .left-0 { left: 0; }
+.tailwind-fallback .right-0 { right: 0; }
+.tailwind-fallback .z-10 { z-index: 10; }
+.tailwind-fallback .z-50 { z-index: 50; }
+.tailwind-fallback .hidden { display: none; }
+.tailwind-fallback .block { display: block; }
+.tailwind-fallback .inline { display: inline; }
+.tailwind-fallback .inline-block { display: inline-block; }
 .modal-close-btn { 
   position: absolute;
   top: -12px;
