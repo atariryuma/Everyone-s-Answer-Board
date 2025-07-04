@@ -196,13 +196,25 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
     var classHeaderName = sheetConfig.classHeader !== undefined ? sheetConfig.classHeader : COLUMN_HEADERS.CLASS;
     debugLog('getPublishedSheetData: Mapped Headers - mainHeaderName=%s, reasonHeaderName=%s, classHeaderName=%s', mainHeaderName, reasonHeaderName, classHeaderName);
 
+    // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
+    var headerIndices = getHeaderIndices(userInfo.spreadsheetId, targetSheet);
+    debugLog('getPublishedSheetData: headerIndices=%s', JSON.stringify(headerIndices));
+
     var formattedData = sheetData.data.map(function(row, index) {
+      // ヘッダーインデックスマップを使用して正確なデータを取得
+      var classIndex = headerIndices[COLUMN_HEADERS.CLASS];
+      var opinionIndex = headerIndices[mainHeaderName] !== undefined ? headerIndices[mainHeaderName] : headerIndices[COLUMN_HEADERS.OPINION];
+      var reasonIndex = headerIndices[reasonHeaderName] !== undefined ? headerIndices[reasonHeaderName] : headerIndices[COLUMN_HEADERS.REASON];
+      
+      debugLog('getPublishedSheetData: Row %s - classIndex=%s, opinionIndex=%s, reasonIndex=%s', index, classIndex, opinionIndex, reasonIndex);
+      debugLog('getPublishedSheetData: Row data length=%s, data=%s', row.originalData ? row.originalData.length : 'undefined', JSON.stringify(row.originalData));
+      
       return {
         rowIndex: row.rowNumber || (index + 2), // 実際の行番号
         name: (sheetData.displayMode === 'named' && row.displayName) ? row.displayName : '',
-        class: row.originalData[getHeaderIndex(sheetData.headers, classHeaderName)] || '',
-        opinion: row.originalData[getHeaderIndex(sheetData.headers, mainHeaderName)] || '',
-        reason: row.originalData[getHeaderIndex(sheetData.headers, reasonHeaderName)] || '',
+        class: (classIndex !== undefined && row.originalData && row.originalData[classIndex]) ? row.originalData[classIndex] : '',
+        opinion: (opinionIndex !== undefined && row.originalData && row.originalData[opinionIndex]) ? row.originalData[opinionIndex] : '',
+        reason: (reasonIndex !== undefined && row.originalData && row.originalData[reasonIndex]) ? row.originalData[reasonIndex] : '',
         reactions: {
           UNDERSTAND: { count: row.understandCount || 0, reacted: false },
           LIKE: { count: row.likeCount || 0, reacted: false },
@@ -1239,7 +1251,7 @@ function getSheetData(userId, sheetName, classFilter, sortMode) {
     
     // 名簿機能は使用せず、空の配列を設定
     var rosterData = [];
-    debugLog('名簿機能は無効化されています。名前はフォーム入力を使用します。');
+    
     
     if (sheetData.length === 0) {
       return {

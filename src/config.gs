@@ -249,6 +249,14 @@ function saveSheetConfig(sheetName, cfg) {
     // 現在の設定を取得
     var configJson = JSON.parse(userInfo.configJson || '{}');
     
+    // showNamesとshowCountsをグローバル設定として保存
+    if (cfg.showNames !== undefined) {
+      configJson.showNames = cfg.showNames;
+    }
+    if (cfg.showCounts !== undefined) {
+      configJson.showCounts = cfg.showCounts;
+    }
+    
     // シート固有の設定を保存
     var sheetConfigKey = 'sheet_' + sheetName;
     configJson[sheetConfigKey] = {

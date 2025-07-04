@@ -10,6 +10,9 @@
   <? if (typeof userId !== "undefined" && userId) { ?>
   <meta name="user-id" content="<?= htmlEncode(String(userId)) ?>">
   <? } ?>
+  
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
   <script>
     // グローバルエラーハンドリング
@@ -26,29 +29,6 @@
     window.addEventListener('unhandledrejection', function(event) {
       console.error('Unhandled promise rejection:', event.reason);
       event.preventDefault();
-    });
-    
-    // TailwindCSS を安全に読み込み（DOMContentLoaded後）
-    document.addEventListener('DOMContentLoaded', function() {
-      try {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.tailwindcss.com';
-        script.async = true;
-        script.defer = true;
-        script.onload = function() {
-          console.log('TailwindCSS が正常に読み込まれました');
-        };
-        script.onerror = function() {
-          console.warn('TailwindCSS の読み込みに失敗しました');
-        };
-        
-        // DOMが確実に存在する場合のみ追加
-        if (document.head) {
-          document.head.appendChild(script);
-        }
-      } catch (e) {
-        console.warn('TailwindCSS スクリプトの作成に失敗:', e);
-      }
     });
   </script>
   <style>
@@ -225,6 +205,7 @@
     .error-shake { animation: errorShake 0.5s ease-out; }
     .fade-in { animation: fadeIn 0.3s ease-out; }
     .slide-up { animation: slideUp 0.3s ease-out; }
+    .fade-out { animation: fadeOut 0.3s ease-out; }
     
     @keyframes successPulse {
       0% { transform: scale3d(1, 1, 1); will-change: transform; }
@@ -244,6 +225,10 @@
     @keyframes slideUp {
       0% { opacity: 0; transform: translateY(20px); will-change: opacity, transform; }
       100% { opacity: 1; transform: translateY(0); will-change: auto; }
+    }
+    @keyframes fadeOut {
+      0% { opacity: 1; will-change: opacity; }
+      100% { opacity: 0; will-change: auto; }
     }
     
     /* Progress */
@@ -474,96 +459,82 @@
         
         <!-- ドメイン・ステータス情報 -->
         <div class="flex items-center gap-2 sm:gap-3">
-          <!-- ドメイン情報（メイン表示） -->
-          <div id="header-domain-info" class="text-right">
-            <div class="flex items-center gap-2 text-xs">
-              <div id="header-status-dot" class="w-2 h-2 bg-gray-500 rounded-full flex-shrink-0"></div>
-              <div>
-                <div class="text-white font-medium" id="header-domain-name">ドメイン確認中...</div>
-                <div class="text-gray-400" id="header-status-text">セットアップ中</div>
+          <!-- ドメイン情報（Registration.htmlスタイル） -->
+          <div id="header-domain-info">
+            <!-- ドメイン一致表示（緑色パネル） -->
+            <!-- ドメイン一致表示（Registration.htmlスタイル） -->
+            <div id="header-domain-match" class="glass-panel bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-3 border border-green-400/30 hidden">
+              <div class="flex items-center gap-2">
+                <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div>
+                  <div class="text-green-400 font-semibold text-sm" id="header-domain-match-text">G Suite ドメイン</div>
+                  <div class="text-green-200 text-xs">セキュアアクセス有効</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- ドメイン不一致表示（Registration.htmlスタイル） -->
+            <div id="header-domain-mismatch" class="glass-panel bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg p-3 border border-yellow-400/30 hidden">
+              <div class="flex items-center gap-2">
+                <svg class="w-5 h-5 text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>
+                <div>
+                  <div class="text-yellow-400 font-semibold text-sm" id="header-domain-mismatch-text">ドメイン不一致</div>
+                  <div class="text-yellow-200 text-xs">アクセス制限あり</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 初期状態表示 -->
+            <div id="header-domain-initial" class="glass-panel bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-3 border border-blue-400/30">
+              <div class="flex items-center gap-2">
+                <div id="header-status-dot" class="w-3 h-3 bg-blue-400 rounded-full animate-pulse flex-shrink-0"></div>
+                <div>
+                  <div class="text-blue-400 font-semibold text-sm" id="header-domain-name-initial">ドメイン確認中</div>
+                  <div class="text-blue-200 text-xs" id="header-status-text-initial">セットアップ中</div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>      
-      <!-- ドメイン不一致の警告（コンパクト版） -->
-      <div id="admin-domain-mismatch-banner" class="mt-2 hidden">
-        <div class="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-lg p-2 border border-yellow-400/30">
-          <div class="flex items-center text-xs">
-            <svg class="w-3 h-3 text-yellow-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"></path>
-            </svg>
-            <span class="text-yellow-200" id="admin-domain-mismatch-compact"></span>
-          </div>
-        </div>
-      </div>
     </div>
   </header>  <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8 pb-32">
-    <!-- シンプルステータスバー -->
-    <section class="mb-6" id="status-bar-section">
-      <div class="glass-panel p-3 sm:p-4">
+    <!-- シンプル統合ステータスバー -->
+    <section class="mb-6">
+      <div class="glass-panel p-4 rounded-lg">
         <div class="flex items-center justify-between">
+          <!-- 左側: ステータス表示 -->
           <div class="flex items-center gap-3">
-            <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
               </svg>
             </div>
             <div>
-              <div class="flex items-center gap-2">
-                <span class="text-sm font-medium text-white" id="guidance-text">セットアップを開始してください</span>
-                <div id="header-status-indicator" class="flex items-center gap-1">
-                  <div class="w-2 h-2 bg-gray-500 rounded-full"></div>
-                </div>
-              </div>
-              <div class="text-xs text-gray-400">Google Workspace連携教育ツール</div>
+              <span class="text-sm font-medium text-white" id="guidance-text">セットアップを開始してください</span>
+              <div class="text-xs text-gray-400 mt-1">3ステップで簡単セットアップ</div>
             </div>
           </div>
           
-          <!-- プログレスインジケーター -->
-          <div class="hidden sm:flex items-center gap-3">
-            <div class="text-right">
-              <div class="text-xs text-gray-400">進行状況</div>
-              <div class="text-sm font-semibold text-white" id="setup-progress-text">0%</div>
+          <!-- 右側: コンパクトステップナビゲーション -->
+          <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1" id="step-1-indicator">
+              <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">1</div>
+              <span class="text-xs text-gray-300 hidden sm:inline">データ準備</span>
             </div>
-            <div class="w-24">
-              <div class="progress-bar h-2">
-                <div id="setup-progress" class="progress-fill" style="width: 0%"></div>
-              </div>
+            <div class="w-4 h-px bg-gray-600"></div>
+            <div class="flex items-center gap-1" id="step-2-indicator">
+              <div class="w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">2</div>
+              <span class="text-xs text-gray-300 hidden sm:inline">シート選択</span>
             </div>
-          </div>
-        </div>
-        
-        <!-- モバイル用プログレスバー -->
-        <div class="sm:hidden mt-3">
-          <div class="flex items-center justify-between text-xs text-gray-400 mb-1">
-            <span>進行状況</span>
-            <span id="setup-progress-text-mobile">0%</span>
-          </div>
-          <div class="progress-bar h-2">
-            <div id="setup-progress-mobile" class="progress-fill" style="width: 0%"></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ステップナビゲーション -->
-    <section class="mb-6">
-      <div class="glass-panel p-4">
-        <div class="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-          <div class="flex items-center" id="step-1-indicator">
-            <div class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-sm transition-all">1</div>
-            <span class="ml-2 text-sm text-gray-300">データ準備</span>
-          </div>
-          <div class="hidden sm:block w-8 h-px bg-gray-600"></div>
-          <div class="flex items-center" id="step-2-indicator">
-            <div class="w-8 h-8 bg-gray-600 text-white rounded-full flex items-center justify-center font-bold text-sm transition-all">2</div>
-            <span class="ml-2 text-sm text-gray-300">シート選択</span>
-          </div>
-          <div class="hidden sm:block w-8 h-px bg-gray-600"></div>
-          <div class="flex items-center" id="step-3-indicator">
-            <div class="w-8 h-8 bg-gray-600 text-white rounded-full flex items-center justify-center font-bold text-sm transition-all">3</div>
-            <span class="ml-2 text-sm text-gray-300">設定・公開</span>
+            <div class="w-4 h-px bg-gray-600"></div>
+            <div class="flex items-center gap-1" id="step-3-indicator">
+              <div class="w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">3</div>
+              <span class="text-xs text-gray-300 hidden sm:inline">設定・公開</span>
+            </div>
           </div>
         </div>
       </div>
@@ -695,68 +666,34 @@
           
           <div id="step2-content" class="progressive-section collapsed">
             <div class="space-y-4">
-              <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
-                <div class="flex items-center gap-2 mb-2">
-                  <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                  </svg>
-                  <span class="text-sm font-medium text-green-200">利用可能なシート</span>
-                </div>
-                <p class="text-xs text-green-300">公開するシートを選択してください</p>
-              </div>
-              
               <div class="space-y-3">
+                <!-- シンプルシート選択 -->
                 <label for="sheet-select" class="block text-sm font-medium text-white">
-                  アクティブシート
+                  シート選択
                 </label>
                 <select id="sheet-select" class="form-control" aria-describedby="sheet-help">
                   <option>読み込み中...</option>
                 </select>
-                <p id="sheet-help" class="text-xs text-gray-400">
-                  選択したシートの内容が回答ボードに表示されます
-                </p>
                 
+                <!-- 現在のアクティブシート（シート選択の直下に移動） -->
+                <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-3" id="active-sheet-panel">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                      <span class="text-sm font-medium text-green-200">アクティブシート</span>
+                    </div>
+                    <p class="text-sm text-white font-semibold" id="current-active-sheet-name">未設定</p>
+                  </div>
+                </div>
+
                 <button type="button" id="switch-sheet-btn" disabled class="btn btn-primary w-full">
                   <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                   </svg>
                   <span id="switch-sheet-text">このシートをアクティブにする</span>
                 </button>
-                
-                <!-- シート詳細情報 -->
-                <div id="sheet-details" class="mt-4 space-y-3 hidden">
-                  <!-- 現在のアクティブシート -->
-                  <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3">
-                    <div class="flex items-center gap-2 mb-2">
-                      <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                      </svg>
-                      <span class="text-sm font-medium text-blue-200">現在のアクティブシート</span>
-                    </div>
-                    <p class="text-sm text-white font-semibold" id="current-active-sheet-name">-</p>
-                  </div>
-                  
-                  
-                  <!-- 関連URL -->
-                  <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-3">
-                    <div class="flex items-center gap-2 mb-2">
-                      <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-                      </svg>
-                      <span class="text-sm font-medium text-purple-200">関連リンク</span>
-                    </div>
-                    <div class="space-y-1 text-xs">
-                      <div>
-                        <span class="text-purple-300">スプレッドシート:</span>
-                        <a href="#" id="spreadsheet-link" class="text-purple-100 hover:text-white underline ml-1" target="_blank">開く</a>
-                      </div>
-                      <div>
-                        <span class="text-purple-300">フォーム:</span>
-                        <a href="#" id="form-link" class="text-purple-100 hover:text-white underline ml-1" target="_blank">開く</a>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -817,7 +754,7 @@
                     </svg>
                     オプション設定（任意）
                   </summary>
-                  <div class="p-4 pt-0 space-y-4">
+                  <div class="p-4 pt-0 space-y-4" id="detail-options">
                     <label class="block">
                       <span class="text-sm text-gray-300 mb-2 block">理由・詳細列</span>
                       <select id="rHeader" class="form-control"></select>
@@ -830,6 +767,14 @@
                       <span class="text-sm text-gray-300 mb-2 block">クラス列</span>
                       <select id="classHeader" class="form-control"></select>
                     </label>
+                    <div class="flex items-center mt-4">
+                      <input type="checkbox" id="showNames" name="showNames" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                      <label for="showNames" class="ml-2 block text-sm text-gray-300">名前を表示する</label>
+                    </div>
+                    <div class="flex items-center mt-2">
+                      <input type="checkbox" id="showCounts" name="showCounts" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                      <label for="showCounts" class="ml-2 block text-sm text-gray-300">リアクション数を表示する</label>
+                    </div>
                   </div>
                 </details>
               </div>
@@ -870,13 +815,6 @@
           </div>
           
           <div class="space-y-3">
-            <button type="button" id="quick-create-board-btn" class="btn btn-google w-full text-sm" title="新しい回答ボードを作成">
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-              </svg>
-              新規ボード作成
-            </button>
-            
             <button type="button" onclick="openDatabaseSpreadsheet()" class="btn btn-secondary w-full text-sm" title="現在のスプレッドシートを開く">
               <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
@@ -891,19 +829,6 @@
               フォームを開く
             </button>
             
-            <button type="button" onclick="clearAllCacheFromAdmin()" class="btn btn-warning w-full text-sm" title="キャッシュをクリアして最新データを取得">
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-              </svg>
-              キャッシュクリア
-            </button>
-            
-            <button type="button" id="refresh-board-btn" class="btn btn-secondary w-full text-sm" title="回答ボードのデータを最新の状態に更新">
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-              </svg>
-              ボードを更新
-            </button>
           </div>
         </div>
         
@@ -1028,6 +953,23 @@
               </ul>
             </div>
             
+            <!-- デジタルシティズンシップの指導 -->
+            <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+              <h4 class="font-medium text-blue-200 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+                デジタルシティズンシップの指導
+              </h4>
+              <p class="text-xs text-blue-100 mb-3">安心で建設的なオンライン学習環境を作るための指導ガイドをご用意しています。</p>
+              <button type="button" id="digital-citizenship-btn" class="btn btn-primary text-sm w-full" title="デジタルシティズンシップの指導ガイドを開く">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                </svg>
+                指導ガイドを開く
+              </button>
+            </div>
+            
             <!-- 注意事項 -->
             <div class="bg-gray-800/50 rounded-lg p-4">
               <h4 class="font-medium text-gray-200 mb-3 flex items-center gap-2">
@@ -1085,6 +1027,164 @@
       <div class="flex justify-end gap-4">
         <button type="button" id="modal-cancel-btn" class="btn btn-secondary">キャンセル</button>
         <button type="button" id="modal-confirm-btn" class="btn btn-primary">はい、実行します</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 自動プライバシー機能モーダル -->
+  <div id="privacy-modal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+    <div class="glass-panel p-8 max-w-2xl w-full mx-4 relative">
+      <div class="flex items-center mb-6">
+        <div class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center mr-4">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+          </svg>
+        </div>
+        <h3 class="text-xl font-semibold text-white">🔒 自動プライバシー機能とセキュリティ</h3>
+      </div>
+      
+      <div class="text-gray-300 mb-6 space-y-4">
+        <p class="text-lg font-medium text-blue-300">みんなの回答ボードのプライバシー保護機能についてご説明します。</p>
+        
+        <div class="bg-gray-800 bg-opacity-50 p-4 rounded-lg">
+          <h4 class="font-semibold text-white mb-2">🔄 自動非公開システム</h4>
+          <p>ボードは<strong class="text-yellow-300">6時間後に自動で非公開</strong>になります。これにより、データの意図しない公開を防いでいます。</p>
+        </div>
+        
+        <div class="bg-gray-800 bg-opacity-50 p-4 rounded-lg">
+          <h4 class="font-semibold text-white mb-2">🔐 アクセス制御</h4>
+          <p>ボードへのアクセスは、<strong class="text-green-300">授業で使用するドメインとGoogleアカウントのみ</strong>に制限されます。</p>
+        </div>
+        
+        <div class="bg-gray-800 bg-opacity-50 p-4 rounded-lg">
+          <h4 class="font-semibold text-white mb-2">👥 匹名性の保護</h4>
+          <p>生徒のプライバシーを守るため、<strong class="text-purple-300">回答は匹名で表示</strong>されます。名前表示は先生が選択できます。</p>
+        </div>
+        
+        <div class="bg-green-900 bg-opacity-30 border border-green-500 p-4 rounded-lg">
+          <h4 class="font-semibold text-green-300 mb-2">✅ デジタルシティズンシップの実践</h4>
+          <p>これらの機能は、生徒が安心して意見を交換できるデジタル環境を提供し、責任あるオンライン行動を学ぶためのものです。</p>
+        </div>
+      </div>
+      
+      <div class="flex justify-end gap-4">
+        <button type="button" id="privacy-modal-cancel" class="btn btn-secondary">キャンセル</button>
+        <button type="button" id="privacy-modal-continue" class="btn btn-primary">理解しました、継続</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- デジタルシティズンシップ指導モーダル -->
+  <div id="digital-citizenship-modal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+    <div class="glass-panel p-8 max-w-4xl w-full mx-4 relative max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+            </svg>
+          </div>
+          <h3 class="text-2xl font-bold text-white">🌐 デジタルシティズンシップ教育ガイド</h3>
+        </div>
+        <button type="button" id="digital-citizenship-modal-close" class="text-gray-400 hover:text-white transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="space-y-6 text-gray-300">
+        <!-- デジタルシティズンシップの重要性 -->
+        <div class="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-500/30 rounded-lg p-6">
+          <h4 class="text-xl font-semibold text-blue-300 mb-4">📚 デジタルシティズンシップとは</h4>
+          <p class="mb-4">デジタル技術を責任を持って適切に使用するための知識、スキル、態度です。</p>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="bg-blue-800/20 p-4 rounded-lg">
+              <h5 class="font-semibold text-blue-200 mb-2">🛡️ セキュリティとプライバシー</h5>
+              <p class="text-sm">個人情報やデジタル足跡を守る方法を学びます。</p>
+            </div>
+            <div class="bg-purple-800/20 p-4 rounded-lg">
+              <h5 class="font-semibold text-purple-200 mb-2">🤝 デジタルコミュニケーション</h5>
+              <p class="text-sm">オンラインでの適切なコミュニケーション方法を習得します。</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- みんなの回答ボードでの実践 -->
+        <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-6">
+          <h4 class="text-xl font-semibold text-green-300 mb-4">🌱 みんなの回答ボードでの実践</h4>
+          <div class="space-y-4">
+            <div class="flex items-start gap-3">
+              <div class="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center mt-1">
+                <span class="text-green-300 font-semibold">1</span>
+              </div>
+              <div>
+                <h5 class="font-semibold text-green-200">尊重と共感</h5>
+                <p class="text-sm text-gray-300">他の人の意見を尊重し、共感を示すことを学びます。</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-3">
+              <div class="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center mt-1">
+                <span class="text-green-300 font-semibold">2</span>
+              </div>
+              <div>
+                <h5 class="font-semibold text-green-200">建設的なフィードバック</h5>
+                <p class="text-sm text-gray-300">「いいね！」「なるほど！」等のリアクションでポジティブな交流を促進します。</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-3">
+              <div class="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center mt-1">
+                <span class="text-green-300 font-semibold">3</span>
+              </div>
+              <div>
+                <h5 class="font-semibold text-green-200">プライバシーの理解</h5>
+                <p class="text-sm text-gray-300">名前表示の選択や個人情報の扱いについて考えます。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 指導のポイント -->
+        <div class="bg-amber-900/20 border border-amber-500/30 rounded-lg p-6">
+          <h4 class="text-xl font-semibold text-amber-300 mb-4">🌟 指導のポイント</h4>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <h5 class="font-semibold text-amber-200 mb-2">事前指導</h5>
+              <ul class="list-disc list-inside space-y-1 text-sm text-gray-300">
+                <li>オンラインでのルールとマナーの確認</li>
+                <li>プライバシー設定の重要性</li>
+                <li>建設的なコメントの例示</li>
+              </ul>
+            </div>
+            <div>
+              <h5 class="font-semibold text-amber-200 mb-2">活動中のサポート</h5>
+              <ul class="list-disc list-inside space-y-1 text-sm text-gray-300">
+                <li>生徒の投稿をモニタリング</li>
+                <li>適切なフィードバックの提供</li>
+                <li>デジタルエチケットの実践例を示す</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        
+        <!-- リソース -->
+        <div class="bg-gray-800/50 border border-gray-600 rounded-lg p-6">
+          <h4 class="text-xl font-semibold text-gray-200 mb-4">📚 参考リソース</h4>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <h5 class="font-semibold text-gray-300 mb-2">文部科学省のガイドライン</h5>
+              <p class="text-sm text-gray-400">「GIGAスクール構想」における情報モラル教育の取り組み</p>
+            </div>
+            <div>
+              <h5 class="font-semibold text-gray-300 mb-2">デジタルシティズンシップ教育</h5>
+              <p class="text-sm text-gray-400">適切なデジタル技術の活用と情報モラルの育成</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="flex justify-end mt-6">
+        <button type="button" id="digital-citizenship-modal-close-btn" class="btn btn-primary">理解しました</button>
       </div>
     </div>
   </div></body>
@@ -1159,6 +1259,99 @@
       element.classList.remove('success-pulse', 'error-shake');
       void element.offsetWidth; // Trigger reflow
       element.classList.add(type === 'success' ? 'success-pulse' : 'error-shake');
+    }
+
+    // プライバシーモーダルの制御関数
+    function showPrivacyModal(onContinue) {
+      const modal = document.getElementById('privacy-modal');
+      if (!modal) {
+        console.error('プライバシーモーダルが見つかりません');
+        return;
+      }
+      
+      modal.classList.remove('hidden');
+      
+      // イベントリスナーを設定（重複を防ぐため一度クリア）
+      const continueBtn = document.getElementById('privacy-modal-continue');
+      const cancelBtn = document.getElementById('privacy-modal-cancel');
+      
+      // 既存のリスナーを削除
+      if (continueBtn) {
+        const newContinueBtn = continueBtn.cloneNode(true);
+        continueBtn.parentNode.replaceChild(newContinueBtn, continueBtn);
+        newContinueBtn.addEventListener('click', () => {
+          hidePrivacyModal();
+          if (onContinue) onContinue();
+        });
+      }
+      
+      if (cancelBtn) {
+        const newCancelBtn = cancelBtn.cloneNode(true);
+        cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+        newCancelBtn.addEventListener('click', hidePrivacyModal);
+      }
+      
+      // Escapeキーでモーダルを閉じる
+      const escapeHandler = (e) => {
+        if (e.key === 'Escape') {
+          hidePrivacyModal();
+          document.removeEventListener('keydown', escapeHandler);
+        }
+      };
+      document.addEventListener('keydown', escapeHandler);
+    }
+    
+    function hidePrivacyModal() {
+      const modal = document.getElementById('privacy-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+    }
+
+    // デジタルシティズンシップモーダルの制御関数
+    function showDigitalCitizenshipModal() {
+      const modal = document.getElementById('digital-citizenship-modal');
+      if (!modal) {
+        console.error('デジタルシティズンシップモーダルが見つかりません');
+        return;
+      }
+      
+      modal.classList.remove('hidden');
+      
+      // 閉じるボタンのイベントリスナーを設定
+      const closeBtn = document.getElementById('digital-citizenship-modal-close');
+      const closeBtnBottom = document.getElementById('digital-citizenship-modal-close-btn');
+      
+      if (closeBtn) {
+        closeBtn.onclick = hideDigitalCitizenshipModal;
+      }
+      
+      if (closeBtnBottom) {
+        closeBtnBottom.onclick = hideDigitalCitizenshipModal;
+      }
+      
+      // Escapeキーでモーダルを閉じる
+      const escapeHandler = (e) => {
+        if (e.key === 'Escape') {
+          hideDigitalCitizenshipModal();
+          document.removeEventListener('keydown', escapeHandler);
+        }
+      };
+      document.addEventListener('keydown', escapeHandler);
+      
+      // モーダルの背景をクリックしたときに閉じる
+      modal.onclick = (e) => {
+        if (e.target === modal) {
+          hideDigitalCitizenshipModal();
+        }
+      };
+    }
+    
+    function hideDigitalCitizenshipModal() {
+      const modal = document.getElementById('digital-citizenship-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
     }
 
     function showConfirmationModal(title, message, onConfirm) {
@@ -1304,36 +1497,34 @@
     }
 
     function displayAdminDomainInfo(info) {
-      const headerDomainName = document.getElementById('header-domain-name');
-      const mismatchBanner = document.getElementById('admin-domain-mismatch-banner');
-      const mismatchText = document.getElementById('admin-domain-mismatch-compact');
+      const headerDomainMatch = document.getElementById('header-domain-match');
+      const headerDomainMismatch = document.getElementById('header-domain-mismatch');
+      const headerDomainInitial = document.getElementById('header-domain-initial');
+      const headerDomainMatchText = document.getElementById('header-domain-match-text');
+      const headerDomainMismatchText = document.getElementById('header-domain-mismatch-text');
+
+      // 全ての表示を一旦非表示にする
+      if (headerDomainMatch) headerDomainMatch.classList.add('hidden');
+      if (headerDomainMismatch) headerDomainMismatch.classList.add('hidden');
+      if (headerDomainInitial) headerDomainInitial.classList.add('hidden');
       
       if (!info || info.error) {
         console.warn('ドメイン情報エラー:', info?.error);
-        if (headerDomainName) {
-          headerDomainName.textContent = 'ドメイン情報取得エラー';
-        }
+        if (headerDomainInitial) headerDomainInitial.classList.remove('hidden');
         return;
       }
 
       if (info.isDomainMatch) {
         // ドメインが一致している場合
-        if (headerDomainName) {
-          headerDomainName.textContent = `${info.deployDomain} ドメイン`;
-          headerDomainName.className = 'text-green-300 font-medium';
-        }
-        if (mismatchBanner) {
-          mismatchBanner.classList.add('hidden');
+        if (headerDomainMatch && headerDomainMatchText) {
+          headerDomainMatch.classList.remove('hidden');
+          headerDomainMatchText.textContent = `${info.deployDomain} ドメイン`;
         }
       } else {
         // ドメイン不一致の場合
-        if (headerDomainName) {
-          headerDomainName.textContent = `${info.currentDomain} (不一致)`;
-          headerDomainName.className = 'text-yellow-300 font-medium';
-        }
-        if (mismatchBanner && mismatchText) {
-          mismatchBanner.classList.remove('hidden');
-          mismatchText.textContent = `ご利用のドメイン: ${info.currentDomain} | 対応ドメイン: ${info.deployDomain}`;
+        if (headerDomainMismatch && headerDomainMismatchText) {
+          headerDomainMismatch.classList.remove('hidden');
+          headerDomainMismatchText.textContent = `${info.currentDomain} (デプロイ: ${info.deployDomain})`;
         }
       }
     }
@@ -1367,8 +1558,8 @@
         elements.switchSheetBtn.addEventListener('click', () => {
           if (!selectedSheet) return;
           showConfirmationModal(
-            '自動プライバシー機能について',
-            'このボードはセキュリティのため6時間後に自動的に非公開になります。この管理パネルから再公開できます。続行しますか？',
+            'シートをアクティブ化',
+            '選択したシートをアクティブにします。これにより、現在の列設定はリセットされます。続行しますか？',
             switchToSheet
           );
         });
@@ -1377,7 +1568,17 @@
         elements.clearSelectionBtn.addEventListener('click', clearSheetSelection);
       }
       if (elements.saveConfigBtn) {
-        elements.saveConfigBtn.addEventListener('click', saveConfig);
+        elements.saveConfigBtn.addEventListener('click', () => {
+          // 最初にプライバシーモーダルを表示
+          showPrivacyModal(() => {
+            // プライバシー承認後、確認モーダルを表示
+            showConfirmationModal(
+              'ボードを公開',
+              '設定を保存して回答ボードを公開します。継続しますか？',
+              saveConfig
+            );
+          });
+        });
       }
       
       // Spreadsheet management
@@ -1388,12 +1589,12 @@
       
       // Create board events
       if (elements.createBoardBtn) {
-        elements.createBoardBtn.addEventListener('click', createBoard);
+        elements.createBoardBtn.addEventListener('click', createBoardAndOpenForm);
       }
       
       const quickCreateBtn = document.getElementById('quick-create-board-btn');
       if (quickCreateBtn) {
-        quickCreateBtn.addEventListener('click', createBoard);
+        quickCreateBtn.addEventListener('click', createBoardAndOpenForm);
       }
 
       const refreshBoardBtn = document.getElementById('refresh-board-btn');
@@ -1405,9 +1606,7 @@
       if (elements.detailOptions) {
         elements.detailOptions.addEventListener('change', function(e) {
           if (e.target.name === 'showNames' || e.target.name === 'showCounts') {
-            const showNames = elements.detailOptions.querySelector('input[name="showNames"]').checked;
-            const showCounts = elements.detailOptions.querySelector('input[name="showCounts"]').checked;
-            updateDisplayOptions(showNames, showCounts);
+            updateConfigButtons(); // 設定保存ボタンの状態を更新
           }
         });
       }
@@ -1428,6 +1627,11 @@
         });
       }
       
+      // Digital citizenship button event
+      const digitalCitizenshipBtn = document.getElementById('digital-citizenship-btn');
+      if (digitalCitizenshipBtn) {
+        digitalCitizenshipBtn.addEventListener('click', showDigitalCitizenshipModal);
+      }
       
       // Teacher guide modal events
       const teacherGuideConfirmBtn = document.getElementById('teacherGuideConfirmBtn');
@@ -1598,23 +1802,6 @@
         currentStep = 4;
       }
       
-      // プログレスバーの更新（デスクトップとモバイル両方）
-      if (elements.setupProgress) {
-        elements.setupProgress.style.width = progress + '%';
-      }
-      if (elements.setupProgressMobile) {
-        elements.setupProgressMobile.style.width = progress + '%';
-      }
-      
-      // プログレステキストの更新（デスクトップとモバイル両方）
-      const progressPercent = Math.round(progress) + '%';
-      if (elements.setupProgressText) {
-        elements.setupProgressText.textContent = progressPercent;
-      }
-      if (elements.setupProgressTextMobile) {
-        elements.setupProgressTextMobile.textContent = progressPercent;
-      }
-
       // ガイダンステキストの更新
       if (elements.guidanceText) {
         elements.guidanceText.textContent = statusText;
@@ -2155,6 +2342,14 @@
             } else if (formFileName) {
               formFileName.textContent = 'Googleフォーム';
             }
+            
+            // フォームを新しいページで開く
+            if (result.formUrl) {
+              showMessage('フォームを新しいページで開いています...', 'info');
+              setTimeout(() => {
+                window.open(result.formUrl, '_blank', 'noopener,noreferrer');
+              }, 1500); // 1.5秒後に開く
+            }
           }
           setTimeout(() => window.location.reload(), 3000);
         })
@@ -2182,14 +2377,43 @@
           // シート詳細情報を更新
           updateSheetDetails(headers);
           
+          // 自動判定した設定を自動でデータベースに保存
+          if (guesses.mainHeader) {
+            // チェックボックスの現在の値を取得
+            const showNamesCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showNames"]') : null;
+            const showCountsCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showCounts"]') : null;
+            
+            const autoConfig = {
+              ...guesses,
+              showNames: showNamesCheckbox ? showNamesCheckbox.checked : false,
+              showCounts: showCountsCheckbox ? showCountsCheckbox.checked : true
+            };
+            
+            // 自動設定をデータベースに保存
+            google.script.run
+              .withSuccessHandler(() => {
+                showMessage('列情報を自動判定し、設定を保存しました。', 'success');
+                updateConfigButtons();
+              })
+              .withFailureHandler((error) => {
+                console.warn('自動設定の保存に失敗:', error);
+                showMessage('列情報を自動判定しましたが、設定の保存に失敗しました。手動で保存してください。', 'warning');
+                updateConfigButtons();
+              })
+              .saveSheetConfig(selectedSheet, autoConfig);
+          }
+          
+          // 既存設定がある場合はそれをロードしてマージ
           google.script.run
             .withSuccessHandler(cfg => {
-              populateConfig(Object.assign({}, guesses, cfg));
+              if (cfg && Object.keys(cfg).length > 0) {
+                populateConfig(Object.assign({}, guesses, cfg));
+                showMessage('既存の設定をロードしました。', 'info');
+              }
               updateConfigButtons();
             })
             .withFailureHandler((error) => {
-              
-              showMessage('新しいシート設定を自動構成しました。確認してください。', 'blue');
+              // 既存設定がない場合はエラーではないので無視
               updateConfigButtons();
             })
             .getConfig(selectedSheet);
@@ -2344,6 +2568,17 @@
       elements.rHeader.value = cfg.reasonHeader || '';
       elements.nameHeader.value = cfg.nameHeader || '';
       elements.classHeader.value = cfg.classHeader || '';
+      
+      // チェックボックスの状態を更新
+      const showNamesCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showNames"]') : null;
+      const showCountsCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showCounts"]') : null;
+      
+      if (showNamesCheckbox) {
+        showNamesCheckbox.checked = cfg.showNames || false;
+      }
+      if (showCountsCheckbox) {
+        showCountsCheckbox.checked = cfg.showCounts !== undefined ? cfg.showCounts : true; // デフォルト値はtrue
+      }
     }
 
     function clearConfigFields() {
@@ -2372,12 +2607,18 @@
         return;
       }
 
+      // チェックボックスの値を取得
+      const showNamesCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showNames"]') : null;
+      const showCountsCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showCounts"]') : null;
+      
       const cfg = {
-        
         mainHeader: elements.mainHeader.value,
         reasonHeader: elements.rHeader.value,
         nameHeader: elements.nameHeader.value,
-        classHeader: elements.classHeader.value
+        classHeader: elements.classHeader.value,
+        // 新しいチェックボックスの値を設定に含める
+        showNames: showNamesCheckbox ? showNamesCheckbox.checked : false,
+        showCounts: showCountsCheckbox ? showCountsCheckbox.checked : true // リアクション数はデフォルトで表示
       };
       
       setLoading(true, '設定を保存中...');
@@ -2397,6 +2638,10 @@
             elements.saveConfigText.textContent = '設定を保存';
           }
           elements.saveConfigBtn.disabled = false;
+          
+          // 設定保存後に表示オプションも同時に更新
+          updateDisplayOptions(cfg.showNames, cfg.showCounts);
+          
           updateSetupProgress();
           setLoading(false);
         })
