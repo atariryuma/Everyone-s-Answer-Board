@@ -1451,7 +1451,7 @@ class StudyQuestApp {
     
     const pollInterval = this.isLowPerformanceMode ? 30000 : 15000;
     // 新着チェックのみ実行、自動更新はしない
-    this.pollingInterval = setInterval(() => this.checkForNewContent(), pollInterval);
+    this.pollingInterval = setInterval(this.checkForNewContent.bind(this), pollInterval);
     
     // Start automatic cleanup for memory management
     this.cleanupInterval = setInterval(() => {
