@@ -679,6 +679,13 @@ header {
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
       </svg>
     </p>
+    <p id="sheetNameText" class="text-xs text-gray-400 h-4 truncate flex items-center justify-end gap-1">
+      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+      </svg>
+    </p>
+    <p id="modeLabel" class="text-xs text-gray-400 truncate"></p>
+    <div class="flex justify-end gap-1 flex-wrap">
       <button type="button" id="endPublicationBtn" class="admin-toggle text-xs bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded hidden whitespace-nowrap transition-all flex items-center gap-1" hidden aria-label="公開終了">
         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"></path>
@@ -864,8 +871,7 @@ class StudyQuestApp {
       sliderValue: document.getElementById('sliderValue'),
       headingLabel: document.getElementById('headingLabel'),
       sheetNameText: document.getElementById('sheetNameText'),
-      headerAdminMode: document.getElementById('header-admin-mode'),
-      
+      modeLabel: document.getElementById('modeLabel'),
       endPublicationBtn: document.getElementById('endPublicationBtn'),
       adminToggleBtn: document.getElementById('adminToggleBtn'),
       ownerNameText: document.getElementById('ownerNameText'),
@@ -895,7 +901,10 @@ class StudyQuestApp {
       scoreOption: document.getElementById('scoreOption'),
       footer: document.getElementById('controlsFooter')
     };
-    
+    // サーバーから渡された設定に基づいてモードラベルを設定
+    if (this.elements.modeLabel) {
+      this.elements.modeLabel.textContent = window.showAdminFeatures ? '管理モード' : '閲覧モード';
+    }
     this.state = {
       currentAnswers: [],
       isLoading: false,
@@ -972,15 +981,7 @@ class StudyQuestApp {
           if (this.elements.adminToggleBtn) {
             this.elements.adminToggleBtn.classList.remove('hidden');
             this.elements.adminToggleBtn.removeAttribute('hidden');
-          }
-          if (this.elements.headerAdminMode) {
-            if (this.state.showAdminFeatures) {
-              this.elements.headerAdminMode.classList.remove('hidden');
-              this.elements.headerAdminMode.removeAttribute('hidden');
-            } else {
-              this.elements.headerAdminMode.classList.add('hidden');
-              this.elements.headerAdminMode.setAttribute('hidden', '');
-            }
+            this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
           }
         }
         // Check if modal should be shown
@@ -1219,7 +1220,7 @@ class StudyQuestApp {
       if (this.elements.adminToggleBtn) {
         this.elements.adminToggleBtn.classList.remove('hidden');
         this.elements.adminToggleBtn.removeAttribute('hidden');
-        
+        this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
       }
       return;
     }
@@ -1238,6 +1239,7 @@ class StudyQuestApp {
         if (this.elements.adminToggleBtn) {
           this.elements.adminToggleBtn.classList.remove('hidden');
           this.elements.adminToggleBtn.removeAttribute('hidden');
+          this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
         }
       }
     } catch (e) {
@@ -1257,6 +1259,7 @@ class StudyQuestApp {
     if (this.elements.adminToggleBtn) {
       this.elements.adminToggleBtn.classList.remove('hidden');
       this.elements.adminToggleBtn.removeAttribute('hidden');
+      this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
     }
     
     // 公開終了ボタンは管理モード時のみ表示
@@ -1270,46 +1273,41 @@ class StudyQuestApp {
       }
     }
     
-    if (this.elements.headerAdminMode) {
-      if (this.state.showAdminFeatures) {
-        this.elements.headerAdminMode.classList.remove('hidden');
-        this.elements.headerAdminMode.removeAttribute('hidden');
-      } else {
-        this.elements.headerAdminMode.classList.add('hidden');
-        this.elements.headerAdminMode.setAttribute('hidden', '');
-      }
+    if (this.elements.modeLabel) {
+      this.elements.modeLabel.textContent = this.state.showAdminFeatures ? '管理モード' : '閲覧モード';
     }
+  }
   
   // 新着コンテンツチェック（表示は更新しない）
-  checkForNewContent() {
-    const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
-    const sortOrder = this.elements.sortOrder.value;
-    this.gas.getPublishedSheetData(__SPREADSHEET_ID__, selectedClass, sortOrder)
-      .then(data => {
-        // 成功した場合は失敗カウントをリセット
+  async checkForNewContent() {
+    try {
+      const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+      const sortOrder = this.elements.sortOrder.value;
+      const data = await     this.gas.getPublishedSheetData(__SPREADSHEET_ID__, selectedClass, sortOrder);
+      
+      // 成功した場合は失敗カウントをリセット
+      this.state.pollingFailureCount = 0;
+      
+      const newCount = data.data ? data.data.length : 0;
+      if (newCount > this.state.lastSeenCount && this.state.lastSeenCount > 0) {
+        const newItems = newCount - this.state.lastSeenCount;
+        this.showNewContentBanner(newItems);
+        debugLog('新着コンテンツ検出:', { newItems, newCount, lastSeenCount: this.state.lastSeenCount });
+      }
+    } catch (error) {
+      this.state.pollingFailureCount++;
+      console.warn('新着チェックに失敗:', error, 'failureCount:', this.state.pollingFailureCount);
+      
+      // 連続で失敗が続く場合はポーリング間隔を延ばす
+      if (this.state.pollingFailureCount >= 3) {
+        debugLog('連続失敗によりポーリング間隔を延長');
+        this.stopPolling();
+        setTimeout(() => {
+          this.startPolling();
+        }, 5000); // 5秒後に再開
         this.state.pollingFailureCount = 0;
-        
-        const newCount = data.data ? data.data.length : 0;
-        if (newCount > this.state.lastSeenCount && this.state.lastSeenCount > 0) {
-          const newItems = newCount - this.state.lastSeenCount;
-          this.showNewContentBanner(newItems);
-          debugLog('新着コンテンツ検出:', { newItems, newCount, lastSeenCount: this.state.lastSeenCount });
-        }
-      })
-      .catch(error => {
-        this.state.pollingFailureCount++;
-        console.warn('新着チェックに失敗:', error, 'failureCount:', this.state.pollingFailureCount);
-        
-        // 連続で失敗が続く場合はポーリング間隔を延ばす
-        if (this.state.pollingFailureCount >= 3) {
-          debugLog('連続失敗によりポーリング間隔を延長');
-          this.stopPolling();
-          setTimeout(() => {
-            this.startPolling();
-          }, 5000); // 5秒後に再開
-          this.state.pollingFailureCount = 0;
-        }
-      });
+      }
+    }
   }
   
   // 新着通知バナーを表示
