@@ -4,8 +4,42 @@
 <meta charset="UTF-8">
 <title>StudyQuest -みんなの回答ボード- - みんなのかいとうボード</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- TailwindCSS CDN -->
-<script src="https://cdn.tailwindcss.com"></script>
+<meta name="referrer" content="no-referrer">
+<!-- Permissions Policy to silence console warnings -->
+<meta http-equiv="Permissions-Policy" content="ambient-light-sensor=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), speaker=(), vibrate=(), vr=()">
+<!-- Preload Google Fonts for better performance -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<!-- TailwindCSS CDN with error handling -->
+<script>
+// Global error handling for document.write and other issues
+window.addEventListener('error', function(event) {
+  if (event.error && event.error.message) {
+    if (event.error.message.includes('document.write') || 
+        event.error.message.includes('Unexpected token')) {
+      console.warn('Document.write or syntax error caught and handled:', event.error.message);
+      event.preventDefault();
+      return false;
+    }
+  }
+});
+
+// Handle unhandled promise rejections
+window.addEventListener('unhandledrejection', function(event) {
+  console.warn('Unhandled promise rejection:', event.reason);
+  event.preventDefault();
+});
+
+// TailwindCSS configuration to suppress production warnings
+window.tailwind = { 
+  config: { 
+    mode: 'jit',
+    corePlugins: { preflight: false }
+  } 
+};
+</script>
+<script src="https://cdn.tailwindcss.com" defer onload="console.log('TailwindCSS loaded successfully')" onerror="console.warn('TailwindCSS failed to load')"></script>
 <script>
 const DEBUG_MODE = false;
 function debugLog(){ if (DEBUG_MODE && console && console.log){ console.log.apply(console, arguments); } }
@@ -403,7 +437,15 @@ header {
 .reaction-border-1 { border-width: 2px; }
 .reaction-border-2 { border-width: 4px; }
 .reaction-border-3 { border-width: 6px; }
-.answer-preview { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; min-height: 120px; }
+.answer-preview { 
+  display: -webkit-box; 
+  -webkit-line-clamp: 5; 
+  line-clamp: 5; 
+  -webkit-box-orient: vertical; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  min-height: 120px; 
+}
 .like-btn svg { 
   transition: fill var(--transition-duration) var(--transition-easing),
               transform var(--transition-duration) var(--transition-easing);
