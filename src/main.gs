@@ -213,129 +213,77 @@ function isUserRegistered(email, spreadsheetId) {
 }
 
 /**
- * 公開エントリーポイント（インテリジェントルーティング版）
- * システムの状態とユーザーの登録状況に応じて、適切な画面を返す
+ * システムの初期セットアップが完了しているかを確認するヘルパー関数
+ * @returns {boolean} セットアップが完了していればtrue
+ */
+function isSystemSetup() {
+  var dbSpreadsheetId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
+  return !!dbSpreadsheetId;
+}
+
+/**
+ * 登録ページを表示する関数
+ */
+function showRegistrationPage() {
+  return HtmlService.createTemplateFromFile('Registration')
+    .evaluate()
+    .setTitle('新規ユーザー登録 - StudyQuest')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+}
+
+/**
+ * Webアプリケーションのメインエントリーポイント
+ * @param {Object} e - URLパラメータを含むイベントオブジェクト
+ * @returns {HtmlOutput} 表示するHTMLコンテンツ
  */
 function doGet(e) {
   try {
-    // パラメータの安全な初期化
-    e = e || {};
-    e.parameter = e.parameter || {};
-    
-    var userId = e.parameter.userId || '';
-    var requestMode = e.parameter.mode || '';
-    var setup = e.parameter.setup || '';
-    
-    // 【チェック1】システムの初期設定が完了しているか？
-    var dbSpreadsheetId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
-    
-    if (!dbSpreadsheetId) {
-      // データベースIDがなければ、セットアップ画面を返す
-      console.log('システムが未設定です。セットアップ画面にリダイレクトします。');
+    // 1. システムの初期セットアップが完了しているか確認
+    if (!isSystemSetup()) {
+      // 未設定の場合はセットアップページを表示
       return HtmlService.createTemplateFromFile('SetupPage')
         .evaluate()
         .setTitle('初回セットアップ - StudyQuest')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
     }
 
-    // セットアップページの明示的な表示要求
-    if (setup === 'true') {
-      return HtmlService.createTemplateFromFile('SetupPage')
-        .evaluate()
-        .setTitle('StudyQuest - サービスアカウント セットアップ')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
-    }
-
-    // 【チェック2】ユーザーが登録済みか？
-    var userEmail = Session.getActiveUser().getEmail();
-    
-    if (!isUserRegistered(userEmail, dbSpreadsheetId)) {
-      // ユーザーがデータベースに登録されていなければ、新規登録画面を返す
-      console.log(`ユーザー(${userEmail})は未登録です。登録画面にリダイレクトします。`);
-      return HtmlService.createTemplateFromFile('Registration')
-        .evaluate()
-        .setTitle('新規ユーザー登録 - StudyQuest')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
-    }
-
-    // 【チェック3】登録済みユーザーには適切な画面を表示
-    console.log(`登録済みユーザー(${userEmail})です。`);
-    
-    // ユーザー情報を取得（userIdが指定されている場合はそれを使用、なければemailから検索）
-    var userInfo;
-    if (userId) {
-      userInfo = findUserById(userId);
-      if (!userInfo) {
-        console.log('指定されたuserIdが無効です。emailから検索します。');
-        userInfo = findUserByEmail(userEmail);
-      }
-    } else {
-      userInfo = findUserByEmail(userEmail);
-      if (userInfo) {
-        userId = userInfo.userId;
-        // userIdがない場合は管理パネルにリダイレクト
-        console.log('登録済みユーザーを管理パネルにリダイレクトします。');
-        var currentUrl = ScriptApp.getService().getUrl();
-        return HtmlService.createHtmlOutput(`
-          <script>
-            window.location.href = '${currentUrl}?userId=${encodeURIComponent(userInfo.userId)}&mode=admin';
-          </script>
-          <p>管理パネルにリダイレクト中...</p>
-        `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
-      }
-    }
-
-    if (!userInfo) {
-      console.error('ユーザー情報の取得に失敗しました。');
-      return HtmlService.createHtmlOutput(
-        '<h2>エラー</h2>' +
-        '<p>ユーザー情報が見つかりません。システム管理者に連絡してください。</p>'
-      ).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    // 2. ユーザー認証と情報取得
+    const currentUserEmail = Session.getActiveUser().getEmail();
+    if (!currentUserEmail) {
+      // ログインしていない場合は登録ページへ誘導
+      return showRegistrationPage();
     }
     
-    // ユーザーの最終アクセス日時を更新（非同期）
-    try {
-      updateUser(userId, { lastAccessedAt: new Date().toISOString() });
-    } catch (updateError) {
-      console.error('最終アクセス日時の更新に失敗: ' + updateError.message);
-    }
+    // 3. ユーザーがデータベースに登録済みか確認
+    const userInfo = findUserByEmail(currentUserEmail);
 
-    // ユーザー情報をプロパティに保存（リアクション機能で使用）
-    PropertiesService.getUserProperties().setProperty('CURRENT_USER_ID', userId);
-
-    // 表示モードの決定：管理者は管理パネル、それ以外は回答ボード
-    if (requestMode === 'admin') {
+    if (userInfo) {
+      // 4. 【登録済みユーザーの処理】
+      //    管理パネルに必要な情報を付加して表示
       var template = HtmlService.createTemplateFromFile('AdminPanel');
       template.userInfo = userInfo;
-      template.userId = userId;
-      template.mode = requestMode;
+      template.userId = userInfo.userId;
+      template.mode = 'admin';
       template.displayMode = 'named';
       template.showAdminFeatures = true;
       return template.evaluate()
         .setTitle('管理パネル - みんなの回答ボード')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+
     } else {
-      // デフォルトは回答ボード表示
-      var template = HtmlService.createTemplateFromFile('Page');
-      template.userInfo = userInfo;
-      template.userId = userId;
-      template.mode = requestMode;
-      template.displayMode = 'anonymous';
-      template.showAdminFeatures = false;
-      return template.evaluate()
-        .setTitle('みんなの回答ボード')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+      // 5. 【未登録ユーザーの処理】
+      //    登録ページを表示
+      return showRegistrationPage();
     }
-    
+
   } catch (error) {
-    console.error('doGetで致命的なエラーが発生しました: ' + error.message);
-    console.error('Stack trace:', error.stack);
-    
+    // 6. 予期せぬエラーが発生した場合のフォールバック
+    console.error('doGetで致命的なエラー:', error.stack);
+    // Assuming 'ErrorPage' exists or creating a simple error output
     return HtmlService.createHtmlOutput(
       '<h1>エラー</h1>' +
-      '<p>アプリケーションの起動に失敗しました。</p>' +
-      '<p>エラー詳細: ' + htmlEncode(error.message) + '</p>' +
-      '<p>しばらく待ってから再度お試しください。</p>'
+      '<p>予期せぬエラーが発生しました。管理者にお問い合わせください。</p>' +
+      '<p>エラー詳細: ' + htmlEncode(error.message) + '</p>'
     ).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
   }
 }
