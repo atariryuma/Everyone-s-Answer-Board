@@ -230,7 +230,7 @@ function doGet(e) {
     // ユーザー情報をプロパティに保存（リアクション機能で使用）
     PropertiesService.getUserProperties().setProperty('CURRENT_USER_ID', userId);
 
-    if (mode === 'admin') {
+    if (mode && mode === 'admin') {
       var template = HtmlService.createTemplateFromFile('AdminPanel');
       template.userInfo = userInfo;
       template.userId = userId;
