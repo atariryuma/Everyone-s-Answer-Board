@@ -170,6 +170,7 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
     }
     
     var configJson = JSON.parse(userInfo.configJson || '{}');
+    var sheetConfig = configJson['sheet_' + targetSheet] || {}; // シート固有の設定を取得
     
     // シート名の決定（パラメータまたは設定から）
     var targetSheet = sheetName || configJson.publishedSheet || 'フォームの回答 1';
@@ -182,14 +183,13 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
     }
     
     // Page.html期待形式に変換
-    console.log('Sheet Headers:', sheetData.headers);
     var formattedData = sheetData.data.map(function(row, index) {
       return {
         rowIndex: row.rowNumber || (index + 2), // 実際の行番号
         name: (sheetData.displayMode === 'named' && row.displayName) ? row.displayName : '',
-        class: row.originalData[getHeaderIndex(sheetData.headers, COLUMN_HEADERS.CLASS)] || '',
-        opinion: row.originalData[getHeaderIndex(sheetData.headers, COLUMN_HEADERS.OPINION)] || '',
-        reason: row.originalData[getHeaderIndex(sheetData.headers, COLUMN_HEADERS.REASON)] || '',
+        class: row.originalData[getHeaderIndex(sheetData.headers, sheetConfig.classHeader || COLUMN_HEADERS.CLASS)] || '',
+        opinion: row.originalData[getHeaderIndex(sheetData.headers, sheetConfig.mainHeader || sheetConfig.opinionHeader || COLUMN_HEADERS.OPINION)] || '',
+        reason: row.originalData[getHeaderIndex(sheetData.headers, sheetConfig.rHeader || sheetConfig.reasonHeader || COLUMN_HEADERS.REASON)] || '',
         reactions: {
           UNDERSTAND: { count: row.understandCount || 0, reacted: false },
           LIKE: { count: row.likeCount || 0, reacted: false },

@@ -31,7 +31,7 @@ var COLUMN_HEADERS = {
   REASON: '理由',
   NAME: '名前',
   UNDERSTAND: 'なるほど！',
-  LIKE: 'いいね！',
+  LIKE: 'いいね！
   CURIOUS: 'もっと知りたい！',
   HIGHLIGHT: 'ハイライト'
 };
