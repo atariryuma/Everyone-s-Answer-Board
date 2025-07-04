@@ -4,7 +4,7 @@
 
 // URL管理の定数
 var URL_CACHE_KEY = 'WEB_APP_URL';
-var URL_CACHE_TTL = 3600; // 1時間
+var URL_CACHE_TTL = 21600; // 6時間
 
 /**
  * WebアプリのURLを取得（キャッシュ利用）
@@ -25,7 +25,7 @@ function getWebAppUrlCached() {
       console.error('WebアプリURL取得エラー: ' + e.message);
       return getFallbackUrl();
     }
-  }, { ttl: 3600 });
+  }, { ttl: URL_CACHE_TTL });
 }
 
 /**

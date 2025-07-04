@@ -748,8 +748,16 @@
                       updateStep(3);
                       showMessage('セットアップが必要です。管理者にセットアップページでの初期設定を依頼してください。', 'warning');
                       // セットアップページへのリンクを表示
-                      const setupUrl = window.location.href.split('?')[0] + '?setup=true';
-                      showMessage(`セットアップページ: <a href="${setupUrl}" target="_blank" style="color: #8be9fd;">こちら</a>`, 'info');
+                      google.script.run
+                        .withSuccessHandler((appUrl) => {
+                          const setupUrl = appUrl + '?setup=true';
+                          showMessage(`セットアップページ: <a href="${setupUrl}" target="_blank" style="color: #8be9fd;">こちら</a>`, 'info');
+                        })
+                        .withFailureHandler(() => {
+                          const setupUrl = window.location.href.split('?')[0] + '?setup=true';
+                          showMessage(`セットアップページ: <a href="${setupUrl}" target="_blank" style="color: #8be9fd;">こちら</a>`, 'info');
+                        })
+                        .getWebAppUrl();
                       break;
                     case 'existing_user':
                       updateStep(3);
@@ -1202,6 +1210,22 @@
       } catch (error) {
         console.warn('クライアントサイドキャッシュクリアでエラーが発生:', error);
       }
+    }
+
+    function reloadPageForNewAccount() {
+      sessionStorage.setItem('treat_as_new_account', 'true');
+      google.script.run
+        .withSuccessHandler(function(url) {
+          const newUrl = new URL(url);
+          newUrl.searchParams.set('t', Date.now());
+          window.top.location.href = newUrl.toString();
+        })
+        .withFailureHandler(function(error) {
+          console.error('URL取得に失敗しました:', error);
+          const currentUrl = window.location.href.split('?')[0];
+          window.top.location.href = currentUrl + '?t=' + Date.now();
+        })
+        .getWebAppUrl();
     }
     
     // URLパラメータをチェックして新規アカウント扱いにする
