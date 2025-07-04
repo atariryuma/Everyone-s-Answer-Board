@@ -1258,7 +1258,7 @@
         nameHeader: document.getElementById('nameHeader'),
         classHeader: document.getElementById('classHeader'),
         switchSheetBtn: document.getElementById('switch-sheet-btn'),
-        clearSelectionBtn: document.getElementById('clear-selection-btn'),
+        
         saveConfigBtn: document.getElementById('save-config-btn'),
         detailOptions: document.getElementById('detail-options'),
         boardUrl: document.getElementById('board-url'),
@@ -2136,32 +2136,7 @@
         })
         .refreshBoardData();
     }
-        .withSuccessHandler((result) => {
-          showMessage(result.message || 'スプレッドシートが正常に追加されました', 'green');
-          addVisualFeedback(urlInput, 'success');
-          urlInput.value = '';
-          addBtn.disabled = false;
-          if (elements.addSpreadsheetText) {
-            elements.addSpreadsheetText.textContent = 'スプレッドシートを追加';
-          }
-          loadStatus(); // Refresh the status
-        })
-        .withFailureHandler((error) => {
-          console.error('addSpreadsheetUrl error:', error);
-          let errorMsg = 'スプレッドシートの追加に失敗しました';
-          if (error && error.message) {
-            errorMsg = error.message;
-          }
-          showMessage('エラー: ' + errorMsg, 'red');
-          addVisualFeedback(addBtn, 'error');
-          addBtn.disabled = false;
-          if (elements.addSpreadsheetText) {
-            elements.addSpreadsheetText.textContent = 'スプレッドシートを追加';
-          }
-          setLoading(false);
-        })
-        .addSpreadsheetUrl(url);
-    }
+        
 
     function createBoard() {
       const btn = elements.createBoardBtn;
