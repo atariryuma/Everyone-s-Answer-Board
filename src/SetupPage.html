@@ -130,9 +130,9 @@
                 🔍 システムテスト実行
             </button>
             <div class="mt-4">
-                <a id="start-studyquest-btn" class="inline-block btn bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-2 px-4 rounded-lg">
+                <button type="button" id="start-studyquest-btn" onclick="startApp()" class="inline-block btn bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-2 px-4 rounded-lg">
                     📚 StudyQuestを開始
-                </a>
+                </button>
             </div>
         </div>
 
@@ -254,18 +254,6 @@
                         .withSuccessHandler((result) => {
                             showMessage('✅ セットアップが正常に完了しました！', 'success');
                             document.getElementById('test-section').classList.remove('hidden');
-                            
-                            // Dynamically set the URL for the "Start StudyQuest" button
-                            google.script.run
-                                .withSuccessHandler((webAppUrl) => {
-                                    document.getElementById('start-studyquest-btn').href = webAppUrl;
-                                })
-                                .withFailureHandler((error) => {
-                                    console.error('Failed to get web app URL:', error);
-                                    showMessage('❌ アプリケーションURLの取得に失敗しました。', 'error');
-                                })
-                                .getWebAppUrlCached(); // Call the server-side function
-                            
                             resolve(result);
                         })
                         .withFailureHandler((error) => {
@@ -328,6 +316,27 @@
                 this.style.borderColor = '#ef4444';
             }
         });
+
+        function startApp() {
+            const btn = document.getElementById('start-studyquest-btn');
+            if (btn) {
+                btn.innerHTML = '<span>読み込み中...</span>';
+                btn.disabled = true;
+            }
+
+            google.script.run
+                .withSuccessHandler(function(url) {
+                    window.top.location.href = url;
+                })
+                .withFailureHandler(function(error) {
+                    alert('アプリケーションのURL取得に失敗しました: ' + error.message);
+                    if (btn) {
+                        btn.innerHTML = '📚 StudyQuestを開始';
+                        btn.disabled = false;
+                    }
+                })
+                .getWebAppUrl();
+        }
     </script>
 </body>
 </html>

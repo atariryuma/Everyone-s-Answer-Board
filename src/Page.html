@@ -2471,10 +2471,13 @@ class StudyQuestApp {
     }
   }
   endAdminMode() {
-    // Redirect to admin URL with mode=admin parameter to show management interface
-    const currentUrl = new URL(window.location.href);
-    currentUrl.searchParams.set('mode', 'admin');
-    window.location.href = currentUrl.toString();
+    google.script.run
+      .withSuccessHandler(function(adminUrl) {
+        const url = new URL(adminUrl);
+        url.searchParams.set('mode', 'admin');
+        window.location.href = url.toString();
+      })
+      .getWebAppUrl();
   }
   updateReactionButtonUI(rowIndex, reaction, count, reacted) {
     document.querySelectorAll('[data-row-index="' + rowIndex + '"][data-reaction="' + reaction + '"]').forEach(btn => {

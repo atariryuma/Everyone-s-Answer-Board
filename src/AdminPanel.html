@@ -2907,21 +2907,25 @@
 
     // ★ 修正点：サーバーに登録ページのURLを問い合わせる
     google.script.run
-      .withSuccessHandler(function(webAppUrl) { // getWebAppUrlCached() は webAppUrl を返す
+      .withSuccessHandler(function(webAppUrl) {
         // サーバーから取得した正規のURLにリダイレクト
         // doGet() が userId がない場合に Registration.html にリダイレクトするため、
         // ベースURLにリダイレクトすれば良い
         window.top.location.href = webAppUrl;
       })
-      .getWebAppUrlCached(); // getWebAppUrlCached() を呼び出す
+      .getWebAppUrl();
   }
     
     // ページ再読み込み（新しいアカウント用）
     function reloadPageForNewAccount() {
       sessionStorage.setItem('treat_as_new_account', 'true');
-      // 管理パネルから新規登録画面にリダイレクト
-      const currentUrl = window.location.href.split('?')[0];
-      window.location.href = currentUrl + '?t=' + Date.now();
+      google.script.run
+        .withSuccessHandler(function(url) {
+          const newUrl = new URL(url);
+          newUrl.searchParams.set('t', Date.now());
+          window.top.location.href = newUrl.toString();
+        })
+        .getWebAppUrl();
     }
 
     // クライアントサイドキャッシュクリア関数
