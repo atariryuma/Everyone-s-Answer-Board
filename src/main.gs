@@ -109,21 +109,21 @@ function getDeployUserDomainInfo() {
     var currentDomain = getEmailDomain(activeUserEmail);
 
     var webAppUrl = ScriptApp.getService().getUrl();
-    var deployDomain = '';
+    var currentDomain = getEmailDomain(Session.getActiveUser().getEmail());
     var webAppUrl = ScriptApp.getService().getUrl();
+    var deployDomain = ''; // 個人アカウント/グローバルアクセスの場合、デフォルトで空
+
     if (webAppUrl) {
+      // G SuiteアカウントのドメインをURLから抽出を試みる (例: /a/domain.com/)
       var domainMatch = webAppUrl.match(/\/a\/([a-zA-Z0-9\-\.]+)\/macros/);
       if (domainMatch && domainMatch[1]) {
-        deployDomain = domainMatch[1]; // URLからドメインを抽出
-      } else {
-        // URLから抽出できない場合はスクリプトプロパティをフォールバックとして使用
-        var props = PropertiesService.getScriptProperties();
-        deployDomain = props.getProperty(SCRIPT_PROPS_KEYS.DEPLOY_DOMAIN) || '';
+        deployDomain = domainMatch[1];
       }
+      // ドメインが抽出されなかった場合、deployDomainは空のままとなり、個人アカウント/グローバルアクセスを示す
     }
 
-    // ユーザーのメールアドレスのドメインとデプロイされたWebアプリのドメインを比較
-    // deployDomainが空の場合は、ドメインが特定できないため不一致としない
+    // 現在のユーザーのドメインと抽出された/デフォルトのデプロイドメインを比較
+    // deployDomainが空の場合、特定のドメインが強制されていないため、一致とみなす（グローバルアクセス）
     var isDomainMatch = (currentDomain === deployDomain) || (deployDomain === '');
 
     return {
