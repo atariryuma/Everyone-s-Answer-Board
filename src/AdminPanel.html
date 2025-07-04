@@ -667,9 +667,20 @@
           <div id="step2-content" class="progressive-section collapsed">
             <div class="space-y-4">
               <div class="space-y-3">
+                <!-- シート選択の説明 -->
+                <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-3">
+                  <div class="flex items-center gap-2 mb-2">
+                    <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
+                    <span class="text-sm font-medium text-green-200">シート選択</span>
+                  </div>
+                  <p class="text-xs text-green-300">スプレッドシートのシートを回答ボードとして表示するシートに指定します</p>
+                </div>
+                
                 <!-- シンプルシート選択 -->
                 <label for="sheet-select" class="block text-sm font-medium text-white">
-                  シート選択
+                  表示したいシートを選択
                 </label>
                 <select id="sheet-select" class="form-control" aria-describedby="sheet-help">
                   <option>読み込み中...</option>
@@ -682,9 +693,12 @@
                       <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                       </svg>
-                      <span class="text-sm font-medium text-green-200">アクティブシート</span>
+                      <span class="text-sm font-medium text-green-200">公開中ボード</span>
                     </div>
-                    <p class="text-sm text-white font-semibold" id="current-active-sheet-name">未設定</p>
+                    <div class="text-right">
+                      <p class="text-sm text-white font-semibold" id="current-active-sheet-name">未設定</p>
+                      <p class="text-xs text-green-300" id="current-board-theme">テーマ: 未設定</p>
+                    </div>
                   </div>
                 </div>
 
@@ -1487,16 +1501,33 @@
       setupEventListeners();
       loadAdminDomainInfo();
     });
-    function loadAdminDomainInfo() {
+    // ===== 共通ドメイン情報処理関数 =====
+    // AdminPanel.html と Registration.html で共通使用
+    
+    /**
+     * ドメイン情報を取得して表示する共通関数
+     * @param {Function} onSuccess - 成功時のコールバック（オプション）
+     * @param {Function} onError - エラー時のコールバック（オプション）
+     */
+    function loadDomainInfo(onSuccess, onError) {
       google.script.run
-        .withSuccessHandler(displayAdminDomainInfo)
+        .withSuccessHandler(info => {
+          displayDomainInfo(info);
+          if (onSuccess) onSuccess(info);
+        })
         .withFailureHandler(error => {
           console.error('ドメイン情報の取得に失敗しました:', error);
+          displayDomainInfo({ error: error.message || error });
+          if (onError) onError(error);
         })
         .getDeployUserDomainInfo();
     }
 
-    function displayAdminDomainInfo(info) {
+    /**
+     * ドメイン情報を表示する共通関数
+     * @param {Object} info - ドメイン情報オブジェクト
+     */
+    function displayDomainInfo(info) {
       const headerDomainMatch = document.getElementById('header-domain-match');
       const headerDomainMismatch = document.getElementById('header-domain-mismatch');
       const headerDomainInitial = document.getElementById('header-domain-initial');
@@ -1518,15 +1549,28 @@
         // ドメインが一致している場合
         if (headerDomainMatch && headerDomainMatchText) {
           headerDomainMatch.classList.remove('hidden');
-          headerDomainMatchText.textContent = `${info.deployDomain} ドメイン`;
+          if (info.deployDomain) {
+            headerDomainMatchText.textContent = `${info.deployDomain} ドメイン`;
+          } else {
+            headerDomainMatchText.textContent = 'グローバルアクセス';
+          }
         }
       } else {
         // ドメイン不一致の場合
         if (headerDomainMismatch && headerDomainMismatchText) {
           headerDomainMismatch.classList.remove('hidden');
-          headerDomainMismatchText.textContent = `${info.currentDomain} (デプロイ: ${info.deployDomain})`;
+          headerDomainMismatchText.textContent = info.currentDomain;
         }
       }
+    }
+
+    // AdminPanel専用のラッパー関数（後方互換性のため）
+    function loadAdminDomainInfo() {
+      loadDomainInfo();
+    }
+
+    function displayAdminDomainInfo(info) {
+      displayDomainInfo(info);
     }
 
     // 重複していたDOMContentLoadedイベントリスナーを削除
@@ -1928,8 +1972,10 @@
         lastUpdatedEl.textContent = '最終更新: ' + now.toLocaleTimeString('ja-JP');
       }
       
-      const activeNameEl = document.getElementById('active-sheet-name');
+      const activeNameEl = document.getElementById('current-active-sheet-name');
       const activeSheetPanelEl = document.getElementById('active-sheet-panel');
+      const boardThemeEl = document.getElementById('current-board-theme');
+      
       if (activeNameEl) {
         activeNameEl.textContent = currentActiveSheet || '未設定';
         if (currentActiveSheet && currentSpreadsheetUrl) {
@@ -1942,6 +1988,15 @@
             activeSheetPanelEl.classList.remove('cursor-pointer', 'hover:bg-green-500/5', 'hover:border-green-400/30', 'hover:shadow-lg', 'hover:shadow-green-500/10');
             activeSheetPanelEl.title = '';
           }
+        }
+      }
+      
+      // ボードテーマを表示
+      if (boardThemeEl) {
+        if (status.mainHeader && currentActiveSheet) {
+          boardThemeEl.textContent = `テーマ: ${status.mainHeader}`;
+        } else {
+          boardThemeEl.textContent = 'テーマ: 未設定';
         }
       }
       
@@ -2045,7 +2100,51 @@
       
       updateUIForSelectedSheet();
       loadConfigForSelected();
+      
+      // 設定状況に応じたパネル開閉制御
+      updatePanelStates(status);
+      
       setLoading(false);
+    }
+    
+    // 設定状況に応じてパネルの開閉状態を制御
+    function updatePanelStates(status) {
+      const step1Content = document.getElementById('step1-content');
+      const step2Content = document.getElementById('step2-content');
+      const step3Content = document.getElementById('step3-content');
+      const step1Icon = document.getElementById('step1-icon');
+      const step2Icon = document.getElementById('step2-icon');
+      const step3Icon = document.getElementById('step3-icon');
+      
+      const isPublished = status && status.activeSheetName && status.appPublished;
+      
+      if (isPublished) {
+        // ボードが公開されている場合：データ準備を閉じて、他を開く
+        if (step1Content) step1Content.classList.remove('expanded');
+        if (step1Content) step1Content.classList.add('collapsed');
+        if (step1Icon) step1Icon.style.transform = 'rotate(0deg)';
+        
+        if (step2Content) step2Content.classList.remove('collapsed');
+        if (step2Content) step2Content.classList.add('expanded');
+        if (step2Icon) step2Icon.style.transform = 'rotate(90deg)';
+        
+        if (step3Content) step3Content.classList.remove('collapsed');
+        if (step3Content) step3Content.classList.add('expanded');
+        if (step3Icon) step3Icon.style.transform = 'rotate(90deg)';
+      } else {
+        // 公開終了の場合：データ準備を開いて、他は閉じる
+        if (step1Content) step1Content.classList.remove('collapsed');
+        if (step1Content) step1Content.classList.add('expanded');
+        if (step1Icon) step1Icon.style.transform = 'rotate(90deg)';
+        
+        if (step2Content) step2Content.classList.remove('expanded');
+        if (step2Content) step2Content.classList.add('collapsed');
+        if (step2Icon) step2Icon.style.transform = 'rotate(0deg)';
+        
+        if (step3Content) step3Content.classList.remove('expanded');
+        if (step3Content) step3Content.classList.add('collapsed');
+        if (step3Icon) step3Icon.style.transform = 'rotate(0deg)';
+      }
     }
     
     function updateDatabaseInfo(status) {

@@ -216,19 +216,59 @@
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans min-h-screen flex items-center justify-center p-4">
   <div class="glass-panel rounded-xl p-8 max-w-2xl w-full shadow-2xl">
-    <div class="text-center mb-8">
+    <div class="text-center mb-6">
       <h1 class="text-3xl font-bold text-yellow-300 mb-2">StudyQuest -みんなの回答ボード-</h1>
       <p class="text-gray-400">教育現場のためのインタラクティブ回答ボード</p>
     </div>
     
+    <!-- ドメイン情報表示 -->
+    <div class="mb-6">
+      <!-- ドメイン一致表示 -->
+      <div id="header-domain-match" class="glass-panel bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-3 border border-green-400/30 hidden">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <div>
+            <div class="text-green-400 font-semibold text-sm" id="header-domain-match-text">ドメイン認証済み</div>
+            <div class="text-green-200 text-xs">組織内アクセス</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- ドメイン不一致表示 -->
+      <div id="header-domain-mismatch" class="glass-panel bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg p-3 border border-yellow-400/30 hidden">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+          </svg>
+          <div>
+            <div class="text-yellow-400 font-semibold text-sm" id="header-domain-mismatch-text">外部アクセス</div>
+            <div class="text-yellow-200 text-xs">制限がある場合があります</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 初期状態表示 -->
+      <div id="header-domain-initial" class="glass-panel bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-3 border border-blue-400/30">
+        <div class="flex items-center gap-2">
+          <div class="w-3 h-3 bg-blue-400 rounded-full animate-pulse flex-shrink-0"></div>
+          <div>
+            <div class="text-blue-400 font-semibold text-sm">アクセス状況確認中</div>
+            <div class="text-blue-200 text-xs">初期化処理中</div>
+          </div>
+        </div>
+      </div>
+    </div>
     
-    <!-- Hero Section with CTA -->
-    <div class="mb-8 text-center fade-in">
-      <div class="glass-panel bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-xl p-6 border border-cyan-400/30 mb-6 feature-card">
-        <h2 class="text-2xl font-bold text-white mb-2">無料でみんなの回答ボードを始めよう！</h2>
-        <p class="text-cyan-200 mb-4">数ステップであなた専用のボードを作成。セキュリティを重視した設計で、安心して授業で活用できます。</p>
+    
+    <!-- コンパクトCTA -->
+    <div class="mb-6 text-center fade-in">
+      <div class="glass-panel bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-xl p-4 border border-cyan-400/30 feature-card">
+        <h2 class="text-xl font-bold text-white mb-2">無料でみんなの回答ボードを始めよう！</h2>
+        <p class="text-cyan-200 text-sm mb-3">数ステップで専用ボードを作成。安心して授業で活用できます。</p>
         <button type="button" 
-                class="cta-button px-8 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-bold rounded-lg transition-all transform hover:scale-105 shadow-lg text-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-gray-800"
+                class="cta-button px-6 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-bold rounded-lg transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-gray-800"
                 aria-label="新規登録に進む">
           いますぐ始める →
         </button>
@@ -258,83 +298,65 @@
 
     <div class="space-y-6">
       <!-- ステップ1: 説明 -->
-      <article class="glass-panel rounded-lg p-6 feature-card fade-in" id="section-1">
-        <h2 class="text-xl font-semibold mb-4 text-cyan-400 flex items-center gap-2">
-          <div class="w-6 h-6 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-sm">1</div>
+      <article class="glass-panel rounded-lg p-4 feature-card fade-in" id="section-1">
+        <h2 class="text-lg font-semibold mb-3 text-cyan-400 flex items-center gap-2">
+          <div class="w-5 h-5 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-xs">1</div>
           みんなの回答ボードとは
         </h2>
-        <ul class="text-sm text-gray-300 space-y-3 mb-6" role="list">
-          <li class="flex items-start gap-3 slide-in">
-            <span class="text-green-400 text-lg" role="img" aria-label="チェックマーク">✓</span>
-            <span>Googleスプレッドシートの回答を、美しいボード形式で表示します</span>
+        <ul class="text-sm text-gray-300 space-y-2 mb-4" role="list">
+          <li class="flex items-start gap-2 slide-in">
+            <span class="text-green-400" role="img" aria-label="チェックマーク">✓</span>
+            <span>Googleスプレッドシート連携で美しいボード表示</span>
           </li>
-          <li class="flex items-start gap-3 slide-in">
-            <span class="text-green-400 text-lg" role="img" aria-label="チェックマーク">✓</span>
-            <span>生徒同士で「いいね！」「なるほど！」「もっと知りたい！」のリアクションができます</span>
+          <li class="flex items-start gap-2 slide-in">
+            <span class="text-green-400" role="img" aria-label="チェックマーク">✓</span>
+            <span>生徒同士のリアクション機能付き</span>
           </li>
-          <li class="flex items-start gap-3 slide-in">
-            <span class="text-green-400 text-lg" role="img" aria-label="チェックマーク">✓</span>
-            <span>先生は重要な回答をハイライトできます</span>
+          <li class="flex items-start gap-2 slide-in">
+            <span class="text-green-400" role="img" aria-label="チェックマーク">✓</span>
+            <span>重要な回答のハイライト機能</span>
           </li>
         </ul>
 
         <!-- Digital Citizenship Education Section with Modal Button -->
-        <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-4">
-          <div class="flex items-start gap-3">
-            <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3 mb-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.168 18.477 18.582 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
               </svg>
+              <span class="text-xs font-semibold text-blue-200">デジタル・シティズンシップ教育対応</span>
             </div>
-            <div class="flex-1">
-              <p class="text-sm font-semibold text-blue-200 mb-2">デジタル・シティズンシップ教育をサポート</p>
-              <p class="text-xs text-blue-300 leading-relaxed mb-3">
-                みんなの回答ボードは、デジタル社会で良い市民となるための学習を支援します。オンライン空間でも互いを尊重し、建設的な対話を育む環境を提供します。
-              </p>
-              <button type="button" onclick="showTeacherGuideModal()" 
-                      class="text-xs px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors text-white font-semibold">
-                📚 指導ガイドを見る
-              </button>
-            </div>
+            <button type="button" onclick="showTeacherGuideModal()" 
+                    class="text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded transition-colors text-white">
+              📚 ガイド
+            </button>
           </div>
         </div>
 
-        <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
-          <div class="flex items-start gap-3">
-            <div class="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-3 mb-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
               </svg>
+              <span class="text-xs font-semibold text-green-200">心理的安全性重視設計</span>
             </div>
-            <div>
-              <p class="text-sm font-semibold text-green-200 mb-2">心理的安全性を重視した設計</p>
-              <ul class="text-xs text-green-300 leading-relaxed space-y-1">
-                <li>• <strong>匿名性のサポート</strong>：生徒が安心して意見を表現できます</li>
-                <li>• <strong>数値の非表示</strong>：競争より協力を重視した環境を作ります</li>
-                <li>• <strong>色による識別</strong>：数を気にせずリアクションの種類を把握できます</li>
-              </ul>
-            </div>
+            <span class="text-xs text-green-300">匿名性・協力重視</span>
           </div>
         </div>
 
-        <!-- StudyQuestのセキュリティ -->
-        <div class="mt-6 p-4 bg-purple-900/20 border border-purple-500/30 rounded-lg glass-panel">
-          <h3 class="font-semibold text-purple-400 mb-2 flex items-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            みんなの回答ボードのセキュリティ
-          </h3>
-          <ul class="text-sm text-purple-200 space-y-2" role="list">
-            <li>• <strong>データ分離</strong>: 学習者の回答データはGoogleスプレッドシートとして分離管理され、アクセス権限が適切に制御されます。</li>
-            <li>• <strong>Google Workspace認証</strong>: Googleアカウント認証により、承認されたユーザーのみがアクセス可能です。</li>
-            <li>• <strong>入力検証</strong>: XSS攻撃やインジェクション攻撃を防ぐため、全てのユーザー入力を適切にエスケープ処理します。</li>
-            <li>• <strong>ドメイン制限</strong>: 指定されたGoogle Workspaceドメイン内からのアクセスに制限できます。</li>
-            <li>• <strong>最小権限の原則</strong>: 必要最小限のデータのみを収集・処理し、不要な個人情報は保存しません。</li>
-            <li>• <strong>Google標準暗号化</strong>: データはGoogle Cloud Platformの標準暗号化により保護されます。</li>
-            <li>• <strong>操作ログ</strong>: 主要な操作はConsoleログに記録され、問題発生時の調査に活用できます。</li>
-            <li>• <strong>Google Apps Scriptセキュリティ</strong>: Googleの組み込みセキュリティ機能（CSRF対策、クリックジャッキング対策等）を活用しています。</li>
-          </ul>
+        <!-- セキュリティ -->
+        <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <span class="text-xs font-semibold text-purple-200">Google標準セキュリティ</span>
+            </div>
+            <span class="text-xs text-purple-300">データ分離・暗号化</span>
+          </div>
         </div>
       </article>
       
@@ -587,8 +609,74 @@
       });
     }
 
+    // ===== 共通ドメイン情報処理関数 =====
+    // AdminPanel.html と Registration.html で共通使用
+    
+    /**
+     * ドメイン情報を取得して表示する共通関数
+     * @param {Function} onSuccess - 成功時のコールバック（オプション）
+     * @param {Function} onError - エラー時のコールバック（オプション）
+     */
+    function loadDomainInfo(onSuccess, onError) {
+      google.script.run
+        .withSuccessHandler(info => {
+          displayDomainInfo(info);
+          if (onSuccess) onSuccess(info);
+        })
+        .withFailureHandler(error => {
+          console.error('ドメイン情報の取得に失敗しました:', error);
+          displayDomainInfo({ error: error.message || error });
+          if (onError) onError(error);
+        })
+        .getDeployUserDomainInfo();
+    }
+
+    /**
+     * ドメイン情報を表示する共通関数
+     * @param {Object} info - ドメイン情報オブジェクト
+     */
+    function displayDomainInfo(info) {
+      const headerDomainMatch = document.getElementById('header-domain-match');
+      const headerDomainMismatch = document.getElementById('header-domain-mismatch');
+      const headerDomainInitial = document.getElementById('header-domain-initial');
+      const headerDomainMatchText = document.getElementById('header-domain-match-text');
+      const headerDomainMismatchText = document.getElementById('header-domain-mismatch-text');
+
+      // 全ての表示を一旦非表示にする
+      if (headerDomainMatch) headerDomainMatch.classList.add('hidden');
+      if (headerDomainMismatch) headerDomainMismatch.classList.add('hidden');
+      if (headerDomainInitial) headerDomainInitial.classList.add('hidden');
+      
+      if (!info || info.error) {
+        console.warn('ドメイン情報エラー:', info?.error);
+        if (headerDomainInitial) headerDomainInitial.classList.remove('hidden');
+        return;
+      }
+
+      if (info.isDomainMatch) {
+        // ドメインが一致している場合
+        if (headerDomainMatch && headerDomainMatchText) {
+          headerDomainMatch.classList.remove('hidden');
+          if (info.deployDomain) {
+            headerDomainMatchText.textContent = `${info.deployDomain} ドメイン`;
+          } else {
+            headerDomainMatchText.textContent = 'グローバルアクセス';
+          }
+        }
+      } else {
+        // ドメイン不一致の場合
+        if (headerDomainMismatch && headerDomainMismatchText) {
+          headerDomainMismatch.classList.remove('hidden');
+          headerDomainMismatchText.textContent = info.currentDomain;
+        }
+      }
+    }
+
     // ユーザーメールアドレスを取得
     window.addEventListener('DOMContentLoaded', async () => {
+      // ドメイン情報を取得
+      loadDomainInfo();
+      
       // scrollToRegistrationのイベントリスナーを設定
       const scrollToRegistrationBtn = document.querySelector('button[aria-label="新規登録に進む"]');
       if (scrollToRegistrationBtn) {

@@ -116,20 +116,17 @@ function log(level, message, details) {
 
 /**
  * デプロイされたWebアプリのドメイン情報と現在のユーザーのドメイン情報を取得
- * AdminPanel.htmlから呼び出される
+ * AdminPanel.html と Registration.html から共通で呼び出される
  */
 function getDeployUserDomainInfo() {
   try {
     var activeUserEmail = Session.getActiveUser().getEmail();
     var currentDomain = getEmailDomain(activeUserEmail);
-
-    var webAppUrl = ScriptApp.getService().getUrl();
-    var currentDomain = getEmailDomain(Session.getActiveUser().getEmail());
     var webAppUrl = ScriptApp.getService().getUrl();
     var deployDomain = ''; // 個人アカウント/グローバルアクセスの場合、デフォルトで空
 
     if (webAppUrl) {
-      // G SuiteアカウントのドメインをURLから抽出を試みる (例: /a/domain.com/)
+      // Google WorkspaceアカウントのドメインをURLから抽出を試みる (例: /a/domain.com/)
       var domainMatch = webAppUrl.match(/\/a\/([a-zA-Z0-9\-\.]+)\/macros/);
       if (domainMatch && domainMatch[1]) {
         deployDomain = domainMatch[1];
@@ -141,10 +138,18 @@ function getDeployUserDomainInfo() {
     // deployDomainが空の場合、特定のドメインが強制されていないため、一致とみなす（グローバルアクセス）
     var isDomainMatch = (currentDomain === deployDomain) || (deployDomain === '');
 
+    console.log('Domain info:', {
+      currentDomain: currentDomain,
+      deployDomain: deployDomain,
+      isDomainMatch: isDomainMatch,
+      webAppUrl: webAppUrl
+    });
+
     return {
       currentDomain: currentDomain,
       deployDomain: deployDomain,
-      isDomainMatch: isDomainMatch
+      isDomainMatch: isDomainMatch,
+      webAppUrl: webAppUrl
     };
   } catch (e) {
     console.error('getDeployUserDomainInfo エラー: ' + e.message);

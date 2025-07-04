@@ -592,6 +592,65 @@ header {
 </div>
 
 <div id="main-container" class="w-full mx-auto px-4 pt-4 pb-4 md:px-6 md:pt-6 md:pb-6">
+<!-- 生徒向けヘッダー情報バー -->
+<div class="mb-3 space-y-2">
+  <!-- ドメイン情報表示 -->
+  <div class="flex justify-center">
+    <!-- ドメイン一致表示 -->
+    <div id="header-domain-match" class="glass-panel bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg px-4 py-2 border border-green-400/30 hidden">
+      <div class="flex items-center gap-2">
+        <svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <div>
+          <div class="text-green-400 font-semibold text-sm" id="header-domain-match-text">学校ドメイン</div>
+          <div class="text-green-200 text-xs">安全な環境でアクセス中</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- ドメイン不一致表示 -->
+    <div id="header-domain-mismatch" class="glass-panel bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg px-4 py-2 border border-yellow-400/30 hidden">
+      <div class="flex items-center gap-2">
+        <svg class="w-4 h-4 text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+        </svg>
+        <div>
+          <div class="text-yellow-400 font-semibold text-sm" id="header-domain-mismatch-text">外部アクセス</div>
+          <div class="text-yellow-200 text-xs">個人アカウントからのアクセス</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 初期状態表示 -->
+    <div id="header-domain-initial" class="glass-panel bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg px-4 py-2 border border-blue-400/30">
+      <div class="flex items-center gap-2">
+        <div class="w-3 h-3 bg-blue-400 rounded-full animate-pulse flex-shrink-0"></div>
+        <div>
+          <div class="text-blue-400 font-semibold text-sm">アクセス確認中</div>
+          <div class="text-blue-200 text-xs">環境をチェックしています</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- フォームリンクボタン -->
+  <div class="flex justify-center" id="form-link-container">
+    <a id="form-link-btn" href="#" target="_blank" class="glass-panel bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-400/30 rounded-lg px-6 py-3 flex items-center gap-3 hover:from-cyan-500/30 hover:to-blue-500/30 hover:border-cyan-400/50 transition-all transform hover:scale-105 shadow-lg text-white hidden">
+      <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+      </svg>
+      <div class="text-left">
+        <div class="font-semibold text-sm">📝 回答フォームを開く</div>
+        <div class="text-xs text-cyan-200">ここから新しい意見を投稿できます</div>
+      </div>
+      <svg class="w-4 h-4 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+      </svg>
+    </a>
+  </div>
+</div>
+
 <header id="main-header" class="glass-panel rounded-xl p-4 mb-4 flex flex-col lg:flex-row justify-between items-center gap-4 shadow-lg fade-in">
   <!-- Left Section: Controls -->
   <div class="flex items-center gap-4 w-full lg:w-auto">
@@ -2942,11 +3001,99 @@ class StudyQuestApp {
   
   // Enhanced cache methods with timestamp tracking
 }
+// ===== 共通ドメイン情報処理関数 =====
+// AdminPanel.html と Registration.html で共通使用
+
+/**
+ * ドメイン情報を取得して表示する共通関数
+ * @param {Function} onSuccess - 成功時のコールバック（オプション）
+ * @param {Function} onError - エラー時のコールバック（オプション）
+ */
+function loadDomainInfo(onSuccess, onError) {
+  google.script.run
+    .withSuccessHandler(info => {
+      displayDomainInfo(info);
+      if (onSuccess) onSuccess(info);
+    })
+    .withFailureHandler(error => {
+      console.error('ドメイン情報の取得に失敗しました:', error);
+      displayDomainInfo({ error: error.message || error });
+      if (onError) onError(error);
+    })
+    .getDeployUserDomainInfo();
+}
+
+/**
+ * ドメイン情報を表示する共通関数
+ * @param {Object} info - ドメイン情報オブジェクト
+ */
+function displayDomainInfo(info) {
+  const headerDomainMatch = document.getElementById('header-domain-match');
+  const headerDomainMismatch = document.getElementById('header-domain-mismatch');
+  const headerDomainInitial = document.getElementById('header-domain-initial');
+  const headerDomainMatchText = document.getElementById('header-domain-match-text');
+  const headerDomainMismatchText = document.getElementById('header-domain-mismatch-text');
+
+  // 全ての表示を一旦非表示にする
+  if (headerDomainMatch) headerDomainMatch.classList.add('hidden');
+  if (headerDomainMismatch) headerDomainMismatch.classList.add('hidden');
+  if (headerDomainInitial) headerDomainInitial.classList.add('hidden');
+  
+  if (!info || info.error) {
+    console.warn('ドメイン情報エラー:', info?.error);
+    if (headerDomainInitial) headerDomainInitial.classList.remove('hidden');
+    return;
+  }
+
+  if (info.isDomainMatch) {
+    // ドメインが一致している場合
+    if (headerDomainMatch && headerDomainMatchText) {
+      headerDomainMatch.classList.remove('hidden');
+      if (info.deployDomain) {
+        headerDomainMatchText.textContent = `${info.deployDomain} ドメイン`;
+      } else {
+        headerDomainMatchText.textContent = 'グローバルアクセス';
+      }
+    }
+  } else {
+    // ドメイン不一致の場合
+    if (headerDomainMismatch && headerDomainMismatchText) {
+      headerDomainMismatch.classList.remove('hidden');
+      headerDomainMismatchText.textContent = info.currentDomain;
+    }
+  }
+}
+
+/**
+ * フォームリンクを取得して表示する関数
+ */
+function loadFormLink() {
+  google.script.run
+    .withSuccessHandler(formInfo => {
+      if (formInfo && formInfo.formUrl) {
+        const formLinkBtn = document.getElementById('form-link-btn');
+        if (formLinkBtn) {
+          formLinkBtn.href = formInfo.formUrl;
+          formLinkBtn.classList.remove('hidden');
+        }
+      }
+    })
+    .withFailureHandler(error => {
+      console.warn('フォーム情報の取得に失敗しました:', error);
+    })
+    .getActiveFormInfo();
+}
+
 try {
   if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
     window.studyQuestApp.destroy();
   }
   window.studyQuestApp = new StudyQuestApp();
+  
+  // ドメイン情報とフォームリンクを取得
+  loadDomainInfo();
+  loadFormLink();
+  
   window.addEventListener('beforeunload', () => {
     if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
       window.studyQuestApp.destroy();
