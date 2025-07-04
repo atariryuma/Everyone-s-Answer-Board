@@ -607,6 +607,28 @@
       });
     }
 
+    // 既存ボードをチェックする関数（自動リダイレクト用）
+    function checkExistingBoard() {
+      return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(new Error('既存ボードチェックタイムアウト'));
+        }, 5000);
+
+        google.script.run
+          .withSuccessHandler(result => {
+            clearTimeout(timeoutId);
+            resolve(result);
+          })
+          .withFailureHandler(error => {
+            clearTimeout(timeoutId);
+            console.error('既存ボードチェックエラー:', error);
+            // エラーの場合は新規ユーザーとして扱う
+            resolve({ status: 'new_user' });
+          })
+          .getExistingBoard();
+      });
+    }
+
     // ===== 共通ドメイン情報処理関数 =====
     // AdminPanel.html と Registration.html で共通使用
     
@@ -672,6 +694,9 @@
 
     // ユーザーメールアドレスを取得
     window.addEventListener('DOMContentLoaded', async () => {
+      // ローディング表示
+      showMessage('アカウント情報を確認中...', 'info');
+      
       // ドメイン情報を取得
       loadDomainInfo();
       
@@ -690,6 +715,18 @@
         document.getElementById('user-email').textContent = email || 'メールアドレスを取得できません';
 
         if (email) {
+          // 自動リダイレクト機能: 登録済みユーザーチェック
+          const existingBoardResult = await checkExistingBoard();
+          
+          if (existingBoardResult && existingBoardResult.status === 'existing_user') {
+            showMessage('既存のアカウントが見つかりました。管理パネルにリダイレクトします...', 'success');
+            // 1秒後にリダイレクト（ユーザーがメッセージを読む時間を確保）
+            setTimeout(() => {
+              window.location.replace(existingBoardResult.adminUrl);
+            }, 1000);
+            return; // 以降の処理をスキップ
+          }
+          
           updateStep(2); // Account verification step
           
           // 新規アカウント扱いフラグをチェック
