@@ -167,11 +167,38 @@ function getUserCached(userId) {
 }
 
 /**
- * @deprecated cacheManager.get() を使用してください
+ * ヘッダーインデックスをキャッシュ付きで取得
  */
 function getHeadersCached(spreadsheetId, sheetName) {
   const key = `hdr_${spreadsheetId}_${sheetName}`;
-  return cacheManager.get(key, () => getHeaderIndices(spreadsheetId, sheetName));
+  return cacheManager.get(key, () => {
+    try {
+      var service = getSheetsService();
+      var range = sheetName + '!1:1';
+      var response = service.spreadsheets.values.get(spreadsheetId, range);
+      
+      if (!response.values || !response.values[0]) {
+        throw new Error('ヘッダー行が見つかりません');
+      }
+      
+      var headers = response.values[0];
+      var indices = {};
+      
+      // COLUMN_HEADERSの各キーに対してインデックスを生成
+      Object.keys(COLUMN_HEADERS).forEach(function(key) {
+        var headerName = COLUMN_HEADERS[key];
+        var index = headers.indexOf(headerName);
+        if (index !== -1) {
+          indices[headerName] = index;
+        }
+      });
+      
+      return indices;
+    } catch (error) {
+      console.error('getHeadersCached error:', error);
+      return {};
+    }
+  });
 }
 
 /**
