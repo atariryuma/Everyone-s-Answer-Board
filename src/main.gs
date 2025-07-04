@@ -36,6 +36,21 @@ var COLUMN_HEADERS = {
   HIGHLIGHT: 'ハイライト'
 };
 
+// 表示モード定数
+var DISPLAY_MODES = {
+  ANONYMOUS: 'anonymous',
+  NAMED: 'named'
+};
+
+// リアクション関連定数
+var REACTION_KEYS = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
+
+// スコア計算設定
+var SCORING_CONFIG = {
+  LIKE_MULTIPLIER_FACTOR: 0.1,
+  RANDOM_SCORE_FACTOR: 0.01
+};
+
 var EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
 var DEBUG = true;
 

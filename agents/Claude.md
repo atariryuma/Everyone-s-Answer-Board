@@ -1,182 +1,198 @@
-# Developer Documentation: Building Modern Web Applications
+承知いたしました。
+提供された「Developer Documentation」と既存の「要件定義書」を統合し、指定されたセクションを除外した上で、完全な要件定義書をMarkdown形式で作成します。
 
-This document provides a comprehensive guide for developers aiming to build robust, user-friendly, and scalable web applications. It covers core design principles, a recommended technology stack, and best practices for coding and architecture, using the provided project as a reference.
+---
 
-## 1. Core Philosophy & Design Principles
+# **要件定義書：みんなの回答ボード**
 
-The foundation of a successful application lies in a strong philosophy that prioritizes the user.
+### 1. 概要
 
-  * **User Safety & Trust**: Create a secure environment where users feel safe to interact and share information.
-  * **Inclusivity**: Design for a diverse audience, ensuring accessibility and ease of use for everyone.
-  * **Empathetic Interaction**: Implement features that allow for clear, positive, and nuanced communication.
-  * **Intuitive UI/UX**:
-      * **Simplicity**: Avoid unnecessary complexity. The user interface should be clean and straightforward.
-      * **Visual Hierarchy**: Use modern design techniques like "glassmorphism" to create a sense of depth and guide the user's focus. The `.glass-panel` class in the project is a good example of this.
-      * **Accessibility**: Ensure high contrast, readable fonts, and keyboard navigability to support all users.
+本ドキュメントは、Google Apps Script (GAS) と Google Workspace を活用したWebアプリケーション「みんなの回答ボード」のシステム要件を定義するものです。本システムは、教育現場において、生徒の回答をリアルタイムで共有し、双方向のコミュニケーションを促進することを目的としています。
 
-## 2. Color Palette & Usage
+#### 1.1. 基本理念と設計原則
 
-A consistent color palette is key to a professional look and feel. This palette is defined using CSS variables for easy theming and maintenance.
+アプリケーションの成功は、ユーザーを最優先する強い理念に基づいています。
 
-**Copy-paste this CSS to use the color palette in your project:**
+* **ユーザーの安全性と信頼**: ユーザーが安心して情報を共有し、対話できる安全な環境を構築します。
+* **包括性**: 多様なユーザー層を考慮し、誰にとってもアクセシブルで使いやすいデザインを目指します。
+* **共感的なインタラクション**: 明確で、前向きかつ繊細なコミュニケーションを可能にする機能を実装します。
+* **直感的なUI/UX**:
+    * **シンプルさ**: 不要な複雑さを避け、クリーンで分かりやすいインターフェースを提供します。
+    * **視覚的階層**: 「グラスモーフィズム」のようなモダンなデザイン技術を用いて奥行きを演出し、ユーザーの視線を誘導します（例: `.glass-panel` クラス）。
+    * **アクセシビリティ**: 全てのユーザーをサポートするため、高いコントラスト、可読性の高いフォント、キーボード操作の可能性を確保します。
 
-```css
-:root {
-  --color-primary: #8be9fd;
-  --color-background: #1a1b26;
-  --color-surface: rgba(26, 27, 38, 0.7);
-  --color-text: #c0caf5;
-  --color-border: rgba(255, 255, 255, 0.1);
-  --color-accent: #facc15;
-  --color-success: #10b981;
-  --color-error: #ef4444;
-  --color-warning: #f59e0b;
-  --color-info: #3b82f6;
-}
-```
+### 2. プロジェクトの目的と背景
 
-### Color Usage Guide
+本プロジェクトは、従来のシステムで発生していた403エラー問題を根本的に解決し、Google Workspace管理者の設定変更を不要にすることを目的としています。 単一のGASプロジェクト構成に移行することで、コードベースを約60%削減し、保守性と拡張性を大幅に向上させています。
 
-| Variable              | Hex/RGBA               | Usage Example & Description                                                                                                                                     |
-| :-------------------- | :--------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--color-primary`     | `#8be9fd` (Cyan)        | **Primary Actions & Highlights:** Used for main buttons, active states, and important interactive elements to draw user attention. (e.g., "Submit" button) |
-| `--color-background`  | `#1a1b26` (Dark Blue)   | **Main App Background:** Provides a dark, modern backdrop that helps content and interactive elements stand out clearly.                                |
-| `--color-surface`     | `rgba(26,27,38,0.7)`   | **Panel & Card Backgrounds:** Used for "glassmorphism" panels (`.glass-panel`) to create a translucent, layered effect.                            |
-| `--color-text`        | `#c0caf5` (Light Gray)  | **Primary Text Color:** Ensures readability against the dark background for all main text content.                                                   |
-| `--color-border`      | `rgba(255,255,255,0.1)`| **Borders:** Defines the edges of panels and other UI elements, enhancing the "glass" effect.                                                     |
-| `--color-accent`      | `#facc15` (Yellow)     | **Accent & Attention:** Used for secondary highlights, titles, or important icons to provide visual contrast. (e.g., Main Title)               |
-| `--color-success`     | `#10b981` (Green)      | **Success Feedback:** For success messages, confirmation indicators, and positive actions. (e.g., "Saved successfully" message)                  |
-| `--color-error`       | `#ef4444` (Red)         | **Error Feedback:** For error messages, warnings about destructive actions, and validation failures. (e.g., "Invalid URL" error)                |
-| `--color-warning`     | `#f59e0b` (Yellow)      | **Warnings:** Used for non-critical warnings or to draw attention to important information that requires user consideration.                           |
-| `--color-info`        | `#3b82f6` (Blue)        | **Informational Messages:** For neutral, informational messages, tips, and guidance within the UI.                                                   |
+### 3. システムアーキテクチャ
 
-## 3. Architecture and Technology Stack
+本システムは、サーバーレスアーキテクチャを採用し、Google Workspaceのサービス群を最大限に活用しています。
 
-This application is built on the Google Workspace platform, making it highly integrated and scalable.
+* **バックエンド**: **Google Apps Script (GAS)** を利用し、V8ランタイムで動作します。ビジネスロジック、データ処理、API連携を担います。
+* **フロントエンド**: **HTML/CSS/JavaScript** で構築されています。UIのスタイリングには**Tailwind CSS**のCDNが利用されます。 GASバックエンドとの通信は `google.script.run` 非同期APIを介して行われ、`ClientOptimizer.html` によって最適化されています。
+* **データベース**: **Google Sheets** を主要なデータストアとして使用します。 ユーザー情報や設定を管理する中央データベースと、各ユーザーの回答データを保存するスプレッドシートで構成されます。Sheets API v4を直接呼び出すことで高速なデータアクセスを実現しています。
+* **認証**:
+    * **ユーザー認証**: Googleアカウントによる認証。
+    * **API認証**: **サービスアカウントモデル**を採用し、JWT（JSON Web Token）を用いてGoogleの各種APIへ安全にアクセスします。これにより、従来の403エラーを解決し、単一GASプロジェクトへのデプロイを簡素化しています。
+* **開発ツール**:
+    * **`clasp`**: GASプロジェクトをローカルで管理するための公式コマンドラインツール。
+    * **`jest`**: クライアントサイドのロジックの信頼性を確保するためのJavaScriptテストフレームワーク。
 
-  * **Backend**: **Google Apps Script (GAS)** serves as the serverless backend, handling all business logic, data processing, and API integrations. It leverages the **V8 runtime** for modern JavaScript features and improved performance.
-  * **Frontend**:
-      * **HTML/CSS/JavaScript**: Standard web technologies are used to build the user interface.
-      * **Tailwind CSS**: A utility-first CSS framework is used for rapid and consistent styling. For simplicity in a GAS environment, the **Tailwind CSS CDN** is used. Include the following script tag in the `<head>` of your HTML files:
-        ```html
-        <script src="https://cdn.tailwindcss.com"></script>
-        ```
-      * **Client-Server Communication**: The frontend communicates with the GAS backend via the `google.script.run` asynchronous API, further optimized by `ClientOptimizer.html`.
-  * **Data Storage**: **Google Sheets** is used as the primary data store for application data, user information, and configurations. It is accessed efficiently via **Google Sheets API v4** direct calls.
-  * **Authentication**: Implements a **Service Account Model** using JWT for secure and efficient access to Google APIs, resolving previous 403 errors and simplifying deployment to a **single GAS project**.
-  * **Development Tools**:
-      * **`clasp`**: The official command-line tool for managing GAS projects locally.
-      * **`jest`**: A JavaScript testing framework for ensuring the reliability of client-side logic. Backend logic is tested via `src/test.gs`.
+### 4. 機能要件
 
-## 4. Coding Standards and Best Practices
+#### 4.1. ユーザー管理機能
 
-### 4.1. The Manifest File (`appsscript.json`)
+* **新規ユーザー登録**:
+    * ユーザーは初回アクセス時に、自身のGoogleアカウントでシステムに登録できます。
+    * 登録プロセスでは、ユーザー専用のGoogleフォームとスプレッドシートが自動で作成されます。
+    * 登録が完了すると、ユーザー専用の固定URLが発行され、管理画面へアクセスできるようになります。
+    * １人のユーザーに対して、1つの固定URLを付与します。
+* **アクセス制御**:
+    * システムは指定されたGoogle Workspaceドメイン内のユーザーのみにアクセスを制限できます。
+    * 管理者権限を持つユーザーは、管理機能へのアクセスが許可されます。
 
-The manifest file is a critical JSON file that configures your Apps Script project.
+#### 4.2. 回答ボード機能 (生徒・閲覧者向け)
 
-  * **`timeZone`**: Set the script's timezone (e.g., `"Asia/Tokyo"`).
-  * **`oauthScopes`**: List the *minimum* required OAuth scopes for your script to function. Avoid overly permissive scopes. Current scopes include:
-    * `https://www.googleapis.com/auth/script.external_request`
-    * `https://www.googleapis.com/auth/forms`
-    * `https://www.googleapis.com/auth/spreadsheets`
-    * `https://www.googleapis.com/auth/drive`
-    * `https://www.googleapis.com/auth/userinfo.email`
-    * `https://www.googleapis.com/auth/script.scriptapp`
-    * `https://www.googleapis.com/auth/script.container.ui`
-  * **`webapp`**: Configure the web app deployment settings.
-      * `executeAs`: Defines whether the script runs as the user accessing it (`USER_ACCESSING`) or the developer who deployed it (`USER_DEPLOYING`).
-      * `access`: Controls who can access the app (`MYSELF`, `DOMAIN`, or `ANYONE_ANONYMOUS`).
-  * **`runtimeVersion`**: Use `V8` for the modern JavaScript runtime.
-  * **`exceptionLogging`**: Set the destination for logged exceptions, with `STACKDRIVER` being a common choice.
+* **回答の表示**:
+    * 教師が設定したスプレッドシートから回答データを取得し、カード形式で一覧表示します。
+    * 表示される回答は、新着順、ランダム順、スコア順などで並び替えが可能です。
+    * クラスごとに回答を絞り込んで表示するフィルター機能を有します。
+* **リアクション機能**:
+    * 各回答カードに対して、「いいね！」「なるほど！」「もっと知りたい！」の3種類のリアクションができます。
+    * 自身がリアクションしたボタンはハイライト表示されます。
+    * リアクションの総数に応じて、カードの枠線のスタイルが変化します。
+* **ハイライト表示**:
+    * 教師がハイライト設定した回答は、特別な装飾（枠の色やアイコン）で強調表示されます。
+* **モーダル表示**:
+    * 回答カードをクリックすると、回答の詳細内容がモーダルウィンドウで表示されます。
+* **新着通知**:
+    * ボードを表示中に新しい回答が投稿されると、画面上部にバナーで通知されます。
 
-### 4.2. Server-Side Script (`.gs` Files)
+#### 4.3. 管理者機能
 
-  * **Performance**:
-      * **Batch Operations**: Minimize calls to services like `SpreadsheetApp`. Instead of reading or writing cell by cell in a loop, read a whole range of data into an array with `getValues()`, manipulate the array in your script, and write it back with `setValues()`.
-      * **Cache Service**: Use `CacheService` (`cache.gs`) to cache frequently accessed, infrequently changing data to avoid redundant service calls.
-      * **Advanced Optimizations**: Leverage `optimizer.gs` for time-bounded batching, exponential backoff, Sheets API rate limiting, memory optimization, and time-sliced parallel processing.
-  * **Organization**:
-      * **Modularity**: Separate concerns by splitting code into different `.gs` files (e.g., `main.gs`, `core.gs`, `database.gs`, `auth.gs`, `cache.gs`, `config.gs`, `url.gs`, `monitor.gs`, `optimizer.gs`, `stability.gs`, `test.gs`).
-  * **Security**:
-      * **Secrets Management**: Store API keys and other secrets in `PropertiesService`, not in the code itself.
+* **ボードの作成と管理**:
+    * 管理者は、新しい回答ボード（Googleフォームと連携したスプレッドシート）をワンクリックで作成できます。
+    * 既存のGoogleスプレッドシートのURLを指定して、回答ボードとして利用することも可能です。
+* **公開設定**:
+    * 管理者は、回答ボードの公開・非公開を切り替えることができます。
+    * 複数のシート（ボード）が存在する場合、生徒に表示するシートを選択できます。
+* **表示設定**:
+    * **表示モード**: 回答者の名前を表示する「記名モード」と、表示しない「匿名モード」を切り替えられます。
+    * **リアクション数**: リアクション数の表示・非表示を切り替えられます。
+    * **並び順**: デフォルトの並び順（スコア順、新着順など）を設定できます。
+* **列マッピング**:
+    * スプレッドシートのどの列を「回答」「理由」「名前」として表示するかを設定画面でマッピングできます。
 
-### 4.3. Client-Side HTML (`.html` Files)
+### 5. 画面仕様
 
-  * **Separation of Concerns**: Keep HTML structure, CSS styling, and JavaScript logic in separate files to make your project easier to read and maintain.
-  * **Asynchronous Loading**: Load data dynamically with `google.script.run` after the initial page load to keep the UI responsive. The `ClientOptimizer.html` provides a `GASOptimizer` class for enhanced client-side call management (concurrency, caching, error handling).
-  * **Use of Scriptlets (`<?...?>`)**: Use scriptlets sparingly for simple, one-time server-side tasks. They are executed before the page is served and can slow down the initial load if overused.
-      * `<?= ... ?>` (Printing Scriptlet): Outputs data into the HTML with contextual escaping.
-      * `<? ... ?>` (Standard Scriptlet): Executes server-side code like loops or conditionals.
-  * **Security**: Trust the contextual escaping of printing scriptlets to prevent XSS. Sanitize any user data you manually place in the HTML. For all external links, use `rel="noopener noreferrer"`.
+本システムは、主に以下の4つのHTMLファイルでUIが構成されています。
 
-## 5. AI/ML Integration (Future Outlook)
+* **`Page.html`**: 生徒や一般閲覧者向けのメインの回答ボード画面です。
+* **`AdminPanel.html`**: 教師向けの管理画面です。
+* **`Registration.html`**: 新規ユーザー登録画面です。
+* **`SetupPage.html`**: 初回システムセットアップ画面です。
 
-Integrating with large language models can significantly enhance the application's capabilities.
+#### 5.1. 画面フローと主要な関数
 
-### Potential Enhancements
+ユーザーの状況に応じて、以下のフローで画面と機能が連携します。すべてのフローはGASの `doGet(e)` 関数を起点とします。
 
-  * **Content Summarization and Keyword Extraction**: To help users quickly grasp the main points of numerous responses.
-  * **AI-Generated Feedback**: To provide users with constructive, personalized feedback.
-  * **Data Analysis and Insights**: To analyze user-generated content and extract valuable trends and patterns.
-  * **Content Moderation**: To automatically identify and filter inappropriate content, ensuring a safe user environment.
+**フロー1: 初回システムセットアップ（システム管理者）**
 
-### Integration Strategy
+1.  **アクセス**: 管理者がWebアプリのURLに初めてアクセスする。
+2.  **判定**: `doGet(e)` は、システムが未セットアップであると判断し、`SetupPage.html` を表示する。
+3.  **実行**: 管理者がサービスアカウント情報を入力し送信すると、クライアントサイドJSが `google.script.run` を介して `setupApplication()` を実行する。
 
-  * The backend (GAS) can use the `UrlFetchApp` service to make HTTP requests to external AI model APIs.
-  * Careful consideration must be given to API key management, rate limits, cost control, data privacy, and robust error handling.
+**フロー2: 新規ユーザー登録（教師）**
 
-## 6. Current Project Status and Development Context
+1.  **アクセス**: 新規の教師ユーザーがWebアプリのURLにアクセスする。
+2.  **判定**: `doGet(e)` は、ユーザーが未登録であると判断し、`Registration.html` を表示する。
+3.  **確認**: 画面表示後、クライアントサイドJSが `getExistingBoard()` を呼び出し、登録済みでないことを確認する。
+4.  **実行**: ユーザーが「登録して開始」ボタンをクリックすると、`registerNewUser()` が実行される。
+5.  **遷移**: 登録完了後、管理画面 (`AdminPanel.html`) にリダイレクトされる。
 
-### 6.1. Project Overview (StudyQuest - みんなの回答ボード)
+**フロー3: 管理画面の操作（教師）**
 
-This application provides an interactive answer board for educational settings, leveraging Google Sheets as a data store. Its core purpose is to facilitate real-time answer sharing from Google Forms to a dynamic web board, enabling student reactions and teacher highlights. The project has recently undergone a significant architectural shift to a **Service Account Model** within a **single Google Apps Script (GAS) project**, which has resolved previous 403 errors and streamlined deployment.
+1.  **アクセス**: 登録済みの教師がURLにアクセスする。
+2.  **判定**: `doGet(e)` は、ユーザーが管理者であると判断し、`AdminPanel.html` を表示する。
+3.  **情報取得**: 画面表示後、クライアントサイドJSが `getStatus()` を呼び出し、現在のボードの状態を取得して表示する。
+4.  **操作**:
+    * **ボード作成**: `createBoardFromAdmin()` を実行。
+    * **シート追加**: `addSpreadsheetUrl()` を実行。
+    * **シート公開**: `switchToSheet()` を実行。
+    * **設定保存**: `saveSheetConfig()` を実行。
 
-### 6.2. Key Features Implemented
+**フロー4: 回答ボードの閲覧（生徒・閲覧者）**
 
-*   **Real-time Answer Sharing**: Displays student responses from Google Forms on a web board.
-*   **Reaction Features**: Students can react with "Understand!", "Like!", and "Curious!".
-*   **Highlighting**: Teachers can highlight important answers.
-*   **Admin Panel (`AdminPanel.html`)**: Comprehensive management interface for:
-    *   Board publication/unpublication.
-    *   Switching between different sheets.
-    *   Configuring display modes (anonymous/named).
-    *   Sorting options (score, newest, oldest, likes, random).
-    *   Creating new boards and utilizing existing spreadsheets.
-    *   Displaying the database's `isActive` status with a direct link to the associated spreadsheet.
-*   **User Registration (`Registration.html`)**: Streamlined quick-start setup for new users.
-*   **Service Account Setup (`SetupPage.html`)**: Dedicated page for initial service account and central database configuration.
-*   **Robust Security**: Implements JWT + Google OAuth2 for authentication, domain-based access control, XSS prevention, and robust error handling.
-*   **Performance Optimizations**: Includes advanced caching, batch processing, and efficient API calls.
-*   **Stability Enhancements**: Incorporates circuit breakers, retry mechanisms, and health monitoring.
+1.  **アクセス**: 生徒が教師から共有されたボードのURLにアクセスする。
+2.  **判定**: `doGet(e)` はボードが公開中か判断する。
+3.  **分岐**:
+    * **公開中**: `Page.html` を表示する。
+        * クライアントサイドの `StudyQuestApp` クラスが `getPublishedSheetData()` を実行し回答データを取得・描画する。
+        * 生徒がリアクションすると、`addReaction()` が実行される。
+    * **非公開中**: `Unpublished.html` を表示する。
 
-### 6.3. Recent Improvements and Bug Fixes
+### 6. データ要件
 
-The project has seen several critical enhancements and bug fixes:
+* **中央データベース (`Users`シート)**: システム全体のユーザー情報を管理するスプレッドシート。
+    * `userId`: ユーザー固有のID
+    * `adminEmail`: ユーザーのメールアドレス
+    * `spreadsheetId`: ユーザーが所有する回答データ用スプレッドシートのID
+    * `configJson`: ユーザーごとの設定（公開シート名、表示モードなど）
+* **回答データシート**: 各ユーザーが所有し、生徒の回答が記録されるスプレッドシート。
+    * 必須列: タイムスタンプ, メールアドレス, 回答内容
+    * オプション列: クラス, 氏名, 理由など
+    * システム追加列: なるほど！, いいね！, もっと知りたい！, ハイライト
 
-*   **New Service Account Architecture**: Full transition to a service account model within a single GAS project, eliminating 403 errors and simplifying setup.
-*   **Comprehensive Performance Optimizations**: Integration of `optimizer.gs` and `cache.gs` for multi-level caching, time-bounded batching, Sheets API rate limiting, memory optimization, and time-sliced parallel processing.
-*   **Enhanced Stability System**: Implementation of `stability.gs` for circuit breakers, resilient execution, health monitoring, failsafe data access, data integrity checks, and auto-recovery.
-*   **Modular Codebase Refinement**: Further separation of concerns across `.gs` files, with core logic consolidated in `core.gs` and deprecated files (`DataProcessor.gs`, `ReactionManager.gs`) removed.
-*   **Optimized Client-Side Communication**: `ClientOptimizer.html` provides a robust `GASOptimizer` class for managing `google.script.run` calls, including concurrency limits, caching, and enhanced error handling.
-*   **Improved Admin Panel (`AdminPanel.html`)**: Enhanced UI/UX, better status indicators, and more intuitive setup flow.
-*   **Refined Registration Flow (`Registration.html`)**: Clearer steps for new user registration and quick setup, with immediate feedback.
-*   **Corrected Highlight Logic**: `processHighlightToggle` in `core.gs` now correctly uses `TRUE`/`FALSE` strings for boolean values in Google Sheets.
-*   **Updated `getAppConfig`**: Now provides more comprehensive status information, including `spreadsheetUrl` and `systemStatus` details.
-*   **Frontend Display Logic**: `Page.html` now includes a `StudyQuestApp` class for managing client-side state, rendering, and interactions, incorporating virtual scrolling and performance tweaks.
+### 7. 非機能要件
 
-### 6.4. Current Known Issues and Future Work
+#### 7.1. パフォーマンス
 
-*   **Client-Side Function Call Mismatch (`TypeError: ...[funcName] is not a function`)**: This error, observed in `src/Page.html` for functions like `checkAdmin`, `getAvailableSheets`, and `getPublishedSheetData`, is typically a deployment/caching issue. The server-side functions are correctly defined and exposed. **To resolve this, ensure the Apps Script project is properly redeployed and the browser's cache is cleared after any code changes.**
-*   **Future Enhancements**:
-    *   Further optimize client-side rendering performance.
-    *   Implement more advanced analytics for board usage.
-    *   Explore AI/ML integrations for content summarization or feedback generation.
+* **高速なレスポンス**:
+    * 初期ロード: **1〜2秒**
+    * データ更新: **0.5〜1秒**
+* **最適化**:
+    * バックエンドでは`CacheService`とインメモリキャッシュを組み合わせた多層キャッシュシステムを導入し、API呼び出しを最小限に抑えます。
+    * フロントエンドでは、仮想スクロール、遅延読み込み、非同期処理により、大量データでも軽快な動作を実現します。
 
-### 6.5. Coding Practices and Conventions
+#### 7.2. セキュリティ
 
-*   **Modularity**: Code is strictly organized into logical `.gs` files, with `core.gs` serving as the central hub for optimized business logic.
-*   **Performance-First**: Emphasis on batch operations, strategic caching (both `CacheService` and in-memory `Map`), and efficient Google Sheets API calls.
-*   **Robust Error Handling**: All functions include comprehensive error handling with user-friendly messages for the frontend and detailed logs for debugging.
-*   **Security**: Adherence to Google Apps Script security best practices, including proper OAuth scopes, input sanitization, and secure property management.
-*   **Frontend Development**: Standard HTML/CSS/JavaScript practices are followed, with Tailwind CSS CDN for styling. `google.script.run` is the primary method for asynchronous client-server communication.
-*   **Testing**: Unit tests are in place (`src/test.gs`) to ensure code reliability and prevent regressions. Developers should maintain high test coverage.
+* **認証**: Googleアカウントによる安全な認証を必須とします。
+* **権限管理**: サービスアカウントモデルにより、システムが必要とする最小限の権限で動作します。ユーザーデータはユーザー自身が所有します。
+* **脆弱性対策**: `HtmlService` のコンテキストエスケープや、全てのユーザー入力の検証により、XSS（クロスサイトスクリプティング）などの脆弱性を防止します。
+* **シークレット管理**: APIキーなどの機密情報は `PropertiesService` を使用して安全に保管し、コード内に直接記述しません。
+
+#### 7.3. 安定性・信頼性
+
+* **エラーハンドリング**: すべての機能において、堅牢なエラーハンドリングを実装し、ユーザーフレンドリーなメッセージを表示します。
+* **監視**: `monitor.gs`により、システムのパフォーマンスメトリクスを収集し、問題の早期発見に努めます。
+* **自己回復**: `stability.gs`に実装されたサーキットブレーカーやリトライ機構により、一時的な障害からの自動回復を目指します。
+
+### 8. その他の非機能要件
+
+#### 8.1. アクセシビリティ (Accessibility)
+
+* **WCAG 2.1準拠**: レベルAAを目標とします。
+* **キーボード操作**: 全ての主要な操作をキーボードのみで完結できるようにします。
+* **スクリーンリーダー対応**: `aria-label`や`role`属性を適切に使用し、コンテンツの構造と意味が伝わるようにします。
+* **コントラスト比**: テキストと背景のコントラスト比を確保し、視認性を高めます。
+
+#### 8.2. 国際化と地域化 (i18n / L10n)
+
+* **多言語対応**: UI上のテキストを外部リソースファイルで管理し、他言語への対応が容易な構造とします。
+* **タイムゾーン**: 日時表示は `appsscript.json` で設定されたタイムゾーン（`Asia/Tokyo`）に統一します。
+
+#### 8.3. プライバシーとデータ管理
+
+* **プライバシーポリシー**: アプリケーション内で、収集データの内容、利用目的、保存期間などを明記したポリシーを閲覧できるようにします。
+* **データ所有権**: ユーザーが作成したスプレッドシートやフォームの所有権は、常にユーザー自身にあることを明確にします。
+* **データ削除**: ユーザーが自身のデータを削除する手順を提供します。
+
+### 9. 既知の制約事項と今後の課題
+
+* **クライアントサイドの関数呼び出しエラー**: `google.script.run`でサーバーサイド関数を呼び出す際に、デプロイやキャッシュの問題で `TypeError: ...[funcName] is not a function` エラーが発生することがあります。これは、GASプロジェクトの再デプロイやブラウザキャッシュのクリアで解決されます。
+* **今後の機能拡張案**:
+    * AI/MLを活用したコンテンツの要約やキーワード抽出機能
+    * ボードの利用状況に関する高度な分析機能
+
+---
