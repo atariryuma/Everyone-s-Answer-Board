@@ -391,6 +391,16 @@ function getAppConfig() {
  */
 function saveSheetConfig(spreadsheetId, sheetName, config) {
   try {
+    if (!spreadsheetId || typeof spreadsheetId !== 'string') {
+      throw new Error('無効なspreadsheetIdです: ' + spreadsheetId);
+    }
+    if (!sheetName || typeof sheetName !== 'string') {
+      throw new Error('無効なsheetNameです: ' + sheetName);
+    }
+    if (!config || typeof config !== 'object') {
+      throw new Error('無効なconfigです: ' + config);
+    }
+    
     var props = PropertiesService.getUserProperties();
     var currentUserId = props.getProperty('CURRENT_USER_ID');
     if (!currentUserId) {
@@ -425,6 +435,13 @@ function saveSheetConfig(spreadsheetId, sheetName, config) {
  */
 function switchToSheet(spreadsheetId, sheetName) {
   try {
+    if (!spreadsheetId || typeof spreadsheetId !== 'string') {
+      throw new Error('無効なspreadsheetIdです: ' + spreadsheetId);
+    }
+    if (!sheetName || typeof sheetName !== 'string') {
+      throw new Error('無効なsheetNameです: ' + sheetName);
+    }
+    
     var props = PropertiesService.getUserProperties();
     var currentUserId = props.getProperty('CURRENT_USER_ID');
     if (!currentUserId) {
