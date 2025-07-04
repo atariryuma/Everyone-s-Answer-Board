@@ -204,13 +204,15 @@ function doGet(e) {
     if (setup === 'true') {
       return HtmlService.createTemplateFromFile('SetupPage')
         .evaluate()
-        .setTitle('StudyQuest - サービスアカウント セットアップ');
+        .setTitle('StudyQuest - サービスアカウント セットアップ')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
     }
     
     if (!userId) {
       return HtmlService.createTemplateFromFile('Registration')
         .evaluate()
-        .setTitle('新規登録');
+        .setTitle('新規登録')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
     }
 
     var userInfo = findUserById(userId);
@@ -232,12 +234,14 @@ function doGet(e) {
       var template = HtmlService.createTemplateFromFile('AdminPanel');
       template.userInfo = userInfo;
       template.userId = userId;
-      return template.evaluate().setTitle('管理パネル - みんなの回答ボード');
+      return template.evaluate().setTitle('管理パネル - みんなの回答ボード')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
     } else {
       var template = HtmlService.createTemplateFromFile('Page');
       template.userInfo = userInfo;
       template.userId = userId;
-      return template.evaluate().setTitle('みんなの回答ボード');
+      return template.evaluate().setTitle('みんなの回答ボード')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
     }
     
   } catch (error) {
@@ -249,7 +253,7 @@ function doGet(e) {
       '<h2>システムエラーが発生しました</h2>' +
       '<p>エラー詳細: ' + error.message + '</p>' +
       '<p>しばらく待ってから再度お試しください。</p>'
-    );
+    ).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
   }
 }
 
