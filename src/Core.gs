@@ -889,8 +889,175 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
 }
 
 // =================================================================
-// プレースホルダー関数（実装予定）
+// フォーム作成機能
 // =================================================================
+
+/**
+ * フォーム作成ファクトリ
+ * @param {Object} options - フォーム作成オプション
+ * @param {string} options.userEmail - ユーザーのメールアドレス
+ * @param {string} options.userId - ユーザーID
+ * @param {string} options.questions - 質問タイプ（'default'など）
+ * @param {string} options.formDescription - フォームの説明
+ * @returns {Object} フォーム作成結果
+ */
+function createFormFactory(options) {
+  try {
+    var userEmail = options.userEmail;
+    var userId = options.userId;
+    var formDescription = options.formDescription || '🌟 みんなの回答ボード - デジタル・シティズンシップを育む対話の場 🌟\n\nここは、あなたの考えを安心して表現し、多様な意見を尊重し合う学びの場です。';
+    
+    // タイムスタンプ生成
+    var now = new Date();
+    var dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm:ss');
+    
+    // フォームタイトル生成
+    var formTitle = '📝 みんなの回答ボード - ' + userEmail + ' - ' + dateTimeString;
+    
+    // フォーム作成
+    var form = FormApp.create(formTitle);
+    form.setDescription(formDescription);
+    
+    // 基本的な質問を追加
+    addUnifiedQuestions(form, options.questions || 'default', {});
+    
+    // スプレッドシート作成
+    var spreadsheetResult = createLinkedSpreadsheet(userEmail, form, dateTimeString);
+    
+    return {
+      formId: form.getId(),
+      formUrl: form.getPublishedUrl(),
+      spreadsheetId: spreadsheetResult.spreadsheetId,
+      spreadsheetUrl: spreadsheetResult.spreadsheetUrl,
+      sheetName: spreadsheetResult.sheetName
+    };
+    
+  } catch (error) {
+    console.error('createFormFactory エラー:', error.message);
+    throw new Error('フォーム作成ファクトリでエラーが発生しました: ' + error.message);
+  }
+}
+
+/**
+ * 統一された質問をフォームに追加
+ * @param {GoogleAppsScript.Forms.Form} form - フォームオブジェクト
+ * @param {string} questionType - 質問タイプ
+ * @param {Object} customConfig - カスタム設定
+ */
+function addUnifiedQuestions(form, questionType, customConfig) {
+  try {
+    var config = getQuestionConfig(questionType, customConfig);
+    
+    // メールアドレス収集を有効化
+    form.setCollectEmail(true);
+    
+    // クラス質問
+    var classItem = form.addTextItem();
+    classItem.setTitle(config.classQuestion.title);
+    classItem.setHelpText(config.classQuestion.helpText);
+    classItem.setRequired(true);
+    
+    // メイン質問
+    var mainItem = form.addParagraphTextItem();
+    mainItem.setTitle(config.mainQuestion.title);
+    mainItem.setHelpText(config.mainQuestion.helpText);
+    mainItem.setRequired(true);
+    
+    // 理由質問
+    var reasonItem = form.addParagraphTextItem();
+    reasonItem.setTitle(config.reasonQuestion.title);
+    reasonItem.setHelpText(config.reasonQuestion.helpText);
+    reasonItem.setRequired(false);
+    
+    // 名前質問
+    var nameItem = form.addTextItem();
+    nameItem.setTitle(config.nameQuestion.title);
+    nameItem.setHelpText(config.nameQuestion.helpText);
+    nameItem.setRequired(false);
+    
+    console.log('フォームに統一質問を追加しました: ' + questionType);
+    
+  } catch (error) {
+    console.error('addUnifiedQuestions エラー:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * 質問設定を取得
+ * @param {string} questionType - 質問タイプ
+ * @param {Object} customConfig - カスタム設定
+ * @returns {Object} 質問設定
+ */
+function getQuestionConfig(questionType, customConfig) {
+  var defaultConfig = {
+    classQuestion: {
+      title: 'あなたのクラス・学年',
+      helpText: 'あなたが所属するクラスや学年を教えてください（例：6年1組、中学3年A組、高校2年など）'
+    },
+    mainQuestion: {
+      title: '今日のテーマについて、あなたの考えや意見を聞かせてください',
+      helpText: 'この質問には正解や間違いはありません。あなた自身の考えを自由に、安心して表現してください。多様な意見こそが、みんなの学びを豊かにします。'
+    },
+    reasonQuestion: {
+      title: 'そう考える理由や体験があれば教えてください（任意）',
+      helpText: 'あなたがそのように考える背景や、関連する体験・エピソードがあれば共有してください。理由を書くことで、あなたの考えがより相手に伝わりやすくなります。'
+    },
+    nameQuestion: {
+      title: 'ニックネーム・呼び名（任意）',
+      helpText: 'みんなの回答ボードで表示される名前です。本名でも、普段呼ばれているニックネームでも、空白でも構いません。あなたが安心できる形で参加してください。'
+    }
+  };
+  
+  // カスタム設定をマージ
+  if (customConfig && typeof customConfig === 'object') {
+    for (var key in customConfig) {
+      if (defaultConfig[key]) {
+        Object.assign(defaultConfig[key], customConfig[key]);
+      }
+    }
+  }
+  
+  return defaultConfig;
+}
+
+/**
+ * リンクされたスプレッドシートを作成
+ * @param {string} userEmail - ユーザーメール
+ * @param {GoogleAppsScript.Forms.Form} form - フォーム
+ * @param {string} dateTimeString - 日時文字列
+ * @returns {Object} スプレッドシート情報
+ */
+function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
+  try {
+    // スプレッドシート名を設定
+    var spreadsheetName = userEmail + ' - 回答データ - ' + dateTimeString;
+    
+    // 新しいスプレッドシートを作成
+    var spreadsheetObj = SpreadsheetApp.create(spreadsheetName);
+    var spreadsheetId = spreadsheetObj.getId();
+    
+    // フォームの回答先としてスプレッドシートを設定
+    form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheetId);
+    
+    // スプレッドシート名を再設定（フォーム設定後に名前が変わる場合があるため）
+    spreadsheetObj.rename(spreadsheetName);
+    
+    // シート名を取得（通常は「フォームの回答 1」）
+    var sheets = spreadsheetObj.getSheets();
+    var sheetName = sheets[0].getName();
+    
+    return {
+      spreadsheetId: spreadsheetId,
+      spreadsheetUrl: spreadsheetObj.getUrl(),
+      sheetName: sheetName
+    };
+    
+  } catch (error) {
+    console.error('createLinkedSpreadsheet エラー:', error.message);
+    throw new Error('スプレッドシート作成に失敗しました: ' + error.message);
+  }
+}
 
 /**
  * フォーム作成
@@ -909,7 +1076,7 @@ function createStudyQuestForm(userEmail, userId) {
       userEmail: userEmail,
       userId: userId,
       questions: 'default',
-      formDescription: 'このフォームは「みんなの回答ボード」で表示されます。デジタル・シティズンシップの観点から、オンライン空間での責任ある行動と建設的な対話を育むことを目的としています。回答内容は匿名で表示されます。'
+      formDescription: '🌟 みんなの回答ボードへようこそ！🌟\n\nここは、あなたの大切な考えや意見を安心して表現できる場所です。\n\n📚 このプラットフォームは「デジタル・シティズンシップ」の理念に基づいて設計されています：\n• 多様な意見を尊重し合う\n• 建設的で思いやりのある対話を心がける\n• オンライン空間でも相手への敬意を忘れない\n• 自分の考えを誠実に表現する\n\n🔒 あなたのプライバシーを大切にします：\n• 回答は匿名で表示されます\n• 個人情報は適切に保護されます\n• 安心して本音を共有してください\n\nあなたの声が、みんなの学びを豊かにします。一緒に素晴らしい対話の場を作りましょう！'
     });
     
     // カスタマイズされた設定を追加
@@ -929,14 +1096,20 @@ function createStudyQuestForm(userEmail, userId) {
     var appUrls = generateAppUrls(userId);
     var boardUrl = appUrls.viewUrl || (appUrls.webAppUrl + '?userId=' + userId);
     
-    var confirmationMessage = '🎉 回答ありがとうございます！\n\n' +
-      'あなたの大切な意見が届きました。\n' +
-      'みんなの回答ボードで、お友達の色々な考えも見てみましょう。\n' +
-      '新しい発見があるかもしれませんね！\n\n' +
+    var confirmationMessage = '🎉 素晴らしい！あなたの声が届きました！\n\n' +
+      '✨ あなたの考えを共有してくれて、ありがとうございます。\n' +
+      'あなたの意見は、クラスのみんなにとって大切な学びの材料になります。\n\n' +
+      '🤝 デジタル・シティズンシップを実践しよう：\n' +
+      '• 他の人の意見も尊重しながら読んでみましょう\n' +
+      '• 違う考えに出会ったら、「なるほど！」で反応してみよう\n' +
+      '• 良いと思った意見には「いいね！」で応援しよう\n' +
+      '• もっと知りたいことがあれば「もっと知りたい！」で示そう\n\n' +
+      '🌈 多様な意見こそが、みんなの成長につながります。\n' +
+      'お友達の色々な考えも見てみましょう。きっと新しい発見がありますよ！\n\n' +
       '📋 みんなの回答ボード:\n' + boardUrl;
       
     if (form.getPublishedUrl()) {
-      confirmationMessage += '\n\n✏️ 回答を編集:\n' + form.getPublishedUrl();
+      confirmationMessage += '\n\n✏️ 回答を修正したい場合は、こちらから編集できます:\n' + form.getPublishedUrl();
     }
     
     form.setConfirmationMessage(confirmationMessage);
