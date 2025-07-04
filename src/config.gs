@@ -264,8 +264,8 @@ function saveSheetConfig(sheetName, cfg) {
     // シート固有の設定を保存
     var sheetConfigKey = 'sheet_' + sheetName;
     configJson[sheetConfigKey] = {
-      mainHeader: cfg.mainHeader || '',
-      rHeader: cfg.rHeader || '',
+      mainHeader: cfg.mainHeader || cfg.answerHeader || '',
+      rHeader: cfg.rHeader || cfg.reasonHeader || '',
       nameHeader: cfg.nameHeader || '',
       classHeader: cfg.classHeader || '',
       savedAt: new Date().toISOString()
