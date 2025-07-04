@@ -678,13 +678,6 @@ header {
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
       </svg>
     </p>
-    <p id="sheetNameText" class="text-xs text-gray-400 h-4 truncate flex items-center justify-end gap-1">
-      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-      </svg>
-    </p>
-    <p id="modeLabel" class="text-xs text-gray-400 truncate"></p>
-    <div class="flex justify-end gap-1 flex-wrap">
       <button type="button" id="endPublicationBtn" class="admin-toggle text-xs bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded hidden whitespace-nowrap transition-all flex items-center gap-1" hidden aria-label="公開終了">
         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"></path>
@@ -870,7 +863,8 @@ class StudyQuestApp {
       sliderValue: document.getElementById('sliderValue'),
       headingLabel: document.getElementById('headingLabel'),
       sheetNameText: document.getElementById('sheetNameText'),
-      modeLabel: document.getElementById('modeLabel'),
+      headerAdminMode: document.getElementById('header-admin-mode'),
+      
       endPublicationBtn: document.getElementById('endPublicationBtn'),
       adminToggleBtn: document.getElementById('adminToggleBtn'),
       ownerNameText: document.getElementById('ownerNameText'),
@@ -900,10 +894,7 @@ class StudyQuestApp {
       scoreOption: document.getElementById('scoreOption'),
       footer: document.getElementById('controlsFooter')
     };
-    // サーバーから渡された設定に基づいてモードラベルを設定
-    if (this.elements.modeLabel) {
-      this.elements.modeLabel.textContent = window.showAdminFeatures ? '管理モード' : '閲覧モード';
-    }
+    
     this.state = {
       currentAnswers: [],
       isLoading: false,
@@ -980,7 +971,15 @@ class StudyQuestApp {
           if (this.elements.adminToggleBtn) {
             this.elements.adminToggleBtn.classList.remove('hidden');
             this.elements.adminToggleBtn.removeAttribute('hidden');
-            this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
+          }
+          if (this.elements.headerAdminMode) {
+            if (this.state.showAdminFeatures) {
+              this.elements.headerAdminMode.classList.remove('hidden');
+              this.elements.headerAdminMode.removeAttribute('hidden');
+            } else {
+              this.elements.headerAdminMode.classList.add('hidden');
+              this.elements.headerAdminMode.setAttribute('hidden', '');
+            }
           }
         }
         // Check if modal should be shown
@@ -1219,7 +1218,7 @@ class StudyQuestApp {
       if (this.elements.adminToggleBtn) {
         this.elements.adminToggleBtn.classList.remove('hidden');
         this.elements.adminToggleBtn.removeAttribute('hidden');
-        this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
+        
       }
       return;
     }
@@ -1238,7 +1237,6 @@ class StudyQuestApp {
         if (this.elements.adminToggleBtn) {
           this.elements.adminToggleBtn.classList.remove('hidden');
           this.elements.adminToggleBtn.removeAttribute('hidden');
-          this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
         }
       }
     } catch (e) {
@@ -1258,7 +1256,6 @@ class StudyQuestApp {
     if (this.elements.adminToggleBtn) {
       this.elements.adminToggleBtn.classList.remove('hidden');
       this.elements.adminToggleBtn.removeAttribute('hidden');
-      this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
     }
     
     // 公開終了ボタンは管理モード時のみ表示
@@ -1272,10 +1269,15 @@ class StudyQuestApp {
       }
     }
     
-    if (this.elements.modeLabel) {
-      this.elements.modeLabel.textContent = this.state.showAdminFeatures ? '管理モード' : '閲覧モード';
+    if (this.elements.headerAdminMode) {
+      if (this.state.showAdminFeatures) {
+        this.elements.headerAdminMode.classList.remove('hidden');
+        this.elements.headerAdminMode.removeAttribute('hidden');
+      } else {
+        this.elements.headerAdminMode.classList.add('hidden');
+        this.elements.headerAdminMode.setAttribute('hidden', '');
+      }
     }
-  }
   
   // 新着コンテンツチェック（表示は更新しない）
   async checkForNewContent() {
