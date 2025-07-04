@@ -217,13 +217,12 @@ function isUserRegistered(email, spreadsheetId) {
  * @returns {boolean} セットアップが完了していればtrue
  */
 function isSystemSetup() {
-  const dbSpreadsheetId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
+  var dbSpreadsheetId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
   return !!dbSpreadsheetId;
 }
 
 /**
  * 登録ページを表示する関数
- * @returns {HtmlOutput}
  */
 function showRegistrationPage() {
   return HtmlService.createTemplateFromFile('Registration')
@@ -234,17 +233,16 @@ function showRegistrationPage() {
 
 /**
  * Webアプリケーションのメインエントリーポイント
- * システムの状態とユーザーの登録状況に応じて、適切な画面を返します。
  * @param {Object} e - URLパラメータを含むイベントオブジェクト
  * @returns {HtmlOutput} 表示するHTMLコンテンツ
  */
 function doGet(e) {
   try {
-    // デバッグ用に、どのバージョンのコードが実行されているかログに出力
-    console.log("実行中のコードバージョン: 2025-07-05 08:00 JST");
+    console.log('DEBUG: doGet called with e:', JSON.stringify(e)); // Log 1
 
     // 1. システムの初期セットアップが完了しているか確認
     if (!isSystemSetup()) {
+      console.log('DEBUG: System not set up. Redirecting to SetupPage.');
       return HtmlService.createTemplateFromFile('SetupPage')
         .evaluate()
         .setTitle('初回セットアップ - StudyQuest')
@@ -253,30 +251,52 @@ function doGet(e) {
 
     // 2. ユーザー認証と情報取得
     const currentUserEmail = Session.getActiveUser().getEmail();
+    console.log('DEBUG: Current user email:', currentUserEmail); // Log 2
     if (!currentUserEmail) {
+      console.log('DEBUG: No current user email. Redirecting to RegistrationPage.');
       return showRegistrationPage();
     }
     
     // 3. ユーザーがデータベースに登録済みか確認
     const userInfo = findUserByEmail(currentUserEmail);
+    console.log('DEBUG: User info:', JSON.stringify(userInfo)); // Log 3
 
     if (userInfo) {
       // 4. 【登録済みユーザーの処理】
-      const adminPanel = HtmlService.createTemplateFromFile('AdminPanel');
-      adminPanel.userId = userInfo.userId;
-      return adminPanel.evaluate().setTitle('管理者パネル - StudyQuest');
+      //    管理パネルに必要な情報を付加して表示
+      var template = HtmlService.createTemplateFromFile('AdminPanel');
+      template.userInfo = userInfo;
+      template.userId = userInfo.userId;
+      template.mode = 'admin'; // This is where 'mode' is set.
+      template.displayMode = 'named';
+      template.showAdminFeatures = true;
+      console.log('DEBUG: AdminPanel template properties:', { // Log 4
+        userInfo: template.userInfo,
+        userId: template.userId,
+        mode: template.mode,
+        displayMode: template.displayMode,
+        showAdminFeatures: template.showAdminFeatures
+      });
+      return template.evaluate()
+        .setTitle('管理パネル - みんなの回答ボード')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
 
     } else {
       // 5. 【未登録ユーザーの処理】
+      //    登録ページを表示
+      console.log('DEBUG: User not registered. Redirecting to RegistrationPage.');
       return showRegistrationPage();
     }
 
   } catch (error) {
     // 6. 予期せぬエラーが発生した場合のフォールバック
     console.error('doGetで致命的なエラー:', error.stack);
+    // Assuming 'ErrorPage' exists or creating a simple error output
     return HtmlService.createHtmlOutput(
-      '<h1>エラー</h1><p>予期せぬエラーが発生しました。管理者にお問い合わせください。</p>'
-    ).setTitle('エラー').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+      '<h1>エラー</h1>' +
+      '<p>予期せぬエラーが発生しました。管理者にお問い合わせください。</p>' +
+      '<p>エラー詳細: ' + htmlEncode(error.message) + '</p>'
+    ).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
   }
 }
 
