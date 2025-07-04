@@ -196,9 +196,18 @@ function performSimpleCleanup() {
  */
 function doGet(e) {
   try {
-    var userId = (e && e.parameter && e.parameter.userId) ? e.parameter.userId : '';
-    var mode = (e && e.parameter && e.parameter.mode) ? e.parameter.mode : '';
-    var setup = (e && e.parameter && e.parameter.setup) ? e.parameter.setup : '';
+    // Ensure e and e.parameter exist and are objects
+    e = e || {};
+    e.parameter = e.parameter || {};
+
+    // Explicitly ensure e.parameter.mode is not null or undefined
+    if (e.parameter.mode === undefined || e.parameter.mode === null) {
+      e.parameter.mode = '';
+    }
+
+    var userId = e.parameter.userId || '';
+    var requestMode = e.parameter.mode || '';
+    var setup = e.parameter.setup || '';
     
     // セットアップページの表示
     if (setup === 'true') {
@@ -230,16 +239,22 @@ function doGet(e) {
     // ユーザー情報をプロパティに保存（リアクション機能で使用）
     PropertiesService.getUserProperties().setProperty('CURRENT_USER_ID', userId);
 
-    if (mode && mode === 'admin') {
+    if (requestMode && requestMode === 'admin') {
       var template = HtmlService.createTemplateFromFile('AdminPanel');
       template.userInfo = userInfo;
       template.userId = userId;
+      template.mode = requestMode; // Explicitly pass mode to template
+      template.displayMode = 'named'; // Explicitly set for admin
+      template.showAdminFeatures = true; // Explicitly set for admin
       return template.evaluate().setTitle('管理パネル - みんなの回答ボード')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
     } else {
       var template = HtmlService.createTemplateFromFile('Page');
       template.userInfo = userInfo;
       template.userId = userId;
+      template.mode = requestMode; // Explicitly pass mode to template
+      template.displayMode = 'anonymous'; // Explicitly set for non-admin
+      template.showAdminFeatures = false; // Explicitly set for non-admin
       return template.evaluate().setTitle('みんなの回答ボード')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
     }
