@@ -196,9 +196,9 @@ function performSimpleCleanup() {
  */
 function doGet(e) {
   try {
-    var userId = e.parameter.userId;
-    var mode = e.parameter.mode;
-    var setup = e.parameter.setup;
+    var userId = (e && e.parameter && e.parameter.userId) ? e.parameter.userId : '';
+    var mode = (e && e.parameter && e.parameter.mode) ? e.parameter.mode : '';
+    var setup = (e && e.parameter && e.parameter.setup) ? e.parameter.setup : '';
     
     // セットアップページの表示
     if (setup === 'true') {
