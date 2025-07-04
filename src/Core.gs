@@ -182,6 +182,7 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
     }
     
     // Page.html期待形式に変換
+    console.log('Sheet Headers:', sheetData.headers);
     var formattedData = sheetData.data.map(function(row, index) {
       return {
         rowIndex: row.rowNumber || (index + 2), // 実際の行番号
