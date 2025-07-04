@@ -1248,7 +1248,7 @@
           msgEl.classList.add('fade-out'); // Assuming a fade-out animation class exists
           msgEl.addEventListener('transitionend', () => msgEl.remove());
         }
-      }, 5000);
+      }, 3000); // Reduced timeout to 3 seconds
     }
 
     function addVisualFeedback(element, type) {
@@ -2354,6 +2354,7 @@
           if (elements.addSpreadsheetText) {
             elements.addSpreadsheetText.textContent = 'スプレッドシートを追加';
           }
+          setLoading(false);
         })
         .addSpreadsheetUrl(url);
     }
@@ -2413,6 +2414,7 @@
           showError(error);
           if (btn) btn.disabled = false;
           if (elements.createBoardText) elements.createBoardText.textContent = '新しいボードを作成して公開';
+          setLoading(false); // Add this line
         })
         .createBoardFromAdmin();
     }
@@ -2450,13 +2452,15 @@
               .withSuccessHandler(() => {
                 showMessage('列情報を自動判定し、設定を保存しました。', 'success');
                 updateConfigButtons();
+                setLoading(false); // Added here
               })
               .withFailureHandler((error) => {
                 console.warn('自動設定の保存に失敗:', error);
                 showMessage('列情報を自動判定しましたが、設定の保存に失敗しました。手動で保存してください。', 'warning');
                 updateConfigButtons();
+                setLoading(false); // Added here
               })
-                      .saveSheetConfig(currentStatus.userInfo.spreadsheetId, selectedSheet, config);
+                      .saveSheetConfig(selectedSheet, autoConfig);
           }
           
           // 既存設定がある場合はそれをロードしてマージ
@@ -2467,10 +2471,12 @@
                 showMessage('既存の設定をロードしました。', 'info');
               }
               updateConfigButtons();
+              setLoading(false); // Added here
             })
             .withFailureHandler((error) => {
               // 既存設定がない場合はエラーではないので無視
               updateConfigButtons();
+              setLoading(false); // Added here
             })
             .getConfig(selectedSheet);
         })
@@ -2479,6 +2485,7 @@
           clearConfigFields();
           hideSheetDetails();
           showMessage('シートヘッダー情報の取得に失敗しました。', 'red');
+          setLoading(false); // Added here
         })
         .getSheetHeaders(currentStatus.userInfo.spreadsheetId, selectedSheet)
     }
@@ -2700,6 +2707,15 @@
           
           updateSetupProgress();
           setLoading(false);
+
+          // Call switchToSheet after saving config
+          google.script.run
+            .withSuccessHandler((switchMsg) => {
+              showMessage(switchMsg, 'green');
+              loadStatus(); // Reload status to reflect published state
+            })
+            .withFailureHandler(showError)
+            .switchToSheet(selectedSheet); // Pass only selectedSheet
         })
         .withFailureHandler((error) => {
           showError(error);
@@ -2721,8 +2737,12 @@
         .withSuccessHandler((msg) => {
           showMessage(msg, 'green');
           loadStatus();
+          setLoading(false);
         })
-        .withFailureHandler(showError)
+        .withFailureHandler((error) => {
+          showError(error);
+          setLoading(false);
+        })
         .switchToSheet(currentStatus.userInfo.spreadsheetId, selectedSheet);
     }
 
@@ -2732,8 +2752,12 @@
         .withSuccessHandler((msg) => {
           showMessage(msg, 'green');
           loadStatus();
+          setLoading(false);
         })
-        .withFailureHandler(showError)
+        .withFailureHandler((error) => {
+          showError(error);
+          setLoading(false);
+        })
         .clearActiveSheet();
     }
 
@@ -2744,7 +2768,10 @@
           showMessage(msg, 'green');
           setLoading(false);
         })
-        .withFailureHandler(showError)
+        .withFailureHandler((error) => {
+          showError(error);
+          setLoading(false);
+        })
         .setDisplayOptions({ showNames, showCounts });
     }
 
@@ -2771,11 +2798,13 @@
     // 重複したsetLoading関数は削除されました - 安全なバージョンのみ使用
     
     function showLoadingOverlay(message = "読み込み中...") {
-      hideLoadingOverlay();
-      
-      const overlay = document.createElement('div');
-      overlay.id = 'loading-overlay';
-      overlay.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50';
+      let overlay = document.getElementById('loading-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'loading-overlay';
+        overlay.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50';
+        document.body.appendChild(overlay);
+      }
       overlay.innerHTML = `
         <div class="glass-panel p-8 rounded-xl text-center">
           <div class="spinner mx-auto mb-4"></div>
@@ -2783,8 +2812,7 @@
           <p class="text-sm text-gray-400 mt-2">しばらくお待ちください...</p>
         </div>
       `;
-      
-      document.body.appendChild(overlay);
+      overlay.style.display = 'flex'; // Ensure it's visible
     }
     
     function enableUnderstandButton() {
