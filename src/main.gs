@@ -237,40 +237,18 @@ function showRegistrationPage() {
  * @returns {HtmlOutput} 表示するHTMLコンテンツ
  */
 function doGet(e) {
-  // ① パラメータe全体をログに出力
+  // ① パラメータe全体をログに出力して、どのようなリクエストか確認する
   console.log(`doGet called with event object: ${JSON.stringify(e)}`);
 
   try {
-    // ② 'mode' と 'userId' パラメータを安全に取得し、デフォルト値を設定
-    const mode = e.parameter && e.parameter.mode ? e.parameter.mode : 'view'; 
-    const userId = e.parameter && e.parameter.userId ? e.parameter.userId : null;
-    const setupParam = e.parameter && e.parameter.setup ? e.parameter.setup : null;
+    // ② 'mode' パラメータの存在を確認し、なければデフォルト値を設定
+    // e.parameter が null または undefined の場合を考慮
+    const mode = (e && e.parameter && e.parameter.mode) ? e.parameter.mode : 'view'; // デフォルトは 'view' モード
+    const userId = (e && e.parameter && e.parameter.userId) ? e.parameter.userId : null;
+    const setupParam = (e && e.parameter && e.parameter.setup) ? e.parameter.setup : null;
 
     console.log(`Request parameters validated. Mode: ${mode}, UserID: ${userId}, SetupParam: ${setupParam}`);
 
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-    // 修正ポイント：以降の全ての処理で、'e.parameter.mode' の代わりに
-    // 上で定義した 'mode' 変数を使用します。
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-
-    // セットアップモードの処理
-    if (setupParam === 'true') {
-      console.log('Redirecting to SetupPage.');
-      return HtmlService.createTemplateFromFile('SetupPage').evaluate().setTitle('StudyQuest - 初回セットアップ');
-    }
-
-    // システムセットアップの確認
-    if (!isSystemSetup()) {
-      console.log('System not set up. Redirecting to SetupPage.');
-      return HtmlService.createTemplateFromFile('SetupPage').evaluate().setTitle('StudyQuest - 初回セットアップ');
-    }
-    
-    // ユーザーIDがない場合は登録ページへ
-    if (!userId) {
-      console.log('No userId provided. Redirecting to RegistrationPage.');
-      return HtmlService.createTemplateFromFile('Registration').evaluate().setTitle('StudyQuest - 新規登録');
-    }
-    
     // どこからのアクセスかを知るためのログを追加
     const userEmail = Session.getActiveUser().getEmail();
     console.log(`Access by user: ${userEmail}`);
@@ -280,6 +258,31 @@ function doGet(e) {
 
     if (e && e.headers && e.headers.referer) {
       console.log(`Referer: ${e.headers.referer}`);
+    }
+
+    // 1. システムの初期セットアップが完了しているか確認
+    if (!isSystemSetup()) {
+      console.log('DEBUG: System not set up. Redirecting to SetupPage.');
+      return HtmlService.createTemplateFromFile('SetupPage')
+        .evaluate()
+        .setTitle('初回セットアップ - StudyQuest')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    }
+
+    // セットアップページの明示的な表示要求
+    if (setupParam === 'true') {
+      console.log('DEBUG: Explicit setup request. Redirecting to SetupPage.');
+      return HtmlService.createTemplateFromFile('SetupPage')
+        .evaluate()
+        .setTitle('StudyQuest - サービスアカウント セットアップ')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    }
+
+    // 2. ユーザー認証と情報取得
+    // currentUserEmail is already defined above as userEmail
+    if (!userEmail) {
+      console.log('DEBUG: No current user email. Redirecting to RegistrationPage.');
+      return showRegistrationPage();
     }
 
     // 3. ユーザーがデータベースに登録済みか確認
@@ -315,10 +318,11 @@ function doGet(e) {
 
   } catch (error) {
     console.error(`doGetで致命的なエラー: ${error.stack}`);
-    // ユーザーフレンドリーなエラーページを返す
-    const template = HtmlService.createTemplateFromFile('Error'); // エラーページ用のテンプレートを別途用意推奨
-    template.errorMessage = error.message;
-    return template.evaluate().setTitle('エラー');
+    return HtmlService.createHtmlOutput(
+      '<h1>エラー</h1>' +
+      '<p>予期せぬエラーが発生しました。管理者にお問い合わせください。</p>' +
+      '<p>エラー詳細: ' + htmlEncode(error.message) + '</p>'
+    ).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
   }
 }
 
