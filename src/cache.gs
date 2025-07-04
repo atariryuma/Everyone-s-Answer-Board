@@ -173,15 +173,36 @@ function getHeadersCached(spreadsheetId, sheetName) {
   const key = `hdr_${spreadsheetId}_${sheetName}`;
   return cacheManager.get(key, () => {
     try {
-      var service = getSheetsService();
-      var range = sheetName + '!1:1';
-      var response = service.spreadsheets.values.get(spreadsheetId, range);
+      console.log(`[getHeadersCached] Starting for spreadsheetId: ${spreadsheetId}, sheetName: ${sheetName}`);
       
-      if (!response.values || !response.values[0]) {
-        throw new Error('ヘッダー行が見つかりません');
+      var service = getSheetsService();
+      if (!service) {
+        throw new Error('Sheets service is not available');
+      }
+      
+      var range = sheetName + '!1:1';
+      console.log(`[getHeadersCached] Fetching range: ${range}`);
+      
+      var response = service.spreadsheets.values.get(spreadsheetId, range);
+      console.log(`[getHeadersCached] API response:`, JSON.stringify(response, null, 2));
+      
+      if (!response) {
+        throw new Error('API response is null or undefined');
+      }
+      
+      if (!response.values) {
+        console.warn(`[getHeadersCached] No values in response for ${range}`);
+        return {};
+      }
+      
+      if (!response.values[0] || response.values[0].length === 0) {
+        console.warn(`[getHeadersCached] Empty header row for ${range}`);
+        return {};
       }
       
       var headers = response.values[0];
+      console.log(`[getHeadersCached] Headers found:`, headers);
+      
       var indices = {};
       
       // COLUMN_HEADERSの各キーに対してインデックスを生成
@@ -190,12 +211,17 @@ function getHeadersCached(spreadsheetId, sheetName) {
         var index = headers.indexOf(headerName);
         if (index !== -1) {
           indices[headerName] = index;
+          console.log(`[getHeadersCached] Mapped ${headerName} -> ${index}`);
+        } else {
+          console.log(`[getHeadersCached] Header not found: ${headerName}`);
         }
       });
       
+      console.log(`[getHeadersCached] Final indices:`, indices);
       return indices;
     } catch (error) {
-      console.error('getHeadersCached error:', error);
+      console.error('getHeadersCached error:', error.toString());
+      console.error('Error stack:', error.stack);
       return {};
     }
   });
