@@ -155,11 +155,11 @@ function addReaction(rowIndex, reactionKey, sheetName) {
  * 公開されたシートのデータを取得
  * Page.htmlから呼び出される - フロントエンド期待形式に対応
  */
-function getPublishedSheetData(sheetName, classFilter, sortOrder) {
+function getPublishedSheetData(classFilter, sortOrder) {
   try {
     var props = PropertiesService.getUserProperties();
     var currentUserId = props.getProperty('CURRENT_USER_ID');
-    debugLog('getPublishedSheetData: userId=%s, sheetName=%s, classFilter=%s, sortOrder=%s', currentUserId, sheetName, classFilter, sortOrder);
+    debugLog('getPublishedSheetData: userId=%s, classFilter=%s, sortOrder=%s', currentUserId, classFilter, sortOrder);
     
     if (!currentUserId) {
       throw new Error('ユーザーコンテキストが設定されていません');
@@ -174,15 +174,21 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
     var configJson = JSON.parse(userInfo.configJson || '{}');
     debugLog('getPublishedSheetData: configJson=%s', JSON.stringify(configJson));
 
-    // シート名の決定（パラメータまたは設定から）
-    var targetSheet = sheetName || configJson.publishedSheet || 'フォームの回答 1';
-    debugLog('getPublishedSheetData: targetSheet=%s', targetSheet);
+    // 公開対象のスプレッドシートIDとシート名を取得
+    var publishedSpreadsheetId = configJson.publishedSpreadsheetId;
+    var publishedSheetName = configJson.publishedSheetName;
 
-    var sheetConfig = configJson['sheet_' + targetSheet] || {}; // シート固有の設定を取得
+    if (!publishedSpreadsheetId || !publishedSheetName) {
+      throw new Error('公開対象のスプレッドシートまたはシートが設定されていません。');
+    }
+
+    // シート固有の設定を取得
+    var sheetKey = 'sheet_' + publishedSpreadsheetId + '_' + publishedSheetName;
+    var sheetConfig = configJson[sheetKey] || {};
     debugLog('getPublishedSheetData: sheetConfig=%s', JSON.stringify(sheetConfig));
     
     // データ取得
-    var sheetData = getSheetData(currentUserId, targetSheet, classFilter, sortOrder);
+    var sheetData = getSheetData(currentUserId, publishedSheetName, classFilter, sortOrder);
     debugLog('getPublishedSheetData: sheetData status=%s, totalCount=%s', sheetData.status, sheetData.totalCount);
 
     if (sheetData.status === 'error') {
@@ -194,24 +200,26 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
     var mainHeaderName = sheetConfig.mainHeader !== undefined ? sheetConfig.mainHeader : (sheetConfig.opinionHeader || COLUMN_HEADERS.OPINION);
     var reasonHeaderName = sheetConfig.rHeader !== undefined ? sheetConfig.rHeader : (sheetConfig.reasonHeader || COLUMN_HEADERS.REASON);
     var classHeaderName = sheetConfig.classHeader !== undefined ? sheetConfig.classHeader : COLUMN_HEADERS.CLASS;
-    debugLog('getPublishedSheetData: Mapped Headers - mainHeaderName=%s, reasonHeaderName=%s, classHeaderName=%s', mainHeaderName, reasonHeaderName, classHeaderName);
+    var nameHeaderName = sheetConfig.nameHeader !== undefined ? sheetConfig.nameHeader : COLUMN_HEADERS.NAME; // Add nameHeaderName
+    debugLog('getPublishedSheetData: Mapped Headers - mainHeaderName=%s, reasonHeaderName=%s, classHeaderName=%s, nameHeaderName=%s', mainHeaderName, reasonHeaderName, classHeaderName, nameHeaderName);
 
     // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
-    var headerIndices = getHeaderIndices(userInfo.spreadsheetId, targetSheet);
+    var headerIndices = getHeaderIndices(publishedSpreadsheetId, publishedSheetName);
     debugLog('getPublishedSheetData: headerIndices=%s', JSON.stringify(headerIndices));
 
     var formattedData = sheetData.data.map(function(row, index) {
       // ヘッダーインデックスマップを使用して正確なデータを取得
-      var classIndex = headerIndices[COLUMN_HEADERS.CLASS];
-      var opinionIndex = headerIndices[mainHeaderName] !== undefined ? headerIndices[mainHeaderName] : headerIndices[COLUMN_HEADERS.OPINION];
-      var reasonIndex = headerIndices[reasonHeaderName] !== undefined ? headerIndices[reasonHeaderName] : headerIndices[COLUMN_HEADERS.REASON];
-      
-      debugLog('getPublishedSheetData: Row %s - classIndex=%s, opinionIndex=%s, reasonIndex=%s', index, classIndex, opinionIndex, reasonIndex);
+      var classIndex = headerIndices[classHeaderName];
+      var opinionIndex = headerIndices[mainHeaderName];
+      var reasonIndex = headerIndices[reasonHeaderName];
+      var nameIndex = headerIndices[nameHeaderName]; // Get nameIndex
+
+      debugLog('getPublishedSheetData: Row %s - classIndex=%s, opinionIndex=%s, reasonIndex=%s, nameIndex=%s', index, classIndex, opinionIndex, reasonIndex, nameIndex);
       debugLog('getPublishedSheetData: Row data length=%s, data=%s', row.originalData ? row.originalData.length : 'undefined', JSON.stringify(row.originalData));
       
       return {
         rowIndex: row.rowNumber || (index + 2), // 実際の行番号
-        name: (sheetData.displayMode === 'named' && row.displayName) ? row.displayName : '',
+        name: (sheetData.displayMode === DISPLAY_MODES.NAMED && nameIndex !== undefined && row.originalData && row.originalData[nameIndex]) ? row.originalData[nameIndex] : '',
         class: (classIndex !== undefined && row.originalData && row.originalData[classIndex]) ? row.originalData[classIndex] : '',
         opinion: (opinionIndex !== undefined && row.originalData && row.originalData[opinionIndex]) ? row.originalData[opinionIndex] : '',
         reason: (reasonIndex !== undefined && row.originalData && row.originalData[reasonIndex]) ? row.originalData[reasonIndex] : '',
@@ -238,9 +246,9 @@ function getPublishedSheetData(sheetName, classFilter, sortOrder) {
 
     var result = {
       header: headerTitle,
-      sheetName: targetSheet,
+      sheetName: publishedSheetName, // targetSheetからpublishedSheetNameに変更
       showCounts: configJson.showCounts !== false,
-      displayMode: sheetData.displayMode || 'anonymous',
+      displayMode: sheetData.displayMode || DISPLAY_MODES.ANONYMOUS,
       data: formattedData,
       rows: formattedData // 後方互換性のため
     };
@@ -314,7 +322,7 @@ function getAppConfig() {
     var answerCount = 0;
     var totalReactions = 0;
     try {
-      if (userInfo.spreadsheetId && configJson.publishedSheetName) {
+      if (configJson.publishedSpreadsheetId && configJson.publishedSheetName) {
         var responseData = getResponsesData(currentUserId, configJson.publishedSheetName);
         if (responseData.status === 'success') {
           answerCount = responseData.data.length;
@@ -431,7 +439,7 @@ function switchToSheet(spreadsheetId, sheetName) {
     var configJson = JSON.parse(userInfo.configJson || '{}');
 
     configJson.publishedSpreadsheetId = spreadsheetId;
-    configJson.publishedSheet = sheetName;
+    configJson.publishedSheetName = sheetName;
     configJson.appPublished = true; // シートを切り替えたら公開状態にする
 
     updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
@@ -888,6 +896,7 @@ function updateUserInDb(userId, updateData) {
 }
 
 function getHeaderIndices(spreadsheetId, sheetName) {
+  debugLog('getHeaderIndices received in core.gs: spreadsheetId=%s, sheetName=%s', spreadsheetId, sheetName);
   return getHeadersCached(spreadsheetId, sheetName);
 }
 

@@ -2426,6 +2426,7 @@
         return;
       }
       
+      console.log('DEBUG: Calling getSheetHeaders from AdminPanel.html. spreadsheetId:', currentStatus.userInfo.spreadsheetId, 'sheetName:', selectedSheet);
       google.script.run
         .withSuccessHandler((headers) => {
           populateHeaderOptions(headers);
