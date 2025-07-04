@@ -237,8 +237,28 @@ function showRegistrationPage() {
  * @returns {HtmlOutput} 表示するHTMLコンテンツ
  */
 function doGet(e) {
+  // ① パラメータe全体をログに出力して、どのようなリクエストか確認する
+  console.log(`doGet called with event object: ${JSON.stringify(e)}`);
+
   try {
-    console.log('DEBUG: doGet called with e:', JSON.stringify(e)); // Log 1
+    // ② 'mode' パラメータの存在を確認し、なければデフォルト値を設定
+    // e.parameter が null または undefined の場合を考慮
+    const mode = (e && e.parameter && e.parameter.mode) ? e.parameter.mode : 'view'; // デフォルトは 'view' モード
+    const userId = (e && e.parameter && e.parameter.userId) ? e.parameter.userId : null;
+    const setupParam = (e && e.parameter && e.parameter.setup) ? e.parameter.setup : null;
+
+    console.log(`Request parameters validated. Mode: ${mode}, UserID: ${userId}, SetupParam: ${setupParam}`);
+
+    // どこからのアクセスかを知るためのログを追加
+    const userEmail = Session.getActiveUser().getEmail();
+    console.log(`Access by user: ${userEmail}`);
+
+    const webAppUrl = ScriptApp.getService().getUrl();
+    console.log(`Current Web App URL: ${webAppUrl}`);
+
+    if (e && e.headers && e.headers.referer) {
+      console.log(`Referer: ${e.headers.referer}`);
+    }
 
     // 1. システムの初期セットアップが完了しているか確認
     if (!isSystemSetup()) {
@@ -249,17 +269,25 @@ function doGet(e) {
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
     }
 
+    // セットアップページの明示的な表示要求 (existing logic)
+    if (setupParam === 'true') {
+      console.log('DEBUG: Explicit setup request. Redirecting to SetupPage.');
+      return HtmlService.createTemplateFromFile('SetupPage')
+        .evaluate()
+        .setTitle('StudyQuest - サービスアカウント セットアップ')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    }
+
     // 2. ユーザー認証と情報取得
-    const currentUserEmail = Session.getActiveUser().getEmail();
-    console.log('DEBUG: Current user email:', currentUserEmail); // Log 2
-    if (!currentUserEmail) {
+    // currentUserEmail is already defined above as userEmail
+    if (!userEmail) {
       console.log('DEBUG: No current user email. Redirecting to RegistrationPage.');
       return showRegistrationPage();
     }
-    
+
     // 3. ユーザーがデータベースに登録済みか確認
-    const userInfo = findUserByEmail(currentUserEmail);
-    console.log('DEBUG: User info:', JSON.stringify(userInfo)); // Log 3
+    const userInfo = findUserByEmail(userEmail);
+    console.log('DEBUG: User info:', JSON.stringify(userInfo));
 
     if (userInfo) {
       // 4. 【登録済みユーザーの処理】
@@ -267,10 +295,10 @@ function doGet(e) {
       var template = HtmlService.createTemplateFromFile('AdminPanel');
       template.userInfo = userInfo;
       template.userId = userInfo.userId;
-      template.mode = 'admin'; // This is where 'mode' is set.
+      template.mode = mode; // Use the 'mode' variable defined at the top
       template.displayMode = 'named';
       template.showAdminFeatures = true;
-      console.log('DEBUG: AdminPanel template properties:', { // Log 4
+      console.log('DEBUG: AdminPanel template properties:', {
         userInfo: template.userInfo,
         userId: template.userId,
         mode: template.mode,
@@ -289,9 +317,7 @@ function doGet(e) {
     }
 
   } catch (error) {
-    // 6. 予期せぬエラーが発生した場合のフォールバック
-    console.error('doGetで致命的なエラー:', error.stack);
-    // Assuming 'ErrorPage' exists or creating a simple error output
+    console.error(`doGetで致命的なエラー: ${error.stack}`);
     return HtmlService.createHtmlOutput(
       '<h1>エラー</h1>' +
       '<p>予期せぬエラーが発生しました。管理者にお問い合わせください。</p>' +
