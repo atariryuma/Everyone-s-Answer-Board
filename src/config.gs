@@ -247,6 +247,7 @@ function saveSheetConfig(sheetName, cfg) {
   try {
     var props = PropertiesService.getUserProperties();
     var currentUserId = props.getProperty('CURRENT_USER_ID');
+    console.log('saveSheetConfig: userId=%s, sheetName=%s, config=%s', currentUserId, sheetName, JSON.stringify(cfg));
     
     if (!currentUserId) {
       throw new Error('ユーザーコンテキストが設定されていません。');
