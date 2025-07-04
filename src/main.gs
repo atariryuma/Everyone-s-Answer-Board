@@ -262,22 +262,6 @@ function doGet(e) {
     // 【チェック3】登録済みユーザーには適切な画面を表示
     console.log(`登録済みユーザー(${userEmail})です。`);
     
-    // アカウント切り替え後のリダイレクト処理
-    // パラメータにuserIdがない場合は、管理パネルにリダイレクト
-    if (!userId) {
-      var userInfo = findUserByEmail(userEmail);
-      if (userInfo) {
-        console.log('登録済みユーザーを管理パネルにリダイレクトします。');
-        var currentUrl = ScriptApp.getService().getUrl();
-        return HtmlService.createHtmlOutput(`
-          <script>
-            window.location.href = '${currentUrl}?userId=${encodeURIComponent(userInfo.userId)}&mode=admin';
-          </script>
-          <p>管理パネルにリダイレクト中...</p>
-        `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
-      }
-    }
-    
     // ユーザー情報を取得（userIdが指定されている場合はそれを使用、なければemailから検索）
     var userInfo;
     if (userId) {
@@ -290,6 +274,15 @@ function doGet(e) {
       userInfo = findUserByEmail(userEmail);
       if (userInfo) {
         userId = userInfo.userId;
+        // userIdがない場合は管理パネルにリダイレクト
+        console.log('登録済みユーザーを管理パネルにリダイレクトします。');
+        var currentUrl = ScriptApp.getService().getUrl();
+        return HtmlService.createHtmlOutput(`
+          <script>
+            window.location.href = '${currentUrl}?userId=${encodeURIComponent(userInfo.userId)}&mode=admin';
+          </script>
+          <p>管理パネルにリダイレクト中...</p>
+        `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
       }
     }
 
