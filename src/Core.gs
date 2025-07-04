@@ -295,7 +295,7 @@ function getAppConfig() {
       configJson.setupStatus = 'completed';
       needsUpdate = true;
     }
-    if (configJson.publishedSheet && !configJson.appPublished) {
+    if (configJson.publishedSheetName && !configJson.appPublished) {
       configJson.appPublished = true;
       needsUpdate = true;
     }
@@ -314,8 +314,8 @@ function getAppConfig() {
     var answerCount = 0;
     var totalReactions = 0;
     try {
-      if (userInfo.spreadsheetId && configJson.publishedSheet) {
-        var responseData = getResponsesData(currentUserId, configJson.publishedSheet);
+      if (userInfo.spreadsheetId && configJson.publishedSheetName) {
+        var responseData = getResponsesData(currentUserId, configJson.publishedSheetName);
         if (responseData.status === 'success') {
           answerCount = responseData.data.length;
           // リアクション数の概算計算（詳細実装は後回し）
@@ -330,7 +330,8 @@ function getAppConfig() {
       status: 'success',
       userId: currentUserId,
       adminEmail: userInfo.adminEmail,
-      publishedSheet: configJson.publishedSheet || '',
+      publishedSpreadsheetId: configJson.publishedSpreadsheetId || '',
+      publishedSheetName: configJson.publishedSheetName || '',
       displayMode: configJson.displayMode || DISPLAY_MODES.ANONYMOUS,
       isPublished: configJson.appPublished || false,
       availableSheets: sheets,
@@ -341,7 +342,7 @@ function getAppConfig() {
       webAppUrl: appUrls.webAppUrl,
       adminUrl: appUrls.adminUrl,
       viewUrl: appUrls.viewUrl,
-      activeSheetName: configJson.publishedSheet || '',
+      activeSheetName: configJson.publishedSheetName || '',
       appUrls: appUrls,
       // データベース詳細情報
       userInfo: {
@@ -370,6 +371,75 @@ function getAppConfig() {
       status: 'error',
       message: '設定の取得に失敗しました: ' + e.message
     };
+  }
+}
+
+/**
+ * シート設定を保存する
+ * AdminPanel.htmlから呼び出される
+ * @param {string} spreadsheetId - 設定対象のスプレッドシートID
+ * @param {string} sheetName - 設定対象のシート名
+ * @param {object} config - 保存するシート固有の設定
+ */
+function saveSheetConfig(spreadsheetId, sheetName, config) {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+
+    var userInfo = findUserById(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+
+    // 新しいキー形式でシート設定を保存
+    var sheetKey = 'sheet_' + spreadsheetId + '_' + sheetName;
+    configJson[sheetKey] = config;
+
+    updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
+    debugLog('✅ シート設定を保存しました: %s', sheetKey);
+    return { status: 'success', message: 'シート設定を保存しました。' };
+  } catch (e) {
+    console.error('シート設定保存エラー: ' + e.message);
+    return { status: 'error', message: 'シート設定の保存に失敗しました: ' + e.message };
+  }
+}
+
+/**
+ * 表示するシートを切り替える
+ * AdminPanel.htmlから呼び出される
+ * @param {string} spreadsheetId - 公開対象のスプレッドシートID
+ * @param {string} sheetName - 公開対象のシート名
+ */
+function switchToSheet(spreadsheetId, sheetName) {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+
+    var userInfo = findUserById(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+
+    configJson.publishedSpreadsheetId = spreadsheetId;
+    configJson.publishedSheet = sheetName;
+    configJson.appPublished = true; // シートを切り替えたら公開状態にする
+
+    updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
+    debugLog('✅ 表示シートを切り替えました: %s - %s', spreadsheetId, sheetName);
+    return { status: 'success', message: '表示シートを切り替えました。' };
+  } catch (e) {
+    console.error('シート切り替えエラー: ' + e.message);
+    return { status: 'error', message: '表示シートの切り替えに失敗しました: ' + e.message };
   }
 }
 
@@ -482,7 +552,7 @@ function getActiveFormInfo(userId) {
     // フォーム回答数を取得
     var answerCount = 0;
     try {
-      if (userInfo.spreadsheetId && configJson.publishedSheet) {
+      if (configJson.publishedSpreadsheetId && configJson.publishedSheet) {
         var responseData = getResponsesData(currentUserId, configJson.publishedSheet);
         if (responseData.status === 'success') {
           answerCount = responseData.data.length;
@@ -670,7 +740,8 @@ function quickStartSetup(userId) {
       formCreated: true,
       formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl,
       editFormUrl: formAndSsInfo.editFormUrl,
-      publishedSheet: formAndSsInfo.sheetName || 'フォームの回答 1',
+      publishedSpreadsheetId: formAndSsInfo.spreadsheetId,
+      publishedSheetName: formAndSsInfo.sheetName || 'フォームの回答 1',
       appPublished: true,
       folderId: folder ? folder.getId() : '',
       folderUrl: folder ? folder.getUrl() : '',

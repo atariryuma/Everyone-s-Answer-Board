@@ -50,6 +50,7 @@ const __DISPLAY_MODE__ = '<?= typeof displayMode !== "undefined" ? displayMode :
 const __SHEET_NAME__ = '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>';
 const __MAPPING__ = '<?= typeof mapping !== "undefined" ? JSON.stringify(mapping) : "{}" ?>';
 const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
+const __SPREADSHEET_ID__ = '<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>';
 const __OWNER_NAME__ = '<?= typeof ownerName !== "undefined" ? ownerName : "" ?>';
 const __SHOW_ADMIN_FEATURES__ = '<?= typeof showAdminFeatures !== "undefined" ? showAdminFeatures : false ?>';
 const __SHOW_HIGHLIGHT_TOGGLE__ = '<?= typeof showHighlightToggle !== "undefined" ? showHighlightToggle : false ?>';
@@ -933,7 +934,7 @@ class StudyQuestApp {
       { key: 'CURIOUS', icon: 'magnifying-glass-plus' }
     ];
     this.gas = {
-      getPublishedSheetData: (sheetName, classFilter, sort) => this.runGas('getPublishedSheetData', sheetName, classFilter, sort),
+      getPublishedSheetData: (spreadsheetId, sheetName, classFilter, sort) => this.runGas('getPublishedSheetData', spreadsheetId, sheetName, classFilter, sort),
       getAvailableSheets: () => this.runGas('getAvailableSheets'),
       addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', rowIndex, reaction, sheetName),
       toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', rowIndex, sheetName),
@@ -1283,7 +1284,7 @@ class StudyQuestApp {
   checkForNewContent() {
     const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
     const sortOrder = this.elements.sortOrder.value;
-    this.gas.getPublishedSheetData(null, selectedClass, sortOrder)
+    this.gas.getPublishedSheetData(__SPREADSHEET_ID__, selectedClass, sortOrder)
       .then(data => {
         // 成功した場合は失敗カウントをリセット
         this.state.pollingFailureCount = 0;
@@ -1577,7 +1578,7 @@ class StudyQuestApp {
     }
     try {
       const sortOrder = this.elements.sortOrder.value;
-      const data = await this.gas.getPublishedSheetData(requestedSheetName, selectedClass, sortOrder);
+      const data = await this.gas.getPublishedSheetData(__SPREADSHEET_ID__, requestedSheetName, selectedClass, sortOrder);
       this.state.sheetName = data.sheetName;
       if (typeof data.showCounts !== 'undefined') {
         this.serverShowCounts = data.showCounts;

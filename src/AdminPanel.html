@@ -879,8 +879,12 @@
                   <span class="text-white" id="db-sheet-count">-</span>
                 </div>
                 <div class="flex justify-between items-center">
-                  <span class="text-blue-300">公開シート:</span>
-                  <span class="text-white" id="db-published-sheet">-</span>
+                  <span class="text-blue-300">公開スプレッドシートID:</span>
+                  <span class="text-white font-mono text-xs" id="db-published-spreadsheet-id">-</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-blue-300">公開シート名:</span>
+                  <span class="text-white" id="db-published-sheet-name">-</span>
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-blue-300">スプレッドシートID:</span>
@@ -1991,7 +1995,7 @@
         elements.sheetSelect.disabled = true;
       }
 
-      if (status.activeSheetName) {
+      if (status.publishedSpreadsheetId && status.publishedSheetName) {
         let baseUrl = status.webAppUrl;
         
         if (!baseUrl) {
@@ -2004,7 +2008,7 @@
         }
         
         webAppUrl = baseUrl;
-        const boardUrl = baseUrl + '?userId=' + encodeURIComponent(userId);
+        const boardUrl = `${baseUrl}?userId=${encodeURIComponent(status.userId)}&spreadsheetId=${encodeURIComponent(status.publishedSpreadsheetId)}&sheetName=${encodeURIComponent(status.publishedSheetName)}`;
         
         console.log('URL生成完了:', { baseUrl, boardUrl, userId });
         if (elements.boardUrl) elements.boardUrl.value = boardUrl;
@@ -2128,7 +2132,10 @@
           safeSetText('db-answer-count', status.answerCount || '0');
           safeSetText('db-reaction-count', status.totalReactions || '0');
           safeSetText('db-sheet-count', (status.availableSheets ? status.availableSheets.length : 0) + ' 枚');
-          safeSetText('db-published-sheet', status.publishedSheet || '未設定');
+          const dbPublishedSpreadsheetIdEl = document.getElementById('db-published-spreadsheet-id');
+      if (dbPublishedSpreadsheetIdEl) dbPublishedSpreadsheetIdEl.textContent = (status && status.publishedSpreadsheetId) || '-';
+      const dbPublishedSheetNameEl = document.getElementById('db-published-sheet-name');
+      if (dbPublishedSheetNameEl) dbPublishedSheetNameEl.textContent = (status && status.publishedSheetName) || '-';
           
           const spreadsheetId = status.userInfo.spreadsheetId || '';
           safeSetText('db-spreadsheet-id', spreadsheetId ? spreadsheetId.substring(0, 20) + '...' : '-');
@@ -2444,7 +2451,7 @@
                 showMessage('列情報を自動判定しましたが、設定の保存に失敗しました。手動で保存してください。', 'warning');
                 updateConfigButtons();
               })
-              .saveSheetConfig(selectedSheet, autoConfig);
+                      .saveSheetConfig(currentStatus.userInfo.spreadsheetId, selectedSheet, config);
           }
           
           // 既存設定がある場合はそれをロードしてマージ
@@ -2468,7 +2475,7 @@
           hideSheetDetails();
           showMessage('シートヘッダー情報の取得に失敗しました。', 'red');
         })
-        .getSheetHeaders(selectedSheet);
+        .getSheetHeaders(currentStatus.userInfo.spreadsheetId, selectedSheet);
     }
     
     // シート詳細情報を更新する関数
@@ -2711,7 +2718,7 @@
           loadStatus();
         })
         .withFailureHandler(showError)
-        .switchToSheet(selectedSheet);
+        .switchToSheet(currentStatus.userInfo.spreadsheetId, selectedSheet);
     }
 
     function clearSheetSelection() {
