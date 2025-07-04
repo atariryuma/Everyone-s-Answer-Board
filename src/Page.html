@@ -13,87 +13,35 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-<!-- Enhanced error handling and CSS loading -->
+<!-- Global error handling and TailwindCSS setup -->
 <script>
-// Aggressive document.write prevention
-(function() {
-  'use strict';
-  
-  // Store original document.write
-  const originalWrite = document.write;
-  const originalWriteln = document.writeln;
-  
-  // Override document.write methods to prevent errors
-  document.write = function(content) {
-    console.warn('document.write() call intercepted and blocked:', content);
-    return false;
-  };
-  
-  document.writeln = function(content) {
-    console.warn('document.writeln() call intercepted and blocked:', content);
-    return false;
-  };
-  
-  // Global error handling
-  window.addEventListener('error', function(event) {
-    if (event.error && event.error.message) {
-      const errorMsg = event.error.message;
-      if (errorMsg.includes('document.write') || 
-          errorMsg.includes('Unexpected token') ||
-          errorMsg.includes('Failed to execute') ||
-          errorMsg.includes('mae_html_user')) {
-        console.warn('Google Apps Script error caught and handled:', errorMsg);
-        event.preventDefault();
-        return false;
-      }
+// Global error handling for document.write and other issues
+window.addEventListener('error', function(event) {
+  if (event.error && event.error.message) {
+    if (event.error.message.includes('document.write') ||
+        event.error.message.includes('Unexpected token')) {
+      console.warn('Document.write or syntax error caught and handled:', event.error.message);
+      event.preventDefault();
+      return false;
     }
-  });
+  }
+});
 
-  // Handle unhandled promise rejections
-  window.addEventListener('unhandledrejection', function(event) {
-    console.warn('Unhandled promise rejection:', event.reason);
-    event.preventDefault();
-  });
+// Handle unhandled promise rejections
+window.addEventListener('unhandledrejection', function(event) {
+  console.warn('Unhandled promise rejection:', event.reason);
+  event.preventDefault();
+});
 
-  // Prevent Google Apps Script internal errors from disrupting the page
-  window.addEventListener('DOMContentLoaded', function() {
-    // Re-enable document.write after initial load if needed
-    setTimeout(function() {
-      if (typeof originalWrite === 'function') {
-        // Keep blocking for safety
-        console.log('document.write remains blocked for security');
-      }
-    }, 1000);
-  });
-})();
-
-// TailwindCSS configuration
-window.tailwind = { 
-  config: { 
+// TailwindCSS configuration to suppress production warnings
+window.tailwind = {
+  config: {
     mode: 'jit',
-    corePlugins: { preflight: false },
-    important: true
-  } 
+    corePlugins: { preflight: false }
+  }
 };
 </script>
-
-<!-- Load TailwindCSS with fallback -->
-<script>
-(function() {
-  const script = document.createElement('script');
-  script.src = 'https://cdn.tailwindcss.com';
-  script.defer = true;
-  script.onload = function() {
-    console.log('TailwindCSS loaded successfully');
-    document.body.classList.add('tailwind-loaded');
-  };
-  script.onerror = function() {
-    console.warn('TailwindCSS failed to load, using fallback styles');
-    document.body.classList.add('tailwind-fallback');
-  };
-  document.head.appendChild(script);
-})();
-</script>
+<script src="https://cdn.tailwindcss.com" defer onload="console.log('TailwindCSS loaded successfully')" onerror="console.warn('TailwindCSS failed to load')"></script>
 <script>
 const DEBUG_MODE = false;
 function debugLog(){ if (DEBUG_MODE && console && console.log){ console.log.apply(console, arguments); } }
