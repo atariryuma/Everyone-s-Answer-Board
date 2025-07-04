@@ -1754,9 +1754,9 @@ function showAdminSidebar() {
     var template = HtmlService.createTemplateFromFile('AdminSidebar');
     var html = template.evaluate()
       .setTitle('みんなの回答ボード - 管理パネル')
-      .setWidth(400)
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
-    
+      .setWidth(400);
+    safeSetXFrameOptionsDeny(html);
+
     SpreadsheetApp.getUi().showSidebar(html);
   } catch (e) {
     console.error('管理サイドバー表示エラー: ' + e.message);

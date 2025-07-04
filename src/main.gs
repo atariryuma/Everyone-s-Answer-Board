@@ -68,6 +68,24 @@ function htmlEncode(text) {
     .replace(/'/g, '&#39;');
 }
 
+/**
+ * HtmlOutputに安全にX-Frame-Optionsヘッダーを設定するユーティリティ
+ * @param {HtmlOutput} htmlOutput - 設定対象のHtmlOutput
+ * @returns {HtmlOutput} 設定後のHtmlOutput
+ */
+function safeSetXFrameOptionsDeny(htmlOutput) {
+  try {
+    if (htmlOutput && typeof htmlOutput.setXFrameOptionsMode === 'function' &&
+        HtmlService && HtmlService.XFrameOptionsMode &&
+        HtmlService.XFrameOptionsMode.DENY) {
+      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    }
+  } catch (e) {
+    console.warn('Failed to set XFrameOptionsMode:', e.message);
+  }
+  return htmlOutput;
+}
+
 // 安定性を重視してvarを使用
 var ULTRA_CONFIG = {
   EXECUTION_LIMITS: {
@@ -225,10 +243,10 @@ function isSystemSetup() {
  * 登録ページを表示する関数
  */
 function showRegistrationPage() {
-  return HtmlService.createTemplateFromFile('Registration')
+  var output = HtmlService.createTemplateFromFile('Registration')
     .evaluate()
-    .setTitle('新規ユーザー登録 - StudyQuest')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    .setTitle('新規ユーザー登録 - StudyQuest');
+  return safeSetXFrameOptionsDeny(output);
 }
 
 /**
@@ -263,19 +281,19 @@ function doGet(e) {
     // 1. システムの初期セットアップが完了しているか確認
     if (!isSystemSetup()) {
       console.log('DEBUG: System not set up. Redirecting to SetupPage.');
-      return HtmlService.createTemplateFromFile('SetupPage')
+      var setupHtml = HtmlService.createTemplateFromFile('SetupPage')
         .evaluate()
-        .setTitle('初回セットアップ - StudyQuest')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+        .setTitle('初回セットアップ - StudyQuest');
+      return safeSetXFrameOptionsDeny(setupHtml);
     }
 
     // セットアップページの明示的な表示要求
     if (setupParam === 'true') {
       console.log('DEBUG: Explicit setup request. Redirecting to SetupPage.');
-      return HtmlService.createTemplateFromFile('SetupPage')
+      var explicitHtml = HtmlService.createTemplateFromFile('SetupPage')
         .evaluate()
-        .setTitle('StudyQuest - サービスアカウント セットアップ')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+        .setTitle('StudyQuest - サービスアカウント セットアップ');
+      return safeSetXFrameOptionsDeny(explicitHtml);
     }
 
     // 2. ユーザー認証と情報取得
@@ -305,9 +323,9 @@ function doGet(e) {
         displayMode: template.displayMode,
         showAdminFeatures: template.showAdminFeatures
       });
-      return template.evaluate()
-        .setTitle('管理パネル - みんなの回答ボード')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+      var adminHtml = template.evaluate()
+        .setTitle('管理パネル - みんなの回答ボード');
+      return safeSetXFrameOptionsDeny(adminHtml);
 
     } else {
       // 5. 【未登録ユーザーの処理】
@@ -318,11 +336,12 @@ function doGet(e) {
 
   } catch (error) {
     console.error(`doGetで致命的なエラー: ${error.stack}`);
-    return HtmlService.createHtmlOutput(
+    var errorHtml = HtmlService.createHtmlOutput(
       '<h1>エラー</h1>' +
       '<p>予期せぬエラーが発生しました。管理者にお問い合わせください。</p>' +
       '<p>エラー詳細: ' + htmlEncode(error.message) + '</p>'
-    ).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    );
+    return safeSetXFrameOptionsDeny(errorHtml);
   }
 }
 
