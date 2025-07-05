@@ -1794,8 +1794,9 @@
     }
 
     // グローバルスコープに関数を登録し、どこからでも安全に呼び出せるようにする
-    window.setLoading = function(isLoading, message = '') {
-      console.log('setLoading called with: ' + isLoading + ', message: ' + message);
+    window.setLoading = function(isLoading, message) {
+      message = message || '';
+      console.log('setLoading called with:', isLoading, ', message:', message);
       
       // 安全にボタンの disabled 状態を更新
       const buttons = [
@@ -2154,7 +2155,10 @@
         }
         
         webAppUrl = baseUrl;
-        const boardUrl = baseUrl + '?userId=' + encodeURIComponent(status.userId) + '&spreadsheetId=' + encodeURIComponent(status.publishedSpreadsheetId) + '&sheetName=' + encodeURIComponent(status.publishedSheetName);
+        const boardUrl = baseUrl + 
+          '?userId=' + encodeURIComponent(status.userId) + 
+          '&spreadsheetId=' + encodeURIComponent(status.publishedSpreadsheetId) + 
+          '&sheetName=' + encodeURIComponent(status.publishedSheetName);
         
         console.log('URL生成完了:', { baseUrl, boardUrl, userId });
         if (elements.boardUrl) elements.boardUrl.value = boardUrl;
@@ -3132,7 +3136,7 @@
         errorMessage = error;
       }
       
-      showMessage('エラー: ' + errorMessage, 'error');
+      showMessage('エラー: ' + (errorMessage || '不明なエラーが発生しました'), 'error');
       setLoading(false);
     }
     
