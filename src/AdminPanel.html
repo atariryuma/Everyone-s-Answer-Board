@@ -3291,55 +3291,46 @@ function switchToAnotherAccount() {
         return;
       }
       
-      console.log('DEBUG: Calling getSheetHeaders from AdminPanel.html. spreadsheetId:', currentStatus.userInfo.spreadsheetId, 'sheetName:', selectedSheet);
+      setLoading(true, '列情報を読み込んでいます...');
+
+      // ★修正点：サーバーの getGuessedHeaders を呼び出す
       google.script.run
-        .withSuccessHandler(function(headers) {
-          populateHeaderOptions(headers);
-          var guesses = guessHeaders(headers);
-          populateConfig(guesses);
-          
-          // シート詳細情報を更新
-          updateSheetDetails(headers);
-          
-          // 自動判定した設定をUIに表示（保存は行わない）
-          if (guesses.opinionHeader) {
-            // 自動判定された設定をUIフィールドに設定
-            populateConfig(guesses);
-            showMessage('列情報を自動判定しました。保存ボタンで確定してください。', 'info');
-            updateConfigButtons();
-            setLoading(false);
+        .withSuccessHandler(function(guessedConfig) {
+          setLoading(false);
+          if (guessedConfig && !guessedConfig.error) {
+            // サーバーからの結果を元にUIを構築
+            populateHeaderOptions(guessedConfig.allHeaders || []);
+            populateConfig(guessedConfig);
+            
+            // シート詳細情報を更新
+            updateSheetDetails(guessedConfig.allHeaders || []);
+            
+            // 既存設定がある場合はそれをロードしてマージ
+            google.script.run
+              .withSuccessHandler(function(cfg) {
+                if (cfg && Object.keys(cfg).length > 0) {
+                  populateConfig(Object.assign({}, guessedConfig, cfg));
+                  showMessage('既存の設定をロードしました。', 'info');
+                } else {
+                  showMessage('列の自動判定が完了しました。', 'success');
+                }
+                updateConfigButtons();
+              })
+              .withFailureHandler(function(error) {
+                // 既存設定がない場合はエラーではないので無視
+                showMessage('列の自動判定が完了しました。', 'success');
+                updateConfigButtons();
+              })
+              .getConfig(selectedSheet, true);
           } else {
-            // 自動判定に失敗した場合
-            showMessage('列の自動判定ができませんでした。手動で設定してください。', 'warning');
-            updateConfigButtons();
-            setLoading(false);
+            showError(new Error(guessedConfig.error || '列の自動判定に失敗しました。'));
           }
-          
-          // 既存設定がある場合はそれをロードしてマージ
-          google.script.run
-            .withSuccessHandler(function(cfg) {
-              if (cfg && Object.keys(cfg).length > 0) {
-                populateConfig(Object.assign({}, guesses, cfg));
-                showMessage('既存の設定をロードしました。', 'info');
-              }
-              updateConfigButtons();
-              setLoading(false); // Added here
-            })
-            .withFailureHandler(function(error) {
-              // 既存設定がない場合はエラーではないので無視
-              updateConfigButtons();
-              setLoading(false); // Added here
-            })
-            .getConfig(selectedSheet, true);
         })
         .withFailureHandler(function(error) {
-          console.error('Failed to get sheet headers:', error);
-          clearConfigFields();
-          hideSheetDetails();
-          showMessage('シートヘッダー情報の取得に失敗しました。', 'red');
-          setLoading(false); // Added here
+          setLoading(false);
+          showError(error);
         })
-        .getSheetHeaders(selectedSheet);
+        .getGuessedHeaders(selectedSheet); // 選択されたシート名を渡す
     }
     
     // シート詳細情報を更新する関数
@@ -3394,89 +3385,6 @@ function switchToAnotherAccount() {
       });
     }
 
-    function guessHeaders(headers) {
-      
-      
-        var find = function(keywords) {
-          return (headers.find(function(h) {
-            return keywords.some(function(k) { return h && String(h).toLowerCase().includes(k); });
-          }) || '');
-        };
-      
-      var isGoogleForm = headers.some(function(h) { return String(h || '').includes('タイムスタンプ') || String(h || '').includes('メールアドレス'); });
-      
-      var question = '';
-      var answer = '';
-      var reason = '';
-      var name = '';
-      var classHeader = '';
-      
-      if (isGoogleForm) {
-        
-        
-        var nonMetaHeaders = headers.filter(function(h) {
-          var hStr = String(h || '').toLowerCase();
-          return !hStr.includes('タイムスタンプ') && 
-                 !hStr.includes('timestamp') && 
-                 !hStr.includes('メールアドレス') && 
-                 !hStr.includes('email') &&
-                 String(h || '').trim() !== '';
-        });
-        
-        
-        
-        for (var i = 0; i < nonMetaHeaders.length; i++) {
-          var header = nonMetaHeaders[i];
-          var hStr = String(header || '').toLowerCase();
-          
-          if (!question && (hStr.includes('question') || hStr.includes('answer') || hStr.length > 20)) {
-            question = header;
-            if (i + 1 < nonMetaHeaders.length && nonMetaHeaders[i + 1] === header) {
-              answer = header;
-              continue;
-            }
-          }
-          
-          if (!answer && (hStr.includes('answer') || hStr.includes('response') || hStr.includes('opinion'))) {
-            answer = header;
-          }
-          
-          if (!reason && (hStr.includes('理由') || hStr.includes('詳細') || hStr.includes('説明'))) {
-            reason = header;
-          }
-          
-          if (!name && (hStr.includes('名前') || hStr.includes('氏名') || hStr.includes('学生'))) {
-            name = header;
-          }
-          
-          if (!classHeader && (hStr.includes('クラス') || hStr.includes('組') || hStr.includes('学級'))) {
-            classHeader = header;
-          }
-        }
-        
-        if (!answer && nonMetaHeaders.length > 0) {
-          answer = nonMetaHeaders[0];
-        }
-        
-      } else {
-        question = find(['質問', '問題']);
-        answer = find(['answer', 'response']);
-        reason = find(['理由']);
-        name = find(['名前', '氏名']);
-        classHeader = find(['クラス']);
-      }
-      
-      var result = {
-        questionHeader: question,
-        opinionHeader: elements.opinionHeader.value,
-        reasonHeader: reason,
-        nameHeader: name,
-        classHeader: classHeader
-      };
-      
-      
-      return result;
-    }
 
     /**
      * サーバーから受け取った設定オブジェクト（cfg）を元に、
