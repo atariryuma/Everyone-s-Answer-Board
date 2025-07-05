@@ -135,6 +135,8 @@ function getUserWithFallback(userId) {
     var cache = CacheService.getScriptCache();
     cache.put('user_' + userId, JSON.stringify(user), USER_CACHE_TTL);
     cache.put('email_' + user.adminEmail, JSON.stringify(user), USER_CACHE_TTL);
+  } else {
+    handleMissingUser(userId);
   }
   return user;
 }
@@ -264,13 +266,21 @@ function initializeDatabaseSheet(spreadsheetId) {
 }
 
 /**
+ * ユーザーが見つからない場合のキャッシュ処理
+ * @param {string} userId - キャッシュ削除対象のユーザーID
+ */
+function handleMissingUser(userId) {
+  invalidateUserCache(userId);
+  clearDatabaseCache();
+}
+
+/**
  * 全キャッシュをクリア
  */
 function clearDatabaseCache() {
-  var cache = CacheService.getScriptCache();
-  // ユーザー関連のキャッシュをクリア
-  // GASのCacheServiceには一括削除機能がないため、個別削除は実装しない
-  debugLog('データベースキャッシュクリア要請を受信しました');
+  cacheManager.clearExpired();
+  PropertiesService.getUserProperties().deleteProperty('CURRENT_USER_ID');
+  debugLog('データベース関連キャッシュをクリアしました');
 }
 
 // =================================================================

@@ -171,6 +171,7 @@ function getPublishedSheetData(classFilter, sortOrder) {
     
     var userInfo = getUserWithFallback(currentUserId);
     if (!userInfo) {
+      handleMissingUser(currentUserId);
       throw new Error('ユーザー情報が見つかりません');
     }
     debugLog('getPublishedSheetData: userInfo=%s', JSON.stringify(userInfo));
@@ -292,6 +293,7 @@ function getAppConfig() {
     
     var userInfo = getUserWithFallback(currentUserId);
     if (!userInfo) {
+      handleMissingUser(currentUserId);
       throw new Error('ユーザー情報が見つかりません');
     }
     
@@ -617,6 +619,7 @@ function getActiveFormInfo(userId) {
     
     var userInfo = getUserWithFallback(currentUserId);
     if (!userInfo) {
+      handleMissingUser(currentUserId);
       return { status: 'error', message: 'ユーザー情報が見つかりません' };
     }
 
