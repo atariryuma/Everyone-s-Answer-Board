@@ -256,17 +256,15 @@ function getPublishedSheetData(classFilter, sortOrder) {
     });
     debugLog('getPublishedSheetData: formattedData length=%s', formattedData.length);
 
-    // ヘッダー情報を取得（問題列があれば使用、なければデフォルト）
-    var questionHeaderIndex = getHeaderIndex(sheetData.headers, COLUMN_HEADERS.TIMESTAMP); // 問題列は通常ないので、タイムスタンプ列を確認
-    var headerTitle = '回答ボード'; // デフォルト
-    
-    // より適切なヘッダータイトルを設定
-    if (sheetData.headers && sheetData.headers.length > 0) {
-      // フォームの質問タイトルなどがあれば使用する場合の処理を将来的に追加可能
-      headerTitle = '回答ボード';
-    }
-    debugLog('getPublishedSheetData: headerTitle=%s', headerTitle);
+    // ★★★ここからが修正箇所★★★
 
+    // ボードのタイトルを、保存された設定（opinionHeader）から取得する
+    // もし設定がなければ、デフォルトでシート名を使う
+    const headerTitle = sheetConfig.opinionHeader || publishedSheetName;
+    
+    // ...（データ取得とフォーマット処理は変更なし）...
+
+    // 最終的に返すオブジェクトの header プロパティに、取得したタイトルを設定
     var result = {
       header: headerTitle,
       sheetName: publishedSheetName, // targetSheetからpublishedSheetNameに変更
