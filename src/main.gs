@@ -259,9 +259,10 @@ function doGet(e) {
   console.log(`doGet called with event object: ${JSON.stringify(e)}`);
 
   try {
-    // ② 'mode' パラメータの存在を確認し、なければデフォルト値を設定
-    // e.parameter が null または undefined の場合を考慮
-    const mode = (e && e.parameter && e.parameter.mode) ? e.parameter.mode : 'view'; // デフォルトは 'view' モード
+    // ★★★ 修正点 ★★★
+    // パラメータがない場合のデフォルトモードを 'view' から 'admin' に変更。
+    // これにより、登録済みユーザーはデフォルトで管理パネルにアクセスするようになります。
+    const mode = (e && e.parameter && e.parameter.mode) ? e.parameter.mode : 'admin';
     const userId = (e && e.parameter && e.parameter.userId) ? e.parameter.userId : null;
     const setupParam = (e && e.parameter && e.parameter.setup) ? e.parameter.setup : null;
     const spreadsheetId = (e && e.parameter && e.parameter.spreadsheetId) ? e.parameter.spreadsheetId : null;
@@ -302,7 +303,6 @@ function doGet(e) {
     }
 
     // 2. ユーザー認証と情報取得（Page.html直接アクセス時は除く）
-    // currentUserEmail is already defined above as userEmail
     if (!userEmail && !isDirectPageAccess) {
       console.log('DEBUG: No current user email. Redirecting to RegistrationPage.');
       return showRegistrationPage();
@@ -405,6 +405,7 @@ function doGet(e) {
       }
 
       // デフォルト：パラメータなしのアクセスは管理パネルへ
+      // (modeのデフォルトが'admin'になったため、このルートが正しく機能する)
       console.log('DEBUG: Default access - user registered. Redirecting to admin panel.');
       var adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
       adminTemplate.userInfo = userInfo;
