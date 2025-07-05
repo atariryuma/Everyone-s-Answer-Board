@@ -1239,6 +1239,178 @@ class StudyQuestApp {
         listenerFunction: this.handlers.onAnswersContainerClick,
         hasClickListener: true
       });
+
+      // Additional mouse event debugging to help identify click issues
+      this.elements.answersContainer.addEventListener('mousedown', (e) => {
+        debugLog('Mouse DOWN event on answers container:', {
+          target: e.target,
+          targetClass: e.target.className,
+          targetTagName: e.target.tagName,
+          button: e.button,
+          buttons: e.buttons,
+          clientX: e.clientX,
+          clientY: e.clientY,
+          screenX: e.screenX,
+          screenY: e.screenY,
+          ctrlKey: e.ctrlKey,
+          shiftKey: e.shiftKey,
+          altKey: e.altKey,
+          metaKey: e.metaKey,
+          targetBounds: e.target.getBoundingClientRect(),
+          targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
+          targetPointerEvents: e.target.style.pointerEvents,
+          answerCard: e.target.closest('.answer-card'),
+          timeStamp: e.timeStamp
+        });
+      }, { passive: true });
+
+      this.elements.answersContainer.addEventListener('mouseup', (e) => {
+        debugLog('Mouse UP event on answers container:', {
+          target: e.target,
+          targetClass: e.target.className,
+          targetTagName: e.target.tagName,
+          button: e.button,
+          buttons: e.buttons,
+          clientX: e.clientX,
+          clientY: e.clientY,
+          screenX: e.screenX,
+          screenY: e.screenY,
+          ctrlKey: e.ctrlKey,
+          shiftKey: e.shiftKey,
+          altKey: e.altKey,
+          metaKey: e.metaKey,
+          targetBounds: e.target.getBoundingClientRect(),
+          targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
+          targetPointerEvents: e.target.style.pointerEvents,
+          answerCard: e.target.closest('.answer-card'),
+          timeStamp: e.timeStamp
+        });
+      }, { passive: true });
+
+      this.elements.answersContainer.addEventListener('mouseover', (e) => {
+        const answerCard = e.target.closest('.answer-card');
+        if (answerCard) {
+          debugLog('Mouse OVER answer card:', {
+            target: e.target,
+            targetClass: e.target.className,
+            targetTagName: e.target.tagName,
+            answerCard: answerCard,
+            answerCardClass: answerCard.className,
+            answerCardDataset: answerCard.dataset,
+            answerCardRowIndex: answerCard.dataset.rowIndex,
+            answerCardComputedStyle: window.getComputedStyle(answerCard).pointerEvents,
+            answerCardPointerEvents: answerCard.style.pointerEvents,
+            targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
+            targetPointerEvents: e.target.style.pointerEvents,
+            timeStamp: e.timeStamp
+          });
+        }
+      }, { passive: true });
+
+      this.elements.answersContainer.addEventListener('mouseout', (e) => {
+        const answerCard = e.target.closest('.answer-card');
+        if (answerCard) {
+          debugLog('Mouse OUT answer card:', {
+            target: e.target,
+            targetClass: e.target.className,
+            targetTagName: e.target.tagName,
+            answerCard: answerCard,
+            answerCardClass: answerCard.className,
+            answerCardDataset: answerCard.dataset,
+            answerCardRowIndex: answerCard.dataset.rowIndex,
+            relatedTarget: e.relatedTarget,
+            relatedTargetClass: e.relatedTarget?.className,
+            timeStamp: e.timeStamp
+          });
+        }
+      }, { passive: true });
+
+      // Additional touch event debugging for mobile devices
+      this.elements.answersContainer.addEventListener('touchstart', (e) => {
+        debugLog('Touch START event on answers container:', {
+          target: e.target,
+          targetClass: e.target.className,
+          targetTagName: e.target.tagName,
+          touches: e.touches.length,
+          changedTouches: e.changedTouches.length,
+          firstTouch: e.touches[0] ? {
+            clientX: e.touches[0].clientX,
+            clientY: e.touches[0].clientY,
+            screenX: e.touches[0].screenX,
+            screenY: e.touches[0].screenY
+          } : null,
+          targetBounds: e.target.getBoundingClientRect(),
+          targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
+          targetPointerEvents: e.target.style.pointerEvents,
+          answerCard: e.target.closest('.answer-card'),
+          timeStamp: e.timeStamp
+        });
+      }, { passive: true });
+
+      this.elements.answersContainer.addEventListener('touchend', (e) => {
+        debugLog('Touch END event on answers container:', {
+          target: e.target,
+          targetClass: e.target.className,
+          targetTagName: e.target.tagName,
+          touches: e.touches.length,
+          changedTouches: e.changedTouches.length,
+          firstChangedTouch: e.changedTouches[0] ? {
+            clientX: e.changedTouches[0].clientX,
+            clientY: e.changedTouches[0].clientY,
+            screenX: e.changedTouches[0].screenX,
+            screenY: e.changedTouches[0].screenY
+          } : null,
+          targetBounds: e.target.getBoundingClientRect(),
+          targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
+          targetPointerEvents: e.target.style.pointerEvents,
+          answerCard: e.target.closest('.answer-card'),
+          timeStamp: e.timeStamp
+        });
+      }, { passive: true });
+
+      // Debugging for pointer events (modern alternative to mouse events)
+      this.elements.answersContainer.addEventListener('pointerdown', (e) => {
+        debugLog('Pointer DOWN event on answers container:', {
+          target: e.target,
+          targetClass: e.target.className,
+          targetTagName: e.target.tagName,
+          pointerId: e.pointerId,
+          pointerType: e.pointerType,
+          button: e.button,
+          buttons: e.buttons,
+          clientX: e.clientX,
+          clientY: e.clientY,
+          pressure: e.pressure,
+          isPrimary: e.isPrimary,
+          targetBounds: e.target.getBoundingClientRect(),
+          targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
+          targetPointerEvents: e.target.style.pointerEvents,
+          answerCard: e.target.closest('.answer-card'),
+          timeStamp: e.timeStamp
+        });
+      }, { passive: true });
+
+      this.elements.answersContainer.addEventListener('pointerup', (e) => {
+        debugLog('Pointer UP event on answers container:', {
+          target: e.target,
+          targetClass: e.target.className,
+          targetTagName: e.target.tagName,
+          pointerId: e.pointerId,
+          pointerType: e.pointerType,
+          button: e.button,
+          buttons: e.buttons,
+          clientX: e.clientX,
+          clientY: e.clientY,
+          pressure: e.pressure,
+          isPrimary: e.isPrimary,
+          targetBounds: e.target.getBoundingClientRect(),
+          targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
+          targetPointerEvents: e.target.style.pointerEvents,
+          answerCard: e.target.closest('.answer-card'),
+          timeStamp: e.timeStamp
+        });
+      }, { passive: true });
+
     } else {
       debugLog('ERROR: answersContainer element not found when setting up event delegation');
     }
