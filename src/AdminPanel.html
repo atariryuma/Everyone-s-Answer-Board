@@ -1582,7 +1582,7 @@
         if (headerDomainMatch && headerDomainMatchText) {
           headerDomainMatch.classList.remove('hidden');
           if (info.deployDomain) {
-            headerDomainMatchText.textContent = `${info.deployDomain} ドメイン`;
+            headerDomainMatchText.textContent = info.deployDomain + ' ドメイン';
           } else {
             headerDomainMatchText.textContent = 'グローバルアクセス';
           }
@@ -1780,7 +1780,7 @@
               // formUrlからeditUrlを生成
               const formId = extractFormIdFromUrl(config.formUrl);
               if (formId) {
-                editUrl = `https://docs.google.com/forms/d/${formId}/edit`;
+                editUrl = 'https://docs.google.com/forms/d/' + formId + '/edit';
               }
             }
             editFormLink.href = editUrl || '#';
@@ -1803,7 +1803,7 @@
 
     // グローバルスコープに関数を登録し、どこからでも安全に呼び出せるようにする
     window.setLoading = function(isLoading, message = '') {
-      console.log(`setLoading called with: ${isLoading}, message: ${message}`);
+      console.log('setLoading called with: ' + isLoading + ', message: ' + message);
       
       // 安全にボタンの disabled 状態を更新
       const buttons = [
@@ -2162,7 +2162,7 @@
         }
         
         webAppUrl = baseUrl;
-        const boardUrl = `${baseUrl}?userId=${encodeURIComponent(status.userId)}&spreadsheetId=${encodeURIComponent(status.publishedSpreadsheetId)}&sheetName=${encodeURIComponent(status.publishedSheetName)}`;
+        const boardUrl = baseUrl + '?userId=' + encodeURIComponent(status.userId) + '&spreadsheetId=' + encodeURIComponent(status.publishedSpreadsheetId) + '&sheetName=' + encodeURIComponent(status.publishedSheetName);
         
         console.log('URL生成完了:', { baseUrl, boardUrl, userId });
         if (elements.boardUrl) elements.boardUrl.value = boardUrl;
@@ -2267,7 +2267,7 @@
             if (element) {
               element.textContent = value || '-';
             } else {
-              console.warn(`Element with id '${id}' not found`);
+              console.warn('Element with id \'' + id + '\' not found');
             }
           };
           
@@ -3225,9 +3225,9 @@
       
       // Close completed sections except step 3
       if (stepNumber !== 3) {
-        const stepContent = document.getElementById(`step${stepNumber}-content`);
+        const stepContent = document.getElementById('step' + stepNumber + '-content');
         if (stepContent && stepContent.classList.contains('expanded')) {
-          toggleSection(`step${stepNumber}-content`);
+          toggleSection('step' + stepNumber + '-content');
         }
       }
       
