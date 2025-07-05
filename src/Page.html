@@ -191,7 +191,12 @@ header {
 }
 .answer-card.loading {
   opacity: 0.7;
+}
+
+.answer-card.loading .reaction-btn,
+.answer-card.loading .highlight-btn {
   pointer-events: none;
+  opacity: 0.5;
 }
 .reaction-btn {
   transition: transform var(--transition-duration) var(--transition-easing),
@@ -606,35 +611,45 @@ header {
       <span class="font-medium">📝 回答フォーム</span>
     </a>
     
-    <!-- ドメイン情報（右側） -->
-    <div class="flex-shrink-0">
-      <!-- ドメイン一致表示 -->
-      <div id="header-domain-match" class="bg-green-500/10 border border-green-400/30 rounded px-2 py-1 hidden">
-        <div class="flex items-center gap-1">
-          <svg class="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          <span class="text-green-400 font-medium" id="header-domain-match-text">学校ドメイン</span>
+    <!-- ドメイン情報と管理モードボタン（右側） -->
+    <div class="flex-shrink-0 flex items-center gap-2">
+      <div>
+        <!-- ドメイン一致表示 -->
+        <div id="header-domain-match" class="bg-green-500/10 border border-green-400/30 rounded px-2 py-1 hidden">
+          <div class="flex items-center gap-1">
+            <svg class="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span class="text-green-400 font-medium" id="header-domain-match-text">学校ドメイン</span>
+          </div>
+        </div>
+        
+        <!-- ドメイン不一致表示 -->
+        <div id="header-domain-mismatch" class="bg-yellow-500/10 border border-yellow-400/30 rounded px-2 py-1 hidden">
+          <div class="flex items-center gap-1">
+            <svg class="w-3 h-3 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+            <span class="text-yellow-400 font-medium" id="header-domain-mismatch-text">外部アクセス</span>
+          </div>
+        </div>
+        
+        <!-- 初期状態表示 -->
+        <div id="header-domain-initial" class="bg-blue-500/10 border border-blue-400/30 rounded px-2 py-1">
+          <div class="flex items-center gap-1">
+            <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+            <span class="text-blue-400 font-medium">確認中</span>
+          </div>
         </div>
       </div>
       
-      <!-- ドメイン不一致表示 -->
-      <div id="header-domain-mismatch" class="bg-yellow-500/10 border border-yellow-400/30 rounded px-2 py-1 hidden">
-        <div class="flex items-center gap-1">
-          <svg class="w-3 h-3 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-          </svg>
-          <span class="text-yellow-400 font-medium" id="header-domain-mismatch-text">外部アクセス</span>
-        </div>
-      </div>
-      
-      <!-- 初期状態表示 -->
-      <div id="header-domain-initial" class="bg-blue-500/10 border border-blue-400/30 rounded px-2 py-1">
-        <div class="flex items-center gap-1">
-          <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-          <span class="text-blue-400 font-medium">確認中</span>
-        </div>
-      </div>
+      <!-- 管理モードボタン -->
+      <button type="button" id="adminToggleBtn" class="admin-toggle text-xs text-gray-500 hover:text-cyan-400 transition-all opacity-60 hover:opacity-100 hidden whitespace-nowrap flex items-center gap-1 px-2 py-1 rounded" hidden aria-label="管理者モード切り替え">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
+      </button>
     </div>
   </div>
   
@@ -676,9 +691,6 @@ header {
   <!-- Right Section: Info & Admin Controls -->
   <div class="w-full lg:w-auto lg:min-w-[150px] text-right space-y-1 px-2">
     <p id="sheetNameText" class="text-xs text-gray-400 h-4 truncate flex items-center justify-end gap-1">
-      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-      </svg>
     </p>
     <div class="flex justify-end gap-1 flex-wrap">
       <button type="button" id="endPublicationBtn" class="admin-toggle text-xs bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded hidden whitespace-nowrap transition-all flex items-center gap-1" hidden aria-label="公開終了">
@@ -686,12 +698,6 @@ header {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"></path>
         </svg>
         公開終了
-      </button>
-      <button type="button" id="adminToggleBtn" class="admin-toggle text-xs text-gray-500 hover:text-cyan-400 transition-all opacity-60 hover:opacity-100 hidden whitespace-nowrap flex items-center gap-1 px-2 py-1 rounded" hidden aria-label="管理者モード切り替え">
-        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-        </svg>
       </button>
     </div>
   </div>
@@ -1099,37 +1105,133 @@ class StudyQuestApp {
   }
   setupEventDelegation() {
     this.handlers.onAnswersContainerClick = (e) => {
+      // Debug: Log all click events on answers container
+      debugLog('Answer container click detected:', {
+        target: e.target,
+        targetClass: e.target.className,
+        targetTagName: e.target.tagName,
+        currentTarget: e.currentTarget,
+        eventPhase: e.eventPhase,
+        bubbles: e.bubbles,
+        cancelable: e.cancelable,
+        defaultPrevented: e.defaultPrevented,
+        targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
+        targetPointerEvents: e.target.style.pointerEvents
+      });
+      
+      // Check if click target is within an answer card
       const answerCard = e.target.closest('.answer-card');
-      if (!answerCard) return;
+      debugLog('Answer card detection:', {
+        answerCard: answerCard,
+        answerCardFound: !!answerCard,
+        answerCardClass: answerCard?.className,
+        answerCardDataset: answerCard?.dataset,
+        answerCardComputedStyle: answerCard ? window.getComputedStyle(answerCard).pointerEvents : null,
+        answerCardPointerEvents: answerCard?.style.pointerEvents,
+        answerCardHasLoadingClass: answerCard?.classList.contains('loading'),
+        answerCardHasHiddenClass: answerCard?.classList.contains('hidden-card'),
+        answerCardHasVisibleClass: answerCard?.classList.contains('visible')
+      });
       
+      if (!answerCard) {
+        debugLog('No answer card found, ignoring click');
+        return;
+      }
+      
+      // Check if the answer card is in loading state
+      if (answerCard.classList.contains('loading')) {
+        debugLog('Answer card is in loading state, ignoring click');
+        return;
+      }
+      
+      // Check if answer card has rowIndex
       const rowIndex = answerCard.dataset.rowIndex;
-      if (!rowIndex) return;
+      debugLog('Row index check:', {
+        rowIndex: rowIndex,
+        rowIndexType: typeof rowIndex,
+        hasRowIndex: !!rowIndex,
+        allDatasetKeys: Object.keys(answerCard.dataset || {})
+      });
       
+      if (!rowIndex) {
+        debugLog('No row index found on answer card, ignoring click');
+        return;
+      }
+      
+      // Check for reaction button clicks
       const reactionBtn = e.target.closest('.reaction-btn');
       if (reactionBtn) {
+        debugLog('Reaction button click detected:', {
+          reactionBtn: reactionBtn,
+          reactionType: reactionBtn.dataset.reaction,
+          disabled: reactionBtn.disabled,
+          rowIndex: rowIndex,
+          classList: reactionBtn.classList.toString()
+        });
+        
         e.stopPropagation();
         const reactionType = reactionBtn.dataset.reaction;
         if (reactionType && !reactionBtn.disabled) {
+          debugLog('Handling reaction:', { rowIndex, reactionType });
           this.handleReaction(rowIndex, reactionType);
+        } else {
+          debugLog('Reaction button click ignored:', {
+            reactionType: reactionType,
+            disabled: reactionBtn.disabled,
+            reason: !reactionType ? 'No reaction type' : 'Button disabled'
+          });
         }
         return;
       }
       
+      // Check for highlight button clicks
       const highlightBtn = e.target.closest('.highlight-btn');
       if (highlightBtn) {
-        debugLog('ハイライトボタンクリック:', { rowIndex, disabled: highlightBtn.disabled, showHighlightToggle: this.state.showHighlightToggle });
+        debugLog('ハイライトボタンクリック:', { 
+          rowIndex, 
+          disabled: highlightBtn.disabled, 
+          showHighlightToggle: this.state.showHighlightToggle,
+          classList: highlightBtn.classList.toString(),
+          dataset: highlightBtn.dataset
+        });
+        
         e.stopPropagation();
         if (!highlightBtn.disabled) {
+          debugLog('Handling highlight:', { rowIndex });
           this.handleHighlight(rowIndex);
+        } else {
+          debugLog('Highlight button click ignored: button disabled');
         }
         return;
       }
+      
+      // If no specific button was clicked, show answer modal
+      debugLog('Showing answer modal for card click:', {
+        rowIndex: rowIndex,
+        clickedElement: e.target,
+        answerCard: answerCard
+      });
       
       this.showAnswerModal(rowIndex);
     };
     
     if (this.elements.answersContainer) {
+      debugLog('Setting up event delegation:', {
+        answersContainer: this.elements.answersContainer,
+        hasAnswersContainer: !!this.elements.answersContainer,
+        answersContainerClass: this.elements.answersContainer.className,
+        answersContainerChildren: this.elements.answersContainer.children.length
+      });
+      
       this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick, { passive: false });
+      
+      // Additional debugging: Test if event listener is properly attached
+      debugLog('Event listener attached to answers container:', {
+        listenerFunction: this.handlers.onAnswersContainerClick,
+        hasClickListener: true
+      });
+    } else {
+      debugLog('ERROR: answersContainer element not found when setting up event delegation');
     }
     this.handlers.onDocumentClick = (e) => {
       if (e.target.matches('#retryLoadBtn')) {
@@ -1139,6 +1241,167 @@ class StudyQuestApp {
       }
     };
     document.addEventListener('click', this.handlers.onDocumentClick, { passive: false });
+  }
+  
+  // Debug helper function - can be called from console
+  debugAnswerCards() {
+    debugLog('=== ANSWER CARDS DEBUG REPORT ===');
+    
+    // Make function globally available
+    window.debugAnswerCards = this.debugAnswerCards.bind(this);
+    
+    const container = this.elements.answersContainer;
+    debugLog('Answers container:', {
+      element: container,
+      exists: !!container,
+      className: container?.className,
+      childrenCount: container?.children?.length || 0
+    });
+    
+    if (!container) {
+      debugLog('ERROR: No answers container found');
+      return;
+    }
+    
+    const answerCards = container.querySelectorAll('.answer-card');
+    debugLog('Answer cards found:', {
+      count: answerCards.length,
+      elements: Array.from(answerCards)
+    });
+    
+    answerCards.forEach((card, index) => {
+      debugLog(`Answer card ${index}:`, {
+        element: card,
+        className: card.className,
+        dataset: card.dataset,
+        rowIndex: card.dataset.rowIndex,
+        hasRowIndex: !!card.dataset.rowIndex,
+        childrenCount: card.children.length,
+        reactionButtons: card.querySelectorAll('.reaction-btn').length,
+        highlightButtons: card.querySelectorAll('.highlight-btn').length
+      });
+    });
+    
+    // Test event listener
+    debugLog('Event listener test:', {
+      hasClickHandler: !!this.handlers.onAnswersContainerClick,
+      handlerFunction: this.handlers.onAnswersContainerClick
+    });
+    
+    debugLog('=== END DEBUG REPORT ===');
+  }
+  
+  // Enhanced debug helper function to simulate clicking on answer cards
+  debugClickAnswerCard(cardIndex = 0, options = {}) {
+    debugLog('=== SIMULATING ANSWER CARD CLICK ===');
+    
+    const {
+      logDetails = true,
+      waitForAnimation = false,
+      simulateHover = false,
+      validateResponse = false
+    } = options;
+    
+    const container = this.elements.answersContainer;
+    if (!container) {
+      debugLog('ERROR: No answers container found');
+      return { success: false, error: 'No answers container found' };
+    }
+    
+    const answerCards = container.querySelectorAll('.answer-card');
+    if (answerCards.length === 0) {
+      debugLog('ERROR: No answer cards found');
+      return { success: false, error: 'No answer cards found' };
+    }
+    
+    if (cardIndex >= answerCards.length) {
+      debugLog('ERROR: Card index out of bounds', { cardIndex, totalCards: answerCards.length });
+      return { success: false, error: 'Card index out of bounds', totalCards: answerCards.length };
+    }
+    
+    const card = answerCards[cardIndex];
+    const cardInfo = {
+      index: cardIndex,
+      element: card,
+      className: card.className,
+      dataset: { ...card.dataset },
+      rowIndex: card.dataset.rowIndex,
+      boundingRect: card.getBoundingClientRect(),
+      computedStyle: {
+        display: getComputedStyle(card).display,
+        visibility: getComputedStyle(card).visibility,
+        opacity: getComputedStyle(card).opacity
+      }
+    };
+    
+    if (logDetails) {
+      debugLog('Card details before click:', cardInfo);
+    }
+    
+    // Simulate hover if requested
+    if (simulateHover) {
+      const hoverEvent = new MouseEvent('mouseenter', {
+        bubbles: true,
+        cancelable: true,
+        view: window
+      });
+      card.dispatchEvent(hoverEvent);
+      debugLog('Hover event dispatched');
+    }
+    
+    // Simulate a click event
+    const clickEvent = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      clientX: cardInfo.boundingRect.left + cardInfo.boundingRect.width / 2,
+      clientY: cardInfo.boundingRect.top + cardInfo.boundingRect.height / 2
+    });
+    
+    const clickResult = card.dispatchEvent(clickEvent);
+    
+    const result = {
+      success: true,
+      cardIndex,
+      cardInfo,
+      clickResult,
+      timestamp: Date.now()
+    };
+    
+    if (logDetails) {
+      debugLog('Click event result:', { 
+        dispatched: clickResult, 
+        cardIndex, 
+        cardElement: card,
+        eventBubbled: clickEvent.bubbles,
+        eventCancelled: clickEvent.defaultPrevented
+      });
+    }
+    
+    // Wait for animations if requested
+    if (waitForAnimation) {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          if (validateResponse) {
+            const updatedCard = answerCards[cardIndex];
+            result.cardStateAfterClick = {
+              className: updatedCard.className,
+              dataset: { ...updatedCard.dataset },
+              computedStyle: {
+                display: getComputedStyle(updatedCard).display,
+                visibility: getComputedStyle(updatedCard).visibility,
+                opacity: getComputedStyle(updatedCard).opacity
+              }
+            };
+          }
+          debugLog('=== CLICK SIMULATION COMPLETE ===');
+          resolve(result);
+        }, 500); // Wait 500ms for animations
+      });
+    }
+    
+    debugLog('=== CLICK SIMULATION COMPLETE ===');
+    return result;
   }
   adjustLayout() {
     if (this.baseBodyPadding === undefined) {
@@ -2014,8 +2277,24 @@ class StudyQuestApp {
     
     const cachedCard = this.cache.get(`render-${cacheKey}`);
     if (cachedCard) {
-      debugLog('キャッシュされたカードを使用:', { rowIndex: data.rowIndex });
-      return cachedCard.cloneNode(true);
+      const clonedCard = cachedCard.cloneNode(true);
+      // Ensure cloned card has proper data-row-index
+      clonedCard.dataset.rowIndex = data.rowIndex;
+      
+      // Ensure all child elements with data-row-index are updated
+      const elementsWithRowIndex = clonedCard.querySelectorAll('[data-row-index]');
+      elementsWithRowIndex.forEach(element => {
+        element.dataset.rowIndex = data.rowIndex;
+      });
+      
+      debugLog('キャッシュされたカードを使用:', { 
+        rowIndex: data.rowIndex,
+        cachedCardDataset: cachedCard.dataset,
+        clonedCardDataset: clonedCard.dataset,
+        hasAnswerCardClass: clonedCard.className.includes('answer-card'),
+        updatedChildElements: elementsWithRowIndex.length
+      });
+      return clonedCard;
     }
     
     const card = document.createElement('div');
@@ -2025,6 +2304,14 @@ class StudyQuestApp {
     card.setAttribute('role', 'article');
     card.setAttribute('tabindex', '0');
     card.setAttribute('aria-label', '回答カード: ' + (data.opinion || '').substring(0, 50) + (data.opinion && data.opinion.length > 50 ? '...' : ''));
+    
+    debugLog('Created answer card with rowIndex:', {
+      rowIndex: data.rowIndex,
+      rowIndexType: typeof data.rowIndex,
+      datasetRowIndex: card.dataset.rowIndex,
+      cardClassName: card.className,
+      hasAnswerCardClass: card.className.includes('answer-card')
+    });
     let highlightBtnHtml = '';
     debugLog('createCard ハイライトボタン条件チェック:', {
       rowIndex: data.rowIndex,
@@ -2523,15 +2810,45 @@ class StudyQuestApp {
     });
   }
   showAnswerModal(rowIndex) {
+    debugLog('showAnswerModal called:', {
+      rowIndex: rowIndex,
+      rowIndexType: typeof rowIndex,
+      currentAnswersLength: this.state.currentAnswers?.length,
+      filteredDataLength: this.state.filteredData?.length
+    });
     
     // 最新データを取得（filteredDataとcurrentAnswersの両方から）
     let data = this.state.currentAnswers.find(r => r.rowIndex == rowIndex);
+    debugLog('Data search in currentAnswers:', {
+      found: !!data,
+      searchRowIndex: rowIndex,
+      availableRowIndexes: this.state.currentAnswers?.map(r => r.rowIndex) || []
+    });
+    
     if (!data && this.state.filteredData) {
       data = this.state.filteredData.find(r => r.rowIndex == rowIndex);
+      debugLog('Data search in filteredData:', {
+        found: !!data,
+        searchRowIndex: rowIndex,
+        availableRowIndexes: this.state.filteredData?.map(r => r.rowIndex) || []
+      });
     }
+    
     if (!data) {
+      debugLog('ERROR: No data found for rowIndex:', {
+        rowIndex: rowIndex,
+        currentAnswers: this.state.currentAnswers,
+        filteredData: this.state.filteredData
+      });
       return;
     }
+    
+    debugLog('Data found for modal:', {
+      rowIndex: rowIndex,
+      data: data,
+      opinion: data.opinion?.substring(0, 50) + '...',
+      reason: data.reason?.substring(0, 50) + '...'
+    });
     this.state.lastFocusedElement = document.activeElement;
     this.elements.modalAnswer.innerHTML = '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + this.escapeHtml(data.opinion || '') + '</p>' + '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + this.escapeHtml(data.reason || '') + '</p>';
     const showName = this.state.displayMode === 'named';
@@ -3056,6 +3373,106 @@ try {
     window.studyQuestApp.destroy();
   }
   window.studyQuestApp = new StudyQuestApp();
+  
+  // Expose debug functions globally for console access
+  window.debugAnswerCards = () => {
+    if (window.studyQuestApp && window.studyQuestApp.debugAnswerCards) {
+      window.studyQuestApp.debugAnswerCards();
+    } else {
+      console.log('StudyQuestApp not available or debug function not found');
+    }
+  };
+  
+  // Enhanced global debug function with additional utility methods
+  window.debugClickAnswerCard = (cardIndex = 0, options = {}) => {
+    if (window.studyQuestApp && window.studyQuestApp.debugClickAnswerCard) {
+      return window.studyQuestApp.debugClickAnswerCard(cardIndex, options);
+    } else {
+      console.log('StudyQuestApp not available or debug function not found');
+      return { success: false, error: 'StudyQuestApp not available' };
+    }
+  };
+
+  // Additional global debug utilities
+  window.debugClickAllAnswerCards = (options = {}) => {
+    if (!window.studyQuestApp) {
+      console.log('StudyQuestApp not available');
+      return { success: false, error: 'StudyQuestApp not available' };
+    }
+    
+    const container = window.studyQuestApp.elements?.answersContainer;
+    if (!container) {
+      console.log('No answers container found');
+      return { success: false, error: 'No answers container found' };
+    }
+    
+    const answerCards = container.querySelectorAll('.answer-card');
+    const results = [];
+    
+    console.log(`Found ${answerCards.length} answer cards, clicking all...`);
+    
+    for (let i = 0; i < answerCards.length; i++) {
+      const result = window.studyQuestApp.debugClickAnswerCard(i, { 
+        ...options, 
+        logDetails: false // Reduce noise when clicking all cards
+      });
+      results.push(result);
+      
+      if (options.delay && i < answerCards.length - 1) {
+        // Add delay between clicks if specified
+        setTimeout(() => {}, options.delay);
+      }
+    }
+    
+    return {
+      success: true,
+      totalCards: answerCards.length,
+      results
+    };
+  };
+
+  window.debugGetAnswerCardInfo = (cardIndex = 0) => {
+    if (!window.studyQuestApp) {
+      console.log('StudyQuestApp not available');
+      return { success: false, error: 'StudyQuestApp not available' };
+    }
+    
+    const container = window.studyQuestApp.elements?.answersContainer;
+    if (!container) {
+      console.log('No answers container found');
+      return { success: false, error: 'No answers container found' };
+    }
+    
+    const answerCards = container.querySelectorAll('.answer-card');
+    if (answerCards.length === 0) {
+      console.log('No answer cards found');
+      return { success: false, error: 'No answer cards found' };
+    }
+    
+    if (cardIndex >= answerCards.length) {
+      console.log('Card index out of bounds');
+      return { success: false, error: 'Card index out of bounds', totalCards: answerCards.length };
+    }
+    
+    const card = answerCards[cardIndex];
+    const cardInfo = {
+      index: cardIndex,
+      className: card.className,
+      dataset: { ...card.dataset },
+      rowIndex: card.dataset.rowIndex,
+      boundingRect: card.getBoundingClientRect(),
+      computedStyle: {
+        display: getComputedStyle(card).display,
+        visibility: getComputedStyle(card).visibility,
+        opacity: getComputedStyle(card).opacity
+      },
+      textContent: card.textContent.trim(),
+      innerHTML: card.innerHTML
+    };
+    
+    console.log('Answer card info:', cardInfo);
+    return { success: true, cardInfo };
+  };
   
   // ドメイン情報とフォームリンクを取得
   loadDomainInfo();
