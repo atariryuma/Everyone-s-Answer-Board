@@ -1175,18 +1175,21 @@
       debounceMap.set(key, timeoutId);
     }
 
-    function showMessage(message, type = 'info') {
+    function showMessage(message, type) {
+      type = type || 'info';
       const messageArea = document.getElementById('message-area');
       if (!messageArea) return;
 
       // 同じメッセージの重複を防ぐ
       const existingMessages = Array.from(messageArea.children);
-      for (const existing of existingMessages) {
-        const existingText = existing.querySelector('span')?.textContent;
+      for (var i = 0; i < existingMessages.length; i++) {
+        var existing = existingMessages[i];
+        var spanElement = existing.querySelector('span');
+        var existingText = spanElement ? spanElement.textContent : null;
         if (existingText === message) {
           // 既存のメッセージを一瞬ハイライト
           existing.style.transform = 'scale(1.05)';
-          setTimeout(() => existing.style.transform = 'scale(1)', 200);
+          setTimeout(function() { existing.style.transform = 'scale(1)'; }, 200);
           return;
         }
       }
@@ -1247,20 +1250,20 @@
 
       // エラーメッセージは長く表示、それ以外は短く表示
       const timeout = type === 'error' ? 5000 : 2500;
-      const removeTimer = setTimeout(() => {
+      const removeTimer = setTimeout(function() {
         const msgEl = document.getElementById(messageId);
         if (msgEl && msgEl.parentNode) {
           msgEl.classList.remove('slide-up');
           msgEl.classList.add('fade-out');
           
           // transitionendイベントに加えてフォールバックタイマーを設定
-          const fallbackTimer = setTimeout(() => {
+          const fallbackTimer = setTimeout(function() {
             if (msgEl && msgEl.parentNode) {
               msgEl.remove();
             }
           }, 500);
           
-          msgEl.addEventListener('transitionend', () => {
+          msgEl.addEventListener('transitionend', function() {
             clearTimeout(fallbackTimer);
             if (msgEl && msgEl.parentNode) {
               msgEl.remove();
@@ -1564,7 +1567,7 @@
       if (headerDomainInitial) headerDomainInitial.classList.add('hidden');
       
       if (!info || info.error) {
-        console.warn('ドメイン情報エラー:', info?.error);
+        console.warn('ドメイン情報エラー:', info && info.error ? info.error : 'Unknown error');
         if (headerDomainInitial) headerDomainInitial.classList.remove('hidden');
         return;
       }
@@ -1765,7 +1768,7 @@
         if (editFormLink) {
           let editUrl = '';
           try {
-            const config = JSON.parse(status.userInfo?.configJson || '{}');
+            const config = JSON.parse(status.userInfo && status.userInfo.configJson ? status.userInfo.configJson : '{}');
             if (config.editFormUrl) {
               editUrl = config.editFormUrl;
             } else if (config.formUrl) {
@@ -2727,12 +2730,12 @@
             // フォームを新しいページで開く
             if (result.formUrl) {
               showMessage('フォームを新しいページで開いています...', 'info');
-              setTimeout(() => {
+              setTimeout(function() {
                 window.open(result.formUrl, '_blank', 'noopener,noreferrer');
               }, 1500); // 1.5秒後に開く
             }
           }
-          setTimeout(() => window.location.reload(), 3000);
+          setTimeout(function() { window.location.reload(); }, 3000);
         })
         .withFailureHandler((error) => {
           showError(error);
