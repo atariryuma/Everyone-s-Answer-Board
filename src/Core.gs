@@ -172,7 +172,16 @@ function getPublishedSheetData(classFilter, sortOrder) {
     var userInfo = getUserWithFallback(currentUserId);
     if (!userInfo) {
       handleMissingUser(currentUserId);
-      throw new Error('ユーザー情報が見つかりません');
+      // Fallback to active user email if property points to missing user
+      var fallbackEmail = Session.getActiveUser().getEmail();
+      var altUser = findUserByEmail(fallbackEmail);
+      if (altUser) {
+        currentUserId = altUser.userId;
+        props.setProperty('CURRENT_USER_ID', currentUserId);
+        userInfo = altUser;
+      } else {
+        throw new Error('ユーザー情報が見つかりません');
+      }
     }
     debugLog('getPublishedSheetData: userInfo=%s', JSON.stringify(userInfo));
     
@@ -294,7 +303,15 @@ function getAppConfig() {
     var userInfo = getUserWithFallback(currentUserId);
     if (!userInfo) {
       handleMissingUser(currentUserId);
-      throw new Error('ユーザー情報が見つかりません');
+      var fallbackEmail = Session.getActiveUser().getEmail();
+      var altUser = findUserByEmail(fallbackEmail);
+      if (altUser) {
+        currentUserId = altUser.userId;
+        props.setProperty('CURRENT_USER_ID', currentUserId);
+        userInfo = altUser;
+      } else {
+        throw new Error('ユーザー情報が見つかりません');
+      }
     }
     
     var configJson = JSON.parse(userInfo.configJson || '{}');
@@ -620,7 +637,15 @@ function getActiveFormInfo(userId) {
     var userInfo = getUserWithFallback(currentUserId);
     if (!userInfo) {
       handleMissingUser(currentUserId);
-      return { status: 'error', message: 'ユーザー情報が見つかりません' };
+      var fallbackEmail = Session.getActiveUser().getEmail();
+      var altUser = findUserByEmail(fallbackEmail);
+      if (altUser) {
+        currentUserId = altUser.userId;
+        props.setProperty('CURRENT_USER_ID', currentUserId);
+        userInfo = altUser;
+      } else {
+        return { status: 'error', message: 'ユーザー情報が見つかりません' };
+      }
     }
 
     var configJson = JSON.parse(userInfo.configJson || '{}');
