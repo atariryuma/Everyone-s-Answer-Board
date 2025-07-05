@@ -214,22 +214,31 @@ function getPublishedSheetData(classFilter, sortOrder) {
     var mainHeaderName = sheetConfig.mainHeader !== undefined ? sheetConfig.mainHeader : (sheetConfig.opinionHeader || COLUMN_HEADERS.OPINION);
     var reasonHeaderName = sheetConfig.rHeader !== undefined ? sheetConfig.rHeader : (sheetConfig.reasonHeader || COLUMN_HEADERS.REASON);
     var classHeaderName = sheetConfig.classHeader !== undefined ? sheetConfig.classHeader : COLUMN_HEADERS.CLASS;
-    var nameHeaderName = sheetConfig.nameHeader !== undefined ? sheetConfig.nameHeader : COLUMN_HEADERS.NAME; // Add nameHeaderName
-    debugLog('getPublishedSheetData: Mapped Headers - mainHeaderName=%s, reasonHeaderName=%s, classHeaderName=%s, nameHeaderName=%s', mainHeaderName, reasonHeaderName, classHeaderName, nameHeaderName);
+    var nameHeaderName = sheetConfig.nameHeader !== undefined ? sheetConfig.nameHeader : COLUMN_HEADERS.NAME;
+    debugLog('getPublishedSheetData: Configured Headers - mainHeaderName=%s, reasonHeaderName=%s, classHeaderName=%s, nameHeaderName=%s', mainHeaderName, reasonHeaderName, classHeaderName, nameHeaderName);
 
     // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
     var headerIndices = getHeaderIndices(publishedSpreadsheetId, publishedSheetName);
-    debugLog('getPublishedSheetData: headerIndices=%s', JSON.stringify(headerIndices));
+    debugLog('getPublishedSheetData: Available headerIndices=%s', JSON.stringify(headerIndices));
+    
+    // 動的列名のマッピング: 設定された名前と実際のヘッダーを照合
+    var mappedIndices = mapConfigToActualHeaders({
+      mainHeader: mainHeaderName,
+      reasonHeader: reasonHeaderName, 
+      classHeader: classHeaderName,
+      nameHeader: nameHeaderName
+    }, headerIndices);
+    debugLog('getPublishedSheetData: Mapped indices=%s', JSON.stringify(mappedIndices));
 
     var formattedData = sheetData.data.map(function(row, index) {
-      // ヘッダーインデックスマップを使用して正確なデータを取得
-      var classIndex = headerIndices[classHeaderName];
-      var opinionIndex = headerIndices[mainHeaderName];
-      var reasonIndex = headerIndices[reasonHeaderName];
-      var nameIndex = headerIndices[nameHeaderName]; // Get nameIndex
+      // マッピングされたインデックスを使用してデータを取得
+      var classIndex = mappedIndices.classHeader;
+      var opinionIndex = mappedIndices.mainHeader;
+      var reasonIndex = mappedIndices.reasonHeader;
+      var nameIndex = mappedIndices.nameHeader;
 
       debugLog('getPublishedSheetData: Row %s - classIndex=%s, opinionIndex=%s, reasonIndex=%s, nameIndex=%s', index, classIndex, opinionIndex, reasonIndex, nameIndex);
-      debugLog('getPublishedSheetData: Row data length=%s, data=%s', row.originalData ? row.originalData.length : 'undefined', JSON.stringify(row.originalData));
+      debugLog('getPublishedSheetData: Row data length=%s, first few values=%s', row.originalData ? row.originalData.length : 'undefined', row.originalData ? JSON.stringify(row.originalData.slice(0, 5)) : 'undefined');
       
       return {
         rowIndex: row.rowNumber || (index + 2), // 実際の行番号
@@ -1672,6 +1681,65 @@ function getColumnHeaderName(columnKey) {
 function getColumnIndex(headers, columnKey) {
   var headerName = getColumnHeaderName(columnKey);
   return getHeaderIndex(headers, headerName);
+}
+
+/**
+ * 設定された列名と実際のスプレッドシートヘッダーをマッピング
+ * @param {Object} configHeaders - 設定されたヘッダー名
+ * @param {Object} actualHeaderIndices - 実際のヘッダーインデックスマップ
+ * @returns {Object} マッピングされたインデックス
+ */
+function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
+  var mappedIndices = {};
+  var availableHeaders = Object.keys(actualHeaderIndices);
+  debugLog('mapConfigToActualHeaders: Available headers in spreadsheet: %s', JSON.stringify(availableHeaders));
+  
+  // 各設定ヘッダーでマッピングを試行
+  for (var configKey in configHeaders) {
+    var configHeaderName = configHeaders[configKey];
+    var mappedIndex = undefined;
+    
+    debugLog('mapConfigToActualHeaders: Trying to map %s = "%s"', configKey, configHeaderName);
+    
+    if (configHeaderName && actualHeaderIndices.hasOwnProperty(configHeaderName)) {
+      // 完全一致
+      mappedIndex = actualHeaderIndices[configHeaderName];
+      debugLog('mapConfigToActualHeaders: Exact match found for %s: index %s', configKey, mappedIndex);
+    } else if (configHeaderName) {
+      // 部分一致で検索（大文字小文字を区別しない）
+      var normalizedConfigName = configHeaderName.toLowerCase().trim();
+      
+      for (var actualHeader in actualHeaderIndices) {
+        var normalizedActualHeader = actualHeader.toLowerCase().trim();
+        if (normalizedActualHeader === normalizedConfigName) {
+          mappedIndex = actualHeaderIndices[actualHeader];
+          debugLog('mapConfigToActualHeaders: Case-insensitive match found for %s: "%s" -> index %s', configKey, actualHeader, mappedIndex);
+          break;
+        }
+      }
+      
+      // 部分一致検索
+      if (mappedIndex === undefined) {
+        for (var actualHeader in actualHeaderIndices) {
+          var normalizedActualHeader = actualHeader.toLowerCase().trim();
+          if (normalizedActualHeader.includes(normalizedConfigName) || normalizedConfigName.includes(normalizedActualHeader)) {
+            mappedIndex = actualHeaderIndices[actualHeader];
+            debugLog('mapConfigToActualHeaders: Partial match found for %s: "%s" -> index %s', configKey, actualHeader, mappedIndex);
+            break;
+          }
+        }
+      }
+    }
+    
+    mappedIndices[configKey] = mappedIndex;
+    
+    if (mappedIndex === undefined) {
+      debugLog('mapConfigToActualHeaders: WARNING - No match found for %s = "%s"', configKey, configHeaderName);
+    }
+  }
+  
+  debugLog('mapConfigToActualHeaders: Final mapping result: %s', JSON.stringify(mappedIndices));
+  return mappedIndices;
 }
 
 /**
