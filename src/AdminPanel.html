@@ -1820,7 +1820,8 @@
       return match ? match[1] : '';
     }
 
-    function setLoading(isLoading, message = '') {
+    // グローバルスコープに関数を登録し、どこからでも安全に呼び出せるようにする
+    window.setLoading = function(isLoading, message = '') {
       console.log(`setLoading called with: ${isLoading}, message: ${message}`);
       
       // 安全にボタンの disabled 状態を更新
@@ -1878,8 +1879,7 @@
       if (isLoading && message) {
         showMessage(message, 'blue');
       }
-    }
-    window.setLoading = setLoading;
+    };
 
 
     function showTeacherGuideModal() {
