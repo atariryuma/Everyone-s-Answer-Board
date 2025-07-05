@@ -43,6 +43,8 @@ function registerNewUser(adminEmail) {
       isActive: 'true',
       configJson: JSON.stringify(updatedConfig)
     });
+    // キャッシュを無効化して最新状態を反映
+    invalidateUserCache(userId, adminEmail, existingUser.spreadsheetId);
     
     debugLog('✅ 既存ユーザー情報を更新しました: ' + adminEmail);
     appUrls = generateAppUrls(userId);
@@ -81,6 +83,8 @@ function registerNewUser(adminEmail) {
   try {
     createUser(userData);
     debugLog('✅ データベースに新規ユーザーを登録しました: ' + adminEmail);
+    // 生成されたユーザー情報のキャッシュをクリア
+    invalidateUserCache(userId, adminEmail);
   } catch (e) {
     console.error('データベースへのユーザー登録に失敗: ' + e.message);
     throw new Error('ユーザー登録に失敗しました。システム管理者に連絡してください。');
@@ -822,6 +826,8 @@ function quickStartSetup(userId) {
       spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
       configJson: JSON.stringify(updatedConfig)
     });
+    // セットアップ完了後に関連キャッシュをクリア
+    invalidateUserCache(userId, userEmail, formAndSsInfo.spreadsheetId);
     
     // ステップ4: 回答ボードを公開状態に設定
     debugLog('🌐 ステップ4: 回答ボード公開中...');
@@ -855,6 +861,7 @@ function quickStartSetup(userId) {
       updateUser(userId, {
         configJson: JSON.stringify(currentConfig)
       });
+      invalidateUserCache(userId, userEmail);
     } catch (updateError) {
       console.error('エラー状態の更新に失敗: ' + updateError.message);
     }
