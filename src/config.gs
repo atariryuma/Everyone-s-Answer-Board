@@ -46,6 +46,46 @@ function openActiveSpreadsheet() {
 }
 
 /**
+ * 現在のスクリプト実行ユーザーのユニークIDを取得する。
+ * まずプロパティストアを確認し、なければセッション情報から取得・保存する。
+ * @returns {string} 現在のユーザーのユニークID
+ */
+function getUserId() {
+  const props = PropertiesService.getUserProperties();
+  let userId = props.getProperty('CURRENT_USER_ID');
+  
+  if (!userId) {
+    // アクティブユーザーのメールアドレスからIDを生成（より安定した方法）
+    const email = Session.getActiveUser().getEmail();
+    if (email) {
+      // メールアドレスをハッシュ化してIDとするなど、ユニークなIDを生成
+      // ここでは簡易的にメールアドレスをそのまま使っていますが、
+      // 必要に応じてUtilities.computeDigest等でハッシュ化してください。
+      userId = email; 
+      props.setProperty('CURRENT_USER_ID', userId);
+    } else {
+      // それでも取得できない場合はエラー
+      throw new Error('ユーザーIDを取得できませんでした。');
+    }
+  }
+  return userId;
+}
+
+// 他の関数も同様に、存在することを確認
+function getUserInfo() {
+  const userId = getUserId();
+  // findUserById関数を呼び出すなど、ユーザー情報を取得するロジック
+  return findUserById(userId); 
+}
+
+function getSheetHeaders(spreadsheetId, sheetName) {
+  const ss = SpreadsheetApp.openById(spreadsheetId);
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return [];
+  return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+}
+
+/**
  * 指定されたシートの設定情報を取得する、新しい推奨関数。
  * 保存された設定があればそれを最優先し、なければ自動マッピングを試みる。
  * @param {string} sheetName - 設定を取得するシート名
@@ -53,10 +93,10 @@ function openActiveSpreadsheet() {
  * @returns {object} 統一された設定オブジェクト
  */
 function getConfig(sheetName, forceRefresh = false) {
-  // ★★★ キャッシュ処理はここから ★★★
+  const userId = getUserId(); // ★修正点: 関数の最初にIDを取得
   const userCache = CacheService.getUserCache();
-  // キャッシュキーをシート名に固有にすることで、シートごとの設定をキャッシュ
-  const cacheKey = 'config_v2_' + getUserId() + '_' + sheetName; 
+  const cacheKey = 'config_v3_' + userId + '_' + sheetName; 
+  
   if (!forceRefresh) {
     const cached = userCache.get(cacheKey);
     if (cached) {
@@ -64,11 +104,10 @@ function getConfig(sheetName, forceRefresh = false) {
       return JSON.parse(cached);
     }
   }
-  // ★★★ キャッシュ処理はここまで ★★★
 
   try {
-    console.log('設定を取得中: シート名 = %s', sheetName);
-    const userInfo = getUserInfo();
+    console.log('設定を取得中: sheetName=%s, userId=%s', sheetName, userId);
+    const userInfo = getUserInfo(); // 依存関係を明確化
     const headers = getSheetHeaders(userInfo.spreadsheetId, sheetName);
 
     // 1. 返却する設定オブジェクトの器を準備
@@ -79,7 +118,7 @@ function getConfig(sheetName, forceRefresh = false) {
       nameHeader: '',
       classHeader: '',
       showNames: false,
-      showCounts: true, // リアクション数はデフォルトで表示
+      showCounts: true, 
       availableHeaders: headers || [],
       hasExistingConfig: false
     };
@@ -103,7 +142,7 @@ function getConfig(sheetName, forceRefresh = false) {
     } else if (headers && headers.length > 0) {
       // 4.【保存設定がない場合のみ】新しい自動マッピングを実行
       console.log('保存済み設定がないため、自動マッピングを実行します。');
-      const guessedConfig = autoMapHeaders(headers); // ★新しい自動判定関数を呼び出す
+      const guessedConfig = autoMapHeaders(headers); 
       finalConfig.opinionHeader = guessedConfig.opinionHeader || '';
       finalConfig.reasonHeader = guessedConfig.reasonHeader || '';
       finalConfig.nameHeader = guessedConfig.nameHeader || '';
@@ -123,12 +162,11 @@ function getConfig(sheetName, forceRefresh = false) {
 }
 
 /**
- * 列ヘッダーのリストから、各項目（意見、理由など）に最もふさわしい列名を推測する
- * @param {Array<string>} headers - スプレッドシートのヘッダー（1行目）のリスト
- * @returns {object} 推測されたマッピング結果 { opinionHeader, reasonHeader, ... }
+ * 列ヘッダーのリストから、各項目に最もふさわしい列名を推測する（改良版）
+ * @param {Array<string>} headers - スプレッドシートのヘッダーリスト
+ * @returns {object} 推測されたマッピング結果
  */
 function autoMapHeaders(headers) {
-  // 各項目で探すキーワードを、優先順位の高い順に並べる
   const mappingRules = {
     opinionHeader: ['今日のテーマ', 'あなたの考え', '意見', 'answer', 'response', 'opinion', '投稿'],
     reasonHeader:  ['そう考える理由', '理由', '詳細', '説明', 'reason'],
@@ -136,32 +174,26 @@ function autoMapHeaders(headers) {
     classHeader:   ['あなたのクラス', 'クラス', '学年', '組', 'class']
   };
 
-  const remainingHeaders = [...headers]; // 未使用のヘッダーを管理する配列
+  const remainingHeaders = [...headers];
   const result = {};
 
-  // 各ルール（opinion, reasonなど）に対して処理を実行
   Object.keys(mappingRules).forEach(key => {
     const keywords = mappingRules[key];
     let bestMatch = '';
 
-    // キーワードリストをループして、最も一致するヘッダーを探す
     for (const keyword of keywords) {
       const matchIndex = remainingHeaders.findIndex(header => 
         header && String(header).toLowerCase().includes(keyword.toLowerCase())
       );
-
       if (matchIndex !== -1) {
         bestMatch = remainingHeaders[matchIndex];
-        // マッチしたヘッダーは、他の項目の候補から削除する
         remainingHeaders.splice(matchIndex, 1); 
-        break; // 一致したら、その項目の探索は終了
+        break;
       }
     }
     result[key] = bestMatch;
   });
 
-  // Googleフォーム特有のメタデータを候補から外す
-  // （もしopinionHeaderが空の場合、メタデータ以外の最初の列を割り当てる）
   if (!result.opinionHeader) {
     const nonMetaHeaders = remainingHeaders.filter(h => {
       const hStr = String(h || '').toLowerCase();
