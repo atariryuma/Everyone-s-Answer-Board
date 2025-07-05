@@ -56,7 +56,7 @@ test.skip('saveSheetConfig appends new row', () => {
   const headers = ['表示シート名','問題文ヘッダー','回答ヘッダー','理由ヘッダー','名前列ヘッダー','クラス列ヘッダー'];
   const { sheet, rows } = setup([headers]);
   const cfg = { questionHeader:'Q', answerHeader:'A', reasonHeader:'R', nameHeader:'名前', classHeader:'クラス' };
-  saveSheetConfig('Sheet1', cfg);
+  saveSheetConfig('spreadsheet-id-123', 'Sheet1', cfg);
   expect(sheet.appendRow).toHaveBeenCalled();
   expect(rows[1]).toEqual(['Sheet1','Q','A','R','名前','クラス']);
 });
