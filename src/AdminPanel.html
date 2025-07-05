@@ -3069,22 +3069,29 @@
     }
 
     function saveConfig() {
-      // 1. 保存するシートが選択されているか確認
-      if (!selectedSheet) {
-        showMessage('シートを選択してください。', 'red');
+      // ★★★ここからが修正後のコード★★★
+
+      // 1. ドロップダウンから現在選択されているシート名を取得
+      const currentSheetName = elements.sheetSelect.value;
+
+      // 2. 必須情報が揃っているか、より厳密にチェック
+      if (!currentSheetName) {
+        showMessage('シートが選択されていません。ドロップダウンから表示したいシートを選んでください。', 'red');
         return;
       }
-      
-      // 2. 必須項目（回答列）が選択されているか確認
       if (!elements.opinionHeader.value) {
-        showMessage('回答データ列を選択してください。', 'red');
+        showMessage('「回答データ列」を選択してください。これは必須項目です。', 'red');
         addVisualFeedback(elements.opinionHeader, 'error');
+        return;
+      }
+      if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
+        showError(new Error('ユーザーのスプレッドシート情報が見つかりません。ページをリロードしてみてください。'));
         return;
       }
 
       // 3. HTMLの入力値から設定オブジェクト（cfg）を作成
-      const showNamesCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showNames"]') : null;
-      const showCountsCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showCounts"]') : null;
+      const showNamesCheckbox = elements.detailOptions.querySelector('input[name="showNames"]');
+      const showCountsCheckbox = elements.detailOptions.querySelector('input[name="showCounts"]');
       
       const cfg = {
         opinionHeader: elements.opinionHeader.value,
@@ -3098,35 +3105,37 @@
       // 4. ローディング表示を開始
       setLoading(true, '設定を保存・適用中...');
       elements.saveConfigBtn.disabled = true;
-      if (elements.saveConfigText) {
-        elements.saveConfigText.textContent = '処理中...';
-      }
+      if (elements.saveConfigText) elements.saveConfigText.textContent = '処理中...';
 
-      // 5. ★重要★ サーバーの統合関数を一度だけ呼び出す
+      // 5. サーバーの統合関数を、正しい引数で呼び出す
       google.script.run
-        .withSuccessHandler(function(latestStatus) {
-          // 成功した場合：サーバーから返された最新の状態でUIを更新
-          updateStatus(latestStatus);
+        .withSuccessHandler(function(result) {
+          if (result && result.success) {
+            // 成功した場合：サーバーから返された最新の状態でUIを更新
+            updateStatus(result.status);
+            showMessage(result.message || '設定の保存とボードの公開が完了しました。', 'success');
+            markStepCompleted(3);
+          } else {
+            // サーバー側で制御されたエラーの場合
+            showError(new Error(result.message || '不明なエラーが発生しました。'));
+          }
           
-          showMessage('設定の保存とボードの公開が完了しました。', 'success');
-          markStepCompleted(3); // ステップ3を完了済みにする
-          
-          // ボタンとローディング表示を元に戻す
           setLoading(false);
           elements.saveConfigBtn.disabled = false;
-          if (elements.saveConfigText) {
-            elements.saveConfigText.textContent = '設定を保存して公開';
-          }
+          if (elements.saveConfigText) elements.saveConfigText.textContent = '設定を保存して公開';
         })
         .withFailureHandler(function(error) {
-          // 失敗した場合：エラーを表示し、ボタンを元に戻す
+          // 通信失敗などの致命的なエラーの場合
           showError(error);
+          setLoading(false);
           elements.saveConfigBtn.disabled = false;
-          if (elements.saveConfigText) {
-            elements.saveConfigText.textContent = '設定を保存して公開';
-          }
+          if (elements.saveConfigText) elements.saveConfigText.textContent = '設定を保存して公開';
         })
-        .saveAndActivateSheet(selectedSheet, cfg); // サーバーにシート名と設定オブジェクトを渡す
+        .saveAndActivateSheet(
+          currentStatus.userInfo.spreadsheetId, // 第1引数: スプレッドシートID
+          currentSheetName,                      // 第2引数: ドロップダウンから直接取得したシート名
+          cfg                                    // 第3引数: 設定オブジェクト
+        ); 
     }
 
     function switchToSheet() {
