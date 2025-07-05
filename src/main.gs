@@ -339,25 +339,38 @@ function doGet(e) {
       // Page.html直接アクセス時は、パラメータ指定されたページを表示
       if (isDirectPageAccess) {
         console.log('DEBUG: Direct page access detected. Showing specified page.');
-        var pageTemplate = HtmlService.createTemplateFromFile('Page');
-        pageTemplate.userId = userId;
-        pageTemplate.sheetName = sheetName;
-        pageTemplate.spreadsheetId = spreadsheetId;
-        pageTemplate.displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
-        pageTemplate.showCounts = configJson.showCounts !== false;
-        var key = 'sheet_' + sheetName;
-        pageTemplate.mapping = configJson[key] || {};
-        pageTemplate.ownerName = userInfo.adminEmail;
-        var isOwner = (userEmail === userInfo.adminEmail);
-        pageTemplate.showAdminFeatures = isOwner;
-        pageTemplate.showHighlightToggle = isOwner;
-        pageTemplate.showScoreSort = true;
-        pageTemplate.isStudentMode = !isOwner;
-        pageTemplate.isAdminUser = isOwner;
-        var pageHtml = pageTemplate.evaluate()
-          .setTitle('回答ボード - みんなの回答ボード');
-        console.log('DEBUG: Serving Page HTML for direct access');
-        return safeSetXFrameOptionsDeny(pageHtml);
+        const template = HtmlService.createTemplateFromFile('Page.html');
+
+        try {
+          const config = JSON.parse(userInfo.configJson || '{}');
+          const sheetConfigKey = 'sheet_' + (config.publishedSheetName || sheetName);
+          const sheetConfig = config[sheetConfigKey] || {};
+          
+          template.userId = userInfo.userId;
+          template.spreadsheetId = userInfo.spreadsheetId;
+          template.ownerName = userInfo.adminEmail;
+          template.sheetName = config.publishedSheetName || sheetName;
+          template.opinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+          template.displayMode = config.displayMode || 'anonymous';
+          template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
+          template.showAdminFeatures = false; // Page.html is for public view, not admin
+          template.isAdminUser = false; // Page.html is for public view, not admin
+
+        } catch (e) {
+          template.opinionHeader = 'お題の読込エラー';
+          template.userId = userInfo.userId;
+          template.spreadsheetId = userInfo.spreadsheetId;
+          template.ownerName = userInfo.adminEmail;
+          template.sheetName = sheetName;
+          template.displayMode = 'anonymous';
+          template.showCounts = true;
+          template.showAdminFeatures = false; // Page.html is for public view, not admin
+          template.isAdminUser = false; // Page.html is for public view, not admin
+        }
+        
+        return template.evaluate()
+            .setTitle('StudyQuest -みんなの回答ボード-')
+            .addMetaTag('viewport', 'width=device-width, initial-scale=1');
       }
 
       // 要件に従ったリダイレクトロジック：
@@ -389,27 +402,38 @@ function doGet(e) {
       if (mode === 'view' && isPublished) {
         // 明示的な回答ボード表示要求（公開済みの場合のみ）
         console.log('DEBUG: Explicit view mode request for published board. Showing Page.');
-        var pageTemplate = HtmlService.createTemplateFromFile('Page');
-        var publishedSheetName = configJson.publishedSheetName;
-        var publishedSpreadsheetId = configJson.publishedSpreadsheetId;
-        pageTemplate.userId = userInfo.userId;
-        pageTemplate.sheetName = publishedSheetName;
-        pageTemplate.spreadsheetId = publishedSpreadsheetId;
-        pageTemplate.displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
-        pageTemplate.showCounts = configJson.showCounts !== false;
-        var key = 'sheet_' + publishedSheetName;
-        pageTemplate.mapping = configJson[key] || {};
-        pageTemplate.ownerName = userInfo.adminEmail;
-        var isOwner = (userEmail === userInfo.adminEmail);
-        pageTemplate.showAdminFeatures = isOwner;
-        pageTemplate.showHighlightToggle = isOwner;
-        pageTemplate.showScoreSort = true;
-        pageTemplate.isStudentMode = !isOwner;
-        pageTemplate.isAdminUser = isOwner;
-        var pageHtml = pageTemplate.evaluate()
-          .setTitle('回答ボード - みんなの回答ボード');
-        console.log('DEBUG: Serving Page HTML for published board');
-        return safeSetXFrameOptionsDeny(pageHtml);
+        const template = HtmlService.createTemplateFromFile('Page.html');
+        
+        try {
+          const config = JSON.parse(userInfo.configJson || '{}');
+          const sheetConfigKey = 'sheet_' + (config.publishedSheetName || sheetName);
+          const sheetConfig = config[sheetConfigKey] || {};
+          
+          template.userId = userInfo.userId;
+          template.spreadsheetId = userInfo.spreadsheetId;
+          template.ownerName = userInfo.adminEmail;
+          template.sheetName = config.publishedSheetName || sheetName;
+          template.opinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+          template.displayMode = config.displayMode || 'anonymous';
+          template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
+          template.showAdminFeatures = false; // Page.html is for public view, not admin
+          template.isAdminUser = false; // Page.html is for public view, not admin
+
+        } catch (e) {
+          template.opinionHeader = 'お題の読込エラー';
+          template.userId = userInfo.userId;
+          template.spreadsheetId = userInfo.spreadsheetId;
+          template.ownerName = userInfo.adminEmail;
+          template.sheetName = sheetName;
+          template.displayMode = 'anonymous';
+          template.showCounts = true;
+          template.showAdminFeatures = false; // Page.html is for public view, not admin
+          template.isAdminUser = false; // Page.html is for public view, not admin
+        }
+        
+        return template.evaluate()
+            .setTitle('StudyQuest -みんなの回答ボード-')
+            .addMetaTag('viewport', 'width=device-width, initial-scale=1');
       }
 
       // デフォルト：パラメータなしのアクセスは管理パネルへ

@@ -52,6 +52,7 @@ const __MAPPING__ = '<?= typeof mapping !== "undefined" ? JSON.stringify(mapping
 const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
 const __SPREADSHEET_ID__ = '<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>';
 const __OWNER_NAME__ = '<?= typeof ownerName !== "undefined" ? ownerName : "" ?>';
+const __OPINION_HEADER__ = '<?= typeof opinionHeader !== "undefined" ? opinionHeader : "お題" ?>';
 const __SHOW_ADMIN_FEATURES__ = '<?= typeof showAdminFeatures !== "undefined" ? showAdminFeatures : false ?>';
 const __SHOW_HIGHLIGHT_TOGGLE__ = '<?= typeof showHighlightToggle !== "undefined" ? showHighlightToggle : false ?>';
 const __SHOW_SCORE_SORT__ = '<?= typeof showScoreSort !== "undefined" ? showScoreSort : false ?>';
@@ -1551,52 +1552,28 @@ class StudyQuestApp {
     }
     this.elements.answersContainer.appendChild(frag);
   }
-  // ★★★ 以下の2つの関数を新しくPage.htmlの<script>内に追加 ★★★
 
-/**
- * 回答データが0件の場合に表示するメッセージを生成する関数
- */
-function displayEmptyState() {
-  const board = document.getElementById('answer-board'); // 回答ボードのコンテナID
-  if (!board) return;
+  displayEmptyState() {
+    const container = this.elements.answersContainer;
+    if (!container) return;
+    
+    container.innerHTML = `
+      <div class="text-center py-16 px-6 col-span-full">
+        <svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+        <h3 class="mt-2 text-lg font-medium text-white">まだ回答がありません</h3>
+        <p class="mt-1 text-sm text-gray-400">最初の回答者になりましょう！</p>
+      </div>
+    `;
+  }
 
-  // 既存の表示をクリア
-  board.innerHTML = '';
-
-  // メッセージ要素を作成
-  const emptyMessageDiv = document.createElement('div');
-  emptyMessageDiv.className = 'text-center py-16 px-6'; // TailwindCSSで見栄えを調整
-  
-  const icon = `<svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>`;
-  const title = '<h3 class="mt-2 text-lg font-medium text-white">まだ回答がありません</h3>';
-  const description = '<p class="mt-1 text-sm text-gray-400">最初の回答者になりましょう！</p>';
-  
-  emptyMessageDiv.innerHTML = icon + title + description;
-  
-  board.appendChild(emptyMessageDiv);
-}
-
-/**
- * サーバーから受け取ったデータでボードを更新する関数（既存の描画処理をこの中に入れる）
- * @param {Array} data - 回答データの配列
- */
-function updateBoard(data) {
-  const board = document.getElementById('answer-board');
-  if (!board) return;
-
-  // 既存の表示をクリア
-  board.innerHTML = '';
-
-  // dataをループしてカードを作成・追加する、既存のロジック
-  data.forEach(item => {
-    const card = createAnswerCard(item); // createAnswerCardはカードを生成する既存の関数と仮定
-    if (card) {
-      board.appendChild(card);
+  setupCriticalElements() {
+    if (this.elements.headingLabel) {
+      const opinionHeader = __OPINION_HEADER__.startsWith('<') ? 'お題を読み込み中...' : this.escapeHtml(__OPINION_HEADER__);
+      this.elements.headingLabel.textContent = opinionHeader;
     }
-  });
-}
+  }
 
   async loadSheetData(showLoading = true, isInitialLoad = false, requestedSheetName = null) {
     if (this.state.isLoading && showLoading) return;
@@ -1623,100 +1600,52 @@ function updateBoard(data) {
     }
     try {
       const sortOrder = this.elements.sortOrder.value;
-      const data = await google.script.run
-  .withSuccessHandler(function(result) {
-    // ローディング表示を終了
-    setLoading(false); 
+      const classFilter = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
+      
+      google.script.run
+        .withSuccessHandler(result => {
+          if (!result || !result.data || result.data.length === 0) {
+            this.displayEmptyState();
+            if (isInitialLoad) {
+              this.state.lastSeenCount = 0;
+            }
+            return;
+          }
 
-    // ★★★ ここからが修正箇所 ★★★
-    
-    // 1. サーバーからデータが返されなかったり、データが0件の場合の処理
-    if (!result || !result.data || result.data.length === 0) {
-      // 「回答がありません」というメッセージを表示するための専用関数を呼び出す
-      displayEmptyState(); 
-      return; // ここで処理を終了
-    }
+          this.state.currentAnswers = result.data;
+          
+          if (isInitialLoad) {
+            this.state.lastSeenCount = result.data.length;
+          }
 
-    // 2. データが1件以上ある場合は、これまで通りボードを描画する
-    // （既存の描画処理をここに記述）
-    updateBoard(result.data); 
-    setHeader(result.header);
-    // ...など
-
-    // ★★★ ここまでが修正箇所 ★★★
-  })
-  .withFailureHandler(function(error) {
-    // エラー処理
-    setLoading(false);
-    showError(error.message);
-  })
-  .getPublishedSheetData(classFilter, sortOrder);
-      this.state.sheetName = data.sheetName;
-      if (typeof data.showCounts !== 'undefined') {
-        this.serverShowCounts = data.showCounts;
-      }
-      if (typeof data.displayMode !== 'undefined') { // Use displayMode from server
-        this.serverDisplayMode = data.displayMode;
-      }
-      if (!this.state.showAdminFeatures) {
-        window.showCounts = this.serverShowCounts;
-        window.displayMode = this.serverDisplayMode;
-        this.updateConfigFromGlobals();
-      }
+          this.renderBoard(false);
+        })
+        .withFailureHandler(error => {
+          console.error('Error loading sheet data:', error);
+          this.displayEmptyState();
+        })
+        .getPublishedSheetData(classFilter, sortOrder);
+      
+      
+      // Post-processing after successful data load
       this.adjustLayout();
+      
       if (!this.state.isAdminUser) {
         this.state.showAdminFeatures = false;
         this.state.showHighlightToggle = false;
       } else {
-        // 管理者の場合のハイライトトグルは常に表示
         this.state.showHighlightToggle = true;
         debugLog('loadSheetData管理者設定更新:', {
           isAdminUser: this.state.isAdminUser,
           showAdminFeatures: this.state.showAdminFeatures,
           showHighlightToggle: this.state.showHighlightToggle
         });
-        // ハイライトトグル設定が変更されたのでキャッシュをクリア
         this.cache.clear();
         debugLog('管理者ハイライト設定によりキャッシュクリア実行');
       }
+      
       if (isInitialLoad) {
-        // Add visual feedback that loading is complete
         this.elements.answersContainer.classList.add('render-optimized');
-        requestIdleCallback(() => {
-          this.populateClassFilter(data.data); // Use data.data
-          this.elements.sheetNameText.textContent = 'シート: ' + this.escapeHtml(data.sheetName || '不明');
-        });
-      } else {
-        // 状態変更時はカードを再描画してハイライトボタンの表示を更新
-        this.renderBoard();
-      }
-      if (JSON.stringify(this.state.currentAnswers) !== JSON.stringify(data.data)) { // Use data.data
-        this.state.currentAnswers = data.data; // Use data.data
-        this.elements.headingLabel.textContent = this.escapeHtml(data.header || '問題');
-        
-        // 初期ロード時にlastSeenCountを設定
-        if (isInitialLoad) {
-          this.state.lastSeenCount = data.data.length; // Use data.data
-          debugLog('初期ロード完了、lastSeenCount設定:', this.state.lastSeenCount);
-        }
-        
-        // デバッグ用: 受信したデータの確認
-        debugLog('Sheet data received:', {
-          totalRows: data.data.length, // Use data.data
-          sampleRow: data.data[0] || null, // Use data.data
-          showAdminFeatures: this.state.showAdminFeatures,
-          displayMode: this.state.displayMode,
-          lastSeenCount: this.state.lastSeenCount
-        });
-        
-        // Use requestAnimationFrame for smooth rendering
-        requestAnimationFrame(() => {
-          this.renderBoard(false, oldAnswers);
-        });
-      } else if (isInitialLoad) {
-        // データに変更がない場合でも初期ロード時はlastSeenCountを設定
-        this.state.lastSeenCount = data.data.length; // Use data.data
-        debugLog('初期ロード（データ変更なし）、lastSeenCount設定:', this.state.lastSeenCount);
       }
     } catch (error) {
       console.error('Error loading sheet data:', error);
