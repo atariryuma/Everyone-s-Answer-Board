@@ -617,32 +617,38 @@
               </div>
             </div>
             
-            <!-- 上級者向け：既存スプレッドシート -->
+            <!-- 外部リソースの連携 (上級者向け) -->
             <details class="bg-gray-800/30 border border-gray-600/30 rounded-xl">
               <summary class="p-4 cursor-pointer text-sm font-medium text-gray-300 hover:text-white flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
                 </svg>
-                上級者向け：既存のスプレッドシートを使用
+                外部リソースの連携 (上級者向け)
               </summary>
               <div class="p-4 pt-0 space-y-4">
-                <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-                  <label class="block text-sm font-medium text-blue-200 mb-2">
-                    スプレッドシートURL
+                <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
+                  <label class="block text-sm font-medium text-purple-200 mb-2">
+                    GoogleフォームまたはスプレッドシートのURL
                   </label>
                   <div class="space-y-3">
                     <input type="url" 
-                           id="spreadsheet-url-input" 
-                           placeholder="https://docs.google.com/spreadsheets/d/..."
+                           id="resource-url-input" 
+                           placeholder="https://docs.google.com/forms/d/... または https://docs.google.com/spreadsheets/d/..."
                            class="form-control"
-                           aria-describedby="url-help">
-                    <p id="url-help" class="text-xs text-blue-300">
-                      既存のGoogleスプレッドシートのURLを貼り付けてください
+                           aria-describedby="resource-url-help">
+                    <p id="resource-url-help" class="text-xs text-purple-300">
+                      既存のGoogleフォームまたはスプレッドシートのURLを貼り付けてください
                     </p>
-                    <button type="button" id="add-spreadsheet-btn" class="btn btn-primary w-full">
-                      <span id="add-spreadsheet-text">スプレッドシートを追加</span>
-                    </button>
+                    <div class="flex gap-2">
+                      <button type="button" id="add-resource-btn" class="btn btn-primary flex-1">
+                        <span id="add-resource-text">リソースを追加</span>
+                      </button>
+                      <button type="button" id="open-resource-btn" class="btn btn-secondary px-3" disabled title="追加後にリソースを開く">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14l-4 4-2-2"></path>
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -907,20 +913,6 @@
               </button>
             </div>
             
-            <!-- トラブルシューティング -->
-            <div class="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
-              <h4 class="font-medium text-red-200 mb-3 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                よくある問題
-              </h4>
-              <ul class="list-disc list-inside space-y-1 text-xs text-red-100">
-                <li>シートが表示されない→権限を確認</li>
-                <li>フォームが作成できない→ドライブ容量を確認</li>
-                <li>データが反映されない→しばらく待ってから再読み込み</li>
-              </ul>
-            </div>
           </div>
         </div>
         
@@ -1700,7 +1692,18 @@
         });
       }
       
-      // Spreadsheet management
+      // Resource management (unified for forms and spreadsheets)
+      const addResourceBtn = document.getElementById('add-resource-btn');
+      if (addResourceBtn) {
+        addResourceBtn.addEventListener('click', addResource);
+      }
+      
+      const openResourceBtn = document.getElementById('open-resource-btn');
+      if (openResourceBtn) {
+        openResourceBtn.addEventListener('click', openResource);
+      }
+      
+      // Legacy spreadsheet management (keep for compatibility)
       const addSpreadsheetBtn = document.getElementById('add-spreadsheet-btn');
       if (addSpreadsheetBtn) {
         addSpreadsheetBtn.addEventListener('click', addSpreadsheet);
@@ -1826,20 +1829,36 @@
       if (status && status.systemStatus && status.systemStatus.formCreated) {
         if (formEditSection) formEditSection.classList.remove('hidden');
         
-        // 編集URLを設定
-        if (editFormLink && status.userInfo && status.userInfo.configJson) {
+        // 正しい編集URLを設定 (/editで終わるURL)
+        if (editFormLink) {
+          let editUrl = '';
           try {
-            const config = JSON.parse(status.userInfo.configJson || '{}');
+            const config = JSON.parse(status.userInfo?.configJson || '{}');
             if (config.editFormUrl) {
-              editFormLink.href = config.editFormUrl;
+              editUrl = config.editFormUrl;
+            } else if (config.formUrl) {
+              // formUrlからeditUrlを生成
+              const formId = extractFormIdFromUrl(config.formUrl);
+              if (formId) {
+                editUrl = `https://docs.google.com/forms/d/${formId}/edit`;
+              }
             }
+            editFormLink.href = editUrl || '#';
           } catch (e) {
             console.warn('フォームURLの取得に失敗:', e);
+            editFormLink.href = '#';
           }
         }
       } else {
         if (formEditSection) formEditSection.classList.add('hidden');
       }
+    }
+    
+    // フォームIDをURLから抽出するヘルパー関数
+    function extractFormIdFromUrl(url) {
+      if (!url) return '';
+      const match = url.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+      return match ? match[1] : '';
     }
 
     function setLoading(isLoading, message = '') {
@@ -2497,6 +2516,86 @@
           noDataDiv.textContent = '活動データがありません';
           activityList.appendChild(noDataDiv);
         }
+      }
+    }
+
+    // New unified resource function with URL type detection
+    function addResource() {
+      const urlInput = document.getElementById('resource-url-input');
+      const addBtn = document.getElementById('add-resource-btn');
+      const openBtn = document.getElementById('open-resource-btn');
+      const addResourceText = document.getElementById('add-resource-text');
+      const url = urlInput ? urlInput.value.trim() : '';
+      
+      if (!url) {
+        showMessage('GoogleフォームまたはスプレッドシートのURLを入力してください。', 'red');
+        if (urlInput) {
+          addVisualFeedback(urlInput, 'error');
+          urlInput.focus();
+        }
+        return;
+      }
+      
+      // Detect URL type
+      const isForm = url.includes('docs.google.com/forms');
+      const isSpreadsheet = url.includes('docs.google.com/spreadsheets');
+      
+      if (!isForm && !isSpreadsheet) {
+        showMessage('有効なGoogleフォームまたはスプレッドシートのURLを入力してください。', 'red');
+        if (urlInput) {
+          addVisualFeedback(urlInput, 'error');
+          urlInput.focus();
+        }
+        return;
+      }
+      
+      const resourceType = isForm ? 'フォーム' : 'スプレッドシート';
+      setLoading(true, `${resourceType}を追加中...`);
+      
+      if (addBtn) addBtn.disabled = true;
+      if (addResourceText) addResourceText.textContent = '追加中...';
+      
+      // Use appropriate server function based on URL type
+      const serverFunction = isForm ? 'addFormUrl' : 'addSpreadsheetUrl';
+      
+      google.script.run
+        .withSuccessHandler((result) => {
+          showMessage(result.message || `${resourceType}が正常に追加されました`, 'green');
+          if (urlInput) {
+            addVisualFeedback(urlInput, 'success');
+            urlInput.value = '';
+          }
+          if (addBtn) addBtn.disabled = false;
+          if (openBtn) {
+            openBtn.disabled = false;
+            openBtn.setAttribute('data-url', url);
+          }
+          if (addResourceText) addResourceText.textContent = 'リソースを追加';
+          
+          // Mark step 1 as completed (data preparation)
+          markStepCompleted(1);
+          loadStatus(); // Refresh the status
+        })
+        .withFailureHandler((error) => {
+          console.error(`${serverFunction} error:`, error);
+          showMessage(`${resourceType}の追加に失敗しました: ` + error.message, 'error');
+          if (urlInput) addVisualFeedback(urlInput, 'error');
+          if (addBtn) addBtn.disabled = false;
+          if (addResourceText) addResourceText.textContent = 'リソースを追加';
+          setLoading(false);
+        })
+        [serverFunction](url);
+    }
+    
+    // Function to open the added resource
+    function openResource() {
+      const openBtn = document.getElementById('open-resource-btn');
+      const url = openBtn ? openBtn.getAttribute('data-url') : '';
+      
+      if (url) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } else {
+        showMessage('開くリソースが見つかりません。先にリソースを追加してください。', 'yellow');
       }
     }
 
