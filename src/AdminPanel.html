@@ -667,14 +667,14 @@
                 <p class="text-xs text-gray-400">表示したいシートを選択</p>
               </div>
             </div>
-            <button type="button" class="toggle-section" onclick="toggleSection('step2-content')" aria-expanded="false" aria-label="セクションを展開/折りたたみ">
+            <button type="button" class="toggle-section" onclick="toggleSection('step2-content')" aria-expanded="true" aria-label="セクションを展開/折りたたみ">
               <svg class="w-5 h-5 text-gray-400 transition-transform" id="step2-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
               </svg>
             </button>
           </div>
           
-          <div id="step2-content" class="progressive-section collapsed">
+          <div id="step2-content" class="progressive-section expanded">
             <div class="space-y-4">
               <div class="space-y-3">
                 <!-- シート選択の説明 -->
@@ -724,14 +724,14 @@
                 <p class="text-xs text-gray-400">列設定を行い公開</p>
               </div>
             </div>
-            <button type="button" class="toggle-section" onclick="toggleSection('step3-content')" aria-expanded="false" aria-label="セクションを展開/折りたたみ">
+            <button type="button" class="toggle-section" onclick="toggleSection('step3-content')" aria-expanded="true" aria-label="セクションを展開/折りたたみ">
               <svg class="w-5 h-5 text-gray-400 transition-transform" id="step3-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
               </svg>
             </button>
           </div>
           
-          <div id="step3-content" class="progressive-section collapsed">
+          <div id="step3-content" class="progressive-section expanded">
             <div id="config-area" class="space-y-4 hidden">
               <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
                 <div class="flex items-center gap-2 mb-2">
@@ -840,6 +840,7 @@
                 <li>データ準備：フォーム作成またはスプレッドシート追加</li>
                 <li>シート選択：表示したいシートを選択</li>
                 <li>設定・公開：列設定を行い回答ボードを公開</li>
+                <li>デジタルシティズンシップ：責任あるデジタル利用を指導</li>
               </ol>
             </div>
             
@@ -2367,6 +2368,8 @@
           if (elements.addSpreadsheetText) {
             elements.addSpreadsheetText.textContent = 'スプレッドシートを追加';
           }
+          // Mark step 1 as completed (data preparation)
+          markStepCompleted(1);
           loadStatus(); // Refresh the status
         })
         .withFailureHandler((error) => {
@@ -2413,6 +2416,9 @@
       google.script.run
         .withSuccessHandler((result) => {
           showMessage(result.message || 'ボードが正常に作成されました', 'green');
+          // Mark step 1 as completed (data preparation)
+          markStepCompleted(1);
+          
           if (result.formUrl && elements.formUrlInput) {
             elements.formUrlInput.value = result.formUrl;
             elements.openFormUrlLink.href = result.formUrl;
@@ -2736,10 +2742,15 @@
           updateSetupProgress();
           setLoading(false);
 
+          // Mark step 2 as completed (sheet selection)
+          markStepCompleted(2);
+          
           // Call switchToSheet after saving config
           google.script.run
             .withSuccessHandler((switchMsg) => {
               showMessage(typeof switchMsg === 'string' ? switchMsg : switchMsg.message || 'シートが正常に切り替わりました', 'green');
+              // Mark step 3 as completed (configuration and publishing)
+              markStepCompleted(3);
               loadStatus(); // Reload status to reflect published state
             })
             .withFailureHandler(showError)
@@ -2934,23 +2945,52 @@
       }
     }
 
+    // Progressive section management
+    let completedSteps = new Set();
+    
+    function markStepCompleted(stepNumber) {
+      completedSteps.add(stepNumber);
+      
+      // Close completed sections except step 3
+      if (stepNumber !== 3) {
+        const stepContent = document.getElementById(`step${stepNumber}-content`);
+        if (stepContent && stepContent.classList.contains('expanded')) {
+          toggleSection(`step${stepNumber}-content`);
+        }
+      }
+      
+      // If step 3 is completed, reopen all sections
+      if (stepNumber === 3) {
+        reopenAllSections();
+      }
+    }
+    
+    function reopenAllSections() {
+      ['step1-content', 'step2-content', 'step3-content'].forEach(sectionId => {
+        const section = document.getElementById(sectionId);
+        if (section && section.classList.contains('collapsed')) {
+          toggleSection(sectionId);
+        }
+      });
+    }
+    
     // Initialize progressive disclosure on page load
     window.addEventListener('DOMContentLoaded', function() {
-      // Set initial states for progressive sections
+      // Set initial states: all sections open initially
       const step1Content = document.getElementById('step1-content');
       const step2Content = document.getElementById('step2-content');
       const step3Content = document.getElementById('step3-content');
       
       if (step1Content) step1Content.classList.add('expanded');
-      if (step2Content) step2Content.classList.add('collapsed');
-      if (step3Content) step3Content.classList.add('collapsed');
+      if (step2Content) step2Content.classList.add('expanded');
+      if (step3Content) step3Content.classList.add('expanded');
       
-      // Initialize step icons
+      // Initialize step icons (all pointing down for expanded)
       const step1Icon = document.getElementById('step1-icon');
       const step2Icon = document.getElementById('step2-icon');
       const step3Icon = document.getElementById('step3-icon');
       
-      if (step1Icon) step1Icon.style.transform = 'rotate(90deg)';
+      if (step1Icon) step1Icon.style.transform = 'rotate(0deg)';
       if (step2Icon) step2Icon.style.transform = 'rotate(0deg)';
       if (step3Icon) step3Icon.style.transform = 'rotate(0deg)';
     });
