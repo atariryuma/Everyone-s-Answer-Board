@@ -211,15 +211,11 @@ function getHeadersCached(spreadsheetId, sheetName) {
       
       var indices = {};
       
-      // COLUMN_HEADERSの各キーに対してインデックスを生成
-      Object.keys(COLUMN_HEADERS).forEach(function(key) {
-        var headerName = COLUMN_HEADERS[key];
-        var index = headers.indexOf(headerName);
-        if (index !== -1) {
+      // すべてのヘッダーのインデックスを生成（動的ヘッダーに対応）
+      headers.forEach(function(headerName, index) {
+        if (headerName && headerName.trim() !== '') {
           indices[headerName] = index;
           console.log(`[getHeadersCached] Mapped ${headerName} -> ${index}`);
-        } else {
-          console.log(`[getHeadersCached] Header not found: ${headerName}`);
         }
       });
       

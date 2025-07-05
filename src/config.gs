@@ -57,19 +57,22 @@ function getConfig(sheetName) {
     var currentUserId = props.getProperty('CURRENT_USER_ID');
     console.log('getConfig: userId=%s, sheetName=%s', currentUserId, sheetName);
 
-    // デフォルト設定（COLUMN_HEADERSと統一）
+    // デフォルト設定（データベース設定キーと統一）
     var config = {
+      // データベース設定キー（プライマリ）
+      mainHeader: COLUMN_HEADERS.OPINION,
+      rHeader: COLUMN_HEADERS.REASON,
+      nameHeader: COLUMN_HEADERS.NAME,
+      classHeader: COLUMN_HEADERS.CLASS,
+      
+      // 後方互換性のための旧キー
       questionHeader: COLUMN_HEADERS.TIMESTAMP,
       answerHeader: COLUMN_HEADERS.OPINION,
       reasonHeader: COLUMN_HEADERS.REASON,
-      nameHeader: COLUMN_HEADERS.NAME,
-      classHeader: COLUMN_HEADERS.CLASS,
-      rosterSheetName: '名簿',
-      mainHeader: COLUMN_HEADERS.OPINION,
-      rHeader: COLUMN_HEADERS.REASON,
       opinionHeader: COLUMN_HEADERS.OPINION,
       timestampHeader: COLUMN_HEADERS.TIMESTAMP,
-      emailHeader: COLUMN_HEADERS.EMAIL
+      emailHeader: COLUMN_HEADERS.EMAIL,
+      rosterSheetName: '名簿'
     };
 
     // シート固有の設定を取得
@@ -90,14 +93,16 @@ function getConfig(sheetName) {
               hasExistingConfig = true;
               var savedConfig = configJson[sheetConfigKey];
               
-              // 保存された設定を適用
+              // 保存された設定を適用（データベース設定キーを優先）
               config.mainHeader = savedConfig.mainHeader !== undefined ? savedConfig.mainHeader : config.mainHeader;
               config.rHeader = savedConfig.rHeader !== undefined ? savedConfig.rHeader : config.rHeader;
               config.nameHeader = savedConfig.nameHeader !== undefined ? savedConfig.nameHeader : config.nameHeader;
               config.classHeader = savedConfig.classHeader !== undefined ? savedConfig.classHeader : config.classHeader;
-              config.answerHeader = savedConfig.mainHeader !== undefined ? savedConfig.mainHeader : config.answerHeader;
-              config.opinionHeader = savedConfig.mainHeader !== undefined ? savedConfig.mainHeader : config.opinionHeader;
-              config.reasonHeader = savedConfig.rHeader !== undefined ? savedConfig.rHeader : config.reasonHeader;
+              
+              // 後方互換性のための旧キーを更新
+              config.answerHeader = config.mainHeader;
+              config.opinionHeader = config.mainHeader;
+              config.reasonHeader = config.rHeader;
               
               console.log('保存済み設定を適用しました:', savedConfig);
             }
@@ -128,9 +133,11 @@ function getConfig(sheetName) {
               config.rHeader = autoMapping.rHeader || config.rHeader;
               config.nameHeader = autoMapping.nameHeader || config.nameHeader;
               config.classHeader = autoMapping.classHeader || config.classHeader;
-              config.answerHeader = autoMapping.mainHeader || config.answerHeader;
-              config.opinionHeader = autoMapping.mainHeader || config.opinionHeader;
-              config.reasonHeader = autoMapping.rHeader || config.reasonHeader;
+              
+              // 後方互換性のための旧キーを更新
+              config.answerHeader = config.mainHeader;
+              config.opinionHeader = config.mainHeader;
+              config.reasonHeader = config.rHeader;
               
               console.log('自動マッピングを適用しました:', autoMapping);
               
@@ -153,12 +160,9 @@ function getConfig(sheetName) {
                 var headerLower = header.toString().toLowerCase();
                 if (headerLower.includes('回答') || headerLower.includes('意見') || headerLower.includes('answer')) {
                   config.mainHeader = header;
-                  config.answerHeader = header;
-                  config.opinionHeader = header;
                 }
                 if (headerLower.includes('理由') || headerLower.includes('reason')) {
                   config.rHeader = header;
-                  config.reasonHeader = header;
                 }
                 if (headerLower.includes('名前') || headerLower.includes('name')) {
                   config.nameHeader = header;
@@ -167,6 +171,11 @@ function getConfig(sheetName) {
                   config.classHeader = header;
                 }
               });
+              
+              // 後方互換性のための旧キーを更新
+              config.answerHeader = config.mainHeader;
+              config.opinionHeader = config.mainHeader;
+              config.reasonHeader = config.rHeader;
             }
           }
           
