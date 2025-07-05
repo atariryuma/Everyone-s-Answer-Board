@@ -1795,8 +1795,24 @@
 
     // グローバルスコープに関数を登録し、どこからでも安全に呼び出せるようにする
     window.setLoading = function(isLoading, message) {
+      // 入力値を安全に処理
+      isLoading = Boolean(isLoading);
       message = message || '';
-      console.log('setLoading called with:', isLoading, ', message:', message);
+      
+      // messageが文字列でない場合は変換
+      if (typeof message !== 'string') {
+        try {
+          message = String(message);
+        } catch (e) {
+          message = 'ローディング中...';
+        }
+      }
+      
+      try {
+        console.log('setLoading called with:', isLoading, ', message:', message);
+      } catch (e) {
+        // console.logが失敗した場合は無視
+      }
       
       // 安全にボタンの disabled 状態を更新
       const buttons = [
@@ -1847,11 +1863,20 @@
       
       // ローディングメッセージの表示
       if (message && elements.guidanceText) {
-        elements.guidanceText.textContent = message;
+        try {
+          elements.guidanceText.textContent = String(message);
+        } catch (e) {
+          console.error('Error setting guidance text:', e);
+          elements.guidanceText.textContent = 'メッセージ表示エラー';
+        }
       }
       
       if (isLoading && message) {
-        showMessage(message, 'blue');
+        try {
+          showMessage(String(message), 'blue');
+        } catch (e) {
+          console.error('Error showing message:', e);
+        }
       }
     };
 
