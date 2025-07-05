@@ -3038,22 +3038,38 @@
       return result;
     }
 
+    /**
+     * サーバーから受け取った設定オブジェクト（cfg）を元に、
+     * 管理パネルの各ドロップダウンの選択状態を更新する
+     * @param {object} cfg - サーバーの`getConfig`から返される設定オブジェクト
+     */
     function populateConfig(cfg) {
+      // 必須の要素が存在するか確認
+      if (!elements.opinionHeader || !elements.reasonHeader || !elements.nameHeader || !elements.classHeader) {
+        console.error('設定用のUI要素が見つかりません。');
+        return;
+      }
+
+      // 各ドロップダウンに、サーバーから受け取った値を設定
       elements.opinionHeader.value = cfg.opinionHeader || '';
-      elements.reasonHeader.value = cfg.reasonHeader || '';
-      elements.nameHeader.value = cfg.nameHeader || '';
-      elements.classHeader.value = cfg.classHeader || '';
-      
-      // チェックボックスの状態を更新
-      var showNamesCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showNames"]') : null;
-      var showCountsCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showCounts"]') : null;
+      elements.reasonHeader.value  = cfg.reasonHeader || '';
+      elements.nameHeader.value    = cfg.nameHeader || '';
+      elements.classHeader.value   = cfg.classHeader || '';
+
+      // 表示オプション（チェックボックス）の状態を更新
+      const showNamesCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showNames"]') : null;
+      const showCountsCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showCounts"]') : null;
       
       if (showNamesCheckbox) {
         showNamesCheckbox.checked = cfg.showNames || false;
       }
       if (showCountsCheckbox) {
-        showCountsCheckbox.checked = cfg.showCounts !== undefined ? cfg.showCounts : true; // デフォルト値はtrue
+        // showCountsは未定義の場合trueをデフォルトとする
+        showCountsCheckbox.checked = cfg.showCounts !== undefined ? cfg.showCounts : true; 
       }
+
+      // 「設定を保存」ボタンの状態を更新
+      updateConfigButtons();
     }
 
     function clearConfigFields() {
