@@ -1551,6 +1551,53 @@ class StudyQuestApp {
     }
     this.elements.answersContainer.appendChild(frag);
   }
+  // ★★★ 以下の2つの関数を新しくPage.htmlの<script>内に追加 ★★★
+
+/**
+ * 回答データが0件の場合に表示するメッセージを生成する関数
+ */
+function displayEmptyState() {
+  const board = document.getElementById('answer-board'); // 回答ボードのコンテナID
+  if (!board) return;
+
+  // 既存の表示をクリア
+  board.innerHTML = '';
+
+  // メッセージ要素を作成
+  const emptyMessageDiv = document.createElement('div');
+  emptyMessageDiv.className = 'text-center py-16 px-6'; // TailwindCSSで見栄えを調整
+  
+  const icon = `<svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>`;
+  const title = '<h3 class="mt-2 text-lg font-medium text-white">まだ回答がありません</h3>';
+  const description = '<p class="mt-1 text-sm text-gray-400">最初の回答者になりましょう！</p>';
+  
+  emptyMessageDiv.innerHTML = icon + title + description;
+  
+  board.appendChild(emptyMessageDiv);
+}
+
+/**
+ * サーバーから受け取ったデータでボードを更新する関数（既存の描画処理をこの中に入れる）
+ * @param {Array} data - 回答データの配列
+ */
+function updateBoard(data) {
+  const board = document.getElementById('answer-board');
+  if (!board) return;
+
+  // 既存の表示をクリア
+  board.innerHTML = '';
+
+  // dataをループしてカードを作成・追加する、既存のロジック
+  data.forEach(item => {
+    const card = createAnswerCard(item); // createAnswerCardはカードを生成する既存の関数と仮定
+    if (card) {
+      board.appendChild(card);
+    }
+  });
+}
+
   async loadSheetData(showLoading = true, isInitialLoad = false, requestedSheetName = null) {
     if (this.state.isLoading && showLoading) return;
     this.state.isLoading = true;
@@ -1576,7 +1623,34 @@ class StudyQuestApp {
     }
     try {
       const sortOrder = this.elements.sortOrder.value;
-      const data = await this.gas.getPublishedSheetData(requestedSheetName, selectedClass, sortOrder);
+      const data = await google.script.run
+  .withSuccessHandler(function(result) {
+    // ローディング表示を終了
+    setLoading(false); 
+
+    // ★★★ ここからが修正箇所 ★★★
+    
+    // 1. サーバーからデータが返されなかったり、データが0件の場合の処理
+    if (!result || !result.data || result.data.length === 0) {
+      // 「回答がありません」というメッセージを表示するための専用関数を呼び出す
+      displayEmptyState(); 
+      return; // ここで処理を終了
+    }
+
+    // 2. データが1件以上ある場合は、これまで通りボードを描画する
+    // （既存の描画処理をここに記述）
+    updateBoard(result.data); 
+    setHeader(result.header);
+    // ...など
+
+    // ★★★ ここまでが修正箇所 ★★★
+  })
+  .withFailureHandler(function(error) {
+    // エラー処理
+    setLoading(false);
+    showError(error.message);
+  })
+  .getPublishedSheetData(classFilter, sortOrder);
       this.state.sheetName = data.sheetName;
       if (typeof data.showCounts !== 'undefined') {
         this.serverShowCounts = data.showCounts;
