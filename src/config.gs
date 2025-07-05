@@ -250,59 +250,69 @@ function getConfig(sheetName, forceRefresh = false) {
 }
 
 /**
- * シート設定を保存し、アクティブ化し、最新のステータスを返す統合関数
- * キャッシュの競合状態を防ぐため、すべての処理を一つのトランザクションで実行
- * @param {string} spreadsheetId - スプレッドシートID
+ * シート設定の保存、アクティブ化、最新ステータスの取得を一つのトランザクションで実行する統合関数
+ * @param {string} spreadsheetId - 対象のスプレッドシートID
  * @param {string} sheetName - 対象のシート名
  * @param {object} config - 保存する設定オブジェクト
- * @returns {object} 更新後の完全なステータス情報
+ * @returns {object} { success: boolean, message: string, status: object } 形式のオブジェクト
  */
 function saveAndActivateSheet(spreadsheetId, sheetName, config) {
+  // ★★★ここから追加：引数の検証処理★★★
+  if (typeof spreadsheetId !== 'string' || !spreadsheetId) {
+    throw new Error('無効なspreadsheetIdです。スプレッドシートIDは必須です。');
+  }
+  if (typeof sheetName !== 'string' || !sheetName) {
+    throw new Error('無効なsheetNameです。シート名は必須です。');
+  }
+  if (typeof config !== 'object' || config === null) {
+    throw new Error('無効なconfigオブジェクトです。設定オブジェクトは必須です。');
+  }
+  // ★★★ここまで追加★★★
+
   try {
     console.log('saveAndActivateSheet開始: sheetName=%s', sheetName);
-    
-    // 1. 全てのキャッシュを事前に削除
-    var props = PropertiesService.getUserProperties();
-    var currentUserId = props.getProperty('CURRENT_USER_ID');
+
+    // 1. 関連キャッシュを事前に削除
+    const props = PropertiesService.getUserProperties();
+    const currentUserId = props.getProperty('CURRENT_USER_ID');
     if (currentUserId) {
-      var userInfo = findUserById(currentUserId);
+      const userInfo = findUserById(currentUserId);
       if (userInfo) {
-        invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId);
+        invalidateUserCache(currentUserId, userInfo.adminEmail, spreadsheetId);
         console.log('saveAndActivateSheet: 事前キャッシュクリア完了');
       }
     }
-    
+
     // 2. 設定を保存
-    var saveResult = saveSheetConfig(spreadsheetId, sheetName, config);
+    saveSheetConfig(spreadsheetId, sheetName, config);
     console.log('saveAndActivateSheet: 設定保存完了');
-    
+
     // 3. シートをアクティブ化
-    var switchResult = switchToSheet(spreadsheetId, sheetName);
+    switchToSheet(spreadsheetId, sheetName);
     console.log('saveAndActivateSheet: シート切り替え完了');
-    
+
     // 4. 表示オプションを設定
-    if (config.showNames !== undefined || config.showCounts !== undefined) {
-      var displayOptions = {
-        showNames: config.showNames || false,
-        showCounts: config.showCounts || false
-      };
-      var displayResult = setDisplayOptions(displayOptions);
-      console.log('saveAndActivateSheet: 表示オプション設定完了');
-    }
-    
-    // 5. 最新のステータスを取得（キャッシュを使わない）
-    var finalStatus = getStatus(true);
+    const displayOptions = {
+      showNames: !!config.showNames, // booleanに変換
+      showCounts: config.showCounts !== undefined ? !!config.showCounts : true // booleanに変換、デフォルトtrue
+    };
+    setDisplayOptions(displayOptions);
+    console.log('saveAndActivateSheet: 表示オプション設定完了');
+
+    // 5. 最新のステータスをキャッシュを無視して取得
+    const finalStatus = getStatus(true);
     console.log('saveAndActivateSheet: 統合処理完了');
-    
+
     return {
       success: true,
       message: '設定の保存・適用が完了しました',
       status: finalStatus
     };
-    
+
   } catch (error) {
-    console.error('saveAndActivateSheet エラー:', error.message);
-    throw new Error('設定の保存・適用に失敗しました: ' + error.message);
+    console.error('saveAndActivateSheetで致命的なエラー:', error.message, error.stack);
+    // クライアントには分かりやすいエラーメッセージを返す
+    throw new Error('設定の保存・適用中にサーバーエラーが発生しました: ' + error.message);
   }
 }
 

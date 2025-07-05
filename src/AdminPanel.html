@@ -3027,24 +3027,24 @@
     }
 
     function saveConfig() {
+      // 1. 保存するシートが選択されているか確認
       if (!selectedSheet) {
         showMessage('シートを選択してください。', 'red');
         return;
       }
       
-      var mainVal = elements.opinionHeader.value;
-      
-      if (!mainVal) {
+      // 2. 必須項目（回答列）が選択されているか確認
+      if (!elements.opinionHeader.value) {
         showMessage('回答データ列を選択してください。', 'red');
         addVisualFeedback(elements.opinionHeader, 'error');
         return;
       }
 
-      // チェックボックスの値を取得
-      var showNamesCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showNames"]') : null;
-      var showCountsCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showCounts"]') : null;
+      // 3. HTMLの入力値から設定オブジェクト（cfg）を作成
+      const showNamesCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showNames"]') : null;
+      const showCountsCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showCounts"]') : null;
       
-      var cfg = {
+      const cfg = {
         opinionHeader: elements.opinionHeader.value,
         reasonHeader: elements.reasonHeader.value,
         nameHeader: elements.nameHeader.value,
@@ -3053,21 +3053,23 @@
         showCounts: showCountsCheckbox ? showCountsCheckbox.checked : true
       };
       
+      // 4. ローディング表示を開始
       setLoading(true, '設定を保存・適用中...');
       elements.saveConfigBtn.disabled = true;
       if (elements.saveConfigText) {
         elements.saveConfigText.textContent = '処理中...';
       }
 
-      // ★★★ここからが修正後のコード★★★
-      // 新しい統合関数を一度だけ呼び出す
+      // 5. ★重要★ サーバーの統合関数を一度だけ呼び出す
       google.script.run
         .withSuccessHandler(function(latestStatus) {
-          // サーバーから返された最新の状態でUIを更新
+          // 成功した場合：サーバーから返された最新の状態でUIを更新
           updateStatus(latestStatus);
           
           showMessage('設定の保存とボードの公開が完了しました。', 'success');
-          markStepCompleted(3); // ステップ3を完了にする
+          markStepCompleted(3); // ステップ3を完了済みにする
+          
+          // ボタンとローディング表示を元に戻す
           setLoading(false);
           elements.saveConfigBtn.disabled = false;
           if (elements.saveConfigText) {
@@ -3075,13 +3077,14 @@
           }
         })
         .withFailureHandler(function(error) {
+          // 失敗した場合：エラーを表示し、ボタンを元に戻す
           showError(error);
           elements.saveConfigBtn.disabled = false;
           if (elements.saveConfigText) {
             elements.saveConfigText.textContent = '設定を保存して公開';
           }
         })
-        .saveAndActivateSheet(selectedSheet, cfg);
+        .saveAndActivateSheet(selectedSheet, cfg); // サーバーにシート名と設定オブジェクトを渡す
     }
 
     function switchToSheet() {
