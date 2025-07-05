@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <base target="_top">
-  <title>StudyQuest -みんなの回答ボード- 管理画面</title>
+  <title>みんなの回答ボード　管理パネル - StudyQuest</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#1a1b26" />
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
@@ -449,11 +449,11 @@
             </svg>
           </div>
           <div class="hidden sm:block">
-            <h1 class="text-lg sm:text-xl font-bold text-white leading-tight">StudyQuest 管理パネル</h1>
-            <p class="text-xs text-gray-400">みんなの回答ボード</p>
+            <h1 class="text-lg sm:text-xl font-bold text-white leading-tight">みんなの回答ボード　管理パネル</h1>
+            <p class="text-xs text-gray-400">StudyQuest</p>
           </div>
           <div class="sm:hidden">
-            <h1 class="text-lg font-bold text-white">StudyQuest</h1>
+            <h1 class="text-lg font-bold text-white">みんなの回答ボード</h1>
           </div>
         </div>
         
@@ -516,6 +516,17 @@
             <div>
               <span class="text-sm font-medium text-white" id="guidance-text">セットアップを開始してください</span>
               <div class="text-xs text-gray-400 mt-1">3ステップで簡単セットアップ</div>
+              <!-- 公開中の情報表示 -->                           
+              <div id="published-info" class="hidden mt-2 p-2 bg-green-900/20 border border-green-500/30 rounded-lg">
+                <div class="flex items-center gap-2 text-xs">
+                  <span class="text-green-400 font-medium">現在のテーマ:</span>
+                  <span class="text-green-200" id="current-theme">読み込み中...</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs mt-1">
+                  <span class="text-green-400 font-medium">回答数:</span>
+                  <span class="text-green-200" id="current-answer-count">0</span>
+                </div>
+              </div>
             </div>
           </div>
           
@@ -584,6 +595,25 @@
                   </svg>
                   <span id="create-board-text">新しいボードを作成</span>
                 </button>
+              </div>
+            </div>
+
+            <!-- フォーム編集ボタン -->
+            <div id="form-edit-section" class="hidden mb-6">
+              <div class="bg-amber-900/20 border border-amber-500/30 rounded-xl p-4">
+                <div class="flex items-center gap-3 mb-3">
+                  <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                  </svg>
+                  <h3 class="font-medium text-amber-200">フォームの管理</h3>
+                </div>
+                <p class="text-sm text-amber-100 mb-3">作成されたフォームを編集して質問をカスタマイズできます</p>
+                <a href="#" id="edit-form-link" target="_blank" class="btn btn-secondary w-full inline-flex items-center justify-center">
+                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14l-4 4-2-2"></path>
+                  </svg>
+                  Googleフォームを編集
+                </a>
               </div>
             </div>
             
@@ -840,7 +870,6 @@
                 <li>データ準備：フォーム作成またはスプレッドシート追加</li>
                 <li>シート選択：表示したいシートを選択</li>
                 <li>設定・公開：列設定を行い回答ボードを公開</li>
-                <li>デジタルシティズンシップ：責任あるデジタル利用を指導</li>
               </ol>
             </div>
             
@@ -859,6 +888,23 @@
                 <li>複数のクラスで同時利用可能</li>
                 <li>セキュアで安全なデータ管理</li>
               </ul>
+            </div>
+            
+            <!-- デジタルシティズンシップガイド -->
+            <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+              <h4 class="font-medium text-blue-200 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+                デジタルシティズンシップ
+              </h4>
+              <p class="text-xs text-blue-100 mb-3">責任あるデジタル利用と指導のポイントを確認しましょう</p>
+              <button type="button" id="show-digital-citizenship-guide" class="btn btn-secondary w-full text-sm py-2">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                指導ガイドを開く
+              </button>
             </div>
             
             <!-- トラブルシューティング -->
@@ -1246,7 +1292,7 @@
           ${icon}
           <span class="ml-2 text-sm font-medium">${message}</span>
         </div>
-        <button class="ml-4 text-white opacity-70 hover:opacity-100 focus:outline-none" onclick="document.getElementById('${messageId}').remove()">
+        <button class="ml-4 text-white opacity-70 hover:opacity-100 focus:outline-none" onclick="removeMessage('${messageId}')">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       `;
@@ -1255,14 +1301,42 @@
 
       // エラーメッセージは長く表示、それ以外は短く表示
       const timeout = type === 'error' ? 5000 : 2500;
-      setTimeout(() => {
+      const removeTimer = setTimeout(() => {
         const msgEl = document.getElementById(messageId);
-        if (msgEl) {
+        if (msgEl && msgEl.parentNode) {
           msgEl.classList.remove('slide-up');
           msgEl.classList.add('fade-out');
-          msgEl.addEventListener('transitionend', () => msgEl.remove());
+          
+          // transitionendイベントに加えてフォールバックタイマーを設定
+          const fallbackTimer = setTimeout(() => {
+            if (msgEl && msgEl.parentNode) {
+              msgEl.remove();
+            }
+          }, 500);
+          
+          msgEl.addEventListener('transitionend', () => {
+            clearTimeout(fallbackTimer);
+            if (msgEl && msgEl.parentNode) {
+              msgEl.remove();
+            }
+          }, { once: true });
         }
       }, timeout);
+      
+      // メッセージ要素にタイマーを保存して、手動削除時にクリア
+      messageElement.removeTimer = removeTimer;
+    }
+
+    function removeMessage(messageId) {
+      const msgEl = document.getElementById(messageId);
+      if (msgEl) {
+        // 自動タイマーをクリア
+        if (msgEl.removeTimer) {
+          clearTimeout(msgEl.removeTimer);
+        }
+        // 即座に削除
+        msgEl.remove();
+      }
     }
 
     function addVisualFeedback(element, type) {
@@ -1672,6 +1746,39 @@
       if (teacherGuideConfirmBtn) {
         teacherGuideConfirmBtn.addEventListener('click', hideTeacherGuideModal);
       }
+      
+      // Digital citizenship guide button
+      const showDigitalCitizenshipBtn = document.getElementById('show-digital-citizenship-guide');
+      if (showDigitalCitizenshipBtn) {
+        showDigitalCitizenshipBtn.addEventListener('click', function() {
+          const modal = document.getElementById('digital-citizenship-modal');
+          if (modal) {
+            modal.classList.remove('hidden');
+          }
+        });
+      }
+      
+      // Digital citizenship modal close events
+      const digitalCitizenshipCloseBtn = document.getElementById('digital-citizenship-modal-close');
+      const digitalCitizenshipCloseBtnBottom = document.getElementById('digital-citizenship-modal-close-btn');
+      
+      if (digitalCitizenshipCloseBtn) {
+        digitalCitizenshipCloseBtn.addEventListener('click', function() {
+          const modal = document.getElementById('digital-citizenship-modal');
+          if (modal) {
+            modal.classList.add('hidden');
+          }
+        });
+      }
+      
+      if (digitalCitizenshipCloseBtnBottom) {
+        digitalCitizenshipCloseBtnBottom.addEventListener('click', function() {
+          const modal = document.getElementById('digital-citizenship-modal');
+          if (modal) {
+            modal.classList.add('hidden');
+          }
+        });
+      }
     }
 
     function enableUnderstandButton() {
@@ -1679,6 +1786,59 @@
       if (btn) {
         btn.disabled = false;
         btn.textContent = '理解しました';
+      }
+    }
+    
+    // 公開情報の更新
+    function updatePublishedInfo(status) {
+      const publishedInfo = document.getElementById('published-info');
+      const currentTheme = document.getElementById('current-theme');
+      const currentAnswerCount = document.getElementById('current-answer-count');
+      const guidanceText = document.getElementById('guidance-text');
+      
+      if (status && status.isPublished && status.activeSheetName) {
+        // 公開中の場合
+        if (publishedInfo) publishedInfo.classList.remove('hidden');
+        if (guidanceText) guidanceText.textContent = 'ボードが公開されています';
+        
+        // 現在のテーマを表示（シート名を使用）
+        if (currentTheme) {
+          currentTheme.textContent = status.activeSheetName || '未設定';
+        }
+        
+        // 回答数を表示
+        if (currentAnswerCount) {
+          currentAnswerCount.textContent = status.answerCount || 0;
+        }
+      } else {
+        // 未公開の場合
+        if (publishedInfo) publishedInfo.classList.add('hidden');
+        if (guidanceText) guidanceText.textContent = 'セットアップを開始してください';
+      }
+    }
+    
+    // フォーム編集セクションの更新
+    function updateFormEditSection(status) {
+      const formEditSection = document.getElementById('form-edit-section');
+      const editFormLink = document.getElementById('edit-form-link');
+      
+      // フォームが作成されている場合のみ表示
+      if (status && status.systemStatus && status.systemStatus.formCreated) {
+        if (formEditSection) formEditSection.classList.remove('hidden');
+        
+        // 編集URLを設定
+        if (editFormLink && status.userInfo && status.userInfo.configJson) {
+          try {
+            const config = JSON.parse(status.userInfo.configJson || '{}');
+            if (config.editFormUrl) {
+              editFormLink.href = config.editFormUrl;
+            }
+          } catch (e) {
+            console.warn('フォームURLの取得に失敗:', e);
+          }
+        }
+      } else {
+        if (formEditSection) formEditSection.classList.add('hidden');
       }
     }
 
@@ -1975,6 +2135,12 @@
       if (lastUpdatedEl) {
         lastUpdatedEl.textContent = '最終更新: ' + now.toLocaleTimeString('ja-JP');
       }
+      
+      // 公開情報の更新
+      updatePublishedInfo(status);
+      
+      // フォーム編集ボタンの表示制御
+      updateFormEditSection(status);
       
       // 削除された公開中ボード表示部分は不要
       
