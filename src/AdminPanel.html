@@ -608,25 +608,6 @@
                 </button>
               </div>
             </div>
-
-            <!-- フォーム編集ボタン -->
-            <div id="form-edit-section" class="hidden mb-6">
-              <div class="bg-amber-900/20 border border-amber-500/30 rounded-xl p-4">
-                <div class="flex items-center gap-3 mb-3">
-                  <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                  </svg>
-                  <h3 class="font-medium text-amber-200">フォームの管理</h3>
-                </div>
-                <p class="text-sm text-amber-100 mb-3">作成されたフォームを編集して質問をカスタマイズできます</p>
-                <a href="#" id="edit-form-link" target="_blank" class="btn btn-secondary w-full inline-flex items-center justify-center">
-                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14l-4 4-2-2"></path>
-                  </svg>
-                  Googleフォームを編集
-                </a>
-              </div>
-            </div>
             
             <!-- 外部リソースの連携 (上級者向け) -->
             <details class="bg-gray-800/30 border border-gray-600/30 rounded-xl">
@@ -1841,8 +1822,8 @@
     }
 
     // グローバルスコープに関数を登録し、どこからでも安全に呼び出せるようにする
-    window.setLoading = function updateLoadingState(isLoading, message = '') {
-      console.log(`updateLoadingState called with: ${isLoading}, message: ${message}`);
+    window.setLoading = function(isLoading, message = '') {
+      console.log(`setLoading called with: ${isLoading}, message: ${message}`);
       
       // 安全にボタンの disabled 状態を更新
       const buttons = [
@@ -1910,7 +1891,7 @@
     function hideTeacherGuideModal() {
       const modal = document.getElementById('teacherGuideModal');
       modal.classList.add('hidden');
-      updateLoadingState(false);
+      setLoading(false);
     }
 
     function updateUIForSelectedSheet() {
@@ -2082,7 +2063,7 @@
           
           showError(new Error(errorMessage));
           enableUnderstandButton();
-          updateLoadingState(false); // エラー時もローディングを終了
+          setLoading(false); // エラー時もローディングを終了
         })
         .getStatus();
       
@@ -2246,7 +2227,7 @@
       // 設定状況に応じたパネル開閉制御
       updatePanelStates(status);
       
-      updateLoadingState(false);
+      setLoading(false);
     }
     
     // 設定状況に応じてパネルの開閉状態を制御
@@ -2529,7 +2510,7 @@
       }
       
       const resourceType = isForm ? 'フォーム' : 'スプレッドシート';
-      updateLoadingState(true, resourceType + 'を追加中...');
+      setLoading(true, resourceType + 'を追加中...');
       
       if (addBtn) addBtn.disabled = true;
       if (addResourceText) addResourceText.textContent = '追加中...';
@@ -2552,7 +2533,7 @@
             
             markStepCompleted(1);
             loadStatus();
-            updateLoadingState(false);
+            setLoading(false);
           })
           .withFailureHandler(function(error) {
             console.error('addFormUrl error:', error);
@@ -2560,7 +2541,7 @@
             if (urlInput) addVisualFeedback(urlInput, 'error');
             if (addBtn) addBtn.disabled = false;
             if (addResourceText) addResourceText.textContent = 'リソースを追加';
-            updateLoadingState(false);
+            setLoading(false);
           })
           .addFormUrl(url);
       } else {
@@ -2580,7 +2561,7 @@
             
             markStepCompleted(1);
             loadStatus();
-            updateLoadingState(false);
+            setLoading(false);
           })
           .withFailureHandler(function(error) {
             console.error('addSpreadsheetUrl error:', error);
@@ -2588,7 +2569,7 @@
             if (urlInput) addVisualFeedback(urlInput, 'error');
             if (addBtn) addBtn.disabled = false;
             if (addResourceText) addResourceText.textContent = 'リソースを追加';
-            updateLoadingState(false);
+            setLoading(false);
           })
           .addSpreadsheetUrl(url);
       }
@@ -2666,7 +2647,7 @@
         return;
       }
       
-      updateLoadingState(true, 'スプレッドシートを追加中...');
+      setLoading(true, 'スプレッドシートを追加中...');
       addBtn.disabled = true;
       if (elements.addSpreadsheetText) {
         elements.addSpreadsheetText.textContent = 'スプレッドシートを追加';
@@ -2693,17 +2674,17 @@
           if (elements.addSpreadsheetText) {
             elements.addSpreadsheetText.textContent = 'スプレッドシートを追加';
           }
-          updateLoadingState(false);
+          setLoading(false);
         })
         .addSpreadsheetUrl(url);
     }
 
     function refreshBoardDataFromAdmin() {
-      updateLoadingState(true, '回答ボードを更新中...');
+      setLoading(true, '回答ボードを更新中...');
       google.script.run
         .withSuccessHandler((result) => {
           showMessage(result.message || result || 'データが正常に更新されました', 'success');
-          updateLoadingState(false);
+          setLoading(false);
           // クライアントサイドのボードを再読み込みするために、親ウィンドウにメッセージを送信
           // これは、AdminPanelがサイドバーやモーダルとして開かれている場合に有効
           if (window.opener && typeof window.opener.postMessage === 'function') {
@@ -2715,7 +2696,7 @@
         .withFailureHandler((error) => {
           console.error('refreshBoardData error:', error);
           showMessage('回答ボードの更新に失敗しました: ' + error.message, 'error');
-          updateLoadingState(false);
+          setLoading(false);
         })
         .refreshBoardData();
     }
@@ -2725,7 +2706,7 @@
       const btn = elements.createBoardBtn;
       if (btn) btn.disabled = true;
       if (elements.createBoardText) elements.createBoardText.textContent = '作成中...';
-      updateLoadingState(true, '新しいボードを作成して公開中...');
+      setLoading(true, '新しいボードを作成して公開中...');
       google.script.run
         .withSuccessHandler((result) => {
           showMessage(result.message || 'ボードが正常に作成されました', 'green');
@@ -2798,13 +2779,13 @@
               .withSuccessHandler(() => {
                 showMessage('列情報を自動判定し、設定を保存しました。', 'success');
                 updateConfigButtons();
-                updateLoadingState(false); // Added here
+                setLoading(false); // Added here
               })
               .withFailureHandler((error) => {
                 console.warn('自動設定の保存に失敗:', error);
                 showMessage('列情報を自動判定しましたが、設定の保存に失敗しました。手動で保存してください。', 'warning');
                 updateConfigButtons();
-                updateLoadingState(false); // Added here
+                setLoading(false); // Added here
               })
                       .saveSheetConfig(currentStatus.userInfo.spreadsheetId, selectedSheet, autoConfig);
           }
@@ -2817,12 +2798,12 @@
                 showMessage('既存の設定をロードしました。', 'info');
               }
               updateConfigButtons();
-              updateLoadingState(false); // Added here
+              setLoading(false); // Added here
             })
             .withFailureHandler((error) => {
               // 既存設定がない場合はエラーではないので無視
               updateConfigButtons();
-              updateLoadingState(false); // Added here
+              setLoading(false); // Added here
             })
             .getConfig(selectedSheet);
         })
@@ -2831,7 +2812,7 @@
           clearConfigFields();
           hideSheetDetails();
           showMessage('シートヘッダー情報の取得に失敗しました。', 'red');
-          updateLoadingState(false); // Added here
+          setLoading(false); // Added here
         })
         .getSheetHeaders(selectedSheet);
     }
@@ -3030,7 +3011,7 @@
         showCounts: showCountsCheckbox ? showCountsCheckbox.checked : true // リアクション数はデフォルトで表示
       };
       
-      updateLoadingState(true, '設定を保存中...');
+      setLoading(true, '設定を保存中...');
       elements.saveConfigBtn.disabled = true;
       if (elements.saveConfigText) {
         elements.saveConfigText.textContent = '保存中...';
@@ -3052,7 +3033,7 @@
           updateDisplayOptions(cfg.showNames, cfg.showCounts);
           
           updateSetupProgress();
-          updateLoadingState(false);
+          setLoading(false);
 
           // Mark step 2 as completed (sheet selection)
           markStepCompleted(2);
@@ -3082,45 +3063,45 @@
     function switchToSheet() {
       if (!selectedSheet) return;
       
-      updateLoadingState(true, 'ボードを切り替え中...');
+      setLoading(true, 'ボードを切り替え中...');
       google.script.run
         .withSuccessHandler((msg) => {
           showMessage(typeof msg === 'string' ? msg : msg.message || 'シートが正常に切り替わりました', 'green');
           loadStatus();
-          updateLoadingState(false);
+          setLoading(false);
         })
         .withFailureHandler((error) => {
           showError(error);
-          updateLoadingState(false);
+          setLoading(false);
         })
         .switchToSheet(currentStatus.userInfo.spreadsheetId, selectedSheet);
     }
 
     function clearSheetSelection() {
-      updateLoadingState(true, 'ボードの公開を終了中...');
+      setLoading(true, 'ボードの公開を終了中...');
       google.script.run
         .withSuccessHandler((msg) => {
           showMessage(typeof msg === 'string' ? msg : msg.message || 'シートの公開が正常に終了しました', 'green');
           loadStatus();
-          updateLoadingState(false);
+          setLoading(false);
         })
         .withFailureHandler((error) => {
           showError(error);
-          updateLoadingState(false);
+          setLoading(false);
         })
         .clearActiveSheet();
     }
 
     function updateDisplayOptions(showNames, showCounts) {
-      updateLoadingState(true, '表示設定を更新中...');
+      setLoading(true, '表示設定を更新中...');
       google.script.run
         .withSuccessHandler((msg) => {
           showMessage(typeof msg === 'string' ? msg : msg.message || '表示オプションが正常に保存されました', 'green');
-          updateLoadingState(false);
+          setLoading(false);
         })
         .withFailureHandler((error) => {
           showError(error);
-          updateLoadingState(false);
+          setLoading(false);
         })
         .setDisplayOptions({ showNames, showCounts });
     }
@@ -3196,7 +3177,7 @@
       }
       
       showMessage('エラー: ' + errorMessage, 'error');
-      updateLoadingState(false);
+      setLoading(false);
     }
     
     // アカウント切り替え機能
