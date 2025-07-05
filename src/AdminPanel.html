@@ -784,12 +784,19 @@
                 </details>
               </div>
               
-              <button type="button" id="save-config-btn" disabled class="btn btn-primary w-full">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
-                </svg>
-                <span id="save-config-text">設定を保存して公開</span>
-              </button>
+              <div class="flex gap-2">
+                <button type="button" id="save-config-btn" disabled class="btn btn-primary flex-1">
+                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                  </svg>
+                  <span id="save-config-text">設定を保存して公開</span>
+                </button>
+                <button type="button" id="reguess-headers-btn" class="btn btn-secondary" title="列を自動で再判定します">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343m11.314 11.314a8 8 0 00-11.314-11.314m11.314 11.314L22 22"></path>
+                  </svg>
+                </button>
+              </div>
             </div>
             
             <div id="config-placeholder" class="text-center py-8">
@@ -1666,6 +1673,13 @@
         });
       }
 
+      // ★★★ ここから追加 ★★★
+      var reguessBtn = document.getElementById('reguess-headers-btn');
+      if (reguessBtn) {
+        reguessBtn.addEventListener('click', runHeaderGuessing);
+      }
+      // ★★★ ここまで追加 ★★★
+
       // Actions
       
       if (elements.clearSelectionBtn) {
@@ -1780,6 +1794,34 @@
       if (openSpreadsheetBtn) {
         openSpreadsheetBtn.addEventListener('click', openDatabaseSpreadsheet);
       }
+    }
+
+    // ★★★ 新しい関数を追加 ★★★
+    /**
+     * サーバーに列の自動判定を要求し、結果をUIに反映させる
+     */
+    function runHeaderGuessing() {
+      if (!selectedSheet || !currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
+        showMessage('シートが選択されていないか、スプレッドシート情報がありません。', 'yellow');
+        return;
+      }
+
+      setLoading(true, '列を自動で再判定しています...');
+
+      google.script.run
+        .withSuccessHandler(function(guessedConfig) {
+          // サーバーから返された自動判定の結果を、UIのドロップダウンに設定
+          populateConfig(guessedConfig);
+          
+          showMessage('列の自動判定が完了しました。内容を確認し、保存してください。', 'success');
+          setLoading(false);
+          updateConfigButtons(); // 保存ボタンを有効化
+        })
+        .withFailureHandler(function(error) {
+          showError(error);
+          setLoading(false);
+        })
+        .getGuessedHeaders(currentStatus.userInfo.spreadsheetId, selectedSheet);
     }
 
     function enableUnderstandButton() {

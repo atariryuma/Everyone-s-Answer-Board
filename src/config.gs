@@ -734,6 +734,33 @@ function verifyUserAuthentication() {
 }
 
 /**
+ * 指定されたシートの列ヘッダーを自動的に推測し、マッピング結果を返す
+ * @param {string} spreadsheetId - 対象のスプレッドシートID（現在未使用だが将来のために残す）
+ * @param {string} sheetName - 対象のシート名
+ * @returns {object} 推測されたヘッダーのマッピングオブジェクト
+ */
+function getGuessedHeaders(spreadsheetId, sheetName) {
+  try {
+    // 注意: spreadsheetIdは現在使われていません。autoMapSheetHeadersが内部で
+    // セッションに基づいたアクティブなスプレッドシートを取得するためです。
+    console.log('getGuessedHeaders: spreadsheetId=%s, sheetName=%s', spreadsheetId, sheetName);
+
+    const guessedConfig = autoMapSheetHeaders(sheetName);
+    if (!guessedConfig) {
+      throw new Error('自動マッピングに失敗しました。対象シートにヘッダー行が存在するか確認してください。');
+    }
+
+    console.log('自動判定を実行しました: sheet=%s, result=%s', sheetName, JSON.stringify(guessedConfig));
+    return guessedConfig;
+
+  } catch (error) {
+    console.error('getGuessedHeadersでエラー:', error.message, error.stack);
+    // クライアントにスタックトレース全体ではなく、分かりやすいメッセージを返す
+    throw new Error('列の自動判定に失敗しました: ' + error.message);
+  }
+}
+
+/**
  * デバッグ用：現在のスプレッドシートとシートの状態を確認
  */
 function debugCurrentSpreadsheetState() {
