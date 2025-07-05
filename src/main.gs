@@ -354,8 +354,13 @@ function doGet(e) {
         return safeSetXFrameOptionsDeny(pageHtml);
       }
 
+      // 要件に従ったリダイレクトロジック：
+      // - データベースに名前があれば管理パネル
+      // - mode=adminまたはmode=viewで明示的に指定された場合はそれに従う
+      
       if (mode === 'admin') {
-        // 管理パネル表示
+        // 明示的な管理パネル要求
+        console.log('DEBUG: Explicit admin mode request. Showing AdminPanel.');
         var adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
         adminTemplate.userInfo = userInfo;
         adminTemplate.userId = userInfo.userId;
@@ -373,9 +378,10 @@ function doGet(e) {
           .setTitle('管理パネル - みんなの回答ボード');
         return safeSetXFrameOptionsDeny(adminHtml);
       }
-
-      if (isPublished) {
-        // 公開ボード表示
+      
+      if (mode === 'view' && isPublished) {
+        // 明示的な回答ボード表示要求（公開済みの場合のみ）
+        console.log('DEBUG: Explicit view mode request for published board. Showing Page.');
         var pageTemplate = HtmlService.createTemplateFromFile('Page');
         var publishedSheetName = configJson.publishedSheetName;
         var publishedSpreadsheetId = configJson.publishedSpreadsheetId;
@@ -398,8 +404,8 @@ function doGet(e) {
         return safeSetXFrameOptionsDeny(pageHtml);
       }
 
-      // 未公開ボード（管理パネルにリダイレクト）
-      console.log('DEBUG: Board not published. Redirecting to admin panel.');
+      // デフォルト：パラメータなしのアクセスは管理パネルへ
+      console.log('DEBUG: Default access - user registered. Redirecting to admin panel.');
       var adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
       adminTemplate.userInfo = userInfo;
       adminTemplate.userId = userInfo.userId;
