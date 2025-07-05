@@ -879,97 +879,66 @@
           </div>
         </div>
         
-        <!-- システム情報 -->
-        <div id="database-info-section" class="glass-panel p-4 sm:p-6 hidden">
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-              </svg>
-            </div>
-            <h3 class="font-semibold text-blue-400">システム状況</h3>
+        <div class="space-y-4 sm:space-y-6">
+
+  <div id="system-info-panel" class="glass-panel p-4 sm:p-6">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-8 h-8 bg-gradient-to-br from-gray-500 to-gray-600 rounded-xl flex items-center justify-center">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"></path>
+        </svg>
+      </div>
+      <h3 class="font-semibold text-gray-300">システム状況</h3>
+    </div>
+
+    <div class="space-y-4">
+      <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+        <h4 class="text-sm font-medium text-gray-200 mb-3"> アカウント情報</h4>
+        <div class="space-y-2 text-xs">
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">メールアドレス:</span>
+            <span class="text-white font-medium" id="info-admin-email">-</span>
           </div>
-          
-          <div class="space-y-4">
-            <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-              <h4 class="text-sm font-medium text-blue-200 mb-3 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                </svg>
-                ユーザー情報
-              </h4>
-              <div class="space-y-2 text-xs">
-                <div class="flex justify-between items-center">
-                  <span class="text-blue-300">ユーザーID:</span>
-                  <span class="text-white font-mono bg-blue-800/50 px-2 py-1 rounded" id="db-user-id">-</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-blue-300">メールアドレス:</span>
-                  <span class="text-white" id="db-admin-email">-</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-blue-300">作成日時:</span>
-                  <span class="text-white" id="db-created-at">-</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-blue-300">最終アクセス:</span>
-                  <span class="text-white" id="db-last-accessed">-</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-blue-300">回答数:</span>
-                  <span class="text-white font-semibold" id="db-answer-count">-</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-blue-300">リアクション数:</span>
-                  <span class="text-white" id="db-reaction-count">-</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-blue-300">利用可能シート:</span>
-                  <span class="text-white" id="db-sheet-count">-</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-blue-300">公開スプレッドシートID:</span>
-                  <span class="text-white font-mono text-xs" id="db-published-spreadsheet-id">-</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-blue-300">公開シート名:</span>
-                  <span class="text-white" id="db-published-sheet-name">-</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-blue-300">スプレッドシートID:</span>
-                  <span class="text-white font-mono text-xs" id="db-spreadsheet-id">-</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-blue-300">セットアップ:</span>
-                  <span class="text-white" id="db-setup-status">-</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-blue-300">フォーム作成:</span>
-                  <span class="text-white" id="db-form-created">-</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-blue-300">アプリ公開:</span>
-                  <span class="text-white" id="db-app-published">-</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-blue-300">最終更新:</span>
-                  <span class="text-white" id="db-last-updated">-</span>
-                </div>
-              </div>
-              
-              <!-- アカウント切り替えボタン -->
-              <div class="mt-4 pt-3 border-t border-blue-500/30">
-                <button type="button" id="account-switch-btn" onclick="switchToAnotherAccount()" 
-                        class="w-full btn bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium py-2 px-4 rounded-lg transition-all transform hover:scale-105">
-                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                  </svg>
-                  別のアカウントでログイン
-                </button>
-              </div>
-            </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">ユーザーID:</span>
+            <span class="text-white font-mono text-xs bg-gray-700 px-1.5 py-0.5 rounded" id="info-user-id">-</span>
           </div>
         </div>
+      </div>
+
+      <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+        <h4 class="text-sm font-medium text-gray-200 mb-3"> ボード稼働状況</h4>
+        <div class="space-y-2 text-xs">
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">公開中のシート:</span>
+            <span class="text-white font-semibold" id="info-published-sheet">-</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">総回答数:</span>
+            <span class="text-white" id="info-answer-count">-</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">総リアクション数:</span>
+            <span class="text-white" id="info-reaction-count">-</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
+        <h4 class="text-sm font-medium text-red-300 mb-3"> Danger Zone</h4>
+        <p class="text-xs text-red-200/80 mb-4">
+          この操作は元に戻せません。アカウントを削除すると、作成したすべてのボードと設定が完全に消去されます。
+        </p>
+        <button type="button" id="delete-account-btn" class="btn btn-danger w-full">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+          </svg>
+          自分のアカウントを削除
+        </button>
+      </div>
+    </div>
+  </div>
+  </div>
       </div>
     </div>
   </main>
@@ -1531,42 +1500,54 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-      elements = {
-        sheetSelect: document.getElementById('sheet-select'),
-        configArea: document.getElementById('config-area'),
-        configPlaceholder: document.getElementById('config-placeholder'),
-        opinionHeader: document.getElementById('opinionHeader'),
-        reasonHeader: document.getElementById('reasonHeader'),
-        nameHeader: document.getElementById('nameHeader'),
-        classHeader: document.getElementById('classHeader'),
-        saveConfigBtn: document.getElementById('save-config-btn'),
-        detailOptions: document.getElementById('detail-options'),
-        boardUrl: document.getElementById('board-url'),
-        viewBoardLink: document.getElementById('view-board-link'),
-        setupProgress: document.getElementById('setup-progress'),
-        setupProgressMobile: document.getElementById('setup-progress-mobile'),
-        setupProgressText: document.getElementById('setup-progress-text'),
-        setupProgressTextMobile: document.getElementById('setup-progress-text-mobile'),
-        headerDomainName: document.getElementById('header-domain-name'),
-        headerStatusDot: document.getElementById('header-status-dot'),
-        headerStatusText: document.getElementById('header-status-text'),
-        configStatus: document.getElementById('config-status'),
-        addSpreadsheetText: document.getElementById('add-spreadsheet-text'),
-        saveConfigText: document.getElementById('save-config-text'),
-        createBoardBtn: document.getElementById('create-board-btn'),
-        createBoardText: document.getElementById('create-board-text'),
-        formUrlInput: document.getElementById('form-url-input'),
-        copyFormUrlBtn: document.getElementById('copy-form-url-btn'),
-        openFormUrlLink: document.getElementById('open-form-url-link'),
-        openSpreadsheetBtn: document.getElementById('open-spreadsheet-btn'),
-        addSpreadsheetBtn: document.getElementById('add-spreadsheet-btn'),
-        guidanceText: document.getElementById('guidance-text'),
-        // 新しいシート詳細要素
-        sheetDetails: document.getElementById('sheet-details'),
-        sheetColumns: document.getElementById('sheet-columns'),
-        spreadsheetLink: document.getElementById('spreadsheet-link'),
-        formLink: document.getElementById('form-link')
-      };
+      // `elements` オブジェクトの定義を修正
+elements = {
+  // ... 既存の要素はそのまま ...
+  sheetSelect: document.getElementById('sheet-select'),
+  configArea: document.getElementById('config-area'),
+  configPlaceholder: document.getElementById('config-placeholder'),
+  opinionHeader: document.getElementById('opinionHeader'),
+  reasonHeader: document.getElementById('reasonHeader'),
+  nameHeader: document.getElementById('nameHeader'),
+  classHeader: document.getElementById('classHeader'),
+  saveConfigBtn: document.getElementById('save-config-btn'),
+  detailOptions: document.getElementById('detail-options'),
+  boardUrl: document.getElementById('board-url'),
+  viewBoardLink: document.getElementById('view-board-link'),
+  setupProgress: document.getElementById('setup-progress'),
+  setupProgressMobile: document.getElementById('setup-progress-mobile'),
+  setupProgressText: document.getElementById('setup-progress-text'),
+  setupProgressTextMobile: document.getElementById('setup-progress-text-mobile'),
+  headerDomainName: document.getElementById('header-domain-name'),
+  headerStatusDot: document.getElementById('header-status-dot'),
+  headerStatusText: document.getElementById('header-status-text'),
+  configStatus: document.getElementById('config-status'),
+  addSpreadsheetText: document.getElementById('add-spreadsheet-text'),
+  saveConfigText: document.getElementById('save-config-text'),
+  createBoardBtn: document.getElementById('create-board-btn'),
+  createBoardText: document.getElementById('create-board-text'),
+  formUrlInput: document.getElementById('form-url-input'),
+  copyFormUrlBtn: document.getElementById('copy-form-url-btn'),
+  openFormUrlLink: document.getElementById('open-form-url-link'),
+  openSpreadsheetBtn: document.getElementById('open-spreadsheet-btn'),
+  addSpreadsheetBtn: document.getElementById('add-spreadsheet-btn'),
+  guidanceText: document.getElementById('guidance-text'),
+  // 新しいシート詳細要素
+  sheetDetails: document.getElementById('sheet-details'),
+  sheetColumns: document.getElementById('sheet-columns'),
+  spreadsheetLink: document.getElementById('spreadsheet-link'),
+  formLink: document.getElementById('form-link'),
+  
+  // ★★★ ここから追加 ★★★
+  // システム情報パネルの要素
+  'info-admin-email': document.getElementById('info-admin-email'),
+  'info-user-id': document.getElementById('info-user-id'),
+  'info-published-sheet': document.getElementById('info-published-sheet'),
+  'info-answer-count': document.getElementById('info-answer-count'),
+  'info-reaction-count': document.getElementById('info-reaction-count'),
+  'delete-account-btn': document.getElementById('delete-account-btn')
+  // ★★★ ここまで追加 ★★★
+};
       loadStatus();
       setupEventListeners();
       loadAdminDomainInfo();
@@ -1652,8 +1633,10 @@
     // 重複していたDOMContentLoadedイベントリスナーを削除
     // 既に上記で設定済み
 
-    function setupEventListeners() {
-      // Sheet selection
+    // `setupEventListeners` 関数の中にこのリスナーを追加
+function setupEventListeners() {
+  // ... 既存のリスナーはそのまま ...
+  // Sheet selection
       if (elements.sheetSelect) {
         elements.sheetSelect.addEventListener('change', function(e) {
           selectedSheet = e.target.value;
@@ -1794,7 +1777,64 @@
       if (openSpreadsheetBtn) {
         openSpreadsheetBtn.addEventListener('click', openDatabaseSpreadsheet);
       }
+
+  // ★★★ ここから追加 ★★★
+  if (elements['delete-account-btn']) {
+    elements['delete-account-btn'].addEventListener('click', handleDeleteRequest);
+  }
+  // ★★★ ここまで追加 ★★★
+}
+
+// ★★★ 以下の2つの関数を新しく追加 ★★★
+
+/**
+ * アカウント削除ボタンが押された時の処理（2重チェックのモーダル表示）
+ */
+function handleDeleteRequest() {
+  showConfirmationModal(
+    'アカウントの完全削除',
+    '本当にこのアカウントを削除しますか？この操作は元に戻せず、すべてのデータが失われます。',
+    function() {
+      setLoading(true, 'アカウントを完全に削除しています...');
+      google.script.run
+        .withSuccessHandler(function(response) {
+          setLoading(false);
+          showMessage(response, 'success');
+          // 削除成功後、2秒後に登録ページにリダイレクト
+          setTimeout(function() {
+            window.top.location.reload(); 
+          }, 2000);
+        })
+        .withFailureHandler(function(error) {
+          setLoading(false);
+          showError(error);
+        })
+        .deleteCurrentUserAccount(); // サーバー側の削除関数を呼び出す
     }
+  );
+}
+
+
+/**
+ * サーバーから受け取ったstatusオブジェクトを元に、新しいUIを更新する
+ * (古い `updateDatabaseInfo` の置き換え)
+ * @param {object} status - getStatusから返されるオブジェクト
+ */
+function updateDatabaseInfo(status) {
+  if (!status || !status.userInfo) return;
+
+  const safeSet = (elementId, value) => {
+    if (elements[elementId]) {
+      elements[elementId].textContent = value || '-';
+    }
+  };
+
+  safeSet('info-admin-email', status.userInfo.adminEmail);
+  safeSet('info-user-id', status.userInfo.userId);
+  safeSet('info-published-sheet', status.publishedSheetName || 'なし');
+  safeSet('info-answer-count', status.answerCount || '0');
+  safeSet('info-reaction-count', status.totalReactions || '0');
+}
 
     // ★★★ 新しい関数を追加 ★★★
     /**

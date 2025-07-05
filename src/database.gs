@@ -415,3 +415,56 @@ function batchUpdateSpreadsheet(service, spreadsheetId, requestBody) {
   });
   return JSON.parse(response.getContentText());
 }
+
+/**
+ * 現在のユーザーのアカウント情報をデータベースから完全に削除する
+ * @returns {string} 成功メッセージ
+ */
+function deleteCurrentUserAccount() {
+  try {
+    const userId = getUserId();
+    if (!userId) {
+      throw new Error('ユーザーが特定できません。');
+    }
+    
+    // ユーザー情報を取得して、関連情報を得る
+    const userInfo = findUserById(userId);
+    if (!userInfo) {
+      throw new Error('データベースにユーザー情報が見つかりません。');
+    }
+
+    const lock = LockService.getScriptLock();
+    lock.waitLock(15000); // 15秒待機
+
+    try {
+      // データベース（シート）からユーザー行を削除
+      const dbSheet = getDbSheet();
+      const data = dbSheet.getDataRange().getValues();
+      // ユーザーIDに基づいて行を探す（A列がIDと仮定）
+      for (let i = data.length - 1; i >= 1; i--) {
+        if (data[i][0] === userId) {
+          dbSheet.deleteRow(i + 1);
+          break;
+        }
+      }
+      
+      // 関連するすべてのキャッシュを削除
+      invalidateUserCache(userId, userInfo.adminEmail, userInfo.spreadsheetId);
+      
+      // UserPropertiesからも関連情報を削除
+      const props = PropertiesService.getUserProperties();
+      props.deleteProperty('CURRENT_USER_ID');
+
+    } finally {
+      lock.releaseLock();
+    }
+    
+    const successMessage = 'アカウント「' + userInfo.adminEmail + '」が正常に削除されました。';
+    console.log(successMessage);
+    return successMessage;
+
+  } catch (error) {
+    console.error('アカウント削除エラー:', error.message, error.stack);
+    throw new Error('アカウントの削除に失敗しました: ' + error.message);
+  }
+}
