@@ -377,14 +377,14 @@ function doGet(e) {
       if (isPublished) {
         // 公開ボード表示
         var pageTemplate = HtmlService.createTemplateFromFile('Page');
-        var sheetName = configJson.publishedSheetName;
-        var spreadsheetId = configJson.publishedSpreadsheetId;
+        var publishedSheetName = configJson.publishedSheetName;
+        var publishedSpreadsheetId = configJson.publishedSpreadsheetId;
         pageTemplate.userId = userInfo.userId;
-        pageTemplate.sheetName = sheetName;
-        pageTemplate.spreadsheetId = spreadsheetId;
+        pageTemplate.sheetName = publishedSheetName;
+        pageTemplate.spreadsheetId = publishedSpreadsheetId;
         pageTemplate.displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
         pageTemplate.showCounts = configJson.showCounts !== false;
-        var key = 'sheet_' + spreadsheetId + '_' + sheetName;
+        var key = 'sheet_' + publishedSpreadsheetId + '_' + publishedSheetName;
         pageTemplate.mapping = configJson[key] || {};
         pageTemplate.ownerName = userInfo.adminEmail;
         var isOwner = (userEmail === userInfo.adminEmail);
