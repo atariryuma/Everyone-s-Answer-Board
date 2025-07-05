@@ -290,6 +290,7 @@ function doGet(e) {
       var setupHtml = HtmlService.createTemplateFromFile('SetupPage')
         .evaluate()
         .setTitle('初回セットアップ - StudyQuest');
+      console.log('DEBUG: Serving SetupPage HTML');
       return safeSetXFrameOptionsDeny(setupHtml);
     }
 
@@ -299,12 +300,14 @@ function doGet(e) {
       var explicitHtml = HtmlService.createTemplateFromFile('SetupPage')
         .evaluate()
         .setTitle('StudyQuest - サービスアカウント セットアップ');
+      console.log('DEBUG: Serving explicit SetupPage HTML');
       return safeSetXFrameOptionsDeny(explicitHtml);
     }
 
     // 2. ユーザー認証と情報取得（Page.html直接アクセス時は除く）
     if (!userEmail && !isDirectPageAccess) {
       console.log('DEBUG: No current user email. Redirecting to RegistrationPage.');
+      console.log('DEBUG: Serving RegistrationPage HTML');
       return showRegistrationPage();
     }
 
@@ -323,6 +326,7 @@ function doGet(e) {
       var configJson = {};
       try {
         configJson = JSON.parse(userInfo.configJson || '{}');
+        console.log('DEBUG: Parsed configJson:', JSON.stringify(configJson));
       } catch (jsonErr) {
         console.warn('Invalid configJson:', jsonErr.message);
       }
@@ -330,6 +334,7 @@ function doGet(e) {
       var isPublished = !!(configJson.appPublished &&
         configJson.publishedSpreadsheetId &&
         configJson.publishedSheetName);
+      console.log(`DEBUG: isPublished = ${isPublished}`);
 
       // Page.html直接アクセス時は、パラメータ指定されたページを表示
       if (isDirectPageAccess) {
@@ -351,6 +356,7 @@ function doGet(e) {
         pageTemplate.isAdminUser = isOwner;
         var pageHtml = pageTemplate.evaluate()
           .setTitle('回答ボード - みんなの回答ボード');
+        console.log('DEBUG: Serving Page HTML for direct access');
         return safeSetXFrameOptionsDeny(pageHtml);
       }
 
@@ -376,6 +382,7 @@ function doGet(e) {
         });
         var adminHtml = adminTemplate.evaluate()
           .setTitle('管理パネル - みんなの回答ボード');
+        console.log('DEBUG: Serving AdminPanel HTML');
         return safeSetXFrameOptionsDeny(adminHtml);
       }
       
@@ -401,6 +408,7 @@ function doGet(e) {
         pageTemplate.isAdminUser = isOwner;
         var pageHtml = pageTemplate.evaluate()
           .setTitle('回答ボード - みんなの回答ボード');
+        console.log('DEBUG: Serving Page HTML for published board');
         return safeSetXFrameOptionsDeny(pageHtml);
       }
 
@@ -415,12 +423,14 @@ function doGet(e) {
       adminTemplate.showAdminFeatures = true;
       var adminHtml = adminTemplate.evaluate()
         .setTitle('管理パネル - みんなの回答ボード');
+      console.log('DEBUG: Serving default AdminPanel HTML');
       return safeSetXFrameOptionsDeny(adminHtml);
 
     } else {
       // 5. 【未登録ユーザーの処理】
       //    Page.html直接アクセス時でもユーザーが見つからない場合は登録ページ
       console.log('DEBUG: User not registered. Redirecting to RegistrationPage.');
+      console.log('DEBUG: Serving RegistrationPage HTML for unregistered user');
       return showRegistrationPage();
     }
 
