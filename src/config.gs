@@ -216,14 +216,14 @@ function getConfig(sheetName, forceRefresh = false) {
     // 最終的な統一された変数名での返却前処理
     var finalConfig = {
       sheetName: config.sheetName || sheetName || '',
-      opinionHeader: config.mainHeader || config.opinionHeader || '回答',
-      timestampHeader: config.questionHeader || config.timestampHeader || 'タイムスタンプ',
+      opinionHeader: config.opinionHeader || config.mainHeader || '回答',
+      timestampHeader: config.timestampHeader || config.questionHeader || 'タイムスタンプ',
       emailHeader: config.emailHeader || 'メールアドレス',
-      reasonHeader: config.rHeader || config.reasonHeader || '理由',
+      reasonHeader: config.reasonHeader || config.rHeader || '理由',
       nameHeader: config.nameHeader || '名前',
       classHeader: config.classHeader || 'クラス',
-      showNames: config.showNames || false,
-      showCounts: config.showCounts || false,
+      showNames: config.showNames !== undefined ? config.showNames : false,
+      showCounts: config.showCounts !== undefined ? config.showCounts : false,
       availableHeaders: config.availableHeaders || [],
       rosterSheetName: config.rosterSheetName || '名簿'
     };
