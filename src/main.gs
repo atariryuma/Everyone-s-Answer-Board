@@ -308,24 +308,69 @@ function doGet(e) {
     console.log('DEBUG: User info:', JSON.stringify(userInfo));
 
     if (userInfo) {
-      // 4. 【登録済みユーザーの処理】
-      //    管理パネルに必要な情報を付加して表示
-      var template = HtmlService.createTemplateFromFile('AdminPanel');
-      template.userInfo = userInfo;
-      template.userId = userInfo.userId;
-      template.mode = mode; // Use the 'mode' variable defined at the top
-      template.displayMode = 'named';
-      template.showAdminFeatures = true;
-      console.log('DEBUG: AdminPanel template properties:', {
-        userInfo: template.userInfo,
-        userId: template.userId,
-        mode: template.mode,
-        displayMode: template.displayMode,
-        showAdminFeatures: template.showAdminFeatures
-      });
-      var adminHtml = template.evaluate()
-        .setTitle('管理パネル - みんなの回答ボード');
-      return safeSetXFrameOptionsDeny(adminHtml);
+      var configJson = {};
+      try {
+        configJson = JSON.parse(userInfo.configJson || '{}');
+      } catch (jsonErr) {
+        console.warn('Invalid configJson:', jsonErr.message);
+      }
+
+      var isPublished = !!(configJson.appPublished &&
+        configJson.publishedSpreadsheetId &&
+        configJson.publishedSheetName);
+
+      if (mode === 'admin') {
+        // 管理パネル表示
+        var adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
+        adminTemplate.userInfo = userInfo;
+        adminTemplate.userId = userInfo.userId;
+        adminTemplate.mode = mode;
+        adminTemplate.displayMode = 'named';
+        adminTemplate.showAdminFeatures = true;
+        console.log('DEBUG: AdminPanel template properties:', {
+          userInfo: adminTemplate.userInfo,
+          userId: adminTemplate.userId,
+          mode: adminTemplate.mode,
+          displayMode: adminTemplate.displayMode,
+          showAdminFeatures: adminTemplate.showAdminFeatures
+        });
+        var adminHtml = adminTemplate.evaluate()
+          .setTitle('管理パネル - みんなの回答ボード');
+        return safeSetXFrameOptionsDeny(adminHtml);
+      }
+
+      if (isPublished) {
+        // 公開ボード表示
+        var pageTemplate = HtmlService.createTemplateFromFile('Page');
+        var sheetName = configJson.publishedSheetName;
+        var spreadsheetId = configJson.publishedSpreadsheetId;
+        pageTemplate.userId = userInfo.userId;
+        pageTemplate.sheetName = sheetName;
+        pageTemplate.spreadsheetId = spreadsheetId;
+        pageTemplate.displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
+        pageTemplate.showCounts = configJson.showCounts !== false;
+        var key = 'sheet_' + spreadsheetId + '_' + sheetName;
+        pageTemplate.mapping = configJson[key] || {};
+        pageTemplate.ownerName = userInfo.adminEmail;
+        var isOwner = (userEmail === userInfo.adminEmail);
+        pageTemplate.showAdminFeatures = isOwner;
+        pageTemplate.showHighlightToggle = isOwner;
+        pageTemplate.showScoreSort = true;
+        pageTemplate.isStudentMode = !isOwner;
+        pageTemplate.isAdminUser = isOwner;
+        var pageHtml = pageTemplate.evaluate()
+          .setTitle('回答ボード - みんなの回答ボード');
+        return safeSetXFrameOptionsDeny(pageHtml);
+      }
+
+      // 未公開ボード
+      var unpubTemplate = HtmlService.createTemplateFromFile('Unpublished');
+      unpubTemplate.ownerName = userInfo.adminEmail;
+      unpubTemplate.isOwner = (userEmail === userInfo.adminEmail);
+      unpubTemplate.boardUrl = generateAppUrls(userInfo.userId).viewUrl;
+      var unpubHtml = unpubTemplate.evaluate()
+        .setTitle('未公開ボード - みんなの回答ボード');
+      return safeSetXFrameOptionsDeny(unpubHtml);
 
     } else {
       // 5. 【未登録ユーザーの処理】
