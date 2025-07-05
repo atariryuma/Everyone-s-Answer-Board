@@ -231,6 +231,24 @@ function getHeadersCached(spreadsheetId, sheetName) {
 }
 
 /**
+ * ユーザー関連キャッシュを無効化します。
+ * @param {string} userId - ユーザーID
+ * @param {string} email - 管理者メールアドレス
+ * @param {string} [spreadsheetId] - 関連スプレッドシートID
+ */
+function invalidateUserCache(userId, email, spreadsheetId) {
+  if (userId) {
+    cacheManager.remove('user_' + userId);
+  }
+  if (email) {
+    cacheManager.remove('email_' + email);
+  }
+  if (spreadsheetId) {
+    cacheManager.clearByPattern(spreadsheetId);
+  }
+}
+
+/**
  * @deprecated cacheManager.get() を使用してください
  */
 function getWebAppUrlCached() {
