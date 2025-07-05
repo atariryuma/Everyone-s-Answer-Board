@@ -264,8 +264,13 @@ function doGet(e) {
     const mode = (e && e.parameter && e.parameter.mode) ? e.parameter.mode : 'view'; // デフォルトは 'view' モード
     const userId = (e && e.parameter && e.parameter.userId) ? e.parameter.userId : null;
     const setupParam = (e && e.parameter && e.parameter.setup) ? e.parameter.setup : null;
+    const spreadsheetId = (e && e.parameter && e.parameter.spreadsheetId) ? e.parameter.spreadsheetId : null;
+    const sheetName = (e && e.parameter && e.parameter.sheetName) ? e.parameter.sheetName : null;
+    
+    // Page.html への直接アクセス判定（特定パラメータがある場合）
+    const isDirectPageAccess = userId && spreadsheetId && sheetName;
 
-    console.log(`Request parameters validated. Mode: ${mode}, UserID: ${userId}, SetupParam: ${setupParam}`);
+    console.log(`Request parameters validated. Mode: ${mode}, UserID: ${userId}, SetupParam: ${setupParam}, IsDirectPageAccess: ${isDirectPageAccess}`);
 
     // どこからのアクセスかを知るためのログを追加
     const userEmail = Session.getActiveUser().getEmail();
@@ -278,8 +283,8 @@ function doGet(e) {
       console.log(`Referer: ${e.headers.referer}`);
     }
 
-    // 1. システムの初期セットアップが完了しているか確認
-    if (!isSystemSetup()) {
+    // 1. システムの初期セットアップが完了しているか確認（Page.html直接アクセス時は除く）
+    if (!isSystemSetup() && !isDirectPageAccess) {
       console.log('DEBUG: System not set up. Redirecting to SetupPage.');
       var setupHtml = HtmlService.createTemplateFromFile('SetupPage')
         .evaluate()
@@ -296,16 +301,23 @@ function doGet(e) {
       return safeSetXFrameOptionsDeny(explicitHtml);
     }
 
-    // 2. ユーザー認証と情報取得
+    // 2. ユーザー認証と情報取得（Page.html直接アクセス時は除く）
     // currentUserEmail is already defined above as userEmail
-    if (!userEmail) {
+    if (!userEmail && !isDirectPageAccess) {
       console.log('DEBUG: No current user email. Redirecting to RegistrationPage.');
       return showRegistrationPage();
     }
 
     // 3. ユーザーがデータベースに登録済みか確認
-    const userInfo = findUserByEmail(userEmail);
-    console.log('DEBUG: User info:', JSON.stringify(userInfo));
+    let userInfo = null;
+    if (isDirectPageAccess) {
+      // Page.html直接アクセス時は、userIdで直接検索
+      userInfo = findUserById(userId);
+      console.log('DEBUG: Direct page access, User info by ID:', JSON.stringify(userInfo));
+    } else {
+      userInfo = findUserByEmail(userEmail);
+      console.log('DEBUG: User info by email:', JSON.stringify(userInfo));
+    }
 
     if (userInfo) {
       var configJson = {};
@@ -318,6 +330,29 @@ function doGet(e) {
       var isPublished = !!(configJson.appPublished &&
         configJson.publishedSpreadsheetId &&
         configJson.publishedSheetName);
+
+      // Page.html直接アクセス時は、パラメータ指定されたページを表示
+      if (isDirectPageAccess) {
+        console.log('DEBUG: Direct page access detected. Showing specified page.');
+        var pageTemplate = HtmlService.createTemplateFromFile('Page');
+        pageTemplate.userId = userId;
+        pageTemplate.sheetName = sheetName;
+        pageTemplate.spreadsheetId = spreadsheetId;
+        pageTemplate.displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
+        pageTemplate.showCounts = configJson.showCounts !== false;
+        var key = 'sheet_' + spreadsheetId + '_' + sheetName;
+        pageTemplate.mapping = configJson[key] || {};
+        pageTemplate.ownerName = userInfo.adminEmail;
+        var isOwner = (userEmail === userInfo.adminEmail);
+        pageTemplate.showAdminFeatures = isOwner;
+        pageTemplate.showHighlightToggle = isOwner;
+        pageTemplate.showScoreSort = true;
+        pageTemplate.isStudentMode = !isOwner;
+        pageTemplate.isAdminUser = isOwner;
+        var pageHtml = pageTemplate.evaluate()
+          .setTitle('回答ボード - みんなの回答ボード');
+        return safeSetXFrameOptionsDeny(pageHtml);
+      }
 
       if (mode === 'admin') {
         // 管理パネル表示
@@ -363,18 +398,21 @@ function doGet(e) {
         return safeSetXFrameOptionsDeny(pageHtml);
       }
 
-      // 未公開ボード
-      var unpubTemplate = HtmlService.createTemplateFromFile('Unpublished');
-      unpubTemplate.ownerName = userInfo.adminEmail;
-      unpubTemplate.isOwner = (userEmail === userInfo.adminEmail);
-      unpubTemplate.boardUrl = generateAppUrls(userInfo.userId).viewUrl;
-      var unpubHtml = unpubTemplate.evaluate()
-        .setTitle('未公開ボード - みんなの回答ボード');
-      return safeSetXFrameOptionsDeny(unpubHtml);
+      // 未公開ボード（管理パネルにリダイレクト）
+      console.log('DEBUG: Board not published. Redirecting to admin panel.');
+      var adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
+      adminTemplate.userInfo = userInfo;
+      adminTemplate.userId = userInfo.userId;
+      adminTemplate.mode = 'admin';
+      adminTemplate.displayMode = 'named';
+      adminTemplate.showAdminFeatures = true;
+      var adminHtml = adminTemplate.evaluate()
+        .setTitle('管理パネル - みんなの回答ボード');
+      return safeSetXFrameOptionsDeny(adminHtml);
 
     } else {
       // 5. 【未登録ユーザーの処理】
-      //    登録ページを表示
+      //    Page.html直接アクセス時でもユーザーが見つからない場合は登録ページ
       console.log('DEBUG: User not registered. Redirecting to RegistrationPage.');
       return showRegistrationPage();
     }
