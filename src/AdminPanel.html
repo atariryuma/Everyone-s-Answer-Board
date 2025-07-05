@@ -1176,9 +1176,27 @@
     }
 
     function showMessage(message, type) {
-      type = type || 'info';
-      const messageArea = document.getElementById('message-area');
-      if (!messageArea) return;
+      try {
+        type = type || 'info';
+        
+        // messageを安全な文字列に変換
+        if (typeof message !== 'string') {
+          try {
+            message = String(message);
+          } catch (e) {
+            message = 'メッセージ表示エラー';
+          }
+        }
+        
+        // 特殊文字のサニタイズ
+        if (typeof message === 'string') {
+          message = message.replace(/[\u0000-\u001F\u007F]/g, ''); // 制御文字を削除
+          message = message.replace(/['"\\]/g, ''); // 引用符とバックスラッシュを削除
+          message = message.substring(0, 200); // 長すぎるメッセージは切り詰め
+        }
+        
+        const messageArea = document.getElementById('message-area');
+        if (!messageArea) return;
 
       // 同じメッセージの重複を防ぐ
       const existingMessages = Array.from(messageArea.children);
@@ -1274,6 +1292,14 @@
       
       // メッセージ要素にタイマーを保存して、手動削除時にクリア
       messageElement.removeTimer = removeTimer;
+      } catch (showMessageError) {
+        // showMessage関数でエラーが発生した場合の安全な処理
+        try {
+          console.error('showMessage function error:', showMessageError);
+        } catch (e) {
+          // エラーログさえ失敗した場合は無視
+        }
+      }
     }
 
     function removeMessage(messageId) {
@@ -1798,24 +1824,31 @@
 
     // グローバルスコープに関数を登録し、どこからでも安全に呼び出せるようにする
     window.setLoading = function(isLoading, message) {
-      // 入力値を安全に処理
-      isLoading = Boolean(isLoading);
-      message = message || '';
-      
-      // messageが文字列でない場合は変換
-      if (typeof message !== 'string') {
-        try {
-          message = String(message);
-        } catch (e) {
-          message = 'ローディング中...';
-        }
-      }
-      
       try {
-        console.log('setLoading called with:', isLoading, ', message:', message);
-      } catch (e) {
-        // console.logが失敗した場合は無視
-      }
+        // 入力値を安全に処理
+        isLoading = Boolean(isLoading);
+        message = message || '';
+        
+        // messageが文字列でない場合は変換
+        if (typeof message !== 'string') {
+          try {
+            message = String(message);
+          } catch (e) {
+            message = 'ローディング中...';
+          }
+        }
+        
+        // messageに特殊文字が含まれている場合の処理
+        if (typeof message === 'string') {
+          message = message.replace(/[\u0000-\u001F\u007F]/g, ''); // 制御文字を削除
+          message = message.replace(/['"\\]/g, ''); // 引用符とバックスラッシュを削除
+        }
+        
+        try {
+          console.log('setLoading called with:', isLoading, ', message:', message);
+        } catch (e) {
+          // console.logが失敗した場合は無視
+        }
       
       // 安全にボタンの disabled 状態を更新
       const buttons = [
@@ -1879,6 +1912,14 @@
           showMessage(String(message), 'blue');
         } catch (e) {
           console.error('Error showing message:', e);
+        }
+      }
+      } catch (globalError) {
+        // 関数全体でエラーが発生した場合の安全な処理
+        try {
+          console.error('setLoading function error:', globalError);
+        } catch (e) {
+          // エラーログさえ失敗した場合は無視
         }
       }
     };
