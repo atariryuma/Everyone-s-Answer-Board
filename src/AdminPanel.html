@@ -3049,56 +3049,39 @@
         reasonHeader: elements.reasonHeader.value,
         nameHeader: elements.nameHeader.value,
         classHeader: elements.classHeader.value,
-        // 新しいチェックボックスの値を設定に含める
         showNames: showNamesCheckbox ? showNamesCheckbox.checked : false,
-        showCounts: showCountsCheckbox ? showCountsCheckbox.checked : true // リアクション数はデフォルトで表示
+        showCounts: showCountsCheckbox ? showCountsCheckbox.checked : true
       };
       
-      setLoading(true, '設定を保存中...');
+      setLoading(true, '設定を保存・適用中...');
       elements.saveConfigBtn.disabled = true;
       if (elements.saveConfigText) {
-        elements.saveConfigText.textContent = '保存中...';
+        elements.saveConfigText.textContent = '処理中...';
       }
-      
-      google.script.run
-        .withSuccessHandler(function(msg) { 
-          showMessage(typeof msg === 'string' ? msg : msg.message || '設定が正常に保存されました', 'green'); 
-          addVisualFeedback(elements.saveConfigBtn, 'success');
-          if (elements.configStatus) {
-            elements.configStatus.classList.remove('hidden');
-          }
-          if (elements.saveConfigText) {
-            elements.saveConfigText.textContent = '設定を保存';
-          }
-          elements.saveConfigBtn.disabled = false;
-          
-          // 設定保存後に表示オプションも同時に更新
-          updateDisplayOptions(cfg.showNames, cfg.showCounts);
-          
-          updateSetupProgress();
-          setLoading(false);
 
-          // Mark step 2 as completed (sheet selection)
-          markStepCompleted(2);
+      // ★★★ここからが修正後のコード★★★
+      // 新しい統合関数を一度だけ呼び出す
+      google.script.run
+        .withSuccessHandler(function(latestStatus) {
+          // サーバーから返された最新の状態でUIを更新
+          updateStatus(latestStatus);
           
-          // 統合関数で一括処理（キャッシュ競合を防ぐ）
-          google.script.run
-            .withSuccessHandler(function(result) {
-              // サーバーから返された最新の状態でUIを更新
-              updateStatus(result.status);
-              showMessage(result.message || '設定の保存・適用が完了しました', 'green');
-              // Mark step 3 as completed (configuration and publishing)
-              markStepCompleted(3);
-            })
-            .withFailureHandler(function(error) {
-              showError(error);
-              addVisualFeedback(elements.saveConfigBtn, 'error');
-              if (elements.saveConfigText) {
-                elements.saveConfigText.textContent = '設定を保存';
-              }
-              elements.saveConfigBtn.disabled = false;
-            })
-            .saveAndActivateSheet(currentStatus.userInfo.spreadsheetId, selectedSheet, cfg);
+          showMessage('設定の保存とボードの公開が完了しました。', 'success');
+          markStepCompleted(3); // ステップ3を完了にする
+          setLoading(false);
+          elements.saveConfigBtn.disabled = false;
+          if (elements.saveConfigText) {
+            elements.saveConfigText.textContent = '設定を保存して公開';
+          }
+        })
+        .withFailureHandler(function(error) {
+          showError(error);
+          elements.saveConfigBtn.disabled = false;
+          if (elements.saveConfigText) {
+            elements.saveConfigText.textContent = '設定を保存して公開';
+          }
+        })
+        .saveAndActivateSheet(selectedSheet, cfg);
     }
 
     function switchToSheet() {
