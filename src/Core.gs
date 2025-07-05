@@ -622,7 +622,8 @@ function getStatus(forceRefresh = false) {
   if (forceRefresh) {
     // Force cache invalidation for current user
     try {
-      var currentUserId = getUserId();
+      var props = PropertiesService.getUserProperties();
+      var currentUserId = props.getProperty('CURRENT_USER_ID');
       if (currentUserId) {
         var userInfo = findUserById(currentUserId);
         if (userInfo) {
