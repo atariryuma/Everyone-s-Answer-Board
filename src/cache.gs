@@ -171,7 +171,7 @@ function getUserCached(userId) {
  */
 function getHeadersCached(spreadsheetId, sheetName) {
   const key = `hdr_${spreadsheetId}_${sheetName}`;
-  return cacheManager.get(key, () => {
+  const indices = cacheManager.get(key, () => {
     try {
       console.log(`[getHeadersCached] Starting for spreadsheetId: ${spreadsheetId}, sheetName: ${sheetName}`);
       
@@ -228,6 +228,13 @@ function getHeadersCached(spreadsheetId, sheetName) {
       return {};
     }
   });
+
+  if (!indices || Object.keys(indices).length === 0) {
+    cacheManager.remove(key);
+    return {};
+  }
+
+  return indices;
 }
 
 /**
