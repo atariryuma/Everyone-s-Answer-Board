@@ -183,27 +183,30 @@ function getHeadersCached(spreadsheetId, sheetName) {
       var range = sheetName + '!1:1';
       console.log(`[getHeadersCached] Fetching range: ${range}`);
       
-      var response = service.spreadsheets.values.get({
-        spreadsheetId: spreadsheetId,
-        range: range
+      // Use the updated API pattern consistent with other functions
+      var url = service.baseUrl + '/' + spreadsheetId + '/values/' + encodeURIComponent(range);
+      var response = UrlFetchApp.fetch(url, {
+        headers: { 'Authorization': 'Bearer ' + service.accessToken }
       });
-      console.log(`[getHeadersCached] API response:`, JSON.stringify(response, null, 2));
       
-      if (!response) {
+      var responseData = JSON.parse(response.getContentText());
+      console.log(`[getHeadersCached] API response:`, JSON.stringify(responseData, null, 2));
+      
+      if (!responseData) {
         throw new Error('API response is null or undefined');
       }
       
-      if (!response.values) {
+      if (!responseData.values) {
         console.warn(`[getHeadersCached] No values in response for ${range}`);
         return {};
       }
       
-      if (!response.values[0] || response.values[0].length === 0) {
+      if (!responseData.values[0] || responseData.values[0].length === 0) {
         console.warn(`[getHeadersCached] Empty header row for ${range}`);
         return {};
       }
       
-      var headers = response.values[0];
+      var headers = responseData.values[0];
       console.log(`[getHeadersCached] Headers found:`, headers);
       
       var indices = {};
