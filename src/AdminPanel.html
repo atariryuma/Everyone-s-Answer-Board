@@ -2915,12 +2915,11 @@
     function guessHeaders(headers) {
       
       
-      var find = function(keywords) {
-        return headers.find(function(h) {
-          return keywords.some(function(k) { return h && String(h).toLowerCase().includes(k); });
-        });
-        ) || '';
-      };
+        var find = function(keywords) {
+          return (headers.find(function(h) {
+            return keywords.some(function(k) { return h && String(h).toLowerCase().includes(k); });
+          }) || '');
+        };
       
       var isGoogleForm = headers.some(function(h) { return String(h || '').includes('タイムスタンプ') || String(h || '').includes('メールアドレス'); });
       
