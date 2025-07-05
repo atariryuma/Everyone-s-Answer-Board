@@ -618,7 +618,23 @@ function getResponsesData(userId, sheetName) {
  * 管理画面用のステータス情報を取得
  * AdminPanel.htmlから呼び出される
  */
-function getStatus() {
+function getStatus(forceRefresh = false) {
+  if (forceRefresh) {
+    // Force cache invalidation for current user
+    try {
+      var currentUserId = getUserId();
+      if (currentUserId) {
+        var userInfo = findUserById(currentUserId);
+        if (userInfo) {
+          invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId);
+          console.log('強制リフレッシュ: ユーザーキャッシュを削除しました');
+        }
+      }
+    } catch (e) {
+      console.warn('強制リフレッシュ中にエラー:', e.message);
+    }
+  }
+  
   return getAppConfig();
 }
 

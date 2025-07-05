@@ -50,12 +50,25 @@ function openActiveSpreadsheet() {
  * 実際のシートヘッダーに基づいた設定を返す
  * @param {string} sheetName - シート名（AdminPanelから渡される、オプション）
  */
-function getConfig(sheetName) {
+function getConfig(sheetName, forceRefresh = false) {
   try {
     var spreadsheet = getCurrentSpreadsheet();
     var props = PropertiesService.getUserProperties();
     var currentUserId = props.getProperty('CURRENT_USER_ID');
-    console.log('getConfig: userId=%s, sheetName=%s', currentUserId, sheetName);
+    console.log('getConfig: userId=%s, sheetName=%s, forceRefresh=%s', currentUserId, sheetName, forceRefresh);
+    
+    // forceRefreshが指定された場合、キャッシュを無効化
+    if (forceRefresh && currentUserId) {
+      try {
+        var userInfo = findUserById(currentUserId);
+        if (userInfo) {
+          invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId);
+          console.log('getConfig: 強制リフレッシュによりキャッシュを削除しました');
+        }
+      } catch (e) {
+        console.warn('getConfig: 強制リフレッシュ中にエラー:', e.message);
+      }
+    }
 
     // デフォルト設定（データベース設定キーと統一）
     var config = {

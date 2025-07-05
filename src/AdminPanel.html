@@ -2005,11 +2005,11 @@
       elements.saveConfigBtn.disabled = !hasConfig;
     }
 
-    function loadStatus() {
-      debounce(_loadStatusInternal, 'loadStatus', 300);
+    function loadStatus(forceRefresh = false) {
+      debounce(() => _loadStatusInternal(forceRefresh), 'loadStatus', 300);
     }
 
-    function _loadStatusInternal() {
+    function _loadStatusInternal(forceRefresh = false) {
       // 教育ガイドモーダルは削除されました
       
       google.script.run
@@ -2037,7 +2037,7 @@
           enableUnderstandButton();
           setLoading(false); // エラー時もローディングを終了
         })
-        .getStatus();
+        .getStatus(forceRefresh);
       
       google.script.run
         .withSuccessHandler((formInfo) => {
@@ -2504,7 +2504,7 @@
             if (addResourceText) addResourceText.textContent = 'リソースを追加';
             
             markStepCompleted(1);
-            loadStatus();
+            loadStatus(true);
             setLoading(false);
           })
           .withFailureHandler(function(error) {
@@ -2532,7 +2532,7 @@
             if (addResourceText) addResourceText.textContent = 'リソースを追加';
             
             markStepCompleted(1);
-            loadStatus();
+            loadStatus(true);
             setLoading(false);
           })
           .withFailureHandler(function(error) {
@@ -2636,7 +2636,7 @@
           }
           // Mark step 1 as completed (data preparation)
           markStepCompleted(1);
-          loadStatus(); // Refresh the status
+          loadStatus(true); // Refresh the status with force refresh
         })
         .withFailureHandler((error) => {
           console.error('addSpreadsheetUrl error:', error);
@@ -3016,7 +3016,7 @@
               showMessage(typeof switchMsg === 'string' ? switchMsg : switchMsg.message || 'シートが正常に切り替わりました', 'green');
               // Mark step 3 as completed (configuration and publishing)
               markStepCompleted(3);
-              loadStatus(); // Reload status to reflect published state
+              loadStatus(true); // Reload status to reflect published state with force refresh
             })
             .withFailureHandler(showError)
             .switchToSheet(currentStatus.userInfo.spreadsheetId, selectedSheet);
@@ -3039,7 +3039,7 @@
       google.script.run
         .withSuccessHandler((msg) => {
           showMessage(typeof msg === 'string' ? msg : msg.message || 'シートが正常に切り替わりました', 'green');
-          loadStatus();
+          loadStatus(true);
           setLoading(false);
         })
         .withFailureHandler((error) => {
@@ -3054,7 +3054,7 @@
       google.script.run
         .withSuccessHandler((msg) => {
           showMessage(typeof msg === 'string' ? msg : msg.message || 'シートの公開が正常に終了しました', 'green');
-          loadStatus();
+          loadStatus(true);
           setLoading(false);
         })
         .withFailureHandler((error) => {
