@@ -390,7 +390,8 @@ function getAppConfig() {
         spreadsheetUrl: userInfo.spreadsheetUrl || '',
         createdAt: userInfo.createdAt || '',
         lastAccessedAt: userInfo.lastAccessedAt || '',
-        isActive: userInfo.isActive || 'false'
+        isActive: userInfo.isActive || 'false',
+        configJson: userInfo.configJson || '{}'
       },
       // 統計情報
       answerCount: answerCount,
