@@ -169,7 +169,7 @@ function getPublishedSheetData(classFilter, sortOrder) {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
     
-    var userInfo = findUserById(currentUserId);
+    var userInfo = getUserWithFallback(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -290,7 +290,7 @@ function getAppConfig() {
       }
     }
     
-    var userInfo = findUserById(currentUserId);
+    var userInfo = getUserWithFallback(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -411,7 +411,7 @@ function saveSheetConfig(spreadsheetId, sheetName, config) {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
 
-    var userInfo = findUserById(currentUserId);
+    var userInfo = getUserWithFallback(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -452,7 +452,7 @@ function switchToSheet(spreadsheetId, sheetName) {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
 
-    var userInfo = findUserById(currentUserId);
+    var userInfo = getUserWithFallback(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -615,7 +615,7 @@ function getActiveFormInfo(userId) {
       }
     }
     
-    var userInfo = findUserById(currentUserId);
+    var userInfo = getUserWithFallback(currentUserId);
     if (!userInfo) {
       return { status: 'error', message: 'ユーザー情報が見つかりません' };
     }
@@ -664,7 +664,7 @@ function toggleHighlight(rowIndex, sheetName) {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
     
-    var userInfo = findUserById(currentUserId);
+    var userInfo = getUserWithFallback(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -706,7 +706,7 @@ function checkAdmin() {
       return false;
     }
     
-    var userInfo = findUserById(currentUserId);
+    var userInfo = getUserWithFallback(currentUserId);
     if (!userInfo) {
       return false;
     }

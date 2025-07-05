@@ -121,6 +121,25 @@ function fetchUserFromDatabase(field, value) {
 }
 
 /**
+ * ユーザー情報をキャッシュ優先で取得し、見つからなければDBから直接取得
+ * @param {string} userId - ユーザーID
+ * @returns {object|null} ユーザー情報
+ */
+function getUserWithFallback(userId) {
+  var user = findUserById(userId);
+  if (user) return user;
+
+  debugLog('[Cache] MISS for key: user_' + userId + '. Fetching from DB.');
+  user = fetchUserFromDatabase('userId', userId);
+  if (user) {
+    var cache = CacheService.getScriptCache();
+    cache.put('user_' + userId, JSON.stringify(user), USER_CACHE_TTL);
+    cache.put('email_' + user.adminEmail, JSON.stringify(user), USER_CACHE_TTL);
+  }
+  return user;
+}
+
+/**
  * ユーザー情報を一括更新
  * @param {string} userId - ユーザーID
  * @param {object} updateData - 更新データ
@@ -173,11 +192,7 @@ function updateUser(userId, updateData) {
     }
     
     // キャッシュを無効化
-    var cache = CacheService.getScriptCache();
-    cache.remove('user_' + userId);
-    if (updateData.adminEmail) {
-      cache.remove('email_' + updateData.adminEmail);
-    }
+    invalidateUserCache(userId, updateData.adminEmail);
     
     return { success: true };
   } catch (error) {
@@ -210,9 +225,7 @@ function createUser(userData) {
   appendSheetsData(service, dbId, sheetName + '!A1', [newRow]);
   
   // キャッシュを無効化
-  var cache = CacheService.getScriptCache();
-  cache.remove('user_' + userData.userId);
-  cache.remove('email_' + userData.adminEmail);
+  invalidateUserCache(userData.userId, userData.adminEmail);
   
   return userData;
 }
