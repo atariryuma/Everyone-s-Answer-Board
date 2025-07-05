@@ -43,7 +43,7 @@ window.tailwind = {
 </script>
 <script src="https://cdn.tailwindcss.com" defer onload="console.log('TailwindCSS loaded successfully')" onerror="console.warn('TailwindCSS failed to load')"></script>
 <script>
-const DEBUG_MODE = false;
+const DEBUG_MODE = true;
 function debugLog(){ if (DEBUG_MODE && console && console.log){ console.log.apply(console, arguments); } }
 const __SHOW_COUNTS__ = '<?= typeof showCounts !== "undefined" ? showCounts : false ?>';
 const __DISPLAY_MODE__ = '<?= typeof displayMode !== "undefined" ? displayMode : "anonymous" ?>';
@@ -392,7 +392,8 @@ header {
 /* Hidden card styles for virtual scrolling */
 .hidden-card {
   visibility: hidden;
-  pointer-events: none;
+  position: absolute;
+  left: -9999px;
 }
 
 .visible {
@@ -1141,6 +1142,12 @@ class StudyQuestApp {
       // Check if the answer card is in loading state
       if (answerCard.classList.contains('loading')) {
         debugLog('Answer card is in loading state, ignoring click');
+        return;
+      }
+      
+      // Check if the answer card is hidden by virtual scrolling
+      if (answerCard.classList.contains('hidden-card')) {
+        debugLog('Answer card is hidden by virtual scrolling, ignoring click');
         return;
       }
       
@@ -3190,17 +3197,22 @@ class StudyQuestApp {
       this.visibilityObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
           const card = entry.target;
+          const rect = card.getBoundingClientRect();
+          const isPartiallyVisible = rect.top < window.innerHeight && rect.bottom > 0;
+          
           if (entry.isIntersecting) {
             card.classList.add('visible');
             card.classList.remove('hidden-card');
-          } else {
+          } else if (!isPartiallyVisible) {
+            // Only mark as hidden if the card is completely outside the viewport
             card.classList.remove('visible');
             card.classList.add('hidden-card');
           }
+          // If partially visible but not intersecting, keep it accessible
         });
       }, {
         rootMargin: `${VIEWPORT_BUFFER}px`,
-        threshold: 0.1
+        threshold: [0, 0.1, 0.5, 1.0] // Multiple thresholds for better visibility detection
       });
     }
 
