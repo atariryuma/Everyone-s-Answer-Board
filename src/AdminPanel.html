@@ -1007,9 +1007,12 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
             </svg>
           </div>
-          <div>
-            <h3 class="font-semibold text-green-400" id="url-section-title">📋 ご利用中のボード</h3>
-            <p class="text-xs text-gray-400" id="url-section-description">以下のURLからいつでも管理画面にアクセスできます</p>
+          <div class="flex-1">
+            <h3 class="font-semibold text-green-400" id="url-section-title">📋 公開中のボード</h3>
+            <div id="current-topic-display" class="mt-1">
+              <p class="text-sm text-blue-300 font-medium" id="current-topic-text">読み込み中...</p>
+              <p class="text-xs text-gray-400">現在の質問・テーマ</p>
+            </div>
           </div>
         </div>
         <div class="flex items-center gap-3">
@@ -1680,8 +1683,7 @@
         });
       }
       
-      // Resource management (unified for forms and spreadsheets) - temporarily disabled
-      /*
+      // Resource management (unified for forms and spreadsheets)
       const addResourceBtn = document.getElementById('add-resource-btn');
       if (addResourceBtn) {
         addResourceBtn.addEventListener('click', addResource);
@@ -1691,7 +1693,6 @@
       if (openResourceBtn) {
         openResourceBtn.addEventListener('click', openResource);
       }
-      */
       
       // Legacy spreadsheet management (keep for compatibility)
       const addSpreadsheetBtn = document.getElementById('add-spreadsheet-btn');
@@ -2122,7 +2123,8 @@
       // フォーム編集ボタンの表示制御
       updateFormEditSection(status);
       
-      // 削除された公開中ボード表示部分は不要
+      // フッターの問題表示を更新
+      updateCurrentTopicDisplay(status);
       
       const headerUserIdEl = document.getElementById('header-user-id');
       if (headerUserIdEl && status && status.userId) {
@@ -2482,12 +2484,151 @@
 
     // New unified resource function with URL type detection
     function addResource() {
-      showMessage('この機能は一時的に無効化されています。', 'info');
+      const urlInput = document.getElementById('resource-url-input');
+      const addBtn = document.getElementById('add-resource-btn');
+      const openBtn = document.getElementById('open-resource-btn');
+      const addResourceText = document.getElementById('add-resource-text');
+      const url = urlInput ? urlInput.value.trim() : '';
+      
+      if (!url) {
+        showMessage('GoogleフォームまたはスプレッドシートのURLを入力してください。', 'red');
+        if (urlInput) {
+          addVisualFeedback(urlInput, 'error');
+          urlInput.focus();
+        }
+        return;
+      }
+      
+      // Detect URL type
+      const isForm = url.includes('docs.google.com/forms');
+      const isSpreadsheet = url.includes('docs.google.com/spreadsheets');
+      
+      if (!isForm && !isSpreadsheet) {
+        showMessage('有効なGoogleフォームまたはスプレッドシートのURLを入力してください。', 'red');
+        if (urlInput) {
+          addVisualFeedback(urlInput, 'error');
+          urlInput.focus();
+        }
+        return;
+      }
+      
+      const resourceType = isForm ? 'フォーム' : 'スプレッドシート';
+      setLoading(true, resourceType + 'を追加中...');
+      
+      if (addBtn) addBtn.disabled = true;
+      if (addResourceText) addResourceText.textContent = '追加中...';
+      
+      // Use appropriate server function based on URL type
+      if (isForm) {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            showMessage(result.message || resourceType + 'が正常に追加されました', 'green');
+            if (urlInput) {
+              addVisualFeedback(urlInput, 'success');
+              urlInput.value = '';
+            }
+            if (addBtn) addBtn.disabled = false;
+            if (openBtn) {
+              openBtn.disabled = false;
+              openBtn.setAttribute('data-url', url);
+            }
+            if (addResourceText) addResourceText.textContent = 'リソースを追加';
+            
+            markStepCompleted(1);
+            loadStatus();
+            setLoading(false);
+          })
+          .withFailureHandler(function(error) {
+            console.error('addFormUrl error:', error);
+            showMessage(resourceType + 'の追加に失敗しました: ' + error.message, 'error');
+            if (urlInput) addVisualFeedback(urlInput, 'error');
+            if (addBtn) addBtn.disabled = false;
+            if (addResourceText) addResourceText.textContent = 'リソースを追加';
+            setLoading(false);
+          })
+          .addFormUrl(url);
+      } else {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            showMessage(result.message || resourceType + 'が正常に追加されました', 'green');
+            if (urlInput) {
+              addVisualFeedback(urlInput, 'success');
+              urlInput.value = '';
+            }
+            if (addBtn) addBtn.disabled = false;
+            if (openBtn) {
+              openBtn.disabled = false;
+              openBtn.setAttribute('data-url', url);
+            }
+            if (addResourceText) addResourceText.textContent = 'リソースを追加';
+            
+            markStepCompleted(1);
+            loadStatus();
+            setLoading(false);
+          })
+          .withFailureHandler(function(error) {
+            console.error('addSpreadsheetUrl error:', error);
+            showMessage(resourceType + 'の追加に失敗しました: ' + error.message, 'error');
+            if (urlInput) addVisualFeedback(urlInput, 'error');
+            if (addBtn) addBtn.disabled = false;
+            if (addResourceText) addResourceText.textContent = 'リソースを追加';
+            setLoading(false);
+          })
+          .addSpreadsheetUrl(url);
+      }
     }
     
     // Function to open the added resource
     function openResource() {
-      showMessage('この機能は一時的に無効化されています。', 'info');
+      const openBtn = document.getElementById('open-resource-btn');
+      const url = openBtn ? openBtn.getAttribute('data-url') : '';
+      
+      if (url) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } else {
+        showMessage('開くリソースが見つかりません。先にリソースを追加してください。', 'yellow');
+      }
+    }
+    
+    // Update current topic display in footer
+    function updateCurrentTopicDisplay(status) {
+      const currentTopicText = document.getElementById('current-topic-text');
+      const currentTopicDisplay = document.getElementById('current-topic-display');
+      
+      if (status && status.activeSheetName && status.isPublished) {
+        // Try to get the actual question from the mapping configuration
+        let questionText = '設定されていません';
+        
+        try {
+          const config = JSON.parse(status.userInfo.configJson || '{}');
+          const sheetKey = 'sheet_' + status.activeSheetName;
+          const sheetConfig = config[sheetKey];
+          
+          if (sheetConfig && sheetConfig.mainHeader) {
+            questionText = sheetConfig.mainHeader;
+          } else if (status.activeSheetName) {
+            // If no specific question found, show sheet name
+            questionText = status.activeSheetName + ' のボード';
+          }
+        } catch (e) {
+          console.warn('Failed to parse topic from config:', e);
+          questionText = status.activeSheetName + ' のボード';
+        }
+        
+        if (currentTopicText) {
+          currentTopicText.textContent = questionText;
+        }
+        if (currentTopicDisplay) {
+          currentTopicDisplay.classList.remove('hidden');
+        }
+      } else {
+        if (currentTopicText) {
+          currentTopicText.textContent = 'ボードが公開されていません';
+        }
+        if (currentTopicDisplay) {
+          currentTopicDisplay.classList.add('hidden');
+        }
+      }
     }
 
     function addSpreadsheet() {
