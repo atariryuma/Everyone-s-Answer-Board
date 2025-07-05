@@ -884,9 +884,7 @@
   <div id="system-info-panel" class="glass-panel p-4 sm:p-6">
     <div class="flex items-center gap-3 mb-4">
       <div class="w-8 h-8 bg-gradient-to-br from-gray-500 to-gray-600 rounded-xl flex items-center justify-center">
-        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"></path>
-        </svg>
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"></path></svg>
       </div>
       <h3 class="font-semibold text-gray-300">システム状況</h3>
     </div>
@@ -902,6 +900,11 @@
           <div class="flex justify-between items-center">
             <span class="text-gray-400">ユーザーID:</span>
             <span class="text-white font-mono text-xs bg-gray-700 px-1.5 py-0.5 rounded" id="info-user-id">-</span>
+          </div>
+          <div class="text-right pt-2">
+            <a href="#" onclick="switchToAnotherAccount(); return false;" class="text-cyan-400 hover:text-cyan-300 hover:underline text-xs">
+              別のアカウントでログイン
+            </a>
           </div>
         </div>
       </div>
@@ -924,18 +927,21 @@
         </div>
       </div>
       
-      <div class="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
-        <h4 class="text-sm font-medium text-red-300 mb-3"> Danger Zone</h4>
-        <p class="text-xs text-red-200/80 mb-4">
-          この操作は元に戻せません。アカウントを削除すると、作成したすべてのボードと設定が完全に消去されます。
-        </p>
-        <button type="button" id="delete-account-btn" class="btn btn-danger w-full">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-          </svg>
-          自分のアカウントを削除
-        </button>
-      </div>
+      <details class="bg-red-900/10 border border-red-500/30 rounded-lg transition-all hover:border-red-500/50">
+        <summary class="p-3 cursor-pointer text-sm font-medium text-red-300 hover:text-red-200 flex items-center justify-between">
+          <span>アカウントの管理</span>
+          <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </summary>
+        <div class="p-3 pt-0">
+          <p class="text-xs text-red-200/80 mb-3">
+            この操作は元に戻せません。アカウントを削除すると、作成したすべてのボードと設定が完全に消去されます。
+          </p>
+          <button type="button" id="delete-account-btn" class="btn btn-danger w-full text-sm py-2">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            <span>自分のアカウントを完全に削除する</span>
+          </button>
+        </div>
+      </details>
     </div>
   </div>
   </div>
@@ -1816,24 +1822,339 @@ function handleDeleteRequest() {
 
 
 /**
- * サーバーから受け取ったstatusオブジェクトを元に、新しいUIを更新する
- * (古い `updateDatabaseInfo` の置き換え)
- * @param {object} status - getStatusから返されるオブジェクト
+ * サーバーから受け取ったstatusオブジェクトを元に、システム状況パネルを更新します。
+ * @param {object} status - getStatusから返される完全なステータスオブジェクト
  */
 function updateDatabaseInfo(status) {
-  if (!status || !status.userInfo) return;
+  if (!status || !status.userInfo) {
+    console.warn('システム情報を更新できませんでした: ユーザー情報がありません。');
+    return;
+  }
 
-  const safeSet = (elementId, value) => {
-    if (elements[elementId]) {
-      elements[elementId].textContent = value || '-';
+  const safeSetText = (elementId, value, prefix = '') => {
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.textContent = value ? prefix + value : '-';
     }
   };
 
-  safeSet('info-admin-email', status.userInfo.adminEmail);
-  safeSet('info-user-id', status.userInfo.userId);
-  safeSet('info-published-sheet', status.publishedSheetName || 'なし');
-  safeSet('info-answer-count', status.answerCount || '0');
-  safeSet('info-reaction-count', status.totalReactions || '0');
+  safeSetText('info-admin-email', status.userInfo.adminEmail);
+  safeSetText('info-user-id', status.userInfo.userId);
+  safeSetText('info-published-sheet', status.publishedSheetName || 'なし');
+  safeSetText('info-answer-count', status.answerCount || '0');
+  safeSetText('info-reaction-count', status.totalReactions || '0');
+}
+
+/**
+ * 設定の進捗状況に応じて、各ステップのパネルの開閉状態を自動で制御します。
+ * @param {object} status - サーバーから取得した現在のステータス情報
+ */
+function updatePanelStates(status) {
+  const step1Content = document.getElementById('step1-content');
+  const step2Content = document.getElementById('step2-content');
+  const step3Content = document.getElementById('step3-content');
+  
+  const isPublished = status && status.activeSheetName && status.appPublished;
+
+  if (step1Content.classList.contains('expanded')) toggleSection('step1-content');
+  if (step2Content.classList.contains('expanded')) toggleSection('step2-content');
+  if (step3Content.classList.contains('expanded')) toggleSection('step3-content');
+
+  if (isPublished) {
+    if (step3Content.classList.contains('collapsed')) toggleSection('step3-content');
+  } else if (status && status.allSheets && status.allSheets.length > 0) {
+    if (step2Content.classList.contains('collapsed')) toggleSection('step2-content');
+  } else {
+    if (step1Content.classList.contains('collapsed')) toggleSection('step1-content');
+  }
+}
+
+/**
+ * フッターの現在のお題表示を更新する関数
+ * @param {object} status - サーバーから取得したステータス情報
+ */
+function updateCurrentTopicDisplay(status) {
+  const currentTopicText = document.getElementById('current-topic-text');
+  const currentTopicDisplay = document.getElementById('current-topic-display');
+  
+  if (!currentTopicText || !currentTopicDisplay) return;
+
+  if (status && status.activeSheetName && status.isPublished) {
+    let questionText = 'お題が設定されていません';
+    
+    try {
+      if (status.userInfo && status.userInfo.configJson) {
+        const config = JSON.parse(status.userInfo.configJson);
+        const sheetConfig = config['sheet_' + status.activeSheetName];
+        
+        if (sheetConfig && sheetConfig.opinionHeader) {
+          questionText = sheetConfig.opinionHeader;
+        } else if (status.activeSheetName) {
+          questionText = status.activeSheetName + ' のボード';
+        }
+      }
+    } catch (e) {
+      console.warn('フッターのお題解析に失敗:', e);
+      questionText = status.activeSheetName + ' のボード';
+    }
+    
+    currentTopicText.textContent = questionText;
+    currentTopicDisplay.classList.remove('hidden');
+
+  } else {
+    currentTopicText.textContent = 'ボードが公開されていません';
+    currentTopicDisplay.classList.add('hidden');
+  }
+}
+
+/**
+ * ユーザーにアカウントの切り替えを確認し、登録ページにリダイレクトする関数
+ */
+function switchToAnotherAccount() {
+  if (confirm("別のアカウントに切り替えますか？現在のセッションは破棄されます。")) {
+    google.script.run
+      .withSuccessHandler(function(webAppUrl) {
+        window.top.location.href = webAppUrl;
+      })
+      .withFailureHandler(function(error) {
+          alert('URLの取得に失敗しました: ' + error.message);
+      })
+      .getWebAppUrl();
+  }
+}
+
+/**
+ * 設定の進捗状況に応じて、各ステップのパネルの開閉状態を自動で制御します。
+ * @param {object} status - サーバーから取得した現在のステータス情報
+ */
+function updatePanelStates(status) {
+  const step1Content = document.getElementById('step1-content');
+  const step2Content = document.getElementById('step2-content');
+  const step3Content = document.getElementById('step3-content');
+  
+  const isPublished = status && status.activeSheetName && status.appPublished;
+
+  if (step1Content.classList.contains('expanded')) toggleSection('step1-content');
+  if (step2Content.classList.contains('expanded')) toggleSection('step2-content');
+  if (step3Content.classList.contains('expanded')) toggleSection('step3-content');
+
+  if (isPublished) {
+    if (step3Content.classList.contains('collapsed')) toggleSection('step3-content');
+  } else if (status && status.allSheets && status.allSheets.length > 0) {
+    if (step2Content.classList.contains('collapsed')) toggleSection('step2-content');
+  } else {
+    if (step1Content.classList.contains('collapsed')) toggleSection('step1-content');
+  }
+}
+
+/**
+ * フッターの現在のお題表示を更新する関数
+ * @param {object} status - サーバーから取得したステータス情報
+ */
+function updateCurrentTopicDisplay(status) {
+  const currentTopicText = document.getElementById('current-topic-text');
+  const currentTopicDisplay = document.getElementById('current-topic-display');
+  
+  if (!currentTopicText || !currentTopicDisplay) return;
+
+  if (status && status.activeSheetName && status.isPublished) {
+    let questionText = 'お題が設定されていません';
+    
+    try {
+      if (status.userInfo && status.userInfo.configJson) {
+        const config = JSON.parse(status.userInfo.configJson);
+        const sheetConfig = config['sheet_' + status.activeSheetName];
+        
+        if (sheetConfig && sheetConfig.opinionHeader) {
+          questionText = sheetConfig.opinionHeader;
+        } else if (status.activeSheetName) {
+          questionText = status.activeSheetName + ' のボード';
+        }
+      }
+    } catch (e) {
+      console.warn('フッターのお題解析に失敗:', e);
+      questionText = status.activeSheetName + ' のボード';
+    }
+    
+    currentTopicText.textContent = questionText;
+    currentTopicDisplay.classList.remove('hidden');
+
+  } else {
+    currentTopicText.textContent = 'ボードが公開されていません';
+    currentTopicDisplay.classList.add('hidden');
+  }
+}
+
+/**
+ * ユーザーにアカウントの切り替えを確認し、登録ページにリダイレクトする関数
+ */
+function switchToAnotherAccount() {
+  if (confirm("別のアカウントに切り替えますか？現在のセッションは破棄されます。")) {
+    google.script.run
+      .withSuccessHandler(function(webAppUrl) {
+        window.top.location.href = webAppUrl;
+      })
+      .withFailureHandler(function(error) {
+          alert('URLの取得に失敗しました: ' + error.message);
+      })
+      .getWebAppUrl();
+  }
+}
+
+/**
+ * 設定の進捗状況に応じて、各ステップのパネルの開閉状態を自動で制御します。
+ * @param {object} status - サーバーから取得した現在のステータス情報
+ */
+function updatePanelStates(status) {
+  const step1Content = document.getElementById('step1-content');
+  const step2Content = document.getElementById('step2-content');
+  const step3Content = document.getElementById('step3-content');
+  
+  const isPublished = status && status.activeSheetName && status.appPublished;
+
+  if (step1Content.classList.contains('expanded')) toggleSection('step1-content');
+  if (step2Content.classList.contains('expanded')) toggleSection('step2-content');
+  if (step3Content.classList.contains('expanded')) toggleSection('step3-content');
+
+  if (isPublished) {
+    if (step3Content.classList.contains('collapsed')) toggleSection('step3-content');
+  } else if (status && status.allSheets && status.allSheets.length > 0) {
+    if (step2Content.classList.contains('collapsed')) toggleSection('step2-content');
+  } else {
+    if (step1Content.classList.contains('collapsed')) toggleSection('step1-content');
+  }
+}
+
+/**
+ * フッターの現在のお題表示を更新する関数
+ * @param {object} status - サーバーから取得したステータス情報
+ */
+function updateCurrentTopicDisplay(status) {
+  const currentTopicText = document.getElementById('current-topic-text');
+  const currentTopicDisplay = document.getElementById('current-topic-display');
+  
+  if (!currentTopicText || !currentTopicDisplay) return;
+
+  if (status && status.activeSheetName && status.isPublished) {
+    let questionText = 'お題が設定されていません';
+    
+    try {
+      if (status.userInfo && status.userInfo.configJson) {
+        const config = JSON.parse(status.userInfo.configJson);
+        const sheetConfig = config['sheet_' + status.activeSheetName];
+        
+        if (sheetConfig && sheetConfig.opinionHeader) {
+          questionText = sheetConfig.opinionHeader;
+        } else if (status.activeSheetName) {
+          questionText = status.activeSheetName + ' のボード';
+        }
+      }
+    } catch (e) {
+      console.warn('フッターのお題解析に失敗:', e);
+      questionText = status.activeSheetName + ' のボード';
+    }
+    
+    currentTopicText.textContent = questionText;
+    currentTopicDisplay.classList.remove('hidden');
+
+  } else {
+    currentTopicText.textContent = 'ボードが公開されていません';
+    currentTopicDisplay.classList.add('hidden');
+  }
+}
+
+/**
+ * ユーザーにアカウントの切り替えを確認し、登録ページにリダイレクトする関数
+ */
+function switchToAnotherAccount() {
+  if (confirm("別のアカウントに切り替えますか？現在のセッションは破棄されます。")) {
+    google.script.run
+      .withSuccessHandler(function(webAppUrl) {
+        window.top.location.href = webAppUrl;
+      })
+      .withFailureHandler(function(error) {
+          alert('URLの取得に失敗しました: ' + error.message);
+      })
+      .getWebAppUrl();
+  }
+}
+
+/**
+ * 設定の進捗状況に応じて、各ステップのパネルの開閉状態を自動で制御します。
+ * @param {object} status - サーバーから取得した現在のステータス情報
+ */
+function updatePanelStates(status) {
+  const step1Content = document.getElementById('step1-content');
+  const step2Content = document.getElementById('step2-content');
+  const step3Content = document.getElementById('step3-content');
+  
+  const isPublished = status && status.activeSheetName && status.appPublished;
+
+  if (step1Content.classList.contains('expanded')) toggleSection('step1-content');
+  if (step2Content.classList.contains('expanded')) toggleSection('step2-content');
+  if (step3Content.classList.contains('expanded')) toggleSection('step3-content');
+
+  if (isPublished) {
+    if (step3Content.classList.contains('collapsed')) toggleSection('step3-content');
+  } else if (status && status.allSheets && status.allSheets.length > 0) {
+    if (step2Content.classList.contains('collapsed')) toggleSection('step2-content');
+  } else {
+    if (step1Content.classList.contains('collapsed')) toggleSection('step1-content');
+  }
+}
+
+/**
+ * フッターの現在のお題表示を更新する関数
+ * @param {object} status - サーバーから取得したステータス情報
+ */
+function updateCurrentTopicDisplay(status) {
+  const currentTopicText = document.getElementById('current-topic-text');
+  const currentTopicDisplay = document.getElementById('current-topic-display');
+  
+  if (!currentTopicText || !currentTopicDisplay) return;
+
+  if (status && status.activeSheetName && status.isPublished) {
+    let questionText = 'お題が設定されていません';
+    
+    try {
+      if (status.userInfo && status.userInfo.configJson) {
+        const config = JSON.parse(status.userInfo.configJson);
+        const sheetConfig = config['sheet_' + status.activeSheetName];
+        
+        if (sheetConfig && sheetConfig.opinionHeader) {
+          questionText = sheetConfig.opinionHeader;
+        } else if (status.activeSheetName) {
+          questionText = status.activeSheetName + ' のボード';
+        }
+      }
+    } catch (e) {
+      console.warn('フッターのお題解析に失敗:', e);
+      questionText = status.activeSheetName + ' のボード';
+    }
+    
+    currentTopicText.textContent = questionText;
+    currentTopicDisplay.classList.remove('hidden');
+
+  } else {
+    currentTopicText.textContent = 'ボードが公開されていません';
+    currentTopicDisplay.classList.add('hidden');
+  }
+}
+
+/**
+ * ユーザーにアカウントの切り替えを確認し、登録ページにリダイレクトする関数
+ */
+function switchToAnotherAccount() {
+  if (confirm("別のアカウントに切り替えますか？現在のセッションは破棄されます。")) {
+    google.script.run
+      .withSuccessHandler(function(webAppUrl) {
+        window.top.location.href = webAppUrl;
+      })
+      .withFailureHandler(function(error) {
+          alert('URLの取得に失敗しました: ' + error.message);
+      })
+      .getWebAppUrl();
+  }
 }
 
     // ★★★ 新しい関数を追加 ★★★
@@ -1912,6 +2233,84 @@ function updateDatabaseInfo(status) {
       if (!url) return '';
       var match = url.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
       return match ? match[1] : '';
+    }
+
+    /**
+     * 設定の進捗状況に応じて、各ステップのパネルの開閉状態を自動で制御します。
+     * @param {object} status - サーバーから取得した現在のステータス情報
+     */
+    function updatePanelStates(status) {
+      const step1Content = document.getElementById('step1-content');
+      const step2Content = document.getElementById('step2-content');
+      const step3Content = document.getElementById('step3-content');
+      
+      const isPublished = status && status.activeSheetName && status.appPublished;
+
+      if (step1Content.classList.contains('expanded')) toggleSection('step1-content');
+      if (step2Content.classList.contains('expanded')) toggleSection('step2-content');
+      if (step3Content.classList.contains('expanded')) toggleSection('step3-content');
+
+      if (isPublished) {
+        if (step3Content.classList.contains('collapsed')) toggleSection('step3-content');
+      } else if (status && status.allSheets && status.allSheets.length > 0) {
+        if (step2Content.classList.contains('collapsed')) toggleSection('step2-content');
+      } else {
+        if (step1Content.classList.contains('collapsed')) toggleSection('step1-content');
+      }
+    }
+
+    /**
+     * フッターの現在のお題表示を更新する関数
+     * @param {object} status - サーバーから取得したステータス情報
+     */
+    function updateCurrentTopicDisplay(status) {
+      const currentTopicText = document.getElementById('current-topic-text');
+      const currentTopicDisplay = document.getElementById('current-topic-display');
+      
+      if (!currentTopicText || !currentTopicDisplay) return;
+
+      if (status && status.activeSheetName && status.isPublished) {
+        let questionText = 'お題が設定されていません';
+        
+        try {
+          if (status.userInfo && status.userInfo.configJson) {
+            const config = JSON.parse(status.userInfo.configJson);
+            const sheetConfig = config['sheet_' + status.activeSheetName];
+            
+            if (sheetConfig && sheetConfig.opinionHeader) {
+              questionText = sheetConfig.opinionHeader;
+            } else if (status.activeSheetName) {
+              questionText = status.activeSheetName + ' のボード';
+            }
+          }
+        } catch (e) {
+          console.warn('フッターのお題解析に失敗:', e);
+          questionText = status.activeSheetName + ' のボード';
+        }
+        
+        currentTopicText.textContent = questionText;
+        currentTopicDisplay.classList.remove('hidden');
+
+      } else {
+        currentTopicText.textContent = 'ボードが公開されていません';
+        currentTopicDisplay.classList.add('hidden');
+      }
+    }
+
+    /**
+     * ユーザーにアカウントの切り替えを確認し、登録ページにリダイレクトする関数
+     */
+    function switchToAnotherAccount() {
+      if (confirm("別のアカウントに切り替えますか？現在のセッションは破棄されます。")) {
+        google.script.run
+          .withSuccessHandler(function(webAppUrl) {
+            window.top.location.href = webAppUrl;
+          })
+          .withFailureHandler(function(error) {
+              alert('URLの取得に失敗しました: ' + error.message);
+          })
+          .getWebAppUrl();
+      }
     }
 
     // グローバルスコープに関数を登録し、どこからでも安全に呼び出せるようにする
@@ -2364,7 +2763,8 @@ function updateDatabaseInfo(status) {
       loadConfigForSelected();
       
       // 設定状況に応じたパネル開閉制御
-      updatePanelStates(status);
+      updateCurrentTopicDisplay(status);
+      updatePanelStates(status); 
       
       setLoading(false);
     }
