@@ -2996,26 +2996,24 @@
           // Mark step 2 as completed (sheet selection)
           markStepCompleted(2);
           
-          // Call switchToSheet after saving config
+          // 統合関数で一括処理（キャッシュ競合を防ぐ）
           google.script.run
-            .withSuccessHandler((switchMsg) => {
-              showMessage(typeof switchMsg === 'string' ? switchMsg : switchMsg.message || 'シートが正常に切り替わりました', 'green');
+            .withSuccessHandler((result) => {
+              // サーバーから返された最新の状態でUIを更新
+              updateStatus(result.status);
+              showMessage(result.message || '設定の保存・適用が完了しました', 'green');
               // Mark step 3 as completed (configuration and publishing)
               markStepCompleted(3);
-              loadStatus(true); // Reload status to reflect published state with force refresh
             })
-            .withFailureHandler(showError)
-            .switchToSheet(currentStatus.userInfo.spreadsheetId, selectedSheet);
-        })
-        .withFailureHandler((error) => {
-          showError(error);
-          addVisualFeedback(elements.saveConfigBtn, 'error');
-          if (elements.saveConfigText) {
-            elements.saveConfigText.textContent = '設定を保存';
-          }
-          elements.saveConfigBtn.disabled = false;
-        })
-        .saveSheetConfig(currentStatus.userInfo.spreadsheetId, selectedSheet, cfg);
+            .withFailureHandler((error) => {
+              showError(error);
+              addVisualFeedback(elements.saveConfigBtn, 'error');
+              if (elements.saveConfigText) {
+                elements.saveConfigText.textContent = '設定を保存';
+              }
+              elements.saveConfigBtn.disabled = false;
+            })
+            .saveAndActivateSheet(currentStatus.userInfo.spreadsheetId, selectedSheet, cfg);
     }
 
     function switchToSheet() {

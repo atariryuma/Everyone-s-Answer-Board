@@ -249,6 +249,62 @@ function getConfig(sheetName, forceRefresh = false) {
   }
 }
 
+/**
+ * シート設定を保存し、アクティブ化し、最新のステータスを返す統合関数
+ * キャッシュの競合状態を防ぐため、すべての処理を一つのトランザクションで実行
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - 対象のシート名
+ * @param {object} config - 保存する設定オブジェクト
+ * @returns {object} 更新後の完全なステータス情報
+ */
+function saveAndActivateSheet(spreadsheetId, sheetName, config) {
+  try {
+    console.log('saveAndActivateSheet開始: sheetName=%s', sheetName);
+    
+    // 1. 全てのキャッシュを事前に削除
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    if (currentUserId) {
+      var userInfo = findUserById(currentUserId);
+      if (userInfo) {
+        invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId);
+        console.log('saveAndActivateSheet: 事前キャッシュクリア完了');
+      }
+    }
+    
+    // 2. 設定を保存
+    var saveResult = saveSheetConfig(spreadsheetId, sheetName, config);
+    console.log('saveAndActivateSheet: 設定保存完了');
+    
+    // 3. シートをアクティブ化
+    var switchResult = switchToSheet(spreadsheetId, sheetName);
+    console.log('saveAndActivateSheet: シート切り替え完了');
+    
+    // 4. 表示オプションを設定
+    if (config.showNames !== undefined || config.showCounts !== undefined) {
+      var displayOptions = {
+        showNames: config.showNames || false,
+        showCounts: config.showCounts || false
+      };
+      var displayResult = setDisplayOptions(displayOptions);
+      console.log('saveAndActivateSheet: 表示オプション設定完了');
+    }
+    
+    // 5. 最新のステータスを取得（キャッシュを使わない）
+    var finalStatus = getStatus(true);
+    console.log('saveAndActivateSheet: 統合処理完了');
+    
+    return {
+      success: true,
+      message: '設定の保存・適用が完了しました',
+      status: finalStatus
+    };
+    
+  } catch (error) {
+    console.error('saveAndActivateSheet エラー:', error.message);
+    throw new Error('設定の保存・適用に失敗しました: ' + error.message);
+  }
+}
 
 /**
  * シート固有の設定を保存
