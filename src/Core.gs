@@ -196,8 +196,8 @@ function getPublishedSheetData(classFilter, sortOrder) {
       throw new Error('公開対象のスプレッドシートまたはシートが設定されていません。');
     }
 
-    // シート固有の設定を取得
-    var sheetKey = 'sheet_' + publishedSpreadsheetId + '_' + publishedSheetName;
+    // シート固有の設定を取得 (sheetKey is based only on sheet name)
+    var sheetKey = 'sheet_' + publishedSheetName;
     var sheetConfig = configJson[sheetKey] || {};
     debugLog('getPublishedSheetData: sheetConfig=%s', JSON.stringify(sheetConfig));
     
@@ -437,8 +437,8 @@ function saveSheetConfig(spreadsheetId, sheetName, config) {
 
     var configJson = JSON.parse(userInfo.configJson || '{}');
 
-    // 新しいキー形式でシート設定を保存
-    var sheetKey = 'sheet_' + spreadsheetId + '_' + sheetName;
+    // save using sheet-specific key expected by getConfig
+    var sheetKey = 'sheet_' + sheetName;
     configJson[sheetKey] = config;
 
     updateUser(currentUserId, { configJson: JSON.stringify(configJson) });

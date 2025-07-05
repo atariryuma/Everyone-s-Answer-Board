@@ -340,7 +340,7 @@ function doGet(e) {
         pageTemplate.spreadsheetId = spreadsheetId;
         pageTemplate.displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
         pageTemplate.showCounts = configJson.showCounts !== false;
-        var key = 'sheet_' + spreadsheetId + '_' + sheetName;
+        var key = 'sheet_' + sheetName;
         pageTemplate.mapping = configJson[key] || {};
         pageTemplate.ownerName = userInfo.adminEmail;
         var isOwner = (userEmail === userInfo.adminEmail);
@@ -390,7 +390,7 @@ function doGet(e) {
         pageTemplate.spreadsheetId = publishedSpreadsheetId;
         pageTemplate.displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
         pageTemplate.showCounts = configJson.showCounts !== false;
-        var key = 'sheet_' + publishedSpreadsheetId + '_' + publishedSheetName;
+        var key = 'sheet_' + publishedSheetName;
         pageTemplate.mapping = configJson[key] || {};
         pageTemplate.ownerName = userInfo.adminEmail;
         var isOwner = (userEmail === userInfo.adminEmail);
