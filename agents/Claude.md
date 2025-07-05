@@ -33,6 +33,28 @@
 
 * **言語**: Google Apps Script (GAS) は、最新のV8ランタイムで動作するJavaScriptです。
 * **規約**: 基本的に **Google JavaScript Style Guide** に準拠します。
+* **ブラウザ互換性**: 教育現場での幅広いデバイス・ブラウザ対応のため、**ES5互換のJavaScript**を使用してください。
+  * **禁止構文**: アロー関数 (`=>`), デフォルトパラメータ (`param = 'default'`), オプショナルチェーニング (`obj?.prop`), for...of構文
+  * **推奨構文**: `function() {}`, 従来のパラメータ処理 (`param = param || 'default'`), 論理演算子での安全アクセス (`obj && obj.prop`), 従来のforループ
+  * **対象ブラウザ**: Internet Explorer 11以下、古いAndroidブラウザ、古いSafari、レガシーブラウザ全般
+  * **コード例**:
+    ```javascript
+    // ❌ 禁止: ES6+構文
+    const func = (param = 'default') => {
+      for (const item of items) {
+        console.log(item?.name);
+      }
+    };
+    
+    // ✅ 推奨: ES5互換構文
+    function func(param) {
+      param = param || 'default';
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i];
+        console.log(item && item.name ? item.name : null);
+      }
+    }
+    ```
 * **命名規則**:
     * 変数・関数: `camelCase` (例: `getUserInfo`)
     * クラス: `PascalCase` (例: `StudyQuestApp`)
