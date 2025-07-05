@@ -99,10 +99,10 @@ function getConfig(sheetName) {
               config.nameHeader = savedConfig.nameHeader !== undefined ? savedConfig.nameHeader : config.nameHeader;
               config.classHeader = savedConfig.classHeader !== undefined ? savedConfig.classHeader : config.classHeader;
               
-              // 後方互換性のための旧キーを更新
-              config.answerHeader = config.mainHeader;
+              // 統一された変数名を使用
               config.opinionHeader = config.mainHeader;
-              config.reasonHeader = config.rHeader;
+              config.timestampHeader = config.questionHeader || 'タイムスタンプ';
+              config.emailHeader = config.emailHeader || 'メールアドレス';
               
               console.log('保存済み設定を適用しました:', savedConfig);
             }
@@ -122,9 +122,9 @@ function getConfig(sheetName) {
           config.availableHeaders = availableHeaders;
           config.sheetName = sheetName;
           
-          // 保存済み設定がない場合、自動マッピングを適用
+          // 保存済み設定がない場合、自動マッピングを適用（自動保存なし）
           if (!hasExistingConfig && availableHeaders.length > 0) {
-            console.log('保存済み設定がないため、自動マッピングを実行します');
+            console.log('保存済み設定がないため、自動マッピングを実行します（自動保存なし）');
             
             // より高度な自動マッピングを使用
             var autoMapping = autoMapSheetHeaders(sheetName);
@@ -134,25 +134,15 @@ function getConfig(sheetName) {
               config.nameHeader = autoMapping.nameHeader || config.nameHeader;
               config.classHeader = autoMapping.classHeader || config.classHeader;
               
-              // 後方互換性のための旧キーを更新
-              config.answerHeader = config.mainHeader;
+              // 統一された変数名を使用
               config.opinionHeader = config.mainHeader;
-              config.reasonHeader = config.rHeader;
+              config.timestampHeader = config.questionHeader || 'タイムスタンプ';
+              config.emailHeader = config.emailHeader || 'メールアドレス';
               
-              console.log('自動マッピングを適用しました:', autoMapping);
+              console.log('自動マッピングを適用しました（一時的）:', autoMapping);
               
-              // 自動マッピングが成功した場合、設定を保存
-              try {
-                var saveResult = saveSheetConfig(spreadsheet.getId(), sheetName, {
-                  mainHeader: autoMapping.mainHeader,
-                  rHeader: autoMapping.rHeader,
-                  nameHeader: autoMapping.nameHeader,
-                  classHeader: autoMapping.classHeader
-                });
-                console.log('自動マッピング設定を保存しました:', saveResult);
-              } catch (saveError) {
-                console.warn('自動マッピング設定の保存でエラー:', saveError.message);
-              }
+              // 自動マッピングの結果を保存しない - ユーザーが明示的に保存する必要がある
+              console.log('自動マッピングの結果は一時的に適用されました。明示的な保存が必要です。');
             } else {
               // autoMapSheetHeaders が失敗した場合、従来のマッピングを使用
               console.log('autoMapSheetHeaders失敗、従来のマッピングを使用');
@@ -172,10 +162,10 @@ function getConfig(sheetName) {
                 }
               });
               
-              // 後方互換性のための旧キーを更新
-              config.answerHeader = config.mainHeader;
+              // 統一された変数名を使用
               config.opinionHeader = config.mainHeader;
-              config.reasonHeader = config.rHeader;
+              config.timestampHeader = config.questionHeader || 'タイムスタンプ';
+              config.emailHeader = config.emailHeader || 'メールアドレス';
             }
           }
           
@@ -210,26 +200,38 @@ function getConfig(sheetName) {
       }
     }
     
-    console.log('getConfig: Returning config: %s', JSON.stringify(config));
-    return config;
+    // 最終的な統一された変数名での返却前処理
+    var finalConfig = {
+      sheetName: config.sheetName || sheetName || '',
+      opinionHeader: config.mainHeader || config.opinionHeader || '回答',
+      timestampHeader: config.questionHeader || config.timestampHeader || 'タイムスタンプ',
+      emailHeader: config.emailHeader || 'メールアドレス',
+      reasonHeader: config.rHeader || config.reasonHeader || '理由',
+      nameHeader: config.nameHeader || '名前',
+      classHeader: config.classHeader || 'クラス',
+      showNames: config.showNames || false,
+      showCounts: config.showCounts || false,
+      availableHeaders: config.availableHeaders || [],
+      rosterSheetName: config.rosterSheetName || '名簿'
+    };
+    
+    console.log('getConfig: Returning unified config: %s', JSON.stringify(finalConfig));
+    return finalConfig;
   } catch (error) {
     console.error('getConfig error:', error.message);
-    // エラー時のデフォルト設定
+    // エラー時のデフォルト設定（統一された変数名）
     return {
-      questionHeader: 'タイムスタンプ',
-      answerHeader: '回答',
-      reasonHeader: '理由',
-      nameHeader: '名前',
-      classHeader: 'クラス',
-      rosterSheetName: '名簿',
-      mainHeader: '回答',
-      rHeader: '理由',
+      sheetName: sheetName || '',
       opinionHeader: '回答',
       timestampHeader: 'タイムスタンプ',
       emailHeader: 'メールアドレス',
+      reasonHeader: '理由',
+      nameHeader: '名前',
+      classHeader: 'クラス',
+      showNames: false,
+      showCounts: false,
       availableHeaders: [],
-      sheetName: sheetName || ''
-
+      rosterSheetName: '名簿'
     };
   }
 }

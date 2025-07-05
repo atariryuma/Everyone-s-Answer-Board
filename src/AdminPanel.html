@@ -503,7 +503,7 @@
         </div>
     </div>
   </header>
-  <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8 pb-32">
+  <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8 pb-40">
     <!-- シンプル統合ステータスバー -->
     <section class="mb-6">
       <div class="glass-panel p-4 rounded-lg">
@@ -745,7 +745,7 @@
                       <span class="text-sm font-medium text-white">回答データ列</span>
                       <span class="px-2 py-1 bg-red-500 text-white text-xs rounded-full">必須</span>
                     </div>
-                    <select id="mainHeader" class="form-control" aria-describedby="main-help"></select>
+                    <select id="opinionHeader" class="form-control" aria-describedby="main-help"></select>
                     <p id="main-help" class="text-xs text-red-300 mt-1">
                       回答内容が含まれる列を選択してください
                     </p>
@@ -763,7 +763,7 @@
                   <div class="p-4 pt-0 space-y-4" id="detail-options">
                     <label class="block">
                       <span class="text-sm text-gray-300 mb-2 block">理由・詳細列</span>
-                      <select id="rHeader" class="form-control"></select>
+                      <select id="reasonHeader" class="form-control"></select>
                     </label>
                     <label class="block">
                       <span class="text-sm text-gray-300 mb-2 block">名前列</span>
@@ -1489,8 +1489,8 @@
         sheetSelect: document.getElementById('sheet-select'),
         configArea: document.getElementById('config-area'),
         configPlaceholder: document.getElementById('config-placeholder'),
-        mainHeader: document.getElementById('mainHeader'),
-        rHeader: document.getElementById('rHeader'),
+        opinionHeader: document.getElementById('opinionHeader'),
+        reasonHeader: document.getElementById('reasonHeader'),
         nameHeader: document.getElementById('nameHeader'),
         classHeader: document.getElementById('classHeader'),
         saveConfigBtn: document.getElementById('save-config-btn'),
@@ -1688,8 +1688,8 @@
       }
       
       // Auto-update config when headers change
-      if (elements.mainHeader) {
-        elements.mainHeader.addEventListener('change', updateConfigButtons);
+      if (elements.opinionHeader) {
+        elements.opinionHeader.addEventListener('change', updateConfigButtons);
       }
       
       // Digital citizenship button event
@@ -1924,7 +1924,7 @@
       const hasSpreadsheet = elements.sheetSelect.options.length > 1;
       const hasSelectedSheet = !!selectedSheet;
       const hasActiveSheet = !!currentActiveSheet;
-      const hasConfig = elements.mainHeader && elements.mainHeader.value;
+      const hasConfig = elements.opinionHeader && elements.opinionHeader.value;
       
       if (hasSpreadsheet) {
         progress = 25;
@@ -2001,7 +2001,7 @@
     }
 
     function updateConfigButtons() {
-      const hasConfig = elements.mainHeader.value;
+      const hasConfig = elements.opinionHeader.value;
       elements.saveConfigBtn.disabled = !hasConfig;
     }
 
@@ -2573,8 +2573,8 @@
           const sheetKey = 'sheet_' + status.activeSheetName;
           const sheetConfig = config[sheetKey];
           
-          if (sheetConfig && sheetConfig.mainHeader) {
-            questionText = sheetConfig.mainHeader;
+          if (sheetConfig && sheetConfig.opinionHeader) {
+            questionText = sheetConfig.opinionHeader;
           } else if (status.activeSheetName) {
             // If no specific question found, show sheet name
             questionText = status.activeSheetName + ' のボード';
@@ -2735,7 +2735,7 @@
           updateSheetDetails(headers);
           
           // 自動判定した設定を自動でデータベースに保存
-          if (guesses.mainHeader) {
+          if (guesses.opinionHeader) {
             // チェックボックスの現在の値を取得
             const showNamesCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showNames"]') : null;
             const showCountsCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showCounts"]') : null;
@@ -2825,7 +2825,7 @@
     }
 
     function populateHeaderOptions(headers) {
-      const selects = [elements.mainHeader, elements.rHeader, elements.nameHeader, elements.classHeader];
+      const selects = [elements.opinionHeader, elements.reasonHeader, elements.nameHeader, elements.classHeader];
       selects.forEach(sel => {
         sel.replaceChildren();
         const defaultOption = document.createElement('option');
@@ -2915,7 +2915,7 @@
       
       const result = {
         questionHeader: question,
-        mainHeader: elements.mainHeader.value,
+        opinionHeader: elements.opinionHeader.value,
         reasonHeader: reason,
         nameHeader: name,
         classHeader: classHeader
@@ -2926,8 +2926,8 @@
     }
 
     function populateConfig(cfg) {
-      elements.mainHeader.value = cfg.answerHeader || cfg.questionHeader || '';
-      elements.rHeader.value = cfg.reasonHeader || '';
+      elements.opinionHeader.value = cfg.opinionHeader || '';
+      elements.reasonHeader.value = cfg.reasonHeader || '';
       elements.nameHeader.value = cfg.nameHeader || '';
       elements.classHeader.value = cfg.classHeader || '';
       
@@ -2944,7 +2944,7 @@
     }
 
     function clearConfigFields() {
-      [elements.mainHeader, elements.rHeader, elements.nameHeader, elements.classHeader].forEach(sel => {
+      [elements.opinionHeader, elements.reasonHeader, elements.nameHeader, elements.classHeader].forEach(sel => {
         sel.replaceChildren();
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
@@ -2961,11 +2961,11 @@
         return;
       }
       
-      const mainVal = elements.mainHeader.value;
+      const mainVal = elements.opinionHeader.value;
       
       if (!mainVal) {
         showMessage('回答データ列を選択してください。', 'red');
-        addVisualFeedback(elements.mainHeader, 'error');
+        addVisualFeedback(elements.opinionHeader, 'error');
         return;
       }
 
@@ -2974,8 +2974,8 @@
       const showCountsCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showCounts"]') : null;
       
       const cfg = {
-        mainHeader: elements.mainHeader.value,
-        reasonHeader: elements.rHeader.value,
+        opinionHeader: elements.opinionHeader.value,
+        reasonHeader: elements.reasonHeader.value,
         nameHeader: elements.nameHeader.value,
         classHeader: elements.classHeader.value,
         // 新しいチェックボックスの値を設定に含める

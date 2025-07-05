@@ -28,7 +28,7 @@ function setup({configRows, dataRows}) {
   global.getConfig = (sheetName) => {
     const row = configRows.find((r, idx) => idx > 0 && r[0] === sheetName);
     if (!row) throw new Error('missing');
-    return { questionHeader: row[1], answerHeader: row[2], reasonHeader: row[3] || null, nameHeader: row[4] || null, classHeader: row[5] || null };
+    return { timestampHeader: row[1], opinionHeader: row[2], reasonHeader: row[3] || null, nameHeader: row[4] || null, classHeader: row[5] || null };
   };
 }
 

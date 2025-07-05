@@ -211,8 +211,8 @@ function getPublishedSheetData(classFilter, sortOrder) {
     
     // Page.html期待形式に変換
     // 設定からヘッダー名を取得。未定義の場合のみデフォルト値を使用。
-    var mainHeaderName = sheetConfig.mainHeader !== undefined ? sheetConfig.mainHeader : (sheetConfig.opinionHeader || COLUMN_HEADERS.OPINION);
-    var reasonHeaderName = sheetConfig.rHeader !== undefined ? sheetConfig.rHeader : (sheetConfig.reasonHeader || COLUMN_HEADERS.REASON);
+    var mainHeaderName = sheetConfig.opinionHeader || COLUMN_HEADERS.OPINION;
+    var reasonHeaderName = sheetConfig.reasonHeader || COLUMN_HEADERS.REASON;
     var classHeaderName = sheetConfig.classHeader !== undefined ? sheetConfig.classHeader : COLUMN_HEADERS.CLASS;
     var nameHeaderName = sheetConfig.nameHeader !== undefined ? sheetConfig.nameHeader : COLUMN_HEADERS.NAME;
     debugLog('getPublishedSheetData: Configured Headers - mainHeaderName=%s, reasonHeaderName=%s, classHeaderName=%s, nameHeaderName=%s', mainHeaderName, reasonHeaderName, classHeaderName, nameHeaderName);
@@ -223,7 +223,7 @@ function getPublishedSheetData(classFilter, sortOrder) {
     
     // 動的列名のマッピング: 設定された名前と実際のヘッダーを照合
     var mappedIndices = mapConfigToActualHeaders({
-      mainHeader: mainHeaderName,
+      opinionHeader: mainHeaderName,
       reasonHeader: reasonHeaderName, 
       classHeader: classHeaderName,
       nameHeader: nameHeaderName
@@ -233,7 +233,7 @@ function getPublishedSheetData(classFilter, sortOrder) {
     var formattedData = sheetData.data.map(function(row, index) {
       // マッピングされたインデックスを使用してデータを取得
       var classIndex = mappedIndices.classHeader;
-      var opinionIndex = mappedIndices.mainHeader;
+      var opinionIndex = mappedIndices.opinionHeader;
       var reasonIndex = mappedIndices.reasonHeader;
       var nameIndex = mappedIndices.nameHeader;
 

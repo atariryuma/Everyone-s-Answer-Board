@@ -230,8 +230,8 @@ test('reaction lists trim spaces and ignore empties', () => {
 
 test('getSheetData supports custom headers from config for non-admin', () => {
   global.getConfig = () => ({
-    questionHeader: 'Question',
-    answerHeader: 'Ans',
+    timestampHeader: 'Question',
+    opinionHeader: 'Ans',
     reasonHeader: 'Why',
     nameHeader: 'Name',
     classHeader: 'Class'
@@ -263,8 +263,8 @@ test('getSheetData supports custom headers from config for non-admin', () => {
 
 test('getSheetData uses question column when answer header missing', () => {
   global.getConfig = () => ({
-    questionHeader: 'Question',
-    answerHeader: '',
+    timestampHeader: 'Question',
+    opinionHeader: '',
     reasonHeader: 'Why',
     nameHeader: 'Name',
     classHeader: 'Class'
@@ -296,8 +296,8 @@ test('getSheetData uses question column when answer header missing', () => {
 
 test('getSheetData uses answer column when question header missing', () => {
   global.getConfig = () => ({
-    questionHeader: '',
-    answerHeader: 'Ans',
+    timestampHeader: '',
+    opinionHeader: 'Ans',
     reasonHeader: 'Why',
     nameHeader: 'Name',
     classHeader: 'Class'
