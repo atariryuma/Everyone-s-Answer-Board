@@ -1207,8 +1207,7 @@
         <button type="button" id="digital-citizenship-modal-close-btn" class="btn btn-primary">理解しました</button>
       </div>
     </div>
-  </div></body>
-
+  </div>
 
   <script>
     // デバウンス機能
@@ -2556,34 +2555,63 @@
       if (addResourceText) addResourceText.textContent = '追加中...';
       
       // Use appropriate server function based on URL type
-      const serverFunction = isForm ? 'addFormUrl' : 'addSpreadsheetUrl';
-      
-      google.script.run
-        .withSuccessHandler((result) => {
-          showMessage(result.message || `${resourceType}が正常に追加されました`, 'green');
-          if (urlInput) {
-            addVisualFeedback(urlInput, 'success');
-            urlInput.value = '';
-          }
-          if (addBtn) addBtn.disabled = false;
-          if (openBtn) {
-            openBtn.disabled = false;
-            openBtn.setAttribute('data-url', url);
-          }
-          if (addResourceText) addResourceText.textContent = 'リソースを追加';
-          
-          // Mark step 1 as completed (data preparation)
-          markStepCompleted(1);
-          loadStatus(); // Refresh the status
-        })
-        .withFailureHandler((error) => {
-          console.error(`${serverFunction} error:`, error);
-          showMessage(`${resourceType}の追加に失敗しました: ` + error.message, 'error');
-          if (urlInput) addVisualFeedback(urlInput, 'error');
-          if (addBtn) addBtn.disabled = false;
-          if (addResourceText) addResourceText.textContent = 'リソースを追加';
-          setLoading(false);
-        })[serverFunction](url);
+      if (isForm) {
+        google.script.run
+          .withSuccessHandler((result) => {
+            showMessage(result.message || `${resourceType}が正常に追加されました`, 'green');
+            if (urlInput) {
+              addVisualFeedback(urlInput, 'success');
+              urlInput.value = '';
+            }
+            if (addBtn) addBtn.disabled = false;
+            if (openBtn) {
+              openBtn.disabled = false;
+              openBtn.setAttribute('data-url', url);
+            }
+            if (addResourceText) addResourceText.textContent = 'リソースを追加';
+            
+            // Mark step 1 as completed (data preparation)
+            markStepCompleted(1);
+            loadStatus(); // Refresh the status
+          })
+          .withFailureHandler((error) => {
+            console.error('addFormUrl error:', error);
+            showMessage(`${resourceType}の追加に失敗しました: ` + error.message, 'error');
+            if (urlInput) addVisualFeedback(urlInput, 'error');
+            if (addBtn) addBtn.disabled = false;
+            if (addResourceText) addResourceText.textContent = 'リソースを追加';
+            setLoading(false);
+          })
+          .addFormUrl(url);
+      } else {
+        google.script.run
+          .withSuccessHandler((result) => {
+            showMessage(result.message || `${resourceType}が正常に追加されました`, 'green');
+            if (urlInput) {
+              addVisualFeedback(urlInput, 'success');
+              urlInput.value = '';
+            }
+            if (addBtn) addBtn.disabled = false;
+            if (openBtn) {
+              openBtn.disabled = false;
+              openBtn.setAttribute('data-url', url);
+            }
+            if (addResourceText) addResourceText.textContent = 'リソースを追加';
+            
+            // Mark step 1 as completed (data preparation)
+            markStepCompleted(1);
+            loadStatus(); // Refresh the status
+          })
+          .withFailureHandler((error) => {
+            console.error('addSpreadsheetUrl error:', error);
+            showMessage(`${resourceType}の追加に失敗しました: ` + error.message, 'error');
+            if (urlInput) addVisualFeedback(urlInput, 'error');
+            if (addBtn) addBtn.disabled = false;
+            if (addResourceText) addResourceText.textContent = 'リソースを追加';
+            setLoading(false);
+          })
+          .addSpreadsheetUrl(url);
+      }
     }
     
     // Function to open the added resource
