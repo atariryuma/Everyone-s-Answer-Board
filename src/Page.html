@@ -1117,7 +1117,9 @@ class StudyQuestApp {
         cancelable: e.cancelable,
         defaultPrevented: e.defaultPrevented,
         targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
-        targetPointerEvents: e.target.style.pointerEvents
+        targetPointerEvents: e.target.style.pointerEvents,
+        clickCoordinates: { x: e.clientX, y: e.clientY },
+        targetBounds: e.target.getBoundingClientRect()
       });
       
       // Check if click target is within an answer card
@@ -1256,6 +1258,14 @@ class StudyQuestApp {
     
     // Make function globally available
     window.debugAnswerCards = this.debugAnswerCards.bind(this);
+    
+    // Add instructions for debugging
+    if (DEBUG_MODE) {
+      console.log('🐛 DEBUG MODE ENABLED - Click debugging is active');
+      console.log('💡 Use debugAnswerCards() to inspect all answer cards');
+      console.log('💡 Use debugClickAnswerCard(0) to test click on first card');
+      console.log('💡 Watch console for click event logs');
+    }
     
     const container = this.elements.answersContainer;
     debugLog('Answers container:', {
