@@ -136,7 +136,7 @@ function getConfig(sheetName) {
               
               // 自動マッピングが成功した場合、設定を保存
               try {
-                var saveResult = saveSheetConfig(sheetName, {
+                var saveResult = saveSheetConfig(spreadsheet.getId(), sheetName, {
                   mainHeader: autoMapping.mainHeader,
                   rHeader: autoMapping.rHeader,
                   nameHeader: autoMapping.nameHeader,
@@ -220,10 +220,10 @@ function getConfig(sheetName) {
       emailHeader: 'メールアドレス',
       availableHeaders: [],
       sheetName: sheetName || ''
+
     };
   }
-}""
-
+}
 
 
 /**
@@ -231,63 +231,6 @@ function getConfig(sheetName) {
  * @param {string} sheetName - シート名
  * @param {object} cfg - 設定オブジェクト
  */
-function saveSheetConfig(sheetName, cfg) {
-  try {
-    var props = PropertiesService.getUserProperties();
-    var currentUserId = props.getProperty('CURRENT_USER_ID');
-    console.log('saveSheetConfig: userId=%s, sheetName=%s, config=%s', currentUserId, sheetName, JSON.stringify(cfg));
-    
-    if (!currentUserId) {
-      throw new Error('ユーザーコンテキストが設定されていません。');
-    }
-    
-    var userInfo = findUserById(currentUserId);
-    if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません。');
-    }
-    
-    // 現在の設定を取得
-    var configJson = JSON.parse(userInfo.configJson || '{}');
-    
-    // showNamesとshowCountsをグローバル設定として保存
-    if (cfg.showNames !== undefined) {
-      configJson.showNames = cfg.showNames;
-    }
-    if (cfg.showCounts !== undefined) {
-      configJson.showCounts = cfg.showCounts;
-    }
-    
-    // シート固有の設定を保存
-    var sheetConfigKey = 'sheet_' + sheetName;
-    configJson[sheetConfigKey] = {
-      mainHeader: cfg.mainHeader || cfg.answerHeader || '',
-      rHeader: cfg.rHeader || cfg.reasonHeader || '',
-      nameHeader: cfg.nameHeader || '',
-      classHeader: cfg.classHeader || '',
-      savedAt: new Date().toISOString()
-    };
-    
-    // データベースに更新
-    var updatedUser = updateUser(currentUserId, {
-      configJson: JSON.stringify(configJson)
-    });
-    
-    // ユーザー情報のキャッシュをクリア
-    cacheManager.remove('user_' + currentUserId);
-    
-    console.log('シート設定を保存しました:', {
-      sheetName: sheetName,
-      userId: currentUserId,
-      config: configJson[sheetConfigKey]
-    });
-    
-    return `シート「${sheetName}」の設定を保存しました`;
-  } catch (error) {
-    console.error('saveSheetConfig エラー:', error);
-    return `設定の保存中にエラーが発生しました: ${error.message}`;
-  }
-}
-
 /**
  * シートヘッダーを取得
  * AdminPanel.htmlから呼び出される
@@ -490,58 +433,6 @@ function addSpreadsheetUrl(url) {
  * シートを切り替える
  * AdminPanel.htmlから呼び出される
  */
-function switchToSheet(sheetName) {
-  try {
-    var props = PropertiesService.getUserProperties();
-    var currentUserId = props.getProperty('CURRENT_USER_ID');
-    
-    if (!currentUserId) {
-      throw new Error('ユーザーコンテキストが設定されていません。');
-    }
-    
-    var userInfo = findUserById(currentUserId);
-    if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません。');
-    }
-    
-    // シートの存在確認
-    var spreadsheet = getCurrentSpreadsheet();
-    var sheet = spreadsheet.getSheetByName(sheetName);
-    if (!sheet) {
-      throw new Error(`指定されたシート「${sheetName}」が見つかりません。`);
-    }
-    
-    var configJson = JSON.parse(userInfo.configJson || '{}');
-    configJson.publishedSheet = sheetName;
-    configJson.appPublished = true;
-    configJson.lastSheetSwitch = new Date().toISOString();
-    
-    // シート固有の設定があるかチェック
-    var sheetConfigKey = 'sheet_' + sheetName;
-    if (!configJson[sheetConfigKey]) {
-      console.log(`シート「${sheetName}」の列設定がありません。デフォルト設定を使用します。`);
-    }
-    
-    updateUser(currentUserId, {
-      configJson: JSON.stringify(configJson)
-    });
-    
-    // キャッシュをクリア（シート切り替え時に最新情報を取得するため）
-    cacheManager.clearByPattern(userInfo.spreadsheetId);
-    
-    console.log('シート切り替え完了:', {
-      userId: currentUserId,
-      sheetName: sheetName,
-      hasSheetConfig: !!configJson[sheetConfigKey]
-    });
-    
-    return 'シートが正常に切り替わり、公開されました。';
-  } catch (e) {
-    console.error('switchToSheet エラー: ' + e.message);
-    throw new Error('シートの切り替えに失敗しました: ' + e.message);
-  }
-}
-
 /**
  * アクティブシートをクリア（公開停止）
  * AdminPanel.htmlから呼び出される
