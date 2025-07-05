@@ -17,38 +17,18 @@
   <script>
     // グローバルエラーハンドリング
     window.addEventListener('error', function(event) {
-      try {
-        console.error('Global error caught:', event.error);
-        console.error('Message:', event.message);
-        console.error('Filename:', event.filename);
-        console.error('Line:', event.lineno, 'Column:', event.colno);
-        if (event.error && event.error.stack) {
-          console.error('Stack Trace:\n', event.error.stack);
-        }
-        // document.writeエラーの場合は特別な処理
-        if (
-          event.error &&
-          event.error.message &&
-          event.error.message.includes('document.write')
-        ) {
-          console.warn('document.write エラーが検出されました。安全なDOM操作に切り替えています。');
-          event.preventDefault();
-        }
-      } catch (loggingError) {
-        console.error('Error while logging global error:', loggingError);
-      }
-    });
-
-    // Promise rejection のキャッチ
-    window.addEventListener('unhandledrejection', function(event) {
-      try {
-        console.error('Unhandled promise rejection:', event.reason);
-        if (event.reason && event.reason.stack) {
-          console.error('Stack Trace:\n', event.reason.stack);
-        }
-      } finally {
+      console.error('Global error caught:', event.error);
+      // document.writeエラーの場合は特別な処理
+      if (event.error && event.error.message && event.error.message.includes('document.write')) {
+        console.warn('document.write エラーが検出されました。安全なDOM操作に切り替えています。');
         event.preventDefault();
       }
+    });
+    
+    // Promise rejection のキャッチ
+    window.addEventListener('unhandledrejection', function(event) {
+      console.error('Unhandled promise rejection:', event.reason);
+      event.preventDefault();
     });
   </script>
   <style>
