@@ -43,8 +43,60 @@ window.tailwind = {
 </script>
 <script src="https://cdn.tailwindcss.com" defer onload="console.log('TailwindCSS loaded successfully')" onerror="console.warn('TailwindCSS failed to load')"></script>
 <script>
-const DEBUG_MODE = false;
-function debugLog(){ if (DEBUG_MODE && console && console.log){ console.log.apply(console, arguments); } }
+const DEBUG_MODE = true;
+function debugLog() {
+  if (DEBUG_MODE && console && console.log) {
+    try {
+      // 引数を安全に処理
+      const args = Array.from(arguments).map(arg => {
+        if (typeof arg === 'object' && arg !== null) {
+          return safeDebugStringify(arg);
+        }
+        return arg;
+      });
+      console.log.apply(console, args);
+    } catch (error) {
+      console.warn('debugLog error:', error.message);
+    }
+  }
+}
+
+function safeDebugStringify(obj, maxDepth = 2, currentDepth = 0) {
+  if (currentDepth > maxDepth) return '[Max Depth Reached]';
+  
+  try {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj !== 'object') return obj;
+    
+    // DOM要素の安全な表示
+    if (obj instanceof HTMLElement) {
+      return `[${obj.tagName}${obj.id ? '#' + obj.id : ''}${obj.className ? '.' + obj.className.split(' ').slice(0, 2).join('.') : ''}]`;
+    }
+    
+    // 配列の安全な表示
+    if (Array.isArray(obj)) {
+      if (obj.length > 5) {
+        return `[Array(${obj.length}): first 3 items + ${obj.length - 3} more]`;
+      }
+      return obj.map(item => safeDebugStringify(item, maxDepth, currentDepth + 1));
+    }
+    
+    // オブジェクトの安全な表示
+    const result = {};
+    let count = 0;
+    for (const key in obj) {
+      if (count >= 8) {
+        result['...'] = `[${Object.keys(obj).length - 8} more properties]`;
+        break;
+      }
+      result[key] = safeDebugStringify(obj[key], maxDepth, currentDepth + 1);
+      count++;
+    }
+    return result;
+  } catch (error) {
+    return '[Stringify Error: ' + error.message + ']';
+  }
+}
 const __SHOW_COUNTS__ = '<?= typeof showCounts !== "undefined" ? showCounts : false ?>';
 const __DISPLAY_MODE__ = '<?= typeof displayMode !== "undefined" ? displayMode : "anonymous" ?>';
 const __SHEET_NAME__ = '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>';
@@ -919,6 +971,9 @@ class StudyQuestApp {
       showHighlightToggle: this.state.showHighlightToggle,
       windowShowHighlightToggle: window.showHighlightToggle
     });
+    
+    // デバッグ機能の動作確認テスト
+    debugLog('🛠️ デバッグ機能が有効化されました');
     this.serverShowCounts = window.showCounts;
     this.serverDisplayMode = window.displayMode;
     this.pollingInterval = null;
@@ -1270,6 +1325,12 @@ setupEventDelegation() {
       validateResponse = false
     } = options;
     
+    // Validate cardIndex
+    if (typeof cardIndex !== 'number' || cardIndex < 0 || !Number.isInteger(cardIndex)) {
+      debugLog('ERROR: Invalid card index', { cardIndex });
+      return { success: false, error: 'Invalid card index. Must be a non-negative integer.' };
+    }
+    
     const container = this.elements.answersContainer;
     if (!container) {
       debugLog('ERROR: No answers container found');
@@ -1288,19 +1349,26 @@ setupEventDelegation() {
     }
     
     const card = answerCards[cardIndex];
-    const cardInfo = {
-      index: cardIndex,
-      element: card,
-      className: card.className,
-      dataset: { ...card.dataset },
-      rowIndex: card.dataset.rowIndex,
-      boundingRect: card.getBoundingClientRect(),
-      computedStyle: {
-        display: getComputedStyle(card).display,
-        visibility: getComputedStyle(card).visibility,
-        opacity: getComputedStyle(card).opacity
-      }
-    };
+    
+    let cardInfo;
+    try {
+      cardInfo = {
+        index: cardIndex,
+        element: card,
+        className: card.className,
+        dataset: { ...card.dataset },
+        rowIndex: card.dataset.rowIndex,
+        boundingRect: card.getBoundingClientRect(),
+        computedStyle: {
+          display: getComputedStyle(card).display,
+          visibility: getComputedStyle(card).visibility,
+          opacity: getComputedStyle(card).opacity
+        }
+      };
+    } catch (error) {
+      debugLog('ERROR: Failed to get card info', { error: error.message });
+      return { success: false, error: `Failed to get card info: ${error.message}` };
+    }
     
     if (logDetails) {
       debugLog('Card details before click:', cardInfo);
@@ -1390,7 +1458,13 @@ setupEventDelegation() {
       }
     }
     
-    debugLog('GAS API呼び出し:', { funcName, args, userId: USER_ID, isStateChanging });
+    debugLog('GAS API呼び出し:', { 
+      funcName, 
+      argsCount: Array.isArray(args) ? args.length : 'not-array',
+      argsPreview: Array.isArray(args) && args.length > 0 ? args.slice(0, 2) : args,
+      userId: USER_ID, 
+      isStateChanging 
+    });
     
     return new Promise((resolve, reject) => {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
@@ -1398,7 +1472,13 @@ setupEventDelegation() {
         debugLog('Google Apps Script環境検出済み、実際にAPI呼び出し実行中...');
         google.script.run
           .withSuccessHandler((result) => {
-            debugLog('GAS APIレスポンス受信:', { funcName, args, result, success: true });
+            debugLog('GAS APIレスポンス受信:', { 
+              funcName, 
+              argsCount: Array.isArray(args) ? args.length : 'not-array',
+              resultType: typeof result,
+              resultSize: Array.isArray(result) ? result.length : typeof result === 'object' ? Object.keys(result || {}).length : 'primitive',
+              success: true 
+            });
             if (!isStateChanging) {
               this.cache.set(cacheKey, result, 1000); // 1秒キャッシュ
             }
@@ -1504,7 +1584,11 @@ setupEventDelegation() {
       if (newCount > this.state.lastSeenCount && this.state.lastSeenCount > 0) {
         const newItems = newCount - this.state.lastSeenCount;
         this.showNewContentBanner(newItems);
-        debugLog('新着コンテンツ検出:', { newItems, newCount, lastSeenCount: this.state.lastSeenCount });
+        debugLog('新着コンテンツ検出:', { 
+          newItems, 
+          newCount, 
+          lastSeenCount: this.state?.lastSeenCount || 0 
+        });
       }
     } catch (error) {
       this.state.pollingFailureCount++;
@@ -3344,7 +3428,7 @@ try {
   };
 
   // Additional global debug utilities
-  window.debugClickAllAnswerCards = (options = {}) => {
+  window.debugClickAllAnswerCards = async (options = {}) => {
     if (!window.studyQuestApp) {
       console.log('StudyQuestApp not available');
       return { success: false, error: 'StudyQuestApp not available' };
@@ -3362,15 +3446,20 @@ try {
     console.log(`Found ${answerCards.length} answer cards, clicking all...`);
     
     for (let i = 0; i < answerCards.length; i++) {
-      const result = window.studyQuestApp.debugClickAnswerCard(i, { 
-        ...options, 
-        logDetails: false // Reduce noise when clicking all cards
-      });
-      results.push(result);
-      
-      if (options.delay && i < answerCards.length - 1) {
-        // Add delay between clicks if specified
-        setTimeout(() => {}, options.delay);
+      try {
+        const result = await window.studyQuestApp.debugClickAnswerCard(i, { 
+          ...options, 
+          logDetails: false // Reduce noise when clicking all cards
+        });
+        results.push(result);
+        
+        if (options.delay && i < answerCards.length - 1) {
+          // Add proper delay between clicks if specified
+          await new Promise(resolve => setTimeout(resolve, options.delay));
+        }
+      } catch (error) {
+        console.error(`Error clicking card ${i}:`, error);
+        results.push({ success: false, error: error.message, cardIndex: i });
       }
     }
     
@@ -3385,6 +3474,12 @@ try {
     if (!window.studyQuestApp) {
       console.log('StudyQuestApp not available');
       return { success: false, error: 'StudyQuestApp not available' };
+    }
+    
+    // Validate cardIndex
+    if (typeof cardIndex !== 'number' || cardIndex < 0 || !Number.isInteger(cardIndex)) {
+      console.log('Invalid card index:', cardIndex);
+      return { success: false, error: 'Invalid card index. Must be a non-negative integer.' };
     }
     
     const container = window.studyQuestApp.elements?.answersContainer;
@@ -3405,23 +3500,29 @@ try {
     }
     
     const card = answerCards[cardIndex];
-    const cardInfo = {
-      index: cardIndex,
-      className: card.className,
-      dataset: { ...card.dataset },
-      rowIndex: card.dataset.rowIndex,
-      boundingRect: card.getBoundingClientRect(),
-      computedStyle: {
-        display: getComputedStyle(card).display,
-        visibility: getComputedStyle(card).visibility,
-        opacity: getComputedStyle(card).opacity
-      },
-      textContent: card.textContent.trim(),
-      innerHTML: card.innerHTML
-    };
     
-    console.log('Answer card info:', cardInfo);
-    return { success: true, cardInfo };
+    try {
+      const cardInfo = {
+        index: cardIndex,
+        className: card.className,
+        dataset: { ...card.dataset },
+        rowIndex: card.dataset.rowIndex,
+        boundingRect: card.getBoundingClientRect(),
+        computedStyle: {
+          display: getComputedStyle(card).display,
+          visibility: getComputedStyle(card).visibility,
+          opacity: getComputedStyle(card).opacity
+        },
+        textContent: card.textContent?.trim() || '',
+        innerHTML: card.innerHTML
+      };
+      
+      console.log('Answer card info:', cardInfo);
+      return { success: true, cardInfo };
+    } catch (error) {
+      console.error('Error getting card info:', error);
+      return { success: false, error: `Error getting card info: ${error.message}` };
+    }
   };
   
   // ドメイン情報とフォームリンクを取得
