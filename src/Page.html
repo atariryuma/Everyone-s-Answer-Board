@@ -3417,7 +3417,7 @@ function loadFormLink() {
     })
     .getActiveFormInfo();
 }
-
+function initializeStudyQuestApp() {
 try {
   if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
     window.studyQuestApp.destroy();
@@ -3550,13 +3550,20 @@ try {
       window.studyQuestApp.destroy();
     }
   });
-} catch (error) {
-  console.error('Error creating StudyQuestApp instance:', error);
-  const container = document.getElementById('answers');
-  if (container) {
-    const msg = StudyQuestApp.prototype.escapeHtml(error.message || '');
-    container.innerHTML = '<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました: ' + msg + '</div>';
+  } catch (error) {
+    console.error('Error creating StudyQuestApp instance:', error);
+    const container = document.getElementById('answers');
+    if (container) {
+      const msg = StudyQuestApp.prototype.escapeHtml(error.message || '');
+      container.innerHTML = '<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました: ' + msg + '</div>';
+    }
   }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeStudyQuestApp);
+} else {
+  initializeStudyQuestApp();
 }
 </script>
 </body>
