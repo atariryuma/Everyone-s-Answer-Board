@@ -2343,14 +2343,19 @@ class StudyQuestApp {
           card.setAttribute('tabindex', '0');
         }
         
-        // Add visual feedback for card activation
-        card.addEventListener('focus', () => {
-          debugLog('Card focused:', { rowIndex: card.dataset.rowIndex });
-        });
-        
-        card.addEventListener('blur', () => {
-          debugLog('Card blurred:', { rowIndex: card.dataset.rowIndex });
-        });
+        // Add visual feedback for card activation (only if not already added)
+        if (!card.hasAttribute('data-focus-listeners-added')) {
+          card.addEventListener('focus', () => {
+            debugLog('Card focused:', { rowIndex: card.dataset.rowIndex });
+          });
+          
+          card.addEventListener('blur', () => {
+            debugLog('Card blurred:', { rowIndex: card.dataset.rowIndex });
+          });
+          
+          // Mark that focus/blur listeners have been added to prevent duplicates
+          card.setAttribute('data-focus-listeners-added', 'true');
+        }
         
       });
       
