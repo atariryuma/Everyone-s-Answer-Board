@@ -218,7 +218,6 @@ header {
 }
 .reaction-btn.loading {
   opacity: 0.6;
-  pointer-events: none;
 }
 .fade-in {
   animation: fadeIn 0.5s ease-out;
@@ -462,7 +461,7 @@ header {
   fill: none;
 }
 .like-btn.liked svg { stroke: transparent; fill: currentColor; transform: scale(1.1); }
-.like-btn.loading { opacity: 0.7; position: relative; pointer-events: none; }
+.like-btn.loading {   opacity: 0.7; position: relative; }
 .like-btn.loading::after { 
   content: ""; 
   position: absolute; 
@@ -1230,7 +1229,7 @@ class StudyQuestApp {
         answersContainerChildren: this.elements.answersContainer.children.length
       });
       
-      this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick, { passive: false });
+      this.elements.answersContainer.addEventListener('mousedown', this.handlers.onAnswersContainerInteraction);
       
       // Additional debugging: Test if event listener is properly attached
       debugLog('Event listener attached to answers container:', {
@@ -2450,7 +2449,7 @@ class StudyQuestApp {
     });
     
     // UIを即座に更新
-    this.applyUpdates([item]);
+    requestAnimationFrame(() => this.applyUpdates([item]));
     
     try {
       // サーバーに送信
@@ -2593,7 +2592,7 @@ class StudyQuestApp {
     });
     
     // UIを即座に更新
-    this.applyUpdates([item]);
+    requestAnimationFrame(() => this.applyUpdates([item]));
     
     try {
       // 管理者権限をチェック
