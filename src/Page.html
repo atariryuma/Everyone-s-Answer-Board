@@ -1151,73 +1151,69 @@ class StudyQuestApp {
     document.addEventListener('visibilitychange', this.handlers.onVisibilityChange, { passive: true });
   }
   setupEventDelegation() {
+    // コンテナが存在しない場合は処理を中断
     if (!this.elements.answersContainer) {
-        debugLog('ERROR: answersContainer not found for event delegation.');
+        console.error('CRITICAL: answersContainer not found. Clicks will not work.');
         return;
     }
 
-    // 既存のリスナーを念のためクリア
+    // 既存のリスナーを一度全て削除し、意図しない重複を防ぐ
     if (this.handlers.onAnswersContainerClick) {
         this.elements.answersContainer.removeEventListener('click', this.handlers.onAnswersContainerClick);
     }
 
-    // 新しいシンプルなクリックハンドラー
+    // 新しいクリックイベントハンドラ
     this.handlers.onAnswersContainerClick = (e) => {
-        // クリックされた要素の最も近い`.answer-card`を探す
+        // クリックされた要素から最も近い`.answer-card`要素を取得
         const answerCard = e.target.closest('.answer-card');
 
-        // カードが見つからなければ何もしない
+        // クリックされたのがカードでなければ何もしない
         if (!answerCard) {
             return;
         }
-
-        // --- デバッグログ ---
-        debugLog('Card Click Event Captured', {
-            target: e.target.tagName,
-            cardRowIndex: answerCard.dataset.rowIndex,
-            hasLoadingClass: answerCard.classList.contains('loading'),
-            hasHiddenClass: answerCard.classList.contains('hidden-card')
+        
+        // デバッグログを強化
+        console.log('[DEBUG] Click detected inside answers container.', {
+            target: e.target.className,
+            cardRowIndex: answerCard.dataset.rowIndex
         });
-        
-        // ローディング中や非表示のカードは無視
+
+        // 念のため、カードがローディング中や非表示なら処理しない
         if (answerCard.classList.contains('loading') || answerCard.classList.contains('hidden-card')) {
-            debugLog('Click ignored: card is loading or hidden.');
-            e.stopPropagation(); // イベントの伝播を止めておく
+            e.preventDefault();
+            e.stopPropagation();
+            console.warn('Click ignored: Card is in a non-interactive state.');
             return;
         }
 
-        // --- クリック対象の判定 ---
+        // クリックされた要素がリアクションボタンか判定
         const reactionBtn = e.target.closest('.reaction-btn');
-        const highlightBtn = e.target.closest('.highlight-btn');
-
         if (reactionBtn && !reactionBtn.disabled) {
-            e.stopPropagation(); // リアクションボタンのクリックがカード全体のクリックとして扱われないようにする
+            e.stopPropagation(); // イベントの伝播を止める
             const rowIndex = reactionBtn.dataset.rowIndex;
-            const reactionType = reactionBtn.dataset.reaction;
-            debugLog('Handling Reaction:', { rowIndex, reactionType });
-            this.handleReaction(rowIndex, reactionType);
-            return;
-        }
-        
-        if (highlightBtn && !highlightBtn.disabled) {
-            e.stopPropagation(); // ハイライトボタンのクリックがカード全体のクリックとして扱われないようにする
-            const rowIndex = highlightBtn.dataset.rowIndex;
-            debugLog('Handling Highlight:', { rowIndex });
-            this.handleHighlight(rowIndex);
-            return;
+            const reaction = reactionBtn.dataset.reaction;
+            this.handleReaction(rowIndex, reaction);
+            return; // これ以降の処理は不要
         }
 
-        // --- カード本体のクリック ---
-        // リアクションやハイライトボタン以外がクリックされた場合
+        // クリックされた要素がハイライトボタンか判定
+        const highlightBtn = e.target.closest('.highlight-btn');
+        if (highlightBtn && !highlightBtn.disabled) {
+            e.stopPropagation(); // イベントの伝播を止める
+            this.handleHighlight(highlightBtn.dataset.rowIndex);
+            return; // これ以降の処理は不要
+        }
+
+        // カード本体がクリックされたと判断し、モーダルを表示
         const rowIndex = answerCard.dataset.rowIndex;
         if (rowIndex) {
-            debugLog('Showing Answer Modal for row:', rowIndex);
             this.showAnswerModal(rowIndex);
         } else {
-            debugLog('Click failed: No rowIndex found on card.');
+            console.error('Click failed: No rowIndex found on the card.');
         }
     };
 
+    // イベントリスナーを一度だけ設定
     this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
   }
   
@@ -2127,8 +2123,9 @@ class StudyQuestApp {
         if (fragment.children.length > 0) {
           container.appendChild(fragment);
           
-          // Ensure newly created cards are clickable after DOM insertion
-          this.ensureCardsClickable(fragment);
+          // --- 修正指示：ここに追加 ---
+          this.ensureCardsClickable(container); 
+          // --- 修正指示：ここまで ---
         }
         
         // Recycle fragment
@@ -2185,8 +2182,9 @@ class StudyQuestApp {
       if (fragment.children.length > 0) {
         container.appendChild(fragment);
         
-        // Ensure newly created cards are clickable after DOM insertion
-        this.ensureCardsClickable(fragment);
+        // --- 修正指示：ここに追加 ---
+        this.ensureCardsClickable(container); 
+        // --- 修正指示：ここまで ---
       }
       
       // Recycle fragment
@@ -2250,59 +2248,11 @@ class StudyQuestApp {
     }
   }
   createAnswerCard(data) {
-    // Check cache first for unchanged data
-    const cacheKey = JSON.stringify({
-      rowIndex: data.rowIndex,
-      opinion: data.opinion,
-      reason: data.reason,
-      name: data.name,
-      reactions: data.reactions,
-      highlight: data.highlight,
-      showCounts: this.state.showCounts,
-      displayMode: this.state.displayMode,
-      showHighlightToggle: this.state.showHighlightToggle
-    });
-    
-    debugLog('createAnswerCard キャッシュチェック:', {
-      rowIndex: data.rowIndex,
-      cacheKey: cacheKey.substring(0, 100) + '...',
-      showHighlightToggle: this.state.showHighlightToggle,
-      hasCachedCard: !!this.cache.get(`render-${cacheKey}`)
-    });
-    
-    const cachedCard = this.cache.get(`render-${cacheKey}`);
-    if (cachedCard) {
-      const clonedCard = cachedCard.cloneNode(true);
-      // Ensure cloned card has proper data-row-index
-      clonedCard.dataset.rowIndex = data.rowIndex;
-      
-      // Ensure all child elements with data-row-index are updated
-      const elementsWithRowIndex = clonedCard.querySelectorAll('[data-row-index]');
-      elementsWithRowIndex.forEach(element => {
-        element.dataset.rowIndex = data.rowIndex;
-      });
-      
-      // Remove loading state from cached card to ensure it's clickable
-      if (clonedCard.classList.contains('loading')) {
-        clonedCard.classList.remove('loading');
-      }
-      
-      debugLog('キャッシュされたカードを使用:', { 
-        rowIndex: data.rowIndex,
-        cachedCardDataset: cachedCard.dataset,
-        clonedCardDataset: clonedCard.dataset,
-        hasAnswerCardClass: clonedCard.className.includes('answer-card'),
-        updatedChildElements: elementsWithRowIndex.length,
-        removedLoadingState: true
-      });
-      return clonedCard;
-    }
-    
     const card = document.createElement('div');
     const highlightClass = data.highlight ? ' highlighted' : '';
-    card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer loading' + highlightClass;
+    card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer' + highlightClass;
     card.dataset.rowIndex = data.rowIndex;
-    // --- 修正指示：ここから ---
+    
     // tabindex属性を常に設定し、キーボードフォーカスを可能にする
     card.setAttribute('tabindex', '0');
     
@@ -2310,45 +2260,14 @@ class StudyQuestApp {
     const accessibleLabel = `回答カード: ${data.name || '匿名'}さんの意見、${data.opinion.substring(0, 30)}...`;
     card.setAttribute('aria-label', accessibleLabel);
     card.setAttribute('role', 'article');
-    // --- 修正指示：ここまで ---
     
-    debugLog('Created answer card with rowIndex:', {
-      rowIndex: data.rowIndex,
-      rowIndexType: typeof data.rowIndex,
-      datasetRowIndex: card.dataset.rowIndex,
-      cardClassName: card.className,
-      hasAnswerCardClass: card.className.includes('answer-card')
-    });
     let highlightBtnHtml = '';
-    debugLog('createCard ハイライトボタン条件チェック:', {
-      rowIndex: data.rowIndex,
-      showHighlightToggle: this.state.showHighlightToggle,
-      isAdminUser: this.state.isAdminUser,
-      condition: this.state.showHighlightToggle
-    });
     if (this.state.showHighlightToggle) {
       const cls = data.highlight ? 'liked' : '';
       const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
       highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
-      debugLog('カードハイライトボタン作成:', { 
-        rowIndex: data.rowIndex, 
-        showHighlightToggle: this.state.showHighlightToggle,
-        windowShowHighlightToggle: window.showHighlightToggle,
-        isAdminUser: this.state.isAdminUser,
-        windowIsAdminUser: window.isAdminUser,
-        showAdminFeatures: this.state.showAdminFeatures,
-        highlight: data.highlight
-      });
-    } else {
-      debugLog('カードハイライトボタンをスキップ:', { 
-        rowIndex: data.rowIndex, 
-        showHighlightToggle: this.state.showHighlightToggle,
-        windowShowHighlightToggle: window.showHighlightToggle,
-        isAdminUser: this.state.isAdminUser,
-        windowIsAdminUser: window.isAdminUser,
-        showAdminFeatures: this.state.showAdminFeatures
-      });
     }
+    
     const showName = this.state.displayMode === 'named';
     let displayName = '';
     
@@ -2359,7 +2278,6 @@ class StudyQuestApp {
       } else if (data.email) {
         displayName = data.email.split('@')[0];
       }
-      
     }
     
     const nameHtml = showName && displayName ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(displayName) + '</span></div>' : '';
@@ -2374,7 +2292,9 @@ class StudyQuestApp {
       const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
       return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + ariaLabel + '" aria-pressed="' + info.reacted + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
     }).join('');
+    
     card.innerHTML = '<div class="relative flex-grow mb-3 answer-preview">' + '<h3 class="opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight">' + this.escapeHtml(data.opinion || '') + '</h3>' + '<p class="text-gray-100 whitespace-pre-wrap break-words mt-4">' + this.escapeHtml(data.reason || '') + '</p>' + '</div>' + '<div class="' + containerClass + '">' + nameHtml + '<div class="flex items-center gap-1" role="group" aria-label="回答への反応">' + reactionButtonsHtml + highlightBtnHtml + '</div>' + '</div>';
+    
     if (data.highlight) {
       const badge = document.createElement('span');
       badge.className = 'highlight-badge';
@@ -2385,12 +2305,6 @@ class StudyQuestApp {
     // 統一されたリアクションスタイルを適用
     this.applyReactionStyles(card, data);
     
-    // Cache the card for reuse (limit cache size)
-    if (this.cache.size > 100) {
-      this.cache.cleanup();
-    }
-    
-    // --- 修正指示：ここから ---
     // キーボード操作（Enterキー、Spaceキー）への対応を追加
     card.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -2399,12 +2313,6 @@ class StudyQuestApp {
             card.click(); 
         }
     });
-    // --- 修正指示：ここまで ---
-    
-    // Clone card for caching and remove loading state from cached version
-    const cardToCache = card.cloneNode(true);
-    cardToCache.classList.remove('loading');
-    this.cache.set(`render-${cacheKey}`, cardToCache);
     
     return card;
   }
