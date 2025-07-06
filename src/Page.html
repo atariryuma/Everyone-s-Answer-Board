@@ -1268,7 +1268,7 @@ class StudyQuestApp {
         hasClickListener: true
       });
 
-      // Additional mouse event debugging to help identify click issues
+      // Fix click event issues by handling mousedown and preventing blur conflicts
       this.elements.answersContainer.addEventListener('mousedown', (e) => {
         const answerCard = e.target.closest('.answer-card');
         debugLog('Mouse DOWN event on answers container:', {
@@ -1295,14 +1295,24 @@ class StudyQuestApp {
           timeStamp: e.timeStamp
         });
         
-        // Convert mousedown to click if answer card has loading class
-        if (answerCard && answerCard.classList.contains('loading')) {
-          debugLog('Answer card has loading class, removing it to enable click');
-          answerCard.classList.remove('loading');
+        // Fix pointer-events and loading state issues
+        if (answerCard) {
+          // Remove loading class to enable click
+          if (answerCard.classList.contains('loading')) {
+            debugLog('Answer card has loading class, removing it to enable click');
+            answerCard.classList.remove('loading');
+          }
+          
+          // Store the card that was clicked to handle blur/click conflicts
+          this.pendingClickCard = answerCard;
+          
+          // Prevent blur event from interfering with click
+          e.preventDefault();
         }
       }, { passive: false });
 
       this.elements.answersContainer.addEventListener('mouseup', (e) => {
+        const answerCard = e.target.closest('.answer-card');
         debugLog('Mouse UP event on answers container:', {
           target: e.target,
           targetClass: e.target.className,
@@ -1320,10 +1330,31 @@ class StudyQuestApp {
           targetBounds: e.target.getBoundingClientRect(),
           targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
           targetPointerEvents: e.target.style.pointerEvents,
-          answerCard: e.target.closest('.answer-card'),
+          answerCard: answerCard,
           timeStamp: e.timeStamp
         });
-      }, { passive: true });
+        
+        // Handle click via mouseup if click event doesn't fire
+        if (answerCard && this.pendingClickCard === answerCard) {
+          debugLog('Converting mouseup to click for answer card');
+          // Clear pending click
+          this.pendingClickCard = null;
+          
+          // Simulate click event
+          setTimeout(() => {
+            const clickEvent = new MouseEvent('click', {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+              clientX: e.clientX,
+              clientY: e.clientY,
+              button: e.button,
+              buttons: e.buttons
+            });
+            answerCard.dispatchEvent(clickEvent);
+          }, 10);
+        }
+      }, { passive: false });
 
       this.elements.answersContainer.addEventListener('mouseover', (e) => {
         const answerCard = e.target.closest('.answer-card');
