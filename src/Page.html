@@ -1052,6 +1052,13 @@ class StudyQuestApp {
       });
     }
   setupCriticalElements() {
+    if (this.elements.headingLabel) {
+      const opinionHeader = __OPINION_HEADER__.startsWith('<')
+        ? 'お題を読み込み中...'
+        : this.escapeHtml(__OPINION_HEADER__);
+      this.elements.headingLabel.textContent = opinionHeader;
+    }
+
     // Only setup absolutely critical event listeners
     this.setupEventDelegation();
     this.handlers.onAnswerModalCloseClick = () => this.hideAnswerModal();
@@ -1883,13 +1890,6 @@ setupEventDelegation() {
         <p class="mt-1 text-sm text-gray-400">最初の回答者になりましょう！</p>
       </div>
     `;
-  }
-
-  setupCriticalElements() {
-    if (this.elements.headingLabel) {
-      const opinionHeader = __OPINION_HEADER__.startsWith('<') ? 'お題を読み込み中...' : this.escapeHtml(__OPINION_HEADER__);
-      this.elements.headingLabel.textContent = opinionHeader;
-    }
   }
 
   // Add these two methods
