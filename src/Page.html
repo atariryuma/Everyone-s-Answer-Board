@@ -1242,6 +1242,26 @@ class StudyQuestApp {
       
       this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick, { passive: false });
       
+      // Additional debugging: Test click event propagation
+      document.addEventListener('click', (e) => {
+        const answerCard = e.target.closest('.answer-card');
+        if (answerCard) {
+          debugLog('Document click event detected on answer card:', {
+            target: e.target,
+            targetClass: e.target.className,
+            targetTagName: e.target.tagName,
+            answerCard: answerCard,
+            answerCardClass: answerCard.className,
+            defaultPrevented: e.defaultPrevented,
+            bubbles: e.bubbles,
+            cancelable: e.cancelable,
+            eventPhase: e.eventPhase,
+            targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
+            answerCardComputedStyle: window.getComputedStyle(answerCard).pointerEvents
+          });
+        }
+      }, { passive: true });
+      
       // Additional debugging: Test if event listener is properly attached
       debugLog('Event listener attached to answers container:', {
         listenerFunction: this.handlers.onAnswersContainerClick,
