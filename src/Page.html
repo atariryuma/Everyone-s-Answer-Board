@@ -927,6 +927,11 @@ class StudyQuestApp {
     this.reactionDebounce = new Map(); // リアクションのデバウンス処理用
     this.highlightDebounce = new Map(); // ハイライトのデバウンス処理用
     this.pendingReactions = new Set(); // 処理中のリアクション
+    
+    // イベントリスナー重複登録防止フラグ
+    this.eventDelegationSetup = false;
+    this.nonCriticalListenersSetup = false;
+    this.modalOperationPending = false;
     this.reactionTypes = [
       { key: 'LIKE', icon: 'hand-thumb-up' },
       { key: 'UNDERSTAND', icon: 'lightbulb' },
@@ -1010,6 +1015,12 @@ class StudyQuestApp {
   }
   
   setupNonCriticalEventListeners() {
+    // 重複登録防止
+    if (this.nonCriticalListenersSetup) {
+      debugLog('非クリティカルイベントリスナーは既に設定済み');
+      return;
+    }
+    
     // Modal handlers
     this.handlers.onAnswerModalContainerClick = (e) => {
       if (e.target === e.currentTarget) {
@@ -1097,12 +1108,21 @@ class StudyQuestApp {
       }
     };
     document.addEventListener('visibilitychange', this.handlers.onVisibilityChange, { passive: true });
+    
+    this.nonCriticalListenersSetup = true;
+    debugLog('非クリティカルイベントリスナー設定完了');
   }
   /**
  * イベント委譲の設定（安定版の堅牢なロジックを採用）
  * これにより、クリックイベントが他のイベントと競合しなくなります。
  */
 setupEventDelegation() {
+    // 重複登録防止
+    if (this.eventDelegationSetup) {
+        debugLog('イベント委譲は既に設定済み');
+        return;
+    }
+    
     this.handlers.onAnswersContainerClick = (e) => {
         console.log('🔍 [CLICK DEBUG] Container click detected:', {
             target: e.target,
@@ -1184,6 +1204,7 @@ setupEventDelegation() {
         // 既存のリスナーをクリアしてから追加
         this.elements.answersContainer.removeEventListener('click', this.handlers.onAnswersContainerClick);
         this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
+        this.eventDelegationSetup = true;
         console.log('✅ [CLICK DEBUG] Event delegation setup complete');
     } else {
         console.error('❌ [CLICK DEBUG] No answers container found for event delegation');
@@ -1410,11 +1431,8 @@ setupEventDelegation() {
         isAdminUser: this.state.isAdminUser,
         showHighlightToggle: this.state.showHighlightToggle
       });
-      if (this.elements.adminToggleBtn) {
-        this.elements.adminToggleBtn.classList.remove('hidden');
-        this.elements.adminToggleBtn.removeAttribute('hidden');
-        this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
-      }
+      this.updateAdminButtonUI();
+      this.updateEndPublicationButtonUI();
       return;
     }
     
@@ -1429,33 +1447,24 @@ setupEventDelegation() {
           isAdminUser: this.state.isAdminUser,
           showHighlightToggle: this.state.showHighlightToggle
         });
-        if (this.elements.adminToggleBtn) {
-          this.elements.adminToggleBtn.classList.remove('hidden');
-          this.elements.adminToggleBtn.removeAttribute('hidden');
-          this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
-        }
+        this.updateAdminButtonUI();
+        this.updateEndPublicationButtonUI();
       }
     } catch (e) {
       console.error('Admin check failed', e);
     }
   }
   
-  showAdminControls() {
-    this.state.isAdminUser = true;
-    this.state.showHighlightToggle = true; // 管理者なら常に表示
-    debugLog('showAdminControls実行、ハイライトトグル有効化:', {
-      isAdminUser: this.state.isAdminUser,
-      showHighlightToggle: this.state.showHighlightToggle
-    });
-    
-    // 管理者切り替えボタンは常に表示
+  // 管理者UI更新の共通メソッド
+  updateAdminButtonUI() {
     if (this.elements.adminToggleBtn) {
       this.elements.adminToggleBtn.classList.remove('hidden');
       this.elements.adminToggleBtn.removeAttribute('hidden');
       this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
     }
-    
-    // 公開終了ボタンは管理モード時のみ表示
+  }
+  
+  updateEndPublicationButtonUI() {
     if (this.elements.endPublicationBtn) {
       if (this.state.showAdminFeatures) {
         this.elements.endPublicationBtn.classList.remove('hidden');
@@ -1465,7 +1474,20 @@ setupEventDelegation() {
         this.elements.endPublicationBtn.setAttribute('hidden', '');
       }
     }
-    
+  }
+  
+  // サーバー管理者権限確認の共通メソッド
+  async checkServerAdminPermission() {
+    try {
+      const isAdmin = await this.gas.checkAdmin();
+      if (!isAdmin) {
+        throw new Error('サーバー側で管理者権限が確認できませんでした');
+      }
+      return true;
+    } catch (error) {
+      console.error('管理者権限確認エラー:', error);
+      throw error;
+    }
   }
   
   // 新着コンテンツチェック（表示は更新しない）
@@ -1714,10 +1736,31 @@ setupEventDelegation() {
     if (this.idleCallbackId) {
       cancelIdleCallback(this.idleCallbackId);
     }
+    // 漏れていたイベントリスナーの削除
+    if (this.elements.refreshContentBtn && this.handlers.onRefreshContentClick) {
+      this.elements.refreshContentBtn.removeEventListener('click', this.handlers.onRefreshContentClick);
+    }
+    if (this.elements.dismissBannerBtn && this.handlers.onDismissBannerClick) {
+      this.elements.dismissBannerBtn.removeEventListener('click', this.handlers.onDismissBannerClick);
+    }
+    if (this.elements.endPublicationBtn && this.handlers.onEndPublicationClick) {
+      this.elements.endPublicationBtn.removeEventListener('click', this.handlers.onEndPublicationClick);
+    }
+    if (this.elements.sheetSelector && this.handlers.onSheetSelectorChange) {
+      this.elements.sheetSelector.removeEventListener('change', this.handlers.onSheetSelectorChange);
+    }
+    
+    // イベントリスナー設定フラグのリセット
+    this.eventDelegationSetup = false;
+    this.nonCriticalListenersSetup = false;
+    this.modalOperationPending = false;
+    
     // Clear caches
     this.cache.clear();
     this.deferredUpdates.clear();
     this.domFragmentPool.length = 0;
+    
+    debugLog('アプリケーションのクリーンアップ完了');
   }
   async loadDataImmediate() {
     // Verify admin first to ensure proper initialization
