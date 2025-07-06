@@ -2850,7 +2850,11 @@ function updateDatabaseInfo(status) {
       updateDatabaseInfo(status);
       
       updateUIForSelectedSheet();
-      loadConfigForSelected();
+      
+      // 公開済みで現在選択中のシートがアクティブシートの場合は、列情報の読み込みをスキップ
+      if (!(status.appPublished && selectedSheet === status.activeSheetName)) {
+        loadConfigForSelected();
+      }
       
       // 設定状況に応じたパネル開閉制御
       updateCurrentTopicDisplay(status);
