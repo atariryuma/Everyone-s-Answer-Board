@@ -2176,15 +2176,22 @@ function handleDeleteRequest() {
  * @param {object} status - getStatusから返される完全なステータスオブジェクト
  */
 function updateDatabaseInfo(status) {
+  console.log('🔧 [DEBUG] updateDatabaseInfo called with status:', status);
+  
   if (!status || !status.userInfo) {
-    console.warn('システム情報を更新できませんでした: ユーザー情報がありません。');
+    console.warn('システム情報を更新できませんでした: ユーザー情報がありません。', status);
     return;
   }
+
+  console.log('✅ [DEBUG] User info found, updating system panel:', status.userInfo);
 
   const safeSetText = (elementId, value, prefix = '') => {
     const element = document.getElementById(elementId);
     if (element) {
       element.textContent = value ? prefix + value : '-';
+      console.log(`✅ [DEBUG] Updated ${elementId}:`, element.textContent);
+    } else {
+      console.warn(`❌ [DEBUG] Element not found: ${elementId}`);
     }
   };
 
@@ -2847,7 +2854,12 @@ function updateDatabaseInfo(status) {
         if (countCb) countCb.checked = !!status.showCounts;
       }
       
-      updateDatabaseInfo(status);
+      // システム情報更新時のリクエスト重複を防ぐ
+      try {
+        updateDatabaseInfo(status);
+      } catch (e) {
+        console.warn('Database info update failed:', e);
+      }
       
       updateUIForSelectedSheet();
       
@@ -2863,57 +2875,6 @@ function updateDatabaseInfo(status) {
       setLoading(false);
     }
     
-    
-    function updateDatabaseInfo(status) {
-      try {
-        var dbSection = document.getElementById('database-info-section');
-        if (!dbSection) {
-          console.warn('Database info section not found');
-          return;
-        }
-        
-        if (status && status.userInfo) {
-          dbSection.classList.remove('hidden');
-          
-          // 安全にDOM要素を更新する関数
-          var safeSetText = function(id, value) {
-            var element = document.getElementById(id);
-            if (element) {
-              element.textContent = value || '-';
-            } else {
-              console.warn('Element with id \'' + id + '\' not found');
-            }
-          };
-          
-          safeSetText('db-user-id', status.userInfo.userId);
-          safeSetText('db-admin-email', status.userInfo.adminEmail);
-          safeSetText('db-created-at', formatDateTime(status.userInfo.createdAt));
-          safeSetText('db-last-accessed', formatDateTime(status.userInfo.lastAccessedAt));
-          
-          if (status.systemStatus) {
-            safeSetText('db-setup-status', status.systemStatus.setupStatus);
-            safeSetText('db-form-created', status.systemStatus.formCreated ? '✅ 作成済み' : '❌ 未作成');
-            safeSetText('db-app-published', status.systemStatus.appPublished ? '✅ 公開中' : '❌ 非公開');
-            safeSetText('db-last-updated', formatDateTime(status.systemStatus.lastUpdated));
-          }
-          
-          safeSetText('db-answer-count', status.answerCount || '0');
-          safeSetText('db-reaction-count', status.totalReactions || '0');
-          safeSetText('db-sheet-count', (status.availableSheets ? status.availableSheets.length : 0) + ' 枚');
-          var dbPublishedSpreadsheetIdEl = document.getElementById('db-published-spreadsheet-id');
-      if (dbPublishedSpreadsheetIdEl) dbPublishedSpreadsheetIdEl.textContent = (status && status.publishedSpreadsheetId) || '-';
-      var dbPublishedSheetNameEl = document.getElementById('db-published-sheet-name');
-      if (dbPublishedSheetNameEl) dbPublishedSheetNameEl.textContent = (status && status.publishedSheetName) || '-';
-          
-          var spreadsheetId = status.userInfo.spreadsheetId || '';
-          safeSetText('db-spreadsheet-id', spreadsheetId ? spreadsheetId.substring(0, 20) + '...' : '-');
-        } else {
-          dbSection.classList.add('hidden');
-        }
-      } catch (e) {
-        console.warn('Database info update failed:', e);
-      }
-    }
     
     function formatDateTime(dateString) {
       if (!dateString) return '';
