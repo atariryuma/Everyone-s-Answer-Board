@@ -2444,7 +2444,6 @@ async handleReaction(rowIndex, reaction) {
     });
     
     try {
-      try {
         // ★修正ポイント②：先にサーバーと通信する
         const res = await this.gas.toggleHighlight(numericRowIndex, this.state.sheetName);
 
