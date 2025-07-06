@@ -1151,70 +1151,67 @@ class StudyQuestApp {
     document.addEventListener('visibilitychange', this.handlers.onVisibilityChange, { passive: true });
   }
   setupEventDelegation() {
-    // コンテナが存在しない場合は処理を中断
     if (!this.elements.answersContainer) {
         console.error('CRITICAL: answersContainer not found. Clicks will not work.');
         return;
     }
 
     // 既存のリスナーを一度全て削除し、意図しない重複を防ぐ
-    if (this.handlers.onAnswersContainerClick) {
-        this.elements.answersContainer.removeEventListener('click', this.handlers.onAnswersContainerClick);
+    if (this.handlers.onAnswersContainerInteraction) {
+        this.elements.answersContainer.removeEventListener('mousedown', this.handlers.onAnswersContainerInteraction);
+        this.elements.answersContainer.removeEventListener('keydown', this.handlers.onAnswersContainerInteraction);
     }
 
-    // 新しいクリックイベントハンドラ
-    this.handlers.onAnswersContainerClick = (e) => {
-        // クリックされた要素から最も近い`.answer-card`要素を取得
-        const answerCard = e.target.closest('.answer-card');
+    // mousedownとkeydownの両方を処理する統合イベントハンドラ
+    this.handlers.onAnswersContainerInteraction = (e) => {
+        // mousedownイベントでない、かつEnterかSpaceキーでもない場合は無視
+        if (e.type !== 'mousedown' && e.key !== 'Enter' && e.key !== ' ') {
+            return;
+        }
 
-        // クリックされたのがカードでなければ何もしない
+        const answerCard = e.target.closest('.answer-card');
         if (!answerCard) {
             return;
         }
-        
-        // デバッグログを強化
-        console.log('[DEBUG] Click detected inside answers container.', {
-            target: e.target.className,
-            cardRowIndex: answerCard.dataset.rowIndex
-        });
 
-        // 念のため、カードがローディング中や非表示なら処理しない
-        if (answerCard.classList.contains('loading') || answerCard.classList.contains('hidden-card')) {
+        // mousedownのデフォルトの動作（テキスト選択など）を一部防ぐ
+        if (e.type === 'mousedown') {
             e.preventDefault();
+        }
+        
+        // キーボード操作の場合もデフォルト動作を防ぐ
+        if (e.type === 'keydown') {
+            e.preventDefault();
+        }
+
+        console.log(`[DEBUG] Interaction detected: ${e.type}`, { cardRowIndex: answerCard.dataset.rowIndex });
+
+        // クリック対象の判定と処理
+        const reactionBtn = e.target.closest('.reaction-btn');
+        if (reactionBtn && !reactionBtn.disabled) {
             e.stopPropagation();
-            console.warn('Click ignored: Card is in a non-interactive state.');
+            this.handleReaction(reactionBtn.dataset.rowIndex, reactionBtn.dataset.reaction);
             return;
         }
 
-        // クリックされた要素がリアクションボタンか判定
-        const reactionBtn = e.target.closest('.reaction-btn');
-        if (reactionBtn && !reactionBtn.disabled) {
-            e.stopPropagation(); // イベントの伝播を止める
-            const rowIndex = reactionBtn.dataset.rowIndex;
-            const reaction = reactionBtn.dataset.reaction;
-            this.handleReaction(rowIndex, reaction);
-            return; // これ以降の処理は不要
-        }
-
-        // クリックされた要素がハイライトボタンか判定
         const highlightBtn = e.target.closest('.highlight-btn');
         if (highlightBtn && !highlightBtn.disabled) {
-            e.stopPropagation(); // イベントの伝播を止める
+            e.stopPropagation();
             this.handleHighlight(highlightBtn.dataset.rowIndex);
-            return; // これ以降の処理は不要
+            return;
         }
-
-        // カード本体がクリックされたと判断し、モーダルを表示
+        
+        // カード本体がクリックされた場合
         const rowIndex = answerCard.dataset.rowIndex;
         if (rowIndex) {
             this.showAnswerModal(rowIndex);
-        } else {
-            console.error('Click failed: No rowIndex found on the card.');
         }
     };
 
-    // イベントリスナーを一度だけ設定
-    this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
+    // 'click' の代わりに 'mousedown' を使用
+    this.elements.answersContainer.addEventListener('mousedown', this.handlers.onAnswersContainerInteraction);
+    // キーボード操作への対応
+    this.elements.answersContainer.addEventListener('keydown', this.handlers.onAnswersContainerInteraction);
   }
   
   // Debug helper function - can be called from console
@@ -2304,15 +2301,6 @@ class StudyQuestApp {
     
     // 統一されたリアクションスタイルを適用
     this.applyReactionStyles(card, data);
-    
-    // キーボード操作（Enterキー、Spaceキー）への対応を追加
-    card.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault(); // デフォルトのキー動作（スクロールなど）を防ぐ
-            // 既に存在する 'click' イベントリスナーを発火させる
-            card.click(); 
-        }
-    });
     
     return card;
   }
