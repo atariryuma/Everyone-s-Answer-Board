@@ -1174,16 +1174,9 @@ class StudyQuestApp {
             return;
         }
 
-        // mousedownのデフォルトの動作（テキスト選択など）を一部防ぐ
-        if (e.type === 'mousedown') {
-            e.preventDefault();
-        }
+        // イベントのデフォルト動作を妨げることで、意図しない挙動（テキスト選択など）を防ぐ
+        e.preventDefault();
         
-        // キーボード操作の場合もデフォルト動作を防ぐ
-        if (e.type === 'keydown') {
-            e.preventDefault();
-        }
-
         console.log(`[DEBUG] Interaction detected: ${e.type}`, { cardRowIndex: answerCard.dataset.rowIndex });
 
         // クリック対象の判定と処理
