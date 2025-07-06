@@ -3468,6 +3468,12 @@ function updateDatabaseInfo(status) {
         return;
       }
       
+      // 既に公開中のシートの場合は、列情報の読み込みをスキップ
+      if (selectedSheet === currentActiveSheet && currentStatus && currentStatus.appPublished) {
+        console.log('既に公開中のシートのため、列情報の読み込みをスキップします:', selectedSheet);
+        return;
+      }
+      
       setLoading(true, '列情報を読み込んでいます...');
 
       google.script.run

@@ -1104,20 +1104,54 @@ class StudyQuestApp {
  */
 setupEventDelegation() {
     this.handlers.onAnswersContainerClick = (e) => {
+        console.log('🔍 [CLICK DEBUG] Container click detected:', {
+            target: e.target,
+            targetClass: e.target.className,
+            targetTag: e.target.tagName,
+            currentTarget: e.currentTarget,
+            eventType: e.type,
+            timestamp: new Date().toISOString()
+        });
+
         const answerCard = e.target.closest('.answer-card');
+        console.log('🔍 [CLICK DEBUG] Answer card search:', {
+            answerCard: answerCard,
+            cardClass: answerCard?.className,
+            cardRowIndex: answerCard?.dataset?.rowIndex,
+            isHidden: answerCard?.classList?.contains('hidden-card')
+        });
+
         if (!answerCard || answerCard.classList.contains('hidden-card')) {
+            console.log('🚫 [CLICK DEBUG] No valid answer card found or card is hidden');
             return;
         }
 
         const rowIndex = answerCard.dataset.rowIndex;
-        if (!rowIndex) return;
+        if (!rowIndex) {
+            console.log('🚫 [CLICK DEBUG] No rowIndex found on card');
+            return;
+        }
+
+        console.log('✅ [CLICK DEBUG] Valid card click detected:', {
+            rowIndex: rowIndex,
+            cardElement: answerCard
+        });
 
         // リアクションボタンのクリックを処理
         const reactionBtn = e.target.closest('.reaction-btn');
         if (reactionBtn) {
+            console.log('🎯 [CLICK DEBUG] Reaction button clicked:', {
+                button: reactionBtn,
+                reaction: reactionBtn.dataset.reaction,
+                disabled: reactionBtn.disabled,
+                rowIndex: rowIndex
+            });
             e.stopPropagation(); // ★重要: イベントの伝播を止め、カード本体のクリックと分離
             if (!reactionBtn.disabled) {
+                console.log('▶️ [CLICK DEBUG] Processing reaction:', reactionBtn.dataset.reaction);
                 this.handleReaction(rowIndex, reactionBtn.dataset.reaction);
+            } else {
+                console.log('🚫 [CLICK DEBUG] Reaction button is disabled');
             }
             return;
         }
@@ -1125,21 +1159,34 @@ setupEventDelegation() {
         // ハイライトボタンのクリックを処理
         const highlightBtn = e.target.closest('.highlight-btn');
         if (highlightBtn) {
+            console.log('🎯 [CLICK DEBUG] Highlight button clicked:', {
+                button: highlightBtn,
+                disabled: highlightBtn.disabled,
+                rowIndex: rowIndex
+            });
             e.stopPropagation(); // ★重要: 同様にイベントの伝播を停止
             if (!highlightBtn.disabled) {
+                console.log('▶️ [CLICK DEBUG] Processing highlight for row:', rowIndex);
                 this.handleHighlight(rowIndex);
+            } else {
+                console.log('🚫 [CLICK DEBUG] Highlight button is disabled');
             }
             return;
         }
 
         // 上記以外の場合は、カード本体のクリックとしてモーダルを表示
+        console.log('📱 [CLICK DEBUG] Card body clicked, showing modal for row:', rowIndex);
         this.showAnswerModal(rowIndex);
     };
 
     if (this.elements.answersContainer) {
+        console.log('🔧 [CLICK DEBUG] Setting up event delegation on answers container:', this.elements.answersContainer);
         // 既存のリスナーをクリアしてから追加
         this.elements.answersContainer.removeEventListener('click', this.handlers.onAnswersContainerClick);
         this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
+        console.log('✅ [CLICK DEBUG] Event delegation setup complete');
+    } else {
+        console.error('❌ [CLICK DEBUG] No answers container found for event delegation');
     }
 }
   
@@ -2300,14 +2347,28 @@ setupEventDelegation() {
  * リアクション処理（連続クリック防止機能＋安定化されたUI更新）
  */
 async handleReaction(rowIndex, reaction) {
+    console.log('🎯 [REACTION DEBUG] handleReaction called:', {
+        rowIndex: rowIndex,
+        reaction: reaction,
+        timestamp: new Date().toISOString()
+    });
+
     const numericRowIndex = parseInt(rowIndex, 10);
     const reactionKey = `${numericRowIndex}-${reaction}`;
 
+    console.log('🔧 [REACTION DEBUG] Processing reaction:', {
+        numericRowIndex: numericRowIndex,
+        reactionKey: reactionKey,
+        pendingReactions: Array.from(this.pendingReactions)
+    });
+
     // ★連続クリック防止機能（問題版から継承）
     if (this.pendingReactions.has(reactionKey)) {
+        console.log('🚫 [REACTION DEBUG] Reaction already pending, skipping:', reactionKey);
         return; // すでに処理中なら何もしない
     }
 
+    console.log('✅ [REACTION DEBUG] Adding reaction to pending:', reactionKey);
     this.pendingReactions.add(reactionKey);
 
     const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
@@ -2375,6 +2436,11 @@ async handleReaction(rowIndex, reaction) {
     }, 2000);
   }
   async handleHighlight(rowIndex) {
+    console.log('⭐ [HIGHLIGHT DEBUG] handleHighlight called:', {
+        rowIndex: rowIndex,
+        timestamp: new Date().toISOString()
+    });
+
     debugLog('handleHighlight開始:', { 
       rowIndex, 
       isAdminUser: this.state.isAdminUser, 
@@ -2383,6 +2449,12 @@ async handleReaction(rowIndex, reaction) {
       showAdminFeatures: this.state.showAdminFeatures,
       windowShowAdminFeatures: window.showAdminFeatures,
       windowShowHighlightToggle: window.showHighlightToggle
+    });
+
+    console.log('🔐 [HIGHLIGHT DEBUG] Admin permissions check:', {
+        isAdminUser: this.state.isAdminUser,
+        showHighlightToggle: this.state.showHighlightToggle,
+        showAdminFeatures: this.state.showAdminFeatures
     });
     
     // 管理者権限の再確認
@@ -2628,11 +2700,23 @@ async handleReaction(rowIndex, reaction) {
     });
   }
   showAnswerModal(rowIndex) {
+    console.log('📱 [MODAL DEBUG] showAnswerModal called:', {
+        rowIndex: rowIndex,
+        rowIndexType: typeof rowIndex,
+        timestamp: new Date().toISOString()
+    });
+
     debugLog('showAnswerModal called:', {
       rowIndex: rowIndex,
       rowIndexType: typeof rowIndex,
       currentAnswersLength: this.state.currentAnswers?.length,
       filteredDataLength: this.state.filteredData?.length
+    });
+
+    console.log('🔍 [MODAL DEBUG] Data search context:', {
+        currentAnswersLength: this.state.currentAnswers?.length,
+        filteredDataLength: this.state.filteredData?.length,
+        searchingFor: rowIndex
     });
     
     // 最新データを取得（filteredDataとcurrentAnswersの両方から）
