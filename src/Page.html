@@ -195,7 +195,6 @@ header {
 
 .answer-card.loading .reaction-btn,
 .answer-card.loading .highlight-btn {
-  pointer-events: none;
   opacity: 0.5;
 }
 .reaction-btn {
@@ -233,8 +232,8 @@ header {
 }
 .admin-toggle {
   transition: background-color var(--animation-duration) var(--transition-easing);
-  backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 .admin-toggle:hover {
   background-color: rgba(139, 233, 253, 0.1);
@@ -246,6 +245,7 @@ header {
   right: 0;
   bottom: 0;
   background: rgba(26, 27, 38, 0.8);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -262,20 +262,16 @@ header {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; will-change: opacity; }
-  to { opacity: 1; }
-}
-@keyframes slideIn {
-  from { opacity: 0; will-change: opacity; }
-  to { opacity: 1; }
+  from { opacity: 0; transform: translateY(10px); will-change: opacity, transform; }
+  to { opacity: 1; transform: translateY(0); will-change: auto; }
 }
 @keyframes pulse {
-  0% { will-change: transform; }
+  0% { transform: scale3d(1, 1, 1); will-change: transform; }
   50% { transform: scale3d(1.05, 1.05, 1); }
-  100% { transform: scale3d(1, 1, 1); }
+  100% { transform: scale3d(1, 1, 1); will-change: auto; }
 }
 @keyframes shake {
-  0%, 100% { will-change: transform; }
+  0%, 100% { transform: translate3d(0, 0, 0); will-change: transform; }
   25% { transform: translate3d(-5px, 0, 0); }
   75% { transform: translate3d(5px, 0, 0); }
 }
@@ -283,9 +279,9 @@ header {
   100% { transform: rotate(360deg); will-change: transform; }
 }
 @keyframes bounce {
-  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
-  40% { transform: translateY(-10px); }
-  60% { transform: translateY(-5px); }
+  0%, 20%, 50%, 80%, 100% { transform: translate3d(0, 0, 0); will-change: auto; }
+  40% { transform: translate3d(0, -10px, 0); will-change: transform; }
+  60% { transform: translate3d(0, -5px, 0); }
 }
 
 
@@ -298,8 +294,8 @@ header {
   }
   
   .glass-panel {
-    backdrop-filter: none;
     -webkit-backdrop-filter: none;
+    backdrop-filter: none;
     background: var(--color-surface);
   }
   
@@ -384,8 +380,8 @@ header {
 }
 
 .low-performance .glass-panel {
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 /* Hidden card styles for virtual scrolling */
@@ -474,7 +470,6 @@ header {
   height: 16px; 
   margin: auto; 
 }
-@keyframes spin { to { transform: rotate(360deg); } }
 .highlight-btn { 
   transition: background var(--transition-duration) var(--transition-easing),
               transform var(--transition-duration) var(--transition-easing);
@@ -586,7 +581,7 @@ header {
 .modal-fade { animation: modalFade 0.2s ease-out; }
 @keyframes modalFade { from { opacity: 0; will-change: opacity; } to { opacity: 1; } }
 .modal-scale { animation: modalScale 0.2s ease-out; }
-@keyframes modalScale { from { will-change: transform; } to { transform: scale3d(1, 1, 1); } }
+@keyframes modalScale { from { transform: scale3d(0.8, 0.8, 1); will-change: transform; } to { transform: scale3d(1, 1, 1); } }
 </style>
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans">
@@ -664,10 +659,10 @@ header {
         <span id="answerCountText">0件</span>
       </div>
       
-      <select id="classFilter" class="hidden text-xs bg-gray-700 border border-gray-600 rounded px-2 py-1"></select>
+      <select id="classFilter" class="hidden text-xs bg-gray-700 border border-gray-600 rounded px-2 py-1" title="クラスフィルター" aria-label="クラスフィルター"></select>
       
       <div class="relative">
-        <select id="sortOrder" class="text-xs bg-gray-700 border border-gray-600 rounded px-2 py-1 pr-6 appearance-none">
+        <select id="sortOrder" class="text-xs bg-gray-700 border border-gray-600 rounded px-2 py-1 pr-6 appearance-none" title="並び順" aria-label="並び順">
           <option value="newest" selected>新着順</option>
           <option value="random">ランダム順</option>
           <option value="score" id="scoreOption" class="hidden">スコア順</option>
@@ -1103,151 +1098,50 @@ class StudyQuestApp {
     };
     document.addEventListener('visibilitychange', this.handlers.onVisibilityChange, { passive: true });
   }
-  setupEventDelegation() {
+  /**
+ * イベント委譲の設定（安定版の堅牢なロジックを採用）
+ * これにより、クリックイベントが他のイベントと競合しなくなります。
+ */
+setupEventDelegation() {
     this.handlers.onAnswersContainerClick = (e) => {
-      // Debug: Log all click events on answers container
-      debugLog('Answer container click detected:', {
-        target: e.target,
-        targetClass: e.target.className,
-        targetTagName: e.target.tagName,
-        currentTarget: e.currentTarget,
-        eventPhase: e.eventPhase,
-        bubbles: e.bubbles,
-        cancelable: e.cancelable,
-        defaultPrevented: e.defaultPrevented,
-        targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
-        targetPointerEvents: e.target.style.pointerEvents
-      });
-      
-      // Check if click target is within an answer card
-      const answerCard = e.target.closest('.answer-card');
-      debugLog('Answer card detection:', {
-        answerCard: answerCard,
-        answerCardFound: !!answerCard,
-        answerCardClass: answerCard?.className,
-        answerCardDataset: answerCard?.dataset,
-        answerCardComputedStyle: answerCard ? window.getComputedStyle(answerCard).pointerEvents : null,
-        answerCardPointerEvents: answerCard?.style.pointerEvents,
-        answerCardHasLoadingClass: answerCard?.classList.contains('loading'),
-        answerCardHasHiddenClass: answerCard?.classList.contains('hidden-card'),
-        answerCardHasVisibleClass: answerCard?.classList.contains('visible')
-      });
-      
-      if (!answerCard) {
-        debugLog('No answer card found, ignoring click');
-        return;
-      }
-      
-      // Check if the answer card is in loading state
-      if (answerCard.classList.contains('loading')) {
-        debugLog('Answer card is in loading state, ignoring click');
-        return;
-      }
-      
-      // Check if the answer card is hidden by virtual scrolling
-      if (answerCard.classList.contains('hidden-card')) {
-        debugLog('Answer card is hidden by virtual scrolling, ignoring click');
-        return;
-      }
-      
-      // Check if answer card has rowIndex
-      const rowIndex = answerCard.dataset.rowIndex;
-      debugLog('Row index check:', {
-        rowIndex: rowIndex,
-        rowIndexType: typeof rowIndex,
-        hasRowIndex: !!rowIndex,
-        allDatasetKeys: Object.keys(answerCard.dataset || {})
-      });
-      
-      if (!rowIndex) {
-        debugLog('No row index found on answer card, ignoring click');
-        return;
-      }
-      
-      // Check for reaction button clicks
-      const reactionBtn = e.target.closest('.reaction-btn');
-      if (reactionBtn) {
-        debugLog('Reaction button click detected:', {
-          reactionBtn: reactionBtn,
-          reactionType: reactionBtn.dataset.reaction,
-          disabled: reactionBtn.disabled,
-          rowIndex: rowIndex,
-          classList: reactionBtn.classList.toString()
-        });
-        
-        e.stopPropagation();
-        const reactionType = reactionBtn.dataset.reaction;
-        if (reactionType && !reactionBtn.disabled) {
-          debugLog('Handling reaction:', { rowIndex, reactionType });
-          this.handleReaction(rowIndex, reactionType);
-        } else {
-          debugLog('Reaction button click ignored:', {
-            reactionType: reactionType,
-            disabled: reactionBtn.disabled,
-            reason: !reactionType ? 'No reaction type' : 'Button disabled'
-          });
+        const answerCard = e.target.closest('.answer-card');
+        if (!answerCard || answerCard.classList.contains('hidden-card')) {
+            return;
         }
-        return;
-      }
-      
-      // Check for highlight button clicks
-      const highlightBtn = e.target.closest('.highlight-btn');
-      if (highlightBtn) {
-        debugLog('ハイライトボタンクリック:', { 
-          rowIndex, 
-          disabled: highlightBtn.disabled, 
-          showHighlightToggle: this.state.showHighlightToggle,
-          classList: highlightBtn.classList.toString(),
-          dataset: highlightBtn.dataset
-        });
-        
-        e.stopPropagation();
-        if (!highlightBtn.disabled) {
-          debugLog('Handling highlight:', { rowIndex });
-          this.handleHighlight(rowIndex);
-        } else {
-          debugLog('Highlight button click ignored: button disabled');
+
+        const rowIndex = answerCard.dataset.rowIndex;
+        if (!rowIndex) return;
+
+        // リアクションボタンのクリックを処理
+        const reactionBtn = e.target.closest('.reaction-btn');
+        if (reactionBtn) {
+            e.stopPropagation(); // ★重要: イベントの伝播を止め、カード本体のクリックと分離
+            if (!reactionBtn.disabled) {
+                this.handleReaction(rowIndex, reactionBtn.dataset.reaction);
+            }
+            return;
         }
-        return;
-      }
-      
-      // If no specific button was clicked, show answer modal
-      debugLog('Showing answer modal for card click:', {
-        rowIndex: rowIndex,
-        clickedElement: e.target,
-        answerCard: answerCard
-      });
-      
-      this.showAnswerModal(rowIndex);
+
+        // ハイライトボタンのクリックを処理
+        const highlightBtn = e.target.closest('.highlight-btn');
+        if (highlightBtn) {
+            e.stopPropagation(); // ★重要: 同様にイベントの伝播を停止
+            if (!highlightBtn.disabled) {
+                this.handleHighlight(rowIndex);
+            }
+            return;
+        }
+
+        // 上記以外の場合は、カード本体のクリックとしてモーダルを表示
+        this.showAnswerModal(rowIndex);
     };
-    
+
     if (this.elements.answersContainer) {
-      debugLog('Setting up event delegation:', {
-        answersContainer: this.elements.answersContainer,
-        hasAnswersContainer: !!this.elements.answersContainer,
-        answersContainerClass: this.elements.answersContainer.className,
-        answersContainerChildren: this.elements.answersContainer.children.length
-      });
-      
-      this.elements.answersContainer.addEventListener('mousedown', this.handlers.onAnswersContainerInteraction);
-      
-      // Additional debugging: Test if event listener is properly attached
-      debugLog('Event listener attached to answers container:', {
-        listenerFunction: this.handlers.onAnswersContainerClick,
-        hasClickListener: true
-      });
-    } else {
-      debugLog('ERROR: answersContainer element not found when setting up event delegation');
+        // 既存のリスナーをクリアしてから追加
+        this.elements.answersContainer.removeEventListener('click', this.handlers.onAnswersContainerClick);
+        this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
     }
-    this.handlers.onDocumentClick = (e) => {
-      if (e.target.matches('#retryLoadBtn')) {
-        e.preventDefault();
-        this.loadInitialData();
-        return;
-      }
-    };
-    document.addEventListener('click', this.handlers.onDocumentClick, { passive: false });
-  }
+}
   
   // Debug helper function - can be called from console
   debugAnswerCards() {
@@ -2399,97 +2293,70 @@ class StudyQuestApp {
     card.innerHTML = '<div class="h-20 w-full rounded bg-gray-500/30 mb-4"></div><div class="h-6 w-full rounded bg-gray-500/20"></div>';
     return card;
   }
-  async handleReaction(rowIndex, reaction) {
+  /**
+ * リアクション処理（連続クリック防止機能＋安定化されたUI更新）
+ */
+/**
+ * リアクション処理（連続クリック防止機能＋安定化されたUI更新）
+ */
+async handleReaction(rowIndex, reaction) {
     const numericRowIndex = parseInt(rowIndex, 10);
     const reactionKey = `${numericRowIndex}-${reaction}`;
-    
-    // Enhanced debounce - prevent rapid consecutive clicks
-    if (this.reactionDebounce.has(reactionKey)) {
-      clearTimeout(this.reactionDebounce.get(reactionKey));
-      return; // Ignore rapid clicks
-    }
-    
-    // 既に処理中の場合は無視
+
+    // ★連続クリック防止機能（問題版から継承）
     if (this.pendingReactions.has(reactionKey)) {
-      return;
+        return; // すでに処理中なら何もしない
     }
-    
-    // Rate limiting - prevent spam
-    const now = Date.now();
-    const lastReactionTime = this.lastReactionTimes?.get(reactionKey) || 0;
-    if (now - lastReactionTime < 300) { // Minimum 300ms between same reactions
-      return;
-    }
-    
+
     this.pendingReactions.add(reactionKey);
-    if (!this.lastReactionTimes) this.lastReactionTimes = new Map();
-    this.lastReactionTimes.set(reactionKey, now);
-    
-    const btns = document.querySelectorAll('[data-row-index="' + numericRowIndex + '"][data-reaction="' + reaction + '"]');
+
+    const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
     const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
-    
-    if (!item || !item.reactions) return;
-    
-    // 元の状態を保存（ロールバック用）
-    const originalReaction = { ...item.reactions[reaction] };
-    const originalReactions = { ...item.reactions };
-    
-    
-    
-    // ローディング状態を設定
-    btns.forEach(btn => {
-      btn.classList.add('loading');
-      btn.disabled = true;
-      btn.setAttribute('aria-disabled', 'true');
-    });
-    
-    try {
-      // サーバーに送信
-      const res = await this.gas.addReaction(numericRowIndex, reaction, this.state.sheetName);
-      
-      if (res && res.status === 'ok' && res.reactions) {
-        // サーバーからの正確な値で更新
-        item.reactions = res.reactions;
-        this.applyUpdates([item]);
-        
-        // モーダルが開いている場合は更新
-        if (!this.elements.answerModalContainer.classList.contains('hidden')) {
-          const modalRowIndex = this.elements.modalReactionContainer.querySelector('[data-row-index]')?.dataset.rowIndex;
-          if (modalRowIndex == rowIndex) {
-            this.updateModalContent(item);
-          }
-        }
-      } else {
-        // エラー時はロールバック
-        throw new Error(res?.message || 'リアクションの処理に失敗しました');
-      }
-    } catch (error) {
-      console.error('Failed to add reaction:', error);
-      
-      // ロールバック - 元の状態に戻す
-      item.reactions = originalReactions;
-      this.applyUpdates([item]);
-      
-      // エラーフィードバック
-      this.showErrorFeedback(btns[0], 'リアクションに失敗しました');
-    } finally {
-      // ローディング状態を解除
-      btns.forEach(btn => {
-        btn.classList.remove('loading');
-        btn.disabled = false;
-        btn.setAttribute('aria-disabled', 'false');
-      });
-      
-      // 処理完了
-      this.pendingReactions.delete(reactionKey);
-      
-      // Enhanced debounce - 500ms delay to prevent accidental double clicks
-      const debounceTimeout = setTimeout(() => {
-        this.reactionDebounce.delete(reactionKey);
-      }, 500);
-      this.reactionDebounce.set(reactionKey, debounceTimeout);
+
+    if (!item) {
+        this.pendingReactions.delete(reactionKey);
+        return;
     }
-  }
+
+    // ★修正ポイント①：UI更新をボタンのローディング表示のみに限定
+    // これにより、クリックイベントを妨害するカード全体のDOM変更を防ぐ
+    btns.forEach(btn => {
+        btn.classList.add('loading');
+        btn.disabled = true;
+    });
+
+    try {
+        // ★修正ポイント②：先にサーバーと通信する
+        const res = await this.gas.addReaction(numericRowIndex, reaction, this.state.sheetName);
+
+        if (res && res.status === 'ok' && res.reactions) {
+            // ★修正ポイント③：サーバーからの応答成功後に、UIを完全に更新する
+            item.reactions = res.reactions;
+            requestAnimationFrame(() => this.applyUpdates([item])); // 次の描画フレームで安全にUIを更新
+
+            // モーダルが開いていればそちらも更新
+            if (!this.elements.answerModalContainer.classList.contains('hidden')) {
+                const modalRowIndex = this.elements.modalReactionContainer.querySelector('[data-row-index]')?.dataset.rowIndex;
+                if (modalRowIndex == rowIndex) {
+                    this.updateModalContent(item);
+                }
+            }
+        } else {
+            throw new Error(res?.message || 'リアクションの処理に失敗しました');
+        }
+    } catch (error) {
+        console.error('Failed to add reaction:', error);
+        this.showErrorFeedback(btns[0], 'リアクションに失敗しました');
+        // エラー時は何もしない（UIは元の状態のまま）
+    } finally {
+        // ★修正ポイント④：最後にボタンのローディング状態を解除
+        btns.forEach(btn => {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        });
+        this.pendingReactions.delete(reactionKey);
+    }
+}
   
   showErrorFeedback(btn, message) {
     if (!btn) return;
@@ -2570,83 +2437,45 @@ class StudyQuestApp {
       return;
     }
     
-    // ローディング状態を設定
+    // ★修正ポイント①：UI更新をボタンのローディング表示のみに限定
     btns.forEach(btn => {
-      btn.classList.add('loading');
-      btn.disabled = true;
-      btn.setAttribute('aria-disabled', 'true');
+        btn.classList.add('loading');
+        btn.disabled = true;
     });
     
     try {
-      // 管理者権限をチェック
-      if (!this.state.isAdminUser && !window.isAdminUser) {
-        throw new Error('管理者権限が必要です。管理モードを有効にしてください。');
-      }
-      
-      // ハイライト機能は管理者なら閲覧モードでも使用可能
-      // （他の管理機能とは異なり、常に利用可能）
-      debugLog('ハイライト権限チェック通過:', {
-        isAdminUser: this.state.isAdminUser,
-        windowIsAdminUser: window.isAdminUser,
-        showAdminFeatures: this.state.showAdminFeatures
-      });
-      
-      debugLog('ハイライト送信中...', { 
-        numericRowIndex, 
-        sheetName: this.state.sheetName, 
-        isAdminUser: this.state.isAdminUser,
-        windowIsAdminUser: window.isAdminUser,
-        showAdminFeatures: this.state.showAdminFeatures,
-        userId: USER_ID,
-        ownerName: OWNER_NAME
-      });
-      const res = await this.gas.toggleHighlight(numericRowIndex, this.state.sheetName);
-      debugLog('ハイライトレスポンス:', res);
-      
-      if (res && res.status === 'ok') {
-        // サーバーからの正確な値で更新
-        item.highlight = res.highlight;
-        this.applyUpdates([item]);
-        this.applyUpdates([item]);
-        
-        // モーダルが開いている場合は更新
-        if (!this.elements.answerModalContainer.classList.contains('hidden')) {
-          const modalRowIndex = this.elements.modalReactionContainer.querySelector('[data-row-index]')?.dataset.rowIndex;
-          if (modalRowIndex == rowIndex) {
-            this.updateModalContent(item);
-          }
+      try {
+        // ★修正ポイント②：先にサーバーと通信する
+        const res = await this.gas.toggleHighlight(numericRowIndex, this.state.sheetName);
+
+        if (res && res.status === 'ok') {
+            // ★修正ポイント③：サーバーからの応答成功後に、UIを完全に更新する
+            item.highlight = res.highlight;
+            requestAnimationFrame(() => this.applyUpdates([item])); // 次の描画フレームで安全にUIを更新
+
+            // モーダルが開いていればそちらも更新
+            if (!this.elements.answerModalContainer.classList.contains('hidden')) {
+                const modalRowIndex = this.elements.modalReactionContainer.querySelector('[data-row-index]')?.dataset.rowIndex;
+                if (modalRowIndex == rowIndex) {
+                    this.updateModalContent(item);
+                }
+            }
+        } else {
+            throw new Error(res?.message || 'ハイライトの処理に失敗しました');
         }
-      } else {
-        // エラー時はロールバック
-        throw new Error(res?.message || 'ハイライトの処理に失敗しました');
-      }
     } catch (error) {
-      console.error('Failed to toggle highlight:', error);
-      
-      // ロールバック - 元の状態に戻す
-      item.highlight = originalHighlight;
-      this.applyUpdates([item]);
-      
-      // エラーフィードバック
-      this.showErrorFeedback(btns[0], 'ハイライトに失敗しました');
+        console.error('Failed to toggle highlight:', error);
+        this.showErrorFeedback(btns[0], 'ハイライトに失敗しました');
     } finally {
-      // ローディング状態を解除
-      btns.forEach(btn => {
-        btn.classList.remove('loading');
-        btn.disabled = false;
-        btn.setAttribute('aria-disabled', 'false');
-      });
-      
-      // 処理完了
-      this.pendingReactions.delete(highlightKey);
-      
-      // Enhanced debounce for highlights - 750ms delay
-      const debounceTimeout = setTimeout(() => {
-        this.reactionDebounce.delete(highlightKey);
-      }, 750);
-      this.reactionDebounce.set(highlightKey, debounceTimeout);
+        // ★修正ポイント④：最後にボタンのローディング状態を解除
+        btns.forEach(btn => {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        });
+        this.pendingReactions.delete(highlightKey);
     }
   }
+  
   async toggleAdminMode() {
     // ボタンを一時的に無効化して重複クリックを防ぐ
     const btn = this.elements.adminToggleBtn;
@@ -3124,8 +2953,8 @@ class StudyQuestApp {
     style.textContent = `
       /* Disable expensive visual effects */
       .glass-panel {
-        backdrop-filter: blur(4px) !important;
         -webkit-backdrop-filter: blur(4px) !important;
+        backdrop-filter: blur(4px) !important;
         background: var(--color-surface) !important;
       }
       
