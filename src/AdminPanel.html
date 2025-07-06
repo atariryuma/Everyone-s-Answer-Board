@@ -2205,20 +2205,29 @@ function updateDatabaseInfo(status) {
   // 新しいUI要素を更新
   
   // 公開状態の更新
-  const isPublished = status && status.activeSheetName && status.appPublished;
+  const isPublished = status && (status.appPublished || (status.activeSheetName && status.publishedSheetName));
   const publishStatusEl = document.getElementById('info-publish-status');
   const publishIndicatorEl = document.getElementById('info-publish-indicator');
   const publishTextEl = document.getElementById('info-publish-text');
+  
+  console.log('🔍 [DEBUG] Publish status check:', {
+    appPublished: status?.appPublished,
+    activeSheetName: status?.activeSheetName,
+    publishedSheetName: status?.publishedSheetName,
+    isPublished: isPublished
+  });
   
   if (publishStatusEl && publishIndicatorEl && publishTextEl) {
     if (isPublished) {
       publishStatusEl.className = 'px-2 py-1 rounded text-xs font-medium bg-green-600 text-white';
       publishIndicatorEl.className = 'w-2 h-2 rounded-full bg-green-400';
       publishTextEl.textContent = '公開中';
+      console.log('✅ [DEBUG] Set status to published');
     } else {
       publishStatusEl.className = 'px-2 py-1 rounded text-xs font-medium bg-gray-600 text-gray-300';
       publishIndicatorEl.className = 'w-2 h-2 rounded-full bg-gray-400';
       publishTextEl.textContent = '非公開';
+      console.log('❌ [DEBUG] Set status to unpublished');
     }
   }
 
@@ -2358,7 +2367,7 @@ function updateDatabaseInfo(status) {
       
       if (!step1Content || !step2Content || !step3Content) return;
       
-      const isPublished = status && status.activeSheetName && status.appPublished;
+      const isPublished = status && (status.appPublished || (status.activeSheetName && status.publishedSheetName));
       const hasSheets = status && status.allSheets && status.allSheets.length > 0;
       const hasSelectedSheet = selectedSheet && selectedSheet.length > 0;
 
@@ -2864,7 +2873,7 @@ function updateDatabaseInfo(status) {
       updateUIForSelectedSheet();
       
       // 公開済みで現在選択中のシートがアクティブシートの場合は、列情報の読み込みをスキップ
-      if (!(status.appPublished && selectedSheet === status.activeSheetName)) {
+      if (!(status.appPublished && (selectedSheet === status.activeSheetName || selectedSheet === status.publishedSheetName))) {
         loadConfigForSelected();
       }
       
