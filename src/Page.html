@@ -2434,12 +2434,7 @@ class StudyQuestApp {
     const originalReaction = { ...item.reactions[reaction] };
     const originalReactions = { ...item.reactions };
     
-    // 楽観的UI更新 - 即座にUIを更新
-    const wasReacted = item.reactions[reaction].reacted;
-    item.reactions[reaction] = {
-      count: wasReacted ? Math.max(0, item.reactions[reaction].count - 1) : item.reactions[reaction].count + 1,
-      reacted: !wasReacted
-    };
+    
     
     // ローディング状態を設定
     btns.forEach(btn => {
@@ -2447,9 +2442,6 @@ class StudyQuestApp {
       btn.disabled = true;
       btn.setAttribute('aria-disabled', 'true');
     });
-    
-    // UIを即座に更新
-    requestAnimationFrame(() => this.applyUpdates([item]));
     
     try {
       // サーバーに送信
@@ -2578,21 +2570,12 @@ class StudyQuestApp {
       return;
     }
     
-    // 元の状態を保存（ロールバック用）
-    const originalHighlight = item.highlight;
-    
-    // 楽観的UI更新 - 即座にUIを更新
-    item.highlight = !originalHighlight;
-    
     // ローディング状態を設定
     btns.forEach(btn => {
       btn.classList.add('loading');
       btn.disabled = true;
       btn.setAttribute('aria-disabled', 'true');
     });
-    
-    // UIを即座に更新
-    requestAnimationFrame(() => this.applyUpdates([item]));
     
     try {
       // 管理者権限をチェック
@@ -2623,6 +2606,7 @@ class StudyQuestApp {
       if (res && res.status === 'ok') {
         // サーバーからの正確な値で更新
         item.highlight = res.highlight;
+        this.applyUpdates([item]);
         this.applyUpdates([item]);
         
         // モーダルが開いている場合は更新
