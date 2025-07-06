@@ -1270,6 +1270,7 @@ class StudyQuestApp {
 
       // Additional mouse event debugging to help identify click issues
       this.elements.answersContainer.addEventListener('mousedown', (e) => {
+        const answerCard = e.target.closest('.answer-card');
         debugLog('Mouse DOWN event on answers container:', {
           target: e.target,
           targetClass: e.target.className,
@@ -1287,10 +1288,19 @@ class StudyQuestApp {
           targetBounds: e.target.getBoundingClientRect(),
           targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
           targetPointerEvents: e.target.style.pointerEvents,
-          answerCard: e.target.closest('.answer-card'),
+          answerCard: answerCard,
+          answerCardClass: answerCard?.className,
+          answerCardHasLoadingClass: answerCard?.classList.contains('loading'),
+          answerCardComputedStyle: answerCard ? window.getComputedStyle(answerCard).pointerEvents : null,
           timeStamp: e.timeStamp
         });
-      }, { passive: true });
+        
+        // Convert mousedown to click if answer card has loading class
+        if (answerCard && answerCard.classList.contains('loading')) {
+          debugLog('Answer card has loading class, removing it to enable click');
+          answerCard.classList.remove('loading');
+        }
+      }, { passive: false });
 
       this.elements.answersContainer.addEventListener('mouseup', (e) => {
         debugLog('Mouse UP event on answers container:', {
