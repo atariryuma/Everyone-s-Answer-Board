@@ -2699,6 +2699,27 @@ class StudyQuestApp {
         card.addEventListener('blur', () => {
           debugLog('Card blurred:', { rowIndex: card.dataset.rowIndex });
         });
+        
+        // Add keyboard accessibility for Enter and Space keys
+        card.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            debugLog('Card keyboard activation:', { 
+              rowIndex: card.dataset.rowIndex,
+              key: e.key,
+              target: e.target
+            });
+            // Simulate a click event on the card
+            const clickEvent = new MouseEvent('click', {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+              clientX: card.getBoundingClientRect().left + card.getBoundingClientRect().width / 2,
+              clientY: card.getBoundingClientRect().top + card.getBoundingClientRect().height / 2
+            });
+            card.dispatchEvent(clickEvent);
+          }
+        });
       });
       
       debugLog('Cards made clickable:', {
