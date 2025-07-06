@@ -3418,6 +3418,8 @@ function updateDatabaseInfo(status) {
         updateConfigButtons();
       } finally {
         setLoading(false);
+        // 列情報取得後に最新の公開状態を確認する
+        loadStatus(true);
       }
     }
     
@@ -3428,12 +3430,16 @@ function updateDatabaseInfo(status) {
         updateConfigButtons();
       } finally {
         setLoading(false);
+        // エラーの場合も公開状態を更新する
+        loadStatus(true);
       }
     }
     
     function handleGuessedHeadersError(error) {
       setLoading(false);
       showError(error);
+      // ヘッダー取得失敗時も公開状態を再確認
+      loadStatus(true);
     }
     
     function _loadConfigForSelectedInternal() {
