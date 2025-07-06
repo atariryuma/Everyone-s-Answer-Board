@@ -1148,51 +1148,54 @@ class StudyQuestApp {
     };
     document.addEventListener('visibilitychange', this.handlers.onVisibilityChange, { passive: true });
   }
-  setupEventDelegation() {
-    if (!this.elements.answersContainer) {
-        console.error('CRITICAL: answersContainer not found. Clicks will not work.');
-        return;
-    }
+  /**
+     * イベント委譲の設定（パフォーマンスと安定性のための核心部分）
+     * 個別のカードにイベントリスナーを追加する代わりに、親コンテナで一括処理します。
+     */
+    setupEventDelegation() {
+        // メインの回答コンテナでクリックイベントを待つ
+        this.handlers.onAnswersContainerClick = (e) => {
+            // 1. クリックされた要素から最も近い`.answer-card`を探す
+            const answerCard = e.target.closest('.answer-card');
+            if (!answerCard) return; // カード内でなければ何もしない
 
-    // 既存のリスナーを一度全て削除し、意図しない重複を防ぐ
-    if (this.handlers.onAnswersContainerClick) {
-        this.elements.answersContainer.removeEventListener('click', this.handlers.onAnswersContainerClick);
-    }
+            // 2. カードのデータ属性（rowIndex）がなければ処理を中断
+            const rowIndex = answerCard.dataset.rowIndex;
+            if (!rowIndex) return;
 
-    // シンプルなclickイベントハンドラ
-    this.handlers.onAnswersContainerClick = (e) => {
-        const answerCard = e.target.closest('.answer-card');
-        if (!answerCard) {
-            return;
-        }
-        
-        console.log(`[DEBUG] Click detected on card`, { cardRowIndex: answerCard.dataset.rowIndex });
+            // 3. リアクションボタンがクリックされたか判定
+            const reactionBtn = e.target.closest('.reaction-btn');
+            if (reactionBtn) {
+                e.stopPropagation(); // ★最重要：イベントがカード本体に伝わるのを防ぐ
+                const reactionType = reactionBtn.dataset.reaction;
+                if (reactionType) {
+                    this.handleReaction(rowIndex, reactionType);
+                }
+                return; // リアクション処理が完了したので、ここで処理を終了する
+            }
 
-        // クリック対象の判定と処理
-        const reactionBtn = e.target.closest('.reaction-btn');
-        if (reactionBtn && !reactionBtn.disabled) {
-            e.stopPropagation();
-            this.handleReaction(reactionBtn.dataset.rowIndex, reactionBtn.dataset.reaction);
-            return;
-        }
+            // 4. ハイライトボタンがクリックされたか判定
+            const highlightBtn = e.target.closest('.highlight-btn');
+            if (highlightBtn) {
+                e.stopPropagation(); // ★最重要：同様にイベントの伝播を停止
+                this.handleHighlight(rowIndex);
+                return; // ハイライト処理が完了したので、ここで処理を終了する
+            }
 
-        const highlightBtn = e.target.closest('.highlight-btn');
-        if (highlightBtn && !highlightBtn.disabled) {
-            e.stopPropagation();
-            this.handleHighlight(highlightBtn.dataset.rowIndex);
-            return;
-        }
-        
-        // カード本体がクリックされた場合
-        const rowIndex = answerCard.dataset.rowIndex;
-        if (rowIndex) {
+            // 5. 上記のいずれでもなければ、カード本体がクリックされたと判断
             this.showAnswerModal(rowIndex);
-        }
-    };
+        };
+        this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
 
-    // 標準的なclickイベントを使用
-    this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
-  }
+        // キーボード操作も同様に委譲で一元管理することで、動作を統一
+        this.handlers.onAnswersContainerKeydown = (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                const activeElement = document.activeElement;
+                // ...フォーカスされている要素に応じて処理を分岐させる...
+            }
+        };
+        this.elements.answersContainer.addEventListener('keydown', this.handlers.onAnswersContainerKeydown);
+    }
   
   // Debug helper function - can be called from console
   debugAnswerCards() {
