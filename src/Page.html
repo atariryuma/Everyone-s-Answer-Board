@@ -190,13 +190,21 @@ header {
   box-shadow: 0 12px 24px rgba(0,0,0,0.2);
 }
 .answer-card.loading {
-  opacity: 0.7;
+  opacity: 0.6;
+  pointer-events: none;
+  cursor: not-allowed;
 }
 
 .answer-card.loading .reaction-btn,
 .answer-card.loading .highlight-btn {
   pointer-events: none;
   opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.answer-card.loading:hover {
+  transform: none;
+  box-shadow: var(--shadow-sm);
 }
 .reaction-btn {
   transition: transform var(--transition-duration) var(--transition-easing),
@@ -2055,6 +2063,9 @@ class StudyQuestApp {
           }
 
           this.renderBoard(false);
+          
+          // Ensure cards are clickable after skeleton replacement
+          this.ensureCardsClickable(this.elements.answersContainer);
         })
         .withFailureHandler(error => {
           console.error('Error loading sheet data:', error);
@@ -2326,6 +2337,9 @@ class StudyQuestApp {
         // Append fragment to container
         if (fragment.children.length > 0) {
           container.appendChild(fragment);
+          
+          // Ensure newly created cards are clickable after DOM insertion
+          this.ensureCardsClickable(fragment);
         }
         
         // Recycle fragment
@@ -2381,6 +2395,9 @@ class StudyQuestApp {
       // Append fragment to container
       if (fragment.children.length > 0) {
         container.appendChild(fragment);
+        
+        // Ensure newly created cards are clickable after DOM insertion
+        this.ensureCardsClickable(fragment);
       }
       
       // Recycle fragment
@@ -2476,19 +2493,25 @@ class StudyQuestApp {
         element.dataset.rowIndex = data.rowIndex;
       });
       
+      // Remove loading state from cached card to ensure it's clickable
+      if (clonedCard.classList.contains('loading')) {
+        clonedCard.classList.remove('loading');
+      }
+      
       debugLog('キャッシュされたカードを使用:', { 
         rowIndex: data.rowIndex,
         cachedCardDataset: cachedCard.dataset,
         clonedCardDataset: clonedCard.dataset,
         hasAnswerCardClass: clonedCard.className.includes('answer-card'),
-        updatedChildElements: elementsWithRowIndex.length
+        updatedChildElements: elementsWithRowIndex.length,
+        removedLoadingState: true
       });
       return clonedCard;
     }
     
     const card = document.createElement('div');
     const highlightClass = data.highlight ? ' highlighted' : '';
-    card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer' + highlightClass;
+    card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer loading' + highlightClass;
     card.dataset.rowIndex = data.rowIndex;
     card.setAttribute('role', 'article');
     card.setAttribute('tabindex', '0');
@@ -2571,7 +2594,11 @@ class StudyQuestApp {
     if (this.cache.size > 100) {
       this.cache.cleanup();
     }
-    this.cache.set(`render-${cacheKey}`, card.cloneNode(true));
+    
+    // Clone card for caching and remove loading state from cached version
+    const cardToCache = card.cloneNode(true);
+    cardToCache.classList.remove('loading');
+    this.cache.set(`render-${cacheKey}`, cardToCache);
     
     return card;
   }
@@ -2581,6 +2608,74 @@ class StudyQuestApp {
     // Simplified skeleton for faster rendering
     card.innerHTML = '<div class="h-20 w-full rounded bg-gray-500/30 mb-4"></div><div class="h-6 w-full rounded bg-gray-500/20"></div>';
     return card;
+  }
+
+  // Function to ensure cards are clickable after DOM insertion
+  ensureCardsClickable(fragmentOrContainer) {
+    debugLog('Ensuring cards are clickable after DOM insertion');
+    
+    // Find all cards in the fragment or container that have loading state
+    const newCards = fragmentOrContainer.querySelectorAll('.answer-card.loading, .answer-card.new-card');
+    
+    debugLog('Found cards needing click setup:', {
+      totalCards: newCards.length,
+      cardElements: Array.from(newCards).map(card => ({
+        rowIndex: card.dataset.rowIndex,
+        hasLoadingClass: card.classList.contains('loading'),
+        hasNewCardClass: card.classList.contains('new-card'),
+        className: card.className
+      }))
+    });
+    
+    if (newCards.length === 0) {
+      debugLog('No cards found needing click setup');
+      return;
+    }
+    
+    // Use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => {
+      newCards.forEach(card => {
+        // Remove loading state to make card clickable
+        if (card.classList.contains('loading')) {
+          card.classList.remove('loading');
+          debugLog('Removed loading state from card:', {
+            rowIndex: card.dataset.rowIndex,
+            className: card.className
+          });
+        }
+        
+        // Ensure card is visible and has proper accessibility
+        if (card.classList.contains('new-card')) {
+          // Remove new-card class after animation completes
+          setTimeout(() => {
+            card.classList.remove('new-card');
+            debugLog('Removed new-card class after animation:', {
+              rowIndex: card.dataset.rowIndex,
+              className: card.className
+            });
+          }, 300); // Match animation duration
+        }
+        
+        // Ensure card is focusable and has proper ARIA attributes
+        if (!card.hasAttribute('tabindex')) {
+          card.setAttribute('tabindex', '0');
+        }
+        
+        // Add visual feedback for card activation
+        card.addEventListener('focus', () => {
+          debugLog('Card focused:', { rowIndex: card.dataset.rowIndex });
+        });
+        
+        card.addEventListener('blur', () => {
+          debugLog('Card blurred:', { rowIndex: card.dataset.rowIndex });
+        });
+      });
+      
+      debugLog('Cards made clickable:', {
+        processedCards: newCards.length,
+        timestamp: performance.now()
+      });
+    });
   }
   async handleReaction(rowIndex, reaction) {
     const numericRowIndex = parseInt(rowIndex, 10);
