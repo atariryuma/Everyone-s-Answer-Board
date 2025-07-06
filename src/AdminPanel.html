@@ -1245,117 +1245,321 @@
       debounceMap.set(key, timeoutId);
     }
 
-    function showMessage(message, type) {
-      try {
-        type = type || 'info';
+    // =============================================================================
+    // DOM UTILITY FUNCTIONS - Refactored common patterns
+    // =============================================================================
+    
+    // Utility for safe DOM element creation
+    function createSafeElement(tag, className, textContent) {
+      var element = document.createElement(tag);
+      if (className) element.className = className;
+      if (textContent) element.textContent = textContent;
+      return element;
+    }
+    
+    // Utility for safe DOM element selection with null checking
+    function safeGetElement(id) {
+      return getCachedElement(id);
+    }
+    
+    // Utility for setting button state (disabled/enabled with text)
+    function setButtonState(button, isDisabled, text) {
+      if (!button) return;
+      button.disabled = isDisabled;
+      if (text) button.textContent = text;
+    }
+    
+    // Utility for setting element text content safely
+    function setSafeTextContent(element, text) {
+      if (!element) return;
+      element.textContent = text || '';
+    }
+    
+    // Utility for adding/removing CSS classes safely
+    function toggleClass(element, className, condition) {
+      if (!element) return;
+      if (condition) {
+        element.classList.add(className);
+      } else {
+        element.classList.remove(className);
+      }
+    }
+    
+    // Utility for creating and setting up event listeners safely
+    function addSafeEventListener(element, event, handler, options = {}) {
+      if (!element) return null;
+      element.addEventListener(event, handler, options);
+      return handler;
+    }
+    
+    // Utility for removing event listeners safely
+    function removeSafeEventListener(element, event, handler) {
+      if (!element || !handler) return;
+      element.removeEventListener(event, handler);
+    }
+    
+    // =============================================================================
+    // ELEMENT CACHE SYSTEM - Optimized DOM queries
+    // =============================================================================
+    
+    // Cache for frequently accessed elements not in the main elements object
+    var elementCache = new Map();
+    
+    // Enhanced safe element getter with caching
+    function getCachedElement(id) {
+      if (elementCache.has(id)) {
+        return elementCache.get(id);
+      }
+      
+      var element = document.getElementById(id);
+      if (element) {
+        elementCache.set(id, element);
+      } else {
+        console.warn('Element not found:', id);
+      }
+      return element;
+    }
+    
+    // Clear cache when needed (e.g., after dynamic content changes)
+    function clearElementCache() {
+      elementCache.clear();
+    }
+    
+    // Update cached element references
+    function updateElementCache(id, element) {
+      if (element) {
+        elementCache.set(id, element);
+      } else {
+        elementCache.delete(id);
+      }
+    }
+    
+    // Batch cache multiple elements
+    function cacheElements(elementIds) {
+      var cached = {};
+      elementIds.forEach(function(id) {
+        cached[id] = getCachedElement(id);
+      });
+      return cached;
+    }
+    
+    // =============================================================================
+    // EVENT HANDLER UTILITIES - Consolidated patterns
+    // =============================================================================
+    
+    // Utility for setting up multiple event listeners efficiently
+    function setupMultipleListeners(elementHandlerMap) {
+      Object.keys(elementHandlerMap).forEach(function(elementId) {
+        var element = elementId.startsWith('#') ? 
+          document.querySelector(elementId) : 
+          (elements[elementId] || getCachedElement(elementId));
         
-        // messageを安全な文字列に変換
-        if (typeof message !== 'string') {
-          try {
-            message = String(message);
-          } catch (e) {
-            message = 'メッセージ表示エラー';
+        if (element) {
+          var handlers = elementHandlerMap[elementId];
+          if (Array.isArray(handlers)) {
+            handlers.forEach(function(handler) {
+              addSafeEventListener(element, handler.event, handler.callback, handler.options);
+            });
+          } else {
+            addSafeEventListener(element, handlers.event, handlers.callback, handlers.options);
           }
         }
-        
-        // 特殊文字のサニタイズ
-        if (typeof message === 'string') {
-          message = message.replace(/[\u0000-\u001F\u007F]/g, ''); // 制御文字を削除
-          message = message.replace(/['"\\]/g, ''); // 引用符とバックスラッシュを削除
-          message = message.substring(0, 200); // 長すぎるメッセージは切り詰め
+      });
+    }
+    
+    // Utility for setting up click handlers with confirmation
+    function setupConfirmationHandler(elementId, confirmTitle, confirmMessage, callback) {
+      var element = elements[elementId] || getCachedElement(elementId);
+      if (element) {
+        addSafeEventListener(element, 'click', function() {
+          showConfirmationModal(confirmTitle, confirmMessage, callback);
+        });
+      }
+    }
+    
+    // Utility for setting up click handlers with privacy modal
+    function setupPrivacyHandler(elementId, callback) {
+      var element = elements[elementId] || getCachedElement(elementId);
+      if (element) {
+        addSafeEventListener(element, 'click', function() {
+          showPrivacyModal(callback);
+        });
+      }
+    }
+    
+    // Utility for delegated event handling
+    function setupDelegatedHandler(parentElement, selector, event, callback) {
+      if (typeof parentElement === 'string') {
+        parentElement = getCachedElement(parentElement);
+      }
+      
+      if (parentElement) {
+        addSafeEventListener(parentElement, event, function(e) {
+          var target = e.target.closest(selector);
+          if (target) {
+            callback.call(target, e);
+          }
+        });
+      }
+    }
+    
+    // =============================================================================
+    // ERROR HANDLING SYSTEM - Centralized error management
+    // =============================================================================
+    
+    // Centralized error handling with consistent formatting
+    function handleError(error, context, userMessage) {
+      // Log error for debugging
+      var errorMsg = error && error.message ? error.message : String(error);
+      console.error('[' + (context || 'Unknown') + '] Error:', errorMsg);
+      
+      // Show user-friendly message
+      var displayMessage = userMessage || 'エラーが発生しました。しばらく待ってから再試行してください。';
+      showMessage(displayMessage, 'error');
+      
+      // Additional error reporting could be added here
+      return false;
+    }
+    
+    // Wrapper for Google Apps Script calls with consistent error handling
+    function safeGASCall(methodName, successHandler, errorMessage) {
+      return {
+        withSuccessHandler: function(handler) {
+          this._successHandler = handler;
+          return this;
+        },
+        withFailureHandler: function(handler) {
+          this._failureHandler = handler;
+          return this;
+        },
+        execute: function() {
+          var self = this;
+          google.script.run
+            .withSuccessHandler(function(result) {
+              if (self._successHandler) {
+                try {
+                  self._successHandler(result);
+                } catch (err) {
+                  handleError(err, methodName + '.successHandler', 'データの処理中にエラーが発生しました。');
+                }
+              }
+            })
+            .withFailureHandler(function(error) {
+              if (self._failureHandler) {
+                try {
+                  self._failureHandler(error);
+                } catch (err) {
+                  handleError(err, methodName + '.failureHandler');
+                }
+              } else {
+                handleError(error, methodName, errorMessage);
+              }
+            })[methodName].apply(google.script.run, arguments);
         }
-        
-        var messageArea = document.getElementById('message-area');
-        if (!messageArea) return;
+      };
+    }
+    
+    // Legacy showError function for backward compatibility
+    function showError(error) {
+      handleError(error, 'Legacy', null);
+    }
 
-      // 同じメッセージの重複を防ぐ
+    // =============================================================================
+    // MESSAGE SYSTEM - Refactored for better maintainability
+    // =============================================================================
+    
+    // Message type configurations
+    var MESSAGE_TYPES = {
+      info: { bgColor: 'bg-blue-500', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+      success: { bgColor: 'bg-green-500', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', extraClass: 'success-pulse' },
+      error: { bgColor: 'bg-red-500', icon: 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z', extraClass: 'error-shake' },
+      warning: { bgColor: 'bg-yellow-500', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.082 16.5c-.77.833.192 2.5 1.732 2.5z', extraClass: 'text-black' },
+      green: { bgColor: 'bg-green-500', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
+      blue: { bgColor: 'bg-blue-500', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+      yellow: { bgColor: 'bg-yellow-500', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.082 16.5c-.77.833.192 2.5 1.732 2.5z', extraClass: 'text-black' }
+    };
+    
+    // Sanitize message content safely
+    function sanitizeMessage(message) {
+      if (typeof message !== 'string') {
+        try {
+          message = String(message);
+        } catch (e) {
+          return 'メッセージ表示エラー';
+        }
+      }
+      
+      // Remove control characters and limit length
+      return message
+        .replace(/[\u0000-\u001F\u007F]/g, '')
+        .replace(/['"\\]/g, '')
+        .substring(0, 200);
+    }
+    
+    // Check for duplicate messages and highlight if found
+    function handleDuplicateMessage(messageArea, message) {
       var existingMessages = Array.from(messageArea.children);
       for (var i = 0; i < existingMessages.length; i++) {
         var existing = existingMessages[i];
         var spanElement = existing.querySelector('span');
         var existingText = spanElement ? spanElement.textContent : null;
         if (existingText === message) {
-          // 既存のメッセージを一瞬ハイライト
+          // Highlight existing message
           existing.style.transform = 'scale(1.05)';
           setTimeout(function() { existing.style.transform = 'scale(1)'; }, 200);
-          return;
+          return true;
         }
       }
-
-      // 古いメッセージが5個以上ある場合は古いものを削除
+      return false;
+    }
+    
+    // Clean up old messages (keep only 5 most recent)
+    function cleanupOldMessages(messageArea) {
       while (messageArea.children.length >= 5) {
         messageArea.children[0].remove();
       }
-
-      var messageId = 'msg-' + Date.now();
-      var messageElement = document.createElement('div');
+    }
+    
+    // Create message DOM structure
+    function createMessageElement(messageId, message, type) {
+      var typeConfig = MESSAGE_TYPES[type] || MESSAGE_TYPES.info;
+      var messageElement = createSafeElement('div');
       messageElement.id = messageId;
-      messageElement.className = 'p-4 mb-3 rounded-lg shadow-md flex items-center justify-between text-white transform transition-all duration-300 ease-out slide-up';
-
-      var bgColor = 'bg-gray-700';
-      var icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
-
-      switch (type) {
-        case 'success':
-          bgColor = 'bg-green-500';
-          icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
-          messageElement.classList.add('success-pulse');
-          break;
-        case 'error':
-          bgColor = 'bg-red-500';
-          icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
-          messageElement.classList.add('error-shake');
-          break;
-        case 'warning':
-        case 'yellow':
-          bgColor = 'bg-yellow-500';
-          icon = '<svg class="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>';
-          messageElement.classList.add('text-black');
-          break;
-        case 'info':
-        case 'blue':
-          bgColor = 'bg-blue-500';
-          icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
-          break;
-        case 'green':
-          bgColor = 'bg-green-500';
-          icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
-          break;
+      messageElement.className = 'p-4 mb-3 rounded-lg shadow-md flex items-center justify-between text-white transform transition-all duration-300 ease-out slide-up ' + typeConfig.bgColor;
+      
+      if (typeConfig.extraClass) {
+        messageElement.classList.add(typeConfig.extraClass);
       }
-
-      messageElement.classList.add(bgColor);
-      // 安全なDOM操作を使用（テンプレートリテラルを避ける）
-      var messageContainer = document.createElement('div');
-      messageContainer.className = 'flex items-center';
       
-      var iconContainer = document.createElement('div');
-      iconContainer.innerHTML = icon;
+      // Create message container with icon and text
+      var messageContainer = createSafeElement('div', 'flex items-center');
+      var iconContainer = createSafeElement('div');
+      iconContainer.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="' + typeConfig.icon + '"></path></svg>';
+      
+      var messageSpan = createSafeElement('span', 'ml-2 text-sm font-medium', message);
       messageContainer.appendChild(iconContainer);
-      
-      var messageSpan = document.createElement('span');
-      messageSpan.className = 'ml-2 text-sm font-medium';
-      messageSpan.textContent = message; // textContentで安全に設定
       messageContainer.appendChild(messageSpan);
       
-      var closeButton = document.createElement('button');
-      closeButton.className = 'ml-4 text-white opacity-70 hover:opacity-100 focus:outline-none';
+      // Create close button
+      var closeButton = createSafeElement('button', 'ml-4 text-white opacity-70 hover:opacity-100 focus:outline-none');
       closeButton.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
-      closeButton.onclick = function() { removeMessage(messageId); }; // 安全な関数参照
+      closeButton.onclick = function() { removeMessage(messageId); };
       
       messageElement.appendChild(messageContainer);
       messageElement.appendChild(closeButton);
-
-      messageArea.appendChild(messageElement);
-
-      // エラーメッセージは長く表示、それ以外は短く表示
+      
+      return messageElement;
+    }
+    
+    // Set up auto-removal timer for message
+    function setupMessageAutoRemoval(messageId, type) {
       var timeout = type === 'error' ? 5000 : 2500;
-      var removeTimer = setTimeout(function() {
-        var msgEl = document.getElementById(messageId);
+      return setTimeout(function() {
+        var msgEl = safeGetElement(messageId);
         if (msgEl && msgEl.parentNode) {
           msgEl.classList.remove('slide-up');
           msgEl.classList.add('fade-out');
           
-          // transitionendイベントに加えてフォールバックタイマーを設定
           var fallbackTimer = setTimeout(function() {
             if (msgEl && msgEl.parentNode) {
               msgEl.remove();
@@ -1370,15 +1574,38 @@
           }, { once: true });
         }
       }, timeout);
-      
-      // メッセージ要素にタイマーを保存して、手動削除時にクリア
-      messageElement.removeTimer = removeTimer;
-      } catch (showMessageError) {
-        // showMessage関数でエラーが発生した場合の安全な処理
+    }
+    
+    // Main showMessage function - now much cleaner
+    function showMessage(message, type) {
+      try {
+        type = type || 'info';
+        message = sanitizeMessage(message);
+        
+        var messageArea = safeGetElement('message-area');
+        if (!messageArea) return;
+        
+        // Check for duplicates
+        if (handleDuplicateMessage(messageArea, message)) {
+          return;
+        }
+        
+        // Clean up old messages
+        cleanupOldMessages(messageArea);
+        
+        // Create and display new message
+        var messageId = 'msg-' + Date.now();
+        var messageElement = createMessageElement(messageId, message, type);
+        messageArea.appendChild(messageElement);
+        
+        // Set up auto-removal
+        messageElement.removeTimer = setupMessageAutoRemoval(messageId, type);
+        
+      } catch (error) {
         try {
-          console.error('showMessage function error:', showMessageError);
+          console.error('showMessage function error:', error);
         } catch (e) {
-          // エラーログさえ失敗した場合は無視
+          // Silently fail if even logging fails
         }
       }
     }
@@ -1749,7 +1976,7 @@ elements = {
     // ステップベースのUI初期化
     function initializeStepBasedUI() {
       // ステップ1のみ開く、ステップ2・3は閉じる（既にHTMLで設定済み）
-      console.log('Step-based UI initialized: Step 1 open, Steps 2-3 closed');
+      // Initialization complete - UI state already set in HTML
     }
 
     // 重複していたDOMContentLoadedイベントリスナーを削除
@@ -1762,9 +1989,6 @@ function setupEventListeners() {
       if (elements.sheetSelect) {
         elements.sheetSelect.addEventListener('change', function(e) {
           selectedSheet = e.target.value;
-          console.log('シート選択:', selectedSheet, 'type:', typeof selectedSheet);
-          console.log('e.target.selectedIndex:', e.target.selectedIndex);
-          console.log('e.target.options[selectedIndex]:', e.target.options[e.target.selectedIndex]);
           
           // selectedSheetが文字列であることを確認
           if (typeof selectedSheet !== 'string' || selectedSheet === '[object Object]') {
@@ -2037,169 +2261,6 @@ function updateDatabaseInfo(status) {
   }
 }
 
-/**
- * 設定の進捗状況に応じて、各ステップのパネルの開閉状態を自動で制御します。
- * @param {object} status - サーバーから取得した現在のステータス情報
- */
-function updatePanelStates(status) {
-  const step1Content = document.getElementById('step1-content');
-  const step2Content = document.getElementById('step2-content');
-  const step3Content = document.getElementById('step3-content');
-  
-  const isPublished = status && status.activeSheetName && status.appPublished;
-
-  if (step1Content.classList.contains('expanded')) toggleSection('step1-content');
-  if (step2Content.classList.contains('expanded')) toggleSection('step2-content');
-  if (step3Content.classList.contains('expanded')) toggleSection('step3-content');
-
-  if (isPublished) {
-    if (step3Content.classList.contains('collapsed')) toggleSection('step3-content');
-  } else if (status && status.allSheets && status.allSheets.length > 0) {
-    if (step2Content.classList.contains('collapsed')) toggleSection('step2-content');
-  } else {
-    if (step1Content.classList.contains('collapsed')) toggleSection('step1-content');
-  }
-}
-
-
-/**
- * ユーザーにアカウントの切り替えを確認し、登録ページにリダイレクトする関数
- */
-function switchToAnotherAccount() {
-  if (confirm("別のアカウントに切り替えますか？現在のセッションは破棄されます。")) {
-    google.script.run
-      .withSuccessHandler(function(webAppUrl) {
-        window.top.location.href = webAppUrl;
-      })
-      .withFailureHandler(function(error) {
-          alert('URLの取得に失敗しました: ' + error.message);
-      })
-      .getWebAppUrl();
-  }
-}
-
-/**
- * 設定の進捗状況に応じて、各ステップのパネルの開閉状態を自動で制御します。
- * @param {object} status - サーバーから取得した現在のステータス情報
- */
-function updatePanelStates(status) {
-  const step1Content = document.getElementById('step1-content');
-  const step2Content = document.getElementById('step2-content');
-  const step3Content = document.getElementById('step3-content');
-  
-  const isPublished = status && status.activeSheetName && status.appPublished;
-
-  if (step1Content.classList.contains('expanded')) toggleSection('step1-content');
-  if (step2Content.classList.contains('expanded')) toggleSection('step2-content');
-  if (step3Content.classList.contains('expanded')) toggleSection('step3-content');
-
-  if (isPublished) {
-    if (step3Content.classList.contains('collapsed')) toggleSection('step3-content');
-  } else if (status && status.allSheets && status.allSheets.length > 0) {
-    if (step2Content.classList.contains('collapsed')) toggleSection('step2-content');
-  } else {
-    if (step1Content.classList.contains('collapsed')) toggleSection('step1-content');
-  }
-}
-
-
-/**
- * ユーザーにアカウントの切り替えを確認し、登録ページにリダイレクトする関数
- */
-function switchToAnotherAccount() {
-  if (confirm("別のアカウントに切り替えますか？現在のセッションは破棄されます。")) {
-    google.script.run
-      .withSuccessHandler(function(webAppUrl) {
-        window.top.location.href = webAppUrl;
-      })
-      .withFailureHandler(function(error) {
-          alert('URLの取得に失敗しました: ' + error.message);
-      })
-      .getWebAppUrl();
-  }
-}
-
-/**
- * 設定の進捗状況に応じて、各ステップのパネルの開閉状態を自動で制御します。
- * @param {object} status - サーバーから取得した現在のステータス情報
- */
-function updatePanelStates(status) {
-  const step1Content = document.getElementById('step1-content');
-  const step2Content = document.getElementById('step2-content');
-  const step3Content = document.getElementById('step3-content');
-  
-  const isPublished = status && status.activeSheetName && status.appPublished;
-
-  if (step1Content.classList.contains('expanded')) toggleSection('step1-content');
-  if (step2Content.classList.contains('expanded')) toggleSection('step2-content');
-  if (step3Content.classList.contains('expanded')) toggleSection('step3-content');
-
-  if (isPublished) {
-    if (step3Content.classList.contains('collapsed')) toggleSection('step3-content');
-  } else if (status && status.allSheets && status.allSheets.length > 0) {
-    if (step2Content.classList.contains('collapsed')) toggleSection('step2-content');
-  } else {
-    if (step1Content.classList.contains('collapsed')) toggleSection('step1-content');
-  }
-}
-
-
-/**
- * ユーザーにアカウントの切り替えを確認し、登録ページにリダイレクトする関数
- */
-function switchToAnotherAccount() {
-  if (confirm("別のアカウントに切り替えますか？現在のセッションは破棄されます。")) {
-    google.script.run
-      .withSuccessHandler(function(webAppUrl) {
-        window.top.location.href = webAppUrl;
-      })
-      .withFailureHandler(function(error) {
-          alert('URLの取得に失敗しました: ' + error.message);
-      })
-      .getWebAppUrl();
-  }
-}
-
-/**
- * 設定の進捗状況に応じて、各ステップのパネルの開閉状態を自動で制御します。
- * @param {object} status - サーバーから取得した現在のステータス情報
- */
-function updatePanelStates(status) {
-  const step1Content = document.getElementById('step1-content');
-  const step2Content = document.getElementById('step2-content');
-  const step3Content = document.getElementById('step3-content');
-  
-  const isPublished = status && status.activeSheetName && status.appPublished;
-
-  if (step1Content.classList.contains('expanded')) toggleSection('step1-content');
-  if (step2Content.classList.contains('expanded')) toggleSection('step2-content');
-  if (step3Content.classList.contains('expanded')) toggleSection('step3-content');
-
-  if (isPublished) {
-    if (step3Content.classList.contains('collapsed')) toggleSection('step3-content');
-  } else if (status && status.allSheets && status.allSheets.length > 0) {
-    if (step2Content.classList.contains('collapsed')) toggleSection('step2-content');
-  } else {
-    if (step1Content.classList.contains('collapsed')) toggleSection('step1-content');
-  }
-}
-
-
-/**
- * ユーザーにアカウントの切り替えを確認し、登録ページにリダイレクトする関数
- */
-function switchToAnotherAccount() {
-  if (confirm("別のアカウントに切り替えますか？現在のセッションは破棄されます。")) {
-    google.script.run
-      .withSuccessHandler(function(webAppUrl) {
-        window.top.location.href = webAppUrl;
-      })
-      .withFailureHandler(function(error) {
-          alert('URLの取得に失敗しました: ' + error.message);
-      })
-      .getWebAppUrl();
-  }
-}
 
     // ★★★ 新しい関数を追加 ★★★
     /**
@@ -2288,17 +2349,29 @@ function switchToAnotherAccount() {
       const step2Content = document.getElementById('step2-content');
       const step3Content = document.getElementById('step3-content');
       
+      if (!step1Content || !step2Content || !step3Content) return;
+      
       const isPublished = status && status.activeSheetName && status.appPublished;
+      const hasSheets = status && status.allSheets && status.allSheets.length > 0;
+      const hasSelectedSheet = selectedSheet && selectedSheet.length > 0;
 
+      // まず全てのセクションを閉じる
       if (step1Content.classList.contains('expanded')) toggleSection('step1-content');
       if (step2Content.classList.contains('expanded')) toggleSection('step2-content');
       if (step3Content.classList.contains('expanded')) toggleSection('step3-content');
 
+      // 状態に応じて適切なセクションを開く
       if (isPublished) {
+        // 公開済みの場合は設定・公開セクションを開く
         if (step3Content.classList.contains('collapsed')) toggleSection('step3-content');
-      } else if (status && status.allSheets && status.allSheets.length > 0) {
+      } else if (hasSelectedSheet) {
+        // シートが選択されている場合は設定・公開セクションを開く
+        if (step3Content.classList.contains('collapsed')) toggleSection('step3-content');
+      } else if (hasSheets) {
+        // シートはあるが選択されていない場合はシート選択セクションを開く
         if (step2Content.classList.contains('collapsed')) toggleSection('step2-content');
       } else {
+        // 何も設定されていない場合はスプレッドシート追加セクションを開く
         if (step1Content.classList.contains('collapsed')) toggleSection('step1-content');
       }
     }
@@ -2425,7 +2498,7 @@ function switchToAnotherAccount() {
 
     function showTeacherGuideModal() {
       // 教育ガイドモーダルは削除されました
-      console.log('教育ガイドモーダルはRegistration.htmlに移動されました');
+      // 教育ガイドモーダルはRegistration.htmlに移動されました
     }
 
     function hideTeacherGuideModal() {
@@ -2786,45 +2859,6 @@ function switchToAnotherAccount() {
       setLoading(false);
     }
     
-    // 設定状況に応じてパネルの開閉状態を制御
-    function updatePanelStates(status) {
-      var step1Content = document.getElementById('step1-content');
-      var step2Content = document.getElementById('step2-content');
-      var step3Content = document.getElementById('step3-content');
-      var step1Icon = document.getElementById('step1-icon');
-      var step2Icon = document.getElementById('step2-icon');
-      var step3Icon = document.getElementById('step3-icon');
-      
-      var isPublished = status && status.activeSheetName && status.appPublished;
-      
-      if (isPublished) {
-        // ボードが公開されている場合：step1とstep2を閉じて、step3を開く
-        if (step1Content) step1Content.classList.remove('expanded');
-        if (step1Content) step1Content.classList.add('collapsed');
-        if (step1Icon) step1Icon.style.transform = 'rotate(0deg)';
-        
-        if (step2Content) step2Content.classList.remove('expanded');
-        if (step2Content) step2Content.classList.add('collapsed');
-        if (step2Icon) step2Icon.style.transform = 'rotate(0deg)';
-        
-        if (step3Content) step3Content.classList.remove('collapsed');
-        if (step3Content) step3Content.classList.add('expanded');
-        if (step3Icon) step3Icon.style.transform = 'rotate(90deg)';
-      } else {
-        // 公開終了の場合：データ準備を開いて、他は閉じる
-        if (step1Content) step1Content.classList.remove('collapsed');
-        if (step1Content) step1Content.classList.add('expanded');
-        if (step1Icon) step1Icon.style.transform = 'rotate(90deg)';
-        
-        if (step2Content) step2Content.classList.remove('expanded');
-        if (step2Content) step2Content.classList.add('collapsed');
-        if (step2Icon) step2Icon.style.transform = 'rotate(0deg)';
-        
-        if (step3Content) step3Content.classList.remove('expanded');
-        if (step3Content) step3Content.classList.add('collapsed');
-        if (step3Icon) step3Icon.style.transform = 'rotate(0deg)';
-      }
-    }
     
     function updateDatabaseInfo(status) {
       try {
@@ -3296,42 +3330,62 @@ function switchToAnotherAccount() {
     }
         
 
-    function createBoard() {
+    // =============================================================================
+    // BOARD CREATION - Refactored into smaller functions
+    // =============================================================================
+    
+    function setupBoardCreationUI() {
       var btn = elements.createBoardBtn;
-      if (btn) btn.disabled = true;
-      if (elements.createBoardText) elements.createBoardText.textContent = '作成中...';
+      setButtonState(btn, true, '作成中...');
       setLoading(true, '新しいボードを作成して公開中...');
+    }
+    
+    function resetBoardCreationUI() {
+      var btn = elements.createBoardBtn;
+      setButtonState(btn, false, '新しいボードを作成して公開');
+    }
+    
+    function handleBoardCreationSuccess(result) {
+      showMessage(result.message || 'ボードが正常に作成されました', 'green');
+      markStepCompleted(1);
+      
+      if (result.formUrl && elements.formUrlInput) {
+        updateFormInfo(result);
+        openFormInNewTab(result.formUrl);
+      }
+      
+      // Reload page after 3 seconds
+      setTimeout(function() { window.location.reload(); }, 3000);
+    }
+    
+    function updateFormInfo(result) {
+      elements.formUrlInput.value = result.formUrl;
+      elements.openFormUrlLink.href = result.formUrl;
+      
+      var formFileName = safeGetElement('form-file-name');
+      if (formFileName) {
+        setSafeTextContent(formFileName, result.formTitle || 'Googleフォーム');
+      }
+    }
+    
+    function openFormInNewTab(formUrl) {
+      showMessage('フォームを新しいページで開いています...', 'info');
+      setTimeout(function() {
+        window.open(formUrl, '_blank', 'noopener,noreferrer');
+      }, 1500);
+    }
+    
+    function handleBoardCreationError(error) {
+      showError(error);
+      resetBoardCreationUI();
+    }
+    
+    function createBoard() {
+      setupBoardCreationUI();
+      
       google.script.run
-        .withSuccessHandler(function(result) {
-          showMessage(result.message || 'ボードが正常に作成されました', 'green');
-          // Mark step 1 as completed (data preparation)
-          markStepCompleted(1);
-          
-          if (result.formUrl && elements.formUrlInput) {
-            elements.formUrlInput.value = result.formUrl;
-            elements.openFormUrlLink.href = result.formUrl;
-            var formFileName = document.getElementById('form-file-name');
-            if (formFileName && result.formTitle) {
-              formFileName.textContent = result.formTitle;
-            } else if (formFileName) {
-              formFileName.textContent = 'Googleフォーム';
-            }
-            
-            // フォームを新しいページで開く
-            if (result.formUrl) {
-              showMessage('フォームを新しいページで開いています...', 'info');
-              setTimeout(function() {
-                window.open(result.formUrl, '_blank', 'noopener,noreferrer');
-              }, 1500); // 1.5秒後に開く
-            }
-          }
-          setTimeout(function() { window.location.reload(); }, 3000);
-        })
-        .withFailureHandler(function(error) {
-          showError(error);
-          if (btn) btn.disabled = false;
-          if (elements.createBoardText) elements.createBoardText.textContent = '新しいボードを作成して公開';
-        })
+        .withSuccessHandler(handleBoardCreationSuccess)
+        .withFailureHandler(handleBoardCreationError)
         .createBoardFromAdmin();
     }
 
@@ -3339,6 +3393,74 @@ function switchToAnotherAccount() {
       debounce(_loadConfigForSelectedInternal, 'loadConfigForSelected', 200);
     }
 
+    // =============================================================================
+    // CONFIG LOADING - Refactored into smaller functions
+    // =============================================================================
+    
+    function handleGuessedHeadersSuccess(guessedConfig) {
+      try {
+        if (guessedConfig && !guessedConfig.error) {
+          processGuessedHeaders(guessedConfig);
+          loadExistingConfig(guessedConfig);
+        } else {
+          showError(new Error(guessedConfig.error || '列の自動判定に失敗しました。'));
+          setLoading(false);
+        }
+      } catch (error) {
+        showError(error);
+        setLoading(false);
+      }
+    }
+    
+    function processGuessedHeaders(guessedConfig) {
+      // サーバーからの結果を元にUIを構築
+      populateHeaderOptions(guessedConfig.allHeaders || []);
+      populateConfig(guessedConfig);
+      
+      // シート詳細情報を更新
+      updateSheetDetails(guessedConfig.allHeaders || []);
+    }
+    
+    function loadExistingConfig(guessedConfig) {
+      google.script.run
+        .withSuccessHandler(function(cfg) {
+          handleExistingConfigSuccess(cfg, guessedConfig);
+        })
+        .withFailureHandler(function(error) {
+          handleExistingConfigError(error);
+        })
+        .getConfig(selectedSheet, true);
+    }
+    
+    function handleExistingConfigSuccess(cfg, guessedConfig) {
+      try {
+        if (cfg && Object.keys(cfg).length > 0) {
+          populateConfig(Object.assign({}, guessedConfig, cfg));
+          showMessage('既存の設定をロードしました。', 'info');
+        } else {
+          showMessage('列の自動判定が完了しました。', 'success');
+        }
+        updateConfigButtons();
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    function handleExistingConfigError(error) {
+      try {
+        // 既存設定がない場合はエラーではないので無視
+        showMessage('列の自動判定が完了しました。', 'success');
+        updateConfigButtons();
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    function handleGuessedHeadersError(error) {
+      setLoading(false);
+      showError(error);
+    }
+    
     function _loadConfigForSelectedInternal() {
       if (!selectedSheet) {
         clearConfigFields();
@@ -3348,44 +3470,10 @@ function switchToAnotherAccount() {
       
       setLoading(true, '列情報を読み込んでいます...');
 
-      // ★修正点：サーバーの getGuessedHeaders を呼び出す
       google.script.run
-        .withSuccessHandler(function(guessedConfig) {
-          setLoading(false);
-          if (guessedConfig && !guessedConfig.error) {
-            // サーバーからの結果を元にUIを構築
-            populateHeaderOptions(guessedConfig.allHeaders || []);
-            populateConfig(guessedConfig);
-            
-            // シート詳細情報を更新
-            updateSheetDetails(guessedConfig.allHeaders || []);
-            
-            // 既存設定がある場合はそれをロードしてマージ
-            google.script.run
-              .withSuccessHandler(function(cfg) {
-                if (cfg && Object.keys(cfg).length > 0) {
-                  populateConfig(Object.assign({}, guessedConfig, cfg));
-                  showMessage('既存の設定をロードしました。', 'info');
-                } else {
-                  showMessage('列の自動判定が完了しました。', 'success');
-                }
-                updateConfigButtons();
-              })
-              .withFailureHandler(function(error) {
-                // 既存設定がない場合はエラーではないので無視
-                showMessage('列の自動判定が完了しました。', 'success');
-                updateConfigButtons();
-              })
-              .getConfig(selectedSheet, true);
-          } else {
-            showError(new Error(guessedConfig.error || '列の自動判定に失敗しました。'));
-          }
-        })
-        .withFailureHandler(function(error) {
-          setLoading(false);
-          showError(error);
-        })
-        .getGuessedHeaders(selectedSheet); // 選択されたシート名を渡す
+        .withSuccessHandler(handleGuessedHeadersSuccess)
+        .withFailureHandler(handleGuessedHeadersError)
+        .getGuessedHeaders(selectedSheet);
     }
     
     // シート詳細情報を更新する関数
@@ -3692,23 +3780,6 @@ function switchToAnotherAccount() {
       setLoading(false);
     }
     
-    // アカウント切り替え機能
-  function switchToAnotherAccount() {
-    // ユーザーに確認
-    if (!confirm("別のアカウントに切り替えますか？現在のセッションは破棄されます。")) {
-      return;
-    }
-
-    // ★ 修正点：サーバーに登録ページのURLを問い合わせる
-    google.script.run
-      .withSuccessHandler(function(webAppUrl) {
-        // サーバーから取得した正規のURLにリダイレクト
-        // doGet() が userId がない場合に Registration.html にリダイレクトするため、
-        // ベースURLにリダイレクトすれば良い
-        window.top.location.href = webAppUrl;
-      })
-      .getWebAppUrl();
-  }
     
     // ページ再読み込み（新しいアカウント用）
     function reloadPageForNewAccount() {
