@@ -945,7 +945,8 @@ class StudyQuestApp {
       classFilter: document.getElementById('classFilter'),
       sortOrder: document.getElementById('sortOrder'),
       scoreOption: document.getElementById('scoreOption'),
-      footer: document.getElementById('controlsFooter')
+      footer: document.getElementById('controlsFooter'),
+      loadingOverlay: document.getElementById('loading-overlay')
     };
     this.state = {
       currentAnswers: [],
@@ -1891,9 +1892,24 @@ setupEventDelegation() {
     }
   }
 
+  // Add these two methods
+  showLoadingOverlay() {
+    if (this.elements.loadingOverlay) {
+      this.elements.loadingOverlay.classList.remove('hidden');
+    }
+  }
+
+  hideLoadingOverlay() {
+    if (this.elements.loadingOverlay) {
+      this.elements.loadingOverlay.classList.add('hidden');
+    }
+  }
+
   async loadSheetData(showLoading = true, isInitialLoad = false, requestedSheetName = null) {
     if (this.state.isLoading && showLoading) return;
     this.state.isLoading = true;
+    this.showLoadingOverlay(); // Add this line
+
     const selectedClass = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
     const oldAnswers = [...this.state.currentAnswers];
     
@@ -1975,6 +1991,7 @@ setupEventDelegation() {
       this.elements.answersContainer.innerHTML = '<div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg">' + '<p class="font-bold">データの読み込みに失敗しました。</p>' + '<p class="text-sm mt-2">' + errorMessage + '</p>' + '<button id="retryLoadBtn" class="mt-4 game-btn bg-cyan-600 text-white px-4 py-2 rounded-lg font-bold border-cyan-800 hover:bg-cyan-500 text-sm">再試行</button>' + '</div>';
     } finally {
       this.state.isLoading = false;
+      this.hideLoadingOverlay(); // Add this line
     }
   }
   async loadAvailableSheets() {
