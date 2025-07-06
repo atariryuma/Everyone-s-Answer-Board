@@ -797,15 +797,6 @@
                 </svg>
                 <span id="save-config-text">設定を保存して公開</span>
               </button>
-              
-              <!-- 連携フォームを開くボタン -->
-              <button type="button" id="open-linked-form-btn" class="btn btn-secondary w-full mt-3" disabled title="連携しているGoogleフォームを開きます">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                </svg>
-                連携フォームを開く
-              </button>
             </div>
             
             <div id="config-placeholder" class="text-center py-8">
@@ -1998,7 +1989,12 @@ function setupEventListeners() {
           }
           
           updateUIForSelectedSheet();
-          loadConfigForSelected();
+          
+          // 公開中のシートの場合は列情報の読み込みをスキップ
+          if (!(currentStatus && currentStatus.appPublished && 
+                (selectedSheet === currentActiveSheet || selectedSheet === currentStatus.publishedSheetName))) {
+            loadConfigForSelected();
+          }
         });
       }
 
@@ -2884,6 +2880,11 @@ function updateDatabaseInfo(status) {
       setLoading(false);
     }
     
+    // ページ読み込み完了時に確実にローディングをクリア
+    window.addEventListener('load', function() {
+      setLoading(false);
+    });
+    
     
     function formatDateTime(dateString) {
       if (!dateString) return '';
@@ -3443,8 +3444,16 @@ function updateDatabaseInfo(status) {
       }
       
       // 既に公開中のシートの場合は、列情報の読み込みをスキップ
-      if (selectedSheet === currentActiveSheet && currentStatus && currentStatus.appPublished) {
-        console.log('既に公開中のシートのため、列情報の読み込みをスキップします:', selectedSheet);
+      console.log('🔍 [DEBUG] Load config check:', {
+        selectedSheet: selectedSheet,
+        currentActiveSheet: currentActiveSheet,
+        appPublished: currentStatus?.appPublished,
+        publishedSheetName: currentStatus?.publishedSheetName
+      });
+
+      if (currentStatus && currentStatus.appPublished && 
+          (selectedSheet === currentActiveSheet || selectedSheet === currentStatus.publishedSheetName)) {
+        console.log('✅ [DEBUG] 既に公開中のシートのため、列情報の読み込みをスキップします:', selectedSheet);
         return;
       }
       
