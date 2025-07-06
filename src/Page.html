@@ -2239,62 +2239,51 @@ class StudyQuestApp {
   }
   createAnswerCard(data) {
     const card = document.createElement('div');
-    const highlightClass = data.highlight ? ' highlighted' : '';
-    card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer' + highlightClass;
+    // `loading`クラスは付けずに生成
+    card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer'; 
     card.dataset.rowIndex = data.rowIndex;
-    
-    // tabindex属性を常に設定し、キーボードフォーカスを可能にする
-    card.setAttribute('tabindex', '0');
-    
-    // ARIA属性を追加し、スクリーンリーダーの読み上げを改善
-    const accessibleLabel = `回答カード: ${data.name || '匿名'}さんの意見、${data.opinion.substring(0, 30)}...`;
-    card.setAttribute('aria-label', accessibleLabel);
+    card.setAttribute('tabindex', '0'); // キーボードフォーカスを可能にする
     card.setAttribute('role', 'article');
-    
+    const accessibleLabel = `回答カード: ${data.name || '匿名'}さんの意見、${(data.opinion || '').substring(0, 30)}...`;
+    card.setAttribute('aria-label', accessibleLabel);
+
     let highlightBtnHtml = '';
     if (this.state.showHighlightToggle) {
-      const cls = data.highlight ? 'liked' : '';
-      const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
-      highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
+        const cls = data.highlight ? 'liked' : '';
+        const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
+        highlightBtnHtml = `<button type="button" class="highlight-btn like-btn text-purple-600 ${cls}" aria-label="${highlightAriaLabel}" aria-pressed="${data.highlight}" data-row-index="${data.rowIndex}">${this.getIcon('star', 'w-5 h-5', data.highlight)}</button>`;
     }
-    
+
     const showName = this.state.displayMode === 'named';
-    let displayName = '';
+    let displayName = showName ? (data.name || (data.email ? data.email.split('@')[0] : '')) : '';
+    const nameHtml = showName && displayName ? `<div><span class="font-bold text-sm text-gray-200">${this.escapeHtml(displayName)}</span></div>` : '';
     
-    if (showName) {
-      // 名前が利用可能な場合はそれを使用、なければemailから生成
-      if (data.name) {
-        displayName = data.name;
-      } else if (data.email) {
-        displayName = data.email.split('@')[0];
-      }
-    }
-    
-    const nameHtml = showName && displayName ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(displayName) + '</span></div>' : '';
     const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
+
     const reactionButtonsHtml = this.reactionTypes.map(rt => {
-      const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
-      const cls = info.reacted ? 'liked' : '';
-      const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
-      const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-lg text-gray-200" aria-hidden="true">' + (info.count || 0) + '</span>' : '';
-      const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
-      const reactionName = reactionNames[rt.key] || rt.key;
-      const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
-      return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + ariaLabel + '" aria-pressed="' + info.reacted + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
+        const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
+        const cls = info.reacted ? 'liked' : '';
+        const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+        const countSpan = this.state.showCounts ? `<span class="reaction-count font-bold text-lg text-gray-200" aria-hidden="true">${info.count || 0}</span>` : '';
+        const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
+        const reactionName = reactionNames[rt.key] || rt.key;
+        const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
+        return `<button type="button" class="reaction-btn like-btn flex items-center gap-1 ${colorClass} ${cls}" data-row-index="${data.rowIndex}" data-reaction="${rt.key}" aria-label="${ariaLabel}" aria-pressed="${info.reacted}">${this.getIcon(rt.icon, 'w-5 h-5', info.reacted)}${countSpan}</button>`;
     }).join('');
-    
-    card.innerHTML = '<div class="relative flex-grow mb-3 answer-preview">' + '<h3 class="opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight">' + this.escapeHtml(data.opinion || '') + '</h3>' + '<p class="text-gray-100 whitespace-pre-wrap break-words mt-4">' + this.escapeHtml(data.reason || '') + '</p>' + '</div>' + '<div class="' + containerClass + '">' + nameHtml + '<div class="flex items-center gap-1" role="group" aria-label="回答への反応">' + reactionButtonsHtml + highlightBtnHtml + '</div>' + '</div>';
-    
+
+    card.innerHTML = `<div class="relative flex-grow mb-3 answer-preview"><h3 class="opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight">${this.escapeHtml(data.opinion || '')}</h3><p class="text-gray-100 whitespace-pre-wrap break-words mt-4">${this.escapeHtml(data.reason || '')}</p></div><div class="${containerClass}">${nameHtml}<div class="flex items-center gap-1" role="group" aria-label="回答への反応">${reactionButtonsHtml}${highlightBtnHtml}</div></div>`;
+
     if (data.highlight) {
-      const badge = document.createElement('span');
-      badge.className = 'highlight-badge';
-      badge.innerHTML = this.getIcon('star', '', true);
-      card.appendChild(badge);
+        const badge = document.createElement('span');
+        badge.className = 'highlight-badge';
+        badge.innerHTML = this.getIcon('star', '', true);
+        card.appendChild(badge);
     }
     
-    // 統一されたリアクションスタイルを適用
     this.applyReactionStyles(card, data);
-    
+
+    // keydownイベントはsetupEventDelegationで処理されるため、ここでは不要
+
     return card;
   }
   createSkeletonCard() {
