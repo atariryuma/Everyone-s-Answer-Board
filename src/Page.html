@@ -596,6 +596,44 @@ header {
 @keyframes modalFade { from { opacity: 0; will-change: opacity; } to { opacity: 1; } }
 .modal-scale { animation: modalScale 0.2s ease-out; }
 @keyframes modalScale { from { will-change: transform; } to { transform: scale3d(1, 1, 1); } }
+
+/* --- 修正指示：ここから --- */
+/* 目的: オーバーレイ要素がクリックイベントを妨げないようにする
+  - フッターやモーダルのコンテナ自体はクリックイベントを透過させる
+  - コンテナ内の操作可能なパネルやボタンのみクリックを受け付ける
+*/
+#controlsFooter, #answerModalContainer, #infoModalContainer, #loading-overlay {
+  pointer-events: none;
+}
+
+/* 目的: 実際に操作する要素ではクリックイベントを有効化する
+*/
+#controlsFooter > .glass-panel, 
+#answerModalCard, 
+#infoModalCard,
+.loading-overlay > div {
+  pointer-events: auto;
+}
+
+/* 目的: 回答カードが他の要素に隠されないように、z-indexを確保する
+  - 相対的な重なり順を定義し、意図しない重なりを防ぐ
+*/
+.answer-card {
+  position: relative;
+  z-index: 10;
+}
+
+.answer-card:hover,
+.answer-card.highlighted {
+  z-index: 20; /* ホバー時やハイライト時に最前面に表示 */
+}
+
+/* 目的: 新着通知バナーが表示されていても、下のカードをクリックできるようにする
+*/
+#newContentBanner {
+  pointer-events: auto; /* バナー自体はクリック可能に */
+}
+/* --- 修正指示：ここまで --- */
 </style>
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans">
@@ -1113,384 +1151,74 @@ class StudyQuestApp {
     document.addEventListener('visibilitychange', this.handlers.onVisibilityChange, { passive: true });
   }
   setupEventDelegation() {
-    this.handlers.onAnswersContainerClick = (e) => {
-      // Debug: Log all click events on answers container
-      debugLog('Answer container click detected:', {
-        target: e.target,
-        targetClass: e.target.className,
-        targetTagName: e.target.tagName,
-        currentTarget: e.currentTarget,
-        eventPhase: e.eventPhase,
-        bubbles: e.bubbles,
-        cancelable: e.cancelable,
-        defaultPrevented: e.defaultPrevented,
-        targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
-        targetPointerEvents: e.target.style.pointerEvents,
-        clickCoordinates: { x: e.clientX, y: e.clientY },
-        targetBounds: e.target.getBoundingClientRect()
-      });
-      
-      // Check if click target is within an answer card
-      const answerCard = e.target.closest('.answer-card');
-      debugLog('Answer card detection:', {
-        answerCard: answerCard,
-        answerCardFound: !!answerCard,
-        answerCardClass: answerCard?.className,
-        answerCardDataset: answerCard?.dataset,
-        answerCardComputedStyle: answerCard ? window.getComputedStyle(answerCard).pointerEvents : null,
-        answerCardPointerEvents: answerCard?.style.pointerEvents,
-        answerCardHasLoadingClass: answerCard?.classList.contains('loading'),
-        answerCardHasHiddenClass: answerCard?.classList.contains('hidden-card'),
-        answerCardHasVisibleClass: answerCard?.classList.contains('visible')
-      });
-      
-      if (!answerCard) {
-        debugLog('No answer card found, ignoring click');
+    if (!this.elements.answersContainer) {
+        debugLog('ERROR: answersContainer not found for event delegation.');
         return;
-      }
-      
-      // Check if the answer card is in loading state
-      if (answerCard.classList.contains('loading')) {
-        debugLog('Answer card is in loading state, ignoring click');
-        return;
-      }
-      
-      // Check if the answer card is hidden by virtual scrolling
-      if (answerCard.classList.contains('hidden-card')) {
-        debugLog('Answer card is hidden by virtual scrolling, ignoring click');
-        return;
-      }
-      
-      // Check if answer card has rowIndex
-      const rowIndex = answerCard.dataset.rowIndex;
-      debugLog('Row index check:', {
-        rowIndex: rowIndex,
-        rowIndexType: typeof rowIndex,
-        hasRowIndex: !!rowIndex,
-        allDatasetKeys: Object.keys(answerCard.dataset || {})
-      });
-      
-      if (!rowIndex) {
-        debugLog('No row index found on answer card, ignoring click');
-        return;
-      }
-      
-      // Check for reaction button clicks
-      const reactionBtn = e.target.closest('.reaction-btn');
-      if (reactionBtn) {
-        debugLog('Reaction button click detected:', {
-          reactionBtn: reactionBtn,
-          reactionType: reactionBtn.dataset.reaction,
-          disabled: reactionBtn.disabled,
-          rowIndex: rowIndex,
-          classList: reactionBtn.classList.toString()
-        });
-        
-        e.stopPropagation();
-        const reactionType = reactionBtn.dataset.reaction;
-        if (reactionType && !reactionBtn.disabled) {
-          debugLog('Handling reaction:', { rowIndex, reactionType });
-          this.handleReaction(rowIndex, reactionType);
-        } else {
-          debugLog('Reaction button click ignored:', {
-            reactionType: reactionType,
-            disabled: reactionBtn.disabled,
-            reason: !reactionType ? 'No reaction type' : 'Button disabled'
-          });
-        }
-        return;
-      }
-      
-      // Check for highlight button clicks
-      const highlightBtn = e.target.closest('.highlight-btn');
-      if (highlightBtn) {
-        debugLog('ハイライトボタンクリック:', { 
-          rowIndex, 
-          disabled: highlightBtn.disabled, 
-          showHighlightToggle: this.state.showHighlightToggle,
-          classList: highlightBtn.classList.toString(),
-          dataset: highlightBtn.dataset
-        });
-        
-        e.stopPropagation();
-        if (!highlightBtn.disabled) {
-          debugLog('Handling highlight:', { rowIndex });
-          this.handleHighlight(rowIndex);
-        } else {
-          debugLog('Highlight button click ignored: button disabled');
-        }
-        return;
-      }
-      
-      // If no specific button was clicked, show answer modal
-      debugLog('Showing answer modal for card click:', {
-        rowIndex: rowIndex,
-        clickedElement: e.target,
-        answerCard: answerCard
-      });
-      
-      this.showAnswerModal(rowIndex);
-    };
-    
-    if (this.elements.answersContainer) {
-      debugLog('Setting up event delegation:', {
-        answersContainer: this.elements.answersContainer,
-        hasAnswersContainer: !!this.elements.answersContainer,
-        answersContainerClass: this.elements.answersContainer.className,
-        answersContainerChildren: this.elements.answersContainer.children.length
-      });
-      
-      this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick, { passive: false });
-      
-      // Additional debugging: Test click event propagation
-      document.addEventListener('click', (e) => {
-        const answerCard = e.target.closest('.answer-card');
-        if (answerCard) {
-          debugLog('Document click event detected on answer card:', {
-            target: e.target,
-            targetClass: e.target.className,
-            targetTagName: e.target.tagName,
-            answerCard: answerCard,
-            answerCardClass: answerCard.className,
-            defaultPrevented: e.defaultPrevented,
-            bubbles: e.bubbles,
-            cancelable: e.cancelable,
-            eventPhase: e.eventPhase,
-            targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
-            answerCardComputedStyle: window.getComputedStyle(answerCard).pointerEvents
-          });
-        }
-      }, { passive: true });
-      
-      // Additional debugging: Test if event listener is properly attached
-      debugLog('Event listener attached to answers container:', {
-        listenerFunction: this.handlers.onAnswersContainerClick,
-        hasClickListener: true
-      });
-
-      // Fix click event issues by handling mousedown and preventing blur conflicts
-      this.elements.answersContainer.addEventListener('mousedown', (e) => {
-        const answerCard = e.target.closest('.answer-card');
-        debugLog('Mouse DOWN event on answers container:', {
-          target: e.target,
-          targetClass: e.target.className,
-          targetTagName: e.target.tagName,
-          button: e.button,
-          buttons: e.buttons,
-          clientX: e.clientX,
-          clientY: e.clientY,
-          screenX: e.screenX,
-          screenY: e.screenY,
-          ctrlKey: e.ctrlKey,
-          shiftKey: e.shiftKey,
-          altKey: e.altKey,
-          metaKey: e.metaKey,
-          targetBounds: e.target.getBoundingClientRect(),
-          targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
-          targetPointerEvents: e.target.style.pointerEvents,
-          answerCard: answerCard,
-          answerCardClass: answerCard?.className,
-          answerCardHasLoadingClass: answerCard?.classList.contains('loading'),
-          answerCardComputedStyle: answerCard ? window.getComputedStyle(answerCard).pointerEvents : null,
-          timeStamp: e.timeStamp
-        });
-        
-        // Fix pointer-events and loading state issues
-        if (answerCard) {
-          // Remove loading class to enable click
-          if (answerCard.classList.contains('loading')) {
-            debugLog('Answer card has loading class, removing it to enable click');
-            answerCard.classList.remove('loading');
-          }
-          
-          // Store the card that was clicked to handle blur/click conflicts
-          this.pendingClickCard = answerCard;
-          
-          // Prevent blur event from interfering with click
-          e.preventDefault();
-        }
-      }, { passive: false });
-
-      this.elements.answersContainer.addEventListener('mouseup', (e) => {
-        const answerCard = e.target.closest('.answer-card');
-        debugLog('Mouse UP event on answers container:', {
-          target: e.target,
-          targetClass: e.target.className,
-          targetTagName: e.target.tagName,
-          button: e.button,
-          buttons: e.buttons,
-          clientX: e.clientX,
-          clientY: e.clientY,
-          screenX: e.screenX,
-          screenY: e.screenY,
-          ctrlKey: e.ctrlKey,
-          shiftKey: e.shiftKey,
-          altKey: e.altKey,
-          metaKey: e.metaKey,
-          targetBounds: e.target.getBoundingClientRect(),
-          targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
-          targetPointerEvents: e.target.style.pointerEvents,
-          answerCard: answerCard,
-          timeStamp: e.timeStamp
-        });
-        
-        // Handle click via mouseup if click event doesn't fire
-        if (answerCard && this.pendingClickCard === answerCard) {
-          debugLog('Converting mouseup to click for answer card');
-          // Clear pending click
-          this.pendingClickCard = null;
-          
-          // Simulate click event
-          setTimeout(() => {
-            const clickEvent = new MouseEvent('click', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              clientX: e.clientX,
-              clientY: e.clientY,
-              button: e.button,
-              buttons: e.buttons
-            });
-            answerCard.dispatchEvent(clickEvent);
-          }, 10);
-        }
-      }, { passive: false });
-
-      this.elements.answersContainer.addEventListener('mouseover', (e) => {
-        const answerCard = e.target.closest('.answer-card');
-        if (answerCard) {
-          debugLog('Mouse OVER answer card:', {
-            target: e.target,
-            targetClass: e.target.className,
-            targetTagName: e.target.tagName,
-            answerCard: answerCard,
-            answerCardClass: answerCard.className,
-            answerCardDataset: answerCard.dataset,
-            answerCardRowIndex: answerCard.dataset.rowIndex,
-            answerCardComputedStyle: window.getComputedStyle(answerCard).pointerEvents,
-            answerCardPointerEvents: answerCard.style.pointerEvents,
-            targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
-            targetPointerEvents: e.target.style.pointerEvents,
-            timeStamp: e.timeStamp
-          });
-        }
-      }, { passive: true });
-
-      this.elements.answersContainer.addEventListener('mouseout', (e) => {
-        const answerCard = e.target.closest('.answer-card');
-        if (answerCard) {
-          debugLog('Mouse OUT answer card:', {
-            target: e.target,
-            targetClass: e.target.className,
-            targetTagName: e.target.tagName,
-            answerCard: answerCard,
-            answerCardClass: answerCard.className,
-            answerCardDataset: answerCard.dataset,
-            answerCardRowIndex: answerCard.dataset.rowIndex,
-            relatedTarget: e.relatedTarget,
-            relatedTargetClass: e.relatedTarget?.className,
-            timeStamp: e.timeStamp
-          });
-        }
-      }, { passive: true });
-
-      // Additional touch event debugging for mobile devices
-      this.elements.answersContainer.addEventListener('touchstart', (e) => {
-        debugLog('Touch START event on answers container:', {
-          target: e.target,
-          targetClass: e.target.className,
-          targetTagName: e.target.tagName,
-          touches: e.touches.length,
-          changedTouches: e.changedTouches.length,
-          firstTouch: e.touches[0] ? {
-            clientX: e.touches[0].clientX,
-            clientY: e.touches[0].clientY,
-            screenX: e.touches[0].screenX,
-            screenY: e.touches[0].screenY
-          } : null,
-          targetBounds: e.target.getBoundingClientRect(),
-          targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
-          targetPointerEvents: e.target.style.pointerEvents,
-          answerCard: e.target.closest('.answer-card'),
-          timeStamp: e.timeStamp
-        });
-      }, { passive: true });
-
-      this.elements.answersContainer.addEventListener('touchend', (e) => {
-        debugLog('Touch END event on answers container:', {
-          target: e.target,
-          targetClass: e.target.className,
-          targetTagName: e.target.tagName,
-          touches: e.touches.length,
-          changedTouches: e.changedTouches.length,
-          firstChangedTouch: e.changedTouches[0] ? {
-            clientX: e.changedTouches[0].clientX,
-            clientY: e.changedTouches[0].clientY,
-            screenX: e.changedTouches[0].screenX,
-            screenY: e.changedTouches[0].screenY
-          } : null,
-          targetBounds: e.target.getBoundingClientRect(),
-          targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
-          targetPointerEvents: e.target.style.pointerEvents,
-          answerCard: e.target.closest('.answer-card'),
-          timeStamp: e.timeStamp
-        });
-      }, { passive: true });
-
-      // Debugging for pointer events (modern alternative to mouse events)
-      this.elements.answersContainer.addEventListener('pointerdown', (e) => {
-        debugLog('Pointer DOWN event on answers container:', {
-          target: e.target,
-          targetClass: e.target.className,
-          targetTagName: e.target.tagName,
-          pointerId: e.pointerId,
-          pointerType: e.pointerType,
-          button: e.button,
-          buttons: e.buttons,
-          clientX: e.clientX,
-          clientY: e.clientY,
-          pressure: e.pressure,
-          isPrimary: e.isPrimary,
-          targetBounds: e.target.getBoundingClientRect(),
-          targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
-          targetPointerEvents: e.target.style.pointerEvents,
-          answerCard: e.target.closest('.answer-card'),
-          timeStamp: e.timeStamp
-        });
-      }, { passive: true });
-
-      this.elements.answersContainer.addEventListener('pointerup', (e) => {
-        debugLog('Pointer UP event on answers container:', {
-          target: e.target,
-          targetClass: e.target.className,
-          targetTagName: e.target.tagName,
-          pointerId: e.pointerId,
-          pointerType: e.pointerType,
-          button: e.button,
-          buttons: e.buttons,
-          clientX: e.clientX,
-          clientY: e.clientY,
-          pressure: e.pressure,
-          isPrimary: e.isPrimary,
-          targetBounds: e.target.getBoundingClientRect(),
-          targetComputedStyle: window.getComputedStyle(e.target).pointerEvents,
-          targetPointerEvents: e.target.style.pointerEvents,
-          answerCard: e.target.closest('.answer-card'),
-          timeStamp: e.timeStamp
-        });
-      }, { passive: true });
-
-    } else {
-      debugLog('ERROR: answersContainer element not found when setting up event delegation');
     }
-    this.handlers.onDocumentClick = (e) => {
-      if (e.target.matches('#retryLoadBtn')) {
-        e.preventDefault();
-        this.loadInitialData();
-        return;
-      }
+
+    // 既存のリスナーを念のためクリア
+    if (this.handlers.onAnswersContainerClick) {
+        this.elements.answersContainer.removeEventListener('click', this.handlers.onAnswersContainerClick);
+    }
+
+    // 新しいシンプルなクリックハンドラー
+    this.handlers.onAnswersContainerClick = (e) => {
+        // クリックされた要素の最も近い`.answer-card`を探す
+        const answerCard = e.target.closest('.answer-card');
+
+        // カードが見つからなければ何もしない
+        if (!answerCard) {
+            return;
+        }
+
+        // --- デバッグログ ---
+        debugLog('Card Click Event Captured', {
+            target: e.target.tagName,
+            cardRowIndex: answerCard.dataset.rowIndex,
+            hasLoadingClass: answerCard.classList.contains('loading'),
+            hasHiddenClass: answerCard.classList.contains('hidden-card')
+        });
+        
+        // ローディング中や非表示のカードは無視
+        if (answerCard.classList.contains('loading') || answerCard.classList.contains('hidden-card')) {
+            debugLog('Click ignored: card is loading or hidden.');
+            e.stopPropagation(); // イベントの伝播を止めておく
+            return;
+        }
+
+        // --- クリック対象の判定 ---
+        const reactionBtn = e.target.closest('.reaction-btn');
+        const highlightBtn = e.target.closest('.highlight-btn');
+
+        if (reactionBtn && !reactionBtn.disabled) {
+            e.stopPropagation(); // リアクションボタンのクリックがカード全体のクリックとして扱われないようにする
+            const rowIndex = reactionBtn.dataset.rowIndex;
+            const reactionType = reactionBtn.dataset.reaction;
+            debugLog('Handling Reaction:', { rowIndex, reactionType });
+            this.handleReaction(rowIndex, reactionType);
+            return;
+        }
+        
+        if (highlightBtn && !highlightBtn.disabled) {
+            e.stopPropagation(); // ハイライトボタンのクリックがカード全体のクリックとして扱われないようにする
+            const rowIndex = highlightBtn.dataset.rowIndex;
+            debugLog('Handling Highlight:', { rowIndex });
+            this.handleHighlight(rowIndex);
+            return;
+        }
+
+        // --- カード本体のクリック ---
+        // リアクションやハイライトボタン以外がクリックされた場合
+        const rowIndex = answerCard.dataset.rowIndex;
+        if (rowIndex) {
+            debugLog('Showing Answer Modal for row:', rowIndex);
+            this.showAnswerModal(rowIndex);
+        } else {
+            debugLog('Click failed: No rowIndex found on card.');
+        }
     };
-    document.addEventListener('click', this.handlers.onDocumentClick, { passive: false });
+
+    this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
   }
   
   // Debug helper function - can be called from console
@@ -2574,9 +2302,15 @@ class StudyQuestApp {
     const highlightClass = data.highlight ? ' highlighted' : '';
     card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer loading' + highlightClass;
     card.dataset.rowIndex = data.rowIndex;
-    card.setAttribute('role', 'article');
+    // --- 修正指示：ここから ---
+    // tabindex属性を常に設定し、キーボードフォーカスを可能にする
     card.setAttribute('tabindex', '0');
-    card.setAttribute('aria-label', '回答カード: ' + (data.opinion || '').substring(0, 50) + (data.opinion && data.opinion.length > 50 ? '...' : ''));
+    
+    // ARIA属性を追加し、スクリーンリーダーの読み上げを改善
+    const accessibleLabel = `回答カード: ${data.name || '匿名'}さんの意見、${data.opinion.substring(0, 30)}...`;
+    card.setAttribute('aria-label', accessibleLabel);
+    card.setAttribute('role', 'article');
+    // --- 修正指示：ここまで ---
     
     debugLog('Created answer card with rowIndex:', {
       rowIndex: data.rowIndex,
@@ -2656,6 +2390,17 @@ class StudyQuestApp {
       this.cache.cleanup();
     }
     
+    // --- 修正指示：ここから ---
+    // キーボード操作（Enterキー、Spaceキー）への対応を追加
+    card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault(); // デフォルトのキー動作（スクロールなど）を防ぐ
+            // 既に存在する 'click' イベントリスナーを発火させる
+            card.click(); 
+        }
+    });
+    // --- 修正指示：ここまで ---
+    
     // Clone card for caching and remove loading state from cached version
     const cardToCache = card.cloneNode(true);
     cardToCache.classList.remove('loading');
@@ -2731,26 +2476,6 @@ class StudyQuestApp {
           debugLog('Card blurred:', { rowIndex: card.dataset.rowIndex });
         });
         
-        // Add keyboard accessibility for Enter and Space keys
-        card.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            debugLog('Card keyboard activation:', { 
-              rowIndex: card.dataset.rowIndex,
-              key: e.key,
-              target: e.target
-            });
-            // Simulate a click event on the card
-            const clickEvent = new MouseEvent('click', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              clientX: card.getBoundingClientRect().left + card.getBoundingClientRect().width / 2,
-              clientY: card.getBoundingClientRect().top + card.getBoundingClientRect().height / 2
-            });
-            card.dispatchEvent(clickEvent);
-          }
-        });
       });
       
       debugLog('Cards made clickable:', {
