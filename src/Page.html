@@ -2736,7 +2736,6 @@ async handleReaction(rowIndex, reaction) {
       this.elements.answersContainer.innerHTML = '';
       
       // UI状態を更新
-      this.showAdminControls();
       this.updateSortOptions();
       // 管理モード切り替え時は設定変更のため再描画が必要
       this.loadSheetData(true, false);
