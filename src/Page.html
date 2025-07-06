@@ -1155,27 +1155,18 @@ class StudyQuestApp {
     }
 
     // 既存のリスナーを一度全て削除し、意図しない重複を防ぐ
-    if (this.handlers.onAnswersContainerInteraction) {
-        this.elements.answersContainer.removeEventListener('mousedown', this.handlers.onAnswersContainerInteraction);
-        this.elements.answersContainer.removeEventListener('keydown', this.handlers.onAnswersContainerInteraction);
+    if (this.handlers.onAnswersContainerClick) {
+        this.elements.answersContainer.removeEventListener('click', this.handlers.onAnswersContainerClick);
     }
 
-    // mousedownとkeydownの両方を処理する統合イベントハンドラ
-    this.handlers.onAnswersContainerInteraction = (e) => {
-        // mousedownイベントでない、かつEnterかSpaceキーでもない場合は無視
-        if (e.type !== 'mousedown' && e.key !== 'Enter' && e.key !== ' ') {
-            return;
-        }
-
+    // シンプルなclickイベントハンドラ
+    this.handlers.onAnswersContainerClick = (e) => {
         const answerCard = e.target.closest('.answer-card');
         if (!answerCard) {
             return;
         }
-
-        // イベントのデフォルト動作を妨げることで、意図しない挙動（テキスト選択など）を防ぐ
-        e.preventDefault();
         
-        console.log(`[DEBUG] Interaction detected: ${e.type}`, { cardRowIndex: answerCard.dataset.rowIndex });
+        console.log(`[DEBUG] Click detected on card`, { cardRowIndex: answerCard.dataset.rowIndex });
 
         // クリック対象の判定と処理
         const reactionBtn = e.target.closest('.reaction-btn');
@@ -1199,10 +1190,8 @@ class StudyQuestApp {
         }
     };
 
-    // 'click' の代わりに 'mousedown' を使用
-    this.elements.answersContainer.addEventListener('mousedown', this.handlers.onAnswersContainerInteraction);
-    // キーボード操作への対応
-    this.elements.answersContainer.addEventListener('keydown', this.handlers.onAnswersContainerInteraction);
+    // 標準的なclickイベントを使用
+    this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
   }
   
   // Debug helper function - can be called from console
@@ -2280,7 +2269,13 @@ class StudyQuestApp {
     
     this.applyReactionStyles(card, data);
 
-    // keydownイベントはsetupEventDelegationで処理されるため、ここでは不要
+    // キーボード操作（Enter、Space）でクリックイベントを発火させる
+    card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            card.click();
+        }
+    });
 
     return card;
   }
