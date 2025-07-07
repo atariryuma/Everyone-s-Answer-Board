@@ -589,7 +589,7 @@ function getResponsesData(userId, sheetName) {
   try {
     var service = getSheetsService();
     var spreadsheetId = userInfo.spreadsheetId;
-    var range = (sheetName || 'フォームの回答 1') + '!A:Z';
+    var range = "'" + (sheetName || 'フォームの回答 1') + "'!A:Z";
     
     var response = batchGetSheetsData(service, spreadsheetId, [range]);
     var values = response.valueRanges[0].values || [];
@@ -720,6 +720,11 @@ function toggleHighlight(rowIndex, sheetName) {
     var userInfo = getUserWithFallback(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    // 管理者権限チェック
+    if (!userInfo.isAdmin) {
+      throw new Error('ハイライト機能は管理者のみ使用できます');
     }
     
     var result = processHighlightToggle(
@@ -975,7 +980,7 @@ function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
     }
     
     // 現在の値を取得
-    var range = sheetName + '!' + String.fromCharCode(65 + highlightColumnIndex) + rowIndex;
+    var range = "'" + sheetName + "'!" + String.fromCharCode(65 + highlightColumnIndex) + rowIndex;
     var currentValue = service.spreadsheets.values.get(spreadsheetId, range).values;
     var isHighlighted = currentValue && currentValue[0] && currentValue[0][0] === 'true';
     
@@ -1083,7 +1088,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
       }
       
       // 現在のリアクション文字列を取得
-      var cellRange = sheetName + '!' + String.fromCharCode(65 + reactionColumnIndex) + rowIndex;
+      var cellRange = "'" + sheetName + "'!" + String.fromCharCode(65 + reactionColumnIndex) + rowIndex;
       var response = service.spreadsheets.values.get(spreadsheetId, cellRange);
       var currentReactionString = (response.values && response.values[0] && response.values[0][0]) || '';
       

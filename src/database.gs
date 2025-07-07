@@ -93,7 +93,7 @@ function fetchUserFromDatabase(field, value) {
     var service = getSheetsService();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
-    var data = batchGetSheetsData(service, dbId, [sheetName + '!A:H']);
+    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
     var values = data.valueRanges[0].values || [];
     
     if (values.length === 0) return null;
@@ -155,7 +155,7 @@ function updateUser(userId, updateData) {
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
     // 現在のデータを取得
-    var data = batchGetSheetsData(service, dbId, [sheetName + '!A:H']);
+    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
     var values = data.valueRanges[0].values || [];
     
     if (values.length === 0) {
@@ -184,7 +184,7 @@ function updateUser(userId, updateData) {
       if (colIndex === -1) return null;
       
       return {
-        range: sheetName + '!' + String.fromCharCode(65 + colIndex) + rowIndex,
+        range: "'" + sheetName + "'!" + String.fromCharCode(65 + colIndex) + rowIndex,
         values: [[updateData[key]]]
       };
     }).filter(function(item) { return item !== null; });
@@ -224,7 +224,7 @@ function createUser(userData) {
     return userData[header] || ''; 
   });
   
-  appendSheetsData(service, dbId, sheetName + '!A1', [newRow]);
+  appendSheetsData(service, dbId, "'" + sheetName + "'!A1", [newRow]);
   
   // キャッシュを無効化
   invalidateUserCache(userData.userId, userData.adminEmail);
@@ -255,7 +255,7 @@ function initializeDatabaseSheet(spreadsheetId) {
     }
     
     // ヘッダーを書き込み
-    var headerRange = sheetName + '!A1:' + String.fromCharCode(65 + DB_SHEET_CONFIG.HEADERS.length - 1) + '1';
+    var headerRange = "'" + sheetName + "'!A1:" + String.fromCharCode(65 + DB_SHEET_CONFIG.HEADERS.length - 1) + '1';
     updateSheetsData(service, spreadsheetId, headerRange, [DB_SHEET_CONFIG.HEADERS]);
 
     debugLog('データベースシート「' + sheetName + '」の初期化が完了しました。');
