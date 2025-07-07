@@ -1,0 +1,3155 @@
+  <script>
+    // グローバルエラーハンドリング
+    window.addEventListener('error', function(event) {
+      console.error('Global error caught:', event.error);
+      // document.writeエラーの場合は特別な処理
+      if (event.error && event.error.message && event.error.message.includes('document.write')) {
+        console.warn('document.write エラーが検出されました。安全なDOM操作に切り替えています。');
+        event.preventDefault();
+      }
+    });
+    
+    // Promise rejection のキャッチ
+    window.addEventListener('unhandledrejection', function(event) {
+      console.error('Unhandled promise rejection:', event.reason);
+      event.preventDefault();
+    });
+  </script>
+  <script>
+    // デバウンス機能
+    var debounceMap = new Map();
+    function debounce(func, key, delay = 1000) {
+      if (debounceMap.has(key)) {
+        clearTimeout(debounceMap.get(key));
+      }
+      var timeoutId = setTimeout(func, delay);
+      debounceMap.set(key, timeoutId);
+    }
+
+    // =============================================================================
+    // DOM UTILITY FUNCTIONS - Refactored common patterns
+    // =============================================================================
+    
+    // Utility for safe DOM element creation
+    function createSafeElement(tag, className, textContent) {
+      var element = document.createElement(tag);
+      if (className) element.className = className;
+      if (textContent) element.textContent = textContent;
+      return element;
+    }
+    
+    // Utility for safe DOM element selection with null checking
+    function safeGetElement(id) {
+      return getCachedElement(id);
+    }
+    
+    // Utility for setting button state (disabled/enabled with text)
+    function setButtonState(button, isDisabled, text) {
+      if (!button) return;
+      button.disabled = isDisabled;
+      if (text) button.textContent = text;
+    }
+    
+    // Utility for setting element text content safely
+    function setSafeTextContent(element, text) {
+      if (!element) return;
+      element.textContent = text || '';
+    }
+    
+    // Utility for adding/removing CSS classes safely
+    function toggleClass(element, className, condition) {
+      if (!element) return;
+      if (condition) {
+        element.classList.add(className);
+      } else {
+        element.classList.remove(className);
+      }
+    }
+    
+    // Utility for creating and setting up event listeners safely
+    function addSafeEventListener(element, event, handler, options = {}) {
+      if (!element) return null;
+      element.addEventListener(event, handler, options);
+      return handler;
+    }
+    
+    // Utility for removing event listeners safely
+    function removeSafeEventListener(element, event, handler) {
+      if (!element || !handler) return;
+      element.removeEventListener(event, handler);
+    }
+    
+    // =============================================================================
+    // ELEMENT CACHE SYSTEM - Optimized DOM queries
+    // =============================================================================
+    
+    // Cache for frequently accessed elements not in the main elements object
+    var elementCache = new Map();
+    
+    // Enhanced safe element getter with caching
+    function getCachedElement(id) {
+      if (elementCache.has(id)) {
+        return elementCache.get(id);
+      }
+      
+      var element = document.getElementById(id);
+      if (element) {
+        elementCache.set(id, element);
+      } else {
+        console.warn('Element not found:', id);
+      }
+      return element;
+    }
+    
+    // Clear cache when needed (e.g., after dynamic content changes)
+    function clearElementCache() {
+      elementCache.clear();
+    }
+    
+    // Update cached element references
+    function updateElementCache(id, element) {
+      if (element) {
+        elementCache.set(id, element);
+      } else {
+        elementCache.delete(id);
+      }
+    }
+    
+    // Batch cache multiple elements
+    function cacheElements(elementIds) {
+      var cached = {};
+      elementIds.forEach(function(id) {
+        cached[id] = getCachedElement(id);
+      });
+      return cached;
+    }
+    
+    // =============================================================================
+    // EVENT HANDLER UTILITIES - Consolidated patterns
+    // =============================================================================
+    
+    // Utility for setting up multiple event listeners efficiently
+    function setupMultipleListeners(elementHandlerMap) {
+      Object.keys(elementHandlerMap).forEach(function(elementId) {
+        var element = elementId.startsWith('#') ? 
+          document.querySelector(elementId) : 
+          (elements[elementId] || getCachedElement(elementId));
+        
+        if (element) {
+          var handlers = elementHandlerMap[elementId];
+          if (Array.isArray(handlers)) {
+            handlers.forEach(function(handler) {
+              addSafeEventListener(element, handler.event, handler.callback, handler.options);
+            });
+          } else {
+            addSafeEventListener(element, handlers.event, handlers.callback, handlers.options);
+          }
+        }
+      });
+    }
+    
+    // Utility for setting up click handlers with confirmation
+    function setupConfirmationHandler(elementId, confirmTitle, confirmMessage, callback) {
+      var element = elements[elementId] || getCachedElement(elementId);
+      if (element) {
+        addSafeEventListener(element, 'click', function() {
+          showConfirmationModal(confirmTitle, confirmMessage, callback);
+        });
+      }
+    }
+    
+    // Utility for setting up click handlers with privacy modal
+    function setupPrivacyHandler(elementId, callback) {
+      var element = elements[elementId] || getCachedElement(elementId);
+      if (element) {
+        addSafeEventListener(element, 'click', function() {
+          showPrivacyModal(callback);
+        });
+      }
+    }
+    
+    // Utility for delegated event handling
+    function setupDelegatedHandler(parentElement, selector, event, callback) {
+      if (typeof parentElement === 'string') {
+        parentElement = getCachedElement(parentElement);
+      }
+      
+      if (parentElement) {
+        addSafeEventListener(parentElement, event, function(e) {
+          var target = e.target.closest(selector);
+          if (target) {
+            callback.call(target, e);
+          }
+        });
+      }
+    }
+    
+    // =============================================================================
+    // ERROR HANDLING SYSTEM - Centralized error management
+    // =============================================================================
+    
+    // Centralized error handling with consistent formatting
+    function handleError(error, context, userMessage) {
+      // Log error for debugging
+      var errorMsg = error && error.message ? error.message : String(error);
+      console.error('[' + (context || 'Unknown') + '] Error:', errorMsg);
+      
+      // Show user-friendly message
+      var displayMessage = userMessage || 'エラーが発生しました。しばらく待ってから再試行してください。';
+      showMessage(displayMessage, 'error');
+      
+      // Additional error reporting could be added here
+      return false;
+    }
+    
+    // Wrapper for Google Apps Script calls with consistent error handling
+    function safeGASCall(methodName, successHandler, errorMessage) {
+      return {
+        withSuccessHandler: function(handler) {
+          this._successHandler = handler;
+          return this;
+        },
+        withFailureHandler: function(handler) {
+          this._failureHandler = handler;
+          return this;
+        },
+        execute: function() {
+          var self = this;
+          google.script.run
+            .withSuccessHandler(function(result) {
+              if (self._successHandler) {
+                try {
+                  self._successHandler(result);
+                } catch (err) {
+                  handleError(err, methodName + '.successHandler', 'データの処理中にエラーが発生しました。');
+                }
+              }
+            })
+            .withFailureHandler(function(error) {
+              if (self._failureHandler) {
+                try {
+                  self._failureHandler(error);
+                } catch (err) {
+                  handleError(err, methodName + '.failureHandler');
+                }
+              } else {
+                handleError(error, methodName, errorMessage);
+              }
+            })[methodName].apply(google.script.run, arguments);
+        }
+      };
+    }
+    
+    // Legacy showError function for backward compatibility
+    function showError(error) {
+      handleError(error, 'Legacy', null);
+    }
+
+    // =============================================================================
+    // MESSAGE SYSTEM - Refactored for better maintainability
+    // =============================================================================
+    
+    // Message type configurations
+    var MESSAGE_TYPES = {
+      info: { bgColor: 'bg-blue-500', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+      success: { bgColor: 'bg-green-500', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', extraClass: 'success-pulse' },
+      error: { bgColor: 'bg-red-500', icon: 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z', extraClass: 'error-shake' },
+      warning: { bgColor: 'bg-yellow-500', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.082 16.5c-.77.833.192 2.5 1.732 2.5z', extraClass: 'text-black' },
+      green: { bgColor: 'bg-green-500', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
+      blue: { bgColor: 'bg-blue-500', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+      yellow: { bgColor: 'bg-yellow-500', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.082 16.5c-.77.833.192 2.5 1.732 2.5z', extraClass: 'text-black' }
+    };
+    
+    // Sanitize message content safely
+    function sanitizeMessage(message) {
+      if (typeof message !== 'string') {
+        try {
+          message = String(message);
+        } catch (e) {
+          return 'メッセージ表示エラー';
+        }
+      }
+      
+      // Remove control characters and limit length
+      return message
+        .replace(/[\u0000-\u001F\u007F]/g, '')
+        .replace(/['"\\]/g, '')
+        .substring(0, 200);
+    }
+    
+    // Check for duplicate messages and highlight if found
+    function handleDuplicateMessage(messageArea, message) {
+      var existingMessages = Array.from(messageArea.children);
+      for (var i = 0; i < existingMessages.length; i++) {
+        var existing = existingMessages[i];
+        var spanElement = existing.querySelector('span');
+        var existingText = spanElement ? spanElement.textContent : null;
+        if (existingText === message) {
+          // Highlight existing message
+          existing.style.transform = 'scale(1.05)';
+          setTimeout(function() { existing.style.transform = 'scale(1)'; }, 200);
+          return true;
+        }
+      }
+      return false;
+    }
+    
+    // Clean up old messages (keep only 5 most recent)
+    function cleanupOldMessages(messageArea) {
+      while (messageArea.children.length >= 5) {
+        messageArea.children[0].remove();
+      }
+    }
+    
+    // Create message DOM structure
+    function createMessageElement(messageId, message, type) {
+      var typeConfig = MESSAGE_TYPES[type] || MESSAGE_TYPES.info;
+      var messageElement = createSafeElement('div');
+      messageElement.id = messageId;
+      messageElement.className = 'p-4 mb-3 rounded-lg shadow-md flex items-center justify-between text-white transform transition-all duration-300 ease-out slide-up ' + typeConfig.bgColor;
+      
+      if (typeConfig.extraClass) {
+        messageElement.classList.add(typeConfig.extraClass);
+      }
+      
+      // Create message container with icon and text
+      var messageContainer = createSafeElement('div', 'flex items-center');
+      var iconContainer = createSafeElement('div');
+      iconContainer.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="' + typeConfig.icon + '"></path></svg>';
+      
+      var messageSpan = createSafeElement('span', 'ml-2 text-sm font-medium', message);
+      messageContainer.appendChild(iconContainer);
+      messageContainer.appendChild(messageSpan);
+      
+      // Create close button
+      var closeButton = createSafeElement('button', 'ml-4 text-white opacity-70 hover:opacity-100 focus:outline-none');
+      closeButton.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+      closeButton.onclick = function() { removeMessage(messageId); };
+      
+      messageElement.appendChild(messageContainer);
+      messageElement.appendChild(closeButton);
+      
+      return messageElement;
+    }
+    
+    // Set up auto-removal timer for message
+    function setupMessageAutoRemoval(messageId, type) {
+      var timeout = type === 'error' ? 5000 : 2500;
+      return setTimeout(function() {
+        var msgEl = safeGetElement(messageId);
+        if (msgEl && msgEl.parentNode) {
+          msgEl.classList.remove('slide-up');
+          msgEl.classList.add('fade-out');
+          
+          var fallbackTimer = setTimeout(function() {
+            if (msgEl && msgEl.parentNode) {
+              msgEl.remove();
+            }
+          }, 500);
+          
+          msgEl.addEventListener('transitionend', function() {
+            clearTimeout(fallbackTimer);
+            if (msgEl && msgEl.parentNode) {
+              msgEl.remove();
+            }
+          }, { once: true });
+        }
+      }, timeout);
+    }
+    
+    // Main showMessage function - now much cleaner
+    function showMessage(message, type) {
+      try {
+        type = type || 'info';
+        message = sanitizeMessage(message);
+        
+        var messageArea = safeGetElement('message-area');
+        if (!messageArea) return;
+        
+        // Check for duplicates
+        if (handleDuplicateMessage(messageArea, message)) {
+          return;
+        }
+        
+        // Clean up old messages
+        cleanupOldMessages(messageArea);
+        
+        // Create and display new message
+        var messageId = 'msg-' + Date.now();
+        var messageElement = createMessageElement(messageId, message, type);
+        messageArea.appendChild(messageElement);
+        
+        // Set up auto-removal
+        messageElement.removeTimer = setupMessageAutoRemoval(messageId, type);
+        
+      } catch (error) {
+        try {
+          console.error('showMessage function error:', error);
+        } catch (e) {
+          // Silently fail if even logging fails
+        }
+      }
+    }
+
+    function removeMessage(messageId) {
+      var msgEl = document.getElementById(messageId);
+      if (msgEl) {
+        // 自動タイマーをクリア
+        if (msgEl.removeTimer) {
+          clearTimeout(msgEl.removeTimer);
+        }
+        // 即座に削除
+        msgEl.remove();
+      }
+    }
+
+    function addVisualFeedback(element, type) {
+      if (!element) return;
+      element.classList.remove('success-pulse', 'error-shake');
+      void element.offsetWidth; // Trigger reflow
+      element.classList.add(type === 'success' ? 'success-pulse' : 'error-shake');
+    }
+
+    // Layout adjustment function for footer padding
+    let baseBodyPadding;
+    function adjustLayout() {
+      if (typeof baseBodyPadding === 'undefined') {
+        baseBodyPadding = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+      }
+      const footer = document.getElementById('admin-footer');
+      if (footer) {
+        const footerHeight = footer.offsetHeight;
+        document.body.style.paddingBottom = footerHeight + baseBodyPadding + 'px';
+      }
+    }
+
+    // プライバシーモーダルの制御関数
+    function showPrivacyModal(onContinue) {
+      var modal = document.getElementById('privacy-modal');
+      if (!modal) {
+        console.error('プライバシーモーダルが見つかりません');
+        return;
+      }
+      
+      modal.classList.remove('hidden');
+      
+      // イベントリスナーを設定（重複を防ぐため一度クリア）
+      var continueBtn = document.getElementById('privacy-modal-continue');
+      var cancelBtn = document.getElementById('privacy-modal-cancel');
+      
+      // 既存のリスナーを削除
+      if (continueBtn) {
+        var newContinueBtn = continueBtn.cloneNode(true);
+        continueBtn.parentNode.replaceChild(newContinueBtn, continueBtn);
+        newContinueBtn.addEventListener('click', function() {
+          hidePrivacyModal();
+          if (onContinue) onContinue();
+        });
+      }
+      
+      if (cancelBtn) {
+        var newCancelBtn = cancelBtn.cloneNode(true);
+        cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+        newCancelBtn.addEventListener('click', hidePrivacyModal);
+      }
+      
+      // Escapeキーでモーダルを閉じる
+      var escapeHandler = function(e) {
+        if (e.key === 'Escape') {
+          hidePrivacyModal();
+          document.removeEventListener('keydown', escapeHandler);
+        }
+      };
+      document.addEventListener('keydown', escapeHandler);
+    }
+    
+    function hidePrivacyModal() {
+      var modal = document.getElementById('privacy-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+    }
+
+    // デジタルシティズンシップモーダルの制御関数
+    function showDigitalCitizenshipModal() {
+      var modal = document.getElementById('digital-citizenship-modal');
+      if (!modal) {
+        console.error('デジタルシティズンシップモーダルが見つかりません');
+        return;
+      }
+      
+      modal.classList.remove('hidden');
+      
+      // 閉じるボタンのイベントリスナーを設定
+      var closeBtn = document.getElementById('digital-citizenship-modal-close');
+      var closeBtnBottom = document.getElementById('digital-citizenship-modal-close-btn');
+      
+      if (closeBtn) {
+        closeBtn.onclick = hideDigitalCitizenshipModal;
+      }
+      
+      if (closeBtnBottom) {
+        closeBtnBottom.onclick = hideDigitalCitizenshipModal;
+      }
+      
+      // Escapeキーでモーダルを閉じる
+      var escapeHandler = function(e) {
+        if (e.key === 'Escape') {
+          hideDigitalCitizenshipModal();
+          document.removeEventListener('keydown', escapeHandler);
+        }
+      };
+      document.addEventListener('keydown', escapeHandler);
+      
+      // モーダルの背景をクリックしたときに閉じる
+      modal.onclick = function(e) {
+        if (e.target === modal) {
+          hideDigitalCitizenshipModal();
+        }
+      };
+    }
+    
+    function hideDigitalCitizenshipModal() {
+      var modal = document.getElementById('digital-citizenship-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+    }
+
+    /**
+     * 設定エリアを非表示にし、プレースホルダーを表示する
+     */
+    function hideConfigArea() {
+        var configArea = document.getElementById('config-area');
+        var configPlaceholder = document.getElementById('config-placeholder');
+        if (configArea) configArea.classList.add('hidden');
+        if (configPlaceholder) configPlaceholder.classList.remove('hidden');
+    }
+
+    function showConfirmationModal(title, message, onConfirm) {
+      var modal = document.getElementById('confirmation-modal');
+      var modalTitle = document.getElementById('modal-title');
+      var modalMessage = document.getElementById('modal-message');
+      
+      if (modalTitle) modalTitle.textContent = title;
+      if (modalMessage) modalMessage.textContent = message;
+      
+      if (!modal) {
+        console.error('確認モーダルが見つかりません');
+        return;
+      }
+      
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      var confirmBtn = document.getElementById('modal-confirm-btn');
+      var cancelBtn = document.getElementById('modal-cancel-btn');
+
+      var confirmHandler = function() {
+        onConfirm();
+        hideConfirmationModal();
+        confirmBtn.removeEventListener('click', confirmHandler);
+        cancelBtn.removeEventListener('click', cancelHandler);
+      };
+
+      var cancelHandler = function() {
+        hideConfirmationModal();
+        confirmBtn.removeEventListener('click', confirmHandler);
+        cancelBtn.removeEventListener('click', cancelHandler);
+      };
+
+      confirmBtn.addEventListener('click', confirmHandler);
+      cancelBtn.addEventListener('click', cancelHandler);
+    }
+
+    function hideConfirmationModal() {
+      var modal = document.getElementById('confirmation-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    // ユーザーIDの安全な初期化
+    var userId = '';
+    
+    // HTMLデータ属性から安全にデータを取得（スクリプトレットを使わない方法）
+    (function() {
+      try {
+        // metaタグからデータを取得
+        var userIdMeta = document.querySelector('meta[name="user-id"]');
+        if (userIdMeta && userIdMeta.content) {
+          userId = userIdMeta.content;
+        }
+      } catch (e) {
+        console.warn('ユーザーIDの初期化でエラー:', e);
+        userId = '';
+      }
+    })();
+    var selectedSheet = '';
+    var currentActiveSheet = '';
+    var webAppUrl = '';
+    var currentSpreadsheetUrl = '';
+    var currentStatus = null; // 現在のステータス情報を保存
+    
+
+    var elements = {}; // elementsオブジェクトを初期化
+
+    // Progressive Disclosure Functions - 早期定義
+    function toggleSection(sectionId) {
+      var section = document.getElementById(sectionId);
+      var icon = document.getElementById(sectionId.replace('content', 'icon'));
+      
+      if (!section) return;
+      
+      var isExpanded = section.classList.contains('expanded');
+      
+      if (isExpanded) {
+        section.classList.remove('expanded');
+        section.classList.add('collapsed');
+        if (icon) {
+          if (sectionId === 'step1-content') {
+            icon.style.transform = 'rotate(0deg)'; // Down arrow
+          } else if (sectionId === 'step2-content' || sectionId === 'step3-content') {
+            icon.style.transform = 'rotate(90deg)'; // Right arrow
+          }
+        }
+      } else {
+        section.classList.remove('collapsed');
+        section.classList.add('expanded');
+        if (icon) {
+          if (sectionId === 'step1-content') {
+            icon.style.transform = 'rotate(180deg)'; // Up arrow
+          } else if (sectionId === 'step2-content' || sectionId === 'step3-content') {
+            icon.style.transform = 'rotate(0deg)'; // Down arrow
+          }
+        }
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      // `elements` オブジェクトの定義を修正
+elements = {
+  // ... 既存の要素はそのまま ...
+  sheetSelect: document.getElementById('sheet-select'),
+  configArea: document.getElementById('config-area'),
+  configPlaceholder: document.getElementById('config-placeholder'),
+  opinionHeader: document.getElementById('opinionHeader'),
+  reasonHeader: document.getElementById('reasonHeader'),
+  nameHeader: document.getElementById('nameHeader'),
+  classHeader: document.getElementById('classHeader'),
+  draftSaveBtn: document.getElementById('draft-save-btn'),
+  publishBtn: document.getElementById('publish-btn'),
+  publishTooltipTrigger: document.getElementById('publish-tooltip-trigger'),
+  publishTooltip: document.getElementById('publish-tooltip'),
+  publishedStatusTrigger: document.getElementById('published-status-trigger'),
+  publishedStatusTooltip: document.getElementById('published-status-tooltip'),
+  detailOptions: document.getElementById('detail-options'),
+  boardUrl: document.getElementById('board-url'),
+  viewBoardLink: document.getElementById('view-board-link'),
+  setupProgress: document.getElementById('setup-progress'),
+  setupProgressMobile: document.getElementById('setup-progress-mobile'),
+  setupProgressText: document.getElementById('setup-progress-text'),
+  setupProgressTextMobile: document.getElementById('setup-progress-text-mobile'),
+  headerDomainName: document.getElementById('header-domain-name'),
+  headerStatusDot: document.getElementById('header-status-dot'),
+  headerStatusText: document.getElementById('header-status-text'),
+  configStatus: document.getElementById('config-status'),
+  addSpreadsheetText: document.getElementById('add-spreadsheet-text'),
+  saveConfigText: document.getElementById('save-config-text'),
+  createBoardBtn: document.getElementById('create-board-btn'),
+  createBoardText: document.getElementById('create-board-text'),
+  formUrlInput: document.getElementById('form-url-input'),
+  copyFormUrlBtn: document.getElementById('copy-form-url-btn'),
+  openFormUrlLink: document.getElementById('open-form-url-link'),
+  openSpreadsheetBtn: document.getElementById('open-spreadsheet-btn'),
+  addSpreadsheetBtn: document.getElementById('add-spreadsheet-btn'),
+  guidanceText: document.getElementById('guidance-text'),
+  // 新しいシート詳細要素
+  sheetDetails: document.getElementById('sheet-details'),
+  sheetColumns: document.getElementById('sheet-columns'),
+  spreadsheetLink: document.getElementById('spreadsheet-link'),
+  formLink: document.getElementById('form-link'),
+  
+  // ★★★ ここから追加 ★★★
+  // システム情報パネルの要素
+  'info-admin-email': document.getElementById('info-admin-email'),
+  'info-user-id': document.getElementById('info-user-id'),
+  'info-published-sheet': document.getElementById('info-published-sheet'),
+  'info-answer-count': document.getElementById('info-answer-count'),
+  'info-reaction-count': document.getElementById('info-reaction-count'),
+  'delete-account-btn': document.getElementById('delete-account-btn'),
+  
+  // 新しいUI要素
+  'info-publish-status': document.getElementById('info-publish-status'),
+  'info-publish-indicator': document.getElementById('info-publish-indicator'),
+  'info-publish-text': document.getElementById('info-publish-text'),
+  'info-display-mode': document.getElementById('info-display-mode'),
+  'info-show-counts': document.getElementById('info-show-counts'),
+  'open-form-btn': document.getElementById('open-form-btn'),
+  'open-linked-form-btn': document.getElementById('open-linked-form-btn'),
+  
+  // 統合フッター要素
+  adminFooter: document.getElementById('admin-footer'),
+  currentTopicText: document.getElementById('current-topic-text')
+  // ★★★ ここまで追加 ★★★
+};
+      loadStatus();
+      setupEventListeners();
+      adjustLayout();
+      loadAdminDomainInfo();
+      
+      // システム状況のリアルタイム更新を開始
+      startSystemStatusUpdate();
+    });
+    // ===== 共通ドメイン情報処理関数 =====
+    // AdminPanel.html と Registration.html で共通使用
+    
+    /**
+     * ドメイン情報を取得して表示する共通関数
+     * @param {Function} onSuccess - 成功時のコールバック（オプション）
+     * @param {Function} onError - エラー時のコールバック（オプション）
+     */
+    function loadDomainInfo(onSuccess, onError) {
+      google.script.run
+        .withSuccessHandler(function(info) {
+          displayDomainInfo(info);
+          if (onSuccess) onSuccess(info);
+        })
+        .withFailureHandler(function(error) {
+          console.error('ドメイン情報の取得に失敗しました:', error);
+          displayDomainInfo({ error: error.message || error });
+          if (onError) onError(error);
+        })
+        .getDeployUserDomainInfo();
+    }
+
+    /**
+     * ドメイン情報を表示する共通関数
+     * @param {Object} info - ドメイン情報オブジェクト
+     */
+    function displayDomainInfo(info) {
+      var headerDomainMatch = document.getElementById('header-domain-match');
+      var headerDomainMismatch = document.getElementById('header-domain-mismatch');
+      var headerDomainInitial = document.getElementById('header-domain-initial');
+      var headerDomainMatchText = document.getElementById('header-domain-match-text');
+      var headerDomainMismatchText = document.getElementById('header-domain-mismatch-text');
+
+      // 全ての表示を一旦非表示にする
+      if (headerDomainMatch) headerDomainMatch.classList.add('hidden');
+      if (headerDomainMismatch) headerDomainMismatch.classList.add('hidden');
+      if (headerDomainInitial) headerDomainInitial.classList.add('hidden');
+      
+      if (!info || info.error) {
+        console.warn('ドメイン情報エラー:', info && info.error ? info.error : 'Unknown error');
+        if (headerDomainInitial) headerDomainInitial.classList.remove('hidden');
+        return;
+      }
+
+      if (info.isDomainMatch) {
+        // ドメインが一致している場合
+        if (headerDomainMatch && headerDomainMatchText) {
+          headerDomainMatch.classList.remove('hidden');
+          if (info.deployDomain) {
+            headerDomainMatchText.textContent = info.deployDomain + ' ドメイン';
+          } else {
+            headerDomainMatchText.textContent = 'グローバルアクセス';
+          }
+        }
+      } else {
+        // ドメイン不一致の場合
+        if (headerDomainMismatch && headerDomainMismatchText) {
+          headerDomainMismatch.classList.remove('hidden');
+          headerDomainMismatchText.textContent = info.currentDomain;
+        }
+      }
+    }
+
+    // AdminPanel専用のラッパー関数（後方互換性のため）
+    function loadAdminDomainInfo() {
+      loadDomainInfo();
+    }
+
+    function displayAdminDomainInfo(info) {
+      displayDomainInfo(info);
+    }
+    
+    // ステップベースのUI初期化
+    function initializeStepBasedUI() {
+      // ステップ1のみ開く、ステップ2・3は閉じる（既にHTMLで設定済み）
+      // Initialization complete - UI state already set in HTML
+    }
+
+    // 重複していたDOMContentLoadedイベントリスナーを削除
+    // 既に上記で設定済み
+
+    // `setupEventListeners` 関数の中にこのリスナーを追加
+function setupEventListeners() {
+  // ... 既存のリスナーはそのまま ...
+  // Sheet selection
+      if (elements.sheetSelect) {
+        elements.sheetSelect.addEventListener('change', function(e) {
+          selectedSheet = e.target.value;
+          
+          // selectedSheetが文字列であることを確認
+          if (typeof selectedSheet !== 'string' || selectedSheet === '[object Object]') {
+            console.error('selectedSheetが無効です:', selectedSheet);
+            console.error('選択されたオプション:', e.target.options[e.target.selectedIndex]);
+            return;
+          }
+          
+          updateUIForSelectedSheet();
+          
+          // 公開中のシートの場合は列情報の読み込みをスキップ
+          if (!(currentStatus && currentStatus.appPublished && 
+                (selectedSheet === currentActiveSheet || selectedSheet === currentStatus.publishedSheetName))) {
+            loadConfigForSelected();
+          }
+        });
+      }
+
+      // ★★★ ここから追加 ★★★
+      var reguessBtn = document.getElementById('reguess-headers-btn');
+      if (reguessBtn) {
+        reguessBtn.addEventListener('click', runHeaderGuessing);
+      }
+      // ★★★ ここまで追加 ★★★
+
+      // Actions
+      
+      if (elements.clearSelectionBtn) {
+        elements.clearSelectionBtn.addEventListener('click', clearSheetSelection);
+      }
+      if (elements.saveConfigBtn) {
+        elements.saveConfigBtn.addEventListener('click', function() {
+          // 最初にプライバシーモーダルを表示
+          showPrivacyModal(function() {
+            // プライバシー承認後、確認モーダルを表示
+            showConfirmationModal(
+              'ボードを公開',
+              '設定を保存して回答ボードを公開します。継続しますか？',
+              saveConfig
+            );
+          });
+        });
+      }
+      
+      // Resource management (unified for forms and spreadsheets)
+      var addResourceBtn = document.getElementById('add-resource-btn');
+      if (addResourceBtn) {
+        addResourceBtn.addEventListener('click', addResource);
+      }
+      
+      var openResourceBtn = document.getElementById('open-resource-btn');
+      if (openResourceBtn) {
+        openResourceBtn.addEventListener('click', openResource);
+      }
+      
+      // Legacy spreadsheet management (keep for compatibility)
+      var addSpreadsheetBtn = document.getElementById('add-spreadsheet-btn');
+      if (addSpreadsheetBtn) {
+        addSpreadsheetBtn.addEventListener('click', addSpreadsheet);
+      }
+      
+      // Create board events
+      if (elements.createBoardBtn) {
+        elements.createBoardBtn.addEventListener('click', createBoard);
+      }
+      
+      var quickCreateBtn = document.getElementById('quick-create-board-btn');
+      if (quickCreateBtn) {
+        quickCreateBtn.addEventListener('click', createBoard);
+      }
+      
+      // 追加フォーム作成ボタン
+      var createAdditionalFormBtn = document.getElementById('create-additional-form-btn');
+      if (createAdditionalFormBtn) {
+        createAdditionalFormBtn.addEventListener('click', createAdditionalForm);
+      }
+
+      var refreshBoardBtn = document.getElementById('refresh-board-btn');
+      if (refreshBoardBtn) {
+        refreshBoardBtn.addEventListener('click', refreshBoardDataFromAdmin);
+      }
+      
+      // Display options
+      if (elements.detailOptions) {
+        elements.detailOptions.addEventListener('change', function(e) {
+          if (e.target.name === 'showNames' || e.target.name === 'showCounts') {
+            updateConfigButtons(); // 設定保存ボタンの状態を更新
+          }
+        });
+      }
+      
+      // Auto-update config when headers change
+      if (elements.opinionHeader) {
+        elements.opinionHeader.addEventListener('change', updateConfigButtons);
+      }
+      
+      // Digital citizenship button event
+      var digitalCitizenshipBtn = document.getElementById('digital-citizenship-btn');
+      if (digitalCitizenshipBtn) {
+        digitalCitizenshipBtn.addEventListener('click', showDigitalCitizenshipModal);
+      }
+      
+      // Teacher guide modal events
+      var teacherGuideConfirmBtn = document.getElementById('teacherGuideConfirmBtn');
+      if (teacherGuideConfirmBtn) {
+        teacherGuideConfirmBtn.addEventListener('click', hideTeacherGuideModal);
+      }
+      
+      // Digital citizenship guide button
+      var showDigitalCitizenshipBtn = document.getElementById('show-digital-citizenship-guide');
+      if (showDigitalCitizenshipBtn) {
+        showDigitalCitizenshipBtn.addEventListener('click', function() {
+          var modal = document.getElementById('digital-citizenship-modal');
+          if (modal) {
+            modal.classList.remove('hidden');
+          }
+        });
+      }
+      
+      // Digital citizenship modal close events
+      var digitalCitizenshipCloseBtn = document.getElementById('digital-citizenship-modal-close');
+      var digitalCitizenshipCloseBtnBottom = document.getElementById('digital-citizenship-modal-close-btn');
+      
+      if (digitalCitizenshipCloseBtn) {
+        digitalCitizenshipCloseBtn.addEventListener('click', function() {
+          var modal = document.getElementById('digital-citizenship-modal');
+          if (modal) {
+            modal.classList.add('hidden');
+          }
+        });
+      }
+      
+      if (digitalCitizenshipCloseBtnBottom) {
+        digitalCitizenshipCloseBtnBottom.addEventListener('click', function() {
+          var modal = document.getElementById('digital-citizenship-modal');
+          if (modal) {
+            modal.classList.add('hidden');
+          }
+        });
+      }
+      
+      var openSpreadsheetBtn = document.getElementById('open-spreadsheet-btn');
+      if (openSpreadsheetBtn) {
+        openSpreadsheetBtn.addEventListener('click', openDatabaseSpreadsheet);
+      }
+
+      var openFormBtn = document.getElementById('open-form-btn');
+      if (openFormBtn) {
+        openFormBtn.addEventListener('click', openForm);
+      }
+
+      // Open linked form button event listener
+      if (elements['open-linked-form-btn']) {
+        elements['open-linked-form-btn'].addEventListener('click', openLinkedForm);
+      }
+
+  // ★★★ ここから追加 ★★★
+  if (elements['delete-account-btn']) {
+    elements['delete-account-btn'].addEventListener('click', handleDeleteRequest);
+  }
+  
+  // セキュリティモーダル関連のイベントリスナー
+  var securityInfoBtn = document.getElementById('security-info-btn');
+  var securityModal = document.getElementById('security-modal');
+  var securityModalClose = document.getElementById('security-modal-close');
+  var securityModalConfirm = document.getElementById('security-modal-confirm');
+  
+  if (securityInfoBtn && securityModal) {
+    securityInfoBtn.addEventListener('click', function() {
+      securityModal.classList.remove('hidden');
+    });
+  }
+  
+  if (securityModalClose && securityModal) {
+    securityModalClose.addEventListener('click', function() {
+      securityModal.classList.add('hidden');
+    });
+  }
+  
+  if (securityModalConfirm && securityModal) {
+    securityModalConfirm.addEventListener('click', function() {
+      securityModal.classList.add('hidden');
+    });
+  }
+  
+  // モーダル外クリックで閉じる
+  if (securityModal) {
+    securityModal.addEventListener('click', function(e) {
+      if (e.target === securityModal) {
+        securityModal.classList.add('hidden');
+      }
+    });
+  }
+  
+  // 公開選択モーダルのイベントリスナー
+  var publishModalPublishBtn = document.getElementById('publish-modal-publish-btn');
+  var publishModalPrivateBtn = document.getElementById('publish-modal-private-btn');
+  
+  if (publishModalPublishBtn) {
+    publishModalPublishBtn.addEventListener('click', publishBoard);
+  }
+  
+  if (publishModalPrivateBtn) {
+    publishModalPrivateBtn.addEventListener('click', saveWithoutPublish);
+  }
+  
+  // 新しい分離されたボタンのイベントリスナー
+  if (elements.draftSaveBtn) {
+    elements.draftSaveBtn.addEventListener('click', saveDraft);
+  }
+  
+  if (elements.publishBtn) {
+    elements.publishBtn.addEventListener('click', showPublishConfirmation);
+  }
+  
+  // ツールチップのイベントリスナー
+  if (elements.publishTooltipTrigger && elements.publishTooltip) {
+    elements.publishTooltipTrigger.addEventListener('mouseenter', showPublishTooltip);
+    elements.publishTooltipTrigger.addEventListener('mouseleave', hidePublishTooltip);
+  }
+  
+  // 公開ステータスツールチップのイベントリスナー
+  if (elements.publishedStatusTrigger && elements.publishedStatusTooltip) {
+    elements.publishedStatusTrigger.addEventListener('mouseenter', showPublishedStatusTooltip);
+    elements.publishedStatusTrigger.addEventListener('mouseleave', hidePublishedStatusTooltip);
+  }
+  
+  // 新しい公開確認モーダルのイベントリスナー
+  var publishConfirmationCancel = document.getElementById('publish-confirmation-cancel');
+  var publishConfirmationConfirm = document.getElementById('publish-confirmation-confirm');
+  
+  if (publishConfirmationCancel) {
+    publishConfirmationCancel.addEventListener('click', hidePublishConfirmation);
+  }
+  
+  if (publishConfirmationConfirm) {
+    publishConfirmationConfirm.addEventListener('click', confirmPublish);
+  }
+  // ★★★ ここまで追加 ★★★
+}
+
+// ★★★ 以下の2つの関数を新しく追加 ★★★
+
+/**
+ * アカウント削除ボタンが押された時の処理（2重チェックのモーダル表示）
+ */
+function handleDeleteRequest() {
+  showConfirmationModal(
+    'アカウントの完全削除',
+    '本当にこのアカウントを削除しますか？この操作は元に戻せず、すべてのデータが失われます。',
+    function() {
+      setLoading(true, 'アカウントを完全に削除しています...');
+      google.script.run
+        .withSuccessHandler(function(response) {
+          setLoading(false);
+          showMessage(response, 'success');
+          // 削除成功後、2秒後に登録ページにリダイレクト
+          setTimeout(function() {
+            window.top.location.reload(); 
+          }, 2000);
+        })
+        .withFailureHandler(function(error) {
+          setLoading(false);
+          showError(error);
+        })
+        .deleteCurrentUserAccount(); // サーバー側の削除関数を呼び出す
+    }
+  );
+}
+
+
+/**
+ * UI要素のテキストを安全に設定するヘルパー関数
+ * @param {string} elementId - 要素のID
+ * @param {string} value - 設定する値
+ * @param {string} prefix - プレフィックス（オプション）
+ */
+function safeSetText(elementId, value, prefix = '') {
+  const element = document.getElementById(elementId);
+  if (element) {
+    element.textContent = value ? prefix + value : '-';
+    console.log(`✅ [DEBUG] Updated ${elementId}:`, element.textContent);
+  } else {
+    console.warn(`❌ [DEBUG] Element not found: ${elementId}`);
+  }
+}
+
+/**
+ * サーバーから受け取ったstatusオブジェクトを元に、システム状況パネルを更新します。
+ * @param {object} status - getStatusから返される完全なステータスオブジェクト
+ */
+function updateDatabaseInfo(status) {
+  console.log('🔧 [DEBUG] updateDatabaseInfo called with status:', status);
+  
+  if (!status || !status.userInfo) {
+    console.warn('システム情報を更新できませんでした: ユーザー情報がありません。', status);
+    return;
+  }
+
+  console.log('✅ [DEBUG] User info found, updating system panel:', status.userInfo);
+
+  // 既存のフィールドを更新
+  safeSetText('info-admin-email', status.userInfo.adminEmail);
+  safeSetText('info-user-id', status.userInfo.userId);
+  safeSetText('info-published-sheet', status.publishedSheetName || 'なし');
+  safeSetText('info-answer-count', status.answerCount || '0');
+  safeSetText('info-reaction-count', status.totalReactions || '0');
+
+  // 新しいUI要素を更新
+  
+  // 公開状態の更新
+  const isPublished = status && (status.appPublished || (status.activeSheetName && status.publishedSheetName));
+  updatePublicationStatusUI(isPublished);
+
+  // 表示モードの更新
+  const displayMode = status.showNames ? '名前表示' : '匿名表示';
+  safeSetText('info-display-mode', displayMode);
+
+  // カウント表示の更新
+  const showCounts = status.showCounts !== undefined ? (status.showCounts ? '表示' : '非表示') : '表示';
+  safeSetText('info-show-counts', showCounts);
+  
+  // チェックボックスの状態を同期
+  syncCheckboxStates(status);
+
+  // ボタンの状態を更新
+  const openSpreadsheetBtns = document.querySelectorAll('#open-spreadsheet-btn');
+  const openFormBtn = document.getElementById('open-form-btn');
+  
+  openSpreadsheetBtns.forEach(btn => {
+    if (btn) {
+      btn.disabled = !status.spreadsheetUrl;
+      if (status.spreadsheetUrl) {
+        btn.title = 'スプレッドシートを開く';
+      } else {
+        btn.title = 'スプレッドシートが設定されていません';
+      }
+    }
+  });
+  
+  if (openFormBtn) {
+    const hasFormUrl = status.formUrl && status.formUrl.trim() !== '';
+    openFormBtn.disabled = !hasFormUrl;
+    if (hasFormUrl) {
+      openFormBtn.title = 'フォームを開く';
+    } else {
+      openFormBtn.title = 'フォームが設定されていません';
+    }
+  }
+
+  // Update open-linked-form-btn state based on formUrl availability
+  const openLinkedFormBtn = elements['open-linked-form-btn'];
+  if (openLinkedFormBtn) {
+    const hasFormUrl = status.formUrl && status.formUrl.trim() !== '';
+    openLinkedFormBtn.disabled = !hasFormUrl;
+    if (hasFormUrl) {
+      openLinkedFormBtn.title = '連携しているGoogleフォームを開きます';
+    } else {
+      openLinkedFormBtn.title = '連携しているフォームが設定されていません';
+    }
+  }
+}
+
+// チェックボックスの状態を同期する関数
+function syncCheckboxStates(status) {
+  // 設定データの優先順位: 公開シート設定 > グローバル設定 > デフォルト値
+  const activeSheetName = status.activeSheetName || status.publishedSheetName;
+  const sheetConfig = activeSheetName && status.systemStatus ? 
+    status.systemStatus[`sheet_${activeSheetName}`] : null;
+  
+  // showNames の値を決定
+  const showNames = sheetConfig?.showNames !== undefined ? 
+    sheetConfig.showNames : 
+    (status.showNames !== undefined ? status.showNames : false);
+    
+  // showCounts の値を決定
+  const showCounts = sheetConfig?.showCounts !== undefined ? 
+    sheetConfig.showCounts : 
+    (status.showCounts !== undefined ? status.showCounts : true);
+  
+  // 名前表示チェックボックスの同期
+  const showNamesCheckbox = document.getElementById('showNames');
+  if (showNamesCheckbox) {
+    showNamesCheckbox.checked = showNames;
+  }
+  
+  // リアクション数表示チェックボックスの同期
+  const showCountsCheckbox = document.getElementById('showCounts');
+  if (showCountsCheckbox) {
+    showCountsCheckbox.checked = showCounts;
+  }
+  
+  console.log('🔄 [DEBUG] Checkbox sync:', {
+    activeSheetName,
+    sheetConfig,
+    showNames,
+    showCounts,
+    globalShowNames: status.showNames,
+    globalShowCounts: status.showCounts,
+    showNamesCheckbox: showNamesCheckbox?.checked,
+    showCountsCheckbox: showCountsCheckbox?.checked
+  });
+  
+  // システム状況パネルの表示も更新
+  updateSystemDisplayInfo(showNames, showCounts);
+}
+
+// システム状況パネルの表示情報を更新
+function updateSystemDisplayInfo(showNames, showCounts) {
+  const displayMode = showNames ? '名前表示' : '匿名表示';
+  const countDisplay = showCounts ? '表示' : '非表示';
+
+  safeSetText('info-display-mode', displayMode);
+  safeSetText('info-show-counts', countDisplay);
+}
+
+// 公開状態バッジの表示を更新
+function updatePublicationStatusUI(isPublished) {
+  var publishStatusEl = document.getElementById('info-publish-status');
+  var publishIndicatorEl = document.getElementById('info-publish-indicator');
+  var publishTextEl = document.getElementById('info-publish-text');
+
+  if (!publishStatusEl || !publishIndicatorEl || !publishTextEl) return;
+
+  if (isPublished) {
+    publishStatusEl.className = 'px-2 py-1 rounded text-xs font-medium bg-green-600 text-white';
+    publishIndicatorEl.className = 'w-2 h-2 rounded-full bg-green-400';
+    publishTextEl.textContent = '公開中';
+  } else {
+    publishStatusEl.className = 'px-2 py-1 rounded text-xs font-medium bg-gray-600 text-gray-300';
+    publishIndicatorEl.className = 'w-2 h-2 rounded-full bg-gray-400';
+    publishTextEl.textContent = '非公開';
+  }
+}
+
+// シート選択ドロップダウンを生成
+function populateSheetSelect(sheets, activeSheetName) {
+  var select = document.getElementById('sheet-select');
+  if (!select) return;
+
+  select.replaceChildren();
+
+  if (sheets && sheets.length) {
+    var defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = '-- 表示するボードを選択 --';
+    select.appendChild(defaultOption);
+    sheets.forEach(function(name) {
+      var opt = document.createElement('option');
+      opt.value = typeof name === 'string' ? name : (name.name || String(name));
+      opt.textContent = opt.value;
+      if (opt.value === activeSheetName) {
+        opt.textContent += ' (公開中)';
+      }
+      select.appendChild(opt);
+    });
+    select.disabled = false;
+  } else {
+    var noData = document.createElement('option');
+    noData.value = '';
+    noData.textContent = '利用可能なボードがありません';
+    select.appendChild(noData);
+    select.disabled = true;
+  }
+}
+
+
+    // ★★★ 新しい関数を追加 ★★★
+    /**
+     * サーバーに列の自動判定を要求し、結果をUIに反映させる
+     */
+    function runHeaderGuessing() {
+      if (!selectedSheet || !currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
+        showMessage('シートが選択されていないか、スプレッドシート情報がありません。', 'yellow');
+        return;
+      }
+
+      setLoading(true, '列を自動で再判定しています...');
+
+      google.script.run
+        .withSuccessHandler(function(guessedConfig) {
+          // サーバーから返された自動判定の結果を、UIのドロップダウンに設定
+          populateConfig(guessedConfig);
+          
+          showMessage('列の自動判定が完了しました。内容を確認し、保存してください。', 'success');
+          setLoading(false);
+          updateConfigButtons(); // 保存ボタンを有効化
+        })
+        .withFailureHandler(function(error) {
+          showError(error);
+          setLoading(false);
+        })
+        .getGuessedHeaders(currentStatus.userInfo.spreadsheetId, selectedSheet);
+    }
+
+    function enableUnderstandButton() {
+      var btn = document.getElementById('teacherGuideConfirmBtn');
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '理解しました';
+      }
+    }
+    
+    
+    // フォーム編集セクションの更新
+    function updateFormEditSection(status) {
+      var formEditSection = document.getElementById('form-edit-section');
+      var editFormLink = document.getElementById('edit-form-link');
+      
+      // フォームが作成されている場合のみ表示
+      if (status && status.systemStatus && status.systemStatus.formCreated) {
+        if (formEditSection) formEditSection.classList.remove('hidden');
+        
+        // 正しい編集URLを設定 (/editで終わるURL)
+        if (editFormLink) {
+          var editUrl = '';
+          try {
+            var config = JSON.parse(status.userInfo && status.userInfo.configJson ? status.userInfo.configJson : '{}');
+            if (config.editFormUrl) {
+              editUrl = config.editFormUrl;
+            } else if (config.formUrl) {
+              // formUrlからeditUrlを生成
+              var formId = extractFormIdFromUrl(config.formUrl);
+              if (formId) {
+                editUrl = 'https://docs.google.com/forms/d/' + formId + '/edit';
+              }
+            }
+            editFormLink.href = editUrl || '#';
+          } catch (e) {
+            console.warn('フォームURLの取得に失敗:', e);
+            editFormLink.href = '#';
+          }
+        }
+      } else {
+        if (formEditSection) formEditSection.classList.add('hidden');
+      }
+    }
+    
+    // フォームIDをURLから抽出するヘルパー関数
+    function extractFormIdFromUrl(url) {
+      if (!url) return '';
+      var match = url.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+      return match ? match[1] : '';
+    }
+
+    /**
+     * 設定の進捗状況に応じて、各ステップのパネルの開閉状態を自動で制御します。
+     * @param {object} status - サーバーから取得した現在のステータス情報
+     */
+    function updatePanelStates(status) {
+      const step1Content = document.getElementById('step1-content');
+      const step2Content = document.getElementById('step2-content');
+      const step3Content = document.getElementById('step3-content');
+      
+      if (!step1Content || !step2Content || !step3Content) return;
+      
+      const isPublished = status && (status.appPublished || (status.activeSheetName && status.publishedSheetName));
+      const hasSheets = status && status.allSheets && status.allSheets.length > 0;
+      const hasSelectedSheet = selectedSheet && selectedSheet.length > 0;
+
+      // まず全てのセクションを閉じる
+      if (step1Content.classList.contains('expanded')) toggleSection('step1-content');
+      if (step2Content.classList.contains('expanded')) toggleSection('step2-content');
+      if (step3Content.classList.contains('expanded')) toggleSection('step3-content');
+
+      // 状態に応じて適切なセクションを開く
+      if (isPublished) {
+        // 公開済みの場合は設定・公開セクションを開く
+        if (step3Content.classList.contains('collapsed')) toggleSection('step3-content');
+      } else if (hasSelectedSheet) {
+        // シートが選択されている場合は設定・公開セクションを開く
+        if (step3Content.classList.contains('collapsed')) toggleSection('step3-content');
+      } else if (hasSheets) {
+        // シートはあるが選択されていない場合はシート選択セクションを開く
+        if (step2Content.classList.contains('collapsed')) toggleSection('step2-content');
+      } else {
+        // 何も設定されていない場合はスプレッドシート追加セクションを開く
+        if (step1Content.classList.contains('collapsed')) toggleSection('step1-content');
+      }
+    }
+
+
+    /**
+     * ユーザーにアカウントの切り替えを確認し、登録ページにリダイレクトする関数
+     */
+    function switchToAnotherAccount() {
+      if (confirm("別のアカウントに切り替えますか？現在のセッションは破棄されます。")) {
+        google.script.run
+          .withSuccessHandler(function(webAppUrl) {
+            window.top.location.href = webAppUrl;
+          })
+          .withFailureHandler(function(error) {
+              alert('URLの取得に失敗しました: ' + error.message);
+          })
+          .getWebAppUrl();
+      }
+    }
+
+    // グローバルスコープに関数を登録し、どこからでも安全に呼び出せるようにする
+    window.setLoading = function(isLoading, message) {
+      try {
+        // 入力値を安全に処理
+        isLoading = Boolean(isLoading);
+        message = message || '';
+        
+        // messageが文字列でない場合は変換
+        if (typeof message !== 'string') {
+          try {
+            message = String(message);
+          } catch (e) {
+            message = 'ローディング中...';
+          }
+        }
+        
+        // messageに特殊文字が含まれている場合の処理
+        if (typeof message === 'string') {
+          message = message.replace(/[\u0000-\u001F\u007F]/g, ''); // 制御文字を削除
+          message = message.replace(/['"\\]/g, ''); // 引用符とバックスラッシュを削除
+        }
+        
+        try {
+          console.log('setLoading called with:', isLoading, ', message:', message);
+        } catch (e) {
+          // console.logが失敗した場合は無視
+        }
+      
+      // 安全にボタンの disabled 状態を更新
+      var buttons = [
+        elements.clearSelectionBtn,
+        elements.saveConfigBtn,
+        elements.addSpreadsheetBtn,
+        elements.createBoardBtn
+      ];
+      
+      buttons.forEach(function(btn) {
+        if (btn) {
+          btn.disabled = isLoading;
+        }
+      });
+      
+      // 全体的なボタンの無効化（安全版）
+      if (isLoading) {
+        var dashboardCards = document.querySelectorAll('.glass-panel button, .glass-panel .cursor-pointer');
+        dashboardCards.forEach(function(card) {
+          if (card && card.id !== 'open-form-btn') {
+            if (card.tagName === 'BUTTON') {
+              card.disabled = true;
+            } else {
+              card.style.pointerEvents = 'none';
+              card.style.opacity = '0.6';
+            }
+          }
+        });
+        
+        if (message) {
+          showLoadingOverlay(message);
+        }
+      } else {
+        var dashboardCards = document.querySelectorAll('.glass-panel button, .glass-panel .cursor-pointer');
+        dashboardCards.forEach(function(card) {
+          if (card && card.id !== 'open-form-btn') {
+            if (card.tagName === 'BUTTON') {
+              card.disabled = false;
+            } else {
+              card.style.pointerEvents = 'auto';
+              card.style.opacity = '1';
+            }
+          }
+        });
+        
+        hideLoadingOverlay();
+      }
+      
+      // ローディングメッセージの表示
+      if (message && elements.guidanceText) {
+        try {
+          elements.guidanceText.textContent = String(message);
+        } catch (e) {
+          console.error('Error setting guidance text:', e);
+          elements.guidanceText.textContent = 'メッセージ表示エラー';
+        }
+      }
+      
+      if (isLoading && message) {
+        try {
+          showMessage(String(message), 'blue');
+        } catch (e) {
+          console.error('Error showing message:', e);
+        }
+      }
+      } catch (globalError) {
+        // 関数全体でエラーが発生した場合の安全な処理
+        try {
+          console.error('setLoading function error:', globalError);
+        } catch (e) {
+          // エラーログさえ失敗した場合は無視
+        }
+      }
+    };
+
+
+    function showTeacherGuideModal() {
+      // 教育ガイドモーダルは削除されました
+      // 教育ガイドモーダルはRegistration.htmlに移動されました
+    }
+
+    function hideTeacherGuideModal() {
+      var modal = document.getElementById('teacherGuideModal');
+      modal.classList.add('hidden');
+      setLoading(false);
+    }
+
+    function updateUIForSelectedSheet() {
+      var hasSelected = !!selectedSheet;
+      var isCurrentActive = selectedSheet === currentActiveSheet;
+      
+      // elements.switchSheetBtn.disabled = !hasSelected || isCurrentActive;
+      
+      // if (elements.switchSheetText) {
+      //   elements.switchSheetText.textContent = isCurrentActive ? 
+      //     '現在のアクティブシート' : 
+      //     (hasSelected ? selectedSheet + 'をアクティブ化' : '-- アクティブシートを選択 --');
+      // }
+      
+      if (hasSelected) {
+        elements.configArea.classList.remove('hidden');
+        elements.configPlaceholder.classList.add('hidden');
+        elements.configArea.classList.add('fade-in');
+      } else {
+        elements.configArea.classList.add('hidden');
+        elements.configPlaceholder.classList.remove('hidden');
+      }
+      
+      updateSetupProgress();
+    }
+
+    function updateStepIndicators(currentStep) {
+      console.log('📊 [DEBUG] updateStepIndicators called with currentStep:', currentStep);
+      var steps = [
+        { id: 'step-1-indicator', step: 1 },
+        { id: 'step-2-indicator', step: 2 },
+        { id: 'step-3-indicator', step: 3 }
+      ];
+      
+      steps.forEach(function(stepObj) {
+        var id = stepObj.id;
+        var step = stepObj.step;
+        var indicator = document.getElementById(id);
+        if (!indicator) return;
+        
+        var circle = indicator.querySelector('div');
+        if (!circle) return;
+        
+        circle.classList.remove('bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-gray-600');
+        
+        if (step <= currentStep) {
+          circle.classList.add('bg-green-500'); // Completed (including current step when all steps are done)
+        } else {
+          circle.classList.add('bg-gray-600'); // Pending
+        }
+      });
+    }
+
+    function updateSetupProgress() {
+      var progress = 0;
+      var statusText = 'セットアップを開始してください';
+      var currentStep = 1;
+      
+      var hasSpreadsheet = elements.sheetSelect.options.length > 1;
+      var hasSelectedSheet = !!selectedSheet;
+      var hasActiveSheet = !!currentActiveSheet;
+      var hasConfig = elements.opinionHeader && elements.opinionHeader.value;
+      
+      if (hasSpreadsheet) {
+        progress = 25;
+        statusText = 'スプレッドシートが追加されました';
+        currentStep = 2;
+      }
+      if (hasSelectedSheet) {
+        progress = 50;
+        statusText = '表示するボードが選択されました';
+        currentStep = 2;
+      }
+      if (hasConfig) {
+        progress = 75;
+        statusText = '列設定が完了しました';
+        currentStep = 3;
+      }
+      if (hasActiveSheet) {
+        progress = 100;
+        statusText = 'ボードが公開されています';
+        currentStep = 4;
+      }
+      
+      // ガイダンステキストの更新
+      if (elements.guidanceText) {
+        elements.guidanceText.textContent = statusText;
+      }
+      
+      // ヘッダーステータスの更新
+      if (elements.headerStatusDot && elements.headerStatusText) {
+        if (progress === 100) {
+          elements.headerStatusDot.className = 'w-2 h-2 bg-green-400 rounded-full flex-shrink-0';
+          elements.headerStatusText.textContent = '公開中';
+          elements.headerStatusText.className = 'text-green-400';
+        } else if (progress > 0) {
+          elements.headerStatusDot.className = 'w-2 h-2 bg-yellow-400 rounded-full flex-shrink-0';
+          elements.headerStatusText.textContent = 'セットアップ中';
+          elements.headerStatusText.className = 'text-yellow-400';
+        } else {
+          elements.headerStatusDot.className = 'w-2 h-2 bg-gray-500 rounded-full flex-shrink-0';
+          elements.headerStatusText.textContent = '未設定';
+          elements.headerStatusText.className = 'text-gray-400';
+        }
+      }
+      
+      updateStepIndicators(currentStep);
+      
+      // Auto-expand relevant sections based on progress
+      // Auto-expand relevant sections based on progress
+      var step1Content = document.getElementById('step1-content');
+      var step2Content = document.getElementById('step2-content');
+      var step3Content = document.getElementById('step3-content');
+
+      if (hasSpreadsheet) {
+        // If spreadsheet is added, collapse step 1
+        if (step1Content && step1Content.classList.contains('expanded')) {
+          toggleSection('step1-content');
+        }
+        // If spreadsheet is added but no sheet selected, expand step 2
+        if (!hasSelectedSheet && step2Content && step2Content.classList.contains('collapsed')) {
+          toggleSection('step2-content');
+        }
+      }
+      
+      if (hasSelectedSheet) {
+        // If sheet is selected, collapse step 2
+        if (step2Content && step2Content.classList.contains('expanded')) {
+          toggleSection('step2-content');
+        }
+        // If sheet is selected but no config, expand step 3
+        if (!hasConfig && step3Content && step3Content.classList.contains('collapsed')) {
+          toggleSection('step3-content');
+        }
+      }
+    }
+
+    function updateConfigButtons() {
+      var hasConfig = elements.opinionHeader.value;
+      elements.saveConfigBtn.disabled = !hasConfig;
+    }
+
+    function loadStatus(forceRefresh = false) {
+      debounce(function() { return _loadStatusInternal(forceRefresh); }, 'loadStatus', 300);
+    }
+
+    function _loadStatusInternal(forceRefresh = false) {
+      // 教育ガイドモーダルは削除されました
+      
+      google.script.run
+        .withSuccessHandler(function(status) {
+          updateStatus(status);
+          enableUnderstandButton();
+        })
+        .withFailureHandler(function(error) {
+          console.error('ステータスの取得に失敗しました', error);
+          var errorMessage = 'ステータスの取得に失敗しました';
+          
+          if (error && typeof error === 'object') {
+            if (error.message && typeof error.message === 'string') {
+              errorMessage = error.message;
+              if (error.message.includes('ユーザー情報')) {
+                showMessage('まず登録を完了してください。', 'yellow');
+                return;
+              }
+            }
+          } else if (typeof error === 'string') {
+            errorMessage = error;
+          }
+          
+          showError(new Error(errorMessage));
+          enableUnderstandButton();
+          setLoading(false); // エラー時もローディングを終了
+        })
+        .getStatus(forceRefresh);
+      
+      google.script.run
+        .withSuccessHandler(function(formInfo) {
+          updateFormInfo(formInfo);
+        })
+        .withFailureHandler(function(error) {
+          console.warn('getActiveFormInfo error:', error);
+          updateFormInfo(null);
+        })
+        .getActiveFormInfo();
+    }
+
+    function updateFormInfo(formInfo) {
+      var formUrlInput = elements.formUrlInput;
+      var openFormUrlLink = elements.openFormUrlLink;
+
+      if (!formInfo) {
+        if (formUrlInput) formUrlInput.value = '';
+        if (openFormUrlLink) openFormUrlLink.href = '#';
+        return;
+      }
+      
+      if (formUrlInput) {
+        formUrlInput.value = formInfo.formUrl || '';
+      }
+      
+      if (openFormUrlLink) {
+        openFormUrlLink.href = formInfo.editUrl || formInfo.formUrl || '#';
+      }
+      
+    }
+
+    /**
+     * 【新・司令塔】サーバーからのデータに基づき、UI更新の全プロセスを開始します。
+     * @param {object} status - サーバーから返された完全な状態オブジェクト
+     */
+    function updateStatus(status) {
+        if (!status || !status.userInfo) {
+            showError(new Error('システム情報の取得に失敗。ページを再読み込みしてください。'));
+            setLoading(false);
+            return;
+        }
+        console.log('🔄 [1/3] Status Object Received', status);
+        currentStatus = status; // 最新の状態をグローバルに保持
+
+        // elementsオブジェクトが初期化されていることを確認
+        if (!elements || !elements.sheetSelect) {
+            console.warn('Elements not yet initialized, deferring update...');
+            setTimeout(() => updateStatus(status), 100);
+            return;
+        }
+
+        // 即座にUIに反映させるべき静的な情報を先に描画
+        updateStaticInfo(status);
+
+        // UIの主要要素を構築・更新し、その後で詳細情報をロード
+        if (status.activeSheetName) {
+            google.script.run.withSuccessHandler(updateDynamicContent).withFailureHandler(showError).getGuessedHeaders(status.activeSheetName);
+        } else {
+            // アクティブシートがない場合は、設定エリアを隠して完了
+            hideConfigArea();
+            updateFooterAndGuidance(currentStatus);
+            setLoading(false);
+            console.log('✅ [3/3] No active sheet - UI update completed');
+        }
+    }
+    
+    /**
+     * 【新】基本的なUI要素を更新します。
+     */
+    function updateStaticInfo(status) {
+        updateDatabaseInfo(status); // システム状況パネル
+        updatePublicationStatusUI(status.isPublished, status.activeSheetName); // 公開ステータス
+        populateSheetSelect(status.allSheets, status.activeSheetName); // シート選択肢
+        updateExistingUserSection(status); // 既存ユーザー向けセクションの表示制御
+        updateCurrentTopicDisplay(status); // 現在のトピック表示を更新
+        const sheetSelect = document.getElementById('sheet-select');
+        if(sheetSelect) sheetSelect.value = status.activeSheetName || '';
+        console.log('✅ [2/3] Static UI Updated');
+    }
+
+    /**
+     * 【新】シートの詳細情報（列ヘッダー等）の取得後に、最終的なUI更新を行います。
+     * @param {object} configDetails - getGuessedHeadersから返される詳細設定
+     */
+    function updateDynamicContent(configDetails) {
+        if (configDetails && configDetails.allHeaders) {
+            populateHeaderOptions(configDetails.allHeaders); // 列マッピングの選択肢を生成
+        }
+        if (configDetails && configDetails.existingConfig) {
+            populateConfig(configDetails.existingConfig); // 保存済みの設定を復元
+        }
+        updateConfigButtons(); // 保存ボタンの状態を更新
+        updateFooterAndGuidance(currentStatus); // ガイダンスとフッターを最終状態に更新
+        
+        const configArea = document.getElementById('config-area');
+        const configPlaceholder = document.getElementById('config-placeholder');
+        if (configArea) configArea.classList.remove('hidden');
+        if (configPlaceholder) configPlaceholder.classList.add('hidden');
+        
+        syncCheckboxStates(currentStatus); // チェックボックス状態の同期
+        setLoading(false); // 全ての処理が完了した時点でローディングを終了
+        console.log('✅ [3/3] Dynamic Content and Final UI Updated');
+    }
+
+    /**
+     * フッターとセットアップのガイダンス表示を制御する
+     * @param {object} status - システムステータス
+     */
+    function updateFooterAndGuidance(status) {
+        console.log('🎯 [DEBUG] updateFooterAndGuidance called with status:', status);
+        const guidanceText = document.getElementById('guidance-text');
+        const adminFooter = document.getElementById('admin-footer');
+        const boardUrlInput = document.getElementById('board-url');
+        const viewBoardLink = document.getElementById('view-board-link');
+
+        if (status.isPublished && status.activeSheetName) {
+            // 公開中の場合
+            if (guidanceText) guidanceText.textContent = `ボード「${status.activeSheetName}」が公開されています。`;
+            updateStepIndicators(3); // 全ステップ(1-3)完了状態
+
+            // フッターにボードURLを表示
+            const boardUrl = `${status.webAppUrl}?userId=${status.userInfo.userId}&spreadsheetId=${status.publishedSpreadsheetId}&sheetName=${encodeURIComponent(status.publishedSheetName)}`;
+            if (boardUrlInput) boardUrlInput.value = boardUrl;
+            if (viewBoardLink) viewBoardLink.href = boardUrl;
+            if (adminFooter) adminFooter.classList.remove('hidden');
+        } else {
+            // 未公開の場合
+            if (guidanceText) guidanceText.textContent = 'セットアップを開始してください';
+            updateStepIndicators(1); // 初期ステップ状態
+            if (adminFooter) adminFooter.classList.add('hidden');
+        }
+        if (typeof adjustLayout === 'function') {
+            adjustLayout(); // フッターの表示/非表示に合わせてレイアウト調整
+        }
+    }
+
+    
+    // 既存ユーザー向けセクションの表示制御
+    function updateExistingUserSection(status) {
+      console.log('🏠 [DEBUG] updateExistingUserSection called with:', {
+        hasUserInfo: !!(status && status.userInfo),
+        hasSpreadsheetId: !!(status && status.userInfo && status.userInfo.spreadsheetId),
+        spreadsheetId: status?.userInfo?.spreadsheetId
+      });
+      
+      var existingUserSection = document.getElementById('existing-user-section');
+      var createBoardBtn = document.getElementById('create-board-btn');
+      
+      if (status && status.userInfo && status.userInfo.spreadsheetId) {
+        // 既にスプレッドシートが設定されている既存ユーザーの場合
+        console.log('✅ [DEBUG] Showing existing user section, hiding create button');
+        if (existingUserSection) existingUserSection.classList.remove('hidden');
+        if (createBoardBtn) createBoardBtn.classList.add('hidden');
+      } else {
+        // 新規ユーザーの場合
+        console.log('❌ [DEBUG] Showing create button, hiding existing user section');
+        if (existingUserSection) existingUserSection.classList.add('hidden');
+        if (createBoardBtn) createBoardBtn.classList.remove('hidden');
+      }
+    }
+    
+    // ページ読み込み完了時に確実にローディングをクリア
+    window.addEventListener('load', function() {
+      setLoading(false);
+    });
+    
+    // システム状況のリアルタイム更新
+    var systemStatusInterval;
+    function startSystemStatusUpdate() {
+      function schedule() {
+        clearInterval(systemStatusInterval);
+        var interval = document.hidden ? 120000 : 30000;
+        systemStatusInterval = setInterval(updateSystemStatus, interval);
+      }
+      updateSystemStatus();
+      schedule();
+      document.addEventListener('visibilitychange', schedule);
+    }
+    
+    function updateSystemStatus() {
+      google.script.run
+        .withSuccessHandler(function(status) {
+          try {
+            updateDatabaseInfo(status);
+            updateSetupProgress();
+          } catch (e) {
+            console.warn('System status update failed:', e);
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.warn('System status update error:', error);
+        })
+        .getStatus(false); // キャッシュ使用
+    }
+    
+    
+    function formatDateTime(dateString) {
+      if (!dateString) return '';
+      try {
+        var date = new Date(dateString);
+        return date.toLocaleString('ja-JP', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch (e) {
+        return dateString;
+      }
+    }
+    
+    function openDatabaseSpreadsheet() {
+      try {
+        var spreadsheetUrl = currentSpreadsheetUrl;
+        if (spreadsheetUrl) {
+          window.open(spreadsheetUrl, '_blank');
+        } else {
+          showMessage('スプレッドシートのURLが見つかりません', 'yellow');
+        }
+      } catch (e) {
+        console.error('Failed to open spreadsheet:', e);
+        showMessage('スプレッドシートを開けませんでした', 'red');
+      }
+    }
+    
+    function openForm() {
+      try {
+        // フォームURLを取得（elements.formUrlInputまたはcurrentStatus.formUrlから）
+        var formUrl = '';
+        if (elements.formUrlInput && elements.formUrlInput.value) {
+          formUrl = elements.formUrlInput.value;
+        } else if (currentStatus && currentStatus.formUrl) {
+          formUrl = currentStatus.formUrl;
+        }
+        
+        if (formUrl && formUrl !== '') {
+          window.open(formUrl, '_blank');
+        } else {
+          showMessage('フォームのURLが見つかりません。フォームが作成されていない可能性があります。', 'yellow');
+        }
+      } catch (e) {
+        console.error('Failed to open form:', e);
+        showMessage('フォームを開けませんでした', 'red');
+      }
+    }
+
+    function openLinkedForm() {
+      try {
+        // 連携フォームURLを取得（currentStatus.formUrlから）
+        var formUrl = '';
+        if (currentStatus && currentStatus.formUrl) {
+          formUrl = currentStatus.formUrl;
+        }
+        
+        if (formUrl && formUrl !== '') {
+          window.open(formUrl, '_blank');
+        } else {
+          showMessage('連携しているフォームが見つかりません。フォームが設定されていない可能性があります。', 'yellow');
+        }
+      } catch (e) {
+        console.error('Failed to open linked form:', e);
+        showMessage('連携フォームを開けませんでした', 'red');
+      }
+    }
+    
+    function updateActivityTimeline(status) {
+      var activityList = document.getElementById('activity-list');
+      var activities = [];
+      
+      if (status.activeSheetName) {
+        activities.push({
+          time: '本日',
+          text: 'ボード「' + status.activeSheetName + '」が公開されました',
+          type: 'active',
+          icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
+        });
+        
+        if (status.answerCount > 0) {
+          activities.push({
+            time: '本日',
+            text: status.answerCount + '件の回答が投稿されました',
+            type: 'response',
+            icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z'
+          });
+        }
+        
+        if (status.totalReactions > 0) {
+          activities.push({
+            time: '本日',
+            text: status.totalReactions + '件のリアクションがありました',
+            type: 'reaction',
+            icon: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z'
+          });
+        }
+      } else {
+        activities.push({
+          time: '未設定',
+          text: '新しいボードを作成するか、既存のスプレッドシートを追加してください',
+          type: 'pending',
+          icon: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+        });
+      }
+      
+      var colors = {
+        active: 'text-green-400 bg-green-500/20',
+        response: 'text-blue-400 bg-blue-500/20',
+        reaction: 'text-purple-400 bg-purple-500/20',
+        pending: 'text-gray-400 bg-gray-500/20'
+      };
+      
+      if (activityList) {
+        activityList.replaceChildren(); // 既存コンテンツをクリア
+        
+        if (activities && activities.length > 0) {
+          activities.forEach(function(activity) {
+            var container = document.createElement('div');
+            container.className = 'flex items-center gap-3 text-sm slide-in';
+            
+            var iconContainer = document.createElement('div');
+            iconContainer.className = 'w-6 h-6 ' + (colors[activity.type] || colors.pending) + ' rounded-full flex items-center justify-center flex-shrink-0';
+            
+            var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('class', 'w-3 h-3');
+            svg.setAttribute('fill', 'none');
+            svg.setAttribute('stroke', 'currentColor');
+            svg.setAttribute('viewBox', '0 0 24 24');
+            
+            var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('stroke-linecap', 'round');
+            path.setAttribute('stroke-linejoin', 'round');
+            path.setAttribute('stroke-width', '2');
+            
+            var allowedIcons = {
+              'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4': true,
+              'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z': true
+            };
+            
+            if (activity.icon && allowedIcons[activity.icon]) {
+              path.setAttribute('d', activity.icon);
+            }
+            
+            svg.appendChild(path);
+            iconContainer.appendChild(svg);
+            
+            var contentContainer = document.createElement('div');
+            contentContainer.className = 'flex-1';
+            
+            var textSpan = document.createElement('span');
+            textSpan.className = 'text-white';
+            textSpan.textContent = activity.text || ''; // textContentでXSS防御
+            
+            var timeSpan = document.createElement('span');
+            timeSpan.className = 'text-xs text-gray-500 ml-2';
+            timeSpan.textContent = activity.time || ''; // textContentでXSS防御
+            
+            contentContainer.appendChild(textSpan);
+            contentContainer.appendChild(timeSpan);
+            
+            container.appendChild(iconContainer);
+            container.appendChild(contentContainer);
+            
+            activityList.appendChild(container);
+          });
+        } else {
+          var noDataDiv = document.createElement('div');
+          noDataDiv.className = 'text-gray-400 text-sm';
+          noDataDiv.textContent = '活動データがありません';
+          activityList.appendChild(noDataDiv);
+        }
+      }
+    }
+
+    // New unified resource function with URL type detection
+    function addResource() {
+      var urlInput = document.getElementById('resource-url-input');
+      var addBtn = document.getElementById('add-resource-btn');
+      var openBtn = document.getElementById('open-resource-btn');
+      var addResourceText = document.getElementById('add-resource-text');
+      var url = urlInput ? urlInput.value.trim() : '';
+      
+      if (!url) {
+        showMessage('GoogleフォームまたはスプレッドシートのURLを入力してください。', 'red');
+        if (urlInput) {
+          addVisualFeedback(urlInput, 'error');
+          urlInput.focus();
+        }
+        return;
+      }
+      
+      // Detect URL type
+      var isForm = url.includes('docs.google.com/forms');
+      var isSpreadsheet = url.includes('docs.google.com/spreadsheets');
+      
+      if (!isForm && !isSpreadsheet) {
+        showMessage('有効なGoogleフォームまたはスプレッドシートのURLを入力してください。', 'red');
+        if (urlInput) {
+          addVisualFeedback(urlInput, 'error');
+          urlInput.focus();
+        }
+        return;
+      }
+      
+      var resourceType = isForm ? 'フォーム' : 'スプレッドシート';
+      setLoading(true, resourceType + 'を追加中...');
+      
+      if (addBtn) addBtn.disabled = true;
+      if (addResourceText) addResourceText.textContent = '追加中...';
+      
+      // Use appropriate server function based on URL type
+      if (isForm) {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            showMessage(result.message || resourceType + 'が正常に追加されました', 'green');
+            if (urlInput) {
+              addVisualFeedback(urlInput, 'success');
+              urlInput.value = '';
+            }
+            if (addBtn) addBtn.disabled = false;
+            if (openBtn) {
+              openBtn.disabled = false;
+              openBtn.setAttribute('data-url', url);
+            }
+            if (addResourceText) addResourceText.textContent = 'リソースを追加';
+            
+            markStepCompleted(1);
+            loadStatus(true);
+            setLoading(false);
+          })
+          .withFailureHandler(function(error) {
+            console.error('addFormUrl error:', error);
+            showMessage(resourceType + 'の追加に失敗しました: ' + error.message, 'error');
+            if (urlInput) addVisualFeedback(urlInput, 'error');
+            if (addBtn) addBtn.disabled = false;
+            if (addResourceText) addResourceText.textContent = 'リソースを追加';
+            setLoading(false);
+          })
+          .addFormUrl(url);
+      } else {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            showMessage(result.message || resourceType + 'が正常に追加されました', 'green');
+            if (urlInput) {
+              addVisualFeedback(urlInput, 'success');
+              urlInput.value = '';
+            }
+            if (addBtn) addBtn.disabled = false;
+            if (openBtn) {
+              openBtn.disabled = false;
+              openBtn.setAttribute('data-url', url);
+            }
+            if (addResourceText) addResourceText.textContent = 'リソースを追加';
+            
+            markStepCompleted(1);
+            loadStatus(true);
+            setLoading(false);
+          })
+          .withFailureHandler(function(error) {
+            console.error('addSpreadsheetUrl error:', error);
+            showMessage(resourceType + 'の追加に失敗しました: ' + error.message, 'error');
+            if (urlInput) addVisualFeedback(urlInput, 'error');
+            if (addBtn) addBtn.disabled = false;
+            if (addResourceText) addResourceText.textContent = 'リソースを追加';
+            setLoading(false);
+          })
+          .addSpreadsheetUrl(url);
+      }
+    }
+    
+    // Function to open the added resource - prioritize form if available
+    function openResource() {
+      var openBtn = document.getElementById('open-resource-btn');
+      var url = openBtn ? openBtn.getAttribute('data-url') : '';
+      
+      // Check if form URL is available from current status (priority)
+      if (currentStatus && currentStatus.formUrl) {
+        window.open(currentStatus.formUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      
+      // Fall back to button's data-url
+      if (url) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } else {
+        showMessage('開くリソースが見つかりません。先にリソースを追加してください。', 'yellow');
+      }
+    }
+    
+    // Update current topic display in footer
+    function updateCurrentTopicDisplay(status) {
+      var currentTopicText = document.getElementById('current-topic-text');
+      var currentTopicDisplay = document.getElementById('current-topic-display');
+      
+      if (status && status.activeSheetName && status.isPublished) {
+        // Try to get the actual question from the mapping configuration
+        var questionText = '設定されていません';
+        
+        try {
+          var config = JSON.parse(status.userInfo.configJson || '{}');
+          var sheetKey = 'sheet_' + status.activeSheetName;
+          var sheetConfig = config[sheetKey];
+          
+          if (sheetConfig && sheetConfig.opinionHeader) {
+            questionText = sheetConfig.opinionHeader;
+          } else if (status.activeSheetName) {
+            // If no specific question found, show sheet name
+            questionText = status.activeSheetName + ' のボード';
+          }
+        } catch (e) {
+          console.warn('Failed to parse topic from config:', e);
+          questionText = status.activeSheetName + ' のボード';
+        }
+        
+        if (currentTopicText) {
+          currentTopicText.textContent = questionText;
+        }
+        if (currentTopicDisplay) {
+          currentTopicDisplay.classList.remove('hidden');
+        }
+        
+        // 統合フッターの表示制御
+        if (elements.adminFooter) {
+          elements.adminFooter.classList.remove('hidden');
+          elements.adminFooter.classList.add('fade-in');
+        }
+        
+        // レイアウト調整
+        setTimeout(adjustLayout, 100);
+        
+      } else {
+        if (currentTopicText) {
+          currentTopicText.textContent = 'ボードが公開されていません';
+        }
+        if (currentTopicDisplay) {
+          currentTopicDisplay.classList.add('hidden');
+        }
+        
+        // 統合フッターの非表示制御
+        if (elements.adminFooter) {
+          elements.adminFooter.classList.add('hidden');
+          elements.adminFooter.classList.remove('fade-in');
+        }
+        
+        // レイアウト調整
+        setTimeout(adjustLayout, 100);
+      }
+    }
+
+    function addSpreadsheet() {
+      var urlInput = document.getElementById('spreadsheet-url-input');
+      var addBtn = document.getElementById('add-spreadsheet-btn');
+      var url = urlInput.value.trim();
+      
+      if (!url) {
+        showMessage('スプレッドシートのURLを入力してください。', 'red');
+        addVisualFeedback(urlInput, 'error');
+        urlInput.focus();
+        return;
+      }
+      
+      if (!url.includes('docs.google.com/spreadsheets')) {
+        showMessage('有効なGoogleスプレッドシートのURLを入力してください。', 'red');
+        addVisualFeedback(urlInput, 'error');
+        urlInput.focus();
+        return;
+      }
+      
+      setLoading(true, 'スプレッドシートを追加中...');
+      addBtn.disabled = true;
+      if (elements.addSpreadsheetText) {
+        elements.addSpreadsheetText.textContent = 'スプレッドシートを追加';
+      }
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showMessage(result.message || 'スプレッドシートが正常に追加されました', 'green');
+          addVisualFeedback(urlInput, 'success');
+          urlInput.value = '';
+          addBtn.disabled = false;
+          if (elements.addSpreadsheetText) {
+            elements.addSpreadsheetText.textContent = 'スプレッドシートを追加';
+          }
+          // Mark step 1 as completed (data preparation)
+          markStepCompleted(1);
+          loadStatus(true); // Refresh the status with force refresh
+        })
+        .withFailureHandler(function(error) {
+          console.error('addSpreadsheetUrl error:', error);
+          showMessage('スプレッドシートの追加に失敗しました: ' + error.message, 'error');
+          addVisualFeedback(urlInput, 'error');
+          addBtn.disabled = false;
+          if (elements.addSpreadsheetText) {
+            elements.addSpreadsheetText.textContent = 'スプレッドシートを追加';
+          }
+          setLoading(false);
+        })
+        .addSpreadsheetUrl(url);
+    }
+
+    function refreshBoardDataFromAdmin() {
+      setLoading(true, '回答ボードを更新中...');
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showMessage(result.message || result || 'データが正常に更新されました', 'success');
+          setLoading(false);
+          // クライアントサイドのボードを再読み込みするために、親ウィンドウにメッセージを送信
+          // これは、AdminPanelがサイドバーやモーダルとして開かれている場合に有効
+          if (window.opener && typeof window.opener.postMessage === 'function') {
+            window.opener.postMessage({ type: 'REFRESH_BOARD_DATA' }, '*');
+          } else if (window.parent && typeof window.parent.postMessage === 'function') {
+            window.parent.postMessage({ type: 'REFRESH_BOARD_DATA' }, '*');
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('refreshBoardData error:', error);
+          showMessage('回答ボードの更新に失敗しました: ' + error.message, 'error');
+          setLoading(false);
+        })
+        .refreshBoardData();
+    }
+        
+
+    // =============================================================================
+    // BOARD CREATION - Refactored into smaller functions
+    // =============================================================================
+    
+    function setupBoardCreationUI() {
+      var btn = elements.createBoardBtn;
+      setButtonState(btn, true, '作成中...');
+      setLoading(true, '新しいボードを作成して公開中...');
+    }
+    
+    function resetBoardCreationUI() {
+      var btn = elements.createBoardBtn;
+      setButtonState(btn, false, '新しいボードを作成して公開');
+    }
+    
+    function handleBoardCreationSuccess(result) {
+      showMessage(result.message || 'ボードが正常に作成されました', 'green');
+      markStepCompleted(1);
+      
+      if (result.formUrl && elements.formUrlInput) {
+        updateFormInfo(result);
+        openFormInNewTab(result.formUrl);
+      }
+      
+      // Reload page after 3 seconds
+      setTimeout(function() { window.location.reload(); }, 3000);
+    }
+    
+    function updateFormInfo(result) {
+      elements.formUrlInput.value = result.formUrl;
+      elements.openFormUrlLink.href = result.formUrl;
+      
+      var formFileName = safeGetElement('form-file-name');
+      if (formFileName) {
+        setSafeTextContent(formFileName, result.formTitle || 'Googleフォーム');
+      }
+    }
+    
+    function openFormInNewTab(formUrl) {
+      showMessage('フォームを新しいページで開いています...', 'info');
+      setTimeout(function() {
+        window.open(formUrl, '_blank', 'noopener,noreferrer');
+      }, 1500);
+    }
+    
+    function handleBoardCreationError(error) {
+      showError(error);
+      resetBoardCreationUI();
+    }
+    
+    function createBoard() {
+      setupBoardCreationUI();
+      
+      google.script.run
+        .withSuccessHandler(handleBoardCreationSuccess)
+        .withFailureHandler(handleBoardCreationError)
+        .createBoardFromAdmin();
+    }
+    
+    // 追加フォーム作成関数
+    function createAdditionalForm() {
+      var btn = document.getElementById('create-additional-form-btn');
+      var text = document.getElementById('create-additional-form-text');
+      
+      if (btn) btn.disabled = true;
+      if (text) text.textContent = '追加フォームを作成中...';
+      setLoading(true, '新しいフォームを作成中...');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          try {
+            setLoading(false);
+            if (btn) btn.disabled = false;
+            if (text) text.textContent = '追加のフォームを作成';
+            
+            if (result && result.success) {
+              showMessage(result.message || '新しいフォームが正常に作成されました', 'success');
+              
+              // フォームURLがある場合は開く
+              if (result.formUrl) {
+                window.open(result.formUrl, '_blank', 'noopener,noreferrer');
+              }
+              
+              // ステータスを更新
+              loadStatus(true);
+            } else {
+              showMessage(result.message || '追加フォームの作成に失敗しました', 'error');
+            }
+          } catch (e) {
+            showMessage('追加フォームの作成中にエラーが発生しました', 'error');
+            setLoading(false);
+            if (btn) btn.disabled = false;
+            if (text) text.textContent = '追加のフォームを作成';
+          }
+        })
+        .withFailureHandler(function(error) {
+          setLoading(false);
+          if (btn) btn.disabled = false;
+          if (text) text.textContent = '追加のフォームを作成';
+          showMessage('追加フォームの作成に失敗しました: ' + error.message, 'error');
+        })
+        .createAdditionalForm(); // 新しいサーバー関数を呼び出し
+    }
+
+    function loadConfigForSelected() {
+      debounce(_loadConfigForSelectedInternal, 'loadConfigForSelected', 200);
+    }
+
+    // =============================================================================
+    // CONFIG LOADING - Refactored into smaller functions
+    // =============================================================================
+    
+    function handleSheetDetailsSuccess(details) {
+      try {
+        if (!details) {
+          throw new Error('シート情報の取得に失敗しました');
+        }
+        populateHeaderOptions(details.allHeaders || []);
+        var cfg = Object.assign({}, details.guessedConfig || {}, details.existingConfig || {});
+        populateConfig(cfg);
+        updateSheetDetails(details.allHeaders || []);
+        updateConfigButtons();
+      } finally {
+        setLoading(false);
+        updateUIForSelectedSheet();
+      }
+    }
+
+    function handleSheetDetailsError(error) {
+      setLoading(false);
+      showError(error);
+      updateUIForSelectedSheet();
+    }
+    
+    function _loadConfigForSelectedInternal() {
+      if (!selectedSheet) {
+        clearConfigFields();
+        hideSheetDetails();
+        return;
+      }
+      
+      // 既に公開中のシートの場合は、列情報の読み込みをスキップ
+      console.log('🔍 [DEBUG] Load config check:', {
+        selectedSheet: selectedSheet,
+        currentActiveSheet: currentActiveSheet,
+        appPublished: currentStatus?.appPublished,
+        publishedSheetName: currentStatus?.publishedSheetName
+      });
+
+      if (currentStatus && currentStatus.appPublished && 
+          (selectedSheet === currentActiveSheet || selectedSheet === currentStatus.publishedSheetName)) {
+        console.log('✅ [DEBUG] 既に公開中のシートのため、列情報の読み込みをスキップします:', selectedSheet);
+        return;
+      }
+      
+      setLoading(true, '列情報を読み込んでいます...');
+
+      google.script.run
+        .withSuccessHandler(handleSheetDetailsSuccess)
+        .withFailureHandler(handleSheetDetailsError)
+        .getSheetDetails(currentStatus.userInfo.spreadsheetId, selectedSheet);
+    }
+    
+    // シート詳細情報を更新する関数
+    function updateSheetDetails(headers) {
+      if (!elements.sheetDetails) return;
+      
+      // シート詳細コンテナを表示
+      elements.sheetDetails.classList.remove('hidden');
+      
+      // 現在のアクティブシート名を更新
+      if (elements.currentActiveSheetName) {
+        elements.currentActiveSheetName.textContent = currentActiveSheet || '未設定';
+      }
+      
+      
+      // スプレッドシートリンクを更新
+      if (elements.spreadsheetLink && currentSpreadsheetUrl) {
+        elements.spreadsheetLink.href = currentSpreadsheetUrl;
+        elements.spreadsheetLink.classList.remove('hidden');
+      }
+      
+      // フォームリンクを更新（currentStatusから取得）
+      if (elements.formLink && currentStatus && currentStatus.formUrl) {
+        elements.formLink.href = currentStatus.formUrl;
+        elements.formLink.classList.remove('hidden');
+      } else if (elements.formLink) {
+        elements.formLink.classList.add('hidden');
+      }
+    }
+    
+    // シート詳細情報を非表示にする関数
+    function hideSheetDetails() {
+      if (elements.sheetDetails) {
+        elements.sheetDetails.classList.add('hidden');
+      }
+    }
+
+    function populateHeaderOptions(headers) {
+      var selects = [elements.opinionHeader, elements.reasonHeader, elements.nameHeader, elements.classHeader];
+      selects.forEach(function(sel) {
+        sel.replaceChildren();
+        var defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = '-- 選択してください --';
+        sel.appendChild(defaultOption);
+        headers.forEach(function(h) {
+          var opt = document.createElement('option');
+          opt.value = h;
+          opt.textContent = h;
+          sel.appendChild(opt);
+        });
+      });
+    }
+
+
+    /**
+     * サーバーから受け取った設定オブジェクト（cfg）を元に、
+     * 管理パネルの各ドロップダウンの選択状態を更新する
+     * @param {object} cfg - サーバーの`getConfig`から返される設定オブジェクト
+     */
+    function populateConfig(cfg) {
+      // 必須の要素が存在するか確認
+      if (!elements.opinionHeader || !elements.reasonHeader || !elements.nameHeader || !elements.classHeader) {
+        console.error('設定用のUI要素が見つかりません。');
+        return;
+      }
+
+      // 各ドロップダウンに、サーバーから受け取った値を設定
+      elements.opinionHeader.value = cfg.opinionHeader || '';
+      elements.reasonHeader.value  = cfg.reasonHeader || '';
+      elements.nameHeader.value    = cfg.nameHeader || '';
+      elements.classHeader.value   = cfg.classHeader || '';
+
+      // 表示オプション（チェックボックス）の状態を更新
+      const showNamesCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showNames"]') : null;
+      const showCountsCheckbox = elements.detailOptions ? elements.detailOptions.querySelector('input[name="showCounts"]') : null;
+      
+      if (showNamesCheckbox) {
+        showNamesCheckbox.checked = cfg.showNames || false;
+      }
+      if (showCountsCheckbox) {
+        // showCountsは未定義の場合trueをデフォルトとする
+        showCountsCheckbox.checked = cfg.showCounts !== undefined ? cfg.showCounts : true; 
+      }
+
+      // 「設定を保存」ボタンの状態を更新
+      updateConfigButtons();
+    }
+
+    function clearConfigFields() {
+      [elements.opinionHeader, elements.reasonHeader, elements.nameHeader, elements.classHeader].forEach(function(sel) {
+        sel.replaceChildren();
+        var defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = '-- 選択してください --';
+        sel.appendChild(defaultOption);
+        sel.value = '';
+      });
+      updateConfigButtons();
+    }
+
+    function saveConfig() {
+      // ★★★ここからが修正後のコード★★★
+
+      // 1. ドロップダウンから現在選択されているシート名を取得
+      const currentSheetName = elements.sheetSelect.value;
+
+      // 2. 必須情報が揃っているか、より厳密にチェック
+      if (!currentSheetName) {
+        showMessage('シートが選択されていません。ドロップダウンから表示したいシートを選んでください。', 'red');
+        return;
+      }
+      if (!elements.opinionHeader.value) {
+        showMessage('「回答データ列」を選択してください。これは必須項目です。', 'red');
+        addVisualFeedback(elements.opinionHeader, 'error');
+        return;
+      }
+      if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
+        showError(new Error('ユーザーのスプレッドシート情報が見つかりません。ページをリロードしてみてください。'));
+        return;
+      }
+
+      // 3. HTMLの入力値から設定オブジェクト（cfg）を作成
+      const showNamesCheckbox = document.getElementById('showNames');
+      const showCountsCheckbox = document.getElementById('showCounts');
+      
+      const cfg = {
+        opinionHeader: elements.opinionHeader.value,
+        reasonHeader: elements.reasonHeader.value,
+        nameHeader: elements.nameHeader.value,
+        classHeader: elements.classHeader.value,
+        showNames: showNamesCheckbox ? showNamesCheckbox.checked : false,
+        showCounts: showCountsCheckbox ? showCountsCheckbox.checked : true
+      };
+      
+      console.log('💾 [DEBUG] Saving config:', {
+        currentSheetName: currentSheetName,
+        spreadsheetId: currentStatus.userInfo.spreadsheetId,
+        cfg: cfg
+      });
+      
+      // 4. 設定をグローバルに保存（モーダルで使用）
+      window.pendingConfig = {
+        spreadsheetId: currentStatus.userInfo.spreadsheetId,
+        sheetName: currentSheetName,
+        config: cfg
+      };
+
+      // 5. ローディング表示を開始
+      setLoading(true, '設定を保存中...');
+      elements.saveConfigBtn.disabled = true;
+      if (elements.saveConfigText) elements.saveConfigText.textContent = '保存中...';
+
+      // 6. 設定のみを保存（公開はしない）
+      google.script.run
+        .withSuccessHandler(function(result) {
+          setLoading(false);
+          elements.saveConfigBtn.disabled = false;
+          if (elements.saveConfigText) elements.saveConfigText.textContent = '設定を保存';
+          showPublishModal();
+        })
+        .withFailureHandler(function(error) {
+          showError(error);
+          setLoading(false);
+          elements.saveConfigBtn.disabled = false;
+          if (elements.saveConfigText) elements.saveConfigText.textContent = '設定を保存';
+        })
+        .saveConfig(currentSheetName, cfg); 
+    }
+
+    /**
+     * 公開選択モーダルを表示
+     */
+    function showPublishModal() {
+      const modal = document.getElementById('publish-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    }
+
+    /**
+     * 公開選択モーダルを非表示
+     */
+    function hidePublishModal() {
+      const modal = document.getElementById('publish-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    /**
+     * 実際に公開処理を実行
+     */
+    function publishBoard() {
+      if (!window.pendingConfig) {
+        showError(new Error('保存された設定が見つかりません。'));
+        return;
+      }
+
+      hidePublishModal();
+      setLoading(true, 'ボードを公開中...');
+
+      google.script.run
+        .withSuccessHandler(function(status) {
+          updateStatus(status);
+          showMessage('ボードが正常に公開されました。', 'success');
+          markStepCompleted(3);
+          setLoading(false);
+          window.pendingConfig = null;
+        })
+        .withFailureHandler(function(error) {
+          showError(error);
+          setLoading(false);
+        })
+        .activateSheet(
+          window.pendingConfig.spreadsheetId,
+          window.pendingConfig.sheetName
+        );
+    }
+
+    /**
+     * 非公開のまま完了
+     */
+    function saveWithoutPublish() {
+      hidePublishModal();
+      showMessage('設定が保存されました。後から公開することができます。', 'success');
+      loadStatus(true); // ステータスを更新
+      window.pendingConfig = null;
+    }
+
+    /**
+     * トースト通知を表示する関数
+     */
+    function showToast(message, type = 'success', duration = 4000) {
+      const toastContainer = document.getElementById('toast-container');
+      if (!toastContainer) return;
+
+      const toast = document.createElement('div');
+      toast.className = `glass-panel p-4 rounded-lg border-l-4 max-w-md transform transition-all duration-300 translate-x-full opacity-0 ${
+        type === 'success' ? 'border-l-green-500 bg-green-900/20' :
+        type === 'error' ? 'border-l-red-500 bg-red-900/20' :
+        type === 'warning' ? 'border-l-yellow-500 bg-yellow-900/20' :
+        'border-l-blue-500 bg-blue-900/20'
+      }`;
+
+      const icon = type === 'success' ? '✅' :
+                   type === 'error' ? '❌' :
+                   type === 'warning' ? '⚠️' : 'ℹ️';
+
+      toast.innerHTML = `
+        <div class="flex items-center gap-3">
+          <span class="text-lg">${icon}</span>
+          <span class="text-sm text-gray-200 flex-1">${message}</span>
+          <button type="button" class="text-gray-400 hover:text-white" onclick="this.parentElement.parentElement.remove()">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      `;
+
+      toastContainer.appendChild(toast);
+
+      // アニメーション
+      setTimeout(() => {
+        toast.classList.remove('translate-x-full', 'opacity-0');
+      }, 100);
+
+      // 自動削除
+      setTimeout(() => {
+        toast.classList.add('translate-x-full', 'opacity-0');
+        setTimeout(() => {
+          if (toast.parentElement) {
+            toast.remove();
+          }
+        }, 300);
+      }, duration);
+    }
+
+    /**
+     * 下書き保存機能
+     */
+    function saveDraft() {
+      const currentSheetName = elements.sheetSelect.value;
+      
+      if (!currentSheetName) {
+        showToast('シートが選択されていません。', 'error');
+        return;
+      }
+      if (!elements.opinionHeader.value) {
+        showToast('回答データ列を選択してください。', 'error');
+        return;
+      }
+
+      // 設定オブジェクトを作成
+      const showNamesCheckbox = document.getElementById('showNames');
+      const showCountsCheckbox = document.getElementById('showCounts');
+      
+      const cfg = {
+        opinionHeader: elements.opinionHeader.value,
+        reasonHeader: elements.reasonHeader.value,
+        nameHeader: elements.nameHeader.value,
+        classHeader: elements.classHeader.value,
+        showNames: showNamesCheckbox ? showNamesCheckbox.checked : false,
+        showCounts: showCountsCheckbox ? showCountsCheckbox.checked : true
+      };
+
+      // ボタンを無効化
+      elements.draftSaveBtn.disabled = true;
+      elements.publishBtn.disabled = true;
+      const draftSaveText = document.getElementById('draft-save-text');
+      if (draftSaveText) draftSaveText.textContent = '保存中...';
+
+      // 設定のみを保存
+      google.script.run
+        .withSuccessHandler(function(result) {
+          elements.draftSaveBtn.disabled = false;
+          elements.publishBtn.disabled = false;
+          if (draftSaveText) draftSaveText.textContent = '下書き保存';
+          
+          showToast('📄 設定を下書き保存しました。いつでも公開できます。', 'success');
+          loadStatus(true); // ステータスを更新
+        })
+        .withFailureHandler(function(error) {
+          elements.draftSaveBtn.disabled = false;
+          elements.publishBtn.disabled = false;
+          if (draftSaveText) draftSaveText.textContent = '下書き保存';
+          
+          showToast('保存中にエラーが発生しました: ' + error.message, 'error');
+        })
+        .saveConfig(currentSheetName, cfg);
+    }
+
+    /**
+     * 公開確認モーダルを表示
+     */
+    function showPublishConfirmation() {
+      const currentSheetName = elements.sheetSelect.value;
+      
+      if (!currentSheetName) {
+        showToast('シートが選択されていません。', 'error');
+        return;
+      }
+      if (!elements.opinionHeader.value) {
+        showToast('回答データ列を選択してください。', 'error');
+        return;
+      }
+
+      // 設定を一時保存
+      const showNamesCheckbox = document.getElementById('showNames');
+      const showCountsCheckbox = document.getElementById('showCounts');
+      
+      window.pendingPublishConfig = {
+        spreadsheetId: currentStatus.userInfo.spreadsheetId,
+        sheetName: currentSheetName,
+        config: {
+          opinionHeader: elements.opinionHeader.value,
+          reasonHeader: elements.reasonHeader.value,
+          nameHeader: elements.nameHeader.value,
+          classHeader: elements.classHeader.value,
+          showNames: showNamesCheckbox ? showNamesCheckbox.checked : false,
+          showCounts: showCountsCheckbox ? showCountsCheckbox.checked : true
+        }
+      };
+
+      // モーダルを表示
+      const modal = document.getElementById('publish-confirmation-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    }
+
+    /**
+     * 公開確認モーダルを非表示
+     */
+    function hidePublishConfirmation() {
+      const modal = document.getElementById('publish-confirmation-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+      window.pendingPublishConfig = null;
+    }
+
+    /**
+     * 公開を確定実行
+     */
+    function confirmPublish() {
+      if (!window.pendingPublishConfig) {
+        showToast('設定が見つかりません。', 'error');
+        return;
+      }
+
+      hidePublishConfirmation();
+      
+      // ボタンを無効化
+      elements.draftSaveBtn.disabled = true;
+      elements.publishBtn.disabled = true;
+      const publishText = document.getElementById('publish-text');
+      if (publishText) publishText.textContent = '公開中...';
+
+      // 設定保存と公開を実行
+      google.script.run
+        .withSuccessHandler(function(status) {
+          elements.draftSaveBtn.disabled = false;
+          elements.publishBtn.disabled = false;
+          if (publishText) publishText.textContent = '公開する';
+          
+          updateStatus(status);
+          showToast('🎯 ボードが正常に公開されました！6時間後に自動で非公開になります。', 'success', 6000);
+          markStepCompleted(3);
+          window.pendingPublishConfig = null;
+        })
+        .withFailureHandler(function(error) {
+          elements.draftSaveBtn.disabled = false;
+          elements.publishBtn.disabled = false;
+          if (publishText) publishText.textContent = '公開する';
+          
+          showToast('公開中にエラーが発生しました: ' + error.message, 'error');
+        })
+        .saveAndActivateSheet(
+          window.pendingPublishConfig.spreadsheetId,
+          window.pendingPublishConfig.sheetName,
+          window.pendingPublishConfig.config
+        );
+    }
+
+    /**
+     * ツールチップを表示
+     */
+    function showPublishTooltip() {
+      if (elements.publishTooltip) {
+        elements.publishTooltip.classList.remove('hidden');
+      }
+    }
+
+    /**
+     * ツールチップを非表示
+     */
+    function hidePublishTooltip() {
+      if (elements.publishTooltip) {
+        elements.publishTooltip.classList.add('hidden');
+      }
+    }
+
+    /**
+     * 公開ステータスツールチップを表示
+     */
+    function showPublishedStatusTooltip() {
+      if (elements.publishedStatusTooltip) {
+        elements.publishedStatusTooltip.classList.remove('hidden');
+      }
+    }
+
+    /**
+     * 公開ステータスツールチップを非表示
+     */
+    function hidePublishedStatusTooltip() {
+      if (elements.publishedStatusTooltip) {
+        elements.publishedStatusTooltip.classList.add('hidden');
+      }
+    }
+
+    function switchToSheet() {
+      if (!selectedSheet) return;
+      
+      setLoading(true, 'ボードを切り替え中...');
+      google.script.run
+        .withSuccessHandler(function(msg) {
+          showMessage(typeof msg === 'string' ? msg : msg.message || 'シートが正常に切り替わりました', 'green');
+          loadStatus(true);
+          setLoading(false);
+        })
+        .withFailureHandler(function(error) {
+          showError(error);
+          setLoading(false);
+        })
+        .switchToSheet(currentStatus.userInfo.spreadsheetId, selectedSheet);
+    }
+
+    function clearSheetSelection() {
+      setLoading(true, 'ボードの公開を終了中...');
+      google.script.run
+        .withSuccessHandler(function(msg) {
+          showMessage(typeof msg === 'string' ? msg : msg.message || 'シートの公開が正常に終了しました', 'green');
+          loadStatus(true);
+          setLoading(false);
+        })
+        .withFailureHandler(function(error) {
+          showError(error);
+          setLoading(false);
+        })
+        .clearActiveSheet();
+    }
+
+    function updateDisplayOptions(showNames, showCounts) {
+      setLoading(true, '表示設定を更新中...');
+      google.script.run
+        .withSuccessHandler(function(msg) {
+          showMessage(typeof msg === 'string' ? msg : msg.message || '表示オプションが正常に保存されました', 'green');
+          setLoading(false);
+        })
+        .withFailureHandler(function(error) {
+          showError(error);
+          setLoading(false);
+        })
+        .setDisplayOptions({ showNames, showCounts });
+    }
+
+    function copyUrl(inputElement, successMessage) {
+      if (inputElement && inputElement.value) {
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(inputElement.value);
+          } else {
+            inputElement.select();
+            document.execCommand('copy');
+          }
+          showMessage(successMessage, 'green');
+        } catch (error) {
+          showMessage('コピーに失敗しました', 'red');
+        }
+      }
+    }
+
+    function copyBoardUrl() {
+      copyUrl(elements.boardUrl, 'ボードURLをコピーしました');
+    }
+
+    // 重複したsetLoading関数は削除されました - 安全なバージョンのみ使用
+    
+    function showLoadingOverlay(message) {
+      message = message || "読み込み中...";
+      var overlay = document.getElementById('loading-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'loading-overlay';
+        overlay.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50';
+        document.body.appendChild(overlay);
+      }
+      // 安全なDOM操作でオーバーレイを構築
+      overlay.innerHTML = ''; // まずクリア
+      
+      var glassPanel = document.createElement('div');
+      glassPanel.className = 'glass-panel p-8 rounded-xl text-center';
+      
+      var spinner = document.createElement('div');
+      spinner.className = 'spinner mx-auto mb-4';
+      glassPanel.appendChild(spinner);
+      
+      var messagePara = document.createElement('p');
+      messagePara.className = 'text-lg text-white font-medium';
+      messagePara.textContent = message; // 安全なtextContent
+      glassPanel.appendChild(messagePara);
+      
+      var waitPara = document.createElement('p');
+      waitPara.className = 'text-sm text-gray-400 mt-2';
+      waitPara.textContent = 'しばらくお待ちください...';
+      glassPanel.appendChild(waitPara);
+      
+      overlay.appendChild(glassPanel);
+      overlay.style.display = 'flex'; // Ensure it's visible
+    }
+    
+    function enableUnderstandButton() {
+      var confirmBtn = document.getElementById('teacherGuideConfirmBtn');
+      if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = '理解しました';
+        confirmBtn.className = 'px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors';
+      }
+    }
+    
+    
+    function hideLoadingOverlay() {
+      var overlay = document.getElementById('loading-overlay');
+      if (overlay) {
+        overlay.style.display = 'none';
+      }
+    }
+    
+    // Enhanced error handling with user-friendly messages
+    function showError(error) {
+      console.error('エラーが発生しました:', error);
+      var errorMessage = 'エラーが発生しました';
+      
+      if (error && typeof error === 'object') {
+        if (error.message && typeof error.message === 'string') {
+          errorMessage = error.message;
+        }
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      showMessage('エラー: ' + (errorMessage || '不明なエラーが発生しました'), 'error');
+      setLoading(false);
+    }
+    
+    
+    // ページ再読み込み（新しいアカウント用）
+    function reloadPageForNewAccount() {
+      sessionStorage.setItem('treat_as_new_account', 'true');
+      google.script.run
+        .withSuccessHandler(function(url) {
+          var newUrl = new URL(url);
+          newUrl.searchParams.set('t', Date.now());
+          window.top.location.href = newUrl.toString();
+        })
+        .getWebAppUrl();
+    }
+
+    // クライアントサイドキャッシュクリア関数
+    function clearClientSideCache() {
+      try {
+        // ローカルストレージをクリア（treat_as_new_account以外）
+        var treatAsNew = localStorage.getItem('treat_as_new_account');
+        localStorage.clear();
+        if (treatAsNew) {
+          localStorage.setItem('treat_as_new_account', treatAsNew);
+        }
+        
+        // セッションストレージをクリア（必要なフラグ以外）
+        var switchRequested = sessionStorage.getItem('account_switch_requested');
+        var treatAsNewSession = sessionStorage.getItem('treat_as_new_account');
+        sessionStorage.clear();
+        if (switchRequested) {
+          sessionStorage.setItem('account_switch_requested', switchRequested);
+        }
+        if (treatAsNewSession) {
+          sessionStorage.setItem('treat_as_new_account', treatAsNewSession);
+        }
+        
+        console.log('クライアントサイドキャッシュをクリアしました');
+      } catch (e) {
+        console.warn('キャッシュクリアに失敗しましたが、処理を続行します:', e.message);
+      }
+    }
+
+    // Progressive section management
+    var completedSteps = new Set();
+    
+    function markStepCompleted(stepNumber) {
+      completedSteps.add(stepNumber);
+      
+      // Close completed sections except step 3
+      if (stepNumber !== 3) {
+        var stepContent = document.getElementById('step' + stepNumber + '-content');
+        if (stepContent && stepContent.classList.contains('expanded')) {
+          toggleSection('step' + stepNumber + '-content');
+        }
+      }
+      
+      // If step 3 is completed, reopen all sections
+      if (stepNumber === 3) {
+        reopenAllSections();
+      }
+    }
+    
+    function reopenAllSections() {
+      ['step1-content', 'step2-content', 'step3-content'].forEach(function(sectionId) {
+        var section = document.getElementById(sectionId);
+        if (section && section.classList.contains('collapsed')) {
+          toggleSection(sectionId);
+        }
+      });
+    }
+    
+    // Initialize progressive disclosure on page load
+    window.addEventListener('DOMContentLoaded', function() {
+      // Set initial states: all sections open initially
+      var step1Content = document.getElementById('step1-content');
+      var step2Content = document.getElementById('step2-content');
+      var step3Content = document.getElementById('step3-content');
+      
+      if (step1Content) step1Content.classList.add('expanded');
+      if (step2Content) step2Content.classList.add('expanded');
+      if (step3Content) step3Content.classList.add('expanded');
+      
+      // Initialize step icons (all pointing down for expanded)
+      var step1Icon = document.getElementById('step1-icon');
+      var step2Icon = document.getElementById('step2-icon');
+      var step3Icon = document.getElementById('step3-icon');
+      
+      if (step1Icon) step1Icon.style.transform = 'rotate(0deg)';
+      if (step2Icon) step2Icon.style.transform = 'rotate(0deg)';
+      if (step3Icon) step3Icon.style.transform = 'rotate(0deg)';
+      adjustLayout();
+    });
+    
+    // Window resize event listener for layout adjustment
+    window.addEventListener('resize', debounce(adjustLayout, 100));
+    
+  </script>

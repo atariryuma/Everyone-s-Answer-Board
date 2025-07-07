@@ -7,7 +7,7 @@ const CONFIG_SHEET_NAME = 'Config';
 
 /**
  * 現在のユーザーのスプレッドシートを取得
- * AdminPanel.htmlから呼び出される
+ * View_AdminPanel.htmlから呼び出される
  */
 function getCurrentSpreadsheet() {
   try {
@@ -32,7 +32,7 @@ function getCurrentSpreadsheet() {
 
 /**
  * アクティブなスプレッドシートのURLを取得
- * AdminPanel.htmlから呼び出される
+ * View_AdminPanel.htmlから呼び出される
  * @returns {string} スプレッドシートURL
  */
 function openActiveSpreadsheet() {
@@ -360,7 +360,7 @@ function activateSheet(spreadsheetId, sheetName) {
  */
 /**
  * シートヘッダーを取得
- * AdminPanel.htmlから呼び出される
+ * View_AdminPanel.htmlから呼び出される
  */
 function getSheetHeaders(sheetName) {
   try {
@@ -495,7 +495,7 @@ function autoMapSheetHeaders(sheetName) {
 
 /**
  * スプレッドシートURLを追加してシート検出を実行
- * Unpublished.htmlから呼び出される
+ * View_TeacherLanding.htmlから呼び出される
  */
 function addSpreadsheetUrl(url) {
   try {
@@ -558,11 +558,11 @@ function addSpreadsheetUrl(url) {
 
 /**
  * シートを切り替える
- * AdminPanel.htmlから呼び出される
+ * View_AdminPanel.htmlから呼び出される
  */
 /**
  * アクティブシートをクリア（公開停止）
- * AdminPanel.htmlから呼び出される
+ * View_AdminPanel.htmlから呼び出される
  */
 function clearActiveSheet() {
   try {
@@ -595,7 +595,7 @@ function clearActiveSheet() {
 
 /**
  * 表示オプションを設定
- * AdminPanel.htmlから呼び出される
+ * View_AdminPanel.htmlから呼び出される
  */
 function setDisplayOptions(options) {
   try {
@@ -628,7 +628,7 @@ function setDisplayOptions(options) {
 
 /**
  * 管理者権限チェック
- * Page.htmlから呼び出される
+ * View_Board.htmlから呼び出される
  */
 function checkAdmin() {
   debugLog('checkAdmin function called.');
@@ -670,7 +670,7 @@ function checkAdmin() {
 
 /**
  * 管理者からボードを作成
- * AdminPanel.htmlから呼び出される
+ * View_AdminPanel.htmlから呼び出される
  */
 function createBoardFromAdmin() {
   try {
@@ -721,7 +721,7 @@ function createBoardFromAdmin() {
 
 /**
  * 既存ボード情報を取得
- * Registration.htmlから呼び出される
+ * View_Registration.htmlから呼び出される
  */
 function getExistingBoard() {
   try {
@@ -754,7 +754,7 @@ function getExistingBoard() {
 
 /**
  * ユーザー認証を検証
- * Registration.htmlから呼び出される
+ * View_Registration.htmlから呼び出される
  */
 function verifyUserAuthentication() {
   try {
@@ -772,7 +772,7 @@ function verifyUserAuthentication() {
 
 /**
  * 指定されたシートのヘッダーを自動でマッピングし、その結果を返す。
- * この関数は AdminPanel.html から直接呼び出されることを想定しています。
+ * この関数は View_AdminPanel.html から直接呼び出されることを想定しています。
  * @param {string} sheetName - 対象のスプレッドシート名。
  * @returns {object} 推測されたヘッダーのマッピング結果。
  */

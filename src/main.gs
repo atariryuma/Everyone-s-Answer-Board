@@ -69,6 +69,15 @@ function htmlEncode(text) {
 }
 
 /**
+ * 他のHTMLファイルの内容をテンプレートにインクルードします。
+ * @param {string} filename - .html拡張子を除いたファイル名。
+ * @return {string} ファイルのコンテンツ。
+ */
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+/**
  * HtmlOutputに安全にX-Frame-Optionsヘッダーを設定するユーティリティ
  * @param {HtmlOutput} htmlOutput - 設定対象のHtmlOutput
  * @returns {HtmlOutput} 設定後のHtmlOutput
@@ -133,7 +142,7 @@ function log(level, message, details) {
 
 /**
  * デプロイされたWebアプリのドメイン情報と現在のユーザーのドメイン情報を取得
- * AdminPanel.html と Registration.html から共通で呼び出される
+ * View_AdminPanel.html と View_Registration.html から共通で呼び出される
  */
 function getDeployUserDomainInfo() {
   try {
@@ -249,7 +258,7 @@ function isSystemSetup() {
  * 登録ページを表示する関数
  */
 function showRegistrationPage() {
-  var output = HtmlService.createTemplateFromFile('Registration')
+  var output = HtmlService.createTemplateFromFile('View_Registration')
     .evaluate()
     .setTitle('新規ユーザー登録 - StudyQuest');
   return safeSetXFrameOptionsDeny(output);
@@ -274,7 +283,7 @@ function doGet(e) {
     const spreadsheetId = (e && e.parameter && e.parameter.spreadsheetId) ? e.parameter.spreadsheetId : null;
     const sheetName = (e && e.parameter && e.parameter.sheetName) ? e.parameter.sheetName : null;
     
-    // Page.html への直接アクセス判定（特定パラメータがある場合）
+    // View_Board.html への直接アクセス判定（特定パラメータがある場合）
     const isDirectPageAccess = userId && spreadsheetId && sheetName;
 
     console.log(`Request parameters validated. Mode: ${mode}, UserID: ${userId}, SetupParam: ${setupParam}, IsDirectPageAccess: ${isDirectPageAccess}`);
@@ -290,10 +299,10 @@ function doGet(e) {
       console.log(`Referer: ${e.headers.referer}`);
     }
 
-    // 1. システムの初期セットアップが完了しているか確認（Page.html直接アクセス時は除く）
+    // 1. システムの初期セットアップが完了しているか確認（View_Board.html直接アクセス時は除く）
     if (!isSystemSetup() && !isDirectPageAccess) {
       console.log('DEBUG: System not set up. Redirecting to SetupPage.');
-      var setupHtml = HtmlService.createTemplateFromFile('SetupPage')
+      var setupHtml = HtmlService.createTemplateFromFile('View_Setup')
         .evaluate()
         .setTitle('初回セットアップ - StudyQuest');
       console.log('DEBUG: Serving SetupPage HTML');
@@ -303,14 +312,14 @@ function doGet(e) {
     // セットアップページの明示的な表示要求
     if (setupParam === 'true') {
       console.log('DEBUG: Explicit setup request. Redirecting to SetupPage.');
-      var explicitHtml = HtmlService.createTemplateFromFile('SetupPage')
+      var explicitHtml = HtmlService.createTemplateFromFile('View_Setup')
         .evaluate()
         .setTitle('StudyQuest - サービスアカウント セットアップ');
       console.log('DEBUG: Serving explicit SetupPage HTML');
       return safeSetXFrameOptionsDeny(explicitHtml);
     }
 
-    // 2. ユーザー認証と情報取得（Page.html直接アクセス時は除く）
+    // 2. ユーザー認証と情報取得（View_Board.html直接アクセス時は除く）
     if (!userEmail && !isDirectPageAccess) {
       console.log('DEBUG: No current user email. Redirecting to RegistrationPage.');
       console.log('DEBUG: Serving RegistrationPage HTML');
@@ -320,7 +329,7 @@ function doGet(e) {
     // 3. ユーザーがデータベースに登録済みか確認
     let userInfo = null;
     if (isDirectPageAccess) {
-      // Page.html直接アクセス時は、userIdで直接検索
+      // View_Board.html直接アクセス時は、userIdで直接検索
       userInfo = findUserById(userId);
       console.log('DEBUG: Direct page access, User info by ID:', JSON.stringify(userInfo));
     } else {
@@ -342,10 +351,10 @@ function doGet(e) {
         configJson.publishedSheetName);
       console.log(`DEBUG: isPublished = ${isPublished}`);
 
-      // Page.html直接アクセス時は、パラメータ指定されたページを表示
+      // View_Board.html直接アクセス時は、パラメータ指定されたページを表示
       if (isDirectPageAccess) {
         console.log('DEBUG: Direct page access detected. Showing specified page.');
-        const template = HtmlService.createTemplateFromFile('Page.html');
+        const template = HtmlService.createTemplateFromFile('View_Board');
 
         try {
           const config = JSON.parse(userInfo.configJson || '{}');
@@ -359,8 +368,8 @@ function doGet(e) {
           template.opinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
-          template.showAdminFeatures = false; // Page.html is for public view, not admin
-          template.isAdminUser = false; // Page.html is for public view, not admin
+          template.showAdminFeatures = false; // View_Board.html is for public view, not admin
+          template.isAdminUser = false; // View_Board.html is for public view, not admin
 
         } catch (e) {
           template.opinionHeader = 'お題の読込エラー';
@@ -370,8 +379,8 @@ function doGet(e) {
           template.sheetName = sheetName;
           template.displayMode = 'anonymous';
           template.showCounts = true;
-          template.showAdminFeatures = false; // Page.html is for public view, not admin
-          template.isAdminUser = false; // Page.html is for public view, not admin
+          template.showAdminFeatures = false; // View_Board.html is for public view, not admin
+          template.isAdminUser = false; // View_Board.html is for public view, not admin
         }
         
         return template.evaluate()
@@ -386,7 +395,7 @@ function doGet(e) {
       if (mode === 'admin') {
         // 明示的な管理パネル要求
         console.log('DEBUG: Explicit admin mode request. Showing AdminPanel.');
-        var adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
+        var adminTemplate = HtmlService.createTemplateFromFile('View_AdminPanel');
         adminTemplate.userInfo = userInfo;
         adminTemplate.userId = userInfo.userId;
         adminTemplate.mode = mode;
@@ -408,7 +417,7 @@ function doGet(e) {
       if (mode === 'view' && isPublished) {
         // 明示的な回答ボード表示要求（公開済みの場合のみ）
         console.log('DEBUG: Explicit view mode request for published board. Showing Page.');
-        const template = HtmlService.createTemplateFromFile('Page.html');
+        const template = HtmlService.createTemplateFromFile('View_Board');
         
         try {
           const config = JSON.parse(userInfo.configJson || '{}');
@@ -422,8 +431,8 @@ function doGet(e) {
           template.opinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
-          template.showAdminFeatures = false; // Page.html is for public view, not admin
-          template.isAdminUser = false; // Page.html is for public view, not admin
+          template.showAdminFeatures = false; // View_Board.html is for public view, not admin
+          template.isAdminUser = false; // View_Board.html is for public view, not admin
 
         } catch (e) {
           template.opinionHeader = 'お題の読込エラー';
@@ -433,8 +442,8 @@ function doGet(e) {
           template.sheetName = sheetName;
           template.displayMode = 'anonymous';
           template.showCounts = true;
-          template.showAdminFeatures = false; // Page.html is for public view, not admin
-          template.isAdminUser = false; // Page.html is for public view, not admin
+          template.showAdminFeatures = false; // View_Board.html is for public view, not admin
+          template.isAdminUser = false; // View_Board.html is for public view, not admin
         }
         
         return template.evaluate()
@@ -445,7 +454,7 @@ function doGet(e) {
       // デフォルト：パラメータなしのアクセスは管理パネルへ
       // (modeのデフォルトが'admin'になったため、このルートが正しく機能する)
       console.log('DEBUG: Default access - user registered. Redirecting to admin panel.');
-      var adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
+      var adminTemplate = HtmlService.createTemplateFromFile('View_AdminPanel');
       adminTemplate.userInfo = userInfo;
       adminTemplate.userId = userInfo.userId;
       adminTemplate.mode = 'admin';
@@ -458,7 +467,7 @@ function doGet(e) {
 
     } else {
       // 5. 【未登録ユーザーの処理】
-      //    Page.html直接アクセス時でもユーザーが見つからない場合は登録ページ
+      //    View_Board.html直接アクセス時でもユーザーが見つからない場合は登録ページ
       console.log('DEBUG: User not registered. Redirecting to RegistrationPage.');
       console.log('DEBUG: Serving RegistrationPage HTML for unregistered user');
       return showRegistrationPage();

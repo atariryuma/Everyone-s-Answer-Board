@@ -104,7 +104,7 @@ function registerNewUser(adminEmail) {
 
 /**
  * リアクションを追加/削除する
- * View_Board.htmlから呼び出される - フロントエンド期待形式に対応
+ * Page.htmlから呼び出される - フロントエンド期待形式に対応
  */
 function addReaction(rowIndex, reactionKey, sheetName) {
   try {
@@ -130,7 +130,7 @@ function addReaction(rowIndex, reactionKey, sheetName) {
       reactingUserEmail
     );
     
-    // View_Board.html期待形式に変換
+    // Page.html期待形式に変換
     if (result && result.status === 'success') {
       // 更新後のリアクション情報を取得
       var updatedReactions = getRowReactions(boardOwnerInfo.spreadsheetId, sheetName, rowIndex, reactingUserEmail);
@@ -157,7 +157,7 @@ function addReaction(rowIndex, reactionKey, sheetName) {
 
 /**
  * 公開されたシートのデータを取得
- * View_Board.htmlから呼び出される - フロントエンド期待形式に対応
+ * Page.htmlから呼び出される - フロントエンド期待形式に対応
  */
 function getPublishedSheetData(classFilter, sortOrder) {
   try {
@@ -209,7 +209,7 @@ function getPublishedSheetData(classFilter, sortOrder) {
       throw new Error(sheetData.message);
     }
     
-    // View_Board.html期待形式に変換
+    // Page.html期待形式に変換
     // 設定からヘッダー名を取得。未定義の場合のみデフォルト値を使用。
     var mainHeaderName = sheetConfig.opinionHeader || COLUMN_HEADERS.OPINION;
     var reasonHeaderName = sheetConfig.reasonHeader || COLUMN_HEADERS.REASON;
@@ -373,7 +373,7 @@ function getAppConfig() {
       displayMode: configJson.displayMode || DISPLAY_MODES.ANONYMOUS,
       isPublished: configJson.appPublished || false,
       availableSheets: sheets,
-      allSheets: sheets, // View_AdminPanel.htmlで使用される
+      allSheets: sheets, // AdminPanel.htmlで使用される
       spreadsheetUrl: userInfo.spreadsheetUrl,
       formUrl: configJson.formUrl || '',
       editFormUrl: configJson.editFormUrl || '',
@@ -415,7 +415,7 @@ function getAppConfig() {
 
 /**
  * シート設定を保存する
- * View_AdminPanel.htmlから呼び出される
+ * AdminPanel.htmlから呼び出される
  * @param {string} spreadsheetId - 設定対象のスプレッドシートID
  * @param {string} sheetName - 設定対象のシート名
  * @param {object} config - 保存するシート固有の設定
@@ -460,7 +460,7 @@ function saveSheetConfig(spreadsheetId, sheetName, config) {
 
 /**
  * 表示するシートを切り替える
- * View_AdminPanel.htmlから呼び出される
+ * AdminPanel.htmlから呼び出される
  * @param {string} spreadsheetId - 公開対象のスプレッドシートID
  * @param {string} sheetName - 公開対象のシート名
  */
@@ -615,7 +615,7 @@ function getResponsesData(userId, sheetName) {
 
 /**
  * 管理画面用のステータス情報を取得
- * View_AdminPanel.htmlから呼び出される
+ * AdminPanel.htmlから呼び出される
  */
 function getStatus(forceRefresh = false) {
   if (forceRefresh) {
@@ -640,7 +640,7 @@ function getStatus(forceRefresh = false) {
 
 /**
  * アクティブなフォーム情報を取得
- * View_AdminPanel.htmlから呼び出される（パラメータなし）
+ * AdminPanel.htmlから呼び出される（パラメータなし）
  */
 function getActiveFormInfo(userId) {
   try {
@@ -692,7 +692,7 @@ function getActiveFormInfo(userId) {
       status: 'success',
       formUrl: configJson.formUrl || '',
       editFormUrl: configJson.editFormUrl || '',
-      editUrl: configJson.editFormUrl || '',  // View_AdminPanel.htmlが期待するフィールド名
+      editUrl: configJson.editFormUrl || '',  // AdminPanel.htmlが期待するフィールド名
       formId: extractFormIdFromUrl(configJson.formUrl || configJson.editFormUrl || ''),
       spreadsheetUrl: userInfo.spreadsheetUrl || '',
       answerCount: answerCount,
@@ -706,7 +706,7 @@ function getActiveFormInfo(userId) {
 
 /**
  * ハイライト状態の切り替え
- * View_Board.htmlから呼び出される - フロントエンド期待形式に対応
+ * Page.htmlから呼び出される - フロントエンド期待形式に対応
  */
 function toggleHighlight(rowIndex, sheetName) {
   try {
@@ -734,7 +734,7 @@ function toggleHighlight(rowIndex, sheetName) {
       rowIndex
     );
     
-    // View_Board.html期待形式に変換
+    // Page.html期待形式に変換
     if (result && result.status === 'success') {
       return {
         status: "ok",
@@ -754,7 +754,7 @@ function toggleHighlight(rowIndex, sheetName) {
 
 /**
  * 管理者権限の確認
- * View_Board.htmlから呼び出される
+ * Page.htmlから呼び出される
  */
 function checkAdmin() {
   try {
@@ -781,7 +781,7 @@ function checkAdmin() {
 
 /**
  * 利用可能なシート一覧を取得
- * View_Board.htmlから呼び出される - フロントエンド期待形式に対応
+ * Page.htmlから呼び出される - フロントエンド期待形式に対応
  */
 function getAvailableSheets() {
   try {
@@ -794,7 +794,7 @@ function getAvailableSheets() {
     
     var sheets = getSheetsList(currentUserId);
     
-    // View_Board.html期待形式に変換: [{name: string}]
+    // Page.html期待形式に変換: [{name: string}]
     return sheets.map(function(sheet) {
       return {
         name: typeof sheet === 'string' ? sheet : (sheet.name || sheet.title || sheet)
