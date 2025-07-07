@@ -2714,6 +2714,7 @@ function populateSheetSelect(sheets, activeSheetName) {
     }
 
     function updateStepIndicators(currentStep) {
+      console.log('📊 [DEBUG] updateStepIndicators called with currentStep:', currentStep);
       var steps = [
         { id: 'step-1-indicator', step: 1 },
         { id: 'step-2-indicator', step: 2 },
@@ -2731,10 +2732,8 @@ function populateSheetSelect(sheets, activeSheetName) {
         
         circle.classList.remove('bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-gray-600');
         
-        if (step < currentStep) {
-          circle.classList.add('bg-green-500'); // Completed
-        } else if (step === currentStep) {
-          circle.classList.add('bg-blue-500'); // Current
+        if (step <= currentStep) {
+          circle.classList.add('bg-green-500'); // Completed (including current step when all steps are done)
         } else {
           circle.classList.add('bg-gray-600'); // Pending
         }
@@ -2964,6 +2963,7 @@ function populateSheetSelect(sheets, activeSheetName) {
      * @param {object} status - システムステータス
      */
     function updateFooterAndGuidance(status) {
+        console.log('🎯 [DEBUG] updateFooterAndGuidance called with status:', status);
         const guidanceText = document.getElementById('guidance-text');
         const adminFooter = document.getElementById('admin-footer');
         const boardUrlInput = document.getElementById('board-url');
@@ -2972,7 +2972,7 @@ function populateSheetSelect(sheets, activeSheetName) {
         if (status.isPublished && status.activeSheetName) {
             // 公開中の場合
             if (guidanceText) guidanceText.textContent = `ボード「${status.activeSheetName}」が公開されています。`;
-            updateStepIndicators(4); // 全ステップ完了状態
+            updateStepIndicators(3); // 全ステップ(1-3)完了状態
 
             // フッターにボードURLを表示
             const boardUrl = `${status.webAppUrl}?userId=${status.userInfo.userId}&spreadsheetId=${status.publishedSpreadsheetId}&sheetName=${encodeURIComponent(status.publishedSheetName)}`;
@@ -2990,25 +2990,6 @@ function populateSheetSelect(sheets, activeSheetName) {
         }
     }
 
-    /**
-     * ステップインジケーターの更新
-     * @param {number} currentStep - 現在のステップ (1-4)
-     */
-    function updateStepIndicators(currentStep) {
-        // ステップインジケーターが存在する場合のみ更新
-        for (let i = 1; i <= 4; i++) {
-            const stepElement = document.getElementById(`step-${i}`);
-            if (stepElement) {
-                if (i <= currentStep) {
-                    stepElement.classList.add('completed');
-                    stepElement.classList.remove('pending');
-                } else {
-                    stepElement.classList.add('pending');
-                    stepElement.classList.remove('completed');
-                }
-            }
-        }
-    }
     
     // 既存ユーザー向けセクションの表示制御
     function updateExistingUserSection(status) {
