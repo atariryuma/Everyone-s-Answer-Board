@@ -258,7 +258,7 @@ function isSystemSetup() {
  * 登録ページを表示する関数
  */
 function showRegistrationPage() {
-  var output = HtmlService.createTemplateFromFile('pages/Registration')
+  var output = HtmlService.createTemplateFromFile('src/pages/Registration')
     .evaluate()
     .setTitle('新規ユーザー登録 - StudyQuest');
   return safeSetXFrameOptionsDeny(output);
@@ -302,7 +302,7 @@ function doGet(e) {
     // 1. システムの初期セットアップが完了しているか確認（View_Board.html直接アクセス時は除く）
     if (!isSystemSetup() && !isDirectPageAccess) {
       console.log('DEBUG: System not set up. Redirecting to SetupPage.');
-      var setupHtml = HtmlService.createTemplateFromFile('pages/Setup')
+      var setupHtml = HtmlService.createTemplateFromFile('src/pages/Setup')
         .evaluate()
         .setTitle('初回セットアップ - StudyQuest');
       console.log('DEBUG: Serving SetupPage HTML');
@@ -312,7 +312,7 @@ function doGet(e) {
     // セットアップページの明示的な表示要求
     if (setupParam === 'true') {
       console.log('DEBUG: Explicit setup request. Redirecting to SetupPage.');
-      var explicitHtml = HtmlService.createTemplateFromFile('pages/Setup')
+      var explicitHtml = HtmlService.createTemplateFromFile('src/pages/Setup')
         .evaluate()
         .setTitle('StudyQuest - サービスアカウント セットアップ');
       console.log('DEBUG: Serving explicit SetupPage HTML');
@@ -354,7 +354,7 @@ function doGet(e) {
       // View_Board.html直接アクセス時は、パラメータ指定されたページを表示
       if (isDirectPageAccess) {
         console.log('DEBUG: Direct page access detected. Showing specified page.');
-        const template = HtmlService.createTemplateFromFile('pages/Board');
+        const template = HtmlService.createTemplateFromFile('src/pages/Board');
 
         try {
           const config = JSON.parse(userInfo.configJson || '{}');
@@ -395,7 +395,7 @@ function doGet(e) {
       if (mode === 'admin') {
         // 明示的な管理パネル要求
         console.log('DEBUG: Explicit admin mode request. Showing AdminPanel.');
-        var adminTemplate = HtmlService.createTemplateFromFile('pages/AdminPanel');
+        var adminTemplate = HtmlService.createTemplateFromFile('src/pages/AdminPanel');
         adminTemplate.userInfo = userInfo;
         adminTemplate.userId = userInfo.userId;
         adminTemplate.mode = mode;
@@ -417,7 +417,7 @@ function doGet(e) {
       if (mode === 'view' && isPublished) {
         // 明示的な回答ボード表示要求（公開済みの場合のみ）
         console.log('DEBUG: Explicit view mode request for published board. Showing Page.');
-        const template = HtmlService.createTemplateFromFile('pages/Board');
+        const template = HtmlService.createTemplateFromFile('src/pages/Board');
         
         try {
           const config = JSON.parse(userInfo.configJson || '{}');
@@ -454,7 +454,7 @@ function doGet(e) {
       // デフォルト：パラメータなしのアクセスは管理パネルへ
       // (modeのデフォルトが'admin'になったため、このルートが正しく機能する)
       console.log('DEBUG: Default access - user registered. Redirecting to admin panel.');
-      var adminTemplate = HtmlService.createTemplateFromFile('pages/AdminPanel');
+      var adminTemplate = HtmlService.createTemplateFromFile('src/pages/AdminPanel');
       adminTemplate.userInfo = userInfo;
       adminTemplate.userId = userInfo.userId;
       adminTemplate.mode = 'admin';
