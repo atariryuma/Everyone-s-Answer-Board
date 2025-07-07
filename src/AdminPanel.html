@@ -1755,6 +1755,17 @@
       }
     }
 
+    /**
+     * 設定エリアを非表示にし、プレースホルダーを表示する
+     */
+    function hideConfigArea() {
+        var configArea = document.getElementById('config-area');
+        var configPlaceholder = document.getElementById('config-placeholder');
+        if (configArea) configArea.classList.add('hidden');
+        if (configPlaceholder) configPlaceholder.classList.remove('hidden');
+    }
+  </script>
+
     function showConfirmationModal(title, message, onConfirm) {
       var modal = document.getElementById('confirmation-modal');
       var modalTitle = document.getElementById('modal-title');
