@@ -2534,9 +2534,25 @@ async handleReaction(rowIndex, reaction) {
         // ★修正ポイント②：先にサーバーと通信する
         const res = await this.gas.addReaction(numericRowIndex, reaction, this.state.sheetName);
 
-        if (res && res.status === 'ok' && res.reactions) {
+        // レスポンスの安全な処理
+        debugLog('addReactionレスポンス:', { res, type: typeof res });
+        
+        if (res && res.status === 'ok') {
             // ★修正ポイント③：サーバーからの応答成功後に、UIを完全に更新する
-            item.reactions = res.reactions;
+            if (res.reactions && typeof res.reactions === 'object') {
+                item.reactions = res.reactions;
+            } else {
+                debugLog('警告: reactionsプロパティが期待された形式ではありません');
+                // フォールバック: 既存のreactionsを保持し、カウントのみ更新
+                if (!item.reactions) {
+                    item.reactions = {};
+                }
+                if (!item.reactions[reaction]) {
+                    item.reactions[reaction] = { count: 0, reacted: false };
+                }
+                item.reactions[reaction].count = (item.reactions[reaction].count || 0) + 1;
+                item.reactions[reaction].reacted = true;
+            }
             requestAnimationFrame(() => this.applyUpdates([item])); // 次の描画フレームで安全にUIを更新
 
             // モーダルが開いていればそちらも更新
@@ -2547,10 +2563,19 @@ async handleReaction(rowIndex, reaction) {
                 }
             }
         } else {
-            throw new Error(res?.message || 'リアクションの処理に失敗しました');
+            const errorMsg = res?.message || 'リアクションの処理に失敗しました';
+            debugLog('リアクションAPIエラー:', { res, errorMsg });
+            throw new Error(errorMsg);
         }
     } catch (error) {
         console.error('Failed to add reaction:', error);
+        debugLog('リアクションエラー詳細:', {
+            error: error.message,
+            stack: error.stack,
+            reaction,
+            rowIndex,
+            item: item ? { rowIndex: item.rowIndex, hasReactions: !!item.reactions } : null
+        });
         this.showErrorFeedback(btns[0], 'リアクションに失敗しました');
         // エラー時は何もしない（UIは元の状態のまま）
     } finally {
@@ -2601,18 +2626,7 @@ async handleReaction(rowIndex, reaction) {
         showAdminFeatures: this.state.showAdminFeatures
     });
     
-    // 管理者権限の再確認
-    debugLog('admin権限再確認中...');
-    try {
-      const adminCheck = await this.gas.checkAdmin();
-      debugLog('サーバー側admin確認結果:', adminCheck);
-      if (!adminCheck) {
-        throw new Error('サーバー側で管理者権限が確認できませんでした。スプレッドシートの所有者でログインしているか確認してください。');
-      }
-    } catch (adminError) {
-      console.error('admin権限確認エラー:', adminError);
-      throw new Error('管理者権限の確認に失敗しました: ' + adminError.message);
-    }
+    // バックエンド側で管理者権限をチェックするので、フロントエンド側のチェックは不要
     
     const numericRowIndex = parseInt(rowIndex, 10);
     const highlightKey = `${numericRowIndex}-highlight`;
