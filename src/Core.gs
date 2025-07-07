@@ -722,8 +722,9 @@ function toggleHighlight(rowIndex, sheetName) {
       throw new Error('ユーザー情報が見つかりません');
     }
     
-    // 管理者権限チェック
-    if (!userInfo.isAdmin) {
+    // 管理者権限チェック - 現在のユーザーがボードの所有者かどうかを確認
+    var activeUserEmail = Session.getActiveUser().getEmail();
+    if (activeUserEmail !== userInfo.adminEmail) {
       throw new Error('ハイライト機能は管理者のみ使用できます');
     }
     
