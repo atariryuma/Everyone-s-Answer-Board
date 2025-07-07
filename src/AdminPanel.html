@@ -805,41 +805,12 @@
                 </details>
               </div>
               
-              <!-- 新しい分離されたボタン -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <!-- 下書き保存ボタン -->
-                <button type="button" id="draft-save-btn" disabled class="btn btn-secondary">
-                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
-                  </svg>
-                  <span id="draft-save-text">下書き保存</span>
-                </button>
-                
-                <!-- 公開ボタン -->
-                <button type="button" id="publish-btn" disabled class="btn btn-primary relative">
-                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                  </svg>
-                  <span id="publish-text">公開する</span>
-                  <!-- ツールチップトリガー -->
-                  <div class="absolute -top-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center cursor-help" id="publish-tooltip-trigger">
-                    <span class="text-white text-xs font-bold">?</span>
-                  </div>
-                </button>
-              </div>
-              
-              <!-- 公開ボタンのツールチップ -->
-              <div id="publish-tooltip" class="hidden absolute z-10 p-3 bg-gray-800 border border-gray-600 rounded-lg shadow-lg text-xs text-gray-300 max-w-xs top-full mt-2 right-0">
-                <div class="flex items-start gap-2">
-                  <span class="text-yellow-400 text-sm">⏱️</span>
-                  <div>
-                    <p class="text-gray-200 font-medium mb-1">自動非公開について</p>
-                    <p class="text-gray-300">📅 ボードは安全のため6時間後に自動で非公開に戻ります。</p>
-                    <p class="text-gray-400 mt-1">💡 延長したい場合は再度「公開する」ボタンを押してください。</p>
-                  </div>
-                </div>
-              </div>
+              <button type="button" id="save-config-btn" disabled class="btn btn-primary w-full">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                </svg>
+                <span id="save-config-text">設定を保存</span>
+              </button>
             </div>
             
             <div id="config-placeholder" class="text-center py-8">
@@ -1061,134 +1032,10 @@
       </details>
     </div>
   </div>
-
-  <!-- データ透明性セクション -->
-  <div id="data-transparency-panel" class="glass-panel p-4 sm:p-6 border-l-4 border-l-blue-400">
-    <div class="flex items-center gap-3 mb-4">
-      <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.586-3H4a1 1 0 00-1 1v10a1 1 0 001 1h5.586l4.707-4.707A1 1 0 0014 16.586V11a1 1 0 011-1z"></path>
-        </svg>
-      </div>
-      <h3 class="font-semibold text-gray-300">🔒 データは安全に管理されています</h3>
-    </div>
-
-    <div class="bg-blue-900/10 border border-blue-500/20 rounded-lg p-4 mb-4">
-      <p class="text-sm text-gray-300 mb-3">
-        このシステムは、<strong class="text-blue-300">あなたのデータを安全に保つことを最優先</strong>に設計されています。データの管理方法は以下の通りです。
-      </p>
-    </div>
-
-    <div class="space-y-4">
-      <!-- 回答一覧シートについて -->
-      <details class="bg-gray-800/30 border border-gray-600/30 rounded-lg">
-        <summary class="p-4 cursor-pointer hover:bg-gray-700/30 transition-colors">
-          <div class="flex items-center gap-3">
-            <div class="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-              <span class="text-white text-xs font-bold">1</span>
-            </div>
-            <span class="font-medium text-gray-200">あなたの「回答一覧シート」について</span>
-            <svg class="w-4 h-4 text-gray-400 ml-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-            </svg>
-          </div>
-        </summary>
-        <div class="px-4 pb-4">
-          <p class="text-sm text-gray-300 mb-3">
-            これは生徒の回答がすべて記録される、<strong class="text-green-300">あなた自身のスプレッドシート</strong>です。
-          </p>
-          <ul class="space-y-2 text-sm text-gray-400">
-            <li class="flex items-start gap-2">
-              <span class="text-green-400 mt-1">✓</span>
-              <span><strong class="text-green-300">所有権はあなたにあります</strong>: このシートはあなたのGoogle Drive内に作成され、<strong>所有者は常にあなた</strong>です。あなたはいつでも自由に閲覧、編集、削除できます。</span>
-            </li>
-            <li class="flex items-start gap-2">
-              <span class="text-green-400 mt-1">✓</span>
-              <span><strong class="text-green-300">アクセスはシステムのみ</strong>: システムは、ボードを表示するために、あなたから許可された<strong>編集権限</strong>でのみこのシートにアクセスします。</span>
-            </li>
-          </ul>
-        </div>
-      </details>
-
-      <!-- サービスアカウントについて -->
-      <details class="bg-gray-800/30 border border-gray-600/30 rounded-lg">
-        <summary class="p-4 cursor-pointer hover:bg-gray-700/30 transition-colors">
-          <div class="flex items-center gap-3">
-            <div class="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center">
-              <span class="text-white text-xs font-bold">2</span>
-            </div>
-            <span class="font-medium text-gray-200">システムを動かす「サービスアカウント」について</span>
-            <svg class="w-4 h-4 text-gray-400 ml-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-            </svg>
-          </div>
-        </summary>
-        <div class="px-4 pb-4">
-          <p class="text-sm text-gray-300 mb-3">
-            このシステムは、「サービスアカウント」という<strong class="text-purple-300">システム専用の"ボット"アカウント</strong>を利用して動作します。
-          </p>
-          <ul class="space-y-2 text-sm text-gray-400">
-            <li class="flex items-start gap-2">
-              <span class="text-purple-400 mt-1">🤖</span>
-              <span><strong class="text-purple-300">あなたの代わりに作業</strong>: このボットが、あなたに代わって「回答一覧シート」にリアクションを記録するなどの作業を安全に行います。</span>
-            </li>
-            <li class="flex items-start gap-2">
-              <span class="text-purple-400 mt-1">🔐</span>
-              <span><strong class="text-purple-300">パスワードは不要</strong>: あなたのパスワードをシステムが知ることは一切ありません。これは、Googleが推奨するセキュアな連携方法です。</span>
-            </li>
-          </ul>
-        </div>
-      </details>
-
-      <!-- データベースについて -->
-      <details class="bg-gray-800/30 border border-gray-600/30 rounded-lg">
-        <summary class="p-4 cursor-pointer hover:bg-gray-700/30 transition-colors">
-          <div class="flex items-center gap-3">
-            <div class="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center">
-              <span class="text-white text-xs font-bold">3</span>
-            </div>
-            <span class="font-medium text-gray-200">個人情報を管理する「データベース」について</span>
-            <svg class="w-4 h-4 text-gray-400 ml-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-            </svg>
-          </div>
-        </summary>
-        <div class="px-4 pb-4">
-          <p class="text-sm text-gray-300 mb-3">
-            あなたのメールアドレスなどの情報は、システム専用のデータベース（スプレッドシート）で管理されます。
-          </p>
-          <ul class="space-y-2 text-sm text-gray-400">
-            <li class="flex items-start gap-2">
-              <span class="text-yellow-400 mt-1">🔒</span>
-              <span><strong class="text-yellow-300">原則非公開</strong>: セキュリティを最大限に高めるため、このデータベースは<strong>共有設定が「制限付き」（非公開）でなければシステムに登録できない設計</strong>になっています。これにより、登録情報が誤って外部に公開されることを防ぎます。</span>
-            </li>
-          </ul>
-        </div>
-      </details>
-    </div>
-
-    <!-- 信頼性メッセージ -->
-    <div class="mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
-      <div class="flex items-center gap-2 text-green-300">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
-        <span class="font-medium text-sm">
-          あなたのデータは常にあなたのものです。システムは必要最小限のアクセスのみを行い、データの所有権を侵害することはありません。
-        </span>
-      </div>
-    </div>
-  </div>
-
   </div>
       </div>
     </div>
   </main>
-  
-  <!-- トースト通知コンテナ -->
-  <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2">
-    <!-- トーストメッセージがここに動的に追加されます -->
-  </div>
   
   <!-- 統合フッター -->
   <footer id="admin-footer" class="fixed bottom-0 left-0 right-0 glass-panel border-t border-gray-700 hidden">
@@ -1200,21 +1047,7 @@
             <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
-            <div class="relative">
-              <span class="text-green-400 font-semibold text-sm cursor-help" id="published-status-trigger">公開中:</span>
-              <!-- 公開ステータスのツールチップ -->
-              <div id="published-status-tooltip" class="hidden absolute z-10 p-3 bg-gray-800 border border-gray-600 rounded-lg shadow-lg text-xs text-gray-300 max-w-xs top-full mt-2 left-0">
-                <div class="flex items-start gap-2">
-                  <span class="text-green-400 text-sm">🟢</span>
-                  <div>
-                    <p class="text-gray-200 font-medium mb-1">現在の公開状態</p>
-                    <p class="text-gray-300">📱 生徒は回答ボードにアクセスできます。</p>
-                    <p class="text-yellow-300 mt-1">⏰ 6時間後に自動で非公開になります。</p>
-                    <p class="text-gray-400 mt-1">💡 継続したい場合は「公開する」ボタンで延長してください。</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <span class="text-green-400 font-semibold text-sm">公開中:</span>
           </div>
           <p class="text-blue-300 font-medium text-lg" id="current-topic-text">読み込み中...</p>
         </div>
@@ -1277,46 +1110,6 @@
           </svg>
           公開する
         </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 新しい公開確認モーダル -->
-  <div id="publish-confirmation-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 hidden items-center justify-center p-4">
-    <div class="glass-panel p-6 rounded-xl max-w-md w-full slide-up">
-      <div class="text-center">
-        <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-          </svg>
-        </div>
-        <h3 class="text-xl font-bold text-cyan-400 mb-3">🎯 回答ボードを公開しますか？</h3>
-        <p class="text-gray-300 mb-4 text-sm">
-          生徒がボードにアクセスできるようになります。<br>
-          <span class="text-yellow-300">📅 安全のため6時間後に自動で非公開に戻ります。</span>
-        </p>
-        
-        <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3 mb-6">
-          <div class="flex items-center gap-2 text-blue-300 text-sm">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <span>設定は既に保存済みです。いつでも公開・非公開を切り替えられます。</span>
-          </div>
-        </div>
-        
-        <div class="flex gap-3">
-          <button type="button" id="publish-confirmation-cancel" class="btn btn-secondary flex-1">
-            キャンセル
-          </button>
-          <button type="button" id="publish-confirmation-confirm" class="btn btn-primary flex-1">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            公開する
-          </button>
-        </div>
       </div>
     </div>
   </div>
@@ -2113,12 +1906,7 @@ elements = {
   reasonHeader: document.getElementById('reasonHeader'),
   nameHeader: document.getElementById('nameHeader'),
   classHeader: document.getElementById('classHeader'),
-  draftSaveBtn: document.getElementById('draft-save-btn'),
-  publishBtn: document.getElementById('publish-btn'),
-  publishTooltipTrigger: document.getElementById('publish-tooltip-trigger'),
-  publishTooltip: document.getElementById('publish-tooltip'),
-  publishedStatusTrigger: document.getElementById('published-status-trigger'),
-  publishedStatusTooltip: document.getElementById('published-status-tooltip'),
+  saveConfigBtn: document.getElementById('save-config-btn'),
   detailOptions: document.getElementById('detail-options'),
   boardUrl: document.getElementById('board-url'),
   viewBoardLink: document.getElementById('view-board-link'),
@@ -2469,39 +2257,6 @@ function setupEventListeners() {
   
   if (publishModalPrivateBtn) {
     publishModalPrivateBtn.addEventListener('click', saveWithoutPublish);
-  }
-  
-  // 新しい分離されたボタンのイベントリスナー
-  if (elements.draftSaveBtn) {
-    elements.draftSaveBtn.addEventListener('click', saveDraft);
-  }
-  
-  if (elements.publishBtn) {
-    elements.publishBtn.addEventListener('click', showPublishConfirmation);
-  }
-  
-  // ツールチップのイベントリスナー
-  if (elements.publishTooltipTrigger && elements.publishTooltip) {
-    elements.publishTooltipTrigger.addEventListener('mouseenter', showPublishTooltip);
-    elements.publishTooltipTrigger.addEventListener('mouseleave', hidePublishTooltip);
-  }
-  
-  // 公開ステータスツールチップのイベントリスナー
-  if (elements.publishedStatusTrigger && elements.publishedStatusTooltip) {
-    elements.publishedStatusTrigger.addEventListener('mouseenter', showPublishedStatusTooltip);
-    elements.publishedStatusTrigger.addEventListener('mouseleave', hidePublishedStatusTooltip);
-  }
-  
-  // 新しい公開確認モーダルのイベントリスナー
-  var publishConfirmationCancel = document.getElementById('publish-confirmation-cancel');
-  var publishConfirmationConfirm = document.getElementById('publish-confirmation-confirm');
-  
-  if (publishConfirmationCancel) {
-    publishConfirmationCancel.addEventListener('click', hidePublishConfirmation);
-  }
-  
-  if (publishConfirmationConfirm) {
-    publishConfirmationConfirm.addEventListener('click', confirmPublish);
   }
   // ★★★ ここまで追加 ★★★
 }
@@ -4166,240 +3921,6 @@ function populateSheetSelect(sheets, activeSheetName) {
       window.pendingConfig = null;
     }
 
-    /**
-     * トースト通知を表示する関数
-     */
-    function showToast(message, type = 'success', duration = 4000) {
-      const toastContainer = document.getElementById('toast-container');
-      if (!toastContainer) return;
-
-      const toast = document.createElement('div');
-      toast.className = `glass-panel p-4 rounded-lg border-l-4 max-w-md transform transition-all duration-300 translate-x-full opacity-0 ${
-        type === 'success' ? 'border-l-green-500 bg-green-900/20' :
-        type === 'error' ? 'border-l-red-500 bg-red-900/20' :
-        type === 'warning' ? 'border-l-yellow-500 bg-yellow-900/20' :
-        'border-l-blue-500 bg-blue-900/20'
-      }`;
-
-      const icon = type === 'success' ? '✅' :
-                   type === 'error' ? '❌' :
-                   type === 'warning' ? '⚠️' : 'ℹ️';
-
-      toast.innerHTML = `
-        <div class="flex items-center gap-3">
-          <span class="text-lg">${icon}</span>
-          <span class="text-sm text-gray-200 flex-1">${message}</span>
-          <button type="button" class="text-gray-400 hover:text-white" onclick="this.parentElement.parentElement.remove()">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-      `;
-
-      toastContainer.appendChild(toast);
-
-      // アニメーション
-      setTimeout(() => {
-        toast.classList.remove('translate-x-full', 'opacity-0');
-      }, 100);
-
-      // 自動削除
-      setTimeout(() => {
-        toast.classList.add('translate-x-full', 'opacity-0');
-        setTimeout(() => {
-          if (toast.parentElement) {
-            toast.remove();
-          }
-        }, 300);
-      }, duration);
-    }
-
-    /**
-     * 下書き保存機能
-     */
-    function saveDraft() {
-      const currentSheetName = elements.sheetSelect.value;
-      
-      if (!currentSheetName) {
-        showToast('シートが選択されていません。', 'error');
-        return;
-      }
-      if (!elements.opinionHeader.value) {
-        showToast('回答データ列を選択してください。', 'error');
-        return;
-      }
-
-      // 設定オブジェクトを作成
-      const showNamesCheckbox = document.getElementById('showNames');
-      const showCountsCheckbox = document.getElementById('showCounts');
-      
-      const cfg = {
-        opinionHeader: elements.opinionHeader.value,
-        reasonHeader: elements.reasonHeader.value,
-        nameHeader: elements.nameHeader.value,
-        classHeader: elements.classHeader.value,
-        showNames: showNamesCheckbox ? showNamesCheckbox.checked : false,
-        showCounts: showCountsCheckbox ? showCountsCheckbox.checked : true
-      };
-
-      // ボタンを無効化
-      elements.draftSaveBtn.disabled = true;
-      elements.publishBtn.disabled = true;
-      const draftSaveText = document.getElementById('draft-save-text');
-      if (draftSaveText) draftSaveText.textContent = '保存中...';
-
-      // 設定のみを保存
-      google.script.run
-        .withSuccessHandler(function(result) {
-          elements.draftSaveBtn.disabled = false;
-          elements.publishBtn.disabled = false;
-          if (draftSaveText) draftSaveText.textContent = '下書き保存';
-          
-          showToast('📄 設定を下書き保存しました。いつでも公開できます。', 'success');
-          loadStatus(true); // ステータスを更新
-        })
-        .withFailureHandler(function(error) {
-          elements.draftSaveBtn.disabled = false;
-          elements.publishBtn.disabled = false;
-          if (draftSaveText) draftSaveText.textContent = '下書き保存';
-          
-          showToast('保存中にエラーが発生しました: ' + error.message, 'error');
-        })
-        .saveConfig(currentSheetName, cfg);
-    }
-
-    /**
-     * 公開確認モーダルを表示
-     */
-    function showPublishConfirmation() {
-      const currentSheetName = elements.sheetSelect.value;
-      
-      if (!currentSheetName) {
-        showToast('シートが選択されていません。', 'error');
-        return;
-      }
-      if (!elements.opinionHeader.value) {
-        showToast('回答データ列を選択してください。', 'error');
-        return;
-      }
-
-      // 設定を一時保存
-      const showNamesCheckbox = document.getElementById('showNames');
-      const showCountsCheckbox = document.getElementById('showCounts');
-      
-      window.pendingPublishConfig = {
-        spreadsheetId: currentStatus.userInfo.spreadsheetId,
-        sheetName: currentSheetName,
-        config: {
-          opinionHeader: elements.opinionHeader.value,
-          reasonHeader: elements.reasonHeader.value,
-          nameHeader: elements.nameHeader.value,
-          classHeader: elements.classHeader.value,
-          showNames: showNamesCheckbox ? showNamesCheckbox.checked : false,
-          showCounts: showCountsCheckbox ? showCountsCheckbox.checked : true
-        }
-      };
-
-      // モーダルを表示
-      const modal = document.getElementById('publish-confirmation-modal');
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-      }
-    }
-
-    /**
-     * 公開確認モーダルを非表示
-     */
-    function hidePublishConfirmation() {
-      const modal = document.getElementById('publish-confirmation-modal');
-      if (modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-      }
-      window.pendingPublishConfig = null;
-    }
-
-    /**
-     * 公開を確定実行
-     */
-    function confirmPublish() {
-      if (!window.pendingPublishConfig) {
-        showToast('設定が見つかりません。', 'error');
-        return;
-      }
-
-      hidePublishConfirmation();
-      
-      // ボタンを無効化
-      elements.draftSaveBtn.disabled = true;
-      elements.publishBtn.disabled = true;
-      const publishText = document.getElementById('publish-text');
-      if (publishText) publishText.textContent = '公開中...';
-
-      // 設定保存と公開を実行
-      google.script.run
-        .withSuccessHandler(function(status) {
-          elements.draftSaveBtn.disabled = false;
-          elements.publishBtn.disabled = false;
-          if (publishText) publishText.textContent = '公開する';
-          
-          updateStatus(status);
-          showToast('🎯 ボードが正常に公開されました！6時間後に自動で非公開になります。', 'success', 6000);
-          markStepCompleted(3);
-          window.pendingPublishConfig = null;
-        })
-        .withFailureHandler(function(error) {
-          elements.draftSaveBtn.disabled = false;
-          elements.publishBtn.disabled = false;
-          if (publishText) publishText.textContent = '公開する';
-          
-          showToast('公開中にエラーが発生しました: ' + error.message, 'error');
-        })
-        .saveAndActivateSheet(
-          window.pendingPublishConfig.spreadsheetId,
-          window.pendingPublishConfig.sheetName,
-          window.pendingPublishConfig.config
-        );
-    }
-
-    /**
-     * ツールチップを表示
-     */
-    function showPublishTooltip() {
-      if (elements.publishTooltip) {
-        elements.publishTooltip.classList.remove('hidden');
-      }
-    }
-
-    /**
-     * ツールチップを非表示
-     */
-    function hidePublishTooltip() {
-      if (elements.publishTooltip) {
-        elements.publishTooltip.classList.add('hidden');
-      }
-    }
-
-    /**
-     * 公開ステータスツールチップを表示
-     */
-    function showPublishedStatusTooltip() {
-      if (elements.publishedStatusTooltip) {
-        elements.publishedStatusTooltip.classList.remove('hidden');
-      }
-    }
-
-    /**
-     * 公開ステータスツールチップを非表示
-     */
-    function hidePublishedStatusTooltip() {
-      if (elements.publishedStatusTooltip) {
-        elements.publishedStatusTooltip.classList.add('hidden');
-      }
-    }
-
     function switchToSheet() {
       if (!selectedSheet) return;
       
@@ -4637,7 +4158,7 @@ function populateSheetSelect(sheets, activeSheetName) {
       <div class="p-6">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-xl font-bold text-white">セキュリティ対策について</h2>
-          <button type="button" id="security-modal-close" class="text-gray-400 hover:text-white" aria-label="モーダルを閉じる" title="モーダルを閉じる">
+          <button type="button" id="security-modal-close" class="text-gray-400 hover:text-white">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
             </svg>
