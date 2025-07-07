@@ -1,133 +1,116 @@
-Of course. Here is a version of the coding AI's guidebook written in English, incorporating the file structure rules we discussed. You can copy and paste this directly into your project's `AGENTS.md` file.
+# 🤖 Agent's Guidebook for "みんなの回答ボード"
 
------
+このドキュメントは、本プロジェクトに貢献するすべてのAIエージェント（および開発者）が遵守すべきガイドラインです。目的は、コードの品質と一貫性を保ち、効率的な開発を促進することです。
 
-# 🤖 Agent's Guidebook for "Everyone's Answer Board"
+## 1. エージェントの役割と目標
 
-This document provides the essential guidelines for all AI agents (and human developers) contributing to this project. Its purpose is to maintain code quality and consistency, and to promote efficient development.
+あなたの役割は、単なるコード生成者ではなく、**教育現場で利用するユーザーの視点を持つプロダクト開発パートナー**です。
 
-## 1\. Agent's Role and Objective
+**目標:**
+* `README.md` に基づき、堅牢で保守性の高い機能を実装すること。
+* パフォーマンス、セキュリティ、アクセシビリティといった非機能要件を常に意識し、高品質なユーザー体験を追求すること。
+* 教育現場での利用シーンを想定し、ITに不慣れな教師や生徒でも直感的に使えるUI/UXを提案・実装すること。
 
-Your role is not just a code generator, but a **product development partner with the perspective of a user in an educational setting.**
+## 2. 基本原則
 
-**Objective:**
+1.  **要件定義書が正義**: すべての実装は、`README.md` に記載された要件定義書を正とします。不明点や矛盾があれば、まず要件を確認してください。
+2.  **シンプル is ベスト**: 複雑なコードよりも、シンプルで可読性の高いコードを優先します。
+3.  **セキュリティ第一**: サービスアカウントのキーや個人情報など、機密情報の取り扱いには最大限の注意を払ってください。
+4.  **テストなきコードは罪**: 新機能の実装やバグ修正には、必ずテストコードを伴わせてください。
+5.  **ユーザー中心設計**: 機能開発の際は、常に教師と生徒の視点に立ち、その利便性を最優先に考えてください。
 
-  * To implement robust and maintainable features based on the requirements in `README.md`.
-  * To pursue a high-quality user experience by always considering non-functional requirements such as performance, security, and accessibility.
-  * To propose and implement an intuitive UI/UX for teachers and students who may not be familiar with IT, by envisioning how the tool will be used in the classroom.
+## 3. 開発ワークフロー
 
-## 2\. Core Principles
+1.  **要件の理解**: Issueやタスク指示を読み込み、関連する`README.md` の箇所を熟読します。
+2.  **設計**: 機能実装の前に、頭の中でクラスや関数の構成、データの流れを設計します。
+3.  **実装 (Coding)**: `src` ディレクトリ内の適切なファイルに、コードスタイルガイドに従って実装します。
+4.  **テスト**: `tests` ディレクトリに、実装した機能に対するJestテストを作成し、実行します。
+5.  **セルフレビュー**: コミットする前に、自身のコードが基本原則と各種ガイドラインを満たしているか確認します。
+6.  **コミット**: 後述の「コミットメッセージ形式」に従って、変更をコミットします。
+7.  **プルリクエスト (PR)**: PRを作成し、変更内容と理由を明確に記述します。
 
-1.  **The requirements document is the single source of truth**: All implementations must be based on the requirements defined in `README.md`. If anything is unclear or contradictory, refer to the requirements first.
-2.  **Simplicity is best**: Prioritize simple, readable code over complex solutions.
-3.  **Security first**: Exercise the utmost caution when handling sensitive information, such as service account keys and personal data.
-4.  **No code without tests**: All new features and bug fixes must be accompanied by tests.
-5.  **User-centered design**: When developing features, always consider the perspectives of teachers and students and prioritize their convenience.
+## 4. コードスタイルガイド
 
-## 3\. Development Workflow
+* **言語**: Google Apps Script (GAS) は、最新のV8ランタイムで動作するJavaScriptです。
+* **規約**: 基本的に **Google JavaScript Style Guide** に準拠します。
+* **ブラウザ互換性**: 教育現場での幅広いデバイス・ブラウザ対応のため、**ES5互換のJavaScript**を使用してください。
+  * **禁止構文**: アロー関数 (`=>`), デフォルトパラメータ (`param = 'default'`), オプショナルチェーニング (`obj?.prop`), for...of構文
+  * **推奨構文**: `function() {}`, 従来のパラメータ処理 (`param = param || 'default'`), 論理演算子での安全アクセス (`obj && obj.prop`), 従来のforループ
+  * **対象ブラウザ**: Internet Explorer 11以下、古いAndroidブラウザ、古いSafari、レガシーブラウザ全般
+  * **コード例**:
+    ```javascript
+    // ❌ 禁止: ES6+構文
+    const func = (param = 'default') => {
+      for (const item of items) {
+        console.log(item?.name);
+      }
+    };
+    
+    // ✅ 推奨: ES5互換構文
+    function func(param) {
+      param = param || 'default';
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i];
+        console.log(item && item.name ? item.name : null);
+      }
+    }
+    ```
+* **命名規則**:
+    * 変数・関数: `camelCase` (例: `getUserInfo`)
+    * クラス: `PascalCase` (例: `StudyQuestApp`)
+    * 定数: `UPPER_SNAKE_CASE` (例: `CACHE_TTL`)
+* **コメント**:
+    * 複雑なロジックや、意図が分かりにくい箇所には必ずコメントを残します。
+    * 公開する関数には **JSDoc** 形式でコメントを記述してください。
+    ```javascript
+    /**
+     * 指定されたユーザーIDの情報を取得します。
+     * @param {string} userId - 取得対象のユーザーID。
+     * @returns {object|null} ユーザー情報オブジェクト。見つからない場合はnull。
+     */
+    function getUserInfo(userId) {
+      // ...
+    }
+    ```
+* **ファイル構成**: プロジェクトの既存のファイル分割ルールに従ってください（例: `core.gs`, `database.gs`, `auth.gs` など）。
 
-1.  **Understand Requirements**: Read the issue or task description and review the relevant sections of `README.md`.
-2.  **Design**: Before implementation, mentally map out the structure of classes, functions, and the data flow.
-3.  **Implement (Coding)**: Write code in the appropriate files within the `src` directory, following the style guide.
-4.  **Test**: Create and run Jest tests for your new features in the `tests` directory.
-5.  **Self-Review**: Before committing, ensure your code adheres to the core principles and guidelines.
-6.  **Commit**: Commit your changes following the "Commit Message Format" described below.
-7.  **Pull Request (PR)**: Create a PR with a clear description of the changes and the reasoning behind them.
+## 5. テスト方針
 
-## 4\. Code Style and File Structure Guide
+* すべての新しいビジネスロジックには、**単体テスト**を追加してください。
+* テストは `/tests` ディレクトリに、`*.test.js` という命名規則で作成します。
+* 既存のテスト (`npm run test`) がすべてパスすることを確認してから、PRを作成してください。
 
-### **Language and Conventions**
+## 6. コミット & PRメッセージ形式
 
-  * **Language**: Google Apps Script (GAS) uses the modern V8 runtime, which supports modern JavaScript.
-  * **Style**: Adhere to the **Google JavaScript Style Guide**.
-  * **Naming Conventions**:
-      * Variables/Functions: `camelCase` (e.g., `getUserInfo`)
-      * Classes: `PascalCase` (e.g., `StudyQuestApp`)
-      * Constants: `UPPER_SNAKE_CASE` (e.g., `CACHE_TTL`)
+変更内容が一目でわかるように、**Conventional Commits** の規約に従います。
 
-### **【CRITICAL】File Organization and Separation of Concerns**
+**フォーマット:** `<type>(<scope>): <subject>`
 
-This project prioritizes maintainability within the Google Apps Script online editor. You **must** adhere to the following file structure rules.
+* **type**:
+    * `feat`: 新機能の追加
+    * `fix`: バグ修正
+    * `docs`: ドキュメントの変更
+    * `style`: コードスタイルの修正（コードの動作に影響しないもの）
+    * `refactor`: リファクタリング
+    * `test`: テストの追加・修正
+    * `chore`: ビルドプロセスや補助ツールの変更
+* **scope (任意)**: 変更範囲（例: `auth`, `admin`, `ui`）
+* **subject**: 変更内容の簡潔な説明（50字以内）
 
-#### **File Naming Convention**
+**良い例:**
+```
+feat(admin): 回答の承認機能を追加
+fix(ui): リアクションボタンが二重に押せる問題を修正
+docs(readme): セットアップ手順を更新
+test(core): toggleHighlight関数のテストケースを追加
+```
 
-All front-end files must be named using the format **`Role_Purpose.html`**. This ensures related files are grouped together alphabetically in the online editor.
+## 7. 禁止事項
 
-| Role | Prefix | Description | Example |
-| :--- | :--- | :--- | :--- |
-| **View** | `View_` | The main HTML file that provides the page structure. | `View_Board.html` |
-| **Style** | `Style_` | A file containing all CSS for the corresponding View. | `Style_Board.html` |
-| **Script**| `Script_`| A file containing all client-side JS for the corresponding View.| `Script_Board.html`|
-| **Component**| `Component_`| A reusable HTML snippet used across multiple Views. | `Component_Header.html`|
+1.  **機密情報を含めない**: APIキー、パスワード、サービスアカウントのJSONファイルなどを絶対にコードに含めないでください。
+2.  **`main` ブランチへの直接プッシュ**: すべての変更は、必ずプルリクエストを通じて行ってください。
+3.  **フォーマットの破壊**: `prettier` や `eslint` などのフォーマッタを無効にしないでください。
+4.  **巨大なPRの作成**: 機能ごと、修正ごとに小さく分割してPRを作成してください。
 
-#### **Implementation Rules**
-
-1.  **HTML (View\_\*.html)**:
-
-      * This file should only contain the structural skeleton of the page.
-      * CSS and JavaScript **must** be included from external files using GAS scriptlets `<?! ... ?>`. **Do not** write inline `<style>` or `<script>` tags directly in this file.
-      * **Example (`View_Board.html`):**
-        ```html
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <base target="_top">
-            <?! include('Style_Board'); ?>
-          </head>
-          <body>
-            <?! include('Component_Header'); ?>
-            <main id="answers"></main>
-            <?! include('Script_Board'); ?>
-          </body>
-        </html>
-        ```
-
-2.  **CSS (Style\_\*.html)**:
-
-      * The entire content of this file must be wrapped in a single `<style>` tag.
-
-3.  **JavaScript (Script\_\*.html)**:
-
-      * The entire content of this file must be wrapped in a single `<script>` tag.
-      * **You cannot use `import`/`export` syntax.** All scripts are ultimately included in a single HTML scope. To avoid polluting the global scope, it is recommended to wrap your code in an **IIFE `(function(){ ... })();`**.
-
-4.  **Server-Side (`Code.gs`)**:
-
-      * You must use the `include(filename)` helper function to load front-end files.
-        ```javascript
-        function include(filename) {
-          return HtmlService.createHtmlOutputFromFile(filename).getContent();
-        }
-        ```
-
-### **Comments**
-
-  * Leave comments for complex logic or code that may be difficult to understand.
-  * Use **JSDoc** format for all public functions.
-
-## 5\. Testing Policy
-
-  * Add **unit tests** for all new business logic.
-  * Tests should be created in the `/tests` directory with the `*.test.js` naming convention.
-  * Ensure all existing tests pass (`npm run test`) before creating a pull request.
-
-## 6\. Commit & PR Message Format
-
-Follow the **Conventional Commits** specification to ensure commit messages are clear and descriptive.
-
-**Format:** `<type>(<scope>): <subject>`
-
-  * **type**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
-  * **scope (optional)**: `auth`, `admin`, `ui`, etc.
-  * **subject**: A concise description of the change (max 50 characters).
-
-## 7\. Prohibited Actions
-
-1.  **Do not commit sensitive information**: Never include API keys, passwords, or service account JSON files in the codebase.
-2.  **Do not push directly to the `main` branch**: All changes must go through a pull request.
-3.  **Do not break formatting**: Do not disable formatters like `prettier` or `eslint`.
-4.  **Do not create massive pull requests**: Break down work into small, logical PRs for each feature or fix.
-
------
-
-This guidebook will be updated as the project evolves. Always refer to the latest version.
+---
+このガイドラインは、プロジェクトの成長とともに更新されます。常に最新版を確認してください。
