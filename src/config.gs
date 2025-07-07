@@ -708,10 +708,19 @@ function getGuessedHeaders(sheetName) {
     // 既存の堅牢なロジックを呼び出して結果を返す
     const mappingResult = autoMapHeaders(headers);
     
-    // 結果にallHeadersも含めて返す
+    // 既存の設定も取得
+    let existingConfig = null;
+    try {
+      existingConfig = getConfig(sheetName);
+    } catch (configError) {
+      console.warn('既存設定の取得に失敗しましたが、処理を続行します: ' + configError.toString());
+    }
+    
+    // 結果にallHeadersと既存設定も含めて返す
     const result = {
       ...mappingResult,
-      allHeaders: headers || []
+      allHeaders: headers || [],
+      existingConfig: existingConfig
     };
     
     console.log('自動判定を実行しました: sheet=%s, result=%s', sheetName, JSON.stringify(result));
