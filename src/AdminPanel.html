@@ -2907,6 +2907,13 @@ function populateSheetSelect(sheets, activeSheetName) {
         console.log('🔄 [1/3] Status Object Received', status);
         currentStatus = status; // 最新の状態をグローバルに保持
 
+        // elementsオブジェクトが初期化されていることを確認
+        if (!elements || !elements.sheetSelect) {
+            console.warn('Elements not yet initialized, deferring update...');
+            setTimeout(() => updateStatus(status), 100);
+            return;
+        }
+
         // 即座にUIに反映させるべき静的な情報を先に描画
         updateStaticInfo(status);
 
@@ -2929,6 +2936,8 @@ function populateSheetSelect(sheets, activeSheetName) {
         updateDatabaseInfo(status); // システム状況パネル
         updatePublicationStatusUI(status.isPublished, status.activeSheetName); // 公開ステータス
         populateSheetSelect(status.allSheets, status.activeSheetName); // シート選択肢
+        updateExistingUserSection(status); // 既存ユーザー向けセクションの表示制御
+        updateCurrentTopicDisplay(status); // 現在のトピック表示を更新
         const sheetSelect = document.getElementById('sheet-select');
         if(sheetSelect) sheetSelect.value = status.activeSheetName || '';
         console.log('✅ [2/3] Static UI Updated');
@@ -2993,15 +3002,23 @@ function populateSheetSelect(sheets, activeSheetName) {
     
     // 既存ユーザー向けセクションの表示制御
     function updateExistingUserSection(status) {
+      console.log('🏠 [DEBUG] updateExistingUserSection called with:', {
+        hasUserInfo: !!(status && status.userInfo),
+        hasSpreadsheetId: !!(status && status.userInfo && status.userInfo.spreadsheetId),
+        spreadsheetId: status?.userInfo?.spreadsheetId
+      });
+      
       var existingUserSection = document.getElementById('existing-user-section');
       var createBoardBtn = document.getElementById('create-board-btn');
       
       if (status && status.userInfo && status.userInfo.spreadsheetId) {
         // 既にスプレッドシートが設定されている既存ユーザーの場合
+        console.log('✅ [DEBUG] Showing existing user section, hiding create button');
         if (existingUserSection) existingUserSection.classList.remove('hidden');
         if (createBoardBtn) createBoardBtn.classList.add('hidden');
       } else {
         // 新規ユーザーの場合
+        console.log('❌ [DEBUG] Showing create button, hiding existing user section');
         if (existingUserSection) existingUserSection.classList.add('hidden');
         if (createBoardBtn) createBoardBtn.classList.remove('hidden');
       }
@@ -3763,6 +3780,12 @@ function populateSheetSelect(sheets, activeSheetName) {
         showNames: showNamesCheckbox ? showNamesCheckbox.checked : false,
         showCounts: showCountsCheckbox ? showCountsCheckbox.checked : true
       };
+      
+      console.log('💾 [DEBUG] Saving config:', {
+        currentSheetName: currentSheetName,
+        spreadsheetId: currentStatus.userInfo.spreadsheetId,
+        cfg: cfg
+      });
       
       // 4. ローディング表示を開始
       setLoading(true, '設定を保存・適用中...');
