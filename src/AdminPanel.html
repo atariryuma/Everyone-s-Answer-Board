@@ -2336,24 +2336,55 @@ function updateDatabaseInfo(status) {
 
 // チェックボックスの状態を同期する関数
 function syncCheckboxStates(status) {
+  // 設定データの優先順位: 公開シート設定 > グローバル設定 > デフォルト値
+  const activeSheetName = status.activeSheetName || status.publishedSheetName;
+  const sheetConfig = activeSheetName && status.systemStatus ? 
+    status.systemStatus[`sheet_${activeSheetName}`] : null;
+  
+  // showNames の値を決定
+  const showNames = sheetConfig?.showNames !== undefined ? 
+    sheetConfig.showNames : 
+    (status.showNames !== undefined ? status.showNames : false);
+    
+  // showCounts の値を決定
+  const showCounts = sheetConfig?.showCounts !== undefined ? 
+    sheetConfig.showCounts : 
+    (status.showCounts !== undefined ? status.showCounts : true);
+  
   // 名前表示チェックボックスの同期
   const showNamesCheckbox = document.getElementById('showNames');
   if (showNamesCheckbox) {
-    showNamesCheckbox.checked = !!status.showNames;
+    showNamesCheckbox.checked = showNames;
   }
   
   // リアクション数表示チェックボックスの同期
   const showCountsCheckbox = document.getElementById('showCounts');
   if (showCountsCheckbox) {
-    showCountsCheckbox.checked = !!status.showCounts;
+    showCountsCheckbox.checked = showCounts;
   }
   
   console.log('🔄 [DEBUG] Checkbox sync:', {
-    showNames: !!status.showNames,
-    showCounts: !!status.showCounts,
+    activeSheetName,
+    sheetConfig,
+    showNames,
+    showCounts,
+    globalShowNames: status.showNames,
+    globalShowCounts: status.showCounts,
     showNamesCheckbox: showNamesCheckbox?.checked,
     showCountsCheckbox: showCountsCheckbox?.checked
   });
+  
+  // システム状況パネルの表示も更新
+  updateSystemDisplayInfo(showNames, showCounts);
+}
+
+// システム状況パネルの表示情報を更新
+function updateSystemDisplayInfo(showNames, showCounts) {
+  const displayMode = showNames ? '名前表示' : '匿名表示';
+  const countDisplay = showCounts ? '表示' : '非表示';
+  
+  safeSetText('info-display-mode', displayMode);
+  safeSetText('info-show-counts', countDisplay);
 }
 
 

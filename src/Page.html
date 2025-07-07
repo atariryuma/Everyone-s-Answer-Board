@@ -2564,8 +2564,20 @@ async handleReaction(rowIndex, reaction) {
             }
         } else {
             const errorMsg = res?.message || 'リアクションの処理に失敗しました';
-            debugLog('リアクションAPIエラー:', { res, errorMsg });
-            throw new Error(errorMsg);
+            debugLog('リアクションAPIエラー:', { 
+                res, 
+                errorMsg,
+                responseType: typeof res,
+                hasValues: res?.values !== undefined,
+                responseKeys: res ? Object.keys(res) : []
+            });
+            
+            // ユーザーフレンドリーなエラーメッセージ
+            if (errorMsg.includes('Cannot read properties of undefined')) {
+                throw new Error('データの読み込みに失敗しました。ページを更新してもう一度お試しください。');
+            } else {
+                throw new Error(errorMsg);
+            }
         }
     } catch (error) {
         console.error('Failed to add reaction:', error);
