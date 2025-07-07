@@ -1946,7 +1946,7 @@ function refreshBoardData() {
  */
 function showAdminSidebar() {
   try {
-    var template = HtmlService.createTemplateFromFile('src/pages/AdminPanel');
+    var template = HtmlService.createTemplateFromFile('View_AdminPanel');
     var html = template.evaluate()
       .setTitle('みんなの回答ボード - 管理パネル')
       .setWidth(400);
