@@ -182,6 +182,12 @@ function getDeployUserDomainInfo() {
 function performSimpleCleanup() {
   try {
     // 期限切れPropertiesServiceエントリの削除
+    // スプレッドシートの共有設定をチェック
+    var sharingCheck = checkSpreadsheetSharingPermission(dbId);
+    if (sharingCheck.status === 'error') {
+      throw new Error(sharingCheck.message);
+    }
+
     var props = PropertiesService.getScriptProperties();
     var allProps = props.getProperties();
     var now = Date.now();

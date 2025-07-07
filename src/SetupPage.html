@@ -258,7 +258,15 @@
                         })
                         .withFailureHandler((error) => {
                             console.error('Setup error:', error);
-                            showMessage(`❌ セットアップに失敗しました: ${error.message || error}`, 'error');
+                            let displayMessage = `❌ セットアップに失敗しました: ${error.message || error}`;
+                            if (error.message && error.message.includes('スプレッドシートの共有設定が「制限付き」になっていません')) {
+                                displayMessage = `
+                                    <p class="font-bold">${error.message}</p>
+                                    <p class="mt-2">セキュリティのため、データベースとして使用するスプレッドシートの共有設定を「制限付き」に変更してください。</p>
+                                    <p>変更方法: スプレッドシートを開き、「共有」ボタン → 「一般的なアクセス」を「制限付き」に変更。</p>
+                                `;
+                            }
+                            showMessage(displayMessage, 'error');
                             reject(error);
                         })
                         .setupApplication(serviceAccountJson, databaseId);

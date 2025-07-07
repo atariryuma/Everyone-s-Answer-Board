@@ -1324,7 +1324,22 @@ function createStudyQuestForm(userEmail, userId) {
       userEmail: userEmail,
       userId: userId,
       questions: 'default',
-      formDescription: '🌟 みんなの回答ボードへようこそ！🌟\n\nここは、あなたの大切な考えや意見を安心して表現できる場所です。\n\n📚 このプラットフォームは「デジタル・シティズンシップ」の理念に基づいて設計されています：\n• 多様な意見を尊重し合う\n• 建設的で思いやりのある対話を心がける\n• オンライン空間でも相手への敬意を忘れない\n• 自分の考えを誠実に表現する\n\n🔒 あなたのプライバシーを大切にします：\n• 回答は匿名で表示されます\n• 個人情報は適切に保護されます\n• 安心して本音を共有してください\n\nあなたの声が、みんなの学びを豊かにします。一緒に素晴らしい対話の場を作りましょう！'
+      formDescription: '🌟 みんなの回答ボードへようこそ！🌟
+
+ここは、あなたの大切な考えや意見を安心して表現できる場所です。
+
+📚 このプラットフォームは「デジタル・シティズンシップ」の理念に基づいて設計されています：
+• 多様な意見を尊重し合う
+• 建設的で思いやりのある対話を心がける
+• オンライン空間でも相手への敬意を忘れない
+• 自分の考えを誠実に表現する
+
+🔒 あなたのプライバシーを大切にします：
+• 回答は匿名で表示されます
+• 個人情報は適切に保護されます
+• 安心して本音を共有してください
+
+あなたの声が、みんなの学びを豊かにします。一緒に素晴らしい対話の場を作りましょう！'
     });
     
     // カスタマイズされた設定を追加
@@ -1344,20 +1359,38 @@ function createStudyQuestForm(userEmail, userId) {
     var appUrls = generateAppUrls(userId);
     var boardUrl = appUrls.viewUrl || (appUrls.webAppUrl + '?userId=' + encodeURIComponent(userId || ''));
     
-    var confirmationMessage = '🎉 素晴らしい！あなたの声が届きました！\n\n' +
-      '✨ あなたの考えを共有してくれて、ありがとうございます。\n' +
-      'あなたの意見は、クラスのみんなにとって大切な学びの材料になります。\n\n' +
-      '🤝 デジタル・シティズンシップを実践しよう：\n' +
-      '• 他の人の意見も尊重しながら読んでみましょう\n' +
-      '• 違う考えに出会ったら、「なるほど！」で反応してみよう\n' +
-      '• 良いと思った意見には「いいね！」で応援しよう\n' +
-      '• もっと知りたいことがあれば「もっと知りたい！」で示そう\n\n' +
-      '🌈 多様な意見こそが、みんなの成長につながります。\n' +
-      'お友達の色々な考えも見てみましょう。きっと新しい発見がありますよ！\n\n' +
-      '📋 みんなの回答ボード:\n' + boardUrl;
+    var confirmationMessage = '🎉 素晴らしい！あなたの声が届きました！
+
+' +
+      '✨ あなたの考えを共有してくれて、ありがとうございます。
+' +
+      'あなたの意見は、クラスのみんなにとって大切な学びの材料になります。
+
+' +
+      '🤝 デジタル・シティズンシップを実践しよう：
+' +
+      '• 他の人の意見も尊重しながら読んでみましょう
+' +
+      '• 違う考えに出会ったら、「なるほど！」で反応してみよう
+' +
+      '• 良いと思った意見には「いいね！」で応援しよう
+' +
+      '• もっと知りたいことがあれば「もっと知りたい！」で示そう
+
+' +
+      '🌈 多様な意見こそが、みんなの成長につながります。
+' +
+      'お友達の色々な考えも見てみましょう。きっと新しい発見がありますよ！
+
+' +
+      '📋 みんなの回答ボード:
+' + boardUrl;
       
     if (form.getPublishedUrl()) {
-      confirmationMessage += '\n\n✏️ 回答を修正したい場合は、こちらから編集できます:\n' + form.getPublishedUrl();
+      confirmationMessage += '
+
+✏️ 回答を修正したい場合は、こちらから編集できます:
+' + form.getPublishedUrl();
     }
     
     form.setConfirmationMessage(confirmationMessage);
@@ -1431,9 +1464,58 @@ function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName) {
     }
     
     console.log('リアクション列を追加しました: ' + sheetName);
-  } catch (e) {
+  }
+  catch (e) {
     console.error('リアクション列追加エラー: ' + e.message);
     // エラーでも処理は継続
+  }
+}
+
+/**
+ * スプレッドシートの共有設定をチェックする
+ * @param {string} spreadsheetId - チェックするスプレッドシートのID
+ * @returns {object} status ('success' or 'error') と message
+ */
+function checkSpreadsheetSharingPermission(spreadsheetId) {
+  try {
+    var service = getDriveService(); // Drive APIサービスを取得
+    var file = service.files.get({
+      fileId: spreadsheetId,
+      fields: 'permissions'
+    });
+
+    var isRestricted = true;
+    var publicAccessFound = false;
+
+    if (file.permissions) {
+      for (var i = 0; i < file.permissions.length; i++) {
+        var permission = file.permissions[i];
+        // typeが'anyone'または'domain'でroleが'reader'以上の場合は公開状態
+        if (permission.type === 'anyone' || (permission.type === 'domain' && permission.role !== 'reader')) {
+          publicAccessFound = true;
+          isRestricted = false;
+          break;
+        }
+      }
+    }
+
+    if (publicAccessFound) {
+      return {
+        status: 'error',
+        message: 'スプレッドシートの共有設定が「制限付き」になっていません。セキュリティのため、「制限付き」に設定してください。'
+      };
+    } else {
+      return {
+        status: 'success',
+        message: 'スプレッドシートの共有設定は「制限付き」です。'
+      };
+    }
+  } catch (e) {
+    console.error('スプレッドシート共有設定チェックエラー: ' + e.message);
+    return {
+      status: 'error',
+      message: 'スプレッドシートの共有設定の確認中にエラーが発生しました: ' + e.message
+    };
   }
 }
 
@@ -1922,4 +2004,25 @@ function isValidEmail(email) {
  */
 function getEmailDomain(email) {
   return email.split('@')[1] || '';
+}
+
+/**
+ * Drive APIサービスを取得
+ * @returns {object} Drive APIサービス
+ */
+function getDriveService() {
+  var accessToken = getServiceAccountTokenCached();
+  return {
+    accessToken: accessToken,
+    baseUrl: 'https://www.googleapis.com/drive/v3',
+    files: {
+      get: function(params) {
+        var url = this.baseUrl + '/files/' + params.fileId + '?fields=' + encodeURIComponent(params.fields);
+        var response = UrlFetchApp.fetch(url, {
+          headers: { 'Authorization': 'Bearer ' + this.accessToken }
+        });
+        return JSON.parse(response.getContentText());
+      }
+    }
+  };
 }
