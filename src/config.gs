@@ -262,11 +262,7 @@ function saveAndActivateSheet(spreadsheetId, sheetName, config) {
     const finalStatus = getStatus(true);
     console.log('saveAndActivateSheet: 統合処理完了');
 
-    return {
-      success: true,
-      message: '設定の保存・適用が完了しました',
-      status: finalStatus
-    };
+    return finalStatus;
 
   } catch (error) {
     console.error('saveAndActivateSheetで致命的なエラー:', error.message, error.stack);
@@ -725,6 +721,46 @@ function getGuessedHeaders(sheetName) {
     console.error('ヘッダーの自動判定に失敗しました: ' + e.toString());
     // エラーが発生した場合は、クライアント側で処理できるようエラー情報を返す
     return { error: e.message };
+  }
+}
+
+/**
+ * 指定されたシートのヘッダー情報と既存設定をまとめて取得します。
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {object} { allHeaders: Array<string>, guessedConfig: object, existingConfig: object }
+ */
+function getSheetDetails(spreadsheetId, sheetName) {
+  try {
+    if (!spreadsheetId || !sheetName) {
+      throw new Error('spreadsheetIdとsheetNameは必須です');
+    }
+
+    const ss = SpreadsheetApp.openById(spreadsheetId);
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      throw new Error('シートが見つかりません: ' + sheetName);
+    }
+
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] || [];
+    const guessed = autoMapHeaders(headers);
+
+    let existing = {};
+    try {
+      existing = getConfig(sheetName, true) || {};
+    } catch (e) {
+      console.warn('getConfig failed in getSheetDetails:', e.message);
+    }
+
+    return {
+      allHeaders: headers,
+      guessedConfig: guessed,
+      existingConfig: existing
+    };
+
+  } catch (error) {
+    console.error('getSheetDetails error:', error.message);
+    throw new Error('シート情報の取得に失敗しました: ' + error.message);
   }
 }
 

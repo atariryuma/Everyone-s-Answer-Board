@@ -2284,30 +2284,7 @@ function updateDatabaseInfo(status) {
   
   // 公開状態の更新
   const isPublished = status && (status.appPublished || (status.activeSheetName && status.publishedSheetName));
-  const publishStatusEl = document.getElementById('info-publish-status');
-  const publishIndicatorEl = document.getElementById('info-publish-indicator');
-  const publishTextEl = document.getElementById('info-publish-text');
-  
-  console.log('🔍 [DEBUG] Publish status check:', {
-    appPublished: status?.appPublished,
-    activeSheetName: status?.activeSheetName,
-    publishedSheetName: status?.publishedSheetName,
-    isPublished: isPublished
-  });
-  
-  if (publishStatusEl && publishIndicatorEl && publishTextEl) {
-    if (isPublished) {
-      publishStatusEl.className = 'px-2 py-1 rounded text-xs font-medium bg-green-600 text-white';
-      publishIndicatorEl.className = 'w-2 h-2 rounded-full bg-green-400';
-      publishTextEl.textContent = '公開中';
-      console.log('✅ [DEBUG] Set status to published');
-    } else {
-      publishStatusEl.className = 'px-2 py-1 rounded text-xs font-medium bg-gray-600 text-gray-300';
-      publishIndicatorEl.className = 'w-2 h-2 rounded-full bg-gray-400';
-      publishTextEl.textContent = '非公開';
-      console.log('❌ [DEBUG] Set status to unpublished');
-    }
-  }
+  updatePublicationStatusUI(isPublished);
 
   // 表示モードの更新
   const displayMode = status.showNames ? '名前表示' : '匿名表示';
@@ -2406,9 +2383,56 @@ function syncCheckboxStates(status) {
 function updateSystemDisplayInfo(showNames, showCounts) {
   const displayMode = showNames ? '名前表示' : '匿名表示';
   const countDisplay = showCounts ? '表示' : '非表示';
-  
+
   safeSetText('info-display-mode', displayMode);
   safeSetText('info-show-counts', countDisplay);
+}
+
+// 公開状態バッジの表示を更新
+function updatePublicationStatusUI(isPublished) {
+  var publishStatusEl = document.getElementById('info-publish-status');
+  var publishIndicatorEl = document.getElementById('info-publish-indicator');
+  var publishTextEl = document.getElementById('info-publish-text');
+
+  if (!publishStatusEl || !publishIndicatorEl || !publishTextEl) return;
+
+  if (isPublished) {
+    publishStatusEl.className = 'px-2 py-1 rounded text-xs font-medium bg-green-600 text-white';
+    publishIndicatorEl.className = 'w-2 h-2 rounded-full bg-green-400';
+    publishTextEl.textContent = '公開中';
+  } else {
+    publishStatusEl.className = 'px-2 py-1 rounded text-xs font-medium bg-gray-600 text-gray-300';
+    publishIndicatorEl.className = 'w-2 h-2 rounded-full bg-gray-400';
+    publishTextEl.textContent = '非公開';
+  }
+}
+
+// シート選択ドロップダウンを生成
+function populateSheetSelect(sheets) {
+  var select = document.getElementById('sheet-select');
+  if (!select) return;
+
+  select.replaceChildren();
+
+  if (sheets && sheets.length) {
+    var defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = '-- アクティブシートを選択 --';
+    select.appendChild(defaultOption);
+    sheets.forEach(function(name) {
+      var opt = document.createElement('option');
+      opt.value = typeof name === 'string' ? name : (name.name || String(name));
+      opt.textContent = opt.value;
+      select.appendChild(opt);
+    });
+    select.disabled = false;
+  } else {
+    var noData = document.createElement('option');
+    noData.value = '';
+    noData.textContent = '利用可能なボードがありません';
+    select.appendChild(noData);
+    select.disabled = true;
+  }
 }
 
 
@@ -2864,161 +2888,30 @@ function updateSystemDisplayInfo(showNames, showCounts) {
     }
 
     function updateStatus(status) {
-      if (!status) {
-        console.error('updateStatus: statusパラメータが無効です');
-        return;
-      }
-      
-      currentStatus = status; // ステータス情報を保存
-      currentActiveSheet = status.activeSheetName || '';
-      currentSpreadsheetUrl = status.spreadsheetUrl || '';
-      
-      var isActive = !!status.activeSheetName;
+      console.log('🔄 UI Update Sequence Started. Status:', status);
 
-      var now = new Date();
-      var lastUpdatedEl = document.getElementById('last-updated');
-      if (lastUpdatedEl) {
-        lastUpdatedEl.textContent = '最終更新: ' + now.toLocaleTimeString('ja-JP');
-      }
-      
-      
-      // フォーム編集ボタンの表示制御
-      updateFormEditSection(status);
-      
-      // フッターの問題表示を更新
+      currentStatus = status;
+
+      updateDatabaseInfo(status);
+      updatePublicationStatusUI(status.isPublished);
       updateCurrentTopicDisplay(status);
-      
-      var headerUserIdEl = document.getElementById('header-user-id');
-      if (headerUserIdEl && status && status.userId) {
-        headerUserIdEl.textContent = status.userId.substring(0, 8) + '...';
-      }
-      var headerAnswerCountEl = document.getElementById('header-answer-count');
-      if (headerAnswerCountEl) headerAnswerCountEl.textContent = (status && status.answerCount) || 0;
-      
-      
 
-      elements.sheetSelect.replaceChildren();
-      
-      // デバッグ情報を追加
-      console.log('allSheets received:', status && status.allSheets);
-      console.log('allSheets type:', status && typeof status.allSheets);
-      if (status && status.allSheets && status.allSheets.length > 0) {
-        console.log('First sheet item:', status.allSheets[0], 'type:', typeof status.allSheets[0]);
-      }
-      
-      if (status && status.allSheets && status.allSheets.length > 0) {
-        var defaultOption = document.createElement('option');
-        defaultOption.value = '';
-        defaultOption.textContent = '-- アクティブシートを選択 --';
-        elements.sheetSelect.appendChild(defaultOption);
-        status.allSheets.forEach(function(sheetItem) {
-          // シートアイテムが文字列かオブジェクトかを確認
-          var sheetName = typeof sheetItem === 'string' ? sheetItem : (sheetItem.name || sheetItem.toString());
-          
-          var opt = document.createElement('option');
-          opt.value = sheetName;
-          opt.textContent = sheetName;
-          if (sheetName === currentActiveSheet) opt.textContent += ' (公開中)';
-          elements.sheetSelect.appendChild(opt);
-        });
-        elements.sheetSelect.disabled = false;
-        if (status.activeSheetName) {
-          elements.sheetSelect.value = status.activeSheetName;
-          selectedSheet = status.activeSheetName;
+      populateSheetSelect(status.allSheets);
+
+      var sheetSelect = document.getElementById('sheet-select');
+      if (sheetSelect) {
+        sheetSelect.value = status.activeSheetName || (sheetSelect.options.length > 0 ? sheetSelect.options[0].value : '');
+        if (sheetSelect.value) {
+          loadConfigForSelected();
+        } else {
+          hideConfigArea();
         }
-      } else {
-        var noSheetsOption = document.createElement('option');
-        noSheetsOption.value = '';
-        noSheetsOption.textContent = '利用可能なボードがありません';
-        elements.sheetSelect.appendChild(noSheetsOption);
-        elements.sheetSelect.disabled = true;
       }
 
-      if (status.publishedSpreadsheetId && status.publishedSheetName) {
-        var baseUrl = status.webAppUrl;
-        
-        if (!baseUrl) {
-          console.warn('webAppUrlが取得できませんでした。フォールバック処理を実行します。');
-          baseUrl = window.location.origin + window.location.pathname;
-          
-          if (baseUrl.endsWith('/')) {
-            baseUrl = baseUrl.slice(0, -1);
-          }
-        }
-        
-        webAppUrl = baseUrl;
-        var boardUrl = baseUrl + 
-          '?userId=' + encodeURIComponent(status.userId) + 
-          '&spreadsheetId=' + encodeURIComponent(status.publishedSpreadsheetId) + 
-          '&sheetName=' + encodeURIComponent(status.publishedSheetName);
-        
-        console.log('URL生成完了:', { baseUrl, boardUrl, userId });
-        if (elements.boardUrl) elements.boardUrl.value = boardUrl;
-        if (elements.viewBoardLink) elements.viewBoardLink.href = boardUrl;
-        
-        // 統合フッターの表示制御
-        if (elements.adminFooter) {
-          elements.adminFooter.classList.remove('hidden');
-          elements.adminFooter.classList.add('fade-in');
-        }
-        
-        // 現在の問題文を更新
-        if (elements.currentTopicText) {
-          // 現在のアクティブシートの問題文を取得して表示
-          const currentSheetConfig = status.activeSheetName ? 
-            (status.sheetConfigs && status.sheetConfigs[status.activeSheetName]) || {} : {};
-          const questionText = currentSheetConfig.opinionHeader || status.activeSheetName || 'お題';
-          elements.currentTopicText.textContent = questionText;
-        }
-        
-        // レイアウト調整
-        setTimeout(adjustLayout, 100);
-        
-      } else {
-        // 統合フッターの非表示制御
-        if (elements.adminFooter) {
-          elements.adminFooter.classList.add('hidden');
-          elements.adminFooter.classList.remove('fade-in');
-        }
-        
-        // フッター内の要素をクリア
-        if (elements.boardUrl) elements.boardUrl.value = '';
-        if (elements.viewBoardLink) elements.viewBoardLink.href = '#';
-        if (elements.currentTopicText) elements.currentTopicText.textContent = 'ボードが公開されていません';
-        
-        // レイアウト調整
-        setTimeout(adjustLayout, 100);
-      }
+      syncCheckboxStates(status);
 
-      if (elements.detailOptions) {
-        var nameCb = elements.detailOptions.querySelector('input[name="showNames"]');
-        var countCb = elements.detailOptions.querySelector('input[name="showCounts"]');
-        if (nameCb) nameCb.checked = !!status.showNames;
-        if (countCb) countCb.checked = !!status.showCounts;
-      }
-      
-      // システム情報更新時のリクエスト重複を防ぐ
-      try {
-        updateDatabaseInfo(status);
-      } catch (e) {
-        console.warn('Database info update failed:', e);
-      }
-      
-      updateUIForSelectedSheet();
-      
-      // 公開済みで現在選択中のシートがアクティブシートの場合は、列情報の読み込みをスキップ
-      if (!(status.appPublished && (selectedSheet === status.activeSheetName || selectedSheet === status.publishedSheetName))) {
-        loadConfigForSelected();
-      }
-      
-      // 設定状況に応じたパネル開閉制御
-      updateCurrentTopicDisplay(status);
-      updatePanelStates(status); 
-      
       setLoading(false);
-      
-      // 既存ユーザー向けの追加フォームセクションの表示/非表示
-      updateExistingUserSection(status);
+      console.log('✅ UI Update Sequence Finished.');
     }
     
     // 既存ユーザー向けセクションの表示制御
@@ -3043,12 +2936,16 @@ function updateSystemDisplayInfo(showNames, showCounts) {
     });
     
     // システム状況のリアルタイム更新
+    var systemStatusInterval;
     function startSystemStatusUpdate() {
-      // 初回更新
+      function schedule() {
+        clearInterval(systemStatusInterval);
+        var interval = document.hidden ? 120000 : 30000;
+        systemStatusInterval = setInterval(updateSystemStatus, interval);
+      }
       updateSystemStatus();
-      
-      // 30秒ごとに自動更新
-      setInterval(updateSystemStatus, 30000);
+      schedule();
+      document.addEventListener('visibilitychange', schedule);
     }
     
     function updateSystemStatus() {
@@ -3606,73 +3503,25 @@ function updateSystemDisplayInfo(showNames, showCounts) {
     // CONFIG LOADING - Refactored into smaller functions
     // =============================================================================
     
-    function handleGuessedHeadersSuccess(guessedConfig) {
+    function handleSheetDetailsSuccess(details) {
       try {
-        if (guessedConfig && !guessedConfig.error) {
-          processGuessedHeaders(guessedConfig);
-          loadExistingConfig(guessedConfig);
-        } else {
-          showError(new Error(guessedConfig.error || '列の自動判定に失敗しました。'));
-          setLoading(false);
+        if (!details) {
+          throw new Error('シート情報の取得に失敗しました');
         }
-      } catch (error) {
-        showError(error);
-        setLoading(false);
-      }
-    }
-    
-    function processGuessedHeaders(guessedConfig) {
-      // サーバーからの結果を元にUIを構築
-      populateHeaderOptions(guessedConfig.allHeaders || []);
-      populateConfig(guessedConfig);
-      
-      // シート詳細情報を更新
-      updateSheetDetails(guessedConfig.allHeaders || []);
-    }
-    
-    function loadExistingConfig(guessedConfig) {
-      google.script.run
-        .withSuccessHandler(function(cfg) {
-          handleExistingConfigSuccess(cfg, guessedConfig);
-        })
-        .withFailureHandler(function(error) {
-          handleExistingConfigError(error);
-        })
-        .getConfig(selectedSheet, true);
-    }
-    
-    function handleExistingConfigSuccess(cfg, guessedConfig) {
-      try {
-        if (cfg && Object.keys(cfg).length > 0) {
-          populateConfig(Object.assign({}, guessedConfig, cfg));
-          showMessage('既存の設定をロードしました。', 'info');
-        } else {
-          showMessage('列の自動判定が完了しました。', 'success');
-        }
+        populateHeaderOptions(details.allHeaders || []);
+        var cfg = Object.assign({}, details.guessedConfig || {}, details.existingConfig || {});
+        populateConfig(cfg);
+        updateSheetDetails(details.allHeaders || []);
         updateConfigButtons();
       } finally {
         setLoading(false);
-        // 列情報取得後はUIのみ更新
         updateUIForSelectedSheet();
       }
     }
-    
-    function handleExistingConfigError(error) {
-      try {
-        // 既存設定がない場合はエラーではないので無視
-        showMessage('列の自動判定が完了しました。', 'success');
-        updateConfigButtons();
-      } finally {
-        setLoading(false);
-        // UIのみ更新し、公開状態の再取得は行わない
-        updateUIForSelectedSheet();
-      }
-    }
-    
-    function handleGuessedHeadersError(error) {
+
+    function handleSheetDetailsError(error) {
       setLoading(false);
       showError(error);
-      // ヘッダー取得失敗時はステータスを更新しない
       updateUIForSelectedSheet();
     }
     
@@ -3700,9 +3549,9 @@ function updateSystemDisplayInfo(showNames, showCounts) {
       setLoading(true, '列情報を読み込んでいます...');
 
       google.script.run
-        .withSuccessHandler(handleGuessedHeadersSuccess)
-        .withFailureHandler(handleGuessedHeadersError)
-        .getGuessedHeaders(selectedSheet);
+        .withSuccessHandler(handleSheetDetailsSuccess)
+        .withFailureHandler(handleSheetDetailsError)
+        .getSheetDetails(currentStatus.userInfo.spreadsheetId, selectedSheet);
     }
     
     // シート詳細情報を更新する関数
@@ -3845,17 +3694,10 @@ function updateSystemDisplayInfo(showNames, showCounts) {
 
       // 5. サーバーの統合関数を、正しい引数で呼び出す
       google.script.run
-        .withSuccessHandler(function(result) {
-          if (result && result.success) {
-            // 成功した場合：サーバーから返された最新の状態でUIを更新
-            updateStatus(result.status);
-            showMessage(result.message || '設定の保存とボードの公開が完了しました。', 'success');
-            markStepCompleted(3);
-          } else {
-            // サーバー側で制御されたエラーの場合
-            showError(new Error(result.message || '不明なエラーが発生しました。'));
-          }
-          
+        .withSuccessHandler(function(status) {
+          updateStatus(status);
+          showMessage('設定の保存とボードの公開が完了しました。', 'success');
+          markStepCompleted(3);
           setLoading(false);
           elements.saveConfigBtn.disabled = false;
           if (elements.saveConfigText) elements.saveConfigText.textContent = '設定を保存して公開';
