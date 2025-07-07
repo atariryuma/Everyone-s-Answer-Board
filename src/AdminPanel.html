@@ -2249,6 +2249,22 @@ function handleDeleteRequest() {
 
 
 /**
+ * UI要素のテキストを安全に設定するヘルパー関数
+ * @param {string} elementId - 要素のID
+ * @param {string} value - 設定する値
+ * @param {string} prefix - プレフィックス（オプション）
+ */
+function safeSetText(elementId, value, prefix = '') {
+  const element = document.getElementById(elementId);
+  if (element) {
+    element.textContent = value ? prefix + value : '-';
+    console.log(`✅ [DEBUG] Updated ${elementId}:`, element.textContent);
+  } else {
+    console.warn(`❌ [DEBUG] Element not found: ${elementId}`);
+  }
+}
+
+/**
  * サーバーから受け取ったstatusオブジェクトを元に、システム状況パネルを更新します。
  * @param {object} status - getStatusから返される完全なステータスオブジェクト
  */
@@ -2261,16 +2277,6 @@ function updateDatabaseInfo(status) {
   }
 
   console.log('✅ [DEBUG] User info found, updating system panel:', status.userInfo);
-
-  const safeSetText = (elementId, value, prefix = '') => {
-    const element = document.getElementById(elementId);
-    if (element) {
-      element.textContent = value ? prefix + value : '-';
-      console.log(`✅ [DEBUG] Updated ${elementId}:`, element.textContent);
-    } else {
-      console.warn(`❌ [DEBUG] Element not found: ${elementId}`);
-    }
-  };
 
   // 既存のフィールドを更新
   safeSetText('info-admin-email', status.userInfo.adminEmail);
