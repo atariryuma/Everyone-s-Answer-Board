@@ -504,7 +504,7 @@
   </header>
   <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8 pb-40">
     <!-- シンプル統合ステータスバー -->
-    <section class="mb-6">
+    <section class="mb-4">
       <div class="glass-panel p-4 rounded-lg">
         <div class="flex items-center justify-between">
           <!-- 左側: ステータス表示 -->
@@ -544,7 +544,7 @@
     <!-- メインコンテンツエリア -->
     <div class="responsive-grid">
       <!-- 左側：セットアップフロー -->
-      <div class="space-y-4 sm:space-y-6">
+      <div class="space-y-3 sm:space-y-4">
         
         <!-- ステップ1: データ準備 -->
         <div class="glass-panel p-4 sm:p-6" id="data-setup-section">
@@ -579,12 +579,25 @@
                   <h3 class="font-semibold">推奨：自動セットアップ</h3>
                 </div>
                 <p class="text-sm mb-4 opacity-90">GoogleフォームとスプレッドシートをWorkspace上で自動作成します</p>
-                <button type="button" id="create-board-btn" class="btn btn-google w-full">
-                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                  </svg>
-                  <span id="create-board-text">新しいボードを作成</span>
-                </button>
+                <div class="space-y-2">
+                  <button type="button" id="create-board-btn" class="btn btn-google w-full">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    <span id="create-board-text">新しいボードを作成</span>
+                  </button>
+                  
+                  <!-- 既存ユーザー向けの新しいフォーム作成 -->
+                  <div id="existing-user-section" class="hidden">
+                    <button type="button" id="create-additional-form-btn" class="btn btn-secondary w-full text-sm">
+                      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                      </svg>
+                      <span id="create-additional-form-text">追加のフォームを作成</span>
+                    </button>
+                    <p class="text-xs text-gray-400 mt-1">現在のボードに連携する新しいフォームを作成</p>
+                  </div>
+                </div>
               </div>
             </div>
             
@@ -614,10 +627,11 @@
                       <button type="button" id="add-resource-btn" class="btn btn-primary flex-1">
                         <span id="add-resource-text">リソースを追加</span>
                       </button>
-                      <button type="button" id="open-resource-btn" class="btn btn-secondary px-3" disabled title="追加後にリソースを開く">
+                      <button type="button" id="open-resource-btn" class="btn btn-secondary px-3" disabled title="フォームまたはスプレッドシートを開く">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14l-4 4-2-2"></path>
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                         </svg>
+                        <span id="open-resource-text" class="ml-1 text-xs hidden sm:inline">開く</span>
                       </button>
                     </div>
                   </div>
@@ -857,7 +871,11 @@
                 <li>自動でフォームとシートを作成</li>
                 <li>リアルタイムでデータを同期</li>
                 <li>複数のクラスで同時利用可能</li>
-                <li>セキュアで安全なデータ管理</li>
+                <li>セキュアで安全なデータ管理 
+                  <button type="button" id="security-info-btn" class="ml-2 text-blue-400 hover:text-blue-300 underline text-xs">
+                    セキュリティについて詳しく
+                  </button>
+                </li>
               </ul>
             </div>
             
@@ -1891,6 +1909,9 @@ elements = {
       setupEventListeners();
       adjustLayout();
       loadAdminDomainInfo();
+      
+      // システム状況のリアルタイム更新を開始
+      startSystemStatusUpdate();
     });
     // ===== 共通ドメイン情報処理関数 =====
     // AdminPanel.html と Registration.html で共通使用
@@ -2050,6 +2071,12 @@ function setupEventListeners() {
       if (quickCreateBtn) {
         quickCreateBtn.addEventListener('click', createBoard);
       }
+      
+      // 追加フォーム作成ボタン
+      var createAdditionalFormBtn = document.getElementById('create-additional-form-btn');
+      if (createAdditionalFormBtn) {
+        createAdditionalFormBtn.addEventListener('click', createAdditionalForm);
+      }
 
       var refreshBoardBtn = document.getElementById('refresh-board-btn');
       if (refreshBoardBtn) {
@@ -2133,6 +2160,39 @@ function setupEventListeners() {
   // ★★★ ここから追加 ★★★
   if (elements['delete-account-btn']) {
     elements['delete-account-btn'].addEventListener('click', handleDeleteRequest);
+  }
+  
+  // セキュリティモーダル関連のイベントリスナー
+  var securityInfoBtn = document.getElementById('security-info-btn');
+  var securityModal = document.getElementById('security-modal');
+  var securityModalClose = document.getElementById('security-modal-close');
+  var securityModalConfirm = document.getElementById('security-modal-confirm');
+  
+  if (securityInfoBtn && securityModal) {
+    securityInfoBtn.addEventListener('click', function() {
+      securityModal.classList.remove('hidden');
+    });
+  }
+  
+  if (securityModalClose && securityModal) {
+    securityModalClose.addEventListener('click', function() {
+      securityModal.classList.add('hidden');
+    });
+  }
+  
+  if (securityModalConfirm && securityModal) {
+    securityModalConfirm.addEventListener('click', function() {
+      securityModal.classList.add('hidden');
+    });
+  }
+  
+  // モーダル外クリックで閉じる
+  if (securityModal) {
+    securityModal.addEventListener('click', function(e) {
+      if (e.target === securityModal) {
+        securityModal.classList.add('hidden');
+      }
+    });
   }
   // ★★★ ここまで追加 ★★★
 }
@@ -2878,12 +2938,52 @@ function updateDatabaseInfo(status) {
       updatePanelStates(status); 
       
       setLoading(false);
+      
+      // 既存ユーザー向けの追加フォームセクションの表示/非表示
+      updateExistingUserSection(status);
+    }
+    
+    // 既存ユーザー向けセクションの表示制御
+    function updateExistingUserSection(status) {
+      var existingUserSection = document.getElementById('existing-user-section');
+      
+      if (existingUserSection && status && status.userInfo && status.userInfo.spreadsheetId) {
+        // 既にスプレッドシートが設定されている既存ユーザーの場合
+        existingUserSection.classList.remove('hidden');
+      } else if (existingUserSection) {
+        existingUserSection.classList.add('hidden');
+      }
     }
     
     // ページ読み込み完了時に確実にローディングをクリア
     window.addEventListener('load', function() {
       setLoading(false);
     });
+    
+    // システム状況のリアルタイム更新
+    function startSystemStatusUpdate() {
+      // 初回更新
+      updateSystemStatus();
+      
+      // 30秒ごとに自動更新
+      setInterval(updateSystemStatus, 30000);
+    }
+    
+    function updateSystemStatus() {
+      google.script.run
+        .withSuccessHandler(function(status) {
+          try {
+            updateDatabaseInfo(status);
+            updateSetupProgress();
+          } catch (e) {
+            console.warn('System status update failed:', e);
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.warn('System status update error:', error);
+        })
+        .getStatus(false); // キャッシュ使用
+    }
     
     
     function formatDateTime(dateString) {
@@ -3159,11 +3259,18 @@ function updateDatabaseInfo(status) {
       }
     }
     
-    // Function to open the added resource
+    // Function to open the added resource - prioritize form if available
     function openResource() {
       var openBtn = document.getElementById('open-resource-btn');
       var url = openBtn ? openBtn.getAttribute('data-url') : '';
       
+      // Check if form URL is available from current status (priority)
+      if (currentStatus && currentStatus.formUrl) {
+        window.open(currentStatus.formUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      
+      // Fall back to button's data-url
       if (url) {
         window.open(url, '_blank', 'noopener,noreferrer');
       } else {
@@ -3362,6 +3469,51 @@ function updateDatabaseInfo(status) {
         .withSuccessHandler(handleBoardCreationSuccess)
         .withFailureHandler(handleBoardCreationError)
         .createBoardFromAdmin();
+    }
+    
+    // 追加フォーム作成関数
+    function createAdditionalForm() {
+      var btn = document.getElementById('create-additional-form-btn');
+      var text = document.getElementById('create-additional-form-text');
+      
+      if (btn) btn.disabled = true;
+      if (text) text.textContent = '追加フォームを作成中...';
+      setLoading(true, '新しいフォームを作成中...');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          try {
+            setLoading(false);
+            if (btn) btn.disabled = false;
+            if (text) text.textContent = '追加のフォームを作成';
+            
+            if (result && result.success) {
+              showMessage(result.message || '新しいフォームが正常に作成されました', 'success');
+              
+              // フォームURLがある場合は開く
+              if (result.formUrl) {
+                window.open(result.formUrl, '_blank', 'noopener,noreferrer');
+              }
+              
+              // ステータスを更新
+              loadStatus(true);
+            } else {
+              showMessage(result.message || '追加フォームの作成に失敗しました', 'error');
+            }
+          } catch (e) {
+            showMessage('追加フォームの作成中にエラーが発生しました', 'error');
+            setLoading(false);
+            if (btn) btn.disabled = false;
+            if (text) text.textContent = '追加のフォームを作成';
+          }
+        })
+        .withFailureHandler(function(error) {
+          setLoading(false);
+          if (btn) btn.disabled = false;
+          if (text) text.textContent = '追加のフォームを作成';
+          showMessage('追加フォームの作成に失敗しました: ' + error.message, 'error');
+        })
+        .createAdditionalForm(); // 新しいサーバー関数を呼び出し
     }
 
     function loadConfigForSelected() {
@@ -3870,5 +4022,108 @@ function updateDatabaseInfo(status) {
     window.addEventListener('resize', debounce(adjustLayout, 100));
     
   </script>
+
+  <!-- セキュリティ情報モーダル -->
+  <div id="security-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-gray-800 rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-bold text-white">セキュリティ対策について</h2>
+          <button type="button" id="security-modal-close" class="text-gray-400 hover:text-white">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="space-y-6 text-gray-300">
+          <!-- セキュリティ対策の概要 -->
+          <section>
+            <h3 class="text-lg font-semibold text-green-400 mb-3">実装されているセキュリティ対策</h3>
+            
+            <div class="space-y-4">
+              <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
+                <h4 class="font-semibold text-green-300 mb-2">OAuth 2.0 認証</h4>
+                <p class="text-sm">Googleの公式OAuth 2.0フローを使用し、ユーザーの認証情報を安全に管理。パスワードは当アプリケーションに保存されません。</p>
+              </div>
+
+              <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+                <h4 class="font-semibold text-blue-300 mb-2">Google Apps Script プラットフォーム</h4>
+                <p class="text-sm">Googleの公式プラットフォーム上で動作し、Google Cloudのセキュリティ基盤を活用。データはGoogle Driveに保存され、Googleのセキュリティポリシーが適用されます。</p>
+              </div>
+
+              <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
+                <h4 class="font-semibold text-purple-300 mb-2">権限最小化の原則</h4>
+                <p class="text-sm">必要最小限の権限のみを要求。スプレッドシートとGoogleフォームへの限定的なアクセスのみを使用します。</p>
+              </div>
+
+              <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
+                <h4 class="font-semibold text-yellow-300 mb-2">ドメイン制限</h4>
+                <p class="text-sm">教育機関ドメインでの利用時、同一ドメイン内でのみデータアクセスが可能。組織外からの不正アクセスを防止します。</p>
+              </div>
+
+              <div class="bg-indigo-900/20 border border-indigo-500/30 rounded-lg p-4">
+                <h4 class="font-semibold text-indigo-300 mb-2">データ暗号化</h4>
+                <p class="text-sm">HTTPS通信による暗号化、Google Driveの保存時暗号化を活用。転送中および保存中のデータを保護します。</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- 潜在的なリスク -->
+          <section>
+            <h3 class="text-lg font-semibold text-orange-400 mb-3">潜在的なリスクと注意点</h3>
+            
+            <div class="space-y-3">
+              <div class="bg-orange-900/20 border border-orange-500/30 rounded-lg p-4">
+                <h4 class="font-semibold text-orange-300 mb-2">第三者アプリケーションのリスク</h4>
+                <p class="text-sm">Google Apps Scriptアプリケーションとして動作するため、Googleアカウントへのアクセス権限を付与する必要があります。信頼できる管理者のみが設定を行ってください。</p>
+              </div>
+
+              <div class="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
+                <h4 class="font-semibold text-red-300 mb-2">スプレッドシートの共有設定</h4>
+                <p class="text-sm">スプレッドシートの共有設定によっては、意図しないユーザーがデータにアクセスする可能性があります。適切な共有設定の維持が重要です。</p>
+              </div>
+
+              <div class="bg-gray-700 border border-gray-500 rounded-lg p-4">
+                <h4 class="font-semibold text-gray-300 mb-2">ネットワーク依存</h4>
+                <p class="text-sm">インターネット接続とGoogleサービスの可用性に依存します。サービス障害時は利用できません。</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- 推奨事項 -->
+          <section>
+            <h3 class="text-lg font-semibold text-cyan-400 mb-3">セキュリティ強化のための推奨事項</h3>
+            
+            <ul class="space-y-2 text-sm">
+              <li class="flex items-start gap-2">
+                <span class="text-cyan-400 mt-1">•</span>
+                <span>定期的にスプレッドシートの共有設定を確認し、不要なアクセス権限を削除してください</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-cyan-400 mt-1">•</span>
+                <span>教育機関のアカウントでの利用を推奨します（組織のセキュリティポリシーが適用されます）</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-cyan-400 mt-1">•</span>
+                <span>機密性の高い個人情報の収集は避け、必要最小限のデータのみを扱ってください</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-cyan-400 mt-1">•</span>
+                <span>利用終了時は、不要になったスプレッドシートやフォームを削除してください</span>
+              </li>
+            </ul>
+          </section>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-gray-600">
+          <button type="button" id="security-modal-confirm" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
+            理解しました
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
