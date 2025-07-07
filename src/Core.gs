@@ -1324,7 +1324,7 @@ function createStudyQuestForm(userEmail, userId) {
       userEmail: userEmail,
       userId: userId,
       questions: 'default',
-      formDescription: '🌟 みんなの回答ボードへようこそ！🌟
+      formDescription: `🌟 みんなの回答ボードへようこそ！🌟
 
 ここは、あなたの大切な考えや意見を安心して表現できる場所です。
 
@@ -1339,7 +1339,7 @@ function createStudyQuestForm(userEmail, userId) {
 • 個人情報は適切に保護されます
 • 安心して本音を共有してください
 
-あなたの声が、みんなの学びを豊かにします。一緒に素晴らしい対話の場を作りましょう！'
+あなたの声が、みんなの学びを豊かにします。一緒に素晴らしい対話の場を作りましょう！`
     });
     
     // カスタマイズされた設定を追加
@@ -1359,38 +1359,26 @@ function createStudyQuestForm(userEmail, userId) {
     var appUrls = generateAppUrls(userId);
     var boardUrl = appUrls.viewUrl || (appUrls.webAppUrl + '?userId=' + encodeURIComponent(userId || ''));
     
-    var confirmationMessage = '🎉 素晴らしい！あなたの声が届きました！
+    var confirmationMessage = `🎉 素晴らしい！あなたの声が届きました！
 
-' +
-      '✨ あなたの考えを共有してくれて、ありがとうございます。
-' +
-      'あなたの意見は、クラスのみんなにとって大切な学びの材料になります。
+✨ あなたの考えを共有してくれて、ありがとうございます。
+あなたの意見は、クラスのみんなにとって大切な学びの材料になります。
 
-' +
-      '🤝 デジタル・シティズンシップを実践しよう：
-' +
-      '• 他の人の意見も尊重しながら読んでみましょう
-' +
-      '• 違う考えに出会ったら、「なるほど！」で反応してみよう
-' +
-      '• 良いと思った意見には「いいね！」で応援しよう
-' +
-      '• もっと知りたいことがあれば「もっと知りたい！」で示そう
+🤝 デジタル・シティズンシップを実践しよう：
+• 他の人の意見も尊重しながら読んでみましょう
+• 違う考えに出会ったら、「なるほど！」で反応してみよう
+• 良いと思った意見には「いいね！」で応援しよう
+• もっと知りたいことがあれば「もっと知りたい！」で示そう
 
-' +
-      '🌈 多様な意見こそが、みんなの成長につながります。
-' +
-      'お友達の色々な考えも見てみましょう。きっと新しい発見がありますよ！
+🌈 多様な意見こそが、みんなの成長につながります。
+お友達の色々な考えも見てみましょう。きっと新しい発見がありますよ！
 
-' +
-      '📋 みんなの回答ボード:
-' + boardUrl;
+📋 みんなの回答ボード:${boardUrl}`;
       
     if (form.getPublishedUrl()) {
-      confirmationMessage += '
+      confirmationMessage += `
 
-✏️ 回答を修正したい場合は、こちらから編集できます:
-' + form.getPublishedUrl();
+✏️ 回答を修正したい場合は、こちらから編集できます:${form.getPublishedUrl()}`;
     }
     
     form.setConfirmationMessage(confirmationMessage);
