@@ -272,6 +272,88 @@ function saveAndActivateSheet(spreadsheetId, sheetName, config) {
 }
 
 /**
+ * 設定のみを保存する（公開はしない）
+ * @param {string} sheetName - シート名
+ * @param {object} config - 設定オブジェクト
+ * @returns {object} 保存完了メッセージ
+ */
+function saveConfig(sheetName, config) {
+  try {
+    if (typeof sheetName !== 'string' || !sheetName) {
+      throw new Error('無効なsheetNameです。シート名は必須です。');
+    }
+    if (typeof config !== 'object' || config === null) {
+      throw new Error('無効なconfigオブジェクトです。設定オブジェクトは必須です。');
+    }
+
+    console.log('saveConfig開始: sheetName=%s', sheetName);
+
+    // ユーザー情報を取得
+    const userInfo = getUserInfo();
+    if (!userInfo || !userInfo.spreadsheetId) {
+      throw new Error('ユーザーのスプレッドシート情報が見つかりません。');
+    }
+
+    // 設定を保存
+    saveSheetConfig(userInfo.spreadsheetId, sheetName, config);
+    console.log('saveConfig: 設定保存完了');
+
+    return {
+      success: true,
+      message: '設定が正常に保存されました。'
+    };
+
+  } catch (error) {
+    console.error('saveConfigで致命的なエラー:', error.message, error.stack);
+    throw new Error('設定の保存中にサーバーエラーが発生しました: ' + error.message);
+  }
+}
+
+/**
+ * シートを公開状態にする（設定は既に保存済みであることを前提）
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {object} 最新のステータス
+ */
+function activateSheet(spreadsheetId, sheetName) {
+  try {
+    if (typeof spreadsheetId !== 'string' || !spreadsheetId) {
+      throw new Error('無効なspreadsheetIdです。スプレッドシートIDは必須です。');
+    }
+    if (typeof sheetName !== 'string' || !sheetName) {
+      throw new Error('無効なsheetNameです。シート名は必須です。');
+    }
+
+    console.log('activateSheet開始: sheetName=%s', sheetName);
+
+    // 関連キャッシュをクリア
+    const props = PropertiesService.getUserProperties();
+    const currentUserId = props.getProperty('CURRENT_USER_ID');
+    if (currentUserId) {
+      const userInfo = findUserById(currentUserId);
+      if (userInfo) {
+        invalidateUserCache(currentUserId, userInfo.adminEmail, spreadsheetId);
+        console.log('activateSheet: キャッシュクリア完了');
+      }
+    }
+
+    // シートをアクティブ化
+    switchToSheet(spreadsheetId, sheetName);
+    console.log('activateSheet: シート切り替え完了');
+
+    // 最新のステータスを取得
+    const finalStatus = getStatus(true);
+    console.log('activateSheet: 公開処理完了');
+
+    return finalStatus;
+
+  } catch (error) {
+    console.error('activateSheetで致命的なエラー:', error.message, error.stack);
+    throw new Error('シートの公開中にサーバーエラーが発生しました: ' + error.message);
+  }
+}
+
+/**
  * シート固有の設定を保存
  * @param {string} sheetName - シート名
  * @param {object} cfg - 設定オブジェクト

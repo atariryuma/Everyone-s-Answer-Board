@@ -809,7 +809,7 @@
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
                 </svg>
-                <span id="save-config-text">設定を保存して公開</span>
+                <span id="save-config-text">設定を保存</span>
               </button>
             </div>
             
@@ -1079,6 +1079,37 @@
       <div class="flex justify-end gap-4">
         <button type="button" id="modal-cancel-btn" class="btn btn-secondary">キャンセル</button>
         <button type="button" id="modal-confirm-btn" class="btn btn-primary">はい、実行します</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 公開選択モーダル -->
+  <div id="publish-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 hidden items-center justify-center p-4">
+    <div class="glass-panel p-8 rounded-xl max-w-md w-full slide-up">
+      <h3 class="text-xl font-bold text-cyan-400 mb-4">📋 設定保存完了</h3>
+      <p class="text-gray-300 mb-6">設定が正常に保存されました。<br>回答ボードを公開しますか？</p>
+      <div class="space-y-3 mb-6">
+        <div class="bg-gray-800/50 p-3 rounded-lg">
+          <div class="flex items-center">
+            <div class="w-3 h-3 bg-green-400 rounded-full mr-2"></div>
+            <span class="text-sm text-gray-300">公開する：生徒がボードにアクセス可能</span>
+          </div>
+        </div>
+        <div class="bg-gray-800/50 p-3 rounded-lg">
+          <div class="flex items-center">
+            <div class="w-3 h-3 bg-gray-400 rounded-full mr-2"></div>
+            <span class="text-sm text-gray-300">非公開：設定のみ保存（後で公開可能）</span>
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-end gap-4">
+        <button type="button" id="publish-modal-private-btn" class="btn btn-secondary">非公開のまま</button>
+        <button type="button" id="publish-modal-publish-btn" class="btn btn-primary">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          公開する
+        </button>
       </div>
     </div>
   </div>
@@ -2214,6 +2245,18 @@ function setupEventListeners() {
         securityModal.classList.add('hidden');
       }
     });
+  }
+  
+  // 公開選択モーダルのイベントリスナー
+  var publishModalPublishBtn = document.getElementById('publish-modal-publish-btn');
+  var publishModalPrivateBtn = document.getElementById('publish-modal-private-btn');
+  
+  if (publishModalPublishBtn) {
+    publishModalPublishBtn.addEventListener('click', publishBoard);
+  }
+  
+  if (publishModalPrivateBtn) {
+    publishModalPrivateBtn.addEventListener('click', saveWithoutPublish);
   }
   // ★★★ ここまで追加 ★★★
 }
@@ -3769,8 +3812,8 @@ function populateSheetSelect(sheets, activeSheetName) {
       }
 
       // 3. HTMLの入力値から設定オブジェクト（cfg）を作成
-      const showNamesCheckbox = elements.detailOptions.querySelector('input[name="showNames"]');
-      const showCountsCheckbox = elements.detailOptions.querySelector('input[name="showCounts"]');
+      const showNamesCheckbox = document.getElementById('showNames');
+      const showCountsCheckbox = document.getElementById('showCounts');
       
       const cfg = {
         opinionHeader: elements.opinionHeader.value,
@@ -3787,33 +3830,95 @@ function populateSheetSelect(sheets, activeSheetName) {
         cfg: cfg
       });
       
-      // 4. ローディング表示を開始
-      setLoading(true, '設定を保存・適用中...');
-      elements.saveConfigBtn.disabled = true;
-      if (elements.saveConfigText) elements.saveConfigText.textContent = '処理中...';
+      // 4. 設定をグローバルに保存（モーダルで使用）
+      window.pendingConfig = {
+        spreadsheetId: currentStatus.userInfo.spreadsheetId,
+        sheetName: currentSheetName,
+        config: cfg
+      };
 
-      // 5. サーバーの統合関数を、正しい引数で呼び出す
+      // 5. ローディング表示を開始
+      setLoading(true, '設定を保存中...');
+      elements.saveConfigBtn.disabled = true;
+      if (elements.saveConfigText) elements.saveConfigText.textContent = '保存中...';
+
+      // 6. 設定のみを保存（公開はしない）
       google.script.run
-        .withSuccessHandler(function(status) {
-          updateStatus(status);
-          showMessage('設定の保存とボードの公開が完了しました。', 'success');
-          markStepCompleted(3);
+        .withSuccessHandler(function(result) {
           setLoading(false);
           elements.saveConfigBtn.disabled = false;
-          if (elements.saveConfigText) elements.saveConfigText.textContent = '設定を保存して公開';
+          if (elements.saveConfigText) elements.saveConfigText.textContent = '設定を保存';
+          showPublishModal();
         })
         .withFailureHandler(function(error) {
-          // 通信失敗などの致命的なエラーの場合
           showError(error);
           setLoading(false);
           elements.saveConfigBtn.disabled = false;
-          if (elements.saveConfigText) elements.saveConfigText.textContent = '設定を保存して公開';
+          if (elements.saveConfigText) elements.saveConfigText.textContent = '設定を保存';
         })
-        .saveAndActivateSheet(
-          currentStatus.userInfo.spreadsheetId, // 第1引数: スプレッドシートID
-          currentSheetName,                      // 第2引数: ドロップダウンから直接取得したシート名
-          cfg                                    // 第3引数: 設定オブジェクト
-        ); 
+        .saveConfig(currentSheetName, cfg); 
+    }
+
+    /**
+     * 公開選択モーダルを表示
+     */
+    function showPublishModal() {
+      const modal = document.getElementById('publish-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    }
+
+    /**
+     * 公開選択モーダルを非表示
+     */
+    function hidePublishModal() {
+      const modal = document.getElementById('publish-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    /**
+     * 実際に公開処理を実行
+     */
+    function publishBoard() {
+      if (!window.pendingConfig) {
+        showError(new Error('保存された設定が見つかりません。'));
+        return;
+      }
+
+      hidePublishModal();
+      setLoading(true, 'ボードを公開中...');
+
+      google.script.run
+        .withSuccessHandler(function(status) {
+          updateStatus(status);
+          showMessage('ボードが正常に公開されました。', 'success');
+          markStepCompleted(3);
+          setLoading(false);
+          window.pendingConfig = null;
+        })
+        .withFailureHandler(function(error) {
+          showError(error);
+          setLoading(false);
+        })
+        .activateSheet(
+          window.pendingConfig.spreadsheetId,
+          window.pendingConfig.sheetName
+        );
+    }
+
+    /**
+     * 非公開のまま完了
+     */
+    function saveWithoutPublish() {
+      hidePublishModal();
+      showMessage('設定が保存されました。後から公開することができます。', 'success');
+      loadStatus(true); // ステータスを更新
+      window.pendingConfig = null;
     }
 
     function switchToSheet() {
@@ -4067,18 +4172,23 @@ function populateSheetSelect(sheets, activeSheetName) {
             
             <div class="space-y-4">
               <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
-                <h4 class="font-semibold text-green-300 mb-2">OAuth 2.0 認証</h4>
-                <p class="text-sm">Googleの公式OAuth 2.0フローを使用し、ユーザーの認証情報を安全に管理。パスワードは当アプリケーションに保存されません。</p>
+                <h4 class="font-semibold text-green-300 mb-2">🔐 Google サービスアカウント認証</h4>
+                <p class="text-sm">Google Cloud Platform (GCP) のサービスアカウントを使用したJWT (JSON Web Token) ベースの認証。RSA-SHA256 署名により、最高レベルのセキュリティを確保しています。ユーザーの認証情報は一切保存されません。</p>
               </div>
 
               <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-                <h4 class="font-semibold text-blue-300 mb-2">Google Apps Script プラットフォーム</h4>
-                <p class="text-sm">Googleの公式プラットフォーム上で動作し、Google Cloudのセキュリティ基盤を活用。データはGoogle Driveに保存され、Googleのセキュリティポリシーが適用されます。</p>
+                <h4 class="font-semibold text-blue-300 mb-2">🏗️ Google Apps Script プラットフォーム</h4>
+                <p class="text-sm">Googleの公式プラットフォーム上で動作し、Google Cloudのエンタープライズグレードのセキュリティ基盤を活用。データはGoogle Driveに暗号化されて保存され、Googleのセキュリティポリシーとコンプライアンス基準が適用されます。</p>
               </div>
 
               <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
-                <h4 class="font-semibold text-purple-300 mb-2">権限最小化の原則</h4>
-                <p class="text-sm">必要最小限の権限のみを要求。スプレッドシートとGoogleフォームへの限定的なアクセスのみを使用します。</p>
+                <h4 class="font-semibold text-purple-300 mb-2">🛡️ スコープ制限とアクセス制御</h4>
+                <p class="text-sm">Google Sheets API とGoogle Drive API への限定的なアクセスのみを使用。サービスアカウントは自動的にユーザーのスプレッドシートに編集者権限を付与しますが、他のデータにはアクセスできません。</p>
+              </div>
+
+              <div class="bg-teal-900/20 border border-teal-500/30 rounded-lg p-4">
+                <h4 class="font-semibold text-teal-300 mb-2">⚡ 自動トークン管理</h4>
+                <p class="text-sm">アクセストークンは3500秒のTTL（Time To Live）で安全にキャッシュされ、自動的にリフレッシュされます。期限切れや不正なトークンによるセキュリティリスクを防止します。</p>
               </div>
 
               <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
@@ -4099,18 +4209,23 @@ function populateSheetSelect(sheets, activeSheetName) {
             
             <div class="space-y-3">
               <div class="bg-orange-900/20 border border-orange-500/30 rounded-lg p-4">
-                <h4 class="font-semibold text-orange-300 mb-2">第三者アプリケーションのリスク</h4>
-                <p class="text-sm">Google Apps Scriptアプリケーションとして動作するため、Googleアカウントへのアクセス権限を付与する必要があります。信頼できる管理者のみが設定を行ってください。</p>
+                <h4 class="font-semibold text-orange-300 mb-2">⚠️ サービスアカウントの管理責任</h4>
+                <p class="text-sm">システムはGoogle Cloud Platformのサービスアカウントを使用してデータにアクセスします。システム管理者は、サービスアカウントの認証情報を適切に管理し、定期的な権限見直しを行う必要があります。</p>
               </div>
 
               <div class="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
-                <h4 class="font-semibold text-red-300 mb-2">スプレッドシートの共有設定</h4>
-                <p class="text-sm">スプレッドシートの共有設定によっては、意図しないユーザーがデータにアクセスする可能性があります。適切な共有設定の維持が重要です。</p>
+                <h4 class="font-semibold text-red-300 mb-2">📊 データアクセス範囲</h4>
+                <p class="text-sm">サービスアカウントはユーザーのスプレッドシートに自動的に編集者権限を付与します。これにより、システムがデータの読み取り・書き込みを行いますが、適切なデータ管理ポリシーの遵守が重要です。</p>
+              </div>
+
+              <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
+                <h4 class="font-semibold text-yellow-300 mb-2">🔄 キャッシュとトークン管理</h4>
+                <p class="text-sm">アクセストークンとユーザーデータは一時的にキャッシュされます。セキュリティ強化のため、キャッシュは自動的に無効化されますが、機密データの取り扱いには注意が必要です。</p>
               </div>
 
               <div class="bg-gray-700 border border-gray-500 rounded-lg p-4">
-                <h4 class="font-semibold text-gray-300 mb-2">ネットワーク依存</h4>
-                <p class="text-sm">インターネット接続とGoogleサービスの可用性に依存します。サービス障害時は利用できません。</p>
+                <h4 class="font-semibold text-gray-300 mb-2">🌐 クラウドサービス依存</h4>
+                <p class="text-sm">Google Cloud Platform とGoogle Workspace サービスの可用性に依存します。サービス障害時は利用できません。また、Googleのセキュリティポリシー変更の影響を受ける可能性があります。</p>
               </div>
             </div>
           </section>
@@ -4121,20 +4236,28 @@ function populateSheetSelect(sheets, activeSheetName) {
             
             <ul class="space-y-2 text-sm">
               <li class="flex items-start gap-2">
-                <span class="text-cyan-400 mt-1">•</span>
-                <span>定期的にスプレッドシートの共有設定を確認し、不要なアクセス権限を削除してください</span>
+                <span class="text-cyan-400 mt-1">🔧</span>
+                <span><strong>定期的なアクセス権限の監査:</strong> スプレッドシートの共有設定とサービスアカウント権限を定期的に確認し、不要なアクセス権限を削除してください</span>
               </li>
               <li class="flex items-start gap-2">
-                <span class="text-cyan-400 mt-1">•</span>
-                <span>教育機関のアカウントでの利用を推奨します（組織のセキュリティポリシーが適用されます）</span>
+                <span class="text-cyan-400 mt-1">🏫</span>
+                <span><strong>教育機関ドメインでの利用:</strong> Google Workspace for Education アカウントでの利用を推奨します（組織のセキュリティポリシーとコンプライアンス基準が適用されます）</span>
               </li>
               <li class="flex items-start gap-2">
-                <span class="text-cyan-400 mt-1">•</span>
-                <span>機密性の高い個人情報の収集は避け、必要最小限のデータのみを扱ってください</span>
+                <span class="text-cyan-400 mt-1">🛡️</span>
+                <span><strong>データ最小化の原則:</strong> 機密性の高い個人情報の収集は避け、教育目的に必要最小限のデータのみを扱ってください</span>
               </li>
               <li class="flex items-start gap-2">
-                <span class="text-cyan-400 mt-1">•</span>
-                <span>利用終了時は、不要になったスプレッドシートやフォームを削除してください</span>
+                <span class="text-cyan-400 mt-1">🔑</span>
+                <span><strong>認証情報の管理:</strong> サービスアカウントキーの定期的な更新（年1回推奨）と、アクセスログの監視を行ってください</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-cyan-400 mt-1">🗑️</span>
+                <span><strong>データライフサイクル管理:</strong> 利用終了時は、不要になったスプレッドシート、フォーム、およびサービスアカウント権限を削除してください</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-cyan-400 mt-1">📋</span>
+                <span><strong>セキュリティドキュメント:</strong> 詳細なセキュリティガイドについては、<a href="/SECURITY.md" target="_blank" class="text-blue-400 hover:text-blue-300 underline">SECURITY.md</a> をご参照ください</span>
               </li>
             </ul>
           </section>
