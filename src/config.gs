@@ -561,8 +561,8 @@ function checkAdmin() {
     var service = getSheetsService();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
-    var response = service.spreadsheets.values.get(dbId, sheetName + '!A:H');
-    var data = (response && response.values) ? response.values : [];
+    var response = batchGetSheetsData(service, dbId, [sheetName + '!A:H']);
+    var data = (response && response.valueRanges && response.valueRanges[0] && response.valueRanges[0].values) ? response.valueRanges[0].values : [];
     
     if (data.length === 0) {
       debugLog('checkAdmin: No data found in Users sheet or sheet is empty.');

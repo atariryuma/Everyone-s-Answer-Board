@@ -982,17 +982,17 @@ function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
     
     // 現在の値を取得
     var range = "'" + sheetName + "'!" + String.fromCharCode(65 + highlightColumnIndex) + rowIndex;
-    var currentValue = service.spreadsheets.values.get(spreadsheetId, range).values;
-    var isHighlighted = currentValue && currentValue[0] && currentValue[0][0] === 'true';
+    var response = batchGetSheetsData(service, spreadsheetId, [range]);
+    var isHighlighted = false;
+    if (response && response.valueRanges && response.valueRanges[0] && 
+        response.valueRanges[0].values && response.valueRanges[0].values[0] &&
+        response.valueRanges[0].values[0][0]) {
+      isHighlighted = response.valueRanges[0].values[0][0] === 'true';
+    }
     
     // 値を切り替え
     var newValue = isHighlighted ? 'false' : 'true';
-    service.spreadsheets.values.update(
-      spreadsheetId,
-      range,
-      { values: [[newValue]] },
-      { valueInputOption: 'RAW' }
-    );
+    updateSheetsData(service, spreadsheetId, range, [[newValue]]);
     
     return {
       status: 'success',
@@ -1090,8 +1090,13 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
       
       // 現在のリアクション文字列を取得
       var cellRange = "'" + sheetName + "'!" + String.fromCharCode(65 + reactionColumnIndex) + rowIndex;
-      var response = service.spreadsheets.values.get(spreadsheetId, cellRange);
-      var currentReactionString = (response.values && response.values[0] && response.values[0][0]) || '';
+      var response = batchGetSheetsData(service, spreadsheetId, [cellRange]);
+      var currentReactionString = '';
+      if (response && response.valueRanges && response.valueRanges[0] && 
+          response.valueRanges[0].values && response.valueRanges[0].values[0] &&
+          response.valueRanges[0].values[0][0]) {
+        currentReactionString = response.valueRanges[0].values[0][0];
+      }
       
       // リアクションの追加/削除処理
       var currentReactions = parseReactionString(currentReactionString);
@@ -1107,12 +1112,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
       
       // 更新された値を書き戻す
       var updatedReactionString = currentReactions.join(', ');
-      service.spreadsheets.values.update(
-        spreadsheetId,
-        cellRange,
-        { values: [[updatedReactionString]] },
-        { valueInputOption: 'RAW' }
-      );
+      updateSheetsData(service, spreadsheetId, cellRange, [[updatedReactionString]]);
       
       debugLog('リアクション更新完了: ' + reactingUserEmail + ' → ' + reactionKey + ' (' + (userIndex >= 0 ? '削除' : '追加') + ')');
       
@@ -1786,8 +1786,13 @@ function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
       if (columnIndex !== undefined) {
         var range = sheetName + '!' + String.fromCharCode(65 + columnIndex) + rowIndex;
         try {
-          var response = service.spreadsheets.values.get(spreadsheetId, range);
-          var cellValue = response.values && response.values[0] && response.values[0][0];
+          var response = batchGetSheetsData(service, spreadsheetId, [range]);
+          var cellValue = '';
+          if (response && response.valueRanges && response.valueRanges[0] && 
+              response.valueRanges[0].values && response.valueRanges[0].values[0] &&
+              response.valueRanges[0].values[0][0]) {
+            cellValue = response.valueRanges[0].values[0][0];
+          }
           
           if (cellValue) {
             var reactions = parseReactionString(cellValue);
@@ -1846,12 +1851,7 @@ function auditLog(action, userId, details) {
 
     var service = getSheetsService();
     var range = LOG_SHEET_CONFIG.SHEET_NAME + '!A:D';
-    service.spreadsheets.values.append(
-      dbId,
-      range,
-      { values: [[new Date().toISOString(), userId, action, JSON.stringify(details || {})]] },
-      { valueInputOption: 'USER_ENTERED' }
-    );
+    appendSheetsData(service, dbId, range, [[new Date().toISOString(), userId, action, JSON.stringify(details || {})]]);
   } catch (e) {
     console.error('監査ログ記録エラー: ' + e.message);
   }
