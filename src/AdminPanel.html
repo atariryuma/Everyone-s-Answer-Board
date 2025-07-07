@@ -2886,31 +2886,137 @@ function populateSheetSelect(sheets) {
       
     }
 
+    /**
+     * 【改修版】サーバーから取得したシステムステータスに基づき、UI全体を一度に更新する。
+     * この関数がUI更新の唯一の起点（Single Source of Truth）となる。
+     * @param {object} status - サーバーから取得した完全なシステムステータスオブジェクト
+     */
     function updateStatus(status) {
-      console.log('🔄 UI Update Sequence Started. Status:', status);
-
-      currentStatus = status;
-
-      updateDatabaseInfo(status);
-      updatePublicationStatusUI(status.isPublished);
-      updateCurrentTopicDisplay(status);
-
-      populateSheetSelect(status.allSheets);
-
-      var sheetSelect = document.getElementById('sheet-select');
-      if (sheetSelect) {
-        sheetSelect.value = status.activeSheetName || (sheetSelect.options.length > 0 ? sheetSelect.options[0].value : '');
-        if (sheetSelect.value) {
-          loadConfigForSelected();
-        } else {
-          hideConfigArea();
+        if (!status || !status.userInfo) {
+            showError(new Error('システム情報の取得に失敗しました。管理者情報がありません。'));
+            setLoading(false);
+            return;
         }
-      }
+        console.log('🔄 [1/5] UI Update Sequence Started. Status:', status);
 
-      syncCheckboxStates(status);
+        // --- ステップ1: グローバル変数の更新 ---
+        currentStatus = status;
+        currentActiveSheet = status.activeSheetName || '';
+        currentSpreadsheetUrl = status.spreadsheetUrl || '';
+        webAppUrl = status.webAppUrl || '';
+        userId = status.userInfo.userId || '';
 
-      setLoading(false);
-      console.log('✅ UI Update Sequence Finished.');
+        // --- ステップ2: UIの主要部分の更新 ---
+        // システム状況パネルを最新化
+        updateDatabaseInfo(status);
+        // 公開/非公開の状態に応じてUIを切り替え
+        updatePublicationStatusUI(status.isPublished);
+        updateCurrentTopicDisplay(status);
+
+        // --- ステップ3: シート選択ドロップダウンの構築と選択 ---
+        const sheetSelect = document.getElementById('sheet-select');
+        if (sheetSelect) {
+            // ドロップダウンの選択肢をクリアして再生成
+            sheetSelect.innerHTML = '';
+
+            if (status.allSheets && status.allSheets.length > 0) {
+                // 利用可能なシートがある場合
+                let defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = '-- 表示するボードを選択 --';
+                sheetSelect.appendChild(defaultOption);
+
+                status.allSheets.forEach(sheetName => {
+                    let opt = document.createElement('option');
+                    opt.value = sheetName;
+                    opt.textContent = sheetName;
+                    if (sheetName === status.activeSheetName) {
+                        opt.textContent += ' (公開中)';
+                    }
+                    sheetSelect.appendChild(opt);
+                });
+                sheetSelect.disabled = false;
+                // 現在公開中のシートを選択状態にする
+                sheetSelect.value = status.activeSheetName || '';
+            } else {
+                // 利用可能なシートがない場合
+                let noSheetsOption = document.createElement('option');
+                noSheetsOption.textContent = '利用可能なボードがありません';
+                sheetSelect.appendChild(noSheetsOption);
+                sheetSelect.disabled = true;
+            }
+        }
+        console.log('✅ [2/5] Sheet dropdown populated and selected.');
+
+        // --- ステップ4: アクティブシートの詳細設定をロード ---
+        // 公開中のシートが存在する場合に限り、その列設定を読み込む
+        if (status.activeSheetName) {
+            loadConfigForSelected();
+        } else {
+            // アクティブなシートがない場合は、設定エリアを初期状態に戻す
+            hideConfigArea();
+        }
+        console.log('✅ [3/5] Config loading initiated for active sheet.');
+
+        // --- ステップ5: フッターとセットアップガイドの表示制御 ---
+        updateFooterAndGuidance(status);
+        console.log('✅ [4/5] Footer and guidance UI updated.');
+
+        // --- ステップ6: チェックボックス状態の同期とローディング完了 ---
+        syncCheckboxStates(status);
+        setLoading(false);
+        console.log('✅ [5/5] UI Update Sequence Finished.');
+    }
+
+    /**
+     * フッターとセットアップのガイダンス表示を制御する
+     * @param {object} status - システムステータス
+     */
+    function updateFooterAndGuidance(status) {
+        const guidanceText = document.getElementById('guidance-text');
+        const adminFooter = document.getElementById('admin-footer');
+        const boardUrlInput = document.getElementById('board-url');
+        const viewBoardLink = document.getElementById('view-board-link');
+
+        if (status.isPublished && status.activeSheetName) {
+            // 公開中の場合
+            if (guidanceText) guidanceText.textContent = `ボード「${status.activeSheetName}」が公開されています。`;
+            updateStepIndicators(4); // 全ステップ完了状態
+
+            // フッターにボードURLを表示
+            const boardUrl = `${status.webAppUrl}?userId=${status.userInfo.userId}&spreadsheetId=${status.publishedSpreadsheetId}&sheetName=${encodeURIComponent(status.publishedSheetName)}`;
+            if (boardUrlInput) boardUrlInput.value = boardUrl;
+            if (viewBoardLink) viewBoardLink.href = boardUrl;
+            if (adminFooter) adminFooter.classList.remove('hidden');
+        } else {
+            // 未公開の場合
+            if (guidanceText) guidanceText.textContent = 'セットアップを開始してください';
+            updateStepIndicators(1); // 初期ステップ状態
+            if (adminFooter) adminFooter.classList.add('hidden');
+        }
+        if (typeof adjustLayout === 'function') {
+            adjustLayout(); // フッターの表示/非表示に合わせてレイアウト調整
+        }
+    }
+
+    /**
+     * ステップインジケーターの更新
+     * @param {number} currentStep - 現在のステップ (1-4)
+     */
+    function updateStepIndicators(currentStep) {
+        // ステップインジケーターが存在する場合のみ更新
+        for (let i = 1; i <= 4; i++) {
+            const stepElement = document.getElementById(`step-${i}`);
+            if (stepElement) {
+                if (i <= currentStep) {
+                    stepElement.classList.add('completed');
+                    stepElement.classList.remove('pending');
+                } else {
+                    stepElement.classList.add('pending');
+                    stepElement.classList.remove('completed');
+                }
+            }
+        }
     }
     
     // 既存ユーザー向けセクションの表示制御
