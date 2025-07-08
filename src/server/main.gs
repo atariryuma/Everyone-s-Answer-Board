@@ -89,10 +89,7 @@ function safeSetXFrameOptionsDeny(htmlOutput) {
  */
 function include(path) {
   // Create a template from the file to allow its scriptlets to be evaluated.
-  const template = HtmlService.createTemplateFromFile(`client/${path}`);
-  // Pass the include function to the sub-template to allow for nesting.
-  template.include = include;
-  return template.evaluate().getContent();
+  const template = HtmlService.createTemplateFromFile(`client/${path}`);  // Pass the include function to the sub-template to allow for nesting.  template.include = include;  const content = template.evaluate().getContent();  Logger.log(`Included content for ${path}:\n${content.substring(0, 500)}...`); // Log first 500 chars  return content;
 }
 
 /**
