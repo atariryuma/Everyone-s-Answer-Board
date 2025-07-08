@@ -1,10 +1,10 @@
 # 🤖 Agent's Guidebook for "Everyone's Answer Board"
 
-This document provides the essential guidelines for all AI agents (and human developers) contributing to this project. Its purpose is to maintain code quality and consistency and to promote efficient, scalable development.
+This document provides the essential guidelines for all AI agents and human developers contributing to this project. Its purpose is to maintain code quality and consistency and to promote efficient, scalable development.
 
 ## 1\. Agent's Role and Objective
 
-Your role is not just a code generator, but a **full-stack development partner** responsible for building a robust, maintainable, and user-centric educational tool.
+Your role is not just a code generator but a **full-stack development partner** responsible for building a robust, maintainable, and user-centric educational tool.
 
 **Objective:**
 
@@ -32,9 +32,9 @@ Your role is not just a code generator, but a **full-stack development partner**
 
 ## 4\. Code Architecture & File Structure
 
-This project adopts a **full-stack, separation of concerns** architecture optimized for local development with `clasp` and maintainability in the GAS online editor. You **must** follow this structure precisely.
+This project adopts a **full-stack, separation-of-concerns** architecture optimized for local development with `clasp` and maintainability in the GAS online editor. You **must** follow this structure precisely.
 
-### **【System-Wide Rule】File Naming and Directory Structure**
+### **[System-Wide Rule] File Naming and Directory Structure**
 
 All files must be placed within the `/src` directory following the structure below. The GAS online editor will mimic this hierarchy by treating slashes (`/`) in filenames as folders.
 
@@ -67,40 +67,76 @@ All files must be placed within the `/src` directory following the structure bel
 └── 📄 appsscript.json # Project manifest (do not modify).
 ```
 
-### **【Implementation Guide】How to Write Code**
+### **[Implementation Guide] How to Write Code**
 
 #### **1. Server-Side Logic (in `/src/server/`)**
 
   * **`main.gs`**: This is the primary entry point. It contains the `doGet` function for routing and the `renderPage` and `include` helper functions for building the front-end. **Do not add business logic here.**
+
+    **Correct Code:**
+
     ```javascript
     // /src/server/main.gs
+
+    /**
+     * The main entry point for the web app.
+     * @param {Object} e - The event parameter.
+     * @returns {HtmlService.HtmlOutput} The HTML page to be served.
+     */
     function doGet(e) {
+      // Logic to determine user role (admin, new user, etc.) would go here.
+      // For this example, we'll route to the AdminPanel.
       if (isAdmin(e)) return renderPage('AdminPanel');
       if (!isRegistered(e)) return renderPage('Registration');
       return renderPage('Page');
     }
 
+    /**
+     * Renders an HTML template page.
+     * @param {string} viewName - The name of the file in /src/client/views/ (without .html).
+     * @param {Object} [data={}] - A data object to pass to the template.
+     * @returns {HtmlService.HtmlOutput} The evaluated HTML output.
+     */
     function renderPage(viewName, data = {}) {
       const template = HtmlService.createTemplateFromFile(`client/views/${viewName}`);
       template.data = data;
-      template.include = include; // Make helper available to templates
-      return template.evaluate().setTitle('みんなの回答ボード').addMetaTag('viewport', 'width=device-width, initial-scale=1');
+      // Make the include function available to the templates.
+      template.include = include; 
+      return template.evaluate()
+        .setTitle("Everyone's Answer Board")
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1');
     }
 
+    /**
+     * Includes the content of another HTML file, allowing for nested includes.
+     * This version uses createTemplateFromFile and evaluate() to enable recursion.
+     * @param {string} path - The path to the file relative to the /src/client/ directory.
+     * @returns {string} The evaluated HTML content of the included file.
+     */
     function include(path) {
-      return HtmlService.createHtmlOutputFromFile('client/' + path).getContent();
+      // Create a template from the file to allow its scriptlets to be evaluated.
+      const template = HtmlService.createTemplateFromFile(`client/${path}`);
+      // Pass the include function to the sub-template to allow for nesting.
+      template.include = include;
+      return template.evaluate().getContent();
     }
     ```
+
   * **Other `.gs` files**: All other business logic (e.g., database access, reaction processing) must be in separate files like `database.gs` or within the `services/` directory.
 
 #### **2. Front-End Views (in `/src/client/views/`)**
 
   * These files are **HTML skeletons only**.
+
   * They must use the `include()` helper function via scriptlets `<?! ... ?>` to load all CSS, JavaScript, and components.
-  * **Example (`/src/client/views/Page.html`):**
+
+  * **Important**: The path passed to `include()` must be relative to the `/src/client/` directory.
+
+    **Correct Code Example (`/src/client/views/Page.html`):**
+
     ```html
     <!DOCTYPE html>
-    <html lang="ja">
+    <html lang="en">
       <head>
         <base target="_top">
         <?! include('styles/main.css.html'); ?>
@@ -108,7 +144,10 @@ All files must be placed within the `/src` directory following the structure bel
       </head>
       <body>
         <?! include('components/Header.html'); ?>
-        <main id="answers"></main>
+
+        <main id="answers" role="main">
+          </main>
+
         <?! include('scripts/main.js.html'); ?>
         <?! include('scripts/Page.js.html'); ?>
       </body>
@@ -119,7 +158,7 @@ All files must be placed within the `/src` directory following the structure bel
 
   * **`.css.html` files**: The entire content **must** be wrapped in `<style>` tags.
   * **`.js.html` files**: The entire content **must** be wrapped in `<script>` tags.
-  * **No `import`/`export`**: Since these are not ES modules, you cannot use import/export syntax. Use the global scope or IIFE `(function(){ ... })();` to avoid conflicts.
+  * **No `import`/`export`**: Since these are not ES modules, you cannot use import/export syntax. Use the global scope or an IIFE `(function(){ ... })();` to avoid conflicts.
 
 ## 5\. Testing Policy
 
@@ -142,7 +181,3 @@ Follow the **Conventional Commits** specification.
 2.  **Do not push directly to the `main` branch**.
 3.  **Do not break the file structure**. All new code must conform to the architecture defined above.
 4.  **Do not create massive pull requests**.
-
------
-
-This guidebook will be updated as the project evolves. Always refer to the latest version.
