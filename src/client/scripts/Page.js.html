@@ -1,6 +1,18 @@
 <script>
 console.log('🔧 Page.js.html script starting...');
 const DEBUG_MODE = true;
+
+// Global error handler for template variable parsing
+window.addEventListener('error', function(event) {
+  if (event.error && event.error.message && event.error.message.includes('Unexpected token')) {
+    console.warn('Template variable parsing error caught:', event.error.message);
+    event.preventDefault();
+    return false;
+  }
+});
+
+// Wrap template variable parsing in try-catch
+try {
 function debugLog() {
   if (DEBUG_MODE && console && console.log) {
     try {
@@ -54,6 +66,7 @@ function safeDebugStringify(obj, maxDepth = 2, currentDepth = 0) {
     return '[Stringify Error: ' + error.message + ']';
   }
 }
+// Safe template variable parsing with fallback values - using traditional string concatenation
 const __SHOW_COUNTS__ = '<?= typeof showCounts !== "undefined" ? showCounts : false ?>';
 const __DISPLAY_MODE__ = '<?= typeof displayMode !== "undefined" ? displayMode : "anonymous" ?>';
 const __SHEET_NAME__ = '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>';
@@ -77,6 +90,20 @@ window.isAdminUser = __IS_ADMIN_USER__.startsWith('<') ? false : __IS_ADMIN_USER
 const SHEET_NAME = __SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHEET_NAME__;
 const USER_ID = __USER_ID__.startsWith('<') ? '' : __USER_ID__;
 const OWNER_NAME = __OWNER_NAME__.startsWith('<') ? '' : __OWNER_NAME__;
+
+// Safe parsing of OPINION_HEADER with fallback
+let OPINION_HEADER;
+try {
+  if (typeof __OPINION_HEADER__ === 'string' && !__OPINION_HEADER__.startsWith('<')) {
+    OPINION_HEADER = __OPINION_HEADER__;
+  } else {
+    OPINION_HEADER = 'お題';
+  }
+} catch (e) {
+  console.warn('Failed to parse OPINION_HEADER:', e);
+  OPINION_HEADER = 'お題';
+}
+
 let MAPPING;
 try {
   if (typeof __MAPPING__ === 'string' && !__MAPPING__.startsWith('<')) {
@@ -87,6 +114,23 @@ try {
 } catch (e) {
   console.warn('Failed to parse MAPPING:', e);
   MAPPING = {};
+}
+
+} catch (templateError) {
+  console.error('Critical template variable parsing error:', templateError);
+  // Fallback values for all template variables
+  window.showCounts = true;
+  window.displayMode = 'anonymous';
+  window.showAdminFeatures = false;
+  window.showHighlightToggle = false;
+  window.showScoreSort = false;
+  window.isStudentMode = true;
+  window.isAdminUser = false;
+  const SHEET_NAME = 'テストシート';
+  const USER_ID = '';
+  const OWNER_NAME = '';
+  const OPINION_HEADER = 'お題';
+  const MAPPING = {};
 }
 </script>
 <script>
@@ -316,10 +360,8 @@ class StudyQuestApp {
     }
   setupCriticalElements() {
     if (this.elements.headingLabel) {
-      const opinionHeader = __OPINION_HEADER__.startsWith('<')
-        ? 'お題を読み込み中...'
-        : this.escapeHtml(__OPINION_HEADER__);
-      this.elements.headingLabel.textContent = opinionHeader;
+      const opinionHeader = OPINION_HEADER || 'お題を読み込み中...';
+      this.elements.headingLabel.textContent = this.escapeHtml(opinionHeader);
     }
 
     // Only setup absolutely critical event listeners
