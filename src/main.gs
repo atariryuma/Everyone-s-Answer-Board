@@ -517,6 +517,21 @@ function htmlEncode(str) {
 }
 
 /**
+ * JavaScript エスケープのテスト関数
+ */
+function testJavaScriptEscaping() {
+  const testString = '今日のテーマについて、あなたの考えや意見を聞かせてください';
+  const escaped = escapeJavaScript(testString);
+  console.log('Original:', testString);
+  console.log('Escaped:', escaped);
+  return {
+    original: testString,
+    escaped: escaped,
+    success: escaped !== testString
+  };
+}
+
+/**
  * パフォーマンス監視エンドポイント（簡易版）
  */
 function getPerformanceMetrics() {
