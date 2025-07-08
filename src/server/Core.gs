@@ -1962,8 +1962,3 @@ function isValidEmail(email) {
 function getEmailDomain(email) {
   return email.split('@')[1] || '';
 }
-
-/**
- * Drive APIサービスを取得
- * @returns {object} Drive APIサービス
- */
