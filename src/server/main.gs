@@ -87,20 +87,10 @@ function safeSetXFrameOptionsDeny(htmlOutput) {
  * @param {string} path - client/ からの相対パス (例: 'styles/main.css.html')
  * @returns {string} ファイルのコンテンツ
  */
-function include(filename) {
-  // Determine the correct subdirectory based on file type
-  var pathPrefix = '';
-  if (filename.endsWith('.css.html')) {
-    pathPrefix = 'client/styles/';
-  } else if (filename.endsWith('.js.html')) {
-    pathPrefix = 'client/scripts/';
-  } else if (filename.endsWith('.html')) {
-    pathPrefix = 'client/components/';
-  } else {
-    // Default to client/ if no specific type is matched
-    pathPrefix = 'client/';
-  }
-  return HtmlService.createHtmlOutputFromFile(pathPrefix + filename).getContent();
+function include(fullRelativePath) {
+  // Example: fullRelativePath could be 'client/styles/main.css.html'
+  // or 'client/scripts/main.js.html' or 'client/components/Header.html'
+  return HtmlService.createHtmlOutputFromFile(fullRelativePath).getContent();
 }
 
 /**
