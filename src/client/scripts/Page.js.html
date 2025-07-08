@@ -1,25 +1,4 @@
 <script>
-// Global error handling for document.write and other issues
-window.addEventListener('error', function(event) {
-  if (event.error && event.error.message) {
-    if (event.error.message.includes('document.write') ||
-        event.error.message.includes('Unexpected token')) {
-      console.warn('Document.write or syntax error caught and handled:', event.error.message);
-      event.preventDefault();
-      return false;
-    }
-  }
-});
-
-// Handle unhandled promise rejections
-window.addEventListener('unhandledrejection', function(event) {
-  console.warn('Unhandled promise rejection:', event.reason);
-  event.preventDefault();
-});
-
-// TailwindCSS configuration moved to HTML head for better load order
-</script>
-<script>
 const DEBUG_MODE = true;
 function debugLog() {
   if (DEBUG_MODE && console && console.log) {
