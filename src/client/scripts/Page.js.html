@@ -476,7 +476,6 @@ setupEventDelegation() {
     }
     
     this.handlers.onAnswersContainerClick = (e) => {
-        console.log('🔍 [CLICK DEBUG] Container click detected:', {
             target: e.target,
             targetClass: e.target.className,
             targetTag: e.target.tagName,
@@ -486,7 +485,6 @@ setupEventDelegation() {
         });
 
         const answerCard = e.target.closest('.answer-card');
-        console.log('🔍 [CLICK DEBUG] Answer card search:', {
             answerCard: answerCard,
             cardClass: answerCard?.className,
             cardRowIndex: answerCard?.dataset?.rowIndex,
@@ -494,17 +492,14 @@ setupEventDelegation() {
         });
 
         if (!answerCard || answerCard.classList.contains('hidden-card')) {
-            console.log('🚫 [CLICK DEBUG] No valid answer card found or card is hidden');
             return;
         }
 
         const rowIndex = answerCard.dataset.rowIndex;
         if (!rowIndex) {
-            console.log('🚫 [CLICK DEBUG] No rowIndex found on card');
             return;
         }
 
-        console.log('✅ [CLICK DEBUG] Valid card click detected:', {
             rowIndex: rowIndex,
             cardElement: answerCard
         });
@@ -512,7 +507,6 @@ setupEventDelegation() {
         // リアクションボタンのクリックを処理
         const reactionBtn = e.target.closest('.reaction-btn');
         if (reactionBtn) {
-            console.log('🎯 [CLICK DEBUG] Reaction button clicked:', {
                 button: reactionBtn,
                 reaction: reactionBtn.dataset.reaction,
                 disabled: reactionBtn.disabled,
@@ -520,10 +514,8 @@ setupEventDelegation() {
             });
             e.stopPropagation(); // ★重要: イベントの伝播を止め、カード本体のクリックと分離
             if (!reactionBtn.disabled) {
-                console.log('▶️ [CLICK DEBUG] Processing reaction:', reactionBtn.dataset.reaction);
                 this.handleReaction(rowIndex, reactionBtn.dataset.reaction);
             } else {
-                console.log('🚫 [CLICK DEBUG] Reaction button is disabled');
             }
             return;
         }
@@ -531,226 +523,28 @@ setupEventDelegation() {
         // ハイライトボタンのクリックを処理
         const highlightBtn = e.target.closest('.highlight-btn');
         if (highlightBtn) {
-            console.log('🎯 [CLICK DEBUG] Highlight button clicked:', {
                 button: highlightBtn,
                 disabled: highlightBtn.disabled,
                 rowIndex: rowIndex
             });
             e.stopPropagation(); // ★重要: 同様にイベントの伝播を停止
             if (!highlightBtn.disabled) {
-                console.log('▶️ [CLICK DEBUG] Processing highlight for row:', rowIndex);
                 this.handleHighlight(rowIndex);
             } else {
-                console.log('🚫 [CLICK DEBUG] Highlight button is disabled');
             }
             return;
         }
 
         // 上記以外の場合は、カード本体のクリックとしてモーダルを表示
-        console.log('📱 [CLICK DEBUG] Card body clicked, showing modal for row:', rowIndex);
         this.showAnswerModal(rowIndex);
     };
 
     if (this.elements.answersContainer) {
-        console.log('🔧 [CLICK DEBUG] Setting up event delegation on answers container:', this.elements.answersContainer);
         // 既存のリスナーをクリアしてから追加
         this.elements.answersContainer.removeEventListener('click', this.handlers.onAnswersContainerClick);
         this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
         this.eventDelegationSetup = true;
-        console.log('✅ [CLICK DEBUG] Event delegation setup complete');
     } else {
-        console.error('❌ [CLICK DEBUG] No answers container found for event delegation');
-    }
-}
-  
-  // Debug helper function - can be called from console
-  debugAnswerCards() {
-    debugLog('=== ANSWER CARDS DEBUG REPORT ===');
-    
-    // Make function globally available
-    window.debugAnswerCards = this.debugAnswerCards.bind(this);
-    
-    const container = this.elements.answersContainer;
-    debugLog('Answers container:', {
-      element: container,
-      exists: !!container,
-      className: container?.className,
-      childrenCount: container?.children?.length || 0
-    });
-    
-    if (!container) {
-      debugLog('ERROR: No answers container found');
-      return;
-    }
-    
-    const answerCards = container.querySelectorAll('.answer-card');
-    debugLog('Answer cards found:', {
-      count: answerCards.length,
-      elements: Array.from(answerCards)
-    });
-    
-    answerCards.forEach((card, index) => {
-      debugLog(`Answer card ${index}:`, {
-        element: card,
-        className: card.className,
-        dataset: card.dataset,
-        rowIndex: card.dataset.rowIndex,
-        hasRowIndex: !!card.dataset.rowIndex,
-        childrenCount: card.children.length,
-        reactionButtons: card.querySelectorAll('.reaction-btn').length,
-        highlightButtons: card.querySelectorAll('.highlight-btn').length
-      });
-    });
-    
-    // Test event listener
-    debugLog('Event listener test:', {
-      hasClickHandler: !!this.handlers.onAnswersContainerClick,
-      handlerFunction: this.handlers.onAnswersContainerClick
-    });
-    
-    debugLog('=== END DEBUG REPORT ===');
-  }
-  
-  // Enhanced debug helper function to simulate clicking on answer cards
-  debugClickAnswerCard(cardIndex = 0, options = {}) {
-    debugLog('=== SIMULATING ANSWER CARD CLICK ===');
-    
-    const {
-      logDetails = true,
-      waitForAnimation = false,
-      simulateHover = false,
-      validateResponse = false
-    } = options;
-    
-    // Validate cardIndex
-    if (typeof cardIndex !== 'number' || cardIndex < 0 || !Number.isInteger(cardIndex)) {
-      debugLog('ERROR: Invalid card index', { cardIndex });
-      return { success: false, error: 'Invalid card index. Must be a non-negative integer.' };
-    }
-    
-    const container = this.elements.answersContainer;
-    if (!container) {
-      debugLog('ERROR: No answers container found');
-      return { success: false, error: 'No answers container found' };
-    }
-    
-    const answerCards = container.querySelectorAll('.answer-card');
-    if (answerCards.length === 0) {
-      debugLog('ERROR: No answer cards found');
-      return { success: false, error: 'No answer cards found' };
-    }
-    
-    if (cardIndex >= answerCards.length) {
-      debugLog('ERROR: Card index out of bounds', { cardIndex, totalCards: answerCards.length });
-      return { success: false, error: 'Card index out of bounds', totalCards: answerCards.length };
-    }
-    
-    const card = answerCards[cardIndex];
-    
-    let cardInfo;
-    try {
-      cardInfo = {
-        index: cardIndex,
-        element: card,
-        className: card.className,
-        dataset: { ...card.dataset },
-        rowIndex: card.dataset.rowIndex,
-        boundingRect: card.getBoundingClientRect(),
-        computedStyle: {
-          display: getComputedStyle(card).display,
-          visibility: getComputedStyle(card).visibility,
-          opacity: getComputedStyle(card).opacity
-        }
-      };
-    } catch (error) {
-      debugLog('ERROR: Failed to get card info', { error: error.message });
-      return { success: false, error: `Failed to get card info: ${error.message}` };
-    }
-    
-    if (logDetails) {
-      debugLog('Card details before click:', cardInfo);
-    }
-    
-    // Simulate hover if requested
-    if (simulateHover) {
-      const hoverEvent = new MouseEvent('mouseenter', {
-        bubbles: true,
-        cancelable: true,
-        view: window
-      });
-      card.dispatchEvent(hoverEvent);
-      debugLog('Hover event dispatched');
-    }
-    
-    // Simulate a click event
-    const clickEvent = new MouseEvent('click', {
-      bubbles: true,
-      cancelable: true,
-      view: window,
-      clientX: cardInfo.boundingRect.left + cardInfo.boundingRect.width / 2,
-      clientY: cardInfo.boundingRect.top + cardInfo.boundingRect.height / 2
-    });
-    
-    const clickResult = card.dispatchEvent(clickEvent);
-    
-    const result = {
-      success: true,
-      cardIndex,
-      cardInfo,
-      clickResult,
-      timestamp: Date.now()
-    };
-    
-    if (logDetails) {
-      debugLog('Click event result:', { 
-        dispatched: clickResult, 
-        cardIndex, 
-        cardElement: card,
-        eventBubbled: clickEvent.bubbles,
-        eventCancelled: clickEvent.defaultPrevented
-      });
-    }
-    
-    // Wait for animations if requested
-    if (waitForAnimation) {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          if (validateResponse) {
-            const updatedCard = answerCards[cardIndex];
-            result.cardStateAfterClick = {
-              className: updatedCard.className,
-              dataset: { ...updatedCard.dataset },
-              computedStyle: {
-                display: getComputedStyle(updatedCard).display,
-                visibility: getComputedStyle(updatedCard).visibility,
-                opacity: getComputedStyle(updatedCard).opacity
-              }
-            };
-          }
-          debugLog('=== CLICK SIMULATION COMPLETE ===');
-          resolve(result);
-        }, 500); // Wait 500ms for animations
-      });
-    }
-    
-    debugLog('=== CLICK SIMULATION COMPLETE ===');
-    return result;
-  }
-  adjustLayout() {
-    if (this.baseBodyPadding === undefined) {
-      this.baseBodyPadding = parseFloat(getComputedStyle(this.elements.body).paddingBottom) || 0;
-    }
-    const footerHeight = this.elements.footer.offsetHeight;
-    this.elements.body.style.paddingBottom = footerHeight + this.baseBodyPadding + 'px';
-  }
-  runGas(funcName, ...args) {
-    // Simple request deduplication for identical calls (except for state-changing operations)
-    const cacheKey = funcName + JSON.stringify(args);
-    const isStateChanging = ['toggleHighlight', 'addReaction', 'endPublication'].includes(funcName);
-    
-    if (!isStateChanging) {
-      const cached = this.cache.get(cacheKey);
-      if (cached) {
         return Promise.resolve(cached);
       }
     }
@@ -2739,122 +2533,6 @@ try {
   }
   window.studyQuestApp = new StudyQuestApp();
   
-  // Expose debug functions globally for console access
-  window.debugAnswerCards = () => {
-    if (window.studyQuestApp && window.studyQuestApp.debugAnswerCards) {
-      window.studyQuestApp.debugAnswerCards();
-    } else {
-      console.log('StudyQuestApp not available or debug function not found');
-    }
-  };
-  
-  // Enhanced global debug function with additional utility methods
-  window.debugClickAnswerCard = (cardIndex = 0, options = {}) => {
-    if (window.studyQuestApp && window.studyQuestApp.debugClickAnswerCard) {
-      return window.studyQuestApp.debugClickAnswerCard(cardIndex, options);
-    } else {
-      console.log('StudyQuestApp not available or debug function not found');
-      return { success: false, error: 'StudyQuestApp not available' };
-    }
-  };
-
-  // Additional global debug utilities
-  window.debugClickAllAnswerCards = async (options = {}) => {
-    if (!window.studyQuestApp) {
-      console.log('StudyQuestApp not available');
-      return { success: false, error: 'StudyQuestApp not available' };
-    }
-    
-    const container = window.studyQuestApp.elements?.answersContainer;
-    if (!container) {
-      console.log('No answers container found');
-      return { success: false, error: 'No answers container found' };
-    }
-    
-    const answerCards = container.querySelectorAll('.answer-card');
-    const results = [];
-    
-    console.log(`Found ${answerCards.length} answer cards, clicking all...`);
-    
-    for (let i = 0; i < answerCards.length; i++) {
-      try {
-        const result = await window.studyQuestApp.debugClickAnswerCard(i, { 
-          ...options, 
-          logDetails: false // Reduce noise when clicking all cards
-        });
-        results.push(result);
-        
-        if (options.delay && i < answerCards.length - 1) {
-          // Add proper delay between clicks if specified
-          await new Promise(resolve => setTimeout(resolve, options.delay));
-        }
-      } catch (error) {
-        console.error(`Error clicking card ${i}:`, error);
-        results.push({ success: false, error: error.message, cardIndex: i });
-      }
-    }
-    
-    return {
-      success: true,
-      totalCards: answerCards.length,
-      results
-    };
-  };
-
-  window.debugGetAnswerCardInfo = (cardIndex = 0) => {
-    if (!window.studyQuestApp) {
-      console.log('StudyQuestApp not available');
-      return { success: false, error: 'StudyQuestApp not available' };
-    }
-    
-    // Validate cardIndex
-    if (typeof cardIndex !== 'number' || cardIndex < 0 || !Number.isInteger(cardIndex)) {
-      console.log('Invalid card index:', cardIndex);
-      return { success: false, error: 'Invalid card index. Must be a non-negative integer.' };
-    }
-    
-    const container = window.studyQuestApp.elements?.answersContainer;
-    if (!container) {
-      console.log('No answers container found');
-      return { success: false, error: 'No answers container found' };
-    }
-    
-    const answerCards = container.querySelectorAll('.answer-card');
-    if (answerCards.length === 0) {
-      console.log('No answer cards found');
-      return { success: false, error: 'No answer cards found' };
-    }
-    
-    if (cardIndex >= answerCards.length) {
-      console.log('Card index out of bounds');
-      return { success: false, error: 'Card index out of bounds', totalCards: answerCards.length };
-    }
-    
-    const card = answerCards[cardIndex];
-    
-    try {
-      const cardInfo = {
-        index: cardIndex,
-        className: card.className,
-        dataset: { ...card.dataset },
-        rowIndex: card.dataset.rowIndex,
-        boundingRect: card.getBoundingClientRect(),
-        computedStyle: {
-          display: getComputedStyle(card).display,
-          visibility: getComputedStyle(card).visibility,
-          opacity: getComputedStyle(card).opacity
-        },
-        textContent: card.textContent?.trim() || '',
-        innerHTML: card.innerHTML
-      };
-      
-      console.log('Answer card info:', cardInfo);
-      return { success: true, cardInfo };
-    } catch (error) {
-      console.error('Error getting card info:', error);
-      return { success: false, error: `Error getting card info: ${error.message}` };
-    }
-  };
   
   // ドメイン情報とフォームリンクを取得
   loadDomainInfo();
