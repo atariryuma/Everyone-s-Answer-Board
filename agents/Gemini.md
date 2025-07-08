@@ -1,183 +1,209 @@
-# 🤖 Agent's Guidebook for "Everyone's Answer Board"
+# 🤖 Agent’s Guidebook for “Everyone’s Answer Board”
 
-This document provides the essential guidelines for all AI agents and human developers contributing to this project. Its purpose is to maintain code quality and consistency and to promote efficient, scalable development.
+This guide ensures all AI agents and human contributors build secure, maintainable, and user-friendly educational tools, following both our project conventions and Google’s HTML Service best practices.
 
-## 1\. Agent's Role and Objective
+---
 
-Your role is not just a code generator but a **full-stack development partner** responsible for building a robust, maintainable, and user-centric educational tool.
+## 1. Agent’s Role & Objective
 
-**Objective:**
+* **Role**: Full-stack development partner, not just a code generator.
+* **Objective**:
 
-  * To implement features according to the `README.md`, following the established architecture.
-  * To strictly adhere to the file structure and separation of concerns to ensure project scalability.
-  * To propose and implement UI/UX enhancements that provide a seamless and high-quality experience for both teachers and students.
+  * Implement features strictly per `README.md`.
+  * Adhere to the prescribed file structure and separation of concerns.
+  * Propose and implement UI/UX improvements for teachers and students.
 
-## 2\. Core Principles
+---
 
-1.  **Requirements are King**: All implementation must be based on `README.md`.
-2.  **Structure is Paramount**: Adherence to the file and directory structure is mandatory for maintaining project sanity.
-3.  **Security First**: Exercise extreme caution with sensitive data.
-4.  **Test Everything**: All new logic must be accompanied by tests.
-5.  **User-Centered Design**: Always prioritize the user experience for teachers and students.
+## 2. Core Principles
 
-## 3\. Development Workflow
+1. **Requirements First**: Every change must trace back to `README.md`.
+2. **Structure Is Paramount**: Follow the `/src` directory layout exactly.
+3. **Security First**: Never expose credentials or sensitive data.
+4. **Test Everything**: Include unit tests for all new server logic.
+5. **User-Centered Design**: Prioritize ease of use for teachers and students.
 
-1.  **Understand Requirements**: Analyze the task and relevant sections of `README.md`.
-2.  **Identify Target Files**: Based on the architecture, determine which files in the `/src` directory need to be created or modified.
-3.  **Implement (Coding)**: Write code following the strict file structure and coding guidelines outlined below.
-4.  **Test**: Add or update tests in the `/tests` directory.
-5.  **Self-Review**: Ensure your changes conform to all guidelines.
-6.  **Commit**: Use the Conventional Commits format.
-7.  **Pull Request (PR)**: Create a focused PR with a clear description.
+---
 
-## 4\. Code Architecture & File Structure
+## 3. Development Workflow
 
-This project adopts a **full-stack, separation-of-concerns** architecture optimized for local development with `clasp` and maintainability in the GAS online editor. You **must** follow this structure precisely.
+1. **Clarify Requirements**: Review the relevant `README.md` section.
+2. **Target Files**: Identify which files under `/src` to update.
+3. **Implement**: Write code following the architecture and coding rules.
+4. **Test**: Add or update tests under `/tests`; confirm `npm run test` passes.
+5. **Self-Review**: Verify adherence to all guidelines.
+6. **Commit**: Use Conventional Commits (e.g., `feat(server): add reactionService`).
+7. **Pull Request**: Keep PRs focused; include a clear description.
 
-### **[System-Wide Rule] File Naming and Directory Structure**
+---
 
-All files must be placed within the `/src` directory following the structure below. The GAS online editor will mimic this hierarchy by treating slashes (`/`) in filenames as folders.
+## 4. Project Architecture & File Structure
 
-```plaintext
+All code lives under `/src`. Slashes in filenames become folders in the GAS editor.
+
+```text
 /src
-├── 📁 server/        # SERVER-SIDE LOGIC (.gs)
-│   ├── main.gs       # Entry points (doGet) and top-level routing.
-│   ├── database.gs   # Database (Google Sheets) operations.
-│   └── services/     # Directory for business logic per feature.
-│       └── reactionService.gs
+├── server/
+│   ├── main.gs         # doGet, routing, render/include helpers only
+│   ├── database.gs     # Sheets/database operations
+│   └── services/       # Business logic (e.g. reactionService.gs)
 │
-├── 📁 client/        # FRONT-END SOURCES
-│   ├── 📁 views/        # Main HTML templates for each page.
-│   │   ├── AdminPanel.html
-│   │   ├── Page.html
-│   │   └── Registration.html
-│   │
-│   ├── 📁 styles/       # CSS files (wrapped in .html).
-│   │   ├── main.css.html
-│   │   └── Page.css.html
-│   │
-│   ├── 📁 scripts/      # Client-side JavaScript (wrapped in .html).
-│   │   ├── main.js.html
-│   │   └── Page.js.html
-│   │
-│   └── 📁 components/   # Reusable UI component snippets.
-│       ├── Header.html
-│       └── ConfirmationModal.html
+├── client/
+│   ├── views/          # HTML templates (AdminPanel.html, Page.html, etc.)
+│   ├── styles/         # CSS snippets wrapped in .css.html
+│   ├── scripts/        # JS snippets wrapped in .js.html
+│   └── components/     # Reusable HTML pieces (Header.html, Modals, etc.)
 │
-└── 📄 appsscript.json # Project manifest (do not modify).
+└── appsscript.json     # GAS manifest (do not modify)
 ```
 
-### **[Implementation Guide] How to Write Code**
+### 4.1 Server-Side Logic (`/src/server/`)
 
-#### **1. Server-Side Logic (in `/src/server/`)**
+* **`main.gs`**:
 
-  * **`main.gs`**: This is the primary entry point. It contains the `doGet` function for routing and the `renderPage` and `include` helper functions for building the front-end. **Do not add business logic here.**
+  * Contains `doGet(e)` to route requests.
+  * Defines `renderPage(viewName, data)` and `include(path)` only.
+  * **No business logic here**—delegate to `database.gs` or `services/`.
 
-    **Correct Code:**
+* **Other `.gs` files**:
 
-    ```javascript
-    // /src/server/main.gs
+  * Each feature’s logic lives in its own file under `server/` or `server/services/`.
 
-    /**
-     * The main entry point for the web app.
-     * @param {Object} e - The event parameter.
-     * @returns {HtmlService.HtmlOutput} The HTML page to be served.
-     */
-    function doGet(e) {
-      // Logic to determine user role (admin, new user, etc.) would go here.
-      // For this example, we'll route to the AdminPanel.
-      if (isAdmin(e)) return renderPage('AdminPanel');
-      if (!isRegistered(e)) return renderPage('Registration');
-      return renderPage('Page');
-    }
+### 4.2 Front-End Views (`/src/client/views/`)
 
-    /**
-     * Renders an HTML template page.
-     * @param {string} viewName - The name of the file in /src/client/views/ (without .html).
-     * @param {Object} [data={}] - A data object to pass to the template.
-     * @returns {HtmlService.HtmlOutput} The evaluated HTML output.
-     */
-    function renderPage(viewName, data = {}) {
-      const template = HtmlService.createTemplateFromFile(`client/views/${viewName}`);
-      template.data = data;
-      // Make the include function available to the templates.
-      template.include = include; 
-      return template.evaluate()
-        .setTitle("Everyone's Answer Board")
-        .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-    }
+* Pure HTML templates.
+* Use scriptlets to include CSS, JS, and components:
 
-    /**
-     * Includes the content of another HTML file, allowing for nested includes.
-     * This version uses createTemplateFromFile and evaluate() to enable recursion.
-     * @param {string} path - The path to the file relative to the /src/client/ directory.
-     * @returns {string} The evaluated HTML content of the included file.
-     */
-    function include(path) {
-      // Create a template from the file to allow its scriptlets to be evaluated.
-      const template = HtmlService.createTemplateFromFile(`client/${path}`);
-      // Pass the include function to the sub-template to allow for nesting.
-      template.include = include;
-      return template.evaluate().getContent();
-    }
-    ```
+  ```html
+  <!DOCTYPE html>
+  <html lang="en">
+    <head>
+      <base target="_top">
+      <?!= include('styles/main.css.html'); ?>
+      <?!= include('styles/Page.css.html'); ?>
+    </head>
+    <body>
+      <?!= include('components/Header.html'); ?>
 
-  * **Other `.gs` files**: All other business logic (e.g., database access, reaction processing) must be in separate files like `database.gs` or within the `services/` directory.
+      <main id="app"></main>
 
-#### **2. Front-End Views (in `/src/client/views/`)**
+      <?!= include('scripts/main.js.html'); ?>
+      <?!= include('scripts/Page.js.html'); ?>
+    </body>
+  </html>
+  ```
 
-  * These files are **HTML skeletons only**.
+---
 
-  * They must use the `include()` helper function via scriptlets `<?! ... ?>` to load all CSS, JavaScript, and components.
+## 5. Google’s HTML Service Best Practices
 
-  * **Important**: The path passed to `include()` must be relative to the `/src/client/` directory.
+These guidelines come directly from Google’s official documentation and ensure your HTML UI loads quickly, stays secure, and remains maintainable.
 
-    **Correct Code Example (`/src/client/views/Page.html`):**
+1. **Separate HTML, CSS & JavaScript**
 
-    ```html
-    <!DOCTYPE html>
-    <html lang="en">
-      <head>
-        <base target="_top">
-        <?! include('styles/main.css.html'); ?>
-        <?! include('styles/Page.css.html'); ?>
-      </head>
-      <body>
-        <?! include('components/Header.html'); ?>
+   * **Why**: Improves readability and reuse.
+   * **How**:
 
-        <main id="answers" role="main">
-          </main>
+     * In `Code.gs`, define:
 
-        <?! include('scripts/main.js.html'); ?>
-        <?! include('scripts/Page.js.html'); ?>
-      </body>
-    </html>
-    ```
+       ```js
+       function include(filename) {
+         return HtmlService
+           .createHtmlOutputFromFile(filename)
+           .getContent();
+       }
+       ```
+     * In your main template:
 
-#### **3. Stylesheets and Scripts (in `/src/client/styles/` & `/src/client/scripts/`)**
+       ```html
+       <?!= include('styles/Page.css.html'); ?>
+       <?!= include('scripts/Page.js.html'); ?>
+       ```
 
-  * **`.css.html` files**: The entire content **must** be wrapped in `<style>` tags.
-  * **`.js.html` files**: The entire content **must** be wrapped in `<script>` tags.
-  * **No `import`/`export`**: Since these are not ES modules, you cannot use import/export syntax. Use the global scope or an IIFE `(function(){ ... })();` to avoid conflicts.
+2. **Load Data Asynchronously**
 
-## 5\. Testing Policy
+   * **Why**: Prevents server-side template delays from blocking the initial render.
+   * **How**:
 
-  * Add unit tests to the `/tests` directory for all new server-side business logic.
-  * Ensure all existing tests pass (`npm run test`) before creating a pull request.
+     * Show a “Loading…” placeholder in HTML.
+     * Call `google.script.run.withSuccessHandler(renderData).fetchData();` in client JS.
 
-## 6\. Commit & PR Message Format
+3. **Always Use HTTPS for External Resources**
 
-Follow the **Conventional Commits** specification.
+   * **Why**: Mixed-content (HTTP) blocks in IFRAME sandbox mode.
+   * **How**:
 
-**Format:** `<type>(<scope>): <subject>`
+     * Ensure every `<script>` or `<link>` URL starts with `https://`.
 
-  * **type**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
-  * **scope (optional)**: `server`, `client`, `admin`, `ui`, etc.
-  * **subject**: A concise description of the change (max 50 characters).
+4. **Include the HTML5 Doctype**
 
-## 7\. Prohibited Actions
+   * **Why**: Forces standards-mode rendering; avoids quirks.
+   * **How**:
 
-1.  **Do not commit sensitive information**.
-2.  **Do not push directly to the `main` branch**.
-3.  **Do not break the file structure**. All new code must conform to the architecture defined above.
-4.  **Do not create massive pull requests**.
+     ```html
+     <!DOCTYPE html>
+     <html>…</html>
+     ```
+
+5. **Place JavaScript at the End of `<body>`**
+
+   * **Why**: Prioritizes HTML/CSS rendering; speeds up perceived load time.
+   * **How**:
+
+     * Move `<script>` includes to just before `</body>`.
+
+6. **Leverage jQuery if Needed**
+
+   * **Why**: Simplifies DOM manipulation and event handling.
+   * **How**:
+
+     ```html
+     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+     <script>
+       $(function() {
+         $('#btn').click(() => alert('Clicked'));
+       });
+     </script>
+     ```
+
+---
+
+## 6. Stylesheet & Script File Rules
+
+* **`.css.html`**: Entire file wrapped in `<style>…</style>`.
+* **`.js.html`**: Entire file wrapped in `<script>…</script>`.
+* **No ES Module Syntax**: Use IIFEs or global scope.
+
+---
+
+## 7. Testing Policy
+
+* Write or update unit tests under `/tests`.
+* Confirm all tests pass before merging.
+* Use clear, focused test cases for each new function.
+
+---
+
+## 8. Commit & PR Guidelines
+
+* **Commit Messages**: Follow Conventional Commits:
+
+  ```
+  <type>(<scope>): <short description>
+  ```
+
+  * types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`.
+* **Pull Requests**:
+
+  * Keep them small and topic-focused.
+  * Provide a descriptive title and summary.
+
+---
+
+## 9. Prohibited Actions
+
+1. **No sensitive data** in any committed files.
+2. **Never push directly** to `main`.
+3. **Do not break** the file structure—always follow `/src` conventions.
+4. **Avoid giant PRs**; split large changes into digestible pieces.
+

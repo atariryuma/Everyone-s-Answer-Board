@@ -1601,13 +1601,13 @@ function updateActivityTimeline(status) {
         var iconContainer = document.createElement('div');
         iconContainer.className = 'w-6 h-6 ' + (colors[activity.type] || colors.pending) + ' rounded-full flex items-center justify-center flex-shrink-0';
         
-        var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        var svg = document.createElementNS('https://www.w3.org/2000/svg', 'svg');
         svg.setAttribute('class', 'w-3 h-3');
         svg.setAttribute('fill', 'none');
         svg.setAttribute('stroke', 'currentColor');
         svg.setAttribute('viewBox', '0 0 24 24');
         
-        var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        var path = document.createElementNS('https://www.w3.org/2000/svg', 'path');
         path.setAttribute('stroke-linecap', 'round');
         path.setAttribute('stroke-linejoin', 'round');
         path.setAttribute('stroke-width', '2');
