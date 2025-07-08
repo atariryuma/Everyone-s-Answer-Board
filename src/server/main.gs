@@ -87,8 +87,20 @@ function safeSetXFrameOptionsDeny(htmlOutput) {
  * @param {string} path - client/ からの相対パス (例: 'styles/main.css.html')
  * @returns {string} ファイルのコンテンツ
  */
-function include(path) {
-  return HtmlService.createHtmlOutputFromFile('client/' + path).getContent();
+function include(filename) {
+  // Determine the correct subdirectory based on file type
+  var pathPrefix = '';
+  if (filename.endsWith('.css.html')) {
+    pathPrefix = 'client/styles/';
+  } else if (filename.endsWith('.js.html')) {
+    pathPrefix = 'client/scripts/';
+  } else if (filename.endsWith('.html')) {
+    pathPrefix = 'client/components/';
+  } else {
+    // Default to client/ if no specific type is matched
+    pathPrefix = 'client/';
+  }
+  return HtmlService.createHtmlOutputFromFile(pathPrefix + filename).getContent();
 }
 
 /**
@@ -206,7 +218,7 @@ function doGet(e) {
           userInfo: userInfo,
           userId: userInfo.userId,
           mode: mode,
-          displayMode: 'named',
+          displayMode: configJson.displayMode || 'named',
           showAdminFeatures: true,
           title: '管理パネル - みんなの回答ボード'
         };

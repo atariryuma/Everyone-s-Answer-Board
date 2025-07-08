@@ -95,19 +95,19 @@ const __SHOW_HIGHLIGHT_TOGGLE__ = '<?= typeof showHighlightToggle !== "undefined
 const __SHOW_SCORE_SORT__ = '<?= typeof showScoreSort !== "undefined" ? showScoreSort : false ?>';
 const __IS_STUDENT_MODE__ = '<?= typeof isStudentMode !== "undefined" ? isStudentMode : true ?>';
 const __IS_ADMIN_USER__ = '<?= typeof isAdminUser !== "undefined" ? isAdminUser : false ?>';
-window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : __SHOW_COUNTS__ === 'true';
-window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
-window.showAdminFeatures = __SHOW_ADMIN_FEATURES__.startsWith('<') ? false : __SHOW_ADMIN_FEATURES__ === 'true';
-window.showHighlightToggle = __SHOW_HIGHLIGHT_TOGGLE__.startsWith('<') ? false : __SHOW_HIGHLIGHT_TOGGLE__ === 'true';
-window.showScoreSort = __SHOW_SCORE_SORT__.startsWith('<') ? false : __SHOW_SCORE_SORT__ === 'true';
-window.isStudentMode = __IS_STUDENT_MODE__.startsWith('<') ? true : __IS_STUDENT_MODE__ === 'true';
-window.isAdminUser = __IS_ADMIN_USER__.startsWith('<') ? false : __IS_ADMIN_USER__ === 'true';
-const SHEET_NAME = __SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHEET_NAME__;
-const USER_ID = __USER_ID__.startsWith('<') ? '' : __USER_ID__;
-const OWNER_NAME = __OWNER_NAME__.startsWith('<') ? '' : __OWNER_NAME__;
+window.showCounts = parseBoolean(__SHOW_COUNTS__, false);
+window.displayMode = parseString(__DISPLAY_MODE__, 'anonymous');
+window.showAdminFeatures = parseBoolean(__SHOW_ADMIN_FEATURES__, false);
+window.showHighlightToggle = parseBoolean(__SHOW_HIGHLIGHT_TOGGLE__, false);
+window.showScoreSort = parseBoolean(__SHOW_SCORE_SORT__, false);
+window.isStudentMode = parseBoolean(__IS_STUDENT_MODE__, true);
+window.isAdminUser = parseBoolean(__IS_ADMIN_USER__, false);
+const SHEET_NAME = parseString(__SHEET_NAME__, 'テストシート');
+const USER_ID = parseString(__USER_ID__, '');
+const OWNER_NAME = parseString(__OWNER_NAME__, '');
 let MAPPING;
 try {
-  if (typeof __MAPPING__ === 'string' && !__MAPPING__.startsWith('<')) {
+  if (typeof __MAPPING__ === 'string' && !__MAPPING__.startsWith('<?=')) {
     MAPPING = JSON.parse(__MAPPING__);
   } else {
     MAPPING = {};
@@ -115,6 +115,16 @@ try {
 } catch (e) {
   console.warn('Failed to parse MAPPING:', e);
   MAPPING = {};
+}
+
+function parseBoolean(value, defaultValue) {
+  if (typeof value === 'string' && value.startsWith('<?=')) return defaultValue;
+  return value === 'true';
+}
+
+function parseString(value, defaultValue) {
+  if (typeof value === 'string' && value.startsWith('<?=')) return defaultValue;
+  return value;
 }
 
 // Optimize initial render
