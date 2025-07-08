@@ -2521,28 +2521,37 @@ function loadFormLink() {
     .getActiveFormInfo();
 }
 
-try {
-  if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
-    window.studyQuestApp.destroy();
-  }
-  window.studyQuestApp = new StudyQuestApp();
-  
-  
-  // ドメイン情報とフォームリンクを取得
-  loadDomainInfo();
-  loadFormLink();
-  
-  window.addEventListener('beforeunload', () => {
+function initializeApp() {
+  try {
     if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
       window.studyQuestApp.destroy();
     }
-  });
-} catch (error) {
-  console.error('Error creating StudyQuestApp instance:', error);
-  const container = document.getElementById('answers');
-  if (container) {
-    const msg = StudyQuestApp.prototype.escapeHtml(error.message || '');
-    container.innerHTML = '<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました: ' + msg + '</div>';
+    window.studyQuestApp = new StudyQuestApp();
+    
+    
+    // ドメイン情報とフォームリンクを取得
+    loadDomainInfo();
+    loadFormLink();
+    
+    window.addEventListener('beforeunload', () => {
+      if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
+        window.studyQuestApp.destroy();
+      }
+    });
+  } catch (error) {
+    console.error('Error creating StudyQuestApp instance:', error);
+    const container = document.getElementById('answers');
+    if (container) {
+      const msg = StudyQuestApp.prototype.escapeHtml(error.message || '');
+      container.innerHTML = '<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました: ' + msg + '</div>';
+    }
   }
+}
+
+// DOM準備完了後にアプリケーションを初期化
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+  initializeApp();
 }
 </script>
