@@ -911,12 +911,17 @@ setupEventDelegation() {
     debugLog('アプリケーションのクリーンアップ完了');
   }
   async loadDataImmediate() {
+    console.log('=== loadDataImmediate called ===');
     try {
       // Verify admin first to ensure proper initialization
+      console.log('Verifying admin...');
       await this.verifyAdminAsync();
+      console.log('Admin verification completed');
       
       // Start loading immediately without waiting
+      console.log('Starting loadSheetData...');
       this.loadSheetData(false, true).then(() => {
+        console.log('loadSheetData completed successfully, starting polling...');
         this.startPolling();
       }).catch(error => {
         console.error('Error in loadSheetData:', error);
@@ -925,6 +930,7 @@ setupEventDelegation() {
       });
       
       // Load sheets in background
+      console.log('Loading available sheets...');
       this.loadAvailableSheets();
     } catch (error) {
       console.error('Error in loadDataImmediate:', error);
@@ -972,9 +978,14 @@ setupEventDelegation() {
   }
 
   async loadSheetData(showLoading = true, isInitialLoad = false, requestedSheetName = null) {
-    if (this.state.isLoading && showLoading) return;
+    console.log('=== loadSheetData called ===', { showLoading, isInitialLoad, requestedSheetName });
+    if (this.state.isLoading && showLoading) {
+      console.log('Already loading, returning early');
+      return;
+    }
     this.state.isLoading = true;
-    this.showLoadingOverlay(); // Add this line
+    this.showLoadingOverlay();
+    console.log('Loading overlay shown, proceeding with data load...');
 
     const selectedClass = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
     const oldAnswers = [...this.state.currentAnswers];
@@ -1007,6 +1018,7 @@ setupEventDelegation() {
         this.displayEmptyState();
       }, 10000); // 10 second timeout
 
+      console.log('About to call google.script.run.getPublishedSheetData with:', { classFilter, sortOrder });
       google.script.run
         .withSuccessHandler(result => {
           clearTimeout(timeoutId);
@@ -2524,14 +2536,20 @@ function loadFormLink() {
 }
 
 function initializeApp() {
+  console.log('=== initializeApp called ===');
   try {
+    console.log('Checking for existing studyQuestApp...');
     if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
+      console.log('Destroying existing studyQuestApp...');
       window.studyQuestApp.destroy();
     }
-    window.studyQuestApp = new StudyQuestApp();
     
+    console.log('Creating new StudyQuestApp instance...');
+    window.studyQuestApp = new StudyQuestApp();
+    console.log('StudyQuestApp created successfully');
     
     // ドメイン情報とフォームリンクを取得
+    console.log('Loading domain info and form link...');
     loadDomainInfo();
     loadFormLink();
     
@@ -2540,8 +2558,11 @@ function initializeApp() {
         window.studyQuestApp.destroy();
       }
     });
+    
+    console.log('=== initializeApp completed successfully ===');
   } catch (error) {
     console.error('Error creating StudyQuestApp instance:', error);
+    console.error('Error stack:', error.stack);
     const container = document.getElementById('answers');
     if (container) {
       const msg = StudyQuestApp.prototype.escapeHtml(error.message || '');
