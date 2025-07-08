@@ -1,25 +1,32 @@
 {
   "name": "everyone-s-answer-board",
   "version": "1.0.0",
-  "description": "Google Apps Script project",
+  "description": "A collaborative answer board using Google Apps Script.",
   "main": "index.js",
   "scripts": {
+    "test": "jest",
     "push": "clasp push",
     "pull": "clasp pull",
-    "open": "clasp open",
-    "test": "jest",
-    "update-url": "node scripts/updateWebAppUrl.js"
+    "open": "clasp open"
   },
-  "keywords": [],
-  "author": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/atariryuma/Everyone-s-Answer-Board.git"
+  },
+  "keywords": [
+    "gas",
+    "google-apps-script"
+  ],
+  "author": "Ryuma Ataria",
   "license": "ISC",
-  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/atariryuma/Everyone-s-Answer-Board/issues"
+  },
+  "homepage": "https://github.com/atariryuma/Everyone-s-Answer-Board#readme",
   "devDependencies": {
     "@google/clasp": "^3.0.6-alpha",
     "googleapis": "^148.0.0",
-    "jest": {
-    "setupFilesAfterEnv": ["./tests/shared-mocks.js"]
-  },
+    "jest": "^29.6.2",
     "jsdom": "^26.1.0"
   }
 }
