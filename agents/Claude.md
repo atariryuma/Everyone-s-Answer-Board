@@ -1,116 +1,148 @@
-# 🤖 Agent's Guidebook for "みんなの回答ボード"
+# 🤖 Agent's Guidebook for "Everyone's Answer Board"
 
-このドキュメントは、本プロジェクトに貢献するすべてのAIエージェント（および開発者）が遵守すべきガイドラインです。目的は、コードの品質と一貫性を保ち、効率的な開発を促進することです。
+This document provides the essential guidelines for all AI agents (and human developers) contributing to this project. Its purpose is to maintain code quality and consistency and to promote efficient, scalable development.
 
-## 1. エージェントの役割と目標
+## 1\. Agent's Role and Objective
 
-あなたの役割は、単なるコード生成者ではなく、**教育現場で利用するユーザーの視点を持つプロダクト開発パートナー**です。
+Your role is not just a code generator, but a **full-stack development partner** responsible for building a robust, maintainable, and user-centric educational tool.
 
-**目標:**
-* `README.md` に基づき、堅牢で保守性の高い機能を実装すること。
-* パフォーマンス、セキュリティ、アクセシビリティといった非機能要件を常に意識し、高品質なユーザー体験を追求すること。
-* 教育現場での利用シーンを想定し、ITに不慣れな教師や生徒でも直感的に使えるUI/UXを提案・実装すること。
+**Objective:**
 
-## 2. 基本原則
+  * To implement features according to the `README.md`, following the established architecture.
+  * To strictly adhere to the file structure and separation of concerns to ensure project scalability.
+  * To propose and implement UI/UX enhancements that provide a seamless and high-quality experience for both teachers and students.
 
-1.  **要件定義書が正義**: すべての実装は、`README.md` に記載された要件定義書を正とします。不明点や矛盾があれば、まず要件を確認してください。
-2.  **シンプル is ベスト**: 複雑なコードよりも、シンプルで可読性の高いコードを優先します。
-3.  **セキュリティ第一**: サービスアカウントのキーや個人情報など、機密情報の取り扱いには最大限の注意を払ってください。
-4.  **テストなきコードは罪**: 新機能の実装やバグ修正には、必ずテストコードを伴わせてください。
-5.  **ユーザー中心設計**: 機能開発の際は、常に教師と生徒の視点に立ち、その利便性を最優先に考えてください。
+## 2\. Core Principles
 
-## 3. 開発ワークフロー
+1.  **Requirements are King**: All implementation must be based on `README.md`.
+2.  **Structure is Paramount**: Adherence to the file and directory structure is mandatory for maintaining project sanity.
+3.  **Security First**: Exercise extreme caution with sensitive data.
+4.  **Test Everything**: All new logic must be accompanied by tests.
+5.  **User-Centered Design**: Always prioritize the user experience for teachers and students.
 
-1.  **要件の理解**: Issueやタスク指示を読み込み、関連する`README.md` の箇所を熟読します。
-2.  **設計**: 機能実装の前に、頭の中でクラスや関数の構成、データの流れを設計します。
-3.  **実装 (Coding)**: `src` ディレクトリ内の適切なファイルに、コードスタイルガイドに従って実装します。
-4.  **テスト**: `tests` ディレクトリに、実装した機能に対するJestテストを作成し、実行します。
-5.  **セルフレビュー**: コミットする前に、自身のコードが基本原則と各種ガイドラインを満たしているか確認します。
-6.  **コミット**: 後述の「コミットメッセージ形式」に従って、変更をコミットします。
-7.  **プルリクエスト (PR)**: PRを作成し、変更内容と理由を明確に記述します。
+## 3\. Development Workflow
 
-## 4. コードスタイルガイド
+1.  **Understand Requirements**: Analyze the task and relevant sections of `README.md`.
+2.  **Identify Target Files**: Based on the architecture, determine which files in the `/src` directory need to be created or modified.
+3.  **Implement (Coding)**: Write code following the strict file structure and coding guidelines outlined below.
+4.  **Test**: Add or update tests in the `/tests` directory.
+5.  **Self-Review**: Ensure your changes conform to all guidelines.
+6.  **Commit**: Use the Conventional Commits format.
+7.  **Pull Request (PR)**: Create a focused PR with a clear description.
 
-* **言語**: Google Apps Script (GAS) は、最新のV8ランタイムで動作するJavaScriptです。
-* **規約**: 基本的に **Google JavaScript Style Guide** に準拠します。
-* **ブラウザ互換性**: 教育現場での幅広いデバイス・ブラウザ対応のため、**ES5互換のJavaScript**を使用してください。
-  * **禁止構文**: アロー関数 (`=>`), デフォルトパラメータ (`param = 'default'`), オプショナルチェーニング (`obj?.prop`), for...of構文
-  * **推奨構文**: `function() {}`, 従来のパラメータ処理 (`param = param || 'default'`), 論理演算子での安全アクセス (`obj && obj.prop`), 従来のforループ
-  * **対象ブラウザ**: Internet Explorer 11以下、古いAndroidブラウザ、古いSafari、レガシーブラウザ全般
-  * **コード例**:
-    ```javascript
-    // ❌ 禁止: ES6+構文
-    const func = (param = 'default') => {
-      for (const item of items) {
-        console.log(item?.name);
-      }
-    };
-    
-    // ✅ 推奨: ES5互換構文
-    function func(param) {
-      param = param || 'default';
-      for (var i = 0; i < items.length; i++) {
-        var item = items[i];
-        console.log(item && item.name ? item.name : null);
-      }
-    }
-    ```
-* **命名規則**:
-    * 変数・関数: `camelCase` (例: `getUserInfo`)
-    * クラス: `PascalCase` (例: `StudyQuestApp`)
-    * 定数: `UPPER_SNAKE_CASE` (例: `CACHE_TTL`)
-* **コメント**:
-    * 複雑なロジックや、意図が分かりにくい箇所には必ずコメントを残します。
-    * 公開する関数には **JSDoc** 形式でコメントを記述してください。
-    ```javascript
-    /**
-     * 指定されたユーザーIDの情報を取得します。
-     * @param {string} userId - 取得対象のユーザーID。
-     * @returns {object|null} ユーザー情報オブジェクト。見つからない場合はnull。
-     */
-    function getUserInfo(userId) {
-      // ...
-    }
-    ```
-* **ファイル構成**: プロジェクトの既存のファイル分割ルールに従ってください（例: `core.gs`, `database.gs`, `auth.gs` など）。
+## 4\. Code Architecture & File Structure
 
-## 5. テスト方針
+This project adopts a **full-stack, separation of concerns** architecture optimized for local development with `clasp` and maintainability in the GAS online editor. You **must** follow this structure precisely.
 
-* すべての新しいビジネスロジックには、**単体テスト**を追加してください。
-* テストは `/tests` ディレクトリに、`*.test.js` という命名規則で作成します。
-* 既存のテスト (`npm run test`) がすべてパスすることを確認してから、PRを作成してください。
+### **【System-Wide Rule】File Naming and Directory Structure**
 
-## 6. コミット & PRメッセージ形式
+All files must be placed within the `/src` directory following the structure below. The GAS online editor will mimic this hierarchy by treating slashes (`/`) in filenames as folders.
 
-変更内容が一目でわかるように、**Conventional Commits** の規約に従います。
-
-**フォーマット:** `<type>(<scope>): <subject>`
-
-* **type**:
-    * `feat`: 新機能の追加
-    * `fix`: バグ修正
-    * `docs`: ドキュメントの変更
-    * `style`: コードスタイルの修正（コードの動作に影響しないもの）
-    * `refactor`: リファクタリング
-    * `test`: テストの追加・修正
-    * `chore`: ビルドプロセスや補助ツールの変更
-* **scope (任意)**: 変更範囲（例: `auth`, `admin`, `ui`）
-* **subject**: 変更内容の簡潔な説明（50字以内）
-
-**良い例:**
-```
-feat(admin): 回答の承認機能を追加
-fix(ui): リアクションボタンが二重に押せる問題を修正
-docs(readme): セットアップ手順を更新
-test(core): toggleHighlight関数のテストケースを追加
+```plaintext
+/src
+├── 📁 server/        # SERVER-SIDE LOGIC (.gs)
+│   ├── main.gs       # Entry points (doGet) and top-level routing.
+│   ├── database.gs   # Database (Google Sheets) operations.
+│   └── services/     # Directory for business logic per feature.
+│       └── reactionService.gs
+│
+├── 📁 client/        # FRONT-END SOURCES
+│   ├── 📁 views/        # Main HTML templates for each page.
+│   │   ├── AdminPanel.html
+│   │   ├── Page.html
+│   │   └── Registration.html
+│   │
+│   ├── 📁 styles/       # CSS files (wrapped in .html).
+│   │   ├── main.css.html
+│   │   └── Page.css.html
+│   │
+│   ├── 📁 scripts/      # Client-side JavaScript (wrapped in .html).
+│   │   ├── main.js.html
+│   │   └── Page.js.html
+│   │
+│   └── 📁 components/   # Reusable UI component snippets.
+│       ├── Header.html
+│       └── ConfirmationModal.html
+│
+└── 📄 appsscript.json # Project manifest (do not modify).
 ```
 
-## 7. 禁止事項
+### **【Implementation Guide】How to Write Code**
 
-1.  **機密情報を含めない**: APIキー、パスワード、サービスアカウントのJSONファイルなどを絶対にコードに含めないでください。
-2.  **`main` ブランチへの直接プッシュ**: すべての変更は、必ずプルリクエストを通じて行ってください。
-3.  **フォーマットの破壊**: `prettier` や `eslint` などのフォーマッタを無効にしないでください。
-4.  **巨大なPRの作成**: 機能ごと、修正ごとに小さく分割してPRを作成してください。
+#### **1. Server-Side Logic (in `/src/server/`)**
 
----
-このガイドラインは、プロジェクトの成長とともに更新されます。常に最新版を確認してください。
+  * **`main.gs`**: This is the primary entry point. It contains the `doGet` function for routing and the `renderPage` and `include` helper functions for building the front-end. **Do not add business logic here.**
+    ```javascript
+    // /src/server/main.gs
+    function doGet(e) {
+      if (isAdmin(e)) return renderPage('AdminPanel');
+      if (!isRegistered(e)) return renderPage('Registration');
+      return renderPage('Page');
+    }
+
+    function renderPage(viewName, data = {}) {
+      const template = HtmlService.createTemplateFromFile(`client/views/${viewName}`);
+      template.data = data;
+      template.include = include; // Make helper available to templates
+      return template.evaluate().setTitle('みんなの回答ボード').addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    }
+
+    function include(path) {
+      return HtmlService.createHtmlOutputFromFile('client/' + path).getContent();
+    }
+    ```
+  * **Other `.gs` files**: All other business logic (e.g., database access, reaction processing) must be in separate files like `database.gs` or within the `services/` directory.
+
+#### **2. Front-End Views (in `/src/client/views/`)**
+
+  * These files are **HTML skeletons only**.
+  * They must use the `include()` helper function via scriptlets `<?! ... ?>` to load all CSS, JavaScript, and components.
+  * **Example (`/src/client/views/Page.html`):**
+    ```html
+    <!DOCTYPE html>
+    <html lang="ja">
+      <head>
+        <base target="_top">
+        <?! include('styles/main.css.html'); ?>
+        <?! include('styles/Page.css.html'); ?>
+      </head>
+      <body>
+        <?! include('components/Header.html'); ?>
+        <main id="answers"></main>
+        <?! include('scripts/main.js.html'); ?>
+        <?! include('scripts/Page.js.html'); ?>
+      </body>
+    </html>
+    ```
+
+#### **3. Stylesheets and Scripts (in `/src/client/styles/` & `/src/client/scripts/`)**
+
+  * **`.css.html` files**: The entire content **must** be wrapped in `<style>` tags.
+  * **`.js.html` files**: The entire content **must** be wrapped in `<script>` tags.
+  * **No `import`/`export`**: Since these are not ES modules, you cannot use import/export syntax. Use the global scope or IIFE `(function(){ ... })();` to avoid conflicts.
+
+## 5\. Testing Policy
+
+  * Add unit tests to the `/tests` directory for all new server-side business logic.
+  * Ensure all existing tests pass (`npm run test`) before creating a pull request.
+
+## 6\. Commit & PR Message Format
+
+Follow the **Conventional Commits** specification.
+
+**Format:** `<type>(<scope>): <subject>`
+
+  * **type**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
+  * **scope (optional)**: `server`, `client`, `admin`, `ui`, etc.
+  * **subject**: A concise description of the change (max 50 characters).
+
+## 7\. Prohibited Actions
+
+1.  **Do not commit sensitive information**.
+2.  **Do not push directly to the `main` branch**.
+3.  **Do not break the file structure**. All new code must conform to the architecture defined above.
+4.  **Do not create massive pull requests**.
+
+-----
+
+This guidebook will be updated as the project evolves. Always refer to the latest version.

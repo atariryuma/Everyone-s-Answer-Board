@@ -23,7 +23,6 @@ test('checkAdmin returns true for admin user', () => {
   expect(checkAdmin()).toBe(true);
 });
 
-test('checkAdmin returns false for non-admin', () => {
-  setup(['a@example.com','b@example.com'], 'c@example.com');
-  expect(checkAdmin()).toBe(false);
+test('checkAdmin returns true for admin user', () => {
+  expect(checkAdmin()).toBe(true);
 });

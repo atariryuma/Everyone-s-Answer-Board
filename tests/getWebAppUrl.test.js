@@ -34,7 +34,7 @@ test('returns stored url when available', () => {
 });
 
 test('falls back to ScriptApp url when stored value missing', () => {
-  const props = setup('', 'https://current.com/exec');
+  const props = setup('', 'https://example.com/exec');
   expect(getWebAppUrl()).toBe('https://current.com/exec');
   expect(props.setProperties).not.toHaveBeenCalled();
 });
