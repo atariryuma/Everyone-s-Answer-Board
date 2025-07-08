@@ -67,6 +67,7 @@ function safeDebugStringify(obj, maxDepth = 2, currentDepth = 0) {
   }
 }
 // Safe template variable parsing with fallback values - using traditional string concatenation
+debugLog('🔧 Starting template variable parsing...');
 const __SHOW_COUNTS__ = '<?= typeof showCounts !== "undefined" ? showCounts : false ?>';
 const __DISPLAY_MODE__ = '<?= typeof displayMode !== "undefined" ? displayMode : "anonymous" ?>';
 const __SHEET_NAME__ = '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>';
@@ -80,6 +81,7 @@ const __SHOW_HIGHLIGHT_TOGGLE__ = '<?= typeof showHighlightToggle !== "undefined
 const __SHOW_SCORE_SORT__ = '<?= typeof showScoreSort !== "undefined" ? showScoreSort : false ?>';
 const __IS_STUDENT_MODE__ = '<?= typeof isStudentMode !== "undefined" ? isStudentMode : true ?>';
 const __IS_ADMIN_USER__ = '<?= typeof isAdminUser !== "undefined" ? isAdminUser : false ?>';
+debugLog('🔧 Template variable constants declared successfully');
 window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : (__SHOW_COUNTS__ === 'true');
 window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
 window.showAdminFeatures = __SHOW_ADMIN_FEATURES__.startsWith('<') ? false : (__SHOW_ADMIN_FEATURES__ === 'true');
@@ -94,10 +96,14 @@ const OWNER_NAME = __OWNER_NAME__.startsWith('<') ? '' : __OWNER_NAME__;
 // Safe parsing of OPINION_HEADER with fallback
 let OPINION_HEADER;
 try {
+  debugLog('🔧 Processing OPINION_HEADER. Raw value:', __OPINION_HEADER__);
+  debugLog('🔧 OPINION_HEADER type:', typeof __OPINION_HEADER__);
   if (typeof __OPINION_HEADER__ === 'string' && !__OPINION_HEADER__.startsWith('<')) {
     OPINION_HEADER = __OPINION_HEADER__;
+    debugLog('🔧 OPINION_HEADER set to:', OPINION_HEADER);
   } else {
     OPINION_HEADER = 'お題';
+    debugLog('🔧 OPINION_HEADER defaulted to:', OPINION_HEADER);
   }
 } catch (e) {
   console.warn('Failed to parse OPINION_HEADER:', e);
