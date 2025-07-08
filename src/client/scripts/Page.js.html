@@ -76,6 +76,7 @@ const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
 const __SPREADSHEET_ID__ = '<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>';
 const __OWNER_NAME__ = '<?= typeof ownerName !== "undefined" ? ownerName : "" ?>';
 const __OPINION_HEADER__ = '<?= typeof opinionHeader !== "undefined" ? opinionHeader : "お題" ?>';
+const __OPINION_HEADER_ENCODED__ = '<?= typeof opinionHeaderEncoded !== "undefined" ? opinionHeaderEncoded : false ?>';
 const __SHOW_ADMIN_FEATURES__ = '<?= typeof showAdminFeatures !== "undefined" ? showAdminFeatures : false ?>';
 const __SHOW_HIGHLIGHT_TOGGLE__ = '<?= typeof showHighlightToggle !== "undefined" ? showHighlightToggle : false ?>';
 const __SHOW_SCORE_SORT__ = '<?= typeof showScoreSort !== "undefined" ? showScoreSort : false ?>';
@@ -93,14 +94,28 @@ const SHEET_NAME = __SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHE
 const USER_ID = __USER_ID__.startsWith('<') ? '' : __USER_ID__;
 const OWNER_NAME = __OWNER_NAME__.startsWith('<') ? '' : __OWNER_NAME__;
 
-// Safe parsing of OPINION_HEADER with fallback
+// Safe parsing of OPINION_HEADER with Base64 decoding support
 let OPINION_HEADER;
 try {
   debugLog('🔧 Processing OPINION_HEADER. Raw value:', __OPINION_HEADER__);
   debugLog('🔧 OPINION_HEADER type:', typeof __OPINION_HEADER__);
+  debugLog('🔧 OPINION_HEADER_ENCODED:', __OPINION_HEADER_ENCODED__);
+  
   if (typeof __OPINION_HEADER__ === 'string' && !__OPINION_HEADER__.startsWith('<')) {
-    OPINION_HEADER = __OPINION_HEADER__;
-    debugLog('🔧 OPINION_HEADER set to:', OPINION_HEADER);
+    // Base64デコードが必要かチェック
+    if (__OPINION_HEADER_ENCODED__ === 'true' || __OPINION_HEADER_ENCODED__ === true) {
+      try {
+        OPINION_HEADER = atob(__OPINION_HEADER__);
+        debugLog('🔧 OPINION_HEADER decoded from Base64:', OPINION_HEADER);
+      } catch (decodeError) {
+        console.warn('Failed to decode Base64 OPINION_HEADER:', decodeError);
+        OPINION_HEADER = __OPINION_HEADER__; // フォールバック
+        debugLog('🔧 OPINION_HEADER using raw value as fallback:', OPINION_HEADER);
+      }
+    } else {
+      OPINION_HEADER = __OPINION_HEADER__;
+      debugLog('🔧 OPINION_HEADER set to raw value:', OPINION_HEADER);
+    }
   } else {
     OPINION_HEADER = 'お題';
     debugLog('🔧 OPINION_HEADER defaulted to:', OPINION_HEADER);

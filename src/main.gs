@@ -394,7 +394,12 @@ function doGet(e) {
           template.ownerName = userInfo.adminEmail;
           template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
           const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
-          template.opinionHeader = escapeJavaScript(rawOpinionHeader);
+          
+          // Base64エンコードでテンプレート変数の問題を回避
+          const opinionHeaderBase64 = Utilities.base64Encode(rawOpinionHeader);
+          template.opinionHeader = opinionHeaderBase64;
+          template.opinionHeaderEncoded = true; // フラグを設定
+          
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
@@ -404,6 +409,7 @@ function doGet(e) {
           console.log('Template variables for direct page access:', {
             sheetName: template.sheetName,
             opinionHeader: template.opinionHeader,
+            opinionHeaderBase64: opinionHeaderBase64,
             rawOpinionHeader: rawOpinionHeader,
             displayMode: template.displayMode
           });
@@ -465,14 +471,21 @@ function doGet(e) {
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
           template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
-          template.opinionHeader = escapeJavaScript(sheetConfig.opinionHeader || config.publishedSheetName || 'お題');
+          const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+          
+          // Base64エンコードでテンプレート変数の問題を回避
+          const opinionHeaderBase64 = Utilities.base64Encode(rawOpinionHeader);
+          template.opinionHeader = opinionHeaderBase64;
+          template.opinionHeaderEncoded = true; // フラグを設定
+          
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
           template.isAdminUser = false; // Page.html is for public view, not admin
 
         } catch (e) {
-          template.opinionHeader = escapeJavaScript('お題の読込エラー');
+          template.opinionHeader = Utilities.base64Encode('お題の読込エラー');
+          template.opinionHeaderEncoded = true;
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
