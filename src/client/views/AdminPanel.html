@@ -5,11 +5,19 @@
   <base target="_top">
   <title>StudyQuest - 管理者パネル</title>
   
+  <!-- TailwindCSS CDN - Load first -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      important: true,
+      corePlugins: {
+        preflight: false,
+      }
+    }
+  </script>
+  
   <?! include('styles/main.css.html'); ?>
   <?! include('styles/AdminPanel.css.html'); ?>
-  
-  <!-- TailwindCSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
 
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans">
