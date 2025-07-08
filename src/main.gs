@@ -15,29 +15,19 @@ function include(path) {
 }
 
 /**
- * JavaScript用の文字列エスケープ関数
+ * JavaScript文字列エスケープ関数
  * @param {string} str エスケープする文字列
  * @return {string} エスケープされた文字列
  */
 function escapeJavaScript(str) {
   if (!str) return '';
-  const original = str.toString();
-  const escaped = original
-    .replace(/\\/g, '\\\\')   // バックスラッシュ
-    .replace(/'/g, "\\'")     // シングルクォート
-    .replace(/"/g, '\\"')     // ダブルクォート
-    .replace(/\n/g, '\\n')    // 改行
-    .replace(/\r/g, '\\r')    // キャリッジリターン
-    .replace(/\t/g, '\\t')    // タブ
-    .replace(/\u2028/g, '\\u2028') // ラインセパレータ
-    .replace(/\u2029/g, '\\u2029'); // パラグラフセパレータ
-  
-  // デバッグログ
-  if (original !== escaped) {
-    console.log('escapeJavaScript:', { original, escaped });
-  }
-  
-  return escaped;
+  return str.toString()
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t');
 }
 
 // グローバル定数の定義
@@ -392,15 +382,8 @@ function doGet(e) {
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
-          template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
-          const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
-          
-          // Base64エンコードでテンプレート変数の問題を回避
-          const opinionHeaderBase64 = Utilities.base64Encode(rawOpinionHeader);
-          template.opinionHeader = opinionHeaderBase64;
-          template.opinionHeaderEncoded = true; // フラグを設定
-          template.cacheTimestamp = Date.now(); // キャッシュバスター
-          
+          template.sheetName = config.publishedSheetName || sheetName;
+          template.opinionHeader = escapeJavaScript(sheetConfig.opinionHeader || config.publishedSheetName || 'お題');
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
@@ -472,24 +455,15 @@ function doGet(e) {
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
-          template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
-          const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
-          
-          // Base64エンコードでテンプレート変数の問題を回避
-          const opinionHeaderBase64 = Utilities.base64Encode(rawOpinionHeader);
-          template.opinionHeader = opinionHeaderBase64;
-          template.opinionHeaderEncoded = true; // フラグを設定
-          template.cacheTimestamp = Date.now(); // キャッシュバスター
-          
+          template.sheetName = config.publishedSheetName || sheetName;
+          template.opinionHeader = escapeJavaScript(sheetConfig.opinionHeader || config.publishedSheetName || 'お題');
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
           template.isAdminUser = false; // Page.html is for public view, not admin
 
         } catch (e) {
-          template.opinionHeader = Utilities.base64Encode('お題の読込エラー');
-          template.opinionHeaderEncoded = true;
-          template.cacheTimestamp = Date.now();
+          template.opinionHeader = escapeJavaScript('お題の読込エラー');
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
@@ -550,6 +524,21 @@ function htmlEncode(str) {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+}
+
+/**
+ * JavaScript エスケープのテスト関数
+ */
+function testJavaScriptEscaping() {
+  const testString = '今日のテーマについて、あなたの考えや意見を聞かせてください';
+  const escaped = escapeJavaScript(testString);
+  console.log('Original:', testString);
+  console.log('Escaped:', escaped);
+  return {
+    original: testString,
+    escaped: escaped,
+    success: escaped !== testString
+  };
 }
 
 /**
