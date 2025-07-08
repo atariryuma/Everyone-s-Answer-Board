@@ -1,18 +1,49 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>StudyQuest -みんなの回答ボード- - みんなのかいとうボード</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<!-- Content Security Policy for enhanced security -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://fonts.googleapis.com https://script.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https:; img-src 'self' data: https:;">
+<!-- Permissions Policy to silence console warnings -->
+<meta http-equiv="Permissions-Policy" content="ambient-light-sensor=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), speaker=(), vibrate=(), vr=()">
+<!-- Preload Google Fonts for better performance -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&amp;display=swap" rel="stylesheet">
+<!-- Global error handling and TailwindCSS setup -->
 <script>
-console.log('🔧 Page.js.html script starting...');
-const DEBUG_MODE = true;
-
-// Global error handler for template variable parsing
+// Global error handling for document.write and other issues
 window.addEventListener('error', function(event) {
-  if (event.error && event.error.message && event.error.message.includes('Unexpected token')) {
-    console.warn('Template variable parsing error caught:', event.error.message);
-    event.preventDefault();
-    return false;
+  if (event.error && event.error.message) {
+    if (event.error.message.includes('document.write') ||
+        event.error.message.includes('Unexpected token')) {
+      console.warn('Document.write or syntax error caught and handled:', event.error.message);
+      event.preventDefault();
+      return false;
+    }
   }
 });
 
-// Wrap template variable parsing in try-catch
-try {
+// Handle unhandled promise rejections
+window.addEventListener('unhandledrejection', function(event) {
+  console.warn('Unhandled promise rejection:', event.reason);
+  event.preventDefault();
+});
+
+// TailwindCSS configuration to suppress production warnings
+window.tailwind = {
+  config: {
+    mode: 'jit',
+    corePlugins: { preflight: false }
+  }
+};
+</script>
+<script src="https://cdn.tailwindcss.com" defer onload="console.log('TailwindCSS loaded successfully')" onerror="console.warn('TailwindCSS failed to load')"></script>
+<script>
+const DEBUG_MODE = true;
 function debugLog() {
   if (DEBUG_MODE && console && console.log) {
     try {
@@ -66,8 +97,6 @@ function safeDebugStringify(obj, maxDepth = 2, currentDepth = 0) {
     return '[Stringify Error: ' + error.message + ']';
   }
 }
-// Safe template variable parsing with fallback values - using traditional string concatenation
-debugLog('🔧 Starting template variable parsing...');
 const __SHOW_COUNTS__ = '<?= typeof showCounts !== "undefined" ? showCounts : false ?>';
 const __DISPLAY_MODE__ = '<?= typeof displayMode !== "undefined" ? displayMode : "anonymous" ?>';
 const __SHEET_NAME__ = '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>';
@@ -76,57 +105,21 @@ const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
 const __SPREADSHEET_ID__ = '<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>';
 const __OWNER_NAME__ = '<?= typeof ownerName !== "undefined" ? ownerName : "" ?>';
 const __OPINION_HEADER__ = '<?= typeof opinionHeader !== "undefined" ? opinionHeader : "お題" ?>';
-const __OPINION_HEADER_ENCODED__ = '<?= typeof opinionHeaderEncoded !== "undefined" ? opinionHeaderEncoded : false ?>';
-const __CACHE_TIMESTAMP__ = '<?= typeof cacheTimestamp !== "undefined" ? cacheTimestamp : Date.now() ?>';
 const __SHOW_ADMIN_FEATURES__ = '<?= typeof showAdminFeatures !== "undefined" ? showAdminFeatures : false ?>';
 const __SHOW_HIGHLIGHT_TOGGLE__ = '<?= typeof showHighlightToggle !== "undefined" ? showHighlightToggle : false ?>';
 const __SHOW_SCORE_SORT__ = '<?= typeof showScoreSort !== "undefined" ? showScoreSort : false ?>';
 const __IS_STUDENT_MODE__ = '<?= typeof isStudentMode !== "undefined" ? isStudentMode : true ?>';
 const __IS_ADMIN_USER__ = '<?= typeof isAdminUser !== "undefined" ? isAdminUser : false ?>';
-debugLog('🔧 Template variable constants declared successfully');
-window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : (__SHOW_COUNTS__ === 'true');
+window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : __SHOW_COUNTS__ === 'true';
 window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
-window.showAdminFeatures = __SHOW_ADMIN_FEATURES__.startsWith('<') ? false : (__SHOW_ADMIN_FEATURES__ === 'true');
-window.showHighlightToggle = __SHOW_HIGHLIGHT_TOGGLE__.startsWith('<') ? false : (__SHOW_HIGHLIGHT_TOGGLE__ === 'true');
-window.showScoreSort = __SHOW_SCORE_SORT__.startsWith('<') ? false : (__SHOW_SCORE_SORT__ === 'true');
+window.showAdminFeatures = __SHOW_ADMIN_FEATURES__.startsWith('<') ? false : __SHOW_ADMIN_FEATURES__ === 'true';
+window.showHighlightToggle = __SHOW_HIGHLIGHT_TOGGLE__.startsWith('<') ? false : __SHOW_HIGHLIGHT_TOGGLE__ === 'true';
+window.showScoreSort = __SHOW_SCORE_SORT__.startsWith('<') ? false : __SHOW_SCORE_SORT__ === 'true';
 window.isStudentMode = __IS_STUDENT_MODE__.startsWith('<') ? true : __IS_STUDENT_MODE__ === 'true';
 window.isAdminUser = __IS_ADMIN_USER__.startsWith('<') ? false : __IS_ADMIN_USER__ === 'true';
 const SHEET_NAME = __SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHEET_NAME__;
 const USER_ID = __USER_ID__.startsWith('<') ? '' : __USER_ID__;
 const OWNER_NAME = __OWNER_NAME__.startsWith('<') ? '' : __OWNER_NAME__;
-
-// Safe parsing of OPINION_HEADER with Base64 decoding support
-let OPINION_HEADER;
-try {
-  debugLog('🔧 Processing OPINION_HEADER. Raw value:', __OPINION_HEADER__);
-  debugLog('🔧 OPINION_HEADER type:', typeof __OPINION_HEADER__);
-  debugLog('🔧 OPINION_HEADER_ENCODED:', __OPINION_HEADER_ENCODED__);
-  debugLog('🔧 CACHE_TIMESTAMP:', __CACHE_TIMESTAMP__);
-  
-  if (typeof __OPINION_HEADER__ === 'string' && !__OPINION_HEADER__.startsWith('<')) {
-    // Base64デコードが必要かチェック
-    if (__OPINION_HEADER_ENCODED__ === 'true' || __OPINION_HEADER_ENCODED__ === true) {
-      try {
-        OPINION_HEADER = atob(__OPINION_HEADER__);
-        debugLog('🔧 OPINION_HEADER decoded from Base64:', OPINION_HEADER);
-      } catch (decodeError) {
-        console.warn('Failed to decode Base64 OPINION_HEADER:', decodeError);
-        OPINION_HEADER = __OPINION_HEADER__; // フォールバック
-        debugLog('🔧 OPINION_HEADER using raw value as fallback:', OPINION_HEADER);
-      }
-    } else {
-      OPINION_HEADER = __OPINION_HEADER__;
-      debugLog('🔧 OPINION_HEADER set to raw value:', OPINION_HEADER);
-    }
-  } else {
-    OPINION_HEADER = 'お題';
-    debugLog('🔧 OPINION_HEADER defaulted to:', OPINION_HEADER);
-  }
-} catch (e) {
-  console.warn('Failed to parse OPINION_HEADER:', e);
-  OPINION_HEADER = 'お題';
-}
-
 let MAPPING;
 try {
   if (typeof __MAPPING__ === 'string' && !__MAPPING__.startsWith('<')) {
@@ -138,24 +131,701 @@ try {
   console.warn('Failed to parse MAPPING:', e);
   MAPPING = {};
 }
-
-} catch (templateError) {
-  console.error('Critical template variable parsing error:', templateError);
-  // Fallback values for all template variables
-  window.showCounts = true;
-  window.displayMode = 'anonymous';
-  window.showAdminFeatures = false;
-  window.showHighlightToggle = false;
-  window.showScoreSort = false;
-  window.isStudentMode = true;
-  window.isAdminUser = false;
-  const SHEET_NAME = 'テストシート';
-  const USER_ID = '';
-  const OWNER_NAME = '';
-  const OPINION_HEADER = 'お題';
-  const MAPPING = {};
-}
 </script>
+<style>
+:root {
+  --color-primary: #8be9fd;
+  --color-background: #1a1b26;
+  --color-surface: rgba(26, 27, 38, 0.95);
+  --color-text: #c0caf5;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-accent: #facc15;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
+  --color-success: #10b981;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+  /* Performance variables */
+  --transition-duration: 0.2s;
+  --transition-easing: ease-out;
+  --animation-duration: 0.3s;
+  --backdrop-blur: 12px;
+}
+body {
+  color: var(--color-text);
+  background-color: var(--color-background);
+  margin: 0;
+  overflow-x: hidden;
+}
+.glass-panel { 
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  backdrop-filter: blur(var(--backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--backdrop-blur));
+  transition: border-color var(--transition-duration) var(--transition-easing);
+}
+.glass-panel:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.game-font {
+  font-family: 'Press Start 2P', cursive;
+}
+.game-btn {
+  transition: transform var(--transition-duration) var(--transition-easing),
+              box-shadow var(--transition-duration) var(--transition-easing),
+              border-bottom-width var(--transition-duration) var(--transition-easing);
+  border-radius: 0.75rem;
+  border-bottom-width: 4px;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+  position: relative;
+  overflow: hidden;
+}
+.game-btn:not(:disabled):hover { 
+  transform: translate3d(0, -2px, 0); 
+  box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+}
+.game-btn:active:not(:disabled) { 
+  transform: translate3d(0, 2px, 0); 
+  border-bottom-width: 2px; 
+}
+.game-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+#classFilter, #sortOrder { 
+  background-color: #6272a4; 
+  border: 1px solid var(--color-border); 
+  color: var(--color-text); 
+  border-radius: 0.75rem; 
+  padding: 0.5rem 0.75rem; 
+  transition: border-color var(--transition-duration) var(--transition-easing),
+              box-shadow var(--transition-duration) var(--transition-easing);
+}
+#classFilter:focus, #sortOrder:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(139, 233, 253, 0.1);
+}
+:focus-visible { 
+  outline: 3px solid var(--color-primary); 
+  outline-offset: 2px; 
+  border-radius: 0.75rem; 
+}
+header { 
+  position: sticky; 
+  top: 0; 
+  z-index: 50; 
+  contain: layout;
+  backdrop-filter: blur(var(--backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--backdrop-blur));
+}
+.answer-card { 
+  transition: transform var(--animation-duration) var(--transition-easing),
+              box-shadow var(--animation-duration) var(--transition-easing);
+  border-radius: 1rem;
+  contain: layout style;
+  position: relative;
+  overflow: hidden;
+}
+.answer-card.highlighted {
+  border-image: linear-gradient(45deg, #9333ea, #c084fc, #9333ea) 1 !important;
+  border-width: 4px !important;
+  box-shadow: 
+    0 0 25px rgba(147, 51, 234, 0.6),
+    inset 0 0 20px rgba(192, 132, 252, 0.1),
+    0 8px 32px rgba(147, 51, 234, 0.2);
+  transform: scale(1.02);
+  position: relative;
+}
+.answer-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.2);
+}
+.answer-card.loading {
+  opacity: 0.7;
+}
+
+.answer-card.loading .reaction-btn,
+.answer-card.loading .highlight-btn {
+  opacity: 0.5;
+}
+.reaction-btn {
+  transition: transform var(--transition-duration) var(--transition-easing),
+              background-color var(--transition-duration) var(--transition-easing),
+              box-shadow var(--transition-duration) var(--transition-easing);
+  position: relative;
+  overflow: hidden;
+}
+.reaction-btn:hover {
+  transform: scale(1.1);
+}
+.reaction-btn:active {
+  transform: scale(0.95);
+}
+.reaction-btn.reacted {
+  background-color: var(--color-primary) !important;
+  color: #000 !important;
+  box-shadow: 0 0 10px rgba(139, 233, 253, 0.5);
+}
+.reaction-btn.loading {
+  opacity: 0.6;
+}
+.fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+.slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+.pulse {
+  animation: pulse 0.6s ease-out;
+}
+.shake {
+  animation: shake 0.5s ease-out;
+}
+.admin-toggle {
+  transition: background-color var(--animation-duration) var(--transition-easing);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.admin-toggle:hover {
+  background-color: rgba(139, 233, 253, 0.1);
+}
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(26, 27, 38, 0.8);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(139, 233, 253, 0.3);
+  border-top: 4px solid var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); will-change: opacity, transform; }
+  to { opacity: 1; transform: translateY(0); will-change: auto; }
+}
+@keyframes pulse {
+  0% { transform: scale3d(1, 1, 1); will-change: transform; }
+  50% { transform: scale3d(1.05, 1.05, 1); }
+  100% { transform: scale3d(1, 1, 1); will-change: auto; }
+}
+@keyframes shake {
+  0%, 100% { transform: translate3d(0, 0, 0); will-change: transform; }
+  25% { transform: translate3d(-5px, 0, 0); }
+  75% { transform: translate3d(5px, 0, 0); }
+}
+@keyframes spin {
+  100% { transform: rotate(360deg); will-change: transform; }
+}
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% { transform: translate3d(0, 0, 0); will-change: auto; }
+  40% { transform: translate3d(0, -10px, 0); will-change: transform; }
+  60% { transform: translate3d(0, -5px, 0); }
+}
+
+
+/* Performance optimizations */
+@media (max-width: 768px) and (max-resolution: 150dpi) {
+  :root {
+    --backdrop-blur: 0px;
+    --transition-duration: 0.1s;
+    --animation-duration: 0.15s;
+  }
+  
+  .glass-panel {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--color-surface);
+  }
+  
+  .answer-card:hover {
+    transform: none;
+  }
+  
+  .reaction-btn:hover {
+    transform: scale(1.05);
+  }
+}
+
+/* Low-end device optimizations */
+@media (max-width: 768px), (max-resolution: 120dpi) {
+  :root {
+    --backdrop-blur: 0px;
+    --transition-duration: 0.1s;
+    --animation-duration: 0.1s;
+  }
+}
+
+/* High refresh rate display optimizations */
+@media (min-resolution: 120dpi) and (min-width: 1200px) {
+  :root {
+    --transition-duration: 0.15s;
+    --animation-duration: 0.2s;
+  }
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+  .answer-card {
+    margin-bottom: 1rem;
+  }
+  .game-btn {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
+  header {
+    padding: 1rem;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --color-border: rgba(255, 255, 255, 0.3);
+    --color-surface: rgba(26, 27, 38, 0.98);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-duration: 0.01ms;
+    --animation-duration: 0.01ms;
+    --backdrop-blur: 0px;
+  }
+  
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transform: none !important;
+  }
+  
+  .answer-card:hover,
+  .reaction-btn:hover,
+  .game-btn:hover {
+    transform: none !important;
+  }
+}
+
+/* Low performance mode styles */
+.low-performance .answer-card {
+  contain: layout style paint;
+}
+
+.low-performance .answer-card:hover {
+  transform: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.low-performance .glass-panel {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Hidden card styles for virtual scrolling */
+.hidden-card {
+  visibility: hidden;
+  position: absolute;
+  left: -9999px;
+}
+
+.visible {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* Optimize grid layout for performance */
+@supports (container-type: inline-size) {
+  #answers {
+    container-type: inline-size;
+  }
+}
+
+/* Optimize for high DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .answer-card {
+    backface-visibility: hidden;
+    perspective: 1000px;
+  }
+}
+.answer-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+.answer-card.new-card {
+  animation: fadeIn 0.3s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.highlight-badge {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #facc15;
+}
+.answer-card.reaction-bg-like { border-color:#ef4444 !important; }
+.answer-card.reaction-bg-understand { border-color:#fbbf24 !important; }
+.answer-card.reaction-bg-curious { border-color:#10b981 !important; }
+.answer-card.reaction-bg-like-understand { border-image: linear-gradient(45deg, #ef4444, #fbbf24) 1 !important; }
+.answer-card.reaction-bg-like-curious { border-image: linear-gradient(45deg, #ef4444, #10b981) 1 !important; }
+.answer-card.reaction-bg-understand-curious { border-image: linear-gradient(45deg, #fbbf24, #10b981) 1 !important; }
+.answer-card.reaction-bg-like-understand-curious { border-image: linear-gradient(45deg, #ef4444, #fbbf24, #10b981) 1 !important; }
+.reaction-border-1 { border-width: 2px; }
+.reaction-border-2 { border-width: 4px; }
+.reaction-border-3 { border-width: 6px; }
+.answer-preview { 
+  display: -webkit-box; 
+  -webkit-line-clamp: 5; 
+  line-clamp: 5; 
+  -webkit-box-orient: vertical; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  min-height: 120px; 
+}
+.like-btn svg { 
+  transition: fill var(--transition-duration) var(--transition-easing),
+              transform var(--transition-duration) var(--transition-easing);
+  fill: none;
+}
+.like-btn.liked svg { stroke: transparent; fill: currentColor; transform: scale(1.1); }
+.like-btn.loading {   opacity: 0.7; position: relative; }
+.like-btn.loading::after { 
+  content: ""; 
+  position: absolute; 
+  inset: 0; 
+  border: 2px solid transparent; 
+  border-top: 2px solid currentColor; 
+  border-radius: 50%; 
+  animation: spin 0.8s linear infinite; 
+  width: 16px; 
+  height: 16px; 
+  margin: auto; 
+}
+.highlight-btn { 
+  transition: background var(--transition-duration) var(--transition-easing),
+              transform var(--transition-duration) var(--transition-easing);
+  border-radius: 4px;
+  padding: 2px;
+}
+.highlight-btn:hover { 
+  background: rgba(147, 51, 234, 0.15);
+  transform: scale(1.1);
+}
+.highlight-btn.liked { 
+  color: #9333ea; 
+  text-shadow: 0 0 8px rgba(147, 51, 234, 0.6);
+}
+#controlsFooter { pointer-events: none; }
+#controlsFooter > .glass-panel { pointer-events: auto; }
+.skeleton { position: relative; overflow: hidden; background-color: rgba(255,255,255,0.05); }
+.skeleton::after { content: ""; position: absolute; inset: 0; background-image: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.2), rgba(255,255,255,0)); animation: skeleton-loading 1.5s infinite; }
+@keyframes skeleton-loading { 0% { transform: translate3d(-100%, 0, 0); will-change: transform; } 100% { transform: translate3d(100%, 0, 0); } }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* Fallback styles when TailwindCSS fails to load */
+.tailwind-fallback .bg-gradient-to-br { background: linear-gradient(135deg, var(--color-background), #2a2b3c); }
+.tailwind-fallback .text-white { color: white; }
+.tailwind-fallback .text-center { text-align: center; }
+.tailwind-fallback .p-4 { padding: 1rem; }
+.tailwind-fallback .p-6 { padding: 1.5rem; }
+.tailwind-fallback .m-4 { margin: 1rem; }
+.tailwind-fallback .mb-4 { margin-bottom: 1rem; }
+.tailwind-fallback .mt-4 { margin-top: 1rem; }
+.tailwind-fallback .flex { display: flex; }
+.tailwind-fallback .flex-col { flex-direction: column; }
+.tailwind-fallback .flex-wrap { flex-wrap: wrap; }
+.tailwind-fallback .items-center { align-items: center; }
+.tailwind-fallback .justify-center { justify-content: center; }
+.tailwind-fallback .justify-between { justify-content: space-between; }
+.tailwind-fallback .gap-4 { gap: 1rem; }
+.tailwind-fallback .grid { display: grid; }
+.tailwind-fallback .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.tailwind-fallback .rounded-lg { border-radius: 0.5rem; }
+.tailwind-fallback .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+.tailwind-fallback .w-full { width: 100%; }
+.tailwind-fallback .h-full { height: 100%; }
+.tailwind-fallback .min-h-screen { min-height: 100vh; }
+.tailwind-fallback .relative { position: relative; }
+.tailwind-fallback .absolute { position: absolute; }
+.tailwind-fallback .fixed { position: fixed; }
+.tailwind-fallback .top-0 { top: 0; }
+.tailwind-fallback .bottom-0 { bottom: 0; }
+.tailwind-fallback .left-0 { left: 0; }
+.tailwind-fallback .right-0 { right: 0; }
+.tailwind-fallback .z-10 { z-index: 10; }
+.tailwind-fallback .z-50 { z-index: 50; }
+.tailwind-fallback .hidden { display: none; }
+.tailwind-fallback .block { display: block; }
+.tailwind-fallback .inline { display: inline; }
+.tailwind-fallback .inline-block { display: inline-block; }
+.modal-close-btn { 
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  transform: none;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+/* モーダルでのリアクション装飾 */
+#answerModalCard.reaction-border-1 { border-width: 3px !important; }
+#answerModalCard.reaction-border-2 { border-width: 4px !important; }
+#answerModalCard.reaction-border-3 { border-width: 5px !important; }
+/* モーダルでのリアクション背景色 */
+#answerModalCard.reaction-bg-like { 
+  border-color: #ef4444 !important; 
+  border-image: none !important;
+}
+#answerModalCard.reaction-bg-understand { 
+  border-color: #fbbf24 !important; 
+  border-image: none !important;
+}
+#answerModalCard.reaction-bg-curious { 
+  border-color: #10b981 !important; 
+  border-image: none !important;
+}
+#answerModalCard.reaction-bg-like-understand { 
+  border-image: linear-gradient(45deg, #ef4444, #fbbf24) 1 !important; 
+  border-color: transparent !important;
+}
+#answerModalCard.reaction-bg-like-curious { 
+  border-image: linear-gradient(45deg, #ef4444, #10b981) 1 !important; 
+  border-color: transparent !important;
+}
+#answerModalCard.reaction-bg-understand-curious { 
+  border-image: linear-gradient(45deg, #fbbf24, #10b981) 1 !important; 
+  border-color: transparent !important;
+}
+#answerModalCard.reaction-bg-like-understand-curious { 
+  border-image: linear-gradient(45deg, #ef4444, #fbbf24, #10b981) 1 !important; 
+  border-color: transparent !important;
+}
+/* モーダルでのハイライト装飾（リアクション装飾より後に配置で優先） */
+#answerModalCard.highlighted {
+  border-image: linear-gradient(45deg, #9333ea, #c084fc, #9333ea) 1 !important;
+  border-width: 4px !important;
+  box-shadow: 
+    0 0 25px rgba(147, 51, 234, 0.6),
+    inset 0 0 20px rgba(192, 132, 252, 0.1) !important;
+  position: relative;
+}
+.render-optimized { transform: translateZ(0); }
+.modal-fade { animation: modalFade 0.2s ease-out; }
+@keyframes modalFade { from { opacity: 0; will-change: opacity; } to { opacity: 1; } }
+.modal-scale { animation: modalScale 0.2s ease-out; }
+@keyframes modalScale { from { transform: scale3d(0.8, 0.8, 1); will-change: transform; } to { transform: scale3d(1, 1, 1); } }
+</style>
+</head>
+<body class="bg-[#1a1b26] text-gray-200 font-sans">
+<!-- Loading Overlay -->
+<div id="loading-overlay" class="loading-overlay hidden">
+  <div class="text-center">
+    <div class="spinner"></div>
+    <p class="mt-4 text-gray-300">読み込み中...</p>
+  </div>
+</div>
+
+<div id="main-container" class="w-full mx-auto px-4 pt-4 pb-4 md:px-6 md:pt-6 md:pb-6">
+<!-- コンパクトヘッダー -->
+<header id="main-header" class="glass-panel rounded-xl p-3 mb-4 shadow-lg fade-in">
+  <!-- 上部: フォームリンク + ドメイン情報（横並び） -->
+  <div class="flex items-center justify-between mb-3 text-xs">
+    <!-- フォームリンク（左側） -->
+    <a id="form-link-btn" href="#" target="_blank" class="bg-cyan-500/10 border border-cyan-400/30 rounded px-3 py-1 flex items-center gap-2 hover:bg-cyan-500/20 transition-all text-cyan-400 hover:text-cyan-300 hidden">
+      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+      </svg>
+      <span class="font-medium">📝 回答フォーム</span>
+    </a>
+    
+    <!-- ドメイン情報と管理モードボタン（右側） -->
+    <div class="flex-shrink-0 flex items-center gap-2">
+      <div>
+        <!-- ドメイン一致表示 -->
+        <div id="header-domain-match" class="bg-green-500/10 border border-green-400/30 rounded px-2 py-1 hidden">
+          <div class="flex items-center gap-1">
+            <svg class="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span class="text-green-400 font-medium" id="header-domain-match-text">学校ドメイン</span>
+          </div>
+        </div>
+        
+        <!-- ドメイン不一致表示 -->
+        <div id="header-domain-mismatch" class="bg-yellow-500/10 border border-yellow-400/30 rounded px-2 py-1 hidden">
+          <div class="flex items-center gap-1">
+            <svg class="w-3 h-3 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+            <span class="text-yellow-400 font-medium" id="header-domain-mismatch-text">外部アクセス</span>
+          </div>
+        </div>
+        
+        <!-- 初期状態表示 -->
+        <div id="header-domain-initial" class="bg-blue-500/10 border border-blue-400/30 rounded px-2 py-1">
+          <div class="flex items-center gap-1">
+            <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+            <span class="text-blue-400 font-medium">確認中</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 管理モードボタン -->
+      <button type="button" id="adminToggleBtn" class="admin-toggle text-xs text-gray-500 hover:text-cyan-400 transition-all opacity-60 hover:opacity-100 hidden whitespace-nowrap flex items-center gap-1 px-2 py-1 rounded" hidden aria-label="管理者モード切り替え">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+  
+  <!-- メイン部分: 問題タイトル + コントロール -->
+  <div class="flex flex-col lg:flex-row items-center gap-3">
+    <!-- 左: コントロール -->
+    <div class="flex items-center gap-3 text-xs">
+      <div id="answerCount" class="text-gray-400 flex items-center gap-1">
+        <svg class="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+        </svg>
+        <span id="answerCountText">0件</span>
+      </div>
+      
+      <select id="classFilter" class="hidden text-xs bg-gray-700 border border-gray-600 rounded px-2 py-1" title="クラスフィルター" aria-label="クラスフィルター"></select>
+      
+      <div class="relative">
+        <select id="sortOrder" class="text-xs bg-gray-700 border border-gray-600 rounded px-2 py-1 pr-6 appearance-none" title="並び順" aria-label="並び順">
+          <option value="newest" selected>新着順</option>
+          <option value="random">ランダム順</option>
+          <option value="score" id="scoreOption" class="hidden">スコア順</option>
+        </select>
+        <svg class="absolute right-1 top-1/2 transform -translate-y-1/2 w-2 h-2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
+      </div>
+    </div>
+
+    <!-- 中央: 問題タイトル（最大） -->
+    <div class="flex-grow text-center min-w-0">
+      <div id="headingLabel" class="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-pink-400 leading-tight">
+        <svg class="w-5 h-5 md:w-6 md:h-6 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
+        </svg>
+      </div>
+    </div>
+
+  <!-- Right Section: Info & Admin Controls -->
+  <div class="w-full lg:w-auto lg:min-w-[150px] text-right space-y-1 px-2">
+    <p id="sheetNameText" class="text-xs text-gray-400 h-4 truncate flex items-center justify-end gap-1">
+    </p>
+    <div class="flex justify-end gap-1 flex-wrap">
+      <button type="button" id="endPublicationBtn" class="admin-toggle text-xs bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded hidden whitespace-nowrap transition-all flex items-center gap-1" hidden aria-label="公開終了">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"></path>
+        </svg>
+        公開終了
+      </button>
+    </div>
+  </div>
+</header>
+<!-- 新着通知バナー -->
+<div id="newContentBanner" class="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-full shadow-lg hidden transition-all duration-300" role="alert" aria-live="polite">
+  <div class="flex items-center gap-3">
+    <span id="newContentIcon" class="w-5 h-5 animate-pulse" aria-hidden="true">📋</span>
+    <span id="newContentText">新しい意見が投稿されました</span>
+    <button type="button" id="refreshContentBtn" class="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-sm font-medium transition-colors" aria-label="新しいコンテンツを更新して表示">
+      更新して表示
+    </button>
+    <button type="button" id="dismissBannerBtn" class="text-white/70 hover:text-white w-5 h-5 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors" aria-label="通知を閉じる">
+      ×
+    </button>
+  </div>
+</div>
+
+<main id="answers" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" role="main" aria-live="polite" aria-label="回答一覧"></main>
+</div>
+<div id="answerModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
+<div id="answerModalCard" class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full max-w-5xl h-auto max-h-[85vh] relative" role="document" aria-labelledby="modalAnswer">
+<button type="button" id="answerModalCloseBtn" class="modal-close-btn bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform z-10" aria-label="閉じる">
+  <span id="iconClose" class="w-6 h-6"></span>
+</button>
+<div id="modalAnswer" class="flex-grow min-h-[200px] mb-4 overflow-y-auto pr-4"></div>
+<div id="modalFooter" class="text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex justify-between items-center">
+<div><span id="modalStudentName" class="font-bold text-2xl text-gray-200"></span></div>
+<div id="modalReactions" class="flex items-center gap-2"></div>
+</div>
+</div>
+</div>
+<div id="infoModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
+<div id="infoModalCard" class="glass-panel rounded-xl p-8 shadow-2xl border-2 border-cyan-400/80 w-full max-w-2xl relative" role="document">
+<div class="space-y-5 text-gray-200 text-lg leading-relaxed">
+<!-- Digital Citizenship Education Section -->
+<div class="bg-gradient-to-r from-green-800/40 to-emerald-800/40 border border-green-400/50 rounded-lg p-4 mb-4">
+<div class="flex items-start gap-3">
+<div class="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+<span class="text-lg">📚</span>
+</div>
+<div>
+<p class="text-base font-bold text-green-200 mb-3">デジタル・シティズンシップって何だろう？</p>
+<p class="text-sm text-green-100 leading-relaxed mb-2">
+<span class="text-green-200 font-semibold">デジタル・シティズンシップ</span>とは、コンピューターやタブレットを使うときに、<span class="text-green-200 font-semibold">やさしい心で相手のことを考える</span>ことです。
+</p>
+<p class="text-sm text-green-200 leading-relaxed mb-2">
+みんなの回答ボードでも、<span class="text-green-200 font-semibold">思いやりのある言葉</span>を選んで、みんなが気持ちよく参加できるようにしましょう。
+</p>
+<p class="text-sm text-green-200 leading-relaxed">
+友だちの意見を聞いて「そういう考えもあるんだね」と<span class="text-green-200 font-semibold">多様性を大切にする心</span>を育てましょう。
+</p>
+</div>
+</div>
+</div>
+
+<p>みんなの意見を気持ちよく共有するために、リアクションのしかたをおぼえよう！</p>
+<ul class="space-y-2">
+<li class="flex items-center gap-2"><span id="infoIconLike" class="w-5 h-5 text-red-400"></span>いいね！：すてきだと思ったときに押そう</li>
+<li class="flex items-center gap-2"><span id="infoIconUnderstand" class="w-5 h-5 text-yellow-400"></span>なるほど！：参考になったときに押そう</li>
+<li class="flex items-center gap-2"><span id="infoIconCurious" class="w-5 h-5 text-green-400"></span>もっと知りたい！：もっと知りたいときに押そう</li>
+</ul>
+<p class="flex items-center gap-2"><span id="infoIconHighlight" class="w-5 h-5 text-purple-400"></span>先生が注目してほしい意見につけています</p>
+<p>責任あるリアクションで、みんなで学びを深めよう！</p>
+
+
+<div class="text-center mt-6">
+<button type="button" id="infoModalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">わかった</button>
+</div>
+</div>
+</div>
+</div>
+<footer id="controlsFooter" class="fixed bottom-0 left-0 right-0 z-40 p-4">
+<div class="glass-panel max-w-md mx-auto rounded-xl p-3 flex items-center justify-center gap-3">
+<input type="range" id="sizeSlider" min="2" max="6" value="4" class="w-1/2" aria-label="表示列数の変更">
+<div class="flex items-center gap-1">
+<span id="sliderValue" class="font-bold text-lg">4</span>
+<span id="iconGrid" class="w-4 h-4"></span>
+</div>
+</div>
+</footer>
 <script>
 // Optimize initial render
 const RENDER_BATCH_SIZE = 10;
@@ -324,7 +994,7 @@ class StudyQuestApp {
       { key: 'CURIOUS', icon: 'magnifying-glass-plus' }
     ];
     this.gas = {
-      getPublishedSheetData: (classFilter, sort) => this.runGas('getPublishedSheetData', classFilter, sort),
+      getPublishedSheetData: (sheetName, classFilter, sort) => this.runGas('getPublishedSheetData', sheetName, classFilter, sort),
       getAvailableSheets: () => this.runGas('getAvailableSheets'),
       addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', rowIndex, reaction, sheetName),
       toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', rowIndex, sheetName),
@@ -383,13 +1053,10 @@ class StudyQuestApp {
     }
   setupCriticalElements() {
     if (this.elements.headingLabel) {
-      const opinionHeader = OPINION_HEADER || 'お題を読み込み中...';
-      this.elements.headingLabel.textContent = this.escapeHtml(opinionHeader);
-      
-      // テンプレート変数が失敗した場合は、サーバーから直接取得
-      if (opinionHeader === 'お題' && USER_ID && SHEET_NAME) {
-        this.fetchOpinionHeaderFromServer();
-      }
+      const opinionHeader = __OPINION_HEADER__.startsWith('<')
+        ? 'お題を読み込み中...'
+        : this.escapeHtml(__OPINION_HEADER__);
+      this.elements.headingLabel.textContent = opinionHeader;
     }
 
     // Only setup absolutely critical event listeners
@@ -520,6 +1187,7 @@ setupEventDelegation() {
     }
     
     this.handlers.onAnswersContainerClick = (e) => {
+        console.log('🔍 [CLICK DEBUG] Container click detected:', {
             target: e.target,
             targetClass: e.target.className,
             targetTag: e.target.tagName,
@@ -529,6 +1197,7 @@ setupEventDelegation() {
         });
 
         const answerCard = e.target.closest('.answer-card');
+        console.log('🔍 [CLICK DEBUG] Answer card search:', {
             answerCard: answerCard,
             cardClass: answerCard?.className,
             cardRowIndex: answerCard?.dataset?.rowIndex,
@@ -536,14 +1205,17 @@ setupEventDelegation() {
         });
 
         if (!answerCard || answerCard.classList.contains('hidden-card')) {
+            console.log('🚫 [CLICK DEBUG] No valid answer card found or card is hidden');
             return;
         }
 
         const rowIndex = answerCard.dataset.rowIndex;
         if (!rowIndex) {
+            console.log('🚫 [CLICK DEBUG] No rowIndex found on card');
             return;
         }
 
+        console.log('✅ [CLICK DEBUG] Valid card click detected:', {
             rowIndex: rowIndex,
             cardElement: answerCard
         });
@@ -551,6 +1223,7 @@ setupEventDelegation() {
         // リアクションボタンのクリックを処理
         const reactionBtn = e.target.closest('.reaction-btn');
         if (reactionBtn) {
+            console.log('🎯 [CLICK DEBUG] Reaction button clicked:', {
                 button: reactionBtn,
                 reaction: reactionBtn.dataset.reaction,
                 disabled: reactionBtn.disabled,
@@ -558,8 +1231,10 @@ setupEventDelegation() {
             });
             e.stopPropagation(); // ★重要: イベントの伝播を止め、カード本体のクリックと分離
             if (!reactionBtn.disabled) {
+                console.log('▶️ [CLICK DEBUG] Processing reaction:', reactionBtn.dataset.reaction);
                 this.handleReaction(rowIndex, reactionBtn.dataset.reaction);
             } else {
+                console.log('🚫 [CLICK DEBUG] Reaction button is disabled');
             }
             return;
         }
@@ -567,28 +1242,226 @@ setupEventDelegation() {
         // ハイライトボタンのクリックを処理
         const highlightBtn = e.target.closest('.highlight-btn');
         if (highlightBtn) {
+            console.log('🎯 [CLICK DEBUG] Highlight button clicked:', {
                 button: highlightBtn,
                 disabled: highlightBtn.disabled,
                 rowIndex: rowIndex
             });
             e.stopPropagation(); // ★重要: 同様にイベントの伝播を停止
             if (!highlightBtn.disabled) {
+                console.log('▶️ [CLICK DEBUG] Processing highlight for row:', rowIndex);
                 this.handleHighlight(rowIndex);
             } else {
+                console.log('🚫 [CLICK DEBUG] Highlight button is disabled');
             }
             return;
         }
 
         // 上記以外の場合は、カード本体のクリックとしてモーダルを表示
+        console.log('📱 [CLICK DEBUG] Card body clicked, showing modal for row:', rowIndex);
         this.showAnswerModal(rowIndex);
     };
 
     if (this.elements.answersContainer) {
+        console.log('🔧 [CLICK DEBUG] Setting up event delegation on answers container:', this.elements.answersContainer);
         // 既存のリスナーをクリアしてから追加
         this.elements.answersContainer.removeEventListener('click', this.handlers.onAnswersContainerClick);
         this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
         this.eventDelegationSetup = true;
+        console.log('✅ [CLICK DEBUG] Event delegation setup complete');
     } else {
+        console.error('❌ [CLICK DEBUG] No answers container found for event delegation');
+    }
+}
+  
+  // Debug helper function - can be called from console
+  debugAnswerCards() {
+    debugLog('=== ANSWER CARDS DEBUG REPORT ===');
+    
+    // Make function globally available
+    window.debugAnswerCards = this.debugAnswerCards.bind(this);
+    
+    const container = this.elements.answersContainer;
+    debugLog('Answers container:', {
+      element: container,
+      exists: !!container,
+      className: container?.className,
+      childrenCount: container?.children?.length || 0
+    });
+    
+    if (!container) {
+      debugLog('ERROR: No answers container found');
+      return;
+    }
+    
+    const answerCards = container.querySelectorAll('.answer-card');
+    debugLog('Answer cards found:', {
+      count: answerCards.length,
+      elements: Array.from(answerCards)
+    });
+    
+    answerCards.forEach((card, index) => {
+      debugLog(`Answer card ${index}:`, {
+        element: card,
+        className: card.className,
+        dataset: card.dataset,
+        rowIndex: card.dataset.rowIndex,
+        hasRowIndex: !!card.dataset.rowIndex,
+        childrenCount: card.children.length,
+        reactionButtons: card.querySelectorAll('.reaction-btn').length,
+        highlightButtons: card.querySelectorAll('.highlight-btn').length
+      });
+    });
+    
+    // Test event listener
+    debugLog('Event listener test:', {
+      hasClickHandler: !!this.handlers.onAnswersContainerClick,
+      handlerFunction: this.handlers.onAnswersContainerClick
+    });
+    
+    debugLog('=== END DEBUG REPORT ===');
+  }
+  
+  // Enhanced debug helper function to simulate clicking on answer cards
+  debugClickAnswerCard(cardIndex = 0, options = {}) {
+    debugLog('=== SIMULATING ANSWER CARD CLICK ===');
+    
+    const {
+      logDetails = true,
+      waitForAnimation = false,
+      simulateHover = false,
+      validateResponse = false
+    } = options;
+    
+    // Validate cardIndex
+    if (typeof cardIndex !== 'number' || cardIndex < 0 || !Number.isInteger(cardIndex)) {
+      debugLog('ERROR: Invalid card index', { cardIndex });
+      return { success: false, error: 'Invalid card index. Must be a non-negative integer.' };
+    }
+    
+    const container = this.elements.answersContainer;
+    if (!container) {
+      debugLog('ERROR: No answers container found');
+      return { success: false, error: 'No answers container found' };
+    }
+    
+    const answerCards = container.querySelectorAll('.answer-card');
+    if (answerCards.length === 0) {
+      debugLog('ERROR: No answer cards found');
+      return { success: false, error: 'No answer cards found' };
+    }
+    
+    if (cardIndex >= answerCards.length) {
+      debugLog('ERROR: Card index out of bounds', { cardIndex, totalCards: answerCards.length });
+      return { success: false, error: 'Card index out of bounds', totalCards: answerCards.length };
+    }
+    
+    const card = answerCards[cardIndex];
+    
+    let cardInfo;
+    try {
+      cardInfo = {
+        index: cardIndex,
+        element: card,
+        className: card.className,
+        dataset: { ...card.dataset },
+        rowIndex: card.dataset.rowIndex,
+        boundingRect: card.getBoundingClientRect(),
+        computedStyle: {
+          display: getComputedStyle(card).display,
+          visibility: getComputedStyle(card).visibility,
+          opacity: getComputedStyle(card).opacity
+        }
+      };
+    } catch (error) {
+      debugLog('ERROR: Failed to get card info', { error: error.message });
+      return { success: false, error: `Failed to get card info: ${error.message}` };
+    }
+    
+    if (logDetails) {
+      debugLog('Card details before click:', cardInfo);
+    }
+    
+    // Simulate hover if requested
+    if (simulateHover) {
+      const hoverEvent = new MouseEvent('mouseenter', {
+        bubbles: true,
+        cancelable: true,
+        view: window
+      });
+      card.dispatchEvent(hoverEvent);
+      debugLog('Hover event dispatched');
+    }
+    
+    // Simulate a click event
+    const clickEvent = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      clientX: cardInfo.boundingRect.left + cardInfo.boundingRect.width / 2,
+      clientY: cardInfo.boundingRect.top + cardInfo.boundingRect.height / 2
+    });
+    
+    const clickResult = card.dispatchEvent(clickEvent);
+    
+    const result = {
+      success: true,
+      cardIndex,
+      cardInfo,
+      clickResult,
+      timestamp: Date.now()
+    };
+    
+    if (logDetails) {
+      debugLog('Click event result:', { 
+        dispatched: clickResult, 
+        cardIndex, 
+        cardElement: card,
+        eventBubbled: clickEvent.bubbles,
+        eventCancelled: clickEvent.defaultPrevented
+      });
+    }
+    
+    // Wait for animations if requested
+    if (waitForAnimation) {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          if (validateResponse) {
+            const updatedCard = answerCards[cardIndex];
+            result.cardStateAfterClick = {
+              className: updatedCard.className,
+              dataset: { ...updatedCard.dataset },
+              computedStyle: {
+                display: getComputedStyle(updatedCard).display,
+                visibility: getComputedStyle(updatedCard).visibility,
+                opacity: getComputedStyle(updatedCard).opacity
+              }
+            };
+          }
+          debugLog('=== CLICK SIMULATION COMPLETE ===');
+          resolve(result);
+        }, 500); // Wait 500ms for animations
+      });
+    }
+    
+    debugLog('=== CLICK SIMULATION COMPLETE ===');
+    return result;
+  }
+  adjustLayout() {
+    if (this.baseBodyPadding === undefined) {
+      this.baseBodyPadding = parseFloat(getComputedStyle(this.elements.body).paddingBottom) || 0;
+    }
+    const footerHeight = this.elements.footer.offsetHeight;
+    this.elements.body.style.paddingBottom = footerHeight + this.baseBodyPadding + 'px';
+  }
+  runGas(funcName, ...args) {
+    // Simple request deduplication for identical calls (except for state-changing operations)
+    const cacheKey = funcName + JSON.stringify(args);
+    const isStateChanging = ['toggleHighlight', 'addReaction', 'endPublication'].includes(funcName);
+    
+    if (!isStateChanging) {
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
         return Promise.resolve(cached);
       }
     }
@@ -982,32 +1855,16 @@ setupEventDelegation() {
     debugLog('アプリケーションのクリーンアップ完了');
   }
   async loadDataImmediate() {
-    console.log('=== loadDataImmediate called ===');
-    try {
-      // Verify admin first to ensure proper initialization
-      console.log('Verifying admin...');
-      await this.verifyAdminAsync();
-      console.log('Admin verification completed');
-      
-      // Start loading immediately without waiting
-      console.log('Starting loadSheetData...');
-      this.loadSheetData(false, true).then(() => {
-        console.log('loadSheetData completed successfully, starting polling...');
-        this.startPolling();
-      }).catch(error => {
-        console.error('Error in loadSheetData:', error);
-        this.hideLoadingOverlay();
-        this.displayEmptyState();
-      });
-      
-      // Load sheets in background
-      console.log('Loading available sheets...');
-      this.loadAvailableSheets();
-    } catch (error) {
-      console.error('Error in loadDataImmediate:', error);
-      this.hideLoadingOverlay();
-      this.displayEmptyState();
-    }
+    // Verify admin first to ensure proper initialization
+    await this.verifyAdminAsync();
+    
+    // Start loading immediately without waiting
+    this.loadSheetData(false, true).then(() => {
+      this.startPolling();
+    });
+    
+    // Load sheets in background
+    this.loadAvailableSheets();
   }
   
   showMinimalSkeleton() {
@@ -1043,37 +1900,15 @@ setupEventDelegation() {
   }
 
   hideLoadingOverlay() {
-    console.log('hideLoadingOverlay called. loadingOverlay element:', this.elements.loadingOverlay);
     if (this.elements.loadingOverlay) {
       this.elements.loadingOverlay.classList.add('hidden');
-      console.log('Loading overlay hidden. classList:', this.elements.loadingOverlay.classList.toString());
-    } else {
-      console.error('loadingOverlay element not found!');
-    }
-  }
-
-  async fetchOpinionHeaderFromServer() {
-    try {
-      debugLog('🔧 Fetching opinion header from server...');
-      const opinionHeader = await this.runGas('getOpinionHeaderSafely', USER_ID, SHEET_NAME);
-      if (opinionHeader && opinionHeader !== 'お題' && this.elements.headingLabel) {
-        this.elements.headingLabel.textContent = this.escapeHtml(opinionHeader);
-        debugLog('🔧 Opinion header updated from server:', opinionHeader);
-      }
-    } catch (error) {
-      console.warn('Failed to fetch opinion header from server:', error);
     }
   }
 
   async loadSheetData(showLoading = true, isInitialLoad = false, requestedSheetName = null) {
-    console.log('=== loadSheetData called ===', { showLoading, isInitialLoad, requestedSheetName });
-    if (this.state.isLoading && showLoading) {
-      console.log('Already loading, returning early');
-      return;
-    }
+    if (this.state.isLoading && showLoading) return;
     this.state.isLoading = true;
-    this.showLoadingOverlay();
-    console.log('Loading overlay shown, proceeding with data load...');
+    this.showLoadingOverlay(); // Add this line
 
     const selectedClass = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
     const oldAnswers = [...this.state.currentAnswers];
@@ -1096,33 +1931,11 @@ setupEventDelegation() {
       container.appendChild(frag);
     }
     try {
-      // Check if required elements exist
-      if (!this.elements.sortOrder) {
-        console.error('sortOrder element not found');
-        this.hideLoadingOverlay();
-        this.displayEmptyState();
-        return;
-      }
-      
       const sortOrder = this.elements.sortOrder.value;
       const classFilter = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
       
-      console.log('Elements check passed. sortOrder:', sortOrder, 'classFilter:', classFilter);
-      
-      // Add timeout to prevent infinite loading
-      const timeoutId = setTimeout(() => {
-        console.error('Sheet data loading timed out');
-        this.hideLoadingOverlay();
-        this.displayEmptyState();
-      }, 10000); // 10 second timeout
-
-      console.log('About to call google.script.run.getPublishedSheetData with:', { classFilter, sortOrder });
       google.script.run
         .withSuccessHandler(result => {
-          clearTimeout(timeoutId);
-          this.state.isLoading = false;
-          this.hideLoadingOverlay();
-          
           if (!result || !result.data || result.data.length === 0) {
             this.displayEmptyState();
             if (isInitialLoad) {
@@ -1145,10 +1958,7 @@ setupEventDelegation() {
           this.renderBoard(false);
         })
         .withFailureHandler(error => {
-          clearTimeout(timeoutId);
           console.error('Error loading sheet data:', error);
-          this.state.isLoading = false;
-          this.hideLoadingOverlay();
           this.displayEmptyState();
         })
         .getPublishedSheetData(classFilter, sortOrder);
@@ -1180,7 +1990,8 @@ setupEventDelegation() {
       this.elements.answersContainer.querySelectorAll('.skeleton').forEach(el => el.remove());
       this.elements.answersContainer.innerHTML = '<div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg">' + '<p class="font-bold">データの読み込みに失敗しました。</p>' + '<p class="text-sm mt-2">' + errorMessage + '</p>' + '<button id="retryLoadBtn" class="mt-4 game-btn bg-cyan-600 text-white px-4 py-2 rounded-lg font-bold border-cyan-800 hover:bg-cyan-500 text-sm">再試行</button>' + '</div>';
     } finally {
-      // Loading state is now managed in success/failure handlers
+      this.state.isLoading = false;
+      this.hideLoadingOverlay(); // Add this line
     }
   }
   async loadAvailableSheets() {
@@ -2633,55 +3444,146 @@ function loadFormLink() {
     .getActiveFormInfo();
 }
 
-function initializeApp() {
-  console.log('=== initializeApp called ===');
-  console.log('Document ready state:', document.readyState);
-  console.log('Available elements:', {
-    answers: !!document.getElementById('answers'),
-    sortOrder: !!document.getElementById('sortOrder'),
-    classFilter: !!document.getElementById('classFilter'),
-    headingLabel: !!document.getElementById('headingLabel'),
-    loadingOverlay: !!document.getElementById('loading-overlay')
-  });
+try {
+  if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
+    window.studyQuestApp.destroy();
+  }
+  window.studyQuestApp = new StudyQuestApp();
   
-  try {
-    console.log('Checking for existing studyQuestApp...');
+  // Expose debug functions globally for console access
+  window.debugAnswerCards = () => {
+    if (window.studyQuestApp && window.studyQuestApp.debugAnswerCards) {
+      window.studyQuestApp.debugAnswerCards();
+    } else {
+      console.log('StudyQuestApp not available or debug function not found');
+    }
+  };
+  
+  // Enhanced global debug function with additional utility methods
+  window.debugClickAnswerCard = (cardIndex = 0, options = {}) => {
+    if (window.studyQuestApp && window.studyQuestApp.debugClickAnswerCard) {
+      return window.studyQuestApp.debugClickAnswerCard(cardIndex, options);
+    } else {
+      console.log('StudyQuestApp not available or debug function not found');
+      return { success: false, error: 'StudyQuestApp not available' };
+    }
+  };
+
+  // Additional global debug utilities
+  window.debugClickAllAnswerCards = async (options = {}) => {
+    if (!window.studyQuestApp) {
+      console.log('StudyQuestApp not available');
+      return { success: false, error: 'StudyQuestApp not available' };
+    }
+    
+    const container = window.studyQuestApp.elements?.answersContainer;
+    if (!container) {
+      console.log('No answers container found');
+      return { success: false, error: 'No answers container found' };
+    }
+    
+    const answerCards = container.querySelectorAll('.answer-card');
+    const results = [];
+    
+    console.log(`Found ${answerCards.length} answer cards, clicking all...`);
+    
+    for (let i = 0; i < answerCards.length; i++) {
+      try {
+        const result = await window.studyQuestApp.debugClickAnswerCard(i, { 
+          ...options, 
+          logDetails: false // Reduce noise when clicking all cards
+        });
+        results.push(result);
+        
+        if (options.delay && i < answerCards.length - 1) {
+          // Add proper delay between clicks if specified
+          await new Promise(resolve => setTimeout(resolve, options.delay));
+        }
+      } catch (error) {
+        console.error(`Error clicking card ${i}:`, error);
+        results.push({ success: false, error: error.message, cardIndex: i });
+      }
+    }
+    
+    return {
+      success: true,
+      totalCards: answerCards.length,
+      results
+    };
+  };
+
+  window.debugGetAnswerCardInfo = (cardIndex = 0) => {
+    if (!window.studyQuestApp) {
+      console.log('StudyQuestApp not available');
+      return { success: false, error: 'StudyQuestApp not available' };
+    }
+    
+    // Validate cardIndex
+    if (typeof cardIndex !== 'number' || cardIndex < 0 || !Number.isInteger(cardIndex)) {
+      console.log('Invalid card index:', cardIndex);
+      return { success: false, error: 'Invalid card index. Must be a non-negative integer.' };
+    }
+    
+    const container = window.studyQuestApp.elements?.answersContainer;
+    if (!container) {
+      console.log('No answers container found');
+      return { success: false, error: 'No answers container found' };
+    }
+    
+    const answerCards = container.querySelectorAll('.answer-card');
+    if (answerCards.length === 0) {
+      console.log('No answer cards found');
+      return { success: false, error: 'No answer cards found' };
+    }
+    
+    if (cardIndex >= answerCards.length) {
+      console.log('Card index out of bounds');
+      return { success: false, error: 'Card index out of bounds', totalCards: answerCards.length };
+    }
+    
+    const card = answerCards[cardIndex];
+    
+    try {
+      const cardInfo = {
+        index: cardIndex,
+        className: card.className,
+        dataset: { ...card.dataset },
+        rowIndex: card.dataset.rowIndex,
+        boundingRect: card.getBoundingClientRect(),
+        computedStyle: {
+          display: getComputedStyle(card).display,
+          visibility: getComputedStyle(card).visibility,
+          opacity: getComputedStyle(card).opacity
+        },
+        textContent: card.textContent?.trim() || '',
+        innerHTML: card.innerHTML
+      };
+      
+      console.log('Answer card info:', cardInfo);
+      return { success: true, cardInfo };
+    } catch (error) {
+      console.error('Error getting card info:', error);
+      return { success: false, error: `Error getting card info: ${error.message}` };
+    }
+  };
+  
+  // ドメイン情報とフォームリンクを取得
+  loadDomainInfo();
+  loadFormLink();
+  
+  window.addEventListener('beforeunload', () => {
     if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
-      console.log('Destroying existing studyQuestApp...');
       window.studyQuestApp.destroy();
     }
-    
-    console.log('Creating new StudyQuestApp instance...');
-    window.studyQuestApp = new StudyQuestApp();
-    console.log('StudyQuestApp created successfully');
-    
-    // ドメイン情報とフォームリンクを取得
-    console.log('Loading domain info and form link...');
-    loadDomainInfo();
-    loadFormLink();
-    
-    window.addEventListener('beforeunload', () => {
-      if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
-        window.studyQuestApp.destroy();
-      }
-    });
-    
-    console.log('=== initializeApp completed successfully ===');
-  } catch (error) {
-    console.error('Error creating StudyQuestApp instance:', error);
-    console.error('Error stack:', error.stack);
-    const container = document.getElementById('answers');
-    if (container) {
-      const msg = error.message || 'Unknown error';
-      container.innerHTML = '<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました: ' + msg + '</div>';
-    }
+  });
+} catch (error) {
+  console.error('Error creating StudyQuestApp instance:', error);
+  const container = document.getElementById('answers');
+  if (container) {
+    const msg = StudyQuestApp.prototype.escapeHtml(error.message || '');
+    container.innerHTML = '<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました: ' + msg + '</div>';
   }
 }
-
-// DOM準備完了後にアプリケーションを初期化
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeApp);
-} else {
-  initializeApp();
-}
 </script>
+</body>
+</html>

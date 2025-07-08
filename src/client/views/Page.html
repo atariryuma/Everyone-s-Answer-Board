@@ -13,7 +13,33 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&amp;display=swap" rel="stylesheet">
-<!-- Global error handling and TailwindCSS setup -->
+<script>
+// Global error handling for document.write and other issues
+window.addEventListener('error', function(event) {
+  if (event.error && event.error.message) {
+    if (event.error.message.includes('document.write') ||
+        event.error.message.includes('Unexpected token')) {
+      console.warn('Document.write or syntax error caught and handled:', event.error.message);
+      event.preventDefault();
+      return false;
+    }
+  }
+});
+
+// Handle unhandled promise rejections
+window.addEventListener('unhandledrejection', function(event) {
+  console.warn('Unhandled promise rejection:', event.reason);
+  event.preventDefault();
+});
+
+// TailwindCSS configuration to suppress production warnings
+window.tailwind = {
+  config: {
+    mode: 'jit',
+    corePlugins: { preflight: false }
+  }
+};
+</script>
 <script src="https://cdn.tailwindcss.com" defer onload="console.log('TailwindCSS loaded successfully')" onerror="console.warn('TailwindCSS failed to load')"></script>
     <?!= include('styles/Page.css.html'); ?>
 </head>
