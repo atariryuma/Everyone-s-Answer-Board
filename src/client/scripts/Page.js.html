@@ -77,6 +77,7 @@ const __SPREADSHEET_ID__ = '<?= typeof spreadsheetId !== "undefined" ? spreadshe
 const __OWNER_NAME__ = '<?= typeof ownerName !== "undefined" ? ownerName : "" ?>';
 const __OPINION_HEADER__ = '<?= typeof opinionHeader !== "undefined" ? opinionHeader : "お題" ?>';
 const __OPINION_HEADER_ENCODED__ = '<?= typeof opinionHeaderEncoded !== "undefined" ? opinionHeaderEncoded : false ?>';
+const __CACHE_TIMESTAMP__ = '<?= typeof cacheTimestamp !== "undefined" ? cacheTimestamp : Date.now() ?>';
 const __SHOW_ADMIN_FEATURES__ = '<?= typeof showAdminFeatures !== "undefined" ? showAdminFeatures : false ?>';
 const __SHOW_HIGHLIGHT_TOGGLE__ = '<?= typeof showHighlightToggle !== "undefined" ? showHighlightToggle : false ?>';
 const __SHOW_SCORE_SORT__ = '<?= typeof showScoreSort !== "undefined" ? showScoreSort : false ?>';
@@ -100,6 +101,7 @@ try {
   debugLog('🔧 Processing OPINION_HEADER. Raw value:', __OPINION_HEADER__);
   debugLog('🔧 OPINION_HEADER type:', typeof __OPINION_HEADER__);
   debugLog('🔧 OPINION_HEADER_ENCODED:', __OPINION_HEADER_ENCODED__);
+  debugLog('🔧 CACHE_TIMESTAMP:', __CACHE_TIMESTAMP__);
   
   if (typeof __OPINION_HEADER__ === 'string' && !__OPINION_HEADER__.startsWith('<')) {
     // Base64デコードが必要かチェック
@@ -383,6 +385,11 @@ class StudyQuestApp {
     if (this.elements.headingLabel) {
       const opinionHeader = OPINION_HEADER || 'お題を読み込み中...';
       this.elements.headingLabel.textContent = this.escapeHtml(opinionHeader);
+      
+      // テンプレート変数が失敗した場合は、サーバーから直接取得
+      if (opinionHeader === 'お題' && USER_ID && SHEET_NAME) {
+        this.fetchOpinionHeaderFromServer();
+      }
     }
 
     // Only setup absolutely critical event listeners
@@ -1042,6 +1049,19 @@ setupEventDelegation() {
       console.log('Loading overlay hidden. classList:', this.elements.loadingOverlay.classList.toString());
     } else {
       console.error('loadingOverlay element not found!');
+    }
+  }
+
+  async fetchOpinionHeaderFromServer() {
+    try {
+      debugLog('🔧 Fetching opinion header from server...');
+      const opinionHeader = await this.runGas('getOpinionHeaderSafely', USER_ID, SHEET_NAME);
+      if (opinionHeader && opinionHeader !== 'お題' && this.elements.headingLabel) {
+        this.elements.headingLabel.textContent = this.escapeHtml(opinionHeader);
+        debugLog('🔧 Opinion header updated from server:', opinionHeader);
+      }
+    } catch (error) {
+      console.warn('Failed to fetch opinion header from server:', error);
     }
   }
 

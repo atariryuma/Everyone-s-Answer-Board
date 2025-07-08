@@ -399,6 +399,7 @@ function doGet(e) {
           const opinionHeaderBase64 = Utilities.base64Encode(rawOpinionHeader);
           template.opinionHeader = opinionHeaderBase64;
           template.opinionHeaderEncoded = true; // フラグを設定
+          template.cacheTimestamp = Date.now(); // キャッシュバスター
           
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
@@ -411,7 +412,8 @@ function doGet(e) {
             opinionHeader: template.opinionHeader,
             opinionHeaderBase64: opinionHeaderBase64,
             rawOpinionHeader: rawOpinionHeader,
-            displayMode: template.displayMode
+            displayMode: template.displayMode,
+            cacheTimestamp: template.cacheTimestamp
           });
 
         } catch (e) {
@@ -477,6 +479,7 @@ function doGet(e) {
           const opinionHeaderBase64 = Utilities.base64Encode(rawOpinionHeader);
           template.opinionHeader = opinionHeaderBase64;
           template.opinionHeaderEncoded = true; // フラグを設定
+          template.cacheTimestamp = Date.now(); // キャッシュバスター
           
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
@@ -486,6 +489,7 @@ function doGet(e) {
         } catch (e) {
           template.opinionHeader = Utilities.base64Encode('お題の読込エラー');
           template.opinionHeaderEncoded = true;
+          template.cacheTimestamp = Date.now();
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
