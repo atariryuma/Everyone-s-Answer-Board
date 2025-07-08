@@ -256,7 +256,7 @@ class StudyQuestApp {
       { key: 'CURIOUS', icon: 'magnifying-glass-plus' }
     ];
     this.gas = {
-      getPublishedSheetData: (sheetName, classFilter, sort) => this.runGas('getPublishedSheetData', sheetName, classFilter, sort),
+      getPublishedSheetData: (classFilter, sort) => this.runGas('getPublishedSheetData', classFilter, sort),
       getAvailableSheets: () => this.runGas('getAvailableSheets'),
       addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', rowIndex, reaction, sheetName),
       toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', rowIndex, sheetName),
@@ -972,8 +972,12 @@ setupEventDelegation() {
   }
 
   hideLoadingOverlay() {
+    console.log('hideLoadingOverlay called. loadingOverlay element:', this.elements.loadingOverlay);
     if (this.elements.loadingOverlay) {
       this.elements.loadingOverlay.classList.add('hidden');
+      console.log('Loading overlay hidden. classList:', this.elements.loadingOverlay.classList.toString());
+    } else {
+      console.error('loadingOverlay element not found!');
     }
   }
 
@@ -1008,8 +1012,18 @@ setupEventDelegation() {
       container.appendChild(frag);
     }
     try {
+      // Check if required elements exist
+      if (!this.elements.sortOrder) {
+        console.error('sortOrder element not found');
+        this.hideLoadingOverlay();
+        this.displayEmptyState();
+        return;
+      }
+      
       const sortOrder = this.elements.sortOrder.value;
       const classFilter = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
+      
+      console.log('Elements check passed. sortOrder:', sortOrder, 'classFilter:', classFilter);
       
       // Add timeout to prevent infinite loading
       const timeoutId = setTimeout(() => {
