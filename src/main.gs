@@ -615,3 +615,43 @@ function testEscapeJavaScript() {
   console.log('escapeJavaScript test results:', results);
   return results;
 }
+
+/**
+ * Base64エンコード/デコードのテスト
+ */
+function testBase64Encoding() {
+  const testCases = [
+    '今日のテーマについて、あなたの考えや意見を聞かせてください',
+    'Simple text',
+    'Text with "quotes"',
+    'Text with \'single quotes\'',
+    'Text with : colon',
+    'お題'
+  ];
+  
+  const results = [];
+  
+  testCases.forEach(testCase => {
+    try {
+      const encoded = Utilities.base64Encode(testCase);
+      console.log(`Original: ${testCase}`);
+      console.log(`Encoded: ${encoded}`);
+      console.log(`Decoded: ${Utilities.base64Decode(encoded)}`);
+      
+      results.push({
+        original: testCase,
+        encoded: encoded,
+        success: true
+      });
+    } catch (e) {
+      results.push({
+        original: testCase,
+        error: e.message,
+        success: false
+      });
+    }
+  });
+  
+  console.log('Base64 encoding test results:', results);
+  return results;
+}
