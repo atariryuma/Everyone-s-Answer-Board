@@ -575,9 +575,7 @@ function testSetup() {
 // ヘルパー関数
 // =================================================================
 
-function include(filename) {
-  return HtmlService.createHtmlOutputFromFile(filename).getContent();
-}
+// include 関数は main.gs で定義されています
 
 
 function getResponsesData(userId, sheetName) {

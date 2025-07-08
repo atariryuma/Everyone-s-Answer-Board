@@ -21,9 +21,9 @@ function extractSaveConfigScript(html) {
 
 describe('AdminPanel saveConfig', () => {
   test('calls google.script.run.saveConfig and stores pending config', () => {
-    const htmlPath = path.resolve(__dirname, '../src/AdminPanel.html');
-    const html = fs.readFileSync(htmlPath, 'utf8');
-    const script = extractSaveConfigScript(html);
+    const jsPath = path.resolve(__dirname, '../src/client/scripts/AdminPanel.js.html');
+    const js = fs.readFileSync(jsPath, 'utf8');
+    const script = extractSaveConfigScript(js);
     expect(script).toBeTruthy();
 
     const dom = new JSDOM(`<!DOCTYPE html><body>

@@ -3,6 +3,17 @@
  * V8ランタイム、最新パフォーマンス技術、安定性強化を統合
  */
 
+/**
+ * HTML ファイルを読み込む include ヘルパー
+ * @param {string} path client/ からの相対パス
+ * @return {string} HTML content
+ */
+function include(path) {
+  const tmpl = HtmlService.createTemplateFromFile('client/' + path);
+  tmpl.include = include;
+  return tmpl.evaluate().getContent();
+}
+
 // グローバル定数の定義
 var SCRIPT_PROPS_KEYS = {
   SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
@@ -345,7 +356,7 @@ function doGet(e) {
       // Page.html直接アクセス時は、パラメータ指定されたページを表示
       if (isDirectPageAccess) {
         console.log('DEBUG: Direct page access detected. Showing specified page.');
-        const template = HtmlService.createTemplateFromFile('Page.html');
+        const template = HtmlService.createTemplateFromFile('client/views/Page.html');
 
         try {
           const config = JSON.parse(userInfo.configJson || '{}');
@@ -386,7 +397,7 @@ function doGet(e) {
       if (mode === 'admin') {
         // 明示的な管理パネル要求
         console.log('DEBUG: Explicit admin mode request. Showing AdminPanel.');
-        var adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
+        var adminTemplate = HtmlService.createTemplateFromFile('client/views/AdminPanel');
         adminTemplate.userInfo = userInfo;
         adminTemplate.userId = userInfo.userId;
         adminTemplate.mode = mode;
@@ -408,7 +419,7 @@ function doGet(e) {
       if (mode === 'view' && isPublished) {
         // 明示的な回答ボード表示要求（公開済みの場合のみ）
         console.log('DEBUG: Explicit view mode request for published board. Showing Page.');
-        const template = HtmlService.createTemplateFromFile('Page.html');
+        const template = HtmlService.createTemplateFromFile('client/views/Page.html');
         
         try {
           const config = JSON.parse(userInfo.configJson || '{}');
@@ -445,7 +456,7 @@ function doGet(e) {
       // デフォルト：パラメータなしのアクセスは管理パネルへ
       // (modeのデフォルトが'admin'になったため、このルートが正しく機能する)
       console.log('DEBUG: Default access - user registered. Redirecting to admin panel.');
-      var adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
+      var adminTemplate = HtmlService.createTemplateFromFile('client/views/AdminPanel');
       adminTemplate.userInfo = userInfo;
       adminTemplate.userId = userInfo.userId;
       adminTemplate.mode = 'admin';
