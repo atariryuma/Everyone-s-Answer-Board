@@ -17,13 +17,7 @@ window.addEventListener('unhandledrejection', function(event) {
   event.preventDefault();
 });
 
-// TailwindCSS configuration to suppress production warnings
-window.tailwind = {
-  config: {
-    mode: 'jit',
-    corePlugins: { preflight: false }
-  }
-};
+// TailwindCSS configuration moved to HTML head for better load order
 </script>
 <script>
 const DEBUG_MODE = true;
@@ -93,11 +87,11 @@ const __SHOW_HIGHLIGHT_TOGGLE__ = '<?= typeof showHighlightToggle !== "undefined
 const __SHOW_SCORE_SORT__ = '<?= typeof showScoreSort !== "undefined" ? showScoreSort : false ?>';
 const __IS_STUDENT_MODE__ = '<?= typeof isStudentMode !== "undefined" ? isStudentMode : true ?>';
 const __IS_ADMIN_USER__ = '<?= typeof isAdminUser !== "undefined" ? isAdminUser : false ?>';
-window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : __SHOW_COUNTS__ === 'true';
+window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : (__SHOW_COUNTS__ === 'true');
 window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
-window.showAdminFeatures = __SHOW_ADMIN_FEATURES__.startsWith('<') ? false : __SHOW_ADMIN_FEATURES__ === 'true';
-window.showHighlightToggle = __SHOW_HIGHLIGHT_TOGGLE__.startsWith('<') ? false : __SHOW_HIGHLIGHT_TOGGLE__ === 'true';
-window.showScoreSort = __SHOW_SCORE_SORT__.startsWith('<') ? false : __SHOW_SCORE_SORT__ === 'true';
+window.showAdminFeatures = __SHOW_ADMIN_FEATURES__.startsWith('<') ? false : (__SHOW_ADMIN_FEATURES__ === 'true');
+window.showHighlightToggle = __SHOW_HIGHLIGHT_TOGGLE__.startsWith('<') ? false : (__SHOW_HIGHLIGHT_TOGGLE__ === 'true');
+window.showScoreSort = __SHOW_SCORE_SORT__.startsWith('<') ? false : (__SHOW_SCORE_SORT__ === 'true');
 window.isStudentMode = __IS_STUDENT_MODE__.startsWith('<') ? true : __IS_STUDENT_MODE__ === 'true';
 window.isAdminUser = __IS_ADMIN_USER__.startsWith('<') ? false : __IS_ADMIN_USER__ === 'true';
 const SHEET_NAME = __SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHEET_NAME__;
