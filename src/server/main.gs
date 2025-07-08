@@ -87,10 +87,12 @@ function safeSetXFrameOptionsDeny(htmlOutput) {
  * @param {string} path - client/ からの相対パス (例: 'styles/main.css.html')
  * @returns {string} ファイルのコンテンツ
  */
-function include(fullRelativePath) {
-  // Example: fullRelativePath could be 'client/styles/main.css.html'
-  // or 'client/scripts/main.js.html' or 'client/components/Header.html'
-  return HtmlService.createHtmlOutputFromFile(fullRelativePath).getContent();
+function include(path) {
+  // Create a template from the file to allow its scriptlets to be evaluated.
+  const template = HtmlService.createTemplateFromFile(`client/${path}`);
+  // Pass the include function to the sub-template to allow for nesting.
+  template.include = include;
+  return template.evaluate().getContent();
 }
 
 /**
