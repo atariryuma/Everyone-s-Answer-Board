@@ -1,0 +1,22 @@
+<!-- 確認モーダルコンポーネント -->
+<!--
+削除・送信などの重要な操作に使用する
+確認ダイアログ
+
+主な内容:
+- モーダルの基本構造
+- 確認・キャンセルボタン
+- メッセージ表示エリア
+- アクセシビリティ対応
+- キーボード操作対応
+-->
+<div id="confirmationModal" class="modal" role="dialog" aria-labelledby="modalTitle" aria-hidden="true">
+  <div class="modal-content">
+    <h2 id="modalTitle">確認</h2>
+    <p id="modalMessage"></p>
+    <div class="modal-actions">
+      <button id="confirmBtn" class="btn btn-primary">確認</button>
+      <button id="cancelBtn" class="btn btn-secondary">キャンセル</button>
+    </div>
+  </div>
+</div>

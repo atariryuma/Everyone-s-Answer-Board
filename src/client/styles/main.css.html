@@ -1,0 +1,560 @@
+<style>
+/* 全体共通スタイル */
+/* 
+基本的なレイアウト、フォント、色、アニメーション等の
+全ページで共通して使用するスタイルを定義
+
+主な内容:
+- CSS変数（色、フォント、サイズ）
+- リセットCSS
+- ユーティリティクラス
+- 共通コンポーネントのスタイル
+
+標準化されたコンポーネントシステム:
+- .btn, .btn-primary, .btn-secondary, .btn-danger, .btn-google
+- .glass-panel, .glass-panel-page, .glass-panel-google
+- .form-control
+- .modal, .modal-content, .modal-actions
+- .status-indicator, .status-active, .status-inactive, .status-error
+- .progress-bar, .progress-fill
+- .tooltip
+- .error-state, .success-state
+*/
+
+:root {
+  /* Color variables */
+  --color-primary: #8be9fd;
+  --color-background: #1a1b26;
+  --color-surface: rgba(26, 27, 38, 0.7);
+  --color-surface-page: rgba(26, 27, 38, 0.95); /* Page-specific variant */
+  --color-text: #c0caf5;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-success: #10b981;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+  --color-info: #3b82f6;
+  --color-google-blue: #4285f4;
+  --color-google-green: #34a853;
+  --color-google-yellow: #fbbc05;
+  --color-google-red: #ea4335;
+  --color-accent: #facc15;
+  
+  /* Shadow variables */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
+  
+  /* Performance variables */
+  --transition-duration: 0.2s;
+  --transition-easing: ease-out;
+  --animation-duration: 0.3s;
+  --backdrop-blur: 12px;
+}
+
+body { 
+  margin: 0; 
+  color: var(--color-text);
+  background: var(--color-background);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Google Sans', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+/* Unified Glass Panel System */
+.glass-panel { 
+  background: var(--color-surface); 
+  -webkit-backdrop-filter: blur(var(--backdrop-blur)); 
+  backdrop-filter: blur(var(--backdrop-blur)); 
+  border: 1px solid var(--color-border); 
+  transition: border-color var(--transition-duration) var(--transition-easing), 
+              transform var(--transition-duration) var(--transition-easing);
+  border-radius: 1rem;
+  will-change: auto;
+}
+.glass-panel:hover { 
+  border-color: rgba(255,255,255,0.2); 
+  will-change: border-color; 
+}
+
+/* Glass panel variants */
+.glass-panel-page {
+  background: var(--color-surface-page);
+}
+
+.glass-panel-google {
+  background: linear-gradient(135deg, var(--color-google-blue), var(--color-google-green));
+  border: 1px solid rgba(66, 133, 244, 0.3);
+}
+.glass-panel-google:hover {
+  border-color: rgba(66, 133, 244, 0.5);
+  box-shadow: 0 4px 20px rgba(66, 133, 244, 0.2);
+}
+
+/* Comprehensive Button System */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+  min-height: 44px; /* iOS touch target */
+  min-width: 44px;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+  transition: all 0.3s ease;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+}
+
+.btn:not(:disabled):active::before {
+  width: 100%;
+  height: 100%;
+}
+
+.btn > * {
+  position: relative;
+  z-index: 1;
+}
+
+.btn:disabled { 
+  opacity: 0.5; 
+  cursor: not-allowed; 
+  transform: none !important;
+}
+.btn:not(:disabled):hover { 
+  transform: translate3d(0, -2px, 0); 
+  will-change: transform; 
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+.btn:not(:disabled):active { 
+  transform: translate3d(0, 0, 0); 
+}
+
+.btn-primary { 
+  background: linear-gradient(135deg, var(--color-primary), #50fa7b);
+  color: #000;
+  font-weight: 700;
+}
+.btn-secondary { 
+  background: rgba(255,255,255,0.1);
+  color: var(--color-text);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+.btn-danger { 
+  background: var(--color-error);
+  color: white;
+}
+
+.btn-google {
+  background: linear-gradient(135deg, var(--color-google-blue), var(--color-google-green));
+  color: white;
+  font-weight: 700;
+}
+
+/* Legacy button support */
+button:disabled { 
+  opacity: 0.5; 
+  cursor: not-allowed; 
+}
+button:not(:disabled):hover {
+  transform: translate3d(0, -2px, 0);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+}
+button:active:not(:disabled) {
+  transform: translate3d(0, 0, 0);
+}
+
+/* Form Controls */
+.form-control {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  color: var(--color-text);
+  transition: all 0.2s ease;
+  font-size: 16px; /* Prevent zoom on iOS */
+  min-height: 44px; /* Touch target */
+}
+.form-control:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(139, 233, 253, 0.1);
+  background: rgba(255,255,255,0.08);
+}
+.form-control:hover {
+  border-color: rgba(255,255,255,0.3);
+}
+.form-control::placeholder {
+  color: rgba(192, 202, 245, 0.5);
+}
+
+/* Status Indicators */
+.status-indicator { 
+  width: 8px; 
+  height: 8px; 
+  border-radius: 50%; 
+  display: inline-block; 
+  margin-right: 8px;
+}
+.status-active { 
+  background-color: var(--color-success); 
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); 
+}
+.status-inactive { background-color: var(--color-warning); }
+.status-error { background-color: var(--color-error); }
+
+/* Modal Base Classes */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(26, 27, 38, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.modal.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+.modal-content {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  padding: 2rem;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  transform: scale(0.8);
+  transition: all 0.3s ease;
+}
+
+.modal.show .modal-content {
+  transform: scale(1);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+
+/* Progress Bars */
+.progress-bar {
+  height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary), #50fa7b);
+  transition: width 0.5s ease;
+  border-radius: 2px;
+}
+
+/* Tooltips */
+.tooltip { position: relative; }
+.tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.9);
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 1000;
+  margin-bottom: 5px;
+}
+.tooltip:hover::after { opacity: 1; }
+
+/* Error and Success States */
+.error-state {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  color: #f87171;
+}
+
+.success-state {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  color: #34d399;
+}
+
+/* Focus styles */
+:focus-visible { 
+  outline: 3px solid var(--color-primary); 
+  outline-offset: 2px; 
+  border-radius: 4px; 
+}
+
+/* Loading spinners */
+.spinner {
+  animation: spin 1s linear infinite;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(139, 233, 253, 0.3);
+  border-top: 2px solid var(--color-primary);
+  border-radius: 50%;
+}
+
+.spinner-small {
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top: 2px solid #10b981;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}
+
+/* Common animations */
+.fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+.slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+.pulse {
+  animation: pulse 2s infinite;
+}
+.shake {
+  animation: shake 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* Additional animations from page-specific files */
+@keyframes successPulse {
+  0% { transform: scale3d(1, 1, 1); will-change: transform; }
+  50% { transform: scale3d(1.05, 1.05, 1); }
+  100% { transform: scale3d(1, 1, 1); will-change: auto; }
+}
+
+@keyframes slideUp {
+  0% { opacity: 0; transform: translateY(20px); will-change: opacity, transform; }
+  100% { opacity: 1; transform: translateY(0); will-change: auto; }
+}
+
+@keyframes fadeOut {
+  0% { opacity: 1; will-change: opacity; }
+  100% { opacity: 0; will-change: auto; }
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% { transform: translate3d(0, 0, 0); will-change: auto; }
+  40% { transform: translate3d(0, -10px, 0); will-change: transform; }
+  60% { transform: translate3d(0, -5px, 0); }
+}
+
+@keyframes loading-skeleton {
+  0% { background-position: 200% 0; will-change: background-position; }
+  100% { background-position: -200% 0; will-change: auto; }
+}
+
+@keyframes skeleton-loading {
+  0% { transform: translate3d(-100%, 0, 0); will-change: transform; }
+  100% { transform: translate3d(100%, 0, 0); }
+}
+
+@keyframes modalFade {
+  from { opacity: 0; will-change: opacity; }
+  to { opacity: 1; }
+}
+
+@keyframes modalScale {
+  from { transform: scale3d(0.8, 0.8, 1); will-change: transform; }
+  to { transform: scale3d(1, 1, 1); }
+}
+
+/* Common card styles */
+.feature-card {
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+}
+.feature-card:hover {
+  border-color: var(--color-primary);
+  transform: translate3d(0, -4px, 0);
+  box-shadow: 0 12px 24px rgba(139, 233, 253, 0.1);
+}
+
+/* CTA button styles */
+.cta-button {
+  position: relative;
+  overflow: hidden;
+}
+.cta-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s;
+}
+.cta-button:hover::before {
+  left: 100%;
+}
+
+/* Loading overlay */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(26, 27, 38, 0.9);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* Step indicators for forms/wizards */
+.step-indicator {
+  text-align: center;
+  position: relative;
+  z-index: 10;
+  transition: all 0.3s ease;
+}
+.step-indicator.completed .step-number {
+  background-color: var(--color-primary);
+  color: #000;
+  box-shadow: 0 0 10px rgba(139, 233, 253, 0.5);
+}
+.step-indicator.active .step-number {
+  background-color: var(--color-warning);
+  color: #000;
+  animation: pulse 2s infinite;
+}
+
+#progress-bar {
+  transition: width 0.8s ease-in-out;
+  background: linear-gradient(90deg, var(--color-primary), #50fa7b);
+}
+
+/* Mobile Touch Optimizations */
+@media (max-width: 768px) {
+  .btn {
+    min-height: 48px; /* Larger touch targets on mobile */
+    padding: 1rem 1.5rem;
+    font-size: 16px;
+  }
+  
+  .form-control {
+    padding: 1rem;
+    font-size: 16px;
+  }
+  
+  .glass-panel {
+    margin: 0.5rem;
+    padding: 1rem;
+  }
+  
+  .modal-content {
+    margin: 1rem;
+    padding: 1.5rem;
+  }
+  
+  /* Stack modal actions vertically on mobile */
+  .modal-actions {
+    flex-direction: column-reverse;
+    gap: 0.75rem;
+  }
+  
+  .step-indicator .step-number {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.75rem;
+  }
+}
+
+/* Performance optimizations */
+.fade-in, .slide-in, .pulse, .shake {
+  will-change: auto;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Low-end device optimizations */
+@media (max-width: 768px) and (max-resolution: 150dpi) {
+  .glass-panel {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(26, 27, 38, 0.95);
+  }
+  .feature-card:hover {
+    transform: none;
+    box-shadow: 0 4px 8px rgba(139, 233, 253, 0.1);
+  }
+}
+</style>

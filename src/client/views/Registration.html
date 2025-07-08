@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <base target="_top">
+  <title>教育現場のためのインタラクティブ回答ボード</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <?! include('styles/main.css.html'); ?>
+  <?! include('styles/Registration.css.html'); ?>
+</head>
+<body class="bg-[#1a1b26] text-gray-200 font-sans min-h-screen flex items-center justify-center p-4">
+  <div class="glass-panel rounded-xl p-8 max-w-2xl w-full shadow-2xl">
+    <div class="text-center mb-6">
+      <h1 class="text-3xl font-bold text-yellow-300 mb-2">StudyQuest -みんなの回答ボード-</h1>
+      <p class="text-gray-400">教育現場のためのセキュアで持続可能な回答システム</p>
+    </div>
+    
+    <!-- ドメイン情報表示 -->
+    <div class="mb-6">
+      <!-- ドメイン一致表示 -->
+      <div id="header-domain-match" class="glass-panel bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-3 border border-green-400/30 hidden">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <div>
+            <div class="text-green-400 font-semibold text-sm" id="header-domain-match-text">認証済み組織ドメイン</div>
+            <div class="text-green-200 text-xs">所属組織内でのセキュアアクセス</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- ドメイン不一致表示 -->
+      <div id="header-domain-mismatch" class="glass-panel bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg p-3 border border-yellow-400/30 hidden">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+          </svg>
+          <div>
+            <div class="text-yellow-400 font-semibold text-sm" id="header-domain-mismatch-text">外部ドメインアクセス</div>
+            <div class="text-yellow-200 text-xs">システム管理者による制限の場合があります</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 初期状態表示 -->
+      <div id="header-domain-initial" class="glass-panel bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-3 border border-blue-400/30">
+        <div class="flex items-center gap-2">
+          <div class="w-3 h-3 bg-blue-400 rounded-full animate-pulse flex-shrink-0"></div>
+          <div>
+            <div class="text-blue-400 font-semibold text-sm">アクセス権限確認中</div>
+            <div class="text-blue-200 text-xs">システム初期化処理中</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- コンパクトCTA -->
+    <div class="mb-6 text-center fade-in">
+      <div class="glass-panel bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-xl p-4 border border-cyan-400/30 feature-card">
+        <h2 class="text-xl font-bold text-white mb-2">教育現場に最適化された回答ボードを始めよう！</h2>
+        <p class="text-cyan-200 text-sm mb-3">わずか数ステップで専用ボードを作成。教育現場で安心してご利用いただけます。</p>
+        <button type="button" 
+                class="cta-button px-6 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-bold rounded-lg transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-gray-800"
+                aria-label="新規登録に進む">
+          いますぐ始める →
+        </button>
+      </div>
+    </div>
+
+    <!-- Progress Steps -->
+    <div class="mb-8 slide-in">
+      <div class="flex items-center justify-between relative">
+        <div class="absolute top-4 left-0 right-0 h-0.5 bg-gray-600 rounded-full"></div>
+        <div class="absolute top-4 left-0 h-0.5 bg-gradient-to-r from-cyan-400 to-blue-400 transition-all duration-500 rounded-full" id="progress-bar"></div>
+        
+        <div class="step-indicator completed" id="step-1" role="progressbar" aria-valuenow="1" aria-valuemin="1" aria-valuemax="3" aria-label="ステップ1: 理解">
+          <div class="step-number w-8 h-8 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-sm relative z-10 transition-all">1</div>
+          <span class="text-xs mt-2 block text-cyan-400">理解</span>
+        </div>
+        <div class="step-indicator" id="step-2" role="progressbar" aria-valuenow="2" aria-valuemin="1" aria-valuemax="3" aria-label="ステップ2: 確認">
+          <div class="step-number w-8 h-8 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm relative z-10 transition-all">2</div>
+          <span class="text-xs mt-2 block text-gray-400">確認</span>
+        </div>
+        <div class="step-indicator" id="step-3" role="progressbar" aria-valuenow="3" aria-valuemin="1" aria-valuemax="3" aria-label="ステップ3: 開始">
+          <div class="step-number w-8 h-8 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm relative z-10 transition-all">3</div>
+          <span class="text-xs mt-2 block text-gray-400">開始</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-6">
+      <!-- ステップ1: 説明 -->
+      <article class="glass-panel rounded-lg p-4 feature-card fade-in" id="section-1">
+        <h2 class="text-lg font-semibold mb-3 text-cyan-400 flex items-center gap-2">
+          <div class="w-5 h-5 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-xs">1</div>
+          みんなの回答ボードとは
+        </h2>
+        <ul class="text-sm text-gray-300 space-y-2 mb-4" role="list">
+          <li class="flex items-start gap-2 slide-in">
+            <span class="text-green-400" role="img" aria-label="チェックマーク">✓</span>
+            <span>Googleスプレッドシート連携による構造化データ管理</span>
+          </li>
+          <li class="flex items-start gap-2 slide-in">
+            <span class="text-green-400" role="img" aria-label="チェックマーク">✓</span>
+            <span>建設的な意見交換を促進するリアクション機能</span>
+          </li>
+          <li class="flex items-start gap-2 slide-in">
+            <span class="text-green-400" role="img" aria-label="チェックマーク">✓</span>
+            <span>教育効果を高める重要回答の可視化機能</span>
+          </li>
+        </ul>
+
+        <!-- Digital Citizenship Education Section with Modal Button -->
+        <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3 mb-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.168 18.477 18.582 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+              </svg>
+              <span class="text-xs font-semibold text-blue-200">デジタル・シティズンシップ教育に準拠</span>
+            </div>
+            <button type="button" onclick="showTeacherGuideModal()" 
+                    class="text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded transition-colors text-white">
+              📚 ガイド
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-3 mb-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+              </svg>
+              <span class="text-xs font-semibold text-green-200">心理的安全性を重視した設計</span>
+            </div>
+            <span class="text-xs text-green-300">匿名性保護・協働学習支援</span>
+          </div>
+        </div>
+
+        <!-- セキュリティ -->
+        <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <span class="text-xs font-semibold text-purple-200">Google標準のセキュリティ基盤</span>
+            </div>
+            <span class="text-xs text-purple-300">データ分離・暗号化・アクセス制御</span>
+          </div>
+        </div>
+      </article>
+      
+      <!-- ステップ2: セットアップ方法 -->
+      <article class="glass-panel rounded-lg p-6 feature-card fade-in" id="section-2">
+        <h2 class="text-xl font-semibold mb-4 text-cyan-400 flex items-center gap-2">
+          <div class="w-6 h-6 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm" id="step-2-icon">2</div>
+          セットアップ方法
+        </h2>
+        <div class="border border-cyan-500 rounded-lg p-4 bg-cyan-900/20 glass-panel">
+          <div class="flex items-start gap-3">
+            <svg class="w-6 h-6 text-cyan-400 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+            <div>
+              <div class="font-semibold text-white mb-2">セキュアで効率的な自動セットアップ</div>
+              <div class="text-sm text-gray-300 leading-relaxed">
+                あなた専用のGoogleフォームとスプレッドシートを自動で作成します。Google Workspace for Educationのセキュリティ機能と連携するため、<strong>完了まで1分ほどかかる場合があります</strong>。完了後、あなた専用の固定URLの回答ボードが作成され、複数のスプレッドシートを管理画面で切り替えて使用できます。
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 重要な注意事項 -->
+        <div class="mt-4 p-4 bg-yellow-900/30 border border-yellow-600/50 rounded-lg glass-panel">
+          <h3 class="font-semibold text-yellow-400 mb-2 flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+            重要なお知らせ
+          </h3>
+          <ul class="text-sm text-yellow-200 space-y-2" role="list">
+            <li class="slide-in">• 一度登録すると、<strong>固定URLの専用回答ボード</strong>があなたの教育活動専用で作成されます</li>
+            <li class="slide-in">• 登録後は<strong>管理画面でスプレッドシートのURLを追加</strong>して複数の授業で使用できます</li>
+            <li class="slide-in">• 生徒には<strong>同じURLを継続共有</strong>でき、授業ごとにURLを変更する必要がありません</li>
+          </ul>
+        </div>
+      </article>
+      
+      <!-- ステップ3: アカウント確認 -->
+      <article class="glass-panel rounded-lg p-6 feature-card fade-in" id="section-3">
+        <h2 class="text-xl font-semibold mb-4 text-cyan-400 flex items-center gap-2">
+          <div class="w-6 h-6 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm" id="step-3-icon">3</div>
+          アカウント確認
+        </h2>
+        <div class="bg-gray-800 rounded-lg p-4 glass-panel">
+          <p class="text-sm text-gray-400 mb-1">認証済みアカウント:</p>
+          <p id="user-email" class="text-white font-semibold flex items-center gap-2">
+            <svg class="w-4 h-4 spinner" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
+            </svg>
+            確認中...
+          </p>
+        </div>
+        
+        <!-- Domain Information -->
+        <div id="domain-info-section" class="mt-4 hidden">
+          <div id="domain-match-panel" class="glass-panel bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-4 border border-green-400/30 mb-4 hidden">
+            <div class="flex items-center">
+              <svg class="w-5 h-5 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <div>
+                <p class="text-green-400 text-sm font-semibold">認証済みドメイン</p>
+                <p class="text-green-200 text-xs" id="domain-match-text"></p>
+              </div>
+            </div>
+          </div>
+          
+          <div id="domain-mismatch-panel" class="glass-panel bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg p-4 border border-yellow-400/30 mb-4 hidden">
+            <div class="flex items-start">
+              <svg class="w-5 h-5 text-yellow-400 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+              </svg>
+              <div>
+                <p class="text-yellow-400 text-sm font-semibold">ドメイン認証の確認</p>
+                <p class="text-yellow-200 text-xs mb-2" id="domain-mismatch-text"></p>
+                <p class="text-yellow-100 text-xs">このシステムは <span id="deploy-domain" class="font-semibold"></span> ドメイン用に構成されています。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      
+      <!-- 登録ボタン -->
+      <button
+        type="button"
+        id="register-btn"
+        class="cta-button w-full py-3 px-6 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-bold rounded-lg transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-gray-800 fade-in"
+        disabled
+        aria-label="アカウント認証を確認して回答ボードを開始する"
+      >
+        認証を確認して開始する
+      </button>
+      
+      <!-- メッセージエリア -->
+      <div id="message-area" class="text-center min-h-[24px]" role="alert" aria-live="polite"></div>
+
+      <!-- 結果表示エリア -->
+      <div id="result-area" class="hidden"></div>
+    </div>
+    
+    <!-- フッター -->
+    <footer class="text-center mt-8 text-xs text-gray-500 fade-in">
+      <p>&copy; 2025 StudyQuest. All rights reserved.</p>
+    </footer>
+  </div>
+  
+  <!-- デジタル・シティズンシップ教育ガイドモーダル -->
+  <div id="teacherGuideModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
+    <div class="glass-panel rounded-xl p-6 sm:p-8 shadow-2xl border-2 border-green-400/80 w-full max-w-4xl max-h-[90vh] overflow-y-auto relative" role="document">
+      <!-- 閉じるボタン -->
+      <button type="button" onclick="hideTeacherGuideModal()" 
+              class="absolute top-4 right-4 w-8 h-8 bg-gray-700 hover:bg-gray-600 rounded-full flex items-center justify-center transition-colors"
+              aria-label="モーダルを閉じる">
+        <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+      
+      <div class="space-y-6 text-gray-200 leading-relaxed">
+        <!-- ヘッダー -->
+        <div class="text-center border-b border-green-400/30 pb-4">
+          <div class="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-3">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.168 18.477 18.582 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+            </svg>
+          </div>
+          <h2 class="text-xl font-bold text-green-300" tabindex="0">📚 デジタル・シティズンシップ教育ガイド</h2>
+          <p class="text-sm text-green-200 mt-2">みんなの回答ボードを活用した指導のポイント</p>
+        </div>
+        
+        <!-- コンテンツ -->
+        <div class="grid lg:grid-cols-2 gap-6">
+          <!-- 指導における留意点 -->
+          <div class="space-y-4">
+            <h3 class="text-lg font-semibold text-green-300 flex items-center gap-2">
+              <span>🎯</span> 指導における留意点
+            </h3>
+            
+            <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+              <h4 class="font-semibold text-blue-200 mb-3">心理的安全性の確保</h4>
+              <ul class="text-sm text-blue-100 space-y-2">
+                <li>• 匿名表示機能を活用し、生徒が安心して発言できる環境を作る</li>
+                <li>• 間違いを恐れずに意見表明できる雰囲気づくりを心がける</li>
+                <li>• 数値表示をオフにして競争より協働を重視する</li>
+              </ul>
+            </div>
+            
+            <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
+              <h4 class="font-semibold text-purple-200 mb-3">多様性の尊重</h4>
+              <ul class="text-sm text-purple-100 space-y-2">
+                <li>• 異なる意見に対する敬意の姿勢をモデリングする</li>
+                <li>• 「正解」よりも「多様な視点」を大切にする授業展開</li>
+                <li>• リアクション機能を通じて共感的コミュニケーションを促す</li>
+              </ul>
+            </div>
+            
+            <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
+              <h4 class="font-semibold text-green-200 mb-3">デジタル・シティズンシップの育成</h4>
+              <ul class="text-sm text-green-100 space-y-2">
+                <li>• オンライン空間での責任ある行動について継続的に指導</li>
+                <li>• 相手の気持ちを想像する力を育む声かけを行う</li>
+                <li>• 建設的な対話のモデルを示し、言葉の選び方を指導する</li>
+              </ul>
+            </div>
+          </div>
+          
+          <!-- システム機能の教育的意図 -->
+          <div class="space-y-4">
+            <h3 class="text-lg font-semibold text-green-300 flex items-center gap-2">
+              <span>⚙️</span> システム機能の教育的意図
+            </h3>
+            
+            <div class="bg-cyan-900/20 border border-cyan-500/30 rounded-lg p-4">
+              <h4 class="font-semibold text-cyan-200 mb-3">匿名性機能</h4>
+              <p class="text-sm text-cyan-100 leading-relaxed">
+                生徒の名前を非表示にすることで、発言への不安を軽減し、多様な意見が出やすい環境を作ります。評価や批判を恐れず、本音での対話を促進します。
+              </p>
+            </div>
+            
+            <div class="bg-orange-900/20 border border-orange-500/30 rounded-lg p-4">
+              <h4 class="font-semibold text-orange-200 mb-3">リアクション機能</h4>
+              <p class="text-sm text-orange-100 leading-relaxed mb-2">
+                色分けされたリアクション（いいね！・なるほど！・もっと知りたい！）により、数値に左右されない共感的なコミュニケーションを育みます。
+              </p>
+              <ul class="text-xs text-orange-200 space-y-1">
+                <li>• 肯定的な反応を可視化</li>
+                <li>• 多様な感情表現の機会提供</li>
+                <li>• 対話のきっかけ作り</li>
+              </ul>
+            </div>
+            
+            <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
+              <h4 class="font-semibold text-yellow-200 mb-3">ハイライト機能</h4>
+              <p class="text-sm text-yellow-100 leading-relaxed">
+                教師が重要な発言を強調することで、学習のポイントを明確にし、質の高い議論への発展を支援します。
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 授業での活用のコツ -->
+        <div class="border-t border-green-400/30 pt-4">
+          <h3 class="text-lg font-semibold text-green-300 mb-3 flex items-center gap-2">
+            <span>💡</span> 授業での活用のコツ
+          </h3>
+          <div class="bg-gray-800/50 rounded-lg p-4">
+            <ul class="text-sm text-gray-200 space-y-2">
+              <li>• <strong>事前指導：</strong>オンライン上での言葉遣いや相手への思いやりについて話し合う</li>
+              <li>• <strong>振り返り：</strong>「どんな気持ちでリアクションしたか」を共有する時間を設ける</li>
+              <li>• <strong>継続指導：</strong>デジタル・シティズンシップの概念を日常的に取り入れる</li>
+            </ul>
+          </div>
+        </div>
+        
+        <!-- 閉じるボタン -->
+        <div class="border-t border-gray-600 pt-4 text-center">
+          <button type="button" onclick="hideTeacherGuideModal()" 
+                  class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-semibold">
+            理解しました
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <?! include('scripts/main.js.html'); ?>
+  <?! include('scripts/Registration.js.html'); ?>
+</body>
+</html>
