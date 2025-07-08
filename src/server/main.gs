@@ -87,8 +87,16 @@ function safeSetXFrameOptionsDeny(htmlOutput) {
  * @param {string} path - client/ からの相対パス (例: 'styles/main.css.html')
  * @returns {string} ファイルのコンテンツ
  */
-function include(path) {  // Create a template from the file to allow its scriptlets to be evaluated.  const template = HtmlService.createTemplateFromFile(`client/${path}`);  // Pass the include function to the sub-template to allow for nesting.  template.include = include;  const content = template.evaluate().getContent();  Logger.log(`Included content for ${path}:
-${content.substring(0, 500)}...`); // Log first 500 chars  return content;}
+function include(path) {
+  // Create a template from the file to allow its scriptlets to be evaluated.
+  const template = HtmlService.createTemplateFromFile(`client/${path}`);
+  // Pass the include function to the sub-template to allow for nesting.
+  template.include = include;
+  const content = template.evaluate().getContent();
+  Logger.log(`Included content for ${path}:
+${content.substring(0, 500)}...`); // Log first 500 chars
+  return content;
+}
 
 /**
  * 指定されたビュー名でページをレンダリングする
