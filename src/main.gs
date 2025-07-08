@@ -564,3 +564,41 @@ function getPerformanceMetrics() {
     };
   }
 }
+
+/**
+ * escapeJavaScript関数のテスト
+ */
+function testEscapeJavaScript() {
+  const testCases = [
+    '今日のテーマについて、あなたの考えや意見を聞かせてください',
+    'Simple text',
+    'Text with "quotes"',
+    'Text with \'single quotes\'',
+    'Text with : colon',
+    'Text with\nnewline',
+    'Text with\ttab',
+    ''
+  ];
+  
+  const results = [];
+  
+  testCases.forEach(testCase => {
+    try {
+      const escaped = escapeJavaScript(testCase);
+      results.push({
+        original: testCase,
+        escaped: escaped,
+        success: true
+      });
+    } catch (e) {
+      results.push({
+        original: testCase,
+        error: e.message,
+        success: false
+      });
+    }
+  });
+  
+  console.log('escapeJavaScript test results:', results);
+  return results;
+}
