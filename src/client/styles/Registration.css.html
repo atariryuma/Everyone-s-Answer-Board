@@ -1,0 +1,119 @@
+<style>
+/* Registration Page 固有スタイル */
+
+/* Registration固有のクイックスタート用スタイル */
+#quickstart-option:hover, #manual-option:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Registration特有のボタンエフェクト */
+.registration-btn:hover {
+  background: linear-gradient(135deg, #06b6d4, #3b82f6);
+}
+
+/* クイックセットアップエリア */
+.quick-setup-area {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.1));
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.quick-setup-area:hover {
+  border-color: rgba(16, 185, 129, 0.4);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.15);
+}
+
+/* プログレス関連のスタイル */
+.registration-progress {
+  background: rgba(139, 233, 253, 0.1);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.registration-progress-bar {
+  height: 4px;
+  background: linear-gradient(90deg, var(--color-primary), #50fa7b);
+  transition: width 0.8s ease-in-out;
+}
+
+/* ステップインジケーターの拡張 */
+.registration-step {
+  position: relative;
+  margin-bottom: 2rem;
+}
+
+.registration-step::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 2rem;
+  height: 3rem;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--color-primary), transparent);
+  transform: translateX(-50%);
+}
+
+.registration-step:last-child::before {
+  display: none;
+}
+
+/* セクション固有のスタイル */
+.registration-section {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  border-radius: 1rem;
+  background: rgba(26, 27, 38, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.registration-section:hover {
+  border-color: rgba(139, 233, 253, 0.3);
+  box-shadow: 0 4px 16px rgba(139, 233, 253, 0.1);
+}
+
+/* モーダル固有のスタイル */
+.teacher-guide-modal {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.teacher-guide-content {
+  max-height: 80vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-primary) transparent;
+}
+
+.teacher-guide-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.teacher-guide-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.teacher-guide-content::-webkit-scrollbar-thumb {
+  background: var(--color-primary);
+  border-radius: 3px;
+}
+
+/* レスポンシブ調整 */
+@media (max-width: 640px) {
+  .registration-section {
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .quick-setup-area {
+    padding: 1rem;
+  }
+  
+  .teacher-guide-content {
+    max-height: 70vh;
+  }
+}
+</style>
