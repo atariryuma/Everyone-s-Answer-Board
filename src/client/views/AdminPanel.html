@@ -9,9 +9,102 @@
 <body>
   <?! include('client/components/Header.html'); ?>
 
-  <main id="adminPanel" role="main">
-    <!-- 管理者パネルのコンテンツ -->
+  <main id="adminPanel" role="main" class="flex-grow p-4 md:p-8">
+    <div class="max-w-4xl mx-auto space-y-6">
+      <!-- メッセージ表示エリア -->
+      <div id="message-area" class="fixed top-4 right-4 z-50 w-full max-w-xs"></div>
+
+      <!-- ヘッダー情報 -->
+      <div class="glass-panel p-4 rounded-lg shadow-lg flex items-center justify-between">
+        <h1 class="text-xl font-bold text-white">管理パネル</h1>
+        <div class="flex items-center space-x-4">
+          <div class="flex items-center">
+            <span id="header-status-dot" class="w-2 h-2 bg-gray-500 rounded-full mr-2"></span>
+            <span id="header-status-text" class="text-gray-400 text-sm">未設定</span>
+          </div>
+          <button id="adminToggleBtn" class="btn btn-secondary hidden">管理モード</button>
+        </div>
+      </div>
+
+      <!-- セットアップステップ -->
+      <div class="glass-panel p-6 rounded-lg shadow-lg">
+        <h2 class="text-lg font-semibold text-white mb-4">セットアップガイド</h2>
+        <div class="space-y-4">
+          <!-- Step 1: Add Spreadsheet -->
+          <div class="glass-panel p-4 rounded-lg border border-gray-700" id="step1-content">
+            <h3 class="font-semibold text-white mb-2">1. スプレッドシートの追加</h3>
+            <input type="text" id="spreadsheet-url-input" class="form-control mb-2" placeholder="GoogleスプレッドシートのURLを入力">
+            <button id="add-spreadsheet-btn" class="btn btn-primary w-full">スプレッドシートを追加</button>
+            <p id="add-spreadsheet-text" class="text-sm text-gray-400 mt-2"></p>
+          </div>
+
+          <!-- Step 2: Select Sheet -->
+          <div class="glass-panel p-4 rounded-lg border border-gray-700" id="step2-content">
+            <h3 class="font-semibold text-white mb-2">2. ボードとして使用するシートを選択</h3>
+            <select id="sheet-select" class="form-control mb-2"></select>
+            <button id="clear-selection-btn" class="btn btn-secondary w-full">選択をクリア</button>
+          </div>
+
+          <!-- Step 3: Configure Columns -->
+          <div class="glass-panel p-4 rounded-lg border border-gray-700" id="step3-content">
+            <h3 class="font-semibold text-white mb-2">3. 列の設定</h3>
+            <div id="config-area" class="space-y-4 hidden">
+              <label for="opinionHeader" class="block text-sm font-medium text-gray-300">回答列:</label>
+              <select id="opinionHeader" class="form-control"></select>
+              <label for="nameHeader" class="block text-sm font-medium text-gray-300">名前列 (任意):</label>
+              <select id="nameHeader" class="form-control"></select>
+              <label for="classHeader" class="block text-sm font-medium text-gray-300">クラス列 (任意):</label>
+              <select id="classHeader" class="form-control"></select>
+              <label for="reasonHeader" class="block text-sm font-medium text-gray-300">理由列 (任意):</label>
+              <select id="reasonHeader" class="form-control"></select>
+              <button id="reguess-headers-btn" class="btn btn-secondary w-full">列を自動再判定</button>
+              <div class="flex items-center mt-4">
+                <input type="checkbox" id="showNames" class="form-checkbox h-5 w-5 text-blue-600">
+                <label for="showNames" class="ml-2 text-gray-300">回答者名を表示する</label>
+              </div>
+              <div class="flex items-center mt-2">
+                <input type="checkbox" id="showCounts" class="form-checkbox h-5 w-5 text-blue-600">
+                <label for="showCounts" class="ml-2 text-gray-300">リアクション数を表示する</label>
+              </div>
+              <button id="save-config-btn" class="btn btn-primary w-full mt-4">設定を保存して公開</button>
+            </div>
+            <div id="config-placeholder" class="text-gray-400 text-center p-4 border border-gray-700 rounded-lg">
+              シートを選択すると、ここに列設定が表示されます。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- その他の管理機能 -->
+      <div class="glass-panel p-6 rounded-lg shadow-lg">
+        <h2 class="text-lg font-semibold text-white mb-4">その他の機能</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="glass-panel p-4 rounded-lg border border-gray-700">
+            <h3 class="font-semibold text-white mb-2">ボードURL</h3>
+            <input type="text" id="board-url" class="form-control mb-2" readonly>
+            <a href="#" id="view-board-link" target="_blank" class="btn btn-secondary w-full text-center">ボードを見る</a>
+          </div>
+          <div class="glass-panel p-4 rounded-lg border border-gray-700">
+            <h3 class="font-semibold text-white mb-2">フォームURL</h3>
+            <input type="text" id="form-url-input" class="form-control mb-2" readonly>
+            <a href="#" id="open-form-url-link" target="_blank" class="btn btn-secondary w-full text-center">フォームを開く</a>
+          </div>
+          <div class="glass-panel p-4 rounded-lg border border-gray-700">
+            <h3 class="font-semibold text-white mb-2">スプレッドシート</h3>
+            <button id="open-spreadsheet-btn" class="btn btn-secondary w-full">スプレッドシートを開く</button>
+          </div>
+          <div class="glass-panel p-4 rounded-lg border border-gray-700">
+            <h3 class="font-semibold text-white mb-2">アカウント管理</h3>
+            <button id="delete-account-btn" class="btn btn-danger w-full">アカウントを削除</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
+
+  <footer id="admin-footer" class="glass-panel p-4 mt-8 text-center text-gray-400 text-sm">
+    <p id="guidance-text">セットアップを開始してください</p>
+  </footer>
 
   <?! include('client/scripts/main.js.html'); ?>
   <?! include('client/scripts/AdminPanel.js.html'); ?>
