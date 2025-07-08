@@ -276,7 +276,7 @@ function isSystemSetup() {
  * 登録ページを表示する関数
  */
 function showRegistrationPage() {
-  var output = HtmlService.createTemplateFromFile('Registration')
+  var output = HtmlService.createTemplateFromFile('client/views/Registration')
     .evaluate()
     .setTitle('新規ユーザー登録 - StudyQuest');
   return safeSetXFrameOptionsDeny(output);
@@ -320,7 +320,7 @@ function doGet(e) {
     // 1. システムの初期セットアップが完了しているか確認（Page.html直接アクセス時は除く）
     if (!isSystemSetup() && !isDirectPageAccess) {
       console.log('DEBUG: System not set up. Redirecting to SetupPage.');
-      var setupHtml = HtmlService.createTemplateFromFile('SetupPage')
+      var setupHtml = HtmlService.createTemplateFromFile('client/views/SetupPage')
         .evaluate()
         .setTitle('初回セットアップ - StudyQuest');
       console.log('DEBUG: Serving SetupPage HTML');
@@ -330,7 +330,7 @@ function doGet(e) {
     // セットアップページの明示的な表示要求
     if (setupParam === 'true') {
       console.log('DEBUG: Explicit setup request. Redirecting to SetupPage.');
-      var explicitHtml = HtmlService.createTemplateFromFile('SetupPage')
+      var explicitHtml = HtmlService.createTemplateFromFile('client/views/SetupPage')
         .evaluate()
         .setTitle('StudyQuest - サービスアカウント セットアップ');
       console.log('DEBUG: Serving explicit SetupPage HTML');
@@ -382,19 +382,41 @@ function doGet(e) {
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
+<<<<<<< HEAD
           template.sheetName = config.publishedSheetName || sheetName;
           template.opinionHeader = escapeJavaScript(sheetConfig.opinionHeader || config.publishedSheetName || 'お題');
+=======
+          template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
+          const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+          
+          // Base64エンコードでテンプレート変数の問題を回避
+          const opinionHeaderBase64 = Utilities.base64Encode(rawOpinionHeader);
+          template.opinionHeader = opinionHeaderBase64;
+          template.opinionHeaderEncoded = true; // フラグを設定
+          template.cacheTimestamp = Date.now(); // キャッシュバスター
+          
+>>>>>>> origin/main
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
           template.isAdminUser = false; // Page.html is for public view, not admin
+          
+          // デバッグログ
+          console.log('Template variables for direct page access:', {
+            sheetName: template.sheetName,
+            opinionHeader: template.opinionHeader,
+            opinionHeaderBase64: opinionHeaderBase64,
+            rawOpinionHeader: rawOpinionHeader,
+            displayMode: template.displayMode,
+            cacheTimestamp: template.cacheTimestamp
+          });
 
         } catch (e) {
           template.opinionHeader = escapeJavaScript('お題の読込エラー');
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
-          template.sheetName = sheetName;
+          template.sheetName = escapeJavaScript(sheetName);
           template.displayMode = 'anonymous';
           template.showCounts = true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
@@ -445,19 +467,37 @@ function doGet(e) {
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
+<<<<<<< HEAD
           template.sheetName = config.publishedSheetName || sheetName;
           template.opinionHeader = escapeJavaScript(sheetConfig.opinionHeader || config.publishedSheetName || 'お題');
+=======
+          template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
+          const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+          
+          // Base64エンコードでテンプレート変数の問題を回避
+          const opinionHeaderBase64 = Utilities.base64Encode(rawOpinionHeader);
+          template.opinionHeader = opinionHeaderBase64;
+          template.opinionHeaderEncoded = true; // フラグを設定
+          template.cacheTimestamp = Date.now(); // キャッシュバスター
+          
+>>>>>>> origin/main
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
           template.isAdminUser = false; // Page.html is for public view, not admin
 
         } catch (e) {
+<<<<<<< HEAD
           template.opinionHeader = escapeJavaScript('お題の読込エラー');
+=======
+          template.opinionHeader = Utilities.base64Encode('お題の読込エラー');
+          template.opinionHeaderEncoded = true;
+          template.cacheTimestamp = Date.now();
+>>>>>>> origin/main
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
-          template.sheetName = sheetName;
+          template.sheetName = escapeJavaScript(sheetName);
           template.displayMode = 'anonymous';
           template.showCounts = true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
@@ -544,4 +584,82 @@ function getPerformanceMetrics() {
       timestamp: Date.now()
     };
   }
+}
+
+/**
+ * escapeJavaScript関数のテスト
+ */
+function testEscapeJavaScript() {
+  const testCases = [
+    '今日のテーマについて、あなたの考えや意見を聞かせてください',
+    'Simple text',
+    'Text with "quotes"',
+    'Text with \'single quotes\'',
+    'Text with : colon',
+    'Text with\nnewline',
+    'Text with\ttab',
+    ''
+  ];
+  
+  const results = [];
+  
+  testCases.forEach(testCase => {
+    try {
+      const escaped = escapeJavaScript(testCase);
+      results.push({
+        original: testCase,
+        escaped: escaped,
+        success: true
+      });
+    } catch (e) {
+      results.push({
+        original: testCase,
+        error: e.message,
+        success: false
+      });
+    }
+  });
+  
+  console.log('escapeJavaScript test results:', results);
+  return results;
+}
+
+/**
+ * Base64エンコード/デコードのテスト
+ */
+function testBase64Encoding() {
+  const testCases = [
+    '今日のテーマについて、あなたの考えや意見を聞かせてください',
+    'Simple text',
+    'Text with "quotes"',
+    'Text with \'single quotes\'',
+    'Text with : colon',
+    'お題'
+  ];
+  
+  const results = [];
+  
+  testCases.forEach(testCase => {
+    try {
+      const encoded = Utilities.base64Encode(testCase);
+      console.log(`Original: ${testCase}`);
+      console.log(`Encoded: ${encoded}`);
+      console.log(`Decoded: ${Utilities.base64Decode(encoded)}`);
+      
+      results.push({
+        original: testCase,
+        encoded: encoded,
+        success: true
+      });
+    } catch (e) {
+      results.push({
+        original: testCase,
+        error: e.message,
+        success: false
+      });
+    }
+  });
+  
+  console.log('Base64 encoding test results:', results);
+  return results;
 }

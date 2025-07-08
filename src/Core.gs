@@ -10,6 +10,38 @@
 // doGetLegacy function removed - consolidated into main doGet in UltraOptimizedCore.gs
 
 /**
+ * 意見ヘッダーを安全に取得する関数（テンプレート変数の問題を回避）
+ * @param {string} userId - ユーザーID
+ * @param {string} sheetName - シート名
+ * @returns {string} 意見ヘッダー
+ */
+function getOpinionHeaderSafely(userId, sheetName) {
+  try {
+    const userInfo = findUserById(userId);
+    if (!userInfo) {
+      return 'お題';
+    }
+    
+    const config = JSON.parse(userInfo.configJson || '{}');
+    const sheetConfigKey = 'sheet_' + (config.publishedSheetName || sheetName);
+    const sheetConfig = config[sheetConfigKey] || {};
+    
+    const opinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+    
+    console.log('getOpinionHeaderSafely:', {
+      userId: userId,
+      sheetName: sheetName,
+      opinionHeader: opinionHeader
+    });
+    
+    return opinionHeader;
+  } catch (e) {
+    console.error('getOpinionHeaderSafely error:', e);
+    return 'お題';
+  }
+}
+
+/**
  * 新規ユーザーを登録する（データベース登録のみ）
  * フォーム作成はクイックスタートで実行される
  */
