@@ -260,7 +260,7 @@ function isSystemSetup() {
  * 登録ページを表示する関数
  */
 function showRegistrationPage() {
-  var output = HtmlService.createTemplateFromFile('Registration')
+  var output = HtmlService.createTemplateFromFile('client/views/Registration')
     .evaluate()
     .setTitle('新規ユーザー登録 - StudyQuest');
   return safeSetXFrameOptionsDeny(output);
@@ -304,7 +304,7 @@ function doGet(e) {
     // 1. システムの初期セットアップが完了しているか確認（Page.html直接アクセス時は除く）
     if (!isSystemSetup() && !isDirectPageAccess) {
       console.log('DEBUG: System not set up. Redirecting to SetupPage.');
-      var setupHtml = HtmlService.createTemplateFromFile('SetupPage')
+      var setupHtml = HtmlService.createTemplateFromFile('client/views/SetupPage')
         .evaluate()
         .setTitle('初回セットアップ - StudyQuest');
       console.log('DEBUG: Serving SetupPage HTML');
@@ -314,7 +314,7 @@ function doGet(e) {
     // セットアップページの明示的な表示要求
     if (setupParam === 'true') {
       console.log('DEBUG: Explicit setup request. Redirecting to SetupPage.');
-      var explicitHtml = HtmlService.createTemplateFromFile('SetupPage')
+      var explicitHtml = HtmlService.createTemplateFromFile('client/views/SetupPage')
         .evaluate()
         .setTitle('StudyQuest - サービスアカウント セットアップ');
       console.log('DEBUG: Serving explicit SetupPage HTML');
