@@ -382,8 +382,20 @@ function doGet(e) {
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
+<<<<<<< HEAD
           template.sheetName = config.publishedSheetName || sheetName;
           template.opinionHeader = escapeJavaScript(sheetConfig.opinionHeader || config.publishedSheetName || 'お題');
+=======
+          template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
+          const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+          
+          // Base64エンコードでテンプレート変数の問題を回避
+          const opinionHeaderBase64 = Utilities.base64Encode(rawOpinionHeader);
+          template.opinionHeader = opinionHeaderBase64;
+          template.opinionHeaderEncoded = true; // フラグを設定
+          template.cacheTimestamp = Date.now(); // キャッシュバスター
+          
+>>>>>>> origin/main
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
@@ -455,15 +467,33 @@ function doGet(e) {
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
+<<<<<<< HEAD
           template.sheetName = config.publishedSheetName || sheetName;
           template.opinionHeader = escapeJavaScript(sheetConfig.opinionHeader || config.publishedSheetName || 'お題');
+=======
+          template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
+          const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+          
+          // Base64エンコードでテンプレート変数の問題を回避
+          const opinionHeaderBase64 = Utilities.base64Encode(rawOpinionHeader);
+          template.opinionHeader = opinionHeaderBase64;
+          template.opinionHeaderEncoded = true; // フラグを設定
+          template.cacheTimestamp = Date.now(); // キャッシュバスター
+          
+>>>>>>> origin/main
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
           template.isAdminUser = false; // Page.html is for public view, not admin
 
         } catch (e) {
+<<<<<<< HEAD
           template.opinionHeader = escapeJavaScript('お題の読込エラー');
+=======
+          template.opinionHeader = Utilities.base64Encode('お題の読込エラー');
+          template.opinionHeaderEncoded = true;
+          template.cacheTimestamp = Date.now();
+>>>>>>> origin/main
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
