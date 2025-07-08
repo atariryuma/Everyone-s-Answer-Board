@@ -14,6 +14,24 @@ function include(path) {
   return tmpl.evaluate().getContent();
 }
 
+/**
+ * JavaScript用の文字列エスケープ関数
+ * @param {string} str エスケープする文字列
+ * @return {string} エスケープされた文字列
+ */
+function escapeJavaScript(str) {
+  if (!str) return '';
+  return str.toString()
+    .replace(/\\/g, '\\\\')   // バックスラッシュ
+    .replace(/'/g, "\\'")     // シングルクォート
+    .replace(/"/g, '\\"')     // ダブルクォート
+    .replace(/\n/g, '\\n')    // 改行
+    .replace(/\r/g, '\\r')    // キャリッジリターン
+    .replace(/\t/g, '\\t')    // タブ
+    .replace(/\u2028/g, '\\u2028') // ラインセパレータ
+    .replace(/\u2029/g, '\\u2029'); // パラグラフセパレータ
+}
+
 // グローバル定数の定義
 var SCRIPT_PROPS_KEYS = {
   SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
@@ -366,19 +384,19 @@ function doGet(e) {
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
-          template.sheetName = config.publishedSheetName || sheetName;
-          template.opinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+          template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
+          template.opinionHeader = escapeJavaScript(sheetConfig.opinionHeader || config.publishedSheetName || 'お題');
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
           template.isAdminUser = false; // Page.html is for public view, not admin
 
         } catch (e) {
-          template.opinionHeader = 'お題の読込エラー';
+          template.opinionHeader = escapeJavaScript('お題の読込エラー');
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
-          template.sheetName = sheetName;
+          template.sheetName = escapeJavaScript(sheetName);
           template.displayMode = 'anonymous';
           template.showCounts = true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
@@ -429,19 +447,19 @@ function doGet(e) {
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
-          template.sheetName = config.publishedSheetName || sheetName;
-          template.opinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+          template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
+          template.opinionHeader = escapeJavaScript(sheetConfig.opinionHeader || config.publishedSheetName || 'お題');
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
           template.isAdminUser = false; // Page.html is for public view, not admin
 
         } catch (e) {
-          template.opinionHeader = 'お題の読込エラー';
+          template.opinionHeader = escapeJavaScript('お題の読込エラー');
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
-          template.sheetName = sheetName;
+          template.sheetName = escapeJavaScript(sheetName);
           template.displayMode = 'anonymous';
           template.showCounts = true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
