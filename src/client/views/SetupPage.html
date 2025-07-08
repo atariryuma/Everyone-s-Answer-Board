@@ -5,17 +5,49 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StudyQuest - 初回セットアップ</title>
-    <?! include('styles/main.css.html'); ?>
-    <?! include('styles/SetupPage.css.html'); ?>
+    <?! include('client/styles/main.css.html'); ?>
+    <?! include('client/styles/SetupPage.css.html'); ?>
 </head>
 <body>
-    <?! include('components/Header.html'); ?>
+    <?! include('client/components/Header.html'); ?>
 
-    <main id="setupPanel" role="main">
-        <!-- Setup panel content -->
+    <main id="setupPanel" role="main" class="flex-grow p-4 md:p-8">
+        <div class="max-w-4xl mx-auto space-y-6">
+            <!-- メッセージ表示エリア -->
+            <div id="message-area" class="fixed top-4 right-4 z-50 w-full max-w-xs"></div>
+
+            <div class="glass-panel p-6 rounded-lg shadow-lg text-center">
+                <h1 class="text-2xl font-bold text-white mb-4">サービスアカウントのセットアップ</h1>
+                <p class="text-gray-300 mb-6">StudyQuestを安全に運用するために、Google Driveと連携するサービスアカウントを設定します。</p>
+
+                <div class="space-y-4 text-left">
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                        <h2 class="text-lg font-semibold text-white mb-2">1. サービスアカウントキーの取得</h2>
+                        <p class="text-gray-400 text-sm mb-2">Google Cloud Platformでサービスアカウントを作成し、JSONキーファイルをダウンロードしてください。</p>
+                        <a href="https://cloud.google.com/iam/docs/creating-managing-service-accounts" target="_blank" class="text-blue-400 hover:underline text-sm">詳細な手順はこちら</a>
+                    </div>
+
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                        <h2 class="text-lg font-semibold text-white mb-2">2. JSONキーの貼り付け</h2>
+                        <textarea id="service-account-key" class="form-control w-full h-48 mb-2" placeholder="ここにJSONキーの内容を貼り付けてください..." rows="10"></textarea>
+                        <button id="save-service-account-btn" class="btn btn-primary w-full">サービスアカウントを設定</button>
+                    </div>
+
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                        <h2 class="text-lg font-semibold text-white mb-2">3. データベーススプレッドシートの作成</h2>
+                        <p class="text-gray-400 text-sm mb-2">ユーザー情報を保存するためのスプレッドシートを作成します。</p>
+                        <button id="create-db-spreadsheet-btn" class="btn btn-secondary w-full">データベーススプレッドシートを作成</button>
+                        <input type="text" id="db-spreadsheet-id" class="form-control mt-2" placeholder="作成されたスプレッドシートID" readonly>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
 
-    <?! include('scripts/main.js.html'); ?>
-    <?! include('scripts/SetupPage.js.html'); ?>
+    <footer class="text-center mt-8 text-xs text-gray-500 fade-in">
+        <p>&copy; 2025 StudyQuest. All rights reserved.</p>
+    </footer>
+
+    <?! include('client/scripts/main.js.html'); ?>
 </body>
 </html>
