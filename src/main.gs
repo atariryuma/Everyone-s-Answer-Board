@@ -21,7 +21,8 @@ function include(path) {
  */
 function escapeJavaScript(str) {
   if (!str) return '';
-  return str.toString()
+  const original = str.toString();
+  const escaped = original
     .replace(/\\/g, '\\\\')   // バックスラッシュ
     .replace(/'/g, "\\'")     // シングルクォート
     .replace(/"/g, '\\"')     // ダブルクォート
@@ -30,6 +31,13 @@ function escapeJavaScript(str) {
     .replace(/\t/g, '\\t')    // タブ
     .replace(/\u2028/g, '\\u2028') // ラインセパレータ
     .replace(/\u2029/g, '\\u2029'); // パラグラフセパレータ
+  
+  // デバッグログ
+  if (original !== escaped) {
+    console.log('escapeJavaScript:', { original, escaped });
+  }
+  
+  return escaped;
 }
 
 // グローバル定数の定義
@@ -385,11 +393,20 @@ function doGet(e) {
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
           template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
-          template.opinionHeader = escapeJavaScript(sheetConfig.opinionHeader || config.publishedSheetName || 'お題');
+          const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+          template.opinionHeader = escapeJavaScript(rawOpinionHeader);
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
           template.isAdminUser = false; // Page.html is for public view, not admin
+          
+          // デバッグログ
+          console.log('Template variables for direct page access:', {
+            sheetName: template.sheetName,
+            opinionHeader: template.opinionHeader,
+            rawOpinionHeader: rawOpinionHeader,
+            displayMode: template.displayMode
+          });
 
         } catch (e) {
           template.opinionHeader = escapeJavaScript('お題の読込エラー');
