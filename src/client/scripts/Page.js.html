@@ -911,16 +911,26 @@ setupEventDelegation() {
     debugLog('アプリケーションのクリーンアップ完了');
   }
   async loadDataImmediate() {
-    // Verify admin first to ensure proper initialization
-    await this.verifyAdminAsync();
-    
-    // Start loading immediately without waiting
-    this.loadSheetData(false, true).then(() => {
-      this.startPolling();
-    });
-    
-    // Load sheets in background
-    this.loadAvailableSheets();
+    try {
+      // Verify admin first to ensure proper initialization
+      await this.verifyAdminAsync();
+      
+      // Start loading immediately without waiting
+      this.loadSheetData(false, true).then(() => {
+        this.startPolling();
+      }).catch(error => {
+        console.error('Error in loadSheetData:', error);
+        this.hideLoadingOverlay();
+        this.displayEmptyState();
+      });
+      
+      // Load sheets in background
+      this.loadAvailableSheets();
+    } catch (error) {
+      console.error('Error in loadDataImmediate:', error);
+      this.hideLoadingOverlay();
+      this.displayEmptyState();
+    }
   }
   
   showMinimalSkeleton() {
@@ -990,8 +1000,19 @@ setupEventDelegation() {
       const sortOrder = this.elements.sortOrder.value;
       const classFilter = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
       
+      // Add timeout to prevent infinite loading
+      const timeoutId = setTimeout(() => {
+        console.error('Sheet data loading timed out');
+        this.hideLoadingOverlay();
+        this.displayEmptyState();
+      }, 10000); // 10 second timeout
+
       google.script.run
         .withSuccessHandler(result => {
+          clearTimeout(timeoutId);
+          this.state.isLoading = false;
+          this.hideLoadingOverlay();
+          
           if (!result || !result.data || result.data.length === 0) {
             this.displayEmptyState();
             if (isInitialLoad) {
@@ -1014,7 +1035,10 @@ setupEventDelegation() {
           this.renderBoard(false);
         })
         .withFailureHandler(error => {
+          clearTimeout(timeoutId);
           console.error('Error loading sheet data:', error);
+          this.state.isLoading = false;
+          this.hideLoadingOverlay();
           this.displayEmptyState();
         })
         .getPublishedSheetData(classFilter, sortOrder);
@@ -1046,8 +1070,7 @@ setupEventDelegation() {
       this.elements.answersContainer.querySelectorAll('.skeleton').forEach(el => el.remove());
       this.elements.answersContainer.innerHTML = '<div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg">' + '<p class="font-bold">データの読み込みに失敗しました。</p>' + '<p class="text-sm mt-2">' + errorMessage + '</p>' + '<button id="retryLoadBtn" class="mt-4 game-btn bg-cyan-600 text-white px-4 py-2 rounded-lg font-bold border-cyan-800 hover:bg-cyan-500 text-sm">再試行</button>' + '</div>';
     } finally {
-      this.state.isLoading = false;
-      this.hideLoadingOverlay(); // Add this line
+      // Loading state is now managed in success/failure handlers
     }
   }
   async loadAvailableSheets() {
