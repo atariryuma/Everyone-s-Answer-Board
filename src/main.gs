@@ -14,6 +14,22 @@ function include(path) {
   return tmpl.evaluate().getContent();
 }
 
+/**
+ * JavaScript文字列エスケープ関数
+ * @param {string} str エスケープする文字列
+ * @return {string} エスケープされた文字列
+ */
+function escapeJavaScript(str) {
+  if (!str) return '';
+  return str.toString()
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t');
+}
+
 // グローバル定数の定義
 var SCRIPT_PROPS_KEYS = {
   SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
@@ -367,14 +383,14 @@ function doGet(e) {
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
           template.sheetName = config.publishedSheetName || sheetName;
-          template.opinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+          template.opinionHeader = escapeJavaScript(sheetConfig.opinionHeader || config.publishedSheetName || 'お題');
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
           template.isAdminUser = false; // Page.html is for public view, not admin
 
         } catch (e) {
-          template.opinionHeader = 'お題の読込エラー';
+          template.opinionHeader = escapeJavaScript('お題の読込エラー');
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
@@ -430,14 +446,14 @@ function doGet(e) {
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
           template.sheetName = config.publishedSheetName || sheetName;
-          template.opinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+          template.opinionHeader = escapeJavaScript(sheetConfig.opinionHeader || config.publishedSheetName || 'お題');
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
           template.isAdminUser = false; // Page.html is for public view, not admin
 
         } catch (e) {
-          template.opinionHeader = 'お題の読込エラー';
+          template.opinionHeader = escapeJavaScript('お題の読込エラー');
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
