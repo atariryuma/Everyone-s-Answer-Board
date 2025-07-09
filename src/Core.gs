@@ -735,6 +735,210 @@ function getActiveFormInfo(userId) {
 }
 
 /**
+ * ボードデータを再読み込み
+ * AdminPanel.htmlから呼び出される
+ */
+function refreshBoardData(userId) {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = userId || props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+    
+    var userInfo = getUserWithFallback(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    // キャッシュをクリア
+    invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId);
+    
+    // 最新のステータスを取得
+    return getAppConfig();
+  } catch (e) {
+    console.error('ボードデータの再読み込みに失敗: ' + e.message);
+    return { status: 'error', message: 'ボードデータの再読み込みに失敗しました: ' + e.message };
+  }
+}
+
+/**
+ * フォームURLを追加
+ * AdminPanel.htmlから呼び出される
+ */
+function addFormUrl(formUrl) {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+    
+    if (!formUrl || typeof formUrl !== 'string') {
+      throw new Error('無効なフォームURLです');
+    }
+    
+    // フォームIDを抽出
+    var formId = extractFormIdFromUrl(formUrl);
+    if (!formId) {
+      throw new Error('フォームURLからIDを抽出できませんでした');
+    }
+    
+    var userInfo = getUserWithFallback(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    configJson.formUrl = formUrl;
+    configJson.formId = formId;
+    configJson.formCreated = true;
+    
+    updateUser(currentUserId, {
+      configJson: JSON.stringify(configJson)
+    });
+    
+    return { 
+      status: 'success', 
+      message: 'フォームURLが正常に追加されました',
+      formId: formId
+    };
+  } catch (e) {
+    console.error('フォームURL追加エラー: ' + e.message);
+    return { status: 'error', message: 'フォームURLの追加に失敗しました: ' + e.message };
+  }
+}
+
+/**
+ * 追加フォームを作成
+ * AdminPanel.htmlから呼び出される
+ */
+function createAdditionalForm(title) {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+    
+    var userInfo = getUserWithFallback(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    // 新しいフォームを作成
+    var formTitle = title || 'StudyQuest 追加フォーム - ' + new Date().toLocaleDateString('ja-JP');
+    var formAndSsInfo = createStudyQuestForm(userInfo.adminEmail, currentUserId, formTitle);
+    
+    return {
+      status: 'success',
+      message: '新しいフォームが正常に作成されました',
+      formUrl: formAndSsInfo.formUrl,
+      editFormUrl: formAndSsInfo.editFormUrl,
+      spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+      formTitle: formAndSsInfo.formTitle
+    };
+  } catch (e) {
+    console.error('追加フォーム作成エラー: ' + e.message);
+    return { status: 'error', message: '追加フォームの作成に失敗しました: ' + e.message };
+  }
+}
+
+/**
+ * フォーム設定を更新
+ * AdminPanel.htmlから呼び出される
+ */
+function updateFormSettings(title, description) {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+    
+    var userInfo = getUserWithFallback(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    
+    if (configJson.editFormUrl) {
+      try {
+        var formId = extractFormIdFromUrl(configJson.editFormUrl);
+        var form = FormApp.openById(formId);
+        
+        if (title) {
+          form.setTitle(title);
+        }
+        if (description) {
+          form.setDescription(description);
+        }
+        
+        return {
+          status: 'success',
+          message: 'フォーム設定が更新されました'
+        };
+      } catch (formError) {
+        console.error('フォーム更新エラー: ' + formError.message);
+        return { status: 'error', message: 'フォームの更新に失敗しました: ' + formError.message };
+      }
+    } else {
+      return { status: 'error', message: 'フォームが見つかりません' };
+    }
+  } catch (e) {
+    console.error('フォーム設定更新エラー: ' + e.message);
+    return { status: 'error', message: 'フォーム設定の更新に失敗しました: ' + e.message };
+  }
+}
+
+/**
+ * システム設定を保存
+ * AdminPanel.htmlから呼び出される
+ */
+function saveSystemConfig(config) {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+    
+    var userInfo = getUserWithFallback(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    
+    // システム設定を更新
+    configJson.systemConfig = {
+      cacheEnabled: config.cacheEnabled,
+      autosaveInterval: config.autosaveInterval,
+      logLevel: config.logLevel,
+      updatedAt: new Date().toISOString()
+    };
+    
+    updateUser(currentUserId, {
+      configJson: JSON.stringify(configJson)
+    });
+    
+    return {
+      status: 'success',
+      message: 'システム設定が保存されました'
+    };
+  } catch (e) {
+    console.error('システム設定保存エラー: ' + e.message);
+    return { status: 'error', message: 'システム設定の保存に失敗しました: ' + e.message };
+  }
+}
+
+/**
  * ハイライト状態の切り替え
  * Page.htmlから呼び出される - フロントエンド期待形式に対応
  */

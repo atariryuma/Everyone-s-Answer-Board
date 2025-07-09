@@ -499,6 +499,31 @@ function batchUpdateSpreadsheet(service, spreadsheetId, requestBody) {
 }
 
 /**
+ * データベースシートを取得
+ * @returns {object} データベースシート
+ */
+function getDbSheet() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    if (!dbId) {
+      throw new Error('データベースIDが設定されていません');
+    }
+    
+    var ss = SpreadsheetApp.openById(dbId);
+    var sheet = ss.getSheetByName(DB_SHEET_CONFIG.SHEET_NAME);
+    if (!sheet) {
+      throw new Error('データベースシートが見つかりません: ' + DB_SHEET_CONFIG.SHEET_NAME);
+    }
+    
+    return sheet;
+  } catch (e) {
+    console.error('getDbSheet error:', e.message);
+    throw new Error('データベースシートの取得に失敗しました: ' + e.message);
+  }
+}
+
+/**
  * 現在のユーザーのアカウント情報をデータベースから完全に削除する
  * @returns {string} 成功メッセージ
  */

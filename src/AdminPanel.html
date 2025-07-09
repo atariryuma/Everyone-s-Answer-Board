@@ -13,6 +13,9 @@
   <!-- TailwindCSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 
+  <!-- ClientOptimizer の統合 -->
+  <?= include('ClientOptimizer'); ?>
+  
   <script>
     // グローバルエラーハンドリング
     window.addEventListener('error', function(event) {
@@ -29,6 +32,24 @@
       console.error('Unhandled promise rejection:', event.reason);
       event.preventDefault();
     });
+
+    // GASOptimizer インスタンスの初期化
+    var gasOptimizer = new GASOptimizer();
+    
+    // UnifiedCache インスタンスの初期化
+    var unifiedCache = new UnifiedCache();
+    
+    // runGas ラッパー関数 - キャッシュ対応
+    function runGas(functionName, ...args) {
+      return gasOptimizer.call(functionName, ...args);
+    }
+    
+    // callWithCache 関数 - 読み取り専用操作用
+    function callWithCache(functionName, cacheKey, ttl, ...args) {
+      return unifiedCache.getOrSet(cacheKey, function() {
+        return gasOptimizer.call(functionName, ...args);
+      }, ttl);
+    }
   </script>
   <style>
     :root {
@@ -1988,17 +2009,16 @@ elements = {
      * @param {Function} onError - エラー時のコールバック（オプション）
      */
     function loadDomainInfo(onSuccess, onError) {
-      google.script.run
-        .withSuccessHandler(function(info) {
+      callWithCache('getDeployUserDomainInfo', 'domain_info', 60000)
+        .then(function(info) {
           displayDomainInfo(info);
           if (onSuccess) onSuccess(info);
         })
-        .withFailureHandler(function(error) {
+        .catch(function(error) {
           console.error('ドメイン情報の取得に失敗しました:', error);
           displayDomainInfo({ error: error.message || error });
           if (onError) onError(error);
-        })
-        .getDeployUserDomainInfo();
+        });
     }
 
     /**
@@ -2281,27 +2301,112 @@ function setupEventListeners() {
  * アカウント削除ボタンが押された時の処理（2重チェックのモーダル表示）
  */
 function handleDeleteRequest() {
-  showConfirmationModal(
-    'アカウントの完全削除',
-    '本当にこのアカウントを削除しますか？この操作は元に戻せず、すべてのデータが失われます。',
-    function() {
-      setLoading(true, 'アカウントを完全に削除しています...');
-      google.script.run
-        .withSuccessHandler(function(response) {
-          setLoading(false);
-          showMessage(response, 'success');
-          // 削除成功後、2秒後に登録ページにリダイレクト
-          setTimeout(function() {
-            window.top.location.reload(); 
-          }, 2000);
-        })
-        .withFailureHandler(function(error) {
-          setLoading(false);
-          showError(error);
-        })
-        .deleteCurrentUserAccount(); // サーバー側の削除関数を呼び出す
+  // プライバシーモーダルを最初に表示
+  showPrivacyModal(function() {
+    // プライバシー確認後、削除確認モーダルを表示
+    showConfirmationModal(
+      'アカウントの完全削除',
+      '本当にこのアカウントを削除しますか？この操作は元に戻せず、すべてのデータが失われます。',
+      function() {
+        setLoading(true, 'アカウントを完全に削除しています...');
+        runGas('deleteCurrentUserAccount')
+          .then(function(response) {
+            setLoading(false);
+            showMessage(response, 'success');
+            setTimeout(function() {
+              window.top.location.reload(); 
+            }, 2000);
+          })
+          .catch(function(error) {
+            setLoading(false);
+            showError(error);
+          });
+      }
+    );
+  });
+}
+
+function showPrivacyModal(onAccept) {
+  var modal = document.getElementById('privacy-modal');
+  if (!modal) {
+    // プライバシーモーダルが存在しない場合は作成
+    modal = createPrivacyModal();
+    document.body.appendChild(modal);
+  }
+  
+  // モーダルを表示
+  modal.classList.remove('hidden');
+  
+  // プライバシー処理のセットアップ
+  setupPrivacyHandler(modal, onAccept);
+  
+  // フォーカス管理
+  setTimeout(function() {
+    var firstFocusable = modal.querySelector('button') || modal.querySelector('[tabindex]');
+    if (firstFocusable) firstFocusable.focus();
+  }, 100);
+}
+
+function setupPrivacyHandler(modal, onAccept) {
+  var acceptBtn = modal.querySelector('.privacy-accept-btn');
+  var cancelBtn = modal.querySelector('.privacy-cancel-btn');
+  
+  if (acceptBtn) {
+    acceptBtn.onclick = function() {
+      modal.classList.add('hidden');
+      if (onAccept) onAccept();
+    };
+  }
+  
+  if (cancelBtn) {
+    cancelBtn.onclick = function() {
+      modal.classList.add('hidden');
+    };
+  }
+  
+  // ESCキーで閉じる
+  var escHandler = function(e) {
+    if (e.key === 'Escape') {
+      modal.classList.add('hidden');
+      document.removeEventListener('keydown', escHandler);
     }
-  );
+  };
+  document.addEventListener('keydown', escHandler);
+}
+
+function createPrivacyModal() {
+  var modal = document.createElement('div');
+  modal.id = 'privacy-modal';
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4 hidden';
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-labelledby', 'privacy-modal-title');
+  
+  modal.innerHTML = `
+    <div class="glass-panel rounded-xl p-6 shadow-2xl border-2 border-red-400/80 w-full max-w-md">
+      <h2 id="privacy-modal-title" class="text-xl font-bold text-red-400 mb-4">プライバシーに関する重要な確認</h2>
+      <div class="space-y-4 text-gray-200">
+        <p class="text-sm">アカウント削除を進める前に、以下の点をご確認ください：</p>
+        <ul class="text-xs space-y-2 list-disc list-inside">
+          <li>すべてのデータ（フォーム、回答、設定）が完全に削除されます</li>
+          <li>削除されたデータは復元できません</li>
+          <li>関連するスプレッドシートとフォームは残りますが、このシステムからアクセスできなくなります</li>
+          <li>削除後は同じメールアドレスで再登録が可能です</li>
+        </ul>
+        <p class="text-sm font-semibold text-yellow-400">この操作を続行しますか？</p>
+      </div>
+      <div class="flex gap-3 mt-6">
+        <button type="button" class="privacy-cancel-btn btn btn-secondary flex-1">
+          キャンセル
+        </button>
+        <button type="button" class="privacy-accept-btn btn btn-danger flex-1">
+          確認しました
+        </button>
+      </div>
+    </div>
+  `;
+  
+  return modal;
 }
 
 
@@ -2513,8 +2618,8 @@ function populateSheetSelect(sheets, activeSheetName) {
 
       setLoading(true, '列を自動で再判定しています...');
 
-      google.script.run
-        .withSuccessHandler(function(guessedConfig) {
+      callWithCache('getGuessedHeaders', `guess_${currentStatus.userInfo.spreadsheetId}_${selectedSheet}`, 30000, currentStatus.userInfo.spreadsheetId, selectedSheet)
+        .then(function(guessedConfig) {
           // サーバーから返された自動判定の結果を、UIのドロップダウンに設定
           populateConfig(guessedConfig);
           
@@ -2522,11 +2627,10 @@ function populateSheetSelect(sheets, activeSheetName) {
           setLoading(false);
           updateConfigButtons(); // 保存ボタンを有効化
         })
-        .withFailureHandler(function(error) {
+        .catch(function(error) {
           showError(error);
           setLoading(false);
-        })
-        .getGuessedHeaders(currentStatus.userInfo.spreadsheetId, selectedSheet);
+        });
     }
 
     function enableUnderstandButton() {
@@ -2621,14 +2725,13 @@ function populateSheetSelect(sheets, activeSheetName) {
      */
     function switchToAnotherAccount() {
       if (confirm("別のアカウントに切り替えますか？現在のセッションは破棄されます。")) {
-        google.script.run
-          .withSuccessHandler(function(webAppUrl) {
+        runGas('getWebAppUrl')
+          .then(function(webAppUrl) {
             window.top.location.href = webAppUrl;
           })
-          .withFailureHandler(function(error) {
+          .catch(function(error) {
               alert('URLの取得に失敗しました: ' + error.message);
-          })
-          .getWebAppUrl();
+          });
       }
     }
 
@@ -2907,12 +3010,20 @@ function populateSheetSelect(sheets, activeSheetName) {
     function _loadStatusInternal(forceRefresh = false) {
       // 教育ガイドモーダルは削除されました
       
-      google.script.run
-        .withSuccessHandler(function(status) {
+      // キャッシュ対応でステータスを取得
+      var statusPromise;
+      if (forceRefresh) {
+        statusPromise = runGas('getStatus', forceRefresh);
+      } else {
+        statusPromise = callWithCache('getStatus', 'admin_status', 300000, forceRefresh); // 5分キャッシュ
+      }
+      
+      statusPromise
+        .then(function(status) {
           updateStatus(status);
           enableUnderstandButton();
         })
-        .withFailureHandler(function(error) {
+        .catch(function(error) {
           console.error('ステータスの取得に失敗しました', error);
           var errorMessage = 'ステータスの取得に失敗しました';
           
@@ -2931,18 +3042,17 @@ function populateSheetSelect(sheets, activeSheetName) {
           showError(new Error(errorMessage));
           enableUnderstandButton();
           setLoading(false); // エラー時もローディングを終了
-        })
-        .getStatus(forceRefresh);
+        });
       
-      google.script.run
-        .withSuccessHandler(function(formInfo) {
+      // キャッシュ対応でフォーム情報を取得
+      callWithCache('getActiveFormInfo', 'form_info', 180000) // 3分キャッシュ
+        .then(function(formInfo) {
           updateFormInfo(formInfo);
         })
-        .withFailureHandler(function(error) {
+        .catch(function(error) {
           console.warn('getActiveFormInfo error:', error);
           updateFormInfo(null);
-        })
-        .getActiveFormInfo();
+        });
     }
 
     function updateFormInfo(formInfo) {
@@ -2990,7 +3100,9 @@ function populateSheetSelect(sheets, activeSheetName) {
 
         // UIの主要要素を構築・更新し、その後で詳細情報をロード
         if (status.activeSheetName) {
-            google.script.run.withSuccessHandler(updateDynamicContent).withFailureHandler(showError).getGuessedHeaders(status.activeSheetName);
+            callWithCache('getGuessedHeaders', `headers_${status.activeSheetName}`, 30000, status.activeSheetName)
+                .then(updateDynamicContent)
+                .catch(showError);
         } else {
             // アクティブシートがない場合は、設定エリアを隠して完了
             hideConfigArea();
@@ -3114,8 +3226,8 @@ function populateSheetSelect(sheets, activeSheetName) {
     }
     
     function updateSystemStatus() {
-      google.script.run
-        .withSuccessHandler(function(status) {
+      callWithCache('getStatus', 'system_status', 5000, false)
+        .then(function(status) {
           try {
             updateDatabaseInfo(status);
             updateSetupProgress();
@@ -3123,10 +3235,9 @@ function populateSheetSelect(sheets, activeSheetName) {
             console.warn('System status update failed:', e);
           }
         })
-        .withFailureHandler(function(error) {
+        .catch(function(error) {
           console.warn('System status update error:', error);
-        })
-        .getStatus(false); // キャッシュ使用
+        });
     }
     
     
@@ -3345,8 +3456,8 @@ function populateSheetSelect(sheets, activeSheetName) {
       
       // Use appropriate server function based on URL type
       if (isForm) {
-        google.script.run
-          .withSuccessHandler(function(result) {
+        runGas('addFormUrl', url)
+          .then(function(result) {
             showMessage(result.message || resourceType + 'が正常に追加されました', 'green');
             if (urlInput) {
               addVisualFeedback(urlInput, 'success');
@@ -3363,18 +3474,17 @@ function populateSheetSelect(sheets, activeSheetName) {
             loadStatus(true);
             setLoading(false);
           })
-          .withFailureHandler(function(error) {
+          .catch(function(error) {
             console.error('addFormUrl error:', error);
             showMessage(resourceType + 'の追加に失敗しました: ' + error.message, 'error');
             if (urlInput) addVisualFeedback(urlInput, 'error');
             if (addBtn) addBtn.disabled = false;
             if (addResourceText) addResourceText.textContent = 'リソースを追加';
             setLoading(false);
-          })
-          .addFormUrl(url);
+          });
       } else {
-        google.script.run
-          .withSuccessHandler(function(result) {
+        runGas('addSpreadsheetUrl', url)
+          .then(function(result) {
             showMessage(result.message || resourceType + 'が正常に追加されました', 'green');
             if (urlInput) {
               addVisualFeedback(urlInput, 'success');
@@ -3391,15 +3501,14 @@ function populateSheetSelect(sheets, activeSheetName) {
             loadStatus(true);
             setLoading(false);
           })
-          .withFailureHandler(function(error) {
+          .catch(function(error) {
             console.error('addSpreadsheetUrl error:', error);
             showMessage(resourceType + 'の追加に失敗しました: ' + error.message, 'error');
             if (urlInput) addVisualFeedback(urlInput, 'error');
             if (addBtn) addBtn.disabled = false;
             if (addResourceText) addResourceText.textContent = 'リソースを追加';
             setLoading(false);
-          })
-          .addSpreadsheetUrl(url);
+          });
       }
     }
     
@@ -3507,8 +3616,8 @@ function populateSheetSelect(sheets, activeSheetName) {
         elements.addSpreadsheetText.textContent = 'スプレッドシートを追加';
       }
       
-      google.script.run
-        .withSuccessHandler(function(result) {
+      runGas('addSpreadsheetUrl', url)
+        .then(function(result) {
           showMessage(result.message || 'スプレッドシートが正常に追加されました', 'green');
           addVisualFeedback(urlInput, 'success');
           urlInput.value = '';
@@ -3520,7 +3629,7 @@ function populateSheetSelect(sheets, activeSheetName) {
           markStepCompleted(1);
           loadStatus(true); // Refresh the status with force refresh
         })
-        .withFailureHandler(function(error) {
+        .catch(function(error) {
           console.error('addSpreadsheetUrl error:', error);
           showMessage('スプレッドシートの追加に失敗しました: ' + error.message, 'error');
           addVisualFeedback(urlInput, 'error');
@@ -3529,14 +3638,13 @@ function populateSheetSelect(sheets, activeSheetName) {
             elements.addSpreadsheetText.textContent = 'スプレッドシートを追加';
           }
           setLoading(false);
-        })
-        .addSpreadsheetUrl(url);
+        });
     }
 
     function refreshBoardDataFromAdmin() {
       setLoading(true, '回答ボードを更新中...');
-      google.script.run
-        .withSuccessHandler(function(result) {
+      runGas('refreshBoardData')
+        .then(function(result) {
           showMessage(result.message || result || 'データが正常に更新されました', 'success');
           setLoading(false);
           // クライアントサイドのボードを再読み込みするために、親ウィンドウにメッセージを送信
@@ -3547,12 +3655,11 @@ function populateSheetSelect(sheets, activeSheetName) {
             window.parent.postMessage({ type: 'REFRESH_BOARD_DATA' }, '*');
           }
         })
-        .withFailureHandler(function(error) {
+        .catch(function(error) {
           console.error('refreshBoardData error:', error);
           showMessage('回答ボードの更新に失敗しました: ' + error.message, 'error');
           setLoading(false);
-        })
-        .refreshBoardData();
+        });
     }
         
 
@@ -3615,16 +3722,15 @@ function populateSheetSelect(sheets, activeSheetName) {
         showMessage('ボード作成がタイムアウトしました。しばらく待ってから再度お試しください。', 'error');
       }, 60000);
       
-      google.script.run
-        .withSuccessHandler(function(result) {
+      runGas('createBoardFromAdmin')
+        .then(function(result) {
           clearTimeout(timeoutId);
           handleBoardCreationSuccess(result);
         })
-        .withFailureHandler(function(error) {
+        .catch(function(error) {
           clearTimeout(timeoutId);
           handleBoardCreationError(error);
-        })
-        .createBoardFromAdmin();
+        });
     }
     
     // 追加フォーム作成関数（タイムアウト対応版）
@@ -3644,8 +3750,8 @@ function populateSheetSelect(sheets, activeSheetName) {
         showMessage('フォーム作成がタイムアウトしました。しばらく待ってから再度お試しください。', 'error');
       }, 30000);
       
-      google.script.run
-        .withSuccessHandler(function(result) {
+      runGas('createAdditionalForm')
+        .then(function(result) {
           try {
             clearTimeout(timeoutId);
             setLoading(false);
@@ -3673,14 +3779,13 @@ function populateSheetSelect(sheets, activeSheetName) {
             if (text) text.textContent = '追加のフォームを作成';
           }
         })
-        .withFailureHandler(function(error) {
+        .catch(function(error) {
           clearTimeout(timeoutId);
           setLoading(false);
           if (btn) btn.disabled = false;
           if (text) text.textContent = '追加のフォームを作成';
           showMessage('追加フォームの作成に失敗しました: ' + error.message, 'error');
-        })
-        .createAdditionalForm(); // 新しいサーバー関数を呼び出し
+        });
     }
 
     function loadConfigForSelected() {
@@ -3736,10 +3841,11 @@ function populateSheetSelect(sheets, activeSheetName) {
       
       setLoading(true, '列情報を読み込んでいます...');
 
-      google.script.run
-        .withSuccessHandler(handleSheetDetailsSuccess)
-        .withFailureHandler(handleSheetDetailsError)
-        .getSheetDetails(currentStatus.userInfo.spreadsheetId, selectedSheet);
+      // キャッシュ対応でシート詳細を取得
+      var cacheKey = 'sheet_details_' + currentStatus.userInfo.spreadsheetId + '_' + selectedSheet;
+      callWithCache('getSheetDetails', cacheKey, 300000, currentStatus.userInfo.spreadsheetId, selectedSheet) // 5分キャッシュ
+        .then(handleSheetDetailsSuccess)
+        .catch(handleSheetDetailsError);
     }
     
     // シート詳細情報を更新する関数
@@ -3894,20 +4000,19 @@ function populateSheetSelect(sheets, activeSheetName) {
       if (elements.saveConfigText) elements.saveConfigText.textContent = '保存中...';
 
       // 6. 設定のみを保存（公開はしない）
-      google.script.run
-        .withSuccessHandler(function(result) {
+      runGas('saveConfig', currentSheetName, cfg)
+        .then(function(result) {
           setLoading(false);
           elements.saveConfigBtn.disabled = false;
           if (elements.saveConfigText) elements.saveConfigText.textContent = '設定を保存';
           showPublishModal();
         })
-        .withFailureHandler(function(error) {
+        .catch(function(error) {
           showError(error);
           setLoading(false);
           elements.saveConfigBtn.disabled = false;
           if (elements.saveConfigText) elements.saveConfigText.textContent = '設定を保存';
-        })
-        .saveConfig(currentSheetName, cfg); 
+        }); 
     }
 
     /**
@@ -3944,22 +4049,21 @@ function populateSheetSelect(sheets, activeSheetName) {
       hidePublishModal();
       setLoading(true, 'ボードを公開中...');
 
-      google.script.run
-        .withSuccessHandler(function(status) {
+      runGas('activateSheet',
+        window.pendingConfig.spreadsheetId,
+        window.pendingConfig.sheetName
+      )
+        .then(function(status) {
           updateStatus(status);
           showMessage('ボードが正常に公開されました。', 'success');
           markStepCompleted(3);
           setLoading(false);
           window.pendingConfig = null;
         })
-        .withFailureHandler(function(error) {
+        .catch(function(error) {
           showError(error);
           setLoading(false);
-        })
-        .activateSheet(
-          window.pendingConfig.spreadsheetId,
-          window.pendingConfig.sheetName
-        );
+        });
     }
 
     /**
@@ -3976,46 +4080,43 @@ function populateSheetSelect(sheets, activeSheetName) {
       if (!selectedSheet) return;
       
       setLoading(true, 'ボードを切り替え中...');
-      google.script.run
-        .withSuccessHandler(function(msg) {
+      runGas('switchToSheet', currentStatus.userInfo.spreadsheetId, selectedSheet)
+        .then(function(msg) {
           showMessage(typeof msg === 'string' ? msg : msg.message || 'シートが正常に切り替わりました', 'green');
           loadStatus(true);
           setLoading(false);
         })
-        .withFailureHandler(function(error) {
+        .catch(function(error) {
           showError(error);
           setLoading(false);
-        })
-        .switchToSheet(currentStatus.userInfo.spreadsheetId, selectedSheet);
+        });
     }
 
     function clearSheetSelection() {
       setLoading(true, 'ボードの公開を終了中...');
-      google.script.run
-        .withSuccessHandler(function(msg) {
+      runGas('clearActiveSheet')
+        .then(function(msg) {
           showMessage(typeof msg === 'string' ? msg : msg.message || 'シートの公開が正常に終了しました', 'green');
           loadStatus(true);
           setLoading(false);
         })
-        .withFailureHandler(function(error) {
+        .catch(function(error) {
           showError(error);
           setLoading(false);
-        })
-        .clearActiveSheet();
+        });
     }
 
     function updateDisplayOptions(showNames, showCounts) {
       setLoading(true, '表示設定を更新中...');
-      google.script.run
-        .withSuccessHandler(function(msg) {
+      runGas('setDisplayOptions', { showNames, showCounts })
+        .then(function(msg) {
           showMessage(typeof msg === 'string' ? msg : msg.message || '表示オプションが正常に保存されました', 'green');
           setLoading(false);
         })
-        .withFailureHandler(function(error) {
+        .catch(function(error) {
           showError(error);
           setLoading(false);
-        })
-        .setDisplayOptions({ showNames, showCounts });
+        });
     }
 
     function copyUrl(inputElement, successMessage) {
@@ -4036,6 +4137,159 @@ function populateSheetSelect(sheets, activeSheetName) {
 
     function copyBoardUrl() {
       copyUrl(elements.boardUrl, 'ボードURLをコピーしました');
+    }
+
+    function copyFormUrl() {
+      var formUrlInput = elements.formUrlInput;
+      copyUrl(formUrlInput, 'フォームURLをコピーしました');
+    }
+
+    function showFormEditModal() {
+      var modal = document.getElementById('form-edit-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        // フォーカス管理
+        setTimeout(function() {
+          var firstFocusable = modal.querySelector('input, button, textarea, select') || modal.querySelector('[tabindex]');
+          if (firstFocusable) firstFocusable.focus();
+        }, 100);
+      }
+    }
+
+    function hideFormEditModal() {
+      var modal = document.getElementById('form-edit-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function refreshFormData() {
+      setLoading(true, 'フォーム情報を更新中...');
+      callWithCache('getActiveFormInfo', 'active_form_info', 10000)
+        .then(function(formInfo) {
+          updateFormInfo(formInfo);
+          showMessage('フォーム情報が更新されました', 'green');
+          setLoading(false);
+        })
+        .catch(function(error) {
+          showError(error);
+          setLoading(false);
+        });
+    }
+
+    function showSystemConfigModal() {
+      var modal = document.getElementById('system-config-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        // フォーカス管理
+        setTimeout(function() {
+          var firstFocusable = modal.querySelector('input, button, textarea, select') || modal.querySelector('[tabindex]');
+          if (firstFocusable) firstFocusable.focus();
+        }, 100);
+      }
+    }
+
+    function hideSystemConfigModal() {
+      var modal = document.getElementById('system-config-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function refreshBoardData() {
+      setLoading(true, 'ボードデータを更新中...');
+      runGas('refreshBoardData')
+        .then(function(status) {
+          updateStatus(status);
+          showMessage('ボードデータが更新されました', 'green');
+          setLoading(false);
+        })
+        .catch(function(error) {
+          showError(error);
+          setLoading(false);
+        });
+    }
+
+    // 重複メッセージ処理とエラーハンドリングの強化
+    var messageHistory = new Map();
+    var messageTimeout = null;
+
+    function handleDuplicateMessage(message, type) {
+      var messageKey = message + '_' + type;
+      var now = Date.now();
+      
+      // 同じメッセージが30秒以内に表示されている場合はスキップ
+      if (messageHistory.has(messageKey)) {
+        var lastShown = messageHistory.get(messageKey);
+        if (now - lastShown < 30000) {
+          console.log('重複メッセージをスキップ:', message);
+          return;
+        }
+      }
+      
+      messageHistory.set(messageKey, now);
+      
+      // メッセージを表示
+      if (type === 'error') {
+        showError(new Error(message));
+      } else {
+        showMessage(message, type);
+      }
+      
+      // 古いメッセージ履歴をクリア
+      setupMessageAutoRemoval();
+    }
+
+    function setupMessageAutoRemoval() {
+      if (messageTimeout) {
+        clearTimeout(messageTimeout);
+      }
+      
+      messageTimeout = setTimeout(function() {
+        var now = Date.now();
+        for (var [key, timestamp] of messageHistory.entries()) {
+          if (now - timestamp > 300000) { // 5分経過したメッセージを削除
+            messageHistory.delete(key);
+          }
+        }
+      }, 300000); // 5分後に実行
+    }
+
+    function handleError(error) {
+      console.error('Enhanced error handling:', error);
+      
+      var errorMessage = 'エラーが発生しました';
+      var errorType = 'error';
+      
+      if (error) {
+        if (typeof error === 'string') {
+          errorMessage = error;
+        } else if (error.message) {
+          errorMessage = error.message;
+        } else if (error.toString) {
+          errorMessage = error.toString();
+        }
+        
+        // 特定のエラータイプに応じて処理を分岐
+        if (errorMessage.includes('認証') || errorMessage.includes('権限')) {
+          errorType = 'auth';
+          errorMessage = 'ログインセッションが期限切れです。ページを再読み込みしてください。';
+        } else if (errorMessage.includes('ネットワーク') || errorMessage.includes('接続')) {
+          errorType = 'network';
+          errorMessage = 'ネットワークエラーが発生しました。しばらく待ってから再度お試しください。';
+        } else if (errorMessage.includes('データベース') || errorMessage.includes('保存')) {
+          errorType = 'database';
+          errorMessage = 'データの保存に失敗しました。しばらく待ってから再度お試しください。';
+        }
+      }
+      
+      handleDuplicateMessage(errorMessage, errorType);
+    }
+
+    function removeMessage(messageElement) {
+      if (messageElement && messageElement.parentNode) {
+        messageElement.parentNode.removeChild(messageElement);
+      }
     }
 
     // 重複したsetLoading関数は削除されました - 安全なバージョンのみ使用
@@ -4111,13 +4365,12 @@ function populateSheetSelect(sheets, activeSheetName) {
     // ページ再読み込み（新しいアカウント用）
     function reloadPageForNewAccount() {
       sessionStorage.setItem('treat_as_new_account', 'true');
-      google.script.run
-        .withSuccessHandler(function(url) {
+      runGas('getWebAppUrl')
+        .then(function(url) {
           var newUrl = new URL(url);
           newUrl.searchParams.set('t', Date.now());
           window.top.location.href = newUrl.toString();
-        })
-        .getWebAppUrl();
+        });
     }
 
     // クライアントサイドキャッシュクリア関数
@@ -4322,6 +4575,169 @@ function populateSheetSelect(sheets, activeSheetName) {
       </div>
     </div>
   </div>
+
+  <!-- Form Edit Modal -->
+  <div id="form-edit-modal" class="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
+    <div class="glass-panel rounded-xl p-6 shadow-2xl border-2 border-blue-400/80 w-full max-w-md">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-blue-400">フォーム編集</h2>
+        <button type="button" onclick="hideFormEditModal()" class="text-gray-400 hover:text-white">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">フォームタイトル</label>
+          <input type="text" id="form-title-input" class="form-control" placeholder="フォームタイトルを入力">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">フォームの説明</label>
+          <textarea id="form-description-input" class="form-control" rows="3" placeholder="フォームの説明を入力"></textarea>
+        </div>
+        <div class="flex gap-3">
+          <button type="button" onclick="hideFormEditModal()" class="btn btn-secondary flex-1">キャンセル</button>
+          <button type="button" onclick="saveFormEdits()" class="btn btn-primary flex-1">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- System Config Modal -->
+  <div id="system-config-modal" class="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
+    <div class="glass-panel rounded-xl p-6 shadow-2xl border-2 border-purple-400/80 w-full max-w-lg">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-purple-400">システム設定</h2>
+        <button type="button" onclick="hideSystemConfigModal()" class="text-gray-400 hover:text-white">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">キャッシュ設定</label>
+          <select id="cache-setting" class="form-control">
+            <option value="enabled">有効</option>
+            <option value="disabled">無効</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">自動保存間隔 (秒)</label>
+          <input type="number" id="autosave-interval" class="form-control" value="30" min="10" max="300">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">ログレベル</label>
+          <select id="log-level" class="form-control">
+            <option value="info">情報</option>
+            <option value="warn">警告</option>
+            <option value="error">エラーのみ</option>
+          </select>
+        </div>
+        <div class="flex gap-3">
+          <button type="button" onclick="hideSystemConfigModal()" class="btn btn-secondary flex-1">キャンセル</button>
+          <button type="button" onclick="saveSystemConfig()" class="btn btn-primary flex-1">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Security Modal (if referenced but not found) -->
+  <div id="security-modal" class="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
+    <div class="glass-panel rounded-xl p-6 shadow-2xl border-2 border-green-400/80 w-full max-w-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-green-400">セキュリティ情報</h2>
+        <button type="button" onclick="document.getElementById('security-modal').classList.add('hidden')" class="text-gray-400 hover:text-white">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="space-y-4 text-gray-300">
+        <p class="text-sm">このシステムは以下のセキュリティ対策を実装しています：</p>
+        <ul class="text-sm space-y-2 list-disc list-inside">
+          <li>Google サービスアカウント認証</li>
+          <li>JWT トークンベースの認証</li>
+          <li>データの暗号化</li>
+          <li>アクセス制御</li>
+          <li>監査ログ</li>
+        </ul>
+        <div class="flex justify-end">
+          <button type="button" onclick="document.getElementById('security-modal').classList.add('hidden')" class="btn btn-primary">
+            理解しました
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 追加の関数実装
+    function saveFormEdits() {
+      var title = document.getElementById('form-title-input').value;
+      var description = document.getElementById('form-description-input').value;
+      
+      if (!title.trim()) {
+        handleDuplicateMessage('フォームタイトルを入力してください', 'warning');
+        return;
+      }
+      
+      setLoading(true, 'フォーム設定を保存中...');
+      
+      runGas('updateFormSettings', title, description)
+        .then(function(result) {
+          if (result.status === 'success') {
+            handleDuplicateMessage('フォーム設定を保存しました', 'success');
+            hideFormEditModal();
+            loadStatus(true); // 強制リフレッシュ
+          } else {
+            handleDuplicateMessage('フォーム設定の保存に失敗しました', 'error');
+          }
+          setLoading(false);
+        })
+        .catch(function(error) {
+          handleDuplicateMessage('フォーム設定の保存中にエラーが発生しました: ' + error.message, 'error');
+          setLoading(false);
+        });
+    }
+    
+    function saveSystemConfig() {
+      var cacheEnabled = document.getElementById('cache-setting').value === 'enabled';
+      var autosaveInterval = parseInt(document.getElementById('autosave-interval').value);
+      var logLevel = document.getElementById('log-level').value;
+      
+      if (autosaveInterval < 10 || autosaveInterval > 300) {
+        handleDuplicateMessage('自動保存間隔は10秒から300秒の間で設定してください', 'warning');
+        return;
+      }
+      
+      setLoading(true, 'システム設定を保存中...');
+      
+      runGas('saveSystemConfig', {
+        cacheEnabled: cacheEnabled,
+        autosaveInterval: autosaveInterval,
+        logLevel: logLevel
+      })
+        .then(function(result) {
+          if (result.status === 'success') {
+            handleDuplicateMessage('システム設定を保存しました', 'success');
+            hideSystemConfigModal();
+            // 設定を反映
+            if (cacheEnabled) {
+              unifiedCache.clear();
+            }
+          } else {
+            handleDuplicateMessage('システム設定の保存に失敗しました', 'error');
+          }
+          setLoading(false);
+        })
+        .catch(function(error) {
+          handleDuplicateMessage('システム設定の保存中にエラーが発生しました: ' + error.message, 'error');
+          setLoading(false);
+        });
+    }
+  </script>
 
 </body>
 </html>
