@@ -3,7 +3,6 @@
  * GAS HTML Service用の最適化されたクライアント関数群
  */
 
-<?= include('UnifiedStyles'); ?>
 <script>
 /**
  * Google Apps Script最適化クライアントAPI
@@ -185,7 +184,11 @@ window.gasCacheCall = (functionName, args, ttl) => window.gasOptimizer.callWithC
 class MessageManager {
   constructor() {
     this.messageContainer = null;
-    this.init();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => this.init());
+    } else {
+      this.init();
+    }
   }
 
   init() {
