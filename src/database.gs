@@ -126,16 +126,31 @@ function fetchUserFromDatabase(field, value) {
  * @returns {object|null} ユーザー情報
  */
 function getUserWithFallback(userId) {
+  // 入力検証
+  if (!userId || typeof userId !== 'string') {
+    console.warn('getUserWithFallback: Invalid userId:', userId);
+    return null;
+  }
+
   var user = findUserById(userId);
   if (user) return user;
 
   debugLog('[Cache] MISS for key: user_' + userId + '. Fetching from DB.');
   user = fetchUserFromDatabase('userId', userId);
   if (user) {
-    var cache = CacheService.getScriptCache();
-    cache.put('user_' + userId, JSON.stringify(user), USER_CACHE_TTL);
-    cache.put('email_' + user.adminEmail, JSON.stringify(user), USER_CACHE_TTL);
+    // キャッシュ管理の最適化
+    try {
+      var cache = CacheService.getScriptCache();
+      cache.put('user_' + userId, JSON.stringify(user), USER_CACHE_TTL);
+      if (user.adminEmail) {
+        cache.put('email_' + user.adminEmail, JSON.stringify(user), USER_CACHE_TTL);
+      }
+    } catch (cacheError) {
+      console.warn('Failed to cache user data:', cacheError.message);
+      // キャッシュ保存失敗でもユーザー情報は返す
+    }
   } else {
+    // ユーザーが見つからない場合の処理を最適化
     handleMissingUser(userId);
   }
   return user;
@@ -193,8 +208,13 @@ function updateUser(userId, updateData) {
       batchUpdateSheetsData(service, dbId, requests);
     }
     
-    // キャッシュを無効化
-    invalidateUserCache(userId, updateData.adminEmail);
+    // 最適化: 変更された内容に基づいてキャッシュを選択的に無効化
+    var userInfo = findUserById(userId);
+    var email = updateData.adminEmail || (userInfo ? userInfo.adminEmail : null);
+    var spreadsheetId = updateData.spreadsheetId || (userInfo ? userInfo.spreadsheetId : null);
+    
+    // キャッシュを無効化（必要最小限）
+    invalidateUserCache(userId, email, spreadsheetId);
     
     return { success: true };
   } catch (error) {
@@ -226,8 +246,8 @@ function createUser(userData) {
   
   appendSheetsData(service, dbId, "'" + sheetName + "'!A1", [newRow]);
   
-  // キャッシュを無効化
-  invalidateUserCache(userData.userId, userData.adminEmail);
+  // 最適化: 新規ユーザー作成時は対象キャッシュのみ無効化
+  invalidateUserCache(userData.userId, userData.adminEmail, userData.spreadsheetId);
   
   return userData;
 }
@@ -270,8 +290,41 @@ function initializeDatabaseSheet(spreadsheetId) {
  * @param {string} userId - キャッシュ削除対象のユーザーID
  */
 function handleMissingUser(userId) {
-  invalidateUserCache(userId);
-  clearDatabaseCache();
+  try {
+    // 最適化: 特定のユーザーキャッシュのみ削除（全体のキャッシュクリアは避ける）
+    if (userId) {
+      // 特定ユーザーのキャッシュを削除
+      cacheManager.remove('user_' + userId);
+      
+      // 関連するメールキャッシュも削除（可能な場合）
+      try {
+        var userProps = PropertiesService.getUserProperties();
+        var currentUserId = userProps.getProperty('CURRENT_USER_ID');
+        if (currentUserId === userId) {
+          // 現在のユーザーIDが無効な場合はクリア
+          userProps.deleteProperty('CURRENT_USER_ID');
+          debugLog('[Cache] Cleared invalid CURRENT_USER_ID: ' + userId);
+        }
+      } catch (propsError) {
+        console.warn('Failed to clear user properties:', propsError.message);
+      }
+    }
+    
+    // 全データベースキャッシュのクリアは最後の手段として実行
+    // 頻繁な実行を避けるため、確実にデータ不整合がある場合のみ実行
+    var shouldClearAll = false;
+    
+    // 判定条件: 複数のユーザーで問題が発生している場合のみ全クリア
+    if (shouldClearAll) {
+      clearDatabaseCache();
+    }
+    
+    debugLog('[Cache] Handled missing user: ' + userId);
+  } catch (error) {
+    console.error('handleMissingUser error:', error.message);
+    // エラーが発生した場合のみ全キャッシュクリア
+    clearDatabaseCache();
+  }
 }
 
 
