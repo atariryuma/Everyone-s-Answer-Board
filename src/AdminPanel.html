@@ -1896,6 +1896,14 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
+      // 初期ロード状態を表示
+      setLoading(true, '設定を読み込み中...');
+      
+      // タイムアウト設定（20秒）
+      var initTimeoutId = setTimeout(function() {
+        setLoading(false);
+        showMessage('初期設定の読み込みに時間がかかっています。ページを再読み込みしてください。', 'warning');
+      }, 20000);
       // `elements` オブジェクトの定義を修正
 elements = {
   // ... 既存の要素はそのまま ...
@@ -1964,6 +1972,12 @@ elements = {
       
       // システム状況のリアルタイム更新を開始
       startSystemStatusUpdate();
+      
+      // 初期ロード完了後にタイムアウトをクリア
+      setTimeout(function() {
+        clearTimeout(initTimeoutId);
+        setLoading(false);
+      }, 1000);
     });
     // ===== 共通ドメイン情報処理関数 =====
     // AdminPanel.html と Registration.html で共通使用
@@ -2662,33 +2676,47 @@ function populateSheetSelect(sheets, activeSheetName) {
       
       // 全体的なボタンの無効化（安全版）
       if (isLoading) {
-        var dashboardCards = document.querySelectorAll('.glass-panel button, .glass-panel .cursor-pointer');
-        dashboardCards.forEach(function(card) {
-          if (card && card.id !== 'open-form-btn') {
-            if (card.tagName === 'BUTTON') {
-              card.disabled = true;
+        // すべてのユーザーインタラクションを無効化
+        var allInteractiveElements = document.querySelectorAll('button, input, select, textarea, a, .cursor-pointer');
+        allInteractiveElements.forEach(function(element) {
+          if (element && element.id !== 'open-form-btn') {
+            if (element.tagName === 'BUTTON' || element.tagName === 'INPUT' || element.tagName === 'SELECT' || element.tagName === 'TEXTAREA') {
+              element.disabled = true;
+              element.style.opacity = '0.6';
             } else {
-              card.style.pointerEvents = 'none';
-              card.style.opacity = '0.6';
+              element.style.pointerEvents = 'none';
+              element.style.opacity = '0.6';
             }
           }
         });
+        
+        // メインコンテナを無効化
+        var mainContent = document.querySelector('.main-content') || document.body;
+        mainContent.style.pointerEvents = 'none';
+        mainContent.style.userSelect = 'none';
         
         if (message) {
           showLoadingOverlay(message);
         }
       } else {
-        var dashboardCards = document.querySelectorAll('.glass-panel button, .glass-panel .cursor-pointer');
-        dashboardCards.forEach(function(card) {
-          if (card && card.id !== 'open-form-btn') {
-            if (card.tagName === 'BUTTON') {
-              card.disabled = false;
+        // すべてのユーザーインタラクションを有効化
+        var allInteractiveElements = document.querySelectorAll('button, input, select, textarea, a, .cursor-pointer');
+        allInteractiveElements.forEach(function(element) {
+          if (element && element.id !== 'open-form-btn') {
+            if (element.tagName === 'BUTTON' || element.tagName === 'INPUT' || element.tagName === 'SELECT' || element.tagName === 'TEXTAREA') {
+              element.disabled = false;
+              element.style.opacity = '1';
             } else {
-              card.style.pointerEvents = 'auto';
-              card.style.opacity = '1';
+              element.style.pointerEvents = 'auto';
+              element.style.opacity = '1';
             }
           }
         });
+        
+        // メインコンテナを有効化
+        var mainContent = document.querySelector('.main-content') || document.body;
+        mainContent.style.pointerEvents = 'auto';
+        mainContent.style.userSelect = 'auto';
         
         hideLoadingOverlay();
       }
@@ -3581,13 +3609,25 @@ function populateSheetSelect(sheets, activeSheetName) {
     function createBoard() {
       setupBoardCreationUI();
       
+      // タイムアウト設定（60秒）
+      var timeoutId = setTimeout(function() {
+        setLoading(false);
+        showMessage('ボード作成がタイムアウトしました。しばらく待ってから再度お試しください。', 'error');
+      }, 60000);
+      
       google.script.run
-        .withSuccessHandler(handleBoardCreationSuccess)
-        .withFailureHandler(handleBoardCreationError)
+        .withSuccessHandler(function(result) {
+          clearTimeout(timeoutId);
+          handleBoardCreationSuccess(result);
+        })
+        .withFailureHandler(function(error) {
+          clearTimeout(timeoutId);
+          handleBoardCreationError(error);
+        })
         .createBoardFromAdmin();
     }
     
-    // 追加フォーム作成関数
+    // 追加フォーム作成関数（タイムアウト対応版）
     function createAdditionalForm() {
       var btn = document.getElementById('create-additional-form-btn');
       var text = document.getElementById('create-additional-form-text');
@@ -3596,9 +3636,18 @@ function populateSheetSelect(sheets, activeSheetName) {
       if (text) text.textContent = '追加フォームを作成中...';
       setLoading(true, '新しいフォームを作成中...');
       
+      // タイムアウト設定（30秒）
+      var timeoutId = setTimeout(function() {
+        setLoading(false);
+        if (btn) btn.disabled = false;
+        if (text) text.textContent = '追加のフォームを作成';
+        showMessage('フォーム作成がタイムアウトしました。しばらく待ってから再度お試しください。', 'error');
+      }, 30000);
+      
       google.script.run
         .withSuccessHandler(function(result) {
           try {
+            clearTimeout(timeoutId);
             setLoading(false);
             if (btn) btn.disabled = false;
             if (text) text.textContent = '追加のフォームを作成';
@@ -3617,6 +3666,7 @@ function populateSheetSelect(sheets, activeSheetName) {
               showMessage(result.message || '追加フォームの作成に失敗しました', 'error');
             }
           } catch (e) {
+            clearTimeout(timeoutId);
             showMessage('追加フォームの作成中にエラーが発生しました', 'error');
             setLoading(false);
             if (btn) btn.disabled = false;
@@ -3624,6 +3674,7 @@ function populateSheetSelect(sheets, activeSheetName) {
           }
         })
         .withFailureHandler(function(error) {
+          clearTimeout(timeoutId);
           setLoading(false);
           if (btn) btn.disabled = false;
           if (text) text.textContent = '追加のフォームを作成';

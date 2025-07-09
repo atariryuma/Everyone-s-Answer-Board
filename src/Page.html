@@ -1008,6 +1008,15 @@ class StudyQuestApp {
     this.init();
   }
   init() {
+      // 初期ロード状態を表示
+      this.showLoadingOverlay();
+      
+      // タイムアウト設定（15秒）
+      this.initTimeoutId = setTimeout(() => {
+        this.hideLoadingOverlay();
+        console.warn('ページの初期化に時間がかかっています。ページを再読み込みしてください。');
+      }, 15000);
+      
       // Critical path only - non-blocking
       this.setupCriticalElements();
       this.showMinimalSkeleton();
@@ -1897,12 +1906,40 @@ setupEventDelegation() {
     if (this.elements.loadingOverlay) {
       this.elements.loadingOverlay.classList.remove('hidden');
     }
+    
+    // すべてのユーザーインタラクションを無効化
+    var allInteractiveElements = document.querySelectorAll('button, input, select, textarea, a, .cursor-pointer, .answer-card');
+    allInteractiveElements.forEach(function(element) {
+      if (element) {
+        element.style.pointerEvents = 'none';
+        element.style.opacity = '0.6';
+      }
+    });
+    
+    // メインコンテナを無効化
+    var mainContent = document.querySelector('#main-container') || document.body;
+    mainContent.style.pointerEvents = 'none';
+    mainContent.style.userSelect = 'none';
   }
 
   hideLoadingOverlay() {
     if (this.elements.loadingOverlay) {
       this.elements.loadingOverlay.classList.add('hidden');
     }
+    
+    // すべてのユーザーインタラクションを有効化
+    var allInteractiveElements = document.querySelectorAll('button, input, select, textarea, a, .cursor-pointer, .answer-card');
+    allInteractiveElements.forEach(function(element) {
+      if (element) {
+        element.style.pointerEvents = 'auto';
+        element.style.opacity = '1';
+      }
+    });
+    
+    // メインコンテナを有効化
+    var mainContent = document.querySelector('#main-container') || document.body;
+    mainContent.style.pointerEvents = 'auto';
+    mainContent.style.userSelect = 'auto';
   }
 
   async loadSheetData(showLoading = true, isInitialLoad = false, requestedSheetName = null) {
@@ -1936,6 +1973,12 @@ setupEventDelegation() {
       
       google.script.run
         .withSuccessHandler(result => {
+          // 初期ロードタイムアウトをクリア
+          if (isInitialLoad && this.initTimeoutId) {
+            clearTimeout(this.initTimeoutId);
+            this.initTimeoutId = null;
+          }
+          
           if (!result || !result.data || result.data.length === 0) {
             this.displayEmptyState();
             if (isInitialLoad) {
@@ -1958,6 +2001,12 @@ setupEventDelegation() {
           this.renderBoard(false);
         })
         .withFailureHandler(error => {
+          // 初期ロードタイムアウトをクリア
+          if (isInitialLoad && this.initTimeoutId) {
+            clearTimeout(this.initTimeoutId);
+            this.initTimeoutId = null;
+          }
+          
           console.error('Error loading sheet data:', error);
           this.displayEmptyState();
         })

@@ -316,6 +316,7 @@ function saveConfig(sheetName, config) {
  * @returns {object} 最新のステータス
  */
 function activateSheet(spreadsheetId, sheetName) {
+  const startTime = Date.now();
   try {
     if (typeof spreadsheetId !== 'string' || !spreadsheetId) {
       throw new Error('無効なspreadsheetIdです。スプレッドシートIDは必須です。');
@@ -326,29 +327,40 @@ function activateSheet(spreadsheetId, sheetName) {
 
     console.log('activateSheet開始: sheetName=%s', sheetName);
 
-    // 関連キャッシュをクリア
+    // 最適化: 一度だけユーザー情報を取得してキャッシュクリア
     const props = PropertiesService.getUserProperties();
     const currentUserId = props.getProperty('CURRENT_USER_ID');
     if (currentUserId) {
+      // ユーザー情報を一度だけ取得してキャッシュ
       const userInfo = findUserById(currentUserId);
       if (userInfo) {
-        invalidateUserCache(currentUserId, userInfo.adminEmail, spreadsheetId);
-        console.log('activateSheet: キャッシュクリア完了');
+        // 最小限のキャッシュクリア（スプレッドシート関連のみ）
+        const keysToRemove = [
+          'config_v3_' + currentUserId + '_' + sheetName,
+          'sheets_' + spreadsheetId,
+          'data_' + spreadsheetId
+        ];
+        keysToRemove.forEach(key => cacheManager.remove(key));
+        console.log('activateSheet: 最小限キャッシュクリア完了');
       }
     }
 
-    // シートをアクティブ化
-    switchToSheet(spreadsheetId, sheetName);
+    // シートをアクティブ化（効率化）
+    const switchResult = switchToSheet(spreadsheetId, sheetName);
     console.log('activateSheet: シート切り替え完了');
 
-    // 最新のステータスを取得
-    const finalStatus = getStatus(true);
+    // 最新のステータスを取得（キャッシュ活用）
+    const finalStatus = getStatus(false);
     console.log('activateSheet: 公開処理完了');
 
+    const executionTime = Date.now() - startTime;
+    console.log('activateSheet完了: 実行時間 %dms', executionTime);
+    
     return finalStatus;
 
   } catch (error) {
-    console.error('activateSheetで致命的なエラー:', error.message, error.stack);
+    const executionTime = Date.now() - startTime;
+    console.error('activateSheetで致命的なエラー (実行時間: %dms):', executionTime, error.message, error.stack);
     throw new Error('シートの公開中にサーバーエラーが発生しました: ' + error.message);
   }
 }
