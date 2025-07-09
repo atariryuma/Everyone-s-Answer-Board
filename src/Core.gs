@@ -782,31 +782,6 @@ function toggleHighlight(rowIndex, sheetName) {
   }
 }
 
-/**
- * 管理者権限の確認
- * Page.htmlから呼び出される
- */
-function checkAdmin() {
-  try {
-    var props = PropertiesService.getUserProperties();
-    var currentUserId = props.getProperty('CURRENT_USER_ID');
-    
-    if (!currentUserId) {
-      return false;
-    }
-    
-    var userInfo = getUserWithFallback(currentUserId);
-    if (!userInfo) {
-      return false;
-    }
-    
-    var activeUser = Session.getActiveUser().getEmail();
-    return activeUser === userInfo.adminEmail;
-  } catch (e) {
-    console.error('管理者確認エラー: ' + e.message);
-    return false;
-  }
-}
 
 
 /**
@@ -1043,14 +1018,6 @@ function getWebAppUrl() {
   return getWebAppUrlCached();
 }
 
-// Legacy wrapper functions - これらの関数は実際の実装がDatabaseManager.gsとUrlManager.gsに移動されました
-function createUserInDb(userData) {
-  return createUser(userData);
-}
-
-function updateUserInDb(userId, updateData) {
-  return updateUser(userId, updateData);
-}
 
 function getHeaderIndices(spreadsheetId, sheetName) {
   debugLog('getHeaderIndices received in core.gs: spreadsheetId=%s, sheetName=%s', spreadsheetId, sheetName);
@@ -1920,42 +1887,7 @@ function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
 // 追加のコアファンクション（Code.gsから移行）
 // =================================================================
 
-/**
- * スプレッドシートが開かれた際に実行される
- */
-function onOpen() {
-  try {
-    var ui = SpreadsheetApp.getUi();
-    ui.createMenu('📋 みんなの回答ボード')
-      .addItem('📊 管理パネルを開く', 'showAdminSidebar')
-      .addSeparator()
-      .addItem('🔄 キャッシュをクリア', 'clearAllCaches')
-      .addItem('📝 名簿キャッシュをクリア', 'clearRosterCache')
-      .addToUi();
-  } catch (e) {
-    console.error('メニュー作成エラー: ' + e.message);
-  }
-}
 
-/**
- * 監査ログを記録
- * @param {string} action - 実行されたアクション
- * @param {string} userId - ユーザーID
- * @param {object} details - 詳細情報
- */
-function auditLog(action, userId, details) {
-  try {
-    var props = PropertiesService.getScriptProperties();
-    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    if (!dbId) return;
-
-    var service = getSheetsService();
-    var range = LOG_SHEET_CONFIG.SHEET_NAME + '!A:D';
-    appendSheetsData(service, dbId, range, [[new Date().toISOString(), userId, action, JSON.stringify(details || {})]]);
-  } catch (e) {
-    console.error('監査ログ記録エラー: ' + e.message);
-  }
-}
 
 /**
  * 回答ボードのデータを強制的に再読み込み
@@ -1971,49 +1903,12 @@ function refreshBoardData() {
   }
 }
 
-/**
- * 管理サイドバーを表示
- */
-function showAdminSidebar() {
-  try {
-    var template = HtmlService.createTemplateFromFile('AdminSidebar');
-    var html = template.evaluate()
-      .setTitle('みんなの回答ボード - 管理パネル')
-      .setWidth(400);
-    safeSetXFrameOptionsDeny(html);
 
-    SpreadsheetApp.getUi().showSidebar(html);
-  } catch (e) {
-    console.error('管理サイドバー表示エラー: ' + e.message);
-    SpreadsheetApp.getUi().alert('管理パネルの表示に失敗しました: ' + e.message);
-  }
-}
-
-/**
- * 名簿キャッシュをクリア
- */
-function clearRosterCache() {
-  try {
-    // CacheManagerを使用してキャッシュクリア
-    cacheManager.clearByPattern('roster');
-    debugLog('名簿キャッシュをクリアしました');
-  } catch (e) {
-    console.error('名簿キャッシュクリアエラー: ' + e.message);
-  }
-}
 
 // =================================================================
 // ユーティリティ関数
 // =================================================================
 
-/**
- * メールアドレスの妥当性をチェック
- * @param {string} email - チェックするメールアドレス
- * @returns {boolean} 妥当な場合true
- */
-function isValidEmail(email) {
-  return EMAIL_REGEX.test(email);
-}
 
 /**
  * メールアドレスからドメインを抽出

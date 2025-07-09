@@ -5,11 +5,11 @@
 
 /**
  * HTML ファイルを読み込む include ヘルパー
- * @param {string} path client/ からの相対パス
+ * @param {string} path ファイルパス
  * @return {string} HTML content
  */
 function include(path) {
-  const tmpl = HtmlService.createTemplateFromFile('client/' + path);
+  const tmpl = HtmlService.createTemplateFromFile(path);
   tmpl.include = include;
   return tmpl.evaluate().getContent();
 }
@@ -206,36 +206,6 @@ function getDeployUserDomainInfo() {
   }
 }
 
-function performSimpleCleanup() {
-  try {
-    // 期限切れPropertiesServiceエントリの削除
-    // スプレッドシートの共有設定をチェック
-    var sharingCheck = checkSpreadsheetSharingPermission(dbId);
-    if (sharingCheck.status === 'error') {
-      throw new Error(sharingCheck.message);
-    }
-
-    var props = PropertiesService.getScriptProperties();
-    var allProps = props.getProperties();
-    var now = Date.now();
-    
-    Object.keys(allProps).forEach(function(key) {
-      if (key.startsWith('CACHE_')) {
-        try {
-          var data = JSON.parse(allProps[key]);
-          if (data.expiresAt && data.expiresAt < now) {
-            props.deleteProperty(key);
-          }
-        } catch (e) {
-          // 無効なデータは削除
-          props.deleteProperty(key);
-        }
-      }
-    });
-  } catch (e) {
-    console.warn('Cleanup failed:', e.message);
-  }
-}
 
 // PerformanceOptimizer.gsでglobalProfilerが既に定義されているため、
 // フォールバックの宣言は不要
@@ -246,22 +216,6 @@ function performSimpleCleanup() {
  * @param {string} spreadsheetId データベースのスプレッドシートID
  * @return {boolean} 登録されていればtrue
  */
-function isUserRegistered(email, spreadsheetId) {
-  try {
-    if (!email || !spreadsheetId) {
-      return false;
-    }
-    
-    // findUserByEmail関数を使用してユーザーを検索
-    var userInfo = findUserByEmail(email);
-    return !!userInfo; // userInfoが存在すればtrue、存在しなければfalse
-    
-  } catch(e) {
-    console.error(`ユーザー登録確認中にエラー: ${e.message}`);
-    // エラー時は安全のため「未登録」として扱う
-    return false;
-  }
-}
 
 /**
  * システムの初期セットアップが完了しているかを確認するヘルパー関数
@@ -276,7 +230,7 @@ function isSystemSetup() {
  * 登録ページを表示する関数
  */
 function showRegistrationPage() {
-  var output = HtmlService.createTemplateFromFile('client/views/Registration')
+  var output = HtmlService.createTemplateFromFile('Registration')
     .evaluate()
     .setTitle('新規ユーザー登録 - StudyQuest');
   return safeSetXFrameOptionsDeny(output);
@@ -320,7 +274,7 @@ function doGet(e) {
     // 1. システムの初期セットアップが完了しているか確認（Page.html直接アクセス時は除く）
     if (!isSystemSetup() && !isDirectPageAccess) {
       console.log('DEBUG: System not set up. Redirecting to SetupPage.');
-      var setupHtml = HtmlService.createTemplateFromFile('client/views/SetupPage')
+      var setupHtml = HtmlService.createTemplateFromFile('SetupPage')
         .evaluate()
         .setTitle('初回セットアップ - StudyQuest');
       console.log('DEBUG: Serving SetupPage HTML');
@@ -330,7 +284,7 @@ function doGet(e) {
     // セットアップページの明示的な表示要求
     if (setupParam === 'true') {
       console.log('DEBUG: Explicit setup request. Redirecting to SetupPage.');
-      var explicitHtml = HtmlService.createTemplateFromFile('client/views/SetupPage')
+      var explicitHtml = HtmlService.createTemplateFromFile('SetupPage')
         .evaluate()
         .setTitle('StudyQuest - サービスアカウント セットアップ');
       console.log('DEBUG: Serving explicit SetupPage HTML');
@@ -372,7 +326,7 @@ function doGet(e) {
       // Page.html直接アクセス時は、パラメータ指定されたページを表示
       if (isDirectPageAccess) {
         console.log('DEBUG: Direct page access detected. Showing specified page.');
-        const template = HtmlService.createTemplateFromFile('client/views/Page.html');
+        const template = HtmlService.createTemplateFromFile('Page');
 
         try {
           const config = JSON.parse(userInfo.configJson || '{}');
@@ -382,10 +336,6 @@ function doGet(e) {
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
-<<<<<<< HEAD
-          template.sheetName = config.publishedSheetName || sheetName;
-          template.opinionHeader = escapeJavaScript(sheetConfig.opinionHeader || config.publishedSheetName || 'お題');
-=======
           template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
           const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
           
@@ -395,7 +345,6 @@ function doGet(e) {
           template.opinionHeaderEncoded = true; // フラグを設定
           template.cacheTimestamp = Date.now(); // キャッシュバスター
           
->>>>>>> origin/main
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
@@ -412,7 +361,9 @@ function doGet(e) {
           });
 
         } catch (e) {
-          template.opinionHeader = escapeJavaScript('お題の読込エラー');
+          template.opinionHeader = Utilities.base64Encode('お題の読込エラー');
+          template.opinionHeaderEncoded = true;
+          template.cacheTimestamp = Date.now();
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
@@ -435,7 +386,7 @@ function doGet(e) {
       if (mode === 'admin') {
         // 明示的な管理パネル要求
         console.log('DEBUG: Explicit admin mode request. Showing AdminPanel.');
-        var adminTemplate = HtmlService.createTemplateFromFile('client/views/AdminPanel');
+        var adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
         adminTemplate.userInfo = userInfo;
         adminTemplate.userId = userInfo.userId;
         adminTemplate.mode = mode;
@@ -457,7 +408,7 @@ function doGet(e) {
       if (mode === 'view' && isPublished) {
         // 明示的な回答ボード表示要求（公開済みの場合のみ）
         console.log('DEBUG: Explicit view mode request for published board. Showing Page.');
-        const template = HtmlService.createTemplateFromFile('client/views/Page.html');
+        const template = HtmlService.createTemplateFromFile('Page');
         
         try {
           const config = JSON.parse(userInfo.configJson || '{}');
@@ -467,10 +418,6 @@ function doGet(e) {
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
-<<<<<<< HEAD
-          template.sheetName = config.publishedSheetName || sheetName;
-          template.opinionHeader = escapeJavaScript(sheetConfig.opinionHeader || config.publishedSheetName || 'お題');
-=======
           template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
           const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
           
@@ -480,20 +427,15 @@ function doGet(e) {
           template.opinionHeaderEncoded = true; // フラグを設定
           template.cacheTimestamp = Date.now(); // キャッシュバスター
           
->>>>>>> origin/main
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
           template.isAdminUser = false; // Page.html is for public view, not admin
 
         } catch (e) {
-<<<<<<< HEAD
-          template.opinionHeader = escapeJavaScript('お題の読込エラー');
-=======
           template.opinionHeader = Utilities.base64Encode('お題の読込エラー');
           template.opinionHeaderEncoded = true;
           template.cacheTimestamp = Date.now();
->>>>>>> origin/main
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
           template.ownerName = userInfo.adminEmail;
@@ -512,7 +454,7 @@ function doGet(e) {
       // デフォルト：パラメータなしのアクセスは管理パネルへ
       // (modeのデフォルトが'admin'になったため、このルートが正しく機能する)
       console.log('DEBUG: Default access - user registered. Redirecting to admin panel.');
-      var adminTemplate = HtmlService.createTemplateFromFile('client/views/AdminPanel');
+      var adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
       adminTemplate.userInfo = userInfo;
       adminTemplate.userId = userInfo.userId;
       adminTemplate.mode = 'admin';
@@ -542,139 +484,19 @@ function doGet(e) {
   }
 }
 
-/**
- * HTMLエンコードを行うヘルパー関数
- * @param {string} str - エンコードする文字列
- * @returns {string} エンコードされた文字列
- */
-function htmlEncode(str) {
-  if (typeof str !== 'string') return '';
-  return str.replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-}
 
 /**
  * JavaScript エスケープのテスト関数
  */
-function testJavaScriptEscaping() {
-  const testString = '今日のテーマについて、あなたの考えや意見を聞かせてください';
-  const escaped = escapeJavaScript(testString);
-  console.log('Original:', testString);
-  console.log('Escaped:', escaped);
-  return {
-    original: testString,
-    escaped: escaped,
-    success: escaped !== testString
-  };
-}
 
 /**
  * パフォーマンス監視エンドポイント（簡易版）
  */
-function getPerformanceMetrics() {
-  try {
-    var metrics = {};
-    
-    // プロファイラー情報
-    if (typeof globalProfiler !== 'undefined') {
-      metrics.profiler = globalProfiler.getReport();
-    }
-    
-    // キャッシュ健康状態
-    metrics.cache = cacheManager.getHealth();
-    
-    // 基本システム情報
-    metrics.system = {
-      timestamp: Date.now(),
-      status: 'running'
-    };
-    
-    return metrics;
-  } catch (e) {
-    return {
-      error: e.message,
-      timestamp: Date.now()
-    };
-  }
-}
 
 /**
  * escapeJavaScript関数のテスト
  */
-function testEscapeJavaScript() {
-  const testCases = [
-    '今日のテーマについて、あなたの考えや意見を聞かせてください',
-    'Simple text',
-    'Text with "quotes"',
-    'Text with \'single quotes\'',
-    'Text with : colon',
-    'Text with\nnewline',
-    'Text with\ttab',
-    ''
-  ];
-  
-  const results = [];
-  
-  testCases.forEach(testCase => {
-    try {
-      const escaped = escapeJavaScript(testCase);
-      results.push({
-        original: testCase,
-        escaped: escaped,
-        success: true
-      });
-    } catch (e) {
-      results.push({
-        original: testCase,
-        error: e.message,
-        success: false
-      });
-    }
-  });
-  
-  console.log('escapeJavaScript test results:', results);
-  return results;
-}
 
 /**
  * Base64エンコード/デコードのテスト
  */
-function testBase64Encoding() {
-  const testCases = [
-    '今日のテーマについて、あなたの考えや意見を聞かせてください',
-    'Simple text',
-    'Text with "quotes"',
-    'Text with \'single quotes\'',
-    'Text with : colon',
-    'お題'
-  ];
-  
-  const results = [];
-  
-  testCases.forEach(testCase => {
-    try {
-      const encoded = Utilities.base64Encode(testCase);
-      console.log(`Original: ${testCase}`);
-      console.log(`Encoded: ${encoded}`);
-      console.log(`Decoded: ${Utilities.base64Decode(encoded)}`);
-      
-      results.push({
-        original: testCase,
-        encoded: encoded,
-        success: true
-      });
-    } catch (e) {
-      results.push({
-        original: testCase,
-        error: e.message,
-        success: false
-      });
-    }
-  });
-  
-  console.log('Base64 encoding test results:', results);
-  return results;
-}

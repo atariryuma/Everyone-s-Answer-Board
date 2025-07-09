@@ -100,10 +100,3 @@ function generateAppUrls(userId) {
   }
 }
 
-/**
- * URLキャッシュをクリア
- */
-function clearUrlCache() {
-  cacheManager.remove(URL_CACHE_KEY);
-  debugLog('URLキャッシュをクリアしました。');
-}

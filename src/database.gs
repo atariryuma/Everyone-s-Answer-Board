@@ -274,14 +274,6 @@ function handleMissingUser(userId) {
   clearDatabaseCache();
 }
 
-/**
- * 全キャッシュをクリア
- */
-function clearDatabaseCache() {
-  cacheManager.clearExpired();
-  PropertiesService.getUserProperties().deleteProperty('CURRENT_USER_ID');
-  debugLog('データベース関連キャッシュをクリアしました');
-}
 
 // =================================================================
 // 最適化されたSheetsサービス関数群

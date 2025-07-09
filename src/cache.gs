@@ -117,12 +117,20 @@ class CacheManager {
    * @param {string} pattern - 削除するキーのパターン（部分一致）
    */
   clearByPattern(pattern) {
-    // この機能はCacheServiceにネイティブサポートされていないため、
-    // 全てのキーを取得してフィルタリングする必要があります。大規模なキャッシュではパフォーマンスに影響する可能性があります。
-    // 現在の実装では、特定のキーを直接削除するアプローチを推奨します。
-    // 今回は前方互換性のために、特定のキーを削除するラッパーとして実装します。
-    this.remove(pattern);
-    console.warn(`[Cache] clearByPattern was called. For better performance, use direct key removal. Key removed: ${pattern}`);
+    // メモ化キャッシュから一致するキーを削除
+    const keysToRemove = [];
+    for (const key of this.memoCache.keys()) {
+      if (key.includes(pattern)) {
+        keysToRemove.push(key);
+      }
+    }
+    
+    keysToRemove.forEach(key => {
+      this.memoCache.delete(key);
+      this.scriptCache.remove(key);
+    });
+    
+    debugLog(`[Cache] Cleared ${keysToRemove.length} cache entries matching pattern: ${pattern}`);
   }
 
   /**
@@ -162,9 +170,6 @@ if (typeof global !== 'undefined') {
 /**
  * @deprecated cacheManager.get() を使用してください
  */
-function getUserCached(userId) {
-  return cacheManager.get(`user_${userId}`, () => findUserById(userId), { enableMemoization: true });
-}
 
 /**
  * ヘッダーインデックスをキャッシュ付きで取得
@@ -243,27 +248,30 @@ function getHeadersCached(spreadsheetId, sheetName) {
  * @param {string} [spreadsheetId] - 関連スプレッドシートID
  */
 function invalidateUserCache(userId, email, spreadsheetId) {
+  const keysToRemove = [];
+  
   if (userId) {
-    cacheManager.remove('user_' + userId);
+    keysToRemove.push('user_' + userId);
   }
   if (email) {
-    cacheManager.remove('email_' + email);
+    keysToRemove.push('email_' + email);
   }
+  if (spreadsheetId) {
+    // スプレッドシートIDを含むキーを削除
+    keysToRemove.push('hdr_' + spreadsheetId);
+    keysToRemove.push('data_' + spreadsheetId);
+    keysToRemove.push('sheets_' + spreadsheetId);
+  }
+  
+  keysToRemove.forEach(key => {
+    cacheManager.remove(key);
+  });
+  
+  // さらに包括的なパターンマッチングが必要な場合
   if (spreadsheetId) {
     cacheManager.clearByPattern(spreadsheetId);
   }
+  
+  debugLog(`[Cache] Invalidated user cache for userId: ${userId}, email: ${email}, spreadsheetId: ${spreadsheetId}`);
 }
 
-/**
- * @deprecated cacheManager.get() を使用してください
- */
-function getWebAppUrlCached() {
-  return cacheManager.get('WEB_APP_URL', () => {
-    try {
-      const url = ScriptApp.getService().getUrl();
-      return url ? (url.endsWith('/') ? url.slice(0, -1) : url) : '';
-    } catch (e) {
-      return '';
-    }
-  });
-}
