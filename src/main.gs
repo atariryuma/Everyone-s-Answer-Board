@@ -339,10 +339,8 @@ function doGet(e) {
           template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
           const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
           
-          // Base64エンコードでテンプレート変数の問題を回避
-          const opinionHeaderBase64 = Utilities.base64Encode(rawOpinionHeader);
-          template.opinionHeader = opinionHeaderBase64;
-          template.opinionHeaderEncoded = true; // フラグを設定
+          // 直接rawOpinionHeaderを使用（Base64エンコード削除）
+          template.opinionHeader = escapeJavaScript(rawOpinionHeader);
           template.cacheTimestamp = Date.now(); // キャッシュバスター
           
           template.displayMode = config.displayMode || 'anonymous';
@@ -354,15 +352,13 @@ function doGet(e) {
           console.log('Template variables for direct page access:', {
             sheetName: template.sheetName,
             opinionHeader: template.opinionHeader,
-            opinionHeaderBase64: opinionHeaderBase64,
             rawOpinionHeader: rawOpinionHeader,
             displayMode: template.displayMode,
             cacheTimestamp: template.cacheTimestamp
           });
 
         } catch (e) {
-          template.opinionHeader = Utilities.base64Encode('お題の読込エラー');
-          template.opinionHeaderEncoded = true;
+          template.opinionHeader = escapeJavaScript('お題の読込エラー');
           template.cacheTimestamp = Date.now();
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
@@ -421,10 +417,8 @@ function doGet(e) {
           template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
           const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
           
-          // Base64エンコードでテンプレート変数の問題を回避
-          const opinionHeaderBase64 = Utilities.base64Encode(rawOpinionHeader);
-          template.opinionHeader = opinionHeaderBase64;
-          template.opinionHeaderEncoded = true; // フラグを設定
+          // 直接rawOpinionHeaderを使用（Base64エンコード削除）
+          template.opinionHeader = escapeJavaScript(rawOpinionHeader);
           template.cacheTimestamp = Date.now(); // キャッシュバスター
           
           template.displayMode = config.displayMode || 'anonymous';
@@ -433,8 +427,7 @@ function doGet(e) {
           template.isAdminUser = false; // Page.html is for public view, not admin
 
         } catch (e) {
-          template.opinionHeader = Utilities.base64Encode('お題の読込エラー');
-          template.opinionHeaderEncoded = true;
+          template.opinionHeader = escapeJavaScript('お題の読込エラー');
           template.cacheTimestamp = Date.now();
           template.userId = userInfo.userId;
           template.spreadsheetId = userInfo.spreadsheetId;
