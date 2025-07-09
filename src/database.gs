@@ -352,14 +352,26 @@ function createSheetsService(accessToken) {
  * @returns {object} レスポンス
  */
 function batchGetSheetsData(service, spreadsheetId, ranges) {
-  var url = service.baseUrl + '/' + spreadsheetId + '/values:batchGet?' + 
-    ranges.map(function(range) { return 'ranges=' + encodeURIComponent(range); }).join('&');
-  
-  var response = UrlFetchApp.fetch(url, {
-    headers: { 'Authorization': 'Bearer ' + service.accessToken }
-  });
-  
-  return JSON.parse(response.getContentText());
+  try {
+    var url = service.baseUrl + '/' + spreadsheetId + '/values:batchGet?' + 
+      ranges.map(function(range) { return 'ranges=' + encodeURIComponent(range); }).join('&');
+    
+    var response = UrlFetchApp.fetch(url, {
+      headers: { 'Authorization': 'Bearer ' + service.accessToken },
+      muteHttpExceptions: true,
+      followRedirects: true,
+      validateHttpsCertificates: true
+    });
+    
+    if (response.getResponseCode() !== 200) {
+      throw new Error('Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText());
+    }
+    
+    return JSON.parse(response.getContentText());
+  } catch (error) {
+    console.error('batchGetSheetsData error:', error.message);
+    throw new Error('データ取得に失敗しました: ' + error.message);
+  }
 }
 
 /**
@@ -370,19 +382,31 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
  * @returns {object} レスポンス
  */
 function batchUpdateSheetsData(service, spreadsheetId, requests) {
-  var url = service.baseUrl + '/' + spreadsheetId + '/values:batchUpdate';
-  
-  var response = UrlFetchApp.fetch(url, {
-    method: 'post',
-    contentType: 'application/json',
-    headers: { 'Authorization': 'Bearer ' + service.accessToken },
-    payload: JSON.stringify({
-      data: requests,
-      valueInputOption: 'RAW'
-    })
-  });
-  
-  return JSON.parse(response.getContentText());
+  try {
+    var url = service.baseUrl + '/' + spreadsheetId + '/values:batchUpdate';
+    
+    var response = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'Authorization': 'Bearer ' + service.accessToken },
+      payload: JSON.stringify({
+        data: requests,
+        valueInputOption: 'RAW'
+      }),
+      muteHttpExceptions: true,
+      followRedirects: true,
+      validateHttpsCertificates: true
+    });
+    
+    if (response.getResponseCode() !== 200) {
+      throw new Error('Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText());
+    }
+    
+    return JSON.parse(response.getContentText());
+  } catch (error) {
+    console.error('batchUpdateSheetsData error:', error.message);
+    throw new Error('データ更新に失敗しました: ' + error.message);
+  }
 }
 
 /**
@@ -414,11 +438,24 @@ function appendSheetsData(service, spreadsheetId, range, values) {
  * @returns {object} スプレッドシート情報
  */
 function getSpreadsheetsData(service, spreadsheetId) {
-  var url = service.baseUrl + '/' + spreadsheetId;
-  var response = UrlFetchApp.fetch(url, {
-    headers: { 'Authorization': 'Bearer ' + service.accessToken }
-  });
-  return JSON.parse(response.getContentText());
+  try {
+    var url = service.baseUrl + '/' + spreadsheetId;
+    var response = UrlFetchApp.fetch(url, {
+      headers: { 'Authorization': 'Bearer ' + service.accessToken },
+      muteHttpExceptions: true,
+      followRedirects: true,
+      validateHttpsCertificates: true
+    });
+    
+    if (response.getResponseCode() !== 200) {
+      throw new Error('Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText());
+    }
+    
+    return JSON.parse(response.getContentText());
+  } catch (error) {
+    console.error('getSpreadsheetsData error:', error.message);
+    throw new Error('スプレッドシート情報取得に失敗しました: ' + error.message);
+  }
 }
 
 /**

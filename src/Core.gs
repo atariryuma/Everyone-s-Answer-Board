@@ -794,10 +794,16 @@ function getAvailableSheets() {
     var currentUserId = props.getProperty('CURRENT_USER_ID');
     
     if (!currentUserId) {
-      throw new Error('ユーザーコンテキストが設定されていません');
+      console.warn('getAvailableSheets: No current user ID set');
+      return [];
     }
     
     var sheets = getSheetsList(currentUserId);
+    
+    if (!sheets || sheets.length === 0) {
+      console.warn('getAvailableSheets: No sheets found for user:', currentUserId);
+      return [];
+    }
     
     // Page.html期待形式に変換: [{name: string}]
     return sheets.map(function(sheet) {
@@ -806,7 +812,8 @@ function getAvailableSheets() {
       };
     });
   } catch (e) {
-    console.error('シート一覧取得エラー: ' + e.message);
+    console.error('getAvailableSheets エラー: ' + e.message);
+    console.error('Error details:', e.stack);
     return [];
   }
 }
@@ -1594,11 +1601,22 @@ function getSheetsList(userId) {
   try {
     var userInfo = findUserById(userId);
     if (!userInfo) {
+      console.warn('getSheetsList: User not found:', userId);
+      return [];
+    }
+    
+    if (!userInfo.spreadsheetId) {
+      console.warn('getSheetsList: No spreadsheet ID for user:', userId);
       return [];
     }
     
     var service = getSheetsService();
     var spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
+    
+    if (!spreadsheet || !spreadsheet.sheets) {
+      console.warn('getSheetsList: Invalid spreadsheet data:', spreadsheet);
+      return [];
+    }
     
     return spreadsheet.sheets.map(function(sheet) {
       return {
@@ -1608,6 +1626,7 @@ function getSheetsList(userId) {
     });
   } catch (e) {
     console.error('シート一覧取得エラー: ' + e.message);
+    console.error('Error details:', e.stack);
     return [];
   }
 }
