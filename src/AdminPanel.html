@@ -1177,7 +1177,7 @@
     }
     
     // Check for duplicate messages and highlight if found
-    function handleDuplicateMessage(messageArea, message) {
+    function checkDuplicateMessage(messageArea, message) {
       var existingMessages = Array.from(messageArea.children);
       for (var i = 0; i < existingMessages.length; i++) {
         var existing = existingMessages[i];
@@ -1267,7 +1267,7 @@
         if (!messageArea) return;
         
         // Check for duplicates
-        if (handleDuplicateMessage(messageArea, message)) {
+        if (checkDuplicateMessage(messageArea, message)) {
           return;
         }
         
