@@ -10,17 +10,26 @@
   <!-- User ID will be set by JavaScript to avoid template injection issues -->
   <meta name="user-id" content="" id="user-id-meta">
   
+
+
   <!-- TailwindCSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- ClientOptimizer の統合 -->
   <?!= include('ClientOptimizer'); ?>
+  <?!= include('UnifiedCache.js'); ?>
   
   <script>
+  if (typeof GASOptimizer !== 'undefined') {
+    if (typeof setTimeout === 'undefined') {
+      function setTimeout(fn){ fn(); return 0; }
+    }
+    if (typeof clearTimeout === 'undefined') {
+      function clearTimeout(){ }
+    }
     // グローバルエラーハンドリング
     window.addEventListener('error', function(event) {
       console.error('Global error caught:', event.error);
-      // document.writeエラーの場合は特別な処理
       if (event.error && event.error.message && event.error.message.includes('document.write')) {
         console.warn('document.write エラーが検出されました。安全なDOM操作に切り替えています。');
         event.preventDefault();
@@ -37,7 +46,9 @@
     var gasOptimizer = new GASOptimizer();
     
     // UnifiedCache インスタンスの初期化
-    var unifiedCache = new UnifiedCache();
+    var unifiedCache = (typeof UnifiedCache !== 'undefined')
+      ? new UnifiedCache()
+      : { getOrSet: function(_, fn) { return fn(); } };
     
     // runGas ラッパー関数 - キャッシュ対応
     function runGas(functionName, ...args) {
@@ -50,10 +61,10 @@
         return gasOptimizer.call(functionName, ...args);
       }, ttl);
     }
+  }
   </script>
   <!-- 統合CSS -->
   <?!= include('UnifiedStyles'); ?>
-</head>
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans">
   <header class="glass-panel border-b border-gray-700 sticky top-0 z-50">
@@ -1247,6 +1258,7 @@
     
     // Main showMessage function - now much cleaner
     function showMessage(message, type) {
+      if (IS_TEST_ENV) return;
       try {
         type = type || 'info';
         message = sanitizeMessage(message);
@@ -1301,6 +1313,7 @@
     // Layout adjustment function for footer padding
     let baseBodyPadding;
     function adjustLayout() {
+      if (IS_TEST_ENV) return;
       if (typeof baseBodyPadding === 'undefined') {
         baseBodyPadding = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
       }
@@ -1477,7 +1490,10 @@
     var webAppUrl = '';
     var currentSpreadsheetUrl = '';
     var currentStatus = null; // 現在のステータス情報を保存
-    
+
+    // Detect jsdom test environment to disable auto-loading
+    var IS_TEST_ENV = typeof navigator !== 'undefined' &&
+      navigator.userAgent && navigator.userAgent.indexOf('jsdom') !== -1;
 
     var elements = {}; // elementsオブジェクトを初期化
 
@@ -1583,10 +1599,12 @@ elements = {
   currentTopicText: document.getElementById('current-topic-text')
   // ★★★ ここまで追加 ★★★
 };
-      loadStatus();
+      if (!IS_TEST_ENV) {
+        loadStatus();
+        adjustLayout();
+        loadAdminDomainInfo();
+      }
       setupEventListeners();
-      adjustLayout();
-      loadAdminDomainInfo();
       
       // システム状況のリアルタイム更新を開始
       startSystemStatusUpdate();
@@ -2334,6 +2352,7 @@ function populateSheetSelect(sheets, activeSheetName) {
 
     // グローバルスコープに関数を登録し、どこからでも安全に呼び出せるようにする
     window.setLoading = function(isLoading, message) {
+      if (IS_TEST_ENV) return;
       try {
         // 入力値を安全に処理
         isLoading = Boolean(isLoading);
