@@ -7,7 +7,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- TailwindCSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <?!= include('styles/Unpublished.css.html'); ?>
+    <style>
+      body { margin: 0; }
+      .glass-panel { 
+        background: rgba(26,27,38,0.7); 
+        backdrop-filter: blur(12px); 
+        -webkit-backdrop-filter: blur(12px); 
+        border: 1px solid rgba(255,255,255,0.1); 
+      }
+      
+    </style>
 </head>
 <body class="bg-gray-800 text-white flex items-center justify-center h-screen">
     <div class="text-center p-4 max-w-lg">
@@ -107,5 +116,98 @@
         <? } ?>
     </div>
 
-<?!= include('scripts/Unpublished.js.html'); ?>
-</body></html>
+    <script>
+        function copyBoardUrl() {
+            const urlInput = document.getElementById('board-url');
+            if (urlInput) {
+                try {
+                    if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(urlInput.value);
+                    } else {
+                        urlInput.select();
+                        document.execCommand('copy');
+                    }
+                    showMessage('URLをコピーしました', 'success');
+                } catch (error) {
+                    showMessage('コピーに失敗しました', 'error');
+                }
+            }
+        }
+
+        function showMessage(message, type = 'info') {
+            const messageArea = document.getElementById('message-area');
+            if (messageArea) {
+                const colors = {
+                    success: 'text-green-400 success-state',
+                    error: 'text-red-400 error-state', 
+                    info: 'text-blue-400'
+                };
+                messageArea.className = `mb-4 text-center text-sm min-h-[1.25rem] ${colors[type] || 'text-gray-400'}`;
+                messageArea.textContent = message;
+                
+                // Add visual feedback animation
+                if (type === 'success' || type === 'error') {
+                    setTimeout(() => {
+                        messageArea.classList.remove('success-state', 'error-state');
+                    }, 600);
+                }
+                
+                setTimeout(() => {
+                    messageArea.textContent = '';
+                    messageArea.className = 'mb-4 text-center text-sm min-h-[1.25rem]';
+                }, 3000);
+            }
+        }
+
+        // 管理者用機能
+        <? if (typeof isOwner !== 'undefined' && isOwner) { ?>
+        document.getElementById('add-spreadsheet-btn').addEventListener('click', function() {
+            const urlInput = document.getElementById('spreadsheet-url-input');
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                showMessage('スプレッドシートのURLを入力してください', 'error');
+                return;
+            }
+            
+            // URL形式チェック
+            const googleSheetsPattern = /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9-_]{10,}/;
+            if (!googleSheetsPattern.test(url)) {
+                showMessage('有効なGoogleスプレッドシートのURLを入力してください', 'error');
+                return;
+            }
+            
+            // ボタンを無効化
+            this.disabled = true;
+            this.classList.add('loading-state');
+            this.innerHTML = '<span role="img" aria-label="読み込み中">⏳</span> 追加中...';
+            showMessage('スプレッドシートを追加中...', 'info');
+            
+            // サーバーに送信
+            google.script.run
+                .withSuccessHandler((result) => {
+                    showMessage(result.message || 'スプレッドシートが追加されました', 'success');
+                    // ページをリロードして回答ボードを表示
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                })
+                .withFailureHandler((error) => {
+                    showMessage('エラー: ' + (error.message || 'スプレッドシートの追加に失敗しました'), 'error');
+                    this.disabled = false;
+                    this.classList.remove('loading-state');
+                    this.innerHTML = '<span role="img" aria-label="ロケット">🚀</span> スプレッドシートを追加';
+                })
+                .addSpreadsheetUrl(url);
+        });
+
+        // Enterキーでも追加
+        document.getElementById('spreadsheet-url-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('add-spreadsheet-btn').click();
+            }
+        });
+        <? } ?>
+    </script>
+</body>
+</html>
