@@ -2520,7 +2520,7 @@ function populateSheetSelect(sheets, activeSheetName) {
       });
       
       // 進行状況バーを更新
-      updateProgressBar(currentStep);
+      updateProgressBarSafe(currentStep);
     }
     
     /**
@@ -2595,6 +2595,17 @@ function populateSheetSelect(sheets, activeSheetName) {
       indicator.setAttribute('title', 
         stepObj.title + ': ' + statusMessages[stepState]
       );
+    }
+    
+    /**
+     * 進行状況バーを安全に更新（関数が存在しない場合はスキップ）
+     */
+    function updateProgressBarSafe(currentStep) {
+      const progressBar = document.querySelector('.progress-fill');
+      if (progressBar) {
+        const progressPercentage = Math.min((currentStep / 3) * 100, 100);
+        progressBar.style.width = `${progressPercentage}%`;
+      }
     }
     
     /**
