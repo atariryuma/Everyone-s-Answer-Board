@@ -82,7 +82,14 @@ function getSheetHeaders(spreadsheetId, sheetName) {
   const ss = SpreadsheetApp.openById(spreadsheetId);
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) return [];
-  return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  
+  const lastColumn = sheet.getLastColumn();
+  if (lastColumn < 1) {
+    console.warn(`シート '${sheetName}' に列が存在しません`);
+    return [];
+  }
+  
+  return sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
 }
 
 /**
@@ -848,14 +855,33 @@ function clearActiveSheet() {
     }
     
     var configJson = JSON.parse(userInfo.configJson || '{}');
-    configJson.publishedSheet = ''; // アクティブシートをクリア
+    
+    // 完全な公開状態のクリア（正しいプロパティ名を使用）
+    configJson.publishedSheet = ''; // 後方互換性のため残す
+    configJson.publishedSheetName = ''; // 正しいプロパティ名
+    configJson.publishedSpreadsheetId = ''; // スプレッドシートIDもクリア
     configJson.appPublished = false; // 公開停止
     
+    // データベースを更新
     updateUser(currentUserId, {
       configJson: JSON.stringify(configJson)
     });
     
-    return '回答ボードの公開を停止しました。';
+    // キャッシュを無効化して即座にUIに反映
+    try {
+      if (typeof invalidateUserCache === 'function') {
+        invalidateUserCache(currentUserId);
+      }
+    } catch (cacheError) {
+      console.warn('キャッシュ無効化でエラーが発生しましたが、処理を続行します:', cacheError.message);
+    }
+    
+    console.log('回答ボードの公開を正常に停止しました - ユーザーID:', currentUserId);
+    return {
+      success: true,
+      message: '✅ 回答ボードの公開を停止しました。',
+      timestamp: new Date().toISOString()
+    };
   } catch (e) {
     console.error('clearActiveSheet エラー: ' + e.message);
     throw new Error('回答ボードの公開停止に失敗しました: ' + e.message);
@@ -1054,7 +1080,11 @@ function getGuessedHeaders(sheetName) {
     }
     
     // ヘッダー行（1行目）を取得
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const lastColumn = sheet.getLastColumn();
+    if (lastColumn < 1) {
+      throw new Error(`シート '${sheetName}' に列が存在しません`);
+    }
+    const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
     
     // 改良された高精度判定ロジックを呼び出し（シート名も渡してデータ分析を有効化）
     const mappingResult = autoMapHeaders(headers, sheetName);
@@ -1102,7 +1132,11 @@ function getSheetDetails(spreadsheetId, sheetName) {
       throw new Error('シートが見つかりません: ' + sheetName);
     }
 
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] || [];
+    const lastColumn = sheet.getLastColumn();
+    if (lastColumn < 1) {
+      throw new Error(`シート '${sheetName}' に列が存在しません`);
+    }
+    const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0] || [];
     const guessed = autoMapHeaders(headers);
 
     let existing = {};

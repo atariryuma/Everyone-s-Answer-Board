@@ -4498,21 +4498,62 @@ function populateSheetSelect(sheets, activeSheetName) {
 
     function unpublishBoard() {
       setLoading(true, 'ボードの公開を停止中...');
+      
+      // UI状態を即座に更新（レスポンシブ感向上）
+      var unpublishBtn = document.getElementById('unpublish-board-btn');
+      if (unpublishBtn) {
+        unpublishBtn.disabled = true;
+        unpublishBtn.innerHTML = `
+          <span class="flex items-center gap-2">
+            <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            停止中...
+          </span>
+        `;
+      }
+      
       runGas('clearActiveSheet')
-        .then(function(msg) {
-          showMessage(typeof msg === 'string' ? msg : msg.message || 'ボードの公開を停止しました', 'success');
-          loadStatus(true);
-          setLoading(false);
+        .then(function(response) {
+          console.log('公開停止レスポンス:', response);
           
-          // 公開停止ボタンを非表示にする
-          var unpublishBtn = document.getElementById('unpublish-board-btn');
+          // レスポンス形式に対応
+          var message = '✅ ボードの公開を停止しました';
+          if (typeof response === 'string') {
+            message = response;
+          } else if (response && response.message) {
+            message = response.message;
+          }
+          
+          showMessage(message, 'success');
+          
+          // UI状態を即座に反映
           if (unpublishBtn) {
             unpublishBtn.classList.add('hidden');
           }
+          
+          // 公開状態表示を即座に更新
+          updatePublicationStatusUI(false, '');
+          
+          // システム状況を強制リフレッシュ
+          loadStatus(true);
+          setLoading(false);
         })
         .catch(function(error) {
+          console.error('公開停止エラー:', error);
           showError(error);
           setLoading(false);
+          
+          // エラー時はボタンを復元
+          if (unpublishBtn) {
+            unpublishBtn.disabled = false;
+            unpublishBtn.innerHTML = `
+              <span class="flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+                公開停止
+              </span>
+            `;
+          }
         });
     }
 
