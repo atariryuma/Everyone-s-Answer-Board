@@ -2829,6 +2829,7 @@ function syncCheckboxStates(status) {
         const customMainQuestion = document.getElementById('custom-main-question').value.trim();
         const mainQuestionType = document.getElementById('main-question-type').value;
         const mainQuestionChoices = document.getElementById('main-question-choices').value.split('\n').filter(choice => choice.trim());
+        const includeOthersOption = document.getElementById('include-others-option').checked;
         const enableClassSelection = document.getElementById('enable-class-selection').checked;
         const classChoices = enableClassSelection ? document.getElementById('class-choices').value.split('\n').filter(choice => choice.trim()) : [];
 
@@ -3089,16 +3090,31 @@ function syncCheckboxStates(status) {
           </div>
 
           <!-- 選択肢設定（選択肢タイプの場合） -->
-          <div id="main-question-choices-div" class="glass-panel bg-yellow-500/5 border border-yellow-400/20 rounded-lg p-4 hidden">
-            <h4 class="text-sm font-semibold text-yellow-400 mb-2">選択肢を設定</h4>
-            <textarea id="main-question-choices" rows="4" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-colors" placeholder="選択肢1&#10;選択肢2&#10;選択肢3"></textarea>
-            <p class="text-xs text-gray-400 mt-2">1行に1つずつ選択肢を入力してください</p>
+          <div id="main-question-choices-div" class="glass-panel bg-yellow-500/5 border border-yellow-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-yellow-500 text-white rounded-full flex items-center justify-center text-sm font-bold">3</div>
+              <h4 class="text-lg font-semibold text-yellow-400">選択肢を設定</h4>
+            </div>
+            <textarea id="main-question-choices" rows="4" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-colors" placeholder="例）&#10;とても良い&#10;良い&#10;普通&#10;あまり良くない&#10;良くない">とても良い
+良い
+普通
+あまり良くない
+良くない</textarea>
+            <p class="text-xs text-gray-400 mt-2">💡 学習者が選択できる選択肢を1行に1つずつ入力してください。例のような評価軸や、具体的な選択肢を設定できます。</p>
+            
+            <div class="mt-4">
+              <label class="flex items-center">
+                <input type="checkbox" id="include-others-option" class="mr-2 rounded bg-gray-700 border-gray-600 text-yellow-500 focus:ring-yellow-400" checked>
+                <span class="text-sm text-gray-300">「その他...」選択肢を追加する</span>
+              </label>
+              <p class="text-xs text-gray-400 mt-1 ml-6">チェックすると、学習者が自由に回答を入力できる「その他...」オプションが自動的に追加されます</p>
+            </div>
           </div>
 
-          <!-- ステップ3: クラス設定（オプション） -->
+          <!-- ステップ4: クラス設定（オプション） -->
           <div class="glass-panel bg-purple-500/5 border border-purple-400/20 rounded-lg p-4">
             <div class="flex items-center gap-2 mb-3">
-              <div class="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-bold">3</div>
+              <div class="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-bold">4</div>
               <h4 class="text-lg font-semibold text-purple-400">クラス設定</h4>
               <span class="text-xs text-gray-400 bg-gray-700/50 px-2 py-1 rounded">オプション</span>
             </div>
