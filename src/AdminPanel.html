@@ -295,7 +295,7 @@
                       <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                       </svg>
-                      <span id="create-additional-form-text" class="text-gray-200">追加のフォームを作成</span>
+                      <span id="create-additional-form-text" class="text-gray-200">新規のフォームを作成</span>
                     </button>
                     <p class="text-xs text-gray-400 mt-1">現在のボードに連携する新しいフォームを作成</p>
                   </div>
@@ -2670,18 +2670,21 @@ function syncCheckboxStates(status) {
     }
     
     /**
-     * 追加のフォームを作成する
+     * 新規フォームを作成する
      */
     function createAdditionalForm() {
         showConfirmationModal(
-            '追加フォームの作成',
-            '現在のスプレッドシートに連携する新しいGoogleフォームを作成します。よろしいですか？',
+            '新規フォームの作成',
+            '新しいGoogleフォームを作成して現在のボードに連携します。よろしいですか？',
             function() {
                 setLoading(true, '新しいフォームを作成しています...');
                 runGas('createAdditionalForm')
                     .then(function(result) {
                         if (result.status === 'success') {
                             showMessage('✅ 新しいフォームが作成され、連携されました！', 'success');
+                            if (result.editFormUrl) {
+                                window.open(result.editFormUrl, '_blank');
+                            }
                             loadStatus(true);
                         } else {
                             throw new Error(result.message || 'フォーム作成に失敗しました。');

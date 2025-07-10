@@ -839,6 +839,39 @@ function createAdditionalForm(title) {
     // 新しいフォームを作成
     var formTitle = title || 'StudyQuest 追加フォーム - ' + new Date().toLocaleDateString('ja-JP');
     var formAndSsInfo = createStudyQuestForm(userInfo.adminEmail, currentUserId, formTitle);
+
+    // 所定のフォルダへ移動
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    if (configJson.folderId) {
+      try {
+        var folder = DriveApp.getFolderById(configJson.folderId);
+        folder.addFile(DriveApp.getFileById(formAndSsInfo.formId));
+        folder.addFile(DriveApp.getFileById(formAndSsInfo.spreadsheetId));
+        DriveApp.getRootFolder().removeFile(DriveApp.getFileById(formAndSsInfo.formId));
+        DriveApp.getRootFolder().removeFile(DriveApp.getFileById(formAndSsInfo.spreadsheetId));
+      } catch (moveErr) {
+        console.warn('ファイル移動に失敗: ' + moveErr.message);
+      }
+    }
+
+    // ユーザー情報更新
+    configJson.formUrl = formAndSsInfo.formUrl;
+    configJson.editFormUrl = formAndSsInfo.editFormUrl;
+    configJson.publishedSpreadsheetId = formAndSsInfo.spreadsheetId;
+    configJson.publishedSheetName = formAndSsInfo.sheetName;
+    configJson.appPublished = true;
+    configJson.formCreated = true;
+
+    updateUser(currentUserId, {
+      spreadsheetId: formAndSsInfo.spreadsheetId,
+      spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+      configJson: JSON.stringify(configJson)
+    });
+
+    var mapping = autoMapSheetHeaders(formAndSsInfo.sheetName);
+    if (mapping) {
+      saveAndActivateSheet(formAndSsInfo.spreadsheetId, formAndSsInfo.sheetName, mapping);
+    }
     
     return {
       status: 'success',
@@ -1368,14 +1401,14 @@ function createFormFactory(options) {
   try {
     var userEmail = options.userEmail;
     var userId = options.userId;
-    var formDescription = options.formDescription || '🌟 みんなの回答ボード - デジタル・シティズンシップを育む対話の場 🌟\n\nここは、あなたの考えを安心して表現し、多様な意見を尊重し合う学びの場です。';
+    var formDescription = options.formDescription || 'みんなの回答ボードへの投稿フォームです。';
     
     // タイムスタンプ生成
     var now = new Date();
     var dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm:ss');
     
     // フォームタイトル生成
-    var formTitle = '📝 みんなの回答ボード - ' + userEmail + ' - ' + dateTimeString;
+    var formTitle = options.formTitle || ('📝 みんなの回答ボード - ' + userEmail + ' - ' + dateTimeString);
     
     // フォーム作成
     var form = FormApp.create(formTitle);
@@ -1410,34 +1443,53 @@ function createFormFactory(options) {
 function addUnifiedQuestions(form, questionType, customConfig) {
   try {
     var config = getQuestionConfig(questionType, customConfig);
-    
-    // メールアドレス収集を有効化
+
     form.setCollectEmail(true);
-    
-    // クラス質問
-    var classItem = form.addTextItem();
-    classItem.setTitle(config.classQuestion.title);
-    classItem.setHelpText(config.classQuestion.helpText);
-    classItem.setRequired(true);
-    
-    // メイン質問
-    var mainItem = form.addParagraphTextItem();
-    mainItem.setTitle(config.mainQuestion.title);
-    mainItem.setHelpText(config.mainQuestion.helpText);
-    mainItem.setRequired(true);
-    
-    // 理由質問
-    var reasonItem = form.addParagraphTextItem();
-    reasonItem.setTitle(config.reasonQuestion.title);
-    reasonItem.setHelpText(config.reasonQuestion.helpText);
-    reasonItem.setRequired(false);
-    
-    // 名前質問
-    var nameItem = form.addTextItem();
-    nameItem.setTitle(config.nameQuestion.title);
-    nameItem.setHelpText(config.nameQuestion.helpText);
-    nameItem.setRequired(false);
-    
+
+    if (questionType === 'simple') {
+      var classItem = form.addListItem();
+      classItem.setTitle(config.classQuestion.title);
+      classItem.setChoiceValues(config.classQuestion.choices);
+      classItem.setRequired(true);
+
+      var nameItem = form.addTextItem();
+      nameItem.setTitle(config.nameQuestion.title);
+      nameItem.setRequired(true);
+
+      var mainItem = form.addTextItem();
+      mainItem.setTitle(config.mainQuestion.title);
+      mainItem.setRequired(true);
+
+      var reasonItem = form.addParagraphTextItem();
+      reasonItem.setTitle(config.reasonQuestion.title);
+      var validation = FormApp.createParagraphTextValidation()
+        .setHelpText(config.reasonQuestion.helpText)
+        .setMaxLength(140)
+        .build();
+      reasonItem.setValidation(validation);
+      reasonItem.setRequired(false);
+    } else {
+      var classItem = form.addTextItem();
+      classItem.setTitle(config.classQuestion.title);
+      classItem.setHelpText(config.classQuestion.helpText);
+      classItem.setRequired(true);
+
+      var mainItem = form.addParagraphTextItem();
+      mainItem.setTitle(config.mainQuestion.title);
+      mainItem.setHelpText(config.mainQuestion.helpText);
+      mainItem.setRequired(true);
+
+      var reasonItem = form.addParagraphTextItem();
+      reasonItem.setTitle(config.reasonQuestion.title);
+      reasonItem.setHelpText(config.reasonQuestion.helpText);
+      reasonItem.setRequired(false);
+
+      var nameItem = form.addTextItem();
+      nameItem.setTitle(config.nameQuestion.title);
+      nameItem.setHelpText(config.nameQuestion.helpText);
+      nameItem.setRequired(false);
+    }
+
     console.log('フォームに統一質問を追加しました: ' + questionType);
     
   } catch (error) {
@@ -1453,7 +1505,8 @@ function addUnifiedQuestions(form, questionType, customConfig) {
  * @returns {Object} 質問設定
  */
 function getQuestionConfig(questionType, customConfig) {
-  var defaultConfig = {
+  var configs = {};
+  configs.default = {
     classQuestion: {
       title: 'あなたのクラス・学年',
       helpText: 'あなたが所属するクラスや学年を教えてください（例：6年1組、中学3年A組、高校2年など）'
@@ -1471,6 +1524,28 @@ function getQuestionConfig(questionType, customConfig) {
       helpText: 'みんなの回答ボードで表示される名前です。本名でも、普段呼ばれているニックネームでも、空白でも構いません。あなたが安心できる形で参加してください。'
     }
   };
+
+  configs.simple = {
+    classQuestion: {
+      title: 'クラス',
+      helpText: '',
+      choices: ['クラス1', 'クラス2', 'クラス3', 'クラス4']
+    },
+    nameQuestion: {
+      title: '名前',
+      helpText: ''
+    },
+    mainQuestion: {
+      title: '今回のテーマについて、あなたの考えや意見を聞かせてください',
+      helpText: ''
+    },
+    reasonQuestion: {
+      title: 'そう考える理由や体験があれば教えてください',
+      helpText: ''
+    }
+  };
+
+  var defaultConfig = configs[questionType] || configs.default;
   
   // カスタム設定をマージ
   if (customConfig && typeof customConfig === 'object') {
@@ -1525,7 +1600,8 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
 /**
  * フォーム作成
  */
-function createStudyQuestForm(userEmail, userId) {
+// questionType defaults to 'simple'
+function createStudyQuestForm(userEmail, userId, formTitle, questionType) {
   try {
     // パフォーマンス測定開始
     var profiler = (typeof globalProfiler !== 'undefined') ? globalProfiler : {
@@ -1538,23 +1614,9 @@ function createStudyQuestForm(userEmail, userId) {
     var formResult = createFormFactory({
       userEmail: userEmail,
       userId: userId,
-      questions: 'default',
-      formDescription: `🌟 みんなの回答ボードへようこそ！🌟
-
-ここは、あなたの大切な考えや意見を安心して表現できる場所です。
-
-📚 このプラットフォームは「デジタル・シティズンシップ」の理念に基づいて設計されています：
-• 多様な意見を尊重し合う
-• 建設的で思いやりのある対話を心がける
-• オンライン空間でも相手への敬意を忘れない
-• 自分の考えを誠実に表現する
-
-🔒 あなたのプライバシーを大切にします：
-• 回答は匿名で表示されます
-• 個人情報は適切に保護されます
-• 安心して本音を共有してください
-
-あなたの声が、みんなの学びを豊かにします。一緒に素晴らしい対話の場を作りましょう！`
+      formTitle: formTitle,
+      questions: questionType || 'simple',
+      formDescription: 'このフォームに回答すると、みんなの回答ボードに反映されます。'
     });
     
     // カスタマイズされた設定を追加
@@ -1574,26 +1636,10 @@ function createStudyQuestForm(userEmail, userId) {
     var appUrls = generateAppUrls(userId);
     var boardUrl = appUrls.viewUrl || (appUrls.webAppUrl + '?userId=' + encodeURIComponent(userId || ''));
     
-    var confirmationMessage = `🎉 素晴らしい！あなたの声が届きました！
+    var confirmationMessage = 'ご回答ありがとうございます！ボードはこちら: ' + boardUrl;
 
-✨ あなたの考えを共有してくれて、ありがとうございます。
-あなたの意見は、クラスのみんなにとって大切な学びの材料になります。
-
-🤝 デジタル・シティズンシップを実践しよう：
-• 他の人の意見も尊重しながら読んでみましょう
-• 違う考えに出会ったら、「なるほど！」で反応してみよう
-• 良いと思った意見には「いいね！」で応援しよう
-• もっと知りたいことがあれば「もっと知りたい！」で示そう
-
-🌈 多様な意見こそが、みんなの成長につながります。
-お友達の色々な考えも見てみましょう。きっと新しい発見がありますよ！
-
-📋 みんなの回答ボード:${boardUrl}`;
-      
     if (form.getPublishedUrl()) {
-      confirmationMessage += `
-
-✏️ 回答を修正したい場合は、こちらから編集できます:${form.getPublishedUrl()}`;
+      confirmationMessage += '\n\n回答の編集はこちら: ' + form.getPublishedUrl();
     }
     
     form.setConfirmationMessage(confirmationMessage);
