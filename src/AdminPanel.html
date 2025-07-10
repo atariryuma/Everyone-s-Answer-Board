@@ -2678,9 +2678,9 @@ function syncCheckboxStates(status) {
             '現在のスプレッドシートに連携する新しいGoogleフォームを作成します。よろしいですか？',
             function() {
                 setLoading(true, '新しいフォームを作成しています...');
-                runGas('createAdditionalForm', currentStatus.userInfo.spreadsheetId)
+                runGas('createAdditionalForm')
                     .then(function(result) {
-                        if (result.success) {
+                        if (result.status === 'success') {
                             showMessage('✅ 新しいフォームが作成され、連携されました！', 'success');
                             loadStatus(true);
                         } else {
