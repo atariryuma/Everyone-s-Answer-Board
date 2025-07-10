@@ -608,9 +608,9 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
                 </svg>
-                回答ボード指導における留意点
+                デジタル・シティズンシップ指導
               </h4>
-              <p class="text-xs text-blue-100 mb-3">回答ボードを活用した指導における重要なポイントを確認しましょう</p>
+              <p class="text-xs text-blue-100 mb-3">デジタル・シティズンシップに基づく回答ボード指導のポイントを確認しましょう</p>
               <button type="button" id="show-digital-citizenship-guide" class="btn btn-secondary w-full text-sm py-2">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -1800,6 +1800,19 @@ function setupEventListeners() {
         });
       }
 
+      // クラス選択の有効/無効切り替え
+      var enableClassSelection = document.getElementById('enable-class-selection');
+      if (enableClassSelection) {
+        enableClassSelection.addEventListener('change', function() {
+          const classChoicesContainer = document.getElementById('class-choices-container');
+          if (this.checked) {
+            classChoicesContainer.classList.remove('hidden');
+          } else {
+            classChoicesContainer.classList.add('hidden');
+          }
+        });
+      }
+
       var refreshBoardBtn = document.getElementById('refresh-board-btn');
       if (refreshBoardBtn) {
         refreshBoardBtn.addEventListener('click', refreshBoardDataFromAdmin);
@@ -2129,6 +2142,9 @@ function syncCheckboxStates(status) {
      * @param {boolean} forceRefresh - キャッシュを無視して強制的に再取得するか
      */
     function loadStatus(forceRefresh = false) {
+      // ユーザーアクションによる手動更新の場合、アクティビティを記録
+      updateUserActivity();
+      
       setLoading(true, '最新のステータス情報を読み込んでいます...');
       
       // キャッシュキーを定義
@@ -2716,7 +2732,28 @@ function syncCheckboxStates(status) {
         const modal = document.getElementById('form-config-modal');
         if (modal) {
             modal.classList.remove('hidden');
+            
+            // 保存されたクラス選択肢を読み込み
+            loadSavedClassChoices();
         }
+    }
+
+    /**
+     * 保存されたクラス選択肢を読み込み
+     */
+    function loadSavedClassChoices() {
+        runGas('getSavedClassChoices')
+            .then(function(result) {
+                if (result.status === 'success' && result.classChoices) {
+                    const classChoicesTextarea = document.getElementById('class-choices');
+                    if (classChoicesTextarea) {
+                        classChoicesTextarea.value = result.classChoices.join('\n');
+                    }
+                }
+            })
+            .catch(function(error) {
+                console.warn('保存されたクラス選択肢の読み込みに失敗:', error.message);
+            });
     }
 
     /**
@@ -2733,20 +2770,31 @@ function syncCheckboxStates(status) {
      * フォーム設定に基づいてフォームを作成
      */
     function createFormWithConfig() {
-        const classChoices = document.getElementById('class-choices').value.split('\n').filter(choice => choice.trim());
+        const customMainQuestion = document.getElementById('custom-main-question').value.trim();
         const mainQuestionType = document.getElementById('main-question-type').value;
         const mainQuestionChoices = document.getElementById('main-question-choices').value.split('\n').filter(choice => choice.trim());
-        const autoName = document.getElementById('auto-name').checked;
-        const autoReason = document.getElementById('auto-reason').checked;
-        const customMainQuestion = document.getElementById('custom-main-question').value.trim();
+        const enableClassSelection = document.getElementById('enable-class-selection').checked;
+        const classChoices = enableClassSelection ? document.getElementById('class-choices').value.split('\n').filter(choice => choice.trim()) : [];
+
+        // バリデーション
+        if (!customMainQuestion) {
+            showMessage('問題文を入力してください。', 'warning');
+            return;
+        }
+
+        if ((mainQuestionType === 'multiple' || mainQuestionType === 'choice') && mainQuestionChoices.length === 0) {
+            showMessage('選択肢を入力してください。', 'warning');
+            return;
+        }
 
         const config = {
             classChoices: classChoices,
             mainQuestionType: mainQuestionType,
             mainQuestionChoices: mainQuestionChoices,
-            autoName: autoName,
-            autoReason: autoReason,
-            customMainQuestion: customMainQuestion
+            autoName: true, // 常にオン
+            autoReason: true, // 常にオン
+            customMainQuestion: customMainQuestion,
+            enableClassSelection: enableClassSelection
         };
 
         hideFormConfigModal();
@@ -2760,6 +2808,11 @@ function syncCheckboxStates(status) {
                         window.open(result.editFormUrl, '_blank');
                     }
                     loadStatus(true);
+                    
+                    // クラス選択肢をデータベースに保存（有効な場合）
+                    if (enableClassSelection && classChoices.length > 0) {
+                        saveClassChoicesToDatabase(classChoices);
+                    }
                 } else {
                     throw new Error(result.message || 'フォーム作成に失敗しました。');
                 }
@@ -2769,6 +2822,16 @@ function syncCheckboxStates(status) {
             })
             .finally(function() {
                 setLoading(false);
+            });
+    }
+
+    /**
+     * クラス選択肢をデータベースに保存
+     */
+    function saveClassChoicesToDatabase(classChoices) {
+        runGas('saveClassChoices', classChoices)
+            .catch(function(error) {
+                console.warn('クラス選択肢の保存に失敗:', error.message);
             });
     }
 
@@ -2845,10 +2908,50 @@ function syncCheckboxStates(status) {
     /**
      * システム状況を定期的に更新
      */
+    // スマートポーリング実装
+    let lastUserActivity = Date.now();
+    let currentPollInterval = 5 * 60 * 1000; // 開始は5分間隔
+    let statusPollTimer = null;
+    
+    function updateUserActivity() {
+      lastUserActivity = Date.now();
+      // ユーザーアクティビティがあった場合、ポーリング間隔をリセット
+      if (currentPollInterval > 2 * 60 * 1000) {
+        currentPollInterval = 2 * 60 * 1000; // 2分に短縮
+        restartStatusPolling();
+      }
+    }
+    
+    function getOptimalPollInterval() {
+      const timeSinceActivity = Date.now() - lastUserActivity;
+      if (timeSinceActivity < 5 * 60 * 1000) {
+        return 2 * 60 * 1000; // 5分以内のアクティビティ: 2分間隔
+      } else if (timeSinceActivity < 15 * 60 * 1000) {
+        return 5 * 60 * 1000; // 15分以内: 5分間隔
+      } else {
+        return 10 * 60 * 1000; // 15分以上: 10分間隔
+      }
+    }
+    
+    function restartStatusPolling() {
+      if (statusPollTimer) {
+        clearInterval(statusPollTimer);
+      }
+      currentPollInterval = getOptimalPollInterval();
+      startSystemStatusUpdate();
+    }
+    
     function startSystemStatusUpdate() {
-      setInterval(function() {
+      statusPollTimer = setInterval(function() {
         // UIが非表示の時は更新しない
         if (document.hidden) return;
+        
+        // 現在のポーリング間隔を確認し、必要に応じて調整
+        const optimalInterval = getOptimalPollInterval();
+        if (optimalInterval !== currentPollInterval) {
+          restartStatusPolling();
+          return;
+        }
         
         // キャッシュを利用して静かに更新
         runGas('getStatus', false)
@@ -2856,14 +2959,22 @@ function syncCheckboxStates(status) {
             // 変更があった場合のみUIを更新
             if (JSON.stringify(status) !== JSON.stringify(currentStatus)) {
               updateUIWithNewStatus(status);
+              console.log('📊 システム状態が更新されました');
             }
           })
           .catch(function(error) {
             // エラーはコンソールにのみ出力
             console.warn('Silent status update failed:', error.message);
           });
-      }, 60000); // 60秒ごとに更新
+      }, currentPollInterval);
+      
+      console.log(`⏰ ステータスポーリング開始: ${currentPollInterval / 1000}秒間隔`);
     }
+    
+    // ユーザーアクティビティを監視
+    document.addEventListener('click', updateUserActivity);
+    document.addEventListener('keypress', updateUserActivity);
+    document.addEventListener('scroll', updateUserActivity);
 
     function openAppSetupPage() {
       // アプリ設定ページを新しいタブで開く
@@ -2885,91 +2996,77 @@ function syncCheckboxStates(status) {
 
   <!-- フォーム設定モーダル -->
   <div id="form-config-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 hidden">
-    <div class="bg-gray-800 rounded-lg max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
-      <div class="p-6">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="text-lg font-semibold text-white">フォーム設定</h3>
-          <button id="form-config-close" class="text-gray-400 hover:text-white">
+    <div class="glass-panel rounded-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="p-8">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-2xl font-bold text-cyan-400">新しいフォームを作成</h3>
+          <button type="button" id="form-config-close" class="text-gray-400 hover:text-white transition-colors" title="閉じる">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
             </svg>
           </button>
         </div>
         
-        <div class="space-y-4">
-          <!-- クラス選択肢設定 -->
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-2">クラス選択肢</label>
-            <textarea id="class-choices" rows="4" class="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white text-sm" placeholder="1年1組&#10;1年2組&#10;2年1組&#10;...">1年1組
-1年2組
-1年3組
-2年1組
-2年2組
-2年3組
-3年1組
-3年2組
-3年3組
-4年1組
-4年2組
-4年3組
-5年1組
-5年2組
-5年3組
-6年1組
-6年2組
-6年3組</textarea>
-            <p class="text-xs text-gray-500 mt-1">1行に1つずつクラス名を入力してください</p>
+        <div class="space-y-6">
+          <!-- ステップ1: 問題文の入力 -->
+          <div class="glass-panel bg-blue-500/5 border border-blue-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
+              <h4 class="text-lg font-semibold text-blue-400">問題文を入力</h4>
+            </div>
+            <textarea id="custom-main-question" rows="3" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors" placeholder="今日のテーマについて、あなたの考えや意見を聞かせてください"></textarea>
+            <p class="text-xs text-gray-400 mt-2">学習者に表示される質問文を入力してください</p>
           </div>
 
-          <!-- メイン質問タイプ -->
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-2">メイン質問の入力タイプ</label>
-            <select id="main-question-type" class="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white text-sm">
-              <option value="paragraph">長文テキスト（段落）</option>
-              <option value="text">短文テキスト（1行）</option>
+          <!-- ステップ2: 回答方法の選択 -->
+          <div class="glass-panel bg-green-500/5 border border-green-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">2</div>
+              <h4 class="text-lg font-semibold text-green-400">回答方法を選択</h4>
+            </div>
+            <select id="main-question-type" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm focus:border-green-400 focus:ring-1 focus:ring-green-400 transition-colors" title="回答方法を選択してください">
+              <option value="paragraph">長文テキスト（自由記述）</option>
+              <option value="text">短文テキスト（1行回答）</option>
               <option value="multiple">選択肢（複数選択可）</option>
               <option value="choice">選択肢（単一選択）</option>
             </select>
           </div>
 
-          <!-- メイン質問選択肢（選択肢タイプの場合） -->
-          <div id="main-question-choices-div" class="hidden">
-            <label class="block text-sm font-medium text-gray-300 mb-2">メイン質問の選択肢</label>
-            <textarea id="main-question-choices" rows="3" class="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white text-sm" placeholder="選択肢1&#10;選択肢2&#10;選択肢3"></textarea>
-            <p class="text-xs text-gray-500 mt-1">1行に1つずつ選択肢を入力してください</p>
+          <!-- 選択肢設定（選択肢タイプの場合） -->
+          <div id="main-question-choices-div" class="glass-panel bg-yellow-500/5 border border-yellow-400/20 rounded-lg p-4 hidden">
+            <h4 class="text-sm font-semibold text-yellow-400 mb-2">選択肢を設定</h4>
+            <textarea id="main-question-choices" rows="4" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-colors" placeholder="選択肢1&#10;選択肢2&#10;選択肢3"></textarea>
+            <p class="text-xs text-gray-400 mt-2">1行に1つずつ選択肢を入力してください</p>
           </div>
 
-          <!-- 自動挿入項目 -->
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-2">自動挿入項目</label>
-            <div class="space-y-2">
+          <!-- ステップ3: クラス設定（オプション） -->
+          <div class="glass-panel bg-purple-500/5 border border-purple-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-bold">3</div>
+              <h4 class="text-lg font-semibold text-purple-400">クラス設定</h4>
+              <span class="text-xs text-gray-400 bg-gray-700/50 px-2 py-1 rounded">オプション</span>
+            </div>
+            <div class="mb-3">
               <label class="flex items-center">
-                <input type="checkbox" id="auto-name" checked class="mr-2 rounded bg-gray-700 border-gray-600">
-                <span class="text-sm text-gray-300">名前欄を自動追加</span>
-              </label>
-              <label class="flex items-center">
-                <input type="checkbox" id="auto-reason" checked class="mr-2 rounded bg-gray-700 border-gray-600">
-                <span class="text-sm text-gray-300">理由欄を自動追加</span>
-              </label>
-              <label class="flex items-center">
-                <input type="checkbox" id="auto-email" checked disabled class="mr-2 rounded bg-gray-700 border-gray-600">
-                <span class="text-sm text-gray-300">メール収集（常時有効）</span>
+                <input type="checkbox" id="enable-class-selection" class="mr-2 rounded bg-gray-700 border-gray-600 text-purple-500 focus:ring-purple-400">
+                <span class="text-sm text-gray-300">クラス選択を有効にする</span>
               </label>
             </div>
-          </div>
-
-          <!-- カスタム質問文 -->
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-2">カスタム質問文（オプション）</label>
-            <input type="text" id="custom-main-question" class="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white text-sm" placeholder="空欄の場合はデフォルトの質問文を使用">
+            <div id="class-choices-container" class="hidden">
+              <textarea id="class-choices" rows="3" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition-colors" placeholder="クラス1&#10;クラス2&#10;クラス3&#10;クラス4">クラス1
+クラス2
+クラス3
+クラス4</textarea>
+              <p class="text-xs text-gray-400 mt-2">1行に1つずつクラス名を入力してください</p>
+            </div>
           </div>
         </div>
 
-        <div class="flex gap-2 mt-6">
-          <button id="form-config-cancel" class="flex-1 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors">
+        <div class="flex gap-3 mt-8">
+          <button type="button" id="form-config-cancel" class="flex-1 px-6 py-3 bg-gray-600/80 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors font-medium">
             キャンセル
           </button>
-          <button id="form-config-create" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+          <button type="button" id="form-config-create" class="flex-1 px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-600 hover:to-blue-600 transition-colors font-medium shadow-lg">
             フォーム作成
           </button>
         </div>

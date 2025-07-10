@@ -1536,18 +1536,18 @@ function addUnifiedQuestions(form, questionType, customConfig) {
       reasonItem.setValidation(validation);
       reasonItem.setRequired(false);
     } else if (questionType === 'custom' && customConfig) {
-      // クラス選択肢
-      var classItem = form.addListItem();
-      classItem.setTitle('クラス');
-      classItem.setChoiceValues(customConfig.classChoices || ['1年1組', '1年2組', '1年3組']);
-      classItem.setRequired(true);
-
-      // 名前欄（自動挿入が有効な場合）
-      if (customConfig.autoName) {
-        var nameItem = form.addTextItem();
-        nameItem.setTitle('名前');
-        nameItem.setRequired(false);
+      // クラス選択肢（有効な場合のみ）
+      if (customConfig.enableClassSelection && customConfig.classChoices && customConfig.classChoices.length > 0) {
+        var classItem = form.addListItem();
+        classItem.setTitle('クラス');
+        classItem.setChoiceValues(customConfig.classChoices);
+        classItem.setRequired(true);
       }
+
+      // 名前欄（常にオン）
+      var nameItem = form.addTextItem();
+      nameItem.setTitle('名前');
+      nameItem.setRequired(false);
 
       // メイン質問
       var mainQuestionTitle = customConfig.customMainQuestion || '今回のテーマについて、あなたの考えや意見を聞かせてください';
@@ -1575,12 +1575,10 @@ function addUnifiedQuestions(form, questionType, customConfig) {
       mainItem.setTitle(mainQuestionTitle);
       mainItem.setRequired(true);
 
-      // 理由欄（自動挿入が有効な場合）
-      if (customConfig.autoReason) {
-        var reasonItem = form.addParagraphTextItem();
-        reasonItem.setTitle('そう考える理由や体験があれば教えてください（任意）');
-        reasonItem.setRequired(false);
-      }
+      // 理由欄（常にオン）
+      var reasonItem = form.addParagraphTextItem();
+      reasonItem.setTitle('そう考える理由や体験があれば教えてください（任意）');
+      reasonItem.setRequired(false);
     } else {
       var classItem = form.addTextItem();
       classItem.setTitle(config.classQuestion.title);
@@ -1672,6 +1670,70 @@ function getQuestionConfig(questionType, customConfig) {
   }
   
   return defaultConfig;
+}
+
+/**
+ * クラス選択肢をデータベースに保存
+ */
+function saveClassChoices(classChoices) {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+    
+    var userInfo = getUserWithFallback(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    configJson.savedClassChoices = classChoices;
+    configJson.lastClassChoicesUpdate = new Date().toISOString();
+    
+    updateUser(currentUserId, {
+      configJson: JSON.stringify(configJson)
+    });
+    
+    console.log('クラス選択肢が保存されました:', classChoices);
+    return { status: 'success', message: 'クラス選択肢が保存されました' };
+  } catch (error) {
+    console.error('クラス選択肢保存エラー:', error.message);
+    return { status: 'error', message: 'クラス選択肢の保存に失敗しました: ' + error.message };
+  }
+}
+
+/**
+ * 保存されたクラス選択肢を取得
+ */
+function getSavedClassChoices() {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      return { status: 'error', message: 'ユーザーコンテキストが設定されていません' };
+    }
+    
+    var userInfo = getUserWithFallback(currentUserId);
+    if (!userInfo) {
+      return { status: 'error', message: 'ユーザー情報が見つかりません' };
+    }
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var savedClassChoices = configJson.savedClassChoices || ['クラス1', 'クラス2', 'クラス3', 'クラス4'];
+    
+    return { 
+      status: 'success', 
+      classChoices: savedClassChoices,
+      lastUpdate: configJson.lastClassChoicesUpdate
+    };
+  } catch (error) {
+    console.error('クラス選択肢取得エラー:', error.message);
+    return { status: 'error', message: 'クラス選択肢の取得に失敗しました: ' + error.message };
+  }
 }
 
 /**

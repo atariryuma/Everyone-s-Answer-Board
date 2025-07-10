@@ -966,6 +966,15 @@ function setDisplayOptions(options) {
     configJson.showNames = options.showNames;
     configJson.showCounts = options.showCounts;
     
+    // showNamesからdisplayModeを設定
+    configJson.displayMode = options.showNames ? 'named' : 'anonymous';
+    
+    console.log('setDisplayOptions: 設定更新', {
+      showNames: options.showNames,
+      showCounts: options.showCounts,
+      displayMode: configJson.displayMode
+    });
+    
     updateUser(currentUserId, {
       configJson: JSON.stringify(configJson)
     });

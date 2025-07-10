@@ -170,6 +170,22 @@ window.showHighlightToggle = __SHOW_HIGHLIGHT_TOGGLE__.startsWith('<') ? false :
 window.showScoreSort = __SHOW_SCORE_SORT__.startsWith('<') ? false : __SHOW_SCORE_SORT__ === 'true';
 window.isStudentMode = __IS_STUDENT_MODE__.startsWith('<') ? true : __IS_STUDENT_MODE__ === 'true';
 window.isAdminUser = __IS_ADMIN_USER__.startsWith('<') ? false : __IS_ADMIN_USER__ === 'true';
+
+// デバッグ情報を出力
+console.log('🔧 サーバー設定受信デバッグ:', {
+  rawValues: {
+    showCounts: __SHOW_COUNTS__,
+    displayMode: __DISPLAY_MODE__,
+    showAdminFeatures: __SHOW_ADMIN_FEATURES__,
+    isAdminUser: __IS_ADMIN_USER__
+  },
+  processedValues: {
+    showCounts: window.showCounts,
+    displayMode: window.displayMode,
+    showAdminFeatures: window.showAdminFeatures,
+    isAdminUser: window.isAdminUser
+  }
+});
 const SHEET_NAME = __SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHEET_NAME__;
 const USER_ID = __USER_ID__.startsWith('<') ? '' : __USER_ID__;
 const OWNER_NAME = __OWNER_NAME__.startsWith('<') ? '' : __OWNER_NAME__;
@@ -385,9 +401,9 @@ header {
   100% { transform: rotate(360deg); will-change: transform; }
 }
 @keyframes bounce {
-  0%, 20%, 50%, 80%, 100% { transform: translate3d(0, 0, 0); will-change: auto; }
-  40% { transform: translate3d(0, -10px, 0); will-change: transform; }
-  60% { transform: translate3d(0, -5px, 0); }
+  0%, 20%, 50%, 80%, 100% { transform: translate(-50%, 0); will-change: auto; }
+  40% { transform: translate(-50%, -10px); will-change: transform; }
+  60% { transform: translate(-50%, -5px); }
 }
 
 
@@ -1667,15 +1683,44 @@ setupEventDelegation() {
       this.state.pollingFailureCount = 0;
       
       const newCount = data.data ? data.data.length : 0;
+      
+      // 現在のフィルター/ソート設定をキーとして保存
+      const currentViewKey = `${selectedClass}-${sortOrder}`;
+      
+      // フィルター/ソート設定が変わった場合は比較をリセット
+      if (this.lastViewKey !== currentViewKey) {
+        console.log('🔄 表示設定変更検出、新着チェックをリセット:', {
+          oldKey: this.lastViewKey,
+          newKey: currentViewKey
+        });
+        this.lastViewKey = currentViewKey;
+        this.state.lastSeenCount = newCount;
+        return;
+      }
+      
+      // 同じフィルター/ソート設定での新着チェック
       if (newCount > this.state.lastSeenCount && this.state.lastSeenCount > 0) {
         const newItems = newCount - this.state.lastSeenCount;
-        this.showNewContentBanner(newItems);
-        debugLog('新着コンテンツ検出:', { 
-          newItems, 
-          newCount, 
-          lastSeenCount: this.state?.lastSeenCount || 0 
-        });
+        
+        // 異常に大きな差は誤検知の可能性が高い
+        if (newItems <= 10) { // 妥当な範囲の新着のみ通知
+          this.showNewContentBanner(newItems);
+          debugLog('新着コンテンツ検出:', { 
+            newItems, 
+            newCount, 
+            lastSeenCount: this.state?.lastSeenCount || 0,
+            viewKey: currentViewKey
+          });
+        } else {
+          console.log('⚠️ 異常な新着数検出、誤検知として無視:', {
+            newItems,
+            newCount,
+            lastSeenCount: this.state.lastSeenCount
+          });
+        }
       }
+      
+      this.lastViewKey = currentViewKey;
     } catch (error) {
       this.state.pollingFailureCount++;
       console.warn('新着チェックに失敗:', error, 'failureCount:', this.state.pollingFailureCount);
@@ -1696,29 +1741,48 @@ setupEventDelegation() {
   showNewContentBanner(newItems) {
     if (!this.elements.newContentBanner) return;
     
-    // 既に表示されている場合は内容のみ更新
-    if (!this.elements.newContentBanner.classList.contains('hidden')) {
-      this.state.newContentCount += newItems;
-      const totalItems = this.state.newContentCount;
-      const message = totalItems === 1 ? '新しい意見が投稿されました' : `${totalItems}件の新しい意見が投稿されました`;
-      this.elements.newContentText.textContent = message;
+    // デバウンス：短時間内の連続通知を防ぐ
+    const now = Date.now();
+    if (this.lastNotificationTime && (now - this.lastNotificationTime) < 2000) {
+      console.log('🚫 通知デバウンス: 短時間内の連続通知をスキップ');
       return;
+    }
+    this.lastNotificationTime = now;
+    
+    // 既に表示されている場合は、新しい数で上書き（累積しない）
+    if (!this.elements.newContentBanner.classList.contains('hidden')) {
+      console.log('📱 通知更新: 既存バナーを新しい数で更新', {
+        oldCount: this.state.newContentCount,
+        newCount: newItems
+      });
+      this.state.newContentCount = newItems; // 累積せず上書き
+    } else {
+      this.state.newContentCount = newItems;
     }
     
     this.state.hasNewContent = true;
-    this.state.newContentCount = newItems;
     
-    const message = newItems === 1 ? '新しい意見が投稿されました' : `${newItems}件の新しい意見が投稿されました`;
+    const message = this.state.newContentCount === 1 ? 
+      '新しい意見が投稿されました' : 
+      `${this.state.newContentCount}件の新しい意見が投稿されました`;
     this.elements.newContentText.textContent = message;
     
     this.elements.newContentBanner.classList.remove('hidden');
     
-    // 自動的に3秒後にアニメーション効果を追加
+    // アニメーションをリセットしてから適用
+    this.elements.newContentBanner.style.animation = '';
+    
+    // 3秒後にバウンスアニメーション
     setTimeout(() => {
       if (!this.elements.newContentBanner.classList.contains('hidden')) {
         this.elements.newContentBanner.style.animation = 'bounce 1s ease-in-out';
       }
     }, 3000);
+    
+    console.log('📢 新着通知表示:', {
+      count: this.state.newContentCount,
+      message: message
+    });
   }
   
   // 新着バナーを閉じる
