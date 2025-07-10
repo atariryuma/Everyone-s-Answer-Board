@@ -2688,7 +2688,6 @@ function syncCheckboxStates(status) {
     google.script.run
       .withSuccessHandler(function(status) {
         updateDatabaseInfo(status);
-        updateSystemInfoPanel(status);
         updateFooterAndGuidance(status);
         setLoading(false);
       })
@@ -3082,11 +3081,11 @@ function syncCheckboxStates(status) {
               <h4 class="text-lg font-semibold text-green-400">回答方法を選択</h4>
             </div>
             <select id="main-question-type" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm focus:border-green-400 focus:ring-1 focus:ring-green-400 transition-colors" title="回答方法を選択してください">
-              <option value="paragraph">長文テキスト（自由記述）</option>
-              <option value="text">短文テキスト（1行回答）</option>
+              <option value="choice" selected>選択肢（単一選択）</option>
               <option value="multiple">選択肢（複数選択可）</option>
-              <option value="choice">選択肢（単一選択）</option>
+              <option value="text">短文テキスト（1行回答）</option>
             </select>
+            <p class="text-xs text-gray-400 mt-2">💡 すべての回答方法で、回答の理由を入力する欄が自動的に追加されます</p>
           </div>
 
           <!-- 選択肢設定（選択肢タイプの場合） -->
@@ -3105,11 +3104,11 @@ function syncCheckboxStates(status) {
             </div>
             <div class="mb-3">
               <label class="flex items-center">
-                <input type="checkbox" id="enable-class-selection" class="mr-2 rounded bg-gray-700 border-gray-600 text-purple-500 focus:ring-purple-400">
+                <input type="checkbox" id="enable-class-selection" class="mr-2 rounded bg-gray-700 border-gray-600 text-purple-500 focus:ring-purple-400" checked>
                 <span class="text-sm text-gray-300">クラス選択を有効にする</span>
               </label>
             </div>
-            <div id="class-choices-container" class="hidden">
+            <div id="class-choices-container">
               <textarea id="class-choices" rows="3" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition-colors" placeholder="クラス1&#10;クラス2&#10;クラス3&#10;クラス4">クラス1
 クラス2
 クラス3
