@@ -489,10 +489,14 @@
                     </div>
                     <div class="flex gap-2">
                       <select id="opinionHeader" class="form-control flex-1" aria-describedby="main-help"></select>
-                      <button type="button" id="reguess-headers-btn" class="btn btn-secondary px-3 py-2" title="列を自動で再判定します">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                        </svg>
+                      <button type="button" id="reguess-headers-btn" class="btn bg-gradient-to-r from-cyan-600/80 to-purple-600/80 hover:from-cyan-600 hover:to-purple-600 text-white px-3 py-2 relative overflow-hidden group" title="AI搭載 高精度列判定システム">
+                        <span class="relative z-10 flex items-center gap-1">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                          </svg>
+                          <span class="text-xs font-bold">AI判定</span>
+                        </span>
+                        <div class="absolute inset-0 bg-gradient-to-r from-cyan-400/20 to-purple-400/20 transform translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
                       </button>
                     </div>
                     <p id="main-help" class="text-xs text-red-300 mt-1">
@@ -534,12 +538,21 @@
                 </details>
               </div>
               
-              <button type="button" id="save-config-btn" disabled class="btn btn-primary w-full">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
-                </svg>
-                <span id="save-config-text">設定を保存</span>
-              </button>
+              <div class="space-y-3">
+                <button type="button" id="save-config-btn" disabled class="btn btn-primary w-full">
+                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                  </svg>
+                  <span id="save-config-text">設定を保存</span>
+                </button>
+                
+                <button type="button" id="unpublish-board-btn" class="btn btn-warning w-full hidden">
+                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"></path>
+                  </svg>
+                  <span id="unpublish-board-text">公開を停止</span>
+                </button>
+              </div>
             </div>
             
             <div id="config-placeholder" class="text-center py-8">
@@ -907,12 +920,78 @@
       var errorMsg = error && error.message ? error.message : String(error);
       console.error('[' + (context || 'Unknown') + '] Error:', errorMsg);
       
-      // Show user-friendly message
-      var displayMessage = userMessage || 'エラーが発生しました。しばらく待ってから再試行してください。';
+      // Convert technical errors to user-friendly messages
+      var displayMessage = userMessage || translateErrorMessage(errorMsg, context);
       showMessage(displayMessage, 'error');
       
       // Additional error reporting could be added here
       return false;
+    }
+
+    /**
+     * 技術的なエラーメッセージをユーザーフレンドリーなメッセージに変換
+     * @param {string} errorMsg - 元のエラーメッセージ
+     * @param {string} context - エラーが発生したコンテキスト
+     * @returns {string} ユーザーフレンドリーなエラーメッセージ
+     */
+    function translateErrorMessage(errorMsg, context) {
+      if (!errorMsg || typeof errorMsg !== 'string') {
+        return 'エラーが発生しました。しばらく待ってから再試行してください。';
+      }
+
+      var lowerMsg = errorMsg.toLowerCase();
+      
+      // スプレッドシート関連のエラー
+      if (lowerMsg.includes('範囲の列数には') || lowerMsg.includes('range')) {
+        return '📊 スプレッドシートにデータが正しく入力されていません。\n💡 解決方法：スプレッドシートを開いて、1行目にヘッダー（列名）が入力されているか確認してください。';
+      }
+      
+      if (lowerMsg.includes('シート情報の取得に失敗') || lowerMsg.includes('sheet')) {
+        return '📋 シートの情報を読み込めませんでした。\n💡 解決方法：\n• スプレッドシートが正しく共有されているか確認\n• シートにデータが入力されているか確認\n• しばらく待ってから再試行';
+      }
+      
+      // 権限関連のエラー
+      if (lowerMsg.includes('permission') || lowerMsg.includes('権限') || lowerMsg.includes('access denied')) {
+        return '🔒 アクセス権限がありません。\n💡 解決方法：\n• スプレッドシートの共有設定を確認\n• 編集権限があることを確認\n• アカウントでログインし直してみる';
+      }
+      
+      // ネットワーク関連のエラー
+      if (lowerMsg.includes('network') || lowerMsg.includes('timeout') || lowerMsg.includes('fetch')) {
+        return '🌐 インターネット接続の問題が発生しました。\n💡 解決方法：\n• インターネット接続を確認\n• しばらく待ってから再試行\n• ページを再読み込み';
+      }
+      
+      // フォーム関連のエラー
+      if (lowerMsg.includes('form') && lowerMsg.includes('not found')) {
+        return '📝 フォームが見つかりません。\n💡 解決方法：\n• フォームが作成されているか確認\n• フォームが削除されていないか確認\n• 新しいフォームを作成';
+      }
+      
+      // データ検証関連のエラー
+      if (lowerMsg.includes('validation') || lowerMsg.includes('invalid')) {
+        return '⚠️ 入力内容に問題があります。\n💡 解決方法：\n• 必須項目がすべて入力されているか確認\n• 入力形式が正しいか確認\n• 特殊文字が含まれていないか確認';
+      }
+      
+      // 認証関連のエラー
+      if (lowerMsg.includes('authentication') || lowerMsg.includes('login') || lowerMsg.includes('unauthorized')) {
+        return '🔐 認証に問題があります。\n💡 解決方法：\n• ログイン状態を確認\n• ページを再読み込み\n• 再度ログインしてみる';
+      }
+      
+      // サーバー関連のエラー
+      if (lowerMsg.includes('server error') || lowerMsg.includes('500') || lowerMsg.includes('503')) {
+        return '⚡ システムが一時的に利用できません。\n💡 解決方法：\n• 数分待ってから再試行\n• 問題が続く場合は管理者に連絡';
+      }
+      
+      // 設定関連のエラー
+      if (context && context.includes('config') || lowerMsg.includes('configuration')) {
+        return '⚙️ 設定の保存に問題があります。\n💡 解決方法：\n• すべての必須項目が入力されているか確認\n• 設定内容に問題がないか確認\n• しばらく待ってから再試行';
+      }
+      
+      // その他の一般的なエラー
+      if (lowerMsg.includes('failed') || lowerMsg.includes('error')) {
+        return '❌ 操作が正常に完了しませんでした。\n💡 解決方法：\n• しばらく待ってから再試行\n• ページを再読み込み\n• 問題が続く場合は別のブラウザを試す';
+      }
+      
+      // フォールバック
+      return '⚠️ 予期しないエラーが発生しました。\n💡 解決方法：\n• ページを再読み込み\n• しばらく待ってから再試行\n• 問題が続く場合はサポートにお問い合わせください';
     }
     
     // Wrapper for Google Apps Script calls with consistent error handling
@@ -955,7 +1034,7 @@
     
     // Legacy showError function for backward compatibility
     function showError(error) {
-      handleError(error, 'Legacy', null);
+      handleError(error, 'General', null);
     }
 
     // =============================================================================
@@ -1616,6 +1695,18 @@ function setupEventListeners() {
         });
       }
       
+      // 公開停止ボタンのイベントハンドラー
+      var unpublishBtn = document.getElementById('unpublish-board-btn');
+      if (unpublishBtn) {
+        unpublishBtn.addEventListener('click', function() {
+          showConfirmationModal(
+            '公開を停止',
+            'ボードの公開を停止します。この操作により、ボードにアクセスできなくなります。継続しますか？',
+            unpublishBoard
+          );
+        });
+      }
+      
       // Resource management (unified for forms and spreadsheets)
       var addResourceBtn = document.getElementById('add-resource-btn');
       if (addResourceBtn) {
@@ -1667,6 +1758,9 @@ function setupEventListeners() {
       if (elements.opinionHeader) {
         elements.opinionHeader.addEventListener('change', updateConfigButtons);
       }
+      
+      // リアルタイムバリデーションの設定
+      setupRealtimeValidation();
       
       // Digital citizenship button event
       var digitalCitizenshipBtn = document.getElementById('digital-citizenship-btn');
@@ -1817,88 +1911,7 @@ function handleDeleteRequest() {
   });
 }
 
-function showPrivacyModal(onAccept) {
-  var modal = document.getElementById('privacy-modal');
-  if (!modal) {
-    // プライバシーモーダルが存在しない場合は作成
-    modal = createPrivacyModal();
-    document.body.appendChild(modal);
-  }
-  
-  // モーダルを表示
-  modal.classList.remove('hidden');
-  
-  // プライバシー処理のセットアップ
-  setupPrivacyHandler(modal, onAccept);
-  
-  // フォーカス管理
-  setTimeout(function() {
-    var firstFocusable = modal.querySelector('button') || modal.querySelector('[tabindex]');
-    if (firstFocusable) firstFocusable.focus();
-  }, 100);
-}
-
-function setupPrivacyHandler(modal, onAccept) {
-  var acceptBtn = modal.querySelector('.privacy-accept-btn');
-  var cancelBtn = modal.querySelector('.privacy-cancel-btn');
-  
-  if (acceptBtn) {
-    acceptBtn.onclick = function() {
-      modal.classList.add('hidden');
-      if (onAccept) onAccept();
-    };
-  }
-  
-  if (cancelBtn) {
-    cancelBtn.onclick = function() {
-      modal.classList.add('hidden');
-    };
-  }
-  
-  // ESCキーで閉じる
-  var escHandler = function(e) {
-    if (e.key === 'Escape') {
-      modal.classList.add('hidden');
-      document.removeEventListener('keydown', escHandler);
-    }
-  };
-  document.addEventListener('keydown', escHandler);
-}
-
-function createPrivacyModal() {
-  var modal = document.createElement('div');
-  modal.id = 'privacy-modal';
-  modal.className = 'fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4 hidden';
-  modal.setAttribute('role', 'dialog');
-  modal.setAttribute('aria-modal', 'true');
-  modal.setAttribute('aria-labelledby', 'privacy-modal-title');
-  
-  modal.innerHTML = `
-    <div class="glass-panel rounded-xl p-6 shadow-2xl border-2 border-red-400/80 w-full max-w-md">
-      <h2 id="privacy-modal-title" class="text-xl font-bold text-red-400 mb-4">プライバシーに関する重要な確認</h2>
-      <div class="space-y-4 text-gray-200">
-        <p class="text-sm">アカウント削除を進める前に、以下の点をご確認ください：</p>
-        <ul class="text-xs space-y-2 list-disc list-inside">
-          <li>すべてのデータ（フォーム、回答、設定）が完全に削除されます</li>
-          <li>削除されたデータは復元できません</li>
-          <li>関連するスプレッドシートとフォームは残りますが、このシステムからアクセスできなくなります</li>
-          <li>削除後は同じメールアドレスで再登録が可能です</li>
-        </ul>
-        <p class="text-sm font-semibold text-yellow-400">この操作を続行しますか？</p>
-      </div>
-      <div class="flex gap-3 mt-6">
-        <button type="button" class="privacy-cancel-btn btn btn-secondary flex-1">
-          キャンセル
-        </button>
-        <button type="button" class="privacy-accept-btn btn btn-danger flex-1">
-          確認しました
-        </button>
-      </div>
-    </div>
-  `;
-  
-  return modal;
-}
+// showPrivacyModal function removed - using the one defined earlier in the file
 
 
 /**
@@ -1980,6 +1993,7 @@ function updateDatabaseInfo(status) {
   if (openFormBtn) {
     const formUrl = status.formUrl || (status.userInfo && status.userInfo.formUrl);
     const hasFormUrl = formUrl && formUrl.trim() !== "";
+    openFormBtn.disabled = !hasFormUrl;
     if (hasFormUrl) {
       openFormBtn.title = 'フォームを開く';
     } else {
@@ -2114,20 +2128,76 @@ function populateSheetSelect(sheets, activeSheetName) {
         return;
       }
 
-      setLoading(true, '列を自動で再判定しています...');
+      // ボタンのビジュアルフィードバック
+      const reguesstBtn = document.getElementById('reguess-headers-btn');
+      if (reguesstBtn) {
+        reguesstBtn.disabled = true;
+        reguesstBtn.innerHTML = `
+          <span class="relative z-10 flex items-center gap-1">
+            <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            <span class="text-xs font-bold">AI分析中</span>
+          </span>
+        `;
+      }
 
-      callWithCache('getGuessedHeaders', `guess_${currentStatus.userInfo.spreadsheetId}_${selectedSheet}`, 30000, currentStatus.userInfo.spreadsheetId, selectedSheet)
+      setLoading(true, '🤖 AI搭載高精度列判定システムが分析中...');
+
+      // 改良されたサーバー側関数を呼び出し（シート名のみ渡す）
+      runGas('getGuessedHeaders', selectedSheet)
         .then(function(guessedConfig) {
-          // サーバーから返された自動判定の結果を、UIのドロップダウンに設定
+          if (guessedConfig.error) {
+            throw new Error(guessedConfig.error);
+          }
+          
+          // サーバーから返された高精度自動判定の結果を、UIのドロップダウンに設定
           populateConfig(guessedConfig);
           
-          showMessage('列の自動判定が完了しました。内容を確認し、保存してください。', 'success');
+          // 判定結果の詳細情報を表示
+          let detailMessage = '✨ AI高精度列判定が完了しました！';
+          const mappedCount = Object.values(guessedConfig).filter(v => v && v !== '').length;
+          const totalHeaders = guessedConfig.allHeaders ? guessedConfig.allHeaders.length : 0;
+          
+          if (mappedCount > 0) {
+            detailMessage += `\n📊 ${totalHeaders}列中${mappedCount}列を自動判定しました。`;
+          }
+          detailMessage += '\n🔍 内容を確認して保存してください。';
+          
+          showMessage(detailMessage, 'success');
           setLoading(false);
           updateConfigButtons(); // 保存ボタンを有効化
+          
+          // ボタンを復元
+          if (reguesstBtn) {
+            reguesstBtn.disabled = false;
+            reguesstBtn.innerHTML = `
+              <span class="relative z-10 flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                </svg>
+                <span class="text-xs font-bold">AI判定</span>
+              </span>
+              <div class="absolute inset-0 bg-gradient-to-r from-cyan-400/20 to-purple-400/20 transform translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
+            `;
+          }
         })
         .catch(function(error) {
-          showError(error);
+          console.error('AI列判定エラー:', error);
+          showError(new Error('AI列判定に失敗しました: ' + error.message));
           setLoading(false);
+          
+          // ボタンを復元
+          if (reguesstBtn) {
+            reguesstBtn.disabled = false;
+            reguesstBtn.innerHTML = `
+              <span class="relative z-10 flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                </svg>
+                <span class="text-xs font-bold">AI判定</span>
+              </span>
+              <div class="absolute inset-0 bg-gradient-to-r from-cyan-400/20 to-purple-400/20 transform translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
+            `;
+          }
         });
     }
 
@@ -2397,13 +2467,37 @@ function populateSheetSelect(sheets, activeSheetName) {
       updateSetupProgress();
     }
 
-    function updateStepIndicators(currentStep) {
+    /**
+     * ステップ進行の可視化を強化
+     * @param {number} currentStep - 現在のステップ（1-3）
+     * @param {object} stepStates - 各ステップの詳細状態
+     */
+    function updateStepIndicators(currentStep, stepStates) {
       console.log('📊 [DEBUG] updateStepIndicators called with currentStep:', currentStep);
+      
       var steps = [
-        { id: 'step-1-indicator', step: 1 },
-        { id: 'step-2-indicator', step: 2 },
-        { id: 'step-3-indicator', step: 3 }
+        { 
+          id: 'step-1-indicator', 
+          step: 1, 
+          title: 'データ準備',
+          description: 'スプレッドシートまたはフォームを準備' 
+        },
+        { 
+          id: 'step-2-indicator', 
+          step: 2, 
+          title: 'シート選択',
+          description: '表示したいシートを選択' 
+        },
+        { 
+          id: 'step-3-indicator', 
+          step: 3, 
+          title: '設定・公開',
+          description: '列設定を行い公開' 
+        }
       ];
+      
+      // ステップガイダンステキストを更新
+      updateStepGuidance(currentStep, stepStates);
       
       steps.forEach(function(stepObj) {
         var id = stepObj.id;
@@ -2412,17 +2506,756 @@ function populateSheetSelect(sheets, activeSheetName) {
         if (!indicator) return;
         
         var circle = indicator.querySelector('div');
+        var labelElement = indicator.querySelector('span');
         if (!circle) return;
         
-        circle.classList.remove('bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-gray-600');
+        // ステップの状態を判定
+        var stepState = getStepState(step, currentStep, stepStates);
         
-        if (step <= currentStep) {
-          circle.classList.add('bg-green-500'); // Completed (including current step when all steps are done)
-        } else {
-          circle.classList.add('bg-gray-600'); // Pending
+        // 視覚的な状態を更新
+        updateStepVisual(circle, labelElement, stepState, step);
+        
+        // ツールチップやARIA属性を更新
+        updateStepAccessibility(indicator, stepState, stepObj);
+      });
+      
+      // 進行状況バーを更新
+      updateProgressBar(currentStep);
+    }
+    
+    /**
+     * ステップの詳細状態を判定
+     */
+    function getStepState(step, currentStep, stepStates) {
+      if (stepStates && stepStates['step' + step]) {
+        return stepStates['step' + step];
+      }
+      
+      if (step < currentStep) {
+        return 'completed';
+      } else if (step === currentStep) {
+        return 'active';
+      } else {
+        return 'pending';
+      }
+    }
+    
+    /**
+     * ステップの視覚的表現を更新
+     */
+    function updateStepVisual(circle, labelElement, stepState, stepNumber) {
+      // 既存のクラスを削除
+      circle.classList.remove('bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-gray-600', 
+                             'bg-red-500', 'bg-yellow-500', 'animate-pulse', 'ring-2', 'ring-blue-300',
+                             'transform', 'scale-110');
+      
+      switch (stepState) {
+        case 'completed':
+          circle.classList.add('bg-green-500', 'transform', 'scale-110');
+          circle.innerHTML = '✓';
+          if (labelElement) labelElement.className = 'text-xs text-green-300 hidden sm:inline font-medium';
+          break;
+        case 'active':
+          circle.classList.add('bg-blue-500', 'animate-pulse', 'ring-2', 'ring-blue-300');
+          circle.textContent = stepNumber;
+          if (labelElement) labelElement.className = 'text-xs text-blue-300 hidden sm:inline font-medium';
+          break;
+        case 'error':
+          circle.classList.add('bg-red-500');
+          circle.innerHTML = '!';
+          if (labelElement) labelElement.className = 'text-xs text-red-300 hidden sm:inline font-medium';
+          break;
+        case 'warning':
+          circle.classList.add('bg-yellow-500');
+          circle.innerHTML = '⚠';
+          if (labelElement) labelElement.className = 'text-xs text-yellow-300 hidden sm:inline font-medium';
+          break;
+        default: // pending
+          circle.classList.add('bg-gray-600');
+          circle.textContent = stepNumber;
+          if (labelElement) labelElement.className = 'text-xs text-gray-400 hidden sm:inline';
+      }
+    }
+    
+    /**
+     * ステップのアクセシビリティ属性を更新
+     */
+    function updateStepAccessibility(indicator, stepState, stepObj) {
+      var statusMessages = {
+        completed: '完了済み',
+        active: '進行中',
+        error: 'エラー',
+        warning: '要確認',
+        pending: '未開始'
+      };
+      
+      indicator.setAttribute('aria-label', 
+        stepObj.title + ' - ' + statusMessages[stepState] + ' - ' + stepObj.description
+      );
+      indicator.setAttribute('title', 
+        stepObj.title + ': ' + statusMessages[stepState]
+      );
+    }
+    
+    /**
+     * ステップガイダンステキストを更新
+     */
+    function updateStepGuidance(currentStep, stepStates) {
+      var guidanceText = document.getElementById('guidance-text');
+      if (!guidanceText) return;
+      
+      var guidanceMessages = {
+        1: {
+          text: 'データ準備を開始してください',
+          action: '新規ボードを作成するか、既存のスプレッドシートを追加してください'
+        },
+        2: {
+          text: 'シートを選択してください',
+          action: 'スプレッドシートから表示したいシートを選択してください'
+        },
+        3: {
+          text: '設定を完了させてください',
+          action: '列設定を行い、ボードを公開してください'
         }
+      };
+      
+      var guidance = guidanceMessages[currentStep];
+      if (guidance && !guidanceText.textContent.includes('公開されています')) {
+        // 公開済みでない場合のみガイダンスを更新
+        showNextActionHint(guidance.action, currentStep);
+      }
+    }
+    
+    /**
+     * 次のアクションヒントを表示
+     */
+    function showNextActionHint(actionText, currentStep) {
+      var hintElement = document.getElementById('next-action-hint');
+      if (!hintElement) {
+        // ヒント要素を作成
+        hintElement = document.createElement('div');
+        hintElement.id = 'next-action-hint';
+        hintElement.className = 'mt-2 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg text-sm text-blue-200';
+        
+        var guidanceContainer = document.getElementById('guidance-text').parentElement;
+        if (guidanceContainer) {
+          guidanceContainer.appendChild(hintElement);
+        }
+      }
+      
+      hintElement.innerHTML = `
+        <div class="flex items-start gap-2">
+          <svg class="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span>${actionText}</span>
+        </div>
+      `;
+    }
+
+    // =============================================================================
+    // REAL-TIME VALIDATION SYSTEM
+    // =============================================================================
+    
+    /**
+     * リアルタイムバリデーションの設定
+     */
+    function setupRealtimeValidation() {
+      // 必須項目の設定
+      var requiredFields = [
+        { id: 'opinion-header', name: '回答データ列', type: 'select' },
+        { id: 'sheet-select', name: 'シート選択', type: 'select' }
+      ];
+      
+      // オプション項目の設定
+      var optionalFields = [
+        { id: 'reason-header', name: '理由・詳細列', type: 'select' },
+        { id: 'name-header', name: '名前列', type: 'select' },
+        { id: 'class-header', name: 'クラス列', type: 'select' }
+      ];
+      
+      // 各フィールドにリアルタイムバリデーションを設定
+      requiredFields.forEach(function(field) {
+        setupFieldValidation(field, true);
+      });
+      
+      optionalFields.forEach(function(field) {
+        setupFieldValidation(field, false);
+      });
+      
+      // フォーム全体のバリデーション状態を初期化
+      updateFormValidationState();
+    }
+    
+    /**
+     * 個別フィールドのバリデーション設定
+     */
+    function setupFieldValidation(fieldConfig, isRequired) {
+      var field = document.getElementById(fieldConfig.id);
+      if (!field) return;
+      
+      // バリデーション状態を保存する属性を追加
+      field.setAttribute('data-required', isRequired.toString());
+      field.setAttribute('data-validation-state', 'pending');
+      
+      // イベントリスナーを追加
+      field.addEventListener('change', function() {
+        validateField(fieldConfig, isRequired);
+      });
+      
+      field.addEventListener('blur', function() {
+        validateField(fieldConfig, isRequired);
+      });
+      
+      // 初期バリデーション
+      setTimeout(function() {
+        validateField(fieldConfig, isRequired);
+      }, 100);
+    }
+    
+    /**
+     * フィールドのバリデーション実行
+     */
+    function validateField(fieldConfig, isRequired) {
+      var field = document.getElementById(fieldConfig.id);
+      if (!field) return;
+      
+      var value = field.value;
+      var isValid = true;
+      var errorMessage = '';
+      
+      // 必須チェック
+      if (isRequired && (!value || value === '' || value === '未選択')) {
+        isValid = false;
+        errorMessage = fieldConfig.name + 'は必須項目です';
+      }
+      
+      // 選択肢チェック（selectの場合）
+      if (fieldConfig.type === 'select' && value && value !== '未選択') {
+        var options = Array.from(field.options);
+        var hasValidOption = options.some(function(option) {
+          return option.value === value && option.value !== '';
+        });
+        
+        if (!hasValidOption) {
+          isValid = false;
+          errorMessage = '無効な選択肢です';
+        }
+      }
+      
+      // バリデーション結果を適用
+      applyValidationResult(field, isValid, errorMessage);
+      
+      // フォーム全体のバリデーション状態を更新
+      updateFormValidationState();
+      
+      return isValid;
+    }
+    
+    /**
+     * バリデーション結果の視覚的フィードバック
+     */
+    function applyValidationResult(field, isValid, errorMessage) {
+      if (!field) return;
+      
+      // 既存のバリデーションクラスを削除
+      field.classList.remove('border-green-500', 'border-red-500', 'border-yellow-500');
+      
+      // バリデーション状態を設定
+      if (isValid) {
+        field.classList.add('border-green-500');
+        field.setAttribute('data-validation-state', 'valid');
+        hideFieldError(field);
+      } else {
+        field.classList.add('border-red-500');
+        field.setAttribute('data-validation-state', 'invalid');
+        showFieldError(field, errorMessage);
+      }
+      
+      // アクセシビリティ属性を更新
+      updateFieldAccessibility(field, isValid, errorMessage);
+    }
+    
+    /**
+     * フィールドエラーメッセージの表示
+     */
+    function showFieldError(field, errorMessage) {
+      var errorId = field.id + '-error';
+      var existingError = document.getElementById(errorId);
+      
+      // 既存のエラーメッセージを削除
+      if (existingError) {
+        existingError.remove();
+      }
+      
+      // 新しいエラーメッセージを作成
+      var errorElement = document.createElement('div');
+      errorElement.id = errorId;
+      errorElement.className = 'text-red-400 text-xs mt-1 flex items-center gap-1';
+      errorElement.innerHTML = `
+        <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <span>${errorMessage}</span>
+      `;
+      
+      // フィールドの直後に挿入
+      field.parentNode.insertBefore(errorElement, field.nextSibling);
+    }
+    
+    /**
+     * フィールドエラーメッセージの非表示
+     */
+    function hideFieldError(field) {
+      var errorId = field.id + '-error';
+      var existingError = document.getElementById(errorId);
+      
+      if (existingError) {
+        existingError.remove();
+      }
+    }
+    
+    /**
+     * フィールドのアクセシビリティ属性更新
+     */
+    function updateFieldAccessibility(field, isValid, errorMessage) {
+      if (isValid) {
+        field.removeAttribute('aria-invalid');
+        field.removeAttribute('aria-describedby');
+      } else {
+        field.setAttribute('aria-invalid', 'true');
+        var errorId = field.id + '-error';
+        field.setAttribute('aria-describedby', errorId);
+      }
+    }
+    
+    /**
+     * フォーム全体のバリデーション状態更新
+     */
+    function updateFormValidationState() {
+      var allFields = document.querySelectorAll('[data-required]');
+      var requiredFields = Array.from(allFields).filter(function(field) {
+        return field.getAttribute('data-required') === 'true';
+      });
+      
+      var allRequiredValid = requiredFields.every(function(field) {
+        return field.getAttribute('data-validation-state') === 'valid';
+      });
+      
+      var hasInvalidFields = Array.from(allFields).some(function(field) {
+        return field.getAttribute('data-validation-state') === 'invalid';
+      });
+      
+      // 保存ボタンの状態を更新
+      updateSaveButtonState(allRequiredValid, hasInvalidFields);
+      
+      // バリデーション状況のサマリーを表示
+      showValidationSummary(requiredFields, allRequiredValid, hasInvalidFields);
+    }
+    
+    /**
+     * 保存ボタンの状態更新
+     */
+    function updateSaveButtonState(allRequiredValid, hasInvalidFields) {
+      var saveBtn = document.getElementById('save-config-btn');
+      if (!saveBtn) return;
+      
+      var isFormValid = allRequiredValid && !hasInvalidFields;
+      
+      // ボタンの有効/無効状態
+      if (selectedSheet && isFormValid) {
+        saveBtn.disabled = false;
+        saveBtn.title = '設定を保存して公開';
+      } else {
+        saveBtn.disabled = true;
+        if (!selectedSheet) {
+          saveBtn.title = 'シートを選択してください';
+        } else if (!allRequiredValid) {
+          saveBtn.title = '必須項目を入力してください';
+        } else if (hasInvalidFields) {
+          saveBtn.title = '入力エラーを修正してください';
+        }
+      }
+    }
+    
+    /**
+     * バリデーション状況のサマリー表示
+     */
+    function showValidationSummary(requiredFields, allRequiredValid, hasInvalidFields) {
+      var summaryElement = document.getElementById('validation-summary');
+      if (!summaryElement) {
+        // サマリー要素を作成
+        summaryElement = createValidationSummary();
+      }
+      
+      if (!summaryElement) return;
+      
+      var completedRequired = requiredFields.filter(function(field) {
+        return field.getAttribute('data-validation-state') === 'valid';
+      }).length;
+      
+      var totalRequired = requiredFields.length;
+      var progressPercent = totalRequired > 0 ? Math.round((completedRequired / totalRequired) * 100) : 0;
+      
+      var statusIcon = '';
+      var statusText = '';
+      var statusClass = '';
+      
+      if (allRequiredValid && !hasInvalidFields) {
+        statusIcon = '✅';
+        statusText = '入力完了 - 保存できます';
+        statusClass = 'text-green-400';
+      } else if (hasInvalidFields) {
+        statusIcon = '❌';
+        statusText = 'エラーがあります';
+        statusClass = 'text-red-400';
+      } else {
+        statusIcon = '⏳';
+        statusText = `進行中 (${completedRequired}/${totalRequired})`;
+        statusClass = 'text-yellow-400';
+      }
+      
+      summaryElement.innerHTML = `
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">${statusIcon}</span>
+            <span class="${statusClass} text-sm font-medium">${statusText}</span>
+          </div>
+          <span class="text-xs text-gray-400">${progressPercent}%</span>
+        </div>
+        <div class="mt-2 bg-gray-700 rounded-full h-2">
+          <div class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: ${progressPercent}%"></div>
+        </div>
+      `;
+    }
+    
+    /**
+     * バリデーションサマリー要素の作成
+     */
+    function createValidationSummary() {
+      var configSection = document.getElementById('config-section');
+      if (!configSection) return null;
+      
+      var summaryElement = document.createElement('div');
+      summaryElement.id = 'validation-summary';
+      summaryElement.className = 'mt-4 p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg';
+      
+      // 設定セクションの最後に追加
+      var lastChild = configSection.querySelector('#step3-content');
+      if (lastChild) {
+        lastChild.appendChild(summaryElement);
+      }
+      
+      return summaryElement;
+    }
+
+    // =============================================================================
+    // CONTEXTUAL HELP SYSTEM
+    // =============================================================================
+    
+    /**
+     * コンテキスト依存ヘルプシステムの初期化
+     */
+    function initializeContextualHelp() {
+      // ヘルプボタンを各セクションに追加
+      addHelpButtons();
+      
+      // フィールドレベルのヘルプを設定
+      setupFieldLevelHelp();
+      
+      // 動的ヘルプパネルを作成
+      createHelpPanel();
+      
+      // 現在のステップに応じたヘルプを初期表示
+      updateContextualHelp(1);
+    }
+    
+    /**
+     * ヘルプボタンをセクションに追加
+     */
+    function addHelpButtons() {
+      var sections = [
+        { id: 'data-setup-section', step: 1, title: 'データ準備のヘルプ' },
+        { id: 'sheet-selection-section', step: 2, title: 'シート選択のヘルプ' },
+        { id: 'config-section', step: 3, title: '設定・公開のヘルプ' }
+      ];
+      
+      sections.forEach(function(section) {
+        addSectionHelpButton(section);
       });
     }
+    
+    /**
+     * セクションにヘルプボタンを追加
+     */
+    function addSectionHelpButton(sectionConfig) {
+      var section = document.getElementById(sectionConfig.id);
+      if (!section) return;
+      
+      var header = section.querySelector('h2').parentElement;
+      if (!header) return;
+      
+      var helpButton = document.createElement('button');
+      helpButton.type = 'button';
+      helpButton.className = 'p-2 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition-colors';
+      helpButton.title = sectionConfig.title;
+      helpButton.innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+      `;
+      
+      helpButton.addEventListener('click', function() {
+        showContextualHelp(sectionConfig.step);
+      });
+      
+      header.appendChild(helpButton);
+    }
+    
+    /**
+     * フィールドレベルのヘルプを設定
+     */
+    function setupFieldLevelHelp() {
+      var fieldHelp = {
+        'opinion-header': {
+          title: '回答データ列について',
+          content: '学習者の回答や意見が記録されている列を選択します。\n\n💡 ヒント：\n• 「回答」「意見」「答え」などの列名を探してください\n• 通常はフォームの主要な質問に対する回答です\n• この列は必須項目です',
+          troubleshooting: '列が見つからない場合：\n• スプレッドシートの1行目にヘッダーがあるか確認\n• フォームで質問を作成済みか確認'
+        },
+        'reason-header': {
+          title: '理由・詳細列について',
+          content: '回答の理由や詳細説明が記録されている列を選択します（任意）。\n\n💡 ヒント：\n• 「理由」「詳細」「説明」などの列名を探してください\n• この情報があると回答の背景が理解しやすくなります',
+          troubleshooting: 'この項目は任意です。該当する列がない場合は「未選択」のままで構いません。'
+        },
+        'name-header': {
+          title: '名前列について',
+          content: '回答者の名前が記録されている列を選択します（任意）。\n\n💡 ヒント：\n• 「名前」「氏名」「回答者」などの列名を探してください\n• プライバシーに注意して使用してください',
+          troubleshooting: '匿名で使用したい場合は「未選択」のままにして、表示設定で「名前を表示する」のチェックを外してください。'
+        },
+        'class-header': {
+          title: 'クラス列について',
+          content: '回答者のクラス・グループが記録されている列を選択します（任意）。\n\n💡 ヒント：\n• 「クラス」「組」「グループ」などの列名を探してください\n• 複数クラスでの集計に便利です',
+          troubleshooting: 'クラス分けしない場合は「未選択」のままで構いません。'
+        }
+      };
+      
+      Object.keys(fieldHelp).forEach(function(fieldId) {
+        addFieldHelpIcon(fieldId, fieldHelp[fieldId]);
+      });
+    }
+    
+    /**
+     * フィールドにヘルプアイコンを追加
+     */
+    function addFieldHelpIcon(fieldId, helpData) {
+      var field = document.getElementById(fieldId);
+      if (!field) return;
+      
+      var label = field.parentElement.querySelector('label');
+      if (!label) return;
+      
+      var helpIcon = document.createElement('button');
+      helpIcon.type = 'button';
+      helpIcon.className = 'ml-2 p-1 rounded text-blue-400 hover:text-blue-300 hover:bg-blue-500/10';
+      helpIcon.title = 'ヘルプを表示';
+      helpIcon.innerHTML = `
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+      `;
+      
+      helpIcon.addEventListener('click', function(e) {
+        e.preventDefault();
+        showFieldHelp(fieldId, helpData);
+      });
+      
+      label.appendChild(helpIcon);
+    }
+    
+    /**
+     * 動的ヘルプパネルを作成
+     */
+    function createHelpPanel() {
+      var helpPanel = document.createElement('div');
+      helpPanel.id = 'contextual-help-panel';
+      helpPanel.className = 'glass-panel p-4 sm:p-6 mt-4 hidden';
+      helpPanel.innerHTML = `
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <h3 class="font-semibold text-blue-400" id="help-panel-title">ヘルプ</h3>
+          </div>
+          <button type="button" id="close-help-panel" class="p-1 rounded text-gray-400 hover:text-white hover:bg-gray-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div id="help-panel-content" class="text-gray-300 text-sm"></div>
+      `;
+      
+      // 右パネルに追加
+      var rightPanel = document.querySelector('.space-y-4.sm\\:space-y-6');
+      if (rightPanel) {
+        rightPanel.insertBefore(helpPanel, rightPanel.firstChild);
+      }
+      
+      // 閉じるボタンの設定
+      var closeBtn = helpPanel.querySelector('#close-help-panel');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', function() {
+          helpPanel.classList.add('hidden');
+        });
+      }
+    }
+    
+    /**
+     * 現在のステップに応じたヘルプを表示
+     */
+    function updateContextualHelp(currentStep) {
+      var helpContent = getStepHelpContent(currentStep);
+      showHelpInPanel('ステップ ' + currentStep + ' のヘルプ', helpContent);
+    }
+    
+    /**
+     * ステップ別ヘルプコンテンツを取得
+     */
+    function getStepHelpContent(step) {
+      var stepHelp = {
+        1: {
+          overview: 'データ準備では、スプレッドシートまたはフォームを用意します。',
+          steps: [
+            '「新規ボードを作成」：自動でフォームとスプレッドシートを作成',
+            '「既存のスプレッドシートを追加」：お手持ちのスプレッドシートを使用'
+          ],
+          tips: [
+            '初回利用の場合は「新規ボードを作成」がおすすめです',
+            '既存データがある場合は「既存のスプレッドシートを追加」を選択'
+          ],
+          troubleshooting: [
+            'ボタンが押せない場合：ログイン状態を確認',
+            'エラーが出る場合：ページを再読み込み'
+          ]
+        },
+        2: {
+          overview: 'スプレッドシートの中から、回答ボードとして表示したいシートを選択します。',
+          steps: [
+            'シート選択ドロップダウンから適切なシートを選択',
+            'シートにデータが入っていることを確認'
+          ],
+          tips: [
+            'フォームの回答は通常「フォームの回答 1」というシート名です',
+            'シートの1行目にはヘッダー（列名）が必要です'
+          ],
+          troubleshooting: [
+            'シートが表示されない場合：スプレッドシートに共有権限があるか確認',
+            '列が読み込まれない場合：シートにデータが入っているか確認'
+          ]
+        },
+        3: {
+          overview: '列の設定を行い、回答ボードを公開します。',
+          steps: [
+            '必須項目：回答データ列を選択',
+            '任意項目：理由、名前、クラス列を選択',
+            '表示オプションを設定',
+            '設定を保存して公開'
+          ],
+          tips: [
+            '必須項目が未選択だと保存できません',
+            'プライバシーに配慮して名前表示を調整してください'
+          ],
+          troubleshooting: [
+            '保存ボタンが無効な場合：必須項目を確認',
+            '列が表示されない場合：シートにヘッダーがあるか確認'
+          ]
+        }
+      };
+      
+      return stepHelp[step] || stepHelp[1];
+    }
+    
+    /**
+     * コンテキストヘルプを表示
+     */
+    function showContextualHelp(step) {
+      var helpContent = getStepHelpContent(step);
+      showHelpInPanel('ステップ ' + step + ' のヘルプ', helpContent);
+    }
+    
+    /**
+     * フィールドヘルプを表示
+     */
+    function showFieldHelp(fieldId, helpData) {
+      var content = {
+        overview: helpData.content,
+        troubleshooting: [helpData.troubleshooting]
+      };
+      showHelpInPanel(helpData.title, content);
+    }
+    
+    /**
+     * ヘルプパネルに内容を表示
+     */
+    function showHelpInPanel(title, content) {
+      var helpPanel = document.getElementById('contextual-help-panel');
+      var titleElement = document.getElementById('help-panel-title');
+      var contentElement = document.getElementById('help-panel-content');
+      
+      if (!helpPanel || !titleElement || !contentElement) return;
+      
+      titleElement.textContent = title;
+      
+      var html = '';
+      
+      if (content.overview) {
+        html += `<div class="mb-4">
+          <h4 class="font-medium text-white mb-2">概要</h4>
+          <p class="text-gray-300">${content.overview}</p>
+        </div>`;
+      }
+      
+      if (content.steps) {
+        html += `<div class="mb-4">
+          <h4 class="font-medium text-white mb-2">手順</h4>
+          <ol class="list-decimal list-inside space-y-1 text-gray-300">
+            ${content.steps.map(step => `<li>${step}</li>`).join('')}
+          </ol>
+        </div>`;
+      }
+      
+      if (content.tips) {
+        html += `<div class="mb-4">
+          <h4 class="font-medium text-yellow-400 mb-2">💡 ヒント</h4>
+          <ul class="list-disc list-inside space-y-1 text-gray-300">
+            ${content.tips.map(tip => `<li>${tip}</li>`).join('')}
+          </ul>
+        </div>`;
+      }
+      
+      if (content.troubleshooting) {
+        html += `<div class="mb-4">
+          <h4 class="font-medium text-red-400 mb-2">🔧 トラブルシューティング</h4>
+          <ul class="list-disc list-inside space-y-1 text-gray-300">
+            ${content.troubleshooting.map(item => `<li>${item}</li>`).join('')}
+          </ul>
+        </div>`;
+      }
+      
+      contentElement.innerHTML = html;
+      helpPanel.classList.remove('hidden');
+      
+      // スムーズにスクロール
+      helpPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    
+    // 初期化時にコンテキストヘルプを設定
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(initializeContextualHelp, 1000);
+    });
 
     function updateSetupProgress() {
       var progress = 0;
@@ -2682,19 +3515,41 @@ function populateSheetSelect(sheets, activeSheetName) {
             if (boardUrlInput) boardUrlInput.value = boardUrl;
             if (viewBoardLink) viewBoardLink.href = boardUrl;
             // opinionHeaderをフッターに表示
-            if (currentTopicText && status.opinionHeader) {
-                currentTopicText.textContent = status.opinionHeader;
-                console.log('✅ [DEBUG] Set footer topic text to:', status.opinionHeader);
-            } else if (currentTopicText) {
-                currentTopicText.textContent = status.activeSheetName || '読み込み中...';
+            if (currentTopicText) {
+                // DOM要素からopinionHeaderの値を取得
+                const opinionHeaderInput = document.getElementById('opinion-header');
+                const opinionHeaderValue = opinionHeaderInput ? opinionHeaderInput.value.trim() : '';
+                
+                if (opinionHeaderValue) {
+                    currentTopicText.textContent = opinionHeaderValue;
+                    console.log('✅ [DEBUG] Set footer topic text to:', opinionHeaderValue);
+                } else if (status.opinionHeader) {
+                    currentTopicText.textContent = status.opinionHeader;
+                    console.log('✅ [DEBUG] Set footer topic text from status to:', status.opinionHeader);
+                } else {
+                    currentTopicText.textContent = status.activeSheetName || '読み込み中...';
+                    console.log('✅ [DEBUG] Set footer topic text fallback to:', status.activeSheetName || '読み込み中...');
+                }
             }
             
             if (adminFooter) adminFooter.classList.remove('hidden');
+            
+            // 公開停止ボタンを表示
+            var unpublishBtn = document.getElementById('unpublish-board-btn');
+            if (unpublishBtn) {
+                unpublishBtn.classList.remove('hidden');
+            }
         } else {
             // 未公開の場合
             if (guidanceText) guidanceText.textContent = 'セットアップを開始してください';
             updateStepIndicators(1); // 初期ステップ状態
             if (adminFooter) adminFooter.classList.add('hidden');
+            
+            // 公開停止ボタンを非表示
+            var unpublishBtn = document.getElementById('unpublish-board-btn');
+            if (unpublishBtn) {
+                unpublishBtn.classList.add('hidden');
+            }
         }
         if (typeof adjustLayout === 'function') {
             adjustLayout(); // フッターの表示/非表示に合わせてレイアウト調整
@@ -3623,6 +4478,26 @@ function populateSheetSelect(sheets, activeSheetName) {
           showMessage(typeof msg === 'string' ? msg : msg.message || 'シートの公開が正常に終了しました', 'green');
           loadStatus(true);
           setLoading(false);
+        })
+        .catch(function(error) {
+          showError(error);
+          setLoading(false);
+        });
+    }
+
+    function unpublishBoard() {
+      setLoading(true, 'ボードの公開を停止中...');
+      runGas('clearActiveSheet')
+        .then(function(msg) {
+          showMessage(typeof msg === 'string' ? msg : msg.message || 'ボードの公開を停止しました', 'success');
+          loadStatus(true);
+          setLoading(false);
+          
+          // 公開停止ボタンを非表示にする
+          var unpublishBtn = document.getElementById('unpublish-board-btn');
+          if (unpublishBtn) {
+            unpublishBtn.classList.add('hidden');
+          }
         })
         .catch(function(error) {
           showError(error);

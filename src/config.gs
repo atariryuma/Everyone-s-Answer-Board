@@ -162,50 +162,366 @@ function getConfig(sheetName, forceRefresh = false) {
 }
 
 /**
- * 列ヘッダーのリストから、各項目に最もふさわしい列名を推測する（改良版）
+ * 列ヘッダーのリストから、各項目に最もふさわしい列名を推測する（大幅強化版）
  * @param {Array<string>} headers - スプレッドシートのヘッダーリスト
+ * @param {string} sheetName - シート名（データ分析用）
  * @returns {object} 推測されたマッピング結果
  */
-function autoMapHeaders(headers) {
+function autoMapHeaders(headers, sheetName = null) {
+  // 高精度マッピングルール（優先度順）
   const mappingRules = {
-    opinionHeader: ['今日のテーマ', 'あなたの考え', '意見', 'answer', 'response', 'opinion', '投稿'],
-    reasonHeader:  ['そう考える理由', '理由', '詳細', '説明', 'reason'],
-    nameHeader:    ['ニックネーム', '名前', '氏名', 'name'],
-    classHeader:   ['あなたのクラス', 'クラス', '学年', '組', 'class']
+    opinionHeader: {
+      exact: ['今日のテーマについて、あなたの考えや意見を聞かせてください', 'あなたの回答・意見', '回答・意見'],
+      high: ['今日のテーマ', 'あなたの考え', '意見', '回答', '答え', '質問への回答'],
+      medium: ['answer', 'response', 'opinion', 'comment', '投稿', 'コメント', '内容'],
+      low: ['テキスト', 'text', '記述', '入力', '自由記述']
+    },
+    reasonHeader: {
+      exact: ['そう考える理由や体験があれば教えてください', '理由・根拠', '根拠・理由'],
+      high: ['そう考える理由', '理由', '根拠', '説明'],
+      medium: ['詳細', 'reason', '理由説明', '補足'],
+      low: ['なぜ', 'why', '背景', '経験']
+    },
+    nameHeader: {
+      exact: ['名前', '氏名', 'name'],
+      high: ['ニックネーム', '呼び名', '表示名'],
+      medium: ['nickname', 'display_name', '投稿者名'],
+      low: ['ユーザー', 'user', '投稿者', '回答者']
+    },
+    classHeader: {
+      exact: ['あなたのクラス', 'クラス名', 'クラス'],
+      high: ['組', '学年', 'class'],
+      medium: ['グループ', 'チーム', 'group', 'team'],
+      low: ['所属', '部門', 'section', '学校']
+    }
   };
 
-  const remainingHeaders = [...headers];
   const result = {};
+  const usedHeaders = new Set();
+  const headerScores = {}; // ヘッダー毎のスコア記録
 
-  Object.keys(mappingRules).forEach(key => {
-    const keywords = mappingRules[key];
-    let bestMatch = '';
-
-    for (const keyword of keywords) {
-      const matchIndex = remainingHeaders.findIndex(header => 
-        header && String(header).toLowerCase().includes(keyword.toLowerCase())
-      );
-      if (matchIndex !== -1) {
-        bestMatch = remainingHeaders[matchIndex];
-        remainingHeaders.splice(matchIndex, 1); 
-        break;
-      }
-    }
-    result[key] = bestMatch;
+  // 1. ヘッダーの前処理と分析
+  const processedHeaders = headers.map((header, index) => {
+    const cleaned = String(header || '').trim();
+    const lower = cleaned.toLowerCase();
+    
+    return {
+      original: header,
+      cleaned: cleaned,
+      lower: lower,
+      index: index,
+      length: cleaned.length,
+      wordCount: cleaned.split(/\s+/).length,
+      hasJapanese: /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(cleaned),
+      hasEnglish: /[A-Za-z]/.test(cleaned),
+      hasNumbers: /\d/.test(cleaned),
+      isMetadata: isMetadataColumn(cleaned)
+    };
   });
 
-  if (!result.opinionHeader) {
-    const nonMetaHeaders = remainingHeaders.filter(h => {
-      const hStr = String(h || '').toLowerCase();
-      return !hStr.includes('タイムスタンプ') && !hStr.includes('メールアドレス');
+  // 2. 各項目に対して最適なヘッダーをスコア計算で決定
+  Object.keys(mappingRules).forEach(mappingKey => {
+    let bestHeader = null;
+    let bestScore = 0;
+
+    processedHeaders.forEach(headerInfo => {
+      if (usedHeaders.has(headerInfo.index) || headerInfo.isMetadata) {
+        return;
+      }
+
+      const score = calculateHeaderScore(headerInfo, mappingRules[mappingKey], mappingKey);
+      
+      if (score > bestScore) {
+        bestScore = score;
+        bestHeader = headerInfo;
+      }
     });
-    if (nonMetaHeaders.length > 0) {
-      result.opinionHeader = nonMetaHeaders[0];
+
+    if (bestHeader && bestScore > 0.3) { // 閾値以上のスコアが必要
+      result[mappingKey] = bestHeader.original;
+      usedHeaders.add(bestHeader.index);
+      headerScores[mappingKey] = bestScore;
+    } else {
+      result[mappingKey] = '';
+    }
+  });
+
+  // 3. 主要な回答列が見つからない場合のフォールバック処理
+  if (!result.opinionHeader) {
+    const candidateHeaders = processedHeaders.filter(h => 
+      !usedHeaders.has(h.index) && 
+      !h.isMetadata &&
+      h.cleaned.length > 0
+    );
+
+    if (candidateHeaders.length > 0) {
+      // 最も長い説明的なヘッダーを選択
+      const fallbackHeader = candidateHeaders.reduce((best, current) => {
+        const currentPriority = calculateFallbackPriority(current);
+        const bestPriority = calculateFallbackPriority(best);
+        return currentPriority > bestPriority ? current : best;
+      });
+      
+      result.opinionHeader = fallbackHeader.original;
+      usedHeaders.add(fallbackHeader.index);
     }
   }
 
-  console.log('自動判定結果:', JSON.stringify(result));
+  // 4. データ内容を分析して判定精度を向上（シート名が提供された場合）
+  if (sheetName) {
+    try {
+      const contentAnalysis = analyzeColumnContent(sheetName, processedHeaders);
+      result = refineResultsWithContentAnalysis(result, contentAnalysis, processedHeaders);
+    } catch (e) {
+      console.warn('データ内容分析でエラーが発生しましたが、処理を続行します:', e.message);
+    }
+  }
+
+  console.log('高精度自動判定結果:', JSON.stringify({
+    result: result,
+    scores: headerScores,
+    totalHeaders: headers.length,
+    usedHeaders: usedHeaders.size
+  }));
+
   return result;
+}
+
+/**
+ * ヘッダーのスコア計算（キーワードマッチング + コンテキスト分析）
+ */
+function calculateHeaderScore(headerInfo, rules, mappingType) {
+  let score = 0;
+  const header = headerInfo.lower;
+
+  // 完全一致（最高スコア）
+  if (rules.exact) {
+    for (const pattern of rules.exact) {
+      if (header === pattern.toLowerCase()) {
+        return 1.0;
+      }
+      if (header.includes(pattern.toLowerCase())) {
+        score = Math.max(score, 0.9);
+      }
+    }
+  }
+
+  // 高優先度マッチング
+  if (rules.high) {
+    for (const pattern of rules.high) {
+      const patternLower = pattern.toLowerCase();
+      if (header.includes(patternLower)) {
+        score = Math.max(score, 0.8 * (patternLower.length / header.length));
+      }
+    }
+  }
+
+  // 中優先度マッチング
+  if (rules.medium) {
+    for (const pattern of rules.medium) {
+      const patternLower = pattern.toLowerCase();
+      if (header.includes(patternLower)) {
+        score = Math.max(score, 0.6 * (patternLower.length / header.length));
+      }
+    }
+  }
+
+  // 低優先度マッチング
+  if (rules.low) {
+    for (const pattern of rules.low) {
+      const patternLower = pattern.toLowerCase();
+      if (header.includes(patternLower)) {
+        score = Math.max(score, 0.4 * (patternLower.length / header.length));
+      }
+    }
+  }
+
+  // コンテキスト分析によるスコア調整
+  score = adjustScoreByContext(score, headerInfo, mappingType);
+
+  return score;
+}
+
+/**
+ * コンテキストに基づくスコア調整
+ */
+function adjustScoreByContext(score, headerInfo, mappingType) {
+  // 長い説明的なヘッダーは質問項目である可能性が高い
+  if (mappingType === 'opinionHeader' && headerInfo.length > 20) {
+    score *= 1.2;
+  }
+
+  // 短いヘッダーは名前やクラス項目の可能性が高い
+  if ((mappingType === 'nameHeader' || mappingType === 'classHeader') && headerInfo.length < 10) {
+    score *= 1.1;
+  }
+
+  // 日本語が含まれる場合の調整
+  if (headerInfo.hasJapanese) {
+    score *= 1.1; // 日本語項目を優先
+  }
+
+  // 数字が含まれるヘッダーの調整
+  if (headerInfo.hasNumbers) {
+    if (mappingType === 'classHeader') {
+      score *= 1.1; // クラス番号の可能性
+    } else {
+      score *= 0.9; // その他では若干減点
+    }
+  }
+
+  return Math.min(score, 1.0); // 最大1.0に制限
+}
+
+/**
+ * メタデータ列かどうかの判定
+ */
+function isMetadataColumn(header) {
+  const metadataPatterns = [
+    'タイムスタンプ', 'timestamp', 'メールアドレス', 'email', 
+    'id', 'uuid', '更新日時', '作成日時', 'created_at', 'updated_at'
+  ];
+  
+  const headerLower = header.toLowerCase();
+  return metadataPatterns.some(pattern => 
+    headerLower.includes(pattern.toLowerCase())
+  );
+}
+
+/**
+ * フォールバック用の優先度計算
+ */
+function calculateFallbackPriority(headerInfo) {
+  let priority = 0;
+  
+  // 長い説明的なヘッダーを優先
+  priority += headerInfo.length * 0.1;
+  
+  // 日本語が含まれる場合は優先
+  if (headerInfo.hasJapanese) {
+    priority += 10;
+  }
+  
+  // 質問らしいパターン
+  if (headerInfo.lower.includes('ください') || headerInfo.lower.includes('何') || 
+      headerInfo.lower.includes('どう') || headerInfo.lower.includes('?')) {
+    priority += 15;
+  }
+  
+  return priority;
+}
+
+/**
+ * 列の実際のデータ内容を分析
+ */
+function analyzeColumnContent(sheetName, processedHeaders) {
+  try {
+    const spreadsheet = getCurrentSpreadsheet();
+    const sheet = spreadsheet.getSheetByName(sheetName);
+    if (!sheet) return {};
+
+    const analysis = {};
+    const lastRow = Math.min(sheet.getLastRow(), 21); // 最大20行まで分析
+    
+    processedHeaders.forEach((headerInfo, index) => {
+      if (lastRow <= 1) return; // データがない場合
+
+      try {
+        const columnData = sheet.getRange(2, index + 1, lastRow - 1, 1).getValues()
+          .map(row => String(row[0] || '').trim())
+          .filter(value => value.length > 0);
+
+        if (columnData.length === 0) return;
+
+        analysis[index] = {
+          avgLength: columnData.reduce((sum, val) => sum + val.length, 0) / columnData.length,
+          maxLength: Math.max(...columnData.map(val => val.length)),
+          hasLongText: columnData.some(val => val.length > 50),
+          hasShortText: columnData.every(val => val.length < 20),
+          containsReasonWords: columnData.some(val => 
+            val.includes('なぜなら') || val.includes('理由') || val.includes('から') || val.includes('ので')
+          ),
+          containsClassPattern: columnData.some(val => 
+            /^\d+[年組]/.test(val) || /^[A-Z]\d*$/.test(val)
+          ),
+          dataCount: columnData.length
+        };
+      } catch (e) {
+        console.warn(`列${index + 1}の分析でエラー:`, e.message);
+      }
+    });
+
+    return analysis;
+  } catch (e) {
+    console.warn('データ内容分析でエラー:', e.message);
+    return {};
+  }
+}
+
+/**
+ * データ内容分析結果を使って判定結果を精緻化
+ */
+function refineResultsWithContentAnalysis(result, contentAnalysis, processedHeaders) {
+  const refinedResult = { ...result };
+
+  // 回答列の精緻化
+  if (refinedResult.opinionHeader) {
+    const opinionIndex = processedHeaders.findIndex(h => h.original === refinedResult.opinionHeader);
+    const analysis = contentAnalysis[opinionIndex];
+    
+    if (analysis && analysis.avgLength < 10 && !analysis.hasLongText) {
+      // 短いテキストばかりの場合、本当に回答列か確認
+      const betterCandidate = findBetterOpinionColumn(contentAnalysis, processedHeaders, refinedResult);
+      if (betterCandidate) {
+        refinedResult.opinionHeader = betterCandidate;
+      }
+    }
+  }
+
+  // 理由列の精緻化
+  if (refinedResult.reasonHeader) {
+    const reasonIndex = processedHeaders.findIndex(h => h.original === refinedResult.reasonHeader);
+    const analysis = contentAnalysis[reasonIndex];
+    
+    if (analysis && analysis.containsReasonWords) {
+      // 理由を示すキーワードが含まれている場合、信頼度を上げる
+      console.log('理由列の信頼度が高いことを確認しました');
+    }
+  }
+
+  // クラス列の精緻化
+  if (refinedResult.classHeader) {
+    const classIndex = processedHeaders.findIndex(h => h.original === refinedResult.classHeader);
+    const analysis = contentAnalysis[classIndex];
+    
+    if (analysis && analysis.containsClassPattern) {
+      console.log('クラス列でクラス番号パターンを確認しました');
+    }
+  }
+
+  return refinedResult;
+}
+
+/**
+ * より適切な回答列を探す
+ */
+function findBetterOpinionColumn(contentAnalysis, processedHeaders, currentResult) {
+  const usedHeaders = Object.values(currentResult).filter(v => v);
+  
+  for (let i = 0; i < processedHeaders.length; i++) {
+    const header = processedHeaders[i];
+    const analysis = contentAnalysis[i];
+    
+    if (usedHeaders.includes(header.original) || header.isMetadata) {
+      continue;
+    }
+    
+    if (analysis && (analysis.hasLongText || analysis.avgLength > 30)) {
+      return header.original;
+    }
+  }
+  
+  return null;
 }
 
 /**
@@ -426,77 +742,18 @@ function autoMapSheetHeaders(sheetName) {
       return null;
     }
     
+    // 新しい高精度自動判定機能を使用
+    const mappingResult = autoMapHeaders(headers, sheetName);
+    
+    // 従来のフォーマットに変換（後方互換性のため）
     var mapping = {
-      mainHeader: '',
-      rHeader: '',
-      nameHeader: '',
-      classHeader: ''
+      mainHeader: mappingResult.opinionHeader || '',
+      rHeader: mappingResult.reasonHeader || '',
+      nameHeader: mappingResult.nameHeader || '',
+      classHeader: mappingResult.classHeader || ''
     };
     
-    // 優先度付きマッピングルール
-    var mappingRules = {
-      mainHeader: [
-        // 高優先度
-        ['今日のテーマについて、あなたの考えや意見を聞かせてください', 'あなたの回答・意見', '回答・意見', '回答内容', '意見・回答'],
-        // 中優先度  
-        ['回答', '意見', 'コメント', '内容', '質問', '答え', 'answer', 'opinion', 'comment'],
-        // 低優先度
-        ['テキスト', 'text', '記述', '入力']
-      ],
-      rHeader: [
-        // 高優先度
-        ['そう考える理由や体験があれば教えてください（任意）', '理由・根拠', '根拠・理由', '理由や根拠'],
-        // 中優先度
-        ['理由', '根拠', '説明', '詳細', 'reason', '理由説明'],
-        // 低優先度
-        ['なぜ', 'why', '背景']
-      ],
-      nameHeader: [
-        // 高優先度
-        ['名前', '氏名', 'name'],
-        // 中優先度
-        ['ニックネーム', '呼び名', '表示名', 'nickname'],
-        // 低優先度
-        ['ユーザー', 'user', '投稿者']
-      ],
-      classHeader: [
-        // 高優先度
-        ['クラス名', 'クラス', '組', 'class'],
-        // 中優先度
-        ['学年', 'グループ', 'チーム', 'group', 'team'],
-        // 低優先度
-        ['所属', '部門', 'section']
-      ]
-    };
-    
-    // 各マッピングルールを適用
-    Object.keys(mappingRules).forEach(function(mappingKey) {
-      if (mapping[mappingKey]) return; // 既にマッピング済み
-      
-      var rules = mappingRules[mappingKey];
-      
-      // 優先度順にチェック
-      for (var priority = 0; priority < rules.length && !mapping[mappingKey]; priority++) {
-        var patterns = rules[priority];
-        
-        for (var i = 0; i < headers.length && !mapping[mappingKey]; i++) {
-          var header = headers[i];
-          var lowerHeader = header.toLowerCase();
-          
-          // 完全一致または部分一致をチェック
-          for (var j = 0; j < patterns.length; j++) {
-            var pattern = patterns[j].toLowerCase();
-            if (lowerHeader === pattern || lowerHeader.includes(pattern)) {
-              mapping[mappingKey] = header;
-              debugLog('マッピング成功: ' + mappingKey + ' = "' + header + '" (パターン: "' + pattern + '", 優先度: ' + priority + ')');
-              break;
-            }
-          }
-        }
-      }
-    });
-    
-    debugLog('自動マッピング結果 for ' + sheetName + ': ' + JSON.stringify(mapping));
+    debugLog('高精度自動マッピング結果 for ' + sheetName + ': ' + JSON.stringify(mapping));
     return mapping;
     
   } catch (e) {
@@ -799,8 +1056,8 @@ function getGuessedHeaders(sheetName) {
     // ヘッダー行（1行目）を取得
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     
-    // 既存の堅牢なロジックを呼び出して結果を返す
-    const mappingResult = autoMapHeaders(headers);
+    // 改良された高精度判定ロジックを呼び出し（シート名も渡してデータ分析を有効化）
+    const mappingResult = autoMapHeaders(headers, sheetName);
     
     // 既存の設定も取得
     let existingConfig = null;
@@ -817,7 +1074,7 @@ function getGuessedHeaders(sheetName) {
       existingConfig: existingConfig
     };
     
-    console.log('自動判定を実行しました: sheet=%s, result=%s', sheetName, JSON.stringify(result));
+    console.log('高精度自動判定を実行しました: sheet=%s, result=%s', sheetName, JSON.stringify(result));
     return result;
 
   } catch (e) {
