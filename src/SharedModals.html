@@ -190,6 +190,142 @@
   </div>
 </div>
 
+<!-- 使い方ガイドモーダル -->
+<div id="usage-guide-modal" class="fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-2xl font-bold text-amber-400">
+          <svg class="w-8 h-8 inline mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+          </svg>
+          使い方ガイド
+        </h3>
+        <button type="button" id="usage-guide-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500" aria-label="閉じる">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="space-y-6 text-gray-300">
+        <!-- 回答ボード管理の流れ -->
+        <div class="glass-panel bg-amber-500/10 rounded-lg p-6 border border-amber-400/30">
+          <h4 class="font-semibold text-amber-400 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+            回答ボード管理の流れ
+          </h4>
+          <ol class="list-decimal list-inside space-y-3 text-sm">
+            <li><strong class="text-amber-300">データソース準備</strong><br>
+              <span class="text-gray-400">• 自動作成：GoogleフォームとスプレッドシートがWorkspace連携で自動作成</span><br>
+              <span class="text-gray-400">• 外部連携：既存のフォーム・シートもURL入力で連携可能</span><br>
+              <span class="text-gray-400">• サービスアカウント共有：スプレッドシートが自動でサービスアカウントと共有</span>
+            </li>
+            <li><strong class="text-amber-300">シート選択と設定</strong><br>
+              <span class="text-gray-400">• 動的シート検出：連携スプレッドシート内の利用可能シートを自動取得</span><br>
+              <span class="text-gray-400">• シート切り替え：複数シート間での簡単な選択・切り替え</span><br>
+              <span class="text-gray-400">• リアルタイムプレビュー：シートヘッダーとデータ構造の即座確認</span>
+            </li>
+            <li><strong class="text-amber-300">高度な列設定</strong><br>
+              <span class="text-gray-400">• AI自動判定：機械学習による列の用途の自動識別</span><br>
+              <span class="text-gray-400">• 手動調整：ドロップダウンによる精密な列マッピング制御</span><br>
+              <span class="text-gray-400">• 必須・任意設定：回答列（必須）、理由・名前・クラス列（任意）</span>
+            </li>
+            <li><strong class="text-amber-300">表示・公開管理</strong><br>
+              <span class="text-gray-400">• 表示モード制御：匿名・記名表示の切り替え</span><br>
+              <span class="text-gray-400">• リアクション管理：いいね数表示・種類の設定</span><br>
+              <span class="text-gray-400">• 公開ステータス管理：ワンクリックでの公開・非公開切り替え</span>
+            </li>
+            <li><strong class="text-amber-300">ユーザー・アクセス管理</strong><br>
+              <span class="text-gray-400">• ドメインベース制御：G Suite/Workspaceドメインの自動検証</span><br>
+              <span class="text-gray-400">• ユーザー登録システム：一意ID管理による集中ユーザーデータベース</span>
+            </li>
+          </ol>
+          
+          <div class="mt-4 p-3 bg-amber-800/30 rounded text-sm">
+            <strong class="text-amber-300">💡 管理のヒント</strong><br>
+            <span class="text-gray-300">• 公開後は管理モード切り替えで学習者と同じ画面を確認可能</span><br>
+            <span class="text-gray-300">• AI活用：列の自動判定機能で設定時間を大幅短縮</span><br>
+            <span class="text-gray-300">• リアルタイム更新：フォーム回答が即座にボードに反映</span><br>
+            <span class="text-gray-300">• バックアップ機能：設定の自動バックアップでデータ保護</span>
+          </div>
+        </div>
+        
+        <!-- セキュリティについて -->
+        <div class="glass-panel bg-blue-500/10 rounded-lg p-6 border border-blue-400/30">
+          <h4 class="font-semibold text-blue-400 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+            </svg>
+            セキュリティについて
+          </h4>
+          
+          <div class="space-y-4">
+            <div class="bg-blue-600/20 border border-blue-400/40 rounded-lg p-4">
+              <h5 class="font-medium text-blue-300 mb-2">🔒 データベースアクセス制御</h5>
+              <ul class="text-sm space-y-1 text-gray-300">
+                <li>• <strong>限定アクセス</strong>：データベースにアクセスできるのは<strong class="text-blue-300">ウェブアプリをデプロイしたユーザー</strong>と<strong class="text-blue-300">サービスアカウント</strong>のみ</li>
+                <li>• <strong>完全非公開設定</strong>：システム上、データベースは非公開設定が必須となっており、外部からのアクセスは一切不可能</li>
+                <li>• <strong>個別データ分離</strong>：各ユーザーのデータは専用スプレッドシートで完全分離</li>
+                <li>• <strong>自動権限管理</strong>：サービスアカウントへの編集権限付与を自動実行</li>
+              </ul>
+            </div>
+            
+            <div class="bg-green-600/20 border border-green-400/40 rounded-lg p-4">
+              <h5 class="font-medium text-green-300 mb-2">🛡️ 多層セキュリティ対策</h5>
+              <ul class="text-sm space-y-1 text-gray-300">
+                <li>• <strong>暗号化認証</strong>：JWT ベースのサービスアカウント認証とトークン自動更新</li>
+                <li>• <strong>ドメイン制限</strong>：組織展開時のドメインベースアクセス制御</li>
+                <li>• <strong>入力検証</strong>：全入力データの包括的検証とサニタイゼーション</li>
+                <li>• <strong>監査ログ</strong>：システム活動の完全追跡とログ記録</li>
+              </ul>
+            </div>
+            
+            <div class="bg-purple-600/20 border border-purple-400/40 rounded-lg p-4">
+              <h5 class="font-medium text-purple-300 mb-2">👥 ユーザー保護</h5>
+              <ul class="text-sm space-y-1 text-gray-300">
+                <li>• <strong>学習者データ保護</strong>：一般ユーザーは他の回答者データや基盤データベースにアクセス不可</li>
+                <li>• <strong>管理者権限分離</strong>：階層的アクセスレベルによる適切な権限管理</li>
+                <li>• <strong>セッションセキュリティ</strong>：自動クリーンアップ機能付きセキュアセッション管理</li>
+              </ul>
+            </div>
+          </div>
+          
+          <div class="mt-4 p-3 bg-blue-800/30 rounded text-sm text-blue-100">
+            <strong>📋 重要</strong>：回答ボード使用者の個人情報や回答データは厳重に保護され、教育目的以外での使用や第三者による不正アクセスを防ぐ設計となっています。
+          </div>
+        </div>
+        
+        <!-- Google連携の利点 -->
+        <div class="glass-panel bg-green-500/10 rounded-lg p-6 border border-green-400/30">
+          <h4 class="font-semibold text-green-400 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5" viewBox="0 0 24 24">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285f4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34a853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#fbbc05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#ea4335"/>
+            </svg>
+            Google連携の利点
+          </h4>
+          <ul class="text-sm space-y-2 text-gray-300">
+            <li>• <strong class="text-green-300">自動フォーム作成</strong>：回答収集フォームの即座生成</li>
+            <li>• <strong class="text-green-300">リアルタイム同期</strong>：フォーム回答の即座反映</li>
+            <li>• <strong class="text-green-300">セキュアな共有</strong>：学校ドメイン内でのデータ管理</li>
+            <li>• <strong class="text-green-300">バックアップ機能</strong>：Google Drive による自動バックアップ</li>
+            <li>• <strong class="text-green-300">分析活用</strong>：Google Sheets での詳細データ分析</li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="flex justify-end mt-6">
+        <button type="button" id="usage-guide-modal-close-btn" class="btn btn-primary">理解しました</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- セキュリティモーダル -->
 <div id="security-modal" class="fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
   <div class="flex items-center justify-center min-h-full p-4">
@@ -343,7 +479,8 @@ class SharedModals {
           'teacherGuideModal',
           'alert-modal',
           'loading-modal',
-          'security-modal'
+          'security-modal',
+          'usage-guide-modal'
         ];
         
         modals.forEach(modalId => {
@@ -360,7 +497,9 @@ class SharedModals {
       'digital-citizenship-modal-close',
       'digital-citizenship-modal-close-btn',
       'teacherGuideModal-close',
-      'teacherGuideModal-close-btn'
+      'teacherGuideModal-close-btn',
+      'usage-guide-modal-close',
+      'usage-guide-modal-close-btn'
     ];
     
     closeButtons.forEach(buttonId => {
@@ -371,6 +510,8 @@ class SharedModals {
             this.hideModal('digital-citizenship-modal');
           } else if (buttonId.includes('teacherGuide')) {
             this.hideModal('teacherGuideModal');
+          } else if (buttonId.includes('usage-guide')) {
+            this.hideModal('usage-guide-modal');
           }
         };
       }
