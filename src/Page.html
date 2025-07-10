@@ -185,6 +185,7 @@ try {
   MAPPING = {};
 }
 </script>
+<?!= include('SharedUtilities'); ?>
 <style>
 :root {
   --color-primary: #8be9fd;
@@ -3181,29 +3182,18 @@ async handleReaction(rowIndex, reaction) {
     }
   }
   debounce(func, delay) {
-    let timeout;
+    // Use SharedUtilities with instance-specific keys
+    const key = `studyquest-${this.instanceId || 'default'}-${Math.random().toString(36).substr(2, 9)}`;
     return (...args) => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => func.apply(this, args), delay);
+      window.sharedUtilities.debounce.debounce(() => func.apply(this, args), key, delay);
     };
   }
   
   throttle(func, delay) {
-    let timeoutId;
-    let lastExecTime = 0;
+    // Use SharedUtilities with instance-specific keys
+    const key = `studyquest-throttle-${this.instanceId || 'default'}-${Math.random().toString(36).substr(2, 9)}`;
     return (...args) => {
-      const currentTime = Date.now();
-      
-      if (currentTime - lastExecTime > delay) {
-        func.apply(this, args);
-        lastExecTime = currentTime;
-      } else {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          func.apply(this, args);
-          lastExecTime = Date.now();
-        }, delay - (currentTime - lastExecTime));
-      }
+      window.sharedUtilities.throttle.throttle(() => func.apply(this, args), key, delay);
     };
   }
   updateSortOptions() {

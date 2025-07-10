@@ -15,8 +15,9 @@
   <!-- TailwindCSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Unified Styles and Shared Modals -->
+  <!-- Unified Styles and Shared Components -->
   <?!= include('UnifiedStyles'); ?>
+  <?!= include('SharedUtilities'); ?>
   
   <!-- ClientOptimizer の統合 -->
   <?!= include('ClientOptimizer'); ?>
@@ -733,112 +734,27 @@
   <!-- 共通モーダルコンポーネントを読み込み -->
   <?!= include('SharedModals'); ?>
   <script>
-    // デバウンス機能
-    var debounceMap = new Map();
-    function debounce(func, key, delay = 1000) {
-      if (debounceMap.has(key)) {
-        clearTimeout(debounceMap.get(key));
-      }
-      var timeoutId = setTimeout(func, delay);
-      debounceMap.set(key, timeoutId);
-    }
+    // Use SharedUtilities instead of local debounce
+    var debounce = window.debounce || function(func, delay, key) {
+      window.sharedUtilities.debounce.debounce(func, key || 'default', delay);
+    };
 
     // =============================================================================
-    // DOM UTILITY FUNCTIONS - Refactored common patterns
+    // DOM UTILITY FUNCTIONS - Use SharedUtilities
     // =============================================================================
     
-    // Utility for safe DOM element creation
-    function createSafeElement(tag, className, textContent) {
-      var element = document.createElement(tag);
-      if (className) element.className = className;
-      if (textContent) element.textContent = textContent;
-      return element;
-    }
-    
-    // Utility for safe DOM element selection with null checking
-    function safeGetElement(id) {
-      return getCachedElement(id);
-    }
-    
-    // Utility for setting button state (disabled/enabled with text)
-    function setButtonState(button, isDisabled, text) {
-      if (!button) return;
-      button.disabled = isDisabled;
-      if (text) button.textContent = text;
-    }
-    
-    // Utility for setting element text content safely
-    function setSafeTextContent(element, text) {
-      if (!element) return;
-      element.textContent = text || '';
-    }
-    
-    // Utility for adding/removing CSS classes safely
-    function toggleClass(element, className, condition) {
-      if (!element) return;
-      if (condition) {
-        element.classList.add(className);
-      } else {
-        element.classList.remove(className);
-      }
-    }
-    
-    // Utility for creating and setting up event listeners safely
-    function addSafeEventListener(element, event, handler, options = {}) {
-      if (!element) return null;
-      element.addEventListener(event, handler, options);
-      return handler;
-    }
-    
-    // Utility for removing event listeners safely
-    function removeSafeEventListener(element, event, handler) {
-      if (!element || !handler) return;
-      element.removeEventListener(event, handler);
-    }
-    
-    // =============================================================================
-    // ELEMENT CACHE SYSTEM - Optimized DOM queries
-    // =============================================================================
-    
-    // Cache for frequently accessed elements not in the main elements object
-    var elementCache = new Map();
-    
-    // Enhanced safe element getter with caching
-    function getCachedElement(id) {
-      if (elementCache.has(id)) {
-        return elementCache.get(id);
-      }
-      
-      var element = document.getElementById(id);
-      if (element) {
-        elementCache.set(id, element);
-      } else {
-        console.warn('Element not found:', id);
-      }
-      return element;
-    }
-    
-    // Clear cache when needed (e.g., after dynamic content changes)
-    function clearElementCache() {
-      elementCache.clear();
-    }
-    
-    // Update cached element references
-    function updateElementCache(id, element) {
-      if (element) {
-        elementCache.set(id, element);
-      } else {
-        elementCache.delete(id);
-      }
-    }
-    
-    // Batch cache multiple elements
-    function cacheElements(elementIds) {
-      var cached = {};
-      elementIds.forEach(function(id) {
-        cached[id] = getCachedElement(id);
-      });
-      return cached;
+    // Backward compatibility functions using SharedUtilities
+    var dom = window.sharedUtilities.dom;
+    var createSafeElement = dom.createSafeElement.bind(dom);
+    var getCachedElement = dom.getCachedElement.bind(dom);
+    var safeGetElement = getCachedElement;
+    var setButtonState = dom.setButtonState.bind(dom);
+    var setSafeTextContent = dom.setSafeTextContent.bind(dom);
+    var toggleClass = dom.toggleClass.bind(dom);
+    var addSafeEventListener = dom.addSafeEventListener.bind(dom);
+    var removeSafeEventListener = dom.removeSafeEventListener.bind(dom);
+    var clearElementCache = dom.clearElementCache.bind(dom);
+    var cacheElements = dom.cacheElements.bind(dom);
     }
     
     // =============================================================================
