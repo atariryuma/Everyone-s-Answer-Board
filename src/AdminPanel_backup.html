@@ -732,6 +732,218 @@
   
   <!-- 共通モーダルコンポーネントを読み込み -->
   <?!= include('SharedModals'); ?>
+    <div class="glass-panel p-8 rounded-xl max-w-md w-full slide-up">
+      <h3 id="modal-title" class="text-xl font-bold text-cyan-400 mb-4"></h3>
+      <p id="modal-message" class="text-gray-300 mb-6"></p>
+      <div class="flex justify-end gap-4">
+        <button type="button" id="modal-cancel-btn" class="btn btn-secondary">キャンセル</button>
+        <button type="button" id="modal-confirm-btn" class="btn btn-primary">はい、実行します</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 公開選択モーダル -->
+  <div id="publish-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 hidden items-center justify-center p-4">
+    <div class="glass-panel p-8 rounded-xl max-w-md w-full slide-up">
+      <h3 class="text-xl font-bold text-cyan-400 mb-4">📋 設定保存完了</h3>
+      <p class="text-gray-300 mb-6">設定が正常に保存されました。<br>回答ボードを公開しますか？</p>
+      <div class="space-y-3 mb-6">
+        <div class="bg-gray-800/50 p-3 rounded-lg">
+          <div class="flex items-center">
+            <div class="w-3 h-3 bg-green-400 rounded-full mr-2"></div>
+            <span class="text-sm text-gray-300">公開する：生徒がボードにアクセス可能</span>
+          </div>
+        </div>
+        <div class="bg-gray-800/50 p-3 rounded-lg">
+          <div class="flex items-center">
+            <div class="w-3 h-3 bg-gray-400 rounded-full mr-2"></div>
+            <span class="text-sm text-gray-300">非公開：設定のみ保存（後で公開可能）</span>
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-end gap-4">
+        <button type="button" id="publish-modal-private-btn" class="btn btn-secondary">非公開のまま</button>
+        <button type="button" id="publish-modal-publish-btn" class="btn btn-primary">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          公開する
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 自動プライバシー機能モーダル -->
+  <div id="privacy-modal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+    <div class="glass-panel p-8 max-w-2xl w-full mx-4 relative">
+      <div class="flex items-center mb-6">
+        <div class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center mr-4">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+          </svg>
+        </div>
+        <h3 class="text-xl font-semibold text-white">🔒 自動プライバシー機能とセキュリティ</h3>
+      </div>
+      
+      <div class="text-gray-300 mb-6 space-y-4">
+        <p class="text-lg font-medium text-blue-300">みんなの回答ボードのプライバシー保護機能についてご説明します。</p>
+        
+        <div class="bg-gray-800 bg-opacity-50 p-4 rounded-lg">
+          <h4 class="font-semibold text-white mb-2">🔄 自動非公開システム</h4>
+          <p>ボードは<strong class="text-yellow-300">6時間後に自動で非公開</strong>になります。これにより、データの意図しない公開を防いでいます。</p>
+        </div>
+        
+        <div class="bg-gray-800 bg-opacity-50 p-4 rounded-lg">
+          <h4 class="font-semibold text-white mb-2">🔐 アクセス制御</h4>
+          <p>ボードへのアクセスは、<strong class="text-green-300">授業で使用するドメインとGoogleアカウントのみ</strong>に制限されます。</p>
+        </div>
+        
+        <div class="bg-gray-800 bg-opacity-50 p-4 rounded-lg">
+          <h4 class="font-semibold text-white mb-2">👥 匿名性の保護</h4>
+          <p>生徒のプライバシーを守るため、<strong class="text-purple-300">回答は匹名で表示</strong>されます。名前表示は先生が選択できます。</p>
+        </div>
+
+        <div class="bg-gray-800 bg-opacity-50 p-4 rounded-lg">
+          <h4 class="font-semibold text-white mb-2">📊 データ所有権とサービスアカウント</h4>
+          <p class="mb-2">
+            生徒の回答データが保存されるGoogleスプレッドシートは、<strong class="text-blue-300">アプリケーションをデプロイした管理者（あなた）が所有者</strong>となります。
+          </p>
+          <p class="mb-2">
+            アプリケーションは、Googleの<strong class="text-blue-300">サービスアカウント</strong>という「ボット」のような仕組みを利用して、あなたのスプレッドシートにのみデータ（回答やリアクション）の読み書きを行います。
+          </p>
+          <p>
+            このサービスアカウントによるアクセスは、厳格な権限設定に基づいており、<strong class="text-blue-300">他の一般ユーザーが直接あなたのスプレッドシートのデータを見ることはできません</strong>。データは安全に保護されています。
+          </p>
+        </div>
+
+        <div class="bg-green-900 bg-opacity-30 border border-green-500 p-4 rounded-lg">
+          <h4 class="font-semibold text-green-300 mb-2">✅ デジタルシティズンシップの実践</h4>
+          <p>これらの機能は、生徒が安心して意見を交換できるデジタル環境を提供し、責任あるオンライン行動を学ぶためのものです。</p>
+        </div>
+      </div>
+      
+      <div class="flex justify-end gap-4">
+        <button type="button" id="privacy-modal-cancel" class="btn btn-secondary">キャンセル</button>
+        <button type="button" id="privacy-modal-continue" class="btn btn-primary">理解しました、継続</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- デジタルシティズンシップ指導モーダル -->
+  <div id="digital-citizenship-modal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+    <div class="glass-panel p-8 max-w-4xl w-full mx-4 relative max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+            </svg>
+          </div>
+          <h3 class="text-2xl font-bold text-white">🌐 デジタルシティズンシップ教育ガイド</h3>
+        </div>
+        <button type="button" id="digital-citizenship-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="space-y-6 text-gray-300">
+        <!-- デジタルシティズンシップの重要性 -->
+        <div class="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-500/30 rounded-lg p-6">
+          <h4 class="text-xl font-semibold text-blue-300 mb-4">📚 デジタルシティズンシップとは</h4>
+          <p class="mb-4">デジタル技術を責任を持って適切に使用するための知識、スキル、態度です。</p>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="bg-blue-800/20 p-4 rounded-lg">
+              <h5 class="font-semibold text-blue-200 mb-2">🛡️ セキュリティとプライバシー</h5>
+              <p class="text-sm">個人情報やデジタル足跡を守る方法を学びます。</p>
+            </div>
+            <div class="bg-purple-800/20 p-4 rounded-lg">
+              <h5 class="font-semibold text-purple-200 mb-2">🤝 デジタルコミュニケーション</h5>
+              <p class="text-sm">オンラインでの適切なコミュニケーション方法を習得します。</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- みんなの回答ボードでの実践 -->
+        <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-6">
+          <h4 class="text-xl font-semibold text-green-300 mb-4">🌱 みんなの回答ボードでの実践</h4>
+          <div class="space-y-4">
+            <div class="flex items-start gap-3">
+              <div class="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center mt-1">
+                <span class="text-green-300 font-semibold">1</span>
+              </div>
+              <div>
+                <h5 class="font-semibold text-green-200">尊重と共感</h5>
+                <p class="text-sm text-gray-300">他の人の意見を尊重し、共感を示すことを学びます。</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-3">
+              <div class="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center mt-1">
+                <span class="text-green-300 font-semibold">2</span>
+              </div>
+              <div>
+                <h5 class="font-semibold text-green-200">建設的なフィードバック</h5>
+                <p class="text-sm text-gray-300">「いいね！」「なるほど！」等のリアクションでポジティブな交流を促進します。</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-3">
+              <div class="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center mt-1">
+                <span class="text-green-300 font-semibold">3</span>
+              </div>
+              <div>
+                <h5 class="font-semibold text-green-200">プライバシーの理解</h5>
+                <p class="text-sm text-gray-300">名前表示の選択や個人情報の扱いについて考えます。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 指導のポイント -->
+        <div class="bg-amber-900/20 border border-amber-500/30 rounded-lg p-6">
+          <h4 class="text-xl font-semibold text-amber-300 mb-4">🌟 指導のポイント</h4>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <h5 class="font-semibold text-amber-200 mb-2">事前指導</h5>
+              <ul class="list-disc list-inside space-y-1 text-sm text-gray-300">
+                <li>オンラインでのルールとマナーの確認</li>
+                <li>プライバシー設定の重要性</li>
+                <li>建設的なコメントの例示</li>
+              </ul>
+            </div>
+            <div>
+              <h5 class="font-semibold text-amber-200 mb-2">活動中のサポート</h5>
+              <ul class="list-disc list-inside space-y-1 text-sm text-gray-300">
+                <li>生徒の投稿をモニタリング</li>
+                <li>適切なフィードバックの提供</li>
+                <li>デジタルエチケットの実践例を示す</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        
+        <!-- リソース -->
+        <div class="bg-gray-800/50 border border-gray-600 rounded-lg p-6">
+          <h4 class="text-xl font-semibold text-gray-200 mb-4">📚 参考リソース</h4>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <h5 class="font-semibold text-gray-300 mb-2">文部科学省のガイドライン</h5>
+              <p class="text-sm text-gray-400">「GIGAスクール構想」における情報モラル教育の取り組み</p>
+            </div>
+            <div>
+              <h5 class="font-semibold text-gray-300 mb-2">デジタルシティズンシップ教育</h5>
+              <p class="text-sm text-gray-400">適切なデジタル技術の活用と情報モラルの育成</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="flex justify-end mt-6">
+        <button type="button" id="digital-citizenship-modal-close-btn" class="btn btn-primary">理解しました</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // デバウンス機能
     var debounceMap = new Map();
