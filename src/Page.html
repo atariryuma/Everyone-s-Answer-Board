@@ -61,6 +61,58 @@ function debugLog() {
   }
 }
 
+// システム全体フロー表示機能
+function showSystemFlow() {
+  if (!DEBUG_MODE) return;
+  
+  console.group('🔄 StudyQuest システム全体フロー');
+  console.log('📋 Phase 1: 初期化処理');
+  console.log('  ├─ HTML構造の読み込み');
+  console.log('  ├─ CSS統合スタイルの適用');
+  console.log('  ├─ JavaScript初期化');
+  console.log('  └─ デバッグモード設定');
+  
+  console.log('🎨 Phase 2: スタイル統合');
+  console.log('  ├─ UnifiedStyles.htmlの読み込み');
+  console.log('  ├─ Page固有スタイルの適用');
+  console.log('  ├─ レスポンシブデザイン対応');
+  console.log('  └─ アクセシビリティ設定');
+  
+  console.log('📡 Phase 3: GAS API連携');
+  console.log('  ├─ Google Apps Script環境検出');
+  console.log('  ├─ 管理者権限確認');
+  console.log('  ├─ シートデータ取得');
+  console.log('  └─ リアルタイム更新設定');
+  
+  console.log('🏗️ Phase 4: UI構築');
+  console.log('  ├─ 回答カード生成');
+  console.log('  ├─ フィルタリング機能');
+  console.log('  ├─ ソート機能');
+  console.log('  └─ ページネーション');
+  
+  console.log('⚡ Phase 5: インタラクション');
+  console.log('  ├─ リアクション機能');
+  console.log('  ├─ ハイライト機能');
+  console.log('  ├─ モーダル表示');
+  console.log('  └─ キーボードショートカット');
+  
+  console.log('🔧 Phase 6: 最適化');
+  console.log('  ├─ パフォーマンス監視');
+  console.log('  ├─ メモリ使用量制御');
+  console.log('  ├─ ネットワーク最適化');
+  console.log('  └─ エラーハンドリング');
+  
+  console.groupEnd();
+  
+  // 現在の状態を表示
+  console.group('📊 現在のシステム状態');
+  console.log('DOM状態:', document.readyState);
+  console.log('CSS読み込み:', document.styleSheets.length + ' stylesheets');
+  console.log('JavaScript実行:', 'Ready');
+  console.log('GAS環境:', typeof google !== 'undefined' ? 'Available' : 'Not Available');
+  console.groupEnd();
+}
+
 function safeDebugStringify(obj, maxDepth = 2, currentDepth = 0) {
   if (currentDepth > maxDepth) return '[Max Depth Reached]';
   
@@ -132,8 +184,8 @@ try {
   MAPPING = {};
 }
 </script>
-<!-- Include UnifiedStyles for optimized CSS -->
-<link rel="stylesheet" href="UnifiedStyles.html">
+<!-- Include UnifiedStyles using GAS best practices -->
+<?!= include('UnifiedStyles'); ?>
 <style>
 /* Page-specific CSS overrides and customizations */
 :root {
@@ -3086,6 +3138,10 @@ try {
   if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
     window.studyQuestApp.destroy();
   }
+  
+  // システム全体フロー表示
+  showSystemFlow();
+  
   window.studyQuestApp = new StudyQuestApp();
   
   // Expose debug functions globally for console access
@@ -3107,6 +3163,9 @@ try {
     }
   };
 
+  // システムフロー表示をグローバルで利用可能にする
+  window.showSystemFlow = showSystemFlow;
+  
   // Additional global debug utilities
   window.debugClickAllAnswerCards = async (options = {}) => {
     if (!window.studyQuestApp) {
