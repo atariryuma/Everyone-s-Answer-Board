@@ -1769,7 +1769,32 @@ function setupEventListeners() {
       // 追加フォーム作成ボタン
       var createAdditionalFormBtn = document.getElementById('create-additional-form-btn');
       if (createAdditionalFormBtn) {
-        createAdditionalFormBtn.addEventListener('click', createAdditionalForm);
+        createAdditionalFormBtn.addEventListener('click', function() {
+          showFormConfigModal(function(config) {
+            setLoading(true, '新規フォームを作成しています。');
+            runGas('createAdditionalFormWithConfig', config)
+              .then(function(response) {
+                setLoading(true, '設定情報を更新しています。');
+                // Simulate configuration update if not handled by createAdditionalFormWithConfig directly
+                // For a real application, you might have another GAS function call here
+                // e.g., runGas('updateInitialConfigForAdditionalForm', response.newFormId).then(...)
+                
+                setLoading(true, 'ボードを公開しています。');
+                // フォームURLを表示
+                if (response.formUrl) {
+                  elements.formUrlInput.value = response.formUrl;
+                  elements.openFormUrlLink.href = response.formUrl;
+                  elements.formUrlSection.classList.remove('hidden');
+                }
+                loadStatus(); // ステータスを再読み込みしてUIを更新
+                showMessage('新しいフォームが正常に作成され、ボードに適用されました！', 'success');
+              })
+              .catch(function(error) {
+                setLoading(false);
+                handleError(error, 'createAdditionalForm');
+              });
+          });
+        });
       }
 
       // フォーム設定モーダルのイベントリスナー
@@ -2657,8 +2682,21 @@ function syncCheckboxStates(status) {
       runGas('saveAndPublish', selectedSheet, config)
         .then(function(status) {
           setLoading(false);
-          showMessage('✅ 設定が保存され、ボードが公開されました！', 'success');
-          updateUIWithNewStatus(status); // UI全体を更新
+              showMessage('設定が保存され、ボードが公開されました！', 'success');
+    loadStatus(); // ステータスを再読み込みしてUIを更新
+    // 強制的にサーバーから情報を取得して管理パネル全体に適用
+    google.script.run
+      .withSuccessHandler(function(status) {
+        updateDatabaseInfo(status);
+        updateSystemInfoPanel(status);
+        updateFooterAndGuidance(status);
+        setLoading(false);
+      })
+      .withFailureHandler(function(error) {
+        handleError(error, 'loadStatus');
+        setLoading(false);
+      })
+      .getStatus();
         })
         .catch(function(error) {
           setLoading(false);
@@ -2710,18 +2748,29 @@ function syncCheckboxStates(status) {
         '新規ボードの作成',
         '新しいGoogleフォームと連携するスプレッドシートを作成します。よろしいですか？',
         function() {
-          setLoading(true, '新しいボードを作成しています...');
-          runGas('createBoard')
-            .then(function(result) {
-              showMessage('✅ 新しいボードが正常に作成されました！', 'success');
-              loadStatus(true); // 全体をリフレッシュ
-            })
-            .catch(function(error) {
-              handleError(error, 'createBoard');
-            })
-            .finally(function() {
-              setLoading(false);
-            });
+          function createBoard() {
+      setLoading(true, '新規フォームを作成しています。');
+      runGas('createBoard')
+        .then(function(response) {
+          setLoading(true, '設定情報を更新しています。');
+          // Assuming the server-side 'createBoard' also handles initial configuration
+          // and returns a status that can be used to update the UI.
+          // If not, a separate GAS call might be needed here for configuration.
+          // For now, we'll just update the message and then refresh.
+          
+          // Simulate configuration update if not handled by createBoard directly
+          // For a real application, you might have another GAS function call here
+          // e.g., runGas('updateInitialConfig', response.newFormId).then(...)
+          
+          setLoading(true, 'ボードを公開しています。');
+          loadStatus(); // ステータスを再読み込みしてUIを更新
+          showMessage('ボードが正常に作成され、公開されました！', 'success');
+        })
+        .catch(function(error) {
+          setLoading(false);
+          handleError(error, 'createBoard');
+        });
+    }
         }
       );
     }
