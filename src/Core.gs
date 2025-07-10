@@ -868,7 +868,12 @@ function createAdditionalForm(title) {
       configJson: JSON.stringify(configJson)
     });
 
-    var mapping = autoMapSheetHeaders(formAndSsInfo.sheetName);
+    var mapping = autoMapSheetHeaders(formAndSsInfo.sheetName, {
+      mainQuestion: '今回のテーマについて、あなたの考えや意見を聞かせてください',
+      reasonQuestion: 'そう考える理由や体験があれば教えてください（任意）',
+      nameQuestion: '名前',
+      classQuestion: 'クラス'
+    });
     if (mapping) {
       saveAndActivateSheet(formAndSsInfo.spreadsheetId, formAndSsInfo.sheetName, mapping);
     }
@@ -935,7 +940,12 @@ function createAdditionalFormWithConfig(config) {
       configJson: JSON.stringify(configJson)
     });
 
-    var mapping = autoMapSheetHeaders(formAndSsInfo.sheetName);
+    var mapping = autoMapSheetHeaders(formAndSsInfo.sheetName, {
+      mainQuestion: config.customMainQuestion,
+      reasonQuestion: 'そう考える理由や体験があれば教えてください（任意）',
+      nameQuestion: '名前',
+      classQuestion: config.enableClassSelection ? 'クラス' : ''
+    });
     if (mapping) {
       saveAndActivateSheet(formAndSsInfo.spreadsheetId, formAndSsInfo.sheetName, mapping);
     }
@@ -1535,7 +1545,7 @@ function createFormFactory(options) {
     form.setDescription(formDescription);
     
     // 基本的な質問を追加
-    addUnifiedQuestions(form, options.questions || 'default', {});
+    addUnifiedQuestions(form, options.questions || 'default', options.customConfig || {});
     
     // スプレッドシート作成
     var spreadsheetResult = createLinkedSpreadsheet(userEmail, form, dateTimeString);
@@ -1615,11 +1625,17 @@ function addUnifiedQuestions(form, questionType, customConfig) {
           if (customConfig.mainQuestionChoices && customConfig.mainQuestionChoices.length > 0) {
             mainItem.setChoiceValues(customConfig.mainQuestionChoices);
           }
+          if (typeof mainItem.showOtherOption === 'function') {
+            mainItem.showOtherOption(true);
+          }
           break;
         case 'choice':
           mainItem = form.addMultipleChoiceItem();
           if (customConfig.mainQuestionChoices && customConfig.mainQuestionChoices.length > 0) {
             mainItem.setChoiceValues(customConfig.mainQuestionChoices);
+          }
+          if (typeof mainItem.showOtherOption === 'function') {
+            mainItem.showOtherOption(true);
           }
           break;
         default:

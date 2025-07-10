@@ -10,7 +10,7 @@ describe('getQuestionConfig simple', () => {
   test('returns simple config', () => {
     const cfg = context.getQuestionConfig('simple');
     expect(cfg.classQuestion.title).toBe('クラス');
-    expect(cfg.classQuestion.choices.length).toBe(4);
+    expect(cfg.classQuestion.choices.length).toBe(18);
     expect(cfg.nameQuestion.title).toBe('名前');
   });
 });
