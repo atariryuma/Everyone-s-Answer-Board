@@ -67,10 +67,10 @@
 </div>
 
 <!-- デジタルシティズンシップモーダル -->
-<div id="digital-citizenship-modal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 hidden">
-  <div class="glass-panel rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+<div id="digital-citizenship-modal" class="fixed inset-0 bg-black/80 z-50 hidden items-center justify-center p-4" role="dialog" aria-modal="true">
+  <div class="glass-panel rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
     <div class="flex items-center justify-between mb-6">
-      <h3 class="text-2xl font-bold text-cyan-400">デジタルシティズンシップ</h3>
+      <h3 class="text-2xl font-bold text-cyan-400">回答ボード指導における留意点</h3>
       <button type="button" id="digital-citizenship-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -80,23 +80,28 @@
     
     <div class="space-y-6 text-gray-300">
       <div class="glass-panel bg-blue-500/10 rounded-lg p-4 border border-blue-400/30">
-        <h4 class="font-semibold text-blue-400 mb-2">🌐 責任あるデジタル利用</h4>
-        <p class="text-sm">デジタルツールを使用する際は、倫理的で責任ある行動を心がけましょう。</p>
+        <h4 class="font-semibold text-blue-400 mb-2">📝 適切な質問設計</h4>
+        <p class="text-sm">学習者が建設的な議論ができるよう、明確で具体的な質問を設計しましょう。曖昧な質問は混乱を招く可能性があります。</p>
       </div>
       
       <div class="glass-panel bg-green-500/10 rounded-lg p-4 border border-green-400/30">
-        <h4 class="font-semibold text-green-400 mb-2">🤝 相互尊重</h4>
-        <p class="text-sm">他の利用者を尊重し、建設的なコミュニケーションを行いましょう。</p>
+        <h4 class="font-semibold text-green-400 mb-2">🤝 多様な意見の尊重</h4>
+        <p class="text-sm">すべての学習者の意見を尊重し、異なる視点から議論できる環境を作りましょう。否定的なリアクションの使用についても事前に指導を行いましょう。</p>
       </div>
       
       <div class="glass-panel bg-purple-500/10 rounded-lg p-4 border border-purple-400/30">
-        <h4 class="font-semibold text-purple-400 mb-2">🛡️ プライバシー保護</h4>
-        <p class="text-sm">個人情報を適切に保護し、他者のプライバシーも尊重しましょう。</p>
+        <h4 class="font-semibold text-purple-400 mb-2">🛡️ 個人情報の保護</h4>
+        <p class="text-sm">学習者の個人情報やプライバシーを保護し、回答内容が適切に管理されることを説明しましょう。名前の表示・非表示は状況に応じて設定してください。</p>
       </div>
       
       <div class="glass-panel bg-red-500/10 rounded-lg p-4 border border-red-400/30">
-        <h4 class="font-semibold text-red-400 mb-2">⚖️ 法的・倫理的責任</h4>
-        <p class="text-sm">デジタル空間でも法的・倫理的責任を理解し、適切に行動しましょう。</p>
+        <h4 class="font-semibold text-red-400 mb-2">⚠️ 不適切な投稿への対応</h4>
+        <p class="text-sm">不適切な内容が投稿された場合の対応方法を事前に決めておき、学習者にもルールを明確に伝えましょう。管理者機能を適切に活用してください。</p>
+      </div>
+      
+      <div class="glass-panel bg-yellow-500/10 rounded-lg p-4 border border-yellow-400/30">
+        <h4 class="font-semibold text-yellow-400 mb-2">📊 データ活用と振り返り</h4>
+        <p class="text-sm">収集された回答データを学習の振り返りに活用し、学習者の理解度向上につなげましょう。リアクション機能も効果的に活用してください。</p>
       </div>
     </div>
     
@@ -163,6 +168,51 @@
     <div class="spinner mx-auto mb-4"></div>
     <h3 id="loading-modal-title" class="text-xl font-bold text-cyan-400 mb-2">処理中...</h3>
     <p id="loading-modal-message" class="text-gray-300">しばらくお待ちください</p>
+  </div>
+</div>
+
+<!-- セキュリティモーダル -->
+<div id="security-modal" class="fixed inset-0 bg-black/80 z-50 hidden items-center justify-center p-4" role="dialog" aria-modal="true">
+  <div class="glass-panel rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="text-2xl font-bold text-cyan-400">セキュリティとデータ保護</h3>
+      <button type="button" id="security-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+    
+    <div class="space-y-6 text-gray-300">
+      <div class="glass-panel bg-blue-500/10 rounded-lg p-4 border border-blue-400/30">
+        <h4 class="font-semibold text-blue-400 mb-2">🔒 データの暗号化と保護</h4>
+        <p class="text-sm">すべてのデータ通信はHTTPS暗号化により保護されており、Google Workspace のセキュリティ基準に準拠しています。学習者の個人情報は適切に保護されます。</p>
+      </div>
+      
+      <div class="glass-panel bg-green-500/10 rounded-lg p-4 border border-green-400/30">
+        <h4 class="font-semibold text-green-400 mb-2">👥 アクセス制御</h4>
+        <p class="text-sm">管理者権限により、教師のみがシート設定や公開・非公開の切り替えを行えます。学習者は閲覧と回答のみ可能で、他の学習者のデータを変更することはできません。</p>
+      </div>
+      
+      <div class="glass-panel bg-purple-500/10 rounded-lg p-4 border border-purple-400/30">
+        <h4 class="font-semibold text-purple-400 mb-2">📊 データの管理と保存</h4>
+        <p class="text-sm">回答データはGoogle スプレッドシートに保存され、学校のGoogle Workspace 管理ポリシーに従って管理されます。データは教育目的でのみ使用されます。</p>
+      </div>
+      
+      <div class="glass-panel bg-yellow-500/10 rounded-lg p-4 border border-yellow-400/30">
+        <h4 class="font-semibold text-yellow-400 mb-2">🛡️ プライバシー設定</h4>
+        <p class="text-sm">名前の表示・非表示、リアクション数の表示設定により、学習環境に応じて適切なプライバシーレベルを設定できます。匿名での議論も可能です。</p>
+      </div>
+      
+      <div class="glass-panel bg-red-500/10 rounded-lg p-4 border border-red-400/30">
+        <h4 class="font-semibold text-red-400 mb-2">⚠️ 注意事項</h4>
+        <p class="text-sm">機密性の高い個人情報や学外秘の内容は投稿しないよう、学習者に事前に指導してください。適切な利用ガイドラインを設定することが重要です。</p>
+      </div>
+    </div>
+    
+    <div class="flex justify-end mt-6">
+      <button type="button" id="security-modal-confirm" class="btn btn-primary">理解しました</button>
+    </div>
   </div>
 </div>
 
@@ -275,7 +325,8 @@ class SharedModals {
           'digital-citizenship-modal',
           'teacherGuideModal',
           'alert-modal',
-          'loading-modal'
+          'loading-modal',
+          'security-modal'
         ];
         
         modals.forEach(modalId => {

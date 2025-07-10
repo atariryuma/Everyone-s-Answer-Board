@@ -565,13 +565,18 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                 </svg>
-                基本の流れ
+                回答ボード管理の流れ
               </h4>
               <ol class="list-decimal list-inside space-y-2 text-xs text-amber-100">
-                <li>データ準備：フォーム作成またはスプレッドシート追加</li>
-                <li>シート選択：表示したいシートを選択</li>
-                <li>設定・公開：列設定を行い回答ボードを公開</li>
+                <li><strong>データソース準備：</strong>Googleフォームまたはスプレッドシートから回答データを取得</li>
+                <li><strong>シート選択：</strong>ドロップダウンから表示したいシートを選択</li>
+                <li><strong>列設定：</strong>回答・理由・名前・クラス列を適切に設定</li>
+                <li><strong>表示設定：</strong>名前表示・リアクション数表示・ソート機能を設定</li>
+                <li><strong>公開管理：</strong>「公開」ボタンで学習者に回答ボードへのアクセスを許可</li>
               </ol>
+              <div class="mt-3 p-2 bg-amber-800/30 rounded text-xs">
+                <strong>💡 ヒント：</strong>公開後は管理モード切り替えで学習者と同じ画面を確認できます
+              </div>
             </div>
             
             <!-- Google連携の利点 -->
@@ -603,9 +608,9 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
                 </svg>
-                デジタルシティズンシップ
+                回答ボード指導における留意点
               </h4>
-              <p class="text-xs text-blue-100 mb-3">責任あるデジタル利用と指導のポイントを確認しましょう</p>
+              <p class="text-xs text-blue-100 mb-3">回答ボードを活用した指導における重要なポイントを確認しましょう</p>
               <button type="button" id="show-digital-citizenship-guide" class="btn btn-secondary w-full text-sm py-2">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -1767,6 +1772,34 @@ function setupEventListeners() {
         createAdditionalFormBtn.addEventListener('click', createAdditionalForm);
       }
 
+      // フォーム設定モーダルのイベントリスナー
+      var formConfigClose = document.getElementById('form-config-close');
+      var formConfigCancel = document.getElementById('form-config-cancel');
+      var formConfigCreate = document.getElementById('form-config-create');
+      var mainQuestionType = document.getElementById('main-question-type');
+
+      if (formConfigClose) {
+        formConfigClose.addEventListener('click', hideFormConfigModal);
+      }
+      if (formConfigCancel) {
+        formConfigCancel.addEventListener('click', hideFormConfigModal);
+      }
+      if (formConfigCreate) {
+        formConfigCreate.addEventListener('click', createFormWithConfig);
+      }
+
+      // 質問タイプ変更時の処理
+      if (mainQuestionType) {
+        mainQuestionType.addEventListener('change', function() {
+          const choicesDiv = document.getElementById('main-question-choices-div');
+          if (this.value === 'multiple' || this.value === 'choice') {
+            choicesDiv.classList.remove('hidden');
+          } else {
+            choicesDiv.classList.add('hidden');
+          }
+        });
+      }
+
       var refreshBoardBtn = document.getElementById('refresh-board-btn');
       if (refreshBoardBtn) {
         refreshBoardBtn.addEventListener('click', refreshBoardDataFromAdmin);
@@ -2673,31 +2706,70 @@ function syncCheckboxStates(status) {
      * 新規フォームを作成する
      */
     function createAdditionalForm() {
-        showConfirmationModal(
-            '新規フォームの作成',
-            '新しいGoogleフォームを作成して現在のボードに連携します。よろしいですか？',
-            function() {
-                setLoading(true, '新しいフォームを作成しています...');
-                runGas('createAdditionalForm')
-                    .then(function(result) {
-                        if (result.status === 'success') {
-                            showMessage('✅ 新しいフォームが作成され、連携されました！', 'success');
-                            if (result.editFormUrl) {
-                                window.open(result.editFormUrl, '_blank');
-                            }
-                            loadStatus(true);
-                        } else {
-                            throw new Error(result.message || 'フォーム作成に失敗しました。');
-                        }
-                    })
-                    .catch(function(error) {
-                        handleError(error, 'createAdditionalForm');
-                    })
-                    .finally(function() {
-                        setLoading(false);
-                    });
-            }
-        );
+        showFormConfigModal();
+    }
+
+    /**
+     * フォーム設定モーダルを表示
+     */
+    function showFormConfigModal() {
+        const modal = document.getElementById('form-config-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
+    }
+
+    /**
+     * フォーム設定モーダルを非表示
+     */
+    function hideFormConfigModal() {
+        const modal = document.getElementById('form-config-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    /**
+     * フォーム設定に基づいてフォームを作成
+     */
+    function createFormWithConfig() {
+        const classChoices = document.getElementById('class-choices').value.split('\n').filter(choice => choice.trim());
+        const mainQuestionType = document.getElementById('main-question-type').value;
+        const mainQuestionChoices = document.getElementById('main-question-choices').value.split('\n').filter(choice => choice.trim());
+        const autoName = document.getElementById('auto-name').checked;
+        const autoReason = document.getElementById('auto-reason').checked;
+        const customMainQuestion = document.getElementById('custom-main-question').value.trim();
+
+        const config = {
+            classChoices: classChoices,
+            mainQuestionType: mainQuestionType,
+            mainQuestionChoices: mainQuestionChoices,
+            autoName: autoName,
+            autoReason: autoReason,
+            customMainQuestion: customMainQuestion
+        };
+
+        hideFormConfigModal();
+        setLoading(true, '新しいフォームを作成しています...');
+
+        runGas('createAdditionalFormWithConfig', config)
+            .then(function(result) {
+                if (result.status === 'success') {
+                    showMessage('✅ 新しいフォームが作成され、連携されました！', 'success');
+                    if (result.editFormUrl) {
+                        window.open(result.editFormUrl, '_blank');
+                    }
+                    loadStatus(true);
+                } else {
+                    throw new Error(result.message || 'フォーム作成に失敗しました。');
+                }
+            })
+            .catch(function(error) {
+                handleError(error, 'createAdditionalForm');
+            })
+            .finally(function() {
+                setLoading(false);
+            });
     }
 
     /**
@@ -2810,5 +2882,100 @@ function syncCheckboxStates(status) {
     }
 
   </script>
+
+  <!-- フォーム設定モーダル -->
+  <div id="form-config-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 hidden">
+    <div class="bg-gray-800 rounded-lg max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold text-white">フォーム設定</h3>
+          <button id="form-config-close" class="text-gray-400 hover:text-white">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="space-y-4">
+          <!-- クラス選択肢設定 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">クラス選択肢</label>
+            <textarea id="class-choices" rows="4" class="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white text-sm" placeholder="1年1組&#10;1年2組&#10;2年1組&#10;...">1年1組
+1年2組
+1年3組
+2年1組
+2年2組
+2年3組
+3年1組
+3年2組
+3年3組
+4年1組
+4年2組
+4年3組
+5年1組
+5年2組
+5年3組
+6年1組
+6年2組
+6年3組</textarea>
+            <p class="text-xs text-gray-500 mt-1">1行に1つずつクラス名を入力してください</p>
+          </div>
+
+          <!-- メイン質問タイプ -->
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">メイン質問の入力タイプ</label>
+            <select id="main-question-type" class="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white text-sm">
+              <option value="paragraph">長文テキスト（段落）</option>
+              <option value="text">短文テキスト（1行）</option>
+              <option value="multiple">選択肢（複数選択可）</option>
+              <option value="choice">選択肢（単一選択）</option>
+            </select>
+          </div>
+
+          <!-- メイン質問選択肢（選択肢タイプの場合） -->
+          <div id="main-question-choices-div" class="hidden">
+            <label class="block text-sm font-medium text-gray-300 mb-2">メイン質問の選択肢</label>
+            <textarea id="main-question-choices" rows="3" class="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white text-sm" placeholder="選択肢1&#10;選択肢2&#10;選択肢3"></textarea>
+            <p class="text-xs text-gray-500 mt-1">1行に1つずつ選択肢を入力してください</p>
+          </div>
+
+          <!-- 自動挿入項目 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">自動挿入項目</label>
+            <div class="space-y-2">
+              <label class="flex items-center">
+                <input type="checkbox" id="auto-name" checked class="mr-2 rounded bg-gray-700 border-gray-600">
+                <span class="text-sm text-gray-300">名前欄を自動追加</span>
+              </label>
+              <label class="flex items-center">
+                <input type="checkbox" id="auto-reason" checked class="mr-2 rounded bg-gray-700 border-gray-600">
+                <span class="text-sm text-gray-300">理由欄を自動追加</span>
+              </label>
+              <label class="flex items-center">
+                <input type="checkbox" id="auto-email" checked disabled class="mr-2 rounded bg-gray-700 border-gray-600">
+                <span class="text-sm text-gray-300">メール収集（常時有効）</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- カスタム質問文 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">カスタム質問文（オプション）</label>
+            <input type="text" id="custom-main-question" class="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white text-sm" placeholder="空欄の場合はデフォルトの質問文を使用">
+          </div>
+        </div>
+
+        <div class="flex gap-2 mt-6">
+          <button id="form-config-cancel" class="flex-1 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors">
+            キャンセル
+          </button>
+          <button id="form-config-create" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+            フォーム作成
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>

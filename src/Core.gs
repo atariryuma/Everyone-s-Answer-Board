@@ -888,6 +888,73 @@ function createAdditionalForm(title) {
 }
 
 /**
+ * 設定付きで新しいフォームを作成
+ */
+function createAdditionalFormWithConfig(config) {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+    
+    var userInfo = getUserWithFallback(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    var formTitle = 'StudyQuest カスタムフォーム - ' + new Date().toLocaleDateString('ja-JP');
+    var formAndSsInfo = createStudyQuestFormWithConfig(userInfo.adminEmail, currentUserId, formTitle, config);
+
+    // 所定のフォルダへ移動
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    if (configJson.folderId) {
+      try {
+        var folder = DriveApp.getFolderById(configJson.folderId);
+        folder.addFile(DriveApp.getFileById(formAndSsInfo.formId));
+        folder.addFile(DriveApp.getFileById(formAndSsInfo.spreadsheetId));
+        DriveApp.getRootFolder().removeFile(DriveApp.getFileById(formAndSsInfo.formId));
+        DriveApp.getRootFolder().removeFile(DriveApp.getFileById(formAndSsInfo.spreadsheetId));
+      } catch (moveErr) {
+        console.warn('ファイル移動に失敗: ' + moveErr.message);
+      }
+    }
+
+    // ユーザー情報更新
+    configJson.formUrl = formAndSsInfo.formUrl;
+    configJson.editFormUrl = formAndSsInfo.editFormUrl;
+    configJson.publishedSpreadsheetId = formAndSsInfo.spreadsheetId;
+    configJson.publishedSheetName = formAndSsInfo.sheetName;
+    configJson.appPublished = true;
+    configJson.formCreated = true;
+
+    updateUser(currentUserId, {
+      spreadsheetId: formAndSsInfo.spreadsheetId,
+      spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+      configJson: JSON.stringify(configJson)
+    });
+
+    var mapping = autoMapSheetHeaders(formAndSsInfo.sheetName);
+    if (mapping) {
+      saveAndActivateSheet(formAndSsInfo.spreadsheetId, formAndSsInfo.sheetName, mapping);
+    }
+    
+    return {
+      status: 'success',
+      message: '新しいカスタムフォームが正常に作成されました',
+      formUrl: formAndSsInfo.formUrl,
+      editFormUrl: formAndSsInfo.editFormUrl,
+      spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+      formTitle: formAndSsInfo.formTitle
+    };
+  } catch (e) {
+    console.error('カスタムフォーム作成エラー: ' + e.message);
+    return { status: 'error', message: 'カスタムフォームの作成に失敗しました: ' + e.message };
+  }
+}
+
+/**
  * フォーム設定を更新
  * AdminPanel.htmlから呼び出される
  */
@@ -1462,12 +1529,58 @@ function addUnifiedQuestions(form, questionType, customConfig) {
 
       var reasonItem = form.addParagraphTextItem();
       reasonItem.setTitle(config.reasonQuestion.title);
+      reasonItem.setHelpText(config.reasonQuestion.helpText);
       var validation = FormApp.createParagraphTextValidation()
-        .setHelpText(config.reasonQuestion.helpText)
         .setMaxLength(140)
         .build();
       reasonItem.setValidation(validation);
       reasonItem.setRequired(false);
+    } else if (questionType === 'custom' && customConfig) {
+      // クラス選択肢
+      var classItem = form.addListItem();
+      classItem.setTitle('クラス');
+      classItem.setChoiceValues(customConfig.classChoices || ['1年1組', '1年2組', '1年3組']);
+      classItem.setRequired(true);
+
+      // 名前欄（自動挿入が有効な場合）
+      if (customConfig.autoName) {
+        var nameItem = form.addTextItem();
+        nameItem.setTitle('名前');
+        nameItem.setRequired(false);
+      }
+
+      // メイン質問
+      var mainQuestionTitle = customConfig.customMainQuestion || '今回のテーマについて、あなたの考えや意見を聞かせてください';
+      var mainItem;
+      
+      switch(customConfig.mainQuestionType) {
+        case 'text':
+          mainItem = form.addTextItem();
+          break;
+        case 'multiple':
+          mainItem = form.addCheckboxItem();
+          if (customConfig.mainQuestionChoices && customConfig.mainQuestionChoices.length > 0) {
+            mainItem.setChoiceValues(customConfig.mainQuestionChoices);
+          }
+          break;
+        case 'choice':
+          mainItem = form.addMultipleChoiceItem();
+          if (customConfig.mainQuestionChoices && customConfig.mainQuestionChoices.length > 0) {
+            mainItem.setChoiceValues(customConfig.mainQuestionChoices);
+          }
+          break;
+        default:
+          mainItem = form.addParagraphTextItem();
+      }
+      mainItem.setTitle(mainQuestionTitle);
+      mainItem.setRequired(true);
+
+      // 理由欄（自動挿入が有効な場合）
+      if (customConfig.autoReason) {
+        var reasonItem = form.addParagraphTextItem();
+        reasonItem.setTitle('そう考える理由や体験があれば教えてください（任意）');
+        reasonItem.setRequired(false);
+      }
     } else {
       var classItem = form.addTextItem();
       classItem.setTitle(config.classQuestion.title);
@@ -1529,7 +1642,7 @@ function getQuestionConfig(questionType, customConfig) {
     classQuestion: {
       title: 'クラス',
       helpText: '',
-      choices: ['クラス1', 'クラス2', 'クラス3', 'クラス4']
+      choices: ['1年1組', '1年2組', '1年3組', '2年1組', '2年2組', '2年3組', '3年1組', '3年2組', '3年3組', '4年1組', '4年2組', '4年3組', '5年1組', '5年2組', '5年3組', '6年1組', '6年2組', '6年3組']
     },
     nameQuestion: {
       title: '名前',
@@ -1537,11 +1650,13 @@ function getQuestionConfig(questionType, customConfig) {
     },
     mainQuestion: {
       title: '今回のテーマについて、あなたの考えや意見を聞かせてください',
-      helpText: ''
+      helpText: '',
+      type: 'paragraph' // デフォルトは長文テキスト
     },
     reasonQuestion: {
-      title: 'そう考える理由や体験があれば教えてください',
-      helpText: ''
+      title: 'そう考える理由や体験があれば教えてください（任意）',
+      helpText: '',
+      type: 'paragraph'
     }
   };
 
@@ -1557,6 +1672,38 @@ function getQuestionConfig(questionType, customConfig) {
   }
   
   return defaultConfig;
+}
+
+/**
+ * カスタム設定でStudyQuestフォームを作成
+ */
+function createStudyQuestFormWithConfig(userEmail, userId, formTitle, config) {
+  try {
+    var formResult = createFormFactory({
+      userEmail: userEmail,
+      userId: userId,
+      formTitle: formTitle,
+      questions: 'custom',
+      formDescription: 'このフォームに回答すると、みんなの回答ボードに反映されます。',
+      customConfig: config
+    });
+    
+    var form = FormApp.openById(formResult.formId);
+    
+    // Email収集タイプの設定
+    try {
+      if (typeof form.setEmailCollectionType === 'function') {
+        form.setEmailCollectionType(FormApp.EmailCollectionType.VERIFIED);
+      }
+    } catch (undocumentedError) {
+      console.warn('Email collection type setting failed:', undocumentedError.message);
+    }
+    
+    return formResult;
+  } catch (error) {
+    console.error('createStudyQuestFormWithConfig Error:', error.message);
+    throw new Error('カスタムフォームの作成に失敗しました: ' + error.message);
+  }
 }
 
 /**
