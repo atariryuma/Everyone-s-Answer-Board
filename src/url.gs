@@ -83,7 +83,7 @@ function generateAppUrls(userId) {
     return {
       webAppUrl: webAppUrl,
       adminUrl: webAppUrl + '?userId=' + encodedUserId + '&mode=admin',
-      viewUrl: webAppUrl + '?userId=' + encodedUserId,
+      viewUrl: webAppUrl + '?userId=' + encodedUserId + '&mode=view',
       setupUrl: webAppUrl + '?setup=true',
       status: 'success'
     };

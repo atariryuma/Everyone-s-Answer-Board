@@ -134,6 +134,12 @@
   </style>
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans">
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="text-center">
+      <div class="spinner"></div>
+      <p id="loading-message" class="mt-4 text-gray-300">処理中...</p>
+    </div>
+  </div>
   <header class="glass-panel border-b border-gray-700 sticky top-0 z-50">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
       <div class="flex items-center justify-between">
@@ -2688,6 +2694,26 @@ function syncCheckboxStates(status) {
             window.open(currentStatus.formUrl, '_blank');
         } else {
             showMessage('連携しているフォームが見つかりません。', 'warning');
+        }
+    }
+
+    /**
+     * ボードのURLをクリップボードにコピーする
+     */
+    function copyBoardUrl() {
+        const urlInput = document.getElementById('board-url');
+        if (urlInput) {
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(urlInput.value);
+                } else {
+                    urlInput.select();
+                    document.execCommand('copy');
+                }
+                showMessage('URLをコピーしました', 'success');
+            } catch (error) {
+                showMessage('コピーに失敗しました', 'error');
+            }
         }
     }
     
