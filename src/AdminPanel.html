@@ -2411,6 +2411,66 @@ function syncCheckboxStates(status) {
       setLoading(false);
     }
 
+    // ======= Utility functions for column configuration =======
+    /**
+     * 列選択用ドロップダウンにヘッダー一覧を設定する
+     * @param {Array<string>} headers - スプレッドシートの列ヘッダー
+     */
+    function populateHeaderOptions(headers) {
+      var selects = [elements.opinionHeader, elements.reasonHeader, elements.nameHeader, elements.classHeader];
+      selects.forEach(function(sel) {
+        sel.replaceChildren();
+        var opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '-- 選択してください --';
+        sel.appendChild(opt);
+        headers.forEach(function(h) {
+          var option = document.createElement('option');
+          option.value = h;
+          option.textContent = h;
+          sel.appendChild(option);
+        });
+      });
+    }
+
+    /**
+     * 設定オブジェクトをUIに反映する
+     * @param {object} cfg - 列設定と表示オプション
+     */
+    function populateConfig(cfg) {
+      if (!elements.opinionHeader || !elements.reasonHeader || !elements.nameHeader || !elements.classHeader) {
+        console.error('設定用のUI要素が見つかりません。');
+        return;
+      }
+
+      elements.opinionHeader.value = cfg.opinionHeader || '';
+      elements.reasonHeader.value  = cfg.reasonHeader || '';
+      elements.nameHeader.value    = cfg.nameHeader || '';
+      elements.classHeader.value   = cfg.classHeader || '';
+
+      var showNamesCb = document.getElementById('showNames');
+      var showCountsCb = document.getElementById('showCounts');
+      if (showNamesCb) showNamesCb.checked = !!cfg.showNames;
+      if (showCountsCb) showCountsCb.checked = cfg.showCounts !== undefined ? cfg.showCounts : true;
+
+      updateConfigButtons();
+    }
+
+    /**
+     * 列設定UIを初期状態に戻す
+     */
+    function clearConfigFields() {
+      [elements.opinionHeader, elements.reasonHeader, elements.nameHeader, elements.classHeader].forEach(function(sel) {
+        sel.replaceChildren();
+        var opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '-- 選択してください --';
+        sel.appendChild(opt);
+        sel.value = '';
+      });
+      updateConfigButtons();
+    }
+
     /**
      * AIによる列判定を実行
      */
@@ -2465,6 +2525,19 @@ function syncCheckboxStates(status) {
       if (saveBtn) {
         saveBtn.disabled = !validateConfig();
       }
+    }
+
+    /**
+     * 入力フィールド変更時に即座にボタン状態を更新する
+     */
+    function setupRealtimeValidation() {
+      const fields = ['opinionHeader', 'reasonHeader', 'nameHeader', 'classHeader'];
+      fields.forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('change', updateConfigButtons);
+        }
+      });
     }
 
     /**
