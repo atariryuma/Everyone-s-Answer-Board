@@ -1740,6 +1740,9 @@ function setupEventListeners() {
       // リアルタイムバリデーションの設定
       setupRealtimeValidation();
       
+      // リアルタイムバリデーションの設定
+      setupRealtimeValidation();
+      
       // Digital citizenship button event
       var digitalCitizenshipBtn = document.getElementById('digital-citizenship-btn');
       if (digitalCitizenshipBtn) {
@@ -2436,6 +2439,18 @@ function syncCheckboxStates(status) {
       const saveBtn = document.getElementById('save-publish-btn');
       if (saveBtn) {
         saveBtn.disabled = !validateConfig();
+      }
+    }
+
+    function setupRealtimeValidation() {
+      const opinionHeader = document.getElementById('opinionHeader');
+      const detailOptions = document.getElementById('detail-options');
+
+      if (opinionHeader) {
+        opinionHeader.addEventListener('change', updateConfigButtons);
+      }
+      if (detailOptions) {
+        detailOptions.addEventListener('change', updateConfigButtons);
       }
     }
 
