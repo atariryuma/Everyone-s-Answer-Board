@@ -2236,12 +2236,26 @@ function syncCheckboxStates(status) {
         document.getElementById('board-url').value = status.appUrls.viewUrl;
         document.getElementById('view-board-link').href = status.appUrls.viewUrl;
         
-        // トピックテキストを設定
+        // トピックテキストを設定（問題文を表示）
         const topicTextElement = document.getElementById('current-topic-text');
         if (topicTextElement) {
-          // 優先順位: 1. フォームのタイトル, 2. シート名
-          const topic = status.formTitle || status.activeSheetName;
-          topicTextElement.textContent = topic || '（トピック未設定）';
+          // 問題文（opinionHeader）を表示
+          let topic = '（問題文未設定）';
+          
+          // 公開中のシート設定から問題文を取得
+          if (status.publishedSheetName && status.userInfo && status.userInfo.configJson) {
+            try {
+              const config = JSON.parse(status.userInfo.configJson);
+              const sheetKey = 'sheet_' + status.publishedSheetName;
+              const sheetConfig = config[sheetKey] || {};
+              topic = sheetConfig.opinionHeader || status.publishedSheetName || '（問題文未設定）';
+            } catch (e) {
+              console.warn('ConfigJson parsing error:', e);
+              topic = status.publishedSheetName || '（問題文未設定）';
+            }
+          }
+          
+          topicTextElement.textContent = topic;
           console.log(`✅ [DEBUG] Set footer topic text to: ${topic}`);
         }
         
@@ -2266,8 +2280,20 @@ function syncCheckboxStates(status) {
       
       // fallback for topic text if everything else fails
       if (isPublished && document.getElementById('current-topic-text').textContent === '読み込み中...') {
-         document.getElementById('current-topic-text').textContent = status.activeSheetName || '...';
-         console.log(`✅ [DEBUG] Set footer topic text fallback to: ${status.activeSheetName}`);
+         // フォールバックでも問題文を取得を試みる
+         let fallbackTopic = '（問題文未設定）';
+         if (status.publishedSheetName && status.userInfo && status.userInfo.configJson) {
+           try {
+             const config = JSON.parse(status.userInfo.configJson);
+             const sheetKey = 'sheet_' + status.publishedSheetName;
+             const sheetConfig = config[sheetKey] || {};
+             fallbackTopic = sheetConfig.opinionHeader || status.publishedSheetName || '（問題文未設定）';
+           } catch (e) {
+             fallbackTopic = status.publishedSheetName || '（問題文未設定）';
+           }
+         }
+         document.getElementById('current-topic-text').textContent = fallbackTopic;
+         console.log(`✅ [DEBUG] Set footer topic text fallback to: ${fallbackTopic}`);
       }
 
       adjustLayout();

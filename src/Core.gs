@@ -292,7 +292,12 @@ function getPublishedSheetData(classFilter, sortOrder) {
 
     // ボードのタイトルを、保存された設定（opinionHeader）から取得する
     // もし設定がなければ、デフォルトでシート名を使う
-    const headerTitle = sheetConfig.opinionHeader || publishedSheetName;
+    let headerTitle = sheetConfig.opinionHeader;
+    
+    // 問題文が未設定または無効な場合のフォールバック
+    if (!headerTitle || headerTitle.trim() === '' || headerTitle.includes('読み込み')) {
+      headerTitle = publishedSheetName || '今日のお題';
+    }
     
     // ...（データ取得とフォーマット処理は変更なし）...
 

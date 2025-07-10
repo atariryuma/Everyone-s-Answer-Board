@@ -1116,8 +1116,9 @@ class StudyQuestApp {
     }
   setupCriticalElements() {
     if (this.elements.headingLabel) {
-      const opinionHeader = __OPINION_HEADER__.startsWith('<')
-        ? 'お題を読み込み中...'
+      // 問題文を常に表示（読み込み中は表示しない）
+      const opinionHeader = __OPINION_HEADER__.startsWith('<') || __OPINION_HEADER__.includes('読み込み')
+        ? 'お題'  // デフォルトテキスト
         : this.escapeHtml(__OPINION_HEADER__);
       this.elements.headingLabel.textContent = opinionHeader;
     }
@@ -2004,10 +2005,8 @@ setupEventDelegation() {
     const selectedClass = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
     const oldAnswers = [...this.state.currentAnswers];
     
-    // Show immediate visual feedback
-    if (isInitialLoad) {
-      this.elements.headingLabel.innerHTML = '<svg class="w-6 h-6 animate-spin inline-block" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path></svg>';
-    }
+    // Show immediate visual feedback - but keep the question text visible
+    // (Removed loading spinner from heading to keep question text always visible)
     
     // Optimized loading state - don't clear if initial load
     if (showLoading && !isInitialLoad) {
@@ -2047,8 +2046,11 @@ setupEventDelegation() {
             this.state.lastSeenCount = result.data.length;
           }
 
-          // Update heading with the actual question text from server
-          if (result.header && this.elements.headingLabel) {
+          // Update heading with the actual question text from server (only if valid)
+          if (result.header && this.elements.headingLabel && 
+              result.header !== '読み込み中...' && 
+              !result.header.includes('読み込み') &&
+              result.header.trim() !== '') {
             this.elements.headingLabel.textContent = result.header;
           }
 
