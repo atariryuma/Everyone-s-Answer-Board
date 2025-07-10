@@ -2667,22 +2667,13 @@ async handleReaction(rowIndex, reaction) {
     
     const isCurrentReactionActive = currentReactions[reaction] && currentReactions[reaction].reacted;
     
-    // 既に他のリアクションをしている場合は、現在のリアクションを外すのみ許可
+    // 既に他のリアクションをしている場合でも、別のリアクションに直接切り替えを許可
+    // （サーバー側で自動的に既存のリアクションを削除して新しいリアクションを追加）
     if (hasAnyReaction && !isCurrentReactionActive) {
-      debugLog('1人1つのリアクション制限: 他のリアクションが既に選択されています');
-      
-      // 視覚的フィードバック
-      btns.forEach(btn => {
-        btn.disabled = false;
-        btn.classList.remove('loading');
-        btn.classList.add('bg-red-500/20', 'border-red-500/50');
-        setTimeout(() => {
-          btn.classList.remove('bg-red-500/20', 'border-red-500/50');
-        }, 800);
+      debugLog('既存のリアクションを切り替えます:', { 
+        existingReactions: Object.keys(currentReactions).filter(key => currentReactions[key]?.reacted),
+        newReaction: reaction
       });
-      
-      this.pendingReactions.delete(reactionKey);
-      return;
     }
 
     try {
@@ -2937,15 +2928,36 @@ async handleReaction(rowIndex, reaction) {
         showHighlightToggle: window.showHighlightToggle
       });
       if (enable) {
+        // 管理モード時は強制的に名前とリアクション数を表示
         window.showCounts = true;
         window.displayMode = 'named';
         window.isStudentMode = false;
+        debugLog('管理モード有効化: 名前とリアクション数を強制表示', {
+          showCounts: window.showCounts,
+          displayMode: window.displayMode
+        });
       } else {
+        // 閲覧モード時はサーバー設定に戻す
         window.showCounts = this.serverShowCounts;
         window.displayMode = this.serverDisplayMode;
         window.isStudentMode = true;
+        debugLog('閲覧モード有効化: サーバー設定を復元', {
+          showCounts: window.showCounts,
+          displayMode: window.displayMode,
+          serverShowCounts: this.serverShowCounts,
+          serverDisplayMode: this.serverDisplayMode
+        });
       }
       this.updateConfigFromGlobals();
+      
+      // 管理モード切り替え後の状態を確認
+      debugLog('管理モード切り替え後の状態確認:', {
+        enable,
+        stateDisplayMode: this.state.displayMode,
+        stateShowCounts: this.state.showCounts,
+        windowDisplayMode: window.displayMode,
+        windowShowCounts: window.showCounts
+      });
       
       // キャッシュをクリアして新しい設定で再描画
       this.cache.clear();
@@ -2972,11 +2984,23 @@ async handleReaction(rowIndex, reaction) {
     
     try {
       await this.runGas('clearActiveSheet');
-      alert('公開を終了しました。管理画面に移動します。');
-      this.endAdminMode();
+      if (window.sharedModals) {
+        window.sharedModals.showAlert('公開終了', '公開を終了しました。管理画面に移動します。', 'success');
+      } else {
+        alert('公開を終了しました。管理画面に移動します。');
+      }
+      // 少し遅延してからページ移動（ユーザーがメッセージを確認できるように）
+      setTimeout(() => {
+        this.endAdminMode();
+      }, 1500);
     } catch (error) {
       console.error('公開終了に失敗しました:', error);
-      alert('公開終了に失敗しました: ' + (error.message || error));
+      const errorMsg = '公開終了に失敗しました: ' + (error.message || error);
+      if (window.sharedModals) {
+        window.sharedModals.showAlert('エラー', errorMsg, 'error');
+      } else {
+        alert(errorMsg);
+      }
     }
   }
   endAdminMode() {

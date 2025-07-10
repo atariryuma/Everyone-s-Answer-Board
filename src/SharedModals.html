@@ -181,6 +181,12 @@ class SharedModals {
     const confirmBtn = document.getElementById('modal-confirm-btn');
     const cancelBtn = document.getElementById('modal-cancel-btn');
 
+    // null checks for modal elements
+    if (!modal || !titleEl || !messageEl || !confirmBtn || !cancelBtn) {
+      console.error('モーダル要素が見つかりません');
+      return;
+    }
+
     titleEl.textContent = title;
     messageEl.textContent = message;
     
@@ -206,6 +212,12 @@ class SharedModals {
     const messageEl = document.getElementById('alert-modal-message');
     const iconEl = document.getElementById('alert-modal-icon');
     const closeBtn = document.getElementById('alert-modal-close-btn');
+
+    // null checks for modal elements
+    if (!modal || !titleEl || !messageEl || !iconEl || !closeBtn) {
+      console.error('アラートモーダル要素が見つかりません');
+      return;
+    }
 
     titleEl.textContent = title;
     messageEl.textContent = message;
@@ -262,7 +274,8 @@ class SharedModals {
           'privacy-modal',
           'digital-citizenship-modal',
           'teacherGuideModal',
-          'alert-modal'
+          'alert-modal',
+          'loading-modal'
         ];
         
         modals.forEach(modalId => {
