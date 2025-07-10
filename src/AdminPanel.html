@@ -731,6 +731,25 @@
         </div>
       </div>
       
+      <!-- アプリ設定リンク -->
+      <div class="bg-blue-900/10 border border-blue-500/30 rounded-lg p-3 transition-all hover:border-blue-500/50">
+        <button type="button" onclick="openAppSetupPage()" class="w-full flex items-center justify-between text-sm font-medium text-blue-300 hover:text-blue-200 transition-colors">
+          <div class="flex items-center">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+            <span>アプリ設定管理</span>
+          </div>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+          </svg>
+        </button>
+        <p class="text-xs text-blue-200/70 mt-2 ml-6">
+          アプリの有効/無効状態を管理できます
+        </p>
+      </div>
+      
       <details class="bg-red-900/10 border border-red-500/30 rounded-lg transition-all hover:border-red-500/50">
         <summary class="p-3 cursor-pointer text-sm font-medium text-red-300 hover:text-red-200 flex items-center justify-between">
           <span>アカウントの管理</span>
@@ -2738,6 +2757,13 @@ function syncCheckboxStates(status) {
             console.warn('Silent status update failed:', error.message);
           });
       }, 60000); // 60秒ごとに更新
+    }
+
+    function openAppSetupPage() {
+      // アプリ設定ページを新しいタブで開く
+      const currentUrl = window.location.href.split('?')[0];
+      const setupUrl = currentUrl + '?setup=true&mode=appsetup';
+      window.open(setupUrl, '_blank');
     }
 
   </script>

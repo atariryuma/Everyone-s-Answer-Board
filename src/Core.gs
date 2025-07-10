@@ -2140,6 +2140,134 @@ function refreshBoardData() {
 // ユーティリティ関数
 // =================================================================
 
+/**
+ * 現在のユーザーのステータス情報を取得（AppSetupPage.htmlから呼び出される）
+ * @returns {object} ユーザーのステータス情報
+ */
+function getCurrentUserStatus() {
+  try {
+    var activeUserEmail = Session.getActiveUser().getEmail();
+    if (!activeUserEmail) {
+      return {
+        status: 'error',
+        message: 'ユーザーが認証されていません'
+      };
+    }
+
+    // データベースに登録されているか確認
+    var userInfo = findUserByEmail(activeUserEmail);
+    if (!userInfo) {
+      return {
+        status: 'error',
+        message: 'ユーザーがデータベースに登録されていません'
+      };
+    }
+
+    // 編集者権限があるか確認
+    if (userInfo.isActive !== 'true') {
+      return {
+        status: 'error',
+        message: 'このユーザーは編集者権限がありません'
+      };
+    }
+
+    return {
+      status: 'success',
+      userInfo: userInfo,
+      message: 'ステータス取得成功'
+    };
+  } catch (e) {
+    console.error('getCurrentUserStatus エラー: ' + e.message);
+    return {
+      status: 'error',
+      message: 'ステータス取得に失敗しました: ' + e.message
+    };
+  }
+}
+
+/**
+ * isActive状態を更新（AppSetupPage.htmlから呼び出される）
+ * @param {boolean} isActive - 新しいisActive状態
+ * @returns {object} 更新結果
+ */
+function updateIsActiveStatus(isActive) {
+  try {
+    var activeUserEmail = Session.getActiveUser().getEmail();
+    if (!activeUserEmail) {
+      return {
+        status: 'error',
+        message: 'ユーザーが認証されていません'
+      };
+    }
+
+    // 現在のユーザー情報を取得
+    var userInfo = findUserByEmail(activeUserEmail);
+    if (!userInfo) {
+      return {
+        status: 'error',
+        message: 'ユーザーがデータベースに登録されていません'
+      };
+    }
+
+    // 編集者権限があるか確認（自分自身の状態変更も含む）
+    if (userInfo.isActive !== 'true') {
+      return {
+        status: 'error',
+        message: 'この操作を実行する権限がありません'
+      };
+    }
+
+    // isActive状態を更新
+    var newIsActiveValue = isActive ? 'true' : 'false';
+    var updateResult = updateUser(userInfo.userId, {
+      isActive: newIsActiveValue,
+      lastAccessedAt: new Date().toISOString()
+    });
+
+    if (updateResult.success) {
+      var statusMessage = isActive 
+        ? 'アプリが正常に有効化されました' 
+        : 'アプリが正常に無効化されました';
+      
+      return {
+        status: 'success',
+        message: statusMessage,
+        newStatus: newIsActiveValue
+      };
+    } else {
+      return {
+        status: 'error',
+        message: 'データベースの更新に失敗しました'
+      };
+    }
+  } catch (e) {
+    console.error('updateIsActiveStatus エラー: ' + e.message);
+    return {
+      status: 'error',
+      message: 'isActive状態の更新に失敗しました: ' + e.message
+    };
+  }
+}
+
+/**
+ * セットアップページへのアクセス権限を確認
+ * @returns {boolean} アクセス権限があればtrue
+ */
+function hasSetupPageAccess() {
+  try {
+    var activeUserEmail = Session.getActiveUser().getEmail();
+    if (!activeUserEmail) {
+      return false;
+    }
+
+    // データベースに登録され、かつisActiveがtrueのユーザーのみアクセス可能
+    var userInfo = findUserByEmail(activeUserEmail);
+    return userInfo && userInfo.isActive === 'true';
+  } catch (e) {
+    console.error('hasSetupPageAccess エラー: ' + e.message);
+    return false;
+  }
+}
 
 /**
  * メールアドレスからドメインを抽出

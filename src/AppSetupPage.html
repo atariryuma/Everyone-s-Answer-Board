@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudyQuest - アプリ設定</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <?!= include('UnifiedStyles'); ?>
+    <?!= include('SharedUtilities'); ?>
+</head>
+<body>
+    <div class="max-w-4xl mx-auto p-6">
+        <!-- ヘッダー -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-cyan-400 mb-2">⚙️ StudyQuest アプリ設定</h1>
+            <p class="text-xl text-gray-300">アプリケーションの運用設定を管理します</p>
+            <p class="text-sm text-gray-400 mt-2">このページでアプリの有効/無効を切り替えることができます</p>
+        </div>
+
+        <!-- メッセージエリア -->
+        <div id="message-area" class="mb-6"></div>
+
+        <!-- 現在のステータス表示 -->
+        <div class="glass-panel rounded-xl p-6 mb-6">
+            <h2 class="text-xl font-semibold text-white mb-4">📊 現在のステータス</h2>
+            <div id="status-display" class="space-y-3">
+                <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                    <div class="flex items-center">
+                        <span class="text-gray-300 mr-3">アプリ状態:</span>
+                        <span id="current-status" class="px-3 py-1 rounded-full text-sm font-medium">
+                            <span class="loading-spinner w-4 h-4 border-2 border-white border-t-transparent rounded-full inline-block mr-2"></span>
+                            読み込み中...
+                        </span>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                    <div class="flex items-center">
+                        <span class="text-gray-300 mr-3">管理者:</span>
+                        <span id="current-admin" class="text-cyan-400">読み込み中...</span>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                    <div class="flex items-center">
+                        <span class="text-gray-300 mr-3">最終更新:</span>
+                        <span id="last-updated" class="text-gray-400">読み込み中...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- アプリ状態切り替えパネル -->
+        <div class="glass-panel rounded-xl p-6 mb-6">
+            <h2 class="text-xl font-semibold text-white mb-4">🔧 アプリ状態の管理</h2>
+            
+            <div class="space-y-6">
+                <!-- isActive トグル -->
+                <div class="p-4 bg-gray-800 rounded-lg">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 class="text-lg font-medium text-white">アプリケーション有効化</h3>
+                            <p class="text-sm text-gray-400">アプリの利用可能状態を制御します</p>
+                        </div>
+                        <div class="flex items-center">
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="isActiveToggle" class="sr-only peer" disabled>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- 詳細説明 -->
+                    <div class="text-sm text-gray-400 mb-4">
+                        <p><strong>有効 (ON):</strong> ユーザーがアプリにアクセスできます</p>
+                        <p><strong>無効 (OFF):</strong> アプリへのアクセスが制限されます</p>
+                    </div>
+
+                    <!-- 変更ボタン -->
+                    <button 
+                        id="updateStatusBtn"
+                        class="w-full btn bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled>
+                        <span id="update-text">変更を保存</span>
+                        <div id="update-spinner" class="loading-spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full mx-auto hidden"></div>
+                    </button>
+                </div>
+
+                <!-- 使用シナリオの説明 -->
+                <div class="p-4 bg-gray-900 rounded-lg">
+                    <h4 class="text-md font-medium text-cyan-400 mb-3">🎯 使用シナリオ</h4>
+                    <div class="grid md:grid-cols-2 gap-4 text-sm text-gray-300">
+                        <div>
+                            <h5 class="font-medium text-white mb-2">一時的な停止・メンテナンス</h5>
+                            <p>アプリケーションのメンテナンス、アップデート、または一時的な問題解決のために使用します。</p>
+                        </div>
+                        <div>
+                            <h5 class="font-medium text-white mb-2">利用停止・アーカイブ</h5>
+                            <p>不要になったアプリを完全削除せず、履歴として残しておく場合に使用します。</p>
+                        </div>
+                        <div>
+                            <h5 class="font-medium text-white mb-2">利用規約違反への対応</h5>
+                            <p>利用規約に違反する行為や不正な利用を検知した場合の対応に使用します。</p>
+                        </div>
+                        <div>
+                            <h5 class="font-medium text-white mb-2">セットアップ中の状態管理</h5>
+                            <p>初期設定が完了するまで、または管理者の最終確認までアプリを非アクティブに保ちます。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 戻るボタン -->
+        <div class="text-center">
+            <button 
+                onclick="window.location.href = '<?= ScriptApp.getService().getUrl() ?>?mode=admin'"
+                class="btn bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-bold py-2 px-6 rounded-lg">
+                ← 管理パネルに戻る
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentUserInfo = null;
+        let setupInProgress = false;
+
+        // メッセージ表示関数
+        function showMessage(message, type = 'info') {
+            const messageArea = document.getElementById('message-area');
+            const colors = {
+                success: 'bg-green-600/20 border-green-500/50 text-green-100',
+                error: 'bg-red-600/20 border-red-500/50 text-red-100',
+                warning: 'bg-yellow-600/20 border-yellow-500/50 text-yellow-100',
+                info: 'bg-blue-600/20 border-blue-500/50 text-blue-100'
+            };
+            
+            messageArea.innerHTML = `
+                <div class="message show glass-panel rounded-lg p-4 border ${colors[type]}">
+                    <div class="flex items-center">
+                        <div class="mr-3">
+                            ${type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'}
+                        </div>
+                        <div class="flex-1">${message}</div>
+                        <button onclick="this.closest('.message').style.display='none'" class="ml-4 text-gray-400 hover:text-white">✕</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 現在のステータスを取得して表示
+        function loadCurrentStatus() {
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.status === 'success') {
+                        currentUserInfo = result.userInfo;
+                        updateStatusDisplay(result.userInfo);
+                        enableControls();
+                    } else {
+                        showMessage(`ステータス取得に失敗しました: ${result.message}`, 'error');
+                    }
+                })
+                .withFailureHandler((error) => {
+                    showMessage(`ステータス取得エラー: ${error.message || error}`, 'error');
+                })
+                .getCurrentUserStatus();
+        }
+
+        // ステータス表示を更新
+        function updateStatusDisplay(userInfo) {
+            const isActive = userInfo.isActive === 'true';
+            const statusElement = document.getElementById('current-status');
+            const adminElement = document.getElementById('current-admin');
+            const lastUpdatedElement = document.getElementById('last-updated');
+            const toggleElement = document.getElementById('isActiveToggle');
+
+            // 現在の状態を表示
+            statusElement.innerHTML = isActive 
+                ? '<span class="bg-green-600 text-green-100 px-3 py-1 rounded-full">🟢 アクティブ</span>'
+                : '<span class="bg-red-600 text-red-100 px-3 py-1 rounded-full">🔴 非アクティブ</span>';
+
+            adminElement.textContent = userInfo.adminEmail || '不明';
+            lastUpdatedElement.textContent = userInfo.lastAccessedAt 
+                ? new Date(userInfo.lastAccessedAt).toLocaleString('ja-JP')
+                : '不明';
+
+            // トグルの状態を設定
+            toggleElement.checked = isActive;
+        }
+
+        // コントロールを有効化
+        function enableControls() {
+            const toggleElement = document.getElementById('isActiveToggle');
+            const updateBtn = document.getElementById('updateStatusBtn');
+            
+            toggleElement.disabled = false;
+            updateBtn.disabled = false;
+
+            // トグル変更時のイベント
+            toggleElement.addEventListener('change', function() {
+                const newStatus = this.checked;
+                const confirmMessage = newStatus 
+                    ? 'アプリを有効化しますか？ユーザーがアクセスできるようになります。'
+                    : 'アプリを無効化しますか？ユーザーのアクセスが制限されます。';
+                
+                if (confirm(confirmMessage)) {
+                    updateIsActiveStatus(newStatus);
+                } else {
+                    // キャンセル時は元に戻す
+                    this.checked = !newStatus;
+                }
+            });
+        }
+
+        // isActive状態を更新
+        function updateIsActiveStatus(isActive) {
+            if (setupInProgress) return;
+            setupInProgress = true;
+
+            const updateBtn = document.getElementById('updateStatusBtn');
+            const updateText = document.getElementById('update-text');
+            const updateSpinner = document.getElementById('update-spinner');
+            
+            try {
+                // ボタン状態を変更
+                updateBtn.disabled = true;
+                updateText.style.display = 'none';
+                updateSpinner.classList.remove('hidden');
+                
+                showMessage(isActive ? 'アプリを有効化中...' : 'アプリを無効化中...', 'info');
+                
+                google.script.run
+                    .withSuccessHandler((result) => {
+                        if (result.status === 'success') {
+                            showMessage(`✅ ${result.message}`, 'success');
+                            // ステータスを再読み込み
+                            loadCurrentStatus();
+                        } else {
+                            showMessage(`❌ ${result.message}`, 'error');
+                        }
+                    })
+                    .withFailureHandler((error) => {
+                        console.error('Update error:', error);
+                        showMessage(`❌ 更新に失敗しました: ${error.message || error}`, 'error');
+                    })
+                    .updateIsActiveStatus(isActive);
+                    
+            } catch (error) {
+                showMessage(`❌ ${error.message}`, 'error');
+            } finally {
+                // ボタン状態をリセット
+                setTimeout(() => {
+                    updateBtn.disabled = false;
+                    updateText.style.display = 'inline';
+                    updateSpinner.classList.add('hidden');
+                    setupInProgress = false;
+                }, 1000);
+            }
+        }
+
+        // ページ読み込み時の処理
+        window.addEventListener('load', function() {
+            loadCurrentStatus();
+        });
+    </script>
+</body>
+</html>

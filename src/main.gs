@@ -283,6 +283,29 @@ function doGet(e) {
       return safeSetXFrameOptionsDeny(setupHtml);
     }
 
+    // アプリ設定ページの表示要求（?setup=true&mode=appsetup）
+    if (setupParam === 'true' && mode === 'appsetup') {
+      console.log('DEBUG: App setup page request. Checking access permissions.');
+      
+      // アクセス権限を確認
+      if (!hasSetupPageAccess()) {
+        console.log('DEBUG: Access denied to app setup page.');
+        var errorHtml = HtmlService.createHtmlOutput(
+          '<h1>アクセス拒否</h1>' +
+          '<p>アプリ設定ページにアクセスする権限がありません。</p>' +
+          '<p>編集者として登録され、かつアクティブ状態である必要があります。</p>'
+        );
+        return safeSetXFrameOptionsDeny(errorHtml);
+      }
+      
+      console.log('DEBUG: Serving AppSetupPage HTML');
+      var appSetupTemplate = HtmlService.createTemplateFromFile('AppSetupPage');
+      appSetupTemplate.include = include;
+      var appSetupHtml = appSetupTemplate.evaluate()
+        .setTitle('アプリ設定 - StudyQuest');
+      return safeSetXFrameOptionsDeny(appSetupHtml);
+    }
+
     // セットアップページの明示的な表示要求
     if (setupParam === 'true') {
       console.log('DEBUG: Explicit setup request. Redirecting to SetupPage.');
