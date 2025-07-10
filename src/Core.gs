@@ -1805,31 +1805,37 @@ function getSheetData(userId, sheetName, classFilter, sortMode) {
  */
 function getSheetsList(userId) {
   try {
+    debugLog('getSheetsList: Start for userId:', userId);
     var userInfo = findUserById(userId);
     if (!userInfo) {
-      console.warn('getSheetsList: User not found:', userId);
+      debugLog('getSheetsList: User not found:', userId);
       return [];
     }
     
+    debugLog('getSheetsList: UserInfo spreadsheetId:', userInfo.spreadsheetId);
     if (!userInfo.spreadsheetId) {
-      console.warn('getSheetsList: No spreadsheet ID for user:', userId);
+      debugLog('getSheetsList: No spreadsheet ID for user:', userId);
       return [];
     }
     
     var service = getSheetsService();
+    debugLog('getSheetsList: SheetsService obtained.');
     var spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
     
+    debugLog('getSheetsList: Spreadsheet data obtained:', JSON.stringify(spreadsheet));
     if (!spreadsheet || !spreadsheet.sheets) {
-      console.warn('getSheetsList: Invalid spreadsheet data:', spreadsheet);
+      debugLog('getSheetsList: Invalid spreadsheet data or no sheets found:', spreadsheet);
       return [];
     }
     
-    return spreadsheet.sheets.map(function(sheet) {
+    var sheets = spreadsheet.sheets.map(function(sheet) {
       return {
         name: sheet.properties.title,
         id: sheet.properties.sheetId
       };
     });
+    debugLog('getSheetsList: Returning sheets:', JSON.stringify(sheets));
+    return sheets;
   } catch (e) {
     console.error('シート一覧取得エラー: ' + e.message);
     console.error('Error details:', e.stack);

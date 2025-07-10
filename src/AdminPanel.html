@@ -9,7 +9,6 @@
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
   <!-- User ID will be set by JavaScript to avoid template injection issues -->
   <meta name="user-id" content="" id="user-id-meta">
-  
 
 
   <!-- TailwindCSS CDN -->
@@ -541,20 +540,6 @@
       <div class="space-y-4 lg:space-y-6">
         
         
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
         <!-- 使い方ガイド -->
@@ -914,55 +899,95 @@
       
       // スプレッドシート関連のエラー
       if (lowerMsg.includes('範囲の列数には') || lowerMsg.includes('range')) {
-        return '📊 スプレッドシートにデータが正しく入力されていません。\n💡 解決方法：スプレッドシートを開いて、1行目にヘッダー（列名）が入力されているか確認してください。';
+        return '📊 スプレッドシートにデータが正しく入力されていません。
+💡 解決方法：スプレッドシートを開いて、1行目にヘッダー（列名）が入力されているか確認してください。';
       }
       
       if (lowerMsg.includes('シート情報の取得に失敗') || lowerMsg.includes('sheet')) {
-        return '📋 シートの情報を読み込めませんでした。\n💡 解決方法：\n• スプレッドシートが正しく共有されているか確認\n• シートにデータが入力されているか確認\n• しばらく待ってから再試行';
+        return '📋 シートの情報を読み込めませんでした。
+💡 解決方法：
+• スプレッドシートが正しく共有されているか確認
+• シートにデータが入力されているか確認
+• しばらく待ってから再試行';
       }
       
       // 権限関連のエラー
       if (lowerMsg.includes('permission') || lowerMsg.includes('権限') || lowerMsg.includes('access denied')) {
-        return '🔒 アクセス権限がありません。\n💡 解決方法：\n• スプレッドシートの共有設定を確認\n• 編集権限があることを確認\n• アカウントでログインし直してみる';
+        return '🔒 アクセス権限がありません。
+💡 解決方法：
+• スプレッドシートの共有設定を確認
+• 編集権限があることを確認
+• アカウントでログインし直してみる';
       }
       
       // ネットワーク関連のエラー
       if (lowerMsg.includes('network') || lowerMsg.includes('timeout') || lowerMsg.includes('fetch')) {
-        return '🌐 インターネット接続の問題が発生しました。\n💡 解決方法：\n• インターネット接続を確認\n• しばらく待ってから再試行\n• ページを再読み込み';
+        return '🌐 インターネット接続の問題が発生しました。
+💡 解決方法：
+• インターネット接続を確認
+• しばらく待ってから再試行
+• ページを再読み込み';
       }
       
       // フォーム関連のエラー
       if (lowerMsg.includes('form') && lowerMsg.includes('not found')) {
-        return '📝 フォームが見つかりません。\n💡 解決方法：\n• フォームが作成されているか確認\n• フォームが削除されていないか確認\n• 新しいフォームを作成';
+        return '📝 フォームが見つかりません。
+💡 解決方法：
+• フォームが作成されているか確認
+• フォームが削除されていないか確認
+• 新しいフォームを作成';
       }
       
       // データ検証関連のエラー
       if (lowerMsg.includes('validation') || lowerMsg.includes('invalid')) {
-        return '⚠️ 入力内容に問題があります。\n💡 解決方法：\n• 必須項目がすべて入力されているか確認\n• 入力形式が正しいか確認\n• 特殊文字が含まれていないか確認';
+        return '⚠️ 入力内容に問題があります。
+💡 解決方法：
+• 必須項目がすべて入力されているか確認
+• 入力形式が正しいか確認
+• 特殊文字が含まれていないか確認';
       }
       
       // 認証関連のエラー
       if (lowerMsg.includes('authentication') || lowerMsg.includes('login') || lowerMsg.includes('unauthorized')) {
-        return '🔐 認証に問題があります。\n💡 解決方法：\n• ログイン状態を確認\n• ページを再読み込み\n• 再度ログインしてみる';
+        return '🔐 認証に問題があります。
+💡 解決方法：
+• ログイン状態を確認
+• ページを再読み込み
+• 再度ログインしてみる';
       }
       
       // サーバー関連のエラー
       if (lowerMsg.includes('server error') || lowerMsg.includes('500') || lowerMsg.includes('503')) {
-        return '⚡ システムが一時的に利用できません。\n💡 解決方法：\n• 数分待ってから再試行\n• 問題が続く場合は管理者に連絡';
+        return '⚡ システムが一時的に利用できません。
+💡 解決方法：
+• 数分待ってから再試行
+• 問題が続く場合は管理者に連絡';
       }
       
       // 設定関連のエラー
       if (context && context.includes('config') || lowerMsg.includes('configuration')) {
-        return '⚙️ 設定の保存に問題があります。\n💡 解決方法：\n• すべての必須項目が入力されているか確認\n• 設定内容に問題がないか確認\n• しばらく待ってから再試行';
+        return '⚙️ 設定の保存に問題があります。
+💡 解決方法：
+• すべての必須項目が入力されているか確認
+• 設定内容に問題がないか確認
+• しばらく待ってから再試行';
       }
       
       // その他の一般的なエラー
       if (lowerMsg.includes('failed') || lowerMsg.includes('error')) {
-        return '❌ 操作が正常に完了しませんでした。\n💡 解決方法：\n• しばらく待ってから再試行\n• ページを再読み込み\n• 問題が続く場合は別のブラウザを試す';
+        return '❌ 操作が正常に完了しませんでした。
+💡 解決方法：
+• しばらく待ってから再試行
+• ページを再読み込み
+• 問題が続く場合は別のブラウザを試す';
       }
       
       // フォールバック
-      return '⚠️ 予期しないエラーが発生しました。\n💡 解決方法：\n• ページを再読み込み\n• しばらく待ってから再試行\n• 問題が続く場合はサポートにお問い合わせください';
+      return '⚠️ 予期しないエラーが発生しました。
+💡 解決方法：
+• ページを再読み込み
+• しばらく待ってから再試行
+• 問題が続く場合はサポートにお問い合わせください';
     }
     
     // Wrapper for Google Apps Script calls with consistent error handling
@@ -1037,8 +1062,8 @@
       
       // Remove control characters and limit length
       return message
-        .replace(/[\u0000-\u001F\u007F]/g, '')
-        .replace(/['"\\]/g, '')
+        .replace(/[ -]/g, '')
+        .replace(/['"\]/g, '')
         .substring(0, 200);
     }
     
@@ -2092,7 +2117,6 @@ function syncCheckboxStates(status) {
         updateUIForNoActiveSheet(status);
         console.log('✅ [3/3] No active sheet - UI update completed');
       }
-      updateStepIndicators(status.setupStep); // ここでsetupStepを渡す
     }
 
     /**
@@ -2269,36 +2293,48 @@ function syncCheckboxStates(status) {
      */
     function populateSheetSelect(sheetNames, activeSheetName) {
       const select = document.getElementById('sheet-select');
-      if (!select) return;
+      if (!select) {
+        console.warn('populateSheetSelect: sheet-select element not found.');
+        return;
+      }
+
+      console.log('populateSheetSelect: Received sheetNames:', sheetNames);
+      console.log('populateSheetSelect: Received activeSheetName:', activeSheetName);
 
       // 現在の選択値を保持
       const previouslySelected = select.value;
       
       // ドロップダウンをクリア
       select.innerHTML = '<option value="">-- シートを選択 --</option>';
+      console.log('populateSheetSelect: After clearing innerHTML:', select.innerHTML);
 
       if (sheetNames && sheetNames.length > 0) {
         sheetNames.forEach(name => {
           const option = document.createElement('option');
-          option.value = name;
-          option.textContent = name;
+          option.value = name.name; // nameオブジェクトからnameプロパティを使用
+          option.textContent = name.name; // nameオブジェクトからnameプロパティを使用
           select.appendChild(option);
         });
         select.disabled = false;
+        console.log('populateSheetSelect: After adding options, innerHTML:', select.innerHTML);
       } else {
         select.innerHTML = '<option value="">利用可能なシートがありません</option>';
         select.disabled = true;
+        console.log('populateSheetSelect: No sheets available, innerHTML:', select.innerHTML);
       }
       
       // アクティブなシートまたは以前選択されていたシートを選択状態にする
       if (activeSheetName) {
         select.value = activeSheetName;
+        console.log('populateSheetSelect: Set select.value to activeSheetName:', activeSheetName);
       } else if (previouslySelected) {
         select.value = previouslySelected;
+        console.log('populateSheetSelect: Set select.value to previouslySelected:', previouslySelected);
       }
       
       // 選択状態に応じてUIを更新
       selectedSheet = select.value;
+      console.log('populateSheetSelect: Final selectedSheet:', selectedSheet);
       updateUIForSelectedSheet();
     }
 
@@ -2429,18 +2465,6 @@ function syncCheckboxStates(status) {
       const saveBtn = document.getElementById('save-publish-btn');
       if (saveBtn) {
         saveBtn.disabled = !validateConfig();
-      }
-    }
-
-    function setupRealtimeValidation() {
-      const opinionHeader = document.getElementById('opinionHeader');
-      const detailOptions = document.getElementById('detail-options');
-
-      if (opinionHeader) {
-        opinionHeader.addEventListener('change', updateConfigButtons);
-      }
-      if (detailOptions) {
-        detailOptions.addEventListener('change', updateConfigButtons);
       }
     }
 
@@ -2593,8 +2617,7 @@ function syncCheckboxStates(status) {
     function openForm() {
         if (currentStatus && currentStatus.formUrl) {
             window.open(currentStatus.formUrl, '_blank');
-        }
-        else {
+        } else {
             showMessage('連携しているフォームが見つかりません。', 'warning');
         }
     }
