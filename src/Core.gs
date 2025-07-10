@@ -1867,6 +1867,15 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
     var sheets = spreadsheetObj.getSheets();
     var sheetName = sheets[0].getName();
     
+    // サービスアカウントとスプレッドシートを共有
+    try {
+      shareSpreadsheetWithServiceAccount(spreadsheetId);
+      console.log('サービスアカウントとの共有完了: ' + spreadsheetId);
+    } catch (shareError) {
+      console.error('サービスアカウント共有エラー:', shareError.message);
+      console.error('スプレッドシート作成は完了しましたが、サービスアカウントとの共有に失敗しました。手動で共有してください。');
+    }
+    
     return {
       spreadsheetId: spreadsheetId,
       spreadsheetUrl: spreadsheetObj.getUrl(),
@@ -1876,6 +1885,88 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
   } catch (error) {
     console.error('createLinkedSpreadsheet エラー:', error.message);
     throw new Error('スプレッドシート作成に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * スプレッドシートをサービスアカウントと共有
+ * @param {string} spreadsheetId - スプレッドシートID
+ */
+function shareSpreadsheetWithServiceAccount(spreadsheetId) {
+  try {
+    var serviceAccountEmail = getServiceAccountEmail();
+    
+    if (!serviceAccountEmail || serviceAccountEmail === 'サービスアカウント未設定' || serviceAccountEmail === 'サービスアカウント設定エラー') {
+      throw new Error('サービスアカウントのメールアドレスが取得できません: ' + serviceAccountEmail);
+    }
+    
+    console.log('サービスアカウント共有開始:', serviceAccountEmail, 'スプレッドシート:', spreadsheetId);
+    
+    // DriveAppを使用してスプレッドシートをサービスアカウントと共有
+    var file = DriveApp.getFileById(spreadsheetId);
+    file.addEditor(serviceAccountEmail);
+    
+    console.log('サービスアカウント共有成功:', serviceAccountEmail);
+    
+  } catch (error) {
+    console.error('shareSpreadsheetWithServiceAccount エラー:', error.message);
+    throw new Error('サービスアカウントとの共有に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * すべての既存スプレッドシートをサービスアカウントと共有
+ * @returns {Object} 共有結果
+ */
+function shareAllSpreadsheetsWithServiceAccount() {
+  try {
+    console.log('全スプレッドシートのサービスアカウント共有開始');
+    
+    var allUsers = getAllUsers();
+    var results = [];
+    var successCount = 0;
+    var errorCount = 0;
+    
+    for (var i = 0; i < allUsers.length; i++) {
+      var user = allUsers[i];
+      if (user.spreadsheetId && user.isActive === 'true') {
+        try {
+          shareSpreadsheetWithServiceAccount(user.spreadsheetId);
+          results.push({
+            userId: user.userId,
+            adminEmail: user.adminEmail,
+            spreadsheetId: user.spreadsheetId,
+            status: 'success'
+          });
+          successCount++;
+          console.log('共有成功:', user.adminEmail, user.spreadsheetId);
+        } catch (shareError) {
+          results.push({
+            userId: user.userId,
+            adminEmail: user.adminEmail,
+            spreadsheetId: user.spreadsheetId,
+            status: 'error',
+            error: shareError.message
+          });
+          errorCount++;
+          console.error('共有失敗:', user.adminEmail, shareError.message);
+        }
+      }
+    }
+    
+    console.log('全スプレッドシート共有完了:', successCount + '件成功', errorCount + '件失敗');
+    
+    return {
+      status: 'completed',
+      totalUsers: allUsers.length,
+      successCount: successCount,
+      errorCount: errorCount,
+      results: results
+    };
+    
+  } catch (error) {
+    console.error('shareAllSpreadsheetsWithServiceAccount エラー:', error.message);
+    throw new Error('全スプレッドシート共有処理でエラーが発生しました: ' + error.message);
   }
 }
 

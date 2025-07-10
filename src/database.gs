@@ -208,6 +208,17 @@ function updateUser(userId, updateData) {
       batchUpdateSheetsData(service, dbId, requests);
     }
     
+    // スプレッドシートIDが更新された場合、サービスアカウントと共有
+    if (updateData.spreadsheetId) {
+      try {
+        shareSpreadsheetWithServiceAccount(updateData.spreadsheetId);
+        console.log('ユーザー更新時のサービスアカウント共有完了:', updateData.spreadsheetId);
+      } catch (shareError) {
+        console.error('ユーザー更新時のサービスアカウント共有エラー:', shareError.message);
+        console.error('スプレッドシートの更新は完了しましたが、サービスアカウントとの共有に失敗しました。手動で共有してください。');
+      }
+    }
+    
     // 最適化: 変更された内容に基づいてキャッシュを選択的に無効化
     var userInfo = findUserById(userId);
     var email = updateData.adminEmail || (userInfo ? userInfo.adminEmail : null);
@@ -470,6 +481,46 @@ function getSpreadsheetsData(service, spreadsheetId) {
     console.error('getSpreadsheetsData error:', error.message);
     console.error('getSpreadsheetsData error stack:', error.stack);
     throw new Error('スプレッドシート情報取得に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * すべてのユーザー情報を取得
+ * @returns {Array} ユーザー情報配列
+ */
+function getAllUsers() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    var service = getSheetsService();
+    var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+    
+    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
+    var values = data.valueRanges[0].values || [];
+    
+    if (values.length <= 1) {
+      return []; // ヘッダーのみの場合は空配列を返す
+    }
+    
+    var headers = values[0];
+    var users = [];
+    
+    for (var i = 1; i < values.length; i++) {
+      var row = values[i];
+      var user = {};
+      
+      for (var j = 0; j < headers.length; j++) {
+        user[headers[j]] = row[j] || '';
+      }
+      
+      users.push(user);
+    }
+    
+    return users;
+    
+  } catch (error) {
+    console.error('getAllUsers エラー:', error.message);
+    throw new Error('全ユーザー情報の取得に失敗しました: ' + error.message);
   }
 }
 
