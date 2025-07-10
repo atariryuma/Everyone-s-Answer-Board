@@ -409,6 +409,7 @@ function getAppConfig() {
       publishedSheetName: configJson.publishedSheetName || '',
       displayMode: configJson.displayMode || DISPLAY_MODES.ANONYMOUS,
       isPublished: configJson.appPublished || false,
+      appPublished: configJson.appPublished || false, // AdminPanel.htmlで使用される
       availableSheets: sheets,
       allSheets: sheets, // AdminPanel.htmlで使用される
       spreadsheetUrl: userInfo.spreadsheetUrl,
@@ -419,6 +420,9 @@ function getAppConfig() {
       viewUrl: appUrls.viewUrl,
       activeSheetName: configJson.publishedSheetName || '',
       appUrls: appUrls,
+      // AdminPanel.htmlが期待する表示設定プロパティ
+      showNames: configJson.showNames || false,
+      showCounts: configJson.showCounts !== undefined ? configJson.showCounts : true,
       // データベース詳細情報
       userInfo: {
         userId: currentUserId,
@@ -2134,40 +2138,62 @@ function getSheetData(userId, sheetName, classFilter, sortMode) {
  */
 function getSheetsList(userId) {
   try {
-    debugLog('getSheetsList: Start for userId:', userId);
+    console.log('getSheetsList: Start for userId:', userId);
     var userInfo = findUserById(userId);
     if (!userInfo) {
-      debugLog('getSheetsList: User not found:', userId);
+      console.warn('getSheetsList: User not found:', userId);
       return [];
     }
     
-    debugLog('getSheetsList: UserInfo spreadsheetId:', userInfo.spreadsheetId);
+    console.log('getSheetsList: UserInfo found:', {
+      userId: userInfo.userId,
+      adminEmail: userInfo.adminEmail,
+      spreadsheetId: userInfo.spreadsheetId,
+      spreadsheetUrl: userInfo.spreadsheetUrl
+    });
+    
     if (!userInfo.spreadsheetId) {
-      debugLog('getSheetsList: No spreadsheet ID for user:', userId);
+      console.warn('getSheetsList: No spreadsheet ID for user:', userId);
       return [];
     }
     
     var service = getSheetsService();
-    debugLog('getSheetsList: SheetsService obtained.');
+    console.log('getSheetsList: SheetsService obtained, attempting to fetch spreadsheet data...');
     var spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
     
-    debugLog('getSheetsList: Spreadsheet data obtained:', JSON.stringify(spreadsheet));
-    if (!spreadsheet || !spreadsheet.sheets) {
-      debugLog('getSheetsList: Invalid spreadsheet data or no sheets found:', spreadsheet);
+    console.log('getSheetsList: Raw spreadsheet data:', spreadsheet);
+    if (!spreadsheet) {
+      console.error('getSheetsList: No spreadsheet data returned');
+      return [];
+    }
+    
+    if (!spreadsheet.sheets) {
+      console.error('getSheetsList: Spreadsheet data missing sheets property. Available properties:', Object.keys(spreadsheet));
+      return [];
+    }
+    
+    if (!Array.isArray(spreadsheet.sheets)) {
+      console.error('getSheetsList: sheets property is not an array:', typeof spreadsheet.sheets);
       return [];
     }
     
     var sheets = spreadsheet.sheets.map(function(sheet) {
+      if (!sheet.properties) {
+        console.warn('getSheetsList: Sheet missing properties:', sheet);
+        return null;
+      }
       return {
         name: sheet.properties.title,
         id: sheet.properties.sheetId
       };
-    });
-    debugLog('getSheetsList: Returning sheets:', JSON.stringify(sheets));
+    }).filter(function(sheet) { return sheet !== null; });
+    
+    console.log('getSheetsList: Successfully returning', sheets.length, 'sheets:', sheets);
     return sheets;
   } catch (e) {
-    console.error('シート一覧取得エラー: ' + e.message);
-    console.error('Error details:', e.stack);
+    console.error('getSheetsList: シート一覧取得エラー:', e.message);
+    console.error('getSheetsList: Error details:', e.stack);
+    console.error('getSheetsList: Error for userId:', userId);
     return [];
   }
 }

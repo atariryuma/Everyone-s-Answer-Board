@@ -439,7 +439,8 @@ function appendSheetsData(service, spreadsheetId, range, values) {
  */
 function getSpreadsheetsData(service, spreadsheetId) {
   try {
-    var url = service.baseUrl + '/' + spreadsheetId;
+    // シート情報を含む基本的なメタデータを取得するために fields パラメータを追加
+    var url = service.baseUrl + '/' + spreadsheetId + '?fields=sheets.properties';
     var response = UrlFetchApp.fetch(url, {
       headers: { 'Authorization': 'Bearer ' + service.accessToken },
       muteHttpExceptions: true,
@@ -448,12 +449,17 @@ function getSpreadsheetsData(service, spreadsheetId) {
     });
     
     if (response.getResponseCode() !== 200) {
+      console.error('Sheets API response code:', response.getResponseCode());
+      console.error('Sheets API response body:', response.getContentText());
       throw new Error('Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText());
     }
     
-    return JSON.parse(response.getContentText());
+    var result = JSON.parse(response.getContentText());
+    console.log('getSpreadsheetsData success: Found', result.sheets ? result.sheets.length : 0, 'sheets');
+    return result;
   } catch (error) {
     console.error('getSpreadsheetsData error:', error.message);
+    console.error('getSpreadsheetsData error stack:', error.stack);
     throw new Error('スプレッドシート情報取得に失敗しました: ' + error.message);
   }
 }
