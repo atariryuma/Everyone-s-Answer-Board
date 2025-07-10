@@ -1691,15 +1691,9 @@ function setupEventListeners() {
         });
       }
       
-      // Resource management (unified for forms and spreadsheets)
       var addResourceBtn = document.getElementById('add-resource-btn');
       if (addResourceBtn) {
         addResourceBtn.addEventListener('click', addResource);
-      }
-      
-      var openResourceBtn = document.getElementById('open-resource-btn');
-      if (openResourceBtn) {
-        openResourceBtn.addEventListener('click', openResource);
       }
       
       // Legacy spreadsheet management (keep for compatibility)
@@ -1995,6 +1989,31 @@ function updateDatabaseInfo(status) {
     } else {
       openLinkedFormBtn.title = '連携しているフォームが設定されていません';
     }
+  }
+}
+
+function updatePublicationStatusUI(isPublished) {
+  const statusIndicator = document.getElementById('info-publish-indicator');
+  const statusText = document.getElementById('info-publish-text');
+  const unpublishBtn = document.getElementById('unpublish-board-btn');
+  const savePublishBtn = document.getElementById('save-publish-btn');
+
+  if (isPublished) {
+    if (statusIndicator) {
+      statusIndicator.classList.remove('bg-gray-400');
+      statusIndicator.classList.add('bg-green-400');
+    }
+    if (statusText) statusText.textContent = '公開中';
+    if (unpublishBtn) unpublishBtn.classList.remove('hidden');
+    if (savePublishBtn) savePublishBtn.textContent = '設定を更新して再公開';
+  } else {
+    if (statusIndicator) {
+      statusIndicator.classList.remove('bg-green-400');
+      statusIndicator.classList.add('bg-gray-400');
+    }
+    if (statusText) statusText.textContent = '非公開';
+    if (unpublishBtn) unpublishBtn.classList.add('hidden');
+    if (savePublishBtn) savePublishBtn.textContent = '設定を保存して公開';
   }
 }
 
