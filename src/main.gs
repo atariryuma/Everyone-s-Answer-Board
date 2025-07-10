@@ -431,48 +431,82 @@ function doGet(e) {
         return safeSetXFrameOptionsDeny(adminHtml);
       }
       
-      if (mode === 'view' && isPublished) {
-        // 明示的な回答ボード表示要求（公開済みの場合のみ）
-        console.log('DEBUG: Explicit view mode request for published board. Showing Page.');
-        const template = HtmlService.createTemplateFromFile('Page');
-        template.include = include;
-        
-        try {
-          const config = JSON.parse(userInfo.configJson || '{}');
-          const sheetConfigKey = 'sheet_' + (config.publishedSheetName || sheetName);
-          const sheetConfig = config[sheetConfigKey] || {};
+      if (mode === 'view') {
+        if (isPublished) {
+          // 明示的な回答ボード表示要求（公開済みの場合）
+          console.log('DEBUG: Explicit view mode request for published board. Showing Page.');
+          const template = HtmlService.createTemplateFromFile('Page');
+          template.include = include;
           
-          template.userId = userInfo.userId;
-          template.spreadsheetId = userInfo.spreadsheetId;
-          template.ownerName = userInfo.adminEmail;
-          template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
-          const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
-          
-          // 直接rawOpinionHeaderを使用（Base64エンコード削除）
-          template.opinionHeader = escapeJavaScript(rawOpinionHeader);
-          template.cacheTimestamp = Date.now(); // キャッシュバスター
-          
-          template.displayMode = config.displayMode || 'anonymous';
-          template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
-          template.showAdminFeatures = false; // Page.html is for public view, not admin
-          template.isAdminUser = false; // Page.html is for public view, not admin
+          try {
+            const config = JSON.parse(userInfo.configJson || '{}');
+            const sheetConfigKey = 'sheet_' + (config.publishedSheetName || sheetName);
+            const sheetConfig = config[sheetConfigKey] || {};
+            
+            template.userId = userInfo.userId;
+            template.spreadsheetId = userInfo.spreadsheetId;
+            template.ownerName = userInfo.adminEmail;
+            template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
+            const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+            
+            // 直接rawOpinionHeaderを使用（Base64エンコード削除）
+            template.opinionHeader = escapeJavaScript(rawOpinionHeader);
+            template.cacheTimestamp = Date.now(); // キャッシュバスター
+            
+            template.displayMode = config.displayMode || 'anonymous';
+            template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
+            template.showAdminFeatures = false; // Page.html is for public view, not admin
+            template.isAdminUser = false; // Page.html is for public view, not admin
 
-        } catch (e) {
-          template.opinionHeader = escapeJavaScript('お題の読込エラー');
-          template.cacheTimestamp = Date.now();
-          template.userId = userInfo.userId;
-          template.spreadsheetId = userInfo.spreadsheetId;
-          template.ownerName = userInfo.adminEmail;
-          template.sheetName = escapeJavaScript(sheetName);
-          template.displayMode = 'anonymous';
-          template.showCounts = true;
-          template.showAdminFeatures = false; // Page.html is for public view, not admin
-          template.isAdminUser = false; // Page.html is for public view, not admin
+          } catch (e) {
+            template.opinionHeader = escapeJavaScript('お題の読込エラー');
+            template.cacheTimestamp = Date.now();
+            template.userId = userInfo.userId;
+            template.spreadsheetId = userInfo.spreadsheetId;
+            template.ownerName = userInfo.adminEmail;
+            template.sheetName = escapeJavaScript(sheetName);
+            template.displayMode = 'anonymous';
+            template.showCounts = true;
+            template.showAdminFeatures = false; // Page.html is for public view, not admin
+            template.isAdminUser = false; // Page.html is for public view, not admin
+          }
+          
+          return template.evaluate()
+              .setTitle('StudyQuest -みんなの回答ボード-')
+              .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+        } else {
+          // 未公開状態での表示要求 - Unpublished.htmlを表示
+          console.log('DEBUG: View mode request for unpublished board. Showing Unpublished.');
+          const template = HtmlService.createTemplateFromFile('Unpublished');
+          template.include = include;
+          
+          try {
+            const config = JSON.parse(userInfo.configJson || '{}');
+            
+            template.userId = userInfo.userId;
+            template.spreadsheetId = userInfo.spreadsheetId;
+            template.ownerName = userInfo.adminEmail;
+            template.isOwner = true; // 管理者であることを示す
+            template.adminEmail = userInfo.adminEmail;
+            template.cacheTimestamp = Date.now();
+            
+            // 管理パネルと回答ボードのURLを設定
+            const appUrls = generateAppUrls(userInfo.userId);
+            template.adminPanelUrl = appUrls.adminUrl;
+            template.boardUrl = appUrls.viewUrl;
+            
+          } catch (e) {
+            console.error('Unpublished template setup error:', e);
+            template.ownerName = 'システム管理者';
+            template.isOwner = true;
+            template.adminEmail = userInfo.adminEmail || 'admin@example.com';
+            template.cacheTimestamp = Date.now();
+          }
+          
+          return template.evaluate()
+              .setTitle('StudyQuest - 準備中')
+              .addMetaTag('viewport', 'width=device-width, initial-scale=1');
         }
-        
-        return template.evaluate()
-            .setTitle('StudyQuest -みんなの回答ボード-')
-            .addMetaTag('viewport', 'width=device-width, initial-scale=1');
       }
 
       // デフォルト：パラメータなしのアクセスは管理パネルへ

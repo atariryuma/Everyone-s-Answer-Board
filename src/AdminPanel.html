@@ -2684,12 +2684,20 @@ function syncCheckboxStates(status) {
         .then(function(response) {
           console.log('公開停止レスポンス:', response);
           showMessage(response.message || '✅ 回答ボードの公開を停止しました。', 'success');
-          loadStatus(true); // UIを最新の状態に更新
+          
+          // 2秒後に回答ボード（未公開状態）にリダイレクト
+          setTimeout(function() {
+            // 現在のURLを取得してviewモードのURLを生成
+            const currentUrl = new URL(window.location.href);
+            const baseUrl = currentUrl.origin + currentUrl.pathname;
+            const viewUrl = baseUrl + '?mode=view';
+            
+            console.log('公開停止後、回答ボードにリダイレクト:', viewUrl);
+            window.location.href = viewUrl;
+          }, 2000);
         })
         .catch(function(error) {
           handleError(error, 'unpublishBoard');
-        })
-        .finally(function() {
           setLoading(false);
         });
     }

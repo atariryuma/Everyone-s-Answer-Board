@@ -1396,46 +1396,99 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
       var service = getSheetsService();
       var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
       
-      var reactionColumnName = COLUMN_HEADERS[reactionKey];
-      var reactionColumnIndex = headerIndices[reactionColumnName];
+      // すべてのリアクション列を取得してユーザーの重複リアクションをチェック
+      var allReactionRanges = [];
+      var allReactionColumns = {};
+      var targetReactionColumnIndex = null;
       
-      if (reactionColumnIndex === undefined) {
-        throw new Error('リアクション列が見つかりません: ' + reactionColumnName);
+      // 全リアクション列の情報を準備
+      REACTION_KEYS.forEach(function(key) {
+        var columnName = COLUMN_HEADERS[key];
+        var columnIndex = headerIndices[columnName];
+        if (columnIndex !== undefined) {
+          var range = "'" + sheetName + "'!" + String.fromCharCode(65 + columnIndex) + rowIndex;
+          allReactionRanges.push(range);
+          allReactionColumns[key] = {
+            columnIndex: columnIndex,
+            range: range
+          };
+          if (key === reactionKey) {
+            targetReactionColumnIndex = columnIndex;
+          }
+        }
+      });
+      
+      if (targetReactionColumnIndex === null) {
+        throw new Error('対象リアクション列が見つかりません: ' + reactionKey);
       }
       
-      // 現在のリアクション文字列を取得
-      var cellRange = "'" + sheetName + "'!" + String.fromCharCode(65 + reactionColumnIndex) + rowIndex;
-      var response = batchGetSheetsData(service, spreadsheetId, [cellRange]);
-      var currentReactionString = '';
-      if (response && response.valueRanges && response.valueRanges[0] && 
-          response.valueRanges[0].values && response.valueRanges[0].values[0] &&
-          response.valueRanges[0].values[0][0]) {
-        currentReactionString = response.valueRanges[0].values[0][0];
+      // 全リアクション列の現在の値を一括取得
+      var response = batchGetSheetsData(service, spreadsheetId, allReactionRanges);
+      var updateData = [];
+      var userAction = null;
+      var targetCount = 0;
+      
+      // 各リアクション列を処理
+      var rangeIndex = 0;
+      REACTION_KEYS.forEach(function(key) {
+        if (!allReactionColumns[key]) return;
+        
+        var currentReactionString = '';
+        if (response && response.valueRanges && response.valueRanges[rangeIndex] && 
+            response.valueRanges[rangeIndex].values && response.valueRanges[rangeIndex].values[0] &&
+            response.valueRanges[rangeIndex].values[0][0]) {
+          currentReactionString = response.valueRanges[rangeIndex].values[0][0];
+        }
+        
+        var currentReactions = parseReactionString(currentReactionString);
+        var userIndex = currentReactions.indexOf(reactingUserEmail);
+        
+        if (key === reactionKey) {
+          // 対象リアクション列の処理
+          if (userIndex >= 0) {
+            // 既にリアクション済み → 削除（トグル）
+            currentReactions.splice(userIndex, 1);
+            userAction = 'removed';
+          } else {
+            // 未リアクション → 追加
+            currentReactions.push(reactingUserEmail);
+            userAction = 'added';
+          }
+          targetCount = currentReactions.length;
+        } else {
+          // 他のリアクション列からユーザーを削除（1人1リアクション制限）
+          if (userIndex >= 0) {
+            currentReactions.splice(userIndex, 1);
+            debugLog('他のリアクションから削除: ' + reactingUserEmail + ' from ' + key);
+          }
+        }
+        
+        // 更新データを準備
+        var updatedReactionString = currentReactions.join(', ');
+        updateData.push({
+          range: allReactionColumns[key].range,
+          values: [[updatedReactionString]]
+        });
+        
+        rangeIndex++;
+      });
+      
+      // すべての更新を一括実行
+      if (updateData.length > 0) {
+        batchUpdateSheetsData(service, spreadsheetId, updateData);
       }
       
-      // リアクションの追加/削除処理
-      var currentReactions = parseReactionString(currentReactionString);
-      var userIndex = currentReactions.indexOf(reactingUserEmail);
-      
-      if (userIndex >= 0) {
-        // 既にリアクション済み → 削除
-        currentReactions.splice(userIndex, 1);
-      } else {
-        // 未リアクション → 追加
-        currentReactions.push(reactingUserEmail);
-      }
-      
-      // 更新された値を書き戻す
-      var updatedReactionString = currentReactions.join(', ');
-      updateSheetsData(service, spreadsheetId, cellRange, [[updatedReactionString]]);
-      
-      debugLog('リアクション更新完了: ' + reactingUserEmail + ' → ' + reactionKey + ' (' + (userIndex >= 0 ? '削除' : '追加') + ')');
+      debugLog('リアクション切り替え完了: ' + reactingUserEmail + ' → ' + reactionKey + ' (' + userAction + ')', {
+        updatedRanges: updateData.length,
+        targetCount: targetCount,
+        allColumns: Object.keys(allReactionColumns)
+      });
       
       return { 
         status: 'success', 
         message: 'リアクションを更新しました。',
-        action: userIndex >= 0 ? 'removed' : 'added',
-        count: currentReactions.length
+        action: userAction,
+        count: targetCount
       };
       
     } finally {
