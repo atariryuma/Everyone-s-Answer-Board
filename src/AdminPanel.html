@@ -2300,9 +2300,6 @@ function syncCheckboxStates(status) {
       console.log('populateSheetSelect: Received sheetNames:', sheetNames);
       console.log('populateSheetSelect: Received activeSheetName:', activeSheetName);
 
-      // 現在の選択値を保持
-      const previouslySelected = select.value;
-      
       // ドロップダウンをクリア
       select.innerHTML = '<option value="">-- シートを選択 --</option>';
       console.log('populateSheetSelect: After clearing innerHTML:', select.innerHTML);
@@ -2326,9 +2323,9 @@ function syncCheckboxStates(status) {
       if (activeSheetName) {
         select.value = activeSheetName;
         console.log('populateSheetSelect: Set select.value to activeSheetName:', activeSheetName);
-      } else if (previouslySelected) {
-        select.value = previouslySelected;
-        console.log('populateSheetSelect: Set select.value to previouslySelected:', previouslySelected);
+      } else {
+        select.value = '';
+        console.log('populateSheetSelect: Reset select.value to empty');
       }
       
       // 選択状態に応じてUIを更新
