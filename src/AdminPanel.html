@@ -1847,17 +1847,6 @@ function setupEventListeners() {
     });
   }
   
-  // 公開選択モーダルのイベントリスナー
-  var publishModalPublishBtn = document.getElementById('publish-modal-publish-btn');
-  var publishModalPrivateBtn = document.getElementById('publish-modal-private-btn');
-  
-  if (publishModalPublishBtn) {
-    publishModalPublishBtn.addEventListener('click', publishBoard);
-  }
-  
-  if (publishModalPrivateBtn) {
-    publishModalPrivateBtn.addEventListener('click', saveWithoutPublish);
-  }
   // ★★★ ここまで追加 ★★★
 }
 
