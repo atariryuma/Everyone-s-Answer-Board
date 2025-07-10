@@ -400,8 +400,7 @@ function doGet(e) {
           displayMode: adminTemplate.displayMode,
           showAdminFeatures: adminTemplate.showAdminFeatures
         });
-        var htmlOutput = HtmlService.createTemplateFromFile('AdminPanel')
-      .evaluate()
+        var adminHtml = adminTemplate.evaluate()
       .setTitle('みんなの回答ボード 管理パネル')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .setSandboxMode(HtmlService.SandboxMode.IFRAME);
