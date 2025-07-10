@@ -8,7 +8,7 @@
 <!-- Content Security Policy for enhanced security -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://fonts.googleapis.com https://script.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https:; img-src 'self' data: https:;">
 <!-- Permissions Policy to silence console warnings -->
-<meta http-equiv="Permissions-Policy" content="ambient-light-sensor=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), speaker=(), vibrate=(), vr=()">
+<meta http-equiv="Permissions-Policy" content="camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()">
 <!-- Preload Google Fonts for better performance -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1250,7 +1250,7 @@ setupEventDelegation() {
     }
     
     this.handlers.onAnswersContainerClick = (e) => {
-        console.log('🔍 [CLICK DEBUG] Container click detected:', {
+        if (DEBUG_MODE) console.log('🔍 [CLICK DEBUG] Container click detected:', {
             target: e.target,
             targetClass: e.target.className,
             targetTag: e.target.tagName,
@@ -1260,7 +1260,7 @@ setupEventDelegation() {
         });
 
         const answerCard = e.target.closest('.answer-card');
-        console.log('🔍 [CLICK DEBUG] Answer card search:', {
+        if (DEBUG_MODE) console.log('🔍 [CLICK DEBUG] Answer card search:', {
             answerCard: answerCard,
             cardClass: answerCard?.className,
             cardRowIndex: answerCard?.dataset?.rowIndex,
@@ -1268,7 +1268,7 @@ setupEventDelegation() {
         });
 
         if (!answerCard || answerCard.classList.contains('hidden-card')) {
-            console.log('🚫 [CLICK DEBUG] No valid answer card found or card is hidden');
+            if (DEBUG_MODE) console.log('🚫 [CLICK DEBUG] No valid answer card found or card is hidden');
             return;
         }
 
@@ -1278,7 +1278,7 @@ setupEventDelegation() {
             return;
         }
 
-        console.log('✅ [CLICK DEBUG] Valid card click detected:', {
+        if (DEBUG_MODE) if (DEBUG_MODE) console.log('✅ [CLICK DEBUG] Valid card click detected:', {
             rowIndex: rowIndex,
             cardElement: answerCard
         });
@@ -1286,7 +1286,7 @@ setupEventDelegation() {
         // リアクションボタンのクリックを処理
         const reactionBtn = e.target.closest('.reaction-btn');
         if (reactionBtn) {
-            console.log('🎯 [CLICK DEBUG] Reaction button clicked:', {
+            if (DEBUG_MODE) console.log('🎯 [CLICK DEBUG] Reaction button clicked:', {
                 button: reactionBtn,
                 reaction: reactionBtn.dataset.reaction,
                 disabled: reactionBtn.disabled,
@@ -1294,7 +1294,7 @@ setupEventDelegation() {
             });
             e.stopPropagation(); // ★重要: イベントの伝播を止め、カード本体のクリックと分離
             if (!reactionBtn.disabled) {
-                console.log('▶️ [CLICK DEBUG] Processing reaction:', reactionBtn.dataset.reaction);
+                if (DEBUG_MODE) console.log('▶️ [CLICK DEBUG] Processing reaction:', reactionBtn.dataset.reaction);
                 this.handleReaction(rowIndex, reactionBtn.dataset.reaction);
             } else {
                 console.log('🚫 [CLICK DEBUG] Reaction button is disabled');
@@ -1305,14 +1305,14 @@ setupEventDelegation() {
         // ハイライトボタンのクリックを処理
         const highlightBtn = e.target.closest('.highlight-btn');
         if (highlightBtn) {
-            console.log('🎯 [CLICK DEBUG] Highlight button clicked:', {
+            if (DEBUG_MODE) console.log('🎯 [CLICK DEBUG] Highlight button clicked:', {
                 button: highlightBtn,
                 disabled: highlightBtn.disabled,
                 rowIndex: rowIndex
             });
             e.stopPropagation(); // ★重要: 同様にイベントの伝播を停止
             if (!highlightBtn.disabled) {
-                console.log('▶️ [CLICK DEBUG] Processing highlight for row:', rowIndex);
+                if (DEBUG_MODE) console.log('▶️ [CLICK DEBUG] Processing highlight for row:', rowIndex);
                 this.handleHighlight(rowIndex);
             } else {
                 console.log('🚫 [CLICK DEBUG] Highlight button is disabled');
@@ -1321,17 +1321,17 @@ setupEventDelegation() {
         }
 
         // 上記以外の場合は、カード本体のクリックとしてモーダルを表示
-        console.log('📱 [CLICK DEBUG] Card body clicked, showing modal for row:', rowIndex);
+        if (DEBUG_MODE) console.log('📱 [CLICK DEBUG] Card body clicked, showing modal for row:', rowIndex);
         this.showAnswerModal(rowIndex);
     };
 
     if (this.elements.answersContainer) {
-        console.log('🔧 [CLICK DEBUG] Setting up event delegation on answers container:', this.elements.answersContainer);
+        if (DEBUG_MODE) console.log('🔧 [CLICK DEBUG] Setting up event delegation on answers container:', this.elements.answersContainer);
         // 既存のリスナーをクリアしてから追加
         this.elements.answersContainer.removeEventListener('click', this.handlers.onAnswersContainerClick);
         this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
         this.eventDelegationSetup = true;
-        console.log('✅ [CLICK DEBUG] Event delegation setup complete');
+        if (DEBUG_MODE) console.log('✅ [CLICK DEBUG] Event delegation setup complete');
     } else {
         console.error('❌ [CLICK DEBUG] No answers container found for event delegation');
     }
@@ -2594,7 +2594,7 @@ setupEventDelegation() {
  * リアクション処理（連続クリック防止機能＋安定化されたUI更新）
  */
 async handleReaction(rowIndex, reaction) {
-    console.log('🎯 [REACTION DEBUG] handleReaction called:', {
+    if (DEBUG_MODE) console.log('🎯 [REACTION DEBUG] handleReaction called:', {
         rowIndex: rowIndex,
         reaction: reaction,
         timestamp: new Date().toISOString()
@@ -2603,7 +2603,7 @@ async handleReaction(rowIndex, reaction) {
     const numericRowIndex = parseInt(rowIndex, 10);
     const reactionKey = `${numericRowIndex}-${reaction}`;
 
-    console.log('🔧 [REACTION DEBUG] Processing reaction:', {
+    if (DEBUG_MODE) console.log('🔧 [REACTION DEBUG] Processing reaction:', {
         numericRowIndex: numericRowIndex,
         reactionKey: reactionKey,
         pendingReactions: Array.from(this.pendingReactions)
@@ -2615,23 +2615,27 @@ async handleReaction(rowIndex, reaction) {
         return; // すでに処理中なら何もしない
     }
 
-    console.log('✅ [REACTION DEBUG] Adding reaction to pending:', reactionKey);
+    if (DEBUG_MODE) console.log('✅ [REACTION DEBUG] Adding reaction to pending:', reactionKey);
     this.pendingReactions.add(reactionKey);
 
     const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
+    
+    // ボタンを即座に無効化して視覚的フィードバックを提供
+    btns.forEach(btn => {
+        btn.disabled = true;
+        btn.classList.add('loading');
+    });
     const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
 
     if (!item) {
+        // エラー時はボタンを再有効化
+        btns.forEach(btn => {
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        });
         this.pendingReactions.delete(reactionKey);
         return;
     }
-
-    // ★修正ポイント①：UI更新をボタンのローディング表示のみに限定
-    // これにより、クリックイベントを妨害するカード全体のDOM変更を防ぐ
-    btns.forEach(btn => {
-        btn.classList.add('loading');
-        btn.disabled = true;
-    });
 
     try {
         // ★修正ポイント②：先にサーバーと通信する
@@ -2656,7 +2660,24 @@ async handleReaction(rowIndex, reaction) {
                 item.reactions[reaction].count = (item.reactions[reaction].count || 0) + 1;
                 item.reactions[reaction].reacted = true;
             }
-            requestAnimationFrame(() => this.applyUpdates([item])); // 次の描画フレームで安全にUIを更新
+            
+            // UI状態を即座に更新
+            requestAnimationFrame(() => {
+                this.applyUpdates([item]); // 次の描画フレームで安全にUIを更新
+                
+                // リアクションボタンの状態を強制更新
+                const reactionBtns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
+                reactionBtns.forEach(btn => {
+                    const reactionInfo = item.reactions?.[reaction];
+                    if (reactionInfo?.reacted) {
+                        btn.classList.add('liked');
+                        btn.setAttribute('aria-pressed', 'true');
+                    } else {
+                        btn.classList.remove('liked');
+                        btn.setAttribute('aria-pressed', 'false');
+                    }
+                });
+            });
 
             // モーダルが開いていればそちらも更新
             if (!this.elements.answerModalContainer.classList.contains('hidden')) {
@@ -2720,7 +2741,7 @@ async handleReaction(rowIndex, reaction) {
     }, 2000);
   }
   async handleHighlight(rowIndex) {
-    console.log('⭐ [HIGHLIGHT DEBUG] handleHighlight called:', {
+    if (DEBUG_MODE) console.log('⭐ [HIGHLIGHT DEBUG] handleHighlight called:', {
         rowIndex: rowIndex,
         timestamp: new Date().toISOString()
     });
@@ -2735,7 +2756,7 @@ async handleReaction(rowIndex, reaction) {
       windowShowHighlightToggle: window.showHighlightToggle
     });
 
-    console.log('🔐 [HIGHLIGHT DEBUG] Admin permissions check:', {
+    if (DEBUG_MODE) console.log('🔐 [HIGHLIGHT DEBUG] Admin permissions check:', {
         isAdminUser: this.state.isAdminUser,
         showHighlightToggle: this.state.showHighlightToggle,
         showAdminFeatures: this.state.showAdminFeatures
@@ -2972,7 +2993,7 @@ async handleReaction(rowIndex, reaction) {
     });
   }
   showAnswerModal(rowIndex) {
-    console.log('📱 [MODAL DEBUG] showAnswerModal called:', {
+    if (DEBUG_MODE) console.log('📱 [MODAL DEBUG] showAnswerModal called:', {
         rowIndex: rowIndex,
         rowIndexType: typeof rowIndex,
         timestamp: new Date().toISOString()
@@ -2985,7 +3006,7 @@ async handleReaction(rowIndex, reaction) {
       filteredDataLength: this.state.filteredData?.length
     });
 
-    console.log('🔍 [MODAL DEBUG] Data search context:', {
+    if (DEBUG_MODE) console.log('🔍 [MODAL DEBUG] Data search context:', {
         currentAnswersLength: this.state.currentAnswers?.length,
         filteredDataLength: this.state.filteredData?.length,
         searchingFor: rowIndex
@@ -3566,6 +3587,20 @@ try {
 
   // システムフロー表示をグローバルで利用可能にする
   window.showSystemFlow = showSystemFlow;
+  
+  // デバッグ用：データ構造確認機能
+  window.debugCurrentData = () => {
+    if (window.studyQuestApp && window.studyQuestApp.state) {
+      console.log('現在のデータ構造:', {
+        currentAnswers: window.studyQuestApp.state.currentAnswers,
+        currentAnswersLength: window.studyQuestApp.state.currentAnswers?.length,
+        firstItem: window.studyQuestApp.state.currentAnswers?.[0],
+        header: window.studyQuestApp.elements?.headingLabel?.textContent
+      });
+    } else {
+      console.log('StudyQuestApp not available');
+    }
+  };
 
   // Additional global debug utilities
   window.debugClickAllAnswerCards = async (options = {}) => {
