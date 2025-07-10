@@ -97,14 +97,14 @@
   /* Admin Panel Layout Fixes */
   .responsive-grid {
     display: grid;
-    gap: 1.5rem; /* モバイルのギャップ */
+    gap: 1rem; /* モバイルのギャップ */
     grid-template-columns: 1fr; /* モバイル: 単一カラム */
   }
   
   @media (min-width: 768px) { /* タブレット向けブレークポイント */
     .responsive-grid {
       grid-template-columns: 2fr 1fr; /* 左: 2/3、右: 1/3 */
-      gap: 1.5rem; /* タブレットのギャップ */
+      gap: 1rem; /* タブレットのギャップ */
     }
     .right-panel {
       min-width: 200px; /* タブレットでの右パネルの最小幅 */
@@ -114,7 +114,7 @@
   @media (min-width: 1024px) { /* デスクトップ向けブレークポイント */
     .responsive-grid {
       grid-template-columns: minmax(400px, 1fr) 350px; /* 左: 最小400px、柔軟。右: 固定350px */
-      gap: 2rem; /* デスクトップのギャップ */
+      gap: 1.5rem; /* デスクトップのギャップ */
     }
     .right-panel {
       min-width: 300px; /* デスクトップでの右パネルの最小幅（安全のため） */
@@ -241,10 +241,10 @@
     <!-- メインコンテンツエリア -->
     <div class="responsive-grid">
       <!-- 左側：セットアップフロー（メインパネル） -->
-      <div class="left-panel space-y-6 lg:space-y-8">
+      <div class="left-panel space-y-4 lg:space-y-6">
         
         <!-- ステップ1: データ準備 -->
-        <div class="glass-panel p-6 lg:p-8" id="data-setup-section">
+        <div class="glass-panel p-4 lg:p-6" id="data-setup-section">
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-3">
               <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-lg">
@@ -364,7 +364,7 @@
         </div>
 
         <!-- ステップ2: シート選択 -->
-        <div class="glass-panel p-6 lg:p-8" id="sheet-selection-section">
+        <div class="glass-panel p-4 lg:p-6" id="sheet-selection-section">
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-3">
               <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-lg">
@@ -416,7 +416,7 @@
         </div>
 
         <!-- ステップ3: 設定・公開 -->
-        <div class="glass-panel p-6 lg:p-8" id="config-section">
+        <div class="glass-panel p-4 lg:p-6" id="config-section">
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-3">
               <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-lg">
@@ -538,7 +538,7 @@
       </div>
       
       <!-- 右側：情報・ヘルプパネル -->
-      <div class="space-y-6 lg:space-y-8">
+      <div class="space-y-4 lg:space-y-6">
         
         
         
@@ -558,7 +558,7 @@
 
 
         <!-- 使い方ガイド -->
-        <div class="glass-panel p-6 lg:p-8">
+        <div class="glass-panel p-4 lg:p-6">
           <div class="flex items-center gap-3 mb-4">
             <div class="w-8 h-8 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center">
               <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -627,7 +627,7 @@
           </div>
         </div>
         <!-- システム状況 -->
-        <div id="system-info-panel" class="glass-panel p-6 lg:p-8">
+        <div id="system-info-panel" class="glass-panel p-4 lg:p-6">
     <div class="flex items-center gap-3 mb-4">
       <div class="w-8 h-8 bg-gradient-to-br from-gray-500 to-gray-600 rounded-xl flex items-center justify-center">
         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"></path></svg>
@@ -1414,6 +1414,19 @@
       console.log('管理者状態:', typeof currentStatus !== 'undefined' && currentStatus ? 'Authenticated' : 'Unknown');
       console.log('スプレッドシートURL:', typeof currentSpreadsheetUrl !== 'undefined' ? (currentSpreadsheetUrl ? 'Set' : 'Not Set') : 'Unknown');
       console.groupEnd();
+    }
+
+    function setLoading(isLoading, message = '') {
+      const loader = document.getElementById('loading-overlay');
+      const loaderMessage = document.getElementById('loading-message');
+      if (!loader) return;
+
+      if (isLoading) {
+        if (loaderMessage) loaderMessage.textContent = message;
+        loader.classList.remove('hidden');
+      } else {
+        loader.classList.add('hidden');
+      }
     }
 
     var elements = {}; // elementsオブジェクトを初期化
