@@ -898,95 +898,95 @@
       
       // スプレッドシート関連のエラー
       if (lowerMsg.includes('範囲の列数には') || lowerMsg.includes('range')) {
-        return '📊 スプレッドシートにデータが正しく入力されていません。
-💡 解決方法：スプレッドシートを開いて、1行目にヘッダー（列名）が入力されているか確認してください。';
+        return `📊 スプレッドシートにデータが正しく入力されていません。
+💡 解決方法：スプレッドシートを開いて、1行目にヘッダー（列名）が入力されているか確認してください。`;
       }
       
       if (lowerMsg.includes('シート情報の取得に失敗') || lowerMsg.includes('sheet')) {
-        return '📋 シートの情報を読み込めませんでした。
+        return `📋 シートの情報を読み込めませんでした。
 💡 解決方法：
 • スプレッドシートが正しく共有されているか確認
 • シートにデータが入力されているか確認
-• しばらく待ってから再試行';
+• しばらく待ってから再試行`;
       }
       
       // 権限関連のエラー
       if (lowerMsg.includes('permission') || lowerMsg.includes('権限') || lowerMsg.includes('access denied')) {
-        return '🔒 アクセス権限がありません。
+        return `🔒 アクセス権限がありません。
 💡 解決方法：
 • スプレッドシートの共有設定を確認
 • 編集権限があることを確認
-• アカウントでログインし直してみる';
+• アカウントでログインし直してみる`;
       }
       
       // ネットワーク関連のエラー
       if (lowerMsg.includes('network') || lowerMsg.includes('timeout') || lowerMsg.includes('fetch')) {
-        return '🌐 インターネット接続の問題が発生しました。
+        return `🌐 インターネット接続の問題が発生しました。
 💡 解決方法：
 • インターネット接続を確認
 • しばらく待ってから再試行
-• ページを再読み込み';
+• ページを再読み込み`;
       }
       
       // フォーム関連のエラー
       if (lowerMsg.includes('form') && lowerMsg.includes('not found')) {
-        return '📝 フォームが見つかりません。
+        return `📝 フォームが見つかりません。
 💡 解決方法：
 • フォームが作成されているか確認
 • フォームが削除されていないか確認
-• 新しいフォームを作成';
+• 新しいフォームを作成`;
       }
       
       // データ検証関連のエラー
       if (lowerMsg.includes('validation') || lowerMsg.includes('invalid')) {
-        return '⚠️ 入力内容に問題があります。
+        return `⚠️ 入力内容に問題があります。
 💡 解決方法：
 • 必須項目がすべて入力されているか確認
 • 入力形式が正しいか確認
-• 特殊文字が含まれていないか確認';
+• 特殊文字が含まれていないか確認`;
       }
       
       // 認証関連のエラー
       if (lowerMsg.includes('authentication') || lowerMsg.includes('login') || lowerMsg.includes('unauthorized')) {
-        return '🔐 認証に問題があります。
+        return `🔐 認証に問題があります。
 💡 解決方法：
 • ログイン状態を確認
 • ページを再読み込み
-• 再度ログインしてみる';
+• 再度ログインしてみる`;
       }
       
       // サーバー関連のエラー
       if (lowerMsg.includes('server error') || lowerMsg.includes('500') || lowerMsg.includes('503')) {
-        return '⚡ システムが一時的に利用できません。
+        return `⚡ システムが一時的に利用できません。
 💡 解決方法：
 • 数分待ってから再試行
-• 問題が続く場合は管理者に連絡';
+• 問題が続く場合は管理者に連絡`;
       }
       
       // 設定関連のエラー
       if (context && context.includes('config') || lowerMsg.includes('configuration')) {
-        return '⚙️ 設定の保存に問題があります。
+        return `⚙️ 設定の保存に問題があります。
 💡 解決方法：
 • すべての必須項目が入力されているか確認
 • 設定内容に問題がないか確認
-• しばらく待ってから再試行';
+• しばらく待ってから再試行`;
       }
       
       // その他の一般的なエラー
       if (lowerMsg.includes('failed') || lowerMsg.includes('error')) {
-        return '❌ 操作が正常に完了しませんでした。
+        return `❌ 操作が正常に完了しませんでした。
 💡 解決方法：
 • しばらく待ってから再試行
 • ページを再読み込み
-• 問題が続く場合は別のブラウザを試す';
+• 問題が続く場合は別のブラウザを試す`;
       }
       
       // フォールバック
-      return '⚠️ 予期しないエラーが発生しました。
+      return `⚠️ 予期しないエラーが発生しました。
 💡 解決方法：
 • ページを再読み込み
 • しばらく待ってから再試行
-• 問題が続く場合はサポートにお問い合わせください';
+• 問題が続く場合はサポートにお問い合わせください`;
     }
     
     // Wrapper for Google Apps Script calls with consistent error handling
@@ -1062,7 +1062,7 @@
       // Remove control characters and limit length
       return message
         .replace(/[\u0000-\u001F\u007F]/g, '')
-        .replace(/['"\]/g, '')
+        .replace(/[\'"\\]/g, '')
         .substring(0, 200);
     }
     
