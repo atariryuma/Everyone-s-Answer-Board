@@ -1625,11 +1625,17 @@ function addUnifiedQuestions(form, questionType, customConfig) {
           if (customConfig.mainQuestionChoices && customConfig.mainQuestionChoices.length > 0) {
             mainItem.setChoiceValues(customConfig.mainQuestionChoices);
           }
+          if (typeof mainItem.showOtherOption === 'function') {
+            mainItem.showOtherOption(true);
+          }
           break;
         case 'choice':
           mainItem = form.addMultipleChoiceItem();
           if (customConfig.mainQuestionChoices && customConfig.mainQuestionChoices.length > 0) {
             mainItem.setChoiceValues(customConfig.mainQuestionChoices);
+          }
+          if (typeof mainItem.showOtherOption === 'function') {
+            mainItem.showOtherOption(true);
           }
           break;
         default:
