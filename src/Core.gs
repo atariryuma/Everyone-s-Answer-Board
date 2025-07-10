@@ -1774,7 +1774,7 @@ function getSheetData(userId, sheetName, classFilter, sortMode) {
     
     // フィルタリング
     var filteredData = processedData;
-    if (classFilter && classFilter !== 'all') {
+    if (classFilter && classFilter !== 'すべて') {
       var classIndex = headerIndices[COLUMN_HEADERS.CLASS];
       if (classIndex !== undefined) {
         filteredData = processedData.filter(function(row) {
