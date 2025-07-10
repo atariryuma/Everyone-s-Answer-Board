@@ -2761,9 +2761,18 @@ function syncCheckboxStates(status) {
 
     function openAppSetupPage() {
       // アプリ設定ページを新しいタブで開く
-      const currentUrl = window.location.href.split('?')[0];
-      const setupUrl = currentUrl + '?setup=true&mode=appsetup';
-      window.open(setupUrl, '_blank');
+      runGas('getWebAppUrlCached')
+        .then(function(webAppUrl) {
+          const setupUrl = webAppUrl + '?setup=true&mode=appsetup';
+          window.open(setupUrl, '_blank');
+        })
+        .catch(function(error) {
+          console.error('WebApp URL取得エラー:', error);
+          // フォールバック: 現在のURLを使用
+          const currentUrl = window.location.href.split('?')[0];
+          const setupUrl = currentUrl + '?setup=true&mode=appsetup';
+          window.open(setupUrl, '_blank');
+        });
     }
 
   </script>
