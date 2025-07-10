@@ -434,7 +434,9 @@ function getAppConfig() {
         formCreated: configJson.formCreated || false,
         appPublished: configJson.appPublished || false,
         lastUpdated: new Date().toISOString()
-      }
+      },
+      // ユーザーのセットアップ段階を判定
+      setupStep: (userInfo && userInfo.spreadsheetId) ? (configJson.publishedSheetName ? 3 : 2) : 1
     };
   } catch (e) {
     console.error('アプリ設定取得エラー: ' + e.message);

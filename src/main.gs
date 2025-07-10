@@ -400,8 +400,11 @@ function doGet(e) {
           displayMode: adminTemplate.displayMode,
           showAdminFeatures: adminTemplate.showAdminFeatures
         });
-        var adminHtml = adminTemplate.evaluate()
-          .setTitle('管理パネル - みんなの回答ボード');
+        var htmlOutput = HtmlService.createTemplateFromFile('AdminPanel')
+      .evaluate()
+      .setTitle('みんなの回答ボード 管理パネル')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .setSandboxMode(HtmlService.SandboxMode.IFRAME);
         console.log('DEBUG: Serving AdminPanel HTML');
         return safeSetXFrameOptionsDeny(adminHtml);
       }

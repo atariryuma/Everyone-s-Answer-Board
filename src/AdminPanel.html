@@ -2092,6 +2092,7 @@ function syncCheckboxStates(status) {
         updateUIForNoActiveSheet(status);
         console.log('✅ [3/3] No active sheet - UI update completed');
       }
+      updateStepIndicators(status.setupStep); // ここでsetupStepを渡す
     }
 
     /**
