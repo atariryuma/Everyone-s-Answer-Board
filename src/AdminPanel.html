@@ -2325,10 +2325,15 @@ function syncCheckboxStates(status) {
         console.log('populateSheetSelect: No sheets available, innerHTML:', select.innerHTML);
       }
       
-      // アクティブなシートまたは以前選択されていたシートを選択状態にする
+      // アクティブなシート名が渡された場合はそれを優先
       if (activeSheetName) {
         select.value = activeSheetName;
+        selectedSheet = activeSheetName;
         console.log('populateSheetSelect: Set select.value to activeSheetName:', activeSheetName);
+      } else if (selectedSheet) {
+        // 未公開状態などでactiveSheetNameが無い場合は現在の選択を維持
+        select.value = selectedSheet;
+        console.log('populateSheetSelect: Keep existing selectedSheet:', selectedSheet);
       } else {
         select.value = '';
         console.log('populateSheetSelect: Reset select.value to empty');
