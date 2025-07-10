@@ -595,12 +595,65 @@ function saveAndActivateSheet(spreadsheetId, sheetName, config) {
 }
 
 /**
- * 設定のみを保存する（公開はしない）
+ *【新しい推奨関数】設定を保存し、ボードを公開する統合関数
+ * @param {string} sheetName - 対象のシート名
+ * @param {object} config - 保存・適用する設定オブジェクト
+ * @returns {object} 最新のステータスオブジェクト
+ */
+function saveAndPublish(sheetName, config) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000); // 30秒待機
+
+  try {
+    console.log('saveAndPublish開始: sheetName=%s', sheetName);
+    
+    const userInfo = getUserInfo();
+    if (!userInfo || !userInfo.spreadsheetId) {
+      throw new Error('ユーザーのスプレッドシート情報が見つかりません。');
+    }
+    const spreadsheetId = userInfo.spreadsheetId;
+
+    // 1. 関連キャッシュを事前にクリア
+    invalidateUserCache(userInfo.userId, userInfo.adminEmail, spreadsheetId);
+    console.log('saveAndPublish: 事前キャッシュクリア完了');
+
+    // 2. 設定を保存
+    saveSheetConfig(spreadsheetId, sheetName, config);
+    console.log('saveAndPublish: 設定保存完了');
+
+    // 3. シートをアクティブ化
+    switchToSheet(spreadsheetId, sheetName);
+    console.log('saveAndPublish: シート切り替え完了');
+
+    // 4. 表示オプションを更新
+    const displayOptions = {
+      showNames: !!config.showNames,
+      showCounts: config.showCounts !== undefined ? !!config.showCounts : true
+    };
+    setDisplayOptions(displayOptions);
+    console.log('saveAndPublish: 表示オプション設定完了');
+
+    // 5. 最新のステータスを強制再取得して返す
+    const finalStatus = getStatus(true); // forceRefresh = true
+    console.log('saveAndPublish: 統合処理完了、最新ステータスを返します。');
+    
+    return finalStatus;
+
+  } catch (error) {
+    console.error('saveAndPublishで致命的なエラー:', error.message, error.stack);
+    throw new Error('設定の保存と公開中にサーバーエラーが発生しました: ' + error.message);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ *【新しい推奨関数】設定を下書きとして保存する（公開はしない）
  * @param {string} sheetName - シート名
  * @param {object} config - 設定オブジェクト
  * @returns {object} 保存完了メッセージ
  */
-function saveConfig(sheetName, config) {
+function saveDraftConfig(sheetName, config) {
   try {
     if (typeof sheetName !== 'string' || !sheetName) {
       throw new Error('無効なsheetNameです。シート名は必須です。');
@@ -609,9 +662,8 @@ function saveConfig(sheetName, config) {
       throw new Error('無効なconfigオブジェクトです。設定オブジェクトは必須です。');
     }
 
-    console.log('saveConfig開始: sheetName=%s', sheetName);
+    console.log('saveDraftConfig開始: sheetName=%s', sheetName);
 
-    // ユーザー情報を取得
     const userInfo = getUserInfo();
     if (!userInfo || !userInfo.spreadsheetId) {
       throw new Error('ユーザーのスプレッドシート情報が見つかりません。');
@@ -619,15 +671,19 @@ function saveConfig(sheetName, config) {
 
     // 設定を保存
     saveSheetConfig(userInfo.spreadsheetId, sheetName, config);
-    console.log('saveConfig: 設定保存完了');
+    
+    // 関連キャッシュをクリア
+    invalidateUserCache(userInfo.userId, userInfo.adminEmail, userInfo.spreadsheetId);
+
+    console.log('saveDraftConfig: 設定保存完了');
 
     return {
       success: true,
-      message: '設定が正常に保存されました。'
+      message: '設定が下書きとして保存されました。'
     };
 
   } catch (error) {
-    console.error('saveConfigで致命的なエラー:', error.message, error.stack);
+    console.error('saveDraftConfigで致命的なエラー:', error.message, error.stack);
     throw new Error('設定の保存中にサーバーエラーが発生しました: ' + error.message);
   }
 }
