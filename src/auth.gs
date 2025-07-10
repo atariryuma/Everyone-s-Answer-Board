@@ -21,7 +21,22 @@ function getServiceAccountTokenCached() {
  */
 function generateNewServiceAccountToken() {
   var props = PropertiesService.getScriptProperties();
-  var serviceAccountCreds = JSON.parse(props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
+  var serviceAccountCredsString = props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
+  
+  if (!serviceAccountCredsString) {
+    throw new Error('サービスアカウント認証情報が設定されていません。スクリプトプロパティで SERVICE_ACCOUNT_CREDS を設定してください。');
+  }
+  
+  var serviceAccountCreds;
+  try {
+    serviceAccountCreds = JSON.parse(serviceAccountCredsString);
+  } catch (e) {
+    throw new Error('サービスアカウント認証情報の形式が正しくありません: ' + e.message);
+  }
+  
+  if (!serviceAccountCreds.client_email || !serviceAccountCreds.private_key) {
+    throw new Error('サービスアカウント認証情報にclient_emailまたはprivate_keyが含まれていません。');
+  }
   
   var privateKey = serviceAccountCreds.private_key.replace(/\\n/g, '\n'); // 改行文字を正規化
   var clientEmail = serviceAccountCreds.client_email;
@@ -54,10 +69,23 @@ function generateNewServiceAccountToken() {
     payload: {
       grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
       assertion: jwt
-    }
+    },
+    muteHttpExceptions: true
   });
   
+  if (response.getResponseCode() !== 200) {
+    console.error('Token request failed. Status:', response.getResponseCode());
+    console.error('Response:', response.getContentText());
+    throw new Error('サービスアカウントトークンの取得に失敗しました。認証情報を確認してください。Status: ' + response.getResponseCode());
+  }
+  
   var responseData = JSON.parse(response.getContentText());
+  if (!responseData.access_token) {
+    console.error('No access token in response:', responseData);
+    throw new Error('アクセストークンが返されませんでした。サービスアカウント設定を確認してください。');
+  }
+  
+  console.log('Service account token generated successfully for:', clientEmail);
   return responseData.access_token;
 }
 
@@ -67,4 +95,24 @@ function generateNewServiceAccountToken() {
 function clearServiceAccountTokenCache() {
   cacheManager.remove(AUTH_CACHE_KEY);
   debugLog('トークンキャッシュをクリアしました');
+}
+
+/**
+ * 設定されているサービスアカウントのメールアドレスを取得
+ * @returns {string} サービスアカウントのメールアドレス
+ */
+function getServiceAccountEmail() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var serviceAccountCredsString = props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
+    
+    if (!serviceAccountCredsString) {
+      return 'サービスアカウント未設定';
+    }
+    
+    var serviceAccountCreds = JSON.parse(serviceAccountCredsString);
+    return serviceAccountCreds.client_email || 'メールアドレス不明';
+  } catch (e) {
+    return 'サービスアカウント設定エラー';
+  }
 }

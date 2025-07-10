@@ -451,6 +451,15 @@ function getSpreadsheetsData(service, spreadsheetId) {
     if (response.getResponseCode() !== 200) {
       console.error('Sheets API response code:', response.getResponseCode());
       console.error('Sheets API response body:', response.getContentText());
+      
+      if (response.getResponseCode() === 403) {
+        var errorResponse = JSON.parse(response.getContentText());
+        if (errorResponse.error && errorResponse.error.message === 'The caller does not have permission') {
+          var serviceAccountEmail = getServiceAccountEmail();
+          throw new Error('スプレッドシートへのアクセス権限がありません。サービスアカウント（' + serviceAccountEmail + '）をスプレッドシートの編集者として共有してください。');
+        }
+      }
+      
       throw new Error('Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText());
     }
     
