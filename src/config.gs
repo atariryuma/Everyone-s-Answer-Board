@@ -798,7 +798,7 @@ function getSheetHeaders(sheetName) {
 /**
  * スプレッドシートの列名から自動的にconfig設定を推測する
  */
-function autoMapSheetHeaders(sheetName) {
+function autoMapSheetHeaders(sheetName, overrides) {
   try {
     var headers = getSheetHeaders(sheetName);
     if (!headers || headers.length === 0) {
@@ -807,7 +807,27 @@ function autoMapSheetHeaders(sheetName) {
     
     // 新しい高精度自動判定機能を使用
     const mappingResult = autoMapHeaders(headers, sheetName);
-    
+
+    // モーダル入力値による上書き
+    if (overrides) {
+      if (overrides.mainQuestion) {
+        const match = headers.find(h => String(h).trim() === overrides.mainQuestion.trim());
+        if (match) mappingResult.opinionHeader = match;
+      }
+      if (overrides.reasonQuestion) {
+        const match = headers.find(h => String(h).trim() === overrides.reasonQuestion.trim());
+        if (match) mappingResult.reasonHeader = match;
+      }
+      if (overrides.nameQuestion) {
+        const match = headers.find(h => String(h).trim() === overrides.nameQuestion.trim());
+        if (match) mappingResult.nameHeader = match;
+      }
+      if (overrides.classQuestion) {
+        const match = headers.find(h => String(h).trim() === overrides.classQuestion.trim());
+        if (match) mappingResult.classHeader = match;
+      }
+    }
+
     // 従来のフォーマットに変換（後方互換性のため）
     var mapping = {
       mainHeader: mappingResult.opinionHeader || '',
