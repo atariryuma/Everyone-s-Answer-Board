@@ -1746,7 +1746,9 @@ setupEventDelegation() {
         currentCount: this.state.currentAnswers ? this.state.currentAnswers.length : 0,
         lastSeenCount: this.state.lastSeenCount,
         selectedClass,
-        sortOrder
+        sortOrder,
+        status: countData.status,
+        error: countData.message
       });
       
       const newCount = countData.count || 0;

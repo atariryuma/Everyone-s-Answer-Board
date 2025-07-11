@@ -2943,6 +2943,13 @@ function getDataCount(classFilter, sortOrder, adminMode) {
     var props = PropertiesService.getUserProperties();
     var currentUserId = props.getProperty('CURRENT_USER_ID');
     
+    console.log('🔍 getDataCount開始:', {
+      classFilter: classFilter,
+      sortOrder: sortOrder,
+      adminMode: adminMode,
+      currentUserId: currentUserId
+    });
+    
     if (!currentUserId) {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
@@ -2956,20 +2963,68 @@ function getDataCount(classFilter, sortOrder, adminMode) {
     var publishedSpreadsheetId = configJson.publishedSpreadsheetId;
     var publishedSheetName = configJson.publishedSheetName;
     
+    console.log('📋 設定情報:', {
+      publishedSpreadsheetId: publishedSpreadsheetId,
+      publishedSheetName: publishedSheetName,
+      configJson: configJson
+    });
+    
     if (!publishedSpreadsheetId || !publishedSheetName) {
-      return { count: 0, lastUpdate: new Date().toISOString() };
+      console.warn('⚠️ スプレッドシートまたはシート名が設定されていません');
+      return { count: 0, lastUpdate: new Date().toISOString(), status: 'error', message: 'スプレッドシート設定なし' };
     }
     
     // 軽量な件数取得（ヘッダー除く）
     var service = getSheetsService();
     var range = publishedSheetName + '!A:A';
+    
+    console.log('🔍 件数チェック開始:', {
+      spreadsheetId: publishedSpreadsheetId,
+      sheetName: publishedSheetName,
+      range: range
+    });
+    
     var response = service.spreadsheets.values.get({
       spreadsheetId: publishedSpreadsheetId,
       range: range
     });
     
     var rows = response.values || [];
-    var dataCount = Math.max(0, rows.length - 1); // ヘッダー行を除く
+    var totalDataCount = Math.max(0, rows.length - 1); // ヘッダー行を除く
+    
+    console.log('📊 件数チェック結果（フィルタ前）:', {
+      totalRows: rows.length,
+      totalDataCount: totalDataCount,
+      firstFewRows: rows.slice(0, 3),
+      range: range
+    });
+    
+    // クラスフィルタリングが必要な場合は簡易的に実装
+    var finalDataCount = totalDataCount;
+    
+    if (classFilter && classFilter !== 'すべて' && totalDataCount > 0) {
+      console.log('🔍 クラスフィルタリング実行:', classFilter);
+      
+      // フィルタリングが必要な場合は、元のgetSheetData関数を呼び出して正確な件数を取得
+      try {
+        var sheetData = getSheetData(currentUserId, publishedSheetName, classFilter, sortOrder, adminMode);
+        if (sheetData.status === 'success') {
+          finalDataCount = sheetData.totalCount || 0;
+          console.log('✅ フィルタリング後件数:', finalDataCount);
+        } else {
+          console.warn('⚠️ フィルタリング処理でエラー:', sheetData.message);
+        }
+      } catch (filterError) {
+        console.warn('⚠️ フィルタリング処理で例外:', filterError.message);
+        // フィルタリングに失敗した場合は全件数を返す
+      }
+    }
+    
+    console.log('📊 最終件数結果:', {
+      totalDataCount: totalDataCount,
+      finalDataCount: finalDataCount,
+      classFilter: classFilter
+    });
     
     // 最終更新時刻を取得（スプレッドシートの最終編集時刻）
     var spreadsheet = service.spreadsheets.get({
@@ -2977,16 +3032,16 @@ function getDataCount(classFilter, sortOrder, adminMode) {
       fields: 'properties.timeZone,sheets(properties(title,sheetId))'
     });
     
-    console.log('📊 軽量件数チェック:', {
+    console.log('📊 軽量件数チェック完了:', {
       userId: currentUserId,
       sheetName: publishedSheetName,
-      dataCount: dataCount,
+      finalDataCount: finalDataCount,
       classFilter: classFilter,
       adminMode: adminMode
     });
     
     return {
-      count: dataCount,
+      count: finalDataCount,
       lastUpdate: new Date().toISOString(), // 簡易実装
       status: 'success'
     };
