@@ -255,25 +255,6 @@ function showRegistrationPage() {
  * @returns {HtmlOutput} 表示するHTMLコンテンツ
  */
 function doGet(e) {
-  // デバッグログの追加（問題特定用）
-  console.log('MAIN_DEBUG: doGet called at', new Date().toISOString());
-  console.log('MAIN_DEBUG: Event object:', JSON.stringify(e, null, 2));
-  
-  try {
-    const debugUserEmail = Session.getActiveUser().getEmail();
-    console.log('MAIN_DEBUG: User email obtained:', debugUserEmail);
-  } catch (emailError) {
-    console.error('MAIN_DEBUG: Failed to get user email:', emailError.message);
-    
-    // 認証エラーの場合、デバッグページを表示
-    return HtmlService.createHtmlOutput(`
-      <h1>認証エラー</h1>
-      <p>ユーザー認証の取得に失敗しました</p>
-      <p>エラー: ${emailError.message}</p>
-      <p>時刻: ${new Date().toISOString()}</p>
-      <p>executeAs: USER_ACCESSING設定での認証問題の可能性があります</p>
-    `);
-  }
   
   // ① パラメータe全体をログに出力して、どのようなリクエストか確認する
   console.log(`doGet called with event object: ${JSON.stringify(e)}`);
@@ -718,12 +699,6 @@ function doGet(e) {
 
   } catch (error) {
     console.error(`doGetで致命的なエラー: ${error.stack}`);
-    console.error('MAIN_DEBUG: Fatal error details:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name,
-      timestamp: new Date().toISOString()
-    });
     
     var errorHtml = HtmlService.createHtmlOutput(
       '<h1>デバッグ：致命的エラー</h1>' +
