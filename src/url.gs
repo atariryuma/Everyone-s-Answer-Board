@@ -111,7 +111,8 @@ function generateAppUrls(userId) {
     
     return {
       webAppUrl: webAppUrl,
-      adminUrl: webAppUrl.replace(/\/dev$/, '/exec'), // 管理パネルは /exec で終わるアドレスに設定
+      adminUrl: webAppUrl.replace(/\/dev$/, '/exec') +
+        '?userId=' + encodedUserId + '&mode=admin',
       viewUrl: webAppUrl + '?userId=' + encodedUserId + '&mode=view',
       setupUrl: webAppUrl + '?setup=true',
       status: 'success'
