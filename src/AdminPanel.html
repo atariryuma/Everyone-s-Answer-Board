@@ -1995,7 +1995,7 @@ function handleDeleteRequest() {
             setLoading(false);
             showMessage(response, 'success');
             setTimeout(function() {
-              window.top.location.href = window.location.origin + '/exec?page=Registration';
+              window.top.location.href = '?page=Registration';
             }, 2000);
           })
           .catch(function(error) {
