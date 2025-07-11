@@ -7,6 +7,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!-- TailwindCSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .text-glow {
+      text-shadow: 0 0 8px rgba(0, 255, 255, 0.8), 0 0 15px rgba(0, 255, 255, 0.6);
+    }
+  </style>
   <?!= include('UnifiedStyles'); ?>
   <?!= include('SharedUtilities'); ?>
   <?!= include('SharedModals'); ?>
@@ -15,7 +20,7 @@
   <div class="container mx-auto px-4 py-8">
     <div class="glass-panel rounded-xl p-6 sm:p-8 max-w-4xl mx-auto shadow-2xl">
     <div class="text-center mb-6">
-      <h1 class="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent mb-3">StudyQuest -みんなの回答ボード-</h1>
+      <h1 class="text-5xl sm:text-6xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent mb-3 text-glow">StudyQuest -みんなの回答ボード-</h1>
       <p class="text-lg text-gray-400">新規ユーザー登録</p>
     </div>
     
