@@ -1713,7 +1713,7 @@ function getQuestionConfig(questionType, customConfig) {
     classQuestion: {
       title: 'クラス',
       helpText: '',
-      choices: ['1年1組', '1年2組', '1年3組', '2年1組', '2年2組', '2年3組', '3年1組', '3年2組', '3年3組', '4年1組', '4年2組', '4年3組', '5年1組', '5年2組', '5年3組', '6年1組', '6年2組', '6年3組']
+      choices: ['クラス1', 'クラス2', 'クラス3', 'クラス4']
     },
     nameQuestion: {
       title: '名前',
