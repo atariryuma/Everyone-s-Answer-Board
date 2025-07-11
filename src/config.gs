@@ -125,7 +125,7 @@ function getConfig(sheetName, forceRefresh = false) {
       nameHeader: '',
       classHeader: '',
       showNames: false,
-      showCounts: true, 
+      showCounts: false,
       availableHeaders: headers || [],
       hasExistingConfig: false
     };
@@ -144,7 +144,7 @@ function getConfig(sheetName, forceRefresh = false) {
       finalConfig.nameHeader = savedSheetConfig.nameHeader || '';
       finalConfig.classHeader = savedSheetConfig.classHeader || '';
       finalConfig.showNames = savedSheetConfig.showNames || false;
-      finalConfig.showCounts = savedSheetConfig.showCounts !== undefined ? savedSheetConfig.showCounts : true;
+      finalConfig.showCounts = savedSheetConfig.showCounts !== undefined ? savedSheetConfig.showCounts : false;
 
     } else if (headers && headers.length > 0) {
       // 4.【保存設定がない場合のみ】新しい自動マッピングを実行
@@ -576,7 +576,7 @@ function saveAndActivateSheet(spreadsheetId, sheetName, config) {
     // 4. 表示オプションを設定
     const displayOptions = {
       showNames: !!config.showNames, // booleanに変換
-      showCounts: config.showCounts !== undefined ? !!config.showCounts : true // booleanに変換、デフォルトtrue
+      showCounts: config.showCounts !== undefined ? !!config.showCounts : false // booleanに変換、デフォルトfalse
     };
     setDisplayOptions(displayOptions);
     console.log('saveAndActivateSheet: 表示オプション設定完了');
@@ -628,7 +628,7 @@ function saveAndPublish(sheetName, config) {
     // 4. 表示オプションを更新
     const displayOptions = {
       showNames: !!config.showNames,
-      showCounts: config.showCounts !== undefined ? !!config.showCounts : true
+      showCounts: config.showCounts !== undefined ? !!config.showCounts : false
     };
     setDisplayOptions(displayOptions);
     console.log('saveAndPublish: 表示オプション設定完了');
