@@ -276,7 +276,14 @@ function doGet(e) {
     debugLog('doGet called with event object:', e);
     try {
       const params = parseRequestParams(e);
-      const { userEmail, userInfo } = validateUserSession(Session.getActiveUser().getEmail(), params);
+      const currentUserEmail = Session.getActiveUser().getEmail();
+      
+      // /exec直接アクセス時の認証チェック
+      if (isDirectExecAccess(e)) {
+        return handleDirectExecAccess(currentUserEmail);
+      }
+      
+      const { userEmail, userInfo } = validateUserSession(currentUserEmail, params);
       const setupOutput = handleSetupPages(params, userEmail);
       if (setupOutput) return setupOutput;
 
@@ -291,7 +298,7 @@ function doGet(e) {
           return renderAnswerBoard(userInfo, params);
         }
         if (!params.userId || params.userId !== userInfo.userId) {
-          const correctUrl = ScriptApp.getService().getUrl();
+          const correctUrl = buildUserAdminUrl(userInfo.userId);
           return HtmlService.createHtmlOutput(`
             <script>window.top.location.href='${correctUrl}'</script>
             <p>管理パネルにリダイレクトしています...</p>`);
@@ -325,6 +332,67 @@ function doGet(e) {
     console.error('doGet wrapper error:', error);
     return HtmlService.createHtmlOutput('<h1>エラー</h1><p>システムエラーが発生しました。</p>');
   }
+}
+
+/**
+ * /exec直接アクセスかどうかを判定
+ * @param {Object} e Event object
+ * @return {boolean}
+ */
+function isDirectExecAccess(e) {
+  const params = (e && e.parameter) || {};
+  // パラメータが空または基本的なパラメータのみの場合は直接アクセス
+  return Object.keys(params).length === 0 || 
+         (Object.keys(params).length === 1 && params.mode);
+}
+
+/**
+ * /exec直接アクセス時の処理
+ * @param {string} userEmail ユーザーメールアドレス
+ * @return {HtmlOutput}
+ */
+function handleDirectExecAccess(userEmail) {
+  try {
+    debugLog('Direct /exec access detected for user:', userEmail);
+    
+    if (!userEmail) {
+      return showRegistrationPage();
+    }
+    
+    // ユーザーがデータベースに登録されているかチェック
+    const userInfo = findUserByEmail(userEmail);
+    
+    if (userInfo && userInfo.userId) {
+      // 登録済みユーザー: 管理パネルにリダイレクト
+      const adminUrl = buildUserAdminUrl(userInfo.userId);
+      debugLog('Redirecting registered user to admin panel:', adminUrl);
+      
+      return HtmlService.createHtmlOutput(`
+        <script>window.top.location.href='${adminUrl}'</script>
+        <div style="text-align:center; padding:50px; font-family:sans-serif;">
+          <h2>管理パネルにリダイレクトしています...</h2>
+          <p>自動的にリダイレクトされない場合は<a href="${adminUrl}">こちら</a>をクリックしてください。</p>
+        </div>
+      `);
+    } else {
+      // 未登録ユーザー: ログイン画面表示
+      debugLog('Unregistered user, showing registration page');
+      return showRegistrationPage();
+    }
+  } catch (error) {
+    console.error('handleDirectExecAccess error:', error);
+    return showRegistrationPage();
+  }
+}
+
+/**
+ * ユーザー専用の管理パネルURLを構築
+ * @param {string} userId ユーザーID
+ * @return {string}
+ */
+function buildUserAdminUrl(userId) {
+  const baseUrl = ScriptApp.getService().getUrl();
+  return `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
 }
 
 /**
