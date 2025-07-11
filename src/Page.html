@@ -1116,6 +1116,7 @@ class StudyQuestApp {
           if (this.elements.adminToggleBtn) {
             this.elements.adminToggleBtn.classList.remove('hidden');
             this.elements.adminToggleBtn.removeAttribute('hidden');
+            this.elements.adminToggleBtn.style.display = ''; // 表示を確実に
             this.elements.adminToggleBtn.textContent = '管理モード';
           }
         } else {
@@ -1125,6 +1126,7 @@ class StudyQuestApp {
           if (this.elements.adminToggleBtn) {
             this.elements.adminToggleBtn.classList.add('hidden');
             this.elements.adminToggleBtn.setAttribute('hidden', '');
+            this.elements.adminToggleBtn.style.display = 'none'; // 確実に非表示
           }
         }
         // Check if modal should be shown
@@ -2254,11 +2256,23 @@ setupEventDelegation() {
       // Post-processing after successful data load
       this.adjustLayout();
       
-      if (!this.state.isAdminUser) {
+      if (!this.state.isAdminUser || !window.hasAdminCapability) {
         this.state.showAdminFeatures = false;
         this.state.showHighlightToggle = false;
+        // 管理モードボタンを確実に非表示
+        if (this.elements.adminToggleBtn) {
+          this.elements.adminToggleBtn.classList.add('hidden');
+          this.elements.adminToggleBtn.setAttribute('hidden', '');
+          this.elements.adminToggleBtn.style.display = 'none';
+        }
       } else {
         this.state.showHighlightToggle = true;
+        // 管理モードボタンを表示
+        if (this.elements.adminToggleBtn) {
+          this.elements.adminToggleBtn.classList.remove('hidden');
+          this.elements.adminToggleBtn.removeAttribute('hidden');
+          this.elements.adminToggleBtn.style.display = '';
+        }
         debugLog('loadSheetData管理者設定更新:', {
           isAdminUser: this.state.isAdminUser,
           showAdminFeatures: this.state.showAdminFeatures,
