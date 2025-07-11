@@ -682,37 +682,7 @@ function getStatus(forceRefresh = false) {
     }
   }
   
-  try {
-    return getAppConfig();
-  } catch (configError) {
-    console.error('getStatus: getAppConfig failed:', configError.message);
-    
-    // エラー時にもユーザー情報は返すように修正
-    try {
-      var props = PropertiesService.getUserProperties();
-      var currentUserId = props.getProperty('CURRENT_USER_ID');
-      var userInfo = currentUserId ? findUserById(currentUserId) : null;
-      
-      return {
-        status: 'error',
-        error: true,
-        message: '管理パネルの読み込みに失敗しました。権限を確認しています...',
-        details: configError.message,
-        userInfo: userInfo,
-        retry: true,
-        timestamp: new Date().toISOString()
-      };
-    } catch (fallbackError) {
-      console.error('getStatus: fallback failed:', fallbackError.message);
-      return {
-        status: 'critical_error',
-        error: true,
-        message: 'システムエラーが発生しました。管理者にお問い合わせください。',
-        details: fallbackError.message,
-        timestamp: new Date().toISOString()
-      };
-    }
-  }
+  return getAppConfig();
 }
 
 /**
@@ -2225,58 +2195,6 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
 }
 
 /**
- * 管理パネル専用：権限問題の緊急修復
- * @param {string} userEmail - ユーザーメール
- * @param {string} spreadsheetId - スプレッドシートID
- * @returns {object} 修復結果
- */
-function emergencyAdminPanelRepair(userEmail, spreadsheetId) {
-  try {
-    console.log('緊急修復開始: 管理パネルアクセス用');
-    
-    // 1. サービスアカウント権限の強制追加
-    addServiceAccountToSpreadsheet(spreadsheetId);
-    console.log('ステップ1: サービスアカウント権限追加完了');
-    
-    // 2. ユーザー権限の強制追加
-    const repairResult = repairUserSpreadsheetAccess(userEmail, spreadsheetId);
-    console.log('ステップ2: ユーザー権限修復結果:', repairResult);
-    
-    // 3. 権限確認テスト
-    try {
-      const testAccess = SpreadsheetApp.openById(spreadsheetId);
-      testAccess.getName();
-      console.log('ステップ3: 権限確認テスト成功');
-    } catch (testError) {
-      console.warn('ステップ3: 権限確認テスト失敗:', testError.message);
-    }
-    
-    // 4. サービスアカウントアクセステスト
-    try {
-      const service = getSheetsService();
-      const testData = getSpreadsheetsData(service, spreadsheetId);
-      console.log('ステップ4: サービスアカウントアクセステスト成功');
-    } catch (serviceTestError) {
-      console.warn('ステップ4: サービスアカウントアクセステスト失敗:', serviceTestError.message);
-    }
-    
-    return {
-      success: true,
-      message: '管理パネルアクセス権限を緊急修復しました',
-      timestamp: new Date().toISOString()
-    };
-    
-  } catch (error) {
-    console.error('緊急修復エラー:', error.message);
-    return {
-      success: false,
-      error: error.message,
-      timestamp: new Date().toISOString()
-    };
-  }
-}
-
-/**
  * スプレッドシートにリアクション列を追加
  */
 function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName) {
@@ -2474,43 +2392,7 @@ function getSheetsList(userId) {
     
     var service = getSheetsService();
     console.log('getSheetsList: SheetsService obtained, attempting to fetch spreadsheet data...');
-    
-    var spreadsheet;
-    try {
-      spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
-    } catch (accessError) {
-      console.warn('getSheetsList: アクセスエラーを検出。サービスアカウント権限を修復中...', accessError.message);
-      
-      // サービスアカウントの権限修復を試行
-      try {
-        addServiceAccountToSpreadsheet(userInfo.spreadsheetId);
-        console.log('getSheetsList: サービスアカウント権限を追加しました。再試行中...');
-        
-        // 少し待ってから再試行
-        Utilities.sleep(1000);
-        spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
-        
-      } catch (repairError) {
-        console.error('getSheetsList: 権限修復に失敗:', repairError.message);
-        
-        // 最終手段：ユーザー権限での修復も試行
-        try {
-          var currentUserEmail = Session.getActiveUser().getEmail();
-          if (currentUserEmail === userInfo.adminEmail) {
-            repairUserSpreadsheetAccess(currentUserEmail, userInfo.spreadsheetId);
-            console.log('getSheetsList: ユーザー権限での修復を実行しました。');
-          }
-        } catch (finalRepairError) {
-          console.error('getSheetsList: 最終修復も失敗:', finalRepairError.message);
-        }
-        
-        return {
-          error: true,
-          message: 'スプレッドシートへのアクセス権限がありません。管理者にお問い合わせください。',
-          details: accessError.message
-        };
-      }
-    }
+    var spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
     
     console.log('getSheetsList: Raw spreadsheet data:', spreadsheet);
     if (!spreadsheet) {

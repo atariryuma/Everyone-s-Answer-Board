@@ -255,26 +255,6 @@ function showRegistrationPage() {
  * @returns {HtmlOutput} 表示するHTMLコンテンツ
  */
 function doGet(e) {
-  // デバッグログの追加（問題特定用）
-  console.log('MAIN_DEBUG: doGet called at', new Date().toISOString());
-  console.log('MAIN_DEBUG: Event object:', JSON.stringify(e, null, 2));
-  
-  try {
-    const debugUserEmail = Session.getActiveUser().getEmail();
-    console.log('MAIN_DEBUG: User email obtained:', debugUserEmail);
-  } catch (emailError) {
-    console.error('MAIN_DEBUG: Failed to get user email:', emailError.message);
-    
-    // 認証エラーの場合、デバッグページを表示
-    return HtmlService.createHtmlOutput(`
-      <h1>認証エラー</h1>
-      <p>ユーザー認証の取得に失敗しました</p>
-      <p>エラー: ${emailError.message}</p>
-      <p>時刻: ${new Date().toISOString()}</p>
-      <p>executeAs: USER_ACCESSING設定での認証問題の可能性があります</p>
-    `);
-  }
-  
   // ① パラメータe全体をログに出力して、どのようなリクエストか確認する
   console.log(`doGet called with event object: ${JSON.stringify(e)}`);
 
@@ -525,30 +505,6 @@ function doGet(e) {
           return redirectHtml;
         }
         
-        // 管理パネルアクセス前の権限確認とサービスアカウント権限修復
-        if (userInfo && userInfo.spreadsheetId) {
-          try {
-            console.log('DEBUG: 管理パネル用の権限確認を実行中...');
-            addServiceAccountToSpreadsheet(userInfo.spreadsheetId);
-            
-            // SpreadsheetAppでもアクセス確認
-            const testAccess = SpreadsheetApp.openById(userInfo.spreadsheetId);
-            testAccess.getName();
-            console.log('DEBUG: 管理パネル用の権限確認完了');
-            
-          } catch (adminAccessError) {
-            console.warn('DEBUG: 管理パネル権限エラー。修復を試行:', adminAccessError.message);
-            try {
-              const repairResult = repairUserSpreadsheetAccess(userEmail, userInfo.spreadsheetId);
-              if (repairResult.success) {
-                console.log('DEBUG: 管理パネル権限修復成功');
-              }
-            } catch (repairError) {
-              console.error('DEBUG: 管理パネル権限修復失敗:', repairError.message);
-            }
-          }
-        }
-        
         // 明示的な管理パネル要求
         console.log('DEBUG: Explicit admin mode request. Showing AdminPanel.');
         var adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
@@ -697,20 +653,10 @@ function doGet(e) {
 
   } catch (error) {
     console.error(`doGetで致命的なエラー: ${error.stack}`);
-    console.error('MAIN_DEBUG: Fatal error details:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name,
-      timestamp: new Date().toISOString()
-    });
-    
     var errorHtml = HtmlService.createHtmlOutput(
-      '<h1>デバッグ：致命的エラー</h1>' +
-      '<p>doGet関数内でエラーが発生しました</p>' +
-      '<p>エラー詳細: ' + htmlEncode(error.message) + '</p>' +
-      '<p>スタック: ' + htmlEncode(error.stack || 'スタック情報なし') + '</p>' +
-      '<p>時刻: ' + new Date().toISOString() + '</p>' +
-      '<p>executeAs設定: USER_DEPLOYING (テスト中)</p>'
+      '<h1>エラー</h1>' +
+      '<p>予期せぬエラーが発生しました。管理者にお問い合わせください。</p>' +
+      '<p>エラー詳細: ' + htmlEncode(error.message) + '</p>'
     );
     return safeSetXFrameOptionsDeny(errorHtml);
   }
