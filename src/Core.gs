@@ -286,6 +286,52 @@ function executeGetPublishedSheetData(classFilter, sortOrder, adminMode) {
 
     var formattedData = formatSheetDataForFrontend(sheetData.data, mappedIndices, headerIndices, adminMode, isOwner, sheetData.displayMode);
 
+    debugLog('getPublishedSheetData: formattedData length=%s', formattedData.length);
+
+    // ボードのタイトルを実際のスプレッドシートのヘッダーから取得
+    let headerTitle = publishedSheetName || '今日のお題';
+    if (mappedIndices.opinionHeader !== undefined) {
+      for (var actualHeader in headerIndices) {
+        if (headerIndices[actualHeader] === mappedIndices.opinionHeader) {
+          headerTitle = actualHeader;
+          debugLog('getPublishedSheetData: Using actual header as title: "%s"', headerTitle);
+          break;
+        }
+      }
+    }
+
+    var finalDisplayMode = (adminMode === true) ? DISPLAY_MODES.NAMED : (sheetData.displayMode || DISPLAY_MODES.ANONYMOUS);
+
+    var result = {
+      header: headerTitle,
+      sheetName: publishedSheetName,
+      showCounts: (adminMode === true) ? true : (configJson.showCounts === true),
+      displayMode: finalDisplayMode,
+      data: formattedData,
+      rows: formattedData // 後方互換性のため
+    };
+
+    console.log('🔍 最終結果:', {
+      adminMode: adminMode,
+      originalDisplayMode: sheetData.displayMode,
+      finalDisplayMode: finalDisplayMode,
+      dataCount: formattedData.length,
+      showCounts: result.showCounts
+    });
+    debugLog('getPublishedSheetData: Returning result=%s', JSON.stringify(result));
+    return result;
+
+  } catch (e) {
+    console.error('公開シートデータ取得エラー: ' + e.message);
+    return {
+      status: 'error',
+      message: 'データの取得に失敗しました: ' + e.message,
+      data: [],
+      rows: []
+    };
+  }
+}
+
 /**
  * 増分データ取得機能：指定された基準点以降の新しいデータのみを取得
  * @param {string} classFilter - クラスフィルタ
@@ -396,19 +442,11 @@ function getIncrementalSheetData(classFilter, sortOrder, adminMode, sinceRowCoun
       newCount: formattedNewData.length,
       isIncremental: true
     };
-    
-    console.log('✅ 増分データ取得完了: %s件の新しいデータを返します', newData.length);
-    
+  } catch (e) {
+    console.error('増分データ取得エラー: ' + e.message);
     return {
-      header: fullData.header,
-      sheetName: fullData.sheetName,
-      showCounts: fullData.showCounts,
-      displayMode: fullData.displayMode,
-      data: newData,
-      rows: newData, // 後方互換性のため
-      totalCount: currentRowCount,
-      newCount: newData.length,
-      isIncremental: true
+      status: 'error',
+      message: '増分データの取得に失敗しました: ' + e.message
     };
   }
 }
