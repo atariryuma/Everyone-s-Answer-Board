@@ -257,448 +257,249 @@ function showRegistrationPage() {
  * @returns {HtmlOutput} 表示するHTMLコンテンツ
  */
 function doGet(e) {
-  // 早期リターン用のキャッシュキー生成
   var requestKey = `doGet_${JSON.stringify(e?.parameter || {})}`;
-  
-  // セッション管理を軽量化：頻繁にアクセスされるエンドポイントでは最小限に
   return cacheManager.get(requestKey, () => {
-    // ① パラメータe全体をログに出力して、どのようなリクエストか確認する
     console.log(`doGet called with event object: ${JSON.stringify(e)}`);
-
     try {
-      // ★★★ 修正点 ★★★
-      // パラメータがない場合のデフォルトモードを 'view' から 'admin' に変更。
-      // これにより、登録済みユーザーはデフォルトで管理パネルにアクセスするようになります。
-      const mode = (e && e.parameter && e.parameter.mode) ? e.parameter.mode : 'admin';
-      const userId = (e && e.parameter && e.parameter.userId) ? e.parameter.userId : null;
-      const setupParam = (e && e.parameter && e.parameter.setup) ? e.parameter.setup : null;
-      const spreadsheetId = (e && e.parameter && e.parameter.spreadsheetId) ? e.parameter.spreadsheetId : null;
-      const sheetName = (e && e.parameter && e.parameter.sheetName) ? e.parameter.sheetName : null;
+      const params = parseRequestParams(e);
+      const { userEmail, userInfo } = validateUserSession(Session.getActiveUser().getEmail(), params);
+      const setupOutput = handleSetupPages(params, userEmail);
+      if (setupOutput) return setupOutput;
 
-      // Page.html への直接アクセス判定
-      // userId が指定されて mode=view の場合は、登録状態に関わらず回答ボードを表示する
-      const isDirectPageAccess = userId && mode === 'view';
-
-      console.log(`Request parameters validated. Mode: ${mode}, UserID: ${userId}, SetupParam: ${setupParam}, IsDirectPageAccess: ${isDirectPageAccess}`);
-
-      // どこからのアクセスかを知るためのログを追加
-      const userEmail = Session.getActiveUser().getEmail();
-      console.log(`Access by user: ${userEmail}`);
-      
-      // 軽量化されたセッション検証（重要なアクセスのみ）
-      if (userEmail && !isDirectPageAccess) {
-        try {
-          // 簡素化されたセッション整合性検証
-          validateAndRepairSession(userEmail);
-        } catch (sessionError) {
-          console.error('セッション管理でエラーが発生しました: ' + sessionError.message);
+      if (userInfo) {
+        if (params.isDirectPageAccess) {
+          return renderAnswerBoard(userInfo, params);
         }
-      }
-
-    const webAppUrl = ScriptApp.getService().getUrl();
-    console.log(`Current Web App URL: ${webAppUrl}`);
-
-    if (e && e.headers && e.headers.referer) {
-      console.log(`Referer: ${e.headers.referer}`);
-    }
-
-    // 1. システムの初期セットアップが完了しているか確認（Page.html直接アクセス時は除く）
-    if (!isSystemSetup() && !isDirectPageAccess) {
-      console.log('DEBUG: System not set up. Redirecting to SetupPage.');
-      var setupTemplate = HtmlService.createTemplateFromFile('SetupPage');
-      setupTemplate.include = include;
-      var setupHtml = setupTemplate.evaluate()
-        .setTitle('初回セットアップ - StudyQuest');
-      console.log('DEBUG: Serving SetupPage HTML');
-      return safeSetXFrameOptionsDeny(setupHtml);
-    }
-
-    // アプリ設定ページの表示要求（?setup=true&mode=appsetup）
-    if (setupParam === 'true' && mode === 'appsetup') {
-      console.log('DEBUG: App setup page request. Checking access permissions.');
-      
-      // ドメイン制限チェック（ただし制限的すぎないように）
-      const domainInfo = getDeployUserDomainInfo();
-      if (domainInfo.deployDomain && domainInfo.deployDomain !== '' && !domainInfo.isDomainMatch) {
-        console.log('DEBUG: Domain access warning. Current:', domainInfo.currentDomain, 'Deploy:', domainInfo.deployDomain);
-        // ドメイン不一致でも警告のみで処理を続行（制限的すぎないように）
-      }
-      
-      // アクセス権限を確認
-      if (!hasSetupPageAccess()) {
-        console.log('DEBUG: Access denied to app setup page.');
-        var errorHtml = HtmlService.createHtmlOutput(
-          '<h1>アクセス拒否</h1>' +
-          '<p>アプリ設定ページにアクセスする権限がありません。</p>' +
-          '<p>編集者として登録され、かつアクティブ状態である必要があります。</p>' +
-          '<p>現在のドメイン: ' + (domainInfo.currentDomain || '不明') + '</p>'
-        );
-        return safeSetXFrameOptionsDeny(errorHtml);
-      }
-      
-      console.log('DEBUG: Serving AppSetupPage HTML');
-      var appSetupTemplate = HtmlService.createTemplateFromFile('AppSetupPage');
-      appSetupTemplate.include = include;
-      var appSetupHtml = appSetupTemplate.evaluate()
-        .setTitle('アプリ設定 - StudyQuest');
-      return safeSetXFrameOptionsDeny(appSetupHtml);
-    }
-
-    // セットアップページの明示的な表示要求
-    if (setupParam === 'true') {
-      console.log('DEBUG: Explicit setup request. Redirecting to SetupPage.');
-      var explicitTemplate = HtmlService.createTemplateFromFile('SetupPage');
-      explicitTemplate.include = include;
-      var explicitHtml = explicitTemplate.evaluate()
-        .setTitle('StudyQuest - サービスアカウント セットアップ');
-      console.log('DEBUG: Serving explicit SetupPage HTML');
-      return safeSetXFrameOptionsDeny(explicitHtml);
-    }
-
-    // 2. ユーザー認証と情報取得（Page.html直接アクセス時は除く）
-    if (!userEmail && !isDirectPageAccess) {
-      console.log('DEBUG: No current user email. Redirecting to RegistrationPage.');
-      console.log('DEBUG: Serving RegistrationPage HTML');
-      return showRegistrationPage();
-    }
-
-    // 3. ユーザーがデータベースに登録済みか確認
-    let userInfo = null;
-    if (isDirectPageAccess) {
-      // Page.html直接アクセス時は、userIdで直接検索
-      userInfo = findUserById(userId);
-      console.log('DEBUG: Direct page access, User info by ID:', JSON.stringify(userInfo));
-    } else {
-      userInfo = findUserByEmail(userEmail);
-      console.log('DEBUG: User info by email:', JSON.stringify(userInfo));
-      
-      // ユーザーが存在する場合、スプレッドシートアクセス権限を確認・修復
-      if (userInfo && userInfo.spreadsheetId) {
-        try {
-          // アクセステストとして簡単な操作を試行
-          const testAccess = SpreadsheetApp.openById(userInfo.spreadsheetId);
-          testAccess.getName(); // 名前取得でアクセス権限をテスト
-          console.log('スプレッドシートアクセス確認: OK');
-        } catch (accessError) {
-          console.warn('スプレッドシートアクセスエラーを検出。権限修復を試行: ' + accessError.message);
-          try {
-            const repairResult = repairUserSpreadsheetAccess(userEmail, userInfo.spreadsheetId);
-            if (repairResult.success) {
-              console.log('スプレッドシートアクセス権限を修復しました');
-            }
-          } catch (repairError) {
-            console.error('スプレッドシートアクセス権限の修復に失敗: ' + repairError.message);
-          }
+        if (params.mode === 'admin') {
+          return renderAdminPanel(userInfo, params.mode);
         }
-      }
-    }
-
-    if (userInfo) {
-      var configJson = {};
-      try {
-        configJson = JSON.parse(userInfo.configJson || '{}');
-        console.log('DEBUG: Parsed configJson:', JSON.stringify(configJson));
-      } catch (jsonErr) {
-        console.warn('Invalid configJson:', jsonErr.message);
-      }
-
-      var isPublished = !!(configJson.appPublished &&
-        configJson.publishedSpreadsheetId &&
-        configJson.publishedSheetName);
-      console.log(`DEBUG: isPublished = ${isPublished}`);
-
-      // Page.html直接アクセス時は、パラメータ指定されたページを表示
-      if (isDirectPageAccess) {
-        console.log('DEBUG: Direct page access detected. Showing specified page.');
-        const template = HtmlService.createTemplateFromFile('Page');
-        template.include = include;
-
-        try {
-          // 回答ボード表示用のスプレッドシートアクセス権限を確保
-          if (userInfo.spreadsheetId) {
-            try {
-              addServiceAccountToSpreadsheet(userInfo.spreadsheetId);
-              console.log('DEBUG: 回答ボード用のスプレッドシートアクセス権限を設定しました');
-            } catch (accessSetupError) {
-              console.warn('DEBUG: 回答ボード用のアクセス権限設定で警告:', accessSetupError.message);
-            }
-          }
-          
-          const config = JSON.parse(userInfo.configJson || '{}');
-          const sheetConfigKey = 'sheet_' + (config.publishedSheetName || sheetName);
-          const sheetConfig = config[sheetConfigKey] || {};
-          
-          template.userId = userInfo.userId;
-          template.spreadsheetId = userInfo.spreadsheetId;
-          template.ownerName = userInfo.adminEmail;
-          template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
-          const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
-          
-          // 直接rawOpinionHeaderを使用（Base64エンコード削除）
-          template.opinionHeader = escapeJavaScript(rawOpinionHeader);
-          template.cacheTimestamp = Date.now(); // キャッシュバスター
-          
-          template.displayMode = config.displayMode || 'anonymous';
-          template.showCounts = config.showCounts !== undefined ? config.showCounts : false;
-          
-          // 現在のユーザーがボードの所有者かどうかをチェック
-          const currentUserEmail = Session.getActiveUser().getEmail();
-          const isOwner = currentUserEmail === userInfo.adminEmail;
-          template.showAdminFeatures = isOwner; // 所有者のみに管理機能を提供
-          template.isAdminUser = isOwner; // 所有者のみに管理者権限を付与
-          
-          console.log('DEBUG: Owner check for direct page access:', {
-            currentUserEmail: currentUserEmail,
-            ownerEmail: userInfo.adminEmail,
-            isOwner: isOwner
-          });
-          
-          // デバッグログ
-          console.log('Template variables for direct page access:', {
-            sheetName: template.sheetName,
-            opinionHeader: template.opinionHeader,
-            rawOpinionHeader: rawOpinionHeader,
-            displayMode: template.displayMode,
-            cacheTimestamp: template.cacheTimestamp
-          });
-
-        } catch (e) {
-          template.opinionHeader = escapeJavaScript('お題の読込エラー');
-          template.cacheTimestamp = Date.now();
-          template.userId = userInfo.userId;
-          template.spreadsheetId = userInfo.spreadsheetId;
-          template.ownerName = userInfo.adminEmail;
-          template.sheetName = escapeJavaScript(sheetName);
-          template.displayMode = 'anonymous';
-          template.showCounts = false;
-          
-          // エラー時も所有者チェックを実行
-          const currentUserEmail = Session.getActiveUser().getEmail();
-          const isOwner = currentUserEmail === userInfo.adminEmail;
-          template.showAdminFeatures = isOwner;
-          template.isAdminUser = isOwner;
+        if (params.mode === 'view') {
+          return renderAnswerBoard(userInfo, params);
         }
-        
-        return template.evaluate()
-            .setTitle('StudyQuest -みんなの回答ボード-')
-            .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-      }
-
-      // 要件に従ったリダイレクトロジック：
-      // - データベースに名前があれば管理パネル
-      // - mode=adminまたはmode=viewで明示的に指定された場合はそれに従う
-      
-      if (mode === 'admin') {
-        // アクセス権限の確認：現在のユーザーが対象ユーザーと一致するかチェック
-        if (userId && userId !== userInfo.userId) {
-          console.log('DEBUG: Access denied - user mismatch. Current user:', userInfo.userId, 'Requested:', userId);
-          
-          // 現在のユーザー自身の管理パネルにリダイレクト（同じURLで動的設定）
+        if (!params.userId || params.userId !== userInfo.userId) {
           const correctUrl = ScriptApp.getService().getUrl();
-          var redirectHtml = HtmlService.createHtmlOutput(`
-            <script>
-              console.log('Redirecting to admin panel...');
-              window.top.location.href = '${correctUrl}';
-            </script>
-            <p>管理パネルにリダイレクトしています...</p>
-          `);
-          return redirectHtml;
+          return HtmlService.createHtmlOutput(`
+            <script>window.top.location.href='${correctUrl}'</script>
+            <p>管理パネルにリダイレクトしています...</p>`);
         }
-        
-        // 管理パネルアクセス前の権限確認とサービスアカウント権限修復
-        if (userInfo && userInfo.spreadsheetId) {
-          try {
-            console.log('DEBUG: 管理パネル用の権限確認を実行中...');
-            addServiceAccountToSpreadsheet(userInfo.spreadsheetId);
-            
-            // SpreadsheetAppでもアクセス確認
-            const testAccess = SpreadsheetApp.openById(userInfo.spreadsheetId);
-            testAccess.getName();
-            console.log('DEBUG: 管理パネル用の権限確認完了');
-            
-          } catch (adminAccessError) {
-            console.warn('DEBUG: 管理パネル権限エラー。修復を試行:', adminAccessError.message);
-            try {
-              const repairResult = repairUserSpreadsheetAccess(userEmail, userInfo.spreadsheetId);
-              if (repairResult.success) {
-                console.log('DEBUG: 管理パネル権限修復成功');
-              }
-            } catch (repairError) {
-              console.error('DEBUG: 管理パネル権限修復失敗:', repairError.message);
-            }
-          }
+        return renderAdminPanel(userInfo, 'admin');
+      }
+
+      return showRegistrationPage();
+    } catch (error) {
+      console.error(`doGetで致命的なエラー: ${error.stack}`);
+      var errorHtml = HtmlService.createHtmlOutput(
+        '<h1>デバッグ：致命的エラー</h1>' +
+        '<p>doGet関数内でエラーが発生しました</p>' +
+        '<p>エラー詳細: ' + htmlEncode(error.message) + '</p>' +
+        '<p>スタック: ' + htmlEncode(error.stack || 'スタック情報なし') + '</p>' +
+        '<p>時刻: ' + new Date().toISOString() + '</p>' +
+        '<p>executeAs設定: USER_DEPLOYING (テスト中)</p>'
+      );
+      return safeSetXFrameOptionsDeny(errorHtml);
+    }
+  }, { ttl: 60 });
+}
+
+/**
+ * doGet のリクエストパラメータを解析
+ * @param {Object} e Event object
+ * @return {{mode:string,userId:string|null,setupParam:string|null,spreadsheetId:string|null,sheetName:string|null,isDirectPageAccess:boolean}}
+ */
+function parseRequestParams(e) {
+  const p = (e && e.parameter) || {};
+  const mode = p.mode || 'admin';
+  const userId = p.userId || null;
+  const setupParam = p.setup || null;
+  const spreadsheetId = p.spreadsheetId || null;
+  const sheetName = p.sheetName || null;
+  const isDirectPageAccess = !!(userId && mode === 'view');
+  return { mode, userId, setupParam, spreadsheetId, sheetName, isDirectPageAccess };
+}
+
+/**
+ * セッション検証とユーザー情報取得
+ * @param {string} userEmail 現在のユーザーのメール
+ * @param {Object} params リクエストパラメータ
+ * @return {{userEmail:string|null,userInfo:Object|null}}
+ */
+function validateUserSession(userEmail, params) {
+  if (userEmail && !params.isDirectPageAccess) {
+    try {
+      validateAndRepairSession(userEmail);
+    } catch (sessionError) {
+      console.error('セッション管理エラー: ' + sessionError.message);
+    }
+  }
+
+  let userInfo = null;
+  if (params.isDirectPageAccess) {
+    userInfo = findUserById(params.userId);
+  } else if (userEmail) {
+    userInfo = findUserByEmail(userEmail);
+    if (userInfo && userInfo.spreadsheetId) {
+      try {
+        const testAccess = SpreadsheetApp.openById(userInfo.spreadsheetId);
+        testAccess.getName();
+      } catch (accessError) {
+        console.warn('スプレッドシートアクセスエラー: ' + accessError.message);
+        try {
+          const repair = repairUserSpreadsheetAccess(userEmail, userInfo.spreadsheetId);
+          if (repair.success) console.log('スプレッドシートアクセス権限を修復しました');
+        } catch (repairError) {
+          console.error('権限修復失敗: ' + repairError.message);
         }
-        
-        // 明示的な管理パネル要求
-        console.log('DEBUG: Explicit admin mode request. Showing AdminPanel.');
-        var adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
-        adminTemplate.include = include;
-        adminTemplate.userInfo = userInfo;
-        adminTemplate.userId = userInfo.userId;
-        adminTemplate.mode = mode;
-        adminTemplate.displayMode = 'named';
-        adminTemplate.showAdminFeatures = true;
-        console.log('DEBUG: AdminPanel template properties:', {
-          userInfo: adminTemplate.userInfo,
-          userId: adminTemplate.userId,
-          mode: adminTemplate.mode,
-          displayMode: adminTemplate.displayMode,
-          showAdminFeatures: adminTemplate.showAdminFeatures
-        });
-        var adminHtml = adminTemplate.evaluate()
+      }
+    }
+  }
+  return { userEmail, userInfo };
+}
+
+/**
+ * セットアップページ関連の処理
+ * @param {Object} params リクエストパラメータ
+ * @param {string} userEmail 現在のユーザーのメール
+ * @return {HtmlOutput|null} 表示するHTMLがあれば返す
+ */
+function handleSetupPages(params, userEmail) {
+  if (!isSystemSetup() && !params.isDirectPageAccess) {
+    const t = HtmlService.createTemplateFromFile('SetupPage');
+    t.include = include;
+    return safeSetXFrameOptionsDeny(t.evaluate().setTitle('初回セットアップ - StudyQuest'));
+  }
+
+  if (params.setupParam === 'true' && params.mode === 'appsetup') {
+    const domainInfo = getDeployUserDomainInfo();
+    if (domainInfo.deployDomain && domainInfo.deployDomain !== '' && !domainInfo.isDomainMatch) {
+      console.log('Domain access warning. Current:', domainInfo.currentDomain, 'Deploy:', domainInfo.deployDomain);
+    }
+    if (!hasSetupPageAccess()) {
+      const errorHtml = HtmlService.createHtmlOutput(
+        '<h1>アクセス拒否</h1>' +
+        '<p>アプリ設定ページにアクセスする権限がありません。</p>' +
+        '<p>編集者として登録され、かつアクティブ状態である必要があります。</p>' +
+        '<p>現在のドメイン: ' + (domainInfo.currentDomain || '不明') + '</p>'
+      );
+      return safeSetXFrameOptionsDeny(errorHtml);
+    }
+    const appSetupTemplate = HtmlService.createTemplateFromFile('AppSetupPage');
+    appSetupTemplate.include = include;
+    return safeSetXFrameOptionsDeny(appSetupTemplate.evaluate().setTitle('アプリ設定 - StudyQuest'));
+  }
+
+  if (params.setupParam === 'true') {
+    const explicit = HtmlService.createTemplateFromFile('SetupPage');
+    explicit.include = include;
+    return safeSetXFrameOptionsDeny(explicit.evaluate().setTitle('StudyQuest - サービスアカウント セットアップ'));
+  }
+
+  if (!userEmail && !params.isDirectPageAccess) {
+    return showRegistrationPage();
+  }
+
+  return null;
+}
+
+/**
+ * 管理パネルを表示
+ * @param {Object} userInfo ユーザー情報
+ * @param {string} mode 表示モード
+ * @return {HtmlOutput} HTMLコンテンツ
+ */
+function renderAdminPanel(userInfo, mode) {
+  const adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
+  adminTemplate.include = include;
+  adminTemplate.userInfo = userInfo;
+  adminTemplate.userId = userInfo.userId;
+  adminTemplate.mode = mode;
+  adminTemplate.displayMode = 'named';
+  adminTemplate.showAdminFeatures = true;
+  return safeSetXFrameOptionsDeny(
+    adminTemplate.evaluate()
       .setTitle('みんなの回答ボード 管理パネル')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-      .setSandboxMode(HtmlService.SandboxMode.IFRAME);
-        console.log('DEBUG: Serving AdminPanel HTML');
-        return safeSetXFrameOptionsDeny(adminHtml);
-      }
-      
-      if (mode === 'view') {
-        if (isPublished) {
-          // 明示的な回答ボード表示要求（公開済みの場合）
-          console.log('DEBUG: Explicit view mode request for published board. Showing Page.');
-          const template = HtmlService.createTemplateFromFile('Page');
-          template.include = include;
-          
-          try {
-            // 通常の回答ボード表示用のスプレッドシートアクセス権限を確保
-            if (userInfo.spreadsheetId) {
-              try {
-                addServiceAccountToSpreadsheet(userInfo.spreadsheetId);
-                console.log('DEBUG: 通常の回答ボード用のスプレッドシートアクセス権限を設定しました');
-              } catch (accessSetupError) {
-                console.warn('DEBUG: 通常の回答ボード用のアクセス権限設定で警告:', accessSetupError.message);
-              }
-            }
-            
-            const config = JSON.parse(userInfo.configJson || '{}');
-            const sheetConfigKey = 'sheet_' + (config.publishedSheetName || sheetName);
-            const sheetConfig = config[sheetConfigKey] || {};
-            
-            template.userId = userInfo.userId;
-            template.spreadsheetId = userInfo.spreadsheetId;
-            template.ownerName = userInfo.adminEmail;
-            template.sheetName = escapeJavaScript(config.publishedSheetName || sheetName);
-            const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
-            
-            // 直接rawOpinionHeaderを使用（Base64エンコード削除）
-            template.opinionHeader = escapeJavaScript(rawOpinionHeader);
-            template.cacheTimestamp = Date.now(); // キャッシュバスター
-            
-            template.displayMode = config.displayMode || 'anonymous';
-            template.showCounts = config.showCounts !== undefined ? config.showCounts : false;
-            
-            // 現在のユーザーがボードの所有者かどうかをチェック
-            const currentUserEmail = Session.getActiveUser().getEmail();
-            const isOwner = currentUserEmail === userInfo.adminEmail;
-            template.showAdminFeatures = isOwner; // 所有者のみに管理機能を提供
-            template.isAdminUser = isOwner; // 所有者のみに管理者権限を付与
+      .setSandboxMode(HtmlService.SandboxMode.IFRAME)
+  );
+}
 
-          } catch (e) {
-            template.opinionHeader = escapeJavaScript('お題の読込エラー');
-            template.cacheTimestamp = Date.now();
-            template.userId = userInfo.userId;
-            template.spreadsheetId = userInfo.spreadsheetId;
-            template.ownerName = userInfo.adminEmail;
-            template.sheetName = escapeJavaScript(sheetName);
-            template.displayMode = 'anonymous';
-            template.showCounts = false;
-            
-            // エラー時も所有者チェックを実行
-            const currentUserEmail = Session.getActiveUser().getEmail();
-            const isOwner = currentUserEmail === userInfo.adminEmail;
-            template.showAdminFeatures = isOwner;
-            template.isAdminUser = isOwner;
-          }
-          
-          return template.evaluate()
-              .setTitle('StudyQuest -みんなの回答ボード-')
-              .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-        } else {
-          // 未公開状態での表示要求 - Unpublished.htmlを表示
-          console.log('DEBUG: View mode request for unpublished board. Showing Unpublished.');
-          const template = HtmlService.createTemplateFromFile('Unpublished');
-          template.include = include;
-          
-          try {
-            const config = JSON.parse(userInfo.configJson || '{}');
-            
-            template.userId = userInfo.userId;
-            template.spreadsheetId = userInfo.spreadsheetId;
-            template.ownerName = userInfo.adminEmail;
-            template.isOwner = true; // 管理者であることを示す
-            template.adminEmail = userInfo.adminEmail;
-            template.cacheTimestamp = Date.now();
-            
-            // 管理パネルと回答ボードのURLを設定
-            const appUrls = generateAppUrls(userInfo.userId);
-            template.adminPanelUrl = appUrls.adminUrl;
-            template.boardUrl = appUrls.viewUrl;
-            
-          } catch (e) {
-            console.error('Unpublished template setup error:', e);
-            template.ownerName = 'システム管理者';
-            template.isOwner = true;
-            template.adminEmail = userInfo.adminEmail || 'admin@example.com';
-            template.cacheTimestamp = Date.now();
-          }
-          
-          return template.evaluate()
-              .setTitle('StudyQuest - 準備中')
-              .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-        }
-      }
-
-      // デフォルト：パラメータなしのアクセスは現在ユーザーの管理パネルへ
-      // URLにuserIdが指定されていない場合、現在のユーザーの管理パネルにリダイレクト
-      if (!userId || userId !== userInfo.userId) {
-        console.log('DEBUG: Default access or user mismatch. Redirecting to current user admin panel.');
-        const correctUrl = ScriptApp.getService().getUrl();
-        var redirectHtml = HtmlService.createHtmlOutput(`
-          <script>
-            console.log('Redirecting to admin panel...');
-            window.top.location.href = '${correctUrl}';
-          </script>
-          <p>管理パネルにリダイレクトしています...</p>
-        `);
-        return redirectHtml;
-      }
-      
-      console.log('DEBUG: Default access - user registered. Showing AdminPanel.');
-      var adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
-      adminTemplate.include = include;
-      adminTemplate.userInfo = userInfo;
-      adminTemplate.userId = userInfo.userId;
-      adminTemplate.mode = 'admin';
-      adminTemplate.displayMode = 'named';
-      adminTemplate.showAdminFeatures = true;
-      var adminHtml = adminTemplate.evaluate()
-        .setTitle('管理パネル - みんなの回答ボード');
-      console.log('DEBUG: Serving default AdminPanel HTML');
-      return safeSetXFrameOptionsDeny(adminHtml);
-
-    } else {
-      // 5. 【未登録ユーザーの処理】
-      //    Page.html直接アクセス時でもユーザーが見つからない場合は登録ページ
-      console.log('DEBUG: User not registered. Redirecting to RegistrationPage.');
-      console.log('DEBUG: Serving RegistrationPage HTML for unregistered user');
-      return showRegistrationPage();
-    }
-
-  } catch (error) {
-    console.error(`doGetで致命的なエラー: ${error.stack}`);
-    
-    var errorHtml = HtmlService.createHtmlOutput(
-      '<h1>デバッグ：致命的エラー</h1>' +
-      '<p>doGet関数内でエラーが発生しました</p>' +
-      '<p>エラー詳細: ' + htmlEncode(error.message) + '</p>' +
-      '<p>スタック: ' + htmlEncode(error.stack || 'スタック情報なし') + '</p>' +
-      '<p>時刻: ' + new Date().toISOString() + '</p>' +
-      '<p>executeAs設定: USER_DEPLOYING (テスト中)</p>'
-    );
-    return safeSetXFrameOptionsDeny(errorHtml);
+/**
+ * 回答ボードまたは未公開ページを表示
+ * @param {Object} userInfo ユーザー情報
+ * @param {Object} params リクエストパラメータ
+ * @return {HtmlOutput} HTMLコンテンツ
+ */
+function renderAnswerBoard(userInfo, params) {
+  let config = {};
+  try {
+    config = JSON.parse(userInfo.configJson || '{}');
+  } catch (e) {
+    console.warn('Invalid configJson:', e.message);
   }
-  }, { ttl: 60 }); // 1分間キャッシュ（動的コンテンツのため短時間）
+  const isPublished = !!(config.appPublished && config.publishedSpreadsheetId && config.publishedSheetName);
+  const sheetConfigKey = 'sheet_' + (config.publishedSheetName || params.sheetName);
+  const sheetConfig = config[sheetConfigKey] || {};
+  const showBoard = params.isDirectPageAccess || isPublished;
+  const file = showBoard ? 'Page' : 'Unpublished';
+  const template = HtmlService.createTemplateFromFile(file);
+  template.include = include;
+
+  if (showBoard) {
+    try {
+      if (userInfo.spreadsheetId) {
+        try { addServiceAccountToSpreadsheet(userInfo.spreadsheetId); } catch (err) { console.warn('アクセス権設定警告:', err.message); }
+      }
+      template.userId = userInfo.userId;
+      template.spreadsheetId = userInfo.spreadsheetId;
+      template.ownerName = userInfo.adminEmail;
+      template.sheetName = escapeJavaScript(config.publishedSheetName || params.sheetName);
+      const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+      template.opinionHeader = escapeJavaScript(rawOpinionHeader);
+      template.cacheTimestamp = Date.now();
+      template.displayMode = config.displayMode || 'anonymous';
+      template.showCounts = config.showCounts !== undefined ? config.showCounts : false;
+      const currentUserEmail = Session.getActiveUser().getEmail();
+      const isOwner = currentUserEmail === userInfo.adminEmail;
+      template.showAdminFeatures = isOwner;
+      template.isAdminUser = isOwner;
+    } catch (e) {
+      template.opinionHeader = escapeJavaScript('お題の読込エラー');
+      template.cacheTimestamp = Date.now();
+      template.userId = userInfo.userId;
+      template.spreadsheetId = userInfo.spreadsheetId;
+      template.ownerName = userInfo.adminEmail;
+      template.sheetName = escapeJavaScript(params.sheetName);
+      template.displayMode = 'anonymous';
+      template.showCounts = false;
+      const currentUserEmail = Session.getActiveUser().getEmail();
+      const isOwner = currentUserEmail === userInfo.adminEmail;
+      template.showAdminFeatures = isOwner;
+      template.isAdminUser = isOwner;
+    }
+    return template.evaluate()
+      .setTitle('StudyQuest -みんなの回答ボード-')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  } else {
+    try {
+      template.userId = userInfo.userId;
+      template.spreadsheetId = userInfo.spreadsheetId;
+      template.ownerName = userInfo.adminEmail;
+      template.isOwner = true;
+      template.adminEmail = userInfo.adminEmail;
+      template.cacheTimestamp = Date.now();
+      const appUrls = generateAppUrls(userInfo.userId);
+      template.adminPanelUrl = appUrls.adminUrl;
+      template.boardUrl = appUrls.viewUrl;
+    } catch (e) {
+      console.error('Unpublished template setup error:', e);
+      template.ownerName = 'システム管理者';
+      template.isOwner = true;
+      template.adminEmail = userInfo.adminEmail || 'admin@example.com';
+      template.cacheTimestamp = Date.now();
+    }
+    return template.evaluate()
+      .setTitle('StudyQuest - 準備中')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
 }
 
 
