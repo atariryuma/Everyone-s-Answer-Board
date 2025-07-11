@@ -300,8 +300,29 @@ function doGet(e) {
         if (!params.userId || params.userId !== userInfo.userId) {
           const correctUrl = buildUserAdminUrl(userInfo.userId);
           return HtmlService.createHtmlOutput(`
-            <script>window.top.location.href='${correctUrl}'</script>
-            <p>管理パネルにリダイレクトしています...</p>`);
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="UTF-8">
+              <meta http-equiv="refresh" content="0;url=${correctUrl}">
+            </head>
+            <body style="text-align:center; padding:50px; font-family:sans-serif;">
+              <h2>正しい管理パネルにリダイレクトしています...</h2>
+              <p>自動的にリダイレクトされない場合は<a href="${correctUrl}">こちら</a>をクリックしてください。</p>
+              <script>
+                try {
+                  if (window.top) {
+                    window.top.location.href = '${correctUrl}';
+                  } else {
+                    window.location.href = '${correctUrl}';
+                  }
+                } catch(e) {
+                  window.location.href = '${correctUrl}';
+                }
+              </script>
+            </body>
+            </html>
+          `);
         }
         return renderAdminPanel(userInfo, 'admin');
       }
@@ -368,11 +389,30 @@ function handleDirectExecAccess(userEmail) {
       debugLog('Redirecting registered user to admin panel:', adminUrl);
       
       return HtmlService.createHtmlOutput(`
-        <script>window.top.location.href='${adminUrl}'</script>
-        <div style="text-align:center; padding:50px; font-family:sans-serif;">
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>リダイレクト中...</title>
+          <meta http-equiv="refresh" content="0;url=${adminUrl}">
+        </head>
+        <body style="text-align:center; padding:50px; font-family:sans-serif;">
           <h2>管理パネルにリダイレクトしています...</h2>
           <p>自動的にリダイレクトされない場合は<a href="${adminUrl}">こちら</a>をクリックしてください。</p>
-        </div>
+          <script>
+            // 複数の方法でリダイレクトを試行
+            try {
+              if (window.top) {
+                window.top.location.href = '${adminUrl}';
+              } else {
+                window.location.href = '${adminUrl}';
+              }
+            } catch(e) {
+              window.location.href = '${adminUrl}';
+            }
+          </script>
+        </body>
+        </html>
       `);
     } else {
       // 未登録ユーザー: ログイン画面表示
@@ -391,8 +431,38 @@ function handleDirectExecAccess(userEmail) {
  * @return {string}
  */
 function buildUserAdminUrl(userId) {
-  const baseUrl = ScriptApp.getService().getUrl();
+  // 正しいWeb App URLを取得
+  const baseUrl = getWebAppUrl();
   return `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
+}
+
+/**
+ * 正しいWeb App URLを取得
+ * @return {string}
+ */
+function getWebAppUrl() {
+  try {
+    // まずScriptApp.getService().getUrl()を試す
+    let url = ScriptApp.getService().getUrl();
+    
+    // URLが正しい形式かチェック
+    if (url && url.includes('/macros/') && url.endsWith('/exec')) {
+      return url;
+    }
+    
+    // フォールバック: 現在のリクエストURLから構築
+    const currentUrl = Session.getActiveUser().getEmail() ? 
+      'https://script.google.com/a/macros/naha-okinawa.ed.jp/s/AKfycby5oABLEuyg46OvwVqt2flUKz15zocFhH-kLD0IuNWm8akKMXiKrOS5kqGCQ7V4DQ-2/exec' :
+      url;
+    
+    console.log('Using Web App URL:', currentUrl);
+    return currentUrl;
+    
+  } catch (error) {
+    console.error('getWebAppUrl error:', error);
+    // ハードコードされたフォールバック
+    return 'https://script.google.com/a/macros/naha-okinawa.ed.jp/s/AKfycby5oABLEuyg46OvwVqt2flUKz15zocFhH-kLD0IuNWm8akKMXiKrOS5kqGCQ7V4DQ-2/exec';
+  }
 }
 
 /**
