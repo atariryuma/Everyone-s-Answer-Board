@@ -207,7 +207,10 @@
           
           <!-- アカウント切り替えオプション -->
           <div class="text-right">
-            <button type="button" onclick="switchToAnotherAccount()" class="text-cyan-400 hover:text-cyan-300 hover:underline text-sm">
+            <button type="button" onclick="switchToAnotherAccount()" class="inline-flex items-center gap-1 text-cyan-400 hover:text-cyan-300 hover:underline text-sm transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+              </svg>
               別のアカウントでログイン
             </button>
           </div>
@@ -523,10 +526,49 @@
 
     // アカウント切り替え機能
     function switchToAnotherAccount() {
-      if (confirm('別のGoogleアカウントでログインしますか？現在のセッションからログアウトされます。')) {
-        // Googleアカウントのログアウト処理
-        window.location.href = 'https://accounts.google.com/logout?continue=' + encodeURIComponent(window.location.href);
+      if (confirm('別のGoogleアカウントでログインしますか？現在のセッションからログアウトされ、アカウント選択画面が表示されます。')) {
+        try {
+          // Google Apps Scriptの認証をリセット
+          google.script.run
+            .withSuccessHandler(function(result) {
+              if (result && result.success) {
+                // 成功時はページをリロードしてアカウント選択を促す
+                const currentUrl = new URL(window.location.href);
+                currentUrl.searchParams.set('force_account_selection', 'true');
+                window.location.replace(currentUrl.toString());
+              } else {
+                // フォールバック: 手動でのアカウント切り替え案内
+                showAccountSwitchFallback();
+              }
+            })
+            .withFailureHandler(function(error) {
+              console.warn('認証リセットエラー:', error);
+              // フォールバック: 手動でのアカウント切り替え案内
+              showAccountSwitchFallback();
+            })
+            .resetUserAuthentication();
+        } catch (error) {
+          console.warn('アカウント切り替えエラー:', error);
+          // フォールバック: 手動でのアカウント切り替え案内
+          showAccountSwitchFallback();
+        }
       }
+    }
+
+    // アカウント切り替えのフォールバック案内
+    function showAccountSwitchFallback() {
+      const fallbackMessage = `
+        アカウントを切り替えるには以下の手順をお試しください：
+
+        1. 新しいブラウザタブでGoogle（google.com）にアクセス
+        2. 右上のプロフィール画像をクリック
+        3. 「別のアカウントを追加」または使用したいアカウントを選択
+        4. このページに戻って再度認証を開始
+
+        または、ブラウザのシークレット/プライベートモードで新しいタブを開いてこのページにアクセスしてください。
+      `;
+      
+      alert(fallbackMessage);
     }
 
     // 既存ボードをチェックする関数
@@ -857,13 +899,20 @@
     // 新規アカウントフラグチェック
     function checkForNewAccountFlag() {
       const urlParams = new URLSearchParams(window.location.search);
-      const isNewAccount = urlParams.get('new_account') === 'true' || urlParams.get('force_account_selection') === 'true';
+      const isNewAccount = urlParams.get('new_account') === 'true';
+      const isForceAccountSelection = urlParams.get('force_account_selection') === 'true';
       
-      if (isNewAccount) {
+      if (isNewAccount || isForceAccountSelection) {
         const cleanUrl = window.location.href.split('?')[0];
         history.replaceState({}, document.title, cleanUrl);
-        sessionStorage.setItem('treat_as_new_account', 'true');
-        showMessage('新しい認証アカウントでの登録準備が整いました。', 'success');
+        
+        if (isForceAccountSelection) {
+          sessionStorage.setItem('force_account_selection', 'true');
+          showMessage('アカウント切り替えが完了しました。認証を開始してください。', 'info');
+        } else {
+          sessionStorage.setItem('treat_as_new_account', 'true');
+          showMessage('新しい認証アカウントでの登録準備が整いました。', 'success');
+        }
       }
     }
     
