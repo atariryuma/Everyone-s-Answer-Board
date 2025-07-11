@@ -13,9 +13,9 @@
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans min-h-screen flex items-center justify-center p-4">
   <div class="glass-panel rounded-xl p-8 max-w-2xl w-full shadow-2xl">
-    <div class="text-center mb-6">
+    <div class="text-center mb-8">
       <h1 class="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent mb-2">Everyone's Answer Board</h1>
-      <p class="text-gray-400">スマート自動化・Google Workspace連携の次世代回答システム</p>
+      <p class="text-gray-400">教育現場のための回答ボードシステム</p>
     </div>
     
     <!-- ドメイン情報表示 -->
@@ -57,198 +57,131 @@
         </div>
       </div>
     </div>
-    
-    
-    <!-- コンパクトCTA -->
-    <div class="mb-6 text-center fade-in">
-      <div class="glass-panel bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-xl p-4 border border-cyan-400/30 feature-card">
-        <h2 class="text-xl font-bold text-white mb-2">🚀 最先端の教育用回答ボードを始めよう！</h2>
-        <p class="text-cyan-200 text-sm mb-3">スマート自動化とGoogle Workspace連携でわずか30秒でセットアップ完了。教育現場の生産性を劇的に向上させます。</p>
-        <button type="button" 
-                class="cta-button px-6 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-bold rounded-lg transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-gray-800"
-                aria-label="新規登録に進む">
-          いますぐ始める →
-        </button>
+
+    <!-- メインCTA -->
+    <div class="text-center mb-8">
+      <div class="glass-panel bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 rounded-xl p-6 border border-emerald-400/30">
+        <h2 class="text-2xl font-bold text-white mb-3">🚀 30秒で回答ボードを作成</h2>
+        <p class="text-emerald-200 mb-6">あなた専用のGoogleフォームとシートを自動作成し、即座に回答ボードとして利用開始できます</p>
+        
+        <!-- 主要機能 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div class="bg-cyan-900/30 rounded-lg p-4 border border-cyan-500/30">
+            <div class="text-2xl mb-2">⚡</div>
+            <div class="font-semibold text-cyan-300 mb-1">自動セットアップ</div>
+            <div class="text-xs text-cyan-200">フォーム・シート・ボードを自動作成</div>
+          </div>
+          <div class="bg-green-900/30 rounded-lg p-4 border border-green-500/30">
+            <div class="text-2xl mb-2">🔒</div>
+            <div class="font-semibold text-green-300 mb-1">プライバシー保護</div>
+            <div class="text-xs text-green-200">外部サービスへの送信なし</div>
+          </div>
+          <div class="bg-blue-900/30 rounded-lg p-4 border border-blue-500/30">
+            <div class="text-2xl mb-2">🎓</div>
+            <div class="font-semibold text-blue-300 mb-1">教育特化</div>
+            <div class="text-xs text-blue-200">デジタルシティズンシップ対応</div>
+          </div>
+        </div>
+
+        <!-- プライバシー保護強調 -->
+        <div class="bg-green-900/20 border border-green-400/40 rounded-lg p-4 mb-6">
+          <div class="font-medium text-green-300 mb-2 flex items-center justify-center gap-2">
+            <span>🔒</span>
+            <span>完全プライバシー保護</span>
+          </div>
+          <div class="text-sm text-green-200 text-center">
+            外部AIサービス（ChatGPT、Claude等）への送信なし • Google Workspace内で完結 • 学習データ完全分離
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Progress Steps -->
-    <div class="mb-8 slide-in">
+    <!-- 簡潔な3ステップ表示 -->
+    <div class="mb-8">
       <div class="flex items-center justify-between relative">
         <div class="absolute top-4 left-0 right-0 h-0.5 bg-gray-600 rounded-full"></div>
         <div class="absolute top-4 left-0 h-0.5 bg-gradient-to-r from-cyan-400 to-blue-400 transition-all duration-500 rounded-full" id="progress-bar"></div>
         
-        <div class="step-indicator completed" id="step-1" role="progressbar" aria-valuenow="1" aria-valuemin="1" aria-valuemax="3" aria-label="ステップ1: 理解">
-          <div class="step-number w-8 h-8 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-sm relative z-10 transition-all">1</div>
-          <span class="text-xs mt-2 block text-cyan-400">理解</span>
+        <div class="step-indicator completed" id="step-1">
+          <div class="step-number w-8 h-8 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-sm relative z-10">1</div>
+          <span class="text-xs mt-2 block text-cyan-400">確認</span>
         </div>
-        <div class="step-indicator" id="step-2" role="progressbar" aria-valuenow="2" aria-valuemin="1" aria-valuemax="3" aria-label="ステップ2: 確認">
-          <div class="step-number w-8 h-8 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm relative z-10 transition-all">2</div>
-          <span class="text-xs mt-2 block text-gray-400">確認</span>
+        <div class="step-indicator" id="step-2">
+          <div class="step-number w-8 h-8 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm relative z-10">2</div>
+          <span class="text-xs mt-2 block text-gray-400">認証</span>
         </div>
-        <div class="step-indicator" id="step-3" role="progressbar" aria-valuenow="3" aria-valuemin="1" aria-valuemax="3" aria-label="ステップ3: 開始">
-          <div class="step-number w-8 h-8 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm relative z-10 transition-all">3</div>
+        <div class="step-indicator" id="step-3">
+          <div class="step-number w-8 h-8 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm relative z-10">3</div>
           <span class="text-xs mt-2 block text-gray-400">開始</span>
         </div>
       </div>
     </div>
 
     <div class="space-y-6">
-      <!-- ステップ1: 説明 -->
-      <article class="glass-panel rounded-lg p-4 feature-card fade-in" id="section-1">
-        <h2 class="text-lg font-semibold mb-3 text-cyan-400 flex items-center gap-2">
-          <div class="w-5 h-5 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-xs">1</div>
-          みんなの回答ボードとは
-        </h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div class="space-y-3">
-            <div class="flex items-start gap-2 slide-in">
-              <span class="text-cyan-400 text-lg">🔍</span>
-              <div>
-                <span class="font-semibold text-cyan-300">スマート列認識</span>
-                <p class="text-xs text-gray-400">シートの列を自動で識別・マッピング（完全ローカル処理）</p>
-              </div>
-            </div>
-            <div class="flex items-start gap-2 slide-in">
-              <span class="text-green-400 text-lg">🔄</span>
-              <div>
-                <span class="font-semibold text-green-300">リアルタイム同期</span>
-                <p class="text-xs text-gray-400">フォーム回答が即座にボードに反映</p>
-              </div>
-            </div>
-            <div class="flex items-start gap-2 slide-in">
-              <span class="text-blue-400 text-lg">🔒</span>
-              <div>
-                <span class="font-semibold text-blue-300">プライバシー保護</span>
-                <p class="text-xs text-gray-400">完全非公開データベースアーキテクチャ</p>
-              </div>
-            </div>
-          </div>
-          <div class="space-y-3">
-            <div class="flex items-start gap-2 slide-in">
-              <span class="text-purple-400 text-lg">🌐</span>
-              <div>
-                <span class="font-semibold text-purple-300">Workspace連携</span>
-                <p class="text-xs text-gray-400">シームレスなGoogle サービス統合</p>
-              </div>
-            </div>
-            <div class="flex items-start gap-2 slide-in">
-              <span class="text-orange-400 text-lg">📊</span>
-              <div>
-                <span class="font-semibold text-orange-300">インサイト分析</span>
-                <p class="text-xs text-gray-400">学習データの詳細分析とレポート</p>
-              </div>
-            </div>
-            <div class="flex items-start gap-2 slide-in">
-              <span class="text-pink-400 text-lg">🎆</span>
-              <div>
-                <span class="font-semibold text-pink-300">エンゲージメント機能</span>
-                <p class="text-xs text-gray-400">リアクション・ハイライト機能</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Digital Citizenship Education Section with Modal Button -->
-        <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3 mb-3">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.168 18.477 18.582 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-              </svg>
-              <span class="text-xs font-semibold text-blue-200">デジタル・シティズンシップ教育に準拠</span>
-            </div>
-            <button type="button" onclick="showTeacherGuideModal()" 
-                    class="text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded transition-colors text-white">
-              📚 ガイド
-            </button>
-          </div>
-        </div>
-
-        <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-3 mb-3">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-              </svg>
-              <span class="text-xs font-semibold text-green-200">心理的安全性を重視した設計</span>
-            </div>
-            <span class="text-xs text-green-300">匿名性保護・協働学習支援</span>
-          </div>
-        </div>
-
-        <!-- セキュリティ -->
-        <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-3">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-              <span class="text-xs font-semibold text-purple-200">Google標準のセキュリティ基盤</span>
-            </div>
-            <span class="text-xs text-purple-300">データ分離・暗号化・アクセス制御</span>
-          </div>
-        </div>
-      </article>
-      
-      <!-- ステップ2: セットアップ方法 -->
-      <article class="glass-panel rounded-lg p-6 feature-card fade-in" id="section-2">
+      <!-- 機能概要 -->
+      <article class="glass-panel rounded-lg p-6" id="section-1">
         <h2 class="text-xl font-semibold mb-4 text-cyan-400 flex items-center gap-2">
-          <div class="w-6 h-6 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm" id="step-2-icon">2</div>
-          セットアップ方法
+          <div class="w-6 h-6 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-sm">1</div>
+          回答ボードの特徴
         </h2>
-        <div class="border border-cyan-500 rounded-lg p-4 bg-cyan-900/20 glass-panel">
-          <div class="flex items-start gap-3">
-            <svg class="w-6 h-6 text-cyan-400 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-            </svg>
-            <div>
-              <div class="font-semibold text-white mb-2">セキュアで効率的な自動セットアップ</div>
-              <div class="text-sm text-gray-300 leading-relaxed space-y-2">
-                <p>あなた専用のGoogleフォームとスプレッドシートを自動で作成します。Google Workspace for Educationのセキュリティ機能と連携するため、<strong>完了まで1分ほどかかる場合があります</strong>。</p>
-                <div class="bg-green-900/30 border border-green-400/40 rounded-lg p-3">
-                  <div class="font-medium text-green-300 mb-2 flex items-center gap-2">
-                    <span>🔒</span>
-                    <span>完全プライバシー保護</span>
-                  </div>
-                  <ul class="space-y-1 text-xs text-green-200">
-                    <li>• 外部AIサービス（ChatGPT、Claude等）への送信一切なし</li>
-                    <li>• ルールベース自動化（生成AI不使用）</li>
-                    <li>• 全処理がGoogle Workspace内で完結</li>
-                    <li>• 学習データの完全分離保護</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
         
-        <!-- 重要な注意事項 -->
-        <div class="mt-4 p-4 bg-yellow-900/30 border border-yellow-600/50 rounded-lg glass-panel">
-          <h3 class="font-semibold text-yellow-400 mb-2 flex items-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z"></path>
-            </svg>
-            重要なお知らせ
-          </h3>
-          <ul class="text-sm text-yellow-200 space-y-2" role="list">
-            <li class="slide-in">• 一度登録すると、<strong>固定URLの専用回答ボード</strong>があなたの教育活動専用で作成されます</li>
-            <li class="slide-in">• 登録後は<strong>管理画面でスプレッドシートのURLを追加</strong>して複数の授業で使用できます</li>
-            <li class="slide-in">• 生徒には<strong>同じURLを継続共有</strong>でき、授業ごとにURLを変更する必要がありません</li>
-          </ul>
+        <div class="space-y-4">
+          <!-- 基本機能 -->
+          <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+            <h3 class="font-semibold text-blue-300 mb-3">基本機能</h3>
+            <ul class="space-y-2 text-sm text-blue-100">
+              <li class="flex items-center gap-2">
+                <span class="text-blue-400">•</span>
+                <span>Googleフォームからの回答をリアルタイム表示</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="text-blue-400">•</span>
+                <span>学習者同士のリアクション機能（いいね・なるほど・もっと知りたい）</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="text-blue-400">•</span>
+                <span>教師による重要回答のハイライト機能</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- 教育価値 -->
+          <div class="bg-emerald-900/20 border border-emerald-500/30 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-semibold text-emerald-300">教育価値</h3>
+              <button type="button" onclick="showTeacherGuideModal()" 
+                      class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-xs font-medium text-white transition-colors">
+                📚 指導ガイド
+              </button>
+            </div>
+            <ul class="space-y-2 text-sm text-emerald-100">
+              <li class="flex items-center gap-2">
+                <span class="text-emerald-400">•</span>
+                <span>デジタル・シティズンシップ教育の実践</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="text-emerald-400">•</span>
+                <span>心理的安全性を重視した匿名表示オプション</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="text-emerald-400">•</span>
+                <span>建設的な対話とコミュニケーション能力の育成</span>
+              </li>
+            </ul>
+          </div>
         </div>
       </article>
       
-      <!-- ステップ3: アカウント確認 -->
-      <article class="glass-panel rounded-lg p-6 feature-card fade-in" id="section-3">
+      <!-- アカウント確認 -->
+      <article class="glass-panel rounded-lg p-6" id="section-3">
         <h2 class="text-xl font-semibold mb-4 text-cyan-400 flex items-center gap-2">
-          <div class="w-6 h-6 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm" id="step-3-icon">3</div>
+          <div class="w-6 h-6 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm" id="step-3-icon">2</div>
           アカウント確認
         </h2>
-        <div class="bg-gray-800 rounded-lg p-4 glass-panel">
+        <div class="bg-gray-800 rounded-lg p-4 mb-4">
           <p class="text-sm text-gray-400 mb-1">認証済みアカウント:</p>
           <p id="user-email" class="text-white font-semibold flex items-center gap-2">
-            <svg class="w-4 h-4 spinner" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <svg class="w-4 h-4 spinner" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
             </svg>
@@ -257,7 +190,7 @@
         </div>
         
         <!-- Domain Information -->
-        <div id="domain-info-section" class="mt-4 hidden">
+        <div id="domain-info-section" class="hidden">
           <div id="domain-match-panel" class="glass-panel bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-4 border border-green-400/30 mb-4 hidden">
             <div class="flex items-center">
               <svg class="w-5 h-5 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -289,13 +222,13 @@
       <button
         type="button"
         id="register-btn"
-        class="cta-button w-full py-4 px-6 bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-500 hover:from-emerald-600 hover:via-cyan-600 hover:to-blue-600 text-white font-bold rounded-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-2xl focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-gray-800 fade-in relative overflow-hidden"
+        class="cta-button w-full py-4 px-6 bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-500 hover:from-emerald-600 hover:via-cyan-600 hover:to-blue-600 text-white font-bold rounded-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-2xl focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-gray-800 relative overflow-hidden"
         disabled
-        aria-label="スマート自動化セットアップで最先端の教育システムを開始"
+        aria-label="回答ボードシステムを開始"
       >
         <span class="relative z-10 flex items-center justify-center gap-3">
           <span class="text-xl">🚀</span>
-          <span>最先端教育システムを開始する</span>
+          <span>回答ボードを作成する</span>
           <span class="text-xl">✨</span>
         </span>
         <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
@@ -304,13 +237,12 @@
       <!-- メッセージエリア -->
       <div id="message-area" class="text-center min-h-[24px]" role="alert" aria-live="polite"></div>
 
-
       <!-- 結果表示エリア -->
       <div id="result-area" class="hidden"></div>
     </div>
     
     <!-- フッター -->
-    <footer class="text-center mt-8 text-xs text-gray-500 fade-in space-y-2">
+    <footer class="text-center mt-8 text-xs text-gray-500 space-y-2">
       <div class="flex items-center justify-center gap-4">
         <span class="flex items-center gap-1">
           <span class="text-cyan-400">⚡</span>
@@ -384,20 +316,11 @@
       }
     }
     
-    // Scroll to registration function
-    function scrollToRegistration() {
-      document.getElementById('section-3').scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'start' 
-      });
-      updateStep(3);
-    }
-    
     // Update step progress
     function updateStep(step) {
       currentStep = step;
       
-      // Update progress bar with performance optimization
+      // Update progress bar
       const progressBar = document.getElementById('progress-bar');
       requestAnimationFrame(() => {
         progressBar.style.width = `${(step / 3) * 100}%`;
@@ -406,7 +329,6 @@
       // Update step indicators
       for (let i = 1; i <= 3; i++) {
         const stepElement = document.getElementById(`step-${i}`);
-        const stepIndicator = document.getElementById(`step-${i}`);
         
         if (stepElement) {
           if (i <= step) {
@@ -432,7 +354,7 @@
           }
         }
         
-        // Update section-specific icons (for steps 2 and 3)
+        // Update section-specific icons
         const iconElement = document.getElementById(`step-${i}-icon`);
         if (iconElement) {
           if (i <= step) {
@@ -447,10 +369,9 @@
     // セキュリティ強化: 認証状態の検証
     async function verifyAuthentication() {
       return new Promise((resolve, reject) => {
-        // タイムアウト処理を追加
         const timeoutId = setTimeout(() => {
           reject(new Error('認証確認がタイムアウトしました'));
-        }, 10000); // 10秒でタイムアウト
+        }, 10000);
 
         google.script.run
           .withSuccessHandler(result => {
@@ -469,7 +390,7 @@
       });
     }
 
-    // 既存ボードをチェックする関数（自動リダイレクト用）
+    // 既存ボードをチェックする関数
     function checkExistingBoard() {
       return new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
@@ -484,92 +405,18 @@
           .withFailureHandler(error => {
             clearTimeout(timeoutId);
             console.error('既存ボードチェックエラー:', error);
-            // エラーの場合は新規ユーザーとして扱う
             resolve({ status: 'new_user' });
           })
           .getExistingBoard();
       });
     }
 
-    // ===== 共通ドメイン情報処理関数 =====
-    // AdminPanel.html と Registration.html で共通使用
-    
-    /**
-     * ドメイン情報を取得して表示する共通関数
-     * @param {Function} onSuccess - 成功時のコールバック（オプション）
-     * @param {Function} onError - エラー時のコールバック（オプション）
-     */
-    function loadDomainInfo(onSuccess, onError) {
-      google.script.run
-        .withSuccessHandler(info => {
-          displayDomainInfo(info);
-          if (onSuccess) onSuccess(info);
-        })
-        .withFailureHandler(error => {
-          console.error('ドメイン情報の取得に失敗しました:', error);
-          displayDomainInfo({ error: error.message || error });
-          if (onError) onError(error);
-        })
-        .getDeployUserDomainInfo();
-    }
-
-    /**
-     * ドメイン情報を表示する共通関数
-     * @param {Object} info - ドメイン情報オブジェクト
-     */
-    function displayDomainInfo(info) {
-      const headerDomainMatch = document.getElementById('header-domain-match');
-      const headerDomainMismatch = document.getElementById('header-domain-mismatch');
-      const headerDomainInitial = document.getElementById('header-domain-initial');
-      const headerDomainMatchText = document.getElementById('header-domain-match-text');
-      const headerDomainMismatchText = document.getElementById('header-domain-mismatch-text');
-
-      // 全ての表示を一旦非表示にする
-      if (headerDomainMatch) headerDomainMatch.classList.add('hidden');
-      if (headerDomainMismatch) headerDomainMismatch.classList.add('hidden');
-      if (headerDomainInitial) headerDomainInitial.classList.add('hidden');
-      
-      if (!info || info.error) {
-        console.warn('ドメイン情報エラー:', info?.error);
-        if (headerDomainInitial) headerDomainInitial.classList.remove('hidden');
-        return;
-      }
-
-      if (info.isDomainMatch) {
-        // ドメインが一致している場合
-        if (headerDomainMatch && headerDomainMatchText) {
-          headerDomainMatch.classList.remove('hidden');
-          if (info.deployDomain) {
-            headerDomainMatchText.textContent = `${info.deployDomain} ドメイン`;
-          } else {
-            headerDomainMatchText.textContent = 'グローバルアクセス';
-          }
-        }
-      } else {
-        // ドメイン不一致の場合
-        if (headerDomainMismatch && headerDomainMismatchText) {
-          headerDomainMismatch.classList.remove('hidden');
-          headerDomainMismatchText.textContent = info.currentDomain;
-        }
-      }
-    }
-
     // ユーザーメールアドレスを取得
     window.addEventListener('DOMContentLoaded', async () => {
-      // ローディング表示
       showMessage('認証状態を確認中...', 'info');
-      
-      // ドメイン情報を取得
       loadDomainInfo();
-      
-      // scrollToRegistrationのイベントリスナーを設定
-      const scrollToRegistrationBtn = document.querySelector('button[aria-label="新規登録に進む"]');
-      if (scrollToRegistrationBtn) {
-        scrollToRegistrationBtn.addEventListener('click', scrollToRegistration);
-      }
 
       try {
-        // セキュリティ強化: 認証状態を確認
         const authResult = await verifyAuthentication();
         const email = authResult.email;
         
@@ -577,31 +424,26 @@
         document.getElementById('user-email').textContent = email || 'メールアドレスを取得できません';
 
         if (email) {
-          // 自動リダイレクト機能: 登録済みユーザーチェック
           const existingBoardResult = await checkExistingBoard();
           
           if (existingBoardResult && existingBoardResult.status === 'existing_user') {
             showMessage('既存の認証済みアカウントが見つかりました。管理パネルにリダイレクトします...', 'success');
-            // 1秒後にリダイレクト（ユーザーがメッセージを読む時間を確保）
             setTimeout(() => {
               window.location.replace(existingBoardResult.adminUrl);
             }, 1000);
-            return; // 以降の処理をスキップ
+            return;
           }
           
-          updateStep(2); // Account verification step
+          updateStep(2);
           
-          // 新規アカウント扱いフラグをチェック
           const treatAsNewAccount = sessionStorage.getItem('treat_as_new_account') === 'true';
           
           if (treatAsNewAccount) {
-            // 新規アカウント扱いの場合は既存ボードチェックをスキップ
-            sessionStorage.removeItem('treat_as_new_account'); // フラグをクリア
+            sessionStorage.removeItem('treat_as_new_account');
             updateStep(3);
             document.getElementById('register-btn').disabled = false;
             showMessage('新しい認証アカウントでの登録を開始できます。', 'success');
           } else {
-            // 通常の既存ボード情報をチェック
             google.script.run
               .withSuccessHandler((result) => {
                 if (result && result.status) {
@@ -609,17 +451,6 @@
                     case 'setup_required':
                       updateStep(3);
                       showMessage('システムセットアップが必要です。管理者にセットアップページでの初期設定を依頼してください。', 'warning');
-                      // セットアップページへのリンクを表示
-                      google.script.run
-                        .withSuccessHandler((appUrl) => {
-                          const setupUrl = appUrl + '?setup=true';
-                          showMessage(`セットアップページ: <a href="${setupUrl}" target="_blank" style="color: #8be9fd;">こちら</a>`, 'info');
-                        })
-                        .withFailureHandler(() => {
-                          const setupUrl = window.location.href.split('?')[0] + '?setup=true';
-                          showMessage(`セットアップページ: <a href="${setupUrl}" target="_blank" style="color: #8be9fd;">こちら</a>`, 'info');
-                        })
-                        .getWebAppUrl();
                       break;
                     case 'existing_user':
                       updateStep(3);
@@ -633,7 +464,7 @@
                     case 'new_user':
                       updateStep(3);
                       document.getElementById('register-btn').disabled = false;
-                      showMessage('認証確認が完了しました。教育用回答ボードを開始できます。', 'success');
+                      showMessage('認証確認が完了しました。回答ボードを開始できます。', 'success');
                       break;
                     case 'auth_required':
                       showMessage('Googleアカウントでログインしてください。', 'error');
@@ -641,11 +472,10 @@
                     default:
                       updateStep(3);
                       document.getElementById('register-btn').disabled = false;
-                      showMessage('認証確認が完了しました。StudyQuestを開始できます。', 'success');
+                      showMessage('認証確認が完了しました。回答ボードを開始できます。', 'success');
                       break;
                   }
                 } else {
-                  // レガシー形式の対応
                   if (result && result.userId) {
                     updateStep(3);
                     document.getElementById('register-btn').disabled = true;
@@ -657,7 +487,7 @@
                   } else {
                     updateStep(3);
                     document.getElementById('register-btn').disabled = false;
-                    showMessage('認証確認が完了しました。教育用回答ボードを開始できます。', 'success');
+                    showMessage('認証確認が完了しました。回答ボードを開始できます。', 'success');
                   }
                 }
               })
@@ -665,7 +495,7 @@
               console.warn('既存ボード確認で問題が発生しました:', error);
               updateStep(3);
               document.getElementById('register-btn').disabled = false;
-              showMessage('認証確認が完了しました。StudyQuestを開始できます。', 'success');
+              showMessage('認証確認が完了しました。回答ボードを開始できます。', 'success');
             })
             .getExistingBoard();
           }
@@ -673,18 +503,15 @@
           showMessage('Googleアカウントでログインしてください。', 'error');
         }
       } catch (error) {
-        // セキュリティ強化: 認証エラーの安全な処理
         console.warn('認証確認中にエラーが発生しました');
         document.getElementById('user-email').textContent = '認証エラー';
         showMessage('認証が必要です。Googleアカウントでログインしてください。', 'error');
       }
     });
     
-
-    // Enterキー対応（登録ボタン用）
+    // Enterキー対応
     document.addEventListener('keypress', (e) => {
       if (e.key === 'Enter' && !document.getElementById('register-btn').disabled) {
-        // Registration page doesn't have URL input field, so just trigger registration if focused
         const registerBtn = document.getElementById('register-btn');
         if (registerBtn && !registerBtn.disabled) {
           registerBtn.click();
@@ -692,7 +519,7 @@
       }
     });
     
-    // セキュリティ強化: 入力バリデーション関数
+    // 入力バリデーション
     function validateInput(value, type) {
       if (!value || typeof value !== 'string') return false;
       
@@ -709,19 +536,12 @@
     // 登録処理
     document.getElementById('register-btn').addEventListener('click', async () => {
       const btn = document.getElementById('register-btn');
-      const messageArea = document.getElementById('message-area');
       
-      // セキュリティ強化: 入力検証
       if (!userEmail || !validateInput(userEmail, 'email')) {
         showMessage('有効なメールアドレスが必要です。', 'error');
         return;
       }
       
-      // 統合版では常に自動セットアップ
-      const setupMethod = 'auto';
-      const spreadsheetUrl = 'AUTO_CREATE';
-      
-      // ボタンを無効化
       btn.disabled = true;
       btn.innerHTML = `
         <svg class="w-5 h-5 spinner inline-block mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -732,7 +552,6 @@
       `;
       showMessage('回答ボードを準備中です...', 'info');
       
-      // 登録処理を実行
       google.script.run
         .withSuccessHandler(result => {
           showMessage(result.message || '登録が完了しました！', 'success');
@@ -750,12 +569,10 @@
                 <p class="text-gray-300">あなた専用の回答ボードが作成されました</p>
               </div>
               
-              <!-- セットアップ選択画面 -->
               <div class="bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-lg p-6 border border-purple-400/30">
                 <h4 class="font-bold text-white mb-4 text-center">🚀 次のステップを選択してください</h4>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <!-- クイックスタートオプション -->
                   <div class="bg-gradient-to-br from-green-500/30 to-cyan-500/30 rounded-lg p-4 border border-green-400/50 hover:border-green-400 transition-all cursor-pointer" id="quickstart-option">
                     <div class="text-center">
                       <div class="text-3xl mb-2">🚀</div>
@@ -776,7 +593,6 @@
                     </div>
                   </div>
                   
-                  <!-- 手動セットアップオプション -->
                   <div class="bg-gradient-to-br from-blue-500/30 to-purple-500/30 rounded-lg p-4 border border-blue-400/50 hover:border-blue-400 transition-all cursor-pointer" id="manual-option">
                     <div class="text-center">
                       <div class="text-3xl mb-2">🔧</div>
@@ -805,7 +621,6 @@
                 </div>
               </div>
               
-              <!-- 進行状況表示（初期は非表示） -->
               <div id="quickstart-progress" class="bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-lg p-4 border border-green-400/30 hidden">
                 <h4 class="font-bold text-white mb-2">🚀 クイックスタート実行中...</h4>
                 <div class="space-y-3">
@@ -824,16 +639,7 @@
           resultArea.classList.remove('hidden');
           btn.style.display = 'none';
           
-          // 既存スプレッドシート入力を無効化
-          const existingInput = document.getElementById('spreadsheet-url');
-          if (existingInput) {
-            existingInput.disabled = true;
-          }
-
-          // グローバル変数に登録結果を保存（クイックスタート用）
           window.lastRegistrationResult = result;
-          
-          
         })
         .withFailureHandler(error => {
           showMessage(`エラー: ${error.message || '登録に失敗しました'}`, 'error');
@@ -841,7 +647,7 @@
           btn.innerHTML = `
             <span class="relative z-10 flex items-center justify-center gap-3">
               <span class="text-xl">🚀</span>
-              <span>最先端教育システムを開始する</span>
+              <span>回答ボードを作成する</span>
               <span class="text-xl">✨</span>
             </span>
             <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
@@ -850,8 +656,6 @@
         .registerNewUser(userEmail);
     });
     
-    // 既存ボード情報の表示
-
     // メッセージ表示関数
     function showMessage(message, type) {
       const messageArea = document.getElementById('message-area');
@@ -870,69 +674,17 @@
       messageArea.innerHTML = `${icons[type] || ''}<span>${escapeHtml(message)}</span>`;
     }
     
-    // クリップボードにコピー（現代的なAPIを使用）
-    async function copyToClipboard(elementId) {
-      const element = document.getElementById(elementId);
-      if (!element) return;
-      
-      const button = element.parentElement.querySelector('button');
-      const originalText = button ? button.textContent : '';
-      
-      try {
-        // 現代的なClipboard APIを使用
-        if (navigator.clipboard && window.isSecureContext) {
-          await navigator.clipboard.writeText(element.value);
-        } else {
-          // フォールバック: 従来の方法
-          element.select();
-          element.setSelectionRange(0, 99999); // モバイル対応
-          document.execCommand('copy');
-        }
-        
-        // コピー完了の視覚的フィードバック
-        if (button) {
-          button.textContent = '✓ コピー済み';
-          button.classList.add('bg-green-700');
-          
-          setTimeout(() => {
-            button.textContent = originalText;
-            button.classList.remove('bg-green-700');
-          }, 2000);
-        }
-      } catch (error) {
-        console.error('コピーに失敗しました:', error);
-        if (button) {
-          button.textContent = '✗ コピー失敗';
-          button.classList.add('bg-red-700');
-          
-          setTimeout(() => {
-            button.textContent = originalText;
-            button.classList.remove('bg-red-700');
-          }, 2000);
-        }
-      }
-    }
-
-    // ページ読み込み時にドメイン情報を取得
-    document.addEventListener('DOMContentLoaded', function() {
-      // loadDomainInfo(); // コメントアウト
-      // checkForNewAccountFlag(); // コメントアウト
-    });
-
     // クイックスタート機能
     function startQuickSetup() {
-      // 選択画面を非表示にして進行状況を表示
       document.querySelector('.bg-gradient-to-r.from-purple-500\\/20').style.display = 'none';
       document.getElementById('quickstart-progress').classList.remove('hidden');
       
-      // グローバル変数から必要な情報を取得
       const userId = window.lastRegistrationResult?.userId;
       if (!userId) {
         showMessage('ユーザーIDが見つかりません。ページを再読み込みしてください。', 'error');
         return;
       }
       
-      // 進行状況の更新
       updateProgress(10, 'Googleフォームを作成中...');
       
       google.script.run
@@ -956,7 +708,6 @@
     }
     
     function openManualSetup() {
-      const userId = window.lastRegistrationResult?.userId;
       const adminUrl = window.lastRegistrationResult?.adminUrl;
       
       if (adminUrl) {
@@ -1016,7 +767,6 @@
     }
     
     function showFallbackOptions() {
-      // エラー時のフォールバックオプションを表示
       document.getElementById('quickstart-progress').classList.add('hidden');
       document.querySelector('.bg-gradient-to-r.from-purple-500\\/20').style.display = 'block';
       showMessage('手動セットアップをお試しください。', 'info');
@@ -1027,7 +777,6 @@
       const modal = document.getElementById('teacherGuideModal');
       modal.classList.remove('hidden');
       
-      // フォーカス管理
       setTimeout(() => {
         const firstFocusable = modal.querySelector('h2') || modal.querySelector('button');
         if (firstFocusable) firstFocusable.focus();
@@ -1049,71 +798,19 @@
       }
     });
     
-    
-    // クライアントサイドキャッシュクリア関数
-    function clearClientSideCache() {
-      try {
-        // ローカルストレージをクリア（treat_as_new_account以外）
-        const treatAsNewAccount = sessionStorage.getItem('treat_as_new_account');
-        sessionStorage.clear();
-        localStorage.clear();
-        if (treatAsNewAccount) {
-          sessionStorage.setItem('treat_as_new_account', treatAsNewAccount);
-        }
-        
-        // Service Worker キャッシュをクリア
-        if ('caches' in window) {
-          caches.keys().then(names => {
-            names.forEach(name => {
-              caches.delete(name);
-            });
-          });
-        }
-        
-        // Cookie のクリア（可能な範囲）
-        document.cookie.split(";").forEach(function(c) { 
-          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-        });
-        
-        console.log('クライアントサイドキャッシュをクリアしました');
-      } catch (error) {
-        console.warn('クライアントサイドキャッシュクリアでエラーが発生:', error);
-      }
-    }
-
-    function reloadPageForNewAccount() {
-      sessionStorage.setItem('treat_as_new_account', 'true');
-      google.script.run
-        .withSuccessHandler(function(url) {
-          const newUrl = new URL(url);
-          newUrl.searchParams.set('t', Date.now());
-          window.top.location.href = newUrl.toString();
-        })
-        .withFailureHandler(function(error) {
-          console.error('URL取得に失敗しました:', error);
-          const currentUrl = window.location.href.split('?')[0];
-          window.top.location.href = currentUrl + '?t=' + Date.now();
-        })
-        .getWebAppUrl();
-    }
-    
-    // URLパラメータをチェックして新規アカウント扱いにする
+    // 新規アカウントフラグチェック
     function checkForNewAccountFlag() {
       const urlParams = new URLSearchParams(window.location.search);
       const isNewAccount = urlParams.get('new_account') === 'true' || urlParams.get('force_account_selection') === 'true';
       
       if (isNewAccount) {
-        // URLパラメータをクリーンアップ
         const cleanUrl = window.location.href.split('?')[0];
         history.replaceState({}, document.title, cleanUrl);
-        
-        // 新規アカウント扱いフラグを設定
         sessionStorage.setItem('treat_as_new_account', 'true');
         showMessage('新しい認証アカウントでの登録準備が整いました。', 'success');
       }
     }
     
-    // ページ読み込み時にフラグをチェック
     document.addEventListener('DOMContentLoaded', function() {
       checkForNewAccountFlag();
     });
@@ -1139,8 +836,8 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.168 18.477 18.582 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
             </svg>
           </div>
-          <h2 class="text-xl font-bold text-green-300" tabindex="0">📚 デジタル・シティズンシップ教育ガイド</h2>
-          <p class="text-sm text-green-200 mt-2">みんなの回答ボードを活用した指導のポイント</p>
+          <h2 class="text-xl font-bold text-green-300" tabindex="0">📚 デジタル・シティズンシップに基づく指導ガイド</h2>
+          <p class="text-sm text-green-200 mt-2">回答ボードを活用した教育のポイント</p>
         </div>
         
         <!-- コンテンツ -->
