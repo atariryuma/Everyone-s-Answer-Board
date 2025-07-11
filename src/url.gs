@@ -10,22 +10,40 @@ var URL_CACHE_TTL = 21600; // 6時間
  * WebアプリのURLを取得（キャッシュ利用）
  * @returns {string} WebアプリURL
  */
-function getWebAppUrlCached() {
-  return cacheManager.get(URL_CACHE_KEY, function() {
-    try {
-      var url = ScriptApp.getService().getUrl();
-      if (!url) {
-        console.warn('ScriptApp.getService().getUrl()がnullを返しました');
-        return getFallbackUrl();
-      }
-      
-      // URLの正規化
-      return url.indexOf('/') === url.length - 1 ? url.slice(0, -1) : url;
-    } catch (e) {
-      console.error('WebアプリURL取得エラー: ' + e.message);
+function computeWebAppUrl() {
+  try {
+    var url = ScriptApp.getService().getUrl();
+    if (!url) {
+      console.warn('ScriptApp.getService().getUrl()がnullを返しました');
       return getFallbackUrl();
     }
+
+    // URLの正規化
+    return url.indexOf('/') === url.length - 1 ? url.slice(0, -1) : url;
+  } catch (e) {
+    console.error('WebアプリURL取得エラー: ' + e.message);
+    return getFallbackUrl();
+  }
+}
+
+function getWebAppUrlCached() {
+  var cachedUrl = cacheManager.get(URL_CACHE_KEY, function() {
+    return computeWebAppUrl();
   }, { ttl: URL_CACHE_TTL });
+
+  try {
+    var currentUrl = computeWebAppUrl();
+    if (/\/dev(?:\?.*)?$/.test(cachedUrl) && /\/exec(?:\?.*)?$/.test(currentUrl)) {
+      cacheManager.remove(URL_CACHE_KEY);
+      cachedUrl = cacheManager.get(URL_CACHE_KEY, function() {
+        return currentUrl;
+      }, { ttl: URL_CACHE_TTL });
+    }
+  } catch (e) {
+    console.warn('WebアプリURL更新チェックでエラー: ' + e.message);
+  }
+
+  return cachedUrl;
 }
 
 /**
