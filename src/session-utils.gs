@@ -85,20 +85,6 @@ function validateAndRepairSession(userEmail) {
     console.error('軽量セッション検証エラー: ' + error.message);
     return false;
   }
-      props.setProperty(userKey, userInfo.userId);
-      
-      // 関連キャッシュをクリア
-      cleanupSessionOnAccountSwitch(userEmail);
-      
-      console.log('セッション修復完了: ' + userEmail);
-    }
-    
-    return true;
-    
-  } catch (error) {
-    console.error('セッション検証でエラー: ' + error.message);
-    return false;
-  }
 }
 
 /**
