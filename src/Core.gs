@@ -397,7 +397,6 @@ function executeGetPublishedSheetData(classFilter, sortOrder, adminMode) {
       rows: []
     };
   }
-  }, { ttl: 600 }); // 10分間キャッシュ
 }
 
 /**
