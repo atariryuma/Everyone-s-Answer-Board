@@ -182,8 +182,10 @@ function getDeployUserDomainInfo() {
     var deployDomain = ''; // 個人アカウント/グローバルアクセスの場合、デフォルトで空
 
     if (webAppUrl) {
-      // Google WorkspaceアカウントのドメインをURLから抽出を試みる (例: /a/domain.com/)
-      var domainMatch = webAppUrl.match(/\/a\/([a-zA-Z0-9\-\.]+)\/macros/);
+      // Google WorkspaceアカウントのドメインをURLから抽出
+      var domainMatch =
+        webAppUrl.match(/\/a\/([a-zA-Z0-9\-.]+)\/macros\//) ||
+        webAppUrl.match(/\/a\/macros\/([a-zA-Z0-9\-.]+)\//);
       if (domainMatch && domainMatch[1]) {
         deployDomain = domainMatch[1];
       }
