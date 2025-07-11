@@ -1900,12 +1900,17 @@ setupEventDelegation() {
     try {
       // 手動リフレッシュ時はキャッシュをクリアして最新データを取得
       this.cache.clear();
+      console.log('🔄 手動リフレッシュ開始 - キャッシュクリア完了');
+      
       await this.loadSheetData(true, false);
+      
       // 手動リフレッシュ後は新着チェック基準を更新（初期化フラグは維持）
       this.state.lastSeenCount = this.state.currentAnswers.length;
       console.log('🔄 手動リフレッシュ完了、新着基準更新:', {
         newLastSeenCount: this.state.lastSeenCount,
-        maintainInitialFlag: this.initialDataLoaded
+        maintainInitialFlag: this.initialDataLoaded,
+        currentAnswersLength: this.state.currentAnswers.length,
+        visibleCards: document.querySelectorAll('.answer-card').length
       });
       
       // 軽い成功フィードバック
@@ -2258,74 +2263,86 @@ setupEventDelegation() {
       
       google.script.run
         .withSuccessHandler(result => {
-          // 初期ロードタイムアウトをクリア
-          if (isInitialLoad && this.initTimeoutId) {
-            clearTimeout(this.initTimeoutId);
-            this.initTimeoutId = null;
-          }
-          
-          if (!result || !result.data || result.data.length === 0) {
-            this.displayEmptyState();
-            if (isInitialLoad) {
-              this.state.lastSeenCount = 0;
+          try {
+            // 初期ロードタイムアウトをクリア
+            if (isInitialLoad && this.initTimeoutId) {
+              clearTimeout(this.initTimeoutId);
+              this.initTimeoutId = null;
             }
-            return;
-          }
+            
+            if (!result || !result.data || result.data.length === 0) {
+              this.displayEmptyState();
+              if (isInitialLoad) {
+                this.state.lastSeenCount = 0;
+              }
+              return;
+            }
 
-          this.state.currentAnswers = result.data;
-          
-          // Apply saved reaction states to restore user's previous reactions
-          this.applyReactionState(result.data);
-          
-          // Populate class filter with available classes and make it visible
-          this.populateClassFilter(result.data);
-          
-          if (isInitialLoad) {
-            this.state.lastSeenCount = result.data.length;
-            // 初期データロード完了フラグを設定
-            this.initialDataLoaded = true;
-            const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
-            const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
-            this.lastViewKey = `${selectedClass}-${sortOrder}`;
-            console.log('📋 初期データロード完了（loadSheetData）:', {
-              lastSeenCount: this.state.lastSeenCount,
-              lastViewKey: this.lastViewKey,
-              dataLength: result.data.length
-            });
-          }
+            this.state.currentAnswers = result.data;
+            
+            // Apply saved reaction states to restore user's previous reactions
+            this.applyReactionState(result.data);
+            
+            // Populate class filter with available classes and make it visible
+            this.populateClassFilter(result.data);
+            
+            if (isInitialLoad) {
+              this.state.lastSeenCount = result.data.length;
+              // 初期データロード完了フラグを設定
+              this.initialDataLoaded = true;
+              const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+              const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
+              this.lastViewKey = `${selectedClass}-${sortOrder}`;
+              console.log('📋 初期データロード完了（loadSheetData）:', {
+                lastSeenCount: this.state.lastSeenCount,
+                lastViewKey: this.lastViewKey,
+                dataLength: result.data.length
+              });
+            }
 
-          // Update heading with the actual question text from server (only if valid)
-          if (result.header && this.elements.headingLabel && 
-              result.header !== '読み込み中...' && 
-              !result.header.includes('読み込み') &&
-              result.header.trim() !== '') {
-            this.elements.headingLabel.textContent = result.header;
-          }
+            // Update heading with the actual question text from server (only if valid)
+            if (result.header && this.elements.headingLabel && 
+                result.header !== '読み込み中...' && 
+                !result.header.includes('読み込み') &&
+                result.header.trim() !== '') {
+              this.elements.headingLabel.textContent = result.header;
+            }
 
-          this.renderBoard(false);
+            this.renderBoard(false);
+          } finally {
+            // 成功時にローディング状態を解除
+            this.state.isLoading = false;
+            this.hideLoadingOverlay();
+          }
         })
         .withFailureHandler(error => {
-          // 初期ロードタイムアウトをクリア
-          if (isInitialLoad && this.initTimeoutId) {
-            clearTimeout(this.initTimeoutId);
-            this.initTimeoutId = null;
+          try {
+            // 初期ロードタイムアウトをクリア
+            if (isInitialLoad && this.initTimeoutId) {
+              clearTimeout(this.initTimeoutId);
+              this.initTimeoutId = null;
+            }
+            
+            console.error('Error loading sheet data:', error);
+            
+            // Check if the error indicates the board has been unpublished
+            const errorStr = error.message || error.toString();
+            if (errorStr.includes('アクティブなシートが見つかりません') || 
+                errorStr.includes('公開されていません') ||
+                errorStr.includes('unpublished') ||
+                errorStr.includes('not found')) {
+              // Board has been unpublished, redirect to Unpublished.html
+              console.log('Board appears to be unpublished, redirecting...');
+              this.redirectToUnpublishedPage();
+              return;
+            }
+            
+            this.displayEmptyState();
+          } finally {
+            // エラー時にもローディング状態を解除
+            this.state.isLoading = false;
+            this.hideLoadingOverlay();
           }
-          
-          console.error('Error loading sheet data:', error);
-          
-          // Check if the error indicates the board has been unpublished
-          const errorStr = error.message || error.toString();
-          if (errorStr.includes('アクティブなシートが見つかりません') || 
-              errorStr.includes('公開されていません') ||
-              errorStr.includes('unpublished') ||
-              errorStr.includes('not found')) {
-            // Board has been unpublished, redirect to Unpublished.html
-            console.log('Board appears to be unpublished, redirecting...');
-            this.redirectToUnpublishedPage();
-            return;
-          }
-          
-          this.displayEmptyState();
         })
         .getPublishedSheetData(classFilter, sortOrder, this.state.showAdminFeatures, false);
       
@@ -2367,9 +2384,9 @@ setupEventDelegation() {
       const errorMessage = this.escapeHtml(error.message || 'Unknown error');
       this.elements.answersContainer.querySelectorAll('.skeleton').forEach(el => el.remove());
       this.elements.answersContainer.innerHTML = '<div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg">' + '<p class="font-bold">データの読み込みに失敗しました。</p>' + '<p class="text-sm mt-2">' + errorMessage + '</p>' + '<button id="retryLoadBtn" class="mt-4 game-btn bg-cyan-600 text-white px-4 py-2 rounded-lg font-bold border-cyan-800 hover:bg-cyan-500 text-sm">再試行</button>' + '</div>';
-    } finally {
+      // 同期エラーの場合にもローディング状態を解除
       this.state.isLoading = false;
-      this.hideLoadingOverlay(); // Add this line
+      this.hideLoadingOverlay();
     }
   }
   async loadAvailableSheets() {
@@ -2591,16 +2608,12 @@ setupEventDelegation() {
             }
             
             changedItems.push(row);
-          } else {
-            this.updateExistingCard(card, row, oldData, changedItems);
-          }
-          
-          if (prevNode) {
             fragment.appendChild(card);
           } else {
-            fragment.insertBefore(card, fragment.firstChild);
+            this.updateExistingCard(card, row, oldData, changedItems);
+            // 既存のカードは既にDOMにあるので、フラグメントに追加しない
+            // 必要に応じて位置を調整するが、ここでは元の位置を保持
           }
-          prevNode = card;
         });
         
         // Append fragment to container
@@ -2646,16 +2659,11 @@ setupEventDelegation() {
           }
           
           changedItems.push(row);
-        } else {
-          this.updateExistingCard(card, row, oldData, changedItems);
-        }
-        
-        if (prevNode) {
           fragment.appendChild(card);
         } else {
-          fragment.insertBefore(card, fragment.firstChild);
+          this.updateExistingCard(card, row, oldData, changedItems);
+          // 既存のカードは既にDOMにあるので、フラグメントに追加しない
         }
-        prevNode = card;
       });
       
       // Append fragment to container
