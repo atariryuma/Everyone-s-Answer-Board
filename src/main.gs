@@ -448,7 +448,7 @@ function doGet(e) {
           // 回答ボード表示用のスプレッドシートアクセス権限を確保
           if (userInfo.spreadsheetId) {
             try {
-              addServiceAccountToSpreadsheet(userInfo.spreadsheetId, true); // allowCurrentUserAccess = true
+              addServiceAccountToSpreadsheet(userInfo.spreadsheetId);
               console.log('DEBUG: 回答ボード用のスプレッドシートアクセス権限を設定しました');
             } catch (accessSetupError) {
               console.warn('DEBUG: 回答ボード用のアクセス権限設定で警告:', accessSetupError.message);
