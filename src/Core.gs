@@ -400,6 +400,96 @@ function executeGetPublishedSheetData(classFilter, sortOrder, adminMode) {
 }
 
 /**
+ * 増分データ取得機能：指定された基準点以降の新しいデータのみを取得
+ * @param {string} classFilter - クラスフィルタ
+ * @param {string} sortOrder - ソート順
+ * @param {boolean} adminMode - 管理者モード
+ * @param {number} sinceRowCount - この行数以降のデータを取得
+ * @returns {object} 新しいデータのみを含む結果
+ */
+function getIncrementalSheetData(classFilter, sortOrder, adminMode, sinceRowCount) {
+  try {
+    console.log('🔄 増分データ取得開始: sinceRowCount=%s', sinceRowCount);
+    
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+    
+    var userInfo = getUserWithFallback(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var publishedSpreadsheetId = configJson.publishedSpreadsheetId;
+    var publishedSheetName = configJson.publishedSheetName;
+    
+    if (!publishedSpreadsheetId || !publishedSheetName) {
+      throw new Error('公開対象のスプレッドシートまたはシートが設定されていません。');
+    }
+    
+    // 全データを取得（キャッシュバイパス）
+    var fullData = executeGetPublishedSheetData(classFilter, sortOrder, adminMode);
+    
+    if (fullData.status === 'error') {
+      throw new Error(fullData.message);
+    }
+    
+    // 現在のデータ数と基準点を比較
+    var currentRowCount = fullData.data.length;
+    var newRowCount = Math.max(0, currentRowCount - sinceRowCount);
+    
+    console.log('🔍 増分データ分析: currentRows=%s, sinceRows=%s, newRows=%s', 
+                currentRowCount, sinceRowCount, newRowCount);
+    
+    // 新しいデータがない場合
+    if (newRowCount <= 0) {
+      return {
+        header: fullData.header,
+        sheetName: fullData.sheetName,
+        showCounts: fullData.showCounts,
+        displayMode: fullData.displayMode,
+        data: [],
+        rows: [],
+        totalCount: currentRowCount,
+        newCount: 0,
+        isIncremental: true
+      };
+    }
+    
+    // 新しいデータのみを抽出（最新のデータが配列の最後にあると仮定）
+    var newData = fullData.data.slice(-newRowCount);
+    
+    console.log('✅ 増分データ取得完了: %s件の新しいデータを返します', newData.length);
+    
+    return {
+      header: fullData.header,
+      sheetName: fullData.sheetName,
+      showCounts: fullData.showCounts,
+      displayMode: fullData.displayMode,
+      data: newData,
+      rows: newData, // 後方互換性のため
+      totalCount: currentRowCount,
+      newCount: newData.length,
+      isIncremental: true
+    };
+    
+  } catch (e) {
+    console.error('増分データ取得エラー: ' + e.message);
+    return {
+      status: 'error',
+      message: '増分データの取得に失敗しました: ' + e.message,
+      data: [],
+      rows: [],
+      isIncremental: true
+    };
+  }
+}
+
+/**
  * アプリ設定を取得（最適化版）
  */
 function getAppConfig() {

@@ -1,209 +1,94 @@
-# 🤖 Agent’s Guidebook for “Everyone’s Answer Board”
+# コーディングスタイル＆ベストプラクティス
 
-This guide ensures all AI agents and human contributors build secure, maintainable, and user-friendly educational tools, following both our project conventions and Google’s HTML Service best practices.
+## 1. 役割と目的意識
 
----
+* **フルスタック開発パートナー**として振る舞い、単なるコード生成にとどまらず、要件の理解・提案・実装まで一貫して担当。
+* **README.md に即した実装** を最優先し、要件変更の根拠は必ず README.md にたどれること。
+* **UX を重視**し、教師・児童が直感的に操作できる UI/UX 改善案を常に模索。
 
-## 1. Agent’s Role & Objective
+## 2. シングル・レスポンシビリティ原則
 
-* **Role**: Full-stack development partner, not just a code generator.
-* **Objective**:
+* **関数・モジュールは「ひとつの働き」だけ**
 
-  * Implement features strictly per `README.md`.
-  * Adhere to the prescribed file structure and separation of concerns.
-  * Propose and implement UI/UX improvements for teachers and students.
+  * 150 行以下を目安に。必要なら helper に切り出す。
+* **長い処理は分割**し、テスト可能な小さな単位で実装。
 
----
+## 3. クライアント／サーバー分離
 
-## 2. Core Principles
+* **ビジネスロジックはサーバー側**に、UI 描画やイベントハンドリングはクライアント側に完全分離。
+* **サーバー関数呼び出しは非同期で**
 
-1. **Requirements First**: Every change must trace back to `README.md`.
-2. **Structure Is Paramount**: Follow the `/src` directory layout exactly.
-3. **Security First**: Never expose credentials or sensitive data.
-4. **Test Everything**: Include unit tests for all new server logic.
-5. **User-Centered Design**: Prioritize ease of use for teachers and students.
-
----
-
-## 3. Development Workflow
-
-1. **Clarify Requirements**: Review the relevant `README.md` section.
-2. **Target Files**: Identify which files under `/src` to update.
-3. **Implement**: Write code following the architecture and coding rules.
-4. **Test**: Add or update tests under `/tests`; confirm `npm run test` passes.
-5. **Self-Review**: Verify adherence to all guidelines.
-6. **Commit**: Use Conventional Commits (e.g., `feat(server): add reactionService`).
-7. **Pull Request**: Keep PRs focused; include a clear description.
-
----
-
-## 4. Project Architecture & File Structure
-
-All code lives under `/src`. Slashes in filenames become folders in the GAS editor.
-
-```text
-/src
-├── server/
-│   ├── main.gs         # doGet, routing, render/include helpers only
-│   ├── database.gs     # Sheets/database operations
-│   └── services/       # Business logic (e.g. reactionService.gs)
-│
-├── client/
-│   ├── views/          # HTML templates (AdminPanel.html, Page.html, etc.)
-│   ├── styles/         # CSS snippets wrapped in .css.html
-│   ├── scripts/        # JS snippets wrapped in .js.html
-│   └── components/     # Reusable HTML pieces (Header.html, Modals, etc.)
-│
-└── appsscript.json     # GAS manifest (do not modify)
-```
-
-### 4.1 Server-Side Logic (`/src/server/`)
-
-* **`main.gs`**:
-
-  * Contains `doGet(e)` to route requests.
-  * Defines `renderPage(viewName, data)` and `include(path)` only.
-  * **No business logic here**—delegate to `database.gs` or `services/`.
-
-* **Other `.gs` files**:
-
-  * Each feature’s logic lives in its own file under `server/` or `server/services/`.
-
-### 4.2 Front-End Views (`/src/client/views/`)
-
-* Pure HTML templates.
-* Use scriptlets to include CSS, JS, and components:
-
-  ```html
-  <!DOCTYPE html>
-  <html lang="en">
-    <head>
-      <base target="_top">
-      <?!= include('styles/main.css.html'); ?>
-      <?!= include('styles/Page.css.html'); ?>
-    </head>
-    <body>
-      <?!= include('components/Header.html'); ?>
-
-      <main id="app"></main>
-
-      <?!= include('scripts/main.js.html'); ?>
-      <?!= include('scripts/Page.js.html'); ?>
-    </body>
-  </html>
+  ```js
+  // クライアント JS
+  showLoading();
+  google.script.run
+    .withSuccessHandler(renderData)
+    .fetchData();
   ```
 
----
+## 4. HTML Service ベストプラクティス
 
-## 5. Google’s HTML Service Best Practices
+1. **HTML／CSS／JavaScript の分割管理**
 
-These guidelines come directly from Google’s official documentation and ensure your HTML UI loads quickly, stays secure, and remains maintainable.
+   * `<style>` と `<script>` はそれぞれ別ファイル（`.css.html`/`.js.html`）で定義し、テンプレート内で `<?!= include('…'); ?>` で読み込む。
+2. **HTML5 Doctype の明示**
 
-1. **Separate HTML, CSS & JavaScript**
+   ```html
+   <!DOCTYPE html>
+   <html lang="ja">
+     …
+   </html>
+   ```
+3. **外部リソースはすべて HTTPS**
+4. **スクリプトは `<body>` の末尾で読み込む**
+5. **必要に応じて jQuery 活用**（ただし最新版を CDN 経由で）
 
-   * **Why**: Improves readability and reuse.
-   * **How**:
+## 5. パフォーマンス最適化
 
-     * In `Code.gs`, define:
+* **バッチ操作**
 
-       ```js
-       function include(filename) {
-         return HtmlService
-           .createHtmlOutputFromFile(filename)
-           .getContent();
-       }
-       ```
-     * In your main template:
+  * スプレッドシート操作は範囲取得・一括書き込みでまとめて実行。
+* **キャッシュ利用**
 
-       ```html
-       <?!= include('styles/Page.css.html'); ?>
-       <?!= include('scripts/Page.js.html'); ?>
-       ```
+  * 頻出データは `CacheService`、ブラウザでは `localStorage`。
+* **トリガーの競合防止**
 
-2. **Load Data Asynchronously**
+  * `LockService` を使って同時実行を排他制御。
 
-   * **Why**: Prevents server-side template delays from blocking the initial render.
-   * **How**:
+## 6. セキュリティと権限管理
 
-     * Show a “Loading…” placeholder in HTML.
-     * Call `google.script.run.withSuccessHandler(renderData).fetchData();` in client JS.
+* **シークレットはスクリプトプロパティに格納**し、ソースコードに直書きしない。
+* **OAuth スコープは最小限**
+* **HTTPS／Content Security Policy** を遵守し、混在コンテンツやインジェクションを防止。
 
-3. **Always Use HTTPS for External Resources**
+## 7. テストとデバッグ
 
-   * **Why**: Mixed-content (HTTP) blocks in IFRAME sandbox mode.
-   * **How**:
+* **ユニットテストの整備**
 
-     * Ensure every `<script>` or `<link>` URL starts with `https://`.
+  * QUnit や Jest でサーバー側ロジックを網羅。
+* **ログ出力**
 
-4. **Include the HTML5 Doctype**
+  * デバッグ時は `Logger.log()`、本番では Stackdriver（`console`）を利用。
+* **自動テストの CI 連携**
 
-   * **Why**: Forces standards-mode rendering; avoids quirks.
-   * **How**:
+  * clasp／GitHub Actions で `npm run test` を必ずパスさせる。
 
-     ```html
-     <!DOCTYPE html>
-     <html>…</html>
-     ```
+## 8. コミット＆プルリクエスト
 
-5. **Place JavaScript at the End of `<body>`**
-
-   * **Why**: Prioritizes HTML/CSS rendering; speeds up perceived load time.
-   * **How**:
-
-     * Move `<script>` includes to just before `</body>`.
-
-6. **Leverage jQuery if Needed**
-
-   * **Why**: Simplifies DOM manipulation and event handling.
-   * **How**:
-
-     ```html
-     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-     <script>
-       $(function() {
-         $('#btn').click(() => alert('Clicked'));
-       });
-     </script>
-     ```
-
----
-
-## 6. Stylesheet & Script File Rules
-
-* **`.css.html`**: Entire file wrapped in `<style>…</style>`.
-* **`.js.html`**: Entire file wrapped in `<script>…</script>`.
-* **No ES Module Syntax**: Use IIFEs or global scope.
-
----
-
-## 7. Testing Policy
-
-* Write or update unit tests under `/tests`.
-* Confirm all tests pass before merging.
-* Use clear, focused test cases for each new function.
-
----
-
-## 8. Commit & PR Guidelines
-
-* **Commit Messages**: Follow Conventional Commits:
+* **Conventional Commits**
 
   ```
-  <type>(<scope>): <short description>
+  feat(script): add reactionService
+  fix(ui): 修正ボタンの動作不具合対応
+  test(server): fetchData のテスト追加
   ```
+* **PR は小さく**、一つの目的に絞って作成。
+* **PR 説明**に「何を」「なぜ」「どのように」を簡潔に記載。
 
-  * types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`.
-* **Pull Requests**:
+## 9. 禁止事項
 
-  * Keep them small and topic-focused.
-  * Provide a descriptive title and summary.
-
----
-
-## 9. Prohibited Actions
-
-1. **No sensitive data** in any committed files.
-2. **Never push directly** to `main`.
-3. **Do not break** the file structure—always follow `/src` conventions.
-4. **Avoid giant PRs**; split large changes into digestible pieces.
+1. **秘密情報のコミット**
+2. **main への直接プッシュ**
+3. **巨大すぎる PR**（レビューしやすいサイズに分割）
+4. **ファイル構造の独断変更**
 

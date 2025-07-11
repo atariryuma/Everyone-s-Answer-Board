@@ -1005,6 +1005,7 @@ class StudyQuestApp {
     this.reactionStorageKey = `reactions_${USER_ID}_${SHEET_NAME}`;
     this.gas = {
       getPublishedSheetData: (sheetName, classFilter, sort, adminMode, bypassCache) => this.runGas('getPublishedSheetData', sheetName, classFilter, sort, adminMode, bypassCache),
+      getIncrementalSheetData: (classFilter, sort, adminMode, sinceRowCount) => this.runGas('getIncrementalSheetData', classFilter, sort, adminMode, sinceRowCount),
       getAvailableSheets: () => this.runGas('getAvailableSheets'),
       addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', rowIndex, reaction, sheetName),
       toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', rowIndex, sheetName),
@@ -1585,50 +1586,181 @@ setupEventDelegation() {
     this.state.newContentCount = 0;
   }
   
-  // コンテンツを更新（手動）
-  async refreshContent() {
+  // 増分コンテンツ更新（新しいカードのみ取得・追加）
+  async refreshContentIncremental() {
     this.dismissNewContentBanner();
     
     try {
-      // 手動リフレッシュ時はキャッシュをクリアして最新データを取得
+      const originalText = this.elements.refreshContentBtn ? this.elements.refreshContentBtn.textContent : '';
+      if (this.elements.refreshContentBtn) {
+        this.elements.refreshContentBtn.textContent = '更新中...';
+        this.elements.refreshContentBtn.disabled = true;
+      }
+      
+      console.log('🔄 増分リフレッシュ開始 - 基準行数:', this.state.lastSeenCount || 0);
+      
+      // 現在のフィルタ設定を取得
+      const classFilter = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+      const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
+      const adminMode = this.state.showAdminFeatures;
+      
+      // 増分データを取得
+      const incrementalData = await this.gas.getIncrementalSheetData(
+        classFilter, 
+        sortOrder, 
+        adminMode, 
+        this.state.lastSeenCount || 0
+      );
+      
+      if (incrementalData.status === 'error') {
+        throw new Error(incrementalData.message);
+      }
+      
+      console.log('📥 増分データ取得結果:', {
+        newCount: incrementalData.newCount,
+        totalCount: incrementalData.totalCount,
+        hasNewData: incrementalData.newCount > 0
+      });
+      
+      // 新しいデータがない場合
+      if (incrementalData.newCount === 0) {
+        this.provideFeedback('最新の状態です', 'info');
+        this.state.lastSeenCount = incrementalData.totalCount;
+        return;
+      }
+      
+      // 新しいカードを既存のカードに追加
+      await this.appendNewCards(incrementalData.data);
+      
+      // 状態を更新
+      this.state.currentAnswers = this.state.currentAnswers.concat(incrementalData.data);
+      this.state.lastSeenCount = incrementalData.totalCount;
+      
+      console.log('✅ 増分リフレッシュ完了:', {
+        addedCards: incrementalData.newCount,
+        totalCards: this.state.currentAnswers.length,
+        newBaseline: this.state.lastSeenCount
+      });
+      
+      this.provideFeedback(`${incrementalData.newCount}件の新しい投稿を追加しました`, 'success');
+      
+    } catch (error) {
+      console.error('増分コンテンツ更新に失敗:', error);
+      
+      // エラー時は従来の全体更新にフォールバック
+      console.log('🔄 フォールバック: 全体更新を実行');
+      await this.refreshContentFull();
+      
+    } finally {
+      // ボタンを元に戻す
+      if (this.elements.refreshContentBtn) {
+        this.elements.refreshContentBtn.textContent = this.elements.refreshContentBtn.textContent.includes('更新中') ? 
+          (originalText || '更新して表示') : this.elements.refreshContentBtn.textContent;
+        this.elements.refreshContentBtn.disabled = false;
+      }
+    }
+  }
+  
+  // 全体コンテンツ更新（従来の方法）
+  async refreshContentFull() {
+    try {
+      // 従来の手動リフレッシュ時はキャッシュをクリアして最新データを取得
       this.cache.clear();
-      console.log('🔄 手動リフレッシュ開始 - キャッシュクリア完了');
+      console.log('🔄 全体リフレッシュ開始 - キャッシュクリア完了');
       
       await this.loadSheetData(true, false);
       
       // 手動リフレッシュ後は新着チェック基準を更新（初期化フラグは維持）
       this.state.lastSeenCount = this.state.currentAnswers.length;
-      console.log('🔄 手動リフレッシュ完了、新着基準更新:', {
+      console.log('🔄 全体リフレッシュ完了、新着基準更新:', {
         newLastSeenCount: this.state.lastSeenCount,
         maintainInitialFlag: this.initialDataLoaded,
         currentAnswersLength: this.state.currentAnswers.length,
         visibleCards: document.querySelectorAll('.answer-card').length
       });
       
-      // 軽い成功フィードバック
-      if (this.elements.refreshContentBtn) {
-        const originalText = this.elements.refreshContentBtn.textContent;
-        this.elements.refreshContentBtn.textContent = '更新完了！';
-        this.elements.refreshContentBtn.style.background = 'rgba(16, 185, 129, 0.3)';
-        setTimeout(() => {
-          this.elements.refreshContentBtn.textContent = originalText;
-          this.elements.refreshContentBtn.style.background = '';
-        }, 2000);
-      }
-    } catch (error) {
-      console.error('コンテンツ更新に失敗:', error);
+      this.provideFeedback('更新完了！', 'success');
       
-      // エラーフィードバック
-      if (this.elements.refreshContentBtn) {
-        const originalText = this.elements.refreshContentBtn.textContent;
-        this.elements.refreshContentBtn.textContent = '更新失敗';
-        this.elements.refreshContentBtn.style.background = 'rgba(239, 68, 68, 0.3)';
-        setTimeout(() => {
-          this.elements.refreshContentBtn.textContent = originalText;
-          this.elements.refreshContentBtn.style.background = '';
-        }, 2000);
+    } catch (error) {
+      console.error('全体コンテンツ更新に失敗:', error);
+      this.provideFeedback('更新失敗', 'error');
+      throw error;
+    }
+  }
+  
+  // コンテンツを更新（手動） - 増分更新を優先
+  async refreshContent() {
+    // 増分更新を試行、失敗時は全体更新にフォールバック
+    await this.refreshContentIncremental();
+  }
+  
+  // 新しいカードを既存のカードコンテナに追加
+  async appendNewCards(newData) {
+    if (!newData || newData.length === 0) return;
+    
+    console.log('📌 新しいカードを追加:', newData.length + '件');
+    
+    const container = this.elements.answersContainer;
+    if (!container) return;
+    
+    // 新しいカードを作成してコンテナに追加
+    const fragment = document.createDocumentFragment();
+    
+    for (const data of newData) {
+      const cardElement = this.createAnswerCard(data);
+      if (cardElement) {
+        // 新しいカードであることを示すアニメーション
+        cardElement.style.opacity = '0';
+        cardElement.style.transform = 'translateY(20px)';
+        fragment.appendChild(cardElement);
       }
     }
+    
+    container.appendChild(fragment);
+    
+    // アニメーションで新しいカードを表示
+    await new Promise(resolve => {
+      requestAnimationFrame(() => {
+        const newCards = container.querySelectorAll('.answer-card[style*="opacity: 0"]');
+        newCards.forEach((card, index) => {
+          setTimeout(() => {
+            card.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+          }, index * 100); // 100msずつ遅延して順次表示
+        });
+        
+        // 全てのアニメーションが完了するまで待機
+        setTimeout(resolve, newCards.length * 100 + 300);
+      });
+    });
+  }
+  
+  // ユーザーフィードバック表示
+  provideFeedback(message, type = 'info') {
+    if (!this.elements.refreshContentBtn) return;
+    
+    const originalText = this.elements.refreshContentBtn.textContent;
+    const originalBackground = this.elements.refreshContentBtn.style.background;
+    
+    this.elements.refreshContentBtn.textContent = message;
+    
+    switch (type) {
+      case 'success':
+        this.elements.refreshContentBtn.style.background = 'rgba(16, 185, 129, 0.3)';
+        break;
+      case 'error':
+        this.elements.refreshContentBtn.style.background = 'rgba(239, 68, 68, 0.3)';
+        break;
+      case 'info':
+        this.elements.refreshContentBtn.style.background = 'rgba(59, 130, 246, 0.3)';
+        break;
+    }
+    
+    setTimeout(() => {
+      this.elements.refreshContentBtn.textContent = originalText;
+      this.elements.refreshContentBtn.style.background = originalBackground;
+    }, 2000);
   }
   
   getMockData(funcName, ...args) {
