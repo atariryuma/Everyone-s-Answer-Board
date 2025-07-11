@@ -1630,10 +1630,17 @@ setupEventDelegation() {
       }
       
       // 新しいカードを既存のカードに追加
-      await this.appendNewCards(incrementalData.data);
-      
+      await this.appendNewCards(incrementalData.data, sortOrder);
+
       // 状態を更新
-      this.state.currentAnswers = this.state.currentAnswers.concat(incrementalData.data);
+      if (sortOrder === 'newest') {
+        this.state.currentAnswers = incrementalData.data.concat(this.state.currentAnswers);
+      } else {
+        this.state.currentAnswers = this.state.currentAnswers.concat(incrementalData.data);
+      }
+
+      // サーバーキャッシュをクリアして他のソート順でも新着が反映されるようにする
+      this.gas.clearCache().catch(err => console.warn('Cache clear failed', err));
       this.state.lastSeenCount = incrementalData.totalCount;
       
       console.log('✅ 増分リフレッシュ完了:', {
@@ -1695,7 +1702,7 @@ setupEventDelegation() {
   }
   
   // 新しいカードを既存のカードコンテナに追加
-  async appendNewCards(newData) {
+  async appendNewCards(newData, sortOrder = 'newest') {
     if (!newData || newData.length === 0) return;
     
     console.log('📌 新しいカードを追加:', newData.length + '件');
@@ -1716,7 +1723,11 @@ setupEventDelegation() {
       }
     }
     
-    container.appendChild(fragment);
+    if (sortOrder === 'newest') {
+      container.prepend(fragment);
+    } else {
+      container.appendChild(fragment);
+    }
     
     // アニメーションで新しいカードを表示
     await new Promise(resolve => {
@@ -2975,7 +2986,6 @@ async handleReaction(rowIndex, reaction) {
       // グローバル設定を更新
       window.showAdminFeatures = enable;
       window.showHighlightToggle = this.state.isAdminUser; // 管理者なら常に表示
-      window.showScoreSort = enable;
       
       debugLog('toggleAdminMode状態更新:', {
         enable,
@@ -2988,6 +2998,7 @@ async handleReaction(rowIndex, reaction) {
         window.showCounts = true;
         window.displayMode = 'named';
         window.isStudentMode = false;
+        window.showScoreSort = window.showCounts;
         debugLog('管理モード有効化: 名前とリアクション数を強制表示', {
           showCounts: window.showCounts,
           displayMode: window.displayMode
@@ -2997,6 +3008,7 @@ async handleReaction(rowIndex, reaction) {
         window.showCounts = this.serverShowCounts;
         window.displayMode = this.serverDisplayMode;
         window.isStudentMode = true;
+        window.showScoreSort = window.showCounts;
         debugLog('閲覧モード有効化: サーバー設定を復元', {
           showCounts: window.showCounts,
           displayMode: window.displayMode,
@@ -3558,6 +3570,7 @@ async handleReaction(rowIndex, reaction) {
     
     this.state.isStudentMode = window.isStudentMode;
     this.state.showCounts = window.showCounts;
+    window.showScoreSort = window.showCounts;
     this.state.showAdminFeatures = window.showAdminFeatures;
     this.state.showHighlightToggle = this.state.isAdminUser; // 管理者なら常に表示
     this.state.showScoreSort = window.showScoreSort;

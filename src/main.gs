@@ -471,6 +471,7 @@ function renderAnswerBoard(userInfo, params) {
       template.cacheTimestamp = Date.now();
       template.displayMode = config.displayMode || 'anonymous';
       template.showCounts = config.showCounts !== undefined ? config.showCounts : false;
+      template.showScoreSort = template.showCounts;
       const currentUserEmail = Session.getActiveUser().getEmail();
       const isOwner = currentUserEmail === userInfo.adminEmail;
       template.showAdminFeatures = isOwner;
@@ -484,6 +485,7 @@ function renderAnswerBoard(userInfo, params) {
       template.sheetName = escapeJavaScript(params.sheetName);
       template.displayMode = 'anonymous';
       template.showCounts = false;
+      template.showScoreSort = false;
       const currentUserEmail = Session.getActiveUser().getEmail();
       const isOwner = currentUserEmail === userInfo.adminEmail;
       template.showAdminFeatures = isOwner;
