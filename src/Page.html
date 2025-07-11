@@ -1069,7 +1069,7 @@ class StudyQuestApp {
     // リアクション状態保存用のキー
     this.reactionStorageKey = `reactions_${USER_ID}_${SHEET_NAME}`;
     this.gas = {
-      getPublishedSheetData: (sheetName, classFilter, sort, adminMode) => this.runGas('getPublishedSheetData', sheetName, classFilter, sort, adminMode),
+      getPublishedSheetData: (sheetName, classFilter, sort, adminMode, bypassCache) => this.runGas('getPublishedSheetData', sheetName, classFilter, sort, adminMode, bypassCache),
       getAvailableSheets: () => this.runGas('getAvailableSheets'),
       addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', rowIndex, reaction, sheetName),
       toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', rowIndex, sheetName),
@@ -1730,7 +1730,20 @@ setupEventDelegation() {
     try {
       const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
       const sortOrder = this.elements.sortOrder.value;
-      const data = await     this.gas.getPublishedSheetData(selectedClass, sortOrder, this.state.showAdminFeatures);
+      
+      // 強制的にサーバーから最新データを取得（キャッシュバイパス）
+      const data = await this.gas.getPublishedSheetData(selectedClass, sortOrder, this.state.showAdminFeatures, true);
+      
+      // 詳細ログ
+      console.log('🔍 新着チェック詳細:', {
+        apiResponse: data,
+        newCount: data.data ? data.data.length : 0,
+        currentCount: this.state.currentAnswers ? this.state.currentAnswers.length : 0,
+        lastSeenCount: this.state.lastSeenCount,
+        selectedClass,
+        sortOrder,
+        adminMode: this.state.showAdminFeatures
+      });
       
       // 成功した場合は失敗カウントをリセット
       this.state.pollingFailureCount = 0;
@@ -1744,7 +1757,9 @@ setupEventDelegation() {
       if (this.lastViewKey !== currentViewKey) {
         console.log('🔄 表示設定変更検出、新着チェックをリセット:', {
           oldKey: this.lastViewKey,
-          newKey: currentViewKey
+          newKey: currentViewKey,
+          newCount,
+          settingLastSeenToNewCount: true
         });
         this.lastViewKey = currentViewKey;
         this.state.lastSeenCount = newCount;
@@ -1752,16 +1767,25 @@ setupEventDelegation() {
       }
       
       // 同じフィルター/ソート設定での新着チェック
-      if (newCount > this.state.lastSeenCount && this.state.lastSeenCount > 0) {
+      const hasNewItems = newCount > this.state.lastSeenCount && this.state.lastSeenCount > 0;
+      console.log('📊 新着判定:', {
+        newCount,
+        lastSeenCount: this.state.lastSeenCount,
+        hasNewItems,
+        difference: newCount - this.state.lastSeenCount,
+        currentViewKey
+      });
+      
+      if (hasNewItems) {
         const newItems = newCount - this.state.lastSeenCount;
         
         // 異常に大きな差は誤検知の可能性が高い
-        if (newItems <= 10) { // 妥当な範囲の新着のみ通知
+        if (newItems <= 10 && newItems > 0) { // 妥当な範囲の新着のみ通知
           this.showNewContentBanner(newItems);
-          debugLog('新着コンテンツ検出:', { 
+          console.log('🎉 新着コンテンツ検出・通知表示:', { 
             newItems, 
             newCount, 
-            lastSeenCount: this.state?.lastSeenCount || 0,
+            lastSeenCount: this.state.lastSeenCount,
             viewKey: currentViewKey
           });
         } else {
@@ -1853,6 +1877,8 @@ setupEventDelegation() {
     this.dismissNewContentBanner();
     
     try {
+      // 手動リフレッシュ時はキャッシュをクリアして最新データを取得
+      this.cache.clear();
       await this.loadSheetData(true, false);
       this.state.lastSeenCount = this.state.currentAnswers.length;
       
@@ -1953,6 +1979,13 @@ setupEventDelegation() {
     this.currentPollInterval = this.isLowPerformanceMode ? 30000 : 15000;
     
     const adaptivePoll = async () => {
+      console.log('⏰ ポーリング実行:', {
+        currentInterval: this.currentPollInterval,
+        successCount: this.pollSuccessCount,
+        failureCount: this.pollFailureCount,
+        timestamp: new Date().toLocaleTimeString()
+      });
+      
       try {
         await this.checkForNewContent();
         this.pollSuccessCount++;
@@ -1962,6 +1995,11 @@ setupEventDelegation() {
         if (this.pollSuccessCount > 3 && this.currentPollInterval > 10000) {
           this.currentPollInterval = Math.max(10000, this.currentPollInterval * 0.9);
         }
+        
+        console.log('✅ ポーリング成功:', {
+          successCount: this.pollSuccessCount,
+          nextInterval: this.currentPollInterval
+        });
       } catch (error) {
         this.pollFailureCount++;
         this.pollSuccessCount = 0;
@@ -1970,7 +2008,10 @@ setupEventDelegation() {
         if (this.pollFailureCount > 2) {
           this.currentPollInterval = Math.min(60000, this.currentPollInterval * 1.5);
         }
-        console.warn('Polling failed:', error);
+        console.warn('❌ ポーリング失敗:', error, {
+          failureCount: this.pollFailureCount,
+          newInterval: this.currentPollInterval
+        });
       }
       
       // Schedule next poll with current interval
@@ -2250,7 +2291,7 @@ setupEventDelegation() {
           
           this.displayEmptyState();
         })
-        .getPublishedSheetData(classFilter, sortOrder, this.state.showAdminFeatures);
+        .getPublishedSheetData(classFilter, sortOrder, this.state.showAdminFeatures, false);
       
       
       // Post-processing after successful data load
@@ -3245,7 +3286,14 @@ async handleReaction(rowIndex, reaction) {
       this.updateAdminButtonUI();
       this.updateEndPublicationButtonUI();
       // 管理モード切り替え時は設定変更のため再描画が必要
-      this.loadSheetData(true, false);
+      this.loadSheetData(true, false).then(() => {
+        // 管理モード切り替え後に新着チェックの基準を更新
+        this.state.lastSeenCount = this.state.currentAnswers.length;
+        console.log('🔄 管理モード切り替え完了、新着チェック基準更新:', {
+          newBaselineCount: this.state.lastSeenCount,
+          adminMode: this.state.showAdminFeatures
+        });
+      });
     } finally {
       // Re-enable button
       if (this.elements.adminToggleBtn) {

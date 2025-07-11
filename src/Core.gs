@@ -191,11 +191,25 @@ function addReaction(rowIndex, reactionKey, sheetName) {
  * 公開されたシートのデータを取得
  * Page.htmlから呼び出される - フロントエンド期待形式に対応
  */
-function getPublishedSheetData(classFilter, sortOrder, adminMode) {
+function getPublishedSheetData(classFilter, sortOrder, adminMode, bypassCache) {
   // キャッシュキー生成（パフォーマンス向上）
   var requestKey = `publishedData_${classFilter}_${sortOrder}_${adminMode}`;
   
+  // キャッシュバイパス時は直接実行
+  if (bypassCache === true) {
+    console.log('🔄 キャッシュバイパス：最新データを直接取得');
+    return executeGetPublishedSheetData(classFilter, sortOrder, adminMode);
+  }
+  
   return cacheManager.get(requestKey, () => {
+    return executeGetPublishedSheetData(classFilter, sortOrder, adminMode);
+  }, { ttl: 600 }); // 10分間キャッシュ
+}
+
+/**
+ * 実際のデータ取得処理（キャッシュ制御から分離）
+ */
+function executeGetPublishedSheetData(classFilter, sortOrder, adminMode) {
     try {
       var props = PropertiesService.getUserProperties();
       var currentUserId = props.getProperty('CURRENT_USER_ID');
