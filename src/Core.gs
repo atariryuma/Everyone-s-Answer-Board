@@ -2939,22 +2939,50 @@ function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
  */
 function refreshBoardData() {
   try {
-    // 全キャッシュを強制クリア
-    cacheManager.clearAll(); // 期限切れだけでなく全てクリア
+    console.log('🧹 強制キャッシュクリア開始...');
     
-    // スクリプトキャッシュもクリア
+    // 1. cacheManagerによる全キャッシュクリア
+    const cacheResult = cacheManager.clearAll();
+    console.log('📊 CacheManager結果:', cacheResult);
+    
+    // 2. 追加のスクリプトキャッシュクリア（念のため）
     try {
       const scriptCache = CacheService.getScriptCache();
       if (scriptCache) {
         scriptCache.removeAll([]);
+        console.log('✅ 追加スクリプトキャッシュクリア完了');
       }
     } catch (scriptCacheError) {
-      console.warn('スクリプトキャッシュクリア失敗:', scriptCacheError.message);
+      console.warn('⚠️ 追加スクリプトキャッシュクリア失敗:', scriptCacheError.message);
+    }
+    
+    // 3. ユーザーキャッシュもクリア
+    try {
+      const userCache = CacheService.getUserCache();
+      if (userCache) {
+        userCache.removeAll([]);
+        console.log('✅ ユーザーキャッシュクリア完了');
+      }
+    } catch (userCacheError) {
+      console.warn('⚠️ ユーザーキャッシュクリア失敗:', userCacheError.message);
+    }
+    
+    // 4. 具体的なキーパターンでのクリア（念のため）
+    try {
+      cacheManager.clearByPattern('publishedData_');
+      cacheManager.clearByPattern('sheetData_');
+      console.log('✅ パターンベースキャッシュクリア完了');
+    } catch (patternError) {
+      console.warn('⚠️ パターンベースキャッシュクリア失敗:', patternError.message);
     }
     
     console.log('🧹 全キャッシュクリア完了（新着チェック用）');
     debugLog('回答ボードのデータ強制再読み込みをトリガーしました。');
-    return { status: 'success', message: '回答ボードのデータを更新しました。' };
+    return { 
+      status: 'success', 
+      message: '回答ボードのデータを更新しました。',
+      cacheResult: cacheResult
+    };
   } catch (e) {
     console.error('回答ボードのデータ再読み込みエラー: ' + e.message);
     return { status: 'error', message: '回答ボードのデータ更新に失敗しました: ' + e.message };

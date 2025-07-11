@@ -228,6 +228,48 @@ class CacheManager {
   }
 
   /**
+   * 全てのキャッシュを強制的にクリアします。
+   * メモ化キャッシュとスクリプトキャッシュの両方をクリアします。
+   */
+  clearAll() {
+    let memoCacheCleared = false;
+    let scriptCacheCleared = false;
+    
+    try {
+      // メモ化キャッシュをクリア
+      this.memoCache.clear();
+      memoCacheCleared = true;
+      debugLog('[Cache] Cleared memoization cache.');
+    } catch (e) {
+      console.warn('[Cache] Failed to clear memoization cache:', e.message);
+    }
+    
+    try {
+      // スクリプトキャッシュを完全にクリア
+      this.scriptCache.removeAll([]);
+      scriptCacheCleared = true;
+      debugLog('[Cache] Cleared script cache.');
+    } catch (e) {
+      console.warn('[Cache] Failed to clear script cache:', e.message);
+    }
+    
+    // 統計をリセット
+    try {
+      this.resetStats();
+    } catch (e) {
+      console.warn('[Cache] Failed to reset stats:', e.message);
+    }
+    
+    console.log(`[Cache] clearAll() completed - MemoCache: ${memoCacheCleared ? 'OK' : 'FAILED'}, ScriptCache: ${scriptCacheCleared ? 'OK' : 'FAILED'}`);
+    
+    return {
+      memoCacheCleared,
+      scriptCacheCleared,
+      success: memoCacheCleared && scriptCacheCleared
+    };
+  }
+
+  /**
    * キャッシュの健全性情報を取得します。
    * @returns {object} 健全性情報
    */
