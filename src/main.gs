@@ -327,13 +327,21 @@ function doGet(e) {
     if (setupParam === 'true' && mode === 'appsetup') {
       console.log('DEBUG: App setup page request. Checking access permissions.');
       
+      // ドメイン制限チェック（ただし制限的すぎないように）
+      const domainInfo = getDeployUserDomainInfo();
+      if (domainInfo.deployDomain && domainInfo.deployDomain !== '' && !domainInfo.isDomainMatch) {
+        console.log('DEBUG: Domain access warning. Current:', domainInfo.currentDomain, 'Deploy:', domainInfo.deployDomain);
+        // ドメイン不一致でも警告のみで処理を続行（制限的すぎないように）
+      }
+      
       // アクセス権限を確認
       if (!hasSetupPageAccess()) {
         console.log('DEBUG: Access denied to app setup page.');
         var errorHtml = HtmlService.createHtmlOutput(
           '<h1>アクセス拒否</h1>' +
           '<p>アプリ設定ページにアクセスする権限がありません。</p>' +
-          '<p>編集者として登録され、かつアクティブ状態である必要があります。</p>'
+          '<p>編集者として登録され、かつアクティブ状態である必要があります。</p>' +
+          '<p>現在のドメイン: ' + (domainInfo.currentDomain || '不明') + '</p>'
         );
         return safeSetXFrameOptionsDeny(errorHtml);
       }
@@ -373,6 +381,26 @@ function doGet(e) {
     } else {
       userInfo = findUserByEmail(userEmail);
       console.log('DEBUG: User info by email:', JSON.stringify(userInfo));
+      
+      // ユーザーが存在する場合、スプレッドシートアクセス権限を確認・修復
+      if (userInfo && userInfo.spreadsheetId) {
+        try {
+          // アクセステストとして簡単な操作を試行
+          const testAccess = SpreadsheetApp.openById(userInfo.spreadsheetId);
+          testAccess.getName(); // 名前取得でアクセス権限をテスト
+          console.log('スプレッドシートアクセス確認: OK');
+        } catch (accessError) {
+          console.warn('スプレッドシートアクセスエラーを検出。権限修復を試行: ' + accessError.message);
+          try {
+            const repairResult = repairUserSpreadsheetAccess(userEmail, userInfo.spreadsheetId);
+            if (repairResult.success) {
+              console.log('スプレッドシートアクセス権限を修復しました');
+            }
+          } catch (repairError) {
+            console.error('スプレッドシートアクセス権限の修復に失敗: ' + repairError.message);
+          }
+        }
+      }
     }
 
     if (userInfo) {
@@ -461,6 +489,22 @@ function doGet(e) {
       // - mode=adminまたはmode=viewで明示的に指定された場合はそれに従う
       
       if (mode === 'admin') {
+        // アクセス権限の確認：現在のユーザーが対象ユーザーと一致するかチェック
+        if (userId && userId !== userInfo.userId) {
+          console.log('DEBUG: Access denied - user mismatch. Current user:', userInfo.userId, 'Requested:', userId);
+          
+          // 現在のユーザー自身の管理パネルにリダイレクト
+          const correctUrl = ScriptApp.getService().getUrl() + '?userId=' + userInfo.userId + '&mode=admin';
+          var redirectHtml = HtmlService.createHtmlOutput(`
+            <script>
+              console.log('Redirecting to correct user panel...');
+              window.top.location.href = '${correctUrl}';
+            </script>
+            <p>正しい管理パネルにリダイレクトしています...</p>
+          `);
+          return redirectHtml;
+        }
+        
         // 明示的な管理パネル要求
         console.log('DEBUG: Explicit admin mode request. Showing AdminPanel.');
         var adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
@@ -571,9 +615,22 @@ function doGet(e) {
         }
       }
 
-      // デフォルト：パラメータなしのアクセスは管理パネルへ
-      // (modeのデフォルトが'admin'になったため、このルートが正しく機能する)
-      console.log('DEBUG: Default access - user registered. Redirecting to admin panel.');
+      // デフォルト：パラメータなしのアクセスは現在ユーザーの管理パネルへ
+      // URLにuserIdが指定されていない場合、現在のユーザーの管理パネルにリダイレクト
+      if (!userId || userId !== userInfo.userId) {
+        console.log('DEBUG: Default access or user mismatch. Redirecting to current user admin panel.');
+        const correctUrl = ScriptApp.getService().getUrl() + '?userId=' + userInfo.userId + '&mode=admin';
+        var redirectHtml = HtmlService.createHtmlOutput(`
+          <script>
+            console.log('Redirecting to user-specific admin panel...');
+            window.top.location.href = '${correctUrl}';
+          </script>
+          <p>あなた専用の管理パネルにリダイレクトしています...</p>
+        `);
+        return redirectHtml;
+      }
+      
+      console.log('DEBUG: Default access - user registered. Showing AdminPanel.');
       var adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
       adminTemplate.include = include;
       adminTemplate.userInfo = userInfo;
