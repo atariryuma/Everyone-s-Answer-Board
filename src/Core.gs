@@ -2935,6 +2935,74 @@ function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
 
 
 /**
+ * 軽量な件数チェック（新着通知用）
+ * 実際のデータではなく件数のみを返す
+ */
+function getDataCount(classFilter, sortOrder, adminMode) {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var currentUserId = props.getProperty('CURRENT_USER_ID');
+    
+    if (!currentUserId) {
+      throw new Error('ユーザーコンテキストが設定されていません');
+    }
+    
+    var userInfo = findUserById(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var publishedSpreadsheetId = configJson.publishedSpreadsheetId;
+    var publishedSheetName = configJson.publishedSheetName;
+    
+    if (!publishedSpreadsheetId || !publishedSheetName) {
+      return { count: 0, lastUpdate: new Date().toISOString() };
+    }
+    
+    // 軽量な件数取得（ヘッダー除く）
+    var service = getSheetsService();
+    var range = publishedSheetName + '!A:A';
+    var response = service.spreadsheets.values.get({
+      spreadsheetId: publishedSpreadsheetId,
+      range: range
+    });
+    
+    var rows = response.values || [];
+    var dataCount = Math.max(0, rows.length - 1); // ヘッダー行を除く
+    
+    // 最終更新時刻を取得（スプレッドシートの最終編集時刻）
+    var spreadsheet = service.spreadsheets.get({
+      spreadsheetId: publishedSpreadsheetId,
+      fields: 'properties.timeZone,sheets(properties(title,sheetId))'
+    });
+    
+    console.log('📊 軽量件数チェック:', {
+      userId: currentUserId,
+      sheetName: publishedSheetName,
+      dataCount: dataCount,
+      classFilter: classFilter,
+      adminMode: adminMode
+    });
+    
+    return {
+      count: dataCount,
+      lastUpdate: new Date().toISOString(), // 簡易実装
+      status: 'success'
+    };
+    
+  } catch (e) {
+    console.error('件数チェックエラー: ' + e.message);
+    return {
+      count: 0,
+      lastUpdate: new Date().toISOString(),
+      status: 'error',
+      message: e.message
+    };
+  }
+}
+
+/**
  * 回答ボードのデータを強制的に再読み込み
  */
 function refreshBoardData() {

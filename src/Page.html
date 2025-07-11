@@ -1078,7 +1078,8 @@ class StudyQuestApp {
       addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', rowIndex, reaction, sheetName),
       toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', rowIndex, sheetName),
       checkAdmin: () => this.runGas('checkAdmin'),
-      clearCache: () => this.runGas('refreshBoardData')
+      clearCache: () => this.runGas('refreshBoardData'),
+      getDataCount: (classFilter, sortOrder, adminMode) => this.runGas('getDataCount', classFilter, sortOrder, adminMode)
     };
     const savedCols = localStorage.getItem('boardColumns');
     if (savedCols && this.elements.sizeSlider && this.elements.sliderValue) {
@@ -1730,38 +1731,28 @@ setupEventDelegation() {
     }
   }
   
-  // 新着コンテンツチェック（表示は更新しない）
-  async checkForNewContent() {
+  // 軽量な新着コンテンツチェック
+  async checkForNewContentLight() {
     try {
       const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
       const sortOrder = this.elements.sortOrder.value;
       
-      // サーバーサイドキャッシュもクリア
-      try {
-        await this.gas.clearCache();
-        console.log('🧹 サーバーキャッシュクリア完了');
-      } catch (cacheError) {
-        console.warn('⚠️ サーバーキャッシュクリア失敗:', cacheError);
-      }
+      // 軽量な件数チェックのみ実行（フルデータ取得なし）
+      const countData = await this.gas.getDataCount(selectedClass, sortOrder, this.state.showAdminFeatures);
       
-      // 強制的にサーバーから最新データを取得（キャッシュバイパス）
-      const data = await this.gas.getPublishedSheetData(selectedClass, sortOrder, this.state.showAdminFeatures, true);
-      
-      // 詳細ログ
-      console.log('🔍 新着チェック詳細:', {
-        apiResponse: data,
-        newCount: data.data ? data.data.length : 0,
+      console.log('📊 軽量新着チェック:', {
+        countResponse: countData,
+        newCount: countData.count || 0,
         currentCount: this.state.currentAnswers ? this.state.currentAnswers.length : 0,
         lastSeenCount: this.state.lastSeenCount,
         selectedClass,
-        sortOrder,
-        adminMode: this.state.showAdminFeatures
+        sortOrder
       });
+      
+      const newCount = countData.count || 0;
       
       // 成功した場合は失敗カウントをリセット
       this.state.pollingFailureCount = 0;
-      
-      const newCount = data.data ? data.data.length : 0;
       
       // 現在のフィルター/ソート設定をキーとして保存
       const currentViewKey = `${selectedClass}-${sortOrder}`;
@@ -1808,11 +1799,12 @@ setupEventDelegation() {
         // 異常に大きな差は誤検知の可能性が高い
         if (newItems <= 10 && newItems > 0) { // 妥当な範囲の新着のみ通知
           this.showNewContentBanner(newItems);
-          console.log('🎉 新着コンテンツ検出・通知表示:', { 
+          console.log('🎉 軽量新着検出・通知表示:', { 
             newItems, 
             newCount, 
             lastSeenCount: this.state.lastSeenCount,
-            viewKey: currentViewKey
+            viewKey: currentViewKey,
+            lightweightCheck: true
           });
         } else {
           console.log('⚠️ 異常な新着数検出、誤検知として無視:', {
@@ -1827,7 +1819,7 @@ setupEventDelegation() {
       this.lastViewKey = currentViewKey;
     } catch (error) {
       this.state.pollingFailureCount++;
-      console.warn('新着チェックに失敗:', error, 'failureCount:', this.state.pollingFailureCount);
+      console.warn('軽量新着チェックに失敗:', error, 'failureCount:', this.state.pollingFailureCount);
       
       // 連続で失敗が続く場合はポーリング間隔を延ばす
       if (this.state.pollingFailureCount >= 3) {
@@ -2019,7 +2011,7 @@ setupEventDelegation() {
       });
       
       try {
-        await this.checkForNewContent();
+        await this.checkForNewContentLight();
         this.pollSuccessCount++;
         this.pollFailureCount = 0;
         
