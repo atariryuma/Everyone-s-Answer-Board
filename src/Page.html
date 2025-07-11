@@ -3111,6 +3111,12 @@ async handleReaction(rowIndex, reaction) {
           return;
         }
         
+        // 管理モード移行時の確認モーダル
+        const confirmed = await this.showAdminModeConfirmation();
+        if (!confirmed) {
+          return; // ユーザーがキャンセルした場合
+        }
+        
         // 最初の管理モード切り替え時のみサーバー側で再確認（オプション）
         if (!this.adminModeVerified) {
           try {
@@ -3163,6 +3169,17 @@ async handleReaction(rowIndex, reaction) {
       // Update local state from global variables
       this.updateConfigFromGlobals();
       
+      // 管理モード有効時は強制的にローカル状態も更新
+      if (enable) {
+        this.state.displayMode = 'named';
+        this.state.showCounts = true;
+        this.state.isStudentMode = false;
+      } else {
+        this.state.displayMode = this.serverDisplayMode;
+        this.state.showCounts = this.serverShowCounts;
+        this.state.isStudentMode = true;
+      }
+      
       // 管理モード切り替え後の状態を確認
       debugLog('管理モード切り替え後の状態確認:', {
         enable,
@@ -3191,6 +3208,80 @@ async handleReaction(rowIndex, reaction) {
       }
     }
   }
+  
+  /**
+   * 管理モード移行確認モーダル
+   */
+  async showAdminModeConfirmation() {
+    return new Promise((resolve) => {
+      // モーダル要素を作成
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      modal.innerHTML = `
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+          <div class="flex items-center mb-4">
+            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+              <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+              </svg>
+            </div>
+            <div class="ml-4">
+              <h3 class="text-lg font-medium text-gray-900">管理モードに切り替えますか？</h3>
+            </div>
+          </div>
+          <div class="mb-6">
+            <p class="text-sm text-gray-600">
+              管理モードでは、<strong>生徒の名前とリアクション数が表示</strong>されます。<br>
+              画面共有時などは十分注意してください。
+            </p>
+          </div>
+          <div class="flex justify-end space-x-3">
+            <button type="button" class="cancel-btn px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+              キャンセル
+            </button>
+            <button type="button" class="confirm-btn px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">
+              管理モードに切り替え
+            </button>
+          </div>
+        </div>
+      `;
+      
+      // イベントリスナーを追加
+      const cancelBtn = modal.querySelector('.cancel-btn');
+      const confirmBtn = modal.querySelector('.confirm-btn');
+      
+      const cleanup = () => {
+        document.body.removeChild(modal);
+      };
+      
+      cancelBtn.addEventListener('click', () => {
+        cleanup();
+        resolve(false);
+      });
+      
+      confirmBtn.addEventListener('click', () => {
+        cleanup();
+        resolve(true);
+      });
+      
+      // Escapeキーでキャンセル
+      const handleKeydown = (e) => {
+        if (e.key === 'Escape') {
+          cleanup();
+          document.removeEventListener('keydown', handleKeydown);
+          resolve(false);
+        }
+      };
+      document.addEventListener('keydown', handleKeydown);
+      
+      // モーダルを表示
+      document.body.appendChild(modal);
+      
+      // フォーカスを確認ボタンに移動
+      setTimeout(() => confirmBtn.focus(), 100);
+    });
+  }
+  
   async endPublication() {
     if (!confirm('公開を終了しますか？生徒は回答ボードにアクセスできなくなります。')) {
       return;
