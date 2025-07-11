@@ -507,12 +507,45 @@ window.testSharedUtilities = function() {
 
 // Shared authentication functions for consistent behavior across pages
 window.sharedUtilities.auth = {
-  // Account switching functionality
+  // Account switching functionality shared across pages
   switchToAnotherAccount: function() {
-    if (confirm('別のGoogleアカウントでログインしますか？現在のセッションからログアウトされます。')) {
-      // Googleアカウントのログアウト処理
-      window.location.href = 'https://accounts.google.com/logout?continue=' + encodeURIComponent(window.location.href);
+    if (confirm('別のGoogleアカウントでログインしますか？現在のセッションからログアウトされ、アカウント選択画面が表示されます。')) {
+      try {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.success) {
+              const url = new URL(window.location.href);
+              url.searchParams.set('force_account_selection', 'true');
+              window.location.replace(url.toString());
+            } else {
+              window.sharedUtilities.auth.showAccountSwitchFallback();
+            }
+          })
+          .withFailureHandler(function(error) {
+            console.warn('認証リセットエラー:', error);
+            window.sharedUtilities.auth.showAccountSwitchFallback();
+          })
+          .resetUserAuthentication();
+      } catch (error) {
+        console.warn('アカウント切り替えエラー:', error);
+        window.sharedUtilities.auth.showAccountSwitchFallback();
+      }
     }
+  },
+
+  // Fallback guidance when automatic switch fails
+  showAccountSwitchFallback: function() {
+    const msg = `
+        アカウントを切り替えるには以下の手順をお試しください：
+
+        1. 新しいブラウザタブでGoogle（google.com）にアクセス
+        2. 右上のプロフィール画像をクリック
+        3. 「別のアカウントを追加」または使用したいアカウントを選択
+        4. このページに戻って再度認証を開始
+
+        または、ブラウザのシークレット/プライベートモードで新しいタブを開いてこのページにアクセスしてください。
+      `;
+    alert(msg);
   },
   
   // Authentication verification with promise
