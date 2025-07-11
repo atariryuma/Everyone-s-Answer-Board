@@ -1209,6 +1209,19 @@ function quickStartSetup(userId) {
     
     // ステップ3: データベースを更新
     debugLog('💾 ステップ3: データベース更新中...');
+    
+    // クイックスタート用の適切な初期設定を作成
+    var sheetConfigKey = 'sheet_' + formAndSsInfo.sheetName;
+    var quickStartSheetConfig = {
+      opinionHeader: '今日のテーマについて、あなたの考えや意見を聞かせてください',
+      reasonHeader: 'そう考える理由や体験があれば教えてください（任意）',
+      nameHeader: '名前',
+      classHeader: 'クラス',
+      showNames: false,
+      showCounts: true,
+      lastModified: new Date().toISOString()
+    };
+    
     var updatedConfig = {
       ...configJson,
       setupStatus: 'completed',
@@ -1216,11 +1229,12 @@ function quickStartSetup(userId) {
       formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl,
       editFormUrl: formAndSsInfo.editFormUrl,
       publishedSpreadsheetId: formAndSsInfo.spreadsheetId,
-      publishedSheetName: formAndSsInfo.sheetName || 'フォームの回答 1',
+      publishedSheetName: formAndSsInfo.sheetName,
       appPublished: true,
       folderId: folder ? folder.getId() : '',
       folderUrl: folder ? folder.getUrl() : '',
-      completedAt: new Date().toISOString()
+      completedAt: new Date().toISOString(),
+      [sheetConfigKey]: quickStartSheetConfig
     };
     
     updateUser(userId, {
