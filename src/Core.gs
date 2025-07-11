@@ -410,16 +410,6 @@ function getIncrementalSheetData(classFilter, sortOrder, adminMode, sinceRowCoun
       newCount: newData.length,
       isIncremental: true
     };
-    
-  } catch (e) {
-    console.error('増分データ取得エラー: ' + e.message);
-    return {
-      status: 'error',
-      message: '増分データの取得に失敗しました: ' + e.message,
-      data: [],
-      rows: [],
-      isIncremental: true
-    };
   }
 }
 
