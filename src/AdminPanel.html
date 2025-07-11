@@ -66,6 +66,10 @@
     }
   }
   </script>
+  <script>
+  const __IS_DEPLOY_USER__ = '<?= typeof isDeployUser !== "undefined" ? isDeployUser : false ?>';
+  window.isDeployUser = __IS_DEPLOY_USER__.startsWith('<') ? false : __IS_DEPLOY_USER__ === 'true';
+  </script>
   <!-- 統合CSS -->
   <?!= include('UnifiedStyles'); ?>
   
@@ -755,7 +759,7 @@
       </div>
       
       <!-- アプリ設定リンク -->
-      <div class="bg-blue-900/10 border border-blue-500/30 rounded-lg p-3 transition-all hover:border-blue-500/50">
+      <div id="app-setup-link" class="bg-blue-900/10 border border-blue-500/30 rounded-lg p-3 transition-all hover:border-blue-500/50">
         <button type="button" onclick="openAppSetupPage()" class="w-full flex items-center justify-between text-sm font-medium text-blue-300 hover:text-blue-200 transition-colors">
           <div class="flex items-center">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1605,6 +1609,10 @@ elements = {
   currentTopicText: document.getElementById('current-topic-text')
   // ★★★ ここまで追加 ★★★
 };
+      if (!window.isDeployUser) {
+        var link = document.getElementById('app-setup-link');
+        if (link) link.style.display = 'none';
+      }
       if (!IS_TEST_ENV) {
         showSystemFlow(); // デバッグフロー表示
         loadStatus();

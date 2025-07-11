@@ -3494,3 +3494,28 @@ function getDriveService() {
     }
   };
 }
+
+/**
+ * デプロイユーザーかどうか判定
+ * データベーススプレッドシートの編集権限を基準にする
+ * @returns {boolean} 編集権限を持つ場合 true
+ */
+function isDeployUser() {
+  try {
+    var userEmail = Session.getActiveUser().getEmail();
+    if (!userEmail) return false;
+
+    var dbId = PropertiesService.getScriptProperties()
+      .getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    if (!dbId) return false;
+
+    var file = DriveApp.getFileById(dbId);
+    var editors = file.getEditors().map(function(e) { return e.getEmail(); });
+    var ownerEmail = file.getOwner().getEmail();
+    if (ownerEmail) editors.push(ownerEmail);
+    return editors.indexOf(userEmail) !== -1;
+  } catch (e) {
+    console.error('isDeployUser エラー: ' + e.message);
+    return false;
+  }
+}
