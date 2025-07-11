@@ -1,94 +1,278 @@
-# コーディングスタイル＆ベストプラクティス
+# Coding Style Guide
 
-## 1. 役割と目的意識
+## 1. Role & Mindset
 
-* **フルスタック開発パートナー**として振る舞い、単なるコード生成にとどまらず、要件の理解・提案・実装まで一貫して担当。
-* **README.md に即した実装** を最優先し、要件変更の根拠は必ず README.md にたどれること。
-* **UX を重視**し、教師・児童が直感的に操作できる UI/UX 改善案を常に模索。
+* **Full-Stack Development Partner**
+  Own the process from requirements → proposal → implementation → refinement.
+* **Requirements First**
+  Every feature or fix must trace back to `README.md`.
+* **UX-Driven**
+  Continually ask “How can teachers and students use this most intuitively?”
 
-## 2. シングル・レスポンシビリティ原則
+---
 
-* **関数・モジュールは「ひとつの働き」だけ**
+## 2. Common Coding Conventions
 
-  * 150 行以下を目安に。必要なら helper に切り出す。
-* **長い処理は分割**し、テスト可能な小さな単位で実装。
+### 2.1 Indentation & Whitespace
 
-## 3. クライアント／サーバー分離
+* Use **2 spaces** per indent level.
+* Remove trailing whitespace on every line.
+* End every file with exactly one newline.
 
-* **ビジネスロジックはサーバー側**に、UI 描画やイベントハンドリングはクライアント側に完全分離。
-* **サーバー関数呼び出しは非同期で**
+### 2.2 Naming
+
+* **Variables & functions**: `camelCase`
+* **Constants**: `UPPER_SNAKE_CASE`
+* **Classes / constructors**: `PascalCase`
+* **File names**: short English words; extensions: `.gs`, `.html`, `.css.html`, `.js.html`.
+
+### 2.3 Syntax & Style
+
+* Always use semicolons.
+* Prefer single quotes (`'string'`).
+* Allow trailing commas in objects/arrays for cleaner diffs.
+* Use guard clauses to keep nesting shallow:
 
   ```js
-  // クライアント JS
-  showLoading();
-  google.script.run
-    .withSuccessHandler(renderData)
-    .fetchData();
+  if (!user) return;
+  // safe to use user here
   ```
 
-## 4. HTML Service ベストプラクティス
+### 2.4 Comments & Documentation
 
-1. **HTML／CSS／JavaScript の分割管理**
+* Document every function with **JSDoc**:
 
-   * `<style>` と `<script>` はそれぞれ別ファイル（`.css.html`/`.js.html`）で定義し、テンプレート内で `<?!= include('…'); ?>` で読み込む。
-2. **HTML5 Doctype の明示**
+  ```js
+  /**
+   * Fetches user data by ID.
+   * @param {string} userId – The ID of the user.
+   * @returns {Object} User data object.
+   */
+  function fetchUserData(userId) { … }
+  ```
+* Add detailed inline comments for complex logic or external-spec integrations.
+* Mark todos/fixes with ticket numbers:
+
+  ```js
+  // TODO #123: update API endpoint
+  ```
+
+---
+
+## 3. Client / Server Separation
+
+### 3.1 Server-Side (Apps Script)
+
+* Implement **only** business logic—no DOM/UI code.
+* Entry points: `doGet(e)` / `doPost(e)` only. Delegate other logic to modules.
+* All data retrieval and updates occur in server functions.
+
+### 3.2 Client-Side (HTML/CSS/JS)
+
+* Build UI entirely in HTML templates + external JS/CSS.
+* **Load data asynchronously**; initial HTML shows placeholders:
+
+  ```html
+  <body>
+    <div id="content">Loading…</div>
+    <?!= include('scripts/main.js.html'); ?>
+  </body>
+  ```
+
+  ```js
+  // main.js.html
+  <script>
+    window.addEventListener('load', () => {
+      google.script.run
+        .withSuccessHandler(renderContent)
+        .fetchInitialData();
+    });
+    function renderContent(data) {
+      document.getElementById('content').textContent = data.text;
+    }
+  </script>
+  ```
+
+---
+
+## 4. Drive API / Sheets API Guidelines
+
+### 4.1 Service Wrapper Modules
+
+* Never call `DriveApp` or `SpreadsheetApp` directly in business logic.
+* Wrap API calls in a module for easy mocking and future changes:
+
+  ```js
+  // driveService.gs
+  var DriveService = (function() {
+    /**
+     * Gets a file by ID.
+     * @param {string} fileId
+     * @returns {GoogleAppsScript.Drive.File}
+     */
+    function getFileById(fileId) {
+      return DriveApp.getFileById(fileId);
+    }
+    return { getFileById };
+  })();
+  ```
+
+### 4.2 Field Filtering
+
+* When using Advanced Drive Service, always specify `fields`:
+
+  ```js
+  Drive.Files.get(fileId, { fields: 'id,name,mimeType' });
+  ```
+
+### 4.3 Batch Operations
+
+* For multiple sheet updates, use `batchUpdate`:
+
+  ```js
+  var requests = [
+    { updateCells: { /* … */ } },
+    { appendDimension: { /* … */ } }
+  ];
+  Sheets.Spreadsheets.batchUpdate({ requests }, SPREADSHEET_ID);
+  ```
+
+### 4.4 Idempotency & Retry
+
+* Implement exponential back-off for network errors or quota limits:
+
+  ```js
+  function retry(fn, attempts) {
+    try {
+      return fn();
+    } catch (e) {
+      if (attempts > 0) {
+        Utilities.sleep(Math.pow(2, attempts) * 1000);
+        return retry(fn, attempts - 1);
+      }
+      throw e;
+    }
+  }
+  var values = retry(() => Sheets.Spreadsheets.Values.get(id, range), 5);
+  ```
+
+### 4.5 Caching
+
+* **CacheService**: cache infrequently changing reference data for minutes.
+* **localStorage** (client-side): cache UI data to reduce server calls.
+
+### 4.6 Logging & Monitoring
+
+* Log key flows and errors via `console.log()` (Stackdriver).
+* Use a consistent prefix:
+
+  ```js
+  console.log('[DriveService] getFileById:', fileId);
+  ```
+
+### 4.7 Testing with Mocks
+
+* In CI unit tests, mock service wrappers.
+* **Jest example**:
+
+  ```js
+  jest.mock('../server/services/driveService', () => ({
+    getFileById: jest.fn().mockReturnValue({ id: '123', name: 'Test' })
+  }));
+  ```
+
+---
+
+## 5. HTML Service Best Practices
+
+1. **Separate HTML / CSS / JS**
+
+   * `.css.html` files contain `<style>…</style>`.
+   * `.js.html` files contain `<script>…</script>`.
+   * Main templates include them via `<?!= include('…'); ?>`.
+
+2. **HTML5 Doctype**
 
    ```html
    <!DOCTYPE html>
-   <html lang="ja">
-     …
-   </html>
+   <html lang="en"> … </html>
    ```
-3. **外部リソースはすべて HTTPS**
-4. **スクリプトは `<body>` の末尾で読み込む**
-5. **必要に応じて jQuery 活用**（ただし最新版を CDN 経由で）
 
-## 5. パフォーマンス最適化
+3. **HTTPS Only**
 
-* **バッチ操作**
+   * All external scripts/styles must use `https://`.
 
-  * スプレッドシート操作は範囲取得・一括書き込みでまとめて実行。
-* **キャッシュ利用**
+4. **Load scripts at end of `<body>`**
 
-  * 頻出データは `CacheService`、ブラウザでは `localStorage`。
-* **トリガーの競合防止**
+   * Prioritize HTML/CSS rendering.
 
-  * `LockService` を使って同時実行を排他制御。
+5. **Asynchronous Data Fetching**
 
-## 6. セキュリティと権限管理
+   * Initial UI shows placeholders; data rendered via `google.script.run`.
 
-* **シークレットはスクリプトプロパティに格納**し、ソースコードに直書きしない。
-* **OAuth スコープは最小限**
-* **HTTPS／Content Security Policy** を遵守し、混在コンテンツやインジェクションを防止。
+6. **Optional jQuery Use**
 
-## 7. テストとデバッグ
+   * If needed, load via CDN:
 
-* **ユニットテストの整備**
+     ```html
+     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+     ```
 
-  * QUnit や Jest でサーバー側ロジックを網羅。
-* **ログ出力**
+---
 
-  * デバッグ時は `Logger.log()`、本番では Stackdriver（`console`）を利用。
-* **自動テストの CI 連携**
+## 6. Performance Optimization
 
-  * clasp／GitHub Actions で `npm run test` を必ずパスさせる。
+* Minimize API calls by batching reads/writes.
+* Use `LockService` to prevent concurrent trigger conflicts.
+* CacheService / localStorage to avoid redundant fetches.
 
-## 8. コミット＆プルリクエスト
+---
 
-* **Conventional Commits**
+## 7. Security Measures
+
+* Store secrets in `PropertiesService`—never hard-code API keys.
+* Limit OAuth scopes to the minimum required.
+* Enforce Content Security Policy and sanitize all user input.
+
+---
+
+## 8. Testing & Debugging
+
+* Write unit tests (QUnit / Jest) covering server-side logic.
+* Mock external calls in tests.
+* Use `Logger.log()` or `console.log()` appropriately.
+* Integrate tests into CI (clasp + GitHub Actions) to run `npm test`.
+
+---
+
+## 9. Git Workflow & Pull Requests
+
+* **Conventional Commits**:
 
   ```
-  feat(script): add reactionService
-  fix(ui): 修正ボタンの動作不具合対応
-  test(server): fetchData のテスト追加
+  feat(server): add fetchData function
+  fix(ui): correct modal close behavior
+  test(services): add retry logic tests
   ```
-* **PR は小さく**、一つの目的に絞って作成。
-* **PR 説明**に「何を」「なぜ」「どのように」を簡潔に記載。
+* **Branch Naming**: `feature/…`, `bugfix/…`, `chore/…`.
+* Keep PRs small, focused, and include clear “What”, “Why”, and “How”.
 
-## 9. 禁止事項
+---
 
-1. **秘密情報のコミット**
-2. **main への直接プッシュ**
-3. **巨大すぎる PR**（レビューしやすいサイズに分割）
-4. **ファイル構造の独断変更**
+## 10. Trigger Management
 
+* Register only necessary triggers.
+* Remove obsolete triggers immediately.
+* Specify time zones explicitly for time-based triggers.
+
+---
+
+## 11. Documentation
+
+* **README.md**: Keep project overview and setup instructions up to date.
+* **CHANGELOG.md**: Record major feature additions and breaking changes.
+* In-code comments should explain intent and any gotchas.
+
+---
+
+Adhering to these guidelines ensures a consistent, maintainable, high-performance, secure, and user-friendly codebase for “Everyone’s Answer Board.” Always refer back here if in doubt.
