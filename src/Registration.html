@@ -15,7 +15,7 @@
   <div class="glass-panel rounded-xl p-8 max-w-2xl w-full shadow-2xl">
     <div class="text-center mb-6">
       <h1 class="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent mb-2">Everyone's Answer Board</h1>
-      <p class="text-gray-400">AI機能搭載・Google Workspace連携の次世代回答システム</p>
+      <p class="text-gray-400">スマート自動化・Google Workspace連携の次世代回答システム</p>
     </div>
     
     <!-- ドメイン情報表示 -->
@@ -63,7 +63,7 @@
     <div class="mb-6 text-center fade-in">
       <div class="glass-panel bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-xl p-4 border border-cyan-400/30 feature-card">
         <h2 class="text-xl font-bold text-white mb-2">🚀 最先端の教育用回答ボードを始めよう！</h2>
-        <p class="text-cyan-200 text-sm mb-3">AI機能とGoogle Workspace連携でわずか30秒でセットアップ完了。教育現場の生産性を劇的に向上させます。</p>
+        <p class="text-cyan-200 text-sm mb-3">スマート自動化とGoogle Workspace連携でわずか30秒でセットアップ完了。教育現場の生産性を劇的に向上させます。</p>
         <button type="button" 
                 class="cta-button px-6 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-bold rounded-lg transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-gray-800"
                 aria-label="新規登録に進む">
@@ -100,20 +100,54 @@
           <div class="w-5 h-5 rounded-full bg-cyan-400 text-white flex items-center justify-center font-bold text-xs">1</div>
           みんなの回答ボードとは
         </h2>
-        <ul class="text-sm text-gray-300 space-y-2 mb-4" role="list">
-          <li class="flex items-start gap-2 slide-in">
-            <span class="text-green-400" role="img" aria-label="チェックマーク">✓</span>
-            <span>Googleスプレッドシート連携による構造化データ管理</span>
-          </li>
-          <li class="flex items-start gap-2 slide-in">
-            <span class="text-green-400" role="img" aria-label="チェックマーク">✓</span>
-            <span>建設的な意見交換を促進するリアクション機能</span>
-          </li>
-          <li class="flex items-start gap-2 slide-in">
-            <span class="text-green-400" role="img" aria-label="チェックマーク">✓</span>
-            <span>教育効果を高める重要回答の可視化機能</span>
-          </li>
-        </ul>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div class="space-y-3">
+            <div class="flex items-start gap-2 slide-in">
+              <span class="text-cyan-400 text-lg">🔍</span>
+              <div>
+                <span class="font-semibold text-cyan-300">スマート列認識</span>
+                <p class="text-xs text-gray-400">シートの列を自動で識別・マッピング（完全ローカル処理）</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-2 slide-in">
+              <span class="text-green-400 text-lg">🔄</span>
+              <div>
+                <span class="font-semibold text-green-300">リアルタイム同期</span>
+                <p class="text-xs text-gray-400">フォーム回答が即座にボードに反映</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-2 slide-in">
+              <span class="text-blue-400 text-lg">🔒</span>
+              <div>
+                <span class="font-semibold text-blue-300">プライバシー保護</span>
+                <p class="text-xs text-gray-400">完全非公開データベースアーキテクチャ</p>
+              </div>
+            </div>
+          </div>
+          <div class="space-y-3">
+            <div class="flex items-start gap-2 slide-in">
+              <span class="text-purple-400 text-lg">🌐</span>
+              <div>
+                <span class="font-semibold text-purple-300">Workspace連携</span>
+                <p class="text-xs text-gray-400">シームレスなGoogle サービス統合</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-2 slide-in">
+              <span class="text-orange-400 text-lg">📊</span>
+              <div>
+                <span class="font-semibold text-orange-300">インサイト分析</span>
+                <p class="text-xs text-gray-400">学習データの詳細分析とレポート</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-2 slide-in">
+              <span class="text-pink-400 text-lg">🎆</span>
+              <div>
+                <span class="font-semibold text-pink-300">エンゲージメント機能</span>
+                <p class="text-xs text-gray-400">リアクション・ハイライト機能</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <!-- Digital Citizenship Education Section with Modal Button -->
         <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3 mb-3">
@@ -170,8 +204,20 @@
             </svg>
             <div>
               <div class="font-semibold text-white mb-2">セキュアで効率的な自動セットアップ</div>
-              <div class="text-sm text-gray-300 leading-relaxed">
-                あなた専用のGoogleフォームとスプレッドシートを自動で作成します。Google Workspace for Educationのセキュリティ機能と連携するため、<strong>完了まで1分ほどかかる場合があります</strong>。完了後、あなた専用の固定URLの回答ボードが作成され、複数のスプレッドシートを管理画面で切り替えて使用できます。
+              <div class="text-sm text-gray-300 leading-relaxed space-y-2">
+                <p>あなた専用のGoogleフォームとスプレッドシートを自動で作成します。Google Workspace for Educationのセキュリティ機能と連携するため、<strong>完了まで1分ほどかかる場合があります</strong>。</p>
+                <div class="bg-green-900/30 border border-green-400/40 rounded-lg p-3">
+                  <div class="font-medium text-green-300 mb-2 flex items-center gap-2">
+                    <span>🔒</span>
+                    <span>完全プライバシー保護</span>
+                  </div>
+                  <ul class="space-y-1 text-xs text-green-200">
+                    <li>• 外部AIサービス（ChatGPT、Claude等）への送信一切なし</li>
+                    <li>• ルールベース自動化（生成AI不使用）</li>
+                    <li>• 全処理がGoogle Workspace内で完結</li>
+                    <li>• 学習データの完全分離保護</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
@@ -245,7 +291,7 @@
         id="register-btn"
         class="cta-button w-full py-4 px-6 bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-500 hover:from-emerald-600 hover:via-cyan-600 hover:to-blue-600 text-white font-bold rounded-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-2xl focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-gray-800 fade-in relative overflow-hidden"
         disabled
-        aria-label="AI支援型セットアップで最先端の教育システムを開始"
+        aria-label="スマート自動化セットアップで最先端の教育システムを開始"
       >
         <span class="relative z-10 flex items-center justify-center gap-3">
           <span class="text-xl">🚀</span>
@@ -267,8 +313,8 @@
     <footer class="text-center mt-8 text-xs text-gray-500 fade-in space-y-2">
       <div class="flex items-center justify-center gap-4">
         <span class="flex items-center gap-1">
-          <span class="text-cyan-400">🤖</span>
-          <span>AI支援</span>
+          <span class="text-cyan-400">⚡</span>
+          <span>スマート自動化</span>
         </span>
         <span class="flex items-center gap-1">
           <span class="text-green-400">🔒</span>
