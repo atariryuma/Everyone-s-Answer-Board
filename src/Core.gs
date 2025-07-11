@@ -290,13 +290,19 @@ function getPublishedSheetData(classFilter, sortOrder) {
 
     // ★★★ここからが修正箇所★★★
 
-    // ボードのタイトルを、保存された設定（opinionHeader）から取得する
-    // もし設定がなければ、デフォルトでシート名を使う
-    let headerTitle = sheetConfig.opinionHeader;
+    // ボードのタイトルを実際のスプレッドシートのヘッダーから取得
+    let headerTitle = publishedSheetName || '今日のお題'; // デフォルト
     
-    // 問題文が未設定または無効な場合のフォールバック
-    if (!headerTitle || headerTitle.trim() === '' || headerTitle.includes('読み込み')) {
-      headerTitle = publishedSheetName || '今日のお題';
+    // マッピングされたopinionHeaderがある場合、実際のヘッダー名を取得
+    if (mappedIndices.opinionHeader !== undefined) {
+      // ヘッダーインデックスから実際のヘッダー名を逆引き
+      for (var actualHeader in headerIndices) {
+        if (headerIndices[actualHeader] === mappedIndices.opinionHeader) {
+          headerTitle = actualHeader;
+          debugLog('getPublishedSheetData: Using actual header as title: "%s"', headerTitle);
+          break;
+        }
+      }
     }
     
     // ...（データ取得とフォーマット処理は変更なし）...
@@ -2499,6 +2505,36 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
             break;
           }
         }
+      }
+    }
+    
+    // opinionHeader（メイン質問）の特別処理：見つからない場合は最も長い質問様ヘッダーを使用
+    if (mappedIndex === undefined && configKey === 'opinionHeader') {
+      var standardHeaders = ['タイムスタンプ', 'メールアドレス', 'クラス', '名前', '理由', 'なるほど！', 'いいね！', 'もっと知りたい！', 'ハイライト'];
+      var questionHeaders = [];
+      
+      for (var header in actualHeaderIndices) {
+        var isStandardHeader = false;
+        for (var i = 0; i < standardHeaders.length; i++) {
+          if (header.toLowerCase().includes(standardHeaders[i].toLowerCase()) || 
+              standardHeaders[i].toLowerCase().includes(header.toLowerCase())) {
+            isStandardHeader = true;
+            break;
+          }
+        }
+        
+        if (!isStandardHeader && header.length > 10) { // 質問は通常長い
+          questionHeaders.push({header: header, index: actualHeaderIndices[header]});
+        }
+      }
+      
+      if (questionHeaders.length > 0) {
+        // 最も長いヘッダーを選択（通常メイン質問が最も長い）
+        var longestHeader = questionHeaders.reduce(function(prev, current) {
+          return (prev.header.length > current.header.length) ? prev : current;
+        });
+        mappedIndex = longestHeader.index;
+        debugLog('mapConfigToActualHeaders: Auto-detected main question header for %s: "%s" -> index %s', configKey, longestHeader.header, mappedIndex);
       }
     }
     
