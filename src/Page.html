@@ -2747,11 +2747,11 @@ setupEventDelegation() {
       
     }
     
-    const nameHtml = showName && displayName ? '<div class="name-display"><span class="font-bold text-sm text-cyan-300 bg-gray-800/50 px-2 py-1 rounded">' + this.escapeHtml(displayName) + '</span></div>' : '';
-    const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
+    const nameHtml = showName && displayName ? '<div class="name-display flex-shrink-0 mr-2"><span class="font-bold text-sm text-cyan-300 bg-gray-800/50 px-2 py-1 rounded border border-cyan-400">' + this.escapeHtml(displayName) + '</span></div>' : '';
+    const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center min-h-[2rem]' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
     
-    // 詳細デバッグログ
-    debugLog('名前表示詳細:', {
+    // 詳細デバッグログ（強制表示）
+    console.log('🔍 名前表示詳細:', {
       rowIndex: data.rowIndex,
       showName,
       displayName,
@@ -2760,7 +2760,10 @@ setupEventDelegation() {
       nameHtml: nameHtml.substring(0, 100),
       hasNameHtml: !!nameHtml,
       displayMode: this.state.displayMode,
-      showAdminFeatures: this.state.showAdminFeatures
+      showAdminFeatures: this.state.showAdminFeatures,
+      isAdminUser: this.state.isAdminUser,
+      windowDisplayMode: window.displayMode,
+      windowShowAdminFeatures: window.showAdminFeatures
     });
     const reactionButtonsHtml = this.reactionTypes.map(rt => {
       const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
@@ -2797,18 +2800,37 @@ setupEventDelegation() {
     // 名前表示部分を追加
     if (nameHtml) {
       const nameContainer = document.createElement('div');
+      nameContainer.className = 'name-container flex-shrink-0';
       nameContainer.innerHTML = nameHtml;
       footerDiv.appendChild(nameContainer);
+      console.log('✅ 名前コンテナを追加:', {
+        rowIndex: data.rowIndex,
+        nameHtml,
+        containerHTML: nameContainer.outerHTML
+      });
+    } else {
+      console.log('❌ 名前HTML生成されず:', {
+        rowIndex: data.rowIndex,
+        showName,
+        displayName
+      });
     }
     
     // リアクション部分を追加
     const reactionsDiv = document.createElement('div');
-    reactionsDiv.className = 'flex items-center gap-1';
+    reactionsDiv.className = 'flex items-center gap-1 flex-shrink-0';
     reactionsDiv.setAttribute('role', 'group');
     reactionsDiv.setAttribute('aria-label', '回答への反応');
     reactionsDiv.innerHTML = reactionButtonsHtml + highlightBtnHtml;
     
     footerDiv.appendChild(reactionsDiv);
+    
+    // 最終的なfooterDivの内容を確認
+    console.log('📦 フッター構成確認:', {
+      rowIndex: data.rowIndex,
+      footerChildren: footerDiv.children.length,
+      footerHTML: footerDiv.outerHTML.substring(0, 200)
+    });
     
     fragment.appendChild(contentDiv);
     fragment.appendChild(footerDiv);
@@ -3183,9 +3205,6 @@ async handleReaction(rowIndex, reaction) {
         });
       }
       
-      // Update local state from global variables
-      this.updateConfigFromGlobals();
-      
       // 管理モード有効時は強制的にローカル状態も更新
       if (enable) {
         this.state.displayMode = 'named';
@@ -3195,6 +3214,15 @@ async handleReaction(rowIndex, reaction) {
         this.state.displayMode = this.serverDisplayMode;
         this.state.showCounts = this.serverShowCounts;
         this.state.isStudentMode = true;
+      }
+      
+      // Update local state from global variables (but preserve displayMode if in admin mode)
+      this.updateConfigFromGlobals();
+      
+      // Re-enforce admin mode settings after updateConfigFromGlobals
+      if (enable) {
+        this.state.displayMode = 'named';
+        this.state.showCounts = true;
       }
       
       // 管理モード切り替え後の状態を確認
@@ -3730,7 +3758,8 @@ async handleReaction(rowIndex, reaction) {
       showHighlightToggle: this.state.showHighlightToggle,
       windowShowHighlightToggle: window.showHighlightToggle,
       showAdminFeatures: this.state.showAdminFeatures,
-      windowShowAdminFeatures: window.showAdminFeatures
+      windowShowAdminFeatures: window.showAdminFeatures,
+      currentDisplayMode: this.state.displayMode
     });
     
     this.state.isStudentMode = window.isStudentMode;
@@ -3738,16 +3767,22 @@ async handleReaction(rowIndex, reaction) {
     this.state.showAdminFeatures = window.showAdminFeatures;
     this.state.showHighlightToggle = this.state.isAdminUser; // 管理者なら常に表示
     this.state.showScoreSort = window.showScoreSort;
+    this.state.showPublishControls = window.showPublishControls;
+    
+    // Only update displayMode if not in admin mode
+    if (!this.state.showAdminFeatures) {
+      this.state.displayMode = window.displayMode;
+    }
     
     debugLog('updateConfigFromGlobals後の状態:', {
       isAdminUser: this.state.isAdminUser,
       showHighlightToggle: this.state.showHighlightToggle,
       windowShowHighlightToggle: window.showHighlightToggle,
       showAdminFeatures: this.state.showAdminFeatures,
-      windowShowAdminFeatures: window.showAdminFeatures
+      windowShowAdminFeatures: window.showAdminFeatures,
+      finalDisplayMode: this.state.displayMode,
+      windowDisplayMode: window.displayMode
     });
-    this.state.showPublishControls = window.showPublishControls;
-    this.state.displayMode = window.displayMode;
   }
   escapeHtml(str) {
     if (!str) return '';
