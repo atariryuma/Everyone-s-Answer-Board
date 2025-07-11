@@ -384,7 +384,7 @@ function doGet(e) {
           template.cacheTimestamp = Date.now(); // キャッシュバスター
           
           template.displayMode = config.displayMode || 'anonymous';
-          template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
+          template.showCounts = config.showCounts !== undefined ? config.showCounts : false;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
           template.isAdminUser = false; // Page.html is for public view, not admin
           
@@ -405,7 +405,7 @@ function doGet(e) {
           template.ownerName = userInfo.adminEmail;
           template.sheetName = escapeJavaScript(sheetName);
           template.displayMode = 'anonymous';
-          template.showCounts = true;
+          template.showCounts = false;
           template.showAdminFeatures = false; // Page.html is for public view, not admin
           template.isAdminUser = false; // Page.html is for public view, not admin
         }
@@ -467,7 +467,7 @@ function doGet(e) {
             template.cacheTimestamp = Date.now(); // キャッシュバスター
             
             template.displayMode = config.displayMode || 'anonymous';
-            template.showCounts = config.showCounts !== undefined ? config.showCounts : true;
+            template.showCounts = config.showCounts !== undefined ? config.showCounts : false;
             template.showAdminFeatures = false; // Page.html is for public view, not admin
             template.isAdminUser = false; // Page.html is for public view, not admin
 
@@ -479,7 +479,7 @@ function doGet(e) {
             template.ownerName = userInfo.adminEmail;
             template.sheetName = escapeJavaScript(sheetName);
             template.displayMode = 'anonymous';
-            template.showCounts = true;
+            template.showCounts = false;
             template.showAdminFeatures = false; // Page.html is for public view, not admin
             template.isAdminUser = false; // Page.html is for public view, not admin
           }
