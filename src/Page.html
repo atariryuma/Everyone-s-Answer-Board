@@ -2747,8 +2747,21 @@ setupEventDelegation() {
       
     }
     
-    const nameHtml = showName && displayName ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(displayName) + '</span></div>' : '';
+    const nameHtml = showName && displayName ? '<div class="name-display"><span class="font-bold text-sm text-cyan-300 bg-gray-800/50 px-2 py-1 rounded">' + this.escapeHtml(displayName) + '</span></div>' : '';
     const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
+    
+    // 詳細デバッグログ
+    debugLog('名前表示詳細:', {
+      rowIndex: data.rowIndex,
+      showName,
+      displayName,
+      dataName: data.name,
+      dataEmail: data.email,
+      nameHtml: nameHtml.substring(0, 100),
+      hasNameHtml: !!nameHtml,
+      displayMode: this.state.displayMode,
+      showAdminFeatures: this.state.showAdminFeatures
+    });
     const reactionButtonsHtml = this.reactionTypes.map(rt => {
       const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
       const cls = info.reacted ? 'liked' : '';
@@ -2781,10 +2794,14 @@ setupEventDelegation() {
     const footerDiv = document.createElement('div');
     footerDiv.className = containerClass;
     
+    // 名前表示部分を追加
     if (nameHtml) {
-      footerDiv.innerHTML = nameHtml;
+      const nameContainer = document.createElement('div');
+      nameContainer.innerHTML = nameHtml;
+      footerDiv.appendChild(nameContainer);
     }
     
+    // リアクション部分を追加
     const reactionsDiv = document.createElement('div');
     reactionsDiv.className = 'flex items-center gap-1';
     reactionsDiv.setAttribute('role', 'group');
