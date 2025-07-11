@@ -284,120 +284,7 @@ function executeGetPublishedSheetData(classFilter, sortOrder, adminMode) {
     }, headerIndices);
     debugLog('getPublishedSheetData: Mapped indices=%s', JSON.stringify(mappedIndices));
 
-    var formattedData = sheetData.data.map(function(row, index) {
-      // マッピングされたインデックスを使用してデータを取得
-      var classIndex = mappedIndices.classHeader;
-      var opinionIndex = mappedIndices.opinionHeader;
-      var reasonIndex = mappedIndices.reasonHeader;
-      var nameIndex = mappedIndices.nameHeader;
-
-      debugLog('getPublishedSheetData: Row %s - classIndex=%s, opinionIndex=%s, reasonIndex=%s, nameIndex=%s', index, classIndex, opinionIndex, reasonIndex, nameIndex);
-      debugLog('getPublishedSheetData: Row data length=%s, first few values=%s', row.originalData ? row.originalData.length : 'undefined', row.originalData ? JSON.stringify(row.originalData.slice(0, 5)) : 'undefined');
-      
-      // 名前データの詳細ログ
-      var nameValue = '';
-      // 管理モードが有効な場合は強制的に名前を表示
-      var shouldShowName = (adminMode === true || sheetData.displayMode === DISPLAY_MODES.NAMED || isOwner);
-      var hasNameIndex = nameIndex !== undefined;
-      var hasOriginalData = row.originalData && row.originalData.length > 0;
-      var hasNameData = hasOriginalData && nameIndex !== undefined && row.originalData[nameIndex];
-      
-      // 管理モード、ネームドモード、または所有者の場合は常に名前を表示
-      if (shouldShowName && hasNameIndex && hasOriginalData) {
-        nameValue = row.originalData[nameIndex] || '';
-      }
-      
-      // フォールバック: emailから名前を生成
-      if (!nameValue && shouldShowName && hasOriginalData) {
-        var emailIndex = headerIndices[COLUMN_HEADERS.EMAIL];
-        if (emailIndex !== undefined && row.originalData[emailIndex]) {
-          nameValue = row.originalData[emailIndex].split('@')[0];
-        }
-      }
-      
-      console.log('🔍 サーバー側名前データ詳細:', {
-        rowIndex: row.rowNumber || (index + 2),
-        shouldShowName: shouldShowName,
-        adminMode: adminMode,
-        displayMode: sheetData.displayMode,
-        isOwner: isOwner,
-        nameIndex: nameIndex,
-        hasNameIndex: hasNameIndex,
-        hasOriginalData: hasOriginalData,
-        originalDataLength: row.originalData ? row.originalData.length : 'undefined',
-        nameValue: nameValue,
-        rawNameData: hasOriginalData && nameIndex !== undefined ? row.originalData[nameIndex] : 'N/A'
-      });
-
-      return {
-        rowIndex: row.rowNumber || (index + 2), // 実際の行番号
-        name: nameValue,
-        email: row.originalData && row.originalData[headerIndices[COLUMN_HEADERS.EMAIL]] ? row.originalData[headerIndices[COLUMN_HEADERS.EMAIL]] : '',
-        class: (classIndex !== undefined && row.originalData && row.originalData[classIndex]) ? row.originalData[classIndex] : '',
-        opinion: (opinionIndex !== undefined && row.originalData && row.originalData[opinionIndex]) ? row.originalData[opinionIndex] : '',
-        reason: (reasonIndex !== undefined && row.originalData && row.originalData[reasonIndex]) ? row.originalData[reasonIndex] : '',
-        reactions: {
-          UNDERSTAND: { count: row.understandCount || 0, reacted: false },
-          LIKE: { count: row.likeCount || 0, reacted: false },
-          CURIOUS: { count: row.curiousCount || 0, reacted: false }
-        },
-        highlight: row.isHighlighted || false
-      };
-    });
-    debugLog('getPublishedSheetData: formattedData length=%s', formattedData.length);
-
-    // ★★★ここからが修正箇所★★★
-
-    // ボードのタイトルを実際のスプレッドシートのヘッダーから取得
-    let headerTitle = publishedSheetName || '今日のお題'; // デフォルト
-    
-    // マッピングされたopinionHeaderがある場合、実際のヘッダー名を取得
-    if (mappedIndices.opinionHeader !== undefined) {
-      // ヘッダーインデックスから実際のヘッダー名を逆引き
-      for (var actualHeader in headerIndices) {
-        if (headerIndices[actualHeader] === mappedIndices.opinionHeader) {
-          headerTitle = actualHeader;
-          debugLog('getPublishedSheetData: Using actual header as title: "%s"', headerTitle);
-          break;
-        }
-      }
-    }
-    
-    // ...（データ取得とフォーマット処理は変更なし）...
-
-    // 管理モード時はdisplayModeを強制的に'named'に設定
-    var finalDisplayMode = (adminMode === true) ? DISPLAY_MODES.NAMED : (sheetData.displayMode || DISPLAY_MODES.ANONYMOUS);
-    
-    // 最終的に返すオブジェクトの header プロパティに、取得したタイトルを設定
-    var result = {
-      header: headerTitle,
-      sheetName: publishedSheetName, // targetSheetからpublishedSheetNameに変更
-      showCounts: (adminMode === true) ? true : (configJson.showCounts === true),
-      displayMode: finalDisplayMode,
-      data: formattedData,
-      rows: formattedData // 後方互換性のため
-    };
-    
-    console.log('🔍 最終結果:', {
-      adminMode: adminMode,
-      originalDisplayMode: sheetData.displayMode,
-      finalDisplayMode: finalDisplayMode,
-      dataCount: formattedData.length,
-      showCounts: result.showCounts
-    });
-    debugLog('getPublishedSheetData: Returning result=%s', JSON.stringify(result));
-    return result;
-    
-  } catch (e) {
-    console.error('公開シートデータ取得エラー: ' + e.message);
-    return {
-      status: 'error',
-      message: 'データの取得に失敗しました: ' + e.message,
-      data: [],
-      rows: []
-    };
-  }
-}
+    var formattedData = formatSheetDataForFrontend(sheetData.data, mappedIndices, headerIndices, adminMode, isOwner, sheetData.displayMode);
 
 /**
  * 増分データ取得機能：指定された基準点以降の新しいデータのみを取得
@@ -431,37 +318,84 @@ function getIncrementalSheetData(classFilter, sortOrder, adminMode, sinceRowCoun
       throw new Error('公開対象のスプレッドシートまたはシートが設定されていません。');
     }
     
-    // 全データを取得（キャッシュバイパス）
-    var fullData = executeGetPublishedSheetData(classFilter, sortOrder, adminMode);
+    // スプレッドシートとシートを取得
+    var spreadsheet = SpreadsheetApp.openById(publishedSpreadsheetId);
+    var sheet = spreadsheet.getSheetByName(publishedSheetName);
     
-    if (fullData.status === 'error') {
-      throw new Error(fullData.message);
+    if (!sheet) {
+      throw new Error('指定されたシートが見つかりません: ' + publishedSheetName);
     }
     
-    // 現在のデータ数と基準点を比較
-    var currentRowCount = fullData.data.length;
-    var newRowCount = Math.max(0, currentRowCount - sinceRowCount);
+    var lastRow = sheet.getLastRow(); // スプレッドシートの最終行
+    var headerRow = 1; // ヘッダー行は1行目と仮定
     
-    console.log('🔍 増分データ分析: currentRows=%s, sinceRows=%s, newRows=%s', 
-                currentRowCount, sinceRowCount, newRowCount);
+    // 実際に読み込むべき開始行を計算 (sinceRowCountはデータ行数なので、+1してヘッダーを考慮)
+    // sinceRowCountが0の場合、ヘッダーの次の行から読み込む
+    var startRowToRead = sinceRowCount + headerRow + 1; 
     
     // 新しいデータがない場合
-    if (newRowCount <= 0) {
+    if (lastRow < startRowToRead) {
+      console.log('🔍 増分データ分析: 新しいデータなし。lastRow=%s, startRowToRead=%s', lastRow, startRowToRead);
       return {
-        header: fullData.header,
-        sheetName: fullData.sheetName,
-        showCounts: fullData.showCounts,
-        displayMode: fullData.displayMode,
+        header: '', // 必要に応じて設定
+        sheetName: publishedSheetName,
+        showCounts: false, // 必要に応じて設定
+        displayMode: '', // 必要に応じて設定
         data: [],
         rows: [],
-        totalCount: currentRowCount,
+        totalCount: lastRow - headerRow, // ヘッダーを除いたデータ総数
         newCount: 0,
         isIncremental: true
       };
     }
     
-    // 新しいデータのみを抽出（最新のデータが配列の最後にあると仮定）
-    var newData = fullData.data.slice(-newRowCount);
+    // 読み込む行数
+    var numRowsToRead = lastRow - startRowToRead + 1;
+    
+    // 必要なデータのみをスプレッドシートから直接取得
+    // getRange(row, column, numRows, numColumns)
+    // ここでは全列を取得すると仮定 (A列から最終列まで)
+    var lastColumn = sheet.getLastColumn();
+    var rawNewData = sheet.getRange(startRowToRead, 1, numRowsToRead, lastColumn).getValues();
+    
+    console.log('📥 スプレッドシートから直接取得した新しいデータ:', rawNewData.length, '件');
+    
+    // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
+    var headerIndices = getHeaderIndices(publishedSpreadsheetId, publishedSheetName);
+    
+    // 動的列名のマッピング: 設定された名前と実際のヘッダーを照合
+    var sheetConfig = configJson['sheet_' + publishedSheetName] || {};
+    var mainHeaderName = sheetConfig.opinionHeader || COLUMN_HEADERS.OPINION;
+    var reasonHeaderName = sheetConfig.reasonHeader || COLUMN_HEADERS.REASON;
+    var classHeaderName = sheetConfig.classHeader !== undefined ? sheetConfig.classHeader : COLUMN_HEADERS.CLASS;
+    var nameHeaderName = sheetConfig.nameHeader !== undefined ? sheetConfig.nameHeader : COLUMN_HEADERS.NAME;
+    var mappedIndices = mapConfigToActualHeaders({
+      opinionHeader: mainHeaderName,
+      reasonHeader: reasonHeaderName, 
+      classHeader: classHeaderName,
+      nameHeader: nameHeaderName
+    }, headerIndices);
+
+    // ユーザー情報と管理者モードの取得
+    var isOwner = (configJson.ownerId === currentUserId);
+    var displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
+
+    // 取得した生データをPage.htmlが期待する形式にフォーマット
+    var formattedNewData = formatSheetDataForFrontend(rawNewData, mappedIndices, headerIndices, adminMode, isOwner, displayMode);
+    
+    console.log('✅ 増分データ取得完了: %s件の新しいデータを返します', formattedNewData.length);
+    
+    return {
+      header: '', // 必要に応じて設定
+      sheetName: publishedSheetName,
+      showCounts: false, // 必要に応じて設定
+      displayMode: displayMode,
+      data: formattedNewData,
+      rows: formattedNewData, // 後方互換性のため
+      totalCount: lastRow - headerRow, // ヘッダーを除いたデータ総数
+      newCount: formattedNewData.length,
+      isIncremental: true
+    };
     
     console.log('✅ 増分データ取得完了: %s件の新しいデータを返します', newData.length);
     
@@ -487,6 +421,73 @@ function getIncrementalSheetData(classFilter, sortOrder, adminMode, sinceRowCoun
       isIncremental: true
     };
   }
+}
+
+/**
+ * スプレッドシートの生データをフロントエンドが期待する形式にフォーマットするヘルパー関数
+ * @param {Array<Object>} rawData - getSheetDataから返された生データ（originalData, reactionCountsなどを含む）
+ * @param {Object} mappedIndices - 設定されたヘッダー名と実際の列インデックスのマッピング
+ * @param {Object} headerIndices - 実際のヘッダー名と列インデックスのマッピング
+ * @param {boolean} adminMode - 管理者モードかどうか
+ * @param {boolean} isOwner - 現在のユーザーがボードのオーナーかどうか
+ * @param {string} displayMode - 表示モード（'named' or 'anonymous'）
+ * @returns {Array<Object>} フォーマットされたデータ
+ */
+function formatSheetDataForFrontend(rawData, mappedIndices, headerIndices, adminMode, isOwner, displayMode) {
+  return rawData.map(function(row, index) {
+    var classIndex = mappedIndices.classHeader;
+    var opinionIndex = mappedIndices.opinionHeader;
+    var reasonIndex = mappedIndices.reasonHeader;
+    var nameIndex = mappedIndices.nameHeader;
+
+    debugLog('formatSheetDataForFrontend: Row %s - classIndex=%s, opinionIndex=%s, reasonIndex=%s, nameIndex=%s', index, classIndex, opinionIndex, reasonIndex, nameIndex);
+    debugLog('formatSheetDataForFrontend: Row data length=%s, first few values=%s', row.originalData ? row.originalData.length : 'undefined', row.originalData ? JSON.stringify(row.originalData.slice(0, 5)) : 'undefined');
+    
+    var nameValue = '';
+    var shouldShowName = (adminMode === true || displayMode === DISPLAY_MODES.NAMED || isOwner);
+    var hasNameIndex = nameIndex !== undefined;
+    var hasOriginalData = row.originalData && row.originalData.length > 0;
+    
+    if (shouldShowName && hasNameIndex && hasOriginalData) {
+      nameValue = row.originalData[nameIndex] || '';
+    }
+    
+    if (!nameValue && shouldShowName && hasOriginalData) {
+      var emailIndex = headerIndices[COLUMN_HEADERS.EMAIL];
+      if (emailIndex !== undefined && row.originalData[emailIndex]) {
+        nameValue = row.originalData[emailIndex].split('@')[0];
+      }
+    }
+    
+    console.log('🔍 サーバー側名前データ詳細:', {
+      rowIndex: row.rowNumber || (index + 2),
+      shouldShowName: shouldShowName,
+      adminMode: adminMode,
+      displayMode: displayMode,
+      isOwner: isOwner,
+      nameIndex: nameIndex,
+      hasNameIndex: hasNameIndex,
+      hasOriginalData: hasOriginalData,
+      originalDataLength: row.originalData ? row.originalData.length : 'undefined',
+      nameValue: nameValue,
+      rawNameData: hasOriginalData && nameIndex !== undefined ? row.originalData[nameIndex] : 'N/A'
+    });
+
+    return {
+      rowIndex: row.rowNumber || (index + 2),
+      name: nameValue,
+      email: row.originalData && row.originalData[headerIndices[COLUMN_HEADERS.EMAIL]] ? row.originalData[headerIndices[COLUMN_HEADERS.EMAIL]] : '',
+      class: (classIndex !== undefined && row.originalData && row.originalData[classIndex]) ? row.originalData[classIndex] : '',
+      opinion: (opinionIndex !== undefined && row.originalData && row.originalData[opinionIndex]) ? row.originalData[opinionIndex] : '',
+      reason: (reasonIndex !== undefined && row.originalData && row.originalData[reasonIndex]) ? row.originalData[reasonIndex] : '',
+      reactions: {
+        UNDERSTAND: { count: row.understandCount || 0, reacted: false },
+        LIKE: { count: row.likeCount || 0, reacted: false },
+        CURIOUS: { count: row.curiousCount || 0, reacted: false }
+      },
+      highlight: row.isHighlighted || false
+    };
+  });
 }
 
 /**
