@@ -517,8 +517,55 @@ class SharedModals {
       }
     });
   }
+
+  // プライバシーモーダルの表示
+  showPrivacy(onContinue) {
+    const modal = document.getElementById('privacy-modal');
+    if (!modal) {
+      console.error('プライバシーモーダルが見つかりません');
+      return;
+    }
+    
+    modal.classList.remove('hidden');
+    
+    const continueBtn = document.getElementById('privacy-modal-continue');
+    const cancelBtn = document.getElementById('privacy-modal-cancel');
+    
+    if (continueBtn) {
+      continueBtn.onclick = () => {
+        this.hideModal('privacy-modal');
+        if (onContinue) onContinue();
+      };
+    }
+    
+    if (cancelBtn) {
+      cancelBtn.onclick = () => {
+        this.hideModal('privacy-modal');
+      };
+    }
+  }
+
+  // デジタル・シティズンシップモーダルの表示
+  showDigitalCitizenship() {
+    const modal = document.getElementById('digital-citizenship-modal');
+    if (!modal) {
+      console.error('デジタル・シティズンシップモーダルが見つかりません');
+      return;
+    }
+    
+    modal.classList.remove('hidden');
+  }
 }
 
 // グローバルインスタンスの作成
 window.sharedModals = new SharedModals();
+
+// グローバル関数（後方互換性のため）
+window.showPrivacyModal = function(onContinue) {
+  window.sharedModals.showPrivacy(onContinue);
+};
+
+window.showDigitalCitizenshipModal = function() {
+  window.sharedModals.showDigitalCitizenship();
+};
 </script>
