@@ -1689,27 +1689,8 @@ function addUnifiedQuestions(form, questionType, customConfig) {
  * @returns {Object} 質問設定
  */
 function getQuestionConfig(questionType, customConfig) {
-  var configs = {};
-  configs.default = {
-    classQuestion: {
-      title: 'あなたのクラス・学年',
-      helpText: 'あなたが所属するクラスや学年を教えてください（例：6年1組、中学3年A組、高校2年など）'
-    },
-    mainQuestion: {
-      title: '今日のテーマについて、あなたの考えや意見を聞かせてください',
-      helpText: 'この質問には正解や間違いはありません。あなた自身の考えを自由に、安心して表現してください。多様な意見こそが、みんなの学びを豊かにします。'
-    },
-    reasonQuestion: {
-      title: 'そう考える理由や体験があれば教えてください（任意）',
-      helpText: 'あなたがそのように考える背景や、関連する体験・エピソードがあれば共有してください。理由を書くことで、あなたの考えがより相手に伝わりやすくなります。'
-    },
-    nameQuestion: {
-      title: 'ニックネーム・呼び名（任意）',
-      helpText: 'みんなの回答ボードで表示される名前です。本名でも、普段呼ばれているニックネームでも、空白でも構いません。あなたが安心できる形で参加してください。'
-    }
-  };
-
-  configs.simple = {
+  // 統一されたテンプレート設定（simple のみ使用）
+  var config = {
     classQuestion: {
       title: 'クラス',
       helpText: '',
@@ -1720,9 +1701,10 @@ function getQuestionConfig(questionType, customConfig) {
       helpText: ''
     },
     mainQuestion: {
-      title: '今回のテーマについて、あなたの考えや意見を聞かせてください',
+      title: '今日のテーマについて、あなたの考えや意見を聞かせてください',
       helpText: '',
-      type: 'paragraph' // デフォルトは長文テキスト
+      choices: ['気づいたことがある。', '疑問に思うことがある。', 'もっと知りたいことがある。'],
+      type: 'paragraph'
     },
     reasonQuestion: {
       title: 'そう考える理由や体験があれば教えてください（任意）',
@@ -1730,19 +1712,42 @@ function getQuestionConfig(questionType, customConfig) {
       type: 'paragraph'
     }
   };
-
-  var defaultConfig = configs[questionType] || configs.default;
   
   // カスタム設定をマージ
   if (customConfig && typeof customConfig === 'object') {
     for (var key in customConfig) {
-      if (defaultConfig[key]) {
-        Object.assign(defaultConfig[key], customConfig[key]);
+      if (config[key]) {
+        Object.assign(config[key], customConfig[key]);
       }
     }
   }
   
-  return defaultConfig;
+  return config;
+}
+
+/**
+ * 質問テンプレート取得用 API
+ * @returns {ContentService.TextOutput} JSON形式の質問設定
+ */
+function doGetQuestionConfig() {
+  try {
+    // 現在の日時を取得してタイトルに含める
+    const now = new Date();
+    const timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
+    
+    const cfg = getQuestionConfig('simple');
+    
+    // タイトルにタイムスタンプを追加
+    cfg.formTitle = `フォーム作成 - ${timestamp}`;
+    
+    return ContentService.createTextOutput(JSON.stringify(cfg)).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    console.error('doGetQuestionConfig error:', error);
+    return ContentService.createTextOutput(JSON.stringify({
+      error: 'Failed to get question config',
+      details: error.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 /**
