@@ -150,7 +150,11 @@ function log(level, message, details) {
     if (typeof globalProfiler !== 'undefined') {
       globalProfiler.start('logging');
     }
-    
+
+    if (level === 'info' && !DEBUG) {
+      return;
+    }
+
     switch (level) {
       case 'error':
         console.error(message, details || '');
@@ -167,6 +171,15 @@ function log(level, message, details) {
     }
   } catch (e) {
     // ログ出力自体が失敗した場合は無視
+  }
+}
+
+function debugLog() {
+  if (!DEBUG) return;
+  try {
+    console.log.apply(console, arguments);
+  } catch (e) {
+    // ignore logging errors
   }
 }
 
@@ -196,7 +209,7 @@ function getDeployUserDomainInfo() {
     // deployDomainが空の場合、特定のドメインが強制されていないため、一致とみなす（グローバルアクセス）
     var isDomainMatch = (currentDomain === deployDomain) || (deployDomain === '');
 
-    console.log('Domain info:', {
+    debugLog('Domain info:', {
       currentDomain: currentDomain,
       deployDomain: deployDomain,
       isDomainMatch: isDomainMatch,
@@ -259,7 +272,7 @@ function showRegistrationPage() {
 function doGet(e) {
   var requestKey = `doGet_${JSON.stringify(e?.parameter || {})}`;
   return cacheManager.get(requestKey, () => {
-    console.log(`doGet called with event object: ${JSON.stringify(e)}`);
+    debugLog('doGet called with event object:', e);
     try {
       const params = parseRequestParams(e);
       const { userEmail, userInfo } = validateUserSession(Session.getActiveUser().getEmail(), params);
@@ -345,7 +358,7 @@ function validateUserSession(userEmail, params) {
         console.warn('スプレッドシートアクセスエラー: ' + accessError.message);
         try {
           const repair = repairUserSpreadsheetAccess(userEmail, userInfo.spreadsheetId);
-          if (repair.success) console.log('スプレッドシートアクセス権限を修復しました');
+          if (repair.success) debugLog('スプレッドシートアクセス権限を修復しました');
         } catch (repairError) {
           console.error('権限修復失敗: ' + repairError.message);
         }
@@ -371,7 +384,7 @@ function handleSetupPages(params, userEmail) {
   if (params.setupParam === 'true' && params.mode === 'appsetup') {
     const domainInfo = getDeployUserDomainInfo();
     if (domainInfo.deployDomain && domainInfo.deployDomain !== '' && !domainInfo.isDomainMatch) {
-      console.log('Domain access warning. Current:', domainInfo.currentDomain, 'Deploy:', domainInfo.deployDomain);
+      debugLog('Domain access warning. Current:', domainInfo.currentDomain, 'Deploy:', domainInfo.deployDomain);
     }
     if (!hasSetupPageAccess()) {
       const errorHtml = HtmlService.createHtmlOutput(

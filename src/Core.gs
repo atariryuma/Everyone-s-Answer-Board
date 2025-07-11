@@ -28,7 +28,7 @@ function getOpinionHeaderSafely(userId, sheetName) {
     
     const opinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
     
-    console.log('getOpinionHeaderSafely:', {
+    debugLog('getOpinionHeaderSafely:', {
       userId: userId,
       sheetName: sheetName,
       opinionHeader: opinionHeader
@@ -197,7 +197,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, bypassCache) {
   
   // キャッシュバイパス時は直接実行
   if (bypassCache === true) {
-    console.log('🔄 キャッシュバイパス：最新データを直接取得');
+    debugLog('🔄 キャッシュバイパス：最新データを直接取得');
     return executeGetPublishedSheetData(classFilter, sortOrder, adminMode);
   }
   
@@ -311,7 +311,7 @@ function executeGetPublishedSheetData(classFilter, sortOrder, adminMode) {
       rows: formattedData // 後方互換性のため
     };
 
-    console.log('🔍 最終結果:', {
+    debugLog('🔍 最終結果:', {
       adminMode: adminMode,
       originalDisplayMode: sheetData.displayMode,
       finalDisplayMode: finalDisplayMode,
@@ -342,7 +342,7 @@ function executeGetPublishedSheetData(classFilter, sortOrder, adminMode) {
  */
 function getIncrementalSheetData(classFilter, sortOrder, adminMode, sinceRowCount) {
   try {
-    console.log('🔄 増分データ取得開始: sinceRowCount=%s', sinceRowCount);
+    debugLog('🔄 増分データ取得開始: sinceRowCount=%s', sinceRowCount);
     
     var props = PropertiesService.getUserProperties();
     var currentUserId = props.getProperty('CURRENT_USER_ID');
@@ -381,7 +381,7 @@ function getIncrementalSheetData(classFilter, sortOrder, adminMode, sinceRowCoun
     
     // 新しいデータがない場合
     if (lastRow < startRowToRead) {
-      console.log('🔍 増分データ分析: 新しいデータなし。lastRow=%s, startRowToRead=%s', lastRow, startRowToRead);
+      debugLog('🔍 増分データ分析: 新しいデータなし。lastRow=%s, startRowToRead=%s', lastRow, startRowToRead);
       return {
         header: '', // 必要に応じて設定
         sheetName: publishedSheetName,
@@ -404,7 +404,7 @@ function getIncrementalSheetData(classFilter, sortOrder, adminMode, sinceRowCoun
     var lastColumn = sheet.getLastColumn();
     var rawNewData = sheet.getRange(startRowToRead, 1, numRowsToRead, lastColumn).getValues();
 
-    console.log('📥 スプレッドシートから直接取得した新しいデータ:', rawNewData.length, '件');
+    debugLog('📥 スプレッドシートから直接取得した新しいデータ:', rawNewData.length, '件');
 
     // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
     var headerIndices = getHeaderIndices(publishedSpreadsheetId, publishedSheetName);
@@ -436,7 +436,7 @@ function getIncrementalSheetData(classFilter, sortOrder, adminMode, sinceRowCoun
     // 取得した生データをPage.htmlが期待する形式にフォーマット
     var formattedNewData = formatSheetDataForFrontend(processedData, mappedIndices, headerIndices, adminMode, isOwner, displayMode);
     
-    console.log('✅ 増分データ取得完了: %s件の新しいデータを返します', formattedNewData.length);
+    debugLog('✅ 増分データ取得完了: %s件の新しいデータを返します', formattedNewData.length);
     
     return {
       header: '', // 必要に応じて設定
@@ -494,7 +494,7 @@ function formatSheetDataForFrontend(rawData, mappedIndices, headerIndices, admin
       }
     }
     
-    console.log('🔍 サーバー側名前データ詳細:', {
+    debugLog('🔍 サーバー側名前データ詳細:', {
       rowIndex: row.rowNumber || (index + 2),
       shouldShowName: shouldShowName,
       adminMode: adminMode,
@@ -764,7 +764,7 @@ function setupApplication(credsJson, dbId) {
     // データベースシートの初期化
     initializeDatabaseSheet(dbId);
 
-    console.log('✅ セットアップが正常に完了しました。');
+    debugLog('✅ セットアップが正常に完了しました。');
     return { status: 'success', message: 'セットアップが正常に完了しました。' };
   } catch (e) {
     console.error('セットアップエラー:', e);
@@ -869,7 +869,7 @@ function getStatus(forceRefresh = false) {
         var userInfo = findUserById(currentUserId);
         if (userInfo) {
           invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId);
-          console.log('強制リフレッシュ: ユーザーキャッシュを削除しました');
+          debugLog('強制リフレッシュ: ユーザーキャッシュを削除しました');
         }
       }
     } catch (e) {
@@ -1609,12 +1609,6 @@ function clearAllCaches() {
   clearServiceAccountTokenCache();
 }
 
-function debugLog() {
-  if (DEBUG && typeof console !== 'undefined' && console.log) {
-    console.log.apply(console, arguments);
-  }
-}
-
 /**
  * GoogleフォームURLからフォームIDを抽出
  */
@@ -1922,7 +1916,7 @@ function addUnifiedQuestions(form, questionType, customConfig) {
       nameItem.setRequired(false);
     }
 
-    console.log('フォームに統一質問を追加しました: ' + questionType);
+    debugLog('フォームに統一質問を追加しました: ' + questionType);
     
   } catch (error) {
     console.error('addUnifiedQuestions エラー:', error.message);
@@ -2023,7 +2017,7 @@ function saveClassChoices(classChoices) {
       configJson: JSON.stringify(configJson)
     });
     
-    console.log('クラス選択肢が保存されました:', classChoices);
+    debugLog('クラス選択肢が保存されました:', classChoices);
     return { status: 'success', message: 'クラス選択肢が保存されました' };
   } catch (error) {
     console.error('クラス選択肢保存エラー:', error.message);
@@ -2116,10 +2110,10 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
       
       // 同一ドメインで閲覧可能に設定（教育機関対応）
       file.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
-      console.log('スプレッドシートを同一ドメイン閲覧可能に設定しました: ' + spreadsheetId);
+      debugLog('スプレッドシートを同一ドメイン閲覧可能に設定しました: ' + spreadsheetId);
       
       // 作成者（現在のユーザー）は所有者として保持
-      console.log('作成者は所有者として権限を保持: ' + userEmail);
+      debugLog('作成者は所有者として権限を保持: ' + userEmail);
       
     } catch (sharingError) {
       console.warn('共有設定の変更に失敗しましたが、処理を続行します: ' + sharingError.message);
@@ -2138,7 +2132,7 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
     // サービスアカウントとスプレッドシートを共有
     try {
       shareSpreadsheetWithServiceAccount(spreadsheetId);
-      console.log('サービスアカウントとの共有完了: ' + spreadsheetId);
+      debugLog('サービスアカウントとの共有完了: ' + spreadsheetId);
     } catch (shareError) {
       console.error('サービスアカウント共有エラー:', shareError.message);
       console.error('スプレッドシート作成は完了しましたが、サービスアカウントとの共有に失敗しました。手動で共有してください。');
@@ -2168,13 +2162,13 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
       throw new Error('サービスアカウントのメールアドレスが取得できません: ' + serviceAccountEmail);
     }
     
-    console.log('サービスアカウント共有開始:', serviceAccountEmail, 'スプレッドシート:', spreadsheetId);
+    debugLog('サービスアカウント共有開始:', serviceAccountEmail, 'スプレッドシート:', spreadsheetId);
     
     // DriveAppを使用してスプレッドシートをサービスアカウントと共有
     var file = DriveApp.getFileById(spreadsheetId);
     file.addEditor(serviceAccountEmail);
     
-    console.log('サービスアカウント共有成功:', serviceAccountEmail);
+    debugLog('サービスアカウント共有成功:', serviceAccountEmail);
     
   } catch (error) {
     console.error('shareSpreadsheetWithServiceAccount エラー:', error.message);
@@ -2188,7 +2182,7 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
  */
 function shareAllSpreadsheetsWithServiceAccount() {
   try {
-    console.log('全スプレッドシートのサービスアカウント共有開始');
+    debugLog('全スプレッドシートのサービスアカウント共有開始');
     
     var allUsers = getAllUsers();
     var results = [];
@@ -2207,7 +2201,7 @@ function shareAllSpreadsheetsWithServiceAccount() {
             status: 'success'
           });
           successCount++;
-          console.log('共有成功:', user.adminEmail, user.spreadsheetId);
+          debugLog('共有成功:', user.adminEmail, user.spreadsheetId);
         } catch (shareError) {
           results.push({
             userId: user.userId,
@@ -2222,7 +2216,7 @@ function shareAllSpreadsheetsWithServiceAccount() {
       }
     }
     
-    console.log('全スプレッドシート共有完了:', successCount + '件成功', errorCount + '件失敗');
+    debugLog('全スプレッドシート共有完了:', successCount + '件成功', errorCount + '件失敗');
     
     return {
       status: 'completed',
@@ -2314,7 +2308,7 @@ function addServiceAccountToSpreadsheet(spreadsheetId) {
     // サービスアカウントを編集者として追加
     if (serviceAccountEmail) {
       spreadsheet.addEditor(serviceAccountEmail);
-      console.log('サービスアカウント (' + serviceAccountEmail + ') をスプレッドシートの編集者として追加しました。');
+      debugLog('サービスアカウント (' + serviceAccountEmail + ') をスプレッドシートの編集者として追加しました。');
       
       // セッション管理：サービスアカウントアクセス権限の記録
       try {
@@ -2325,14 +2319,14 @@ function addServiceAccountToSpreadsheet(spreadsheetId) {
           accessType: 'service_account_editor',
           securityLevel: 'domain_view'
         };
-        console.log('サービスアカウントアクセス権限を記録しました:', JSON.stringify(sessionData));
+        debugLog('サービスアカウントアクセス権限を記録しました:', JSON.stringify(sessionData));
       } catch (sessionLogError) {
         console.warn('セッション記録でエラー:', sessionLogError.message);
       }
     }
     
     // 同一ドメインユーザーは共有設定により閲覧可能
-    console.log('同一ドメインユーザーは共有設定により閲覧可能です');
+    debugLog('同一ドメインユーザーは共有設定により閲覧可能です');
     
   } catch (e) {
     console.error('サービスアカウントの追加に失敗: ' + e.message);
@@ -2348,7 +2342,7 @@ function addServiceAccountToSpreadsheet(spreadsheetId) {
  */
 function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
   try {
-    console.log('スプレッドシートアクセス権限の修復を開始: ' + userEmail + ' -> ' + spreadsheetId);
+    debugLog('スプレッドシートアクセス権限の修復を開始: ' + userEmail + ' -> ' + spreadsheetId);
     
     // DriveApp経由で共有設定を変更
     var file = DriveApp.getFileById(spreadsheetId);
@@ -2356,14 +2350,14 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
     // ドメイン全体でアクセス可能に設定
     try {
       file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
-      console.log('スプレッドシートをドメイン全体で編集可能に設定しました');
+      debugLog('スプレッドシートをドメイン全体で編集可能に設定しました');
     } catch (domainSharingError) {
       console.warn('ドメイン共有設定に失敗: ' + domainSharingError.message);
       
       // ドメイン共有に失敗した場合は個別にユーザーを追加
       try {
         file.addEditor(userEmail);
-        console.log('ユーザーを個別に編集者として追加しました: ' + userEmail);
+        debugLog('ユーザーを個別に編集者として追加しました: ' + userEmail);
       } catch (individualError) {
         console.error('個別ユーザー追加も失敗: ' + individualError.message);
       }
@@ -2373,7 +2367,7 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
     try {
       var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
       spreadsheet.addEditor(userEmail);
-      console.log('SpreadsheetApp経由でユーザーを編集者として追加: ' + userEmail);
+      debugLog('SpreadsheetApp経由でユーザーを編集者として追加: ' + userEmail);
     } catch (spreadsheetAddError) {
       console.warn('SpreadsheetApp経由の追加で警告: ' + spreadsheetAddError.message);
     }
@@ -2386,7 +2380,7 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
     if (serviceAccountEmail) {
       try {
         file.addEditor(serviceAccountEmail);
-        console.log('サービスアカウントも編集者として追加: ' + serviceAccountEmail);
+        debugLog('サービスアカウントも編集者として追加: ' + serviceAccountEmail);
       } catch (serviceError) {
         console.warn('サービスアカウント追加で警告: ' + serviceError.message);
       }
@@ -2414,21 +2408,21 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
  */
 function emergencyAdminPanelRepair(userEmail, spreadsheetId) {
   try {
-    console.log('緊急修復開始: 管理パネルアクセス用');
+    debugLog('緊急修復開始: 管理パネルアクセス用');
     
     // 1. サービスアカウント権限の強制追加
     addServiceAccountToSpreadsheet(spreadsheetId);
-    console.log('ステップ1: サービスアカウント権限追加完了');
+    debugLog('ステップ1: サービスアカウント権限追加完了');
     
     // 2. ユーザー権限の強制追加
     const repairResult = repairUserSpreadsheetAccess(userEmail, spreadsheetId);
-    console.log('ステップ2: ユーザー権限修復結果:', repairResult);
+    debugLog('ステップ2: ユーザー権限修復結果:', repairResult);
     
     // 3. 権限確認テスト
     try {
       const testAccess = SpreadsheetApp.openById(spreadsheetId);
       testAccess.getName();
-      console.log('ステップ3: 権限確認テスト成功');
+      debugLog('ステップ3: 権限確認テスト成功');
     } catch (testError) {
       console.warn('ステップ3: 権限確認テスト失敗:', testError.message);
     }
@@ -2437,7 +2431,7 @@ function emergencyAdminPanelRepair(userEmail, spreadsheetId) {
     try {
       const service = getSheetsService();
       const testData = getSpreadsheetsData(service, spreadsheetId);
-      console.log('ステップ4: サービスアカウントアクセステスト成功');
+      debugLog('ステップ4: サービスアカウントアクセステスト成功');
     } catch (serviceTestError) {
       console.warn('ステップ4: サービスアカウントアクセステスト失敗:', serviceTestError.message);
     }
@@ -2491,7 +2485,7 @@ function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName) {
       console.warn('Auto-resize failed:', resizeError.message);
     }
     
-    console.log('リアクション列を追加しました: ' + sheetName);
+    debugLog('リアクション列を追加しました: ' + sheetName);
   }
   catch (e) {
     console.error('リアクション列追加エラー: ' + e.message);
@@ -2556,7 +2550,7 @@ function getSheetData(userId, sheetName, classFilter, sortMode, adminMode) {
   
   // 管理モードの場合はキャッシュをバイパス（最新データを取得）
   if (adminMode === true) {
-    console.log('🔄 管理モード：シートデータキャッシュをバイパス');
+    debugLog('🔄 管理モード：シートデータキャッシュをバイパス');
     return executeGetSheetData(userId, sheetName, classFilter, sortMode);
   }
   
@@ -2657,14 +2651,14 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
  */
 function getSheetsList(userId) {
   try {
-    console.log('getSheetsList: Start for userId:', userId);
+    debugLog('getSheetsList: Start for userId:', userId);
     var userInfo = findUserById(userId);
     if (!userInfo) {
       console.warn('getSheetsList: User not found:', userId);
       return [];
     }
     
-    console.log('getSheetsList: UserInfo found:', {
+    debugLog('getSheetsList: UserInfo found:', {
       userId: userInfo.userId,
       adminEmail: userInfo.adminEmail,
       spreadsheetId: userInfo.spreadsheetId,
@@ -2677,7 +2671,7 @@ function getSheetsList(userId) {
     }
     
     var service = getSheetsService();
-    console.log('getSheetsList: SheetsService obtained, attempting to fetch spreadsheet data...');
+    debugLog('getSheetsList: SheetsService obtained, attempting to fetch spreadsheet data...');
     
     var spreadsheet;
     try {
@@ -2688,7 +2682,7 @@ function getSheetsList(userId) {
       // サービスアカウントの権限修復を試行
       try {
         addServiceAccountToSpreadsheet(userInfo.spreadsheetId);
-        console.log('getSheetsList: サービスアカウント権限を追加しました。再試行中...');
+        debugLog('getSheetsList: サービスアカウント権限を追加しました。再試行中...');
         
         // 少し待ってから再試行
         Utilities.sleep(1000);
@@ -2702,7 +2696,7 @@ function getSheetsList(userId) {
           var currentUserEmail = Session.getActiveUser().getEmail();
           if (currentUserEmail === userInfo.adminEmail) {
             repairUserSpreadsheetAccess(currentUserEmail, userInfo.spreadsheetId);
-            console.log('getSheetsList: ユーザー権限での修復を実行しました。');
+            debugLog('getSheetsList: ユーザー権限での修復を実行しました。');
           }
         } catch (finalRepairError) {
           console.error('getSheetsList: 最終修復も失敗:', finalRepairError.message);
@@ -2716,7 +2710,7 @@ function getSheetsList(userId) {
       }
     }
     
-    console.log('getSheetsList: Raw spreadsheet data:', spreadsheet);
+    debugLog('getSheetsList: Raw spreadsheet data:', spreadsheet);
     if (!spreadsheet) {
       console.error('getSheetsList: No spreadsheet data returned');
       return [];
@@ -2743,7 +2737,7 @@ function getSheetsList(userId) {
       };
     }).filter(function(sheet) { return sheet !== null; });
     
-    console.log('getSheetsList: Successfully returning', sheets.length, 'sheets:', sheets);
+    debugLog('getSheetsList: Successfully returning', sheets.length, 'sheets:', sheets);
     return sheets;
   } catch (e) {
     console.error('getSheetsList: シート一覧取得エラー:', e.message);
@@ -3069,7 +3063,7 @@ function getDataCount(classFilter, sortOrder, adminMode) {
     var props = PropertiesService.getUserProperties();
     var currentUserId = props.getProperty('CURRENT_USER_ID');
     
-    console.log('🔍 getDataCount開始:', {
+    debugLog('🔍 getDataCount開始:', {
       classFilter: classFilter,
       sortOrder: sortOrder,
       adminMode: adminMode,
@@ -3089,7 +3083,7 @@ function getDataCount(classFilter, sortOrder, adminMode) {
     var publishedSpreadsheetId = configJson.publishedSpreadsheetId;
     var publishedSheetName = configJson.publishedSheetName;
     
-    console.log('📋 設定情報:', {
+    debugLog('📋 設定情報:', {
       publishedSpreadsheetId: publishedSpreadsheetId,
       publishedSheetName: publishedSheetName,
       configJson: configJson
@@ -3102,7 +3096,7 @@ function getDataCount(classFilter, sortOrder, adminMode) {
     
     // 軽量な件数取得（SpreadsheetAppを使用）
     var range = publishedSheetName + '!A:A';
-    console.log('🔍 件数チェック開始:', {
+    debugLog('🔍 件数チェック開始:', {
       spreadsheetId: publishedSpreadsheetId,
       sheetName: publishedSheetName,
       range: range
@@ -3125,12 +3119,12 @@ function getDataCount(classFilter, sortOrder, adminMode) {
       
       if (lastRow > 1) { // ヘッダー行を除く
         totalDataCount = lastRow - 1;
-        console.log('✅ SpreadsheetApp使用で件数取得成功:', {
+        debugLog('✅ SpreadsheetApp使用で件数取得成功:', {
           lastRow: lastRow,
           totalDataCount: totalDataCount
         });
       } else {
-        console.log('📄 データ行なし（ヘッダーのみ）');
+        debugLog('📄 データ行なし（ヘッダーのみ）');
       }
       
     } catch (spreadsheetAppError) {
@@ -3140,14 +3134,14 @@ function getDataCount(classFilter, sortOrder, adminMode) {
       try {
         var service = getSheetsService();
         
-        console.log('🔍 フォールバック - getSheetsService使用:', { range: range });
+        debugLog('🔍 フォールバック - getSheetsService使用:', { range: range });
         
         var response = service.spreadsheets.values.get({
           spreadsheetId: publishedSpreadsheetId,
           range: range
         });
         
-        console.log('📡 API レスポンス詳細:', {
+        debugLog('📡 API レスポンス詳細:', {
           response: response,
           hasValues: !!response?.values,
           responseType: typeof response,
@@ -3157,7 +3151,7 @@ function getDataCount(classFilter, sortOrder, adminMode) {
         if (response && response.values && Array.isArray(response.values)) {
           rows = response.values;
           totalDataCount = Math.max(0, rows.length - 1); // ヘッダー行を除く
-          console.log('✅ フォールバック成功:', {
+          debugLog('✅ フォールバック成功:', {
             rowsLength: rows.length,
             totalDataCount: totalDataCount,
             firstRow: rows[0] || 'なし',
@@ -3180,7 +3174,7 @@ function getDataCount(classFilter, sortOrder, adminMode) {
       }
     }
     
-    console.log('📊 件数チェック結果（フィルタ前）:', {
+    debugLog('📊 件数チェック結果（フィルタ前）:', {
       totalRows: rows.length,
       totalDataCount: totalDataCount,
       firstFewRows: rows.slice(0, 3),
@@ -3191,14 +3185,14 @@ function getDataCount(classFilter, sortOrder, adminMode) {
     var finalDataCount = totalDataCount;
     
     if (classFilter && classFilter !== 'すべて' && totalDataCount > 0) {
-      console.log('🔍 クラスフィルタリング実行:', classFilter);
+      debugLog('🔍 クラスフィルタリング実行:', classFilter);
       
       // フィルタリングが必要な場合は、元のgetSheetData関数を呼び出して正確な件数を取得
       try {
         var sheetData = getSheetData(currentUserId, publishedSheetName, classFilter, sortOrder, adminMode);
         if (sheetData.status === 'success') {
           finalDataCount = sheetData.totalCount || 0;
-          console.log('✅ フィルタリング後件数:', finalDataCount);
+          debugLog('✅ フィルタリング後件数:', finalDataCount);
         } else {
           console.warn('⚠️ フィルタリング処理でエラー:', sheetData.message);
         }
@@ -3208,7 +3202,7 @@ function getDataCount(classFilter, sortOrder, adminMode) {
       }
     }
     
-    console.log('📊 最終件数結果:', {
+    debugLog('📊 最終件数結果:', {
       totalDataCount: totalDataCount,
       finalDataCount: finalDataCount,
       classFilter: classFilter
@@ -3222,7 +3216,7 @@ function getDataCount(classFilter, sortOrder, adminMode) {
     //   fields: 'properties.timeZone,sheets(properties(title,sheetId))'
     // });
     
-    console.log('📊 軽量件数チェック完了:', {
+    debugLog('📊 軽量件数チェック完了:', {
       userId: currentUserId,
       sheetName: publishedSheetName,
       finalDataCount: finalDataCount,
@@ -3253,16 +3247,7 @@ function getDataCount(classFilter, sortOrder, adminMode) {
  */
 function testGetDataCount() {
   try {
-    console.log('🧪 getDataCount テスト開始...');
-    
     var result = getDataCount('すべて', 'newest', false);
-    
-    console.log('🧪 テスト結果:', {
-      result: result,
-      status: result ? result.status : 'undefined',
-      count: result ? result.count : 'undefined',
-      message: result ? result.message : 'undefined'
-    });
     
     return result;
   } catch (error) {
@@ -3280,18 +3265,15 @@ function testGetDataCount() {
  */
 function refreshBoardData() {
   try {
-    console.log('🧹 強制キャッシュクリア開始...');
-    
+
     // 1. cacheManagerによる全キャッシュクリア
     const cacheResult = cacheManager.clearAll();
-    console.log('📊 CacheManager結果:', cacheResult);
     
     // 2. 追加のスクリプトキャッシュクリア（念のため）
     try {
       const scriptCache = CacheService.getScriptCache();
       if (scriptCache) {
         scriptCache.removeAll([]);
-        console.log('✅ 追加スクリプトキャッシュクリア完了');
       }
     } catch (scriptCacheError) {
       console.warn('⚠️ 追加スクリプトキャッシュクリア失敗:', scriptCacheError.message);
@@ -3302,7 +3284,6 @@ function refreshBoardData() {
       const userCache = CacheService.getUserCache();
       if (userCache) {
         userCache.removeAll([]);
-        console.log('✅ ユーザーキャッシュクリア完了');
       }
     } catch (userCacheError) {
       console.warn('⚠️ ユーザーキャッシュクリア失敗:', userCacheError.message);
@@ -3312,13 +3293,10 @@ function refreshBoardData() {
     try {
       cacheManager.clearByPattern('publishedData_');
       cacheManager.clearByPattern('sheetData_');
-      console.log('✅ パターンベースキャッシュクリア完了');
     } catch (patternError) {
       console.warn('⚠️ パターンベースキャッシュクリア失敗:', patternError.message);
     }
-    
-    console.log('🧹 全キャッシュクリア完了（新着チェック用）');
-    debugLog('回答ボードのデータ強制再読み込みをトリガーしました。');
+
     return { 
       status: 'success', 
       message: '回答ボードのデータを更新しました。',
