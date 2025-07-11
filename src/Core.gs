@@ -1598,7 +1598,7 @@ function addUnifiedQuestions(form, questionType, customConfig) {
       reasonItem.setTitle(config.reasonQuestion.title);
       reasonItem.setHelpText(config.reasonQuestion.helpText);
       var validation = FormApp.createParagraphTextValidation()
-        .setMaxLength(140)
+        .requireTextLengthLessThanOrEqualTo(140)
         .build();
       reasonItem.setValidation(validation);
       reasonItem.setRequired(false);
