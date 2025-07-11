@@ -501,5 +501,68 @@ window.testSharedUtilities = function() {
   return window.getSharedUtilitiesStats();
 };
 
+// =============================================================================
+// AUTHENTICATION UTILITIES
+// =============================================================================
+
+// Shared authentication functions for consistent behavior across pages
+window.sharedUtilities.auth = {
+  // Account switching functionality
+  switchToAnotherAccount: function() {
+    if (confirm('別のGoogleアカウントでログインしますか？現在のセッションからログアウトされます。')) {
+      // Googleアカウントのログアウト処理
+      window.location.href = 'https://accounts.google.com/logout?continue=' + encodeURIComponent(window.location.href);
+    }
+  },
+  
+  // Authentication verification with promise
+  verifyAuthentication: function() {
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error('認証確認がタイムアウトしました'));
+      }, 10000);
+
+      google.script.run
+        .withSuccessHandler(result => {
+          clearTimeout(timeoutId);
+          if (result && result.authenticated && result.email) {
+            resolve(result);
+          } else {
+            reject(new Error('認証が必要です'));
+          }
+        })
+        .withFailureHandler(error => {
+          clearTimeout(timeoutId);
+          reject(error);
+        })
+        .verifyUserAuthentication();
+    });
+  },
+  
+  // Display authentication info in standardized format
+  displayAuthInfo: function(containerId, email, showSwitchOption = true) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    container.innerHTML = `
+      <div class="bg-gray-800 rounded-lg p-4 mb-4">
+        <p class="text-sm text-gray-400 mb-1">認証済みアカウント:</p>
+        <p class="text-white font-semibold">${window.sharedUtilities.security.escapeHtml(email)}</p>
+      </div>
+      ${showSwitchOption ? `
+      <div class="text-right">
+        <button type="button" onclick="window.sharedUtilities.auth.switchToAnotherAccount()" class="text-cyan-400 hover:text-cyan-300 hover:underline text-sm">
+          別のアカウントでログイン
+        </button>
+      </div>` : ''}
+    `;
+  }
+};
+
+// Global function for backward compatibility
+window.switchToAnotherAccount = function() {
+  window.sharedUtilities.auth.switchToAnotherAccount();
+};
+
 console.log('✅ SharedUtilities loaded successfully - Version 1.0.0');
 </script>

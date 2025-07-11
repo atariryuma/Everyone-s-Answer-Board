@@ -18,33 +18,6 @@
       <p class="text-gray-400">教育現場のための回答ボードシステム</p>
     </div>
     
-    <!-- ドメイン情報表示 -->
-    <div class="mb-6">
-      <!-- ドメイン一致表示 -->
-      <div id="header-domain-match" class="glass-panel bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-3 border border-green-400/30 hidden">
-        <div class="flex items-center gap-2">
-          <svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          <div>
-            <div class="text-green-400 font-semibold text-sm" id="header-domain-match-text">認証済み組織ドメイン</div>
-            <div class="text-green-200 text-xs">所属組織内でのセキュアアクセス</div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- ドメイン不一致表示 -->
-      <div id="header-domain-mismatch" class="glass-panel bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg p-3 border border-yellow-400/30 hidden">
-        <div class="flex items-center gap-2">
-          <svg class="w-4 h-4 text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-          </svg>
-          <div>
-            <div class="text-yellow-400 font-semibold text-sm" id="header-domain-mismatch-text">外部ドメインアクセス</div>
-            <div class="text-yellow-200 text-xs">システム管理者による制限の場合があります</div>
-          </div>
-        </div>
-      </div>
       
       <!-- 初期状態表示 -->
       <div id="header-domain-initial" class="glass-panel bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-3 border border-blue-400/30">
@@ -176,17 +149,48 @@
       <article class="glass-panel rounded-lg p-6" id="section-3">
         <h2 class="text-xl font-semibold mb-4 text-cyan-400 flex items-center gap-2">
           <div class="w-6 h-6 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm" id="step-3-icon">2</div>
-          アカウント確認
+          認証確認
         </h2>
-        <div class="bg-gray-800 rounded-lg p-4 mb-4">
-          <p class="text-sm text-gray-400 mb-1">認証済みアカウント:</p>
-          <p id="user-email" class="text-white font-semibold flex items-center gap-2">
-            <svg class="w-4 h-4 spinner" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
+        
+        <!-- 認証開始ボタン -->
+        <div id="auth-start-section" class="text-center py-6">
+          <p class="text-gray-300 mb-6">回答ボードの作成にはGoogleアカウントでの認証が必要です。</p>
+          <button 
+            type="button" 
+            id="start-auth-btn"
+            class="btn bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-semibold px-6 py-3 rounded-lg transition-all transform hover:scale-105">
+            <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
-            確認中...
+            認証を開始
+          </button>
+          <p class="text-xs text-gray-500 mt-3">
+            <button type="button" onclick="showPrivacyModal()" class="text-cyan-400 hover:underline">プライバシーポリシー</button>
+            および
+            <button type="button" onclick="showDigitalCitizenshipModal()" class="text-cyan-400 hover:underline">デジタル・シティズンシップ</button>
+            に同意の上、認証を行ってください。
           </p>
+        </div>
+        
+        <!-- 認証結果表示 -->
+        <div id="auth-result-section" class="hidden">
+          <div class="bg-gray-800 rounded-lg p-4 mb-4">
+            <p class="text-sm text-gray-400 mb-1">認証済みアカウント:</p>
+            <p id="user-email" class="text-white font-semibold flex items-center gap-2">
+              <svg class="w-4 h-4 spinner hidden" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
+              </svg>
+              <span id="user-email-text">認証待ち...</span>
+            </p>
+          </div>
+          
+          <!-- アカウント切り替えオプション -->
+          <div class="text-right">
+            <button type="button" onclick="switchToAnotherAccount()" class="text-cyan-400 hover:text-cyan-300 hover:underline text-sm">
+              別のアカウントでログイン
+            </button>
+          </div>
         </div>
         
         <!-- Domain Information -->
@@ -375,6 +379,60 @@
     }
     
     // セキュリティ強化: 認証状態の検証
+    // ユーザーが認証開始ボタンをクリックした時の処理
+    function startAuthentication() {
+      // 認証開始セクションを隠し、結果セクションを表示
+      document.getElementById('auth-start-section').classList.add('hidden');
+      document.getElementById('auth-result-section').classList.remove('hidden');
+      
+      // スピナーを表示
+      const spinner = document.querySelector('#user-email .spinner');
+      const emailText = document.getElementById('user-email-text');
+      spinner.classList.remove('hidden');
+      emailText.textContent = '認証中...';
+      
+      // 認証実行
+      verifyAuthentication()
+        .then(async result => {
+          spinner.classList.add('hidden');
+          emailText.textContent = result.email;
+          userEmail = result.email;
+          
+          // ステップ2を完了状態に
+          updateStep(2);
+          
+          try {
+            // 既存ボードをチェック
+            const existingBoardResult = await checkExistingBoard();
+            
+            if (existingBoardResult && existingBoardResult.status === 'existing_user') {
+              showMessage('既存の認証済みアカウントが見つかりました。管理パネルにリダイレクトします...', 'success');
+              setTimeout(() => {
+                window.location.replace(existingBoardResult.adminUrl);
+              }, 1000);
+              return;
+            }
+            
+            // 新規ユーザーまたは登録可能状態
+            updateStep(3);
+            document.getElementById('register-btn').disabled = false;
+            showMessage('認証確認が完了しました。回答ボードを開始できます。', 'success');
+            
+          } catch (boardCheckError) {
+            console.warn('既存ボード確認で問題が発生しました:', boardCheckError);
+            updateStep(3);
+            document.getElementById('register-btn').disabled = false;
+            showMessage('認証確認が完了しました。回答ボードを開始できます。', 'success');
+          }
+        })
+        .catch(error => {
+          spinner.classList.add('hidden');
+          emailText.textContent = '認証に失敗しました';
+          console.error('Authentication error:', error);
+          showMessage('認証に失敗しました。再度お試しください。', 'error');
+        });
+    }
+
     async function verifyAuthentication() {
       return new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
@@ -396,6 +454,14 @@
           })
           .verifyUserAuthentication();
       });
+    }
+
+    // アカウント切り替え機能
+    function switchToAnotherAccount() {
+      if (confirm('別のGoogleアカウントでログインしますか？現在のセッションからログアウトされます。')) {
+        // Googleアカウントのログアウト処理
+        window.location.href = 'https://accounts.google.com/logout?continue=' + encodeURIComponent(window.location.href);
+      }
     }
 
     // 既存ボードをチェックする関数
@@ -420,101 +486,17 @@
     }
 
     // ユーザーメールアドレスを取得
+    // ページ初期化処理（ユーザー同意ベースの認証フロー）
     window.addEventListener('DOMContentLoaded', async () => {
-      showMessage('認証状態を確認中...', 'info');
       loadDomainInfo();
-
-      try {
-        const authResult = await verifyAuthentication();
-        const email = authResult.email;
-        
-        userEmail = email;
-        document.getElementById('user-email').textContent = email || 'メールアドレスを取得できません';
-
-        if (email) {
-          const existingBoardResult = await checkExistingBoard();
-          
-          if (existingBoardResult && existingBoardResult.status === 'existing_user') {
-            showMessage('既存の認証済みアカウントが見つかりました。管理パネルにリダイレクトします...', 'success');
-            setTimeout(() => {
-              window.location.replace(existingBoardResult.adminUrl);
-            }, 1000);
-            return;
-          }
-          
-          updateStep(2);
-          
-          const treatAsNewAccount = sessionStorage.getItem('treat_as_new_account') === 'true';
-          
-          if (treatAsNewAccount) {
-            sessionStorage.removeItem('treat_as_new_account');
-            updateStep(3);
-            document.getElementById('register-btn').disabled = false;
-            showMessage('新しい認証アカウントでの登録を開始できます。', 'success');
-          } else {
-            google.script.run
-              .withSuccessHandler((result) => {
-                if (result && result.status) {
-                  switch (result.status) {
-                    case 'setup_required':
-                      updateStep(3);
-                      showMessage('システムセットアップが必要です。管理者にセットアップページでの初期設定を依頼してください。', 'warning');
-                      break;
-                    case 'existing_user':
-                      updateStep(3);
-                      document.getElementById('register-btn').disabled = true;
-                      showMessage('既存の認証済みアカウントが見つかりました。管理画面にアクセスしてください。', 'info');
-                      if (result.adminUrl) {
-                        const messageArea = document.getElementById('message-area');
-                        messageArea.innerHTML += `<div class="mt-2"><a href="${result.adminUrl}" target="_blank" class="text-cyan-400 hover:text-cyan-300 underline">管理画面を開く</a></div>`;
-                      }
-                      break;
-                    case 'new_user':
-                      updateStep(3);
-                      document.getElementById('register-btn').disabled = false;
-                      showMessage('認証確認が完了しました。回答ボードを開始できます。', 'success');
-                      break;
-                    case 'auth_required':
-                      showMessage('Googleアカウントでログインしてください。', 'error');
-                      break;
-                    default:
-                      updateStep(3);
-                      document.getElementById('register-btn').disabled = false;
-                      showMessage('認証確認が完了しました。回答ボードを開始できます。', 'success');
-                      break;
-                  }
-                } else {
-                  if (result && result.userId) {
-                    updateStep(3);
-                    document.getElementById('register-btn').disabled = true;
-                    showMessage('既存の認証済みアカウントが見つかりました。管理画面にアクセスしてください。', 'info');
-                    if (result.adminUrl) {
-                      const messageArea = document.getElementById('message-area');
-                      messageArea.innerHTML += `<div class="mt-2"><a href="${result.adminUrl}" target="_blank" class="text-cyan-400 hover:text-cyan-300 underline">管理画面を開く</a></div>`;
-                    }
-                  } else {
-                    updateStep(3);
-                    document.getElementById('register-btn').disabled = false;
-                    showMessage('認証確認が完了しました。回答ボードを開始できます。', 'success');
-                  }
-                }
-              })
-            .withFailureHandler((error) => {
-              console.warn('既存ボード確認で問題が発生しました:', error);
-              updateStep(3);
-              document.getElementById('register-btn').disabled = false;
-              showMessage('認証確認が完了しました。回答ボードを開始できます。', 'success');
-            })
-            .getExistingBoard();
-          }
-        } else {
-          showMessage('Googleアカウントでログインしてください。', 'error');
-        }
-      } catch (error) {
-        console.warn('認証確認中にエラーが発生しました');
-        document.getElementById('user-email').textContent = '認証エラー';
-        showMessage('認証が必要です。Googleアカウントでログインしてください。', 'error');
+      
+      // 認証開始ボタンのイベントリスナーを設定
+      const startAuthBtn = document.getElementById('start-auth-btn');
+      if (startAuthBtn) {
+        startAuthBtn.addEventListener('click', startAuthentication);
       }
+      
+      showMessage('回答ボード作成の準備が完了しました。認証を開始してください。', 'info');
     });
     
     // Enterキー対応
