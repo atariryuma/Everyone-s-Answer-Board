@@ -403,12 +403,12 @@ function getIncrementalSheetData(classFilter, sortOrder, adminMode, sinceRowCoun
     // ここでは全列を取得すると仮定 (A列から最終列まで)
     var lastColumn = sheet.getLastColumn();
     var rawNewData = sheet.getRange(startRowToRead, 1, numRowsToRead, lastColumn).getValues();
-    
+
     console.log('📥 スプレッドシートから直接取得した新しいデータ:', rawNewData.length, '件');
-    
+
     // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
     var headerIndices = getHeaderIndices(publishedSpreadsheetId, publishedSheetName);
-    
+
     // 動的列名のマッピング: 設定された名前と実際のヘッダーを照合
     var sheetConfig = configJson['sheet_' + publishedSheetName] || {};
     var mainHeaderName = sheetConfig.opinionHeader || COLUMN_HEADERS.OPINION;
@@ -417,7 +417,7 @@ function getIncrementalSheetData(classFilter, sortOrder, adminMode, sinceRowCoun
     var nameHeaderName = sheetConfig.nameHeader !== undefined ? sheetConfig.nameHeader : COLUMN_HEADERS.NAME;
     var mappedIndices = mapConfigToActualHeaders({
       opinionHeader: mainHeaderName,
-      reasonHeader: reasonHeaderName, 
+      reasonHeader: reasonHeaderName,
       classHeader: classHeaderName,
       nameHeader: nameHeaderName
     }, headerIndices);
@@ -426,8 +426,15 @@ function getIncrementalSheetData(classFilter, sortOrder, adminMode, sinceRowCoun
     var isOwner = (configJson.ownerId === currentUserId);
     var displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
 
+    // 新しいデータを既存の処理パイプラインと同様に加工
+    var headers = sheet.getRange(headerRow, 1, 1, lastColumn).getValues()[0];
+    var rosterMap = buildRosterMap([]); // roster is not used
+    var processedData = rawNewData.map(function(row, idx) {
+      return processRowData(row, headers, headerIndices, rosterMap, displayMode, startRowToRead + idx, isOwner);
+    });
+
     // 取得した生データをPage.htmlが期待する形式にフォーマット
-    var formattedNewData = formatSheetDataForFrontend(rawNewData, mappedIndices, headerIndices, adminMode, isOwner, displayMode);
+    var formattedNewData = formatSheetDataForFrontend(processedData, mappedIndices, headerIndices, adminMode, isOwner, displayMode);
     
     console.log('✅ 増分データ取得完了: %s件の新しいデータを返します', formattedNewData.length);
     
