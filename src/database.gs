@@ -633,15 +633,41 @@ function deleteCurrentUserAccount() {
     lock.waitLock(15000); // 15秒待機
 
     try {
-      // データベース（シート）からユーザー行を削除
-      const dbSheet = getDbSheet();
-      const data = dbSheet.getDataRange().getValues();
+      // データベース（シート）からユーザー行を削除（サービスアカウント経由）
+      var props = PropertiesService.getScriptProperties();
+      var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+      var service = getSheetsService();
+      var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+      
+      // データを取得
+      var response = service.Spreadsheets.Values.get(dbId, sheetName);
+      var data = response.values || [];
+      
       // ユーザーIDに基づいて行を探す（A列がIDと仮定）
+      var rowToDelete = -1;
       for (let i = data.length - 1; i >= 1; i--) {
         if (data[i][0] === userId) {
-          dbSheet.deleteRow(i + 1);
+          rowToDelete = i + 1; // スプレッドシートは1ベース
           break;
         }
+      }
+      
+      if (rowToDelete !== -1) {
+        // 行を削除
+        var deleteRequest = {
+          deleteDimension: {
+            range: {
+              sheetId: 0,
+              dimension: 'ROWS',
+              startIndex: rowToDelete - 1, // APIは0ベース
+              endIndex: rowToDelete
+            }
+          }
+        };
+        
+        service.Spreadsheets.batchUpdate({
+          requests: [deleteRequest]
+        }, dbId);
       }
       
       // 関連するすべてのキャッシュを削除
