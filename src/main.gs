@@ -277,6 +277,33 @@ function doGet(e) {
     // どこからのアクセスかを知るためのログを追加
     const userEmail = Session.getActiveUser().getEmail();
     console.log(`Access by user: ${userEmail}`);
+    
+    // セッション分離の強化：アカウント切り替え検出と整合性保証
+    if (userEmail && !isDirectPageAccess) {
+      try {
+        // アカウント切り替えを検出
+        const switchInfo = detectAccountSwitch(userEmail);
+        if (switchInfo.isAccountSwitch) {
+          console.log('アカウント切り替えを検出しました: ' + switchInfo.previousEmail + ' → ' + switchInfo.currentEmail);
+        }
+        
+        // セッション整合性を検証・修復
+        const sessionValid = validateAndRepairSession(userEmail);
+        if (!sessionValid) {
+          console.warn('セッション整合性の修復に失敗しました。強制初期化を実行します。');
+          forceSessionReset(userEmail);
+        }
+        
+      } catch (sessionError) {
+        console.error('セッション管理でエラーが発生しました: ' + sessionError.message);
+        // 重大なエラーの場合は強制初期化
+        try {
+          forceSessionReset(userEmail);
+        } catch (resetError) {
+          console.error('強制セッション初期化も失敗しました: ' + resetError.message);
+        }
+      }
+    }
 
     const webAppUrl = ScriptApp.getService().getUrl();
     console.log(`Current Web App URL: ${webAppUrl}`);
@@ -385,8 +412,18 @@ function doGet(e) {
           
           template.displayMode = config.displayMode || 'anonymous';
           template.showCounts = config.showCounts !== undefined ? config.showCounts : false;
-          template.showAdminFeatures = false; // Page.html is for public view, not admin
-          template.isAdminUser = false; // Page.html is for public view, not admin
+          
+          // 現在のユーザーがボードの所有者かどうかをチェック
+          const currentUserEmail = Session.getActiveUser().getEmail();
+          const isOwner = currentUserEmail === userInfo.adminEmail;
+          template.showAdminFeatures = isOwner; // 所有者のみに管理機能を提供
+          template.isAdminUser = isOwner; // 所有者のみに管理者権限を付与
+          
+          console.log('DEBUG: Owner check for direct page access:', {
+            currentUserEmail: currentUserEmail,
+            ownerEmail: userInfo.adminEmail,
+            isOwner: isOwner
+          });
           
           // デバッグログ
           console.log('Template variables for direct page access:', {
@@ -406,8 +443,12 @@ function doGet(e) {
           template.sheetName = escapeJavaScript(sheetName);
           template.displayMode = 'anonymous';
           template.showCounts = false;
-          template.showAdminFeatures = false; // Page.html is for public view, not admin
-          template.isAdminUser = false; // Page.html is for public view, not admin
+          
+          // エラー時も所有者チェックを実行
+          const currentUserEmail = Session.getActiveUser().getEmail();
+          const isOwner = currentUserEmail === userInfo.adminEmail;
+          template.showAdminFeatures = isOwner;
+          template.isAdminUser = isOwner;
         }
         
         return template.evaluate()
@@ -468,8 +509,12 @@ function doGet(e) {
             
             template.displayMode = config.displayMode || 'anonymous';
             template.showCounts = config.showCounts !== undefined ? config.showCounts : false;
-            template.showAdminFeatures = false; // Page.html is for public view, not admin
-            template.isAdminUser = false; // Page.html is for public view, not admin
+            
+            // 現在のユーザーがボードの所有者かどうかをチェック
+            const currentUserEmail = Session.getActiveUser().getEmail();
+            const isOwner = currentUserEmail === userInfo.adminEmail;
+            template.showAdminFeatures = isOwner; // 所有者のみに管理機能を提供
+            template.isAdminUser = isOwner; // 所有者のみに管理者権限を付与
 
           } catch (e) {
             template.opinionHeader = escapeJavaScript('お題の読込エラー');
@@ -480,8 +525,12 @@ function doGet(e) {
             template.sheetName = escapeJavaScript(sheetName);
             template.displayMode = 'anonymous';
             template.showCounts = false;
-            template.showAdminFeatures = false; // Page.html is for public view, not admin
-            template.isAdminUser = false; // Page.html is for public view, not admin
+            
+            // エラー時も所有者チェックを実行
+            const currentUserEmail = Session.getActiveUser().getEmail();
+            const isOwner = currentUserEmail === userInfo.adminEmail;
+            template.showAdminFeatures = isOwner;
+            template.isAdminUser = isOwner;
           }
           
           return template.evaluate()
