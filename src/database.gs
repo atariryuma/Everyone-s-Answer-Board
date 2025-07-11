@@ -674,8 +674,8 @@ function deleteCurrentUserAccount() {
       invalidateUserCache(userId, userInfo.adminEmail, userInfo.spreadsheetId);
       
       // UserPropertiesからも関連情報を削除
-      const props = PropertiesService.getUserProperties();
-      props.deleteProperty('CURRENT_USER_ID');
+      const userProps = PropertiesService.getUserProperties();
+      userProps.deleteProperty('CURRENT_USER_ID');
 
     } finally {
       lock.releaseLock();
