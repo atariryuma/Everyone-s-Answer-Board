@@ -299,7 +299,8 @@ function doGet(e) {
     console.log(`Access by user: ${userEmail}`);
     
     // セッション分離の強化：アカウント切り替え検出と整合性保証
-    if (userEmail && !isDirectPageAccess) {
+    // 回答ボード（isDirectPageAccess）でも現在のユーザーのセッション管理を実行
+    if (userEmail) {
       try {
         // アカウント切り替えを検出
         const switchInfo = detectAccountSwitch(userEmail);
@@ -444,6 +445,16 @@ function doGet(e) {
         template.include = include;
 
         try {
+          // 回答ボード表示用のスプレッドシートアクセス権限を確保
+          if (userInfo.spreadsheetId) {
+            try {
+              addServiceAccountToSpreadsheet(userInfo.spreadsheetId, true); // allowCurrentUserAccess = true
+              console.log('DEBUG: 回答ボード用のスプレッドシートアクセス権限を設定しました');
+            } catch (accessSetupError) {
+              console.warn('DEBUG: 回答ボード用のアクセス権限設定で警告:', accessSetupError.message);
+            }
+          }
+          
           const config = JSON.parse(userInfo.configJson || '{}');
           const sheetConfigKey = 'sheet_' + (config.publishedSheetName || sheetName);
           const sheetConfig = config[sheetConfigKey] || {};
@@ -581,6 +592,16 @@ function doGet(e) {
           template.include = include;
           
           try {
+            // 通常の回答ボード表示用のスプレッドシートアクセス権限を確保
+            if (userInfo.spreadsheetId) {
+              try {
+                addServiceAccountToSpreadsheet(userInfo.spreadsheetId, true); // allowCurrentUserAccess = true
+                console.log('DEBUG: 通常の回答ボード用のスプレッドシートアクセス権限を設定しました');
+              } catch (accessSetupError) {
+                console.warn('DEBUG: 通常の回答ボード用のアクセス権限設定で警告:', accessSetupError.message);
+              }
+            }
+            
             const config = JSON.parse(userInfo.configJson || '{}');
             const sheetConfigKey = 'sheet_' + (config.publishedSheetName || sheetName);
             const sheetConfig = config[sheetConfigKey] || {};
