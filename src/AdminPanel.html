@@ -2817,9 +2817,18 @@ function syncCheckboxStates(status) {
         const modal = document.getElementById('form-config-modal');
         if (modal) {
             modal.classList.remove('hidden');
-            
+
             // 保存されたクラス選択肢を読み込み
             loadSavedClassChoices();
+
+            const mainQuestion = document.getElementById('custom-main-question');
+            if (mainQuestion && !mainQuestion.value.trim()) {
+                mainQuestion.value = '今日のテーマについて、あなたの考えや意見を聞かせてください';
+            }
+            const mainChoices = document.getElementById('main-question-choices');
+            if (mainChoices && !mainChoices.value.trim()) {
+                mainChoices.value = '気づいたことがある。\n疑問に思うことがある。\nもっと知りたいことがある。';
+            }
         }
     }
 
@@ -3100,7 +3109,7 @@ function syncCheckboxStates(status) {
               <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
               <h4 class="text-lg font-semibold text-blue-400">問題文を入力</h4>
             </div>
-            <textarea id="custom-main-question" rows="3" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors" placeholder="今日のテーマについて、あなたの考えや意見を聞かせてください"></textarea>
+            <textarea id="custom-main-question" rows="3" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors" placeholder="今日のテーマについて、あなたの考えや意見を聞かせてください">今日のテーマについて、あなたの考えや意見を聞かせてください</textarea>
             <p class="text-xs text-gray-400 mt-2">学習者に表示される質問文を入力してください</p>
           </div>
 
@@ -3124,7 +3133,9 @@ function syncCheckboxStates(status) {
               <div class="w-6 h-6 bg-yellow-500 text-white rounded-full flex items-center justify-center text-sm font-bold">3</div>
               <h4 class="text-lg font-semibold text-yellow-400">選択肢を設定</h4>
             </div>
-            <textarea id="main-question-choices" rows="4" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-colors" placeholder="気づいたことがある。&#10;疑問に思うことがある。&#10;もっと知りたいことがある。"></textarea>
+            <textarea id="main-question-choices" rows="4" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-colors" placeholder="気づいたことがある。&#10;疑問に思うことがある。&#10;もっと知りたいことがある。">気づいたことがある。
+疑問に思うことがある。
+もっと知りたいことがある。</textarea>
             <p class="text-xs text-gray-400 mt-2">💡 学習者が選択できる選択肢を1行に1つずつ入力してください。例のような評価軸や、具体的な選択肢を設定できます。</p>
             
             <div class="mt-4">
