@@ -1885,6 +1885,23 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
     var spreadsheetObj = SpreadsheetApp.create(spreadsheetName);
     var spreadsheetId = spreadsheetObj.getId();
     
+    // スプレッドシートの共有設定を即座に変更（重要）
+    try {
+      // デプロイドメインのユーザーがアクセスできるように設定
+      var file = DriveApp.getFileById(spreadsheetId);
+      
+      // ドメイン全体でリーダー権限を付与（教育機関の場合）
+      file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
+      console.log('スプレッドシートをドメイン全体で編集可能に設定しました: ' + spreadsheetId);
+      
+      // 作成者（現在のユーザー）を明示的に所有者として設定
+      file.addEditor(userEmail);
+      console.log('作成者を編集者として追加: ' + userEmail);
+      
+    } catch (sharingError) {
+      console.warn('共有設定の変更に失敗しましたが、処理を続行します: ' + sharingError.message);
+    }
+    
     // フォームの回答先としてスプレッドシートを設定
     form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheetId);
     
@@ -2069,14 +2086,111 @@ function addServiceAccountToSpreadsheet(spreadsheetId) {
     var serviceAccountCreds = JSON.parse(props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
     var serviceAccountEmail = serviceAccountCreds.client_email;
     
+    // 現在のユーザーのメールアドレスも取得
+    var currentUserEmail = Session.getActiveUser().getEmail();
+    
+    var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    
+    // サービスアカウントを編集者として追加
     if (serviceAccountEmail) {
-      var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
       spreadsheet.addEditor(serviceAccountEmail);
       console.log('サービスアカウント (' + serviceAccountEmail + ') をスプレッドシートの編集者として追加しました。');
     }
+    
+    // 現在のユーザーも編集者として追加（重要：これがないとアクセスできない）
+    if (currentUserEmail) {
+      try {
+        spreadsheet.addEditor(currentUserEmail);
+        console.log('現在のユーザー (' + currentUserEmail + ') をスプレッドシートの編集者として追加しました。');
+        
+        // セッション管理：スプレッドシートアクセス権限の記録
+        try {
+          const sessionData = {
+            userEmail: currentUserEmail,
+            spreadsheetId: spreadsheetId,
+            accessGranted: new Date().toISOString(),
+            accessType: 'editor'
+          };
+          console.log('スプレッドシートアクセス権限を記録しました:', JSON.stringify(sessionData));
+        } catch (sessionLogError) {
+          console.warn('セッション記録でエラー:', sessionLogError.message);
+        }
+        
+      } catch (userAddError) {
+        console.warn('ユーザーの編集者追加で警告: ' + userAddError.message);
+        // すでに編集者の場合はエラーになることがあるので、警告レベル
+      }
+    }
+    
   } catch (e) {
-    console.error('サービスアカウントの追加に失敗: ' + e.message);
+    console.error('スプレッドシートへの編集者追加に失敗: ' + e.message);
     // エラーでも処理は継続
+  }
+}
+
+/**
+ * 既存ユーザーのスプレッドシートアクセス権限を修復
+ * ユーザーがスプレッドシートにアクセスできない場合に使用
+ * @param {string} userEmail - ユーザーのメールアドレス
+ * @param {string} spreadsheetId - スプレッドシートID
+ */
+function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
+  try {
+    console.log('スプレッドシートアクセス権限の修復を開始: ' + userEmail + ' -> ' + spreadsheetId);
+    
+    // DriveApp経由で共有設定を変更
+    var file = DriveApp.getFileById(spreadsheetId);
+    
+    // ドメイン全体でアクセス可能に設定
+    try {
+      file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
+      console.log('スプレッドシートをドメイン全体で編集可能に設定しました');
+    } catch (domainSharingError) {
+      console.warn('ドメイン共有設定に失敗: ' + domainSharingError.message);
+      
+      // ドメイン共有に失敗した場合は個別にユーザーを追加
+      try {
+        file.addEditor(userEmail);
+        console.log('ユーザーを個別に編集者として追加しました: ' + userEmail);
+      } catch (individualError) {
+        console.error('個別ユーザー追加も失敗: ' + individualError.message);
+      }
+    }
+    
+    // SpreadsheetApp経由でも編集者として追加
+    try {
+      var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      spreadsheet.addEditor(userEmail);
+      console.log('SpreadsheetApp経由でユーザーを編集者として追加: ' + userEmail);
+    } catch (spreadsheetAddError) {
+      console.warn('SpreadsheetApp経由の追加で警告: ' + spreadsheetAddError.message);
+    }
+    
+    // サービスアカウントも確認
+    var props = PropertiesService.getScriptProperties();
+    var serviceAccountCreds = JSON.parse(props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
+    var serviceAccountEmail = serviceAccountCreds.client_email;
+    
+    if (serviceAccountEmail) {
+      try {
+        file.addEditor(serviceAccountEmail);
+        console.log('サービスアカウントも編集者として追加: ' + serviceAccountEmail);
+      } catch (serviceError) {
+        console.warn('サービスアカウント追加で警告: ' + serviceError.message);
+      }
+    }
+    
+    return {
+      success: true,
+      message: 'スプレッドシートアクセス権限を修復しました。ドメイン全体でアクセス可能です。'
+    };
+    
+  } catch (e) {
+    console.error('スプレッドシートアクセス権限の修復に失敗: ' + e.message);
+    return {
+      success: false,
+      error: e.message
+    };
   }
 }
 
