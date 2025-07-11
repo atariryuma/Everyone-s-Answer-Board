@@ -165,8 +165,9 @@ const __IS_STUDENT_MODE__ = '<?= typeof isStudentMode !== "undefined" ? isStuden
 const __IS_ADMIN_USER__ = '<?= typeof isAdminUser !== "undefined" ? isAdminUser : false ?>';
 window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : __SHOW_COUNTS__ === 'true';
 window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
-// Use server-provided showAdminFeatures value (respect ownership permissions)
-window.showAdminFeatures = __SHOW_ADMIN_FEATURES__.startsWith('<') ? false : __SHOW_ADMIN_FEATURES__ === 'true';
+// Store server-provided admin capability but always start in view mode
+window.hasAdminCapability = __SHOW_ADMIN_FEATURES__.startsWith('<') ? false : __SHOW_ADMIN_FEATURES__ === 'true';
+window.showAdminFeatures = false; // Always start in view mode
 window.showHighlightToggle = __SHOW_HIGHLIGHT_TOGGLE__.startsWith('<') ? false : __SHOW_HIGHLIGHT_TOGGLE__ === 'true';
 window.showScoreSort = __SHOW_SCORE_SORT__.startsWith('<') ? false : __SHOW_SCORE_SORT__ === 'true';
 window.isStudentMode = __IS_STUDENT_MODE__.startsWith('<') ? true : __IS_STUDENT_MODE__ === 'true';
@@ -1026,7 +1027,7 @@ class StudyQuestApp {
       isStudentMode: window.isStudentMode,
       isAdminUser: window.isAdminUser,
       showCounts: window.showCounts,
-      showAdminFeatures: window.showAdminFeatures,
+      showAdminFeatures: false, // 初期状態は常に閲覧モード
       showHighlightToggle: window.isAdminUser, // 管理者なら常に表示
       showScoreSort: window.showScoreSort,
       displayMode: window.displayMode,
@@ -1108,13 +1109,22 @@ class StudyQuestApp {
         this.adjustLayout();
         this.updateSortOptions();
         this.setupObservers();
-        // Initial admin state setup - 管理者であっても最初は閲覧モードで起動、切り替えボタンのみ表示
-        if (window.isAdminUser) {
+        // Initial admin state setup - 管理者権限があっても最初は閲覧モードで起動
+        if (window.hasAdminCapability && window.isAdminUser) {
           this.state.isAdminUser = true;
+          this.state.showAdminFeatures = false; // 初期は閲覧モード
           if (this.elements.adminToggleBtn) {
             this.elements.adminToggleBtn.classList.remove('hidden');
             this.elements.adminToggleBtn.removeAttribute('hidden');
-            this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
+            this.elements.adminToggleBtn.textContent = '管理モード';
+          }
+        } else {
+          // 非管理者の場合は管理機能を完全に無効化
+          this.state.isAdminUser = false;
+          this.state.showAdminFeatures = false;
+          if (this.elements.adminToggleBtn) {
+            this.elements.adminToggleBtn.classList.add('hidden');
+            this.elements.adminToggleBtn.setAttribute('hidden', '');
           }
         }
         // Check if modal should be shown
@@ -3082,7 +3092,7 @@ async handleReaction(rowIndex, reaction) {
       
       // 管理者権限チェック
       if (enable) {
-        if (!this.state.isAdminUser) {
+        if (!this.state.isAdminUser || !window.hasAdminCapability) {
           console.warn('管理者権限がありません。');
           return;
         }
