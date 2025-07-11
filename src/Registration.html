@@ -14,26 +14,50 @@
 <body class="bg-[#1a1b26] text-gray-200 font-sans min-h-screen">
   <div class="container mx-auto px-4 py-8">
     <div class="glass-panel rounded-xl p-6 sm:p-8 max-w-4xl mx-auto shadow-2xl">
-    <div class="text-center mb-8">
+    <div class="text-center mb-6">
       <h1 class="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent mb-2">📚 StudyQuest</h1>
       <p class="text-gray-400">みんなの回答ボード - 新規ユーザー登録</p>
     </div>
     
-      
+    <!-- ドメイン情報表示 -->
+    <div class="mb-6">
       <!-- 初期状態表示 -->
-      <div id="header-domain-initial" class="glass-panel bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-3 border border-blue-400/30">
-        <div class="flex items-center gap-2">
+      <div id="header-domain-initial" class="glass-panel bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-4 border border-blue-400/30">
+        <div class="flex items-center gap-3">
           <div class="w-3 h-3 bg-blue-400 rounded-full flex-shrink-0"></div>
-          <div>
+          <div class="flex-1">
             <div class="text-blue-400 font-semibold text-sm">回答ボードシステム</div>
-            <div class="text-blue-200 text-xs">認証開始をお待ちください</div>
+            <div class="text-blue-200 text-xs">組織情報を読み込み中...</div>
           </div>
         </div>
       </div>
+      
+      <!-- ドメイン一致時の表示 -->
+      <div id="header-domain-match" class="glass-panel bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-4 border border-green-400/30 hidden">
+        <div class="flex items-center gap-3">
+          <div class="w-3 h-3 bg-green-400 rounded-full flex-shrink-0"></div>
+          <div class="flex-1">
+            <div class="text-green-400 font-semibold text-sm">認証済み組織</div>
+            <div class="text-green-200 text-xs" id="header-domain-match-text">組織情報を確認中...</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- ドメイン不一致時の表示 -->
+      <div id="header-domain-mismatch" class="glass-panel bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg p-4 border border-yellow-400/30 hidden">
+        <div class="flex items-start gap-3">
+          <div class="w-3 h-3 bg-yellow-400 rounded-full flex-shrink-0 mt-0.5"></div>
+          <div class="flex-1">
+            <div class="text-yellow-400 font-semibold text-sm">組織ドメイン確認</div>
+            <div class="text-yellow-200 text-xs" id="header-domain-mismatch-text">ドメイン情報を確認中...</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    <!-- メインCTA -->
-    <div class="text-center mb-8">
-      <div class="glass-panel bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 rounded-xl p-6 border border-emerald-400/30">
+    <div class="space-y-6">
+      <!-- メインCTA -->
+      <article class="glass-panel bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 rounded-lg p-6 border border-emerald-400/30">
         <h2 class="text-2xl font-bold text-white mb-3">🚀 30秒で回答ボードを作成</h2>
         <p class="text-emerald-200 mb-6">あなた専用のGoogleフォームとシートを自動作成し、即座に回答ボードとして利用開始できます</p>
         
@@ -66,11 +90,9 @@
             外部AIサービス（ChatGPT、Claude等）への送信なし • Google Workspace内で完結 • 学習データ完全分離
           </div>
         </div>
-      </div>
-    </div>
+      </article>
 
-    <!-- 簡潔な3ステップ表示 -->
-    <div class="mb-8">
+      <!-- 簡潔な3ステップ表示 -->
       <div class="flex items-center justify-between relative">
         <div class="absolute top-4 left-0 right-0 h-0.5 bg-gray-600 rounded-full"></div>
         <div class="absolute top-4 left-0 h-0.5 bg-gradient-to-r from-cyan-400 to-blue-400 transition-all duration-500 rounded-full" id="progress-bar"></div>
@@ -88,9 +110,7 @@
           <span class="text-xs mt-2 block text-gray-400">開始</span>
         </div>
       </div>
-    </div>
 
-    <div class="space-y-6">
       <!-- 機能概要 -->
       <article class="glass-panel rounded-lg p-6" id="section-1">
         <h2 class="text-xl font-semibold mb-4 text-cyan-400 flex items-center gap-2">
@@ -303,29 +323,51 @@
       
       if (!info || info.error) {
         console.warn('ドメイン情報の取得エラー:', info?.error);
+        // エラー時は初期状態を更新
+        if (headerInitial) {
+          document.querySelector('#header-domain-initial .text-blue-200').textContent = 'ドメイン情報の取得に失敗しました';
+        }
         return;
       }
 
-      section.classList.remove('hidden');
+      // ヘッダー部分の更新
       if (headerInitial) headerInitial.classList.add('hidden');
 
       if (info.isDomainMatch) {
         // ドメインが一致している場合
-        matchPanel.classList.remove('hidden');
-        mismatchPanel.classList.add('hidden');
-        if (headerMatch) headerMatch.classList.remove('hidden');
+        if (headerMatch) {
+          headerMatch.classList.remove('hidden');
+          document.getElementById('header-domain-match-text').textContent =
+            `${info.deployDomain} ドメインの認証済みユーザーです`;
+        }
         if (headerMismatch) headerMismatch.classList.add('hidden');
-        document.getElementById('domain-match-text').textContent =
-          `このウェブアプリは ${info.deployDomain} ドメイン用です。あなたのアカウント（${info.currentDomain}）で利用できます。`;
+        
+        // セクション内の詳細情報も更新
+        if (section) section.classList.remove('hidden');
+        if (matchPanel) {
+          matchPanel.classList.remove('hidden');
+          document.getElementById('domain-match-text').textContent =
+            `このウェブアプリは ${info.deployDomain} ドメイン用です。あなたのアカウント（${info.currentDomain}）で利用できます。`;
+        }
+        if (mismatchPanel) mismatchPanel.classList.add('hidden');
       } else {
         // ドメインが不一致の場合
-        matchPanel.classList.add('hidden');
-        mismatchPanel.classList.remove('hidden');
+        if (headerMismatch) {
+          headerMismatch.classList.remove('hidden');
+          document.getElementById('header-domain-mismatch-text').textContent =
+            `このアプリは ${info.deployDomain} ドメイン用です（現在: ${info.currentDomain}）`;
+        }
         if (headerMatch) headerMatch.classList.add('hidden');
-        if (headerMismatch) headerMismatch.classList.remove('hidden');
-        document.getElementById('domain-mismatch-text').textContent =
-          `あなたのアカウントのドメイン（${info.currentDomain}）とは異なります。機能が制限される可能性があります。`;
-        document.getElementById('deploy-domain').textContent = info.deployDomain;
+        
+        // セクション内の詳細情報も更新
+        if (section) section.classList.remove('hidden');
+        if (mismatchPanel) {
+          mismatchPanel.classList.remove('hidden');
+          document.getElementById('domain-mismatch-text').textContent =
+            `あなたのアカウントのドメイン（${info.currentDomain}）とは異なります。機能が制限される可能性があります。`;
+          document.getElementById('deploy-domain').textContent = info.deployDomain;
+        }
+        if (matchPanel) matchPanel.classList.add('hidden');
       }
     }
     
@@ -391,9 +433,6 @@
       const emailText = document.getElementById('user-email-text');
       spinner.classList.remove('hidden');
       emailText.textContent = '認証中...';
-      
-      // ドメイン情報を認証後に読み込み
-      loadDomainInfo();
       
       // 認証実行
       verifyAuthentication()
@@ -497,6 +536,9 @@
       if (startAuthBtn) {
         startAuthBtn.addEventListener('click', startAuthentication);
       }
+      
+      // ドメイン情報を事前に読み込み
+      loadDomainInfo();
       
       showMessage('回答ボード作成の準備が完了しました。認証を開始してください。', 'info');
     });
