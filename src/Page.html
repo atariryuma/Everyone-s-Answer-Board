@@ -1069,7 +1069,7 @@ class StudyQuestApp {
     // リアクション状態保存用のキー
     this.reactionStorageKey = `reactions_${USER_ID}_${SHEET_NAME}`;
     this.gas = {
-      getPublishedSheetData: (sheetName, classFilter, sort) => this.runGas('getPublishedSheetData', sheetName, classFilter, sort),
+      getPublishedSheetData: (sheetName, classFilter, sort, adminMode) => this.runGas('getPublishedSheetData', sheetName, classFilter, sort, adminMode),
       getAvailableSheets: () => this.runGas('getAvailableSheets'),
       addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', rowIndex, reaction, sheetName),
       toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', rowIndex, sheetName),
@@ -1730,7 +1730,7 @@ setupEventDelegation() {
     try {
       const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
       const sortOrder = this.elements.sortOrder.value;
-      const data = await     this.gas.getPublishedSheetData(selectedClass, sortOrder);
+      const data = await     this.gas.getPublishedSheetData(selectedClass, sortOrder, this.state.showAdminFeatures);
       
       // 成功した場合は失敗カウントをリセット
       this.state.pollingFailureCount = 0;
@@ -2250,7 +2250,7 @@ setupEventDelegation() {
           
           this.displayEmptyState();
         })
-        .getPublishedSheetData(classFilter, sortOrder);
+        .getPublishedSheetData(classFilter, sortOrder, this.state.showAdminFeatures);
       
       
       // Post-processing after successful data load

@@ -191,15 +191,15 @@ function addReaction(rowIndex, reactionKey, sheetName) {
  * 公開されたシートのデータを取得
  * Page.htmlから呼び出される - フロントエンド期待形式に対応
  */
-function getPublishedSheetData(classFilter, sortOrder) {
+function getPublishedSheetData(classFilter, sortOrder, adminMode) {
   // キャッシュキー生成（パフォーマンス向上）
-  var requestKey = `publishedData_${classFilter}_${sortOrder}`;
+  var requestKey = `publishedData_${classFilter}_${sortOrder}_${adminMode}`;
   
   return cacheManager.get(requestKey, () => {
     try {
       var props = PropertiesService.getUserProperties();
       var currentUserId = props.getProperty('CURRENT_USER_ID');
-      debugLog('getPublishedSheetData: userId=%s, classFilter=%s, sortOrder=%s', currentUserId, classFilter, sortOrder);
+      debugLog('getPublishedSheetData: userId=%s, classFilter=%s, sortOrder=%s, adminMode=%s', currentUserId, classFilter, sortOrder, adminMode);
       
       if (!currentUserId) {
         throw new Error('ユーザーコンテキストが設定されていません');
@@ -280,9 +280,45 @@ function getPublishedSheetData(classFilter, sortOrder) {
       debugLog('getPublishedSheetData: Row %s - classIndex=%s, opinionIndex=%s, reasonIndex=%s, nameIndex=%s', index, classIndex, opinionIndex, reasonIndex, nameIndex);
       debugLog('getPublishedSheetData: Row data length=%s, first few values=%s', row.originalData ? row.originalData.length : 'undefined', row.originalData ? JSON.stringify(row.originalData.slice(0, 5)) : 'undefined');
       
+      // 名前データの詳細ログ
+      var nameValue = '';
+      // 管理モードが有効な場合は強制的に名前を表示
+      var shouldShowName = (adminMode === true || sheetData.displayMode === DISPLAY_MODES.NAMED || isOwner);
+      var hasNameIndex = nameIndex !== undefined;
+      var hasOriginalData = row.originalData && row.originalData.length > 0;
+      var hasNameData = hasOriginalData && nameIndex !== undefined && row.originalData[nameIndex];
+      
+      // 管理モード、ネームドモード、または所有者の場合は常に名前を表示
+      if (shouldShowName && hasNameIndex && hasOriginalData) {
+        nameValue = row.originalData[nameIndex] || '';
+      }
+      
+      // フォールバック: emailから名前を生成
+      if (!nameValue && shouldShowName && hasOriginalData) {
+        var emailIndex = headerIndices[COLUMN_HEADERS.EMAIL];
+        if (emailIndex !== undefined && row.originalData[emailIndex]) {
+          nameValue = row.originalData[emailIndex].split('@')[0];
+        }
+      }
+      
+      console.log('🔍 サーバー側名前データ詳細:', {
+        rowIndex: row.rowNumber || (index + 2),
+        shouldShowName: shouldShowName,
+        adminMode: adminMode,
+        displayMode: sheetData.displayMode,
+        isOwner: isOwner,
+        nameIndex: nameIndex,
+        hasNameIndex: hasNameIndex,
+        hasOriginalData: hasOriginalData,
+        originalDataLength: row.originalData ? row.originalData.length : 'undefined',
+        nameValue: nameValue,
+        rawNameData: hasOriginalData && nameIndex !== undefined ? row.originalData[nameIndex] : 'N/A'
+      });
+
       return {
         rowIndex: row.rowNumber || (index + 2), // 実際の行番号
-        name: ((sheetData.displayMode === DISPLAY_MODES.NAMED || isOwner) && nameIndex !== undefined && row.originalData && row.originalData[nameIndex]) ? row.originalData[nameIndex] : '',
+        name: nameValue,
+        email: row.originalData && row.originalData[headerIndices[COLUMN_HEADERS.EMAIL]] ? row.originalData[headerIndices[COLUMN_HEADERS.EMAIL]] : '',
         class: (classIndex !== undefined && row.originalData && row.originalData[classIndex]) ? row.originalData[classIndex] : '',
         opinion: (opinionIndex !== undefined && row.originalData && row.originalData[opinionIndex]) ? row.originalData[opinionIndex] : '',
         reason: (reasonIndex !== undefined && row.originalData && row.originalData[reasonIndex]) ? row.originalData[reasonIndex] : '',
@@ -315,15 +351,26 @@ function getPublishedSheetData(classFilter, sortOrder) {
     
     // ...（データ取得とフォーマット処理は変更なし）...
 
+    // 管理モード時はdisplayModeを強制的に'named'に設定
+    var finalDisplayMode = (adminMode === true) ? DISPLAY_MODES.NAMED : (sheetData.displayMode || DISPLAY_MODES.ANONYMOUS);
+    
     // 最終的に返すオブジェクトの header プロパティに、取得したタイトルを設定
     var result = {
       header: headerTitle,
       sheetName: publishedSheetName, // targetSheetからpublishedSheetNameに変更
-      showCounts: configJson.showCounts === true,
-      displayMode: sheetData.displayMode || DISPLAY_MODES.ANONYMOUS,
+      showCounts: (adminMode === true) ? true : (configJson.showCounts === true),
+      displayMode: finalDisplayMode,
       data: formattedData,
       rows: formattedData // 後方互換性のため
     };
+    
+    console.log('🔍 最終結果:', {
+      adminMode: adminMode,
+      originalDisplayMode: sheetData.displayMode,
+      finalDisplayMode: finalDisplayMode,
+      dataCount: formattedData.length,
+      showCounts: result.showCounts
+    });
     debugLog('getPublishedSheetData: Returning result=%s', JSON.stringify(result));
     return result;
     
