@@ -270,8 +270,9 @@ function showRegistrationPage() {
  * @returns {HtmlOutput} 表示するHTMLコンテンツ
  */
 function doGet(e) {
-  var requestKey = `doGet_${JSON.stringify(e?.parameter || {})}`;
-  return cacheManager.get(requestKey, () => {
+  try {
+    var requestKey = `doGet_${JSON.stringify(e?.parameter || {})}`;
+    var result = cacheManager.get(requestKey, () => {
     debugLog('doGet called with event object:', e);
     try {
       const params = parseRequestParams(e);
@@ -311,7 +312,19 @@ function doGet(e) {
       );
       return safeSetXFrameOptionsDeny(errorHtml);
     }
-  }, { ttl: 60 });
+    }, { ttl: 60 });
+    
+    // HtmlOutputオブジェクトかどうかチェックして返す
+    if (result && typeof result.getContent === 'function') {
+      return result;
+    } else {
+      console.error('doGet: Invalid return value type:', typeof result);
+      return HtmlService.createHtmlOutput('<h1>エラー</h1><p>不正な戻り値が検出されました。</p>');
+    }
+  } catch (error) {
+    console.error('doGet wrapper error:', error);
+    return HtmlService.createHtmlOutput('<h1>エラー</h1><p>システムエラーが発生しました。</p>');
+  }
 }
 
 /**

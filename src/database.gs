@@ -12,8 +12,17 @@ var DB_BATCH_SIZE = 100;
  * @returns {object} Sheets APIサービス
  */
 function getSheetsService() {
-  var accessToken = getServiceAccountTokenCached();
-  return createSheetsService(accessToken);
+  try {
+    var accessToken = getServiceAccountTokenCached();
+    if (!accessToken) {
+      console.error('Failed to get service account token');
+      return null;
+    }
+    return createSheetsService(accessToken);
+  } catch (error) {
+    console.error('getSheetsService error:', error.message);
+    return null;
+  }
 }
 
 /**
@@ -636,7 +645,15 @@ function deleteCurrentUserAccount() {
       // データベース（シート）からユーザー行を削除（サービスアカウント経由）
       var props = PropertiesService.getScriptProperties();
       var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+      if (!dbId) {
+        throw new Error('データベースIDが設定されていません');
+      }
+      
       var service = getSheetsService();
+      if (!service) {
+        throw new Error('Sheets APIサービスの初期化に失敗しました');
+      }
+      
       var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
       
       // データを取得
