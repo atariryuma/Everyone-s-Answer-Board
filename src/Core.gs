@@ -2108,7 +2108,7 @@ function createStudyQuestForm(userEmail, userId, formTitle, questionType) {
 /**
  * サービスアカウントをスプレッドシートに追加
  */
-function addServiceAccountToSpreadsheet(spreadsheetId, allowCurrentUserAccess = false) {
+function addServiceAccountToSpreadsheet(spreadsheetId) {
   try {
     var props = PropertiesService.getScriptProperties();
     var serviceAccountCreds = JSON.parse(props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
@@ -2116,7 +2116,7 @@ function addServiceAccountToSpreadsheet(spreadsheetId, allowCurrentUserAccess = 
     
     var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     
-    // サービスアカウントを編集者として追加
+    // サービスアカウントのみを編集者として追加（制限的アクセス）
     if (serviceAccountEmail) {
       spreadsheet.addEditor(serviceAccountEmail);
       console.log('サービスアカウント (' + serviceAccountEmail + ') をスプレッドシートの編集者として追加しました。');
@@ -2128,7 +2128,7 @@ function addServiceAccountToSpreadsheet(spreadsheetId, allowCurrentUserAccess = 
           spreadsheetId: spreadsheetId,
           accessGranted: new Date().toISOString(),
           accessType: 'service_account_editor',
-          securityLevel: allowCurrentUserAccess ? 'read_access' : 'restricted'
+          securityLevel: 'restricted'
         };
         console.log('サービスアカウントアクセス権限を記録しました:', JSON.stringify(sessionData));
       } catch (sessionLogError) {
@@ -2136,24 +2136,12 @@ function addServiceAccountToSpreadsheet(spreadsheetId, allowCurrentUserAccess = 
       }
     }
     
-    // 回答ボードアクセス時は現在のユーザーにも読み取り権限を付与
-    if (allowCurrentUserAccess) {
-      try {
-        const currentUserEmail = Session.getActiveUser().getEmail();
-        if (currentUserEmail) {
-          spreadsheet.addViewer(currentUserEmail);
-          console.log('現在のユーザー (' + currentUserEmail + ') に回答ボード用の閲覧権限を付与しました。');
-        }
-      } catch (userAccessError) {
-        console.warn('ユーザー閲覧権限の付与で警告: ' + userAccessError.message);
-        // エラーでも処理は継続（既に権限がある場合など）
-      }
-    } else {
-      console.log('制限的アクセス設定: サービスアカウントのみがスプレッドシートにアクセス可能');
-    }
+    // 注意：制限的設定により、ユーザーは直接スプレッドシートにアクセスできません
+    // すべてのアクセスはサービスアカウント経由で行われます
+    console.log('制限的アクセス設定完了: サービスアカウントのみがスプレッドシートにアクセス可能');
     
   } catch (e) {
-    console.error('スプレッドシートアクセス権限の設定に失敗: ' + e.message);
+    console.error('サービスアカウントの追加に失敗: ' + e.message);
     // エラーでも処理は継続
   }
 }
