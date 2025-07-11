@@ -1038,6 +1038,10 @@ class StudyQuestApp {
       pollingFailureCount: 0
     };
     
+    // 新着チェック用の初期化
+    this.lastViewKey = null;
+    this.initialDataLoaded = false;
+    
     debugLog('初期状態設定:', {
       isAdminUser: this.state.isAdminUser,
       windowIsAdminUser: window.isAdminUser,
@@ -1762,8 +1766,21 @@ setupEventDelegation() {
       // 現在のフィルター/ソート設定をキーとして保存
       const currentViewKey = `${selectedClass}-${sortOrder}`;
       
+      // 初回データロード完了の確認
+      if (!this.initialDataLoaded) {
+        console.log('📋 初回データロード完了、新着チェック基準設定:', {
+          currentViewKey,
+          newCount,
+          initialSetup: true
+        });
+        this.lastViewKey = currentViewKey;
+        this.state.lastSeenCount = newCount;
+        this.initialDataLoaded = true;
+        return;
+      }
+      
       // フィルター/ソート設定が変わった場合は比較をリセット
-      if (this.lastViewKey !== currentViewKey) {
+      if (this.lastViewKey !== null && this.lastViewKey !== currentViewKey) {
         console.log('🔄 表示設定変更検出、新着チェックをリセット:', {
           oldKey: this.lastViewKey,
           newKey: currentViewKey,
@@ -1806,6 +1823,7 @@ setupEventDelegation() {
         }
       }
       
+      // 現在のビューキーを確実に設定
       this.lastViewKey = currentViewKey;
     } catch (error) {
       this.state.pollingFailureCount++;
@@ -1889,7 +1907,12 @@ setupEventDelegation() {
       // 手動リフレッシュ時はキャッシュをクリアして最新データを取得
       this.cache.clear();
       await this.loadSheetData(true, false);
+      // 手動リフレッシュ後は新着チェック基準を更新（初期化フラグは維持）
       this.state.lastSeenCount = this.state.currentAnswers.length;
+      console.log('🔄 手動リフレッシュ完了、新着基準更新:', {
+        newLastSeenCount: this.state.lastSeenCount,
+        maintainInitialFlag: this.initialDataLoaded
+      });
       
       // 軽い成功フィードバック
       if (this.elements.refreshContentBtn) {
@@ -2265,6 +2288,16 @@ setupEventDelegation() {
           
           if (isInitialLoad) {
             this.state.lastSeenCount = result.data.length;
+            // 初期データロード完了フラグを設定
+            this.initialDataLoaded = true;
+            const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+            const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
+            this.lastViewKey = `${selectedClass}-${sortOrder}`;
+            console.log('📋 初期データロード完了（loadSheetData）:', {
+              lastSeenCount: this.state.lastSeenCount,
+              lastViewKey: this.lastViewKey,
+              dataLength: result.data.length
+            });
           }
 
           // Update heading with the actual question text from server (only if valid)
