@@ -1073,7 +1073,8 @@ class StudyQuestApp {
       getAvailableSheets: () => this.runGas('getAvailableSheets'),
       addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', rowIndex, reaction, sheetName),
       toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', rowIndex, sheetName),
-      checkAdmin: () => this.runGas('checkAdmin')
+      checkAdmin: () => this.runGas('checkAdmin'),
+      clearCache: () => this.runGas('refreshBoardData')
     };
     const savedCols = localStorage.getItem('boardColumns');
     if (savedCols && this.elements.sizeSlider && this.elements.sliderValue) {
@@ -1730,6 +1731,14 @@ setupEventDelegation() {
     try {
       const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
       const sortOrder = this.elements.sortOrder.value;
+      
+      // サーバーサイドキャッシュもクリア
+      try {
+        await this.gas.clearCache();
+        console.log('🧹 サーバーキャッシュクリア完了');
+      } catch (cacheError) {
+        console.warn('⚠️ サーバーキャッシュクリア失敗:', cacheError);
+      }
       
       // 強制的にサーバーから最新データを取得（キャッシュバイパス）
       const data = await this.gas.getPublishedSheetData(selectedClass, sortOrder, this.state.showAdminFeatures, true);

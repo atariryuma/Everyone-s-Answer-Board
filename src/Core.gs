@@ -256,7 +256,7 @@ function executeGetPublishedSheetData(classFilter, sortOrder, adminMode) {
     debugLog('getPublishedSheetData: isOwner=%s, ownerId=%s, currentUserId=%s', isOwner, configJson.ownerId, currentUserId);
     
     // データ取得
-    var sheetData = getSheetData(currentUserId, publishedSheetName, classFilter, sortOrder);
+    var sheetData = getSheetData(currentUserId, publishedSheetName, classFilter, sortOrder, adminMode);
     debugLog('getPublishedSheetData: sheetData status=%s, totalCount=%s', sheetData.status, sheetData.totalCount);
 
     if (sheetData.status === 'error') {
@@ -2424,11 +2424,25 @@ function checkSpreadsheetSharingPermission(spreadsheetId) {
 /**
  * シートデータ取得
  */
-function getSheetData(userId, sheetName, classFilter, sortMode) {
+function getSheetData(userId, sheetName, classFilter, sortMode, adminMode) {
   // キャッシュキー生成（ユーザー、シート、フィルタ条件ごとに個別キャッシュ）
   var cacheKey = `sheetData_${userId}_${sheetName}_${classFilter}_${sortMode}`;
   
+  // 管理モードの場合はキャッシュをバイパス（最新データを取得）
+  if (adminMode === true) {
+    console.log('🔄 管理モード：シートデータキャッシュをバイパス');
+    return executeGetSheetData(userId, sheetName, classFilter, sortMode);
+  }
+  
   return cacheManager.get(cacheKey, () => {
+    return executeGetSheetData(userId, sheetName, classFilter, sortMode);
+  }, { ttl: 300 }); // 5分間キャッシュ
+}
+
+/**
+ * 実際のシートデータ取得処理（キャッシュ制御から分離）
+ */
+function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     try {
       var userInfo = findUserById(userId);
       if (!userInfo) {
@@ -2510,7 +2524,6 @@ function getSheetData(userId, sheetName, classFilter, sortMode) {
       headers: []
     };
   }
-  }, { ttl: 300 }); // 5分間キャッシュ
 }
 
 /**
@@ -2926,7 +2939,20 @@ function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
  */
 function refreshBoardData() {
   try {
-    cacheManager.clearExpired(); // 全キャッシュをクリア
+    // 全キャッシュを強制クリア
+    cacheManager.clearAll(); // 期限切れだけでなく全てクリア
+    
+    // スクリプトキャッシュもクリア
+    try {
+      const scriptCache = CacheService.getScriptCache();
+      if (scriptCache) {
+        scriptCache.removeAll([]);
+      }
+    } catch (scriptCacheError) {
+      console.warn('スクリプトキャッシュクリア失敗:', scriptCacheError.message);
+    }
+    
+    console.log('🧹 全キャッシュクリア完了（新着チェック用）');
     debugLog('回答ボードのデータ強制再読み込みをトリガーしました。');
     return { status: 'success', message: '回答ボードのデータを更新しました。' };
   } catch (e) {
