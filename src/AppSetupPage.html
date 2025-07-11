@@ -167,7 +167,7 @@
 
         // ステータス表示を更新
         function updateStatusDisplay(userInfo) {
-            const isActive = userInfo.isActive === 'true';
+            const isActive = userInfo.isActive === true || String(userInfo.isActive).toLowerCase() === 'true';
             const statusElement = document.getElementById('current-status');
             const adminElement = document.getElementById('current-admin');
             const lastUpdatedElement = document.getElementById('last-updated');

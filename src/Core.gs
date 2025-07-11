@@ -2610,7 +2610,7 @@ function getCurrentUserStatus() {
     }
 
     // 編集者権限があるか確認
-    if (userInfo.isActive !== 'true') {
+    if (!isTrue(userInfo.isActive)) {
       return {
         status: 'error',
         message: 'このユーザーは編集者権限がありません'
@@ -2656,7 +2656,7 @@ function updateIsActiveStatus(isActive) {
     }
 
     // 編集者権限があるか確認（自分自身の状態変更も含む）
-    if (userInfo.isActive !== 'true') {
+    if (!isTrue(userInfo.isActive)) {
       return {
         status: 'error',
         message: 'この操作を実行する権限がありません'
@@ -2708,7 +2708,7 @@ function hasSetupPageAccess() {
 
     // データベースに登録され、かつisActiveがtrueのユーザーのみアクセス可能
     var userInfo = findUserByEmail(activeUserEmail);
-    return userInfo && userInfo.isActive === 'true';
+    return userInfo && isTrue(userInfo.isActive);
   } catch (e) {
     console.error('hasSetupPageAccess エラー: ' + e.message);
     return false;

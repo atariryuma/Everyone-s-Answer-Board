@@ -81,6 +81,18 @@ var EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
 var DEBUG = true;
 
 /**
+ * Determine if a value represents boolean true.
+ * Accepts boolean true, 'true', or 'TRUE'.
+ * @param {any} value
+ * @returns {boolean}
+ */
+function isTrue(value) {
+  if (typeof value === 'boolean') return value === true;
+  if (value === undefined || value === null) return false;
+  return String(value).toLowerCase() === 'true';
+}
+
+/**
  * HTMLエスケープ関数（Utilities.htmlEncodeの代替）
  * @param {string} text - エスケープするテキスト
  * @returns {string} エスケープされたテキスト

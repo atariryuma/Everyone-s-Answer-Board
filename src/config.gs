@@ -1037,7 +1037,7 @@ function checkAdmin() {
     }
 
     for (var i = 1; i < data.length; i++) {
-      if (data[i][emailIndex] === activeUserEmail && data[i][isActiveIndex] === 'true') {
+      if (data[i][emailIndex] === activeUserEmail && isTrue(data[i][isActiveIndex])) {
         return true;
       }
     }
@@ -1108,7 +1108,7 @@ function getExistingBoard() {
     var activeUserEmail = Session.getActiveUser().getEmail();
     var userInfo = findUserByEmail(activeUserEmail);
     
-    if (userInfo && userInfo.isActive === 'true') {
+    if (userInfo && isTrue(userInfo.isActive)) {
       var appUrls = generateAppUrls(userInfo.userId);
       return {
         status: 'existing_user',
@@ -1116,7 +1116,7 @@ function getExistingBoard() {
         adminUrl: appUrls.adminUrl,
         viewUrl: appUrls.viewUrl
       };
-    } else if (userInfo && userInfo.isActive === 'false') {
+    } else if (userInfo && String(userInfo.isActive).toLowerCase() === 'false') {
       return {
         status: 'setup_required',
         userId: userInfo.userId
