@@ -32,4 +32,17 @@ describe('getWebAppUrlCached upgrade', () => {
     context.ScriptApp.getService = () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/exec' });
     expect(context.getWebAppUrlCached()).toMatch('/exec');
   });
+
+  test('normalizes domain placement in url', () => {
+    context.ScriptApp.getService = () => ({ getUrl: () => 'https://script.google.com/a/example.com/macros/s/ID/exec' });
+    const normalized = context.computeWebAppUrl();
+    expect(normalized).toBe('https://script.google.com/a/macros/example.com/s/ID/exec');
+  });
+
+  test('updates cache when domain format differs', () => {
+    context.cacheManager.store['WEB_APP_URL'] = 'https://script.google.com/a/example.com/macros/s/ID/exec';
+    context.ScriptApp.getService = () => ({ getUrl: () => 'https://script.google.com/a/macros/example.com/s/ID/exec' });
+    const updated = context.getWebAppUrlCached();
+    expect(updated).toBe('https://script.google.com/a/macros/example.com/s/ID/exec');
+  });
 });

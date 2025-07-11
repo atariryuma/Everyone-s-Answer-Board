@@ -18,8 +18,17 @@ function computeWebAppUrl() {
       return getFallbackUrl();
     }
 
-    // URLの正規化
-    return url.indexOf('/') === url.length - 1 ? url.slice(0, -1) : url;
+    url = url.replace(/\/$/, '');
+
+    // \"https://script.google.com/a/<domain>/macros/s/...\" 形式を
+    // \"https://script.google.com/a/macros/<domain>/s/...\" に補正
+    var wrongPattern = /^https:\/\/script\.google\.com\/a\/([^\/]+)\/macros\//;
+    var match = url.match(wrongPattern);
+    if (match) {
+      url = url.replace(wrongPattern, 'https://script.google.com/a/macros/' + match[1] + '/');
+    }
+
+    return url;
   } catch (e) {
     console.error('WebアプリURL取得エラー: ' + e.message);
     return getFallbackUrl();
