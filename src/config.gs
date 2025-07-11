@@ -1194,6 +1194,24 @@ function verifyUserAuthentication() {
 }
 
 /**
+ * セッションをリセットして新しいアカウント選択を促す
+ * SharedUtilities のアカウント切り替え機能から呼び出される
+ * @returns {{success:boolean,error:(string|undefined)}}
+ */
+function resetUserAuthentication() {
+  try {
+    var email = Session.getActiveUser().getEmail();
+    if (typeof cleanupSessionOnAccountSwitch === 'function' && email) {
+      cleanupSessionOnAccountSwitch(email);
+    }
+    return { success: true };
+  } catch (e) {
+    console.error('resetUserAuthentication エラー: ' + e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
  * 指定されたシートのヘッダーを自動でマッピングし、その結果を返す。
  * この関数は AdminPanel.html から直接呼び出されることを想定しています。
  * @param {string} sheetName - 対象のスプレッドシート名。

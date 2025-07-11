@@ -529,52 +529,6 @@
       });
     }
 
-    // アカウント切り替え機能
-    function switchToAnotherAccount() {
-      if (confirm('別のGoogleアカウントでログインしますか？現在のセッションからログアウトされ、アカウント選択画面が表示されます。')) {
-        try {
-          // Google Apps Scriptの認証をリセット
-          google.script.run
-            .withSuccessHandler(function(result) {
-              if (result && result.success) {
-                // 成功時はページをリロードしてアカウント選択を促す
-                const currentUrl = new URL(window.location.href);
-                currentUrl.searchParams.set('force_account_selection', 'true');
-                window.location.replace(currentUrl.toString());
-              } else {
-                // フォールバック: 手動でのアカウント切り替え案内
-                showAccountSwitchFallback();
-              }
-            })
-            .withFailureHandler(function(error) {
-              console.warn('認証リセットエラー:', error);
-              // フォールバック: 手動でのアカウント切り替え案内
-              showAccountSwitchFallback();
-            })
-            .resetUserAuthentication();
-        } catch (error) {
-          console.warn('アカウント切り替えエラー:', error);
-          // フォールバック: 手動でのアカウント切り替え案内
-          showAccountSwitchFallback();
-        }
-      }
-    }
-
-    // アカウント切り替えのフォールバック案内
-    function showAccountSwitchFallback() {
-      const fallbackMessage = `
-        アカウントを切り替えるには以下の手順をお試しください：
-
-        1. 新しいブラウザタブでGoogle（google.com）にアクセス
-        2. 右上のプロフィール画像をクリック
-        3. 「別のアカウントを追加」または使用したいアカウントを選択
-        4. このページに戻って再度認証を開始
-
-        または、ブラウザのシークレット/プライベートモードで新しいタブを開いてこのページにアクセスしてください。
-      `;
-      
-      alert(fallbackMessage);
-    }
 
     // 既存ボードをチェックする関数
     function checkExistingBoard() {
