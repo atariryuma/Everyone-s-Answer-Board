@@ -2107,6 +2107,9 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
     // スプレッドシートの共有設定を同一ドメイン閲覧可能に設定
     try {
       var file = DriveApp.getFileById(spreadsheetId);
+      if (!file) {
+        throw new Error('スプレッドシートが見つかりません: ' + spreadsheetId);
+      }
       
       // 同一ドメインで閲覧可能に設定（教育機関対応）
       file.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
@@ -2165,8 +2168,16 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
     debugLog('サービスアカウント共有開始:', serviceAccountEmail, 'スプレッドシート:', spreadsheetId);
     
     // DriveAppを使用してスプレッドシートをサービスアカウントと共有
-    var file = DriveApp.getFileById(spreadsheetId);
-    file.addEditor(serviceAccountEmail);
+    try {
+      var file = DriveApp.getFileById(spreadsheetId);
+      if (!file) {
+        throw new Error('スプレッドシートが見つかりません: ' + spreadsheetId);
+      }
+      file.addEditor(serviceAccountEmail);
+    } catch (driveError) {
+      console.error('DriveApp error:', driveError.message);
+      throw new Error('Drive API操作に失敗しました: ' + driveError.message);
+    }
     
     debugLog('サービスアカウント共有成功:', serviceAccountEmail);
     
@@ -2345,7 +2356,16 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
     debugLog('スプレッドシートアクセス権限の修復を開始: ' + userEmail + ' -> ' + spreadsheetId);
     
     // DriveApp経由で共有設定を変更
-    var file = DriveApp.getFileById(spreadsheetId);
+    var file;
+    try {
+      file = DriveApp.getFileById(spreadsheetId);
+      if (!file) {
+        throw new Error('スプレッドシートが見つかりません: ' + spreadsheetId);
+      }
+    } catch (driveError) {
+      console.error('DriveApp.getFileById error:', driveError.message);
+      throw new Error('スプレッドシートへのアクセスに失敗しました: ' + driveError.message);
+    }
     
     // ドメイン全体でアクセス可能に設定
     try {
@@ -3487,11 +3507,26 @@ function isDeployUser() {
       .getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
     if (!dbId) return false;
 
-    var file = DriveApp.getFileById(dbId);
-    var editors = file.getEditors().map(function(e) { return e.getEmail(); });
-    var ownerEmail = file.getOwner().getEmail();
-    if (ownerEmail) editors.push(ownerEmail);
-    return editors.indexOf(userEmail) !== -1;
+    var file;
+    try {
+      file = DriveApp.getFileById(dbId);
+      if (!file) {
+        throw new Error('データベーススプレッドシートが見つかりません: ' + dbId);
+      }
+    } catch (driveError) {
+      console.error('DriveApp.getFileById error for database check:', driveError.message);
+      return false;
+    }
+    
+    try {
+      var editors = file.getEditors().map(function(e) { return e.getEmail(); });
+      var ownerEmail = file.getOwner().getEmail();
+      if (ownerEmail) editors.push(ownerEmail);
+      return editors.indexOf(userEmail) !== -1;
+    } catch (permissionError) {
+      console.error('Permission check error:', permissionError.message);
+      return false;
+    }
   } catch (e) {
     console.error('isDeployUser エラー: ' + e.message);
     return false;

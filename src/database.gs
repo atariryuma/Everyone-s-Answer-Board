@@ -657,7 +657,10 @@ function deleteCurrentUserAccount() {
       var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
       
       // データを取得
-      var response = service.Spreadsheets.Values.get(dbId, sheetName);
+      var response = service.spreadsheets.values.get({
+        spreadsheetId: dbId,
+        range: sheetName
+      });
       var data = response.values || [];
       
       // ユーザーIDに基づいて行を探す（A列がIDと仮定）
@@ -682,9 +685,9 @@ function deleteCurrentUserAccount() {
           }
         };
         
-        service.Spreadsheets.batchUpdate({
+        batchUpdateSpreadsheet(service, dbId, {
           requests: [deleteRequest]
-        }, dbId);
+        });
       }
       
       // 関連するすべてのキャッシュを削除
