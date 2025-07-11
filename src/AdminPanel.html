@@ -2150,7 +2150,7 @@ function syncCheckboxStates(status) {
   // showCounts の値を決定
   const showCounts = sheetConfig?.showCounts !== undefined ? 
     sheetConfig.showCounts : 
-    (status.showCounts !== undefined ? status.showCounts : true);
+    (status.showCounts !== undefined ? status.showCounts : false);
   
   const showNamesCheckbox = document.getElementById('showNames');
   const showCountsCheckbox = document.getElementById('showCounts');
@@ -2527,7 +2527,7 @@ function syncCheckboxStates(status) {
         ...details.guessedConfig, 
         ...details.existingConfig,
         showNames: details.existingConfig?.showNames || false,
-        showCounts: details.existingConfig?.showCounts !== undefined ? details.existingConfig.showCounts : true
+        showCounts: details.existingConfig?.showCounts !== undefined ? details.existingConfig.showCounts : false
       };
       
       populateConfig(configToUse);
@@ -2584,7 +2584,7 @@ function syncCheckboxStates(status) {
       var showNamesCb = document.getElementById('showNames');
       var showCountsCb = document.getElementById('showCounts');
       if (showNamesCb) showNamesCb.checked = !!cfg.showNames;
-      if (showCountsCb) showCountsCb.checked = cfg.showCounts !== undefined ? cfg.showCounts : true;
+      if (showCountsCb) showCountsCb.checked = cfg.showCounts !== undefined ? cfg.showCounts : false;
 
       updateConfigButtons();
     }
@@ -2639,7 +2639,7 @@ function syncCheckboxStates(status) {
         nameHeader: document.getElementById('nameHeader').value,
         classHeader: document.getElementById('classHeader').value,
         showNames: showNamesCheckbox ? showNamesCheckbox.checked : false,
-        showCounts: showCountsCheckbox ? showCountsCheckbox.checked : true,
+        showCounts: showCountsCheckbox ? showCountsCheckbox.checked : false,
       };
     }
 
