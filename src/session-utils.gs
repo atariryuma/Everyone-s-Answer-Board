@@ -122,22 +122,20 @@ function validateAndRepairSession(userEmail) {
  */
 function detectAccountSwitch(currentEmail) {
   try {
-    const scriptProps = PropertiesService.getScriptProperties();
-    const lastAccessEmail = scriptProps.getProperty('LAST_ACCESS_EMAIL');
-    const lastAccessTime = scriptProps.getProperty('LAST_ACCESS_TIME');
-    
-    const isAccountSwitch = lastAccessEmail && lastAccessEmail !== currentEmail;
+    const userProps = PropertiesService.getUserProperties();
+    const lastAccessEmail = userProps.getProperty('LAST_ACCESS_EMAIL');
+    const lastAccessTime = userProps.getProperty('LAST_ACCESS_TIME');
+
+    const isAccountSwitch = !!lastAccessEmail && lastAccessEmail !== currentEmail;
     const currentTime = new Date().toISOString();
-    
+
     if (isAccountSwitch) {
       console.log('アカウント切り替えを検出:');
       console.log('前回: ' + lastAccessEmail + ' (' + lastAccessTime + ')');
       console.log('今回: ' + currentEmail + ' (' + currentTime + ')');
-      
-      // セッションクリーンアップを実行
+
       cleanupSessionOnAccountSwitch(currentEmail);
-      
-      // グローバルキャッシュもクリア
+
       try {
         if (typeof clearDatabaseCache === 'function') {
           clearDatabaseCache();
@@ -146,20 +144,19 @@ function detectAccountSwitch(currentEmail) {
         console.warn('グローバルキャッシュクリアでエラー: ' + globalCacheError.message);
       }
     }
-    
-    // 最後のアクセス情報を更新
-    scriptProps.setProperties({
+
+    userProps.setProperties({
       'LAST_ACCESS_EMAIL': currentEmail,
       'LAST_ACCESS_TIME': currentTime
     });
-    
+
     return {
       isAccountSwitch: isAccountSwitch,
       previousEmail: lastAccessEmail,
       currentEmail: currentEmail,
       switchTime: currentTime
     };
-    
+
   } catch (error) {
     console.error('アカウント切り替え検出でエラー: ' + error.message);
     return {
