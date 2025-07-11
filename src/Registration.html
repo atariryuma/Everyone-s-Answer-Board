@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <base target="_top">
-  <title>Everyone's Answer Board - 教育現場に最適化された回答システム</title>
+  <title>みんなの回答ボード - 新規登録 - StudyQuest</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!-- TailwindCSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -14,7 +14,7 @@
 <body class="bg-[#1a1b26] text-gray-200 font-sans min-h-screen flex items-center justify-center p-4">
   <div class="glass-panel rounded-xl p-8 max-w-2xl w-full shadow-2xl">
     <div class="text-center mb-8">
-      <h1 class="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent mb-2">Everyone's Answer Board</h1>
+      <h1 class="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent mb-2">みんなの回答ボード</h1>
       <p class="text-gray-400">教育現場のための回答ボードシステム</p>
     </div>
     
@@ -257,7 +257,7 @@
           <span>Workspace連携</span>
         </span>
       </div>
-      <p>&copy; 2025 Everyone's Answer Board. All rights reserved.</p>
+      <p>&copy; 2025 みんなの回答ボード. All rights reserved.</p>
     </footer>
   </div>
   
@@ -292,6 +292,9 @@
       const section = document.getElementById('domain-info-section');
       const matchPanel = document.getElementById('domain-match-panel');
       const mismatchPanel = document.getElementById('domain-mismatch-panel');
+      const headerInitial = document.getElementById('header-domain-initial');
+      const headerMatch = document.getElementById('header-domain-match');
+      const headerMismatch = document.getElementById('header-domain-mismatch');
       
       if (!info || info.error) {
         console.warn('ドメイン情報の取得エラー:', info?.error);
@@ -299,18 +302,23 @@
       }
 
       section.classList.remove('hidden');
+      if (headerInitial) headerInitial.classList.add('hidden');
 
       if (info.isDomainMatch) {
         // ドメインが一致している場合
         matchPanel.classList.remove('hidden');
         mismatchPanel.classList.add('hidden');
-        document.getElementById('domain-match-text').textContent = 
+        if (headerMatch) headerMatch.classList.remove('hidden');
+        if (headerMismatch) headerMismatch.classList.add('hidden');
+        document.getElementById('domain-match-text').textContent =
           `このウェブアプリは ${info.deployDomain} ドメイン用です。あなたのアカウント（${info.currentDomain}）で利用できます。`;
       } else {
         // ドメインが不一致の場合
         matchPanel.classList.add('hidden');
         mismatchPanel.classList.remove('hidden');
-        document.getElementById('domain-mismatch-text').textContent = 
+        if (headerMatch) headerMatch.classList.add('hidden');
+        if (headerMismatch) headerMismatch.classList.remove('hidden');
+        document.getElementById('domain-mismatch-text').textContent =
           `あなたのアカウントのドメイン（${info.currentDomain}）とは異なります。機能が制限される可能性があります。`;
         document.getElementById('deploy-domain').textContent = info.deployDomain;
       }
