@@ -2974,23 +2974,85 @@ function getDataCount(classFilter, sortOrder, adminMode) {
       return { count: 0, lastUpdate: new Date().toISOString(), status: 'error', message: 'スプレッドシート設定なし' };
     }
     
-    // 軽量な件数取得（ヘッダー除く）
-    var service = getSheetsService();
+    // 軽量な件数取得（SpreadsheetAppを使用）
     var range = publishedSheetName + '!A:A';
-    
     console.log('🔍 件数チェック開始:', {
       spreadsheetId: publishedSpreadsheetId,
       sheetName: publishedSheetName,
       range: range
     });
     
-    var response = service.spreadsheets.values.get({
-      spreadsheetId: publishedSpreadsheetId,
-      range: range
-    });
+    var totalDataCount = 0;
+    var rows = [];
     
-    var rows = response.values || [];
-    var totalDataCount = Math.max(0, rows.length - 1); // ヘッダー行を除く
+    try {
+      // SpreadsheetAppを直接使用（より確実）
+      var spreadsheet = SpreadsheetApp.openById(publishedSpreadsheetId);
+      var sheet = spreadsheet.getSheetByName(publishedSheetName);
+      
+      if (!sheet) {
+        throw new Error('シートが見つかりません: ' + publishedSheetName);
+      }
+      
+      // A列の最後の行番号を取得
+      var lastRow = sheet.getLastRow();
+      
+      if (lastRow > 1) { // ヘッダー行を除く
+        totalDataCount = lastRow - 1;
+        console.log('✅ SpreadsheetApp使用で件数取得成功:', {
+          lastRow: lastRow,
+          totalDataCount: totalDataCount
+        });
+      } else {
+        console.log('📄 データ行なし（ヘッダーのみ）');
+      }
+      
+    } catch (spreadsheetAppError) {
+      console.warn('⚠️ SpreadsheetAppでエラー、getSheetsServiceにフォールバック:', spreadsheetAppError.message);
+      
+      // フォールバック: getSheetsServiceを使用
+      try {
+        var service = getSheetsService();
+        
+        console.log('🔍 フォールバック - getSheetsService使用:', { range: range });
+        
+        var response = service.spreadsheets.values.get({
+          spreadsheetId: publishedSpreadsheetId,
+          range: range
+        });
+        
+        console.log('📡 API レスポンス詳細:', {
+          response: response,
+          hasValues: !!response?.values,
+          responseType: typeof response,
+          responseKeys: response ? Object.keys(response) : 'null'
+        });
+        
+        if (response && response.values && Array.isArray(response.values)) {
+          rows = response.values;
+          totalDataCount = Math.max(0, rows.length - 1); // ヘッダー行を除く
+          console.log('✅ フォールバック成功:', {
+            rowsLength: rows.length,
+            totalDataCount: totalDataCount,
+            firstRow: rows[0] || 'なし',
+            sampleData: rows.slice(0, 2)
+          });
+        } else {
+          console.warn('⚠️ フォールバックでも値を取得できませんでした - response.values が存在しないか配列ではありません');
+          console.warn('⚠️ レスポンス詳細:', {
+            responseExists: !!response,
+            valuesExists: !!(response && response.values),
+            valuesType: response && response.values ? typeof response.values : 'undefined',
+            isArray: response && response.values ? Array.isArray(response.values) : false
+          });
+          totalDataCount = 0;
+        }
+        
+      } catch (serviceError) {
+        console.error('❌ getSheetsServiceでもエラー:', serviceError.message);
+        throw serviceError;
+      }
+    }
     
     console.log('📊 件数チェック結果（フィルタ前）:', {
       totalRows: rows.length,
@@ -3027,10 +3089,12 @@ function getDataCount(classFilter, sortOrder, adminMode) {
     });
     
     // 最終更新時刻を取得（スプレッドシートの最終編集時刻）
-    var spreadsheet = service.spreadsheets.get({
-      spreadsheetId: publishedSpreadsheetId,
-      fields: 'properties.timeZone,sheets(properties(title,sheetId))'
-    });
+    // この機能は簡易実装のため省略し、現在時刻を使用
+    // var service = getSheetsService();
+    // var spreadsheet = service.spreadsheets.get({
+    //   spreadsheetId: publishedSpreadsheetId,
+    //   fields: 'properties.timeZone,sheets(properties(title,sheetId))'
+    // });
     
     console.log('📊 軽量件数チェック完了:', {
       userId: currentUserId,
@@ -3053,6 +3117,34 @@ function getDataCount(classFilter, sortOrder, adminMode) {
       lastUpdate: new Date().toISOString(),
       status: 'error',
       message: e.message
+    };
+  }
+}
+
+/**
+ * getDataCount関数をテストするためのヘルパー関数
+ * デバッグ用途で使用
+ */
+function testGetDataCount() {
+  try {
+    console.log('🧪 getDataCount テスト開始...');
+    
+    var result = getDataCount('すべて', 'newest', false);
+    
+    console.log('🧪 テスト結果:', {
+      result: result,
+      status: result ? result.status : 'undefined',
+      count: result ? result.count : 'undefined',
+      message: result ? result.message : 'undefined'
+    });
+    
+    return result;
+  } catch (error) {
+    console.error('🧪 テストエラー:', error.message);
+    return {
+      status: 'test_error',
+      message: error.message,
+      count: 0
     };
   }
 }

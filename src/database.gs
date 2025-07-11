@@ -329,7 +329,47 @@ function handleMissingUser(userId) {
 function createSheetsService(accessToken) {
   return {
     accessToken: accessToken,
-    baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets'
+    baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
+    spreadsheets: {
+      values: {
+        get: function(options) {
+          var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + 
+                   options.spreadsheetId + '/values/' + encodeURIComponent(options.range);
+          
+          var response = UrlFetchApp.fetch(url, {
+            headers: { 'Authorization': 'Bearer ' + accessToken },
+            muteHttpExceptions: true,
+            followRedirects: true,
+            validateHttpsCertificates: true
+          });
+          
+          if (response.getResponseCode() !== 200) {
+            throw new Error('Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText());
+          }
+          
+          return JSON.parse(response.getContentText());
+        }
+      },
+      get: function(options) {
+        var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + options.spreadsheetId;
+        if (options.fields) {
+          url += '?fields=' + encodeURIComponent(options.fields);
+        }
+        
+        var response = UrlFetchApp.fetch(url, {
+          headers: { 'Authorization': 'Bearer ' + accessToken },
+          muteHttpExceptions: true,
+          followRedirects: true,
+          validateHttpsCertificates: true
+        });
+        
+        if (response.getResponseCode() !== 200) {
+          throw new Error('Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText());
+        }
+        
+        return JSON.parse(response.getContentText());
+      }
+    }
   };
 }
 
