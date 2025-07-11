@@ -1788,30 +1788,7 @@ function setupEventListeners() {
       var createAdditionalFormBtn = document.getElementById('create-additional-form-btn');
       if (createAdditionalFormBtn) {
         createAdditionalFormBtn.addEventListener('click', function() {
-          showFormConfigModal(function(config) {
-            setLoading(true, '新規フォームを作成しています。');
-            runGas('createAdditionalFormWithConfig', config)
-              .then(function(response) {
-                setLoading(true, '設定情報を更新しています。');
-                // Simulate configuration update if not handled by createAdditionalFormWithConfig directly
-                // For a real application, you might have another GAS function call here
-                // e.g., runGas('updateInitialConfigForAdditionalForm', response.newFormId).then(...)
-                
-                setLoading(true, 'ボードを公開しています。');
-                // フォームURLを表示
-                if (response.formUrl) {
-                  elements.formUrlInput.value = response.formUrl;
-                  elements.openFormUrlLink.href = response.formUrl;
-                  elements.formUrlSection.classList.remove('hidden');
-                }
-                loadStatus(); // ステータスを再読み込みしてUIを更新
-                showMessage('新しいフォームが正常に作成され、ボードに適用されました！', 'success');
-              })
-              .catch(function(error) {
-                setLoading(false);
-                handleError(error, 'createAdditionalForm');
-              });
-          });
+          showFormConfigModal();
         });
       }
 
@@ -2712,7 +2689,7 @@ function syncCheckboxStates(status) {
         .then(function(status) {
           setLoading(false);
               showMessage('設定が保存され、ボードが公開されました！', 'success');
-    loadStatus(); // ステータスを再読み込みしてUIを更新
+    loadStatus(true); // ステータスを再読み込みしてUIを更新
     // 強制的にサーバーから情報を取得して管理パネル全体に適用
     google.script.run
       .withSuccessHandler(function(status) {
@@ -2771,37 +2748,26 @@ function syncCheckboxStates(status) {
     /**
      * 新しいボードを作成する
      */
-    function createBoard() {
-      showConfirmationModal(
-        '新規ボードの作成',
-        '新しいGoogleフォームと連携するスプレッドシートを作成します。よろしいですか？',
-        function() {
-          function createBoard() {
-      setLoading(true, '新規フォームを作成しています。');
-      runGas('createBoard')
-        .then(function(response) {
-          setLoading(true, '設定情報を更新しています。');
-          // Assuming the server-side 'createBoard' also handles initial configuration
-          // and returns a status that can be used to update the UI.
-          // If not, a separate GAS call might be needed here for configuration.
-          // For now, we'll just update the message and then refresh.
-          
-          // Simulate configuration update if not handled by createBoard directly
-          // For a real application, you might have another GAS function call here
-          // e.g., runGas('updateInitialConfig', response.newFormId).then(...)
-          
-          setLoading(true, 'ボードを公開しています。');
-          loadStatus(); // ステータスを再読み込みしてUIを更新
-          showMessage('ボードが正常に作成され、公開されました！', 'success');
-        })
-        .catch(function(error) {
-          setLoading(false);
-          handleError(error, 'createBoard');
-        });
-    }
-        }
-      );
-    }
+      function createBoard() {
+        showConfirmationModal(
+          '新規ボードの作成',
+          '新しいGoogleフォームと連携するスプレッドシートを作成します。よろしいですか？',
+          function() {
+            setLoading(true, '新規フォームを作成しています。');
+            runGas('createBoard')
+              .then(function(response) {
+                setLoading(true, '設定情報を更新しています。');
+                setLoading(true, 'ボードを公開しています。');
+                loadStatus(true); // ステータスを再読み込みしてUIを更新
+                showMessage('ボードが正常に作成され、公開されました！', 'success');
+              })
+              .catch(function(error) {
+                setLoading(false);
+                handleError(error, 'createBoard');
+              });
+          }
+        );
+      }
     
     /**
      * 新規フォームを作成する
