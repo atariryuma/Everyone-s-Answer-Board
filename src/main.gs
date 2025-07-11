@@ -288,43 +288,36 @@ function doGet(e) {
       if (setupOutput) return setupOutput;
 
       if (userInfo) {
+        // 管理パネルアクセス時の厳格なセキュリティチェック
+        if (params.mode === 'admin') {
+          if (!params.userId) {
+            // userIdパラメータが無い場合は自分のIDでリダイレクト
+            const correctUrl = buildUserAdminUrl(userInfo.userId);
+            return createSecureRedirect(correctUrl, '管理パネルにリダイレクトしています...');
+          }
+          
+          if (params.userId !== userInfo.userId) {
+            // 他人のuserIdでアクセスしようとした場合
+            console.warn(`Unauthorized access attempt: ${currentUserEmail} tried to access userId: ${params.userId}`);
+            const correctUrl = buildUserAdminUrl(userInfo.userId);
+            return createSecureRedirect(correctUrl, '正しい管理パネルにリダイレクトしています...');
+          }
+          
+          // 正当なアクセス
+          return renderAdminPanel(userInfo, params.mode);
+        }
+        
         if (params.isDirectPageAccess) {
           return renderAnswerBoard(userInfo, params);
         }
-        if (params.mode === 'admin') {
-          return renderAdminPanel(userInfo, params.mode);
-        }
+        
         if (params.mode === 'view') {
           return renderAnswerBoard(userInfo, params);
         }
-        if (!params.userId || params.userId !== userInfo.userId) {
-          const correctUrl = buildUserAdminUrl(userInfo.userId);
-          return HtmlService.createHtmlOutput(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta charset="UTF-8">
-              <meta http-equiv="refresh" content="0;url=${correctUrl}">
-            </head>
-            <body style="text-align:center; padding:50px; font-family:sans-serif;">
-              <h2>正しい管理パネルにリダイレクトしています...</h2>
-              <p>自動的にリダイレクトされない場合は<a href="${correctUrl}">こちら</a>をクリックしてください。</p>
-              <script>
-                try {
-                  if (window.top) {
-                    window.top.location.href = '${correctUrl}';
-                  } else {
-                    window.location.href = '${correctUrl}';
-                  }
-                } catch(e) {
-                  window.location.href = '${correctUrl}';
-                }
-              </script>
-            </body>
-            </html>
-          `);
-        }
-        return renderAdminPanel(userInfo, 'admin');
+        
+        // デフォルトは管理パネル
+        const correctUrl = buildUserAdminUrl(userInfo.userId);
+        return createSecureRedirect(correctUrl, '管理パネルにリダイレクトしています...');
       }
 
       return showRegistrationPage();
@@ -431,9 +424,41 @@ function handleDirectExecAccess(userEmail) {
  * @return {string}
  */
 function buildUserAdminUrl(userId) {
-  // 正しいWeb App URLを取得
   const baseUrl = getWebAppUrl();
   return `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
+}
+
+/**
+ * セキュアなリダイレクトHTMLを作成
+ * @param {string} targetUrl リダイレクト先URL
+ * @param {string} message 表示メッセージ
+ * @return {HtmlOutput}
+ */
+function createSecureRedirect(targetUrl, message) {
+  return HtmlService.createHtmlOutput(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta http-equiv="refresh" content="0;url=${targetUrl}">
+    </head>
+    <body style="text-align:center; padding:50px; font-family:sans-serif;">
+      <h2>${message}</h2>
+      <p>自動的にリダイレクトされない場合は<a href="${targetUrl}">こちら</a>をクリックしてください。</p>
+      <script>
+        try {
+          if (window.top) {
+            window.top.location.href = '${targetUrl}';
+          } else {
+            window.location.href = '${targetUrl}';
+          }
+        } catch(e) {
+          window.location.href = '${targetUrl}';
+        }
+      </script>
+    </body>
+    </html>
+  `);
 }
 
 /**
