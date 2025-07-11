@@ -267,9 +267,10 @@ function doGet(e) {
     const setupParam = (e && e.parameter && e.parameter.setup) ? e.parameter.setup : null;
     const spreadsheetId = (e && e.parameter && e.parameter.spreadsheetId) ? e.parameter.spreadsheetId : null;
     const sheetName = (e && e.parameter && e.parameter.sheetName) ? e.parameter.sheetName : null;
-    
-    // Page.html への直接アクセス判定（特定パラメータがある場合）
-    const isDirectPageAccess = userId && spreadsheetId && sheetName;
+
+    // Page.html への直接アクセス判定
+    // userId が指定されて mode=view の場合は、登録状態に関わらず回答ボードを表示する
+    const isDirectPageAccess = userId && mode === 'view';
 
     console.log(`Request parameters validated. Mode: ${mode}, UserID: ${userId}, SetupParam: ${setupParam}, IsDirectPageAccess: ${isDirectPageAccess}`);
 
