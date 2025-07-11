@@ -23,29 +23,18 @@ function getSheetsService() {
  */
 function findUserById(userId) {
   var cacheKey = 'user_' + userId;
-  var cache = CacheService.getScriptCache();
   
-  // キャッシュから取得を試行
-  var cachedUser = cache.get(cacheKey);
-  if (cachedUser) {
-    debugLog('ユーザーキャッシュヒット: ' + userId);
-    try {
-      return JSON.parse(cachedUser);
-    } catch (e) {
-      console.error('キャッシュデータ解析エラー:', e);
+  return cacheManager.get(cacheKey, () => {
+    // データベースから取得
+    var user = fetchUserFromDatabase('userId', userId);
+    
+    if (user) {
+      // 関連キャッシュも設定
+      cacheManager.get('email_' + user.adminEmail, () => user, { ttl: USER_CACHE_TTL });
     }
-  }
-  
-  // データベースから取得
-  var user = fetchUserFromDatabase('userId', userId);
-  
-  if (user) {
-    // キャッシュに保存
-    cache.put(cacheKey, JSON.stringify(user), USER_CACHE_TTL);
-    cache.put('email_' + user.adminEmail, JSON.stringify(user), USER_CACHE_TTL);
-  }
-  
-  return user;
+    
+    return user;
+  }, { ttl: USER_CACHE_TTL, enableMemoization: true });
 }
 
 /**
@@ -55,29 +44,18 @@ function findUserById(userId) {
  */
 function findUserByEmail(email) {
   var cacheKey = 'email_' + email;
-  var cache = CacheService.getScriptCache();
   
-  // キャッシュから取得を試行
-  var cachedUser = cache.get(cacheKey);
-  if (cachedUser) {
-    debugLog('メールキャッシュヒット: ' + email);
-    try {
-      return JSON.parse(cachedUser);
-    } catch (e) {
-      console.error('キャッシュデータ解析エラー:', e);
+  return cacheManager.get(cacheKey, () => {
+    // データベースから取得
+    var user = fetchUserFromDatabase('adminEmail', email);
+    
+    if (user) {
+      // 関連キャッシュも設定
+      cacheManager.get('user_' + user.userId, () => user, { ttl: USER_CACHE_TTL });
     }
-  }
-  
-  // データベースから取得
-  var user = fetchUserFromDatabase('adminEmail', email);
-  
-  if (user) {
-    // 両方のキーでキャッシュ
-    cache.put(cacheKey, JSON.stringify(user), USER_CACHE_TTL);
-    cache.put('user_' + user.userId, JSON.stringify(user), USER_CACHE_TTL);
-  }
-  
-  return user;
+    
+    return user;
+  }, { ttl: USER_CACHE_TTL, enableMemoization: true });
 }
 
 /**
@@ -363,26 +341,31 @@ function createSheetsService(accessToken) {
  * @returns {object} レスポンス
  */
 function batchGetSheetsData(service, spreadsheetId, ranges) {
-  try {
-    var url = service.baseUrl + '/' + spreadsheetId + '/values:batchGet?' + 
-      ranges.map(function(range) { return 'ranges=' + encodeURIComponent(range); }).join('&');
-    
-    var response = UrlFetchApp.fetch(url, {
-      headers: { 'Authorization': 'Bearer ' + service.accessToken },
-      muteHttpExceptions: true,
-      followRedirects: true,
-      validateHttpsCertificates: true
-    });
-    
-    if (response.getResponseCode() !== 200) {
-      throw new Error('Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText());
+  // API呼び出しをキャッシュ化（短期間）
+  var cacheKey = `batchGet_${spreadsheetId}_${JSON.stringify(ranges)}`;
+  
+  return cacheManager.get(cacheKey, () => {
+    try {
+      var url = service.baseUrl + '/' + spreadsheetId + '/values:batchGet?' + 
+        ranges.map(function(range) { return 'ranges=' + encodeURIComponent(range); }).join('&');
+      
+      var response = UrlFetchApp.fetch(url, {
+        headers: { 'Authorization': 'Bearer ' + service.accessToken },
+        muteHttpExceptions: true,
+        followRedirects: true,
+        validateHttpsCertificates: true
+      });
+      
+      if (response.getResponseCode() !== 200) {
+        throw new Error('Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText());
+      }
+      
+      return JSON.parse(response.getContentText());
+    } catch (error) {
+      console.error('batchGetSheetsData error:', error.message);
+      throw new Error('データ取得に失敗しました: ' + error.message);
     }
-    
-    return JSON.parse(response.getContentText());
-  } catch (error) {
-    console.error('batchGetSheetsData error:', error.message);
-    throw new Error('データ取得に失敗しました: ' + error.message);
-  }
+  }, { ttl: 120 }); // 2分間キャッシュ（API制限対策）
 }
 
 /**

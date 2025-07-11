@@ -342,7 +342,7 @@ function getHeadersCached(spreadsheetId, sheetName) {
       console.error('Error stack:', error.stack);
       return {};
     }
-  });
+  }, { ttl: 1800, enableMemoization: true }); // 30分間キャッシュ + メモ化
 
   if (!indices || Object.keys(indices).length === 0) {
     cacheManager.remove(key);

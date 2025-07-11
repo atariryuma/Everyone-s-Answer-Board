@@ -12,7 +12,10 @@ var TOKEN_EXPIRY_BUFFER = 300; // 5分のバッファ
  * @returns {string} アクセストークン
  */
 function getServiceAccountTokenCached() {
-  return cacheManager.get(AUTH_CACHE_KEY, generateNewServiceAccountToken, { ttl: 3500 });
+  return cacheManager.get(AUTH_CACHE_KEY, generateNewServiceAccountToken, { 
+    ttl: 3500, 
+    enableMemoization: true 
+  }); // メモ化対応でトークン取得を高速化
 }
   
 /**

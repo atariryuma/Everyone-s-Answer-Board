@@ -1050,40 +1050,45 @@ function setDisplayOptions(options) {
  */
 function checkAdmin() {
   debugLog('checkAdmin function called.');
-  try {
-    var activeUserEmail = Session.getActiveUser().getEmail();
-    var props = PropertiesService.getScriptProperties();
-    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    var service = getSheetsService();
-    var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
-    
-    var response = batchGetSheetsData(service, dbId, [sheetName + '!A:H']);
-    var data = (response && response.valueRanges && response.valueRanges[0] && response.valueRanges[0].values) ? response.valueRanges[0].values : [];
-    
-    if (data.length === 0) {
-      debugLog('checkAdmin: No data found in Users sheet or sheet is empty.');
-      return false;
-    }
-    
-    var headers = data[0];
-    var emailIndex = headers.indexOf('adminEmail');
-    var isActiveIndex = headers.indexOf('isActive');
-    
-    if (emailIndex === -1 || isActiveIndex === -1) {
-      console.warn('checkAdmin: Missing required headers in Users sheet.');
-      return false;
-    }
-
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][emailIndex] === activeUserEmail && isTrue(data[i][isActiveIndex])) {
-        return true;
+  
+  var activeUserEmail = Session.getActiveUser().getEmail();
+  var cacheKey = `admin_${activeUserEmail}`;
+  
+  return cacheManager.get(cacheKey, () => {
+    try {
+      var props = PropertiesService.getScriptProperties();
+      var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+      var service = getSheetsService();
+      var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+      
+      var response = batchGetSheetsData(service, dbId, [sheetName + '!A:H']);
+      var data = (response && response.valueRanges && response.valueRanges[0] && response.valueRanges[0].values) ? response.valueRanges[0].values : [];
+      
+      if (data.length === 0) {
+        debugLog('checkAdmin: No data found in Users sheet or sheet is empty.');
+        return false;
       }
+      
+      var headers = data[0];
+      var emailIndex = headers.indexOf('adminEmail');
+      var isActiveIndex = headers.indexOf('isActive');
+      
+      if (emailIndex === -1 || isActiveIndex === -1) {
+        console.warn('checkAdmin: Missing required headers in Users sheet.');
+        return false;
+      }
+
+      for (var i = 1; i < data.length; i++) {
+        if (data[i][emailIndex] === activeUserEmail && isTrue(data[i][isActiveIndex])) {
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      console.error('checkAdmin エラー: ' + e.message);
+      return false;
     }
-    return false;
-  } catch (e) {
-    console.error('checkAdmin エラー: ' + e.message);
-    return false;
-  }
+  }, { ttl: 900 }); // 15分間キャッシュ（権限情報）
 }
 
 /**

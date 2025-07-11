@@ -192,33 +192,37 @@ function addReaction(rowIndex, reactionKey, sheetName) {
  * Page.htmlから呼び出される - フロントエンド期待形式に対応
  */
 function getPublishedSheetData(classFilter, sortOrder) {
-  try {
-    var props = PropertiesService.getUserProperties();
-    var currentUserId = props.getProperty('CURRENT_USER_ID');
-    debugLog('getPublishedSheetData: userId=%s, classFilter=%s, sortOrder=%s', currentUserId, classFilter, sortOrder);
-    
-    if (!currentUserId) {
-      throw new Error('ユーザーコンテキストが設定されていません');
-    }
-    
-    var userInfo = getUserWithFallback(currentUserId);
-    if (!userInfo) {
-      handleMissingUser(currentUserId);
-      // Fallback to active user email if property points to missing user
-      var fallbackEmail = Session.getActiveUser().getEmail();
-      var altUser = findUserByEmail(fallbackEmail);
-      if (altUser) {
-        currentUserId = altUser.userId;
-        props.setProperty('CURRENT_USER_ID', currentUserId);
-        userInfo = altUser;
-      } else {
-        throw new Error('ユーザー情報が見つかりません');
+  // キャッシュキー生成（パフォーマンス向上）
+  var requestKey = `publishedData_${classFilter}_${sortOrder}`;
+  
+  return cacheManager.get(requestKey, () => {
+    try {
+      var props = PropertiesService.getUserProperties();
+      var currentUserId = props.getProperty('CURRENT_USER_ID');
+      debugLog('getPublishedSheetData: userId=%s, classFilter=%s, sortOrder=%s', currentUserId, classFilter, sortOrder);
+      
+      if (!currentUserId) {
+        throw new Error('ユーザーコンテキストが設定されていません');
       }
-    }
-    debugLog('getPublishedSheetData: userInfo=%s', JSON.stringify(userInfo));
-    
-    var configJson = JSON.parse(userInfo.configJson || '{}');
-    debugLog('getPublishedSheetData: configJson=%s', JSON.stringify(configJson));
+      
+      var userInfo = getUserWithFallback(currentUserId);
+      if (!userInfo) {
+        handleMissingUser(currentUserId);
+        // Fallback to active user email if property points to missing user
+        var fallbackEmail = Session.getActiveUser().getEmail();
+        var altUser = findUserByEmail(fallbackEmail);
+        if (altUser) {
+          currentUserId = altUser.userId;
+          props.setProperty('CURRENT_USER_ID', currentUserId);
+          userInfo = altUser;
+        } else {
+          throw new Error('ユーザー情報が見つかりません');
+        }
+      }
+      debugLog('getPublishedSheetData: userInfo=%s', JSON.stringify(userInfo));
+      
+      var configJson = JSON.parse(userInfo.configJson || '{}');
+      debugLog('getPublishedSheetData: configJson=%s', JSON.stringify(configJson));
 
     // 公開対象のスプレッドシートIDとシート名を取得
     var publishedSpreadsheetId = configJson.publishedSpreadsheetId;
@@ -2360,20 +2364,24 @@ function checkSpreadsheetSharingPermission(spreadsheetId) {
  * シートデータ取得
  */
 function getSheetData(userId, sheetName, classFilter, sortMode) {
-  try {
-    var userInfo = findUserById(userId);
-    if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません');
-    }
-    
-    var spreadsheetId = userInfo.spreadsheetId;
-    var service = getSheetsService();
-    
-    // フォーム回答データのみを取得（名簿機能は使用しない）
-    var ranges = [sheetName + '!A:Z'];
-    
-    var responses = batchGetSheetsData(service, spreadsheetId, ranges);
-    var sheetData = responses.valueRanges[0].values || [];
+  // キャッシュキー生成（ユーザー、シート、フィルタ条件ごとに個別キャッシュ）
+  var cacheKey = `sheetData_${userId}_${sheetName}_${classFilter}_${sortMode}`;
+  
+  return cacheManager.get(cacheKey, () => {
+    try {
+      var userInfo = findUserById(userId);
+      if (!userInfo) {
+        throw new Error('ユーザー情報が見つかりません');
+      }
+      
+      var spreadsheetId = userInfo.spreadsheetId;
+      var service = getSheetsService();
+      
+      // フォーム回答データのみを取得（名簿機能は使用しない）
+      var ranges = [sheetName + '!A:Z'];
+      
+      var responses = batchGetSheetsData(service, spreadsheetId, ranges);
+      var sheetData = responses.valueRanges[0].values || [];
     
     // 名簿機能は使用せず、空の配列を設定
     var rosterData = [];
@@ -2441,6 +2449,7 @@ function getSheetData(userId, sheetName, classFilter, sortMode) {
       headers: []
     };
   }
+  }, { ttl: 300 }); // 5分間キャッシュ
 }
 
 /**

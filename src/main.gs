@@ -257,57 +257,43 @@ function showRegistrationPage() {
  * @returns {HtmlOutput} 表示するHTMLコンテンツ
  */
 function doGet(e) {
+  // 早期リターン用のキャッシュキー生成
+  var requestKey = `doGet_${JSON.stringify(e?.parameter || {})}`;
   
-  // ① パラメータe全体をログに出力して、どのようなリクエストか確認する
-  console.log(`doGet called with event object: ${JSON.stringify(e)}`);
+  // セッション管理を軽量化：頻繁にアクセスされるエンドポイントでは最小限に
+  return cacheManager.get(requestKey, () => {
+    // ① パラメータe全体をログに出力して、どのようなリクエストか確認する
+    console.log(`doGet called with event object: ${JSON.stringify(e)}`);
 
-  try {
-    // ★★★ 修正点 ★★★
-    // パラメータがない場合のデフォルトモードを 'view' から 'admin' に変更。
-    // これにより、登録済みユーザーはデフォルトで管理パネルにアクセスするようになります。
-    const mode = (e && e.parameter && e.parameter.mode) ? e.parameter.mode : 'admin';
-    const userId = (e && e.parameter && e.parameter.userId) ? e.parameter.userId : null;
-    const setupParam = (e && e.parameter && e.parameter.setup) ? e.parameter.setup : null;
-    const spreadsheetId = (e && e.parameter && e.parameter.spreadsheetId) ? e.parameter.spreadsheetId : null;
-    const sheetName = (e && e.parameter && e.parameter.sheetName) ? e.parameter.sheetName : null;
+    try {
+      // ★★★ 修正点 ★★★
+      // パラメータがない場合のデフォルトモードを 'view' から 'admin' に変更。
+      // これにより、登録済みユーザーはデフォルトで管理パネルにアクセスするようになります。
+      const mode = (e && e.parameter && e.parameter.mode) ? e.parameter.mode : 'admin';
+      const userId = (e && e.parameter && e.parameter.userId) ? e.parameter.userId : null;
+      const setupParam = (e && e.parameter && e.parameter.setup) ? e.parameter.setup : null;
+      const spreadsheetId = (e && e.parameter && e.parameter.spreadsheetId) ? e.parameter.spreadsheetId : null;
+      const sheetName = (e && e.parameter && e.parameter.sheetName) ? e.parameter.sheetName : null;
 
-    // Page.html への直接アクセス判定
-    // userId が指定されて mode=view の場合は、登録状態に関わらず回答ボードを表示する
-    const isDirectPageAccess = userId && mode === 'view';
+      // Page.html への直接アクセス判定
+      // userId が指定されて mode=view の場合は、登録状態に関わらず回答ボードを表示する
+      const isDirectPageAccess = userId && mode === 'view';
 
-    console.log(`Request parameters validated. Mode: ${mode}, UserID: ${userId}, SetupParam: ${setupParam}, IsDirectPageAccess: ${isDirectPageAccess}`);
+      console.log(`Request parameters validated. Mode: ${mode}, UserID: ${userId}, SetupParam: ${setupParam}, IsDirectPageAccess: ${isDirectPageAccess}`);
 
-    // どこからのアクセスかを知るためのログを追加
-    const userEmail = Session.getActiveUser().getEmail();
-    console.log(`Access by user: ${userEmail}`);
-    
-    // セッション分離の強化：アカウント切り替え検出と整合性保証
-    // 回答ボード（isDirectPageAccess）でも現在のユーザーのセッション管理を実行
-    if (userEmail) {
-      try {
-        // アカウント切り替えを検出
-        const switchInfo = detectAccountSwitch(userEmail);
-        if (switchInfo.isAccountSwitch) {
-          console.log('アカウント切り替えを検出しました: ' + switchInfo.previousEmail + ' → ' + switchInfo.currentEmail);
-        }
-        
-        // セッション整合性を検証・修復
-        const sessionValid = validateAndRepairSession(userEmail);
-        if (!sessionValid) {
-          console.warn('セッション整合性の修復に失敗しました。強制初期化を実行します。');
-          forceSessionReset(userEmail);
-        }
-        
-      } catch (sessionError) {
-        console.error('セッション管理でエラーが発生しました: ' + sessionError.message);
-        // 重大なエラーの場合は強制初期化
+      // どこからのアクセスかを知るためのログを追加
+      const userEmail = Session.getActiveUser().getEmail();
+      console.log(`Access by user: ${userEmail}`);
+      
+      // 軽量化されたセッション検証（重要なアクセスのみ）
+      if (userEmail && !isDirectPageAccess) {
         try {
-          forceSessionReset(userEmail);
-        } catch (resetError) {
-          console.error('強制セッション初期化も失敗しました: ' + resetError.message);
+          // 簡素化されたセッション整合性検証
+          validateAndRepairSession(userEmail);
+        } catch (sessionError) {
+          console.error('セッション管理でエラーが発生しました: ' + sessionError.message);
         }
       }
-    }
 
     const webAppUrl = ScriptApp.getService().getUrl();
     console.log(`Current Web App URL: ${webAppUrl}`);
@@ -712,6 +698,7 @@ function doGet(e) {
     );
     return safeSetXFrameOptionsDeny(errorHtml);
   }
+  }, { ttl: 60 }); // 1分間キャッシュ（動的コンテンツのため短時間）
 }
 
 
