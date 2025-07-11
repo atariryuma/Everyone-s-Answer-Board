@@ -595,7 +595,7 @@ function doGet(e) {
             // 通常の回答ボード表示用のスプレッドシートアクセス権限を確保
             if (userInfo.spreadsheetId) {
               try {
-                addServiceAccountToSpreadsheet(userInfo.spreadsheetId);
+                addServiceAccountToSpreadsheet(userInfo.spreadsheetId, true); // allowCurrentUserAccess = true
                 console.log('DEBUG: 通常の回答ボード用のスプレッドシートアクセス権限を設定しました');
               } catch (accessSetupError) {
                 console.warn('DEBUG: 通常の回答ボード用のアクセス権限設定で警告:', accessSetupError.message);
