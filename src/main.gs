@@ -414,6 +414,7 @@ function renderAdminPanel(userInfo, mode) {
   adminTemplate.mode = mode;
   adminTemplate.displayMode = 'named';
   adminTemplate.showAdminFeatures = true;
+  adminTemplate.isDeployUser = isDeployUser();
   return safeSetXFrameOptionsDeny(
     adminTemplate.evaluate()
       .setTitle('みんなの回答ボード 管理パネル')
