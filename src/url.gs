@@ -18,7 +18,12 @@ function getWebAppUrlCached() {
         console.warn('ScriptApp.getService().getUrl()がnullを返しました');
         return getFallbackUrl();
       }
-      
+
+      // dev URL だった場合は exec に書き換え
+      if (/\/dev(?:\?.*)?$/.test(url)) {
+        url = url.replace(/\/dev(\?.*)?$/, '/exec$1');
+      }
+
       // URLの正規化
       return url.indexOf('/') === url.length - 1 ? url.slice(0, -1) : url;
     } catch (e) {
