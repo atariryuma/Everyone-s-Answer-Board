@@ -720,6 +720,9 @@ function getActiveFormInfo(userId) {
       }
     }
 
+    // Ensure CURRENT_USER_ID is stored for subsequent requests
+    props.setProperty('CURRENT_USER_ID', currentUserId);
+
     var configJson = JSON.parse(userInfo.configJson || '{}');
     
     // フォーム回答数を取得
