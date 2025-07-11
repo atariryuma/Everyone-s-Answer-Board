@@ -311,7 +311,7 @@ function getPublishedSheetData(classFilter, sortOrder) {
     var result = {
       header: headerTitle,
       sheetName: publishedSheetName, // targetSheetからpublishedSheetNameに変更
-      showCounts: configJson.showCounts === true,
+      showCounts: configJson.showCounts !== false,
       displayMode: sheetData.displayMode || DISPLAY_MODES.ANONYMOUS,
       data: formattedData,
       rows: formattedData // 後方互換性のため
@@ -428,7 +428,7 @@ function getAppConfig() {
       appUrls: appUrls,
       // AdminPanel.htmlが期待する表示設定プロパティ
       showNames: configJson.showNames || false,
-      showCounts: configJson.showCounts === true,
+      showCounts: configJson.showCounts !== undefined ? configJson.showCounts : true,
       // データベース詳細情報
       userInfo: {
         userId: currentUserId,
@@ -1221,7 +1221,7 @@ function quickStartSetup(userId) {
       nameHeader: '名前',
       classHeader: 'クラス',
       showNames: false,
-      showCounts: false,
+      showCounts: true,
       lastModified: new Date().toISOString()
     };
     
