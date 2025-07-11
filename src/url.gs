@@ -42,10 +42,12 @@ function getWebAppUrlCached() {
 
   try {
     var currentUrl = computeWebAppUrl();
+    // キャッシュされたURLと現在のURLが異なる場合、キャッシュを更新
     if (cachedUrl !== currentUrl) {
-      cacheManager.remove(URL_CACHE_KEY);
+      console.log('Cached URL is stale or incorrect. Updating cache.');
+      cacheManager.remove(URL_CACHE_KEY); // 古いキャッシュを無効化
       cachedUrl = cacheManager.get(URL_CACHE_KEY, function() {
-        return currentUrl;
+        return currentUrl; // 最新のURLをキャッシュに保存
       }, { ttl: URL_CACHE_TTL });
     }
   } catch (e) {
