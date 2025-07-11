@@ -3764,7 +3764,7 @@ function loadFormLink() {
     .withFailureHandler(error => {
       console.warn('フォーム情報の取得に失敗しました:', error);
     })
-    .getActiveFormInfo();
+    .getActiveFormInfo(USER_ID);
 }
 
 try {
