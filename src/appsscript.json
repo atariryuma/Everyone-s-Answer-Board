@@ -12,7 +12,7 @@
     "https://www.googleapis.com/auth/script.container.ui"
   ],
   "webapp": {
-    "executeAs": "USER_ACCESSING",
+    "executeAs": "USER_DEPLOYING",
     "access": "ANYONE"
   }
 }
