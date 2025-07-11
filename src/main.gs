@@ -513,14 +513,14 @@ function doGet(e) {
         if (userId && userId !== userInfo.userId) {
           console.log('DEBUG: Access denied - user mismatch. Current user:', userInfo.userId, 'Requested:', userId);
           
-          // 現在のユーザー自身の管理パネルにリダイレクト（同じURLで動的設定）
-          const correctUrl = ScriptApp.getService().getUrl();
+          // 現在のユーザー自身の管理パネルにリダイレクト
+          const correctUrl = ScriptApp.getService().getUrl() + '?userId=' + userInfo.userId + '&mode=admin';
           var redirectHtml = HtmlService.createHtmlOutput(`
             <script>
-              console.log('Redirecting to admin panel...');
+              console.log('Redirecting to correct user panel...');
               window.top.location.href = '${correctUrl}';
             </script>
-            <p>管理パネルにリダイレクトしています...</p>
+            <p>正しい管理パネルにリダイレクトしています...</p>
           `);
           return redirectHtml;
         }
@@ -663,13 +663,13 @@ function doGet(e) {
       // URLにuserIdが指定されていない場合、現在のユーザーの管理パネルにリダイレクト
       if (!userId || userId !== userInfo.userId) {
         console.log('DEBUG: Default access or user mismatch. Redirecting to current user admin panel.');
-        const correctUrl = ScriptApp.getService().getUrl();
+        const correctUrl = ScriptApp.getService().getUrl() + '?userId=' + userInfo.userId + '&mode=admin';
         var redirectHtml = HtmlService.createHtmlOutput(`
           <script>
-            console.log('Redirecting to admin panel...');
+            console.log('Redirecting to user-specific admin panel...');
             window.top.location.href = '${correctUrl}';
           </script>
-          <p>管理パネルにリダイレクトしています...</p>
+          <p>あなた専用の管理パネルにリダイレクトしています...</p>
         `);
         return redirectHtml;
       }

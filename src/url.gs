@@ -100,7 +100,7 @@ function generateAppUrls(userId) {
     
     return {
       webAppUrl: webAppUrl,
-      adminUrl: webAppUrl, // 管理パネルは同じURLで動的に設定
+      adminUrl: webAppUrl + '?userId=' + encodedUserId + '&mode=admin',
       viewUrl: webAppUrl + '?userId=' + encodedUserId + '&mode=view',
       setupUrl: webAppUrl + '?setup=true',
       status: 'success'
