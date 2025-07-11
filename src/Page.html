@@ -165,7 +165,8 @@ const __IS_STUDENT_MODE__ = '<?= typeof isStudentMode !== "undefined" ? isStuden
 const __IS_ADMIN_USER__ = '<?= typeof isAdminUser !== "undefined" ? isAdminUser : false ?>';
 window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : __SHOW_COUNTS__ === 'true';
 window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
-window.showAdminFeatures = __SHOW_ADMIN_FEATURES__.startsWith('<') ? false : __SHOW_ADMIN_FEATURES__ === 'true';
+// Admin users always start in view mode (showAdminFeatures = false)
+window.showAdminFeatures = false;
 window.showHighlightToggle = __SHOW_HIGHLIGHT_TOGGLE__.startsWith('<') ? false : __SHOW_HIGHLIGHT_TOGGLE__ === 'true';
 window.showScoreSort = __SHOW_SCORE_SORT__.startsWith('<') ? false : __SHOW_SCORE_SORT__ === 'true';
 window.isStudentMode = __IS_STUDENT_MODE__.startsWith('<') ? true : __IS_STUDENT_MODE__ === 'true';
@@ -1658,20 +1659,30 @@ setupEventDelegation() {
   
   // 管理者UI更新の共通メソッド
   updateAdminButtonUI() {
-    if (this.elements.adminToggleBtn) {
+    // Only show admin toggle button for administrators, never for viewers
+    if (this.elements.adminToggleBtn && this.state.isAdminUser) {
+      // Show button for admin users only
       this.elements.adminToggleBtn.classList.remove('hidden');
       this.elements.adminToggleBtn.removeAttribute('hidden');
-      this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
       
-      // Add colored styling when admin mode is active
+      // Always show "管理モード" text, never show "閲覧モード" to avoid confusion
+      this.elements.adminToggleBtn.textContent = '管理モード';
+      
+      // Apply styling based on current admin mode state
       if (this.state.showAdminFeatures) {
-        // Active admin mode: colored background and text
+        // Active admin mode: highlighted styling
         this.elements.adminToggleBtn.classList.remove('text-gray-500', 'opacity-60');
         this.elements.adminToggleBtn.classList.add('bg-cyan-600', 'hover:bg-cyan-700', 'text-white', 'shadow-lg', 'ring-2', 'ring-cyan-400/50');
       } else {
-        // Inactive admin mode: default gray styling
+        // Inactive admin mode: subtle gray styling
         this.elements.adminToggleBtn.classList.remove('bg-cyan-600', 'hover:bg-cyan-700', 'text-white', 'shadow-lg', 'ring-2', 'ring-cyan-400/50');
         this.elements.adminToggleBtn.classList.add('text-gray-500', 'opacity-60');
+      }
+    } else {
+      // Hide button for non-admin users
+      if (this.elements.adminToggleBtn) {
+        this.elements.adminToggleBtn.classList.add('hidden');
+        this.elements.adminToggleBtn.setAttribute('hidden', '');
       }
     }
   }
@@ -2212,6 +2223,19 @@ setupEventDelegation() {
           }
           
           console.error('Error loading sheet data:', error);
+          
+          // Check if the error indicates the board has been unpublished
+          const errorStr = error.message || error.toString();
+          if (errorStr.includes('アクティブなシートが見つかりません') || 
+              errorStr.includes('公開されていません') ||
+              errorStr.includes('unpublished') ||
+              errorStr.includes('not found')) {
+            // Board has been unpublished, redirect to Unpublished.html
+            console.log('Board appears to be unpublished, redirecting...');
+            this.redirectToUnpublishedPage();
+            return;
+          }
+          
           this.displayEmptyState();
         })
         .getPublishedSheetData(classFilter, sortOrder);
@@ -2679,6 +2703,16 @@ setupEventDelegation() {
     const showName = this.state.displayMode === 'named';
     let displayName = '';
     
+    // Debug: Log display mode and admin features state
+    debugLog('Card creation display state:', {
+      displayMode: this.state.displayMode,
+      showName,
+      showAdminFeatures: this.state.showAdminFeatures,
+      isAdminUser: this.state.isAdminUser,
+      dataName: data.name,
+      dataEmail: data.email
+    });
+    
     if (showName) {
       // 名前が利用可能な場合はそれを使用、なければemailから生成
       if (data.name) {
@@ -3038,10 +3072,9 @@ async handleReaction(rowIndex, reaction) {
   }
   
   async toggleAdminMode() {
-    // ボタンを一時的に無効化して重複クリックを防ぐ
-    const btn = this.elements.adminToggleBtn;
-    if (btn) {
-      btn.disabled = true;
+    // Temporarily disable button to prevent duplicate clicks
+    if (this.elements.adminToggleBtn) {
+      this.elements.adminToggleBtn.disabled = true;
     }
     
     try {
@@ -3102,6 +3135,8 @@ async handleReaction(rowIndex, reaction) {
           serverDisplayMode: this.serverDisplayMode
         });
       }
+      
+      // Update local state from global variables
       this.updateConfigFromGlobals();
       
       // 管理モード切り替え後の状態を確認
@@ -3121,13 +3156,14 @@ async handleReaction(rowIndex, reaction) {
       
       // UI状態を更新
       this.updateSortOptions();
+      this.updateAdminButtonUI();
       this.updateEndPublicationButtonUI();
       // 管理モード切り替え時は設定変更のため再描画が必要
       this.loadSheetData(true, false);
     } finally {
-      // ボタンを再度有効化
-      if (btn) {
-        btn.disabled = false;
+      // Re-enable button
+      if (this.elements.adminToggleBtn) {
+        this.elements.adminToggleBtn.disabled = false;
       }
     }
   }
@@ -3143,9 +3179,9 @@ async handleReaction(rowIndex, reaction) {
       } else {
         alert('公開を終了しました。管理画面に移動します。');
       }
-      // 少し遅延してからページ移動（ユーザーがメッセージを確認できるように）
+      // 少し遅延してからUnpublished.htmlに移動（ユーザーがメッセージを確認できるように）
       setTimeout(() => {
-        this.endAdminMode();
+        this.redirectToUnpublishedPage();
       }, 1500);
     } catch (error) {
       console.error('公開終了に失敗しました:', error);
@@ -3157,6 +3193,23 @@ async handleReaction(rowIndex, reaction) {
       }
     }
   }
+  redirectToUnpublishedPage() {
+    // Force redirect to Unpublished.html for both admin and viewers
+    google.script.run
+      .withSuccessHandler(function(webAppUrl) {
+        const url = new URL(webAppUrl);
+        // Redirect to Unpublished.html
+        url.pathname = url.pathname.replace(/\/[^\/]*$/, '/Unpublished.html');
+        window.location.href = url.toString();
+      })
+      .withFailureHandler(function(error) {
+        console.error('Failed to get web app URL:', error);
+        // Fallback: try relative path
+        window.location.href = './Unpublished.html';
+      })
+      .getWebAppUrl();
+  }
+  
   endAdminMode() {
     google.script.run
       .withSuccessHandler(function(adminUrl) {
@@ -3348,6 +3401,16 @@ async handleReaction(rowIndex, reaction) {
     this.elements.modalAnswer.innerHTML = '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + this.escapeHtml(data.opinion || '') + '</p>' + '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + this.escapeHtml(data.reason || '') + '</p>';
     const showName = this.state.displayMode === 'named';
     let modalDisplayName = '';
+    
+    // Debug: Log modal display mode state
+    debugLog('Modal display state:', {
+      displayMode: this.state.displayMode,
+      showName,
+      showAdminFeatures: this.state.showAdminFeatures,
+      isAdminUser: this.state.isAdminUser,
+      dataName: data.name,
+      dataEmail: data.email
+    });
     
     if (showName) {
       // 名前が利用可能な場合はそれを使用、なければemailから生成

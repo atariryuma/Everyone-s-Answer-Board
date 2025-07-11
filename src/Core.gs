@@ -233,6 +233,10 @@ function getPublishedSheetData(classFilter, sortOrder) {
     var sheetConfig = configJson[sheetKey] || {};
     debugLog('getPublishedSheetData: sheetConfig=%s', JSON.stringify(sheetConfig));
     
+    // Check if current user is the board owner
+    var isOwner = (configJson.ownerId === currentUserId);
+    debugLog('getPublishedSheetData: isOwner=%s, ownerId=%s, currentUserId=%s', isOwner, configJson.ownerId, currentUserId);
+    
     // データ取得
     var sheetData = getSheetData(currentUserId, publishedSheetName, classFilter, sortOrder);
     debugLog('getPublishedSheetData: sheetData status=%s, totalCount=%s', sheetData.status, sheetData.totalCount);
@@ -274,7 +278,7 @@ function getPublishedSheetData(classFilter, sortOrder) {
       
       return {
         rowIndex: row.rowNumber || (index + 2), // 実際の行番号
-        name: (sheetData.displayMode === DISPLAY_MODES.NAMED && nameIndex !== undefined && row.originalData && row.originalData[nameIndex]) ? row.originalData[nameIndex] : '',
+        name: ((sheetData.displayMode === DISPLAY_MODES.NAMED || isOwner) && nameIndex !== undefined && row.originalData && row.originalData[nameIndex]) ? row.originalData[nameIndex] : '',
         class: (classIndex !== undefined && row.originalData && row.originalData[classIndex]) ? row.originalData[classIndex] : '',
         opinion: (opinionIndex !== undefined && row.originalData && row.originalData[opinionIndex]) ? row.originalData[opinionIndex] : '',
         reason: (reasonIndex !== undefined && row.originalData && row.originalData[reasonIndex]) ? row.originalData[reasonIndex] : '',
@@ -2397,9 +2401,13 @@ function getSheetData(userId, sheetName, classFilter, sortMode) {
     var configJson = JSON.parse(userInfo.configJson || '{}');
     var displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
     
+    // Check if current user is the board owner
+    var isOwner = (configJson.ownerId === userId);
+    debugLog('getSheetData: isOwner=%s, ownerId=%s, userId=%s', isOwner, configJson.ownerId, userId);
+    
     // データを処理
     var processedData = dataRows.map(function(row, index) {
-      return processRowData(row, headers, headerIndices, rosterMap, displayMode, index + 2);
+      return processRowData(row, headers, headerIndices, rosterMap, displayMode, index + 2, isOwner);
     });
     
     // フィルタリング
@@ -2550,7 +2558,7 @@ function buildRosterMap(rosterData) {
 /**
  * 行データを処理（スコア計算、名前変換など）
  */
-function processRowData(row, headers, headerIndices, rosterMap, displayMode, rowNumber) {
+function processRowData(row, headers, headerIndices, rosterMap, displayMode, rowNumber, isOwner) {
   var processedRow = {
     rowNumber: rowNumber,
     originalData: row,
@@ -2595,9 +2603,9 @@ function processRowData(row, headers, headerIndices, rosterMap, displayMode, row
   
   // 名前の表示処理（フォーム入力の名前を使用）
   var nameIndex = headerIndices[COLUMN_HEADERS.NAME];
-  if (nameIndex !== undefined && row[nameIndex] && displayMode === DISPLAY_MODES.NAMED) {
+  if (nameIndex !== undefined && row[nameIndex] && (displayMode === DISPLAY_MODES.NAMED || isOwner)) {
     processedRow.displayName = row[nameIndex];
-  } else if (displayMode === DISPLAY_MODES.NAMED) {
+  } else if (displayMode === DISPLAY_MODES.NAMED || isOwner) {
     // 名前入力がない場合のフォールバック
     processedRow.displayName = '匿名';
   }

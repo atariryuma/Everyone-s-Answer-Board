@@ -341,18 +341,14 @@ body {
   border-color: var(--color-accent);
 }
 
-/* Admin Toggle */
+/* Admin Toggle - Subtle button for administrators only */
 .admin-toggle {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  z-index: 1000;
-  background: rgba(0,0,0,0.8);
-  border: 1px solid var(--color-border);
-  border-radius: 0.5rem;
-  padding: 0.5rem;
-  color: var(--color-text);
   font-size: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.admin-toggle:hover {
+  transform: translateY(-1px);
 }
 
 /* Step Indicator System (from Registration.html) */
