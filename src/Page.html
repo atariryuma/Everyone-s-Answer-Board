@@ -100,54 +100,7 @@ function safeDebugStringify(obj, maxDepth = 2, currentDepth = 0) {
 
 // システム全体フロー表示機能
 function showSystemFlow() {
-  if (!DEBUG_MODE) return;
-  
-  console.group('🔄 StudyQuest システム全体フロー');
-  console.log('📋 Phase 1: 初期化処理');
-  console.log('  ├─ HTML構造の読み込み');
-  console.log('  ├─ CSS統合スタイルの適用');
-  console.log('  ├─ JavaScript初期化');
-  console.log('  └─ デバッグモード設定');
-  
-  console.log('🎨 Phase 2: スタイル統合');
-  console.log('  ├─ CSSスタイルの読み込み');
-  console.log('  ├─ Page固有スタイルの適用');
-  console.log('  ├─ レスポンシブデザイン対応');
-  console.log('  └─ アクセシビリティ設定');
-  
-  console.log('📡 Phase 3: GAS API連携');
-  console.log('  ├─ Google Apps Script環境検出');
-  console.log('  ├─ 管理者権限確認');
-  console.log('  ├─ シートデータ取得');
-  console.log('  └─ リアルタイム更新設定');
-  
-  console.log('🏗️ Phase 4: UI構築');
-  console.log('  ├─ 回答カード生成');
-  console.log('  ├─ フィルタリング機能');
-  console.log('  ├─ ソート機能');
-  console.log('  └─ ページネーション');
-  
-  console.log('⚡ Phase 5: インタラクション');
-  console.log('  ├─ リアクション機能');
-  console.log('  ├─ ハイライト機能');
-  console.log('  ├─ モーダル表示');
-  console.log('  └─ キーボードショートカット');
-  
-  console.log('🔧 Phase 6: 最適化');
-  console.log('  ├─ パフォーマンス監視');
-  console.log('  ├─ メモリ使用量制御');
-  console.log('  ├─ ネットワーク最適化');
-  console.log('  └─ エラーハンドリング');
-  
-  console.groupEnd();
-  
-  // 現在の状態を表示
-  console.group('📊 現在のシステム状態');
-  console.log('DOM状態:', document.readyState);
-  console.log('CSS読み込み:', document.styleSheets.length + ' stylesheets');
-  console.log('JavaScript実行:', 'Ready');
-  console.log('GAS環境:', typeof google !== 'undefined' ? 'Available' : 'Not Available');
-  console.groupEnd();
+  // Development flow display removed for production
 }
 
 const __SHOW_COUNTS__ = '<?= typeof showCounts !== "undefined" ? showCounts : false ?>';
@@ -173,21 +126,7 @@ window.showScoreSort = __SHOW_SCORE_SORT__.startsWith('<') ? false : __SHOW_SCOR
 window.isStudentMode = __IS_STUDENT_MODE__.startsWith('<') ? true : __IS_STUDENT_MODE__ === 'true';
 window.isAdminUser = __IS_ADMIN_USER__.startsWith('<') ? false : __IS_ADMIN_USER__ === 'true';
 
-// デバッグ情報を出力
-console.log('🔧 サーバー設定受信デバッグ:', {
-  rawValues: {
-    showCounts: __SHOW_COUNTS__,
-    displayMode: __DISPLAY_MODE__,
-    showAdminFeatures: __SHOW_ADMIN_FEATURES__,
-    isAdminUser: __IS_ADMIN_USER__
-  },
-  processedValues: {
-    showCounts: window.showCounts,
-    displayMode: window.displayMode,
-    showAdminFeatures: window.showAdminFeatures,
-    isAdminUser: window.isAdminUser
-  }
-});
+// Server configuration processing completed
 const SHEET_NAME = __SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHEET_NAME__;
 const USER_ID = __USER_ID__.startsWith('<') ? '' : __USER_ID__;
 const OWNER_NAME = __OWNER_NAME__.startsWith('<') ? '' : __OWNER_NAME__;
@@ -1042,15 +981,7 @@ class StudyQuestApp {
     this.lastViewKey = null;
     this.initialDataLoaded = false;
     
-    debugLog('初期状態設定:', {
-      isAdminUser: this.state.isAdminUser,
-      windowIsAdminUser: window.isAdminUser,
-      showHighlightToggle: this.state.showHighlightToggle,
-      windowShowHighlightToggle: window.showHighlightToggle
-    });
-    
-    // デバッグ機能の動作確認テスト
-    debugLog('🛠️ デバッグ機能が有効化されました');
+    // Initial state setup complete
     this.serverShowCounts = window.showCounts;
     this.serverDisplayMode = window.displayMode;
     this.pollingInterval = null;
@@ -1147,7 +1078,7 @@ class StudyQuestApp {
       // AdminPanelからのメッセージをリッスン
       window.addEventListener('message', (event) => {
         if (event.data && event.data.type === 'REFRESH_BOARD_DATA') {
-          debugLog('REFRESH_BOARD_DATAメッセージを受信しました。ボードを再読み込みします。');
+          // Refresh board data message received
           this.loadSheetData(true);
         }
       });
@@ -1182,7 +1113,7 @@ class StudyQuestApp {
   setupNonCriticalEventListeners() {
     // 重複登録防止
     if (this.nonCriticalListenersSetup) {
-      debugLog('非クリティカルイベントリスナーは既に設定済み');
+      // Non-critical event listeners already set up
       return;
     }
     
@@ -1305,7 +1236,7 @@ class StudyQuestApp {
     document.addEventListener('visibilitychange', this.handlers.onVisibilityChange, { passive: true });
     
     this.nonCriticalListenersSetup = true;
-    debugLog('非クリティカルイベントリスナー設定完了');
+    // Non-critical event listener setup complete
   }
   /**
  * イベント委譲の設定（安定版の堅牢なロジックを採用）
@@ -1314,59 +1245,28 @@ class StudyQuestApp {
 setupEventDelegation() {
     // 重複登録防止
     if (this.eventDelegationSetup) {
-        debugLog('イベント委譲は既に設定済み');
+        // Event delegation already set up
         return;
     }
     
     this.handlers.onAnswersContainerClick = (e) => {
-        if (DEBUG_MODE) console.log('🔍 [CLICK DEBUG] Container click detected:', {
-            target: e.target,
-            targetClass: e.target.className,
-            targetTag: e.target.tagName,
-            currentTarget: e.currentTarget,
-            eventType: e.type,
-            timestamp: new Date().toISOString()
-        });
-
         const answerCard = e.target.closest('.answer-card');
-        if (DEBUG_MODE) console.log('🔍 [CLICK DEBUG] Answer card search:', {
-            answerCard: answerCard,
-            cardClass: answerCard?.className,
-            cardRowIndex: answerCard?.dataset?.rowIndex,
-            isHidden: answerCard?.classList?.contains('hidden-card')
-        });
 
         if (!answerCard || answerCard.classList.contains('hidden-card')) {
-            if (DEBUG_MODE) console.log('🚫 [CLICK DEBUG] No valid answer card found or card is hidden');
             return;
         }
 
         const rowIndex = answerCard.dataset.rowIndex;
         if (!rowIndex) {
-            console.log('🚫 [CLICK DEBUG] No rowIndex found on card');
             return;
         }
-
-        if (DEBUG_MODE) if (DEBUG_MODE) console.log('✅ [CLICK DEBUG] Valid card click detected:', {
-            rowIndex: rowIndex,
-            cardElement: answerCard
-        });
 
         // リアクションボタンのクリックを処理
         const reactionBtn = e.target.closest('.reaction-btn');
         if (reactionBtn) {
-            if (DEBUG_MODE) console.log('🎯 [CLICK DEBUG] Reaction button clicked:', {
-                button: reactionBtn,
-                reaction: reactionBtn.dataset.reaction,
-                disabled: reactionBtn.disabled,
-                rowIndex: rowIndex
-            });
             e.stopPropagation(); // ★重要: イベントの伝播を止め、カード本体のクリックと分離
             if (!reactionBtn.disabled) {
-                if (DEBUG_MODE) console.log('▶️ [CLICK DEBUG] Processing reaction:', reactionBtn.dataset.reaction);
                 this.handleReaction(rowIndex, reactionBtn.dataset.reaction);
-            } else {
-                console.log('🚫 [CLICK DEBUG] Reaction button is disabled');
             }
             return;
         }
@@ -1374,211 +1274,28 @@ setupEventDelegation() {
         // ハイライトボタンのクリックを処理
         const highlightBtn = e.target.closest('.highlight-btn');
         if (highlightBtn) {
-            if (DEBUG_MODE) console.log('🎯 [CLICK DEBUG] Highlight button clicked:', {
-                button: highlightBtn,
-                disabled: highlightBtn.disabled,
-                rowIndex: rowIndex
-            });
             e.stopPropagation(); // ★重要: 同様にイベントの伝播を停止
             if (!highlightBtn.disabled) {
-                if (DEBUG_MODE) console.log('▶️ [CLICK DEBUG] Processing highlight for row:', rowIndex);
                 this.handleHighlight(rowIndex);
-            } else {
-                console.log('🚫 [CLICK DEBUG] Highlight button is disabled');
             }
             return;
         }
 
         // 上記以外の場合は、カード本体のクリックとしてモーダルを表示
-        if (DEBUG_MODE) console.log('📱 [CLICK DEBUG] Card body clicked, showing modal for row:', rowIndex);
         this.showAnswerModal(rowIndex);
     };
 
     if (this.elements.answersContainer) {
-        if (DEBUG_MODE) console.log('🔧 [CLICK DEBUG] Setting up event delegation on answers container:', this.elements.answersContainer);
         // 既存のリスナーをクリアしてから追加
         this.elements.answersContainer.removeEventListener('click', this.handlers.onAnswersContainerClick);
         this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
         this.eventDelegationSetup = true;
-        if (DEBUG_MODE) console.log('✅ [CLICK DEBUG] Event delegation setup complete');
     } else {
-        console.error('❌ [CLICK DEBUG] No answers container found for event delegation');
+        console.error('No answers container found for event delegation');
     }
 }
   
-  // Debug helper function - can be called from console
-  debugAnswerCards() {
-    debugLog('=== ANSWER CARDS DEBUG REPORT ===');
-    
-    // Make function globally available
-    window.debugAnswerCards = this.debugAnswerCards.bind(this);
-    
-    const container = this.elements.answersContainer;
-    debugLog('Answers container:', {
-      element: container,
-      exists: !!container,
-      className: container?.className,
-      childrenCount: container?.children?.length || 0
-    });
-    
-    if (!container) {
-      debugLog('ERROR: No answers container found');
-      return;
-    }
-    
-    const answerCards = container.querySelectorAll('.answer-card');
-    debugLog('Answer cards found:', {
-      count: answerCards.length,
-      elements: Array.from(answerCards)
-    });
-    
-    answerCards.forEach((card, index) => {
-      debugLog(`Answer card ${index}:`, {
-        element: card,
-        className: card.className,
-        dataset: card.dataset,
-        rowIndex: card.dataset.rowIndex,
-        hasRowIndex: !!card.dataset.rowIndex,
-        childrenCount: card.children.length,
-        reactionButtons: card.querySelectorAll('.reaction-btn').length,
-        highlightButtons: card.querySelectorAll('.highlight-btn').length
-      });
-    });
-    
-    // Test event listener
-    debugLog('Event listener test:', {
-      hasClickHandler: !!this.handlers.onAnswersContainerClick,
-      handlerFunction: this.handlers.onAnswersContainerClick
-    });
-    
-    debugLog('=== END DEBUG REPORT ===');
-  }
-  
-  // Enhanced debug helper function to simulate clicking on answer cards
-  debugClickAnswerCard(cardIndex = 0, options = {}) {
-    debugLog('=== SIMULATING ANSWER CARD CLICK ===');
-    
-    const {
-      logDetails = true,
-      waitForAnimation = false,
-      simulateHover = false,
-      validateResponse = false
-    } = options;
-    
-    // Validate cardIndex
-    if (typeof cardIndex !== 'number' || cardIndex < 0 || !Number.isInteger(cardIndex)) {
-      debugLog('ERROR: Invalid card index', { cardIndex });
-      return { success: false, error: 'Invalid card index. Must be a non-negative integer.' };
-    }
-    
-    const container = this.elements.answersContainer;
-    if (!container) {
-      debugLog('ERROR: No answers container found');
-      return { success: false, error: 'No answers container found' };
-    }
-    
-    const answerCards = container.querySelectorAll('.answer-card');
-    if (answerCards.length === 0) {
-      debugLog('ERROR: No answer cards found');
-      return { success: false, error: 'No answer cards found' };
-    }
-    
-    if (cardIndex >= answerCards.length) {
-      debugLog('ERROR: Card index out of bounds', { cardIndex, totalCards: answerCards.length });
-      return { success: false, error: 'Card index out of bounds', totalCards: answerCards.length };
-    }
-    
-    const card = answerCards[cardIndex];
-    
-    let cardInfo;
-    try {
-      cardInfo = {
-        index: cardIndex,
-        element: card,
-        className: card.className,
-        dataset: { ...card.dataset },
-        rowIndex: card.dataset.rowIndex,
-        boundingRect: card.getBoundingClientRect(),
-        computedStyle: {
-          display: getComputedStyle(card).display,
-          visibility: getComputedStyle(card).visibility,
-          opacity: getComputedStyle(card).opacity
-        }
-      };
-    } catch (error) {
-      debugLog('ERROR: Failed to get card info', { error: error.message });
-      return { success: false, error: `Failed to get card info: ${error.message}` };
-    }
-    
-    if (logDetails) {
-      debugLog('Card details before click:', cardInfo);
-    }
-    
-    // Simulate hover if requested
-    if (simulateHover) {
-      const hoverEvent = new MouseEvent('mouseenter', {
-        bubbles: true,
-        cancelable: true,
-        view: window
-      });
-      card.dispatchEvent(hoverEvent);
-      debugLog('Hover event dispatched');
-    }
-    
-    // Simulate a click event
-    const clickEvent = new MouseEvent('click', {
-      bubbles: true,
-      cancelable: true,
-      view: window,
-      clientX: cardInfo.boundingRect.left + cardInfo.boundingRect.width / 2,
-      clientY: cardInfo.boundingRect.top + cardInfo.boundingRect.height / 2
-    });
-    
-    const clickResult = card.dispatchEvent(clickEvent);
-    
-    const result = {
-      success: true,
-      cardIndex,
-      cardInfo,
-      clickResult,
-      timestamp: Date.now()
-    };
-    
-    if (logDetails) {
-      debugLog('Click event result:', { 
-        dispatched: clickResult, 
-        cardIndex, 
-        cardElement: card,
-        eventBubbled: clickEvent.bubbles,
-        eventCancelled: clickEvent.defaultPrevented
-      });
-    }
-    
-    // Wait for animations if requested
-    if (waitForAnimation) {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          if (validateResponse) {
-            const updatedCard = answerCards[cardIndex];
-            result.cardStateAfterClick = {
-              className: updatedCard.className,
-              dataset: { ...updatedCard.dataset },
-              computedStyle: {
-                display: getComputedStyle(updatedCard).display,
-                visibility: getComputedStyle(updatedCard).visibility,
-                opacity: getComputedStyle(updatedCard).opacity
-              }
-            };
-          }
-          debugLog('=== CLICK SIMULATION COMPLETE ===');
-          resolve(result);
-        }, 500); // Wait 500ms for animations
-      });
-    }
-    
-    debugLog('=== CLICK SIMULATION COMPLETE ===');
-    return result;
-  }
+  // Debug helper functions removed for production
   adjustLayout() {
     if (this.baseBodyPadding === undefined) {
       this.baseBodyPadding = parseFloat(getComputedStyle(this.elements.body).paddingBottom) || 0;
@@ -1598,27 +1315,13 @@ setupEventDelegation() {
       }
     }
     
-    debugLog('GAS API呼び出し:', { 
-      funcName, 
-      argsCount: Array.isArray(args) ? args.length : 'not-array',
-      argsPreview: Array.isArray(args) && args.length > 0 ? args.slice(0, 2) : args,
-      userId: USER_ID, 
-      isStateChanging 
-    });
+    // GAS API call processing
     
     return new Promise((resolve, reject) => {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         const userId = USER_ID || '';
-        debugLog('Google Apps Script環境検出済み、実際にAPI呼び出し実行中...');
         google.script.run
           .withSuccessHandler((result) => {
-            debugLog('GAS APIレスポンス受信:', { 
-              funcName, 
-              argsCount: Array.isArray(args) ? args.length : 'not-array',
-              resultType: typeof result,
-              resultSize: Array.isArray(result) ? result.length : typeof result === 'object' ? Object.keys(result || {}).length : 'primitive',
-              success: true 
-            });
             if (!isStateChanging) {
               this.cache.set(cacheKey, result, 1000); // 1秒キャッシュ
             }
@@ -1633,7 +1336,6 @@ setupEventDelegation() {
       } else {
         console.warn('Google Apps Script environment not detected.');
         this.getMockData(funcName, ...args).then((result) => {
-          debugLog('モックデータ取得:', { funcName, result });
           if (!isStateChanging) {
             this.cache.set(cacheKey, result, 1000); // 1秒キャッシュ
           }
@@ -1647,10 +1349,7 @@ setupEventDelegation() {
     if (window.isAdminUser) {
       this.state.isAdminUser = true;
       this.state.showHighlightToggle = true; // 管理者なら常に表示
-      debugLog('管理者権限確認済み、ハイライトトグル有効化:', {
-        isAdminUser: this.state.isAdminUser,
-        showHighlightToggle: this.state.showHighlightToggle
-      });
+      // Admin permissions verified
       this.updateAdminButtonUI();
       this.updateEndPublicationButtonUI();
       return;
@@ -1663,10 +1362,7 @@ setupEventDelegation() {
         window.isAdminUser = true;
         this.state.isAdminUser = true;
         this.state.showHighlightToggle = true; // 管理者なら常に表示
-        debugLog('API管理者権限確認済み、ハイライトトグル有効化:', {
-          isAdminUser: this.state.isAdminUser,
-          showHighlightToggle: this.state.showHighlightToggle
-        });
+        // API admin permissions verified
         this.updateAdminButtonUI();
         this.updateEndPublicationButtonUI();
       }
@@ -1761,11 +1457,7 @@ setupEventDelegation() {
       
       // 初回データロード完了の確認
       if (!this.initialDataLoaded) {
-        console.log('📋 初回データロード完了、新着チェック基準設定:', {
-          currentViewKey,
-          newCount,
-          initialSetup: true
-        });
+        // Initial data load completed
         this.lastViewKey = currentViewKey;
         this.state.lastSeenCount = newCount;
         this.initialDataLoaded = true;
@@ -1825,7 +1517,7 @@ setupEventDelegation() {
       
       // 連続で失敗が続く場合はポーリング間隔を延ばす
       if (this.state.pollingFailureCount >= 3) {
-        debugLog('連続失敗によりポーリング間隔を延長');
+        // Polling interval extended due to consecutive failures
         this.stopPolling();
         setTimeout(() => {
           this.startPolling();
@@ -2293,11 +1985,7 @@ setupEventDelegation() {
               const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
               const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
               this.lastViewKey = `${selectedClass}-${sortOrder}`;
-              console.log('📋 初期データロード完了（loadSheetData）:', {
-                lastSeenCount: this.state.lastSeenCount,
-                lastViewKey: this.lastViewKey,
-                dataLength: result.data.length
-              });
+              // Initial data load completed
             }
 
             // Update heading with the actual question text from server (only if valid)
@@ -2367,13 +2055,9 @@ setupEventDelegation() {
           this.elements.adminToggleBtn.removeAttribute('hidden');
           this.elements.adminToggleBtn.style.display = '';
         }
-        debugLog('loadSheetData管理者設定更新:', {
-          isAdminUser: this.state.isAdminUser,
-          showAdminFeatures: this.state.showAdminFeatures,
-          showHighlightToggle: this.state.showHighlightToggle
-        });
+        // Admin settings updated
         this.cache.clear();
-        debugLog('管理者ハイライト設定によりキャッシュクリア実行');
+        // Cache cleared due to admin highlight settings
       }
       
       if (isInitialLoad) {
@@ -2489,11 +2173,11 @@ setupEventDelegation() {
     // ハイライト状態を適用（リアクション装飾より優先）
     if (data.highlight) {
       element.classList.add('highlighted');
-      debugLog('ハイライト装飾適用:', { rowIndex: data.rowIndex, element: element.tagName, highlight: data.highlight });
+      // Highlight decoration applied
       // ハイライト時はリアクション装飾をスキップ
       return;
     } else {
-      debugLog('ハイライト装飾なし:', { rowIndex: data.rowIndex, element: element.tagName, highlight: data.highlight });
+      // No highlight decoration
     }
     
     // アクティブなリアクションを特定
@@ -2529,13 +2213,10 @@ setupEventDelegation() {
     // 管理者の場合はハイライトトグルを確実に有効化
     if (this.state.isAdminUser && !this.state.showHighlightToggle) {
       this.state.showHighlightToggle = true;
-      debugLog('renderBoard中にハイライトトグル強制有効化:', {
-        isAdminUser: this.state.isAdminUser,
-        showHighlightToggle: this.state.showHighlightToggle
-      });
+      // Highlight toggle force enabled in renderBoard
       // ハイライトトグル設定が変更されたのでキャッシュをクリア
       this.cache.clear();
-      debugLog('renderBoard: ハイライト設定変更によりキャッシュクリア実行');
+      // Cache cleared due to highlight setting change
     }
     
     const container = this.elements.answersContainer;
@@ -2735,12 +2416,7 @@ setupEventDelegation() {
     // Optimized cache key generation (faster than JSON.stringify)
     const cacheKey = `${data.rowIndex}-${data.opinion?.slice(0,50)}-${data.reason?.slice(0,30)}-${data.name}-${JSON.stringify(data.reactions)}-${data.highlight}-${this.state.showCounts}-${this.state.displayMode}-${this.state.showHighlightToggle}`;
     
-    debugLog('createAnswerCard キャッシュチェック:', {
-      rowIndex: data.rowIndex,
-      cacheKey: cacheKey.substring(0, 100) + '...',
-      showHighlightToggle: this.state.showHighlightToggle,
-      hasCachedCard: !!this.cache.get(`render-${cacheKey}`)
-    });
+    // Answer card cache check
     
     const cachedCard = this.cache.get(`render-${cacheKey}`);
     if (cachedCard) {
@@ -2754,13 +2430,7 @@ setupEventDelegation() {
         btn.dataset.rowIndex = data.rowIndex;
       });
       
-      debugLog('キャッシュされたカードを使用:', { 
-        rowIndex: data.rowIndex,
-        cachedCardDataset: cachedCard.dataset,
-        clonedCardDataset: clonedCard.dataset,
-        hasAnswerCardClass: clonedCard.className.includes('answer-card'),
-        updatedChildElements: elementsWithRowIndex.length
-      });
+      // Using cached card
       return clonedCard;
     }
     
@@ -2772,55 +2442,22 @@ setupEventDelegation() {
     card.setAttribute('tabindex', '0');
     card.setAttribute('aria-label', '回答カード: ' + (data.opinion || '').substring(0, 50) + (data.opinion && data.opinion.length > 50 ? '...' : ''));
     
-    debugLog('Created answer card with rowIndex:', {
-      rowIndex: data.rowIndex,
-      rowIndexType: typeof data.rowIndex,
-      datasetRowIndex: card.dataset.rowIndex,
-      cardClassName: card.className,
-      hasAnswerCardClass: card.className.includes('answer-card')
-    });
+    // Answer card created
     let highlightBtnHtml = '';
-    debugLog('createCard ハイライトボタン条件チェック:', {
-      rowIndex: data.rowIndex,
-      showHighlightToggle: this.state.showHighlightToggle,
-      isAdminUser: this.state.isAdminUser,
-      condition: this.state.showHighlightToggle
-    });
+    // Highlight button condition check
     if (this.state.showHighlightToggle) {
       const cls = data.highlight ? 'liked' : '';
       const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
       highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
-      debugLog('カードハイライトボタン作成:', { 
-        rowIndex: data.rowIndex, 
-        showHighlightToggle: this.state.showHighlightToggle,
-        windowShowHighlightToggle: window.showHighlightToggle,
-        isAdminUser: this.state.isAdminUser,
-        windowIsAdminUser: window.isAdminUser,
-        showAdminFeatures: this.state.showAdminFeatures,
-        highlight: data.highlight
-      });
+      // Highlight button created
     } else {
-      debugLog('カードハイライトボタンをスキップ:', { 
-        rowIndex: data.rowIndex, 
-        showHighlightToggle: this.state.showHighlightToggle,
-        windowShowHighlightToggle: window.showHighlightToggle,
-        isAdminUser: this.state.isAdminUser,
-        windowIsAdminUser: window.isAdminUser,
-        showAdminFeatures: this.state.showAdminFeatures
-      });
+      // Highlight button skipped
     }
     const showName = this.state.displayMode === 'named';
     let displayName = '';
     
     // Debug: Log display mode and admin features state
-    debugLog('Card creation display state:', {
-      displayMode: this.state.displayMode,
-      showName,
-      showAdminFeatures: this.state.showAdminFeatures,
-      isAdminUser: this.state.isAdminUser,
-      dataName: data.name,
-      dataEmail: data.email
-    });
+    // Card display state configured
     
     if (showName) {
       // 名前が利用可能な場合はそれを使用、なければemailから生成
@@ -2835,21 +2472,7 @@ setupEventDelegation() {
     const nameHtml = showName && displayName ? '<div class="name-display flex-shrink-0 mr-2"><span class="font-bold text-sm text-cyan-300 bg-gray-800/50 px-2 py-1 rounded border border-cyan-400">' + this.escapeHtml(displayName) + '</span></div>' : '';
     const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center min-h-[2rem]' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
     
-    // 詳細デバッグログ（強制表示）
-    console.log('🔍 名前表示詳細:', {
-      rowIndex: data.rowIndex,
-      showName,
-      displayName,
-      dataName: data.name,
-      dataEmail: data.email,
-      nameHtml: nameHtml.substring(0, 100),
-      hasNameHtml: !!nameHtml,
-      displayMode: this.state.displayMode,
-      showAdminFeatures: this.state.showAdminFeatures,
-      isAdminUser: this.state.isAdminUser,
-      windowDisplayMode: window.displayMode,
-      windowShowAdminFeatures: window.showAdminFeatures
-    });
+    // Name display configuration complete
     const reactionButtonsHtml = this.reactionTypes.map(rt => {
       const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
       const cls = info.reacted ? 'liked' : '';
@@ -2952,28 +2575,13 @@ setupEventDelegation() {
  * リアクション処理（連続クリック防止機能＋安定化されたUI更新）
  */
 async handleReaction(rowIndex, reaction) {
-    if (DEBUG_MODE) console.log('🎯 [REACTION DEBUG] handleReaction called:', {
-        rowIndex: rowIndex,
-        reaction: reaction,
-        timestamp: new Date().toISOString()
-    });
-
     const numericRowIndex = parseInt(rowIndex, 10);
     const reactionKey = `${numericRowIndex}-${reaction}`;
 
-    if (DEBUG_MODE) console.log('🔧 [REACTION DEBUG] Processing reaction:', {
-        numericRowIndex: numericRowIndex,
-        reactionKey: reactionKey,
-        pendingReactions: Array.from(this.pendingReactions)
-    });
-
     // ★連続クリック防止機能（問題版から継承）
     if (this.pendingReactions.has(reactionKey)) {
-        console.log('🚫 [REACTION DEBUG] Reaction already pending, skipping:', reactionKey);
         return; // すでに処理中なら何もしない
     }
-
-    if (DEBUG_MODE) console.log('✅ [REACTION DEBUG] Adding reaction to pending:', reactionKey);
     this.pendingReactions.add(reactionKey);
 
     const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
@@ -3119,26 +2727,7 @@ async handleReaction(rowIndex, reaction) {
     }, 2000);
   }
   async handleHighlight(rowIndex) {
-    if (DEBUG_MODE) console.log('⭐ [HIGHLIGHT DEBUG] handleHighlight called:', {
-        rowIndex: rowIndex,
-        timestamp: new Date().toISOString()
-    });
-
-    debugLog('handleHighlight開始:', { 
-      rowIndex, 
-      isAdminUser: this.state.isAdminUser, 
-      showHighlightToggle: this.state.showHighlightToggle,
-      windowIsAdminUser: window.isAdminUser,
-      showAdminFeatures: this.state.showAdminFeatures,
-      windowShowAdminFeatures: window.showAdminFeatures,
-      windowShowHighlightToggle: window.showHighlightToggle
-    });
-
-    if (DEBUG_MODE) console.log('🔐 [HIGHLIGHT DEBUG] Admin permissions check:', {
-        isAdminUser: this.state.isAdminUser,
-        showHighlightToggle: this.state.showHighlightToggle,
-        showAdminFeatures: this.state.showAdminFeatures
-    });
+    // Highlight processing started
     
     // バックエンド側で管理者権限をチェックするので、フロントエンド側のチェックは不要
     
@@ -3147,7 +2736,6 @@ async handleReaction(rowIndex, reaction) {
     
     // Enhanced debounce for highlight operations
     if (this.highlightDebounce.has(highlightKey)) {
-      debugLog('デバウンス中、処理をスキップ');
       clearTimeout(this.highlightDebounce.get(highlightKey));
       return; // Ignore rapid highlight clicks
     }
@@ -3156,13 +2744,11 @@ async handleReaction(rowIndex, reaction) {
     const now = Date.now();
     const lastHighlightTime = this.lastReactionTimes?.get(highlightKey) || 0;
     if (now - lastHighlightTime < 500) { // Minimum 500ms between highlights
-      debugLog('レート制限中、処理をスキップ');
       return;
     }
     
     // 既に処理中の場合は無視
     if (this.pendingReactions.has(highlightKey)) {
-      debugLog('既に処理中、処理をスキップ');
       return;
     }
     
@@ -3173,10 +2759,7 @@ async handleReaction(rowIndex, reaction) {
     const btns = document.querySelectorAll('.highlight-btn[data-row-index="' + numericRowIndex + '"]');
     const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
     
-    debugLog('ハイライト処理:', { numericRowIndex, btnsFound: btns.length, itemFound: !!item });
-    
     if (!item) {
-      debugLog('対象データが見つからない');
       this.pendingReactions.delete(highlightKey);
       return;
     }
@@ -3604,26 +3187,13 @@ async handleReaction(rowIndex, reaction) {
         timestamp: new Date().toISOString()
     });
 
-    debugLog('showAnswerModal called:', {
-      rowIndex: rowIndex,
-      rowIndexType: typeof rowIndex,
-      currentAnswersLength: this.state.currentAnswers?.length,
-      filteredDataLength: this.state.filteredData?.length
-    });
+    // Show answer modal called
 
-    if (DEBUG_MODE) console.log('🔍 [MODAL DEBUG] Data search context:', {
-        currentAnswersLength: this.state.currentAnswers?.length,
-        filteredDataLength: this.state.filteredData?.length,
-        searchingFor: rowIndex
-    });
+    // Data search context
     
     // 最新データを取得（filteredDataとcurrentAnswersの両方から）
     let data = this.state.currentAnswers.find(r => r.rowIndex == rowIndex);
-    debugLog('Data search in currentAnswers:', {
-      found: !!data,
-      searchRowIndex: rowIndex,
-      availableRowIndexes: this.state.currentAnswers?.map(r => r.rowIndex) || []
-    });
+    // Data search in currentAnswers
     
     if (!data && this.state.filteredData) {
       data = this.state.filteredData.find(r => r.rowIndex == rowIndex);
