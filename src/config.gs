@@ -47,28 +47,66 @@ function openActiveSpreadsheet() {
 
 /**
  * 現在のスクリプト実行ユーザーのユニークIDを取得する。
- * まずプロパティストアを確認し、なければセッション情報から取得・保存する。
+ * セッション分離を強化し、アカウント間の混在を防ぐ。
  * @returns {string} 現在のユーザーのユニークID
  */
 function getUserId() {
+  const email = Session.getActiveUser().getEmail();
+  if (!email) {
+    throw new Error('ユーザーIDを取得できませんでした。');
+  }
+  
+  // メールアドレスベースのユニークキーを生成
+  const userKey = 'CURRENT_USER_ID_' + Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, email, Utilities.Charset.UTF_8)
+    .map(function(byte) { return (byte + 256).toString(16).slice(-2); })
+    .join('');
+  
   const props = PropertiesService.getUserProperties();
-  let userId = props.getProperty('CURRENT_USER_ID');
+  let userId = props.getProperty(userKey);
   
   if (!userId) {
-    // アクティブユーザーのメールアドレスからIDを生成（より安定した方法）
-    const email = Session.getActiveUser().getEmail();
-    if (email) {
-      // メールアドレスをハッシュ化してIDとするなど、ユニークなIDを生成
-      // ここでは簡易的にメールアドレスをそのまま使っていますが、
-      // 必要に応じてUtilities.computeDigest等でハッシュ化してください。
-      userId = email; 
-      props.setProperty('CURRENT_USER_ID', userId);
+    // 既存ユーザーを検索してセッション同期
+    const userInfo = findUserByEmail(email);
+    if (userInfo) {
+      userId = userInfo.userId;
+      console.log('既存ユーザーのセッションを復元: ' + email);
     } else {
-      // それでも取得できない場合はエラー
-      throw new Error('ユーザーIDを取得できませんでした。');
+      // 新規ユーザーの場合はメールアドレスをIDとして使用
+      userId = email;
+      console.log('新規ユーザーIDを生成: ' + email);
     }
+    
+    // アカウント固有のキーで保存
+    props.setProperty(userKey, userId);
+    
+    // 古いキャッシュをクリア
+    clearOldUserCache(email);
   }
+  
   return userId;
+}
+
+/**
+ * 古いユーザーキャッシュをクリアしてセッション混在を防ぐ
+ * @param {string} currentEmail - 現在のユーザーメール
+ */
+function clearOldUserCache(currentEmail) {
+  try {
+    const props = PropertiesService.getUserProperties();
+    
+    // 古い形式のキャッシュを削除
+    props.deleteProperty('CURRENT_USER_ID');
+    
+    // 現在のユーザー以外のキャッシュをクリア
+    const userCache = CacheService.getUserCache();
+    if (userCache) {
+      userCache.removeAll(['config_v3_', 'user_', 'email_']);
+    }
+    
+    console.log('古いユーザーキャッシュをクリアしました: ' + currentEmail);
+  } catch (e) {
+    console.warn('キャッシュクリア中にエラーが発生しましたが、処理を続行します: ' + e.message);
+  }
 }
 
 // 他の関数も同様に、存在することを確認

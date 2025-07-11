@@ -1167,6 +1167,36 @@ class StudyQuestApp {
       return;
     }
     
+    // Optimized: Event delegation for answer cards container
+    this.handlers.onAnswersContainerClick = (e) => {
+      const card = e.target.closest('.answer-card');
+      const reactionBtn = e.target.closest('.reaction-btn');
+      const highlightBtn = e.target.closest('.highlight-btn');
+      
+      if (reactionBtn && card) {
+        const rowIndex = card.dataset.rowIndex;
+        const reaction = reactionBtn.dataset.reaction;
+        if (rowIndex && reaction) {
+          this.handleReaction(rowIndex, reaction);
+        }
+      } else if (highlightBtn && card) {
+        const rowIndex = card.dataset.rowIndex;
+        if (rowIndex) {
+          this.handleHighlight(rowIndex);
+        }
+      } else if (card) {
+        // Card click to show modal
+        const rowIndex = card.dataset.rowIndex;
+        if (rowIndex) {
+          this.showAnswerModal(parseInt(rowIndex));
+        }
+      }
+    };
+    
+    if (this.elements.answersContainer) {
+      this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
+    }
+    
     // Modal handlers
     this.handlers.onAnswerModalContainerClick = (e) => {
       if (e.target === e.currentTarget) {
@@ -1894,9 +1924,38 @@ setupEventDelegation() {
       clearInterval(this.pollingInterval);
     }
     
-    const pollInterval = this.isLowPerformanceMode ? 30000 : 15000;
-    // 新着チェックのみ実行、自動更新はしない
-    this.pollingInterval = setInterval(() => this.checkForNewContent(), pollInterval);
+    // Adaptive polling: start with normal interval, adjust based on success/failure
+    this.pollSuccessCount = 0;
+    this.pollFailureCount = 0;
+    this.currentPollInterval = this.isLowPerformanceMode ? 30000 : 15000;
+    
+    const adaptivePoll = async () => {
+      try {
+        await this.checkForNewContent();
+        this.pollSuccessCount++;
+        this.pollFailureCount = 0;
+        
+        // Reduce interval on consistent success (but not below minimum)
+        if (this.pollSuccessCount > 3 && this.currentPollInterval > 10000) {
+          this.currentPollInterval = Math.max(10000, this.currentPollInterval * 0.9);
+        }
+      } catch (error) {
+        this.pollFailureCount++;
+        this.pollSuccessCount = 0;
+        
+        // Increase interval on failures (exponential backoff)
+        if (this.pollFailureCount > 2) {
+          this.currentPollInterval = Math.min(60000, this.currentPollInterval * 1.5);
+        }
+        console.warn('Polling failed:', error);
+      }
+      
+      // Schedule next poll with current interval
+      this.pollingTimeout = setTimeout(adaptivePoll, this.currentPollInterval);
+    };
+    
+    // Start first poll
+    this.pollingTimeout = setTimeout(adaptivePoll, this.currentPollInterval);
     
     // Start automatic cleanup for memory management
     this.cleanupInterval = setInterval(() => {
@@ -1907,6 +1966,11 @@ setupEventDelegation() {
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
+    }
+    
+    if (this.pollingTimeout) {
+      clearTimeout(this.pollingTimeout);
+      this.pollingTimeout = null;
     }
     
     if (this.cleanupInterval) {
@@ -2535,18 +2599,8 @@ setupEventDelegation() {
     }
   }
   createAnswerCard(data) {
-    // Check cache first for unchanged data
-    const cacheKey = JSON.stringify({
-      rowIndex: data.rowIndex,
-      opinion: data.opinion,
-      reason: data.reason,
-      name: data.name,
-      reactions: data.reactions,
-      highlight: data.highlight,
-      showCounts: this.state.showCounts,
-      displayMode: this.state.displayMode,
-      showHighlightToggle: this.state.showHighlightToggle
-    });
+    // Optimized cache key generation (faster than JSON.stringify)
+    const cacheKey = `${data.rowIndex}-${data.opinion?.slice(0,50)}-${data.reason?.slice(0,30)}-${data.name}-${JSON.stringify(data.reactions)}-${data.highlight}-${this.state.showCounts}-${this.state.displayMode}-${this.state.showHighlightToggle}`;
     
     debugLog('createAnswerCard キャッシュチェック:', {
       rowIndex: data.rowIndex,
@@ -2561,10 +2615,10 @@ setupEventDelegation() {
       // Ensure cloned card has proper data-row-index
       clonedCard.dataset.rowIndex = data.rowIndex;
       
-      // Ensure all child elements with data-row-index are updated
-      const elementsWithRowIndex = clonedCard.querySelectorAll('[data-row-index]');
-      elementsWithRowIndex.forEach(element => {
-        element.dataset.rowIndex = data.rowIndex;
+      // Optimized: Only update elements that need row index (avoid querySelectorAll)
+      const reactionButtons = clonedCard.querySelectorAll('.reaction-btn');
+      reactionButtons.forEach(btn => {
+        btn.dataset.rowIndex = data.rowIndex;
       });
       
       debugLog('キャッシュされたカードを使用:', { 
@@ -2647,7 +2701,43 @@ setupEventDelegation() {
       const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
       return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + ariaLabel + '" aria-pressed="' + info.reacted + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
     }).join('');
-    card.innerHTML = '<div class="relative flex-grow mb-3 answer-preview">' + '<h3 class="opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight">' + this.escapeHtml(data.opinion || '') + '</h3>' + '<p class="text-gray-100 whitespace-pre-wrap break-words mt-4">' + this.escapeHtml(data.reason || '') + '</p>' + '</div>' + '<div class="' + containerClass + '">' + nameHtml + '<div class="flex items-center gap-1" role="group" aria-label="回答への反応">' + reactionButtonsHtml + highlightBtnHtml + '</div>' + '</div>';
+    // Optimized: Use DocumentFragment instead of innerHTML for better performance
+    const fragment = document.createDocumentFragment();
+    
+    // Create main content div
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'relative flex-grow mb-3 answer-preview';
+    
+    const opinionTitle = document.createElement('h3');
+    opinionTitle.className = 'opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
+    opinionTitle.textContent = data.opinion || '';
+    
+    const reasonText = document.createElement('p');
+    reasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
+    reasonText.textContent = data.reason || '';
+    
+    contentDiv.appendChild(opinionTitle);
+    contentDiv.appendChild(reasonText);
+    
+    // Create footer div
+    const footerDiv = document.createElement('div');
+    footerDiv.className = containerClass;
+    
+    if (nameHtml) {
+      footerDiv.innerHTML = nameHtml;
+    }
+    
+    const reactionsDiv = document.createElement('div');
+    reactionsDiv.className = 'flex items-center gap-1';
+    reactionsDiv.setAttribute('role', 'group');
+    reactionsDiv.setAttribute('aria-label', '回答への反応');
+    reactionsDiv.innerHTML = reactionButtonsHtml + highlightBtnHtml;
+    
+    footerDiv.appendChild(reactionsDiv);
+    
+    fragment.appendChild(contentDiv);
+    fragment.appendChild(footerDiv);
+    card.appendChild(fragment);
     if (data.highlight) {
       const badge = document.createElement('span');
       badge.className = 'highlight-badge';
