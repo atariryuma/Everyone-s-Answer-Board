@@ -1995,7 +1995,7 @@ function handleDeleteRequest() {
             setLoading(false);
             showMessage(response, 'success');
             setTimeout(function() {
-              window.top.location.reload(); 
+              window.top.location.href = window.location.origin + '/exec?page=Registration';
             }, 2000);
           })
           .catch(function(error) {
@@ -2790,44 +2790,17 @@ function syncCheckboxStates(status) {
     }
 
     /**
-     * サーバーから質問テンプレートを読み込み、フォームに設定
+     * 管理パネル用の設定初期化（プレースホルダーのみ、デフォルト値は設定しない）
      */
     async function initQuestionConfig() {
         try {
-            const response = await fetch(window.location.origin + '/exec?doGetQuestionConfig');
-            const cfg = await response.json();
-            
-            if (cfg.error) {
-                console.error('Question config API error:', cfg.error);
-                return;
-            }
-            
-            // メイン質問の設定
-            const mainQuestionElement = document.getElementById('custom-main-question');
-            if (mainQuestionElement && cfg.mainQuestion) {
-                mainQuestionElement.value = cfg.mainQuestion.title || '';
-            }
-            
-            // メイン質問の選択肢設定
-            const mainChoicesElement = document.getElementById('main-question-choices');
-            if (mainChoicesElement && cfg.mainQuestion && cfg.mainQuestion.choices) {
-                mainChoicesElement.value = cfg.mainQuestion.choices.join('\n');
-            }
-            
-            // クラス選択肢の設定
-            const classChoicesElement = document.getElementById('class-choices');
-            if (classChoicesElement && cfg.classQuestion && cfg.classQuestion.choices) {
-                classChoicesElement.value = cfg.classQuestion.choices.join('\n');
-            }
-            
-            // フォームタイトルがあれば設定（今後の拡張用）
-            if (cfg.formTitle) {
-                console.log('Form title from server:', cfg.formTitle);
-            }
+            // 管理パネルではプレースホルダーのみ表示し、デフォルト値は設定しない
+            // 保存されたクラス選択肢のみ読み込む
+            loadSavedClassChoices();
             
         } catch (error) {
-            console.error('Failed to load question config:', error);
-            // エラー時はデフォルトの読み込み処理を実行
+            console.error('Failed to initialize question config:', error);
+            // エラー時もクラス選択肢の読み込みを試行
             loadSavedClassChoices();
         }
     }
@@ -3109,7 +3082,7 @@ function syncCheckboxStates(status) {
               <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
               <h4 class="text-lg font-semibold text-blue-400">問題文を入力</h4>
             </div>
-            <textarea id="custom-main-question" rows="3" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors" placeholder=""></textarea>
+            <textarea id="custom-main-question" rows="3" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors" placeholder="例：今日のテーマについて、あなたの考えや意見を聞かせてください"></textarea>
             <p class="text-xs text-gray-400 mt-2">学習者に表示される質問文を入力してください</p>
           </div>
 
@@ -3133,7 +3106,7 @@ function syncCheckboxStates(status) {
               <div class="w-6 h-6 bg-yellow-500 text-white rounded-full flex items-center justify-center text-sm font-bold">3</div>
               <h4 class="text-lg font-semibold text-yellow-400">選択肢を設定</h4>
             </div>
-            <textarea id="main-question-choices" rows="4" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-colors" placeholder=""></textarea>
+            <textarea id="main-question-choices" rows="4" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-colors" placeholder="例：&#10;気づいたことがある。&#10;疑問に思うことがある。&#10;もっと知りたいことがある。"></textarea>
             <p class="text-xs text-gray-400 mt-2">💡 学習者が選択できる選択肢を1行に1つずつ入力してください。例のような評価軸や、具体的な選択肢を設定できます。</p>
             
             <div class="mt-4">
@@ -3159,7 +3132,7 @@ function syncCheckboxStates(status) {
               </label>
             </div>
             <div id="class-choices-container">
-              <textarea id="class-choices" rows="3" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition-colors" placeholder=""></textarea>
+              <textarea id="class-choices" rows="3" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition-colors" placeholder="例：&#10;クラス1&#10;クラス2&#10;クラス3&#10;クラス4"></textarea>
               <p class="text-xs text-gray-400 mt-2">1行に1つずつクラス名を入力してください</p>
             </div>
           </div>
