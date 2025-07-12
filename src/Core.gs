@@ -3373,7 +3373,18 @@ function getStatus(requestUserId, forceRefresh = false) {
     
     // 公開状態の判定
     const isPublished = !!(configJson.appPublished && configJson.publishedSpreadsheetId && configJson.publishedSheetName);
-    
+
+    let topic = '（問題文未設定）';
+    if (customFormInfo && customFormInfo.mainQuestion) {
+      topic = customFormInfo.mainQuestion;
+    } else if (configJson.mainQuestion) {
+      topic = configJson.mainQuestion;
+    } else if (configJson.publishedSheetName) {
+      const sheetKey = 'sheet_' + configJson.publishedSheetName;
+      const sheetConfig = configJson[sheetKey] || {};
+      topic = sheetConfig.opinionHeader || configJson.publishedSheetName;
+    }
+
     return {
       status: 'success',
       userInfo: userInfo,
@@ -3386,7 +3397,8 @@ function getStatus(requestUserId, forceRefresh = false) {
       formUrl: formUrl || null,
       webAppUrl: getWebAppUrlCached(),
       appUrls: generateAppUrls(requestUserId),
-      customFormInfo: customFormInfo
+      customFormInfo: customFormInfo,
+      currentTopic: topic
     };
     
   } catch (error) {
