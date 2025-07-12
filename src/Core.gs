@@ -638,33 +638,10 @@ function formatSheetDataForFrontend(rawData, mappedIndices, headerIndices, admin
 function getAppConfigMultiTenant(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
-    var props = PropertiesService.getUserProperties();
-    var currentUserId = props.getProperty('CURRENT_USER_ID');
-    
-    if (!currentUserId) {
-      // コンテキストが設定されていない場合、現在のユーザーで検索
-      var activeUser = Session.getActiveUser().getEmail();
-      var userInfo = findUserByEmail(activeUser);
-      if (userInfo) {
-        currentUserId = userInfo.userId;
-        props.setProperty('CURRENT_USER_ID', currentUserId);
-      } else {
-        throw new Error('ユーザー情報が見つかりません');
-      }
-    }
-    
+    var currentUserId = requestUserId;
     var userInfo = findUserById(currentUserId);
     if (!userInfo) {
-      handleMissingUser(currentUserId);
-      var fallbackEmail = Session.getActiveUser().getEmail();
-      var altUser = findUserByEmail(fallbackEmail);
-      if (altUser) {
-        currentUserId = altUser.userId;
-        props.setProperty('CURRENT_USER_ID', currentUserId);
-        userInfo = altUser;
-      } else {
-        throw new Error('ユーザー情報が見つかりません');
-      }
+      throw new Error('ユーザー情報が見つかりません');
     }
     
     var configJson = JSON.parse(userInfo.configJson || '{}');
@@ -772,7 +749,7 @@ function getAppConfigMultiTenant(requestUserId) {
  * @param {string} sheetName - 設定対象のシート名
  * @param {object} config - 保存するシート固有の設定
  */
-function saveSheetConfig(spreadsheetId, sheetName, config) {
+function saveSheetConfig(userId, spreadsheetId, sheetName, config) {
   try {
     if (!spreadsheetId || typeof spreadsheetId !== 'string') {
       throw new Error('無効なspreadsheetIdです: ' + spreadsheetId);
@@ -784,12 +761,7 @@ function saveSheetConfig(spreadsheetId, sheetName, config) {
       throw new Error('無効なconfigです: ' + config);
     }
     
-    var props = PropertiesService.getUserProperties();
-    var currentUserId = props.getProperty('CURRENT_USER_ID');
-    if (!currentUserId) {
-      throw new Error('ユーザーコンテキストが設定されていません');
-    }
-
+    var currentUserId = userId;
     var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
@@ -816,7 +788,7 @@ function saveSheetConfig(spreadsheetId, sheetName, config) {
  * @param {string} spreadsheetId - 公開対象のスプレッドシートID
  * @param {string} sheetName - 公開対象のシート名
  */
-function switchToSheet(spreadsheetId, sheetName) {
+function switchToSheet(userId, spreadsheetId, sheetName) {
   try {
     if (!spreadsheetId || typeof spreadsheetId !== 'string') {
       throw new Error('無効なspreadsheetIdです: ' + spreadsheetId);
@@ -825,12 +797,7 @@ function switchToSheet(spreadsheetId, sheetName) {
       throw new Error('無効なsheetNameです: ' + sheetName);
     }
     
-    var props = PropertiesService.getUserProperties();
-    var currentUserId = props.getProperty('CURRENT_USER_ID');
-    if (!currentUserId) {
-      throw new Error('ユーザーコンテキストが設定されていません');
-    }
-
+    var currentUserId = userId;
     var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
@@ -2093,15 +2060,9 @@ function doGetQuestionConfig() {
 /**
  * クラス選択肢をデータベースに保存
  */
-function saveClassChoices(classChoices) {
+function saveClassChoices(userId, classChoices) {
   try {
-    var props = PropertiesService.getUserProperties();
-    var currentUserId = props.getProperty('CURRENT_USER_ID');
-    
-    if (!currentUserId) {
-      throw new Error('ユーザーコンテキストが設定されていません');
-    }
-    
+    var currentUserId = userId;
     var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
@@ -2126,15 +2087,9 @@ function saveClassChoices(classChoices) {
 /**
  * 保存されたクラス選択肢を取得
  */
-function getSavedClassChoices() {
+function getSavedClassChoices(userId) {
   try {
-    var props = PropertiesService.getUserProperties();
-    var currentUserId = props.getProperty('CURRENT_USER_ID');
-    
-    if (!currentUserId) {
-      return { status: 'error', message: 'ユーザーコンテキストが設定されていません' };
-    }
-    
+    var currentUserId = userId;
     var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       return { status: 'error', message: 'ユーザー情報が見つかりません' };
@@ -4051,8 +4006,8 @@ function deleteCurrentUserAccountMultiTenant(requestUserId) {
     
     clearExecutionUserInfoCache();
     
-    // 従来のdeleteCurrentUserAccount処理を実行
-    const result = deleteCurrentUserAccount();
+    // 従来のdeleteUserAccount処理を実行
+    const result = deleteUserAccount(requestUserId);
     
     return result;
   } catch (e) {
@@ -4162,7 +4117,7 @@ function getSavedClassChoicesMultiTenant(requestUserId) {
     clearExecutionUserInfoCache();
     
     // 従来のgetSavedClassChoices処理を実行
-    const result = getSavedClassChoices();
+    const result = getSavedClassChoices(requestUserId);
     
     return result;
   } catch (e) {
@@ -4190,7 +4145,7 @@ function saveClassChoicesMultiTenant(requestUserId, classChoices) {
     clearExecutionUserInfoCache();
     
     // 従来のsaveClassChoices処理を実行
-    const result = saveClassChoices(classChoices);
+    const result = saveClassChoices(requestUserId, classChoices);
     
     return result;
   } catch (e) {
