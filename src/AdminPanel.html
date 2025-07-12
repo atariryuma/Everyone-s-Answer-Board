@@ -1491,7 +1491,7 @@
       showLoadingState('公開中...');
       
       // 公開処理を実行（activateSheet関数を使用）
-      runGasWithUserId('activateSheet', selectedSheet)
+      runGasWithUserId('activateSheetSimple', selectedSheet)
         .then(function(result) {
           console.log('Board published successfully:', result);
           hideLoadingState();

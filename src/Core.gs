@@ -3539,3 +3539,98 @@ function checkSetupPageAccess() {
     };
   }
 }
+
+/**
+ * 全ユーザー一覧を取得（AppSetupPage.html用ラッパー）
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ */
+function getAllUsersForAdminForUI(requestUserId) {
+  try {
+    const result = getAllUsersForAdmin();
+    return {
+      status: 'success',
+      users: result
+    };
+  } catch (error) {
+    console.error('getAllUsersForAdminForUI wrapper error:', error.message);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+
+/**
+ * カスタム設定でフォームを作成（AdminPanel.html用ラッパー）
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ * @param {object} config - フォーム設定
+ */
+function createAdditionalFormWithConfig(requestUserId, config) {
+  try {
+    verifyUserAccess(requestUserId);
+    const activeUserEmail = Session.getActiveUser().getEmail();
+    const formTitle = config.formTitle || 'カスタムフォーム';
+    
+    const result = createStudyQuestFormWithConfig(activeUserEmail, requestUserId, formTitle, config);
+    
+    return {
+      status: 'success',
+      message: 'カスタムフォームが正常に作成されました！',
+      formUrl: result.formUrl,
+      spreadsheetUrl: result.spreadsheetUrl,
+      formTitle: result.formTitle
+    };
+  } catch (error) {
+    console.error('createAdditionalFormWithConfig error:', error.message);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+
+/**
+ * 現在のユーザーアカウントを削除（AdminPanel.html用）
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ */
+function deleteCurrentUserAccount(requestUserId) {
+  try {
+    verifyUserAccess(requestUserId);
+    const result = deleteUserAccount(requestUserId);
+    
+    return {
+      status: 'success',
+      message: 'アカウントが正常に削除されました',
+      result: result
+    };
+  } catch (error) {
+    console.error('deleteCurrentUserAccount error:', error.message);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+
+/**
+ * シートを有効化（AdminPanel.html用のシンプル版）
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ * @param {string} sheetName - シート名
+ */
+function activateSheetSimple(requestUserId, sheetName) {
+  try {
+    verifyUserAccess(requestUserId);
+    const userInfo = findUserById(requestUserId);
+    if (!userInfo || !userInfo.spreadsheetId) {
+      throw new Error('ユーザー情報またはスプレッドシートIDが見つかりません');
+    }
+    
+    return activateSheet(requestUserId, userInfo.spreadsheetId, sheetName);
+  } catch (error) {
+    console.error('activateSheetSimple error:', error.message);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
+}
