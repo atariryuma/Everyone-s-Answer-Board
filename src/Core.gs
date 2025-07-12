@@ -3197,10 +3197,23 @@ function getStatus(requestUserId, forceRefresh = false) {
     if (forceRefresh) {
       clearExecutionUserInfoCache(); // 実行レベルキャッシュをクリア
     }
-    const userInfo = getCachedUserInfo(requestUserId);
+    let userInfo = getCachedUserInfo(requestUserId);
     
     if (!userInfo) {
       return { status: 'error', message: 'ユーザー情報が見つかりません' };
+    }
+    
+    // 自動修復: スプレッドシートIDがあるのにconfigJsonにpublishedSpreadsheetIdがない場合
+    let configJson = JSON.parse(userInfo.configJson || '{}');
+    if (userInfo.spreadsheetId && !configJson.publishedSpreadsheetId) {
+      debugLog('getStatus: Auto-repairing missing publishedSpreadsheetId');
+      const repairResult = repairUserConfigJson(requestUserId);
+      if (repairResult.status === 'success') {
+        // 修復後、最新のユーザー情報を再取得
+        userInfo = findUserById(requestUserId);
+        // configJsonも更新
+        configJson = JSON.parse(userInfo.configJson || '{}');
+      }
     }
     
     // スプレッドシート情報を取得
@@ -3217,8 +3230,7 @@ function getStatus(requestUserId, forceRefresh = false) {
       console.error('getStatus sheetError details:', sheetError.stack);
     }
     
-    // 設定情報をパース
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    // 設定情報は既に上でパース済み
     
     // カスタムフォーム情報を取得
     let customFormInfo = null;
@@ -3353,6 +3365,7 @@ function checkSetupPageAccess() {
  */
 function getAllUsersForAdminForUI(requestUserId) {
   try {
+    verifyUserAccess(requestUserId);
     const result = getAllUsersForAdmin();
     return {
       status: 'success',
@@ -3391,6 +3404,8 @@ function createCustomFormUI(requestUserId, config) {
       updatedConfigJson.lastFormCreatedAt = new Date().toISOString();
       updatedConfigJson.setupStatus = 'completed';
       updatedConfigJson.appPublished = true;
+      updatedConfigJson.publishedSpreadsheetId = result.spreadsheetId; // 重要：スプレッドシートIDを設定
+      updatedConfigJson.publishedSheetName = result.sheetName; // 重要：シート名を設定
       
       // カスタムフォーム設定情報を保存
       updatedConfigJson.formTitle = config.formTitle;
@@ -3455,6 +3470,8 @@ function createQuickStartFormUI(requestUserId) {
       updatedConfigJson.formCreated = true;
       updatedConfigJson.setupStatus = 'completed';
       updatedConfigJson.appPublished = true;
+      updatedConfigJson.publishedSpreadsheetId = result.spreadsheetId; // 重要：スプレッドシートIDを設定
+      updatedConfigJson.publishedSheetName = result.sheetName; // 重要：シート名を設定
       
       const updateData = {
         spreadsheetId: result.spreadsheetId,
@@ -3509,6 +3526,62 @@ function deleteCurrentUserAccount(requestUserId) {
       status: 'error',
       message: error.message
     };
+  }
+}
+
+/**
+ * 既存ユーザーのconfigJsonを修復する関数
+ * フォーム作成済みだがpublishedSpreadsheetIdが欠如している場合に使用
+ */
+function repairUserConfigJson(requestUserId) {
+  try {
+    verifyUserAccess(requestUserId);
+    const userInfo = findUserById(requestUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    const configJson = JSON.parse(userInfo.configJson || '{}');
+    
+    // スプレッドシートIDがあるが、configJsonにpublishedSpreadsheetIdがない場合
+    if (userInfo.spreadsheetId && !configJson.publishedSpreadsheetId) {
+      console.log('repairUserConfigJson: Repairing missing publishedSpreadsheetId for user:', requestUserId);
+      
+      configJson.publishedSpreadsheetId = userInfo.spreadsheetId;
+      
+      // シート名を取得して設定
+      try {
+        const sheets = getSheetsListInternal(requestUserId);
+        if (sheets && sheets.length > 0) {
+          // 最初のシートを公開シートとして設定（通常は「フォームの回答 1」）
+          configJson.publishedSheetName = sheets[0].name;
+          console.log('repairUserConfigJson: Set publishedSheetName to:', sheets[0].name);
+        }
+      } catch (sheetError) {
+        console.warn('repairUserConfigJson: Failed to get sheet names:', sheetError.message);
+      }
+      
+      // フォーム作成状態を正しく設定
+      if (configJson.formUrl && !configJson.formCreated) {
+        configJson.formCreated = true;
+        configJson.setupStatus = 'completed';
+        console.log('repairUserConfigJson: Set formCreated to true');
+      }
+      
+      // 更新
+      updateUser(requestUserId, {
+        configJson: JSON.stringify(configJson)
+      });
+      
+      console.log('repairUserConfigJson: Successfully repaired configJson for user:', requestUserId);
+      return { status: 'success', message: 'configJsonを修復しました' };
+    } else {
+      return { status: 'no_action', message: '修復の必要はありません' };
+    }
+    
+  } catch (error) {
+    console.error('repairUserConfigJson error:', error.message);
+    return { status: 'error', message: error.message };
   }
 }
 
