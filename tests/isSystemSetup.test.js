@@ -1,7 +1,7 @@
 const fs = require('fs');
 const vm = require('vm');
 
-describe('isSystemSetup requires ADMIN_EMAIL', () => {
+describe('isSystemSetup requires ADMIN_EMAIL and SERVICE_ACCOUNT_CREDS', () => {
   const code = fs.readFileSync('src/main.gs', 'utf8');
   let context;
 
@@ -22,10 +22,20 @@ describe('isSystemSetup requires ADMIN_EMAIL', () => {
     expect(context.isSystemSetup()).toBe(false);
   });
 
-  test('returns true when both properties exist', () => {
+  test('returns false when service account missing', () => {
     scriptProps.getProperty = (key) => {
       if (key === 'DATABASE_SPREADSHEET_ID') return 'id';
       if (key === 'ADMIN_EMAIL') return 'admin@example.com';
+      return null;
+    };
+    expect(context.isSystemSetup()).toBe(false);
+  });
+
+  test('returns true when all properties exist', () => {
+    scriptProps.getProperty = (key) => {
+      if (key === 'DATABASE_SPREADSHEET_ID') return 'id';
+      if (key === 'ADMIN_EMAIL') return 'admin@example.com';
+      if (key === 'SERVICE_ACCOUNT_CREDS') return '{"client_email":"a","private_key":"b"}';
       return null;
     };
     expect(context.isSystemSetup()).toBe(true);

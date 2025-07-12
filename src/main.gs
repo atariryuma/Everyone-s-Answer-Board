@@ -254,7 +254,8 @@ function isSystemSetup() {
   var props = PropertiesService.getScriptProperties();
   var dbSpreadsheetId = props.getProperty('DATABASE_SPREADSHEET_ID');
   var adminEmail = props.getProperty('ADMIN_EMAIL');
-  return !!dbSpreadsheetId && !!adminEmail;
+  var serviceAccountCreds = props.getProperty('SERVICE_ACCOUNT_CREDS');
+  return !!dbSpreadsheetId && !!adminEmail && !!serviceAccountCreds;
 }
 
 /**
