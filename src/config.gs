@@ -764,6 +764,7 @@ function saveSheetConfigBatch(spreadsheetId, sheetName, config, displayOptions) 
     configJson.publishedSpreadsheetId = spreadsheetId;
     configJson.displayMode = displayOptions.showNames ? 'named' : 'anonymous';
     configJson.showCounts = displayOptions.showCounts;
+    configJson.appPublished = true;
     configJson.lastModified = new Date().toISOString();
     
     // 一回のAPI呼び出しで全ての設定を更新

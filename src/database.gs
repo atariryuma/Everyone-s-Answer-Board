@@ -31,8 +31,12 @@ function getSheetsService() {
  * @returns {object|null} ユーザー情報
  */
 function findUserById(userId) {
-  // キャッシュを無効化してデータベースから直接取得
-  return fetchUserFromDatabase('userId', userId);
+  var cacheKey = 'user_' + userId;
+  return cacheManager.get(
+    cacheKey,
+    function() { return fetchUserFromDatabase('userId', userId); },
+    { ttl: 300, enableMemoization: true }
+  );
 }
 
 /**
@@ -41,8 +45,12 @@ function findUserById(userId) {
  * @returns {object|null} ユーザー情報
  */
 function findUserByEmail(email) {
-  // キャッシュを無効化してデータベースから直接取得
-  return fetchUserFromDatabase('adminEmail', email);
+  var cacheKey = 'email_' + email;
+  return cacheManager.get(
+    cacheKey,
+    function() { return fetchUserFromDatabase('adminEmail', email); },
+    { ttl: 300, enableMemoization: true }
+  );
 }
 
 /**
