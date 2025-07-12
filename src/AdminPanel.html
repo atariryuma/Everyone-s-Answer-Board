@@ -62,11 +62,11 @@
     // マルチテナント対応: 新しいrunGasWithUserId関数
     function runGasWithUserId(functionName, ...args) {
       if (!userId) {
-        console.error('❌ MultiTenant - No userId available for:', functionName);
+        console.error('❌  - No userId available for:', functionName);
         throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
       }
       
-      console.log('✅ MultiTenant - runGasWithUserId:', functionName, 'userId:', userId);
+      console.log('✅  - runGasWithUserId:', functionName, 'userId:', userId);
       // userIdを第一引数として追加
       return gasOptimizer.call(functionName, userId, ...args);
     }
@@ -81,12 +81,12 @@
     // マルチテナント対応: callWithCacheWithUserId関数
     function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
       if (!userId) {
-        console.error('❌ MultiTenant - No userId available for cached call:', functionName);
+        console.error('❌  - No userId available for cached call:', functionName);
         throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
       }
       
       return unifiedCache.getOrSet(cacheKey, function() {
-        console.log('✅ MultiTenant - callWithCacheWithUserId:', functionName, 'userId:', userId);
+        console.log('✅  - callWithCacheWithUserId:', functionName, 'userId:', userId);
         return gasOptimizer.call(functionName, userId, ...args);
       }, ttl);
     }
@@ -1491,7 +1491,7 @@
       showLoadingState('公開中...');
       
       // 公開処理を実行（activateSheet関数を使用）
-      runGasWithUserId('activateSheetMultiTenant', selectedSheet)
+      runGasWithUserId('activateSheet', selectedSheet)
         .then(function(result) {
           console.log('Board published successfully:', result);
           hideLoadingState();
@@ -1538,21 +1538,21 @@
         var templateUserId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
         if (templateUserId && templateUserId.trim() !== '') {
           userId = templateUserId;
-          console.log('✅ MultiTenant - userId from template:', userId);
+          console.log('✅  - userId from template:', userId);
         } else {
           // フォールバック: metaタグから取得
           var userIdMeta = document.querySelector('meta[name="user-id"]');
           if (userIdMeta && userIdMeta.content) {
             userId = userIdMeta.content;
-            console.log('✅ MultiTenant - userId from meta:', userId);
+            console.log('✅  - userId from meta:', userId);
           }
         }
         
         if (!userId) {
-          console.error('❌ MultiTenant - userId not found in template or meta');
+          console.error('❌  - userId not found in template or meta');
         }
       } catch (e) {
-        console.error('❌ MultiTenant - userId initialization error:', e);
+        console.error('❌  - userId initialization error:', e);
         userId = '';
       }
     })();
@@ -2152,7 +2152,7 @@ function handleDeleteRequest() {
       '本当にこのアカウントを削除しますか？この操作は元に戻せず、すべてのデータが失われます。',
       function() {
         setLoading(true, 'アカウントを完全に削除しています...');
-        runGasWithUserId('deleteCurrentUserAccountMultiTenant')
+        runGasWithUserId('deleteCurrentUserAccount')
           .then(function(response) {
             setLoading(false);
             showMessage(response, 'success');
@@ -2350,16 +2350,16 @@ function syncCheckboxStates(status) {
           unifiedCache.delete(cacheKey);
         }
         // マルチテナント対応: 新しい関数を使用
-        runGasWithUserId('getStatusMultiTenant')
+        runGasWithUserId('getStatus')
           .then(function(status) {
-            console.log('✅ Status loaded (MultiTenant forced refresh)', status);
+            console.log('✅ Status loaded ( forced refresh)', status);
             updateUIWithNewStatus(status);
             setLoading(false);
           })
           .catch(function(error) {
-            console.error('❌ MultiTenant getStatus failed, falling back to legacy:', error);
+            console.error('❌  getStatus failed, falling back to legacy:', error);
             // フォールバック: 従来の方法
-            runGasWithUserId('getStatusMultiTenant', forceRefresh)
+            runGasWithUserId('getStatus', forceRefresh)
               .then(function(status) {
                 console.log('✅ Status loaded (legacy fallback)', status);
                 updateUIWithNewStatus(status);
@@ -2372,7 +2372,7 @@ function syncCheckboxStates(status) {
           });
       } else {
         // マルチテナント対応: キャッシュ付きで新しい関数を使用
-        callWithCacheWithUserId('getStatusMultiTenant', cacheKey, cacheTime)
+        callWithCacheWithUserId('getStatus', cacheKey, cacheTime)
           .then(function(status) {
             console.log('✅ Status loaded (cached)', status);
             updateUIWithNewStatus(status);
@@ -2697,7 +2697,7 @@ function syncCheckboxStates(status) {
         setLoading(true, '列情報を読み込んでいます...');
       }
       
-      runGasWithUserId('getSheetDetailsMultiTenant', currentStatus.userInfo.spreadsheetId, selectedSheet)
+      runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
         .then(handleSheetDetailsSuccess)
         .catch(handleSheetDetailsError);
     }
@@ -2800,7 +2800,7 @@ function syncCheckboxStates(status) {
       }
       setLoading(true, 'AI搭載高精度列判定システムが分析中...');
       
-      runGasWithUserId('getSheetDetailsMultiTenant', currentStatus.userInfo.spreadsheetId, selectedSheet)
+      runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
         .then(function(details) {
           const configToUse = {
             ...details.guessedConfig,
@@ -2890,7 +2890,7 @@ function syncCheckboxStates(status) {
         classChoices: config.classChoices
       };
       
-      runGasWithUserId('saveAndPublishMultiTenant', settingsData)
+      runGasWithUserId('saveAndPublish', settingsData)
         .then(function(result) {
           setLoading(false);
           if (result && result.status === 'success') {
@@ -2898,7 +2898,7 @@ function syncCheckboxStates(status) {
             // マルチテナント版は latestStatus を含むので、それでUIを更新
             if (result.latestStatus) {
               updateUIWithNewStatus(result.latestStatus);
-              console.log('✅ saveAndPublishMultiTenant success - UI updated with latest status');
+              console.log('✅ saveAndPublish success - UI updated with latest status');
             } else {
               loadStatus(true);
             }
@@ -2908,9 +2908,9 @@ function syncCheckboxStates(status) {
         })
         .catch(function(error) {
           setLoading(false);
-          console.error('❌ MultiTenant saveAndPublish failed, falling back to legacy:', error);
+          console.error('❌  saveAndPublish failed, falling back to legacy:', error);
           // フォールバック: 従来の方法
-          runGasWithUserId('saveAndPublishMultiTenant', selectedSheet, config)
+          runGasWithUserId('saveAndPublish', selectedSheet, config)
             .then(function(status) {
               setLoading(false);
               showMessage('設定が保存され、ボードが公開されました！', 'success');
@@ -2942,7 +2942,7 @@ function syncCheckboxStates(status) {
      */
     function unpublishBoard() {
       setLoading(true, 'ボードの公開を停止中...');
-      runGasWithUserId('clearActiveSheetMultiTenant')
+      runGasWithUserId('clearActiveSheet')
         .then(function(response) {
           console.log('公開停止レスポンス:', response);
           showMessage(response.message || '✅ 回答ボードの公開を停止しました。', 'success');
@@ -2971,7 +2971,7 @@ function syncCheckboxStates(status) {
           '新しいGoogleフォームと連携するスプレッドシートを作成します。よろしいですか？',
           function() {
             setLoading(true, '新規フォームを作成しています。');
-            runGasWithUserId('createBoardMultiTenant')
+            runGasWithUserId('createBoard')
               .then(function(response) {
                 setLoading(true, '設定情報を更新しています。');
                 setLoading(true, 'ボードを公開しています。');
@@ -3026,7 +3026,7 @@ function syncCheckboxStates(status) {
      * 保存されたクラス選択肢を読み込み
      */
     function loadSavedClassChoices() {
-        runGasWithUserId('getSavedClassChoicesMultiTenant')
+        runGasWithUserId('getSavedClassChoices')
             .then(function(result) {
                 if (result.status === 'success' && result.classChoices) {
                     const classChoicesTextarea = document.getElementById('class-choices');
@@ -3085,7 +3085,7 @@ function syncCheckboxStates(status) {
         hideFormConfigModal();
         setLoading(true, '新しいフォームを作成しています...');
 
-        runGasWithUserId('createAdditionalFormWithConfigMultiTenant', config)
+        runGasWithUserId('createAdditionalFormWithConfig', config)
             .then(function(result) {
                 if (result.status === 'success') {
                     showMessage('✅ 新しいフォームが作成され、連携されました！', 'success');
@@ -3114,7 +3114,7 @@ function syncCheckboxStates(status) {
      * クラス選択肢をデータベースに保存
      */
     function saveClassChoicesToDatabase(classChoices) {
-        runGasWithUserId('saveClassChoicesMultiTenant', classChoices)
+        runGasWithUserId('saveClassChoices', classChoices)
             .catch(function(error) {
                 console.warn('クラス選択肢の保存に失敗:', error.message);
             });
@@ -3131,7 +3131,7 @@ function syncCheckboxStates(status) {
       }
 
       setLoading(true, 'リソースを追加しています...');
-      runGasWithUserId('addSpreadsheetUrlMultiTenant', url)
+      runGasWithUserId('addSpreadsheetUrl', url)
         .then(function(result) {
           if (result.status === 'success') {
             showMessage(result.message, 'success');
@@ -3239,7 +3239,7 @@ function syncCheckboxStates(status) {
         }
         
         // キャッシュを利用して静かに更新
-        runGasWithUserId('getStatusMultiTenant', false)
+        runGasWithUserId('getStatus', false)
           .then(function(status) {
             // 変更があった場合のみUIを更新
             if (JSON.stringify(status) !== JSON.stringify(currentStatus)) {
@@ -3263,7 +3263,7 @@ function syncCheckboxStates(status) {
 
     function openAppSetupPage() {
       // アプリ設定ページを新しいタブで開く
-      runGasWithUserId('getWebAppUrlCachedMultiTenant')
+      runGasWithUserId('getWebAppUrlCached')
         .then(function(webAppUrl) {
           const setupUrl = webAppUrl + '?setup=true&mode=appsetup';
           window.open(setupUrl, '_blank');

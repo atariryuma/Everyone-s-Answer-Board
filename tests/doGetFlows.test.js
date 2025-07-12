@@ -18,7 +18,7 @@ describe.skip('doGet flows', () => {
     context.renderAdminPanel = jest.fn(() => 'admin');
     context.showRegistrationPage = jest.fn(() => 'register');
     context.handleSetupPages = context.handleSetupPages || (() => null);
-    context.validateUserSessionMultiTenant = jest.fn(() => ({
+    context.validateUserSession = jest.fn(() => ({
       userEmail: 'me@example.com',
       userInfo: { userId: '1', adminEmail: 'me@example.com' }
     }));
@@ -39,7 +39,7 @@ describe.skip('doGet flows', () => {
   });
 
   test('shows registration when userInfo missing', () => {
-    context.validateUserSessionMultiTenant.mockReturnValue({ userEmail: null, userInfo: null });
+    context.validateUserSession.mockReturnValue({ userEmail: null, userInfo: null });
     const result = context.doGet({});
     expect(result).toBe('register');
   });

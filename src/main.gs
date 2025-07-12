@@ -287,7 +287,7 @@ function doGet(e) {
     }
     
     // マルチテナント対応: userIdベースでユーザー情報を取得
-    const { userEmail, userInfo } = validateUserSessionMultiTenant(currentUserEmail, params);
+    const { userEmail, userInfo } = validateUserSession(currentUserEmail, params);
     const setupOutput = handleSetupPages(params, userEmail);
     if (setupOutput) return setupOutput;
 
@@ -515,12 +515,12 @@ function parseRequestParams(e) {
  * @param {Object} params - リクエストパラメータ（userIdを含む）
  * @returns {Object} userEmailとuserInfoを含むオブジェクト
  */
-function validateUserSessionMultiTenant(currentUserEmail, params) {
-  console.log('validateUserSessionMultiTenant - email:', currentUserEmail, 'params:', params);
+function validateUserSession(currentUserEmail, params) {
+  console.log('validateUserSession - email:', currentUserEmail, 'params:', params);
   
   // 基本的な認証チェック（Googleアカウントにログインしているか）
   if (!currentUserEmail) {
-    console.warn('validateUserSessionMultiTenant - no authenticated user');
+    console.warn('validateUserSession - no authenticated user');
     return { userEmail: null, userInfo: null };
   }
   
@@ -528,30 +528,30 @@ function validateUserSessionMultiTenant(currentUserEmail, params) {
   
   // マルチテナント対応: 常にuserIdベースでユーザー情報を取得
   if (params.userId) {
-    console.log('validateUserSessionMultiTenant - looking up userId:', params.userId);
+    console.log('validateUserSession - looking up userId:', params.userId);
     userInfo = findUserById(params.userId);
     
     if (userInfo) {
       // セキュリティチェック: リクエストされたuserIdが認証済みユーザーのものか確認
       if (userInfo.adminEmail !== currentUserEmail) {
-        console.warn('validateUserSessionMultiTenant - security violation:', 
+        console.warn('validateUserSession - security violation:', 
                     'authenticated:', currentUserEmail, 
                     'requested:', userInfo.adminEmail);
         // 本人以外のデータへのアクセス試行は拒否
         return { userEmail: currentUserEmail, userInfo: null };
       }
       
-      console.log('validateUserSessionMultiTenant - valid user found:', userInfo.userId);
+      console.log('validateUserSession - valid user found:', userInfo.userId);
     } else {
-      console.warn('validateUserSessionMultiTenant - userId not found:', params.userId);
+      console.warn('validateUserSession - userId not found:', params.userId);
     }
   } else if (params.isDirectPageAccess) {
     // 直接ページアクセスの場合は、emailベースでフォールバック
-    console.log('validateUserSessionMultiTenant - direct page access, looking up by email');
+    console.log('validateUserSession - direct page access, looking up by email');
     userInfo = findUserByEmail(currentUserEmail);
   } else {
     // userIdパラメータがない場合は、emailベースでフォールバック
-    console.log('validateUserSessionMultiTenant - no userId param, looking up by email');
+    console.log('validateUserSession - no userId param, looking up by email');
     userInfo = findUserByEmail(currentUserEmail);
   }
   
