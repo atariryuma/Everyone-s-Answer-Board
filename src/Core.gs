@@ -3606,3 +3606,67 @@ function isDeployUser() {
   }
 }
 
+// =================================================================
+// ユーザー管理機能（AppSetupPage.html用）
+// =================================================================
+
+/**
+ * 全ユーザー一覧を取得（AppSetupPage.html用ラッパー）
+ */
+function getAllUsersForAdminForUI() {
+  try {
+    const users = getAllUsersForAdmin();
+    return {
+      status: 'success',
+      users: users
+    };
+  } catch (error) {
+    console.error('getAllUsersForAdmin wrapper error:', error.message);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+
+/**
+ * 管理者によるユーザー削除（AppSetupPage.html用ラッパー）
+ * @param {string} targetUserId - 削除対象ユーザーID
+ * @param {string} reason - 削除理由
+ */
+function deleteUserAccountByAdminForUI(targetUserId, reason) {
+  try {
+    const result = deleteUserAccountByAdmin(targetUserId, reason);
+    return {
+      status: 'success',
+      message: result.message,
+      deletedUser: result.deletedUser
+    };
+  } catch (error) {
+    console.error('deleteUserAccountByAdmin wrapper error:', error.message);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+
+/**
+ * 削除ログ取得（AppSetupPage.html用ラッパー）
+ */
+function getDeletionLogsForUI() {
+  try {
+    const logs = getDeletionLogs();
+    return {
+      status: 'success',
+      logs: logs
+    };
+  } catch (error) {
+    console.error('getDeletionLogs wrapper error:', error.message);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+

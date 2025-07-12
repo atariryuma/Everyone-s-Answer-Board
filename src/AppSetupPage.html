@@ -110,6 +110,66 @@
             </div>
         </div>
 
+        <!-- ユーザー管理セクション -->
+        <div class="glass-panel rounded-xl p-6 mb-6">
+            <h2 class="text-xl font-semibold text-white mb-4">👥 ユーザー管理</h2>
+            
+            <div class="space-y-4">
+                <!-- ユーザー一覧表示エリア -->
+                <div id="user-list-container" class="hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-medium text-white">登録ユーザー一覧</h3>
+                        <div class="flex gap-2">
+                            <button 
+                                id="refresh-users-btn"
+                                onclick="loadUserList()"
+                                class="btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+                                🔄 更新
+                            </button>
+                            <button 
+                                id="view-logs-btn"
+                                onclick="viewDeletionLogs()"
+                                class="btn bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm">
+                                📋 削除ログ
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="user-table-wrapper" class="bg-gray-800 rounded-lg overflow-hidden">
+                        <div id="user-loading" class="p-8 text-center text-gray-400">
+                            <div class="loading-spinner w-8 h-8 border-2 border-gray-400 border-t-transparent rounded-full mx-auto mb-2"></div>
+                            ユーザー一覧を読み込み中...
+                        </div>
+                        <div id="user-table-content" class="hidden">
+                            <table class="w-full">
+                                <thead class="bg-gray-900">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">メールアドレス</th>
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">登録日</th>
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">状態</th>
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">最終アクセス</th>
+                                        <th class="px-4 py-3 text-center text-sm font-medium text-gray-300">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="user-table-body" class="divide-y divide-gray-700">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ユーザー管理ボタン -->
+                <div class="text-center">
+                    <button 
+                        id="manage-users-btn"
+                        onclick="toggleUserManagement()"
+                        class="btn bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-3 px-6 rounded-lg">
+                        👥 ユーザー管理を開く
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- 戻るボタン -->
         <div class="text-center">
             <button 
@@ -117,6 +177,88 @@
                 class="btn bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-bold py-2 px-6 rounded-lg">
                 ← 管理パネルに戻る
             </button>
+        </div>
+    </div>
+
+    <!-- 削除確認モーダル -->
+    <div id="delete-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-semibold text-white mb-4">⚠️ ユーザーアカウント削除</h3>
+            
+            <div class="mb-4">
+                <p class="text-gray-300 mb-2">以下のユーザーを削除しますか？</p>
+                <div class="bg-gray-800 p-3 rounded-lg">
+                    <p class="text-cyan-400 font-medium" id="delete-user-email"></p>
+                    <p class="text-sm text-gray-400" id="delete-user-id"></p>
+                </div>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-300 mb-2">削除理由 <span class="text-red-400">*</span></label>
+                <textarea 
+                    id="deletion-reason"
+                    class="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white resize-none"
+                    rows="3"
+                    placeholder="削除理由を入力してください（必須）"
+                    required></textarea>
+                <p class="text-xs text-gray-400 mt-1">この情報は監査ログに記録されます</p>
+            </div>
+            
+            <div class="bg-red-900/20 border border-red-500/50 p-3 rounded-lg mb-4">
+                <p class="text-red-200 text-sm">
+                    ⚠️ この操作は取り消せません。ユーザーのデータが完全に削除されます。
+                </p>
+            </div>
+            
+            <div class="flex gap-3">
+                <button 
+                    onclick="cancelDeletion()"
+                    class="flex-1 btn bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg">
+                    キャンセル
+                </button>
+                <button 
+                    id="confirm-delete-btn"
+                    onclick="confirmDeletion()"
+                    class="flex-1 btn bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg">
+                    削除実行
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 削除ログモーダル -->
+    <div id="logs-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="glass-panel rounded-xl p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold text-white">📋 削除ログ</h3>
+                <button 
+                    onclick="closeDeletionLogs()"
+                    class="text-gray-400 hover:text-white text-2xl">✕</button>
+            </div>
+            
+            <div id="logs-content">
+                <div id="logs-loading" class="p-8 text-center text-gray-400">
+                    <div class="loading-spinner w-8 h-8 border-2 border-gray-400 border-t-transparent rounded-full mx-auto mb-2"></div>
+                    削除ログを読み込み中...
+                </div>
+                <div id="logs-table-content" class="hidden">
+                    <div class="bg-gray-800 rounded-lg overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-900">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">削除日時</th>
+                                    <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">実行者</th>
+                                    <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">対象ユーザー</th>
+                                    <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">削除理由</th>
+                                    <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">タイプ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logs-table-body" class="divide-y divide-gray-700">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -276,6 +418,217 @@
         window.addEventListener('load', function() {
             loadCurrentStatus();
         });
+
+        // ユーザー管理機能のJavaScript関数
+        let userManagementVisible = false;
+        let currentUserList = [];
+        let userToDelete = null;
+
+        // ユーザー管理の表示/非表示を切り替え
+        function toggleUserManagement() {
+            const container = document.getElementById('user-list-container');
+            const btn = document.getElementById('manage-users-btn');
+            
+            if (userManagementVisible) {
+                container.classList.add('hidden');
+                btn.textContent = '👥 ユーザー管理を開く';
+                userManagementVisible = false;
+            } else {
+                container.classList.remove('hidden');
+                btn.textContent = '👥 ユーザー管理を閉じる';
+                userManagementVisible = true;
+                loadUserList();
+            }
+        }
+
+        // ユーザー一覧を取得して表示
+        function loadUserList() {
+            const loadingDiv = document.getElementById('user-loading');
+            const contentDiv = document.getElementById('user-table-content');
+            
+            loadingDiv.classList.remove('hidden');
+            contentDiv.classList.add('hidden');
+            
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.status === 'success') {
+                        currentUserList = result.users;
+                        displayUserList(result.users);
+                    } else {
+                        showMessage(`ユーザー一覧の取得に失敗しました: ${result.message}`, 'error');
+                    }
+                    loadingDiv.classList.add('hidden');
+                })
+                .withFailureHandler((error) => {
+                    showMessage(`エラー: ${error.message || error}`, 'error');
+                    loadingDiv.classList.add('hidden');
+                })
+                .getAllUsersForAdminForUI();
+        }
+
+        // ユーザー一覧をテーブルに表示
+        function displayUserList(users) {
+            const tableBody = document.getElementById('user-table-body');
+            const contentDiv = document.getElementById('user-table-content');
+            
+            if (users.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-4 py-8 text-center text-gray-400">
+                            登録ユーザーが見つかりません
+                        </td>
+                    </tr>
+                `;
+            } else {
+                tableBody.innerHTML = users.map(user => {
+                    const isActive = user.isActive === true || String(user.isActive).toLowerCase() === 'true';
+                    const statusBadge = isActive 
+                        ? '<span class="px-2 py-1 bg-green-600 text-green-100 rounded-full text-xs">アクティブ</span>'
+                        : '<span class="px-2 py-1 bg-red-600 text-red-100 rounded-full text-xs">非アクティブ</span>';
+                    
+                    const lastAccess = user.lastAccessedAt 
+                        ? new Date(user.lastAccessedAt).toLocaleDateString('ja-JP')
+                        : '不明';
+                    
+                    const registrationDate = user.registrationDate 
+                        ? new Date(user.registrationDate).toLocaleDateString('ja-JP')
+                        : '不明';
+                    
+                    return `
+                        <tr class="hover:bg-gray-700/50">
+                            <td class="px-4 py-3 text-sm text-white">${user.adminEmail}</td>
+                            <td class="px-4 py-3 text-sm text-gray-300">${registrationDate}</td>
+                            <td class="px-4 py-3">${statusBadge}</td>
+                            <td class="px-4 py-3 text-sm text-gray-300">${lastAccess}</td>
+                            <td class="px-4 py-3 text-center">
+                                <button 
+                                    onclick="showDeleteConfirmation('${user.userId}', '${user.adminEmail}')"
+                                    class="btn bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs">
+                                    削除
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+            
+            contentDiv.classList.remove('hidden');
+        }
+
+        // 削除確認モーダルを表示
+        function showDeleteConfirmation(userId, userEmail) {
+            userToDelete = { userId, userEmail };
+            
+            document.getElementById('delete-user-email').textContent = userEmail;
+            document.getElementById('delete-user-id').textContent = `ID: ${userId}`;
+            document.getElementById('deletion-reason').value = '';
+            document.getElementById('delete-modal').classList.remove('hidden');
+        }
+
+        // 削除をキャンセル
+        function cancelDeletion() {
+            userToDelete = null;
+            document.getElementById('delete-modal').classList.add('hidden');
+        }
+
+        // 削除を実行
+        function confirmDeletion() {
+            if (!userToDelete) return;
+            
+            const reason = document.getElementById('deletion-reason').value.trim();
+            if (!reason) {
+                showMessage('削除理由を入力してください', 'warning');
+                return;
+            }
+            
+            const confirmBtn = document.getElementById('confirm-delete-btn');
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = '削除中...';
+            
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.status === 'success') {
+                        showMessage(`✅ ${result.message}`, 'success');
+                        cancelDeletion();
+                        loadUserList(); // ユーザー一覧を再読み込み
+                    } else {
+                        showMessage(`❌ ${result.message}`, 'error');
+                    }
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = '削除実行';
+                })
+                .withFailureHandler((error) => {
+                    showMessage(`❌ 削除に失敗しました: ${error.message || error}`, 'error');
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = '削除実行';
+                })
+                .deleteUserAccountByAdminForUI(userToDelete.userId, reason);
+        }
+
+        // 削除ログを表示
+        function viewDeletionLogs() {
+            const modal = document.getElementById('logs-modal');
+            const loadingDiv = document.getElementById('logs-loading');
+            const contentDiv = document.getElementById('logs-table-content');
+            
+            modal.classList.remove('hidden');
+            loadingDiv.classList.remove('hidden');
+            contentDiv.classList.add('hidden');
+            
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.status === 'success') {
+                        displayDeletionLogs(result.logs);
+                    } else {
+                        showMessage(`ログの取得に失敗しました: ${result.message}`, 'error');
+                    }
+                    loadingDiv.classList.add('hidden');
+                })
+                .withFailureHandler((error) => {
+                    showMessage(`エラー: ${error.message || error}`, 'error');
+                    loadingDiv.classList.add('hidden');
+                })
+                .getDeletionLogsForUI();
+        }
+
+        // 削除ログをテーブルに表示
+        function displayDeletionLogs(logs) {
+            const tableBody = document.getElementById('logs-table-body');
+            const contentDiv = document.getElementById('logs-table-content');
+            
+            if (logs.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-4 py-8 text-center text-gray-400">
+                            削除ログが見つかりません
+                        </td>
+                    </tr>
+                `;
+            } else {
+                tableBody.innerHTML = logs.map(log => {
+                    const deleteDate = new Date(log.timestamp).toLocaleString('ja-JP');
+                    const typeColor = log.deleteType === 'admin' ? 'text-red-400' : 'text-blue-400';
+                    const typeText = log.deleteType === 'admin' ? '管理者削除' : '自己削除';
+                    
+                    return `
+                        <tr class="hover:bg-gray-700/50">
+                            <td class="px-4 py-3 text-sm text-gray-300">${deleteDate}</td>
+                            <td class="px-4 py-3 text-sm text-white">${log.executorEmail}</td>
+                            <td class="px-4 py-3 text-sm text-cyan-400">${log.targetEmail}</td>
+                            <td class="px-4 py-3 text-sm text-gray-300">${log.reason || '理由なし'}</td>
+                            <td class="px-4 py-3 text-sm ${typeColor}">${typeText}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+            
+            contentDiv.classList.remove('hidden');
+        }
+
+        // 削除ログモーダルを閉じる
+        function closeDeletionLogs() {
+            document.getElementById('logs-modal').classList.add('hidden');
+        }
     </script>
 </body>
 </html>

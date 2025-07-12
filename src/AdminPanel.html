@@ -68,8 +68,8 @@
   }
   </script>
   <script>
-  const __IS_DEPLOY_USER__ = '<?= typeof isDeployUser !== "undefined" ? isDeployUser : false ?>';
-  window.isDeployUser = __IS_DEPLOY_USER__.startsWith('<') ? false : __IS_DEPLOY_USER__ === 'true';
+  const __IS_DEPLOY_USER__ = <?= typeof isDeployUser !== "undefined" ? isDeployUser : false ?>;
+  window.isDeployUser = __IS_DEPLOY_USER__ === true;
   
   // URL更新処理
   const shouldUpdateUrl = '<?= typeof shouldUpdateUrl !== "undefined" ? shouldUpdateUrl : false ?>';
@@ -1695,9 +1695,16 @@ elements = {
   currentTopicText: document.getElementById('current-topic-text')
   // ★★★ ここまで追加 ★★★
 };
-      if (!window.isDeployUser) {
-        var link = document.getElementById('app-setup-link');
-        if (link) link.style.display = 'none';
+      // AppSetupPageリンクの表示制御
+      var appSetupLink = document.getElementById('app-setup-link');
+      if (appSetupLink) {
+        if (window.isDeployUser) {
+          appSetupLink.style.display = 'block';
+          console.log('✅ AppSetupPage link shown for deploy user');
+        } else {
+          appSetupLink.style.display = 'none';
+          console.log('ℹ️ AppSetupPage link hidden for non-deploy user');
+        }
       }
       if (!IS_TEST_ENV) {
         showSystemFlow(); // デバッグフロー表示

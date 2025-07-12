@@ -8,6 +8,350 @@ var USER_CACHE_TTL = 300; // 5分
 var DB_BATCH_SIZE = 100;
 
 /**
+ * 削除ログ用シート設定
+ */
+const DELETE_LOG_SHEET_CONFIG = {
+  SHEET_NAME: 'DeleteLogs',
+  HEADERS: ['timestamp', 'executorEmail', 'targetUserId', 'targetEmail', 'reason', 'deleteType']
+};
+
+/**
+ * 削除ログを記録
+ * @param {string} executorEmail - 削除実行者のメール
+ * @param {string} targetUserId - 削除対象のユーザーID
+ * @param {string} targetEmail - 削除対象のメール
+ * @param {string} reason - 削除理由
+ * @param {string} deleteType - 削除タイプ ("self" | "admin")
+ */
+function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, deleteType) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    
+    if (!dbId) {
+      console.warn('削除ログの記録をスキップします: データベースIDが設定されていません');
+      return;
+    }
+    
+    const service = getSheetsService();
+    const logSheetName = DELETE_LOG_SHEET_CONFIG.SHEET_NAME;
+    
+    // ログシートの存在確認・作成
+    try {
+      const spreadsheetInfo = getSpreadsheetsData(service, dbId);
+      const logSheetExists = spreadsheetInfo.sheets.some(sheet => 
+        sheet.properties.title === logSheetName
+      );
+      
+      if (!logSheetExists) {
+        // ログシートを作成
+        const addSheetRequest = {
+          addSheet: {
+            properties: {
+              title: logSheetName
+            }
+          }
+        };
+        
+        batchUpdateSpreadsheet(service, dbId, {
+          requests: [addSheetRequest]
+        });
+        
+        // ヘッダー行を追加
+        appendSheetsData(service, dbId, `'${logSheetName}'!A1`, [DELETE_LOG_SHEET_CONFIG.HEADERS]);
+      }
+    } catch (sheetError) {
+      console.warn('ログシートの確認に失敗しましたが、処理を続行します:', sheetError.message);
+    }
+    
+    // ログエントリを追加
+    const logEntry = [
+      new Date().toISOString(),
+      executorEmail,
+      targetUserId,
+      targetEmail,
+      reason || '',
+      deleteType
+    ];
+    
+    appendSheetsData(service, dbId, `'${logSheetName}'!A:F`, [logEntry]);
+    console.log('✅ 削除ログを記録しました:', logEntry);
+    
+  } catch (error) {
+    console.error('削除ログの記録に失敗しました:', error.message);
+    // ログ記録の失敗は削除処理自体を止めない
+  }
+}
+
+/**
+ * 全ユーザー一覧を取得（管理者用）
+ */
+function getAllUsersForAdmin() {
+  try {
+    // 管理者権限チェック
+    if (!isDeployUser()) {
+      throw new Error('この機能にアクセスする権限がありません。');
+    }
+    
+    const props = PropertiesService.getScriptProperties();
+    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    
+    if (!dbId) {
+      throw new Error('データベースIDが設定されていません');
+    }
+    
+    const service = getSheetsService();
+    const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+    
+    const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
+    const values = data.valueRanges[0].values || [];
+    
+    if (values.length <= 1) {
+      return []; // ヘッダーのみの場合
+    }
+    
+    const headers = values[0];
+    const users = [];
+    
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      const user = {};
+      
+      headers.forEach((header, index) => {
+        user[header] = row[index] || '';
+      });
+      
+      // 設定情報をパース
+      try {
+        user.configJson = JSON.parse(user.configJson || '{}');
+      } catch (e) {
+        user.configJson = {};
+      }
+      
+      users.push(user);
+    }
+    
+    console.log(`✅ 管理者用ユーザー一覧を取得: ${users.length}件`);
+    return users;
+    
+  } catch (error) {
+    console.error('getAllUsersForAdmin error:', error.message);
+    throw new Error('ユーザー一覧の取得に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * 管理者による他ユーザーアカウント削除
+ * @param {string} targetUserId - 削除対象のユーザーID
+ * @param {string} reason - 削除理由
+ */
+function deleteUserAccountByAdmin(targetUserId, reason) {
+  try {
+    // 管理者権限チェック
+    if (!isDeployUser()) {
+      throw new Error('この機能にアクセスする権限がありません。');
+    }
+    
+    // 削除理由の検証
+    if (!reason || reason.trim().length < 20) {
+      throw new Error('削除理由は20文字以上で入力してください。');
+    }
+    
+    const executorEmail = Session.getActiveUser().getEmail();
+    
+    // 削除対象ユーザー情報を取得
+    const targetUserInfo = findUserById(targetUserId);
+    if (!targetUserInfo) {
+      throw new Error('削除対象のユーザーが見つかりません。');
+    }
+    
+    // 自分自身の削除を防ぐ
+    if (targetUserInfo.adminEmail === executorEmail) {
+      throw new Error('自分自身のアカウントは管理者削除機能では削除できません。個人用削除機能をご利用ください。');
+    }
+    
+    const lock = LockService.getScriptLock();
+    lock.waitLock(15000);
+    
+    try {
+      // データベースからユーザー行を削除
+      const props = PropertiesService.getScriptProperties();
+      const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+      
+      if (!dbId) {
+        throw new Error('データベースIDが設定されていません');
+      }
+      
+      const service = getSheetsService();
+      const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+      
+      // データベーススプレッドシートの情報を取得
+      const spreadsheetInfo = getSpreadsheetsData(service, dbId);
+      const targetSheetId = spreadsheetInfo.sheets.find(sheet => 
+        sheet.properties.title === sheetName
+      )?.properties.sheetId;
+      
+      if (targetSheetId === null || targetSheetId === undefined) {
+        throw new Error(`データベースシート「${sheetName}」が見つかりません`);
+      }
+      
+      // データを取得してユーザー行を特定
+      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
+      const values = data.valueRanges[0].values || [];
+      
+      let rowToDelete = -1;
+      for (let i = values.length - 1; i >= 1; i--) {
+        if (values[i][0] === targetUserId) {
+          rowToDelete = i + 1; // スプレッドシートは1ベース
+          break;
+        }
+      }
+      
+      if (rowToDelete !== -1) {
+        const deleteRequest = {
+          deleteDimension: {
+            range: {
+              sheetId: targetSheetId,
+              dimension: 'ROWS',
+              startIndex: rowToDelete - 1, // APIは0ベース
+              endIndex: rowToDelete
+            }
+          }
+        };
+        
+        batchUpdateSpreadsheet(service, dbId, {
+          requests: [deleteRequest]
+        });
+        
+        console.log(`✅ 管理者削除完了: row ${rowToDelete}, sheetId ${targetSheetId}`);
+      } else {
+        throw new Error('削除対象のユーザー行が見つかりませんでした');
+      }
+      
+      // 削除ログを記録
+      logAccountDeletion(
+        executorEmail,
+        targetUserId,
+        targetUserInfo.adminEmail,
+        reason.trim(),
+        'admin'
+      );
+      
+      // 関連キャッシュを削除
+      invalidateUserCache(targetUserId, targetUserInfo.adminEmail, targetUserInfo.spreadsheetId, false);
+      
+    } finally {
+      lock.releaseLock();
+    }
+    
+    const successMessage = `管理者によりアカウント「${targetUserInfo.adminEmail}」が削除されました。\n削除理由: ${reason.trim()}`;
+    console.log(successMessage);
+    return {
+      success: true,
+      message: successMessage,
+      deletedUser: {
+        userId: targetUserId,
+        email: targetUserInfo.adminEmail
+      }
+    };
+    
+  } catch (error) {
+    console.error('deleteUserAccountByAdmin error:', error.message);
+    throw new Error('管理者によるアカウント削除に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * 削除権限チェック
+ * @param {string} targetUserId - 対象ユーザーID
+ */
+function canDeleteUser(targetUserId) {
+  try {
+    const currentUserEmail = Session.getActiveUser().getEmail();
+    const targetUser = findUserById(targetUserId);
+    
+    if (!targetUser) {
+      return false;
+    }
+    
+    // 本人削除 OR 管理者削除
+    return (currentUserEmail === targetUser.adminEmail) || isDeployUser();
+  } catch (error) {
+    console.error('canDeleteUser error:', error.message);
+    return false;
+  }
+}
+
+/**
+ * 削除ログ一覧を取得（管理者用）
+ */
+function getDeletionLogs() {
+  try {
+    // 管理者権限チェック
+    if (!isDeployUser()) {
+      throw new Error('この機能にアクセスする権限がありません。');
+    }
+    
+    const props = PropertiesService.getScriptProperties();
+    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    
+    if (!dbId) {
+      throw new Error('データベースIDが設定されていません');
+    }
+    
+    const service = getSheetsService();
+    const logSheetName = DELETE_LOG_SHEET_CONFIG.SHEET_NAME;
+    
+    try {
+      // ログシートの存在確認
+      const spreadsheetInfo = getSpreadsheetsData(service, dbId);
+      const logSheetExists = spreadsheetInfo.sheets.some(sheet => 
+        sheet.properties.title === logSheetName
+      );
+      
+      if (!logSheetExists) {
+        console.log('削除ログシートが存在しません');
+        return []; // ログシートがない場合は空の配列を返す
+      }
+      
+      // ログデータを取得
+      const data = batchGetSheetsData(service, dbId, [`'${logSheetName}'!A:F`]);
+      const values = data.valueRanges[0].values || [];
+      
+      if (values.length <= 1) {
+        return []; // ヘッダーのみまたは空の場合
+      }
+      
+      const headers = values[0];
+      const logs = [];
+      
+      // データをオブジェクト形式に変換（最新順に並び替え）
+      for (let i = values.length - 1; i >= 1; i--) {
+        const row = values[i];
+        const log = {};
+        
+        headers.forEach((header, index) => {
+          log[header] = row[index] || '';
+        });
+        
+        logs.push(log);
+      }
+      
+      console.log(`✅ 削除ログを取得: ${logs.length}件`);
+      return logs;
+      
+    } catch (sheetError) {
+      console.warn('ログシートの読み取りに失敗:', sheetError.message);
+      return []; // シートアクセスエラーの場合は空を返す
+    }
+    
+  } catch (error) {
+    console.error('getDeletionLogs error:', error.message);
+    throw new Error('削除ログの取得に失敗しました: ' + error.message);
+  }
+}
+
+/**
  * 最適化されたSheetsサービスを取得
  * @returns {object} Sheets APIサービス
  */
@@ -689,6 +1033,15 @@ function deleteCurrentUserAccount() {
       } else {
         console.warn('User row not found for deletion, userId:', userId);
       }
+      
+      // 削除ログを記録
+      logAccountDeletion(
+        userInfo.adminEmail,
+        userId,
+        userInfo.adminEmail,
+        '自己削除',
+        'self'
+      );
       
       // 関連するすべてのキャッシュを削除
       invalidateUserCache(userId, userInfo.adminEmail, userInfo.spreadsheetId, false);
