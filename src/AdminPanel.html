@@ -2308,14 +2308,28 @@ function updateDatabaseInfo(status) {
   // 既存のフィールドを更新
   safeSetText('info-admin-email', status.userInfo.adminEmail);
   safeSetText('info-user-id', status.userInfo.userId);
-  safeSetText('info-published-sheet', status.publishedSheetName || 'なし');
+  // 公開シート名の表示（複数のソースから取得を試みる）
+  let publishedSheetName = status.publishedSheetName || status.activeSheetName;
+  if (!publishedSheetName && status.userInfo && status.userInfo.configJson) {
+    try {
+      const config = JSON.parse(status.userInfo.configJson);
+      publishedSheetName = config.publishedSheetName;
+    } catch (e) {
+      console.warn('ConfigJSON parse error in published sheet name:', e);
+    }
+  }
+  safeSetText('info-published-sheet', publishedSheetName || 'なし');
   safeSetText('info-answer-count', status.answerCount || '0');
   safeSetText('info-reaction-count', status.totalReactions || '0');
 
   // 新しいUI要素を更新
   
-  // 公開状態の更新
-  const isPublished = status && (status.appPublished || (status.activeSheetName && status.publishedSheetName));
+  // 公開状態の更新（複数の判定方法を試す）
+  const isPublished = status && (
+    status.isPublished || 
+    status.appPublished || 
+    (status.publishedSheetName && status.publishedSheetName !== 'なし')
+  );
   updatePublicationStatusUI(isPublished);
 
   // 表示モードの更新
@@ -2615,7 +2629,19 @@ function syncCheckboxStates(status) {
         return;
       }
       
-      const formUrl = status.formUrl || (status.userInfo && status.userInfo.formUrl);
+      // formURLを複数の場所から取得を試みる
+      let formUrl = status.formUrl;
+      if (!formUrl && status.userInfo && status.userInfo.formUrl) {
+        formUrl = status.userInfo.formUrl;
+      }
+      if (!formUrl && status.userInfo && status.userInfo.configJson) {
+        try {
+          const config = JSON.parse(status.userInfo.configJson);
+          formUrl = config.formUrl || config.editFormUrl;
+        } catch (e) {
+          console.warn('ConfigJSON parse error:', e);
+        }
+      }
       const hasFormUrl = formUrl && formUrl.trim() !== '';
       
       if (hasFormUrl) {

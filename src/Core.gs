@@ -3350,12 +3350,19 @@ function getStatus(requestUserId, forceRefresh = false) {
       }
     }
     
+    // 公開状態の判定
+    const isPublished = !!(configJson.appPublished && configJson.publishedSpreadsheetId && configJson.publishedSheetName);
+    
     return {
       status: 'success',
       userInfo: userInfo,
       sheetNames: sheetNames,
       setupStep: configJson.setupStatus === 'completed' ? 3 : 2,
       activeSheetName: configJson.publishedSheetName || '',
+      publishedSheetName: configJson.publishedSheetName || null,
+      isPublished: isPublished,
+      appPublished: configJson.appPublished || false,
+      formUrl: configJson.formUrl || null,
       webAppUrl: getWebAppUrlCached(),
       appUrls: {
         webApp: getWebAppUrlCached(),

@@ -759,6 +759,8 @@ function saveAndPublish(requestUserId, sheetNameOrSettingsData, configData) {
     currentConfig.appPublished = true;
     currentConfig.setupStatus = 'published';
     currentConfig.lastPublishedAt = new Date().toISOString();
+    currentConfig.publishedSheetName = sheetName;  // 重要: 公開シート名を設定
+    currentConfig.publishedSpreadsheetId = spreadsheetId;  // 公開スプレッドシートIDも設定
     
     updateUser(requestUserId, {
       configJson: JSON.stringify(currentConfig)
