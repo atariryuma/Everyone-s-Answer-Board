@@ -628,28 +628,44 @@ function deleteCurrentUserAccount() {
       
       var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
       
+      // データベーススプレッドシートの情報を取得してsheetIdを確認
+      var spreadsheetInfo = getSpreadsheetsData(service, dbId);
+      
+      var targetSheetId = null;
+      for (var i = 0; i < spreadsheetInfo.sheets.length; i++) {
+        if (spreadsheetInfo.sheets[i].properties.title === sheetName) {
+          targetSheetId = spreadsheetInfo.sheets[i].properties.sheetId;
+          break;
+        }
+      }
+      
+      if (targetSheetId === null) {
+        throw new Error('データベースシート「' + sheetName + '」が見つかりません');
+      }
+      
+      console.log('Found database sheet with sheetId:', targetSheetId);
+      
       // データを取得
-      var response = service.spreadsheets.values.get({
-        spreadsheetId: dbId,
-        range: sheetName
-      });
-      var data = response.values || [];
+      var data = batchGetSheetsData(service, dbId, [\"'\" + sheetName + \"'!A:H\"]);
+      var values = data.valueRanges[0].values || [];
       
       // ユーザーIDに基づいて行を探す（A列がIDと仮定）
       var rowToDelete = -1;
-      for (let i = data.length - 1; i >= 1; i--) {
-        if (data[i][0] === userId) {
+      for (let i = values.length - 1; i >= 1; i--) {
+        if (values[i][0] === userId) {
           rowToDelete = i + 1; // スプレッドシートは1ベース
           break;
         }
       }
       
       if (rowToDelete !== -1) {
-        // 行を削除
+        console.log('Deleting row:', rowToDelete, 'from sheetId:', targetSheetId);
+        
+        // 行を削除（正しいsheetIdを使用）
         var deleteRequest = {
           deleteDimension: {
             range: {
-              sheetId: 0,
+              sheetId: targetSheetId,
               dimension: 'ROWS',
               startIndex: rowToDelete - 1, // APIは0ベース
               endIndex: rowToDelete
@@ -660,6 +676,10 @@ function deleteCurrentUserAccount() {
         batchUpdateSpreadsheet(service, dbId, {
           requests: [deleteRequest]
         });
+        
+        console.log('Row deletion completed successfully');
+      } else {
+        console.warn('User row not found for deletion, userId:', userId);
       }
       
       // 関連するすべてのキャッシュを削除
@@ -678,7 +698,20 @@ function deleteCurrentUserAccount() {
     return successMessage;
 
   } catch (error) {
-    console.error('アカウント削除エラー:', error.message, error.stack);
-    throw new Error('アカウントの削除に失敗しました: ' + error.message);
+    console.error('アカウント削除エラー:', error.message);
+    console.error('アカウント削除エラー詳細:', error.stack);
+    
+    // より詳細なエラー情報を提供
+    var errorMessage = 'アカウントの削除に失敗しました: ' + error.message;
+    
+    if (error.message.includes('No grid with id')) {
+      errorMessage += '\n詳細: データベースシートのIDが正しく取得できませんでした。データベース設定を確認してください。';
+    } else if (error.message.includes('permissions')) {
+      errorMessage += '\n詳細: サービスアカウントの権限が不足している可能性があります。';
+    } else if (error.message.includes('not found')) {
+      errorMessage += '\n詳細: 削除対象のユーザーまたはシートが見つかりませんでした。';
+    }
+    
+    throw new Error(errorMessage);
   }
 }
