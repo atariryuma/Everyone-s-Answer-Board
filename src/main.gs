@@ -598,7 +598,10 @@ function renderAdminPanel(userInfo, mode) {
   adminTemplate.mode = mode;
   adminTemplate.displayMode = 'named';
   adminTemplate.showAdminFeatures = true;
-  adminTemplate.isDeployUser = isDeployUser();
+  const deployUserResult = isDeployUser();
+  console.log('renderAdminPanel - isDeployUser() result:', deployUserResult);
+  console.log('renderAdminPanel - current user email:', Session.getActiveUser().getEmail());
+  adminTemplate.isDeployUser = deployUserResult;
   adminTemplate.DEBUG_MODE = shouldEnableDebugMode();
   
   // URL更新用の情報を追加

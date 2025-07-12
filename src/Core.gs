@@ -3566,11 +3566,19 @@ function shouldEnableDebugMode() {
 function isDeployUser() {
   try {
     var userEmail = Session.getActiveUser().getEmail();
-    if (!userEmail) return false;
+    console.log('isDeployUser - checking user:', userEmail);
+    if (!userEmail) {
+      console.log('isDeployUser - no user email found');
+      return false;
+    }
 
     var dbId = PropertiesService.getScriptProperties()
-      .getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    if (!dbId) return false;
+      .getProperty('DATABASE_SPREADSHEET_ID');
+    console.log('isDeployUser - database ID:', dbId);
+    if (!dbId) {
+      console.log('isDeployUser - no database ID found');
+      return false;
+    }
 
     var file;
     try {
@@ -3585,17 +3593,23 @@ function isDeployUser() {
     
     try {
       var editors = file.getEditors().map(function(e) { return e.getEmail(); });
+      console.log('isDeployUser - file editors:', editors);
       var ownerEmail = '';
       try {
         var owner = file.getOwner();
         if (owner && typeof owner.getEmail === 'function') {
           ownerEmail = owner.getEmail();
         }
+        console.log('isDeployUser - file owner:', ownerEmail);
       } catch (ownerErr) {
         console.warn('getOwner failed:', ownerErr.message);
       }
       if (ownerEmail) editors.push(ownerEmail);
-      return editors.indexOf(userEmail) !== -1;
+      
+      var hasPermission = editors.indexOf(userEmail) !== -1;
+      console.log('isDeployUser - all authorized users:', editors);
+      console.log('isDeployUser - has permission:', hasPermission);
+      return hasPermission;
     } catch (permissionError) {
       console.error('Permission check error:', permissionError.message);
       return false;
