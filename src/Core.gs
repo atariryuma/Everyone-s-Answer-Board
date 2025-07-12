@@ -2606,72 +2606,89 @@ function getSheetsList(userId) {
     // キャッシュキーを生成
     const cacheKey = `sheets_list_${userId}`;
     
-    // キャッシュから取得を試行（30分間キャッシュ）
-    return cacheManager.get(cacheKey, () => {
-      debugLog('getSheetsList: Cache miss, fetching from API');
-      
-      var userInfo = findUserById(userId);
-      if (!userInfo) {
-        console.warn('getSheetsList: User not found:', userId);
-        return [];
+    // キャッシュの使用を試行、失敗時は直接実行
+    try {
+      if (typeof cacheManager !== 'undefined' && cacheManager) {
+        return cacheManager.get(cacheKey, () => {
+          return getSheetsListInternal(userId);
+        }, { ttl: 1800 }); // 30分間キャッシュ
+      } else {
+        debugLog('getSheetsList: cacheManager not available, executing directly');
+        return getSheetsListInternal(userId);
       }
-      
-      if (!userInfo.spreadsheetId) {
-        console.warn('getSheetsList: No spreadsheet ID for user:', userId);
-        return [];
-      }
-      
-      var service = getSheetsService();
-      var spreadsheet;
-      
-      try {
-        spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
-      } catch (accessError) {
-        console.warn('getSheetsList: アクセスエラーを検出。サービスアカウント権限を修復中...', accessError.message);
-        
-        // サービスアカウントの権限修復を試行
-        try {
-          addServiceAccountToSpreadsheet(userInfo.spreadsheetId);
-          debugLog('getSheetsList: サービスアカウント権限を追加しました。再試行中...');
-          
-          // 少し待ってから再試行
-          Utilities.sleep(1000);
-          spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
-          
-        } catch (repairError) {
-          console.error('getSheetsList: 権限修復に失敗:', repairError.message);
-          return {
-            error: true,
-            message: 'スプレッドシートへのアクセス権限がありません。管理者にお問い合わせください。',
-            details: accessError.message
-          };
-        }
-      }
-      
-      if (!spreadsheet || !spreadsheet.sheets || !Array.isArray(spreadsheet.sheets)) {
-        console.error('getSheetsList: Invalid spreadsheet data');
-        return [];
-      }
-      
-      var sheets = spreadsheet.sheets.map(function(sheet) {
-        if (!sheet.properties) {
-          console.warn('getSheetsList: Sheet missing properties:', sheet);
-          return null;
-        }
-        return {
-          name: sheet.properties.title,
-          id: sheet.properties.sheetId
-        };
-      }).filter(function(sheet) { return sheet !== null; });
-      
-      debugLog('getSheetsList: Successfully returning', sheets.length, 'sheets:', sheets);
-      return sheets;
-    }, { ttl: 1800 }); // 30分間キャッシュ
+    } catch (cacheError) {
+      console.warn('getSheetsList: Cache error, falling back to direct execution:', cacheError.message);
+      return getSheetsListInternal(userId);
+    }
     
   } catch (e) {
     console.error('getSheetsList: シート一覧取得エラー:', e.message);
     return [];
   }
+}
+
+/**
+ * 内部シート一覧取得関数
+ */
+function getSheetsListInternal(userId) {
+  debugLog('getSheetsListInternal: Start for userId:', userId);
+  
+  var userInfo = findUserById(userId);
+  if (!userInfo) {
+    console.warn('getSheetsListInternal: User not found:', userId);
+    return [];
+  }
+  
+  if (!userInfo.spreadsheetId) {
+    console.warn('getSheetsListInternal: No spreadsheet ID for user:', userId);
+    return [];
+  }
+  
+  var service = getSheetsService();
+  var spreadsheet;
+  
+  try {
+    spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
+  } catch (accessError) {
+    console.warn('getSheetsListInternal: アクセスエラーを検出。サービスアカウント権限を修復中...', accessError.message);
+    
+    // サービスアカウントの権限修復を試行
+    try {
+      addServiceAccountToSpreadsheet(userInfo.spreadsheetId);
+      debugLog('getSheetsListInternal: サービスアカウント権限を追加しました。再試行中...');
+      
+      // 少し待ってから再試行
+      Utilities.sleep(1000);
+      spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
+      
+    } catch (repairError) {
+      console.error('getSheetsListInternal: 権限修復に失敗:', repairError.message);
+      return {
+        error: true,
+        message: 'スプレッドシートへのアクセス権限がありません。管理者にお問い合わせください。',
+        details: accessError.message
+      };
+    }
+  }
+  
+  if (!spreadsheet || !spreadsheet.sheets || !Array.isArray(spreadsheet.sheets)) {
+    console.error('getSheetsListInternal: Invalid spreadsheet data');
+    return [];
+  }
+  
+  var sheets = spreadsheet.sheets.map(function(sheet) {
+    if (!sheet.properties) {
+      console.warn('getSheetsListInternal: Sheet missing properties:', sheet);
+      return null;
+    }
+    return {
+      name: sheet.properties.title,
+      id: sheet.properties.sheetId
+    };
+  }).filter(function(sheet) { return sheet !== null; });
+  
+  debugLog('getSheetsListInternal: Successfully returning', sheets.length, 'sheets:', sheets);
+  return sheets;
 }
 
 /**
@@ -3190,11 +3207,14 @@ function getStatus(requestUserId, forceRefresh = false) {
     let sheetNames = [];
     try {
       if (userInfo.spreadsheetId) {
+        debugLog('getStatus: Attempting to get sheet list for userId:', requestUserId);
         const sheets = getSheetsList(requestUserId);
+        debugLog('getStatus: getSheetsList returned:', sheets);
         sheetNames = sheets || [];
       }
     } catch (sheetError) {
-      console.warn('スプレッドシート情報の取得に失敗:', sheetError.message);
+      console.error('スプレッドシート情報の取得に失敗:', sheetError.message);
+      console.error('getStatus sheetError details:', sheetError.stack);
     }
     
     // 設定情報をパース
