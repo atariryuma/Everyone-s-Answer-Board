@@ -277,12 +277,16 @@ function doGet(e) {
     const params = parseRequestParams(e);
     const currentUserEmail = Session.getActiveUser().getEmail();
     
+    // マルチテナント対応: 認証確認のみでセッション依存を削除
+    console.log('doGet - currentUserEmail:', currentUserEmail, 'requestedUserId:', params.userId);
+    
     // /exec直接アクセス時の認証チェック（管理パネルへのアクセスを完全に防止）
     if (isDirectExecAccess(e)) {
       return handleDirectExecAccess(currentUserEmail);
     }
     
-    const { userEmail, userInfo } = validateUserSession(currentUserEmail, params);
+    // マルチテナント対応: userIdベースでユーザー情報を取得
+    const { userEmail, userInfo } = validateUserSessionMultiTenant(currentUserEmail, params);
     const setupOutput = handleSetupPages(params, userEmail);
     if (setupOutput) return setupOutput;
 
@@ -501,42 +505,56 @@ function parseRequestParams(e) {
   return { mode, userId, setupParam, spreadsheetId, sheetName, isDirectPageAccess };
 }
 
-/**
- * セッション検証とユーザー情報取得
- * @param {string} userEmail 現在のユーザーのメール
- * @param {Object} params リクエストパラメータ
- * @return {{userEmail:string|null,userInfo:Object|null}}
- */
-function validateUserSession(userEmail, params) {
-  if (userEmail && !params.isDirectPageAccess) {
-    try {
-      validateAndRepairSession(userEmail);
-    } catch (sessionError) {
-      console.error('セッション管理エラー: ' + sessionError.message);
-    }
-  }
 
-  let userInfo = null;
-  if (params.isDirectPageAccess) {
-    userInfo = findUserById(params.userId);
-  } else if (userEmail) {
-    userInfo = findUserByEmail(userEmail);
-    if (userInfo && userInfo.spreadsheetId) {
-      try {
-        const testAccess = SpreadsheetApp.openById(userInfo.spreadsheetId);
-        testAccess.getName();
-      } catch (accessError) {
-        console.warn('スプレッドシートアクセスエラー: ' + accessError.message);
-        try {
-          const repair = repairUserSpreadsheetAccess(userEmail, userInfo.spreadsheetId);
-          if (repair.success) debugLog('スプレッドシートアクセス権限を修復しました');
-        } catch (repairError) {
-          console.error('権限修復失敗: ' + repairError.message);
-        }
-      }
-    }
+
+/**
+ * マルチテナント対応: ステートレスなユーザーセッション検証
+ * 全ての処理をuserIdベースで実行し、emailは認証確認のみに使用
+ * @param {string} currentUserEmail - 現在の認証済みユーザーメール（認証確認のみ）
+ * @param {Object} params - リクエストパラメータ（userIdを含む）
+ * @returns {Object} userEmailとuserInfoを含むオブジェクト
+ */
+function validateUserSessionMultiTenant(currentUserEmail, params) {
+  console.log('validateUserSessionMultiTenant - email:', currentUserEmail, 'params:', params);
+  
+  // 基本的な認証チェック（Googleアカウントにログインしているか）
+  if (!currentUserEmail) {
+    console.warn('validateUserSessionMultiTenant - no authenticated user');
+    return { userEmail: null, userInfo: null };
   }
-  return { userEmail, userInfo };
+  
+  let userInfo = null;
+  
+  // マルチテナント対応: 常にuserIdベースでユーザー情報を取得
+  if (params.userId) {
+    console.log('validateUserSessionMultiTenant - looking up userId:', params.userId);
+    userInfo = findUserById(params.userId);
+    
+    if (userInfo) {
+      // セキュリティチェック: リクエストされたuserIdが認証済みユーザーのものか確認
+      if (userInfo.adminEmail !== currentUserEmail) {
+        console.warn('validateUserSessionMultiTenant - security violation:', 
+                    'authenticated:', currentUserEmail, 
+                    'requested:', userInfo.adminEmail);
+        // 本人以外のデータへのアクセス試行は拒否
+        return { userEmail: currentUserEmail, userInfo: null };
+      }
+      
+      console.log('validateUserSessionMultiTenant - valid user found:', userInfo.userId);
+    } else {
+      console.warn('validateUserSessionMultiTenant - userId not found:', params.userId);
+    }
+  } else if (params.isDirectPageAccess) {
+    // 直接ページアクセスの場合は、emailベースでフォールバック
+    console.log('validateUserSessionMultiTenant - direct page access, looking up by email');
+    userInfo = findUserByEmail(currentUserEmail);
+  } else {
+    // userIdパラメータがない場合は、emailベースでフォールバック
+    console.log('validateUserSessionMultiTenant - no userId param, looking up by email');
+    userInfo = findUserByEmail(currentUserEmail);
+  }
+  
+  return { userEmail: currentUserEmail, userInfo: userInfo };
 }
 
 /**
