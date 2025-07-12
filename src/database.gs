@@ -74,6 +74,16 @@ function fetchUserFromDatabase(field, value) {
         headers.forEach(function(header, index) {
           user[header] = values[i][index] || '';
         });
+        
+        // デバッグログでマッピングを確認
+        console.log('fetchUserFromDatabase - Found user:', {
+          field: field,
+          value: value,
+          userId: user.userId,
+          adminEmail: user.adminEmail,
+          createdAt: user.createdAt
+        });
+        
         return user;
       }
     }

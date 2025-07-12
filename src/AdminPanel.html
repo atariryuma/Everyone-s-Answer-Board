@@ -70,6 +70,23 @@
   <script>
   const __IS_DEPLOY_USER__ = '<?= typeof isDeployUser !== "undefined" ? isDeployUser : false ?>';
   window.isDeployUser = __IS_DEPLOY_USER__.startsWith('<') ? false : __IS_DEPLOY_USER__ === 'true';
+  
+  // URL更新処理
+  const shouldUpdateUrl = '<?= typeof shouldUpdateUrl !== "undefined" ? shouldUpdateUrl : false ?>';
+  const correctUrl = '<?= typeof correctUrl !== "undefined" ? correctUrl : "" ?>';
+  
+  if (shouldUpdateUrl === 'true' && correctUrl && correctUrl !== '') {
+    console.log('Updating URL to:', correctUrl);
+    try {
+      // ブラウザのURL表示を更新（リダイレクトせずに）
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({}, '', correctUrl);
+        console.log('URL updated successfully to:', correctUrl);
+      }
+    } catch (e) {
+      console.warn('Failed to update URL:', e);
+    }
+  }
   </script>
   <!-- 統合CSS -->
   <?!= include('UnifiedStyles'); ?>

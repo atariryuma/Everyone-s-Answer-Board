@@ -371,28 +371,11 @@ function handleDirectExecAccess(userEmail) {
     console.log('handleDirectExecAccess - userEmail:', userEmail);
     
     if (userInfo && userInfo.userId) {
-      // 登録済みユーザー: 管理パネルにリダイレクト
-      const adminUrl = buildUserAdminUrl(userInfo.userId);
-      console.log('handleDirectExecAccess - Redirecting to:', adminUrl);
-      debugLog('Redirecting registered user to admin panel:', adminUrl);
+      // 登録済みユーザー: 管理パネルに自動遷移（リダイレクトではなく直接遷移）
+      console.log('handleDirectExecAccess - Found user, transitioning to admin panel for userId:', userInfo.userId);
       
-      return HtmlService.createHtmlOutput(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>リダイレクト中...</title>
-          <script>
-            // 即座にリダイレクト
-            window.location.replace('${adminUrl}');
-          </script>
-        </head>
-        <body style="text-align:center; padding:50px; font-family:sans-serif;">
-          <h2>管理パネルにリダイレクトしています...</h2>
-          <p>自動的にリダイレクトされない場合は<a href="${adminUrl}">こちら</a>をクリックしてください。</p>
-        </body>
-        </html>
-      `);
+      // ここで直接管理パネルを表示する（リダイレクトしない）
+      return renderAdminPanel(userInfo, 'admin');
     } else {
       // 未登録ユーザー: 新規登録画面表示
       console.log('handleDirectExecAccess - Unregistered user, showing registration page');
@@ -615,6 +598,12 @@ function renderAdminPanel(userInfo, mode) {
   adminTemplate.displayMode = 'named';
   adminTemplate.showAdminFeatures = true;
   adminTemplate.isDeployUser = isDeployUser();
+  
+  // URL更新用の情報を追加
+  const correctUrl = buildUserAdminUrl(userInfo.userId);
+  adminTemplate.correctUrl = correctUrl;
+  adminTemplate.shouldUpdateUrl = true;
+  
   return adminTemplate.evaluate()
     .setTitle('みんなの回答ボード 管理パネル')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
