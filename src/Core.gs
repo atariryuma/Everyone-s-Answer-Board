@@ -3270,10 +3270,11 @@ function getStatus(requestUserId, forceRefresh = false) {
     if (userInfo.spreadsheetId && configJson.publishedSpreadsheetId && !configJson.formCreated) {
       try {
         const sheets = getSheetsList(requestUserId);
-        const hasFormResponseSheet = sheets && sheets.some(sheet => 
-          sheet.toLowerCase().includes('フォームの回答') || 
-          sheet.toLowerCase().includes('form responses')
-        );
+        const hasFormResponseSheet = sheets && sheets.some(sheet => {
+          const sheetName = typeof sheet === 'string' ? sheet : (sheet.name || sheet.title || '');
+          return sheetName.toLowerCase().includes('フォームの回答') || 
+                 sheetName.toLowerCase().includes('form responses');
+        });
         
         if (hasFormResponseSheet) {
           debugLog('getStatus: Auto-repairing formCreated status - form response sheet detected');

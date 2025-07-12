@@ -318,7 +318,8 @@ function autoMapHeaders(headers, sheetName = null) {
       }
     });
 
-    if (bestHeader && bestScore > 0.3) { // 閾値以上のスコアが必要
+    const minScore = mappingKey === 'opinionHeader' ? 0.5 : 0.3; // opinionHeaderは高い閾値
+    if (bestHeader && bestScore > minScore) {
       result[mappingKey] = bestHeader.original;
       usedHeaders.add(bestHeader.index);
       headerScores[mappingKey] = bestScore;
@@ -332,7 +333,7 @@ function autoMapHeaders(headers, sheetName = null) {
     const candidateHeaders = processedHeaders.filter(h => 
       !usedHeaders.has(h.index) && 
       !h.isMetadata &&
-      h.cleaned.length > 0
+      h.cleaned.length > 3 // 短すぎるヘッダー（3文字以下）を除外
     );
 
     if (candidateHeaders.length > 0) {
@@ -434,9 +435,9 @@ function adjustScoreByContext(score, headerInfo, mappingType) {
 
   // 短すぎるヘッダーはopinionHeaderには不適切（特に3文字以下）
   if (mappingType === 'opinionHeader' && headerInfo.length <= 3) {
-    score *= 0.3; // 大幅に減点
+    score *= 0.1; // 極度に減点（ほぼ無効化）
   } else if (mappingType === 'opinionHeader' && headerInfo.length < 8) {
-    score *= 0.7; // 中程度減点
+    score *= 0.5; // 大幅減点
   }
 
   // 短いヘッダーは名前やクラス項目の可能性が高い
@@ -764,6 +765,10 @@ function saveAndPublish(requestUserId, sheetNameOrSettingsData, configData) {
       configJson: JSON.stringify(currentConfig)
     });
     console.log('saveAndPublish: 公開状態を更新完了');
+
+    // 重要: 公開状態更新後にキャッシュをクリアして最新状態を確実に反映
+    invalidateUserCache(requestUserId, latestUserInfo.adminEmail, latestUserInfo.spreadsheetId, true);
+    clearExecutionUserInfoCache();
 
     // 6. 最新のステータスを強制再取得して返す
     const finalStatus = getStatus(requestUserId, true); // forceRefresh = true
