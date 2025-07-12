@@ -293,7 +293,7 @@ function doGet(e) {
           if (!params.userId) {
             // userIdパラメータが無い場合は自分のIDでリダイレクト
             const correctUrl = buildUserAdminUrl(userInfo.userId);
-            return createSecureRedirect(correctUrl, '管理パネルにリダイレクトしています...');
+            return createSecureRedirect(correctUrl, 'ユーザー専用管理パネルにリダイレクトしています...');
           }
           
           if (params.userId !== userInfo.userId) {
@@ -303,7 +303,7 @@ function doGet(e) {
             return createSecureRedirect(correctUrl, '正しい管理パネルにリダイレクトしています...');
           }
           
-          // 正当なアクセス
+          // 正当なアクセス（正しいuserIdでのアクセス）
           return renderAdminPanel(userInfo, params.mode);
         }
         
@@ -419,7 +419,7 @@ function handleDirectExecAccess(userEmail) {
 }
 
 /**
- * ユーザー専用の管理パネルURLを構築
+ * ユーザー専用の一意の管理パネルURLを構築
  * @param {string} userId ユーザーID
  * @return {string}
  */
@@ -440,25 +440,45 @@ function createSecureRedirect(targetUrl, message) {
     <html>
     <head>
       <meta charset="UTF-8">
-      <meta http-equiv="refresh" content="0;url=${targetUrl}">
+      <meta http-equiv="refresh" content="2;url=${targetUrl}">
+      <title>リダイレクト中...</title>
     </head>
-    <body style="text-align:center; padding:50px; font-family:sans-serif;">
-      <h2>${message}</h2>
-      <p>自動的にリダイレクトされない場合は<a href="${targetUrl}">こちら</a>をクリックしてください。</p>
+    <body style="text-align:center; padding:50px; font-family:sans-serif; background-color:#f5f5f5;">
+      <div style="max-width:600px; margin:0 auto; background:white; padding:40px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.1);">
+        <h2 style="color:#333; margin-bottom:20px;">${message}</h2>
+        <p style="color:#666; margin-bottom:30px;">2秒後に自動的にリダイレクトされます...</p>
+        <a href="${targetUrl}" 
+           style="display:inline-block; background:#4CAF50; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold;"
+           onclick="handleRedirectClick(event)">
+          管理パネルへ移動
+        </a>
+        <p style="color:#999; font-size:14px; margin-top:20px;">
+          自動的にリダイレクトされない場合は上のボタンをクリックしてください。
+        </p>
+      </div>
       <script>
-        try {
-          if (window.top) {
+        function handleRedirectClick(event) {
+          event.preventDefault();
+          try {
+            // ユーザーアクションによるリダイレクト
             window.top.location.href = '${targetUrl}';
-          } else {
+          } catch(e) {
             window.location.href = '${targetUrl}';
           }
-        } catch(e) {
-          window.location.href = '${targetUrl}';
         }
+        
+        // 2秒後の自動リダイレクト（ユーザーアクション後）
+        setTimeout(function() {
+          try {
+            window.top.location.href = '${targetUrl}';
+          } catch(e) {
+            window.location.href = '${targetUrl}';
+          }
+        }, 2000);
       </script>
     </body>
     </html>
-  `);
+  `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 /**
