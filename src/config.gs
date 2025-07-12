@@ -644,8 +644,8 @@ function saveAndActivateSheet(requestUserId, spreadsheetId, sheetName, config) {
 
     // 2-4. バッチ処理で効率化（設定保存、シート切り替え、表示オプション設定を統合）
     const displayOptions = {
-      showNames: !!config.showNames,
-      showCounts: config.showCounts !== undefined ? !!config.showCounts : false
+      showNames: !!(config && config.showNames),
+      showCounts: (config && config.showCounts !== undefined) ? !!config.showCounts : false
     };
 
     // 統合処理
@@ -681,13 +681,45 @@ function saveAndActivateSheet(requestUserId, spreadsheetId, sheetName, config) {
  * @param {object} config - 保存・適用する設定オブジェクト
  * @returns {object} 最新のステータスオブジェクト
  */
-function saveAndPublish(requestUserId, sheetName, config) {
+function saveAndPublish(requestUserId, sheetNameOrSettingsData, configData) {
   verifyUserAccess(requestUserId);
   const lock = LockService.getScriptLock();
   lock.waitLock(30000); // 30秒待機
 
   try {
-    console.log('saveAndPublish開始: sheetName=%s', sheetName);
+    // パラメータの正規化: 新形式（settingsDataオブジェクト）と旧形式（個別パラメータ）の両方に対応
+    let sheetName, config;
+    
+    if (typeof sheetNameOrSettingsData === 'object' && sheetNameOrSettingsData !== null) {
+      // 新形式: settingsDataオブジェクトが渡された場合
+      console.log('saveAndPublish開始: 新形式（settingsData）', sheetNameOrSettingsData);
+      sheetName = sheetNameOrSettingsData.selectedSheet;
+      config = {
+        opinionHeader: sheetNameOrSettingsData.opinionHeader,
+        reasonHeader: sheetNameOrSettingsData.reasonHeader,
+        nameHeader: sheetNameOrSettingsData.nameHeader,
+        classHeader: sheetNameOrSettingsData.classHeader,
+        showNames: sheetNameOrSettingsData.showNames,
+        showCounts: sheetNameOrSettingsData.showCounts,
+        classChoices: sheetNameOrSettingsData.classChoices
+      };
+    } else {
+      // 旧形式: 個別パラメータが渡された場合
+      console.log('saveAndPublish開始: 旧形式（個別パラメータ）sheetName=%s', sheetNameOrSettingsData);
+      sheetName = sheetNameOrSettingsData;
+      config = configData || {};
+    }
+
+    // パラメータ検証
+    if (!sheetName || typeof sheetName !== 'string') {
+      throw new Error('無効なシート名が指定されました: ' + sheetName);
+    }
+    
+    if (!config || typeof config !== 'object') {
+      throw new Error('無効な設定データが指定されました');
+    }
+
+    console.log('saveAndPublish: パラメータ正規化完了 - sheetName:', sheetName, 'config:', config);
 
     const userInfo = getUserInfo(requestUserId);
     if (!userInfo || !userInfo.spreadsheetId) {

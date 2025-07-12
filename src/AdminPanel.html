@@ -2465,6 +2465,9 @@ function syncCheckboxStates(status) {
       // カスタムフォーム情報を表示
       updateCustomFormInfo(status);
       
+      // フォームURL表示エリアを更新
+      updateFormUrlSection(status);
+      
       // 自動公開ダイアログのチェック
       checkAutoPublishDialog(status);
     }
@@ -2518,6 +2521,58 @@ function syncCheckboxStates(status) {
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
+    }
+
+    /**
+     * フォームURL表示セクションを更新する
+     * @param {object} status - ステータスオブジェクト
+     */
+    function updateFormUrlSection(status) {
+      const formUrlSection = document.getElementById('form-url-section');
+      const formUrlInput = elements.formUrlInput;
+      const copyFormUrlBtn = elements.copyFormUrlBtn;
+      const openFormUrlLink = elements.openFormUrlLink;
+      
+      if (!formUrlSection || !formUrlInput) {
+        return;
+      }
+      
+      const formUrl = status.formUrl || (status.userInfo && status.userInfo.formUrl);
+      const hasFormUrl = formUrl && formUrl.trim() !== '';
+      
+      if (hasFormUrl) {
+        // フォームURLがある場合、表示エリアを表示してURLを設定
+        formUrlInput.value = formUrl;
+        formUrlSection.classList.remove('hidden');
+        
+        // コピーボタンの設定
+        if (copyFormUrlBtn) {
+          copyFormUrlBtn.onclick = function() {
+            formUrlInput.select();
+            formUrlInput.setSelectionRange(0, 99999); // モバイル対応
+            
+            try {
+              document.execCommand('copy');
+              showMessage('フォームURLをコピーしました', 'success');
+            } catch (err) {
+              console.error('コピーに失敗しました:', err);
+              showMessage('コピーに失敗しました', 'error');
+            }
+          };
+        }
+        
+        // 外部リンクボタンの設定
+        if (openFormUrlLink) {
+          openFormUrlLink.href = formUrl;
+        }
+        
+        console.log('✅ [DEBUG] Form URL section displayed:', formUrl);
+      } else {
+        // フォームURLがない場合、表示エリアを隠す
+        formUrlSection.classList.add('hidden');
+        formUrlInput.value = '';
+        console.log('✅ [DEBUG] Form URL section hidden - no form URL available');
+      }
     }
 
     /**
