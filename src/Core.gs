@@ -947,10 +947,17 @@ function getResponsesData(userId, sheetName) {
  * @returns {object} ユーザーのステータス情報
  */
 function getCurrentUserStatus(requestUserId) {
-  verifyUserAccess(requestUserId);
   try {
     const activeUserEmail = Session.getActiveUser().getEmail();
-    const userInfo = findUserById(requestUserId);
+    
+    // requestUserIdが無効な場合は、メールアドレスでユーザーを検索
+    let userInfo;
+    if (requestUserId && requestUserId.trim() !== '') {
+      verifyUserAccess(requestUserId);
+      userInfo = findUserById(requestUserId);
+    } else {
+      userInfo = findUserByEmail(activeUserEmail);
+    }
 
     if (!userInfo) {
       return { status: 'error', message: 'ユーザー情報が見つかりません。' };

@@ -1938,7 +1938,7 @@ function setupEventListeners() {
       
       // Create board events
       if (elements.createBoardBtn) {
-        elements.createBoardBtn.addEventListener('click', createBoard);
+        elements.createBoardBtn.addEventListener('click', createAdditionalForm);
       }
       
       var quickCreateBtn = document.getElementById('quick-create-board-btn');
@@ -2966,24 +2966,8 @@ function syncCheckboxStates(status) {
      * 新しいボードを作成する
      */
       function createBoard() {
-        showConfirmationModal(
-          '新規ボードの作成',
-          '新しいGoogleフォームと連携するスプレッドシートを作成します。よろしいですか？',
-          function() {
-            setLoading(true, '新規フォームを作成しています。');
-            runGasWithUserId('createBoard')
-              .then(function(response) {
-                setLoading(true, '設定情報を更新しています。');
-                setLoading(true, 'ボードを公開しています。');
-                loadStatus(true); // ステータスを再読み込みしてUIを更新
-                showMessage('ボードが正常に作成され、公開されました！', 'success');
-              })
-              .catch(function(error) {
-                setLoading(false);
-                handleError(error, 'createBoard');
-              });
-          }
-        );
+        // この関数は現在使用されていません。既存ユーザーはクイックスタートを使用してください。
+        showMessage('既存ユーザーは「新しいフォームを作成」ボタンをご利用ください。', 'info');
       }
     
     /**
