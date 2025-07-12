@@ -3498,3 +3498,37 @@ function getDeletionLogsForUI() {
   }
 }
 
+
+
+/**
+ * ボードを作成 (createBoardFromAdminのエイリアス)
+ * AdminPanel.htmlから呼び出される
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ */
+function createBoard(requestUserId) {
+  return createBoardFromAdmin(requestUserId);
+}
+
+/**
+ * ユーザーのセットアップページアクセス権限をチェックする
+ */
+function checkSetupPageAccess() {
+  try {
+    var activeUserEmail = Session.getActiveUser().getEmail();
+    var userInfo = findUserByEmail(activeUserEmail);
+    var hasAccess = hasSetupPageAccess();
+    
+    return {
+      status: 'success',
+      email: activeUserEmail,
+      userInfo: userInfo,
+      hasAccess: hasAccess,
+      isActive: userInfo ? userInfo.isActive : null
+    };
+  } catch (e) {
+    return {
+      status: 'error',
+      message: e.message
+    };
+  }
+}
