@@ -41,9 +41,9 @@ window.tailwind = {
   }
 };
 </script>
-<script src="https://cdn.tailwindcss.com" defer onload="console.log('TailwindCSS loaded successfully')" onerror="console.warn('TailwindCSS failed to load')"></script>
+<script src="https://cdn.tailwindcss.com" defer onerror="console.warn('TailwindCSS failed to load')"></script>
 <script>
-const DEBUG_MODE = false;
+const DEBUG_MODE = <?= typeof DEBUG_MODE !== 'undefined' ? DEBUG_MODE : false ?>;
 function debugLog() {
   if (DEBUG_MODE && console && console.log) {
     try {

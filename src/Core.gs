@@ -3494,6 +3494,14 @@ function getDriveService() {
 }
 
 /**
+ * 現在のアクセスユーザーがデバッグを有効にすべきかを判定
+ * @returns {boolean} デバッグモードを有効にすべき場合はtrue
+ */
+function shouldEnableDebugMode() {
+  return isDeployUser();
+}
+
+/**
  * デプロイユーザーかどうか判定
  * データベーススプレッドシートの編集権限を基準にする
  * @returns {boolean} 編集権限を持つ場合 true

@@ -599,6 +599,7 @@ function renderAdminPanel(userInfo, mode) {
   adminTemplate.displayMode = 'named';
   adminTemplate.showAdminFeatures = true;
   adminTemplate.isDeployUser = isDeployUser();
+  adminTemplate.DEBUG_MODE = shouldEnableDebugMode();
   
   // URL更新用の情報を追加
   const correctUrl = buildUserAdminUrl(userInfo.userId);
@@ -641,6 +642,7 @@ function renderAnswerBoard(userInfo, params) {
       template.spreadsheetId = userInfo.spreadsheetId;
       template.ownerName = userInfo.adminEmail;
       template.sheetName = escapeJavaScript(config.publishedSheetName || params.sheetName);
+      template.DEBUG_MODE = shouldEnableDebugMode();
       const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
       template.opinionHeader = escapeJavaScript(rawOpinionHeader);
       template.cacheTimestamp = Date.now();
