@@ -2698,10 +2698,10 @@ function syncCheckboxStates(status) {
       console.log('populateSheetSelect: After clearing innerHTML:', select.innerHTML);
 
       if (sheetNames && sheetNames.length > 0) {
-        sheetNames.forEach(name => {
+        sheetNames.forEach(sheet => {
           const option = document.createElement('option');
-          option.value = name.name; // nameオブジェクトからnameプロパティを使用
-          option.textContent = name.name; // nameオブジェクトからnameプロパティを使用
+          option.value = sheet.name; // sheetオブジェクトからnameプロパティを使用
+          option.textContent = sheet.name; // sheetオブジェクトからnameプロパティを使用
           select.appendChild(option);
         });
         select.disabled = false;

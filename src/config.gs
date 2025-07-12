@@ -497,7 +497,16 @@ function calculateFallbackPriority(headerInfo) {
  */
 function analyzeColumnContent(sheetName, processedHeaders) {
   try {
-    const spreadsheet = getCurrentSpreadsheet();
+    // Note: この関数はautoMapHeaders内でのみ使用され、requestUserIdが利用できない
+    // そのため、SpreadsheetApp.getActiveSpreadsheet()を使用するか、
+    // 呼び出し元でスプレッドシートを渡すように変更する必要がある
+    let spreadsheet;
+    try {
+      spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    } catch (e) {
+      console.warn('analyzeColumnContent: アクティブスプレッドシートが取得できません。スキップします。');
+      return {};
+    }
     const sheet = spreadsheet.getSheetByName(sheetName);
     if (!sheet) return {};
 

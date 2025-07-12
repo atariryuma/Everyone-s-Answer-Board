@@ -3180,9 +3180,10 @@ function isDeployUser() {
 /**
  * マルチテナント対応: ステータス取得
  * @param {string} requestUserId - リクエストされたユーザーID（第一引数）
+ * @param {boolean} forceRefresh - キャッシュを強制的にリフレッシュするかどうか（第二引数、オプション）
  * @returns {Object} ステータス情報
  */
-function getStatus(requestUserId) {
+function getStatus(requestUserId, forceRefresh = false) {
   try {
     console.log('getStatus - requestUserId:', requestUserId);
     
@@ -3199,7 +3200,9 @@ function getStatus(requestUserId) {
     }
     
     // 従来のgetStatus処理をuserIdベースで実行
-    clearExecutionUserInfoCache(); // 実行レベルキャッシュをクリア
+    if (forceRefresh) {
+      clearExecutionUserInfoCache(); // 実行レベルキャッシュをクリア
+    }
     const userInfo = getCachedUserInfo(requestUserId);
     
     if (!userInfo) {
@@ -3210,7 +3213,7 @@ function getStatus(requestUserId) {
     let sheetNames = [];
     try {
       if (userInfo.spreadsheetId) {
-        const sheets = getSheetsInfoOptimized(userInfo.spreadsheetId);
+        const sheets = getSheetsList(requestUserId);
         sheetNames = sheets || [];
       }
     } catch (sheetError) {
