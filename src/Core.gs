@@ -3350,6 +3350,27 @@ function getStatus(requestUserId, forceRefresh = false) {
       }
     }
     
+    // フォームURLの取得と修復
+    let formUrl = configJson.formUrl || configJson.editFormUrl;
+    
+    // フォームURLがない場合、スプレッドシートから取得を試みる
+    if (!formUrl && userInfo.spreadsheetId && configJson.formCreated) {
+      try {
+        const retrievedFormUrl = getFormUrlSafely(configJson, userInfo.spreadsheetId);
+        if (retrievedFormUrl) {
+          formUrl = retrievedFormUrl;
+          // configJsonを更新
+          configJson.formUrl = formUrl;
+          updateUser(requestUserId, {
+            configJson: JSON.stringify(configJson)
+          });
+          debugLog('getStatus: フォームURLを自動修復しました:', formUrl);
+        }
+      } catch (e) {
+        console.warn('getStatus: フォームURL自動修復に失敗:', e.message);
+      }
+    }
+    
     // 公開状態の判定
     const isPublished = !!(configJson.appPublished && configJson.publishedSpreadsheetId && configJson.publishedSheetName);
     
@@ -3362,12 +3383,9 @@ function getStatus(requestUserId, forceRefresh = false) {
       publishedSheetName: configJson.publishedSheetName || null,
       isPublished: isPublished,
       appPublished: configJson.appPublished || false,
-      formUrl: configJson.formUrl || null,
+      formUrl: formUrl || null,
       webAppUrl: getWebAppUrlCached(),
-      appUrls: {
-        webApp: getWebAppUrlCached(),
-        spreadsheet: userInfo.spreadsheetUrl || ''
-      },
+      appUrls: generateAppUrls(requestUserId),
       customFormInfo: customFormInfo
     };
     

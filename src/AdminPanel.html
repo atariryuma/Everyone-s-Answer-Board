@@ -2629,7 +2629,7 @@ function syncCheckboxStates(status) {
         return;
       }
       
-      // formURLを複数の場所から取得を試みる
+      // formURLを複数の場所から取得を試みる（サーバー側で修復済みのものを優先）
       let formUrl = status.formUrl;
       if (!formUrl && status.userInfo && status.userInfo.formUrl) {
         formUrl = status.userInfo.formUrl;
@@ -2638,6 +2638,7 @@ function syncCheckboxStates(status) {
         try {
           const config = JSON.parse(status.userInfo.configJson);
           formUrl = config.formUrl || config.editFormUrl;
+          console.log('✅ [DEBUG] Retrieved formUrl from configJson:', formUrl);
         } catch (e) {
           console.warn('ConfigJSON parse error:', e);
         }
@@ -2758,18 +2759,26 @@ function syncCheckboxStates(status) {
         if (topicTextElement) {
           let topic = '（問題文未設定）';
           
-          // カスタムフォーム情報から優先的に取得
+          // 1. カスタムフォーム情報から優先的に取得
           if (status.customFormInfo && status.customFormInfo.mainQuestion) {
             topic = status.customFormInfo.mainQuestion;
             console.log('✅ [DEBUG] Using custom form main question:', topic);
           } 
-          // フォールバック: 公開中のシート設定から問題文を取得
-          else if (status.publishedSheetName && status.userInfo && status.userInfo.configJson) {
+          // 2. configJsonのmainQuestionから取得（新規フォーム用）
+          else if (status.userInfo && status.userInfo.configJson) {
             try {
               const config = JSON.parse(status.userInfo.configJson);
-              const sheetKey = 'sheet_' + status.publishedSheetName;
-              const sheetConfig = config[sheetKey] || {};
-              topic = sheetConfig.opinionHeader || status.publishedSheetName || '（問題文未設定）';
+              if (config.mainQuestion) {
+                topic = config.mainQuestion;
+                console.log('✅ [DEBUG] Using config.mainQuestion:', topic);
+              }
+              // 3. フォールバック: 公開中のシート設定から問題文を取得
+              else if (status.publishedSheetName) {
+                const sheetKey = 'sheet_' + status.publishedSheetName;
+                const sheetConfig = config[sheetKey] || {};
+                topic = sheetConfig.opinionHeader || status.publishedSheetName || '（問題文未設定）';
+                console.log('✅ [DEBUG] Using sheet config opinionHeader:', topic);
+              }
             } catch (e) {
               console.warn('ConfigJson parsing error:', e);
               topic = status.publishedSheetName || '（問題文未設定）';
