@@ -568,6 +568,7 @@ function validateUserSession(currentUserEmail, params) {
  * @return {HtmlOutput|null} 表示するHTMLがあれば返す
  */
 function handleSetupPages(params, userEmail) {
+  // セットアップが未完了の場合は、userEmailの有無に関係なくセットアップページを優先
   if (!isSystemSetup() && !params.isDirectPageAccess) {
     const t = HtmlService.createTemplateFromFile('SetupPage');
     t.include = include;
@@ -599,6 +600,7 @@ function handleSetupPages(params, userEmail) {
     return safeSetXFrameOptionsDeny(explicit.evaluate().setTitle('StudyQuest - サービスアカウント セットアップ'));
   }
 
+  // システムセットアップが完了している場合のみ、userEmailをチェック
   if (!userEmail && !params.isDirectPageAccess) {
     return showRegistrationPage();
   }
