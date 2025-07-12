@@ -7,6 +7,20 @@ describe('autoMapSheetHeaders override', () => {
   vm.createContext(context);
   vm.runInContext(code, context);
   // Override dependencies after evaluation
+  context.verifyUserAccess = jest.fn();
+  context.getCurrentSpreadsheetMultiTenant = jest.fn(() => ({ getId: () => 'ID' }));
+  context.getSheetHeadersForAdminPanelMultiTenant = jest.fn(() => [
+    'クラス',
+    '名前',
+    '質問X',
+    'そう考える理由や体験があれば教えてください（任意）'
+  ]);
+  context.getSheetHeadersMultiTenant = jest.fn(() => [
+    'クラス',
+    '名前',
+    '質問X',
+    'そう考える理由や体験があれば教えてください（任意）'
+  ]);
   context.getSheetHeaders = jest.fn(() => [
     'クラス',
     '名前',
@@ -21,7 +35,7 @@ describe('autoMapSheetHeaders override', () => {
   }));
 
   test('uses overrides for mapping', () => {
-    const mapping = context.autoMapSheetHeaders('フォームの回答 1', {
+    const mapping = context.autoMapSheetHeadersMultiTenant('uid1', 'フォームの回答 1', {
       mainQuestion: '質問X',
       reasonQuestion: 'そう考える理由や体験があれば教えてください（任意）',
       nameQuestion: '名前',

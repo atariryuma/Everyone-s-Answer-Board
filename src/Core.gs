@@ -836,6 +836,11 @@ function setupApplicationMultiTenant(credsJson, dbId) {
     props.setProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS, credsJson);
     props.setProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID, dbId);
 
+    var adminEmail = Session.getEffectiveUser().getEmail();
+    if (adminEmail) {
+      props.setProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL, adminEmail);
+    }
+
     // データベースシートの初期化
     initializeDatabaseSheet(dbId);
 
@@ -3552,7 +3557,7 @@ function getDriveService() {
  * @returns {boolean} デバッグモードを有効にすべき場合はtrue
  */
 function shouldEnableDebugMode() {
-  return isDeployUser();
+  return isSystemAdmin();
 }
 
 /**
@@ -3561,113 +3566,20 @@ function shouldEnableDebugMode() {
  * 2. 教育機関ドメインの管理者権限を確認
  * @returns {boolean} 管理者権限を持つ場合 true
  */
-function isDeployUser() {
+function isSystemAdmin() {
   try {
-    var userEmail = Session.getActiveUser().getEmail();
-    console.log('isDeployUser - checking user:', userEmail);
-    if (!userEmail) {
-      console.log('isDeployUser - no user email found');
-      return false;
-    }
-
-    // 方法1: GASスクリプト自体の編集権限を確認
-    var scriptId = ScriptApp.getScriptId();
-    console.log('isDeployUser - script ID:', scriptId);
-    
-    try {
-      var scriptFile = DriveApp.getFileById(scriptId);
-      if (scriptFile) {
-        var editors = scriptFile.getEditors().map(function(e) { return e.getEmail(); });
-        console.log('isDeployUser - script editors:', editors);
-        
-        var ownerEmail = '';
-        try {
-          var owner = scriptFile.getOwner();
-          console.log('isDeployUser - raw owner object:', owner);
-          if (owner) {
-            if (typeof owner.getEmail === 'function') {
-              ownerEmail = owner.getEmail();
-            } else if (owner.email) {
-              ownerEmail = owner.email;
-            }
-          }
-          console.log('isDeployUser - script owner:', ownerEmail);
-        } catch (ownerErr) {
-          console.warn('getOwner failed:', ownerErr.message);
-          console.warn('getOwner error details:', ownerErr);
-        }
-        
-        // 追加のオーナー確認方法: Drive API詳細情報
-        if (!ownerEmail) {
-          try {
-            console.log('isDeployUser - attempting Drive API owners check');
-            var fileDetails = DriveApp.getFileById(scriptId);
-            var viewers = fileDetails.getViewers();
-            console.log('isDeployUser - script viewers:', viewers.map(function(v) { return v.getEmail(); }));
-            
-            // プロパティサービスでオーナー情報が保存されている可能性をチェック
-            var props = PropertiesService.getScriptProperties();
-            var storedOwner = props.getProperty('SCRIPT_OWNER_EMAIL');
-            if (storedOwner) {
-              console.log('isDeployUser - stored owner from properties:', storedOwner);
-              ownerEmail = storedOwner;
-            }
-          } catch (driveDetailsError) {
-            console.warn('Drive details check failed:', driveDetailsError.message);
-          }
-        }
-        
-        if (ownerEmail) editors.push(ownerEmail);
-        
-        var hasScriptPermission = editors.indexOf(userEmail) !== -1;
-        console.log('isDeployUser - all script users:', editors);
-        console.log('isDeployUser - script permission check:', hasScriptPermission);
-        
-        if (hasScriptPermission) {
-          console.log('isDeployUser - granted via script permissions');
-          return true;
-        }
-      }
-    } catch (driveError) {
-      console.warn('Drive API error for script check:', driveError.message);
-    }
-
-    // 方法2: 明示的なオーナー確認（既知のオーナーアドレス）
-    var knownOwners = ['35t22@naha-okinawa.ed.jp', 'ryuma.atari@gmail.com'];
-    if (knownOwners.indexOf(userEmail) !== -1) {
-      console.log('isDeployUser - granted via known owner list:', userEmail);
-      return true;
-    }
-
-    // 方法3: 教育機関ドメインの管理者権限を確認
-    var userDomain = userEmail.split('@')[1];
-    console.log('isDeployUser - user domain:', userDomain);
-    
-    // 教育機関ドメインの場合、特定の条件で管理者権限を付与
-    var educationDomains = ['naha-okinawa.ed.jp']; // 必要に応じてドメインを追加
-    
-    if (educationDomains.indexOf(userDomain) !== -1) {
-      console.log('isDeployUser - education domain detected:', userDomain);
-      
-      // データベースにユーザーが登録されており、かつアクティブな場合は管理者とみなす
-      try {
-        var userInfo = findUserByEmail(userEmail);
-        if (userInfo && userInfo.isActive === 'true') {
-          console.log('isDeployUser - granted via education domain (active user)');
-          return true;
-        }
-      } catch (dbError) {
-        console.warn('Database check failed:', dbError.message);
-      }
-    }
-    
-    console.log('isDeployUser - no permission found');
-    return false;
-    
+    var props = PropertiesService.getScriptProperties();
+    var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
+    var currentUserEmail = Session.getActiveUser().getEmail();
+    return adminEmail && currentUserEmail && adminEmail === currentUserEmail;
   } catch (e) {
-    console.error('isDeployUser エラー: ' + e.message);
+    console.error('isSystemAdmin エラー: ' + e.message);
     return false;
   }
+}
+
+function isDeployUser() {
+  return isSystemAdmin();
 }
 
 // =================================================================

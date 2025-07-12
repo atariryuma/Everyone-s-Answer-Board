@@ -93,14 +93,14 @@
   }
   </script>
   <script>
-  const __IS_DEPLOY_USER_RAW__ = '<?= typeof isDeployUser !== "undefined" ? isDeployUser : false ?>';
-  const __IS_DEPLOY_USER__ = __IS_DEPLOY_USER_RAW__ === 'true' || __IS_DEPLOY_USER_RAW__ === true;
-  window.isDeployUser = __IS_DEPLOY_USER__;
+  const __IS_SYSTEM_ADMIN_RAW__ = '<?= typeof isDeployUser !== "undefined" ? isDeployUser : false ?>';
+  const __IS_SYSTEM_ADMIN__ = __IS_SYSTEM_ADMIN_RAW__ === 'true' || __IS_SYSTEM_ADMIN_RAW__ === true;
+  window.isSystemAdmin = __IS_SYSTEM_ADMIN__;
   console.log('Template Debug:');
-  console.log('- Raw template value:', __IS_DEPLOY_USER_RAW__);
-  console.log('- Raw template type:', typeof __IS_DEPLOY_USER_RAW__);
-  console.log('- Processed value:', __IS_DEPLOY_USER__);
-  console.log('- window.isDeployUser final:', window.isDeployUser);
+  console.log('- Raw template value:', __IS_SYSTEM_ADMIN_RAW__);
+  console.log('- Raw template type:', typeof __IS_SYSTEM_ADMIN_RAW__);
+  console.log('- Processed value:', __IS_SYSTEM_ADMIN__);
+  console.log('- window.isSystemAdmin final:', window.isSystemAdmin);
   
   // URL更新処理
   const shouldUpdateUrl = '<?= typeof shouldUpdateUrl !== "undefined" ? shouldUpdateUrl : false ?>';
@@ -1742,12 +1742,12 @@ elements = {
       var appSetupLink = document.getElementById('app-setup-link');
       var accountDeletionSection = document.getElementById('account-deletion-section');
       
-      console.log('Display control - isDeployUser:', window.isDeployUser);
+      console.log('Display control - isSystemAdmin:', window.isSystemAdmin);
       console.log('Display control - appSetupLink element:', appSetupLink);
       console.log('Display control - accountDeletionSection element:', accountDeletionSection);
-      
-      if (window.isDeployUser) {
-        // デプロイユーザーの場合：AppSetupPageリンクを表示、削除セクションを非表示
+
+      if (window.isSystemAdmin) {
+        // システム管理者の場合：AppSetupPageリンクを表示、削除セクションを非表示
         if (appSetupLink) {
           appSetupLink.style.display = 'block';
           console.log('✅ AppSetupPage link shown for deploy user');
