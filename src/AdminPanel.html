@@ -2711,9 +2711,16 @@ function syncCheckboxStates(status) {
       }
       setLoading(true, 'AI搭載高精度列判定システムが分析中...');
       
-      runGas('getGuessedHeaders', selectedSheet)
-        .then(function(guessed) {
-          populateConfig(guessed);
+      runGas('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
+        .then(function(details) {
+          const configToUse = {
+            ...details.guessedConfig,
+            ...details.existingConfig,
+            showNames: details.existingConfig?.showNames || false,
+            showCounts: details.existingConfig?.showCounts !== undefined ? details.existingConfig.showCounts : false
+          };
+          populateHeaderOptions(details.allHeaders);
+          populateConfig(configToUse);
           showMessage('🤖 AIによる列判定が完了しました。', 'info');
           setLoading(false);
         })

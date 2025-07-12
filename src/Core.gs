@@ -219,7 +219,7 @@ function executeGetPublishedSheetData(classFilter, sortOrder, adminMode) {
         throw new Error('ユーザーコンテキストが設定されていません');
       }
       
-      var userInfo = getUserWithFallback(currentUserId);
+      var userInfo = findUserById(currentUserId);
       if (!userInfo) {
         handleMissingUser(currentUserId);
         // Fallback to active user email if property points to missing user
@@ -351,7 +351,7 @@ function getIncrementalSheetData(classFilter, sortOrder, adminMode, sinceRowCoun
       throw new Error('ユーザーコンテキストが設定されていません');
     }
     
-    var userInfo = getUserWithFallback(currentUserId);
+    var userInfo = getUserInfoCached();
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -545,7 +545,7 @@ function getAppConfig() {
       }
     }
     
-    var userInfo = getUserWithFallback(currentUserId);
+    var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       handleMissingUser(currentUserId);
       var fallbackEmail = Session.getActiveUser().getEmail();
@@ -682,7 +682,7 @@ function saveSheetConfig(spreadsheetId, sheetName, config) {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
 
-    var userInfo = getUserWithFallback(currentUserId);
+    var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -723,7 +723,7 @@ function switchToSheet(spreadsheetId, sheetName) {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
 
-    var userInfo = getUserWithFallback(currentUserId);
+    var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -931,7 +931,7 @@ function getActiveFormInfo(userId) {
       }
     }
     
-    var userInfo = getUserWithFallback(currentUserId);
+    var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       handleMissingUser(currentUserId);
       var fallbackEmail = Session.getActiveUser().getEmail();
@@ -992,7 +992,7 @@ function refreshBoardData(userId) {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
     
-    var userInfo = getUserWithFallback(currentUserId);
+    var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -1031,7 +1031,7 @@ function addFormUrl(formUrl) {
       throw new Error('フォームURLからIDを抽出できませんでした');
     }
     
-    var userInfo = getUserWithFallback(currentUserId);
+    var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -1069,7 +1069,7 @@ function createAdditionalForm(title) {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
     
-    var userInfo = getUserWithFallback(currentUserId);
+    var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -1142,7 +1142,7 @@ function createAdditionalFormWithConfig(config) {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
     
-    var userInfo = getUserWithFallback(currentUserId);
+    var userInfo = getUserInfoCached();
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -1215,7 +1215,7 @@ function updateFormSettings(title, description) {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
     
-    var userInfo = getUserWithFallback(currentUserId);
+    var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -1264,7 +1264,7 @@ function saveSystemConfig(config) {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
     
-    var userInfo = getUserWithFallback(currentUserId);
+    var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -1306,7 +1306,7 @@ function toggleHighlight(rowIndex, sheetName) {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
     
-    var userInfo = getUserWithFallback(currentUserId);
+    var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -2004,7 +2004,7 @@ function saveClassChoices(classChoices) {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
     
-    var userInfo = getUserWithFallback(currentUserId);
+    var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -2037,7 +2037,7 @@ function getSavedClassChoices() {
       return { status: 'error', message: 'ユーザーコンテキストが設定されていません' };
     }
     
-    var userInfo = getUserWithFallback(currentUserId);
+    var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       return { status: 'error', message: 'ユーザー情報が見つかりません' };
     }
