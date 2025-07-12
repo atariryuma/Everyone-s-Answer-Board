@@ -1108,10 +1108,14 @@ function clearActiveSheet() {
     }
     
     console.log('回答ボードの公開を正常に停止しました - ユーザーID:', currentUserId);
+    
+    // 最新のステータスを取得して返す（UI更新のため）
+    const updatedStatus = getStatus(true);
     return {
       success: true,
       message: '✅ 回答ボードの公開を停止しました。',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      ...updatedStatus
     };
   } catch (e) {
     console.error('clearActiveSheet エラー: ' + e.message);

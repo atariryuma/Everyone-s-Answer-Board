@@ -2274,26 +2274,36 @@ function syncCheckboxStates(status) {
       
       // キャッシュキーを定義
       const cacheKey = 'status_' + (userId || 'guest');
+      const cacheTime = 60000; // 60秒キャッシュ
       
-      // キャッシュを無視するかどうかのロジック
       if (forceRefresh) {
-        // キャッシュを削除
-        if (typeof cacheManager !== 'undefined') {
-          cacheManager.remove(cacheKey);
+        // 強制更新時はキャッシュを削除してサーバーから取得
+        if (typeof unifiedCache !== 'undefined') {
+          unifiedCache.delete(cacheKey);
         }
+        runGas('getStatus', forceRefresh)
+          .then(function(status) {
+            console.log('✅ Status loaded (forced refresh)', status);
+            updateUIWithNewStatus(status);
+            setLoading(false);
+          })
+          .catch(function(error) {
+            handleError(error, 'loadStatus');
+            setLoading(false);
+          });
+      } else {
+        // 通常の呼び出しはキャッシュを活用
+        callWithCache('getStatus', cacheKey, cacheTime, false)
+          .then(function(status) {
+            console.log('✅ Status loaded (cached)', status);
+            updateUIWithNewStatus(status);
+            setLoading(false);
+          })
+          .catch(function(error) {
+            handleError(error, 'loadStatus');
+            setLoading(false);
+          });
       }
-      
-      // getStatusを呼び出し
-      runGas('getStatus', forceRefresh)
-        .then(function(status) {
-          console.log('✅ [1/3] Status Object Received', status);
-          updateUIWithNewStatus(status);
-          setLoading(false);
-        })
-        .catch(function(error) {
-          handleError(error, 'loadStatus');
-          setLoading(false);
-        });
     }
 
     /**
@@ -2792,20 +2802,15 @@ function syncCheckboxStates(status) {
       runGas('saveAndPublish', selectedSheet, config)
         .then(function(status) {
           setLoading(false);
-              showMessage('設定が保存され、ボードが公開されました！', 'success');
-    loadStatus(true); // ステータスを再読み込みしてUIを更新
-    // 強制的にサーバーから情報を取得して管理パネル全体に適用
-    google.script.run
-      .withSuccessHandler(function(status) {
-        updateDatabaseInfo(status);
-        updateFooterAndGuidance(status);
-        setLoading(false);
-      })
-      .withFailureHandler(function(error) {
-        handleError(error, 'loadStatus');
-        setLoading(false);
-      })
-      .getStatus();
+          showMessage('設定が保存され、ボードが公開されました！', 'success');
+          // サーバーレスポンスの最新ステータスでUIを直接更新（追加のAPI呼び出し不要）
+          if (status && typeof status === 'object') {
+            updateUIWithNewStatus(status);
+            console.log('✅ saveAndPublish success - UI updated with response status');
+          } else {
+            // フォールバック: レスポンスが期待された形式でない場合のみloadStatus呼び出し
+            loadStatus(true);
+          }
         })
         .catch(function(error) {
           setLoading(false);
@@ -2832,7 +2837,14 @@ function syncCheckboxStates(status) {
           console.log('公開停止レスポンス:', response);
           showMessage(response.message || '✅ 回答ボードの公開を停止しました。', 'success');
           setLoading(false);
-          loadStatus(true); // 更新された状態を取得
+          // サーバーレスポンスの最新ステータスでUIを直接更新（追加のAPI呼び出し不要）
+          if (response && typeof response === 'object' && response.success) {
+            updateUIWithNewStatus(response);
+            console.log('✅ unpublishBoard success - UI updated with response status');
+          } else {
+            // フォールバック: レスポンスが期待された形式でない場合のみloadStatus呼び出し
+            loadStatus(true);
+          }
         })
         .catch(function(error) {
           handleError(error, 'unpublishBoard');
