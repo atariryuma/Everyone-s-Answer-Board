@@ -1005,7 +1005,8 @@ class StudyQuestApp {
     // リアクション状態保存用のキー
     this.reactionStorageKey = `reactions_${USER_ID}_${SHEET_NAME}`;
     this.gas = {
-      getPublishedSheetData: (sheetName, classFilter, sort, adminMode, bypassCache) => this.runGas('getPublishedSheetData', this.state.userId, sheetName, classFilter, sort, adminMode, bypassCache),
+      getPublishedSheetData: (classFilter, sort, adminMode, bypassCache) =>
+        this.runGas('getPublishedSheetData', this.state.userId, classFilter, sort, adminMode, bypassCache),
       getIncrementalSheetData: (classFilter, sort, adminMode, sinceRowCount) => this.runGas('getIncrementalSheetData', this.state.userId, classFilter, sort, adminMode, sinceRowCount),
       getAvailableSheets: () => this.runGas('getAvailableSheets', this.state.userId),
       addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', this.state.userId, rowIndex, reaction, sheetName),
@@ -2176,7 +2177,7 @@ setupEventDelegation() {
             this.hideLoadingOverlay();
           }
         })
-        .getPublishedSheetData(this.state.sheetName, classFilter, sortOrder, this.state.showAdminFeatures, false);
+        .getPublishedSheetData(this.state.userId, classFilter, sortOrder, this.state.showAdminFeatures, false);
       
       
       // Post-processing after successful data load
