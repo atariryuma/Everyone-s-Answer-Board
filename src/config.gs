@@ -1148,7 +1148,9 @@ function createBoardFromAdmin(requestUserId) {
       formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl,
       editFormUrl: formAndSsInfo.editFormUrl,
       createdAt: new Date().toISOString(),
-      publishedSheet: formAndSsInfo.sheetName, // 作成時に公開シートを設定
+      publishedSpreadsheetId: formAndSsInfo.spreadsheetId, // スプレッドシートIDを設定
+      publishedSheetName: formAndSsInfo.sheetName, // 作成時に公開シートを設定
+      publishedSheet: formAndSsInfo.sheetName, // 後方互換性のため残す
       appPublished: true // 作成時に公開状態にする
     };
 
