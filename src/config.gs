@@ -1335,43 +1335,25 @@ function resetUserAuthentication() {
 /**
  * 指定されたシートのヘッダーを自動でマッピングし、その結果を返す。
  * この関数は AdminPanel.html から直接呼び出されることを想定しています。
+ * @deprecated getSheetDetails関数を使用してください。重複処理を避けるため統合されました。
  * @param {string} sheetName - 対象のスプレッドシート名。
  * @returns {object} 推測されたヘッダーのマッピング結果。
  */
 function getGuessedHeaders(sheetName) {
   try {
-    const spreadsheet = getCurrentSpreadsheet();
-    const sheet = spreadsheet.getSheetByName(sheetName);
-    if (!sheet) {
-      throw new Error(`シート '${sheetName}' が見つかりません。`);
-    }
+    console.log('⚠️ getGuessedHeaders は非推奨です。getSheetDetails を使用してください。');
     
-    // ヘッダー行（1行目）を取得
-    const lastColumn = sheet.getLastColumn();
-    if (lastColumn < 1) {
-      throw new Error(`シート '${sheetName}' に列が存在しません`);
-    }
-    const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+    // getSheetDetailsの結果を利用して重複処理を回避
+    const sheetDetails = getSheetDetails(null, sheetName);
     
-    // 改良された高精度判定ロジックを呼び出し（シート名も渡してデータ分析を有効化）
-    const mappingResult = autoMapHeaders(headers, sheetName);
-    
-    // 既存の設定も取得
-    let existingConfig = null;
-    try {
-      existingConfig = getConfig(sheetName);
-    } catch (configError) {
-      console.warn('既存設定の取得に失敗しましたが、処理を続行します: ' + configError.toString());
-    }
-    
-    // 結果にallHeadersと既存設定も含めて返す
+    // getGuessedHeadersの期待する形式に変換
     const result = {
-      ...mappingResult,
-      allHeaders: headers || [],
-      existingConfig: existingConfig
+      ...sheetDetails.guessedConfig,
+      allHeaders: sheetDetails.allHeaders,
+      existingConfig: sheetDetails.existingConfig
     };
     
-    console.log('高精度自動判定を実行しました: sheet=%s, result=%s', sheetName, JSON.stringify(result));
+    console.log('getGuessedHeaders (統合済み): sheet=%s, result=%s', sheetName, JSON.stringify(result));
     return result;
 
   } catch (e) {

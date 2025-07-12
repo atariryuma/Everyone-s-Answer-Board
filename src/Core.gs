@@ -4,6 +4,34 @@
  */
 
 // =================================================================
+// ユーザー情報キャッシュ（関数実行中の重複取得を防ぐ）
+// =================================================================
+
+var _executionUserInfoCache = null;
+
+/**
+ * 関数実行中のユーザー情報キャッシュをクリア
+ */
+function clearExecutionUserInfoCache() {
+  _executionUserInfoCache = null;
+}
+
+/**
+ * ユーザー情報を取得（実行中はキャッシュを使用）
+ * @param {string} userId ユーザーID
+ * @returns {Object} ユーザー情報
+ */
+function getCachedUserInfo(userId) {
+  if (_executionUserInfoCache && _executionUserInfoCache.userId === userId) {
+    return _executionUserInfoCache.userInfo;
+  }
+  
+  const userInfo = findUserById(userId);
+  _executionUserInfoCache = { userId, userInfo };
+  return userInfo;
+}
+
+// =================================================================
 // メインロジック
 // =================================================================
 
@@ -17,7 +45,7 @@
  */
 function getOpinionHeaderSafely(userId, sheetName) {
   try {
-    const userInfo = findUserById(userId);
+    const userInfo = getCachedUserInfo(userId);
     if (!userInfo) {
       return 'お題';
     }
@@ -139,6 +167,9 @@ function registerNewUser(adminEmail) {
  * Page.htmlから呼び出される - フロントエンド期待形式に対応
  */
 function addReaction(rowIndex, reactionKey, sheetName) {
+  // 実行開始時にユーザー情報キャッシュをクリア
+  clearExecutionUserInfoCache();
+  
   try {
     var reactingUserEmail = Session.getActiveUser().getEmail();
     var props = PropertiesService.getUserProperties();
@@ -180,6 +211,9 @@ function addReaction(rowIndex, reactionKey, sheetName) {
       status: "error",
       message: e.message
     };
+  } finally {
+    // 実行終了時にユーザー情報キャッシュをクリア
+    clearExecutionUserInfoCache();
   }
 }
 
@@ -192,18 +226,26 @@ function addReaction(rowIndex, reactionKey, sheetName) {
  * Page.htmlから呼び出される - フロントエンド期待形式に対応
  */
 function getPublishedSheetData(classFilter, sortOrder, adminMode, bypassCache) {
-  // キャッシュキー生成（パフォーマンス向上）
-  var requestKey = `publishedData_${classFilter}_${sortOrder}_${adminMode}`;
+  // 実行開始時にユーザー情報キャッシュをクリア
+  clearExecutionUserInfoCache();
   
-  // キャッシュバイパス時は直接実行
-  if (bypassCache === true) {
-    debugLog('🔄 キャッシュバイパス：最新データを直接取得');
-    return executeGetPublishedSheetData(classFilter, sortOrder, adminMode);
+  try {
+    // キャッシュキー生成（パフォーマンス向上）
+    var requestKey = `publishedData_${classFilter}_${sortOrder}_${adminMode}`;
+    
+    // キャッシュバイパス時は直接実行
+    if (bypassCache === true) {
+      debugLog('🔄 キャッシュバイパス：最新データを直接取得');
+      return executeGetPublishedSheetData(classFilter, sortOrder, adminMode);
+    }
+    
+    return cacheManager.get(requestKey, () => {
+      return executeGetPublishedSheetData(classFilter, sortOrder, adminMode);
+    }, { ttl: 600 }); // 10分間キャッシュ
+  } finally {
+    // 実行終了時にユーザー情報キャッシュをクリア
+    clearExecutionUserInfoCache();
   }
-  
-  return cacheManager.get(requestKey, () => {
-    return executeGetPublishedSheetData(classFilter, sortOrder, adminMode);
-  }, { ttl: 600 }); // 10分間キャッシュ
 }
 
 /**
@@ -219,7 +261,7 @@ function executeGetPublishedSheetData(classFilter, sortOrder, adminMode) {
         throw new Error('ユーザーコンテキストが設定されていません');
       }
       
-      var userInfo = findUserById(currentUserId);
+      var userInfo = getCachedUserInfo(currentUserId);
       if (!userInfo) {
         handleMissingUser(currentUserId);
         // Fallback to active user email if property points to missing user
@@ -228,7 +270,7 @@ function executeGetPublishedSheetData(classFilter, sortOrder, adminMode) {
         if (altUser) {
           currentUserId = altUser.userId;
           props.setProperty('CURRENT_USER_ID', currentUserId);
-          userInfo = altUser;
+          userInfo = getCachedUserInfo(currentUserId);
         } else {
           throw new Error('ユーザー情報が見つかりません');
         }
@@ -823,7 +865,7 @@ function testSetup() {
 
 
 function getResponsesData(userId, sheetName) {
-  var userInfo = findUserById(userId);
+  var userInfo = getCachedUserInfo(userId);
   if (!userInfo) {
     return { status: 'error', message: 'ユーザー情報が見つかりません' };
   }
@@ -860,13 +902,16 @@ function getResponsesData(userId, sheetName) {
  * AdminPanel.htmlから呼び出される
  */
 function getStatus(forceRefresh = false) {
+  // 実行開始時にユーザー情報キャッシュをクリア
+  clearExecutionUserInfoCache();
+  
   if (forceRefresh) {
     // Force cache invalidation for current user
     try {
       var props = PropertiesService.getUserProperties();
       var currentUserId = props.getProperty('CURRENT_USER_ID');
       if (currentUserId) {
-        var userInfo = findUserById(currentUserId);
+        var userInfo = getCachedUserInfo(currentUserId);
         if (userInfo) {
           invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId, false);
           debugLog('強制リフレッシュ: ユーザーキャッシュを削除しました');
@@ -886,7 +931,7 @@ function getStatus(forceRefresh = false) {
     try {
       var props = PropertiesService.getUserProperties();
       var currentUserId = props.getProperty('CURRENT_USER_ID');
-      var userInfo = currentUserId ? findUserById(currentUserId) : null;
+      var userInfo = currentUserId ? getCachedUserInfo(currentUserId) : null;
       
       return {
         status: 'error',
@@ -907,6 +952,9 @@ function getStatus(forceRefresh = false) {
         timestamp: new Date().toISOString()
       };
     }
+  } finally {
+    // 実行終了時にユーザー情報キャッシュをクリア
+    clearExecutionUserInfoCache();
   }
 }
 
@@ -1134,6 +1182,9 @@ function createAdditionalForm(title) {
  * 設定付きで新しいフォームを作成
  */
 function createAdditionalFormWithConfig(config) {
+  // 実行開始時にユーザー情報キャッシュをクリア
+  clearExecutionUserInfoCache();
+  
   try {
     var props = PropertiesService.getUserProperties();
     var currentUserId = props.getProperty('CURRENT_USER_ID');
@@ -1142,10 +1193,13 @@ function createAdditionalFormWithConfig(config) {
       throw new Error('ユーザーコンテキストが設定されていません');
     }
     
-    var userInfo = getUserInfoCached();
+    // ユーザー情報を一度だけ取得（キャッシュ活用）
+    var userInfo = getCachedUserInfo(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
+    
+    console.log('📝 フォーム作成開始: ' + currentUserId);
     
     var formTitle = 'StudyQuest カスタムフォーム - ' + new Date().toLocaleDateString('ja-JP');
     var formAndSsInfo = createStudyQuestFormWithConfig(userInfo.adminEmail, currentUserId, formTitle, config);
@@ -1199,6 +1253,9 @@ function createAdditionalFormWithConfig(config) {
   } catch (e) {
     console.error('カスタムフォーム作成エラー: ' + e.message);
     return { status: 'error', message: 'カスタムフォームの作成に失敗しました: ' + e.message };
+  } finally {
+    // 実行終了時にユーザー情報キャッシュをクリア
+    clearExecutionUserInfoCache();
   }
 }
 
@@ -2584,7 +2641,7 @@ function getSheetData(userId, sheetName, classFilter, sortMode, adminMode) {
  */
 function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     try {
-      var userInfo = findUserById(userId);
+      var userInfo = getCachedUserInfo(userId);
       if (!userInfo) {
         throw new Error('ユーザー情報が見つかりません');
       }
