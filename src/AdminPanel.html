@@ -1515,13 +1515,17 @@
         });
     }
     
-    // 自動公開ダイアログのチェック
+    // 自動公開ダイアログのチェック（新規フォーム作成時は自動処理に移行済みのためスキップ）
     function checkAutoPublishDialog(status) {
-      if (status && status.autoShowPublishDialog && status.readyToPublish) {
-        console.log('Auto-showing publish dialog for new/updated form');
-        
-        // 新しいフォームの場合はより積極的に表示
-        const delay = status.isNewForm ? 500 : 1000;
+      // 新規フォーム作成時は createAdditionalForm で自動処理されるため、ここでは何もしない
+      if (status && status.autoPublishCompleted) {
+        console.log('Auto-publish already completed during form creation');
+        return;
+      }
+      
+      // 既存フォームの手動設定変更時のみダイアログを表示
+      if (status && status.autoShowPublishDialog && status.readyToPublish && !status.isNewForm) {
+        console.log('Showing publish dialog for existing form configuration changes');
         
         setTimeout(function() {
           showPublishConfirmDialog();
@@ -1530,7 +1534,7 @@
           if (currentStatus) {
             currentStatus.autoShowPublishDialog = false;
           }
-        }, delay);
+        }, 1000);
       }
     }
 
@@ -1637,6 +1641,65 @@
         loader.classList.remove('hidden');
       } else {
         loader.classList.add('hidden');
+      }
+    }
+
+    // プログレスバー関数群 - フォーム作成の段階的進行を表示
+    function showProgressStep(currentStep, totalSteps, message) {
+      let progressContainer = document.getElementById('progress-container');
+      
+      if (!progressContainer) {
+        // プログレスバーコンテナを動的に作成
+        progressContainer = document.createElement('div');
+        progressContainer.id = 'progress-container';
+        progressContainer.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+        progressContainer.innerHTML = `
+          <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <div class="text-center mb-4">
+              <h3 class="text-lg font-semibold text-gray-900">フォーム作成進行中</h3>
+            </div>
+            <div class="mb-4">
+              <div class="bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div id="progress-bar" class="bg-blue-600 h-full transition-all duration-500 ease-out" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="text-center">
+              <p id="progress-message" class="text-sm text-gray-600"></p>
+              <p class="text-xs text-gray-500 mt-2">
+                ステップ <span id="progress-current">1</span> / <span id="progress-total">5</span>
+              </p>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(progressContainer);
+      }
+      
+      const progressBar = document.getElementById('progress-bar');
+      const progressMessage = document.getElementById('progress-message');
+      const progressCurrent = document.getElementById('progress-current');
+      const progressTotal = document.getElementById('progress-total');
+      
+      if (progressBar) {
+        const percentage = (currentStep / totalSteps) * 100;
+        progressBar.style.width = percentage + '%';
+      }
+      
+      if (progressMessage) progressMessage.textContent = message;
+      if (progressCurrent) progressCurrent.textContent = currentStep;
+      if (progressTotal) progressTotal.textContent = totalSteps;
+      
+      progressContainer.classList.remove('hidden');
+    }
+
+    function hideProgressBar() {
+      const progressContainer = document.getElementById('progress-container');
+      if (progressContainer) {
+        progressContainer.classList.add('hidden');
+        setTimeout(() => {
+          if (progressContainer.parentNode) {
+            progressContainer.parentNode.removeChild(progressContainer);
+          }
+        }, 500);
       }
     }
 
@@ -3247,16 +3310,61 @@ function syncCheckboxStates(status) {
         };
 
         hideFormConfigModal();
-        setLoading(true, '新しいフォームを作成しています...');
+        
+        // プログレスバーで段階的な進行状況を表示
+        showProgressStep(1, 5, 'フォームを作成中...');
 
         runGasWithUserId('createCustomFormUI', config)
             .then(function(result) {
                 if (result.status === 'success') {
-                    showMessage('✅ 新しいフォームが作成され、連携されました！', 'success');
-                    if (result.editFormUrl) {
-                        window.open(result.editFormUrl, '_blank');
+                    showProgressStep(2, 5, 'フォーム作成完了！設定を保存中...');
+                    
+                    // 自動設定保存と公開処理
+                    if (result.autoPublishReady && result.sheetName) {
+                        return runGasWithUserId('autoSaveAndPublishAfterFormCreation', 
+                            result.sheetName, result)
+                            .then(function(autoResult) {
+                                showProgressStep(3, 5, '設定保存完了！公開中...');
+                                
+                                if (autoResult.status === 'success') {
+                                    showProgressStep(4, 5, '公開完了！UIを更新中...');
+                                    
+                                    // UIを更新
+                                    return new Promise(function(resolve) {
+                                        setTimeout(function() {
+                                            loadStatus(true).then(function() {
+                                                showProgressStep(5, 5, '全て完了！');
+                                                setTimeout(function() {
+                                                    hideProgressBar();
+                                                    showMessage('✅ フォーム作成、設定保存、公開が自動で完了しました！', 'success');
+                                                    
+                                                    // フォーム編集ページを開く
+                                                    if (result.formUrl) {
+                                                        const editUrl = result.formUrl.replace('/viewform', '/edit');
+                                                        window.open(editUrl, '_blank');
+                                                    }
+                                                    resolve();
+                                                }, 1000);
+                                            });
+                                        }, 500);
+                                    });
+                                } else {
+                                    throw new Error(autoResult.message || '自動公開に失敗しました');
+                                }
+                            });
+                    } else {
+                        // フォールバック: 手動設定
+                        showProgressStep(5, 5, 'フォーム作成完了');
+                        setTimeout(function() {
+                            hideProgressBar();
+                            showMessage('✅ フォームが作成されました！設定タブで設定を行ってください。', 'success');
+                            if (result.formUrl) {
+                                const editUrl = result.formUrl.replace('/viewform', '/edit');
+                                window.open(editUrl, '_blank');
+                            }
+                            loadStatus(true);
+                        }, 1000);
                     }
-                    loadStatus(true);
                     
                     // クラス選択肢をデータベースに保存（有効な場合）
                     if (enableClassSelection && classChoices.length > 0) {
@@ -3267,10 +3375,8 @@ function syncCheckboxStates(status) {
                 }
             })
             .catch(function(error) {
+                hideProgressBar();
                 handleError(error, 'createAdditionalForm');
-            })
-            .finally(function() {
-                setLoading(false);
             });
     }
 

@@ -2109,6 +2109,14 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
       console.error('スプレッドシート作成は完了しましたが、サービスアカウントとの共有に失敗しました。手動で共有してください。');
     }
     
+    // リアクション列をスプレッドシートに追加
+    try {
+      addReactionColumnsToSpreadsheet(spreadsheetId, sheetName);
+      debugLog('リアクション列の追加完了: ' + spreadsheetId + ', シート: ' + sheetName);
+    } catch (reactionError) {
+      console.warn('リアクション列の追加に失敗しましたが、処理を続行します:', reactionError.message);
+    }
+    
     return {
       spreadsheetId: spreadsheetId,
       spreadsheetUrl: spreadsheetObj.getUrl(),
@@ -3495,8 +3503,12 @@ function createCustomFormUI(requestUserId, config) {
       updatedConfigJson.lastFormCreatedAt = new Date().toISOString();
       updatedConfigJson.setupStatus = 'completed';
       updatedConfigJson.appPublished = true;
-      updatedConfigJson.publishedSpreadsheetId = result.spreadsheetId; // 重要：スプレッドシートIDを設定
-      updatedConfigJson.publishedSheetName = result.sheetName; // 重要：シート名を設定
+      updatedConfigJson.publishedSpreadsheetId = result.spreadsheetId;
+      updatedConfigJson.publishedSheetName = result.sheetName;
+      
+      // 自動公開フラグを設定（新規フォーム作成時）
+      updatedConfigJson.autoPublishAfterCreation = true;
+      updatedConfigJson.readyForAutoPublish = true;
       
       // カスタムフォーム設定情報を保存
       updatedConfigJson.formTitle = config.formTitle;
@@ -3530,7 +3542,10 @@ function createCustomFormUI(requestUserId, config) {
       message: 'カスタムフォームが正常に作成されました！',
       formUrl: result.formUrl,
       spreadsheetUrl: result.spreadsheetUrl,
-      formTitle: result.formTitle
+      formTitle: result.formTitle,
+      spreadsheetId: result.spreadsheetId,
+      sheetName: result.sheetName,
+      autoPublishReady: true
     };
   } catch (error) {
     console.error('createCustomFormUI error:', error.message);
@@ -3541,60 +3556,76 @@ function createCustomFormUI(requestUserId, config) {
   }
 }
 
+
+
 /**
- * クイックスタート用フォーム作成（UI用ラッパー）
+ * フォーム作成後の自動設定保存と公開処理
  * @param {string} requestUserId - リクエスト元のユーザーID
+ * @param {string} sheetName - シート名
+ * @param {object} formData - フォーム作成結果データ
  */
-function createQuickStartFormUI(requestUserId) {
+function autoSaveAndPublishAfterFormCreation(requestUserId, sheetName, formData) {
   try {
     verifyUserAccess(requestUserId);
-    const activeUserEmail = Session.getActiveUser().getEmail();
+    console.log('autoSaveAndPublishAfterFormCreation 開始 - userId:', requestUserId, 'sheetName:', sheetName);
     
-    const result = createQuickStartForm(activeUserEmail, requestUserId);
+    // 基本設定オブジェクトを作成
+    const basicConfig = {
+      opinionHeader: formData.mainQuestion || 'お題',
+      displayMode: 'anonymous',
+      showCounts: false
+    };
     
-    // 既存ユーザーの情報を更新
-    const existingUser = findUserById(requestUserId);
-    if (existingUser) {
-      const updatedConfigJson = JSON.parse(existingUser.configJson || '{}');
-      updatedConfigJson.formUrl = result.viewFormUrl || result.formUrl;
-      updatedConfigJson.editFormUrl = result.editFormUrl;
-      updatedConfigJson.formCreated = true;
-      updatedConfigJson.setupStatus = 'completed';
-      updatedConfigJson.appPublished = true;
-      updatedConfigJson.publishedSpreadsheetId = result.spreadsheetId; // 重要：スプレッドシートIDを設定
-      updatedConfigJson.publishedSheetName = result.sheetName; // 重要：シート名を設定
+    // Step 1: 設定を保存
+    console.log('自動設定保存開始...');
+    saveSheetConfig(requestUserId, formData.spreadsheetId, sheetName, basicConfig);
+    
+    // Step 2: シートをアクティブ化
+    console.log('シート自動アクティブ化開始...');
+    switchToSheet(requestUserId, formData.spreadsheetId, sheetName);
+    
+    // Step 3: 表示オプションを設定
+    const displayOptions = {
+      displayMode: 'anonymous',
+      showCounts: false
+    };
+    setDisplayOptions(requestUserId, displayOptions);
+    
+    // Step 4: 公開状態を更新
+    console.log('自動公開状態更新開始...');
+    const userInfo = getUserInfo(requestUserId);
+    if (userInfo) {
+      const currentConfig = JSON.parse(userInfo.configJson || '{}');
+      currentConfig.appPublished = true;
+      currentConfig.setupStatus = 'published';
+      currentConfig.lastPublishedAt = new Date().toISOString();
+      currentConfig.autoPublishCompleted = true;
       
-      const updateData = {
-        spreadsheetId: result.spreadsheetId,
-        spreadsheetUrl: result.spreadsheetUrl,
-        configJson: JSON.stringify(updatedConfigJson),
-        lastAccessedAt: new Date().toISOString()
-      };
+      updateUser(requestUserId, {
+        configJson: JSON.stringify(currentConfig)
+      });
       
-      updateUser(requestUserId, updateData);
+      // キャッシュクリア
+      invalidateUserCache(requestUserId, userInfo.adminEmail, userInfo.spreadsheetId, true);
     }
+    
+    console.log('autoSaveAndPublishAfterFormCreation 完了');
     
     return {
       status: 'success',
-      message: 'クイックスタートフォームが正常に作成されました！',
-      formUrl: result.formUrl,
-      spreadsheetUrl: result.spreadsheetUrl,
-      formTitle: result.formTitle
+      message: 'フォーム作成、設定保存、公開が自動で完了しました！',
+      published: true,
+      autoPublishCompleted: true
     };
+    
   } catch (error) {
-    console.error('createQuickStartFormUI error:', error.message);
+    console.error('autoSaveAndPublishAfterFormCreation error:', error.message);
     return {
       status: 'error',
-      message: error.message
+      message: '自動設定・公開処理でエラーが発生しました: ' + error.message,
+      published: false
     };
   }
-}
-
-/**
- * @deprecated createCustomFormUIを使用してください
- */
-function createAdditionalFormWithConfig(requestUserId, config) {
-  return createCustomFormUI(requestUserId, config);
 }
 
 /**
