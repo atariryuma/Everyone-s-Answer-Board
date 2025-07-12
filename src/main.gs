@@ -251,8 +251,10 @@ function getDeployUserDomainInfo() {
  * @returns {boolean} セットアップが完了していればtrue
  */
 function isSystemSetup() {
-  var dbSpreadsheetId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
-  return !!dbSpreadsheetId;
+  var props = PropertiesService.getScriptProperties();
+  var dbSpreadsheetId = props.getProperty('DATABASE_SPREADSHEET_ID');
+  var adminEmail = props.getProperty('ADMIN_EMAIL');
+  return !!dbSpreadsheetId && !!adminEmail;
 }
 
 /**
