@@ -1,32 +1,30 @@
 const fs = require('fs');
 const vm = require('vm');
 
-describe('isDeployUser checks spreadsheet editors', () => {
+describe('isDeployUser uses ADMIN_EMAIL property', () => {
   const code = fs.readFileSync('src/Core.gs', 'utf8');
   let context;
   beforeEach(() => {
-    const scriptProps = { getProperty: jest.fn(() => 'SPREADSHEET_ID') };
-    const file = {
-      getEditors: () => [{ getEmail: () => 'editor@example.com' }],
-      getOwner: () => ({ getEmail: () => 'owner@example.com' })
-    };
+    const scriptProps = { getProperty: jest.fn((key) => {
+      if (key === 'ADMIN_EMAIL') return 'admin@example.com';
+      return null;
+    }) };
     context = {
       PropertiesService: { getScriptProperties: () => scriptProps },
-      Session: { getActiveUser: () => ({ getEmail: () => 'editor@example.com' }) },
-      DriveApp: { getFileById: jest.fn(() => file) },
-      SCRIPT_PROPS_KEYS: { DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID' },
+      Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
+      SCRIPT_PROPS_KEYS: { ADMIN_EMAIL: 'ADMIN_EMAIL' },
       console
     };
     vm.createContext(context);
     vm.runInContext(code, context);
   });
 
-  test('returns true for editor email', () => {
-    context.Session.getActiveUser = () => ({ getEmail: () => 'editor@example.com' });
+  test('returns true when email matches property', () => {
+    context.Session.getActiveUser = () => ({ getEmail: () => 'admin@example.com' });
     expect(context.isDeployUser()).toBe(true);
   });
 
-  test('returns false for non editor', () => {
+  test('returns false when email does not match', () => {
     context.Session.getActiveUser = () => ({ getEmail: () => 'other@example.com' });
     expect(context.isDeployUser()).toBe(false);
   });

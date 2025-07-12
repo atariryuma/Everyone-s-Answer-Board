@@ -62,6 +62,30 @@ function cleanupSessionOnAccountSwitch(currentEmail) {
   }
 }
 
+/**
+ * Detect account switch and handle cleanup if necessary.
+ * @param {string} currentEmail - Current user's email.
+ * @returns {Object} Result info.
+ */
+function detectAccountSwitch(currentEmail) {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var lastEmail = props.getProperty('LAST_ACCESS_EMAIL');
+    var isSwitch = !!(lastEmail && lastEmail !== currentEmail);
+    props.setProperty('LAST_ACCESS_EMAIL', currentEmail);
+    if (isSwitch) {
+      cleanupSessionOnAccountSwitch(currentEmail);
+      if (typeof clearDatabaseCache === 'function') {
+        clearDatabaseCache(currentEmail);
+      }
+    }
+    return { isAccountSwitch: isSwitch, previousEmail: lastEmail };
+  } catch (e) {
+    console.error('detectAccountSwitch error: ' + e.message);
+    return { isAccountSwitch: false };
+  }
+}
+
 
 
 
