@@ -288,9 +288,15 @@ function doGet(e) {
     if (userInfo) {
       // 管理パネルアクセス時の厳格なセキュリティチェック
       if (params.mode === 'admin') {
+        console.log('Admin panel access - params.userId:', params.userId);
+        console.log('Admin panel access - userInfo.userId:', userInfo.userId);
+        console.log('Admin panel access - currentUserEmail:', currentUserEmail);
+        console.log('Admin panel access - userInfo.adminEmail:', userInfo.adminEmail);
+        
         if (!params.userId) {
           // userIdパラメータが無い場合は自分のIDでリダイレクト
           const correctUrl = buildUserAdminUrl(userInfo.userId);
+          console.log('Missing userId, redirecting to:', correctUrl);
           return createSecureRedirect(correctUrl, 'ユーザー専用管理パネルにリダイレクトしています...');
         }
         
@@ -298,10 +304,12 @@ function doGet(e) {
           // 他人のuserIdでアクセスしようとした場合
           console.warn(`Unauthorized access attempt: ${currentUserEmail} tried to access userId: ${params.userId}`);
           const correctUrl = buildUserAdminUrl(userInfo.userId);
+          console.log('Unauthorized access, redirecting to:', correctUrl);
           return createSecureRedirect(correctUrl, '正しい管理パネルにリダイレクトしています...');
         }
         
         // 正当なアクセス（正しいuserIdでのアクセス）
+        console.log('Valid admin panel access for userId:', params.userId);
         return renderAdminPanel(userInfo, params.mode);
       }
       
@@ -359,15 +367,35 @@ function handleDirectExecAccess(userEmail) {
     
     // サービスアカウント経由でユーザーがデータベースに登録されているかチェック
     const userInfo = findUserByEmail(userEmail);
+    console.log('handleDirectExecAccess - userInfo:', userInfo);
+    console.log('handleDirectExecAccess - userEmail:', userEmail);
     
     if (userInfo && userInfo.userId) {
       // 登録済みユーザー: 管理パネルにリダイレクト
       const adminUrl = buildUserAdminUrl(userInfo.userId);
+      console.log('handleDirectExecAccess - Redirecting to:', adminUrl);
       debugLog('Redirecting registered user to admin panel:', adminUrl);
       
-      return createSecureRedirect(adminUrl, '管理パネルにリダイレクトしています...');
+      return HtmlService.createHtmlOutput(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>リダイレクト中...</title>
+          <script>
+            // 即座にリダイレクト
+            window.location.replace('${adminUrl}');
+          </script>
+        </head>
+        <body style="text-align:center; padding:50px; font-family:sans-serif;">
+          <h2>管理パネルにリダイレクトしています...</h2>
+          <p>自動的にリダイレクトされない場合は<a href="${adminUrl}">こちら</a>をクリックしてください。</p>
+        </body>
+        </html>
+      `);
     } else {
       // 未登録ユーザー: 新規登録画面表示
+      console.log('handleDirectExecAccess - Unregistered user, showing registration page');
       debugLog('Unregistered user, showing registration page');
       return showRegistrationPage();
     }
@@ -384,7 +412,11 @@ function handleDirectExecAccess(userEmail) {
  */
 function buildUserAdminUrl(userId) {
   const baseUrl = getWebAppUrl();
-  return `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
+  const adminUrl = `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
+  console.log('buildUserAdminUrl - baseUrl:', baseUrl);
+  console.log('buildUserAdminUrl - userId:', userId);
+  console.log('buildUserAdminUrl - adminUrl:', adminUrl);
+  return adminUrl;
 }
 
 /**
@@ -583,12 +615,10 @@ function renderAdminPanel(userInfo, mode) {
   adminTemplate.displayMode = 'named';
   adminTemplate.showAdminFeatures = true;
   adminTemplate.isDeployUser = isDeployUser();
-  return safeSetXFrameOptionsDeny(
-    adminTemplate.evaluate()
-      .setTitle('みんなの回答ボード 管理パネル')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-      .setSandboxMode(HtmlService.SandboxMode.IFRAME)
-  );
+  return adminTemplate.evaluate()
+    .setTitle('みんなの回答ボード 管理パネル')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setSandboxMode(HtmlService.SandboxMode.NATIVE);
 }
 
 /**

@@ -31,19 +31,8 @@ function getSheetsService() {
  * @returns {object|null} ユーザー情報
  */
 function findUserById(userId) {
-  var cacheKey = 'user_' + userId;
-  
-  return cacheManager.get(cacheKey, () => {
-    // データベースから取得
-    var user = fetchUserFromDatabase('userId', userId);
-    
-    if (user) {
-      // 関連キャッシュも設定
-      cacheManager.get('email_' + user.adminEmail, () => user, { ttl: USER_CACHE_TTL });
-    }
-    
-    return user;
-  }, { ttl: USER_CACHE_TTL, enableMemoization: true });
+  // キャッシュを無効化してデータベースから直接取得
+  return fetchUserFromDatabase('userId', userId);
 }
 
 /**
@@ -52,19 +41,8 @@ function findUserById(userId) {
  * @returns {object|null} ユーザー情報
  */
 function findUserByEmail(email) {
-  var cacheKey = 'email_' + email;
-  
-  return cacheManager.get(cacheKey, () => {
-    // データベースから取得
-    var user = fetchUserFromDatabase('adminEmail', email);
-    
-    if (user) {
-      // 関連キャッシュも設定
-      cacheManager.get('user_' + user.userId, () => user, { ttl: USER_CACHE_TTL });
-    }
-    
-    return user;
-  }, { ttl: USER_CACHE_TTL, enableMemoization: true });
+  // キャッシュを無効化してデータベースから直接取得
+  return fetchUserFromDatabase('adminEmail', email);
 }
 
 /**
@@ -119,25 +97,9 @@ function getUserWithFallback(userId) {
     return null;
   }
 
-  var user = findUserById(userId);
-  if (user) return user;
-
-  debugLog('[Cache] MISS for key: user_' + userId + '. Fetching from DB.');
-  user = fetchUserFromDatabase('userId', userId);
-  if (user) {
-    // キャッシュ管理の最適化
-    try {
-      var cache = CacheService.getScriptCache();
-      cache.put('user_' + userId, JSON.stringify(user), USER_CACHE_TTL);
-      if (user.adminEmail) {
-        cache.put('email_' + user.adminEmail, JSON.stringify(user), USER_CACHE_TTL);
-      }
-    } catch (cacheError) {
-      console.warn('Failed to cache user data:', cacheError.message);
-      // キャッシュ保存失敗でもユーザー情報は返す
-    }
-  } else {
-    // ユーザーが見つからない場合の処理を最適化
+  // キャッシュを使わずデータベースから直接取得
+  var user = fetchUserFromDatabase('userId', userId);
+  if (!user) {
     handleMissingUser(userId);
   }
   return user;
