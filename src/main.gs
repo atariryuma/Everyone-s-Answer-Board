@@ -271,80 +271,65 @@ function showRegistrationPage() {
  */
 function doGet(e) {
   try {
-    var requestKey = `doGet_${JSON.stringify(e?.parameter || {})}`;
-    var result = cacheManager.get(requestKey, () => {
     debugLog('doGet called with event object:', e);
-    try {
-      const params = parseRequestParams(e);
-      const currentUserEmail = Session.getActiveUser().getEmail();
-      
-      // /exec直接アクセス時の認証チェック
-      if (isDirectExecAccess(e)) {
-        return handleDirectExecAccess(currentUserEmail);
-      }
-      
-      const { userEmail, userInfo } = validateUserSession(currentUserEmail, params);
-      const setupOutput = handleSetupPages(params, userEmail);
-      if (setupOutput) return setupOutput;
-
-      if (userInfo) {
-        // 管理パネルアクセス時の厳格なセキュリティチェック
-        if (params.mode === 'admin') {
-          if (!params.userId) {
-            // userIdパラメータが無い場合は自分のIDでリダイレクト
-            const correctUrl = buildUserAdminUrl(userInfo.userId);
-            return createSecureRedirect(correctUrl, 'ユーザー専用管理パネルにリダイレクトしています...');
-          }
-          
-          if (params.userId !== userInfo.userId) {
-            // 他人のuserIdでアクセスしようとした場合
-            console.warn(`Unauthorized access attempt: ${currentUserEmail} tried to access userId: ${params.userId}`);
-            const correctUrl = buildUserAdminUrl(userInfo.userId);
-            return createSecureRedirect(correctUrl, '正しい管理パネルにリダイレクトしています...');
-          }
-          
-          // 正当なアクセス（正しいuserIdでのアクセス）
-          return renderAdminPanel(userInfo, params.mode);
-        }
-        
-        if (params.isDirectPageAccess) {
-          return renderAnswerBoard(userInfo, params);
-        }
-        
-        if (params.mode === 'view') {
-          return renderAnswerBoard(userInfo, params);
-        }
-        
-        // デフォルトは管理パネル
-        const correctUrl = buildUserAdminUrl(userInfo.userId);
-        return createSecureRedirect(correctUrl, '管理パネルにリダイレクトしています...');
-      }
-
-      return showRegistrationPage();
-    } catch (error) {
-      console.error(`doGetで致命的なエラー: ${error.stack}`);
-      var errorHtml = HtmlService.createHtmlOutput(
-        '<h1>デバッグ：致命的エラー</h1>' +
-        '<p>doGet関数内でエラーが発生しました</p>' +
-        '<p>エラー詳細: ' + htmlEncode(error.message) + '</p>' +
-        '<p>スタック: ' + htmlEncode(error.stack || 'スタック情報なし') + '</p>' +
-        '<p>時刻: ' + new Date().toISOString() + '</p>' +
-        '<p>executeAs設定: USER_DEPLOYING (テスト中)</p>'
-      );
-      return safeSetXFrameOptionsDeny(errorHtml);
-    }
-    }, { ttl: 60 });
     
-    // HtmlOutputオブジェクトかどうかチェックして返す
-    if (result && typeof result.getContent === 'function') {
-      return result;
-    } else {
-      console.error('doGet: Invalid return value type:', typeof result);
-      return HtmlService.createHtmlOutput('<h1>エラー</h1><p>不正な戻り値が検出されました。</p>');
+    const params = parseRequestParams(e);
+    const currentUserEmail = Session.getActiveUser().getEmail();
+    
+    // /exec直接アクセス時の認証チェック（管理パネルへのアクセスを完全に防止）
+    if (isDirectExecAccess(e)) {
+      return handleDirectExecAccess(currentUserEmail);
     }
+    
+    const { userEmail, userInfo } = validateUserSession(currentUserEmail, params);
+    const setupOutput = handleSetupPages(params, userEmail);
+    if (setupOutput) return setupOutput;
+
+    if (userInfo) {
+      // 管理パネルアクセス時の厳格なセキュリティチェック
+      if (params.mode === 'admin') {
+        if (!params.userId) {
+          // userIdパラメータが無い場合は自分のIDでリダイレクト
+          const correctUrl = buildUserAdminUrl(userInfo.userId);
+          return createSecureRedirect(correctUrl, 'ユーザー専用管理パネルにリダイレクトしています...');
+        }
+        
+        if (params.userId !== userInfo.userId) {
+          // 他人のuserIdでアクセスしようとした場合
+          console.warn(`Unauthorized access attempt: ${currentUserEmail} tried to access userId: ${params.userId}`);
+          const correctUrl = buildUserAdminUrl(userInfo.userId);
+          return createSecureRedirect(correctUrl, '正しい管理パネルにリダイレクトしています...');
+        }
+        
+        // 正当なアクセス（正しいuserIdでのアクセス）
+        return renderAdminPanel(userInfo, params.mode);
+      }
+      
+      if (params.isDirectPageAccess) {
+        return renderAnswerBoard(userInfo, params);
+      }
+      
+      if (params.mode === 'view') {
+        return renderAnswerBoard(userInfo, params);
+      }
+      
+      // デフォルトは管理パネル
+      const correctUrl = buildUserAdminUrl(userInfo.userId);
+      return createSecureRedirect(correctUrl, '管理パネルにリダイレクトしています...');
+    }
+
+    return showRegistrationPage();
   } catch (error) {
-    console.error('doGet wrapper error:', error);
-    return HtmlService.createHtmlOutput('<h1>エラー</h1><p>システムエラーが発生しました。</p>');
+    console.error(`doGetで致命的なエラー: ${error.stack}`);
+    var errorHtml = HtmlService.createHtmlOutput(
+      '<h1>デバッグ：致命的エラー</h1>' +
+      '<p>doGet関数内でエラーが発生しました</p>' +
+      '<p>エラー詳細: ' + htmlEncode(error.message) + '</p>' +
+      '<p>スタック: ' + htmlEncode(error.stack || 'スタック情報なし') + '</p>' +
+      '<p>時刻: ' + new Date().toISOString() + '</p>' +
+      '<p>executeAs設定: USER_DEPLOYING (テスト中)</p>'
+    );
+    return safeSetXFrameOptionsDeny(errorHtml);
   }
 }
 
@@ -355,9 +340,8 @@ function doGet(e) {
  */
 function isDirectExecAccess(e) {
   const params = (e && e.parameter) || {};
-  // パラメータが空または基本的なパラメータのみの場合は直接アクセス
-  return Object.keys(params).length === 0 || 
-         (Object.keys(params).length === 1 && params.mode);
+  // パラメータが空の場合のみ直接アクセス（管理パネルアクセスを完全防止）
+  return Object.keys(params).length === 0;
 }
 
 /**
@@ -373,7 +357,7 @@ function handleDirectExecAccess(userEmail) {
       return showRegistrationPage();
     }
     
-    // ユーザーがデータベースに登録されているかチェック
+    // サービスアカウント経由でユーザーがデータベースに登録されているかチェック
     const userInfo = findUserByEmail(userEmail);
     
     if (userInfo && userInfo.userId) {
@@ -381,34 +365,9 @@ function handleDirectExecAccess(userEmail) {
       const adminUrl = buildUserAdminUrl(userInfo.userId);
       debugLog('Redirecting registered user to admin panel:', adminUrl);
       
-      return HtmlService.createHtmlOutput(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>リダイレクト中...</title>
-          <meta http-equiv="refresh" content="0;url=${adminUrl}">
-        </head>
-        <body style="text-align:center; padding:50px; font-family:sans-serif;">
-          <h2>管理パネルにリダイレクトしています...</h2>
-          <p>自動的にリダイレクトされない場合は<a href="${adminUrl}">こちら</a>をクリックしてください。</p>
-          <script>
-            // 複数の方法でリダイレクトを試行
-            try {
-              if (window.top) {
-                window.top.location.href = '${adminUrl}';
-              } else {
-                window.location.href = '${adminUrl}';
-              }
-            } catch(e) {
-              window.location.href = '${adminUrl}';
-            }
-          </script>
-        </body>
-        </html>
-      `);
+      return createSecureRedirect(adminUrl, '管理パネルにリダイレクトしています...');
     } else {
-      // 未登録ユーザー: ログイン画面表示
+      // 未登録ユーザー: 新規登録画面表示
       debugLog('Unregistered user, showing registration page');
       return showRegistrationPage();
     }
