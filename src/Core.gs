@@ -2602,97 +2602,74 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
 function getSheetsList(userId) {
   try {
     debugLog('getSheetsList: Start for userId:', userId);
-    var userInfo = findUserById(userId);
-    if (!userInfo) {
-      console.warn('getSheetsList: User not found:', userId);
-      return [];
-    }
     
-    debugLog('getSheetsList: UserInfo found:', {
-      userId: userInfo.userId,
-      adminEmail: userInfo.adminEmail,
-      spreadsheetId: userInfo.spreadsheetId,
-      spreadsheetUrl: userInfo.spreadsheetUrl
-    });
+    // キャッシュキーを生成
+    const cacheKey = `sheets_list_${userId}`;
     
-    if (!userInfo.spreadsheetId) {
-      console.warn('getSheetsList: No spreadsheet ID for user:', userId);
-      return [];
-    }
-    
-    var service = getSheetsService();
-    debugLog('getSheetsList: SheetsService obtained, attempting to fetch spreadsheet data...');
-    
-    var spreadsheet;
-    try {
-      spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
-    } catch (accessError) {
-      console.warn('getSheetsList: アクセスエラーを検出。サービスアカウント権限を修復中...', accessError.message);
+    // キャッシュから取得を試行（30分間キャッシュ）
+    return cacheManager.get(cacheKey, () => {
+      debugLog('getSheetsList: Cache miss, fetching from API');
       
-      // サービスアカウントの権限修復を試行
+      var userInfo = findUserById(userId);
+      if (!userInfo) {
+        console.warn('getSheetsList: User not found:', userId);
+        return [];
+      }
+      
+      if (!userInfo.spreadsheetId) {
+        console.warn('getSheetsList: No spreadsheet ID for user:', userId);
+        return [];
+      }
+      
+      var service = getSheetsService();
+      var spreadsheet;
+      
       try {
-        addServiceAccountToSpreadsheet(userInfo.spreadsheetId);
-        debugLog('getSheetsList: サービスアカウント権限を追加しました。再試行中...');
-        
-        // 少し待ってから再試行
-        Utilities.sleep(1000);
         spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
+      } catch (accessError) {
+        console.warn('getSheetsList: アクセスエラーを検出。サービスアカウント権限を修復中...', accessError.message);
         
-      } catch (repairError) {
-        console.error('getSheetsList: 権限修復に失敗:', repairError.message);
-        
-        // 最終手段：ユーザー権限での修復も試行
+        // サービスアカウントの権限修復を試行
         try {
-          var currentUserEmail = Session.getActiveUser().getEmail();
-          if (currentUserEmail === userInfo.adminEmail) {
-            repairUserSpreadsheetAccess(currentUserEmail, userInfo.spreadsheetId);
-            debugLog('getSheetsList: ユーザー権限での修復を実行しました。');
-          }
-        } catch (finalRepairError) {
-          console.error('getSheetsList: 最終修復も失敗:', finalRepairError.message);
+          addServiceAccountToSpreadsheet(userInfo.spreadsheetId);
+          debugLog('getSheetsList: サービスアカウント権限を追加しました。再試行中...');
+          
+          // 少し待ってから再試行
+          Utilities.sleep(1000);
+          spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
+          
+        } catch (repairError) {
+          console.error('getSheetsList: 権限修復に失敗:', repairError.message);
+          return {
+            error: true,
+            message: 'スプレッドシートへのアクセス権限がありません。管理者にお問い合わせください。',
+            details: accessError.message
+          };
         }
-        
+      }
+      
+      if (!spreadsheet || !spreadsheet.sheets || !Array.isArray(spreadsheet.sheets)) {
+        console.error('getSheetsList: Invalid spreadsheet data');
+        return [];
+      }
+      
+      var sheets = spreadsheet.sheets.map(function(sheet) {
+        if (!sheet.properties) {
+          console.warn('getSheetsList: Sheet missing properties:', sheet);
+          return null;
+        }
         return {
-          error: true,
-          message: 'スプレッドシートへのアクセス権限がありません。管理者にお問い合わせください。',
-          details: accessError.message
+          name: sheet.properties.title,
+          id: sheet.properties.sheetId
         };
-      }
-    }
+      }).filter(function(sheet) { return sheet !== null; });
+      
+      debugLog('getSheetsList: Successfully returning', sheets.length, 'sheets:', sheets);
+      return sheets;
+    }, { ttl: 1800 }); // 30分間キャッシュ
     
-    debugLog('getSheetsList: Raw spreadsheet data:', spreadsheet);
-    if (!spreadsheet) {
-      console.error('getSheetsList: No spreadsheet data returned');
-      return [];
-    }
-    
-    if (!spreadsheet.sheets) {
-      console.error('getSheetsList: Spreadsheet data missing sheets property. Available properties:', Object.keys(spreadsheet));
-      return [];
-    }
-    
-    if (!Array.isArray(spreadsheet.sheets)) {
-      console.error('getSheetsList: sheets property is not an array:', typeof spreadsheet.sheets);
-      return [];
-    }
-    
-    var sheets = spreadsheet.sheets.map(function(sheet) {
-      if (!sheet.properties) {
-        console.warn('getSheetsList: Sheet missing properties:', sheet);
-        return null;
-      }
-      return {
-        name: sheet.properties.title,
-        id: sheet.properties.sheetId
-      };
-    }).filter(function(sheet) { return sheet !== null; });
-    
-    debugLog('getSheetsList: Successfully returning', sheets.length, 'sheets:', sheets);
-    return sheets;
   } catch (e) {
     console.error('getSheetsList: シート一覧取得エラー:', e.message);
-    console.error('getSheetsList: Error details:', e.stack);
-    console.error('getSheetsList: Error for userId:', userId);
     return [];
   }
 }

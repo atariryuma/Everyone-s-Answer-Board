@@ -1501,8 +1501,9 @@
           console.log('Board published successfully:', result);
           hideLoadingState();
           
-          // ステータスを更新
-          updateStatusInfo();
+          // ステータスを更新（キャッシュを強制リフレッシュ）
+          statusCache = null; // キャッシュをクリア
+          getCachedStatus(true);
           
           // 成功メッセージを表示
           showToast('回答ボードが公開されました！', 'success');
@@ -1789,6 +1790,34 @@ elements = {
         setLoading(false);
       }, 1000);
     });
+    // ===== キャッシュ機能強化 =====
+    let statusCache = null;
+    let statusCacheTime = 0;
+    const STATUS_CACHE_TTL = 30000; // 30秒間キャッシュ
+
+    /**
+     * キャッシュされたステータスを取得
+     * @param {boolean} forceRefresh - 強制的にリフレッシュするかどうか
+     * @returns {Promise} ステータス情報
+     */
+    function getCachedStatus(forceRefresh = false) {
+      const now = Date.now();
+      
+      // キャッシュが有効かつ強制リフレッシュでない場合はキャッシュを返す
+      if (!forceRefresh && statusCache && (now - statusCacheTime) < STATUS_CACHE_TTL) {
+        console.log('📊 Status cache hit');
+        return Promise.resolve(statusCache);
+      }
+      
+      console.log('📊 Status cache miss, fetching from server');
+      return runGasWithUserId('getStatus', forceRefresh)
+        .then(function(status) {
+          statusCache = status;
+          statusCacheTime = now;
+          return status;
+        });
+    }
+
     // ===== 共通ドメイン情報処理関数 =====
     // AdminPanel.html と Registration.html で共通使用
     
@@ -2354,30 +2383,21 @@ function syncCheckboxStates(status) {
         if (typeof unifiedCache !== 'undefined') {
           unifiedCache.delete(cacheKey);
         }
-        // マルチテナント対応: 新しい関数を使用
-        runGasWithUserId('getStatus')
+        // キャッシュされたステータスを取得（強制リフレッシュ）
+        getCachedStatus(true)
           .then(function(status) {
-            console.log('✅ Status loaded ( forced refresh)', status);
+            console.log('✅ Status loaded (forced refresh)', status);
             updateUIWithNewStatus(status);
             setLoading(false);
           })
           .catch(function(error) {
-            console.error('❌  getStatus failed, falling back to legacy:', error);
-            // フォールバック: 従来の方法
-            runGasWithUserId('getStatus', forceRefresh)
-              .then(function(status) {
-                console.log('✅ Status loaded (legacy fallback)', status);
-                updateUIWithNewStatus(status);
-                setLoading(false);
-              })
-              .catch(function(legacyError) {
-                handleError(legacyError, 'loadStatus');
-                setLoading(false);
-              });
+            console.error('❌ getCachedStatus failed:', error);
+            handleError(error, 'loadStatus');
+            setLoading(false);
           });
       } else {
-        // マルチテナント対応: キャッシュ付きで新しい関数を使用
-        callWithCacheWithUserId('getStatus', cacheKey, cacheTime)
+        // キャッシュされたステータスを取得（通常読み込み）
+        getCachedStatus(false)
           .then(function(status) {
             console.log('✅ Status loaded (cached)', status);
             updateUIWithNewStatus(status);
@@ -3307,8 +3327,8 @@ function syncCheckboxStates(status) {
           return;
         }
         
-        // キャッシュを利用して静かに更新
-        runGasWithUserId('getStatus', false)
+        // キャッシュされたステータスを取得
+        getCachedStatus(false)
           .then(function(status) {
             // 変更があった場合のみUIを更新
             if (JSON.stringify(status) !== JSON.stringify(currentStatus)) {
