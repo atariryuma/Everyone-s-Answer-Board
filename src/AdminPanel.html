@@ -2458,28 +2458,32 @@ function syncCheckboxStates(status) {
           unifiedCache.delete(cacheKey);
         }
         // キャッシュされたステータスを取得（強制リフレッシュ）
-        getCachedStatus(true)
+        return getCachedStatus(true)
           .then(function(status) {
             console.log('✅ Status loaded (forced refresh)', status);
             updateUIWithNewStatus(status);
             setLoading(false);
+            return status;
           })
           .catch(function(error) {
             console.error('❌ getCachedStatus failed:', error);
             handleError(error, 'loadStatus');
             setLoading(false);
+            throw error;
           });
       } else {
         // キャッシュされたステータスを取得（通常読み込み）
-        getCachedStatus(false)
+        return getCachedStatus(false)
           .then(function(status) {
             console.log('✅ Status loaded (cached)', status);
             updateUIWithNewStatus(status);
             setLoading(false);
+            return status;
           })
           .catch(function(error) {
             handleError(error, 'loadStatus');
             setLoading(false);
+            throw error;
           });
       }
     }
@@ -3329,25 +3333,30 @@ function syncCheckboxStates(status) {
                                 if (autoResult.status === 'success') {
                                     showProgressStep(4, 5, '公開完了！UIを更新中...');
                                     
-                                    // UIを更新
-                                    return new Promise(function(resolve) {
-                                        setTimeout(function() {
-                                            loadStatus(true).then(function() {
-                                                showProgressStep(5, 5, '全て完了！');
-                                                setTimeout(function() {
-                                                    hideProgressBar();
-                                                    showMessage('✅ フォーム作成、設定保存、公開が自動で完了しました！', 'success');
-                                                    
-                                                    // フォーム編集ページを開く
-                                                    if (result.formUrl) {
-                                                        const editUrl = result.formUrl.replace('/viewform', '/edit');
-                                                        window.open(editUrl, '_blank');
-                                                    }
-                                                    resolve();
-                                                }, 1000);
-                                            });
-                                        }, 500);
-                                    });
+                                    // UIを更新（エラーハンドリング付き）
+                                    showProgressStep(5, 5, '全て完了！');
+                                    setTimeout(function() {
+                                        hideProgressBar();
+                                        showMessage('✅ フォーム作成、設定保存、公開が自動で完了しました！', 'success');
+                                        
+                                        // フォーム編集ページを開く
+                                        if (result.formUrl) {
+                                            const editUrl = result.formUrl.replace('/viewform', '/edit');
+                                            window.open(editUrl, '_blank');
+                                        }
+                                        
+                                        // UI を非同期で更新（エラーハンドリング付き）
+                                        try {
+                                            const statusResult = loadStatus(true);
+                                            if (statusResult && typeof statusResult.then === 'function') {
+                                                statusResult.catch(function(error) {
+                                                    console.warn('Status reload failed:', error);
+                                                });
+                                            }
+                                        } catch (error) {
+                                            console.warn('Status reload error:', error);
+                                        }
+                                    }, 1000);
                                 } else {
                                     throw new Error(autoResult.message || '自動公開に失敗しました');
                                 }
@@ -3362,7 +3371,18 @@ function syncCheckboxStates(status) {
                                 const editUrl = result.formUrl.replace('/viewform', '/edit');
                                 window.open(editUrl, '_blank');
                             }
-                            loadStatus(true);
+                            
+                            // UI を非同期で更新（エラーハンドリング付き）
+                            try {
+                                const statusResult = loadStatus(true);
+                                if (statusResult && typeof statusResult.then === 'function') {
+                                    statusResult.catch(function(error) {
+                                        console.warn('Status reload failed:', error);
+                                    });
+                                }
+                            } catch (error) {
+                                console.warn('Status reload error:', error);
+                            }
                         }, 1000);
                     }
                     
