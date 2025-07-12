@@ -3560,7 +3560,7 @@ function shouldEnableDebugMode() {
 
 /**
  * デプロイユーザーかどうか判定
- * データベーススプレッドシートの編集権限を基準にする
+ * GASスクリプト自体の編集権限を基準にする
  * @returns {boolean} 編集権限を持つ場合 true
  */
 function isDeployUser() {
@@ -3572,46 +3572,41 @@ function isDeployUser() {
       return false;
     }
 
-    var dbId = PropertiesService.getScriptProperties()
-      .getProperty('DATABASE_SPREADSHEET_ID');
-    console.log('isDeployUser - database ID:', dbId);
-    if (!dbId) {
-      console.log('isDeployUser - no database ID found');
-      return false;
-    }
-
-    var file;
-    try {
-      file = DriveApp.getFileById(dbId);
-      if (!file) {
-        throw new Error('データベーススプレッドシートが見つかりません: ' + dbId);
-      }
-    } catch (driveError) {
-      console.error('DriveApp.getFileById error for database check:', driveError.message);
-      return false;
-    }
+    // GASスクリプト自体のIDを取得
+    var scriptId = ScriptApp.getScriptId();
+    console.log('isDeployUser - script ID:', scriptId);
     
     try {
-      var editors = file.getEditors().map(function(e) { return e.getEmail(); });
-      console.log('isDeployUser - file editors:', editors);
+      // Drive APIでスクリプトファイルの権限を確認
+      var scriptFile = DriveApp.getFileById(scriptId);
+      if (!scriptFile) {
+        console.log('isDeployUser - script file not found');
+        return false;
+      }
+      
+      var editors = scriptFile.getEditors().map(function(e) { return e.getEmail(); });
+      console.log('isDeployUser - script editors:', editors);
+      
       var ownerEmail = '';
       try {
-        var owner = file.getOwner();
+        var owner = scriptFile.getOwner();
         if (owner && typeof owner.getEmail === 'function') {
           ownerEmail = owner.getEmail();
         }
-        console.log('isDeployUser - file owner:', ownerEmail);
+        console.log('isDeployUser - script owner:', ownerEmail);
       } catch (ownerErr) {
         console.warn('getOwner failed:', ownerErr.message);
       }
+      
       if (ownerEmail) editors.push(ownerEmail);
       
       var hasPermission = editors.indexOf(userEmail) !== -1;
       console.log('isDeployUser - all authorized users:', editors);
       console.log('isDeployUser - has permission:', hasPermission);
       return hasPermission;
-    } catch (permissionError) {
-      console.error('Permission check error:', permissionError.message);
+      
+    } catch (driveError) {
+      console.error('Drive API error for script check:', driveError.message);
       return false;
     }
   } catch (e) {
