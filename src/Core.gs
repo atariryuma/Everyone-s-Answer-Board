@@ -3573,6 +3573,25 @@ function createAdditionalFormWithConfig(requestUserId, config) {
     
     const result = createStudyQuestFormWithConfig(activeUserEmail, requestUserId, formTitle, config);
     
+    // 既存ユーザーの情報を更新（スプレッドシート情報を追加）
+    const existingUser = findUserById(requestUserId);
+    if (existingUser) {
+      const updatedConfigJson = JSON.parse(existingUser.configJson || '{}');
+      updatedConfigJson.formUrl = result.viewFormUrl || result.formUrl;
+      updatedConfigJson.editFormUrl = result.editFormUrl;
+      updatedConfigJson.formCreated = true;
+      updatedConfigJson.lastFormCreatedAt = new Date().toISOString();
+      
+      const updateData = {
+        spreadsheetId: result.spreadsheetId,
+        spreadsheetUrl: result.spreadsheetUrl,
+        configJson: JSON.stringify(updatedConfigJson),
+        lastAccessedAt: new Date().toISOString()
+      };
+      
+      updateUser(requestUserId, updateData);
+    }
+    
     return {
       status: 'success',
       message: 'カスタムフォームが正常に作成されました！',
