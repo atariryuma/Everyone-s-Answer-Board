@@ -754,8 +754,8 @@ function saveAndPublish(requestUserId, sheetNameOrSettingsData, configData) {
     console.log('saveAndPublish: 表示オプション設定完了');
 
     // 5. 公開状態を更新（重要：ボードを実際に公開状態にする）
-    const userInfo = getUserInfo(requestUserId);
-    const currentConfig = JSON.parse(userInfo.configJson || '{}');
+    const latestUserInfo = getUserInfo(requestUserId);
+    const currentConfig = JSON.parse(latestUserInfo.configJson || '{}');
     currentConfig.appPublished = true;
     currentConfig.setupStatus = 'published';
     currentConfig.lastPublishedAt = new Date().toISOString();
