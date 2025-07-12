@@ -425,6 +425,11 @@
                 </div>
               </div>
             </div>
+            
+            <!-- カスタムフォーム情報表示エリア -->
+            <div id="custom-form-info-section" class="hidden mt-4">
+              <!-- updateCustomFormInfo()で動的に内容が設定される -->
+            </div>
           </div>
         </div>
 
@@ -2437,8 +2442,75 @@ function syncCheckboxStates(status) {
       // シート選択ドロップダウンを更新
       populateSheetSelect(status.allSheets, status.activeSheetName);
       
+      // カスタムフォーム情報を表示
+      updateCustomFormInfo(status);
+      
       // 自動公開ダイアログのチェック
       checkAutoPublishDialog(status);
+    }
+
+    /**
+     * カスタムフォーム情報を表示する
+     * @param {object} status - ステータスオブジェクト
+     */
+    function updateCustomFormInfo(status) {
+      const customFormInfoSection = document.getElementById('custom-form-info-section');
+      
+      if (!customFormInfoSection) {
+        // セクションが存在しない場合は作成（将来的な拡張用）
+        return;
+      }
+      
+      if (status.customFormInfo && status.customFormInfo.mainQuestion) {
+        // カスタムフォーム情報を表示
+        const formInfo = status.customFormInfo;
+        
+        customFormInfoSection.innerHTML = `
+          <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              <span class="font-medium text-blue-200">現在のカスタムフォーム設定</span>
+            </div>
+            <div class="space-y-2 text-sm">
+              ${formInfo.formTitle ? `<div><span class="text-gray-300">タイトル:</span> <span class="text-white">${escapeHtml(formInfo.formTitle)}</span></div>` : ''}
+              <div><span class="text-gray-300">質問:</span> <span class="text-white">${escapeHtml(formInfo.mainQuestion)}</span></div>
+              <div><span class="text-gray-300">回答形式:</span> <span class="text-white">${getQuestionTypeLabel(formInfo.questionType)}</span></div>
+              ${formInfo.choices && formInfo.choices.length > 0 ? `<div><span class="text-gray-300">選択肢:</span> <span class="text-white">${formInfo.choices.join(', ')}</span></div>` : ''}
+              ${formInfo.enableClass ? `<div><span class="text-gray-300">クラス選択:</span> <span class="text-green-400">有効</span></div>` : ''}
+              <div class="text-xs text-gray-400 mt-2">作成日: ${new Date(formInfo.lastCreated).toLocaleString('ja-JP')}</div>
+            </div>
+          </div>
+        `;
+        
+        customFormInfoSection.classList.remove('hidden');
+        console.log('✅ [DEBUG] Custom form info displayed');
+      } else {
+        customFormInfoSection.classList.add('hidden');
+      }
+    }
+
+    /**
+     * HTMLエスケープ関数
+     */
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    /**
+     * 質問タイプのラベルを取得
+     */
+    function getQuestionTypeLabel(type) {
+      const labels = {
+        'text': 'テキスト入力',
+        'multiple': 'チェックボックス',
+        'choice': 'ラジオボタン',
+        'paragraph': '長文入力'
+      };
+      return labels[type] || type;
     }
 
     /**
@@ -2505,11 +2577,15 @@ function syncCheckboxStates(status) {
         // トピックテキストを設定（問題文を表示）
         const topicTextElement = document.getElementById('current-topic-text');
         if (topicTextElement) {
-          // 問題文（opinionHeader）を表示
           let topic = '（問題文未設定）';
           
-          // 公開中のシート設定から問題文を取得
-          if (status.publishedSheetName && status.userInfo && status.userInfo.configJson) {
+          // カスタムフォーム情報から優先的に取得
+          if (status.customFormInfo && status.customFormInfo.mainQuestion) {
+            topic = status.customFormInfo.mainQuestion;
+            console.log('✅ [DEBUG] Using custom form main question:', topic);
+          } 
+          // フォールバック: 公開中のシート設定から問題文を取得
+          else if (status.publishedSheetName && status.userInfo && status.userInfo.configJson) {
             try {
               const config = JSON.parse(status.userInfo.configJson);
               const sheetKey = 'sheet_' + status.publishedSheetName;

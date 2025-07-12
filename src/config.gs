@@ -1336,99 +1336,11 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
  * アクティブシートをクリア（公開停止）
  * AdminPanel.htmlから呼び出される
  */
-function clearActiveSheet() {
-  try {
-    var props = PropertiesService.getUserProperties();
-    var currentUserId = props.getProperty('CURRENT_USER_ID');
-    
-    if (!currentUserId) {
-      throw new Error('ユーザーコンテキストが設定されていません。');
-    }
-    
-    var userInfo = findUserById(currentUserId);
-    if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません。');
-    }
-    
-    var configJson = JSON.parse(userInfo.configJson || '{}');
-    
-    // 完全な公開状態のクリア（正しいプロパティ名を使用）
-    configJson.publishedSheet = ''; // 後方互換性のため残す
-    configJson.publishedSheetName = ''; // 正しいプロパティ名
-    configJson.publishedSpreadsheetId = ''; // スプレッドシートIDもクリア
-    configJson.appPublished = false; // 公開停止
-    
-    // データベースを更新
-    updateUser(currentUserId, {
-      configJson: JSON.stringify(configJson)
-    });
-    
-    // キャッシュを無効化して即座にUIに反映
-    try {
-      if (typeof invalidateUserCache === 'function') {
-        invalidateUserCache(currentUserId, null, null, false);
-      }
-    } catch (cacheError) {
-      console.warn('キャッシュ無効化でエラーが発生しましたが、処理を続行します:', cacheError.message);
-    }
-    
-    console.log('回答ボードの公開を正常に停止しました - ユーザーID:', currentUserId);
-    
-    // 最新のステータスを取得して返す（UI更新のため）
-    const updatedStatus = getStatus(true);
-    return {
-      success: true,
-      message: '✅ 回答ボードの公開を停止しました。',
-      timestamp: new Date().toISOString(),
-      ...updatedStatus
-    };
-  } catch (e) {
-    console.error('clearActiveSheet エラー: ' + e.message);
-    throw new Error('回答ボードの公開停止に失敗しました: ' + e.message);
-  }
-}
 
 /**
  * 表示オプションを設定
  * AdminPanel.htmlから呼び出される
  */
-function setDisplayOptions(options) {
-  try {
-    var props = PropertiesService.getUserProperties();
-    var currentUserId = props.getProperty('CURRENT_USER_ID');
-    
-    if (!currentUserId) {
-      throw new Error('ユーザーコンテキストが設定されていません。');
-    }
-    
-    var userInfo = findUserById(currentUserId);
-    if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません。');
-    }
-    
-    var configJson = JSON.parse(userInfo.configJson || '{}');
-    configJson.showNames = options.showNames;
-    configJson.showCounts = options.showCounts;
-    
-    // showNamesからdisplayModeを設定
-    configJson.displayMode = options.showNames ? 'named' : 'anonymous';
-    
-    console.log('setDisplayOptions: 設定更新', {
-      showNames: options.showNames,
-      showCounts: options.showCounts,
-      displayMode: configJson.displayMode
-    });
-    
-    updateUser(currentUserId, {
-      configJson: JSON.stringify(configJson)
-    });
-    
-    return '表示オプションを保存しました。';
-  } catch (e) {
-    console.error('setDisplayOptions エラー: ' + e.message);
-    throw new Error('表示オプションの保存に失敗しました: ' + e.message);
-  }
-}
 
 
 

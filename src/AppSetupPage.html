@@ -407,13 +407,33 @@
         function goBackToAdminPanel() {
             google.script.run
                 .withSuccessHandler((webAppUrl) => {
-                    window.location.href = webAppUrl + '?mode=admin&userId=' + __USER_ID__;
+                    const targetUrl = webAppUrl + '?mode=admin&userId=' + __USER_ID__;
+                    try {
+                        // iframeの場合は親ウィンドウに移動
+                        if (window.parent !== window) {
+                            window.parent.location.href = targetUrl;
+                        } else {
+                            window.location.href = targetUrl;
+                        }
+                    } catch (e) {
+                        // フォールバック: 新しいタブで開く
+                        window.open(targetUrl, '_blank');
+                    }
                 })
                 .withFailureHandler((error) => {
                     console.error('WebApp URL取得エラー:', error);
                     // フォールバック: 現在のURLを使用
                     const currentUrl = window.location.href.split('?')[0];
-                    window.location.href = currentUrl + '?mode=admin&userId=' + __USER_ID__;
+                    const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__;
+                    try {
+                        if (window.parent !== window) {
+                            window.parent.location.href = targetUrl;
+                        } else {
+                            window.location.href = targetUrl;
+                        }
+                    } catch (e) {
+                        window.open(targetUrl, '_blank');
+                    }
                 })
                 .getWebAppUrlCached();
         }
