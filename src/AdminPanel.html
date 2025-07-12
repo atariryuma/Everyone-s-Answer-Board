@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#1a1b26" />
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
-  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), ambient-light-sensor=(), speaker-selection=(), vibrate=(), vr=()" />
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), speaker-selection=()" />
   <!-- User ID from server template -->
   <meta name="user-id" content="<?= typeof userId !== 'undefined' ? userId : '' ?>" id="user-id-meta">
 
@@ -2757,34 +2757,31 @@ function syncCheckboxStates(status) {
         // トピックテキストを設定（問題文を表示）
         const topicTextElement = document.getElementById('current-topic-text');
         if (topicTextElement) {
-          let topic = '（問題文未設定）';
-          
-          // 1. カスタムフォーム情報から優先的に取得
-          if (status.customFormInfo && status.customFormInfo.mainQuestion) {
-            topic = status.customFormInfo.mainQuestion;
-            console.log('✅ [DEBUG] Using custom form main question:', topic);
-          } 
-          // 2. configJsonのmainQuestionから取得（新規フォーム用）
-          else if (status.userInfo && status.userInfo.configJson) {
-            try {
-              const config = JSON.parse(status.userInfo.configJson);
-              if (config.mainQuestion) {
-                topic = config.mainQuestion;
-                console.log('✅ [DEBUG] Using config.mainQuestion:', topic);
+          let topic = status.currentTopic || '（問題文未設定）';
+
+          if (!status.currentTopic) {
+            if (status.customFormInfo && status.customFormInfo.mainQuestion) {
+              topic = status.customFormInfo.mainQuestion;
+              console.log('✅ [DEBUG] Using custom form main question:', topic);
+            } else if (status.userInfo && status.userInfo.configJson) {
+              try {
+                const config = JSON.parse(status.userInfo.configJson);
+                if (config.mainQuestion) {
+                  topic = config.mainQuestion;
+                  console.log('✅ [DEBUG] Using config.mainQuestion:', topic);
+                } else if (status.publishedSheetName) {
+                  const sheetKey = 'sheet_' + status.publishedSheetName;
+                  const sheetConfig = config[sheetKey] || {};
+                  topic = sheetConfig.opinionHeader || status.publishedSheetName || '（問題文未設定）';
+                  console.log('✅ [DEBUG] Using sheet config opinionHeader:', topic);
+                }
+              } catch (e) {
+                console.warn('ConfigJson parsing error:', e);
+                topic = status.publishedSheetName || '（問題文未設定）';
               }
-              // 3. フォールバック: 公開中のシート設定から問題文を取得
-              else if (status.publishedSheetName) {
-                const sheetKey = 'sheet_' + status.publishedSheetName;
-                const sheetConfig = config[sheetKey] || {};
-                topic = sheetConfig.opinionHeader || status.publishedSheetName || '（問題文未設定）';
-                console.log('✅ [DEBUG] Using sheet config opinionHeader:', topic);
-              }
-            } catch (e) {
-              console.warn('ConfigJson parsing error:', e);
-              topic = status.publishedSheetName || '（問題文未設定）';
             }
           }
-          
+
           topicTextElement.textContent = topic;
           console.log(`✅ [DEBUG] Set footer topic text to: ${topic}`);
         }
