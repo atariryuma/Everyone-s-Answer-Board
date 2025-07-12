@@ -592,36 +592,30 @@ function saveAndActivateSheet(spreadsheetId, sheetName, config) {
   try {
     console.log('saveAndActivateSheet開始: sheetName=%s', sheetName);
 
-    // 1. 関連キャッシュを事前に削除
+    // 1. 最小限のキャッシュクリア（設定保存時のみ）
     const props = PropertiesService.getUserProperties();
     const currentUserId = props.getProperty('CURRENT_USER_ID');
-    if (currentUserId) {
-      const userInfo = findUserById(currentUserId);
-      if (userInfo) {
-        invalidateUserCache(currentUserId, userInfo.adminEmail, spreadsheetId);
-        console.log('saveAndActivateSheet: 事前キャッシュクリア完了');
-      }
-    }
 
-    // 2. 設定を保存
-    saveSheetConfig(spreadsheetId, sheetName, config);
-    console.log('saveAndActivateSheet: 設定保存完了');
-
-    // 3. シートをアクティブ化
-    switchToSheet(spreadsheetId, sheetName);
-    console.log('saveAndActivateSheet: シート切り替え完了');
-
-    // 4. 表示オプションを設定
+    // 2-4. バッチ処理で効率化（設定保存、シート切り替え、表示オプション設定を統合）
     const displayOptions = {
-      showNames: !!config.showNames, // booleanに変換
-      showCounts: config.showCounts !== undefined ? !!config.showCounts : false // booleanに変換、デフォルトfalse
+      showNames: !!config.showNames,
+      showCounts: config.showCounts !== undefined ? !!config.showCounts : false
     };
-    setDisplayOptions(displayOptions);
-    console.log('saveAndActivateSheet: 表示オプション設定完了');
+    
+    // 統合処理
+    saveSheetConfigBatch(spreadsheetId, sheetName, config, displayOptions);
+    console.log('saveAndActivateSheet: バッチ処理完了');
 
     // 5. 最新のステータスをキャッシュを無視して取得
     const finalStatus = getStatus(true);
     console.log('saveAndActivateSheet: 統合処理完了');
+    
+    // 6. フォーム作成直後の場合は自動で公開準備まで進める
+    if (finalStatus && finalStatus.setupStep <= 2) {
+      console.log('saveAndActivateSheet: 新規フォーム作成後の自動化開始');
+      finalStatus.readyToPublish = true;
+      finalStatus.autoShowPublishDialog = true;
+    }
 
     return finalStatus;
 
@@ -651,9 +645,8 @@ function saveAndPublish(sheetName, config) {
     }
     const spreadsheetId = userInfo.spreadsheetId;
 
-    // 1. 関連キャッシュを事前にクリア
-    invalidateUserCache(userInfo.userId, userInfo.adminEmail, spreadsheetId);
-    console.log('saveAndPublish: 事前キャッシュクリア完了');
+    // 1. 最小限のキャッシュクリア（公開時のみ）
+    console.log('saveAndPublish: 公開処理開始');
 
     // 2. 設定を保存
     saveSheetConfig(spreadsheetId, sheetName, config);
@@ -682,6 +675,46 @@ function saveAndPublish(sheetName, config) {
     throw new Error('設定の保存と公開中にサーバーエラーが発生しました: ' + error.message);
   } finally {
     lock.releaseLock();
+  }
+}
+
+/**
+ * バッチ処理で設定保存・シート切り替え・表示オプション設定を統合実行
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @param {object} config - 設定オブジェクト
+ * @param {object} displayOptions - 表示オプション
+ */
+function saveSheetConfigBatch(spreadsheetId, sheetName, config, displayOptions) {
+  try {
+    // 一度のユーザー情報取得で全処理を実行
+    const userInfo = getUserInfo();
+    const configJson = JSON.parse(userInfo.configJson || '{}');
+    
+    // シート設定を更新
+    const sheetConfigKey = 'sheet_' + sheetName;
+    configJson[sheetConfigKey] = {
+      ...config,
+      lastModified: new Date().toISOString()
+    };
+    
+    // アクティブシートと表示設定を同時更新
+    configJson.publishedSheetName = sheetName;
+    configJson.publishedSpreadsheetId = spreadsheetId;
+    configJson.displayMode = displayOptions.showNames ? 'named' : 'anonymous';
+    configJson.showCounts = displayOptions.showCounts;
+    configJson.lastModified = new Date().toISOString();
+    
+    // 一回のAPI呼び出しで全ての設定を更新
+    updateUser(userInfo.userId, {
+      configJson: JSON.stringify(configJson),
+      lastAccessedAt: new Date().toISOString()
+    });
+    
+    console.log('saveSheetConfigBatch: 統合更新完了');
+  } catch (error) {
+    console.error('saveSheetConfigBatch error:', error.message);
+    throw new Error('バッチ処理中にエラーが発生しました: ' + error.message);
   }
 }
 

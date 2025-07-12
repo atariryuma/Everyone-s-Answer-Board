@@ -1428,6 +1428,58 @@
       modal.classList.add('hidden');
       modal.classList.remove('flex');
     }
+    
+    // 公開確認ダイアログを表示
+    function showPublishConfirmDialog() {
+      showConfirmationModal(
+        '回答ボードを公開しますか？',
+        'フォームの設定が完了しました。生徒がアクセスできるように回答ボードを公開しますか？',
+        function() {
+          publishBoard();
+        }
+      );
+    }
+    
+    // ワンクリックで公開を実行
+    function publishBoard() {
+      console.log('Publishing board automatically...');
+      
+      if (!selectedSheet) {
+        console.error('No sheet selected for publishing');
+        return;
+      }
+      
+      // 表示をロード中に変更
+      showLoadingState('公開中...');
+      
+      // 公開処理を実行（activateSheet関数を使用）
+      runGas('activateSheet', selectedSheet)
+        .then(function(result) {
+          console.log('Board published successfully:', result);
+          hideLoadingState();
+          
+          // ステータスを更新
+          updateStatusInfo();
+          
+          // 成功メッセージを表示
+          showToast('回答ボードが公開されました！', 'success');
+        })
+        .catch(function(error) {
+          console.error('Failed to publish board:', error);
+          hideLoadingState();
+          showToast('公開に失敗しました: ' + error.message, 'error');
+        });
+    }
+    
+    // 自動公開ダイアログのチェック
+    function checkAutoPublishDialog(status) {
+      if (status && status.autoShowPublishDialog && status.readyToPublish) {
+        console.log('Auto-showing publish dialog');
+        setTimeout(function() {
+          showPublishConfirmDialog();
+        }, 1000); // 1秒後に表示
+      }
+    }
 
     // ユーザーIDの安全な初期化
     var userId = '';
@@ -2279,6 +2331,9 @@ function syncCheckboxStates(status) {
       
       // シート選択ドロップダウンを更新
       populateSheetSelect(status.allSheets, status.activeSheetName);
+      
+      // 自動公開ダイアログのチェック
+      checkAutoPublishDialog(status);
     }
 
     /**
