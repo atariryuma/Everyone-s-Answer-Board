@@ -1067,10 +1067,17 @@ function getDataCount(requestUserId) {
 }
 
 /**
- * ボードデータを再読み込み (マルチテナント対応版)
+ * フォーム設定を更新 (マルチテナント対応版)
  * AdminPanel.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
+ * @param {string} title - 新しいタイトル
+ * @param {string} description - 新しい説明
  */
+function updateFormSettings(requestUserId, title, description) {
+  verifyUserAccess(requestUserId);
+  try {
+    var currentUserId = requestUserId; // requestUserId を使用
+
     var userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
