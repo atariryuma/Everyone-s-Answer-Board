@@ -68,8 +68,14 @@
   }
   </script>
   <script>
-  const __IS_DEPLOY_USER__ = <?= typeof isDeployUser !== "undefined" ? isDeployUser : false ?>;
-  window.isDeployUser = __IS_DEPLOY_USER__ === true;
+  const __IS_DEPLOY_USER_RAW__ = '<?= typeof isDeployUser !== "undefined" ? isDeployUser : false ?>';
+  const __IS_DEPLOY_USER__ = __IS_DEPLOY_USER_RAW__ === 'true' || __IS_DEPLOY_USER_RAW__ === true;
+  window.isDeployUser = __IS_DEPLOY_USER__;
+  console.log('Template Debug:');
+  console.log('- Raw template value:', __IS_DEPLOY_USER_RAW__);
+  console.log('- Raw template type:', typeof __IS_DEPLOY_USER_RAW__);
+  console.log('- Processed value:', __IS_DEPLOY_USER__);
+  console.log('- window.isDeployUser final:', window.isDeployUser);
   
   // URL更新処理
   const shouldUpdateUrl = '<?= typeof shouldUpdateUrl !== "undefined" ? shouldUpdateUrl : false ?>';
@@ -802,7 +808,7 @@
         </p>
       </div>
       
-      <details class="bg-red-900/10 border border-red-500/30 rounded-lg transition-all hover:border-red-500/50">
+      <details id="account-deletion-section" class="bg-red-900/10 border border-red-500/30 rounded-lg transition-all hover:border-red-500/50">
         <summary class="p-3 cursor-pointer text-sm font-medium text-red-300 hover:text-red-200 flex items-center justify-between">
           <span>アカウントの管理</span>
           <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -1695,15 +1701,33 @@ elements = {
   currentTopicText: document.getElementById('current-topic-text')
   // ★★★ ここまで追加 ★★★
 };
-      // AppSetupPageリンクの表示制御
+      // AppSetupPageリンクとアカウント削除セクションの表示制御
       var appSetupLink = document.getElementById('app-setup-link');
-      if (appSetupLink) {
-        if (window.isDeployUser) {
+      var accountDeletionSection = document.getElementById('account-deletion-section');
+      
+      console.log('Display control - isDeployUser:', window.isDeployUser);
+      console.log('Display control - appSetupLink element:', appSetupLink);
+      console.log('Display control - accountDeletionSection element:', accountDeletionSection);
+      
+      if (window.isDeployUser) {
+        // デプロイユーザーの場合：AppSetupPageリンクを表示、削除セクションを非表示
+        if (appSetupLink) {
           appSetupLink.style.display = 'block';
           console.log('✅ AppSetupPage link shown for deploy user');
-        } else {
+        }
+        if (accountDeletionSection) {
+          accountDeletionSection.style.display = 'none';
+          console.log('✅ Account deletion section hidden for deploy user');
+        }
+      } else {
+        // 一般ユーザーの場合：AppSetupPageリンクを非表示、削除セクションを表示
+        if (appSetupLink) {
           appSetupLink.style.display = 'none';
           console.log('ℹ️ AppSetupPage link hidden for non-deploy user');
+        }
+        if (accountDeletionSection) {
+          accountDeletionSection.style.display = 'block';
+          console.log('ℹ️ Account deletion section shown for non-deploy user');
         }
       }
       if (!IS_TEST_ENV) {
