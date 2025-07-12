@@ -370,6 +370,14 @@ function handleDirectExecAccess(userEmail) {
   try {
     debugLog('Direct /exec access detected for user:', userEmail);
     
+    // システムセットアップ未完了の場合は、セットアップページを優先表示
+    if (!isSystemSetup()) {
+      console.log('handleDirectExecAccess - System not setup, showing setup page');
+      const t = HtmlService.createTemplateFromFile('SetupPage');
+      t.include = include;
+      return safeSetXFrameOptionsDeny(t.evaluate().setTitle('初回セットアップ - StudyQuest'));
+    }
+    
     if (!userEmail) {
       return showRegistrationPage();
     }
