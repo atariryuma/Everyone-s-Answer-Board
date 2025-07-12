@@ -254,7 +254,7 @@ function autoMapHeaders(headers, sheetName = null) {
     }
   };
 
-  const result = {};
+  let result = {};
   const usedHeaders = new Set();
   const headerScores = {}; // ヘッダー毎のスコア記録
 

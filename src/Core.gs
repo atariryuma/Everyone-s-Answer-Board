@@ -3520,7 +3520,15 @@ function isDeployUser() {
     
     try {
       var editors = file.getEditors().map(function(e) { return e.getEmail(); });
-      var ownerEmail = file.getOwner().getEmail();
+      var ownerEmail = '';
+      try {
+        var owner = file.getOwner();
+        if (owner && typeof owner.getEmail === 'function') {
+          ownerEmail = owner.getEmail();
+        }
+      } catch (ownerErr) {
+        console.warn('getOwner failed:', ownerErr.message);
+      }
       if (ownerEmail) editors.push(ownerEmail);
       return editors.indexOf(userEmail) !== -1;
     } catch (permissionError) {
