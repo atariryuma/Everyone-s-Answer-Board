@@ -78,7 +78,8 @@ var SCORING_CONFIG = {
 };
 
 var EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
-var DEBUG = true;
+var DEBUG = PropertiesService.getScriptProperties()
+  .getProperty('DEBUG_MODE') === 'true';
 
 /**
  * Determine if a value represents boolean true.
