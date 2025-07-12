@@ -1005,14 +1005,14 @@ class StudyQuestApp {
     // リアクション状態保存用のキー
     this.reactionStorageKey = `reactions_${USER_ID}_${SHEET_NAME}`;
     this.gas = {
-      getPublishedSheetData: (sheetName, classFilter, sort, adminMode, bypassCache) => this.runGas('getPublishedSheetDataMultiTenant', this.state.userId, sheetName, classFilter, sort, adminMode, bypassCache),
-      getIncrementalSheetData: (classFilter, sort, adminMode, sinceRowCount) => this.runGas('getIncrementalSheetDataMultiTenant', this.state.userId, classFilter, sort, adminMode, sinceRowCount),
-      getAvailableSheets: () => this.runGas('getAvailableSheetsMultiTenant', this.state.userId),
-      addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReactionMultiTenant', this.state.userId, rowIndex, reaction, sheetName),
-      toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlightMultiTenant', this.state.userId, rowIndex, sheetName),
-      checkAdmin: () => this.runGas('checkAdminMultiTenant', this.state.userId),
-      clearCache: () => this.runGas('refreshBoardDataMultiTenant', this.state.userId),
-      getDataCount: (classFilter, sortOrder, adminMode) => this.runGas('getDataCountMultiTenant', this.state.userId, classFilter, sortOrder, adminMode)
+      getPublishedSheetData: (sheetName, classFilter, sort, adminMode, bypassCache) => this.runGas('getPublishedSheetData', this.state.userId, sheetName, classFilter, sort, adminMode, bypassCache),
+      getIncrementalSheetData: (classFilter, sort, adminMode, sinceRowCount) => this.runGas('getIncrementalSheetData', this.state.userId, classFilter, sort, adminMode, sinceRowCount),
+      getAvailableSheets: () => this.runGas('getAvailableSheets', this.state.userId),
+      addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', this.state.userId, rowIndex, reaction, sheetName),
+      toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', this.state.userId, rowIndex, sheetName),
+      checkAdmin: () => this.runGas('checkAdmin', this.state.userId),
+      clearCache: () => this.runGas('refreshBoardData', this.state.userId),
+      getDataCount: (classFilter, sortOrder, adminMode) => this.runGas('getDataCount', this.state.userId, classFilter, sortOrder, adminMode)
     };
     const savedCols = localStorage.getItem('boardColumns');
     if (savedCols && this.elements.sizeSlider && this.elements.sliderValue) {

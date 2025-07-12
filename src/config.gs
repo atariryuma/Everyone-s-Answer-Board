@@ -24,7 +24,7 @@ function getUserInfoCached(requestUserId) {
  * AdminPanel.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function getCurrentSpreadsheetMultiTenant(requestUserId) {
+function getCurrentSpreadsheet(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
     var userInfo = findUserById(requestUserId);
@@ -34,7 +34,7 @@ function getCurrentSpreadsheetMultiTenant(requestUserId) {
 
     return SpreadsheetApp.openById(userInfo.spreadsheetId);
   } catch (e) {
-    console.error('getCurrentSpreadsheetMultiTenant エラー: ' + e.message);
+    console.error('getCurrentSpreadsheet エラー: ' + e.message);
     throw new Error('スプレッドシートの取得に失敗しました: ' + e.message);
   }
 }
@@ -45,13 +45,13 @@ function getCurrentSpreadsheetMultiTenant(requestUserId) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  * @returns {string} スプレッドシートURL
  */
-function openActiveSpreadsheetMultiTenant(requestUserId) {
+function openActiveSpreadsheet(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
-    var ss = getCurrentSpreadsheetMultiTenant(requestUserId);
+    var ss = getCurrentSpreadsheet(requestUserId);
     return ss.getUrl();
   } catch (e) {
-    console.error('openActiveSpreadsheetMultiTenant エラー: ' + e.message);
+    console.error('openActiveSpreadsheet エラー: ' + e.message);
     throw new Error('スプレッドシートのURL取得に失敗しました: ' + e.message);
   }
 }
@@ -134,7 +134,7 @@ function getUserInfo(requestUserId) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  * @returns {string} スプレッドシートID
  */
-function getEffectiveSpreadsheetIdMultiTenant(requestUserId) {
+function getEffectiveSpreadsheetId(requestUserId) {
   verifyUserAccess(requestUserId);
   const userInfo = getUserInfo(requestUserId);
   const configJson = userInfo && userInfo.configJson
@@ -149,7 +149,7 @@ function getEffectiveSpreadsheetIdMultiTenant(requestUserId) {
  * @param {string} spreadsheetId - スプレッドシートID
  * @param {string} sheetName - シート名
  */
-function getSheetHeadersMultiTenant(requestUserId, spreadsheetId, sheetName) {
+function getSheetHeaders(requestUserId, spreadsheetId, sheetName) {
   verifyUserAccess(requestUserId);
   const ss = SpreadsheetApp.openById(spreadsheetId);
   const sheet = ss.getSheetByName(sheetName);
@@ -172,7 +172,7 @@ function getSheetHeadersMultiTenant(requestUserId, spreadsheetId, sheetName) {
  * @param {boolean} forceRefresh - キャッシュを無視して強制的に再取得するかどうか
  * @returns {object} 統一された設定オブジェクト
  */
-function getConfigMultiTenant(requestUserId, sheetName, forceRefresh = false) {
+function getConfig(requestUserId, sheetName, forceRefresh = false) {
   verifyUserAccess(requestUserId);
   const userId = requestUserId; // requestUserId を使用
   const userCache = CacheService.getUserCache();
@@ -189,7 +189,7 @@ function getConfigMultiTenant(requestUserId, sheetName, forceRefresh = false) {
   try {
     console.log('設定を取得中: sheetName=%s, userId=%s', sheetName, userId);
     const userInfo = getUserInfo(userId); // 依存関係を明確化
-    const headers = getSheetHeadersMultiTenant(userId, userInfo.spreadsheetId, sheetName);
+    const headers = getSheetHeaders(userId, userInfo.spreadsheetId, sheetName);
 
     // 1. 返却する設定オブジェクトの器を準備
     let finalConfig = {
@@ -233,11 +233,11 @@ function getConfigMultiTenant(requestUserId, sheetName, forceRefresh = false) {
     // 5. 最終的な設定をキャッシュに保存
     userCache.put(cacheKey, JSON.stringify(finalConfig), 3600); // 1時間キャッシュ
 
-    console.log('getConfigMultiTenant: 最終設定を返します: %s', JSON.stringify(finalConfig));
+    console.log('getConfig: 最終設定を返します: %s', JSON.stringify(finalConfig));
     return finalConfig;
 
   } catch (error) {
-    console.error('getConfigMultiTenantでエラー:', error.message, error.stack);
+    console.error('getConfigでエラー:', error.message, error.stack);
     throw new Error('シート設定の取得中にエラーが発生しました: ' + error.message);
   }
 }
@@ -613,7 +613,7 @@ function findBetterOpinionColumn(contentAnalysis, processedHeaders, currentResul
  * @param {object} config - 保存する設定オブジェクト
  * @returns {object} { success: boolean, message: string, status: object } 形式のオブジェクト
  */
-function saveAndActivateSheetMultiTenant(requestUserId, spreadsheetId, sheetName, config) {
+function saveAndActivateSheet(requestUserId, spreadsheetId, sheetName, config) {
   verifyUserAccess(requestUserId);
   // ★★★ここから追加：引数の検証処理★★★
   if (typeof spreadsheetId !== 'string' || !spreadsheetId) {
@@ -628,7 +628,7 @@ function saveAndActivateSheetMultiTenant(requestUserId, spreadsheetId, sheetName
   // ★★★ここまで追加★★★
 
   try {
-    console.log('saveAndActivateSheetMultiTenant開始: sheetName=%s', sheetName);
+    console.log('saveAndActivateSheet開始: sheetName=%s', sheetName);
 
     // 1. 最小限のキャッシュクリア（設定保存時のみ）
     const currentUserId = requestUserId; // requestUserId を使用
@@ -640,17 +640,17 @@ function saveAndActivateSheetMultiTenant(requestUserId, spreadsheetId, sheetName
     };
 
     // 統合処理
-    saveSheetConfigBatchMultiTenant(requestUserId, spreadsheetId, sheetName, config, displayOptions);
-    console.log('saveAndActivateSheetMultiTenant: バッチ処理完了');
+    saveSheetConfigBatch(requestUserId, spreadsheetId, sheetName, config, displayOptions);
+    console.log('saveAndActivateSheet: バッチ処理完了');
 
     // 5. 最新のステータスをキャッシュを無視して取得
-    const finalStatus = getStatusMultiTenant(requestUserId, true);
-    console.log('saveAndActivateSheetMultiTenant: 統合処理完了');
+    const finalStatus = getStatus(requestUserId, true);
+    console.log('saveAndActivateSheet: 統合処理完了');
 
     // 6. 新しいスプレッドシートまたは設定変更時に自動で公開準備まで進める
-    const isNewOrUpdatedForm = checkIfNewOrUpdatedFormMultiTenant(requestUserId, spreadsheetId, sheetName);
+    const isNewOrUpdatedForm = checkIfNewOrUpdatedForm(requestUserId, spreadsheetId, sheetName);
     if (finalStatus && isNewOrUpdatedForm) {
-      console.log('saveAndActivateSheetMultiTenant: 新規/更新フォーム作成後の自動化開始');
+      console.log('saveAndActivateSheet: 新規/更新フォーム作成後の自動化開始');
       finalStatus.readyToPublish = true;
       finalStatus.autoShowPublishDialog = true;
       finalStatus.isNewForm = true;
@@ -659,7 +659,7 @@ function saveAndActivateSheetMultiTenant(requestUserId, spreadsheetId, sheetName
     return finalStatus;
 
   } catch (error) {
-    console.error('saveAndActivateSheetMultiTenantで致命的なエラー:', error.message, error.stack);
+    console.error('saveAndActivateSheetで致命的なエラー:', error.message, error.stack);
     // クライアントには分かりやすいエラーメッセージを返す
     throw new Error('設定の保存・適用中にサーバーエラーが発生しました: ' + error.message);
   }
@@ -672,13 +672,13 @@ function saveAndActivateSheetMultiTenant(requestUserId, spreadsheetId, sheetName
  * @param {object} config - 保存・適用する設定オブジェクト
  * @returns {object} 最新のステータスオブジェクト
  */
-function saveAndPublishMultiTenant(requestUserId, sheetName, config) {
+function saveAndPublish(requestUserId, sheetName, config) {
   verifyUserAccess(requestUserId);
   const lock = LockService.getScriptLock();
   lock.waitLock(30000); // 30秒待機
 
   try {
-    console.log('saveAndPublishMultiTenant開始: sheetName=%s', sheetName);
+    console.log('saveAndPublish開始: sheetName=%s', sheetName);
 
     const userInfo = getUserInfo(requestUserId);
     if (!userInfo || !userInfo.spreadsheetId) {
@@ -687,32 +687,32 @@ function saveAndPublishMultiTenant(requestUserId, sheetName, config) {
     const spreadsheetId = userInfo.spreadsheetId;
 
     // 1. 最小限のキャッシュクリア（公開時のみ）
-    console.log('saveAndPublishMultiTenant: 公開処理開始');
+    console.log('saveAndPublish: 公開処理開始');
 
     // 2. 設定を保存
     saveSheetConfig(requestUserId, spreadsheetId, sheetName, config);
-    console.log('saveAndPublishMultiTenant: 設定保存完了');
+    console.log('saveAndPublish: 設定保存完了');
 
     // 3. シートをアクティブ化
     switchToSheet(requestUserId, spreadsheetId, sheetName);
-    console.log('saveAndPublishMultiTenant: シート切り替え完了');
+    console.log('saveAndPublish: シート切り替え完了');
 
     // 4. 表示オプションを更新
     const displayOptions = {
       showNames: !!config.showNames,
       showCounts: config.showCounts !== undefined ? !!config.showCounts : false
     };
-    setDisplayOptionsMultiTenant(requestUserId, displayOptions);
-    console.log('saveAndPublishMultiTenant: 表示オプション設定完了');
+    setDisplayOptions(requestUserId, displayOptions);
+    console.log('saveAndPublish: 表示オプション設定完了');
 
     // 5. 最新のステータスを強制再取得して返す
-    const finalStatus = getStatusMultiTenant(requestUserId, true); // forceRefresh = true
-    console.log('saveAndPublishMultiTenant: 統合処理完了、最新ステータスを返します。');
+    const finalStatus = getStatus(requestUserId, true); // forceRefresh = true
+    console.log('saveAndPublish: 統合処理完了、最新ステータスを返します。');
 
     return finalStatus;
 
   } catch (error) {
-    console.error('saveAndPublishMultiTenantで致命的なエラー:', error.message, error.stack);
+    console.error('saveAndPublishで致命的なエラー:', error.message, error.stack);
     throw new Error('設定の保存と公開中にサーバーエラーが発生しました: ' + error.message);
   } finally {
     lock.releaseLock();
@@ -726,7 +726,7 @@ function saveAndPublishMultiTenant(requestUserId, sheetName, config) {
  * @param {string} sheetName - シート名
  * @returns {boolean} 新規または更新フォームの場合true
  */
-function checkIfNewOrUpdatedFormMultiTenant(requestUserId, spreadsheetId, sheetName) {
+function checkIfNewOrUpdatedForm(requestUserId, spreadsheetId, sheetName) {
   verifyUserAccess(requestUserId);
   try {
     const userInfo = getUserInfo(requestUserId);
@@ -735,14 +735,14 @@ function checkIfNewOrUpdatedFormMultiTenant(requestUserId, spreadsheetId, sheetN
     // 現在のスプレッドシートIDが以前と異なる場合（新しいフォーム）
     const currentSpreadsheetId = configJson.publishedSpreadsheetId;
     if (currentSpreadsheetId !== spreadsheetId) {
-      console.log('checkIfNewOrUpdatedFormMultiTenant: 新しいスプレッドシート検出');
+      console.log('checkIfNewOrUpdatedForm: 新しいスプレッドシート検出');
       return true;
     }
 
     // 現在のシート名が以前と異なる場合（新しいシート）
     const currentSheetName = configJson.publishedSheetName;
     if (currentSheetName !== sheetName) {
-      console.log('checkIfNewOrUpdatedFormMultiTenant: 新しいシート検出');
+      console.log('checkIfNewOrUpdatedForm: 新しいシート検出');
       return true;
     }
 
@@ -753,15 +753,15 @@ function checkIfNewOrUpdatedFormMultiTenant(requestUserId, spreadsheetId, sheetN
     const thirtyMinutes = 30 * 60 * 1000; // 30分をミリ秒で
 
     if (timeDiff < thirtyMinutes) {
-      console.log('checkIfNewOrUpdatedFormMultiTenant: 最近作成されたフォーム検出');
+      console.log('checkIfNewOrUpdatedForm: 最近作成されたフォーム検出');
       return true;
     }
 
-    console.log('checkIfNewOrUpdatedFormMultiTenant: 既存フォームの設定更新');
+    console.log('checkIfNewOrUpdatedForm: 既存フォームの設定更新');
     return false;
 
   } catch (error) {
-    console.error('checkIfNewOrUpdatedFormMultiTenant error:', error.message);
+    console.error('checkIfNewOrUpdatedForm error:', error.message);
     // エラーの場合は安全側に倒して新規扱い
     return true;
   }
@@ -775,7 +775,7 @@ function checkIfNewOrUpdatedFormMultiTenant(requestUserId, spreadsheetId, sheetN
  * @param {object} config - 設定オブジェクト
  * @param {object} displayOptions - 表示オプション
  */
-function saveSheetConfigBatchMultiTenant(requestUserId, spreadsheetId, sheetName, config, displayOptions) {
+function saveSheetConfigBatch(requestUserId, spreadsheetId, sheetName, config, displayOptions) {
   verifyUserAccess(requestUserId);
   try {
     // 一度のユーザー情報取得で全処理を実行
@@ -807,10 +807,10 @@ function saveSheetConfigBatchMultiTenant(requestUserId, spreadsheetId, sheetName
     // 関連キャッシュを無効化してUI即座反映
     invalidateUserCache(userInfo.userId, userInfo.adminEmail, spreadsheetId, false);
 
-    console.log('saveSheetConfigBatchMultiTenant: 統合更新完了');
-    console.log('saveSheetConfigBatchMultiTenant: 更新内容 - spreadsheetId:', spreadsheetId, 'sheetName:', sheetName);
+    console.log('saveSheetConfigBatch: 統合更新完了');
+    console.log('saveSheetConfigBatch: 更新内容 - spreadsheetId:', spreadsheetId, 'sheetName:', sheetName);
   } catch (error) {
-    console.error('saveSheetConfigBatchMultiTenant error:', error.message);
+    console.error('saveSheetConfigBatch error:', error.message);
     throw new Error('バッチ処理中にエラーが発生しました: ' + error.message);
   }
 }
@@ -822,7 +822,7 @@ function saveSheetConfigBatchMultiTenant(requestUserId, spreadsheetId, sheetName
  * @param {object} config - 設定オブジェクト
  * @returns {object} 保存完了メッセージ
  */
-function saveDraftConfigMultiTenant(requestUserId, sheetName, config) {
+function saveDraftConfig(requestUserId, sheetName, config) {
   verifyUserAccess(requestUserId);
   try {
     if (typeof sheetName !== 'string' || !sheetName) {
@@ -832,7 +832,7 @@ function saveDraftConfigMultiTenant(requestUserId, sheetName, config) {
       throw new Error('無効なconfigオブジェクトです。設定オブジェクトは必須です。');
     }
 
-    console.log('saveDraftConfigMultiTenant開始: sheetName=%s', sheetName);
+    console.log('saveDraftConfig開始: sheetName=%s', sheetName);
 
     const userInfo = getUserInfo(requestUserId);
     if (!userInfo || !userInfo.spreadsheetId) {
@@ -845,7 +845,7 @@ function saveDraftConfigMultiTenant(requestUserId, sheetName, config) {
     // 関連キャッシュをクリア
     invalidateUserCache(userInfo.userId, userInfo.adminEmail, userInfo.spreadsheetId, false);
 
-    console.log('saveDraftConfigMultiTenant: 設定保存完了');
+    console.log('saveDraftConfig: 設定保存完了');
 
     return {
       success: true,
@@ -853,7 +853,7 @@ function saveDraftConfigMultiTenant(requestUserId, sheetName, config) {
     };
 
   } catch (error) {
-    console.error('saveDraftConfigMultiTenantで致命的なエラー:', error.message, error.stack);
+    console.error('saveDraftConfigで致命的なエラー:', error.message, error.stack);
     throw new Error('設定の保存中にサーバーエラーが発生しました: ' + error.message);
   }
 }
@@ -865,7 +865,7 @@ function saveDraftConfigMultiTenant(requestUserId, sheetName, config) {
  * @param {string} sheetName - シート名
  * @returns {object} 最新のステータス
  */
-function activateSheetMultiTenant(requestUserId, spreadsheetId, sheetName) {
+function activateSheet(requestUserId, spreadsheetId, sheetName) {
   verifyUserAccess(requestUserId);
   const startTime = Date.now();
   try {
@@ -876,7 +876,7 @@ function activateSheetMultiTenant(requestUserId, spreadsheetId, sheetName) {
       throw new Error('無効なsheetNameです。シート名は必須です。');
     }
 
-    console.log('activateSheetMultiTenant開始: sheetName=%s', sheetName);
+    console.log('activateSheet開始: sheetName=%s', sheetName);
 
     // 最適化: 一度だけユーザー情報を取得してキャッシュクリア
     const currentUserId = requestUserId; // requestUserId を使用
@@ -891,78 +891,27 @@ function activateSheetMultiTenant(requestUserId, spreadsheetId, sheetName) {
           'data_' + spreadsheetId
         ];
         keysToRemove.forEach(key => cacheManager.remove(key));
-        console.log('activateSheetMultiTenant: 最小限キャッシュクリア完了');
+        console.log('activateSheet: 最小限キャッシュクリア完了');
       }
     }
 
     // シートをアクティブ化（効率化）
     const switchResult = switchToSheet(requestUserId, spreadsheetId, sheetName);
-    console.log('activateSheetMultiTenant: シート切り替え完了');
+    console.log('activateSheet: シート切り替え完了');
 
     // 最新のステータスを取得（キャッシュ活用）
-    const finalStatus = getStatusMultiTenant(requestUserId, false);
-    console.log('activateSheetMultiTenant: 公開処理完了');
+    const finalStatus = getStatus(requestUserId, false);
+    console.log('activateSheet: 公開処理完了');
 
     const executionTime = Date.now() - startTime;
-    console.log('activateSheetMultiTenant完了: 実行時間 %dms', executionTime);
+    console.log('activateSheet完了: 実行時間 %dms', executionTime);
 
     return finalStatus;
 
   } catch (error) {
     const executionTime = Date.now() - startTime;
-    console.error('activateSheetMultiTenantで致命的なエラー (実行時間: %dms):', executionTime, error.message, error.stack);
+    console.error('activateSheetで致命的なエラー (実行時間: %dms):', executionTime, error.message, error.stack);
     throw new Error('シートの公開中にサーバーエラーが発生しました: ' + error.message);
-  }
-}
-
-/**
- * シート固有の設定を保存
- * @param {string} sheetName - シート名
- * @param {object} cfg - 設定オブジェクト
- */
-/**
- * シートヘッダーを取得
- * AdminPanel.htmlから呼び出される
- */
-function getSheetHeaders(sheetName) {
-  try {
-    var spreadsheet = getCurrentSpreadsheet();
-    
-    // シート名が指定されていない場合、利用可能なシートを表示
-    if (!sheetName) {
-      var allSheets = spreadsheet.getSheets();
-      var sheetNames = allSheets.map(function(sheet) { return sheet.getName(); });
-      console.log('利用可能なシート:', sheetNames);
-      throw new Error('シート名が指定されていません。利用可能なシート: ' + sheetNames.join(', '));
-    }
-    
-    var sheet = spreadsheet.getSheetByName(sheetName);
-    if (!sheet) {
-      // シートが見つからない場合、利用可能なシートを表示
-      var allSheets = spreadsheet.getSheets();
-      var sheetNames = allSheets.map(function(sheet) { return sheet.getName(); });
-      console.log('要求されたシート「' + sheetName + '」が見つかりません');
-      console.log('利用可能なシート:', sheetNames);
-      
-      // デフォルトシートを試行
-      if (sheetNames.length > 0) {
-        var firstSheet = allSheets[0];
-        console.log('デフォルトシート「' + firstSheet.getName() + '」を使用します');
-        sheet = firstSheet;
-      } else {
-        throw new Error('シートが見つかりません: ' + sheetName + '. 利用可能なシート: ' + sheetNames.join(', '));
-      }
-    }
-    
-    var lastColumn = sheet.getLastColumn();
-    if (lastColumn === 0) {
-      return [];
-    }
-    var headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
-    return headers.filter(String); // 空のヘッダーを除外
-  } catch (e) {
-    console.error('getSheetHeaders エラー: ' + e.message);
-    throw new Error('シートヘッダーの取得に失敗しました: ' + e.message);
   }
 }
 
@@ -972,10 +921,10 @@ function getSheetHeaders(sheetName) {
  * @param {string} sheetName - シート名
  * @param {object} overrides - 上書き設定
  */
-function autoMapSheetHeadersMultiTenant(requestUserId, sheetName, overrides) {
+function autoMapSheetHeaders(requestUserId, sheetName, overrides) {
   verifyUserAccess(requestUserId);
   try {
-    var headers = getSheetHeadersMultiTenant(requestUserId, getCurrentSpreadsheetMultiTenant(requestUserId).getId(), sheetName);
+    var headers = getSheetHeaders(requestUserId, getCurrentSpreadsheet(requestUserId).getId(), sheetName);
     if (!headers || headers.length === 0) {
       return null;
     }
@@ -1026,7 +975,7 @@ function autoMapSheetHeadersMultiTenant(requestUserId, sheetName, overrides) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  * @param {string} url - スプレッドシートURL
  */
-function addSpreadsheetUrlMultiTenant(requestUserId, url) {
+function addSpreadsheetUrl(requestUserId, url) {
   verifyUserAccess(requestUserId);
   try {
     var spreadsheetId = url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1];
@@ -1082,7 +1031,7 @@ function addSpreadsheetUrlMultiTenant(requestUserId, url) {
       needsRefresh: true // UI側でのリフレッシュが必要
     };
   } catch (e) {
-    console.error('addSpreadsheetUrlMultiTenant エラー: ' + e.message);
+    console.error('addSpreadsheetUrl エラー: ' + e.message);
     throw new Error('スプレッドシートの追加に失敗しました: ' + e.message);
   }
 }
@@ -1092,7 +1041,7 @@ function addSpreadsheetUrlMultiTenant(requestUserId, url) {
  * AdminPanel.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function clearActiveSheetMultiTenant(requestUserId) {
+function clearActiveSheet(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
     var currentUserId = requestUserId; // requestUserId を使用
@@ -1127,7 +1076,7 @@ function clearActiveSheetMultiTenant(requestUserId) {
     console.log('回答ボードの公開を正常に停止しました - ユーザーID:', currentUserId);
 
     // 最新のステータスを取得して返す（UI更新のため）
-    const updatedStatus = getStatusMultiTenant(requestUserId, true);
+    const updatedStatus = getStatus(requestUserId, true);
     return {
       success: true,
       message: '✅ 回答ボードの公開を停止しました。',
@@ -1135,7 +1084,7 @@ function clearActiveSheetMultiTenant(requestUserId) {
       ...updatedStatus
     };
   } catch (e) {
-    console.error('clearActiveSheetMultiTenant エラー: ' + e.message);
+    console.error('clearActiveSheet エラー: ' + e.message);
     throw new Error('回答ボードの公開停止に失敗しました: ' + e.message);
   }
 }
@@ -1146,7 +1095,7 @@ function clearActiveSheetMultiTenant(requestUserId) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  * @param {object} options - 表示オプション
  */
-function setDisplayOptionsMultiTenant(requestUserId, options) {
+function setDisplayOptions(requestUserId, options) {
   verifyUserAccess(requestUserId);
   try {
     var currentUserId = requestUserId; // requestUserId を使用
@@ -1163,7 +1112,7 @@ function setDisplayOptionsMultiTenant(requestUserId, options) {
     // showNamesからdisplayModeを設定
     configJson.displayMode = options.showNames ? 'named' : 'anonymous';
 
-    console.log('setDisplayOptionsMultiTenant: 設定更新', {
+    console.log('setDisplayOptions: 設定更新', {
       showNames: options.showNames,
       showCounts: options.showCounts,
       displayMode: configJson.displayMode
@@ -1175,7 +1124,7 @@ function setDisplayOptionsMultiTenant(requestUserId, options) {
 
     return '表示オプションを保存しました。';
   } catch (e) {
-    console.error('setDisplayOptionsMultiTenant エラー: ' + e.message);
+    console.error('setDisplayOptions エラー: ' + e.message);
     throw new Error('表示オプションの保存に失敗しました: ' + e.message);
   }
 }
@@ -1185,7 +1134,7 @@ function setDisplayOptionsMultiTenant(requestUserId, options) {
  * AdminPanel.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function createBoardFromAdminMultiTenant(requestUserId) {
+function createBoardFromAdmin(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
     var activeUserEmail = Session.getActiveUser().getEmail();
@@ -1228,7 +1177,7 @@ function createBoardFromAdminMultiTenant(requestUserId) {
       formTitle: formAndSsInfo.formTitle // フォームタイトルも返す
     };
   } catch (e) {
-    console.error('createBoardFromAdminMultiTenant エラー: ' + e.message);
+    console.error('createBoardFromAdmin エラー: ' + e.message);
     throw new Error('ボードの作成に失敗しました: ' + e.message);
   }
 }
@@ -1238,7 +1187,7 @@ function createBoardFromAdminMultiTenant(requestUserId) {
  * Registration.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function getExistingBoardMultiTenant(requestUserId) {
+function getExistingBoard(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
     var activeUserEmail = Session.getActiveUser().getEmail();
@@ -1263,7 +1212,7 @@ function getExistingBoardMultiTenant(requestUserId) {
       };
     }
   } catch (e) {
-    console.error('getExistingBoardMultiTenant エラー: ' + e.message);
+    console.error('getExistingBoard エラー: ' + e.message);
     return { status: 'error', message: '既存ボード情報の取得に失敗しました: ' + e.message };
   }
 }
@@ -1273,7 +1222,7 @@ function getExistingBoardMultiTenant(requestUserId) {
  * Registration.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function verifyUserAuthenticationMultiTenant(requestUserId) {
+function verifyUserAuthentication(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
     var email = Session.getActiveUser().getEmail();
@@ -1283,7 +1232,7 @@ function verifyUserAuthenticationMultiTenant(requestUserId) {
       return { authenticated: false, email: null };
     }
   } catch (e) {
-    console.error('verifyUserAuthenticationMultiTenant エラー: ' + e.message);
+    console.error('verifyUserAuthentication エラー: ' + e.message);
     return { authenticated: false, email: null, error: e.message };
   }
 }
@@ -1294,7 +1243,7 @@ function verifyUserAuthenticationMultiTenant(requestUserId) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  * @returns {{success:boolean,error:(string|undefined)}}
  */
-function resetUserAuthenticationMultiTenant(requestUserId) {
+function resetUserAuthentication(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
     var email = Session.getActiveUser().getEmail();
@@ -1303,7 +1252,7 @@ function resetUserAuthenticationMultiTenant(requestUserId) {
     }
     return { success: true };
   } catch (e) {
-    console.error('resetUserAuthenticationMultiTenant エラー: ' + e.message);
+    console.error('resetUserAuthentication エラー: ' + e.message);
     return { success: false, error: e.message };
   }
 }
@@ -1314,54 +1263,6 @@ function resetUserAuthenticationMultiTenant(requestUserId) {
  * @param {string} sheetName - シート名
  * @param {object} overrides - 上書き設定
  */
-function autoMapSheetHeadersMultiTenant(requestUserId, sheetName, overrides) {
-  verifyUserAccess(requestUserId);
-  try {
-    var headers = getSheetHeadersForAdminPanelMultiTenant(requestUserId, sheetName);
-    if (!headers || headers.length === 0) {
-      return null;
-    }
-
-    // 新しい高精度自動判定機能を使用
-    const mappingResult = autoMapHeaders(headers, sheetName);
-
-    // モーダル入力値による上書き
-    if (overrides) {
-      if (overrides.mainQuestion) {
-        const match = headers.find(h => String(h).trim() === overrides.mainQuestion.trim());
-        if (match) mappingResult.opinionHeader = match;
-      }
-      if (overrides.reasonQuestion) {
-        const match = headers.find(h => String(h).trim() === overrides.reasonQuestion.trim());
-        if (match) mappingResult.reasonHeader = match;
-      }
-      if (overrides.nameQuestion) {
-        const match = headers.find(h => String(h).trim() === overrides.nameQuestion.trim());
-        if (match) mappingResult.nameHeader = match;
-      }
-      if (overrides.classQuestion) {
-        const match = headers.find(h => String(h).trim() === overrides.classQuestion.trim());
-        if (match) mappingResult.classHeader = match;
-      }
-    }
-
-    // 従来のフォーマットに変換（後方互換性のため）
-    var mapping = {
-      mainHeader: mappingResult.opinionHeader || '',
-      rHeader: mappingResult.reasonHeader || '',
-      nameHeader: mappingResult.nameHeader || '',
-      classHeader: mappingResult.classHeader || ''
-    };
-
-    debugLog('高精度自動マッピング結果 for ' + sheetName + ': ' + JSON.stringify(mapping));
-    return mapping;
-
-  } catch (e) {
-    console.error('autoMapSheetHeadersMultiTenant エラー: ' + e.message);
-    return null;
-  }
-}
-
 /**
  * 指定されたシートのヘッダー情報と既存設定をまとめて取得します。(マルチテナント対応版)
  * @param {string} requestUserId - リクエスト元のユーザーID
@@ -1369,13 +1270,13 @@ function autoMapSheetHeadersMultiTenant(requestUserId, sheetName, overrides) {
  * @param {string} sheetName - シート名
  * @returns {object} { allHeaders: Array<string>, guessedConfig: object, existingConfig: object }
  */
-function getSheetDetailsMultiTenant(requestUserId, spreadsheetId, sheetName) {
+function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
   verifyUserAccess(requestUserId);
   try {
     if (!sheetName) {
       throw new Error('sheetNameは必須です');
     }
-    var targetId = spreadsheetId || getEffectiveSpreadsheetIdMultiTenant(requestUserId);
+    var targetId = spreadsheetId || getEffectiveSpreadsheetId(requestUserId);
     if (!targetId) {
       throw new Error('spreadsheetIdが取得できません');
     }
@@ -1394,9 +1295,9 @@ function getSheetDetailsMultiTenant(requestUserId, spreadsheetId, sheetName) {
 
     let existing = {};
     try {
-      existing = getConfigMultiTenant(requestUserId, sheetName, true) || {};
+      existing = getConfig(requestUserId, sheetName, true) || {};
     } catch (e) {
-      console.warn('getConfigMultiTenant failed in getSheetDetailsMultiTenant:', e.message);
+      console.warn('getConfig failed in getSheetDetails:', e.message);
     }
 
     return {
@@ -1406,7 +1307,7 @@ function getSheetDetailsMultiTenant(requestUserId, spreadsheetId, sheetName) {
     };
 
   } catch (error) {
-    console.error('getSheetDetailsMultiTenant error:', error.message);
+    console.error('getSheetDetails error:', error.message);
     throw new Error('シート情報の取得に失敗しました: ' + error.message);
   }
 }
@@ -1419,7 +1320,7 @@ function getSheetDetailsMultiTenant(requestUserId, spreadsheetId, sheetName) {
  * @param {object} config - 保存する設定オブジェクト
  * @returns {object} { success: boolean, message: string, status: object } 形式のオブジェクト
  */
-function saveAndActivateSheetMultiTenant(requestUserId, spreadsheetId, sheetName, config) {
+function saveAndActivateSheet(requestUserId, spreadsheetId, sheetName, config) {
   verifyUserAccess(requestUserId);
   // ★★★ここから追加：引数の検証処理★★★
   if (typeof spreadsheetId !== 'string' || !spreadsheetId) {
@@ -1434,7 +1335,7 @@ function saveAndActivateSheetMultiTenant(requestUserId, spreadsheetId, sheetName
   // ★★★ここまで追加★★★
 
   try {
-    console.log('saveAndActivateSheetMultiTenant開始: sheetName=%s', sheetName);
+    console.log('saveAndActivateSheet開始: sheetName=%s', sheetName);
 
     // 1. 最小限のキャッシュクリア（設定保存時のみ）
     const currentUserId = requestUserId; // requestUserId を使用
@@ -1446,17 +1347,17 @@ function saveAndActivateSheetMultiTenant(requestUserId, spreadsheetId, sheetName
     };
 
     // 統合処理
-    saveSheetConfigBatchMultiTenant(requestUserId, spreadsheetId, sheetName, config, displayOptions);
-    console.log('saveAndActivateSheetMultiTenant: バッチ処理完了');
+    saveSheetConfigBatch(requestUserId, spreadsheetId, sheetName, config, displayOptions);
+    console.log('saveAndActivateSheet: バッチ処理完了');
 
     // 5. 最新のステータスをキャッシュを無視して取得
-    const finalStatus = getStatusMultiTenant(requestUserId, true);
-    console.log('saveAndActivateSheetMultiTenant: 統合処理完了');
+    const finalStatus = getStatus(requestUserId, true);
+    console.log('saveAndActivateSheet: 統合処理完了');
 
     // 6. 新しいスプレッドシートまたは設定変更時に自動で公開準備まで進める
-    const isNewOrUpdatedForm = checkIfNewOrUpdatedFormMultiTenant(requestUserId, spreadsheetId, sheetName);
+    const isNewOrUpdatedForm = checkIfNewOrUpdatedForm(requestUserId, spreadsheetId, sheetName);
     if (finalStatus && isNewOrUpdatedForm) {
-      console.log('saveAndActivateSheetMultiTenant: 新規/更新フォーム作成後の自動化開始');
+      console.log('saveAndActivateSheet: 新規/更新フォーム作成後の自動化開始');
       finalStatus.readyToPublish = true;
       finalStatus.autoShowPublishDialog = true;
       finalStatus.isNewForm = true;
@@ -1465,7 +1366,7 @@ function saveAndActivateSheetMultiTenant(requestUserId, spreadsheetId, sheetName
     return finalStatus;
 
   } catch (error) {
-    console.error('saveAndActivateSheetMultiTenantで致命的なエラー:', error.message, error.stack);
+    console.error('saveAndActivateSheetで致命的なエラー:', error.message, error.stack);
     // クライアントには分かりやすいエラーメッセージを返す
     throw new Error('設定の保存・適用中にサーバーエラーが発生しました: ' + error.message);
   }
@@ -1478,13 +1379,13 @@ function saveAndActivateSheetMultiTenant(requestUserId, spreadsheetId, sheetName
  * @param {object} config - 保存・適用する設定オブジェクト
  * @returns {object} 最新のステータスオブジェクト
  */
-function saveAndPublishMultiTenant(requestUserId, sheetName, config) {
+function saveAndPublish(requestUserId, sheetName, config) {
   verifyUserAccess(requestUserId);
   const lock = LockService.getScriptLock();
   lock.waitLock(30000); // 30秒待機
 
   try {
-    console.log('saveAndPublishMultiTenant開始: sheetName=%s', sheetName);
+    console.log('saveAndPublish開始: sheetName=%s', sheetName);
 
     const userInfo = getUserInfo(requestUserId);
     if (!userInfo || !userInfo.spreadsheetId) {
@@ -1493,32 +1394,32 @@ function saveAndPublishMultiTenant(requestUserId, sheetName, config) {
     const spreadsheetId = userInfo.spreadsheetId;
 
     // 1. 最小限のキャッシュクリア（公開時のみ）
-    console.log('saveAndPublishMultiTenant: 公開処理開始');
+    console.log('saveAndPublish: 公開処理開始');
 
     // 2. 設定を保存
     saveSheetConfig(requestUserId, spreadsheetId, sheetName, config);
-    console.log('saveAndPublishMultiTenant: 設定保存完了');
+    console.log('saveAndPublish: 設定保存完了');
 
     // 3. シートをアクティブ化
     switchToSheet(requestUserId, spreadsheetId, sheetName);
-    console.log('saveAndPublishMultiTenant: シート切り替え完了');
+    console.log('saveAndPublish: シート切り替え完了');
 
     // 4. 表示オプションを更新
     const displayOptions = {
       showNames: !!config.showNames,
       showCounts: config.showCounts !== undefined ? !!config.showCounts : false
     };
-    setDisplayOptionsMultiTenant(requestUserId, displayOptions);
-    console.log('saveAndPublishMultiTenant: 表示オプション設定完了');
+    setDisplayOptions(requestUserId, displayOptions);
+    console.log('saveAndPublish: 表示オプション設定完了');
 
     // 5. 最新のステータスを強制再取得して返す
-    const finalStatus = getStatusMultiTenant(requestUserId, true); // forceRefresh = true
-    console.log('saveAndPublishMultiTenant: 統合処理完了、最新ステータスを返します。');
+    const finalStatus = getStatus(requestUserId, true); // forceRefresh = true
+    console.log('saveAndPublish: 統合処理完了、最新ステータスを返します。');
 
     return finalStatus;
 
   } catch (error) {
-    console.error('saveAndPublishMultiTenantで致命的なエラー:', error.message, error.stack);
+    console.error('saveAndPublishで致命的なエラー:', error.message, error.stack);
     throw new Error('設定の保存と公開中にサーバーエラーが発生しました: ' + error.message);
   } finally {
     lock.releaseLock();
@@ -1532,7 +1433,7 @@ function saveAndPublishMultiTenant(requestUserId, sheetName, config) {
  * @param {string} sheetName - シート名
  * @returns {boolean} 新規または更新フォームの場合true
  */
-function checkIfNewOrUpdatedFormMultiTenant(requestUserId, spreadsheetId, sheetName) {
+function checkIfNewOrUpdatedForm(requestUserId, spreadsheetId, sheetName) {
   verifyUserAccess(requestUserId);
   try {
     const userInfo = getUserInfo(requestUserId);
@@ -1541,14 +1442,14 @@ function checkIfNewOrUpdatedFormMultiTenant(requestUserId, spreadsheetId, sheetN
     // 現在のスプレッドシートIDが以前と異なる場合（新しいフォーム）
     const currentSpreadsheetId = configJson.publishedSpreadsheetId;
     if (currentSpreadsheetId !== spreadsheetId) {
-      console.log('checkIfNewOrUpdatedFormMultiTenant: 新しいスプレッドシート検出');
+      console.log('checkIfNewOrUpdatedForm: 新しいスプレッドシート検出');
       return true;
     }
 
     // 現在のシート名が以前と異なる場合（新しいシート）
     const currentSheetName = configJson.publishedSheetName;
     if (currentSheetName !== sheetName) {
-      console.log('checkIfNewOrUpdatedFormMultiTenant: 新しいシート検出');
+      console.log('checkIfNewOrUpdatedForm: 新しいシート検出');
       return true;
     }
 
@@ -1559,15 +1460,15 @@ function checkIfNewOrUpdatedFormMultiTenant(requestUserId, spreadsheetId, sheetN
     const thirtyMinutes = 30 * 60 * 1000; // 30分をミリ秒で
 
     if (timeDiff < thirtyMinutes) {
-      console.log('checkIfNewOrUpdatedFormMultiTenant: 最近作成されたフォーム検出');
+      console.log('checkIfNewOrUpdatedForm: 最近作成されたフォーム検出');
       return true;
     }
 
-    console.log('checkIfNewOrUpdatedFormMultiTenant: 既存フォームの設定更新');
+    console.log('checkIfNewOrUpdatedForm: 既存フォームの設定更新');
     return false;
 
   } catch (error) {
-    console.error('checkIfNewOrUpdatedFormMultiTenant error:', error.message);
+    console.error('checkIfNewOrUpdatedForm error:', error.message);
     // エラーの場合は安全側に倒して新規扱い
     return true;
   }
@@ -1581,7 +1482,7 @@ function checkIfNewOrUpdatedFormMultiTenant(requestUserId, spreadsheetId, sheetN
  * @param {object} config - 設定オブジェクト
  * @param {object} displayOptions - 表示オプション
  */
-function saveSheetConfigBatchMultiTenant(requestUserId, spreadsheetId, sheetName, config, displayOptions) {
+function saveSheetConfigBatch(requestUserId, spreadsheetId, sheetName, config, displayOptions) {
   verifyUserAccess(requestUserId);
   try {
     // 一度のユーザー情報取得で全処理を実行
@@ -1613,10 +1514,10 @@ function saveSheetConfigBatchMultiTenant(requestUserId, spreadsheetId, sheetName
     // 関連キャッシュを無効化してUI即座反映
     invalidateUserCache(userInfo.userId, userInfo.adminEmail, spreadsheetId, false);
 
-    console.log('saveSheetConfigBatchMultiTenant: 統合更新完了');
-    console.log('saveSheetConfigBatchMultiTenant: 更新内容 - spreadsheetId:', spreadsheetId, 'sheetName:', sheetName);
+    console.log('saveSheetConfigBatch: 統合更新完了');
+    console.log('saveSheetConfigBatch: 更新内容 - spreadsheetId:', spreadsheetId, 'sheetName:', sheetName);
   } catch (error) {
-    console.error('saveSheetConfigBatchMultiTenant error:', error.message);
+    console.error('saveSheetConfigBatch error:', error.message);
     throw new Error('バッチ処理中にエラーが発生しました: ' + error.message);
   }
 }
@@ -1628,7 +1529,7 @@ function saveSheetConfigBatchMultiTenant(requestUserId, spreadsheetId, sheetName
  * @param {object} config - 設定オブジェクト
  * @returns {object} 保存完了メッセージ
  */
-function saveDraftConfigMultiTenant(requestUserId, sheetName, config) {
+function saveDraftConfig(requestUserId, sheetName, config) {
   verifyUserAccess(requestUserId);
   try {
     if (typeof sheetName !== 'string' || !sheetName) {
@@ -1638,7 +1539,7 @@ function saveDraftConfigMultiTenant(requestUserId, sheetName, config) {
       throw new Error('無効なconfigオブジェクトです。設定オブジェクトは必須です。');
     }
 
-    console.log('saveDraftConfigMultiTenant開始: sheetName=%s', sheetName);
+    console.log('saveDraftConfig開始: sheetName=%s', sheetName);
 
     const userInfo = getUserInfo(requestUserId);
     if (!userInfo || !userInfo.spreadsheetId) {
@@ -1651,7 +1552,7 @@ function saveDraftConfigMultiTenant(requestUserId, sheetName, config) {
     // 関連キャッシュをクリア
     invalidateUserCache(userInfo.userId, userInfo.adminEmail, userInfo.spreadsheetId, false);
 
-    console.log('saveDraftConfigMultiTenant: 設定保存完了');
+    console.log('saveDraftConfig: 設定保存完了');
 
     return {
       success: true,
@@ -1659,7 +1560,7 @@ function saveDraftConfigMultiTenant(requestUserId, sheetName, config) {
     };
 
   } catch (error) {
-    console.error('saveDraftConfigMultiTenantで致命的なエラー:', error.message, error.stack);
+    console.error('saveDraftConfigで致命的なエラー:', error.message, error.stack);
     throw new Error('設定の保存中にサーバーエラーが発生しました: ' + error.message);
   }
 }
@@ -1670,54 +1571,6 @@ function saveDraftConfigMultiTenant(requestUserId, sheetName, config) {
  * @param {string} sheetName - シート名
  * @param {object} overrides - 上書き設定
  */
-function autoMapSheetHeadersMultiTenant(requestUserId, sheetName, overrides) {
-  verifyUserAccess(requestUserId);
-  try {
-    var headers = getSheetHeadersForAdminPanelMultiTenant(requestUserId, sheetName);
-    if (!headers || headers.length === 0) {
-      return null;
-    }
-
-    // 新しい高精度自動判定機能を使用
-    const mappingResult = autoMapHeaders(headers, sheetName);
-
-    // モーダル入力値による上書き
-    if (overrides) {
-      if (overrides.mainQuestion) {
-        const match = headers.find(h => String(h).trim() === overrides.mainQuestion.trim());
-        if (match) mappingResult.opinionHeader = match;
-      }
-      if (overrides.reasonQuestion) {
-        const match = headers.find(h => String(h).trim() === overrides.reasonQuestion.trim());
-        if (match) mappingResult.reasonHeader = match;
-      }
-      if (overrides.nameQuestion) {
-        const match = headers.find(h => String(h).trim() === overrides.nameQuestion.trim());
-        if (match) mappingResult.nameHeader = match;
-      }
-      if (overrides.classQuestion) {
-        const match = headers.find(h => String(h).trim() === overrides.classQuestion.trim());
-        if (match) mappingResult.classHeader = match;
-      }
-    }
-
-    // 従来のフォーマットに変換（後方互換性のため）
-    var mapping = {
-      mainHeader: mappingResult.opinionHeader || '',
-      rHeader: mappingResult.reasonHeader || '',
-      nameHeader: mappingResult.nameHeader || '',
-      classHeader: mappingResult.classHeader || ''
-    };
-
-    debugLog('高精度自動マッピング結果 for ' + sheetName + ': ' + JSON.stringify(mapping));
-    return mapping;
-
-  } catch (e) {
-    console.error('autoMapSheetHeadersMultiTenant エラー: ' + e.message);
-    return null;
-  }
-}
-
 
 /**
  * シートを切り替える
@@ -1827,7 +1680,7 @@ function setDisplayOptions(options) {
  * 管理者からボードを作成
  * AdminPanel.htmlから呼び出される
  */
-function createBoardFromAdminMultiTenant(requestUserId) {
+function createBoardFromAdmin(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
     var activeUserEmail = Session.getActiveUser().getEmail();
@@ -1880,7 +1733,7 @@ function createBoardFromAdminMultiTenant(requestUserId) {
  * Registration.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function getExistingBoardMultiTenant(requestUserId) {
+function getExistingBoard(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
     var activeUserEmail = Session.getActiveUser().getEmail();
@@ -1905,7 +1758,7 @@ function getExistingBoardMultiTenant(requestUserId) {
       };
     }
   } catch (e) {
-    console.error('getExistingBoardMultiTenant エラー: ' + e.message);
+    console.error('getExistingBoard エラー: ' + e.message);
     return { status: 'error', message: '既存ボード情報の取得に失敗しました: ' + e.message };
   }
 }
@@ -1915,7 +1768,7 @@ function getExistingBoardMultiTenant(requestUserId) {
  * Registration.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function verifyUserAuthenticationMultiTenant(requestUserId) {
+function verifyUserAuthentication(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
     var email = Session.getActiveUser().getEmail();
@@ -1925,7 +1778,7 @@ function verifyUserAuthenticationMultiTenant(requestUserId) {
       return { authenticated: false, email: null };
     }
   } catch (e) {
-    console.error('verifyUserAuthenticationMultiTenant エラー: ' + e.message);
+    console.error('verifyUserAuthentication エラー: ' + e.message);
     return { authenticated: false, email: null, error: e.message };
   }
 }
@@ -1936,7 +1789,7 @@ function verifyUserAuthenticationMultiTenant(requestUserId) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  * @returns {{success:boolean,error:(string|undefined)}}
  */
-function resetUserAuthenticationMultiTenant(requestUserId) {
+function resetUserAuthentication(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
     var email = Session.getActiveUser().getEmail();
@@ -1945,7 +1798,7 @@ function resetUserAuthenticationMultiTenant(requestUserId) {
     }
     return { success: true };
   } catch (e) {
-    console.error('resetUserAuthenticationMultiTenant エラー: ' + e.message);
+    console.error('resetUserAuthentication エラー: ' + e.message);
     return { success: false, error: e.message };
   }
 }
@@ -1958,12 +1811,12 @@ function resetUserAuthenticationMultiTenant(requestUserId) {
  * @param {string} sheetName - シート名
  * @returns {object} { allHeaders: Array<string>, guessedConfig: object, existingConfig: object }
  */
-function getSheetDetailsMultiTenant(requestUserId, spreadsheetId, sheetName) {
+function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
   try {
     if (!sheetName) {
       throw new Error('sheetNameは必須です');
     }
-    var targetId = spreadsheetId || getEffectiveSpreadsheetIdMultiTenant(requestUserId);
+    var targetId = spreadsheetId || getEffectiveSpreadsheetId(requestUserId);
     if (!targetId) {
       throw new Error('spreadsheetIdが取得できません');
     }
@@ -1982,9 +1835,9 @@ function getSheetDetailsMultiTenant(requestUserId, spreadsheetId, sheetName) {
 
     let existing = {};
     try {
-      existing = getConfigMultiTenant(requestUserId, sheetName, true) || {};
+      existing = getConfig(requestUserId, sheetName, true) || {};
     } catch (e) {
-      console.warn('getConfigMultiTenant failed in getSheetDetailsMultiTenant:', e.message);
+      console.warn('getConfig failed in getSheetDetails:', e.message);
     }
 
     return {

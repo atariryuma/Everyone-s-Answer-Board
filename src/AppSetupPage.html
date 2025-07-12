@@ -307,7 +307,7 @@
                 .withFailureHandler((error) => {
                     showMessage(`ステータス取得エラー: ${error.message || error}`, 'error');
                 })
-                .getCurrentUserStatusMultiTenant(__USER_ID__);
+                .getCurrentUserStatus(__USER_ID__);
         }
 
         // ステータス表示を更新
@@ -387,7 +387,7 @@
                         console.error('Update error:', error);
                         showMessage(`❌ 更新に失敗しました: ${error.message || error}`, 'error');
                     })
-                    .updateIsActiveStatusMultiTenant(__USER_ID__, isActive);
+                    .updateIsActiveStatus(__USER_ID__, isActive);
                     
             } catch (error) {
                 showMessage(`❌ ${error.message}`, 'error');
@@ -466,7 +466,7 @@
                     showMessage(`エラー: ${error.message || error}`, 'error');
                     loadingDiv.classList.add('hidden');
                 })
-                .getAllUsersForAdminForUIMultiTenant(__USER_ID__);
+                .getAllUsersForAdminForUI(__USER_ID__);
         }
 
         // ユーザー一覧をテーブルに表示
@@ -565,7 +565,7 @@
                     confirmBtn.disabled = false;
                     confirmBtn.textContent = '削除実行';
                 })
-                .deleteUserAccountByAdminForUIMultiTenant(__USER_ID__, userToDelete.userId, reason);
+                .deleteUserAccountByAdminForUI(__USER_ID__, userToDelete.userId, reason);
         }
 
         // 削除ログを表示
@@ -591,7 +591,7 @@
                     showMessage(`エラー: ${error.message || error}`, 'error');
                     loadingDiv.classList.add('hidden');
                 })
-                .getDeletionLogsForUIMultiTenant(__USER_ID__);
+                .getDeletionLogsForUI(__USER_ID__);
         }
 
         // 削除ログをテーブルに表示
