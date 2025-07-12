@@ -610,11 +610,13 @@ function saveAndActivateSheet(spreadsheetId, sheetName, config) {
     const finalStatus = getStatus(true);
     console.log('saveAndActivateSheet: 統合処理完了');
     
-    // 6. フォーム作成直後の場合は自動で公開準備まで進める
-    if (finalStatus && finalStatus.setupStep <= 2) {
-      console.log('saveAndActivateSheet: 新規フォーム作成後の自動化開始');
+    // 6. 新しいスプレッドシートまたは設定変更時に自動で公開準備まで進める
+    const isNewOrUpdatedForm = checkIfNewOrUpdatedForm(spreadsheetId, sheetName);
+    if (finalStatus && isNewOrUpdatedForm) {
+      console.log('saveAndActivateSheet: 新規/更新フォーム作成後の自動化開始');
       finalStatus.readyToPublish = true;
       finalStatus.autoShowPublishDialog = true;
+      finalStatus.isNewForm = true;
     }
 
     return finalStatus;
@@ -679,6 +681,52 @@ function saveAndPublish(sheetName, config) {
 }
 
 /**
+ * 新しいフォームまたは更新されたフォームかどうかを判定
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {boolean} 新規または更新フォームの場合true
+ */
+function checkIfNewOrUpdatedForm(spreadsheetId, sheetName) {
+  try {
+    const userInfo = getUserInfo();
+    const configJson = JSON.parse(userInfo.configJson || '{}');
+    
+    // 現在のスプレッドシートIDが以前と異なる場合（新しいフォーム）
+    const currentSpreadsheetId = configJson.publishedSpreadsheetId;
+    if (currentSpreadsheetId !== spreadsheetId) {
+      console.log('checkIfNewOrUpdatedForm: 新しいスプレッドシート検出');
+      return true;
+    }
+    
+    // 現在のシート名が以前と異なる場合（新しいシート）
+    const currentSheetName = configJson.publishedSheetName;
+    if (currentSheetName !== sheetName) {
+      console.log('checkIfNewOrUpdatedForm: 新しいシート検出');
+      return true;
+    }
+    
+    // 最近作成されたスプレッドシートの場合（作成から30分以内）
+    const createdAt = new Date(userInfo.createdAt || 0);
+    const now = new Date();
+    const timeDiff = now.getTime() - createdAt.getTime();
+    const thirtyMinutes = 30 * 60 * 1000; // 30分をミリ秒で
+    
+    if (timeDiff < thirtyMinutes) {
+      console.log('checkIfNewOrUpdatedForm: 最近作成されたフォーム検出');
+      return true;
+    }
+    
+    console.log('checkIfNewOrUpdatedForm: 既存フォームの設定更新');
+    return false;
+    
+  } catch (error) {
+    console.error('checkIfNewOrUpdatedForm error:', error.message);
+    // エラーの場合は安全側に倒して新規扱い
+    return true;
+  }
+}
+
+/**
  * バッチ処理で設定保存・シート切り替え・表示オプション設定を統合実行
  * @param {string} spreadsheetId - スプレッドシートID
  * @param {string} sheetName - シート名
@@ -708,10 +756,15 @@ function saveSheetConfigBatch(spreadsheetId, sheetName, config, displayOptions) 
     // 一回のAPI呼び出しで全ての設定を更新
     updateUser(userInfo.userId, {
       configJson: JSON.stringify(configJson),
-      lastAccessedAt: new Date().toISOString()
+      lastAccessedAt: new Date().toISOString(),
+      spreadsheetId: spreadsheetId // スプレッドシートIDも更新
     });
     
+    // 関連キャッシュを無効化してUI即座反映
+    invalidateUserCache(userInfo.userId, userInfo.adminEmail, spreadsheetId);
+    
     console.log('saveSheetConfigBatch: 統合更新完了');
+    console.log('saveSheetConfigBatch: 更新内容 - spreadsheetId:', spreadsheetId, 'sheetName:', sheetName);
   } catch (error) {
     console.error('saveSheetConfigBatch error:', error.message);
     throw new Error('バッチ処理中にエラーが発生しました: ' + error.message);

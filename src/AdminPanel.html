@@ -78,10 +78,17 @@
   if (shouldUpdateUrl === 'true' && correctUrl && correctUrl !== '') {
     console.log('Updating URL to:', correctUrl);
     try {
-      // ブラウザのURL表示を更新（リダイレクトせずに）
-      if (window.history && window.history.replaceState) {
-        window.history.replaceState({}, '', correctUrl);
-        console.log('URL updated successfully to:', correctUrl);
+      // セキュリティ制限のため、同一オリジンでのみURL更新を実行
+      const currentOrigin = window.location.origin;
+      const targetUrl = new URL(correctUrl);
+      
+      if (currentOrigin === targetUrl.origin || window.top === window) {
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState({}, '', correctUrl);
+          console.log('URL updated successfully to:', correctUrl);
+        }
+      } else {
+        console.log('URL update skipped due to cross-origin restrictions');
       }
     } catch (e) {
       console.warn('Failed to update URL:', e);
@@ -1474,10 +1481,19 @@
     // 自動公開ダイアログのチェック
     function checkAutoPublishDialog(status) {
       if (status && status.autoShowPublishDialog && status.readyToPublish) {
-        console.log('Auto-showing publish dialog');
+        console.log('Auto-showing publish dialog for new/updated form');
+        
+        // 新しいフォームの場合はより積極的に表示
+        const delay = status.isNewForm ? 500 : 1000;
+        
         setTimeout(function() {
           showPublishConfirmDialog();
-        }, 1000); // 1秒後に表示
+          
+          // フラグをリセットして重複表示を防ぐ
+          if (currentStatus) {
+            currentStatus.autoShowPublishDialog = false;
+          }
+        }, delay);
       }
     }
 
