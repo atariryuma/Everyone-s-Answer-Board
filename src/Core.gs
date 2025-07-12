@@ -3923,40 +3923,6 @@ function addFormUrlMultiTenant(requestUserId, formUrl) {
   }
 }
 
-/**
- * マルチテナント対応: 追加フォーム作成
- * @param {string} requestUserId - リクエストされたユーザーID
- * @param {string} title - フォームタイトル
- * @returns {Object} 実行結果
- */
-function createAdditionalFormMultiTenant(requestUserId, title) {
-  try {
-    console.log('createAdditionalFormMultiTenant - requestUserId:', requestUserId, 'title:', title);
-    
-    // セキュリティチェック
-    const currentUserEmail = Session.getActiveUser().getEmail();
-    const requestedUserInfo = findUserById(requestUserId);
-    
-    if (!requestedUserInfo || requestedUserInfo.adminEmail !== currentUserEmail) {
-      throw new Error('権限がありません');
-    }
-    
-    clearExecutionUserInfoCache();
-    const userInfo = getCachedUserInfo(requestUserId);
-    if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません');
-    }
-    
-    // 従来のcreateAdditionalForm処理を実行
-    const result = createAdditionalForm(title);
-    
-    return result;
-  } catch (e) {
-    console.error('createAdditionalFormMultiTenant error:', e.message);
-    return { status: 'error', message: '追加フォームの作成に失敗しました: ' + e.message };
-  }
-}
-
 // =================================================================
 // 追加のマルチテナント対応関数群
 // =================================================================

@@ -3085,7 +3085,7 @@ function syncCheckboxStates(status) {
         hideFormConfigModal();
         setLoading(true, '新しいフォームを作成しています...');
 
-        runGasWithUserId('createAdditionalFormMultiTenant', config)
+        runGasWithUserId('createAdditionalFormWithConfigMultiTenant', config)
             .then(function(result) {
                 if (result.status === 'success') {
                     showMessage('✅ 新しいフォームが作成され、連携されました！', 'success');
