@@ -2609,15 +2609,25 @@ function getSheetsList(userId) {
     // キャッシュの使用を試行、失敗時は直接実行
     try {
       if (typeof cacheManager !== 'undefined' && cacheManager) {
-        return cacheManager.get(cacheKey, () => {
+        debugLog('getSheetsList: Using cacheManager');
+        const result = cacheManager.get(cacheKey, () => {
+          debugLog('getSheetsList: Cache miss, executing getSheetsListInternal');
           return getSheetsListInternal(userId);
         }, { ttl: 1800 }); // 30分間キャッシュ
+        debugLog('getSheetsList: cacheManager.get returned:', result);
+        
+        if (result === undefined || result === null) {
+          console.warn('getSheetsList: cacheManager returned undefined/null, falling back to direct execution');
+          return getSheetsListInternal(userId);
+        }
+        return result;
       } else {
         debugLog('getSheetsList: cacheManager not available, executing directly');
         return getSheetsListInternal(userId);
       }
     } catch (cacheError) {
       console.warn('getSheetsList: Cache error, falling back to direct execution:', cacheError.message);
+      console.warn('getSheetsList: Cache error details:', cacheError.stack);
       return getSheetsListInternal(userId);
     }
     
@@ -3209,10 +3219,12 @@ function getStatus(requestUserId, forceRefresh = false) {
       debugLog('getStatus: Auto-repairing missing publishedSpreadsheetId');
       const repairResult = repairUserConfigJson(requestUserId);
       if (repairResult.status === 'success') {
-        // 修復後、最新のユーザー情報を再取得
+        // 修復後、キャッシュをクリアして最新のユーザー情報を再取得
+        invalidateUserCache(requestUserId, userInfo.adminEmail, userInfo.spreadsheetId, true);
         userInfo = findUserById(requestUserId);
         // configJsonも更新
         configJson = JSON.parse(userInfo.configJson || '{}');
+        debugLog('getStatus: After repair - formCreated:', configJson.formCreated, 'setupStatus:', configJson.setupStatus);
       }
     }
     
@@ -3221,9 +3233,21 @@ function getStatus(requestUserId, forceRefresh = false) {
     try {
       if (userInfo.spreadsheetId) {
         debugLog('getStatus: Attempting to get sheet list for userId:', requestUserId);
+        debugLog('getStatus: userInfo.spreadsheetId:', userInfo.spreadsheetId);
         const sheets = getSheetsList(requestUserId);
         debugLog('getStatus: getSheetsList returned:', sheets);
-        sheetNames = sheets || [];
+        debugLog('getStatus: getSheetsList type:', typeof sheets);
+        
+        if (sheets === undefined) {
+          console.warn('getStatus: getSheetsList returned undefined, trying direct call');
+          const directSheets = getSheetsListInternal(requestUserId);
+          debugLog('getStatus: getSheetsListInternal returned:', directSheets);
+          sheetNames = directSheets || [];
+        } else {
+          sheetNames = sheets || [];
+        }
+      } else {
+        console.warn('getStatus: No spreadsheetId found in userInfo');
       }
     } catch (sheetError) {
       console.error('スプレッドシート情報の取得に失敗:', sheetError.message);
@@ -3562,10 +3586,12 @@ function repairUserConfigJson(requestUserId) {
       }
       
       // フォーム作成状態を正しく設定
-      if (configJson.formUrl && !configJson.formCreated) {
+      // スプレッドシートIDがあるということは、フォームも作成済みである
+      if (userInfo.spreadsheetId && !configJson.formCreated) {
         configJson.formCreated = true;
         configJson.setupStatus = 'completed';
-        console.log('repairUserConfigJson: Set formCreated to true');
+        configJson.appPublished = true; // スプレッドシートがあれば公開可能
+        console.log('repairUserConfigJson: Set formCreated=true, setupStatus=completed, appPublished=true');
       }
       
       // 更新

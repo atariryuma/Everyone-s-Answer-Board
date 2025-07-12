@@ -2726,6 +2726,15 @@ function syncCheckboxStates(status) {
         });
         select.disabled = false;
         console.log('populateSheetSelect: After adding options, innerHTML:', select.innerHTML);
+      } else if (activeSheetName) {
+        // sheetNamesがない場合でも、activeSheetNameがあれば追加
+        console.log('populateSheetSelect: No sheetNames but activeSheetName exists, adding it:', activeSheetName);
+        const option = document.createElement('option');
+        option.value = activeSheetName;
+        option.textContent = activeSheetName;
+        select.appendChild(option);
+        select.disabled = false;
+        console.log('populateSheetSelect: Added activeSheetName as option:', activeSheetName);
       } else {
         select.innerHTML = '<option value="">利用可能なシートがありません</option>';
         select.disabled = true;
