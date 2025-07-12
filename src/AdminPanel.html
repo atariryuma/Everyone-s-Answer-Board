@@ -3038,6 +3038,7 @@ function syncCheckboxStates(status) {
      * フォーム設定に基づいてフォームを作成
      */
     function createFormWithConfig() {
+        const customFormTitle = document.getElementById('custom-form-title').value.trim();
         const customMainQuestion = document.getElementById('custom-main-question').value.trim();
         const mainQuestionType = document.getElementById('main-question-type').value;
         const mainQuestionChoices = document.getElementById('main-question-choices').value.split('\n').filter(choice => choice.trim());
@@ -3046,30 +3047,38 @@ function syncCheckboxStates(status) {
         const classChoices = enableClassSelection ? document.getElementById('class-choices').value.split('\n').filter(choice => choice.trim()) : [];
 
         // バリデーション
+        if (!customFormTitle) {
+            showMessage('フォームタイトルを入力してください。', 'warning');
+            document.getElementById('custom-form-title').focus();
+            return;
+        }
+
         if (!customMainQuestion) {
-            showMessage('問題文を入力してください。', 'warning');
+            showMessage('質問内容を入力してください。', 'warning');
+            document.getElementById('custom-main-question').focus();
             return;
         }
 
         if ((mainQuestionType === 'multiple' || mainQuestionType === 'choice') && mainQuestionChoices.length === 0) {
             showMessage('選択肢を入力してください。', 'warning');
+            document.getElementById('main-question-choices').focus();
             return;
         }
 
         const config = {
-            classChoices: classChoices,
-            mainQuestionType: mainQuestionType,
-            mainQuestionChoices: mainQuestionChoices,
-            autoName: true, // 常にオン
-            autoReason: true, // 常にオン
-            customMainQuestion: customMainQuestion,
-            enableClassSelection: enableClassSelection
+            formTitle: customFormTitle,
+            mainQuestion: customMainQuestion,
+            questionType: mainQuestionType,
+            choices: mainQuestionChoices,
+            includeOthers: includeOthersOption,
+            enableClass: enableClassSelection,
+            classChoices: classChoices
         };
 
         hideFormConfigModal();
         setLoading(true, '新しいフォームを作成しています...');
 
-        runGasWithUserId('createAdditionalFormWithConfig', config)
+        runGasWithUserId('createCustomFormUI', config)
             .then(function(result) {
                 if (result.status === 'success') {
                     showMessage('✅ 新しいフォームが作成され、連携されました！', 'success');
@@ -3277,14 +3286,49 @@ function syncCheckboxStates(status) {
         </div>
         
         <div class="space-y-6">
+          <!-- ステップ0: フォームタイトルの設定 -->
+          <div class="glass-panel bg-cyan-500/5 border border-cyan-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-cyan-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm0 2h12v8H4V6z"/>
+                  <path d="M6 8h8v2H6V8zm0 4h6v2H6v-2z"/>
+                </svg>
+              </div>
+              <h4 class="text-lg font-semibold text-cyan-400">フォームタイトル</h4>
+              <span class="text-xs text-gray-400 bg-gray-700/50 px-2 py-1 rounded">必須</span>
+            </div>
+            <input 
+              type="text" 
+              id="custom-form-title" 
+              class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-colors" 
+              placeholder="例：国語の授業振り返り、理科実験レポート、今日の学習まとめ"
+              maxlength="100"
+            >
+            <div class="flex justify-between items-center mt-2">
+              <p class="text-xs text-gray-400">📝 作成されるフォームのタイトルに使用されます（自動で日時が追加されます）</p>
+              <span class="text-xs text-gray-500" id="title-counter">0/100</span>
+            </div>
+          </div>
+
           <!-- ステップ1: 問題文の入力 -->
           <div class="glass-panel bg-blue-500/5 border border-blue-400/20 rounded-lg p-4">
             <div class="flex items-center gap-2 mb-3">
               <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
-              <h4 class="text-lg font-semibold text-blue-400">問題文を入力</h4>
+              <h4 class="text-lg font-semibold text-blue-400">質問内容を入力</h4>
+              <span class="text-xs text-gray-400 bg-gray-700/50 px-2 py-1 rounded">必須</span>
             </div>
-            <textarea id="custom-main-question" rows="3" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors" placeholder="例：今日のテーマについて、あなたの考えや意見を聞かせてください"></textarea>
-            <p class="text-xs text-gray-400 mt-2">学習者に表示される質問文を入力してください</p>
+            <textarea 
+              id="custom-main-question" 
+              rows="3" 
+              class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors" 
+              placeholder="例：今日の授業で学んだことの中で、最も印象に残ったことは何ですか？"
+              maxlength="500"
+            ></textarea>
+            <div class="flex justify-between items-center mt-2">
+              <p class="text-xs text-gray-400">💡 学習者に表示される質問文を入力してください</p>
+              <span class="text-xs text-gray-500" id="question-counter">0/500</span>
+            </div>
           </div>
 
           <!-- ステップ2: 回答方法の選択 -->
@@ -3350,6 +3394,47 @@ function syncCheckboxStates(status) {
       </div>
     </div>
   </div>
+
+  <!-- フォーム設定モーダル用JavaScript -->
+  <script>
+  // 文字数カウンター機能
+  function setupCharacterCounters() {
+    const titleInput = document.getElementById('custom-form-title');
+    const questionTextarea = document.getElementById('custom-main-question');
+    const titleCounter = document.getElementById('title-counter');
+    const questionCounter = document.getElementById('question-counter');
+
+    if (titleInput && titleCounter) {
+      titleInput.addEventListener('input', function() {
+        const count = this.value.length;
+        titleCounter.textContent = `${count}/100`;
+        titleCounter.className = count > 90 ? 'text-xs text-red-400' : 'text-xs text-gray-500';
+      });
+    }
+
+    if (questionTextarea && questionCounter) {
+      questionTextarea.addEventListener('input', function() {
+        const count = this.value.length;
+        questionCounter.textContent = `${count}/500`;
+        questionCounter.className = count > 450 ? 'text-xs text-red-400' : 'text-xs text-gray-500';
+      });
+    }
+  }
+
+  // モーダル表示時にカウンターを初期化
+  document.addEventListener('DOMContentLoaded', function() {
+    setupCharacterCounters();
+  });
+
+  // フォーム設定モーダルが開かれたときにカウンターをリセット
+  const originalShowFormConfigModal = window.showFormConfigModal;
+  if (typeof originalShowFormConfigModal === 'function') {
+    window.showFormConfigModal = function() {
+      originalShowFormConfigModal();
+      setTimeout(setupCharacterCounters, 100); // モーダル表示後にセットアップ
+    };
+  }
+  </script>
 
 </body>
 </html>

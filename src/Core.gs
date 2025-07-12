@@ -1913,7 +1913,69 @@ function getSavedClassChoices(userId) {
 }
 
 /**
- * カスタム設定でStudyQuestフォームを作成
+ * クイックスタート用フォーム作成（デフォルト設定）
+ * @param {string} userEmail - ユーザーメールアドレス
+ * @param {string} userId - ユーザーID
+ * @returns {Object} フォーム作成結果
+ */
+function createQuickStartForm(userEmail, userId) {
+  try {
+    const now = new Date();
+    const dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm:ss');
+    const formTitle = `みんなの回答ボード - ${dateTimeString}`;
+    
+    const defaultConfig = {
+      mainQuestion: '今日の学習について、あなたの考えや感想を聞かせてください',
+      questionType: 'text',
+      enableClass: false,
+      includeOthers: false
+    };
+    
+    return createFormFactory({
+      userEmail: userEmail,
+      userId: userId,
+      formTitle: formTitle,
+      questions: 'custom',
+      formDescription: 'このフォームに回答すると、みんなの回答ボードに反映されます。',
+      customConfig: defaultConfig
+    });
+  } catch (error) {
+    console.error('createQuickStartForm Error:', error.message);
+    throw new Error('クイックスタートフォームの作成に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * カスタムフォーム作成（管理パネル用）
+ * @param {string} userEmail - ユーザーメールアドレス
+ * @param {string} userId - ユーザーID
+ * @param {Object} config - カスタム設定
+ * @returns {Object} フォーム作成結果
+ */
+function createCustomForm(userEmail, userId, config) {
+  try {
+    const now = new Date();
+    const dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm:ss');
+    const baseTitle = config.formTitle || 'カスタムフォーム';
+    const formTitle = `${baseTitle} - ${dateTimeString}`;
+    
+    return createFormFactory({
+      userEmail: userEmail,
+      userId: userId,
+      formTitle: formTitle,
+      questions: 'custom',
+      formDescription: 'このフォームに回答すると、みんなの回答ボードに反映されます。',
+      customConfig: config
+    });
+  } catch (error) {
+    console.error('createCustomForm Error:', error.message);
+    throw new Error('カスタムフォームの作成に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * カスタム設定でStudyQuestフォームを作成（廃止予定）
+ * @deprecated createCustomFormを使用してください
  */
 function createStudyQuestFormWithConfig(userEmail, userId, formTitle, config) {
   try {
@@ -3561,17 +3623,16 @@ function getAllUsersForAdminForUI(requestUserId) {
 }
 
 /**
- * カスタム設定でフォームを作成（AdminPanel.html用ラッパー）
+ * カスタムフォーム作成（AdminPanel.html用ラッパー）
  * @param {string} requestUserId - リクエスト元のユーザーID
  * @param {object} config - フォーム設定
  */
-function createAdditionalFormWithConfig(requestUserId, config) {
+function createCustomFormUI(requestUserId, config) {
   try {
     verifyUserAccess(requestUserId);
     const activeUserEmail = Session.getActiveUser().getEmail();
-    const formTitle = config.formTitle || 'カスタムフォーム';
     
-    const result = createStudyQuestFormWithConfig(activeUserEmail, requestUserId, formTitle, config);
+    const result = createCustomForm(activeUserEmail, requestUserId, config);
     
     // 既存ユーザーの情報を更新（スプレッドシート情報を追加）
     const existingUser = findUserById(requestUserId);
@@ -3600,12 +3661,66 @@ function createAdditionalFormWithConfig(requestUserId, config) {
       formTitle: result.formTitle
     };
   } catch (error) {
-    console.error('createAdditionalFormWithConfig error:', error.message);
+    console.error('createCustomFormUI error:', error.message);
     return {
       status: 'error',
       message: error.message
     };
   }
+}
+
+/**
+ * クイックスタート用フォーム作成（UI用ラッパー）
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ */
+function createQuickStartFormUI(requestUserId) {
+  try {
+    verifyUserAccess(requestUserId);
+    const activeUserEmail = Session.getActiveUser().getEmail();
+    
+    const result = createQuickStartForm(activeUserEmail, requestUserId);
+    
+    // 既存ユーザーの情報を更新
+    const existingUser = findUserById(requestUserId);
+    if (existingUser) {
+      const updatedConfigJson = JSON.parse(existingUser.configJson || '{}');
+      updatedConfigJson.formUrl = result.viewFormUrl || result.formUrl;
+      updatedConfigJson.editFormUrl = result.editFormUrl;
+      updatedConfigJson.formCreated = true;
+      updatedConfigJson.setupStatus = 'completed';
+      updatedConfigJson.appPublished = true;
+      
+      const updateData = {
+        spreadsheetId: result.spreadsheetId,
+        spreadsheetUrl: result.spreadsheetUrl,
+        configJson: JSON.stringify(updatedConfigJson),
+        lastAccessedAt: new Date().toISOString()
+      };
+      
+      updateUser(requestUserId, updateData);
+    }
+    
+    return {
+      status: 'success',
+      message: 'クイックスタートフォームが正常に作成されました！',
+      formUrl: result.formUrl,
+      spreadsheetUrl: result.spreadsheetUrl,
+      formTitle: result.formTitle
+    };
+  } catch (error) {
+    console.error('createQuickStartFormUI error:', error.message);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+
+/**
+ * @deprecated createCustomFormUIを使用してください
+ */
+function createAdditionalFormWithConfig(requestUserId, config) {
+  return createCustomFormUI(requestUserId, config);
 }
 
 /**
