@@ -646,7 +646,7 @@ function deleteCurrentUserAccount() {
       console.log('Found database sheet with sheetId:', targetSheetId);
       
       // データを取得
-      var data = batchGetSheetsData(service, dbId, [\"'\" + sheetName + \"'!A:H\"]);
+      var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
       var values = data.valueRanges[0].values || [];
       
       // ユーザーIDに基づいて行を探す（A列がIDと仮定）
