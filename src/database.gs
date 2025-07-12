@@ -949,9 +949,8 @@ function getDbSheet() {
  * 現在のユーザーのアカウント情報をデータベースから完全に削除する
  * @returns {string} 成功メッセージ
  */
-function deleteCurrentUserAccount() {
+function deleteUserAccount(userId) {
   try {
-    const userId = getUserId();
     if (!userId) {
       throw new Error('ユーザーが特定できません。');
     }

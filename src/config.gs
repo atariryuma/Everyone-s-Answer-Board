@@ -690,11 +690,11 @@ function saveAndPublishMultiTenant(requestUserId, sheetName, config) {
     console.log('saveAndPublishMultiTenant: 公開処理開始');
 
     // 2. 設定を保存
-    saveSheetConfig(spreadsheetId, sheetName, config);
+    saveSheetConfig(requestUserId, spreadsheetId, sheetName, config);
     console.log('saveAndPublishMultiTenant: 設定保存完了');
 
     // 3. シートをアクティブ化
-    switchToSheet(spreadsheetId, sheetName);
+    switchToSheet(requestUserId, spreadsheetId, sheetName);
     console.log('saveAndPublishMultiTenant: シート切り替え完了');
 
     // 4. 表示オプションを更新
@@ -840,7 +840,7 @@ function saveDraftConfigMultiTenant(requestUserId, sheetName, config) {
     }
 
     // 設定を保存
-    saveSheetConfig(userInfo.spreadsheetId, sheetName, config);
+    saveSheetConfig(requestUserId, userInfo.spreadsheetId, sheetName, config);
 
     // 関連キャッシュをクリア
     invalidateUserCache(userInfo.userId, userInfo.adminEmail, userInfo.spreadsheetId, false);
@@ -896,7 +896,7 @@ function activateSheetMultiTenant(requestUserId, spreadsheetId, sheetName) {
     }
 
     // シートをアクティブ化（効率化）
-    const switchResult = switchToSheet(spreadsheetId, sheetName);
+    const switchResult = switchToSheet(requestUserId, spreadsheetId, sheetName);
     console.log('activateSheetMultiTenant: シート切り替え完了');
 
     // 最新のステータスを取得（キャッシュ活用）
@@ -1496,11 +1496,11 @@ function saveAndPublishMultiTenant(requestUserId, sheetName, config) {
     console.log('saveAndPublishMultiTenant: 公開処理開始');
 
     // 2. 設定を保存
-    saveSheetConfig(spreadsheetId, sheetName, config);
+    saveSheetConfig(requestUserId, spreadsheetId, sheetName, config);
     console.log('saveAndPublishMultiTenant: 設定保存完了');
 
     // 3. シートをアクティブ化
-    switchToSheet(spreadsheetId, sheetName);
+    switchToSheet(requestUserId, spreadsheetId, sheetName);
     console.log('saveAndPublishMultiTenant: シート切り替え完了');
 
     // 4. 表示オプションを更新
@@ -1646,7 +1646,7 @@ function saveDraftConfigMultiTenant(requestUserId, sheetName, config) {
     }
 
     // 設定を保存
-    saveSheetConfig(userInfo.spreadsheetId, sheetName, config);
+    saveSheetConfig(requestUserId, userInfo.spreadsheetId, sheetName, config);
 
     // 関連キャッシュをクリア
     invalidateUserCache(userInfo.userId, userInfo.adminEmail, userInfo.spreadsheetId, false);
