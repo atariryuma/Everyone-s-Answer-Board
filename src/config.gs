@@ -5,6 +5,19 @@
 
 const CONFIG_SHEET_NAME = 'Config';
 
+var runtimeUserInfo = null;
+
+/**
+ * 実行中に一度だけユーザー情報を取得して再利用する。
+ * @returns {object|null} ユーザー情報
+ */
+function getUserInfoCached() {
+  if (runtimeUserInfo) return runtimeUserInfo;
+  var userId = getUserId();
+  runtimeUserInfo = findUserById(userId);
+  return runtimeUserInfo;
+}
+
 /**
  * 現在のユーザーのスプレッドシートを取得
  * AdminPanel.htmlから呼び出される
@@ -111,9 +124,7 @@ function clearOldUserCache(currentEmail) {
 
 // 他の関数も同様に、存在することを確認
 function getUserInfo() {
-  const userId = getUserId();
-  // findUserById関数を呼び出すなど、ユーザー情報を取得するロジック
-  return findUserById(userId);
+  return getUserInfoCached();
 }
 
 /**

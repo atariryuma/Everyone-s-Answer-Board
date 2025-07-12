@@ -115,8 +115,8 @@ function getUserWithFallback(userId) {
     return null;
   }
 
-  // キャッシュを使わずデータベースから直接取得
-  var user = fetchUserFromDatabase('userId', userId);
+  // 可能な限りキャッシュを利用
+  var user = findUserById(userId);
   if (!user) {
     handleMissingUser(userId);
   }
