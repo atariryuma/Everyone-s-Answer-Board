@@ -79,6 +79,12 @@ function registerNewUser(adminEmail) {
     throw new Error('認証エラー: 操作を実行しているユーザーとメールアドレスが一致しません。');
   }
 
+  // ドメイン制限チェック
+  var domainInfo = getDeployUserDomainInfo();
+  if (domainInfo.deployDomain && domainInfo.deployDomain !== '' && !domainInfo.isDomainMatch) {
+    throw new Error(`ドメインアクセスが制限されています。許可されたドメイン: ${domainInfo.deployDomain}, 現在のドメイン: ${domainInfo.currentDomain}`);
+  }
+
   // 既存ユーザーチェック（1ユーザー1行の原則）
   var existingUser = findUserByEmail(adminEmail);
   var userId, appUrls;

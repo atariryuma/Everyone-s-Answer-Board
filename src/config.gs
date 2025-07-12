@@ -1223,10 +1223,24 @@ function getExistingBoard(requestUserId) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function verifyUserAuthentication(requestUserId) {
-  verifyUserAccess(requestUserId);
+  // 新規ユーザー（requestUserIdがundefinedまたはnull）の場合はverifyUserAccessをスキップ
+  if (requestUserId) {
+    verifyUserAccess(requestUserId);
+  }
   try {
     var email = Session.getActiveUser().getEmail();
     if (email) {
+      // ドメイン制限チェック
+      var domainInfo = getDeployUserDomainInfo();
+      if (domainInfo.deployDomain && domainInfo.deployDomain !== '' && !domainInfo.isDomainMatch) {
+        console.warn('Domain access denied:', domainInfo.currentDomain, 'vs', domainInfo.deployDomain);
+        return { 
+          authenticated: false, 
+          email: null, 
+          error: `ドメインアクセスが制限されています。許可されたドメイン: ${domainInfo.deployDomain}, 現在のドメイン: ${domainInfo.currentDomain}` 
+        };
+      }
+      
       return { authenticated: true, email: email };
     } else {
       return { authenticated: false, email: null };
@@ -1763,25 +1777,6 @@ function getExistingBoard(requestUserId) {
   }
 }
 
-/**
- * ユーザー認証を検証 (マルチテナント対応版)
- * Registration.htmlから呼び出される
- * @param {string} requestUserId - リクエスト元のユーザーID
- */
-function verifyUserAuthentication(requestUserId) {
-  verifyUserAccess(requestUserId);
-  try {
-    var email = Session.getActiveUser().getEmail();
-    if (email) {
-      return { authenticated: true, email: email };
-    } else {
-      return { authenticated: false, email: null };
-    }
-  } catch (e) {
-    console.error('verifyUserAuthentication エラー: ' + e.message);
-    return { authenticated: false, email: null, error: e.message };
-  }
-}
 
 /**
  * セッションをリセットして新しいアカウント選択を促す (マルチテナント対応版)
