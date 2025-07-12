@@ -2369,6 +2369,17 @@ function syncCheckboxStates(status) {
      * @param {boolean} forceRefresh - キャッシュを無視して強制的に再取得するか
      */
     function loadStatus(forceRefresh = false) {
+      // パフォーマンス最適化: 短時間内の連続呼び出しを防ぐクールダウン
+      const now = Date.now();
+      const cooldownPeriod = 2000; // 2秒のクールダウン
+      
+      if (!forceRefresh && loadStatus.lastCall && (now - loadStatus.lastCall) < cooldownPeriod) {
+        console.log('✅ loadStatus: クールダウン中のため呼び出しをスキップ');
+        return Promise.resolve(currentStatus);
+      }
+      
+      loadStatus.lastCall = now;
+      
       // ユーザーアクションによる手動更新の場合、アクティビティを記録
       updateUserActivity();
       

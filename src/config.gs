@@ -432,6 +432,13 @@ function adjustScoreByContext(score, headerInfo, mappingType) {
     score *= 1.2;
   }
 
+  // 短すぎるヘッダーはopinionHeaderには不適切（特に3文字以下）
+  if (mappingType === 'opinionHeader' && headerInfo.length <= 3) {
+    score *= 0.3; // 大幅に減点
+  } else if (mappingType === 'opinionHeader' && headerInfo.length < 8) {
+    score *= 0.7; // 中程度減点
+  }
+
   // 短いヘッダーは名前やクラス項目の可能性が高い
   if ((mappingType === 'nameHeader' || mappingType === 'classHeader') && headerInfo.length < 10) {
     score *= 1.1;
@@ -746,7 +753,19 @@ function saveAndPublish(requestUserId, sheetNameOrSettingsData, configData) {
     setDisplayOptions(requestUserId, displayOptions);
     console.log('saveAndPublish: 表示オプション設定完了');
 
-    // 5. 最新のステータスを強制再取得して返す
+    // 5. 公開状態を更新（重要：ボードを実際に公開状態にする）
+    const userInfo = getUserInfo(requestUserId);
+    const currentConfig = JSON.parse(userInfo.configJson || '{}');
+    currentConfig.appPublished = true;
+    currentConfig.setupStatus = 'published';
+    currentConfig.lastPublishedAt = new Date().toISOString();
+    
+    updateUser(requestUserId, {
+      configJson: JSON.stringify(currentConfig)
+    });
+    console.log('saveAndPublish: 公開状態を更新完了');
+
+    // 6. 最新のステータスを強制再取得して返す
     const finalStatus = getStatus(requestUserId, true); // forceRefresh = true
     console.log('saveAndPublish: 統合処理完了、最新ステータスを返します。');
 

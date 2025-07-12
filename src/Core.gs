@@ -70,6 +70,44 @@ function getOpinionHeaderSafely(userId, sheetName) {
 }
 
 /**
+ * フォームURLを安全に取得する関数
+ * configJsonにformUrlがない場合、スプレッドシートから取得を試みる
+ * @param {Object} configJson - 設定JSON
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @returns {string} フォームURL
+ */
+function getFormUrlSafely(configJson, spreadsheetId) {
+  try {
+    // 既にconfigJsonにformUrlがある場合はそれを返す
+    if (configJson && configJson.formUrl) {
+      return configJson.formUrl;
+    }
+    
+    // スプレッドシートIDがない場合は空文字を返す
+    if (!spreadsheetId) {
+      return '';
+    }
+    
+    // スプレッドシートからフォームURLを取得を試みる
+    try {
+      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      const form = spreadsheet.getFormUrl();
+      if (form) {
+        debugLog('getFormUrlSafely: スプレッドシートからフォームURLを取得:', form);
+        return form;
+      }
+    } catch (e) {
+      debugLog('getFormUrlSafely: スプレッドシートからのフォームURL取得に失敗:', e.message);
+    }
+    
+    return '';
+  } catch (e) {
+    console.error('getFormUrlSafely error:', e);
+    return '';
+  }
+}
+
+/**
  * 新規ユーザーを登録する（データベース登録のみ）
  * フォーム作成はクイックスタートで実行される
  */
@@ -705,7 +743,7 @@ function getAppConfig(requestUserId) {
       availableSheets: sheets,
       allSheets: sheets, // AdminPanel.htmlで使用される
       spreadsheetUrl: userInfo.spreadsheetUrl,
-      formUrl: configJson.formUrl || '',
+      formUrl: getFormUrlSafely(configJson, userInfo.spreadsheetId),
       editFormUrl: configJson.editFormUrl || '',
       webAppUrl: appUrls.webAppUrl,
       adminUrl: appUrls.adminUrl,
@@ -3225,6 +3263,34 @@ function getStatus(requestUserId, forceRefresh = false) {
         // configJsonも更新
         configJson = JSON.parse(userInfo.configJson || '{}');
         debugLog('getStatus: After repair - formCreated:', configJson.formCreated, 'setupStatus:', configJson.setupStatus);
+      }
+    }
+
+    // 追加の自動修復: スプレッドシートが存在し、フォームの回答シートがあるのにformCreatedがfalseの場合
+    if (userInfo.spreadsheetId && configJson.publishedSpreadsheetId && !configJson.formCreated) {
+      try {
+        const sheets = getSheetsList(requestUserId);
+        const hasFormResponseSheet = sheets && sheets.some(sheet => 
+          sheet.toLowerCase().includes('フォームの回答') || 
+          sheet.toLowerCase().includes('form responses')
+        );
+        
+        if (hasFormResponseSheet) {
+          debugLog('getStatus: Auto-repairing formCreated status - form response sheet detected');
+          configJson.formCreated = true;
+          configJson.setupStatus = configJson.appPublished ? 'published' : 'completed';
+          
+          updateUser(requestUserId, {
+            configJson: JSON.stringify(configJson)
+          });
+          
+          // userInfoも再取得して同期
+          userInfo = findUserById(requestUserId);
+          configJson = JSON.parse(userInfo.configJson || '{}');
+          debugLog('getStatus: formCreated status repaired to:', configJson.formCreated);
+        }
+      } catch (e) {
+        console.warn('getStatus: Failed to auto-repair formCreated status:', e.message);
       }
     }
     
