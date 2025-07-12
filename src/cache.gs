@@ -399,8 +399,9 @@ function getHeadersCached(spreadsheetId, sheetName) {
  * @param {string} userId - ユーザーID
  * @param {string} email - 管理者メールアドレス
  * @param {string} [spreadsheetId] - 関連スプレッドシートID
+ * @param {boolean} [clearPattern=false] - パターンベースのクリアを行うか
  */
-function invalidateUserCache(userId, email, spreadsheetId) {
+function invalidateUserCache(userId, email, spreadsheetId, clearPattern) {
   const keysToRemove = [];
   
   if (userId) {
@@ -421,7 +422,7 @@ function invalidateUserCache(userId, email, spreadsheetId) {
   });
   
   // さらに包括的なパターンマッチングが必要な場合
-  if (spreadsheetId) {
+  if (clearPattern && spreadsheetId) {
     cacheManager.clearByPattern(spreadsheetId);
   }
   

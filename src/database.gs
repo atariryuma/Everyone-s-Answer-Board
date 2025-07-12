@@ -184,7 +184,7 @@ function updateUser(userId, updateData) {
     var spreadsheetId = updateData.spreadsheetId || (userInfo ? userInfo.spreadsheetId : null);
     
     // キャッシュを無効化（必要最小限）
-    invalidateUserCache(userId, email, spreadsheetId);
+    invalidateUserCache(userId, email, spreadsheetId, false);
     
     return { success: true };
   } catch (error) {
@@ -217,7 +217,7 @@ function createUser(userData) {
   appendSheetsData(service, dbId, "'" + sheetName + "'!A1", [newRow]);
   
   // 最適化: 新規ユーザー作成時は対象キャッシュのみ無効化
-  invalidateUserCache(userData.userId, userData.adminEmail, userData.spreadsheetId);
+  invalidateUserCache(userData.userId, userData.adminEmail, userData.spreadsheetId, false);
   
   return userData;
 }
@@ -683,7 +683,7 @@ function deleteCurrentUserAccount() {
       }
       
       // 関連するすべてのキャッシュを削除
-      invalidateUserCache(userId, userInfo.adminEmail, userInfo.spreadsheetId);
+      invalidateUserCache(userId, userInfo.adminEmail, userInfo.spreadsheetId, false);
       
       // UserPropertiesからも関連情報を削除
       const userProps = PropertiesService.getUserProperties();

@@ -113,7 +113,20 @@ function clearOldUserCache(currentEmail) {
 function getUserInfo() {
   const userId = getUserId();
   // findUserById関数を呼び出すなど、ユーザー情報を取得するロジック
-  return findUserById(userId); 
+  return findUserById(userId);
+}
+
+/**
+ * 現在有効なスプレッドシートIDを取得します。
+ * 設定に公開中のIDがあればそれを優先します。
+ * @returns {string} スプレッドシートID
+ */
+function getEffectiveSpreadsheetId() {
+  const userInfo = getUserInfo();
+  const configJson = userInfo && userInfo.configJson
+    ? JSON.parse(userInfo.configJson)
+    : {};
+  return configJson.publishedSpreadsheetId || userInfo.spreadsheetId;
 }
 
 function getSheetHeaders(spreadsheetId, sheetName) {
@@ -761,7 +774,7 @@ function saveSheetConfigBatch(spreadsheetId, sheetName, config, displayOptions) 
     });
     
     // 関連キャッシュを無効化してUI即座反映
-    invalidateUserCache(userInfo.userId, userInfo.adminEmail, spreadsheetId);
+    invalidateUserCache(userInfo.userId, userInfo.adminEmail, spreadsheetId, false);
     
     console.log('saveSheetConfigBatch: 統合更新完了');
     console.log('saveSheetConfigBatch: 更新内容 - spreadsheetId:', spreadsheetId, 'sheetName:', sheetName);
@@ -797,7 +810,7 @@ function saveDraftConfig(sheetName, config) {
     saveSheetConfig(userInfo.spreadsheetId, sheetName, config);
     
     // 関連キャッシュをクリア
-    invalidateUserCache(userInfo.userId, userInfo.adminEmail, userInfo.spreadsheetId);
+    invalidateUserCache(userInfo.userId, userInfo.adminEmail, userInfo.spreadsheetId, false);
 
     console.log('saveDraftConfig: 設定保存完了');
 
@@ -995,10 +1008,16 @@ function addSpreadsheetUrl(url) {
     // サービスアカウントをスプレッドシートに追加
     addServiceAccountToSpreadsheet(spreadsheetId);
     
-    // ユーザー情報にスプレッドシートIDとURLを更新
+    // 公開設定をリセットしつつユーザー情報を更新
+    var configJson = userInfo.configJson ? JSON.parse(userInfo.configJson) : {};
+    configJson.publishedSpreadsheetId = spreadsheetId;
+    configJson.publishedSheetName = '';
+    configJson.appPublished = false;
+
     updateUser(currentUserId, {
       spreadsheetId: spreadsheetId,
-      spreadsheetUrl: url
+      spreadsheetUrl: url,
+      configJson: JSON.stringify(configJson)
     });
     
     // シートリストを即座に取得
@@ -1015,8 +1034,8 @@ function addSpreadsheetUrl(url) {
       // シートリスト取得に失敗してもスプレッドシート追加は成功とする
     }
     
-    // キャッシュをクリアして最新の状態を確保
-    cacheManager.clearByPattern(spreadsheetId);
+    // 必要最小限のキャッシュ無効化
+    invalidateUserCache(currentUserId, userInfo.adminEmail, spreadsheetId, true);
     
     return { 
       status: 'success', 
@@ -1070,7 +1089,7 @@ function clearActiveSheet() {
     // キャッシュを無効化して即座にUIに反映
     try {
       if (typeof invalidateUserCache === 'function') {
-        invalidateUserCache(currentUserId);
+        invalidateUserCache(currentUserId, null, null, false);
       }
     } catch (cacheError) {
       console.warn('キャッシュ無効化でエラーが発生しましたが、処理を続行します:', cacheError.message);
@@ -1354,11 +1373,14 @@ function getGuessedHeaders(sheetName) {
  */
 function getSheetDetails(spreadsheetId, sheetName) {
   try {
-    if (!spreadsheetId || !sheetName) {
-      throw new Error('spreadsheetIdとsheetNameは必須です');
+    if (!sheetName) {
+      throw new Error('sheetNameは必須です');
     }
-
-    const ss = SpreadsheetApp.openById(spreadsheetId);
+    var targetId = spreadsheetId || getEffectiveSpreadsheetId();
+    if (!targetId) {
+      throw new Error('spreadsheetIdが取得できません');
+    }
+    const ss = SpreadsheetApp.openById(targetId);
     const sheet = ss.getSheetByName(sheetName);
     if (!sheet) {
       throw new Error('シートが見つかりません: ' + sheetName);

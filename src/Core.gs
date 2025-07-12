@@ -76,7 +76,7 @@ function registerNewUser(adminEmail) {
       configJson: JSON.stringify(updatedConfig)
     });
     // キャッシュを無効化して最新状態を反映
-    invalidateUserCache(userId, adminEmail, existingUser.spreadsheetId);
+    invalidateUserCache(userId, adminEmail, existingUser.spreadsheetId, false);
     
     debugLog('✅ 既存ユーザー情報を更新しました: ' + adminEmail);
     appUrls = generateAppUrls(userId);
@@ -116,7 +116,7 @@ function registerNewUser(adminEmail) {
     createUser(userData);
     debugLog('✅ データベースに新規ユーザーを登録しました: ' + adminEmail);
     // 生成されたユーザー情報のキャッシュをクリア
-    invalidateUserCache(userId, adminEmail);
+    invalidateUserCache(userId, adminEmail, null, false);
   } catch (e) {
     console.error('データベースへのユーザー登録に失敗: ' + e.message);
     throw new Error('ユーザー登録に失敗しました。システム管理者に連絡してください。');
@@ -868,7 +868,7 @@ function getStatus(forceRefresh = false) {
       if (currentUserId) {
         var userInfo = findUserById(currentUserId);
         if (userInfo) {
-          invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId);
+          invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId, false);
           debugLog('強制リフレッシュ: ユーザーキャッシュを削除しました');
         }
       }
@@ -998,7 +998,7 @@ function refreshBoardData(userId) {
     }
     
     // キャッシュをクリア
-    invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId);
+    invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId, false);
     
     // 最新のステータスを取得
     return getAppConfig();
@@ -1471,7 +1471,7 @@ function quickStartSetup(userId) {
       configJson: JSON.stringify(updatedConfig)
     });
     // セットアップ完了後に関連キャッシュをクリア
-    invalidateUserCache(userId, userEmail, formAndSsInfo.spreadsheetId);
+    invalidateUserCache(userId, userEmail, formAndSsInfo.spreadsheetId, true);
     
     // ステップ4: 回答ボードを公開状態に設定
     debugLog('🌐 ステップ4: 回答ボード公開中...');
@@ -1505,7 +1505,7 @@ function quickStartSetup(userId) {
       updateUser(userId, {
         configJson: JSON.stringify(currentConfig)
       });
-      invalidateUserCache(userId, userEmail);
+      invalidateUserCache(userId, userEmail, null, false);
     } catch (updateError) {
       console.error('エラー状態の更新に失敗: ' + updateError.message);
     }
@@ -3532,3 +3532,4 @@ function isDeployUser() {
     return false;
   }
 }
+
