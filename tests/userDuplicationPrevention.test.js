@@ -114,7 +114,7 @@ describe('User Duplication Prevention Tests', () => {
       context.findOrCreateUser('concurrent@example.com');
       
       // Verify: ロックが適切に取得・解放される
-      expect(mockLock.waitLock).toHaveBeenCalledWith(30000);
+      expect(mockLock.waitLock).toHaveBeenCalledWith(10000);
       expect(mockLock.releaseLock).toHaveBeenCalled();
     });
 
@@ -290,7 +290,7 @@ describe('User Duplication Prevention Tests', () => {
         context.findOrCreateUser('timeout@example.com');
       }).toThrow('システムが混雑しています');
       
-      expect(mockLock.waitLock).toHaveBeenCalledWith(30000); // 30秒
+      expect(mockLock.waitLock).toHaveBeenCalledWith(10000); // 10秒
     });
   });
 

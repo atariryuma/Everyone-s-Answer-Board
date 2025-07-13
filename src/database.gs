@@ -682,6 +682,87 @@ function attemptWithAdaptiveLock(adminEmail, additionalData) {
 }
 
 /**
+ * ⚡ 軽量ロックでのユーザー作成試行
+ * 適応的ロック失敗時のフォールバック
+ * @param {string} adminEmail - メールアドレス
+ * @param {object} additionalData - 追加データ
+ * @returns {object} { userId, isNewUser, userInfo }
+ */
+function attemptWithLightweightLock(adminEmail, additionalData) {
+  const lock = LockService.getScriptLock();
+  const timeout = 3000; // 3秒
+
+  try {
+    if (!lock.waitLock(timeout)) {
+      debugLog('attemptWithLightweightLock: タイムアウト', { adminEmail, timeout });
+      const existingUser = findUserByEmail(adminEmail);
+      if (existingUser) {
+        debugLog('attemptWithLightweightLock: 既存ユーザー返却', { userId: existingUser.userId });
+        return {
+          userId: existingUser.userId,
+          isNewUser: false,
+          userInfo: existingUser
+        };
+      }
+      throw new Error('ユーザー情報の確保に失敗しました: attemptWithLightweightLock');
+    }
+
+    debugLog('attemptWithLightweightLock: ロック取得成功', { adminEmail });
+
+    const existingUser = findUserByEmail(adminEmail);
+
+    if (existingUser) {
+      if (Object.keys(additionalData).length > 0) {
+        const updateData = {
+          lastAccessedAt: new Date().toISOString(),
+          isActive: 'true',
+          ...additionalData
+        };
+        updateUser(existingUser.userId, updateData);
+      }
+
+      return {
+        userId: existingUser.userId,
+        isNewUser: false,
+        userInfo: existingUser
+      };
+    }
+
+    const userId = generateConsistentUserId(adminEmail);
+    const userData = {
+      userId: userId,
+      adminEmail: adminEmail,
+      createdAt: new Date().toISOString(),
+      lastAccessedAt: new Date().toISOString(),
+      isActive: 'true',
+      configJson: '{}',
+      spreadsheetId: '',
+      spreadsheetUrl: '',
+      ...additionalData
+    };
+
+    createUserAtomic(userData);
+
+    debugLog('attemptWithLightweightLock: 新規ユーザー作成完了', { userId });
+
+    return {
+      userId: userId,
+      isNewUser: true,
+      userInfo: userData
+    };
+  } catch (error) {
+    console.error('attemptWithLightweightLock エラー:', error);
+    throw error;
+  } finally {
+    try {
+      lock.releaseLock();
+    } catch (e) {
+      console.warn('軽量ロック解除エラー:', e.message);
+    }
+  }
+}
+
+/**
  * 🔧 一貫したユーザーID生成
  * メールアドレスから決定論的にUUIDを生成
  * @param {string} adminEmail - メールアドレス
