@@ -4,17 +4,7 @@
  * 高負荷時のタイムアウト問題を解決
  */
 
-/**
- * 🚀 エンハンスドユーザー作成（本番環境対応版）- 無効化
- * メール特化ロック（EmailSpecificLock.gs）に統合済み
- * 競合するロック戦略を防ぐため無効化
- * @deprecated Use findOrCreateUserWithEmailLock instead
- */
-function findOrCreateUserEnhanced(adminEmail, additionalData = {}) {
-  console.warn('findOrCreateUserEnhanced is deprecated. Use findOrCreateUserWithEmailLock instead.');
-  // 直接EmailLockシステムにリダイレクト
-  return findOrCreateUserWithEmailLock(adminEmail, additionalData);
-}
+
 
 /**
  * 🎯 Stage 1: 適応的ロック（20秒タイムアウト）
@@ -246,7 +236,7 @@ function findOrCreateUserWithRetry(adminEmail, additionalData = {}) {
 
   for (let i = 0; i < maxRetries; i++) {
     try {
-      return findOrCreateUserEnhanced(adminEmail, additionalData);
+      return findOrCreateUserWithEmailLock(adminEmail, additionalData);
     } catch (e) {
       if (e.message === 'LOCK_TIMEOUT' && i < maxRetries - 1) {
         Utilities.sleep(interval);
@@ -259,16 +249,7 @@ function findOrCreateUserWithRetry(adminEmail, additionalData = {}) {
   throw new Error('LOCK_TIMEOUT');
 }
 
-/**
- * 🎯 本番環境用メイン関数（findOrCreateUserの置き換え）- 無効化
- * メール特化ロック（EmailSpecificLock.gs）に統合済み
- * @deprecated Use findOrCreateUserWithEmailLock instead
- */
-function findOrCreateUserProduction(adminEmail, additionalData = {}) {
-  console.warn('findOrCreateUserProduction is deprecated. Use findOrCreateUserWithEmailLock instead.');
-  // 直接EmailLockシステムにリダイレクト
-  return findOrCreateUserWithEmailLock(adminEmail, additionalData);
-}
+
 
 /**
  * 📈 パフォーマンス監視付きユーザー作成
@@ -286,7 +267,7 @@ function findOrCreateUserWithMetrics(adminEmail, additionalData = {}) {
   };
   
   try {
-    const result = findOrCreateUserEnhanced(adminEmail, additionalData);
+    const result = findOrCreateUserWithEmailLock(adminEmail, additionalData);
     
     metrics.endTime = Date.now();
     metrics.totalDuration = metrics.endTime - metrics.startTime;

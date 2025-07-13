@@ -206,71 +206,56 @@ function invalidateUserCacheConsistent(userId, adminEmail) {
 }
 
 /**
- * 🎯 最適化されたクイックスタート
- * 重複登録を防ぐ統合フロー
- * 
- * @param {string} requestUserId - リクエストユーザーID（オプション）
- * @returns {Object} クイックスタート結果
+ * クイックスタートセットアップ
+ * @returns {object} セットアップ結果
  */
-function quickStartSetupOptimized(requestUserId) {
+function quickStartSetup() {
   try {
-    const activeUserEmail = Session.getActiveUser().getEmail();
-    let userInfo;
-
-    // 1. ユーザー情報の統一取得・作成
-    if (requestUserId) {
-      // 既存ユーザーIDが指定されている場合
-      userInfo = findUserByIdDirect(requestUserId);
-      if (!userInfo) {
-        throw new Error('指定されたユーザーIDが見つかりません');
-      }
-      
-      // メールアドレス一致確認
-      if (userInfo.adminEmail !== activeUserEmail) {
-        throw new Error('ユーザーIDとメールアドレスが一致しません');
-      }
-    } else {
-      // 新規または既存ユーザーの自動判定
-      const upsertResult = upsertUser(activeUserEmail);
-      userInfo = upsertResult.userInfo;
-      requestUserId = upsertResult.userId;
-    }
-
-    // 2. フォームとスプレッドシート作成
-    const formAndSsInfo = createStudyQuestForm(activeUserEmail, requestUserId);
+    const userEmail = Session.getActiveUser().getEmail();
     
-    // 3. ユーザー情報更新
-    const updatedData = {
-      spreadsheetId: formAndSsInfo.spreadsheetId,
-      spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
-      configJson: JSON.stringify({
-        formUrl: formAndSsInfo.formUrl,
-        publishedSheetName: formAndSsInfo.sheetName,
-        sheet_フォームの回答: {
-          published: true,
-          publishDate: new Date().toISOString(),
-          opinionHeader: formAndSsInfo.opinionHeader || 'お題'
-        }
-      }),
-      lastAccessedAt: new Date().toISOString()
+    // ユーザーを検索または作成（ロック管理はfindOrCreateUserWithEmailLockに一任）
+    const userResult = findOrCreateUserWithEmailLock(userEmail);
+    const userId = userResult.userId;
+    
+    // フォームとスプレッドシートを作成
+    const { formUrl, spreadsheetUrl, spreadsheetId } = createStudyQuestForm(userEmail, userId);
+    
+    // ユーザー情報を更新
+    const config = {
+      formUrl: formUrl,
+      publishedSheetName: 'フォームの回答 1',
+      sheet_フォームの回答_1: {
+        published: true,
+        publishDate: new Date().toISOString(),
+        opinionHeader: 'お題'
+      }
     };
     
-    updateUserDirect(requestUserId, updatedData);
+    const updateData = {
+      spreadsheetId: spreadsheetId,
+      spreadsheetUrl: spreadsheetUrl,
+      configJson: JSON.stringify(config)
+    };
     
-    // 4. キャッシュ更新
-    invalidateUserCacheConsistent(requestUserId, activeUserEmail);
+    updateUser(userId, updateData);
+    
+    // 管理画面URLを生成
+    const adminUrl = getWebAppUrl() + '?page=admin&userId=' + userId;
     
     return {
       status: 'success',
-      userId: requestUserId,
-      formUrl: formAndSsInfo.formUrl,
-      spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
-      message: 'クイックスタートが完了しました'
+      userId: userId,
+      adminUrl: adminUrl,
+      formUrl: formUrl,
+      spreadsheetUrl: spreadsheetUrl
     };
     
-  } catch (error) {
-    console.error('quickStartSetupOptimized エラー:', error);
-    throw error;
+  } catch (e) {
+    console.error('quickStartSetup エラー:', e);
+    const errorMessage = e.message.includes('LOCK_TIMEOUT') 
+      ? 'システムが混み合っています。数分待ってから再度お試しください。'
+      : `ユーザー情報の確保に失敗しました: ${e.message}`;
+    throw new Error(`${errorMessage} (${Session.getActiveUser().getEmail()})`);
   }
 }
 
