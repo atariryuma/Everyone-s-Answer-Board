@@ -5,6 +5,9 @@
 
 // メール処理状態はCacheServiceで管理（実行間で共有）
 const EMAIL_LOCK_CACHE = CacheService.getScriptCache();
+// スクリプトロックの保持者情報を共有
+const SCRIPT_LOCK_INFO_CACHE = CacheService.getScriptCache();
+const SCRIPT_LOCK_HOLDER_KEY = 'scriptLockHolder';
 
 /**
  * メール特化ロック：同一メールの重複処理を防止
@@ -81,13 +84,20 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
     console.log('findOrCreateUserWithEmailLock: 新規ユーザー作成開始', { adminEmail });
     const lock = LockService.getScriptLock();
     const timeout = 30000; // 10秒→30秒に延長（高負荷対応）
-    
+
     if (!lock.waitLock(timeout)) {
-      console.error('findOrCreateUserWithEmailLock: スクリプトロックタイムアウト', { adminEmail, timeout });
+      const holder = SCRIPT_LOCK_INFO_CACHE.get(SCRIPT_LOCK_HOLDER_KEY);
+      console.error('findOrCreateUserWithEmailLock: スクリプトロックタイムアウト', {
+        adminEmail,
+        timeout,
+        lockHolder: holder
+      });
       // タイムアウト時に関連するメールロックをクリーンアップ
       cleanupEmailLocks();
       throw new Error('SCRIPT_LOCK_TIMEOUT');
     }
+
+    SCRIPT_LOCK_INFO_CACHE.put(SCRIPT_LOCK_HOLDER_KEY, adminEmail, 60);
     
     try {
       // ダブルチェック: ロック取得後に再度確認
@@ -136,6 +146,7 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
       
     } finally {
       lock.releaseLock();
+      SCRIPT_LOCK_INFO_CACHE.remove(SCRIPT_LOCK_HOLDER_KEY);
     }
     
   } finally {
