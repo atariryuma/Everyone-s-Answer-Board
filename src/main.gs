@@ -705,6 +705,7 @@ function renderAnswerBoard(userInfo, params) {
       const isOwner = currentUserEmail === userInfo.adminEmail;
       template.showAdminFeatures = isOwner;
       template.isAdminUser = isOwner;
+      template.formUrl = getFormUrlSafely(config, userInfo.spreadsheetId);
     } catch (e) {
       template.opinionHeader = escapeJavaScript('お題の読込エラー');
       template.cacheTimestamp = Date.now();
@@ -718,6 +719,7 @@ function renderAnswerBoard(userInfo, params) {
       const isOwner = currentUserEmail === userInfo.adminEmail;
       template.showAdminFeatures = isOwner;
       template.isAdminUser = isOwner;
+      template.formUrl = '';
     }
     return template.evaluate()
       .setTitle('StudyQuest -みんなの回答ボード-')
