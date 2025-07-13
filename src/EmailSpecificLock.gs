@@ -79,14 +79,14 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
       };
     }
     
-    // Step 3: 新規ユーザー作成（スクリプトロック使用）
+    // Step 3: 新規ユーザー作成（ユーザー特化ロック使用）
     console.log('findOrCreateUserWithEmailLock: 新規ユーザー作成開始', { adminEmail });
-    const lock = LockService.getScriptLock();
-    const timeout = 15000;
+    const lock = LockService.getUserLock();
+    const timeout = 25000; // 15秒→25秒に延長
     
     if (!lock.waitLock(timeout)) {
-      console.error('findOrCreateUserWithEmailLock: スクリプトロックタイムアウト', { adminEmail, timeout });
-      throw new Error('SCRIPT_LOCK_TIMEOUT');
+      console.error('findOrCreateUserWithEmailLock: ユーザーロックタイムアウト', { adminEmail, timeout });
+      throw new Error('USER_LOCK_TIMEOUT');
     }
     
     try {
@@ -100,7 +100,7 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
         };
       }
       
-      // 新規ユーザー作成実行
+      // 新規ユーザー作成実行（既存のcreateUserAtomicを使用）
       const userId = generateUniqueUserId();
       const userData = {
         userId: userId,
@@ -111,14 +111,20 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
         ...additionalData
       };
       
-      const props = PropertiesService.getScriptProperties();
-      const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
-      if (!dbId) throw new Error('Database not configured');
-      
-      const sheet = SpreadsheetApp.openById(dbId).getSheetByName('ユーザー');
-      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      const newRow = headers.map(header => userData[header] || '');
-      sheet.appendRow(newRow);
+      // 既存の安全な作成関数を使用
+      if (typeof createUserAtomic === 'function') {
+        createUserAtomic(userData);
+      } else {
+        // フォールバック: 直接Sheetに追加
+        const props = PropertiesService.getScriptProperties();
+        const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
+        if (!dbId) throw new Error('Database not configured');
+        
+        const sheet = SpreadsheetApp.openById(dbId).getSheetByName('ユーザー');
+        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+        const newRow = headers.map(header => userData[header] || '');
+        sheet.appendRow(newRow);
+      }
       
       console.log('findOrCreateUserWithEmailLock: 新規ユーザー作成完了', { userId, adminEmail });
       
