@@ -1313,7 +1313,8 @@ function comprehensiveUserSearch(userId) {
 function quickStartSetup(requestUserId) {
   const activeUserEmail = Session.getActiveUser().getEmail();
   let userInfo;
-  
+
+  console.log('[quickStartSetup] started by:', activeUserEmail);
   debugLog('quickStartSetup: 開始', { requestUserId, activeUserEmail });
 
   try {
@@ -1345,10 +1346,13 @@ function quickStartSetup(requestUserId) {
       });
     }
   } catch (error) {
-    console.error('quickStartSetup: ユーザー確保エラー:', error);
+    console.error('quickStartSetup: ユーザー確保エラー:', {
+      error: error,
+      activeUserEmail: activeUserEmail
+    });
     const message = error.message.startsWith('ユーザー情報の確保に失敗しました')
-      ? error.message
-      : `ユーザー情報の確保に失敗しました: ${error.message}`;
+      ? `${error.message} (${activeUserEmail})`
+      : `ユーザー情報の確保に失敗しました: ${error.message} (${activeUserEmail})`;
     throw new Error(message);
   }
   // 🚀 セットアップ実行
