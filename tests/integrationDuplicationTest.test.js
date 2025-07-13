@@ -101,7 +101,7 @@ describe('Integration Test: Duplicate User Prevention', () => {
       
       const simulateUserCreation = (userEmail) => {
         const lock = mockLockService.getScriptLock();
-        if (!lock.waitLock(30000)) {
+        if (!lock.waitLock(10000)) {
           throw new Error('システムが混雑しています');
         }
         
