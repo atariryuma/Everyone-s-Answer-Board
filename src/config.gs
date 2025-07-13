@@ -1085,6 +1085,19 @@ function addSpreadsheetUrl(requestUserId, url) {
         sheetCount: sheets.length,
         sheets: sheets.map(s => s.name)
       });
+      
+      // 外部スプレッドシート追加時にリアクション列を追加
+      if (sheets.length > 0) {
+        try {
+          // 最初のシートにリアクション列を追加（通常は回答データシート）
+          const primarySheetName = sheets[0].name;
+          addReactionColumnsToSpreadsheet(spreadsheetId, primarySheetName);
+          console.log('✅ Reaction columns added to external spreadsheet:', primarySheetName);
+        } catch (reactionError) {
+          console.warn('⚠️ Failed to add reaction columns to external spreadsheet:', reactionError.message);
+          // リアクション列追加の失敗はスプレッドシート追加の失敗にはしない
+        }
+      }
     } catch (sheetError) {
       console.warn('シートリスト取得でエラー:', sheetError.message);
       // シートリスト取得に失敗してもスプレッドシート追加は成功とする

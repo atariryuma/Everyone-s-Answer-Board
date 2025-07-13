@@ -3860,6 +3860,15 @@ function createCustomFormUI(requestUserId, config) {
           invalidateUserCache(requestUserId, activeUserEmail, existingUser.spreadsheetId, true);
         }
         
+        // カスタムフォーム作成後にリアクション列を追加
+        try {
+          addReactionColumnsToSpreadsheet(result.spreadsheetId, result.sheetName);
+          console.log('✅ [DEBUG] Reaction columns added to custom form spreadsheet:', result.sheetName);
+        } catch (reactionError) {
+          console.warn('⚠️ [WARNING] Failed to add reaction columns, but form creation succeeded:', reactionError.message);
+          // リアクション列追加の失敗はフォーム作成の失敗にはしない
+        }
+        
         console.log('✅ [DEBUG] Form creation workflow completed successfully');
         
       } catch (dbError) {
