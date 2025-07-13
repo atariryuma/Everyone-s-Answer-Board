@@ -335,6 +335,13 @@ function doGet(e) {
       return createSecureRedirect(correctUrl, '管理パネルにリダイレクトしています...');
     }
 
+    if (params.isDirectPageAccess) {
+      const publicInfo = findUserById(params.userId);
+      if (publicInfo) {
+        return renderAnswerBoard(publicInfo, params);
+      }
+    }
+
     return showRegistrationPage();
   } catch (error) {
     console.error(`doGetで致命的なエラー: ${error.stack}`);
@@ -672,7 +679,9 @@ function renderAnswerBoard(userInfo, params) {
   const isPublished = !!(config.appPublished && config.publishedSpreadsheetId && config.publishedSheetName);
   const sheetConfigKey = 'sheet_' + (config.publishedSheetName || params.sheetName);
   const sheetConfig = config[sheetConfigKey] || {};
-  const showBoard = params.isDirectPageAccess || isPublished;
+  const currentUserEmail = Session.getActiveUser().getEmail();
+  const isOwner = currentUserEmail === userInfo.adminEmail;
+  const showBoard = isOwner || isPublished;
   const file = showBoard ? 'Page' : 'Unpublished';
   const template = HtmlService.createTemplateFromFile(file);
   template.include = include;
@@ -693,7 +702,6 @@ function renderAnswerBoard(userInfo, params) {
       template.displayMode = config.displayMode || 'anonymous';
       template.showCounts = config.showCounts !== undefined ? config.showCounts : false;
       template.showScoreSort = template.showCounts;
-      const currentUserEmail = Session.getActiveUser().getEmail();
       const isOwner = currentUserEmail === userInfo.adminEmail;
       template.showAdminFeatures = isOwner;
       template.isAdminUser = isOwner;
@@ -707,7 +715,6 @@ function renderAnswerBoard(userInfo, params) {
       template.displayMode = 'anonymous';
       template.showCounts = false;
       template.showScoreSort = false;
-      const currentUserEmail = Session.getActiveUser().getEmail();
       const isOwner = currentUserEmail === userInfo.adminEmail;
       template.showAdminFeatures = isOwner;
       template.isAdminUser = isOwner;
