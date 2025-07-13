@@ -39,8 +39,9 @@ function findOrCreateUserEnhanced(adminEmail, additionalData = {}) {
     return result;
   }
 
-  // Stage 4: 最終エラー（適切なメッセージ）
-  throw new Error('現在システムが非常に混雑しており、新規ユーザー登録ができません。既存ユーザーの場合は、ページを更新してもう一度お試しください。新規ユーザーの場合は、しばらく時間をおいてから再度アクセスしてください。');
+  // Stage 4: 最終エラー
+  // クライアント側での自動リトライを促すため専用エラーコードを返す
+  throw new Error('LOCK_TIMEOUT');
 }
 
 /**
@@ -262,6 +263,31 @@ function getLockStatistics() {
 }
 
 /**
+ * サーバー側でリトライしながらユーザーを取得または作成する
+ * @param {string} adminEmail - メールアドレス
+ * @param {object} additionalData - 追加データ
+ * @returns {object} 結果オブジェクト
+ */
+function findOrCreateUserWithRetry(adminEmail, additionalData = {}) {
+  const maxRetries = 3;
+  const interval = 1500;
+
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return findOrCreateUserEnhanced(adminEmail, additionalData);
+    } catch (e) {
+      if (e.message === 'LOCK_TIMEOUT' && i < maxRetries - 1) {
+        Utilities.sleep(interval);
+        continue;
+      }
+      throw e;
+    }
+  }
+
+  throw new Error('LOCK_TIMEOUT');
+}
+
+/**
  * 🎯 本番環境用メイン関数（findOrCreateUserの置き換え）
  * 既存のfindOrCreateUserを段階的に置き換える
  * @param {string} adminEmail - メールアドレス
@@ -270,7 +296,7 @@ function getLockStatistics() {
  */
 function findOrCreateUserProduction(adminEmail, additionalData = {}) {
   try {
-    return findOrCreateUserEnhanced(adminEmail, additionalData);
+    return findOrCreateUserWithRetry(adminEmail, additionalData);
   } catch (error) {
     // 本番環境用エラーログ
     console.error('findOrCreateUserProduction 最終エラー:', {

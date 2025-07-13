@@ -298,6 +298,8 @@
     let userEmail = '';
     let currentStep = 1;
     let domainInfo = null;
+    let registrationRetryCount = 0;
+    const MAX_REGISTRATION_RETRIES = 2;
 
     function escapeHtml(str) {
       if (!str) return '';
@@ -590,15 +592,15 @@
       }
     }
 
-    // 登録処理
-    document.getElementById('register-btn').addEventListener('click', async () => {
+    // 登録処理実行
+    function executeRegistration() {
       const btn = document.getElementById('register-btn');
-      
+
       if (!userEmail || !validateInput(userEmail, 'email')) {
         showMessage('有効なメールアドレスが必要です。', 'error');
         return;
       }
-      
+
       btn.disabled = true;
       btn.innerHTML = `
         <svg class="w-5 h-5 spinner inline-block mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -608,9 +610,10 @@
         登録処理中...
       `;
       showMessage('回答ボードを準備中です...', 'info');
-      
+
       google.script.run
         .withSuccessHandler(result => {
+          registrationRetryCount = 0;
           showMessage(result.message || '登録が完了しました！', 'success');
 
           const resultArea = document.getElementById('result-area');
@@ -699,19 +702,27 @@
           window.lastRegistrationResult = result;
         })
         .withFailureHandler(error => {
-          showMessage(`エラー: ${error.message || '登録に失敗しました'}`, 'error');
-          btn.disabled = false;
-          btn.innerHTML = `
-            <span class="relative z-10 flex items-center justify-center gap-3">
-              <span class="text-xl">🚀</span>
-              <span>回答ボードを作成する</span>
-              <span class="text-xl">✨</span>
-            </span>
-            <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
-          `;
+          if (error && error.message && error.message.includes('LOCK_TIMEOUT')) {
+            if (registrationRetryCount < MAX_REGISTRATION_RETRIES) {
+              registrationRetryCount++;
+              const waitTime = registrationRetryCount * 5;
+              showMessage(`システムが混み合っています。${waitTime}秒後に自動で再試行します...`, 'warning');
+              setTimeout(() => {
+                executeRegistration();
+              }, waitTime * 1000);
+            } else {
+              showMessage('申し訳ありません、システムの混雑が続いています。しばらく時間をおいてから、ページを更新してもう一度お試しください。', 'error');
+              resetRegisterButton();
+            }
+          } else {
+            showMessage(`エラー: ${error.message || '登録に失敗しました'}`, 'error');
+            resetRegisterButton();
+          }
         })
         .registerNewUser(userEmail);
-    });
+    }
+
+    document.getElementById('register-btn').addEventListener('click', executeRegistration);
     
     // メッセージ表示関数
     function showMessage(message, type) {
@@ -719,16 +730,31 @@
       const icons = {
         error: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
         success: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
-        info: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
+        info: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+        warning: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M4.93 4.93l14.14 14.14M9.17 9.17l5.66 5.66"></path></svg>'
       };
       const colors = {
         error: 'text-red-400',
         success: 'text-green-400',
-        info: 'text-blue-400'
+        info: 'text-blue-400',
+        warning: 'text-yellow-400'
       };
       
       messageArea.className = `text-center min-h-[24px] ${colors[type] || 'text-gray-400'} flex items-center justify-center gap-2`;
       messageArea.innerHTML = `${icons[type] || ''}<span>${escapeHtml(message)}</span>`;
+    }
+
+    function resetRegisterButton() {
+      const btn = document.getElementById('register-btn');
+      btn.disabled = false;
+      btn.innerHTML = `
+        <span class="relative z-10 flex items-center justify-center gap-3">
+          <span class="text-xl">🚀</span>
+          <span>回答ボードを作成する</span>
+          <span class="text-xl">✨</span>
+        </span>
+        <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+      `;
     }
     
     // クイックスタート機能
