@@ -6,6 +6,14 @@
   <title>StudyQuest - 登録</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
+    /* Force override any external CSS */
+    html, body {
+      background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;
+      min-height: 100vh !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
     /* Modern CSS Reset */
     * {
       margin: 0;
@@ -321,6 +329,20 @@
     .action-btn:hover {
       transform: translateY(-1px);
       opacity: 0.9;
+    }
+
+    /* Glass panel for modals (SharedModals compatibility) */
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.08) !important;
+      -webkit-backdrop-filter: blur(20px) !important;
+      backdrop-filter: blur(20px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.2) !important;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    /* Override TailwindCSS classes that might interfere */
+    .bg-black\/80 {
+      background-color: rgba(0, 0, 0, 0.8) !important;
     }
 
     /* Responsive design */
