@@ -19,10 +19,15 @@
     });
   </script>
   <style>
-    /* EMERGENCY RESET: Override everything */
-    * {
+    /* SELECTIVE RESET: Only reset elements that need it */
+    html, body, div, span, h1, h2, h3, h4, h5, h6, button {
       margin: 0 !important;
       padding: 0 !important;
+      box-sizing: border-box !important;
+    }
+    
+    /* Preserve normal spacing for text elements */
+    p, a, span {
       box-sizing: border-box !important;
     }
     
@@ -100,27 +105,29 @@
     }
 
     .title {
-      font-size: 28px;
-      font-weight: 700;
-      color: white;
-      margin-bottom: 8px;
-      letter-spacing: -0.02em;
+      font-size: 28px !important;
+      font-weight: 700 !important;
+      color: white !important;
+      margin-bottom: 8px !important;
+      letter-spacing: -0.02em !important;
+      line-height: 1.2 !important;
     }
 
     .subtitle {
-      font-size: 16px;
-      color: rgba(255, 255, 255, 0.7);
-      line-height: 1.5;
+      font-size: 16px !important;
+      color: rgba(255, 255, 255, 0.7) !important;
+      line-height: 1.5 !important;
+      margin-bottom: 0 !important;
     }
 
     /* Status card */
     .status-card {
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 16px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      padding: 20px;
-      margin-bottom: 32px;
-      text-align: center;
+      background: rgba(255, 255, 255, 0.05) !important;
+      border-radius: 16px !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      padding: 20px !important;
+      margin-bottom: 32px !important;
+      text-align: center !important;
     }
 
     .status-indicator {
@@ -141,15 +148,18 @@
     }
 
     .status-text {
-      font-size: 14px;
-      color: rgba(255, 255, 255, 0.8);
-      margin-bottom: 8px;
+      font-size: 14px !important;
+      color: rgba(255, 255, 255, 0.8) !important;
+      margin-bottom: 8px !important;
+      line-height: 1.4 !important;
     }
 
     .user-email {
-      font-size: 16px;
-      font-weight: 600;
-      color: white;
+      font-size: 16px !important;
+      font-weight: 600 !important;
+      color: white !important;
+      line-height: 1.4 !important;
+      margin: 0 !important;
     }
 
     /* Button */
@@ -238,10 +248,11 @@
 
     /* Footer */
     .footer {
-      text-align: center;
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.5);
-      line-height: 1.4;
+      text-align: center !important;
+      font-size: 12px !important;
+      color: rgba(255, 255, 255, 0.5) !important;
+      line-height: 1.6 !important;
+      margin-top: 8px !important;
     }
 
     .footer a {
@@ -379,10 +390,10 @@
       }
     }
   </style>
-  <!-- External includes disabled for standalone operation -->
-  <!-- <?!= include('UnifiedStyles'); ?> -->
-  <!-- <?!= include('SharedUtilities'); ?> -->
-  <!-- <?!= include('SharedModals'); ?> -->
+  <!-- External includes - carefully controlled -->
+  <!-- <?!= include('UnifiedStyles'); ?> Disabled to prevent conflicts -->
+  <?!= include('SharedUtilities'); ?>
+  <?!= include('SharedModals'); ?>
 </head>
 <body>
   <div class="glass-container" id="main-container">
@@ -670,14 +681,7 @@
       }
     }
 
-    // Fallback functions for modal dependencies
-    function showPrivacyModal() {
-      alert('プライバシーポリシー:\n\n• 個人情報は適切に保護されます\n• 回答データは教育目的でのみ使用されます\n• 管理者は適切なアクセス権限を持っています\n• データは法的要件に従って管理されます');
-    }
-
-    function showDigitalCitizenshipModal() {
-      alert('デジタル・シティズンシップについて:\n\nデジタル社会における責任ある市民として、技術を適切かつ効果的に使用する能力です。回答ボードを通じて、この重要な概念を実践的に指導しましょう。');
-    }
+    // Modal functions are now provided by SharedModals
 
     // IMMEDIATE EXECUTION: Apply styles as soon as possible
     (function() {
