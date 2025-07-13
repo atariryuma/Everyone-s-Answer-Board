@@ -442,9 +442,9 @@
 
     <!-- Footer -->
     <div class="footer">
-      <a href="#" onclick="showPrivacyModal()">プライバシーポリシー</a>
+      <a href="javascript:void(0)" data-modal="privacy">プライバシーポリシー</a>
       および
-      <a href="#" onclick="showDigitalCitizenshipModal()">デジタル・シティズンシップ</a>
+      <a href="javascript:void(0)" data-modal="digital-citizenship">デジタル・シティズンシップ</a>
       に同意の上で作成されます
     </div>
   </div>
@@ -894,11 +894,45 @@
             };
           }
           
-          const modalLinks = document.querySelectorAll('a[onclick*="Modal"]');
+          const modalLinks = document.querySelectorAll('a[data-modal]');
           modalLinks.forEach(link => {
+            // Add controlled event handlers
             link.addEventListener('click', function(e) {
-              console.log('🖱️ Modal link clicked:', link.onclick);
-              // Re-apply modal protection after click
+              console.log('🖱️ Modal link clicked:', link.textContent);
+              
+              // Prevent default navigation behavior
+              e.preventDefault();
+              e.stopPropagation();
+              
+              const modalType = link.getAttribute('data-modal');
+              console.log('📂 Modal type:', modalType);
+              
+              // Determine which modal to show based on data attribute
+              if (modalType === 'privacy') {
+                console.log('📋 Opening Privacy Modal');
+                if (typeof window.showPrivacyModal === 'function') {
+                  window.showPrivacyModal();
+                } else {
+                  const modal = document.getElementById('privacy-modal');
+                  if (modal) {
+                    modal.classList.remove('hidden');
+                    modal.style.display = 'flex';
+                  }
+                }
+              } else if (modalType === 'digital-citizenship') {
+                console.log('🌐 Opening Digital Citizenship Modal');
+                if (typeof window.showDigitalCitizenshipModal === 'function') {
+                  window.showDigitalCitizenshipModal();
+                } else {
+                  const modal = document.getElementById('digital-citizenship-modal');
+                  if (modal) {
+                    modal.classList.remove('hidden');
+                    modal.style.display = 'flex';
+                  }
+                }
+              }
+              
+              // Re-apply modal protection after opening
               setTimeout(() => {
                 const modals = document.querySelectorAll('[id*="modal"]');
                 modals.forEach(modal => {
@@ -909,10 +943,13 @@
                     modal.style.left = '0';
                     modal.style.right = '0';
                     modal.style.bottom = '0';
+                    modal.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
                     console.log('✅ Modal protection applied to:', modal.id);
                   }
                 });
               }, 100);
+              
+              return false; // Prevent any further navigation
             });
           });
           
