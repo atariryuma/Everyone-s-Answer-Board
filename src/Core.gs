@@ -136,14 +136,8 @@ function ensureUserExists(adminEmail) {
   };
 
   try {
-    // 新しいメール特化ロックシステムを優先使用
-    const createFn =
-      typeof findOrCreateUserEnhanced === 'function'
-        ? findOrCreateUserEnhanced
-        : (typeof findOrCreateUserProduction === 'function'
-          ? findOrCreateUserProduction
-          : findOrCreateUser);
-    const result = createFn(adminEmail, {
+    // メール特化ロックシステムのみ使用（競合するロック戦略を排除）
+    const result = findOrCreateUserWithEmailLock(adminEmail, {
       configJson: JSON.stringify(initialConfig)
     });
 
@@ -1340,12 +1334,8 @@ function quickStartSetup(requestUserId) {
       
       debugLog('quickStartSetup: 既存ユーザー確認完了', { userId: requestUserId });
     } else {
-      // 新規または既存ユーザーの自動判定
-      const createFn =
-        typeof findOrCreateUserProduction === 'function'
-          ? findOrCreateUserProduction
-          : findOrCreateUser;
-      const result = createFn(activeUserEmail);
+      // 新規または既存ユーザーの自動判定（メール特化ロックのみ使用）
+      const result = findOrCreateUserWithEmailLock(activeUserEmail);
       requestUserId = result.userId;
       userInfo = result.userInfo;
       

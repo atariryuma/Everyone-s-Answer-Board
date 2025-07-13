@@ -5,57 +5,15 @@
  */
 
 /**
- * 🚀 エンハンスドユーザー作成（本番環境対応版）
- * 段階的フォールバック機構で高い成功率を実現
- * @param {string} adminEmail - メールアドレス
- * @param {object} additionalData - 追加データ
- * @returns {object} { userId, isNewUser, userInfo }
+ * 🚀 エンハンスドユーザー作成（本番環境対応版）- 無効化
+ * メール特化ロック（EmailSpecificLock.gs）に統合済み
+ * 競合するロック戦略を防ぐため無効化
+ * @deprecated Use findOrCreateUserWithEmailLock instead
  */
 function findOrCreateUserEnhanced(adminEmail, additionalData = {}) {
-  if (!adminEmail || !adminEmail.includes('@')) {
-    throw new Error('有効なメールアドレスが必要です');
-  }
-
-  debugLog('findOrCreateUserEnhanced: 開始', { adminEmail });
-
-  try {
-    // 新方式: メール特化ロックシステムを優先使用
-    const result = findOrCreateUserWithEmailLock(adminEmail, additionalData);
-    debugLog('findOrCreateUserEnhanced: EmailLock成功', { adminEmail });
-    return result;
-  } catch (error) {
-    if (error.message === 'EMAIL_ALREADY_PROCESSING') {
-      // 同一メールで処理中の場合はエラー
-      throw new Error('LOCK_TIMEOUT');
-    }
-    
-    // EmailLock失敗時は従来方式にフォールバック
-    debugLog('findOrCreateUserEnhanced: EmailLock失敗、従来方式フォールバック', { adminEmail, error: error.message });
-  }
-
-  // Stage 1: 高速ロック試行（20秒）
-  let result = attemptWithAdaptiveLock(adminEmail, additionalData);
-  if (result) {
-    debugLog('findOrCreateUserEnhanced: Stage1成功', { adminEmail });
-    return result;
-  }
-
-  // Stage 2: 中速ロック試行（12秒）
-  result = attemptWithMediumLock(adminEmail, additionalData);
-  if (result) {
-    debugLog('findOrCreateUserEnhanced: Stage2成功', { adminEmail });
-    return result;
-  }
-
-  // Stage 3: 最終フォールバック（既存ユーザーのみ）
-  result = attemptFinalFallback(adminEmail);
-  if (result) {
-    debugLog('findOrCreateUserEnhanced: Stage3成功', { adminEmail });
-    return result;
-  }
-
-  // Stage 4: 最終エラー
-  throw new Error('LOCK_TIMEOUT');
+  console.warn('findOrCreateUserEnhanced is deprecated. Use findOrCreateUserWithEmailLock instead.');
+  // 直接EmailLockシステムにリダイレクト
+  return findOrCreateUserWithEmailLock(adminEmail, additionalData);
 }
 
 /**
@@ -302,25 +260,14 @@ function findOrCreateUserWithRetry(adminEmail, additionalData = {}) {
 }
 
 /**
- * 🎯 本番環境用メイン関数（findOrCreateUserの置き換え）
- * 既存のfindOrCreateUserを段階的に置き換える
- * @param {string} adminEmail - メールアドレス
- * @param {object} additionalData - 追加データ
- * @returns {object} { userId, isNewUser, userInfo }
+ * 🎯 本番環境用メイン関数（findOrCreateUserの置き換え）- 無効化
+ * メール特化ロック（EmailSpecificLock.gs）に統合済み
+ * @deprecated Use findOrCreateUserWithEmailLock instead
  */
 function findOrCreateUserProduction(adminEmail, additionalData = {}) {
-  try {
-    return findOrCreateUserWithRetry(adminEmail, additionalData);
-  } catch (error) {
-    // 本番環境用エラーログ
-    console.error('findOrCreateUserProduction 最終エラー:', {
-      error: error.message,
-      adminEmail: adminEmail,
-      timestamp: new Date().toISOString(),
-      lockStats: getLockStatistics()
-    });
-    throw error;
-  }
+  console.warn('findOrCreateUserProduction is deprecated. Use findOrCreateUserWithEmailLock instead.');
+  // 直接EmailLockシステムにリダイレクト
+  return findOrCreateUserWithEmailLock(adminEmail, additionalData);
 }
 
 /**

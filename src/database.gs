@@ -424,46 +424,6 @@ function findUserByEmailNonBlocking(email) {
 }
 
 /**
- * ロック競合を避けるための軽量ユーザー検索
- * 登録処理中にhandleDirectExecAccessで使用
- * @param {string} email メールアドレス
- * @returns {object|null} ユーザー情報またはnull
- */
-function findUserByEmailNonBlocking(email) {
-  try {
-    if (!email) return null;
-    
-    const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
-    if (!dbId) return null;
-    
-    const sheet = SpreadsheetApp.openById(dbId).getSheetByName('ユーザー');
-    if (!sheet) return null;
-    
-    // ロックなしで軽量検索（読み取り専用）
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0];
-    const emailIndex = headers.indexOf('adminEmail');
-    
-    if (emailIndex === -1) return null;
-    
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][emailIndex] === email) {
-        const user = {};
-        headers.forEach((header, index) => {
-          user[header] = data[i][index];
-        });
-        return user;
-      }
-    }
-    return null;
-  } catch (error) {
-    console.error('findUserByEmailNonBlocking error:', error);
-    return null;
-  }
-}
-
-/**
  * メールアドレスでユーザー検索
  * @param {string} email - メールアドレス
  * @returns {object|null} ユーザー情報
@@ -657,21 +617,22 @@ function updateUser(userId, updateData) {
 }
 
 /**
- * 🎯 プロダクション環境向け: ユーザー検索・作成（リトライ機能付き）
+ * 🎯 プロダクション環境向け: ユーザー検索・作成（リトライ機能付き）- 統合版
+ * メール特化ロックシステムを使用
  * @param {string} adminEmail - ユーザーメールアドレス
  * @param {object} additionalData - 追加データ
  * @param {number} maxRetries - 最大リトライ回数（デフォルト: 3）
- * @param {number} initialBackoff - 初期待機時間（ミリ秒、デフォルト: 2000）
+ * @param {number} initialBackoff - 初期待機時間（ミリ秒、デフォルト: 1000）
  * @returns {object} { userId, isNewUser, userInfo }
  */
-function findOrCreateUserProduction(adminEmail, additionalData = {}, maxRetries = 3, initialBackoff = 2000) {
+function findOrCreateUserProductionWithRetry(adminEmail, additionalData = {}, maxRetries = 3, initialBackoff = 1000) {
   let attempts = 0;
   let lastError = null;
 
   while (attempts < maxRetries) {
     try {
-      // 既存の findOrCreateUser を呼び出す
-      const result = findOrCreateUser(adminEmail, additionalData);
+      // メール特化ロックシステムを直接使用
+      const result = findOrCreateUserWithEmailLock(adminEmail, additionalData);
       
       // 成功した場合は結果を返す
       return result;
@@ -679,24 +640,29 @@ function findOrCreateUserProduction(adminEmail, additionalData = {}, maxRetries 
     } catch (error) {
       lastError = error;
       
-      // LOCK_TIMEOUT エラー、またはそれに類するメッセージの場合のみリトライ
-      if (error.message && (error.message.includes('LOCK_TIMEOUT') || error.message.includes('Lock wait timeout'))) {
+      // EmailLock関連エラーの場合のみリトライ
+      if (error.message && (
+        error.message.includes('LOCK_TIMEOUT') || 
+        error.message.includes('SCRIPT_LOCK_TIMEOUT') ||
+        error.message.includes('EMAIL_ALREADY_PROCESSING') ||
+        error.message.includes('Lock wait timeout')
+      )) {
         attempts++;
         
         if (attempts < maxRetries) {
-          const waitTime = initialBackoff * Math.pow(2, attempts - 1) + Math.random() * 1000;
-          console.warn(`findOrCreateUserProduction: LOCK_TIMEOUT, リトライ ${attempts}/${maxRetries} (${waitTime}ms待機)...`, { adminEmail });
+          const waitTime = initialBackoff * Math.pow(2, attempts - 1) + Math.random() * 500;
+          console.warn(`findOrCreateUserProductionWithRetry: EmailLock失敗, リトライ ${attempts}/${maxRetries} (${waitTime}ms待機)...`, { adminEmail });
           Utilities.sleep(waitTime);
         }
       } else {
-        // LOCK_TIMEOUT以外のエラーは即時スロー
+        // EMAIL_ALREADY_PROCESSING以外のエラーは即時スロー
         throw error;
       }
     }
   }
 
   // リトライ上限に達した場合
-  console.error(`findOrCreateUserProduction 最終エラー: ${lastError.message}`, {
+  console.error(`findOrCreateUserProductionWithRetry 最終エラー: ${lastError.message}`, {
     adminEmail: adminEmail,
     attempts: attempts,
     lastErrorMessage: lastError.toString()
@@ -713,19 +679,14 @@ function findOrCreateUserProduction(adminEmail, additionalData = {}, maxRetries 
  * @param {object} additionalData - 追加データ（オプション）
  * @returns {object} { userId, isNewUser, userInfo }
  */
+/**
+ * @deprecated Use findOrCreateUserWithEmailLock instead
+ * 競合するロック戦略を防ぐため無効化
+ */
 function findOrCreateUser(adminEmail, additionalData = {}) {
-  if (!adminEmail || !adminEmail.includes('@')) {
-    throw new Error('有効なメールアドレスが必要です');
-  }
-
-  // 🔒 適応的ロックメカニズム
-  const result = attemptWithAdaptiveLock(adminEmail, additionalData);
-  if (result) {
-    return result;
-  }
-  
-  // フォールバック: 軽量ロックで再試行
-  return attemptWithLightweightLock(adminEmail, additionalData);
+  console.warn('findOrCreateUser is deprecated. Use findOrCreateUserWithEmailLock instead.');
+  // 直接EmailLockシステムにリダイレクト
+  return findOrCreateUserWithEmailLock(adminEmail, additionalData);
 }
 
 /**

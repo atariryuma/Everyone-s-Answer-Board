@@ -79,14 +79,14 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
       };
     }
     
-    // Step 3: 新規ユーザー作成（ユーザー特化ロック使用）
+    // Step 3: 新規ユーザー作成（スクリプトロック使用 - ユーザーロック廃止）
     console.log('findOrCreateUserWithEmailLock: 新規ユーザー作成開始', { adminEmail });
-    const lock = LockService.getUserLock();
-    const timeout = 25000; // 15秒→25秒に延長
+    const lock = LockService.getScriptLock();
+    const timeout = 10000; // 25秒→10秒に短縮
     
     if (!lock.waitLock(timeout)) {
-      console.error('findOrCreateUserWithEmailLock: ユーザーロックタイムアウト', { adminEmail, timeout });
-      throw new Error('USER_LOCK_TIMEOUT');
+      console.error('findOrCreateUserWithEmailLock: スクリプトロックタイムアウト', { adminEmail, timeout });
+      throw new Error('SCRIPT_LOCK_TIMEOUT');
     }
     
     try {
