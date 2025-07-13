@@ -2,13 +2,15 @@
 <!-- GAS include用のモーダルコンポーネント集 -->
 
 <!-- 確認モーダル -->
-<div id="confirmation-modal" class="fixed inset-0 bg-black/80 z-[60] hidden items-center justify-center" role="dialog" aria-modal="true">
-  <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4">
-    <h3 id="modal-title" class="text-xl font-bold text-cyan-400 mb-4"></h3>
-    <p id="modal-message" class="text-gray-300 mb-6"></p>
-    <div class="flex justify-end gap-3">
-      <button type="button" id="modal-cancel-btn" class="btn btn-secondary">キャンセル</button>
-      <button type="button" id="modal-confirm-btn" class="btn btn-primary">はい、実行します</button>
+<div id="confirmation-modal" class="fixed inset-0 bg-black/80 z-[60] hidden" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4">
+      <h3 id="modal-title" class="text-xl font-bold text-cyan-400 mb-4"></h3>
+      <p id="modal-message" class="text-gray-300 mb-6"></p>
+      <div class="flex justify-end gap-3">
+        <button type="button" id="modal-cancel-btn" class="btn btn-secondary">キャンセル</button>
+        <button type="button" id="modal-confirm-btn" class="btn btn-primary">はい、実行します</button>
+      </div>
     </div>
   </div>
 </div>
