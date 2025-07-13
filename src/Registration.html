@@ -2,43 +2,32 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <!-- <base target="_top"> Temporarily disabled for testing -->
+  <base target="_top">
   <title>StudyQuest - 登録</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Prevent external CSS interference -->
+  
+  <!-- GAS IFRAME Sandbox Mode Fix: Immediate Style Application -->
   <script>
-    // IMMEDIATE: Block any external stylesheets and force our styles
-    document.addEventListener('DOMContentLoaded', function() {
-      // Remove any external stylesheets that might interfere
-      const links = document.querySelectorAll('link[rel="stylesheet"]');
-      links.forEach(link => {
-        if (link.href && !link.href.includes('fonts.googleapis.com')) {
-          link.disabled = true;
-        }
-      });
-    });
+    // CRITICAL: Apply styles immediately before any external CSS loads
+    (function() {
+      const style = document.createElement('style');
+      style.textContent = 
+        'html { background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important; min-height: 100vh !important; }' +
+        'body { background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important; min-height: 100vh !important; display: flex !important; align-items: center !important; justify-content: center !important; padding: 20px !important; margin: 0 !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important; }';
+      (document.head || document.documentElement).appendChild(style);
+    })();
   </script>
   <style>
-    /* SELECTIVE RESET: Only reset elements that need it */
-    html, body, div, span, h1, h2, h3, h4, h5, h6, button {
-      margin: 0 !important;
-      padding: 0 !important;
-      box-sizing: border-box !important;
-    }
-    
-    /* Preserve normal spacing for text elements */
-    p, a, span {
-      box-sizing: border-box !important;
-    }
-    
-    /* CRITICAL: Force override any external CSS - must be first */
-    html {
+    /* GAS IFRAME FIX: Maximum CSS specificity and priority */
+    html[lang="ja"], html {
       background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;
       min-height: 100vh !important;
       width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
     }
     
-    body {
+    body.gliffy-body, body {
       background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;
       min-height: 100vh !important;
       margin: 0 !important;
@@ -51,9 +40,15 @@
       width: 100% !important;
     }
 
-    /* Override any framework classes */
-    .container, .main, .content, .app, .page {
+    /* SELECTIVE RESET: Only reset elements that need it */
+    html, body, div, span, h1, h2, h3, h4, h5, h6, button {
+      box-sizing: border-box !important;
+    }
+    
+    /* Override any framework/external classes with high specificity */
+    .container, .main, .content, .app, .page, div[class*="tailwind"], div[class*="tw-"] {
       all: unset !important;
+      display: block !important;
     }
 
     /* Animated background elements */
@@ -622,48 +617,49 @@
       }
     });
 
-    // NUCLEAR OPTION: Force styles with maximum priority
+    // GAS IFRAME FIX: Force styles with maximum priority for Google Apps Script
     function forceCorrectStyles() {
       const html = document.documentElement;
       const body = document.body;
       const container = document.getElementById('main-container');
       
-      // Remove any interfering classes
+      // GAS-specific: Remove any auto-added classes
       if (body) {
-        body.className = '';
-        body.removeAttribute('class');
-      }
-      if (html) {
-        html.className = '';
-        html.removeAttribute('class');
+        // Preserve existing classes but override problematic ones
+        const classList = body.className.split(' ').filter(cls => 
+          !cls.includes('tailwind') && !cls.includes('tw-') && !cls.includes('gas-')
+        );
+        body.className = classList.join(' ');
       }
       
-      // Force HTML styles with cssText (highest priority)
-      if (html) {
-        html.style.cssText = `
-          background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;
-          min-height: 100vh !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          width: 100% !important;
-        `;
-      }
+      // GAS IFRAME: Force critical styles with maximum specificity
+      const criticalStyle = document.createElement('style');
+      criticalStyle.id = 'gas-override-styles';
+      criticalStyle.textContent = 
+        'html[lang="ja"], html {' +
+          'background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;' +
+          'min-height: 100vh !important;' +
+          'margin: 0 !important;' +
+          'padding: 0 !important;' +
+          'width: 100% !important;' +
+        '}' +
+        'body.gliffy-body, body {' +
+          'background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;' +
+          'min-height: 100vh !important;' +
+          'margin: 0 !important;' +
+          'padding: 20px !important;' +
+          'display: flex !important;' +
+          'align-items: center !important;' +
+          'justify-content: center !important;' +
+          'overflow-x: hidden !important;' +
+          'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;' +
+          'width: 100% !important;' +
+        '}';
       
-      // Force body styles with cssText (highest priority)
-      if (body) {
-        body.style.cssText = `
-          background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;
-          min-height: 100vh !important;
-          margin: 0 !important;
-          padding: 20px !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-          overflow-x: hidden !important;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-          width: 100% !important;
-        `;
-      }
+      // Remove existing override and add new one
+      const existing = document.getElementById('gas-override-styles');
+      if (existing) existing.remove();
+      document.head.appendChild(criticalStyle);
       
       // Force glassmorphism container styles if needed
       if (container && !container.style.background) {
@@ -683,49 +679,72 @@
 
     // Modal functions are now provided by SharedModals
 
-    // IMMEDIATE EXECUTION: Apply styles as soon as possible
+    // GAS IFRAME TIMING FIX: Multi-stage style application
     (function() {
+      let styleApplied = false;
+      
       // Apply styles immediately when script runs
       function applyEmergencyStyles() {
         const html = document.documentElement;
         const body = document.body || document.getElementsByTagName('body')[0];
         
         if (html) {
-          html.style.background = 'linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%)';
-          html.style.minHeight = '100vh';
-          html.style.margin = '0';
-          html.style.padding = '0';
+          html.style.setProperty('background', 'linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%)', 'important');
+          html.style.setProperty('min-height', '100vh', 'important');
+          html.style.setProperty('margin', '0', 'important');
+          html.style.setProperty('padding', '0', 'important');
         }
         
         if (body) {
-          body.style.background = 'linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%)';
-          body.style.minHeight = '100vh';
-          body.style.margin = '0';
-          body.style.padding = '20px';
-          body.style.display = 'flex';
-          body.style.alignItems = 'center';
-          body.style.justifyContent = 'center';
-          body.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+          body.style.setProperty('background', 'linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%)', 'important');
+          body.style.setProperty('min-height', '100vh', 'important');
+          body.style.setProperty('margin', '0', 'important');
+          body.style.setProperty('padding', '20px', 'important');
+          body.style.setProperty('display', 'flex', 'important');
+          body.style.setProperty('align-items', 'center', 'important');
+          body.style.setProperty('justify-content', 'center', 'important');
+          body.style.setProperty('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', 'important');
+          styleApplied = true;
         }
       }
       
       // Apply immediately
       applyEmergencyStyles();
       
-      // Apply after DOM is ready
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
+      // GAS-specific: Handle different ready states
+      function initWhenReady() {
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
           applyEmergencyStyles();
+          forceCorrectStyles();
           initializeRegistration();
-        });
-      } else {
-        initializeRegistration();
+        } else {
+          setTimeout(initWhenReady, 10);
+        }
       }
       
-      // Apply styles with intervals to ensure they stick
-      setTimeout(applyEmergencyStyles, 10);
-      setTimeout(applyEmergencyStyles, 50);
-      setTimeout(applyEmergencyStyles, 200);
+      // Apply after DOM is ready with GAS-specific timing
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+          initWhenReady();
+        });
+        // Backup for GAS iframe load timing
+        window.addEventListener('load', function() {
+          setTimeout(initWhenReady, 100);
+        });
+      } else {
+        initWhenReady();
+      }
+      
+      // Continuous style enforcement for GAS iframe
+      const intervals = [50, 200, 500, 1000, 2000];
+      intervals.forEach(delay => {
+        setTimeout(() => {
+          if (!styleApplied || !document.body.style.background.includes('#1a1b26')) {
+            applyEmergencyStyles();
+            forceCorrectStyles();
+          }
+        }, delay);
+      });
     })();
 
     function initializeRegistration() {
