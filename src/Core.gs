@@ -2231,13 +2231,9 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
       console.error('スプレッドシート作成は完了しましたが、サービスアカウントとの共有に失敗しました。手動で共有してください。');
     }
     
-    // リアクション列をスプレッドシートに追加
-    try {
-      addReactionColumnsToSpreadsheet(spreadsheetId, sheetName);
-      debugLog('リアクション列の追加完了: ' + spreadsheetId + ', シート: ' + sheetName);
-    } catch (reactionError) {
-      console.warn('リアクション列の追加に失敗しましたが、処理を続行します:', reactionError.message);
-    }
+    // リアクション列の追加はcreateLinkedSpreadsheetでは行わず、フォーム作成完了後に実施
+    // これにより、Google Formsが自動生成するヘッダーとの重複を防ぐ
+    debugLog('スプレッドシート作成完了 (リアクション列は後で追加): ' + spreadsheetId + ', シート: ' + sheetName);
     
     return {
       spreadsheetId: spreadsheetId,
@@ -2578,22 +2574,43 @@ function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName) {
     var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     var sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
     
-    var additionalHeaders = [
+    var targetHeaders = [
       COLUMN_HEADERS.UNDERSTAND,
       COLUMN_HEADERS.LIKE,
       COLUMN_HEADERS.CURIOUS,
       COLUMN_HEADERS.HIGHLIGHT
     ];
     
-    // 効率的にヘッダー情報を取得
+    // 現在のヘッダーを取得
     var currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    var startCol = currentHeaders.length + 1;
+    console.log('Current headers:', currentHeaders);
     
-    // バッチでヘッダーを追加
-    sheet.getRange(1, startCol, 1, additionalHeaders.length).setValues([additionalHeaders]);
+    // 既に存在しないヘッダーのみを追加対象とする
+    var headersToAdd = [];
+    targetHeaders.forEach(function(header) {
+      var exists = currentHeaders.some(function(existingHeader) {
+        return String(existingHeader).trim() === String(header).trim();
+      });
+      if (!exists) {
+        headersToAdd.push(header);
+      } else {
+        console.log('Header already exists, skipping:', header);
+      }
+    });
+    
+    if (headersToAdd.length === 0) {
+      console.log('All reaction columns already exist, skipping addition');
+      return;
+    }
+    
+    console.log('Adding headers:', headersToAdd);
+    
+    // 不足しているヘッダーのみを追加
+    var startCol = currentHeaders.length + 1;
+    sheet.getRange(1, startCol, 1, headersToAdd.length).setValues([headersToAdd]);
     
     // スタイリングを一括適用
-    var allHeadersRange = sheet.getRange(1, 1, 1, currentHeaders.length + additionalHeaders.length);
+    var allHeadersRange = sheet.getRange(1, 1, 1, currentHeaders.length + headersToAdd.length);
     allHeadersRange.setFontWeight('bold').setBackground('#E3F2FD');
     
     // 自動リサイズ（エラーが出ても続行）
@@ -2603,7 +2620,7 @@ function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName) {
       console.warn('Auto-resize failed:', resizeError.message);
     }
     
-    debugLog('リアクション列を追加しました: ' + sheetName);
+    debugLog('リアクション列を追加しました (' + headersToAdd.length + ' columns): ' + sheetName);
   }
   catch (e) {
     console.error('リアクション列追加エラー: ' + e.message);
