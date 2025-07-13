@@ -3,8 +3,8 @@
  * 同一ユーザーの重複操作を防ぎ、他ユーザーとの競合のみロック対象とする
  */
 
-// グローバルメール処理状態管理
-const PROCESSING_EMAILS = {};
+// メール処理状態はCacheServiceで管理（実行間で共有）
+const EMAIL_LOCK_CACHE = CacheService.getScriptCache();
 
 /**
  * メール特化ロック：同一メールの重複処理を防止
@@ -13,18 +13,16 @@ const PROCESSING_EMAILS = {};
  */
 function acquireEmailLock(adminEmail) {
   const lockKey = 'processing_' + adminEmail;
-  
+
   // 既に同じメールで処理中の場合は拒否
-  if (PROCESSING_EMAILS[lockKey]) {
+  if (EMAIL_LOCK_CACHE.get(lockKey)) {
     console.log('Email-specific lock: Already processing for', adminEmail);
     return false;
   }
-  
-  // ロック取得
-  PROCESSING_EMAILS[lockKey] = {
-    timestamp: Date.now()
-  };
-  
+
+  // ロック取得（60秒有効）
+  EMAIL_LOCK_CACHE.put(lockKey, String(Date.now()), 60);
+
   console.log('Email-specific lock: Acquired for', adminEmail);
   return true;
 }
@@ -35,7 +33,7 @@ function acquireEmailLock(adminEmail) {
  */
 function releaseEmailLock(adminEmail) {
   const lockKey = 'processing_' + adminEmail;
-  delete PROCESSING_EMAILS[lockKey];
+  EMAIL_LOCK_CACHE.remove(lockKey);
   console.log('Email-specific lock: Released for', adminEmail);
 }
 
@@ -151,13 +149,5 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
  * 5分以上古い処理状態は自動削除
  */
 function cleanupEmailLocks() {
-  const now = Date.now();
-  const timeout = 5 * 60 * 1000; // 5分
-  
-  Object.keys(PROCESSING_EMAILS).forEach(key => {
-    if (now - PROCESSING_EMAILS[key].timestamp > timeout) {
-      delete PROCESSING_EMAILS[key];
-      console.log('Email lock cleanup: Removed stale lock', key);
-    }
-  });
+  // CacheService のエントリは自動的に期限切れになるため明示的なクリーンアップは不要
 }
