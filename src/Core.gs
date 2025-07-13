@@ -136,7 +136,11 @@ function ensureUserExists(adminEmail) {
   };
 
   try {
-    const result = findOrCreateUserProduction(adminEmail, {
+    const createFn =
+      typeof findOrCreateUserProduction === 'function'
+        ? findOrCreateUserProduction
+        : findOrCreateUser;
+    const result = createFn(adminEmail, {
       configJson: JSON.stringify(initialConfig)
     });
 
@@ -1334,7 +1338,11 @@ function quickStartSetup(requestUserId) {
       debugLog('quickStartSetup: 既存ユーザー確認完了', { userId: requestUserId });
     } else {
       // 新規または既存ユーザーの自動判定
-      const result = findOrCreateUserProduction(activeUserEmail);
+      const createFn =
+        typeof findOrCreateUserProduction === 'function'
+          ? findOrCreateUserProduction
+          : findOrCreateUser;
+      const result = createFn(activeUserEmail);
       requestUserId = result.userId;
       userInfo = result.userInfo;
       
