@@ -18,14 +18,29 @@ function findOrCreateUserEnhanced(adminEmail, additionalData = {}) {
 
   debugLog('findOrCreateUserEnhanced: 開始', { adminEmail });
 
-  // Stage 1: 高速ロック試行（10秒）
+  try {
+    // 新方式: メール特化ロックシステムを優先使用
+    const result = findOrCreateUserWithEmailLock(adminEmail, additionalData);
+    debugLog('findOrCreateUserEnhanced: EmailLock成功', { adminEmail });
+    return result;
+  } catch (error) {
+    if (error.message === 'EMAIL_ALREADY_PROCESSING') {
+      // 同一メールで処理中の場合はエラー
+      throw new Error('LOCK_TIMEOUT');
+    }
+    
+    // EmailLock失敗時は従来方式にフォールバック
+    debugLog('findOrCreateUserEnhanced: EmailLock失敗、従来方式フォールバック', { adminEmail, error: error.message });
+  }
+
+  // Stage 1: 高速ロック試行（15秒）
   let result = attemptWithAdaptiveLock(adminEmail, additionalData);
   if (result) {
     debugLog('findOrCreateUserEnhanced: Stage1成功', { adminEmail });
     return result;
   }
 
-  // Stage 2: 中速ロック試行（5秒）
+  // Stage 2: 中速ロック試行（8秒）
   result = attemptWithMediumLock(adminEmail, additionalData);
   if (result) {
     debugLog('findOrCreateUserEnhanced: Stage2成功', { adminEmail });
@@ -40,7 +55,6 @@ function findOrCreateUserEnhanced(adminEmail, additionalData = {}) {
   }
 
   // Stage 4: 最終エラー
-  // クライアント側での自動リトライを促すため専用エラーコードを返す
   throw new Error('LOCK_TIMEOUT');
 }
 
@@ -51,8 +65,10 @@ function findOrCreateUserEnhanced(adminEmail, additionalData = {}) {
  * @returns {object|null} 成功時は結果、失敗時はnull
  */
 function attemptWithAdaptiveLock(adminEmail, additionalData) {
-  const lock = LockService.getScriptLock(); // getUserLock→getScriptLockに変更
-  const timeout = 15000; // 10秒→15秒に延長
+  // メール特化ロック: 同一メールアドレスの処理を直列化
+  const emailLockKey = 'email_lock_' + adminEmail;
+  const lock = LockService.getScriptLock();
+  const timeout = 15000;
   
   try {
     if (!lock.waitLock(timeout)) {

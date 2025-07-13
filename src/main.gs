@@ -390,7 +390,8 @@ function handleDirectExecAccess(userEmail) {
     }
     
     // サービスアカウント経由でユーザーがデータベースに登録されているかチェック
-    const userInfo = findUserByEmail(userEmail);
+    // 登録処理中の場合はロック競合を避けるため、軽量チェックを使用
+    const userInfo = findUserByEmailNonBlocking(userEmail);
     console.log('handleDirectExecAccess - userInfo:', userInfo);
     console.log('handleDirectExecAccess - userEmail:', userEmail);
     
