@@ -2576,34 +2576,8 @@ function syncCheckboxStates(status) {
         return;
       }
       
-      if (status.customFormInfo && status.customFormInfo.mainQuestion) {
-        // カスタムフォーム情報を表示
-        const formInfo = status.customFormInfo;
-        
-        customFormInfoSection.innerHTML = `
-          <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-            <div class="flex items-center gap-2 mb-3">
-              <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-              </svg>
-              <span class="font-medium text-blue-200">現在のカスタムフォーム設定</span>
-            </div>
-            <div class="space-y-2 text-sm">
-              ${formInfo.formTitle ? `<div><span class="text-gray-300">タイトル:</span> <span class="text-white">${escapeHtml(formInfo.formTitle)}</span></div>` : ''}
-              <div><span class="text-gray-300">質問:</span> <span class="text-white">${escapeHtml(formInfo.mainQuestion)}</span></div>
-              <div><span class="text-gray-300">回答形式:</span> <span class="text-white">${getQuestionTypeLabel(formInfo.questionType)}</span></div>
-              ${formInfo.choices && formInfo.choices.length > 0 ? `<div><span class="text-gray-300">選択肢:</span> <span class="text-white">${formInfo.choices.join(', ')}</span></div>` : ''}
-              ${formInfo.enableClass ? `<div><span class="text-gray-300">クラス選択:</span> <span class="text-green-400">有効</span></div>` : ''}
-              <div class="text-xs text-gray-400 mt-2">作成日: ${new Date(formInfo.lastCreated).toLocaleString('ja-JP')}</div>
-            </div>
-          </div>
-        `;
-        
-        customFormInfoSection.classList.remove('hidden');
-        console.log('✅ [DEBUG] Custom form info displayed');
-      } else {
-        customFormInfoSection.classList.add('hidden');
-      }
+      // customFormInfo は opinionHeader に統一したため、このセクションは常に非表示
+      customFormInfoSection.classList.add('hidden');
     }
 
     /**
@@ -2757,28 +2731,19 @@ function syncCheckboxStates(status) {
         // トピックテキストを設定（問題文を表示）
         const topicTextElement = document.getElementById('current-topic-text');
         if (topicTextElement) {
-          let topic = status.currentTopic || '（問題文未設定）';
-
-          if (!status.currentTopic) {
-            if (status.customFormInfo && status.customFormInfo.mainQuestion) {
-              topic = status.customFormInfo.mainQuestion;
-              console.log('✅ [DEBUG] Using custom form main question:', topic);
-            } else if (status.userInfo && status.userInfo.configJson) {
-              try {
-                const config = JSON.parse(status.userInfo.configJson);
-                if (config.mainQuestion) {
-                  topic = config.mainQuestion;
-                  console.log('✅ [DEBUG] Using config.mainQuestion:', topic);
-                } else if (status.publishedSheetName) {
-                  const sheetKey = 'sheet_' + status.publishedSheetName;
-                  const sheetConfig = config[sheetKey] || {};
-                  topic = sheetConfig.opinionHeader || status.publishedSheetName || '（問題文未設定）';
-                  console.log('✅ [DEBUG] Using sheet config opinionHeader:', topic);
-                }
-              } catch (e) {
-                console.warn('ConfigJson parsing error:', e);
-                topic = status.publishedSheetName || '（問題文未設定）';
-              }
+          let topic = '（問題文未設定）';
+          
+          // opinionHeaderを優先的に使用
+          if (status.userInfo && status.userInfo.configJson && status.publishedSheetName) {
+            try {
+              const config = JSON.parse(status.userInfo.configJson);
+              const sheetKey = 'sheet_' + status.publishedSheetName;
+              const sheetConfig = config[sheetKey] || {};
+              topic = sheetConfig.opinionHeader || status.publishedSheetName || '（問題文未設定）';
+              console.log('✅ [DEBUG] Using sheet config opinionHeader:', topic);
+            } catch (e) {
+              console.warn('ConfigJson parsing error:', e);
+              topic = status.publishedSheetName || '（問題文未設定）';
             }
           }
 
@@ -3337,7 +3302,7 @@ function syncCheckboxStates(status) {
 
         const config = {
             formTitle: customFormTitle,
-            mainQuestion: customMainQuestion,
+            opinionHeader: customMainQuestion,  // mainQuestion を opinionHeader に統一
             questionType: mainQuestionType,
             choices: mainQuestionChoices,
             includeOthers: includeOthersOption,

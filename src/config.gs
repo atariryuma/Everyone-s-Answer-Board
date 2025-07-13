@@ -1000,6 +1000,11 @@ function autoMapSheetHeaders(requestUserId, sheetName, overrides) {
 
     // モーダル入力値による上書き
     if (overrides) {
+      if (overrides.opinionHeader) {
+        const match = headers.find(h => String(h).trim() === overrides.opinionHeader.trim());
+        if (match) mappingResult.opinionHeader = match;
+      }
+      // 後方互換性のためmainQuestionもサポート
       if (overrides.mainQuestion) {
         const match = headers.find(h => String(h).trim() === overrides.mainQuestion.trim());
         if (match) mappingResult.opinionHeader = match;

@@ -1959,7 +1959,7 @@ function createQuickStartForm(userEmail, userId) {
     const formTitle = `みんなの回答ボード - ${dateTimeString}`;
     
     const defaultConfig = {
-      mainQuestion: '今日の学習について、あなたの考えや感想を聞かせてください',
+      opinionHeader: '今日の学習について、あなたの考えや感想を聞かせてください',  // mainQuestion を opinionHeader に統一
       questionType: 'text',
       enableClass: false,
       includeOthers: false
@@ -1993,10 +1993,10 @@ function createCustomForm(userEmail, userId, config) {
     const baseTitle = config.formTitle || 'カスタムフォーム';
     const formTitle = `${baseTitle} - ${dateTimeString}`;
     
-    // AdminPanelのconfig構造を内部形式に変換
+    // AdminPanelのconfig構造を内部形式に変換 (opinionHeaderに統一)
     const convertedConfig = {
       mainQuestion: {
-        title: config.mainQuestion || '今日の学習について、あなたの考えや感想を聞かせてください',
+        title: config.opinionHeader || '今日の学習について、あなたの考えや感想を聞かせてください',  // mainQuestion を opinionHeader に統一
         type: config.questionType || 'text',
         choices: config.choices || [],
         includeOthers: config.includeOthers || false
@@ -3303,6 +3303,33 @@ function getStatus(requestUserId, forceRefresh = false) {
       }
     }
     
+    // mainQuestionからopinionHeaderへの移行処理
+    if (configJson.mainQuestion && configJson.publishedSheetName) {
+      try {
+        const sheetKey = 'sheet_' + configJson.publishedSheetName;
+        if (!configJson[sheetKey]) {
+          configJson[sheetKey] = {};
+        }
+        // 既存のopinionHeaderがない場合のみ移行
+        if (!configJson[sheetKey].opinionHeader) {
+          configJson[sheetKey].opinionHeader = configJson.mainQuestion;
+          console.log('✅ [Migration] Moved mainQuestion to opinionHeader for sheet:', configJson.publishedSheetName);
+        }
+        delete configJson.mainQuestion;
+        
+        // 設定を保存
+        updateUser(requestUserId, {
+          configJson: JSON.stringify(configJson)
+        });
+        
+        // userInfoも再取得して同期
+        userInfo = findUserById(requestUserId);
+        configJson = JSON.parse(userInfo.configJson || '{}');
+      } catch (e) {
+        console.warn('getStatus: Failed to migrate mainQuestion to opinionHeader:', e.message);
+      }
+    }
+    
     // スプレッドシート情報を取得
     let sheetNames = [];
     try {
@@ -3336,15 +3363,8 @@ function getStatus(requestUserId, forceRefresh = false) {
     if (configJson.formCreated && configJson.lastFormCreatedAt) {
       try {
         // カスタムフォームの設定情報を取得
-        customFormInfo = {
-          formTitle: configJson.formTitle || null,
-          mainQuestion: configJson.mainQuestion || null,
-          questionType: configJson.questionType || null,
-          choices: configJson.choices || [],
-          enableClass: configJson.enableClass || false,
-          classChoices: configJson.classChoices || [],
-          lastCreated: configJson.lastFormCreatedAt
-        };
+        // customFormInfo は opinionHeader に統一したため削除
+        customFormInfo = null;
       } catch (e) {
         console.warn('カスタムフォーム情報の取得に失敗:', e.message);
       }
@@ -3375,11 +3395,8 @@ function getStatus(requestUserId, forceRefresh = false) {
     const isPublished = !!(configJson.appPublished && configJson.publishedSpreadsheetId && configJson.publishedSheetName);
 
     let topic = '（問題文未設定）';
-    if (customFormInfo && customFormInfo.mainQuestion) {
-      topic = customFormInfo.mainQuestion;
-    } else if (configJson.mainQuestion) {
-      topic = configJson.mainQuestion;
-    } else if (configJson.publishedSheetName) {
+    // opinionHeaderのみを使用するように統一
+    if (configJson.publishedSheetName) {
       const sheetKey = 'sheet_' + configJson.publishedSheetName;
       const sheetConfig = configJson[sheetKey] || {};
       topic = sheetConfig.opinionHeader || configJson.publishedSheetName;
@@ -3547,14 +3564,28 @@ function createCustomFormUI(requestUserId, config) {
       updatedConfigJson.autoPublishAfterCreation = true;
       updatedConfigJson.readyForAutoPublish = true;
       
-      // カスタムフォーム設定情報を保存
+      // カスタムフォーム設定情報を保存 (opinionHeaderに統一)
       updatedConfigJson.formTitle = config.formTitle;
-      updatedConfigJson.mainQuestion = config.mainQuestion;
       updatedConfigJson.questionType = config.questionType;
       updatedConfigJson.choices = config.choices;
       updatedConfigJson.includeOthers = config.includeOthers;
       updatedConfigJson.enableClass = config.enableClass;
       updatedConfigJson.classChoices = config.classChoices;
+      
+      // 既存のmainQuestionをopinionHeaderに移行して削除
+      if (updatedConfigJson.mainQuestion) {
+        // シート固有の設定に移行
+        const sheetKey = 'sheet_' + result.sheetName;
+        if (!updatedConfigJson[sheetKey]) {
+          updatedConfigJson[sheetKey] = {};
+        }
+        // 既存のopinionHeaderがない場合のみ移行
+        if (!updatedConfigJson[sheetKey].opinionHeader) {
+          updatedConfigJson[sheetKey].opinionHeader = updatedConfigJson.mainQuestion;
+        }
+        delete updatedConfigJson.mainQuestion;
+        console.log('✅ Migrated mainQuestion to opinionHeader for sheet:', result.sheetName);
+      }
       
       // 新しく作成されたスプレッドシート情報をメインのユーザー情報として更新
       const updateData = {
@@ -3608,7 +3639,7 @@ function autoSaveAndPublishAfterFormCreation(requestUserId, sheetName, formData)
     
     // 基本設定オブジェクトを作成
     const basicConfig = {
-      opinionHeader: formData.mainQuestion || 'お題',
+      opinionHeader: formData.opinionHeader || 'お題',  // mainQuestion を opinionHeader に統一
       displayMode: 'anonymous',
       showCounts: false
     };

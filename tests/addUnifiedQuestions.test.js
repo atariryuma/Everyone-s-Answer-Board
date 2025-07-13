@@ -28,8 +28,8 @@ describe('addUnifiedQuestions other option', () => {
     };
 
     context.addUnifiedQuestions(form, 'custom', {
-      mainQuestionType: 'multiple',
-      mainQuestionChoices: ['A', 'B'],
+      questionType: 'multiple',  // mainQuestionType を questionType に統一
+      choices: ['A', 'B'],        // mainQuestionChoices を choices に統一
       customMainQuestion: 'Q',
       enableClassSelection: false
     });
@@ -49,8 +49,8 @@ describe('addUnifiedQuestions other option', () => {
     };
 
     context.addUnifiedQuestions(form, 'custom', {
-      mainQuestionType: 'choice',
-      mainQuestionChoices: ['A', 'B'],
+      questionType: 'choice',     // mainQuestionType を questionType に統一
+      choices: ['A', 'B'],        // mainQuestionChoices を choices に統一
       customMainQuestion: 'Q',
       enableClassSelection: false
     });
