@@ -3499,8 +3499,8 @@ function getStatus(requestUserId, forceRefresh = false) {
         debugLog('getStatus: getSheetsList returned:', sheets);
         debugLog('getStatus: getSheetsList type:', typeof sheets);
         
-        if (sheets === undefined) {
-          console.warn('getStatus: getSheetsList returned undefined, trying direct call');
+        if (sheets === undefined || sheets === null) {
+          console.warn('getStatus: getSheetsList returned undefined/null, trying direct call');
           const directSheets = getSheetsListInternal(requestUserId);
           debugLog('getStatus: getSheetsListInternal returned:', directSheets);
           sheetNames = directSheets || [];
@@ -3561,10 +3561,11 @@ function getStatus(requestUserId, forceRefresh = false) {
       topic = sheetConfig.opinionHeader || configJson.publishedSheetName;
     }
 
-    return {
+    const returnObject = {
       status: 'success',
       userInfo: userInfo,
-      sheetNames: sheetNames,
+      sheetNames: sheetNames,  // Keep for backward compatibility
+      allSheets: sheetNames,   // Add for AdminPanel.html compatibility
       setupStep: configJson.setupStatus === 'completed' ? 3 : 2,
       activeSheetName: configJson.publishedSheetName || '',
       publishedSheetName: configJson.publishedSheetName || null,
@@ -3577,6 +3578,10 @@ function getStatus(requestUserId, forceRefresh = false) {
       customFormInfo: customFormInfo,
       currentTopic: topic
     };
+    
+    debugLog('getStatus: Returning object with sheetNames/allSheets:', returnObject.allSheets ? returnObject.allSheets.length : 0, 'sheets');
+    
+    return returnObject;
     
   } catch (error) {
     console.error('getStatus error:', error.message);

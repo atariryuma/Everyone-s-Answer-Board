@@ -80,4 +80,33 @@ describe('Core.gs utilities', () => {
       expect(res.isExistingUser).toBe(true);
     });
   });
+
+  describe('getStatus sheet name property compatibility', () => {
+    beforeEach(() => {
+      Object.assign(context, {
+        Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
+        findUserById: jest.fn(() => ({ 
+          userId: 'test-user-id', 
+          adminEmail: 'admin@example.com',
+          spreadsheetId: 'test-sheet-id',
+          configJson: '{"setupStatus":"completed","publishedSheetName":"Sheet1"}'
+        })),
+        getSheetsList: jest.fn(() => [{ name: 'Sheet1', id: 0 }, { name: 'Sheet2', id: 1 }]),
+        generateAppUrls: jest.fn(() => ({ webAppUrl: 'https://example.com' })),
+        getWebAppUrlCached: jest.fn(() => 'https://example.com')
+      });
+    });
+
+    test('getStatus returns both sheetNames and allSheets properties', () => {
+      const result = context.getStatus('test-user-id');
+      
+      expect(result.status).toBe('success');
+      expect(result.sheetNames).toBeDefined();
+      expect(result.allSheets).toBeDefined();
+      expect(result.sheetNames).toEqual(result.allSheets);
+      expect(Array.isArray(result.allSheets)).toBe(true);
+      expect(result.allSheets).toHaveLength(2);
+      expect(result.allSheets[0]).toEqual({ name: 'Sheet1', id: 0 });
+    });
+  });
 });
