@@ -514,8 +514,8 @@
                         ? new Date(user.lastAccessedAt).toLocaleDateString('ja-JP')
                         : '不明';
                     
-                    const registrationDate = user.registrationDate 
-                        ? new Date(user.registrationDate).toLocaleDateString('ja-JP')
+                    const registrationDate = user.createdAt 
+                        ? new Date(user.createdAt).toLocaleDateString('ja-JP')
                         : '不明';
                     
                     return `
