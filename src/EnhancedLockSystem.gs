@@ -51,7 +51,7 @@ function findOrCreateUserEnhanced(adminEmail, additionalData = {}) {
  * @returns {object|null} 成功時は結果、失敗時はnull
  */
 function attemptWithAdaptiveLock(adminEmail, additionalData) {
-  const lock = LockService.getScriptLock();
+  const lock = LockService.getUserLock();
   const timeout = 10000; // 10秒
   
   try {
@@ -133,7 +133,7 @@ function attemptWithAdaptiveLock(adminEmail, additionalData) {
  * @returns {object|null} 成功時は結果、失敗時はnull
  */
 function attemptWithMediumLock(adminEmail, additionalData) {
-  const lock = LockService.getScriptLock();
+  const lock = LockService.getUserLock();
   const timeout = 5000; // 5秒
   
   try {
