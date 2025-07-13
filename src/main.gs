@@ -599,6 +599,15 @@ function handleSetupPages(params, userEmail) {
     }
     const appSetupTemplate = HtmlService.createTemplateFromFile('AppSetupPage');
     appSetupTemplate.include = include;
+    
+    // AppSetupPage用のuserIdを設定
+    const currentUserEmail = Session.getActiveUser().getEmail();
+    const currentUserInfo = findUserByEmail(currentUserEmail);
+    appSetupTemplate.userId = currentUserInfo ? currentUserInfo.userId : '';
+    
+    console.log('AppSetupPage - currentUserEmail:', currentUserEmail);
+    console.log('AppSetupPage - userId set to:', appSetupTemplate.userId);
+    
     return safeSetXFrameOptionsDeny(appSetupTemplate.evaluate().setTitle('アプリ設定 - StudyQuest'));
   }
 

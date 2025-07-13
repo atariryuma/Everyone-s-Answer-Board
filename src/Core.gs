@@ -3482,11 +3482,22 @@ function getStatus(requestUserId, forceRefresh = false) {
  */
 /**
  * 管理者によるユーザー削除（AppSetupPage.html用ラッパー）
+ * @param {string} requestUserId - リクエスト元のユーザーID
  * @param {string} targetUserId - 削除対象ユーザーID
  * @param {string} reason - 削除理由
  */
-function deleteUserAccountByAdminForUI(targetUserId, reason) {
+function deleteUserAccountByAdminForUI(requestUserId, targetUserId, reason) {
   try {
+    // 管理者権限チェック
+    if (!isDeployUser()) {
+      throw new Error('管理者権限が必要です。ユーザー削除を実行する権限がありません。');
+    }
+    
+    console.log('deleteUserAccountByAdminForUI: 管理者として実行', {
+      requestUserId: requestUserId,
+      targetUserId: targetUserId
+    });
+    
     const result = deleteUserAccountByAdmin(targetUserId, reason);
     return {
       status: 'success',
@@ -3505,8 +3516,14 @@ function deleteUserAccountByAdminForUI(targetUserId, reason) {
 /**
  * 削除ログ取得（AppSetupPage.html用ラッパー）
  */
-function getDeletionLogsForUI() {
+function getDeletionLogsForUI(requestUserId) {
   try {
+    // 管理者権限チェック
+    if (!isDeployUser()) {
+      throw new Error('管理者権限が必要です。削除ログを閲覧する権限がありません。');
+    }
+    
+    console.log('getDeletionLogsForUI: 管理者として実行');
     const logs = getDeletionLogs();
     return {
       status: 'success',
@@ -3562,7 +3579,18 @@ function checkSetupPageAccess() {
  */
 function getAllUsersForAdminForUI(requestUserId) {
   try {
-    verifyUserAccess(requestUserId);
+    // 管理者権限チェック（userIdではなく直接チェック）
+    if (!isDeployUser()) {
+      throw new Error('管理者権限が必要です。この機能にアクセスする権限がありません。');
+    }
+    
+    // requestUserIdが空の場合でも管理者なら許可
+    if (requestUserId && requestUserId.trim() !== '') {
+      verifyUserAccess(requestUserId);
+    } else {
+      console.log('getAllUsersForAdminForUI: 管理者として実行（userIdなし）');
+    }
+    
     const result = getAllUsersForAdmin();
     return {
       status: 'success',
