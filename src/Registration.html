@@ -658,21 +658,23 @@
         body.className = classList.join(' ');
       }
 
-      // Protect modal elements and their content from our aggressive styles
+      // Protect modal elements but preserve their internal layout
       const modals = document.querySelectorAll('#privacy-modal, #digital-citizenship-modal, #usage-guide-modal, #security-modal');
       modals.forEach(modal => {
         if (modal) {
-          // Don't revert modal container styles, but protect content
-          const content = modal.querySelectorAll('h3, h4, p, button, a, svg, .glass-panel *');
-          content.forEach(element => {
-            element.style.all = 'revert';
-            // Ensure text is visible
-            if (element.tagName === 'P' || element.tagName === 'H3' || element.tagName === 'H4') {
-              element.style.color = 'white';
-              element.style.lineHeight = '1.6';
-              element.style.marginBottom = '1rem';
-            }
-          });
+          // Protect modal from our aggressive global styles without breaking layout
+          modal.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+          modal.style.fontSize = '14px';
+          modal.style.lineHeight = '1.6';
+          
+          // Protect glass-panel structure
+          const glassPanel = modal.querySelector('.glass-panel');
+          if (glassPanel) {
+            glassPanel.style.display = 'block';
+            glassPanel.style.position = 'relative';
+            glassPanel.style.width = 'auto';
+            glassPanel.style.height = 'auto';
+          }
         }
       });
 
@@ -714,7 +716,20 @@
         /* Modal protection - ensure modals work correctly */ +
         '#privacy-modal, #digital-citizenship-modal, #usage-guide-modal, #security-modal { position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; z-index: 9999 !important; display: flex !important; align-items: center !important; justify-content: center !important; background-color: rgba(0, 0, 0, 0.8) !important; }' +
         '#privacy-modal.hidden, #digital-citizenship-modal.hidden, #usage-guide-modal.hidden, #security-modal.hidden { display: none !important; }' +
-        '#privacy-modal .glass-panel, #digital-citizenship-modal .glass-panel, #usage-guide-modal .glass-panel, #security-modal .glass-panel { background: rgba(30, 41, 59, 0.95) !important; backdrop-filter: blur(20px) !important; -webkit-backdrop-filter: blur(20px) !important; border-radius: 12px !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important; padding: 1.5rem !important; max-width: 90vw !important; max-height: 90vh !important; overflow-y: auto !important; color: white !important; }';
+        '#privacy-modal .glass-panel, #digital-citizenship-modal .glass-panel, #usage-guide-modal .glass-panel, #security-modal .glass-panel { background: rgba(30, 41, 59, 0.95) !important; backdrop-filter: blur(20px) !important; -webkit-backdrop-filter: blur(20px) !important; border-radius: 12px !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important; padding: 1.5rem !important; max-width: 90vw !important; max-height: 90vh !important; overflow-y: auto !important; color: white !important; display: block !important; position: relative !important; }' +
+        /* Protect modal internal elements from global resets */ +
+        '[id*="modal"] h1, [id*="modal"] h2, [id*="modal"] h3, [id*="modal"] h4 { display: block !important; font-weight: bold !important; margin-bottom: 1rem !important; color: white !important; }' +
+        '[id*="modal"] p { display: block !important; margin-bottom: 1rem !important; line-height: 1.6 !important; color: rgba(255, 255, 255, 0.9) !important; }' +
+        '[id*="modal"] button { display: inline-block !important; padding: 0.5rem 1rem !important; border-radius: 0.375rem !important; border: 1px solid rgba(255, 255, 255, 0.2) !important; background: rgba(59, 130, 246, 0.8) !important; color: white !important; cursor: pointer !important; margin: 0.25rem !important; }' +
+        '[id*="modal"] .space-y-4 > * + * { margin-top: 1rem !important; }' +
+        '[id*="modal"] .space-y-6 > * + * { margin-top: 1.5rem !important; }' +
+        '[id*="modal"] .flex { display: flex !important; }' +
+        '[id*="modal"] .justify-end { justify-content: flex-end !important; }' +
+        '[id*="modal"] .gap-3 > * + * { margin-left: 0.75rem !important; }' +
+        '[id*="modal"] .text-center { text-align: center !important; }' +
+        '[id*="modal"] .mb-4 { margin-bottom: 1rem !important; }' +
+        '[id*="modal"] .mb-6 { margin-bottom: 1.5rem !important; }' +
+        '[id*="modal"] .mt-6 { margin-top: 1.5rem !important; }';
       
       // Remove existing override and add new one
       const existing = document.getElementById('gas-override-styles');
@@ -974,7 +989,7 @@
                       padding: 1rem !important;
                     `;
                     
-                    // Apply glass panel styles to content
+                    // Apply glass panel styles and fix layout
                     const glassPanel = modal.querySelector('.glass-panel');
                     if (glassPanel) {
                       glassPanel.style.cssText = `
@@ -989,7 +1004,50 @@
                         max-height: 90vh !important;
                         overflow-y: auto !important;
                         color: white !important;
+                        display: block !important;
+                        position: relative !important;
                       `;
+                      
+                      // Fix all child elements layout
+                      const allChildren = glassPanel.querySelectorAll('*');
+                      allChildren.forEach(child => {
+                        // Restore display properties for common elements
+                        if (child.tagName === 'DIV') {
+                          child.style.display = 'block';
+                        }
+                        if (child.tagName === 'H1' || child.tagName === 'H2' || child.tagName === 'H3' || child.tagName === 'H4') {
+                          child.style.display = 'block';
+                          child.style.fontWeight = 'bold';
+                          child.style.marginBottom = '1rem';
+                          child.style.color = 'white';
+                        }
+                        if (child.tagName === 'P') {
+                          child.style.display = 'block';
+                          child.style.marginBottom = '1rem';
+                          child.style.lineHeight = '1.6';
+                          child.style.color = 'rgba(255, 255, 255, 0.9)';
+                        }
+                        if (child.tagName === 'BUTTON') {
+                          child.style.display = 'inline-block';
+                          child.style.padding = '0.5rem 1rem';
+                          child.style.margin = '0.25rem';
+                          child.style.borderRadius = '0.375rem';
+                          child.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+                          child.style.backgroundColor = 'rgba(59, 130, 246, 0.8)';
+                          child.style.color = 'white';
+                          child.style.cursor = 'pointer';
+                        }
+                        // Preserve flex layouts where they exist
+                        if (child.classList.contains('flex')) {
+                          child.style.display = 'flex';
+                        }
+                        if (child.classList.contains('justify-end')) {
+                          child.style.justifyContent = 'flex-end';
+                        }
+                        if (child.classList.contains('text-center')) {
+                          child.style.textAlign = 'center';
+                        }
+                      });
                     }
                     
                     console.log('✅ Modal styles applied to:', modal.id);
