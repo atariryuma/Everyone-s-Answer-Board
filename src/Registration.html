@@ -414,7 +414,6 @@
   <!-- External includes - carefully controlled -->
   <!-- <?!= include('UnifiedStyles'); ?> Disabled to prevent conflicts -->
   <?!= include('SharedUtilities'); ?>
-  <?!= include('SharedModals'); ?>
 </head>
 <body>
   <div class="glass-container" id="main-container">
@@ -460,6 +459,8 @@
       <a href="#" class="action-btn secondary" id="admin-panel-btn">管理画面を開く</a>
     </div>
   </div>
+
+  <?!= include('SharedModals'); ?>
 
   <script>
     let userEmail = '';
