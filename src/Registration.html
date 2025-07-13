@@ -44,15 +44,6 @@
     html, body, div, span, h1, h2, h3, h4, h5, h6, button {
       box-sizing: border-box !important;
     }
-    
-    /* Override any framework/external classes with high specificity - but preserve modals */
-    .container:not([id*="modal"]), .main:not([id*="modal"]), .content:not([id*="modal"]), 
-    .app:not([id*="modal"]), .page:not([id*="modal"]), 
-    div[class*="tailwind"]:not([id*="modal"]):not(.glass-panel), 
-    div[class*="tw-"]:not([id*="modal"]):not(.glass-panel) {
-      all: unset !important;
-      display: block !important;
-    }
 
     /* Preserve modal and glass-panel styles */
     .glass-panel, [id*="modal"], [id*="modal"] *, .modal, .modal *, svg, svg * {
@@ -724,43 +715,7 @@
       // GAS IFRAME: Force critical styles with maximum specificity
       const criticalStyle = document.createElement('style');
       criticalStyle.id = 'gas-override-styles';
-      criticalStyle.textContent = 
-        'html[lang="ja"], html {' +
-          'background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;' +
-          'min-height: 100vh !important;' +
-          'margin: 0 !important;' +
-          'padding: 0 !important;' +
-          'width: 100% !important;' +
-        '}' +
-        'body.gliffy-body, body {' +
-          'background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;' +
-          'min-height: 100vh !important;' +
-          'margin: 0 !important;' +
-          'padding: 20px !important;' +
-          'display: flex !important;' +
-          'align-items: center !important;' +
-          'justify-content: center !important;' +
-          'overflow-x: hidden !important;' +
-          'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;' +
-          'width: 100% !important;' +
-        '}' +
-        /* Modal protection - ensure modals work correctly */ +
-        '#privacy-modal, #digital-citizenship-modal, #usage-guide-modal, #security-modal { position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; z-index: 9999 !important; display: flex !important; align-items: center !important; justify-content: center !important; background-color: rgba(0, 0, 0, 0.8) !important; }' +
-        '#privacy-modal.hidden, #digital-citizenship-modal.hidden, #usage-guide-modal.hidden, #security-modal.hidden { display: none !important; }' +
-        '#privacy-modal .glass-panel, #digital-citizenship-modal .glass-panel, #usage-guide-modal .glass-panel, #security-modal .glass-panel { background: rgba(30, 41, 59, 0.95) !important; backdrop-filter: blur(20px) !important; -webkit-backdrop-filter: blur(20px) !important; border-radius: 12px !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important; padding: 1.5rem !important; max-width: 90vw !important; max-height: 90vh !important; overflow-y: auto !important; color: white !important; display: block !important; position: relative !important; }' +
-        /* Protect modal internal elements from global resets */ +
-        '[id*="modal"] h1, [id*="modal"] h2, [id*="modal"] h3, [id*="modal"] h4 { display: block !important; font-weight: bold !important; margin-bottom: 1rem !important; color: white !important; }' +
-        '[id*="modal"] p { display: block !important; margin-bottom: 1rem !important; line-height: 1.6 !important; color: rgba(255, 255, 255, 0.9) !important; }' +
-        '[id*="modal"] button { display: inline-block !important; padding: 0.5rem 1rem !important; border-radius: 0.375rem !important; border: 1px solid rgba(255, 255, 255, 0.2) !important; background: rgba(59, 130, 246, 0.8) !important; color: white !important; cursor: pointer !important; margin: 0.25rem !important; }' +
-        '[id*="modal"] .space-y-4 > * + * { margin-top: 1rem !important; }' +
-        '[id*="modal"] .space-y-6 > * + * { margin-top: 1.5rem !important; }' +
-        '[id*="modal"] .flex { display: flex !important; }' +
-        '[id*="modal"] .justify-end { justify-content: flex-end !important; }' +
-        '[id*="modal"] .gap-3 > * + * { margin-left: 0.75rem !important; }' +
-        '[id*="modal"] .text-center { text-align: center !important; }' +
-        '[id*="modal"] .mb-4 { margin-bottom: 1rem !important; }' +
-        '[id*="modal"] .mb-6 { margin-bottom: 1.5rem !important; }' +
-        '[id*="modal"] .mt-6 { margin-top: 1.5rem !important; }';
+      criticalStyle.textContent = '';
       
       // Remove existing override and add new one
       const existing = document.getElementById('gas-override-styles');
@@ -790,41 +745,12 @@
       let styleApplied = false;
       let initializationStarted = false;
       
-      // Apply styles immediately when script runs
-      function applyEmergencyStyles() {
-        const html = document.documentElement;
-        const body = document.body || document.getElementsByTagName('body')[0];
-        
-        if (html) {
-          html.style.setProperty('background', 'linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%)', 'important');
-          html.style.setProperty('min-height', '100vh', 'important');
-          html.style.setProperty('margin', '0', 'important');
-          html.style.setProperty('padding', '0', 'important');
-        }
-        
-        if (body) {
-          body.style.setProperty('background', 'linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%)', 'important');
-          body.style.setProperty('min-height', '100vh', 'important');
-          body.style.setProperty('margin', '0', 'important');
-          body.style.setProperty('padding', '20px', 'important');
-          body.style.setProperty('display', 'flex', 'important');
-          body.style.setProperty('align-items', 'center', 'important');
-          body.style.setProperty('justify-content', 'center', 'important');
-          body.style.setProperty('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', 'important');
-          styleApplied = true;
-        }
-      }
-      
-      // Apply immediately
-      applyEmergencyStyles();
-      
       // GAS-specific: Handle different ready states
       function initWhenReady() {
         if (initializationStarted) return; // Prevent duplicate initialization
         
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
           initializationStarted = true;
-          applyEmergencyStyles();
           forceCorrectStyles();
           initializeRegistration();
         } else {
@@ -850,7 +776,6 @@
       intervals.forEach(delay => {
         setTimeout(() => {
           if (!styleApplied || !document.body.style.background.includes('#1a1b26')) {
-            applyEmergencyStyles();
             forceCorrectStyles();
           }
           // Always protect modals on each interval
@@ -957,17 +882,6 @@
                 console.log('📋 Opening Privacy Modal');
                 if (typeof window.showPrivacyModal === 'function') {
                   window.showPrivacyModal();
-                  // Force modal styling immediately after opening
-                  setTimeout(() => {
-                    const modal = document.getElementById('privacy-modal');
-                    if (modal && !modal.classList.contains('hidden')) {
-                      modal.style.cssText = `
-                        position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
-                        z-index: 9999 !important; display: flex !important; align-items: center !important; justify-content: center !important;
-                        background-color: rgba(0, 0, 0, 0.8) !important; backdrop-filter: blur(4px) !important; padding: 1rem !important;
-                      `;
-                    }
-                  }, 50);
                 } else {
                   const modal = document.getElementById('privacy-modal');
                   if (modal) {
@@ -979,17 +893,6 @@
                 console.log('🌐 Opening Digital Citizenship Modal');
                 if (typeof window.showDigitalCitizenshipModal === 'function') {
                   window.showDigitalCitizenshipModal();
-                  // Force modal styling immediately after opening
-                  setTimeout(() => {
-                    const modal = document.getElementById('digital-citizenship-modal');
-                    if (modal && !modal.classList.contains('hidden')) {
-                      modal.style.cssText = `
-                        position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
-                        z-index: 9999 !important; display: flex !important; align-items: center !important; justify-content: center !important;
-                        background-color: rgba(0, 0, 0, 0.8) !important; backdrop-filter: blur(4px) !important; padding: 1rem !important;
-                      `;
-                    }
-                  }, 50);
                 } else {
                   const modal = document.getElementById('digital-citizenship-modal');
                   if (modal) {
@@ -998,93 +901,6 @@
                   }
                 }
               }
-              
-              // Re-apply modal protection after opening
-              setTimeout(() => {
-                const modals = document.querySelectorAll('#privacy-modal, #digital-citizenship-modal, #usage-guide-modal, #security-modal');
-                modals.forEach(modal => {
-                  if (modal && !modal.classList.contains('hidden')) {
-                    // Apply modal container styles
-                    modal.style.cssText = `
-                      position: fixed !important;
-                      top: 0 !important;
-                      left: 0 !important;
-                      right: 0 !important;
-                      bottom: 0 !important;
-                      z-index: 9999 !important;
-                      display: flex !important;
-                      align-items: center !important;
-                      justify-content: center !important;
-                      background-color: rgba(0, 0, 0, 0.8) !important;
-                      backdrop-filter: blur(4px) !important;
-                      padding: 1rem !important;
-                    `;
-                    
-                    // Apply glass panel styles and fix layout
-                    const glassPanel = modal.querySelector('.glass-panel');
-                    if (glassPanel) {
-                      glassPanel.style.cssText = `
-                        background: rgba(30, 41, 59, 0.95) !important;
-                        backdrop-filter: blur(20px) !important;
-                        -webkit-backdrop-filter: blur(20px) !important;
-                        border-radius: 12px !important;
-                        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-                        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
-                        padding: 1.5rem !important;
-                        max-width: 90vw !important;
-                        max-height: 90vh !important;
-                        overflow-y: auto !important;
-                        color: white !important;
-                        display: block !important;
-                        position: relative !important;
-                      `;
-                      
-                      // Fix all child elements layout
-                      const allChildren = glassPanel.querySelectorAll('*');
-                      allChildren.forEach(child => {
-                        // Restore display properties for common elements
-                        if (child.tagName === 'DIV') {
-                          child.style.display = 'block';
-                        }
-                        if (child.tagName === 'H1' || child.tagName === 'H2' || child.tagName === 'H3' || child.tagName === 'H4') {
-                          child.style.display = 'block';
-                          child.style.fontWeight = 'bold';
-                          child.style.marginBottom = '1rem';
-                          child.style.color = 'white';
-                        }
-                        if (child.tagName === 'P') {
-                          child.style.display = 'block';
-                          child.style.marginBottom = '1rem';
-                          child.style.lineHeight = '1.6';
-                          child.style.color = 'rgba(255, 255, 255, 0.9)';
-                        }
-                        if (child.tagName === 'BUTTON') {
-                          child.style.display = 'inline-block';
-                          child.style.padding = '0.5rem 1rem';
-                          child.style.margin = '0.25rem';
-                          child.style.borderRadius = '0.375rem';
-                          child.style.border = '1px solid rgba(255, 255, 255, 0.2)';
-                          child.style.backgroundColor = 'rgba(59, 130, 246, 0.8)';
-                          child.style.color = 'white';
-                          child.style.cursor = 'pointer';
-                        }
-                        // Preserve flex layouts where they exist
-                        if (child.classList.contains('flex')) {
-                          child.style.display = 'flex';
-                        }
-                        if (child.classList.contains('justify-end')) {
-                          child.style.justifyContent = 'flex-end';
-                        }
-                        if (child.classList.contains('text-center')) {
-                          child.style.textAlign = 'center';
-                        }
-                      });
-                    }
-                    
-                    console.log('✅ Modal styles applied to:', modal.id);
-                  }
-                });
-              }, 100);
               
               return false; // Prevent any further navigation
             });
