@@ -1507,7 +1507,7 @@
           hideLoadingState();
           
           // ステータスを更新（キャッシュを強制リフレッシュ）
-          statusCache = null; // キャッシュをクリア
+          cacheManager.invalidateDependents('user_data_change'); // 統一キャッシュ管理
           getCachedStatus(true);
           
           // 成功メッセージを表示
@@ -1859,10 +1859,86 @@ elements = {
         setLoading(false);
       }, 1000);
     });
-    // ===== キャッシュ機能強化 =====
-    let statusCache = null;
-    let statusCacheTime = 0;
-    const STATUS_CACHE_TTL = 30000; // 30秒間キャッシュ
+    // ===== 統一キャッシュ管理システム =====
+    class FrontendCacheManager {
+      constructor() {
+        this.caches = new Map();
+        this.defaultTTL = 30000; // 30秒
+        this.dependencies = new Map();
+        this._initializeDependencies();
+      }
+      
+      _initializeDependencies() {
+        // キャッシュ依存関係の定義
+        this.dependencies.set('user_data_change', ['status', 'userInfo', 'formUrls']);
+        this.dependencies.set('form_creation', ['status', 'formUrls', 'sheetDetails']);
+        this.dependencies.set('config_change', ['status', 'sheetDetails']);
+      }
+      
+      get(key, defaultValue = null) {
+        const cached = this.caches.get(key);
+        if (!cached) return defaultValue;
+        
+        const now = Date.now();
+        if (now - cached.timestamp > cached.ttl) {
+          this.caches.delete(key);
+          console.log(`📊 [Cache] Expired and removed: ${key}`);
+          return defaultValue;
+        }
+        
+        console.log(`📊 [Cache] Hit: ${key}`);
+        return cached.value;
+      }
+      
+      set(key, value, ttl = null) {
+        this.caches.set(key, {
+          value: value,
+          timestamp: Date.now(),
+          ttl: ttl || this.defaultTTL
+        });
+        console.log(`📊 [Cache] Set: ${key} (TTL: ${ttl || this.defaultTTL}ms)`);
+      }
+      
+      invalidate(key) {
+        this.caches.delete(key);
+        console.log(`📊 [Cache] Invalidated: ${key}`);
+      }
+      
+      invalidatePattern(pattern) {
+        let count = 0;
+        for (const key of this.caches.keys()) {
+          if (key.includes(pattern)) {
+            this.caches.delete(key);
+            count++;
+          }
+        }
+        console.log(`📊 [Cache] Invalidated ${count} entries matching pattern: ${pattern}`);
+      }
+      
+      invalidateDependents(changeType) {
+        const dependents = this.dependencies.get(changeType);
+        if (!dependents) return;
+        
+        dependents.forEach(key => this.invalidate(key));
+        console.log(`🔄 [Cache] Cascade invalidation: ${changeType} -> [${dependents.join(', ')}]`);
+      }
+      
+      clear() {
+        const count = this.caches.size;
+        this.caches.clear();
+        console.log(`🖾️ [Cache] Cleared all ${count} entries`);
+      }
+      
+      getStats() {
+        return {
+          totalEntries: this.caches.size,
+          dependencies: this.dependencies.size
+        };
+      }
+    }
+    
+    // グローバルキャッシュマネージャーのインスタンス
+    const cacheManager = new FrontendCacheManager();
 
     /**
      * キャッシュされたステータスを取得
@@ -1870,20 +1946,31 @@ elements = {
      * @returns {Promise} ステータス情報
      */
     function getCachedStatus(forceRefresh = false) {
-      const now = Date.now();
+      const cacheKey = 'status';
       
-      // キャッシュが有効かつ強制リフレッシュでない場合はキャッシュを返す
-      if (!forceRefresh && statusCache && (now - statusCacheTime) < STATUS_CACHE_TTL) {
-        console.log('📊 Status cache hit');
-        return Promise.resolve(statusCache);
+      // 統一キャッシュマネージャーでチェック
+      if (!forceRefresh) {
+        const cached = cacheManager.get(cacheKey);
+        if (cached) {
+          return Promise.resolve(cached);
+        }
       }
       
       console.log('📊 Status cache miss, fetching from server');
       return runGasWithUserId('getStatus', forceRefresh)
         .then(function(status) {
-          statusCache = status;
-          statusCacheTime = now;
+          cacheManager.set(cacheKey, status);
           return status;
+        })
+        .catch(function(error) {
+          console.error('⚠️ [Cache] Failed to fetch status:', error);
+          // キャッシュから古いデータを返すことも考慮
+          const staleData = cacheManager.get(cacheKey + '_stale');
+          if (staleData) {
+            console.log('📊 [Cache] Returning stale data due to fetch error');
+            return staleData;
+          }
+          throw error;
         });
     }
 
@@ -2611,6 +2698,13 @@ function syncCheckboxStates(status) {
       }
       
       // formURLを複数の場所から取得を試みる（最新のものを優先）
+      console.log('🔍 [DEBUG] updateFormUrlSection called with status:', {
+        hasStatusFormUrl: !!status.formUrl,
+        statusFormUrl: status.formUrl,
+        hasUserInfo: !!status.userInfo,
+        hasConfigJson: !!(status.userInfo && status.userInfo.configJson)
+      });
+      
       let formUrl = null;
       
       // 1. statusから直接取得（最新）
@@ -2624,6 +2718,11 @@ function syncCheckboxStates(status) {
           const config = JSON.parse(status.userInfo.configJson);
           formUrl = config.formUrl;
           console.log('✅ [DEBUG] Retrieved formUrl from configJson:', formUrl);
+          console.log('🔍 [DEBUG] Full config data:', {
+            hasFormUrl: !!config.formUrl,
+            hasEditFormUrl: !!config.editFormUrl,
+            lastFormCreatedAt: config.lastFormCreatedAt
+          });
         } catch (e) {
           console.warn('ConfigJSON parse error:', e);
         }
@@ -2663,6 +2762,12 @@ function syncCheckboxStates(status) {
         
         // 編集リンクボタンの設定
         if (editFormUrlLink) {
+          console.log('🔍 [DEBUG] Setting up edit form link:', {
+            hasStatusEditFormUrl: !!status.editFormUrl,
+            statusEditFormUrl: status.editFormUrl,
+            formUrlForConversion: formUrl
+          });
+          
           let editFormUrl = null;
           
           // 1. statusから直接取得（最新）
@@ -3325,8 +3430,9 @@ function syncCheckboxStates(status) {
 
     /**
      * フォーム設定に基づいてフォームを作成
+     * Promiseベースの非同期処理でエラーハンドリングを改善
      */
-    function createFormWithConfig() {
+    async function createFormWithConfig() {
         const customFormTitle = document.getElementById('custom-form-title').value.trim();
         const customMainQuestion = document.getElementById('custom-main-question').value.trim();
         const mainQuestionType = document.getElementById('main-question-type').value;
@@ -3366,117 +3472,177 @@ function syncCheckboxStates(status) {
 
         hideFormConfigModal();
         
-        // プログレスバーで段階的な進行状況を表示
-        showProgressStep(1, 5, 'フォームを作成中...');
+        try {
+            // プログレスバーで段階的な進行状況を表示
+            showProgressStep(1, 5, 'フォームを作成中...');
 
-        runGasWithUserId('createCustomFormUI', config)
-            .then(function(result) {
-                if (result.status === 'success') {
-                    showProgressStep(2, 5, 'フォーム作成完了！設定を保存中...');
+            // タイムアウト付きでフォーム作成を実行
+            const result = await withTimeout(
+                runGasWithUserId('createCustomFormUI', config),
+                300000,  // 5分のタイムアウト
+                'フォーム作成がタイムアウトしました。しばらく待ってから再試行してください。'
+            );
+
+            if (result.status !== 'success') {
+                throw new Error(result.message || 'フォーム作成に失敗しました。');
+            }
+
+            showProgressStep(2, 5, 'フォーム作成完了！設定を保存中...');
+            
+            // 自動設定保存と公開処理
+            if (result.autoPublishReady && result.sheetName) {
+                try {
+                    const autoResult = await withTimeout(
+                        runGasWithUserId('autoSaveAndPublishAfterFormCreation', result.sheetName, result),
+                        180000,  // 3分のタイムアウト
+                        '設定保存・公開処理がタイムアウトしました。'
+                    );
                     
-                    // 自動設定保存と公開処理
-                    if (result.autoPublishReady && result.sheetName) {
-                        return runGasWithUserId('autoSaveAndPublishAfterFormCreation', 
-                            result.sheetName, result)
-                            .then(function(autoResult) {
-                                showProgressStep(3, 5, '設定保存完了！公開中...');
-                                
-                                if (autoResult.status === 'success') {
-                                    showProgressStep(4, 5, '公開完了！UIを更新中...');
-                                    
-                                    // UIを更新（エラーハンドリング付き）
-                                    showProgressStep(5, 5, '全て完了！');
-                                    setTimeout(function() {
-                                        hideProgressBar();
-                                        showMessage('✅ フォーム作成、設定保存、公開が自動で完了しました！', 'success');
-                                        
-                                        // フォーム編集ページを開く
-                                        if (result.editFormUrl) {
-                                            window.open(result.editFormUrl, '_blank');
-                                        } else if (result.formUrl) {
-                                            const editUrl = result.formUrl.replace('/viewform', '/edit');
-                                            window.open(editUrl, '_blank');
-                                        }
-                                        
-                                        // UI を非同期で更新（エラーハンドリング付き）
-                                        try {
-                                            // キャッシュをクリアして強制リロード
-                                            statusCache.clear();
-                                            const statusResult = loadStatus(true);
-                                            if (statusResult && typeof statusResult.then === 'function') {
-                                                statusResult.then(function() {
-                                                    console.log('✅ [DEBUG] UI updated after form creation');
-                                                }).catch(function(error) {
-                                                    console.warn('Status reload failed:', error);
-                                                });
-                                            }
-                                        } catch (error) {
-                                            console.warn('Status reload error:', error);
-                                        }
-                                    }, 1000);
-                                } else {
-                                    throw new Error(autoResult.message || '自動公開に失敗しました');
-                                }
-                            });
+                    showProgressStep(3, 5, '設定保存完了！公開中...');
+                    
+                    if (autoResult.status === 'success') {
+                        showProgressStep(4, 5, '公開完了！UIを更新中...');
+                        showProgressStep(5, 5, '全て完了！');
+                        
+                        await completeFormCreationProcess(result, '✅ フォーム作成、設定保存、公開が自動で完了しました！');
                     } else {
-                        // フォールバック: 手動設定
-                        showProgressStep(5, 5, 'フォーム作成完了');
-                        setTimeout(function() {
-                            hideProgressBar();
-                            showMessage('✅ フォームが作成されました！設定タブで設定を行ってください。', 'success');
-                            if (result.editFormUrl) {
-                                window.open(result.editFormUrl, '_blank');
-                            } else if (result.formUrl) {
-                                const editUrl = result.formUrl.replace('/viewform', '/edit');
-                                window.open(editUrl, '_blank');
-                            }
-                            
-                            // UI を非同期で更新（エラーハンドリング付き）
-                            try {
-                                // キャッシュをクリアして強制リロード
-                                statusCache.clear();
-                                const statusResult = loadStatus(true);
-                                if (statusResult && typeof statusResult.then === 'function') {
-                                    statusResult.then(function() {
-                                        console.log('✅ [DEBUG] UI updated after simple form creation');
-                                    }).catch(function(error) {
-                                        console.warn('Status reload failed:', error);
-                                    });
-                                }
-                            } catch (error) {
-                                console.warn('Status reload error:', error);
-                            }
-                        }, 1000);
+                        throw new Error(autoResult.message || '自動公開に失敗しました');
+                    }
+                } catch (autoError) {
+                    console.warn('⚠️ 自動公開処理でエラーが発生しました:', autoError.message);
+                    // フォールバック: 手動設定モードで続行
+                    await handleManualFormSetup(result);
+                }
+            } else {
+                // フォールバック: 手動設定
+                await handleManualFormSetup(result);
+            }
+            
+            // クラス選択肢をデータベースに保存（有効な場合）
+            if (enableClassSelection && classChoices.length > 0) {
+                // 非同期でクラス選択肢を保存（エラーは無視）
+                saveClassChoicesToDatabase(classChoices).catch(error => {
+                    console.warn('クラス選択肢の保存に失敗:', error.message);
+                });
+            }
+
+        } catch (error) {
+            hideProgressBar();
+            handleError(error, 'createFormWithConfig', 'フォーム作成処理でエラーが発生しました。');
+        }
+    }
+
+    /**
+     * フォーム作成完了処理を実行
+     * @param {Object} result - フォーム作成結果
+     * @param {string} successMessage - 成功メッセージ
+     */
+    async function completeFormCreationProcess(result, successMessage) {
+        return new Promise((resolve) => {
+            setTimeout(async () => {
+                try {
+                    hideProgressBar();
+                    showMessage(successMessage, 'success');
+                    
+                    // フォーム編集ページを開く
+                    if (result.editFormUrl) {
+                        window.open(result.editFormUrl, '_blank');
+                    } else if (result.formUrl) {
+                        const editUrl = result.formUrl.replace('/viewform', '/edit');
+                        window.open(editUrl, '_blank');
                     }
                     
-                    // クラス選択肢をデータベースに保存（有効な場合）
-                    if (enableClassSelection && classChoices.length > 0) {
-                        saveClassChoicesToDatabase(classChoices);
-                    }
-                } else {
-                    throw new Error(result.message || 'フォーム作成に失敗しました。');
+                    // UI を非同期で更新（エラーハンドリング付き）
+                    await updateUIAfterFormCreation(result);
+                    resolve();
+                } catch (error) {
+                    console.warn('⚠️ フォーム作成完了処理でエラー:', error);
+                    resolve(); // エラーでも処理は完了とみなす
                 }
-            })
-            .catch(function(error) {
-                hideProgressBar();
-                handleError(error, 'createAdditionalForm');
-            });
+            }, 1000);
+        });
+    }
+
+    /**
+     * 手動フォーム設定モードの処理
+     * @param {Object} result - フォーム作成結果
+     */
+    async function handleManualFormSetup(result) {
+        showProgressStep(5, 5, 'フォーム作成完了');
+        return completeFormCreationProcess(result, '✅ フォームが作成されました！設定タブで設定を行ってください。');
+    }
+
+    /**
+     * フォーム作成後のUI更新処理
+     * @param {Object} result - フォーム作成結果
+     */
+    async function updateUIAfterFormCreation(result) {
+        try {
+            // キャッシュをクリアして強制リロード
+            cacheManager.invalidateDependents('form_creation');
+            console.log('🔄 [DEBUG] Initiating UI update after form creation');
+            
+            try {
+                const newStatus = await withTimeout(loadStatus(true), 30000, 'ステータス更新がタイムアウトしました');
+                console.log('✅ [DEBUG] UI updated successfully after form creation:', {
+                    hasFormUrl: !!newStatus.formUrl,
+                    hasEditFormUrl: !!newStatus.editFormUrl,
+                    formUrl: newStatus.formUrl
+                });
+            } catch (statusError) {
+                console.warn('⚠️ [DEBUG] Status reload failed:', statusError);
+                // フォールバック: 部分的なUI更新
+                if (result.formUrl) {
+                    console.log('🔄 [DEBUG] Attempting fallback UI update with result data');
+                    updateFormUrlSection({formUrl: result.formUrl, editFormUrl: result.editFormUrl});
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ [DEBUG] UI update initialization failed:', error);
+        }
+    }
+
+    /**
+     * タイムアウト付きのPromise実行
+     * @param {Promise} promise - 実行するPromise
+     * @param {number} timeoutMs - タイムアウト時間（ミリ秒）
+     * @param {string} timeoutMessage - タイムアウト時のエラーメッセージ
+     * @returns {Promise} タイムアウト付きのPromise
+     */
+    function withTimeout(promise, timeoutMs, timeoutMessage) {
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => {
+                reject(new Error(timeoutMessage || 'タイムアウトが発生しました'));
+            }, timeoutMs);
+        });
+
+        return Promise.race([promise, timeoutPromise]);
     }
 
     /**
      * クラス選択肢をデータベースに保存
+     * @param {Array} classChoices - クラス選択肢の配列
+     * @returns {Promise} 保存処理のPromise
      */
-    function saveClassChoicesToDatabase(classChoices) {
-        runGasWithUserId('saveClassChoices', classChoices)
-            .catch(function(error) {
-                console.warn('クラス選択肢の保存に失敗:', error.message);
-            });
+    async function saveClassChoicesToDatabase(classChoices) {
+        try {
+            const result = await withTimeout(
+                runGasWithUserId('saveClassChoices', classChoices),
+                30000,  // 30秒のタイムアウト
+                'クラス選択肢の保存がタイムアウトしました'
+            );
+            console.log('✅ クラス選択肢の保存が完了しました');
+            return result;
+        } catch (error) {
+            console.warn('⚠️ クラス選択肢の保存に失敗:', error.message);
+            throw error;
+        }
     }
 
     /**
      * 外部リソース（スプレッドシート or フォーム）を追加する
      */
-    function addResource() {
+    async function addResource() {
       const url = document.getElementById('resource-url-input').value;
       if (!url) {
         showMessage('URLを入力してください。', 'warning');
@@ -3484,21 +3650,25 @@ function syncCheckboxStates(status) {
       }
 
       setLoading(true, 'リソースを追加しています...');
-      runGasWithUserId('addSpreadsheetUrl', url)
-        .then(function(result) {
-          if (result.status === 'success') {
-            showMessage(result.message, 'success');
-            loadStatus(true);
-          } else {
-            throw new Error(result.message);
-          }
-        })
-        .catch(function(error) {
-          handleError(error, 'addResource');
-        })
-        .finally(function() {
-          setLoading(false);
-        });
+      
+      try {
+        const result = await withTimeout(
+          runGasWithUserId('addSpreadsheetUrl', url),
+          120000,  // 2分のタイムアウト
+          'リソース追加処理がタイムアウトしました。'
+        );
+        
+        if (result.status === 'success') {
+          showMessage(result.message, 'success');
+          await loadStatus(true);
+        } else {
+          throw new Error(result.message);
+        }
+      } catch (error) {
+        handleError(error, 'addResource', 'リソースの追加に失敗しました。');
+      } finally {
+        setLoading(false);
+      }
     }
     
     /**

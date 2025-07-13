@@ -504,10 +504,16 @@ function updateUser(userId, updateData) {
       throw new Error('更新対象のユーザーが見つかりません');
     }
     
+    // バックアップ用に現在のデータを保存
+    var originalValues = values[rowIndex - 1].slice(); // 1-based to 0-based
+    
     // バッチ更新リクエストを作成
     var requests = Object.keys(updateData).map(function(key) {
       var colIndex = headers.indexOf(key);
-      if (colIndex === -1) return null;
+      if (colIndex === -1) {
+        console.warn('未知のフィールドをスキップ:', key);
+        return null;
+      }
       
       return {
         range: "'" + sheetName + "'!" + String.fromCharCode(65 + colIndex) + rowIndex,
@@ -515,8 +521,33 @@ function updateUser(userId, updateData) {
       };
     }).filter(function(item) { return item !== null; });
     
-    if (requests.length > 0) {
+    if (requests.length === 0) {
+      console.warn('更新するフィールドがありません');
+      return { success: true, message: '更新フィールドなし' };
+    }
+    
+    console.log('💾 [DEBUG] Updating user data:', {
+      userId: userId,
+      updateFields: Object.keys(updateData),
+      requestCount: requests.length
+    });
+    
+    try {
       batchUpdateSheetsData(service, dbId, requests);
+      console.log('✅ [DEBUG] Database update completed successfully');
+      
+      // 更新成功を検証 - データを再取得して確認
+      var verificationData = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!" + rowIndex + ":" + rowIndex]);
+      if (verificationData.valueRanges[0].values && verificationData.valueRanges[0].values.length > 0) {
+        console.log('✅ [DEBUG] Database update verification successful');
+      } else {
+        throw new Error('更新後のデータ検証に失敗しました');
+      }
+    } catch (updateError) {
+      console.error('⚠️ [ERROR] Database update failed:', updateError);
+      // ロールバックは実装しない（Google Sheets APIの制限）
+      // 代わりにエラーを伝播して呼び出し元で処理
+      throw new Error('データベース更新に失敗しました: ' + updateError.message);
     }
     
     // スプレッドシートIDが更新された場合、サービスアカウントと共有

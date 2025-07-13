@@ -3309,30 +3309,67 @@ function getStatus(requestUserId, forceRefresh = false) {
       }
     }
     
-    // mainQuestionからopinionHeaderへの移行処理
+    // 自動修復フラグのチェック（無限ループ防止）
+    var autoRepairFlags = configJson.autoRepairFlags || {};
+    var currentTime = new Date().toISOString();
+    var repairCooldown = 60000; // 1分間のクールダウン
+    
+    // mainQuestionからopinionHeaderへの移行処理（クールダウン付き）
     if (configJson.mainQuestion && configJson.publishedSheetName) {
-      try {
-        const sheetKey = 'sheet_' + configJson.publishedSheetName;
-        if (!configJson[sheetKey]) {
-          configJson[sheetKey] = {};
-        }
-        // 既存のopinionHeaderがない場合のみ移行
-        if (!configJson[sheetKey].opinionHeader) {
-          configJson[sheetKey].opinionHeader = configJson.mainQuestion;
-          console.log('✅ [Migration] Moved mainQuestion to opinionHeader for sheet:', configJson.publishedSheetName);
-        }
-        delete configJson.mainQuestion;
+      var lastMigrationAttempt = autoRepairFlags.mainQuestionMigrationAttempt;
+      var shouldAttemptMigration = !lastMigrationAttempt || 
+        (Date.now() - new Date(lastMigrationAttempt).getTime()) > repairCooldown;
         
-        // 設定を保存
-        updateUser(requestUserId, {
-          configJson: JSON.stringify(configJson)
-        });
-        
-        // userInfoも再取得して同期
-        userInfo = findUserById(requestUserId);
-        configJson = JSON.parse(userInfo.configJson || '{}');
-      } catch (e) {
-        console.warn('getStatus: Failed to migrate mainQuestion to opinionHeader:', e.message);
+      if (shouldAttemptMigration) {
+        try {
+          console.log('🔄 [MIGRATION] Starting mainQuestion to opinionHeader migration');
+          
+          const sheetKey = 'sheet_' + configJson.publishedSheetName;
+          if (!configJson[sheetKey]) {
+            configJson[sheetKey] = {};
+          }
+          
+          // 既存のopinionHeaderがない場合のみ移行
+          if (!configJson[sheetKey].opinionHeader) {
+            configJson[sheetKey].opinionHeader = configJson.mainQuestion;
+            console.log('✅ [MIGRATION] Moved mainQuestion to opinionHeader for sheet:', configJson.publishedSheetName);
+          }
+          
+          delete configJson.mainQuestion;
+          
+          // 移行フラグを更新
+          if (!configJson.autoRepairFlags) configJson.autoRepairFlags = {};
+          configJson.autoRepairFlags.mainQuestionMigrationCompleted = currentTime;
+          configJson.autoRepairFlags.mainQuestionMigrationAttempt = currentTime;
+          
+          // 設定を保存
+          updateUser(requestUserId, {
+            configJson: JSON.stringify(configJson)
+          });
+          
+          // userInfoも再取得して同期
+          userInfo = findUserById(requestUserId);
+          configJson = JSON.parse(userInfo.configJson || '{}');
+          
+          console.log('✅ [MIGRATION] Migration completed successfully');
+          
+        } catch (e) {
+          console.warn('⚠️ [MIGRATION] Failed to migrate mainQuestion to opinionHeader:', e.message);
+          
+          // 失敗した試行も記録してクールダウンを適用
+          if (!configJson.autoRepairFlags) configJson.autoRepairFlags = {};
+          configJson.autoRepairFlags.mainQuestionMigrationAttempt = currentTime;
+          
+          try {
+            updateUser(requestUserId, {
+              configJson: JSON.stringify(configJson)
+            });
+          } catch (flagUpdateError) {
+            console.warn('⚠️ [MIGRATION] Failed to update migration flags:', flagUpdateError.message);
+          }
+        }
+      } else {
+        console.log('🔄 [MIGRATION] Skipping migration due to cooldown period');
       }
     }
     
@@ -3558,6 +3595,20 @@ function createCustomFormUI(requestUserId, config) {
       console.log('createCustomFormUI - updating user data for:', requestUserId);
       
       const updatedConfigJson = JSON.parse(existingUser.configJson || '{}');
+      
+      // 楽観的ロック: バージョン管理で競合状態を検出
+      var currentVersion = updatedConfigJson.version || 0;
+      var newVersion = currentVersion + 1;
+      updatedConfigJson.version = newVersion;
+      updatedConfigJson.lastModified = new Date().toISOString();
+      updatedConfigJson.lastModifiedBy = 'createCustomFormUI';
+      
+      console.log('🔄 [DEBUG] Config version update:', {
+        currentVersion: currentVersion,
+        newVersion: newVersion,
+        operation: 'createCustomFormUI'
+      });
+      
       updatedConfigJson.formUrl = result.formUrl;
       // editFormUrlがない場合はviewformからeditに変換
       if (result.editFormUrl) {
@@ -3612,13 +3663,43 @@ function createCustomFormUI(requestUserId, config) {
       
       console.log('createCustomFormUI - update data:', JSON.stringify(updateData));
       
-      updateUser(requestUserId, updateData);
-      
-      // キャッシュをクリアして次回取得時に最新データを確保
-      invalidateUserCache(requestUserId, activeUserEmail, result.spreadsheetId, true);
-      // 旧スプレッドシートのキャッシュもクリア
-      if (existingUser.spreadsheetId && existingUser.spreadsheetId !== result.spreadsheetId) {
-        invalidateUserCache(requestUserId, activeUserEmail, existingUser.spreadsheetId, true);
+      try {
+        // データベース更新を実行し、完了を確認
+        var updateResult = updateUser(requestUserId, updateData);
+        console.log('✅ [DEBUG] User data update completed:', updateResult);
+        
+        // 更新後のデータを検証
+        var verificationUser = findUserById(requestUserId);
+        if (!verificationUser) {
+          throw new Error('更新後のユーザーデータの検証に失敗しました');
+        }
+        
+        try {
+          var verificationConfig = JSON.parse(verificationUser.configJson || '{}');
+          if (verificationConfig.formUrl !== result.formUrl) {
+            console.warn('⚠️ [WARNING] Form URL verification mismatch');
+            console.warn('Expected:', result.formUrl);
+            console.warn('Found:', verificationConfig.formUrl);
+          } else {
+            console.log('✅ [DEBUG] Form URL verification successful');
+          }
+        } catch (parseError) {
+          console.warn('⚠️ [WARNING] Config JSON verification failed:', parseError);
+        }
+        
+        // キャッシュをクリアして次回取得時に最新データを確保
+        invalidateUserCache(requestUserId, activeUserEmail, result.spreadsheetId, true);
+        // 旧スプレッドシートのキャッシュもクリア
+        if (existingUser.spreadsheetId && existingUser.spreadsheetId !== result.spreadsheetId) {
+          invalidateUserCache(requestUserId, activeUserEmail, existingUser.spreadsheetId, true);
+        }
+        
+        console.log('✅ [DEBUG] Form creation workflow completed successfully');
+        
+      } catch (dbError) {
+        console.error('⚠️ [ERROR] Database update failed during form creation:', dbError);
+        // データベース更新に失敗した場合、フォームとスプレッドシートは作成済みだが、ユーザーデータが不整合状態になる
+        throw new Error('フォームの作成は完了しましたが、ユーザーデータの更新に失敗しました: ' + dbError.message);
       }
     } else {
       console.warn('createCustomFormUI - user not found:', requestUserId);

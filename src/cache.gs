@@ -11,6 +11,7 @@ class CacheManager {
   constructor() {
     this.scriptCache = CacheService.getScriptCache();
     this.memoCache = new Map(); // メモ化用の高速キャッシュ
+    this.dependencyMap = new Map(); // キャッシュ依存関係マップ
     this.defaultTTL = 21600; // デフォルトTTL（6時間）
     
     // パフォーマンス監視用の統計情報
@@ -19,8 +20,12 @@ class CacheManager {
       misses: 0,
       errors: 0,
       totalOps: 0,
-      lastReset: Date.now()
+      lastReset: Date.now(),
+      cascadeInvalidations: 0
     };
+    
+    // キャッシュ依存関係の初期化
+    this._initializeDependencies();
   }
 
   /**
@@ -219,12 +224,118 @@ class CacheManager {
   }
 
   /**
+   * キャッシュ依存関係を初期化します。
+   * @private
+   */
+  _initializeDependencies() {
+    // ユーザー関連キャッシュの依存関係を定義
+    const userDependencies = [
+      'user_*',
+      'status_*',
+      'sheets_*',
+      'config_*',
+      'form_*'
+    ];
+    
+    // スプレッドシート関連キャッシュの依存関係
+    const spreadsheetDependencies = [
+      'hdr_*',
+      'data_*',
+      'sheets_*'
+    ];
+    
+    // 依存関係をマップに登録
+    this.dependencyMap.set('user_change', userDependencies);
+    this.dependencyMap.set('spreadsheet_change', spreadsheetDependencies);
+    this.dependencyMap.set('form_change', ['form_*', 'status_*', 'user_*']);
+    
+    console.log('⚙️ [Cache] Dependency map initialized:', this.dependencyMap.size, 'relationships');
+  }
+  
+  /**
+   * 依存関係に基づいてカスケード無効化を実行します。
+   * @param {string} changeType - 変更タイプ ('user_change', 'spreadsheet_change', 'form_change')
+   * @param {string} [specificKey] - 特定のキーを指定した場合
+   */
+  invalidateDependents(changeType, specificKey = null) {
+    const dependencies = this.dependencyMap.get(changeType);
+    if (!dependencies) {
+      console.warn(`[Cache] Unknown change type for dependency invalidation: ${changeType}`);
+      return;
+    }
+    
+    let invalidatedCount = 0;
+    
+    if (specificKey) {
+      // 特定キーの無効化
+      try {
+        this.memoCache.delete(specificKey);
+        this.scriptCache.remove(specificKey);
+        invalidatedCount++;
+      } catch (e) {
+        console.warn(`[Cache] Failed to invalidate specific key: ${specificKey}`, e.message);
+      }
+    }
+    
+    // パターンベースの無効化
+    dependencies.forEach(pattern => {
+      try {
+        this.clearByPattern(pattern.replace('*', ''));
+        invalidatedCount++;
+      } catch (e) {
+        console.warn(`[Cache] Failed to clear pattern during cascade: ${pattern}`, e.message);
+      }
+    });
+    
+    this.stats.cascadeInvalidations++;
+    console.log(`🔄 [Cache] Cascade invalidation completed: ${changeType}, ${invalidatedCount} patterns cleared`);
+  }
+  
+  /**
    * 期限切れのキャッシュをクリアします（この機能はGASでは自動です）。
    * メモ化キャッシュをクリアする目的で実装します。
    */
   clearExpired() {
     this.memoCache.clear();
     debugLog('[Cache] Cleared memoization cache.');
+  }
+  
+  /**
+   * キャッシュキーをサニタイズします。
+   * @param {string} key - 元のキー
+   * @param {string} [namespace='default'] - ネームスペース
+   * @returns {string} サニタイズされたキー
+   */
+  sanitizeKey(key, namespace = 'default') {
+    if (typeof key !== 'string') {
+      console.warn('[Cache] Key must be a string, got:', typeof key);
+      key = String(key);
+    }
+    
+    // 危険な文字を除去し、長さを制限
+    const sanitized = key
+      .replace(/[^a-zA-Z0-9\-_]/g, '_') // 英数字、ハイフン、アンダースコア以外をアンダースコアに変換
+      .substring(0, 200); // 最大200文字に制限
+    
+    // ネームスペースを付与
+    const namespacedKey = `${namespace}:${sanitized}`;
+    
+    // キーが変更された場合は警告
+    if (namespacedKey !== `${namespace}:${key}`) {
+      console.warn(`[Cache] Key sanitized: '${key}' -> '${namespacedKey}'`);
+    }
+    
+    return namespacedKey;
+  }
+  
+  /**
+   * ネームスペース全体をクリアします。
+   * @param {string} namespace - クリアするネームスペース
+   */
+  clearNamespace(namespace) {
+    const pattern = `${namespace}:`;
+    this.clearByPattern(pattern);
+    console.log(`🖾️ [Cache] Cleared namespace: ${namespace}`);
   }
 
   /**
