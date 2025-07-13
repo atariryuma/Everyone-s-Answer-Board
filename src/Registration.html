@@ -6,31 +6,28 @@
   <title>StudyQuest - 登録</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    /* Force override any external CSS */
+    /* CRITICAL: Force override any external CSS - must be first */
     html, body {
       background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;
       min-height: 100vh !important;
       margin: 0 !important;
       padding: 0 !important;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      overflow-x: hidden !important;
     }
 
     /* Modern CSS Reset */
     * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+      margin: 0 !important;
+      padding: 0 !important;
+      box-sizing: border-box !important;
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif !important;
-      background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;
-      min-height: 100vh !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
       padding: 20px !important;
-      overflow-x: hidden !important;
-      margin: 0 !important;
     }
 
     /* Animated background elements */
@@ -361,10 +358,10 @@
       }
     }
   </style>
-  <!-- UnifiedStyles disabled to prevent conflicts with glassmorphism design -->
+  <!-- External includes disabled for standalone operation -->
   <!-- <?!= include('UnifiedStyles'); ?> -->
-  <?!= include('SharedUtilities'); ?>
-  <?!= include('SharedModals'); ?>
+  <!-- <?!= include('SharedUtilities'); ?> -->
+  <!-- <?!= include('SharedModals'); ?> -->
 </head>
 <body>
   <div class="glass-container" id="main-container">
@@ -593,19 +590,32 @@
       }
     });
 
-    // Ensure styles are applied (fallback for Google Apps Script environment)
-    function ensureStylesApplied() {
+    // CRITICAL: Force styles immediately to override any external interference
+    function forceCorrectStyles() {
+      const html = document.documentElement;
       const body = document.body;
       const container = document.getElementById('main-container');
       
-      // Force critical styles - always apply to override any conflicts
-      body.style.background = 'linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%)';
-      body.style.minHeight = '100vh';
-      body.style.display = 'flex';
-      body.style.alignItems = 'center';
-      body.style.justifyContent = 'center';
-      body.style.padding = '20px';
-      body.style.margin = '0';
+      // Force HTML and body styles
+      html.style.cssText = `
+        background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;
+        min-height: 100vh !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+      `;
+      
+      body.style.cssText = `
+        background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;
+        min-height: 100vh !important;
+        margin: 0 !important;
+        padding: 20px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        overflow-x: hidden !important;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+      `;
       
       // Force glassmorphism container styles if needed
       if (container && !container.style.background) {
@@ -623,16 +633,39 @@
       }
     }
 
-    // Initialize
-    document.addEventListener('DOMContentLoaded', async () => {
-      // Ensure styles are applied first
-      ensureStylesApplied();
+    // Fallback functions for modal dependencies
+    function showPrivacyModal() {
+      alert('プライバシーポリシー:\n\n• 個人情報は適切に保護されます\n• 回答データは教育目的でのみ使用されます\n• 管理者は適切なアクセス権限を持っています\n• データは法的要件に従って管理されます');
+    }
+
+    function showDigitalCitizenshipModal() {
+      alert('デジタル・シティズンシップについて:\n\nデジタル社会における責任ある市民として、技術を適切かつ効果的に使用する能力です。回答ボードを通じて、この重要な概念を実践的に指導しましょう。');
+    }
+
+    // Immediate style application (before DOM ready)
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initializeRegistration);
+    } else {
+      initializeRegistration();
+    }
+
+    // Also apply styles immediately if DOM is already ready
+    forceCorrectStyles();
+
+    function initializeRegistration() {
+      console.log('🎨 Initializing Registration with new color scheme');
       
-      // Force refresh styles after a short delay to override any conflicts
-      setTimeout(() => {
-        ensureStylesApplied();
-      }, 100);
+      // Apply styles immediately and repeatedly to ensure they stick
+      forceCorrectStyles();
+      setTimeout(forceCorrectStyles, 50);
+      setTimeout(forceCorrectStyles, 200);
+      setTimeout(forceCorrectStyles, 500);
       
+      // Continue with registration logic
+      initializeRegistrationLogic();
+    }
+
+    async function initializeRegistrationLogic() {
       try {
         await getUserEmail();
         await checkExistingBoard();
@@ -640,7 +673,7 @@
         console.log('初期化エラー:', error);
         showMessage('認証を確認してください', 'info');
       }
-    });
+    }
   </script>
 </body>
 </html>
