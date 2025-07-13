@@ -588,15 +588,33 @@ function findOrCreateUser(adminEmail, additionalData = {}) {
     throw new Error('有効なメールアドレスが必要です');
   }
 
-  // 🔒 LockService を使用した原子的操作
+  // 🔒 適応的ロックメカニズム
+  const result = attemptWithAdaptiveLock(adminEmail, additionalData);
+  if (result) {
+    return result;
+  }
+  
+  // フォールバック: 軽量ロックで再試行
+  return attemptWithLightweightLock(adminEmail, additionalData);
+}
+
+/**
+ * 🎯 適応的ロックでのユーザー作成試行
+ * @param {string} adminEmail - メールアドレス
+ * @param {object} additionalData - 追加データ
+ * @returns {object|null} 成功時は結果、失敗時はnull
+ */
+function attemptWithAdaptiveLock(adminEmail, additionalData) {
   const lock = LockService.getScriptLock();
+  const maxWaitTime = 10000; // 10秒に短縮
+  
   try {
-    // メールアドレス固有のロック（最大30秒待機）
-    if (!lock.waitLock(30000)) {
-      throw new Error('システムが混雑しています。しばらく後に再試行してください。');
+    if (!lock.waitLock(maxWaitTime)) {
+      debugLog('attemptWithAdaptiveLock: タイムアウト', { adminEmail, waitTime: maxWaitTime });
+      return null; // フォールバックに委謗
     }
 
-    debugLog('findOrCreateUser: ロック取得成功', { adminEmail });
+    debugLog('attemptWithAdaptiveLock: ロック取得成功', { adminEmail });
 
     // 1. 既存ユーザー確認
     let existingUser = findUserByEmail(adminEmail);
