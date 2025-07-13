@@ -705,7 +705,17 @@
           'overflow-x: hidden !important;' +
           'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;' +
           'width: 100% !important;' +
-        '}';
+        '}' +
+        /* Modal protection - ensure modals work correctly */ +
+        '.fixed { position: fixed !important; }' +
+        '.inset-0 { top: 0 !important; right: 0 !important; bottom: 0 !important; left: 0 !important; }' +
+        '.z-50, .z-\\[60\\] { z-index: 9999 !important; }' +
+        '.flex { display: flex !important; }' +
+        '.items-center { align-items: center !important; }' +
+        '.justify-center { justify-content: center !important; }' +
+        '.hidden { display: none !important; }' +
+        '[id*="modal"] { z-index: 9999 !important; }' +
+        '[id*="modal"] .glass-panel { background: rgba(30, 41, 59, 0.95) !important; backdrop-filter: blur(20px) !important; }';
       
       // Remove existing override and add new one
       const existing = document.getElementById('gas-override-styles');
@@ -733,6 +743,7 @@
     // GAS IFRAME TIMING FIX: Multi-stage style application
     (function() {
       let styleApplied = false;
+      let initializationStarted = false;
       
       // Apply styles immediately when script runs
       function applyEmergencyStyles() {
@@ -764,7 +775,10 @@
       
       // GAS-specific: Handle different ready states
       function initWhenReady() {
+        if (initializationStarted) return; // Prevent duplicate initialization
+        
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
+          initializationStarted = true;
           applyEmergencyStyles();
           forceCorrectStyles();
           initializeRegistration();
@@ -806,6 +820,10 @@
     })();
 
     function initializeRegistration() {
+      // Prevent duplicate initialization
+      if (window.registrationInitialized) return;
+      window.registrationInitialized = true;
+      
       console.log('🎨 Initializing Registration with new color scheme');
       
       // Apply styles immediately and repeatedly to ensure they stick
@@ -822,6 +840,30 @@
       try {
         await getUserEmail();
         await checkExistingBoard();
+        
+        // Ensure modal functionality works after our aggressive style fixes
+        setTimeout(() => {
+          const modalLinks = document.querySelectorAll('a[onclick*="Modal"]');
+          modalLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+              // Re-apply modal protection after click
+              setTimeout(() => {
+                const modals = document.querySelectorAll('[id*="modal"]');
+                modals.forEach(modal => {
+                  if (modal && !modal.classList.contains('hidden')) {
+                    modal.style.zIndex = '9999';
+                    modal.style.position = 'fixed';
+                    modal.style.top = '0';
+                    modal.style.left = '0';
+                    modal.style.right = '0';
+                    modal.style.bottom = '0';
+                  }
+                });
+              }, 100);
+            });
+          });
+        }, 1000);
+        
       } catch (error) {
         console.log('初期化エラー:', error);
         showMessage('認証を確認してください', 'info');
