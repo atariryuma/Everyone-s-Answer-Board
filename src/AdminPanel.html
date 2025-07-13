@@ -2610,19 +2610,28 @@ function syncCheckboxStates(status) {
         return;
       }
       
-      // formURLを複数の場所から取得を試みる（サーバー側で修復済みのものを優先）
-      let formUrl = status.formUrl;
-      if (!formUrl && status.userInfo && status.userInfo.formUrl) {
-        formUrl = status.userInfo.formUrl;
+      // formURLを複数の場所から取得を試みる（最新のものを優先）
+      let formUrl = null;
+      
+      // 1. statusから直接取得（最新）
+      if (status.formUrl) {
+        formUrl = status.formUrl;
+        console.log('✅ [DEBUG] Using formUrl from status:', formUrl);
       }
-      if (!formUrl && status.userInfo && status.userInfo.configJson) {
+      // 2. userInfo.configJsonから取得
+      else if (status.userInfo && status.userInfo.configJson) {
         try {
           const config = JSON.parse(status.userInfo.configJson);
-          formUrl = config.formUrl || config.editFormUrl;
+          formUrl = config.formUrl;
           console.log('✅ [DEBUG] Retrieved formUrl from configJson:', formUrl);
         } catch (e) {
           console.warn('ConfigJSON parse error:', e);
         }
+      }
+      // 3. フォールバック
+      else if (status.userInfo && status.userInfo.formUrl) {
+        formUrl = status.userInfo.formUrl;
+        console.log('✅ [DEBUG] Using formUrl from userInfo:', formUrl);
       }
       const hasFormUrl = formUrl && formUrl.trim() !== '';
       
@@ -2655,10 +2664,18 @@ function syncCheckboxStates(status) {
         // 編集リンクボタンの設定
         if (editFormUrlLink) {
           let editFormUrl = null;
-          if (status.userInfo && status.userInfo.configJson) {
+          
+          // 1. statusから直接取得（最新）
+          if (status.editFormUrl) {
+            editFormUrl = status.editFormUrl;
+            console.log('✅ [DEBUG] Using editFormUrl from status:', editFormUrl);
+          }
+          // 2. userInfo.configJsonから取得
+          else if (status.userInfo && status.userInfo.configJson) {
             try {
               const config = JSON.parse(status.userInfo.configJson);
               editFormUrl = config.editFormUrl;
+              console.log('✅ [DEBUG] Retrieved editFormUrl from configJson:', editFormUrl);
             } catch (e) {
               console.warn('Failed to get editFormUrl from config:', e);
             }
@@ -2667,11 +2684,15 @@ function syncCheckboxStates(status) {
           if (editFormUrl) {
             editFormUrlLink.href = editFormUrl;
             editFormUrlLink.classList.remove('hidden');
+            console.log('✅ [DEBUG] Edit button enabled with URL:', editFormUrl);
           } else if (formUrl && formUrl.includes('/viewform')) {
-            editFormUrlLink.href = formUrl.replace('/viewform', '/edit');
+            const convertedEditUrl = formUrl.replace('/viewform', '/edit');
+            editFormUrlLink.href = convertedEditUrl;
             editFormUrlLink.classList.remove('hidden');
+            console.log('✅ [DEBUG] Edit button enabled with converted URL:', convertedEditUrl);
           } else {
             editFormUrlLink.classList.add('hidden');
+            console.log('✅ [DEBUG] Edit button hidden: no valid URL');
           }
         }
         
@@ -3379,9 +3400,13 @@ function syncCheckboxStates(status) {
                                         
                                         // UI を非同期で更新（エラーハンドリング付き）
                                         try {
+                                            // キャッシュをクリアして強制リロード
+                                            statusCache.clear();
                                             const statusResult = loadStatus(true);
                                             if (statusResult && typeof statusResult.then === 'function') {
-                                                statusResult.catch(function(error) {
+                                                statusResult.then(function() {
+                                                    console.log('✅ [DEBUG] UI updated after form creation');
+                                                }).catch(function(error) {
                                                     console.warn('Status reload failed:', error);
                                                 });
                                             }
@@ -3408,9 +3433,13 @@ function syncCheckboxStates(status) {
                             
                             // UI を非同期で更新（エラーハンドリング付き）
                             try {
+                                // キャッシュをクリアして強制リロード
+                                statusCache.clear();
                                 const statusResult = loadStatus(true);
                                 if (statusResult && typeof statusResult.then === 'function') {
-                                    statusResult.catch(function(error) {
+                                    statusResult.then(function() {
+                                        console.log('✅ [DEBUG] UI updated after simple form creation');
+                                    }).catch(function(error) {
                                         console.warn('Status reload failed:', error);
                                     });
                                 }

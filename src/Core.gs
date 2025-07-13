@@ -3417,7 +3417,8 @@ function getStatus(requestUserId, forceRefresh = false) {
       publishedSheetName: configJson.publishedSheetName || null,
       isPublished: isPublished,
       appPublished: configJson.appPublished || false,
-      formUrl: formUrl || null,
+      formUrl: configJson.formUrl || null,
+      editFormUrl: configJson.editFormUrl || null,
       webAppUrl: getWebAppUrlCached(),
       appUrls: generateAppUrls(requestUserId),
       customFormInfo: customFormInfo,
@@ -3615,6 +3616,10 @@ function createCustomFormUI(requestUserId, config) {
       
       // キャッシュをクリアして次回取得時に最新データを確保
       invalidateUserCache(requestUserId, activeUserEmail, result.spreadsheetId, true);
+      // 旧スプレッドシートのキャッシュもクリア
+      if (existingUser.spreadsheetId && existingUser.spreadsheetId !== result.spreadsheetId) {
+        invalidateUserCache(requestUserId, activeUserEmail, existingUser.spreadsheetId, true);
+      }
     } else {
       console.warn('createCustomFormUI - user not found:', requestUserId);
     }
@@ -3623,6 +3628,7 @@ function createCustomFormUI(requestUserId, config) {
       status: 'success',
       message: 'カスタムフォームが正常に作成されました！',
       formUrl: result.formUrl,
+      editFormUrl: result.editFormUrl,
       spreadsheetUrl: result.spreadsheetUrl,
       formTitle: result.formTitle,
       spreadsheetId: result.spreadsheetId,
