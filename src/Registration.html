@@ -761,7 +761,7 @@
           showMessage('クイックスタートに失敗しました。手動セットアップをお試しください。', 'error');
           showFallbackOptions();
         })
-        .quickStartSetup(userId);
+        .quickStartSetup(); // userIdを渡さず、quickStartSetup内で新規登録も実行
     }
     
     function openManualSetup() {

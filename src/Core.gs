@@ -1307,56 +1307,94 @@ function toggleHighlight(requestUserId, rowIndex, sheetName) {
  */
 
 /**
+ * 包括的ユーザー検索（マルチレベルフォールバック）
+ * @param {string} userId - ユーザーID
+ * @returns {Object|null} ユーザー情報またはnull
+ */
+function comprehensiveUserSearch(userId) {
+  var userInfo = null;
+  
+  try {
+    // Level 1: キャッシュクリア後の検索
+    cacheManager.remove('user_' + userId);
+    userInfo = findUserById(userId);
+    if (userInfo) {
+      console.log('✅ comprehensiveUserSearch: Level 1 (キャッシュクリア後) で見つかりました');
+      return userInfo;
+    }
+    
+    // Level 2: 全キャッシュクリア後の検索
+    console.warn('comprehensiveUserSearch: Level 1 失敗。Level 2 を試行');
+    cacheManager.clearByPattern('user_');
+    Utilities.sleep(500);
+    userInfo = findUserById(userId);
+    if (userInfo) {
+      console.log('✅ comprehensiveUserSearch: Level 2 (全キャッシュクリア後) で見つかりました');
+      return userInfo;
+    }
+    
+    // Level 3: データベース直接検索
+    console.warn('comprehensiveUserSearch: Level 2 失敗。Level 3 (データベース直接) を試行');
+    userInfo = fetchUserFromDatabase('userId', userId);
+    if (userInfo) {
+      console.log('✅ comprehensiveUserSearch: Level 3 (データベース直接) で見つかりました');
+      return userInfo;
+    }
+    
+    console.warn('comprehensiveUserSearch: 全レベルで検索失敗');
+    return null;
+    
+  } catch (error) {
+    console.error('comprehensiveUserSearch エラー:', error.message);
+    return null;
+  }
+}
+
+/**
  * クイックスタートセットアップ（完全版） (マルチテナント対応版)
  * フォルダ作成、フォーム作成、スプレッドシート作成、ボード公開まで一括実行
- * @param {string} requestUserId - リクエスト元のユーザーID
+ * @param {string} requestUserId - リクエスト元のユーザーID（nullの場合は新規登録も実行）
  */
 function quickStartSetup(requestUserId) {
-  // 新規ユーザー（requestUserIdがundefinedまたはnull）の場合はverifyUserAccessをスキップ
-  if (requestUserId) {
+  var userInfo = null;
+  var activeUserEmail = Session.getActiveUser().getEmail();
+  
+  // 新規ユーザー（requestUserIdがundefinedまたはnull）の場合は現在のユーザーでユーザー登録を実行
+  if (!requestUserId) {
+    console.log('quickStartSetup: userIdが未指定。現在のユーザーで新規登録を実行');
+    try {
+      var registrationResult = registerNewUser(activeUserEmail);
+      requestUserId = registrationResult.userId;
+      userInfo = findUserById(requestUserId);
+      if (!userInfo) {
+        throw new Error('ユーザー登録直後の情報取得に失敗しました');
+      }
+      console.log('✅ quickStartSetup: 新規ユーザー登録が完了しました:', requestUserId);
+    } catch (regError) {
+      console.error('quickStartSetup: 新規ユーザー登録エラー:', regError.message);
+      throw new Error(`新規ユーザー登録に失敗しました: ${regError.message}`);
+    }
+  } else {
+    // 既存ユーザーの場合は認証を実行
     try {
       verifyUserAccess(requestUserId);
+      userInfo = findUserById(requestUserId);
     } catch (error) {
       // 新規ユーザー作成直後の場合、キャッシュまたはタイミング問題でユーザーが見つからない可能性
-      console.warn('quickStartSetup: verifyUserAccess failed, checking if user exists:', error.message);
+      console.warn('quickStartSetup: verifyUserAccess failed, attempting comprehensive user search:', error.message);
       
-      // キャッシュをクリアして、ユーザーが実際に存在するかを直接確認
-      cacheManager.remove('user_' + requestUserId);
-      var userInfo = findUserById(requestUserId);
+      // マルチレベル検索を実行
+      userInfo = comprehensiveUserSearch(requestUserId);
       if (!userInfo) {
-        console.warn('quickStartSetup: 最初の検索で見つからず。キャッシュクリア後に再試行');
-        // さらに全体的なキャッシュクリアを試行
-        cacheManager.clearByPattern('user_');
-        Utilities.sleep(500); // 0.5秒待機
-        userInfo = findUserById(requestUserId);
-        if (!userInfo) {
-          console.warn('quickStartSetup: キャッシュクリア後も見つからず。データベース直接検索を試行');
-          // データベースから直接検索（キャッシュバイパス）
-          try {
-            userInfo = fetchUserFromDatabase('userId', requestUserId);
-          } catch (dbError) {
-            console.error('quickStartSetup: データベース直接検索でもエラー:', dbError.message);
-          }
-          
-          if (!userInfo) {
-            throw new Error(`認証エラー: ユーザーID ${requestUserId} が見つかりません。新規登録から再試行してください。`);
-          } else {
-            console.log('✅ quickStartSetup: データベース直接検索で見つかりました');
-          }
-        } else {
-          console.log('✅ quickStartSetup: キャッシュクリア後の検索で見つかりました');
-        }
-      } else {
-        console.log('✅ quickStartSetup: キャッシュクリア後の最初の検索で見つかりました');
+        throw new Error(`認証エラー: ユーザーID ${requestUserId} が見つかりません。新規登録から再試行してください。`);
       }
       
-      // ユーザーが存在する場合、現在のセッションユーザーと一致するかチェック
-      var activeUserEmail = Session.getActiveUser().getEmail();
+      // セキュリティチェック
       if (activeUserEmail !== userInfo.adminEmail) {
         throw new Error(`権限エラー: ${activeUserEmail} はユーザーID ${requestUserId} のデータにアクセスする権限がありません。`);
       }
       
-      console.log('✅ quickStartSetup: 新規ユーザーの認証を確認しました:', requestUserId);
+      console.log('✅ quickStartSetup: 包括的検索でユーザーを確認しました:', requestUserId);
     }
   }
   try {

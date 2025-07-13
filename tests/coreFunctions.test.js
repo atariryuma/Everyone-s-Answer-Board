@@ -17,7 +17,9 @@ describe('Core.gs utilities', () => {
         sleep: jest.fn(),
         getUuid: () => 'UUID'
       },
-      fetchUserFromDatabase: jest.fn()
+      fetchUserFromDatabase: jest.fn(),
+      comprehensiveUserSearch: jest.fn(),
+      registerNewUser: jest.fn(() => ({ userId: 'UUID', adminUrl: 'admin', viewUrl: 'view' }))
     };
     vm.createContext(context);
     vm.runInContext(code, context);
