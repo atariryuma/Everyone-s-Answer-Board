@@ -420,6 +420,42 @@ function findUserByEmailNonBlocking(email) {
 }
 
 /**
+ * ロック競合を避けるための軽量ユーザー検索
+ * 登録処理中にhandleDirectExecAccessで使用
+ * @param {string} email メールアドレス
+ * @returns {object|null} ユーザー情報またはnull
+ */
+function findUserByEmailNonBlocking(email) {
+  try {
+    if (!email) return null;
+    
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('ユーザー');
+    if (!sheet) return null;
+    
+    // ロックなしで軽量検索（読み取り専用）
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const emailIndex = headers.indexOf('adminEmail');
+    
+    if (emailIndex === -1) return null;
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][emailIndex] === email) {
+        const user = {};
+        headers.forEach((header, index) => {
+          user[header] = data[i][index];
+        });
+        return user;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('findUserByEmailNonBlocking error:', error);
+    return null;
+  }
+}
+
+/**
  * メールアドレスでユーザー検索
  * @param {string} email - メールアドレス
  * @returns {object|null} ユーザー情報

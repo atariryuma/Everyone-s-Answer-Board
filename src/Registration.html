@@ -300,6 +300,7 @@
     let domainInfo = null;
     let registrationRetryCount = 0;
     const MAX_REGISTRATION_RETRIES = 3; // 増加: 2回→3回
+    let isRegistrationInProgress = false; // 処理状態フラグ
 
     function escapeHtml(str) {
       if (!str) return '';
@@ -597,7 +598,8 @@
       const btn = document.getElementById('register-btn');
 
       // 既に処理中の場合は重複実行を防止
-      if (btn.disabled) {
+      if (isRegistrationInProgress) {
+        console.log('Registration already in progress, ignoring request');
         return;
       }
 
@@ -606,7 +608,10 @@
         return;
       }
 
+      // 処理開始フラグ設定と即座のボタン無効化
+      isRegistrationInProgress = true;
       btn.disabled = true;
+      btn.style.pointerEvents = 'none';
       btn.innerHTML = `
         <svg class="w-5 h-5 spinner inline-block mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -712,7 +717,10 @@
               registrationRetryCount++;
               const waitTime = Math.min(registrationRetryCount * 3, 10); // 最大10秒
               showMessage(`システムが混み合っています。${waitTime}秒後に自動で再試行します... (${registrationRetryCount}/${MAX_REGISTRATION_RETRIES})`, 'warning');
+              
+              // リトライ前に処理フラグをリセット
               setTimeout(() => {
+                isRegistrationInProgress = false;
                 executeRegistration();
               }, waitTime * 1000);
             } else {
@@ -720,6 +728,7 @@
               resetRegisterButton();
             }
           } else {
+            isRegistrationInProgress = false; // エラー時も処理フラグをリセット
             showMessage(`エラー: ${error.message || '登録に失敗しました'}`, 'error');
             resetRegisterButton();
           }
@@ -751,7 +760,9 @@
 
     function resetRegisterButton() {
       const btn = document.getElementById('register-btn');
+      isRegistrationInProgress = false; // 処理フラグもリセット
       btn.disabled = false;
+      btn.style.pointerEvents = 'auto'; // クリック可能に戻す
       btn.innerHTML = `
         <span class="relative z-10 flex items-center justify-center gap-3">
           <span class="text-xl">🚀</span>

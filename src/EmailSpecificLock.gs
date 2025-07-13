@@ -22,8 +22,7 @@ function acquireEmailLock(adminEmail) {
   
   // ロック取得
   PROCESSING_EMAILS[lockKey] = {
-    timestamp: Date.now(),
-    email: adminEmail
+    timestamp: Date.now()
   };
   
   console.log('Email-specific lock: Acquired for', adminEmail);
@@ -68,6 +67,9 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
         };
         updateUser(existingUser.userId, updateData);
       }
+      
+      // 古いロック状態をクリーンアップ
+      cleanupEmailLocks();
       
       return {
         userId: existingUser.userId,

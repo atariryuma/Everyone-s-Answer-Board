@@ -33,14 +33,14 @@ function findOrCreateUserEnhanced(adminEmail, additionalData = {}) {
     debugLog('findOrCreateUserEnhanced: EmailLock失敗、従来方式フォールバック', { adminEmail, error: error.message });
   }
 
-  // Stage 1: 高速ロック試行（15秒）
+  // Stage 1: 高速ロック試行（20秒）
   let result = attemptWithAdaptiveLock(adminEmail, additionalData);
   if (result) {
     debugLog('findOrCreateUserEnhanced: Stage1成功', { adminEmail });
     return result;
   }
 
-  // Stage 2: 中速ロック試行（8秒）
+  // Stage 2: 中速ロック試行（12秒）
   result = attemptWithMediumLock(adminEmail, additionalData);
   if (result) {
     debugLog('findOrCreateUserEnhanced: Stage2成功', { adminEmail });
@@ -59,16 +59,14 @@ function findOrCreateUserEnhanced(adminEmail, additionalData = {}) {
 }
 
 /**
- * 🎯 Stage 1: 適応的ロック（10秒タイムアウト）
+ * 🎯 Stage 1: 適応的ロック（20秒タイムアウト）
  * @param {string} adminEmail - メールアドレス
  * @param {object} additionalData - 追加データ
  * @returns {object|null} 成功時は結果、失敗時はnull
  */
 function attemptWithAdaptiveLock(adminEmail, additionalData) {
-  // メール特化ロック: 同一メールアドレスの処理を直列化
-  const emailLockKey = 'email_lock_' + adminEmail;
   const lock = LockService.getScriptLock();
-  const timeout = 15000;
+  const timeout = 20000;
   
   try {
     if (!lock.waitLock(timeout)) {
@@ -78,8 +76,8 @@ function attemptWithAdaptiveLock(adminEmail, additionalData) {
 
     debugLog('attemptWithAdaptiveLock: ロック取得成功', { adminEmail });
 
-    // 1. 既存ユーザー確認
-    let existingUser = findUserByEmail(adminEmail);
+    // 1. 既存ユーザー確認（ノンブロッキング検索でキャッシュ重複回避）
+    let existingUser = findUserByEmailNonBlocking(adminEmail);
     
     if (existingUser) {
       debugLog('attemptWithAdaptiveLock: 既存ユーザー発見', { userId: existingUser.userId, adminEmail });
@@ -143,14 +141,14 @@ function attemptWithAdaptiveLock(adminEmail, additionalData) {
 }
 
 /**
- * 🔥 Stage 2: 中速ロック（5秒タイムアウト）
+ * 🔥 Stage 2: 中速ロック（12秒タイムアウト）
  * @param {string} adminEmail - メールアドレス
  * @param {object} additionalData - 追加データ
  * @returns {object|null} 成功時は結果、失敗時はnull
  */
 function attemptWithMediumLock(adminEmail, additionalData) {
-  const lock = LockService.getScriptLock(); // getUserLock→getScriptLockに変更
-  const timeout = 8000; // 5秒→8秒に延長
+  const lock = LockService.getScriptLock();
+  const timeout = 12000;
   
   try {
     if (!lock.waitLock(timeout)) {
@@ -161,7 +159,7 @@ function attemptWithMediumLock(adminEmail, additionalData) {
     debugLog('attemptWithMediumLock: ロック取得成功', { adminEmail });
 
     // 既存ユーザー確認のみ（新規作成は行わない）
-    let existingUser = findUserByEmail(adminEmail);
+    let existingUser = findUserByEmailNonBlocking(adminEmail);
     
     if (existingUser) {
       debugLog('attemptWithMediumLock: 既存ユーザー発見', { userId: existingUser.userId });
