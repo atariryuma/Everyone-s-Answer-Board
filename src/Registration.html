@@ -2,32 +2,53 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <base target="_top">
+  <!-- <base target="_top"> Temporarily disabled for testing -->
   <title>StudyQuest - 登録</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Prevent external CSS interference -->
+  <script>
+    // IMMEDIATE: Block any external stylesheets and force our styles
+    document.addEventListener('DOMContentLoaded', function() {
+      // Remove any external stylesheets that might interfere
+      const links = document.querySelectorAll('link[rel="stylesheet"]');
+      links.forEach(link => {
+        if (link.href && !link.href.includes('fonts.googleapis.com')) {
+          link.disabled = true;
+        }
+      });
+    });
+  </script>
   <style>
-    /* CRITICAL: Force override any external CSS - must be first */
-    html, body {
-      background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;
-      min-height: 100vh !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      overflow-x: hidden !important;
-    }
-
-    /* Modern CSS Reset */
+    /* EMERGENCY RESET: Override everything */
     * {
       margin: 0 !important;
       padding: 0 !important;
       box-sizing: border-box !important;
     }
-
+    
+    /* CRITICAL: Force override any external CSS - must be first */
+    html {
+      background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;
+      min-height: 100vh !important;
+      width: 100% !important;
+    }
+    
     body {
+      background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;
+      min-height: 100vh !important;
+      margin: 0 !important;
       padding: 20px !important;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      overflow-x: hidden !important;
+      width: 100% !important;
+    }
+
+    /* Override any framework classes */
+    .container, .main, .content, .app, .page {
+      all: unset !important;
     }
 
     /* Animated background elements */
@@ -590,32 +611,48 @@
       }
     });
 
-    // CRITICAL: Force styles immediately to override any external interference
+    // NUCLEAR OPTION: Force styles with maximum priority
     function forceCorrectStyles() {
       const html = document.documentElement;
       const body = document.body;
       const container = document.getElementById('main-container');
       
-      // Force HTML and body styles
-      html.style.cssText = `
-        background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;
-        min-height: 100vh !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-      `;
+      // Remove any interfering classes
+      if (body) {
+        body.className = '';
+        body.removeAttribute('class');
+      }
+      if (html) {
+        html.className = '';
+        html.removeAttribute('class');
+      }
       
-      body.style.cssText = `
-        background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;
-        min-height: 100vh !important;
-        margin: 0 !important;
-        padding: 20px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        overflow-x: hidden !important;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-      `;
+      // Force HTML styles with cssText (highest priority)
+      if (html) {
+        html.style.cssText = `
+          background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;
+          min-height: 100vh !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 100% !important;
+        `;
+      }
+      
+      // Force body styles with cssText (highest priority)
+      if (body) {
+        body.style.cssText = `
+          background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;
+          min-height: 100vh !important;
+          margin: 0 !important;
+          padding: 20px !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          overflow-x: hidden !important;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+          width: 100% !important;
+        `;
+      }
       
       // Force glassmorphism container styles if needed
       if (container && !container.style.background) {
@@ -642,15 +679,50 @@
       alert('デジタル・シティズンシップについて:\n\nデジタル社会における責任ある市民として、技術を適切かつ効果的に使用する能力です。回答ボードを通じて、この重要な概念を実践的に指導しましょう。');
     }
 
-    // Immediate style application (before DOM ready)
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initializeRegistration);
-    } else {
-      initializeRegistration();
-    }
-
-    // Also apply styles immediately if DOM is already ready
-    forceCorrectStyles();
+    // IMMEDIATE EXECUTION: Apply styles as soon as possible
+    (function() {
+      // Apply styles immediately when script runs
+      function applyEmergencyStyles() {
+        const html = document.documentElement;
+        const body = document.body || document.getElementsByTagName('body')[0];
+        
+        if (html) {
+          html.style.background = 'linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%)';
+          html.style.minHeight = '100vh';
+          html.style.margin = '0';
+          html.style.padding = '0';
+        }
+        
+        if (body) {
+          body.style.background = 'linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%)';
+          body.style.minHeight = '100vh';
+          body.style.margin = '0';
+          body.style.padding = '20px';
+          body.style.display = 'flex';
+          body.style.alignItems = 'center';
+          body.style.justifyContent = 'center';
+          body.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        }
+      }
+      
+      // Apply immediately
+      applyEmergencyStyles();
+      
+      // Apply after DOM is ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+          applyEmergencyStyles();
+          initializeRegistration();
+        });
+      } else {
+        initializeRegistration();
+      }
+      
+      // Apply styles with intervals to ensure they stick
+      setTimeout(applyEmergencyStyles, 10);
+      setTimeout(applyEmergencyStyles, 50);
+      setTimeout(applyEmergencyStyles, 200);
+    })();
 
     function initializeRegistration() {
       console.log('🎨 Initializing Registration with new color scheme');
