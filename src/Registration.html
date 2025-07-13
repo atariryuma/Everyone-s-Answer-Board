@@ -5,55 +5,60 @@
   <base target="_top">
   <title>StudyQuest - 登録</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
+  
   <style>
-    /* 基本スタイルとリセット */
+    /* GAS IFRAME FIX: Maximum CSS specificity and priority */
     html[lang="ja"], html {
       background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;
       min-height: 100vh !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
     }
+    
     body {
       background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%) !important;
       min-height: 100vh !important;
       margin: 0 !important;
       padding: 20px !important;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif !important;
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
+      overflow-x: hidden !important;
+      width: 100% !important;
     }
-    *, *::before, *::after { box-sizing: border-box !important; }
 
-    /* 背景のアニメーション要素 */
+    html, body, div, span, h1, h2, h3, h4, h5, h6, p, button, a {
+      box-sizing: border-box !important;
+    }
+    
     body::before {
       content: '' !important;
       position: fixed !important;
-      top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+      top: 0 !important; left: 0 !important;
+      width: 100% !important; height: 100% !important;
       background: radial-gradient(ellipse at top left, rgba(6, 182, 212, 0.1) 0%, transparent 70%),
                   radial-gradient(ellipse at bottom right, rgba(168, 85, 247, 0.08) 0%, transparent 70%) !important;
       z-index: -1 !important;
     }
 
-    /* メインコンテンツ（ガラス風デザイン） */
     .glass-container {
       background: rgba(255, 255, 255, 0.08) !important;
-      backdrop-filter: blur(20px) !important;
       -webkit-backdrop-filter: blur(20px) !important;
+      backdrop-filter: blur(20px) !important;
       border-radius: 24px !important;
       border: 1px solid rgba(255, 255, 255, 0.2) !important;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1) !important;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
       width: 100% !important;
       max-width: 420px !important;
       padding: 40px 32px !important;
+      position: relative !important;
+      z-index: 10 !important;
       text-align: center !important;
-      animation: fadeIn 0.6s ease-out !important;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
+      animation: fadeIn 0.6s ease-out;
     }
 
-    /* ヘッダー */
     .header { margin-bottom: 40px !important; }
     .logo {
       width: 56px !important; height: 56px !important;
@@ -63,10 +68,9 @@
       display: flex !important; align-items: center !important; justify-content: center !important;
       font-size: 24px !important; color: white !important; font-weight: 600 !important;
     }
-    .title { font-size: 28px !important; font-weight: 700 !important; color: white !important; margin: 0 0 8px 0 !important; }
-    .subtitle { font-size: 16px !important; color: rgba(255, 255, 255, 0.7) !important; margin: 0 !important; }
+    .title { font-size: 28px !important; font-weight: 700 !important; color: white !important; margin-bottom: 8px !important; }
+    .subtitle { font-size: 16px !important; color: rgba(255, 255, 255, 0.7) !important; margin-bottom: 0 !important; }
 
-    /* ステータス表示 */
     .status-card {
       background: rgba(255, 255, 255, 0.05) !important;
       border-radius: 16px !important;
@@ -77,7 +81,6 @@
     .status-text { font-size: 14px !important; color: rgba(255, 255, 255, 0.8) !important; margin-bottom: 8px !important; }
     .user-email { font-size: 16px !important; font-weight: 600 !important; color: white !important; word-break: break-all !important; }
 
-    /* ボタン */
     .register-btn {
       width: 100% !important;
       background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%) !important;
@@ -91,40 +94,38 @@
       transition: all 0.3s ease !important;
       margin-bottom: 24px !important;
     }
-    .register-btn:hover:not(:disabled) { transform: translateY(-2px) !important; box-shadow: 0 8px 25px rgba(6, 182, 212, 0.3) !important; }
-    .register-btn:disabled { opacity: 0.5 !important; cursor: not-allowed !important; }
+    .register-btn:hover:not(:disabled) { transform: translateY(-1px) !important; box-shadow: 0 8px 25px rgba(6, 182, 212, 0.4) !important; }
+    .register-btn:disabled { opacity: 0.6 !important; cursor: not-allowed !important; }
+    .spinner {
+      width: 20px !important; height: 20px !important;
+      border: 2px solid rgba(255, 255, 255, 0.3) !important;
+      border-top: 2px solid white !important;
+      border-radius: 50% !important;
+      animation: spin 1s linear infinite !important;
+      display: inline-block !important; vertical-align: middle !important; margin-right: 8px !important;
+    }
 
-    /* メッセージエリア */
-    .message-area { min-height: 24px !important; font-size: 14px !important; margin-bottom: 24px !important; }
-    .message-area.success { color: #10b981 !important; }
+    .message-area { min-height: 24px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin-bottom: 24px !important; font-size: 14px !important; color: rgba(255, 255, 255, 0.8) !important; }
     .message-area.error { color: #ef4444 !important; }
-    .message-area.info { color: #f59e0b !important; }
+    .message-area.success { color: #10b981 !important; }
+    .message-area.warning { color: #f59e0b !important; }
 
-    /* フッター */
-    .footer { font-size: 12px !important; color: rgba(255, 255, 255, 0.5) !important; }
-    .footer a { color: rgba(255, 255, 255, 0.7) !important; text-decoration: underline !important; cursor: pointer !important; }
+    .footer { text-align: center !important; font-size: 12px !important; color: rgba(255, 255, 255, 0.5) !important; margin-top: 8px !important; }
+    .footer a { color: rgba(255, 255, 255, 0.7) !important; text-decoration: none !important; border-bottom: 1px solid rgba(255, 255, 255, 0.3) !important; transition: color 0.2s ease !important; cursor: pointer !important; }
     .footer a:hover { color: white !important; }
 
-    /* 登録完了画面 */
-    .success-container { display: none; }
-    .success-icon {
-      width: 64px !important; height: 64px !important;
-      background: #10b981 !important;
-      border-radius: 50% !important; margin: 0 auto 24px !important;
-      display: flex !important; align-items: center !important; justify-content: center !important;
-      font-size: 28px !important; color: white !important;
-    }
-    .action-btn {
-      display: block !important; padding: 14px 24px !important;
-      border-radius: 10px !important; border: none !important;
-      font-size: 15px !important; font-weight: 600 !important;
-      text-decoration: none !important; color: white !important;
-      margin-top: 12px !important;
-    }
+    .success-container { display: none; /* Initially hidden */ }
+    .success-icon { width: 64px !important; height: 64px !important; background: #10b981 !important; border-radius: 50% !important; margin: 0 auto 24px !important; display: flex !important; align-items: center !important; justify-content: center !important; font-size: 28px !important; color: white !important; }
+    .action-btn { display: block !important; padding: 14px 24px !important; border-radius: 10px !important; border: none !important; font-size: 15px !important; font-weight: 600 !important; text-decoration: none !important; color: white !important; margin-top: 12px !important; cursor: pointer !important; }
     .action-btn.primary { background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%) !important; }
     .action-btn.secondary { background: rgba(255, 255, 255, 0.1) !important; border: 1px solid rgba(255, 255, 255, 0.2) !important; }
 
-    /* ★★★ モーダルの修正されたスタイル ★★★ */
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* ================================================= */
+    /* ★★★ ここからが修正されたモーダルのスタイル ★★★ */
+    /* ================================================= */
     .modal-overlay {
       position: fixed !important;
       top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
@@ -136,15 +137,20 @@
       justify-content: center !important;
       z-index: 9999 !important;
       padding: 20px !important;
+      
+      /* 表示・非表示のアニメーション */
       opacity: 0 !important;
       visibility: hidden !important;
       transition: opacity 0.3s ease, visibility 0s 0.3s !important;
     }
+
+    /* JavaScriptでこのクラスを付けて表示します */
     .modal-overlay.is-visible {
       opacity: 1 !important;
       visibility: visible !important;
       transition: opacity 0.3s ease, visibility 0s !important;
     }
+
     .modal-content {
       background: rgba(30, 41, 59, 0.95) !important;
       border: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -155,8 +161,11 @@
       padding: 24px 32px !important;
       max-height: 90vh !important;
       overflow-y: auto !important;
+      color: rgba(255, 255, 255, 0.9) !important;
     }
   </style>
+
+  <?!= include('SharedUtilities'); ?>
 </head>
 <body>
 
@@ -166,14 +175,21 @@
       <h1 class="title">StudyQuest</h1>
       <p class="subtitle">教育用回答ボードシステム</p>
     </div>
+
     <div class="status-card">
-      <div class="status-text" id="status-text">認証情報を確認中...</div>
+      <div class="status-text" id="status-text">認証情報を確認中</div>
       <div class="user-email" id="user-email"></div>
     </div>
+
     <div class="message-area" id="message-area"></div>
-    <button class="register-btn" id="register-btn" disabled>回答ボードを作成</button>
+
+    <button class="register-btn" id="register-btn" disabled>
+      <span id="btn-content">回答ボードを作成</span>
+    </button>
+
     <div class="footer">
-      <a data-modal-trigger="privacy">プライバシーポリシー</a> 及び
+      <a data-modal-trigger="privacy">プライバシーポリシー</a>
+      および
       <a data-modal-trigger="digital-citizenship">デジタル・シティズンシップ</a>
       に同意の上で作成されます
     </div>
@@ -189,23 +205,31 @@
   <div id="privacy-modal" class="modal-overlay">
     <div class="modal-content">
       <h2 class="title">プライバシーポリシー</h2>
-      <p>ここにプライバシーポリシーの内容が入ります。</p>
+      <p>ここにプライバシーポリシーの内容が入ります。個人情報は適切に保護され、教育目的でのみ使用されます。</p>
       <button class="action-btn secondary" data-close>閉じる</button>
     </div>
   </div>
+  
   <div id="digital-citizenship-modal" class="modal-overlay">
     <div class="modal-content">
       <h2 class="title">デジタル・シティズンシップ</h2>
-      <p>ここにデジタル・シティズンシップの内容が入ります。</p>
+      <p>デジタル社会における責任ある市民として、技術を適切かつ効果的に使用する能力です。この回答ボードを通じて、他者への配慮や情報倫理について実践的に学びましょう。</p>
       <button class="action-btn secondary" data-close>閉じる</button>
     </div>
   </div>
 
+
   <script>
+    // -------------------------------------------
+    // ★★★ 登録処理とモーダル制御のスクリプト ★★★
+    // -------------------------------------------
     document.addEventListener('DOMContentLoaded', () => {
+
+      // --- 要素の取得 ---
       const mainContainer = document.getElementById('main-container');
       const successContainer = document.getElementById('success-container');
       const registerBtn = document.getElementById('register-btn');
+      const btnContent = document.getElementById('btn-content');
       const statusTextEl = document.getElementById('status-text');
       const userEmailEl = document.getElementById('user-email');
       const messageAreaEl = document.getElementById('message-area');
@@ -236,48 +260,52 @@
           setTimeout(() => { window.top.location.href = result.adminUrl; }, 3000);
         }
       };
-
+      
       const executeRegistration = () => {
         if (isRegistrationInProgress || !userEmail) return;
 
         isRegistrationInProgress = true;
         registerBtn.disabled = true;
-        registerBtn.textContent = '登録処理中...';
+        btnContent.innerHTML = '<span class="spinner"></span>登録処理中...';
         showMessage('', 'info');
 
         google.script.run
           .withSuccessHandler(showSuccessResult)
           .withFailureHandler(error => {
+            console.error('Registration error:', error);
             showMessage(error.message || '登録に失敗しました', 'error');
             registerBtn.disabled = false;
-            registerBtn.textContent = '回答ボードを作成';
+            btnContent.textContent = '回答ボードを作成';
             isRegistrationInProgress = false;
           })
           .quickStartSetup();
       };
-
+      
       const initializePage = () => {
-        google.script.run.withSuccessHandler(result => {
-          if (result?.status === 'existing_user') {
-            window.top.location.href = result.adminUrl;
-            return;
-          }
-          google.script.run
-            .withSuccessHandler(authResult => {
-              if (authResult?.email || authResult?.userEmail) {
-                updateUserDisplay(authResult.email || authResult.userEmail);
-              } else {
-                throw new Error('メールアドレスが取得できませんでした');
-              }
-            })
-            .withFailureHandler(err => {
-              statusTextEl.textContent = '認証エラー';
-              showMessage('ページの再読み込みが必要です', 'error');
-            })
-            .verifyUserAuthentication();
-        }).getExistingBoard();
+        google.script.run
+          .withSuccessHandler(result => {
+            if (result?.status === 'existing_user') {
+              window.top.location.href = result.adminUrl;
+              return;
+            }
+            google.script.run
+              .withSuccessHandler(authResult => {
+                if (authResult?.email || authResult?.userEmail) {
+                  updateUserDisplay(authResult.email || authResult.userEmail);
+                } else {
+                  throw new Error('メールアドレスが取得できませんでした');
+                }
+              })
+              .withFailureHandler(err => {
+                statusTextEl.textContent = '認証エラー';
+                showMessage('ページの再読み込みが必要です', 'error');
+                console.error(err);
+              })
+              .verifyUserAuthentication();
+          })
+          .getExistingBoard();
       };
-
+      
       // --- モーダル制御 ---
       const modalTriggers = document.querySelectorAll('[data-modal-trigger]');
       modalTriggers.forEach(trigger => {
@@ -299,7 +327,7 @@
           document.querySelectorAll('.modal-overlay.is-visible').forEach(modal => modal.classList.remove('is-visible'));
         }
       });
-
+      
       // --- イベントリスナーと初期化 ---
       registerBtn.addEventListener('click', executeRegistration);
       initializePage();
