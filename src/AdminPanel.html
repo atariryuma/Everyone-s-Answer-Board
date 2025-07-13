@@ -422,6 +422,11 @@
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                     </svg>
                   </a>
+                  <a id="edit-form-url-link" href="#" target="_blank" class="btn btn-primary" title="フォームを編集">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                    </svg>
+                  </a>
                 </div>
               </div>
             </div>
@@ -1775,6 +1780,7 @@ elements = {
   formUrlInput: document.getElementById('form-url-input'),
   copyFormUrlBtn: document.getElementById('copy-form-url-btn'),
   openFormUrlLink: document.getElementById('open-form-url-link'),
+  editFormUrlLink: document.getElementById('edit-form-url-link'),
   openSpreadsheetBtn: document.getElementById('open-spreadsheet-btn'),
   addSpreadsheetBtn: document.getElementById('add-spreadsheet-btn'),
   guidanceText: document.getElementById('guidance-text'),
@@ -2598,6 +2604,7 @@ function syncCheckboxStates(status) {
       const formUrlInput = elements.formUrlInput;
       const copyFormUrlBtn = elements.copyFormUrlBtn;
       const openFormUrlLink = elements.openFormUrlLink;
+      const editFormUrlLink = elements.editFormUrlLink;
       
       if (!formUrlSection || !formUrlInput) {
         return;
@@ -2645,11 +2652,37 @@ function syncCheckboxStates(status) {
           openFormUrlLink.href = formUrl;
         }
         
+        // 編集リンクボタンの設定
+        if (editFormUrlLink) {
+          let editFormUrl = null;
+          if (status.userInfo && status.userInfo.configJson) {
+            try {
+              const config = JSON.parse(status.userInfo.configJson);
+              editFormUrl = config.editFormUrl;
+            } catch (e) {
+              console.warn('Failed to get editFormUrl from config:', e);
+            }
+          }
+          
+          if (editFormUrl) {
+            editFormUrlLink.href = editFormUrl;
+            editFormUrlLink.classList.remove('hidden');
+          } else if (formUrl && formUrl.includes('/viewform')) {
+            editFormUrlLink.href = formUrl.replace('/viewform', '/edit');
+            editFormUrlLink.classList.remove('hidden');
+          } else {
+            editFormUrlLink.classList.add('hidden');
+          }
+        }
+        
         console.log('✅ [DEBUG] Form URL section displayed:', formUrl);
       } else {
         // フォームURLがない場合、表示エリアを隠す
         formUrlSection.classList.add('hidden');
         formUrlInput.value = '';
+        if (editFormUrlLink) {
+          editFormUrlLink.classList.add('hidden');
+        }
         console.log('✅ [DEBUG] Form URL section hidden - no form URL available');
       }
     }
@@ -3337,7 +3370,9 @@ function syncCheckboxStates(status) {
                                         showMessage('✅ フォーム作成、設定保存、公開が自動で完了しました！', 'success');
                                         
                                         // フォーム編集ページを開く
-                                        if (result.formUrl) {
+                                        if (result.editFormUrl) {
+                                            window.open(result.editFormUrl, '_blank');
+                                        } else if (result.formUrl) {
                                             const editUrl = result.formUrl.replace('/viewform', '/edit');
                                             window.open(editUrl, '_blank');
                                         }
@@ -3364,7 +3399,9 @@ function syncCheckboxStates(status) {
                         setTimeout(function() {
                             hideProgressBar();
                             showMessage('✅ フォームが作成されました！設定タブで設定を行ってください。', 'success');
-                            if (result.formUrl) {
+                            if (result.editFormUrl) {
+                                window.open(result.editFormUrl, '_blank');
+                            } else if (result.formUrl) {
                                 const editUrl = result.formUrl.replace('/viewform', '/edit');
                                 window.open(editUrl, '_blank');
                             }

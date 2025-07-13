@@ -1695,9 +1695,15 @@ function createFormFactory(options) {
     // スプレッドシート作成
     var spreadsheetResult = createLinkedSpreadsheet(userEmail, form, dateTimeString);
     
+    const formUrl = form.getPublishedUrl();
+    const editFormUrl = form.getEditUrl();
+    
+    console.log('✅ [DEBUG] Form URLs - viewform:', formUrl, 'edit:', editFormUrl);
+    
     return {
       formId: form.getId(),
-      formUrl: form.getPublishedUrl(),
+      formUrl: formUrl,
+      editFormUrl: editFormUrl,
       spreadsheetId: spreadsheetResult.spreadsheetId,
       spreadsheetUrl: spreadsheetResult.spreadsheetUrl,
       sheetName: spreadsheetResult.sheetName
@@ -3552,7 +3558,15 @@ function createCustomFormUI(requestUserId, config) {
       
       const updatedConfigJson = JSON.parse(existingUser.configJson || '{}');
       updatedConfigJson.formUrl = result.formUrl;
-      updatedConfigJson.editFormUrl = result.editFormUrl || result.formUrl;
+      // editFormUrlがない場合はviewformからeditに変換
+      if (result.editFormUrl) {
+        updatedConfigJson.editFormUrl = result.editFormUrl;
+      } else if (result.formUrl && result.formUrl.includes('/viewform')) {
+        updatedConfigJson.editFormUrl = result.formUrl.replace('/viewform', '/edit');
+      } else {
+        updatedConfigJson.editFormUrl = result.formUrl;
+      }
+      console.log('✅ [DEBUG] Form URLs saved - viewform:', result.formUrl, 'edit:', updatedConfigJson.editFormUrl);
       updatedConfigJson.formCreated = true;
       updatedConfigJson.lastFormCreatedAt = new Date().toISOString();
       updatedConfigJson.setupStatus = 'completed';
