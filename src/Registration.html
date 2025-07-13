@@ -841,11 +841,63 @@
         await getUserEmail();
         await checkExistingBoard();
         
-        // Ensure modal functionality works after our aggressive style fixes
+        // Debug modal functionality and ensure it works after our aggressive style fixes
         setTimeout(() => {
+          // Check if modal functions exist
+          console.log('🔍 Modal function check:');
+          console.log('- showPrivacyModal:', typeof window.showPrivacyModal);
+          console.log('- showDigitalCitizenshipModal:', typeof window.showDigitalCitizenshipModal);
+          console.log('- sharedModals:', typeof window.sharedModals);
+          
+          // Check if modal elements exist in DOM
+          const privacyModal = document.getElementById('privacy-modal');
+          const digitalModal = document.getElementById('digital-citizenship-modal');
+          console.log('- privacy-modal element:', !!privacyModal);
+          console.log('- digital-citizenship-modal element:', !!digitalModal);
+          
+          // If functions don't exist, create fallback
+          if (typeof window.showPrivacyModal !== 'function') {
+            console.warn('⚠️ showPrivacyModal not found, creating fallback');
+            window.showPrivacyModal = function() {
+              const modal = document.getElementById('privacy-modal');
+              if (modal) {
+                modal.classList.remove('hidden');
+                modal.style.display = 'flex';
+                modal.style.position = 'fixed';
+                modal.style.zIndex = '9999';
+                modal.style.top = '0';
+                modal.style.left = '0';
+                modal.style.right = '0';
+                modal.style.bottom = '0';
+              } else {
+                alert('プライバシーポリシー:\n\n• 個人情報は適切に保護されます\n• 回答データは教育目的でのみ使用されます\n• 管理者は適切なアクセス権限を持っています\n• データは法的要件に従って管理されます');
+              }
+            };
+          }
+          
+          if (typeof window.showDigitalCitizenshipModal !== 'function') {
+            console.warn('⚠️ showDigitalCitizenshipModal not found, creating fallback');
+            window.showDigitalCitizenshipModal = function() {
+              const modal = document.getElementById('digital-citizenship-modal');
+              if (modal) {
+                modal.classList.remove('hidden');
+                modal.style.display = 'flex';
+                modal.style.position = 'fixed';
+                modal.style.zIndex = '9999';
+                modal.style.top = '0';
+                modal.style.left = '0';
+                modal.style.right = '0';
+                modal.style.bottom = '0';
+              } else {
+                alert('デジタル・シティズンシップについて:\n\nデジタル社会における責任ある市民として、技術を適切かつ効果的に使用する能力です。回答ボードを通じて、この重要な概念を実践的に指導しましょう。');
+              }
+            };
+          }
+          
           const modalLinks = document.querySelectorAll('a[onclick*="Modal"]');
           modalLinks.forEach(link => {
             link.addEventListener('click', function(e) {
+              console.log('🖱️ Modal link clicked:', link.onclick);
               // Re-apply modal protection after click
               setTimeout(() => {
                 const modals = document.querySelectorAll('[id*="modal"]');
@@ -857,11 +909,51 @@
                     modal.style.left = '0';
                     modal.style.right = '0';
                     modal.style.bottom = '0';
+                    console.log('✅ Modal protection applied to:', modal.id);
                   }
                 });
               }, 100);
             });
           });
+          
+          // Add modal close functionality
+          setTimeout(() => {
+            // Setup close button handlers for all modals
+            const setupModalCloseHandlers = () => {
+              const modals = document.querySelectorAll('[id*="modal"]');
+              modals.forEach(modal => {
+                // Close on backdrop click
+                modal.addEventListener('click', function(e) {
+                  if (e.target === modal) {
+                    modal.classList.add('hidden');
+                    modal.style.display = 'none';
+                  }
+                });
+                
+                // Close buttons
+                const closeButtons = modal.querySelectorAll('[id*="close"], [id*="cancel"]');
+                closeButtons.forEach(btn => {
+                  btn.addEventListener('click', function() {
+                    modal.classList.add('hidden');
+                    modal.style.display = 'none';
+                  });
+                });
+              });
+              
+              // ESC key to close modals
+              document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                  const openModals = document.querySelectorAll('[id*="modal"]:not(.hidden)');
+                  openModals.forEach(modal => {
+                    modal.classList.add('hidden');
+                    modal.style.display = 'none';
+                  });
+                }
+              });
+            };
+            
+            setupModalCloseHandlers();
+          }, 1500);
         }, 1000);
         
       } catch (error) {
