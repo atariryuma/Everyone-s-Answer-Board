@@ -82,10 +82,12 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
     // Step 3: 新規ユーザー作成（スクリプトロック使用 - ユーザーロック廃止）
     console.log('findOrCreateUserWithEmailLock: 新規ユーザー作成開始', { adminEmail });
     const lock = LockService.getScriptLock();
-    const timeout = 10000; // 25秒→10秒に短縮
+    const timeout = 30000; // 10秒→30秒に延長（高負荷対応）
     
     if (!lock.waitLock(timeout)) {
       console.error('findOrCreateUserWithEmailLock: スクリプトロックタイムアウト', { adminEmail, timeout });
+      // タイムアウト時に関連するメールロックをクリーンアップ
+      cleanupEmailLocks();
       throw new Error('SCRIPT_LOCK_TIMEOUT');
     }
     
