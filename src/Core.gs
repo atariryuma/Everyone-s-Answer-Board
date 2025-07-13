@@ -136,10 +136,13 @@ function ensureUserExists(adminEmail) {
   };
 
   try {
+    // 新しいメール特化ロックシステムを優先使用
     const createFn =
-      typeof findOrCreateUserProduction === 'function'
-        ? findOrCreateUserProduction
-        : findOrCreateUser;
+      typeof findOrCreateUserEnhanced === 'function'
+        ? findOrCreateUserEnhanced
+        : (typeof findOrCreateUserProduction === 'function'
+          ? findOrCreateUserProduction
+          : findOrCreateUser);
     const result = createFn(adminEmail, {
       configJson: JSON.stringify(initialConfig)
     });

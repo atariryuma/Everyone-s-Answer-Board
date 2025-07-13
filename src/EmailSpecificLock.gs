@@ -54,6 +54,7 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
   try {
     // Step 2: 既存ユーザー確認（ロックなし）
     let existingUser = findUserByEmailNonBlocking(adminEmail);
+    console.log('findOrCreateUserWithEmailLock: 既存ユーザー確認結果', { existingUser: !!existingUser, adminEmail });
     
     if (existingUser) {
       console.log('findOrCreateUserWithEmailLock: 既存ユーザー発見', { userId: existingUser.userId, adminEmail });
@@ -79,10 +80,12 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
     }
     
     // Step 3: 新規ユーザー作成（スクリプトロック使用）
+    console.log('findOrCreateUserWithEmailLock: 新規ユーザー作成開始', { adminEmail });
     const lock = LockService.getScriptLock();
     const timeout = 15000;
     
     if (!lock.waitLock(timeout)) {
+      console.error('findOrCreateUserWithEmailLock: スクリプトロックタイムアウト', { adminEmail, timeout });
       throw new Error('SCRIPT_LOCK_TIMEOUT');
     }
     
