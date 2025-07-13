@@ -577,6 +577,56 @@ function updateUser(userId, updateData) {
 }
 
 /**
+ * 🎯 プロダクション環境向け: ユーザー検索・作成（リトライ機能付き）
+ * @param {string} adminEmail - ユーザーメールアドレス
+ * @param {object} additionalData - 追加データ
+ * @param {number} maxRetries - 最大リトライ回数（デフォルト: 3）
+ * @param {number} initialBackoff - 初期待機時間（ミリ秒、デフォルト: 2000）
+ * @returns {object} { userId, isNewUser, userInfo }
+ */
+function findOrCreateUserProduction(adminEmail, additionalData = {}, maxRetries = 3, initialBackoff = 2000) {
+  let attempts = 0;
+  let lastError = null;
+
+  while (attempts < maxRetries) {
+    try {
+      // 既存の findOrCreateUser を呼び出す
+      const result = findOrCreateUser(adminEmail, additionalData);
+      
+      // 成功した場合は結果を返す
+      return result;
+      
+    } catch (error) {
+      lastError = error;
+      
+      // LOCK_TIMEOUT エラー、またはそれに類するメッセージの場合のみリトライ
+      if (error.message && (error.message.includes('LOCK_TIMEOUT') || error.message.includes('Lock wait timeout'))) {
+        attempts++;
+        
+        if (attempts < maxRetries) {
+          const waitTime = initialBackoff * Math.pow(2, attempts - 1) + Math.random() * 1000;
+          console.warn(`findOrCreateUserProduction: LOCK_TIMEOUT, リトライ ${attempts}/${maxRetries} (${waitTime}ms待機)...`, { adminEmail });
+          Utilities.sleep(waitTime);
+        }
+      } else {
+        // LOCK_TIMEOUT以外のエラーは即時スロー
+        throw error;
+      }
+    }
+  }
+
+  // リトライ上限に達した場合
+  console.error(`findOrCreateUserProduction 最終エラー: ${lastError.message}`, {
+    adminEmail: adminEmail,
+    attempts: attempts,
+    lastErrorMessage: lastError.toString()
+  });
+  
+  // 最後のタイムアウトエラーをスロー
+  throw new Error(`ユーザー情報の確保に失敗しました: LOCK_TIMEOUT`);
+}
+
+/**
  * 🎯 原子的なユーザー検索・作成操作（Upsert）
  * 重複を防ぐためのメイン関数
  * @param {string} adminEmail - ユーザーメールアドレス
