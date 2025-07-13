@@ -658,15 +658,20 @@
         body.className = classList.join(' ');
       }
 
-      // Protect modal elements and SVGs from our aggressive styles
-      const modals = document.querySelectorAll('[id*="modal"], .glass-panel');
+      // Protect modal elements and their content from our aggressive styles
+      const modals = document.querySelectorAll('#privacy-modal, #digital-citizenship-modal, #usage-guide-modal, #security-modal');
       modals.forEach(modal => {
         if (modal) {
-          modal.style.all = 'revert';
-          // Recursively protect child elements
-          const children = modal.querySelectorAll('*');
-          children.forEach(child => {
-            child.style.all = 'revert';
+          // Don't revert modal container styles, but protect content
+          const content = modal.querySelectorAll('h3, h4, p, button, a, svg, .glass-panel *');
+          content.forEach(element => {
+            element.style.all = 'revert';
+            // Ensure text is visible
+            if (element.tagName === 'P' || element.tagName === 'H3' || element.tagName === 'H4') {
+              element.style.color = 'white';
+              element.style.lineHeight = '1.6';
+              element.style.marginBottom = '1rem';
+            }
           });
         }
       });
@@ -707,15 +712,9 @@
           'width: 100% !important;' +
         '}' +
         /* Modal protection - ensure modals work correctly */ +
-        '.fixed { position: fixed !important; }' +
-        '.inset-0 { top: 0 !important; right: 0 !important; bottom: 0 !important; left: 0 !important; }' +
-        '.z-50, .z-\\[60\\] { z-index: 9999 !important; }' +
-        '.flex { display: flex !important; }' +
-        '.items-center { align-items: center !important; }' +
-        '.justify-center { justify-content: center !important; }' +
-        '.hidden { display: none !important; }' +
-        '[id*="modal"] { z-index: 9999 !important; }' +
-        '[id*="modal"] .glass-panel { background: rgba(30, 41, 59, 0.95) !important; backdrop-filter: blur(20px) !important; }';
+        '#privacy-modal, #digital-citizenship-modal, #usage-guide-modal, #security-modal { position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; z-index: 9999 !important; display: flex !important; align-items: center !important; justify-content: center !important; background-color: rgba(0, 0, 0, 0.8) !important; }' +
+        '#privacy-modal.hidden, #digital-citizenship-modal.hidden, #usage-guide-modal.hidden, #security-modal.hidden { display: none !important; }' +
+        '#privacy-modal .glass-panel, #digital-citizenship-modal .glass-panel, #usage-guide-modal .glass-panel, #security-modal .glass-panel { background: rgba(30, 41, 59, 0.95) !important; backdrop-filter: blur(20px) !important; -webkit-backdrop-filter: blur(20px) !important; border-radius: 12px !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important; padding: 1.5rem !important; max-width: 90vw !important; max-height: 90vh !important; overflow-y: auto !important; color: white !important; }';
       
       // Remove existing override and add new one
       const existing = document.getElementById('gas-override-styles');
@@ -912,6 +911,17 @@
                 console.log('📋 Opening Privacy Modal');
                 if (typeof window.showPrivacyModal === 'function') {
                   window.showPrivacyModal();
+                  // Force modal styling immediately after opening
+                  setTimeout(() => {
+                    const modal = document.getElementById('privacy-modal');
+                    if (modal && !modal.classList.contains('hidden')) {
+                      modal.style.cssText = `
+                        position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+                        z-index: 9999 !important; display: flex !important; align-items: center !important; justify-content: center !important;
+                        background-color: rgba(0, 0, 0, 0.8) !important; backdrop-filter: blur(4px) !important; padding: 1rem !important;
+                      `;
+                    }
+                  }, 50);
                 } else {
                   const modal = document.getElementById('privacy-modal');
                   if (modal) {
@@ -923,6 +933,17 @@
                 console.log('🌐 Opening Digital Citizenship Modal');
                 if (typeof window.showDigitalCitizenshipModal === 'function') {
                   window.showDigitalCitizenshipModal();
+                  // Force modal styling immediately after opening
+                  setTimeout(() => {
+                    const modal = document.getElementById('digital-citizenship-modal');
+                    if (modal && !modal.classList.contains('hidden')) {
+                      modal.style.cssText = `
+                        position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+                        z-index: 9999 !important; display: flex !important; align-items: center !important; justify-content: center !important;
+                        background-color: rgba(0, 0, 0, 0.8) !important; backdrop-filter: blur(4px) !important; padding: 1rem !important;
+                      `;
+                    }
+                  }, 50);
                 } else {
                   const modal = document.getElementById('digital-citizenship-modal');
                   if (modal) {
@@ -934,17 +955,44 @@
               
               // Re-apply modal protection after opening
               setTimeout(() => {
-                const modals = document.querySelectorAll('[id*="modal"]');
+                const modals = document.querySelectorAll('#privacy-modal, #digital-citizenship-modal, #usage-guide-modal, #security-modal');
                 modals.forEach(modal => {
                   if (modal && !modal.classList.contains('hidden')) {
-                    modal.style.zIndex = '9999';
-                    modal.style.position = 'fixed';
-                    modal.style.top = '0';
-                    modal.style.left = '0';
-                    modal.style.right = '0';
-                    modal.style.bottom = '0';
-                    modal.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-                    console.log('✅ Modal protection applied to:', modal.id);
+                    // Apply modal container styles
+                    modal.style.cssText = `
+                      position: fixed !important;
+                      top: 0 !important;
+                      left: 0 !important;
+                      right: 0 !important;
+                      bottom: 0 !important;
+                      z-index: 9999 !important;
+                      display: flex !important;
+                      align-items: center !important;
+                      justify-content: center !important;
+                      background-color: rgba(0, 0, 0, 0.8) !important;
+                      backdrop-filter: blur(4px) !important;
+                      padding: 1rem !important;
+                    `;
+                    
+                    // Apply glass panel styles to content
+                    const glassPanel = modal.querySelector('.glass-panel');
+                    if (glassPanel) {
+                      glassPanel.style.cssText = `
+                        background: rgba(30, 41, 59, 0.95) !important;
+                        backdrop-filter: blur(20px) !important;
+                        -webkit-backdrop-filter: blur(20px) !important;
+                        border-radius: 12px !important;
+                        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+                        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+                        padding: 1.5rem !important;
+                        max-width: 90vw !important;
+                        max-height: 90vh !important;
+                        overflow-y: auto !important;
+                        color: white !important;
+                      `;
+                    }
+                    
+                    console.log('✅ Modal styles applied to:', modal.id);
                   }
                 });
               }, 100);
