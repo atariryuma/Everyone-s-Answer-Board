@@ -204,6 +204,25 @@ function registerNewUser(adminEmail) {
     cacheManager.remove('email_' + adminEmail);
     cacheManager.invalidateDependents('user_change', 'user_' + userId);
     
+    // Google Sheetsの書き込み→読み取り一貫性を保証するため短い待機
+    Utilities.sleep(1000); // 1秒待機
+    
+    // ユーザー作成確認のため再取得テスト
+    var verificationUser = findUserById(userId);
+    if (!verificationUser) {
+      console.warn('⚠️ 新規ユーザーの即座検証に失敗。キャッシュを再クリア');
+      cacheManager.clearByPattern('user_');
+      Utilities.sleep(500); // 追加で0.5秒待機
+      verificationUser = findUserById(userId);
+      if (!verificationUser) {
+        console.error('❌ 新規ユーザーの検証に失敗。データベース書き込み問題の可能性');
+      } else {
+        console.log('✅ 新規ユーザーの遅延検証に成功');
+      }
+    } else {
+      console.log('✅ 新規ユーザーの即座検証に成功');
+    }
+    
     debugLog('✅ 新規ユーザーのキャッシュクリアを完了しました: ' + userId);
   } catch (e) {
     console.error('データベースへのユーザー登録に失敗: ' + e.message);
@@ -1305,12 +1324,30 @@ function quickStartSetup(requestUserId) {
       cacheManager.remove('user_' + requestUserId);
       var userInfo = findUserById(requestUserId);
       if (!userInfo) {
+        console.warn('quickStartSetup: 最初の検索で見つからず。キャッシュクリア後に再試行');
         // さらに全体的なキャッシュクリアを試行
         cacheManager.clearByPattern('user_');
+        Utilities.sleep(500); // 0.5秒待機
         userInfo = findUserById(requestUserId);
         if (!userInfo) {
-          throw new Error(`認証エラー: ユーザーID ${requestUserId} が見つかりません。新規登録から再試行してください。`);
+          console.warn('quickStartSetup: キャッシュクリア後も見つからず。データベース直接検索を試行');
+          // データベースから直接検索（キャッシュバイパス）
+          try {
+            userInfo = fetchUserFromDatabase('userId', requestUserId);
+          } catch (dbError) {
+            console.error('quickStartSetup: データベース直接検索でもエラー:', dbError.message);
+          }
+          
+          if (!userInfo) {
+            throw new Error(`認証エラー: ユーザーID ${requestUserId} が見つかりません。新規登録から再試行してください。`);
+          } else {
+            console.log('✅ quickStartSetup: データベース直接検索で見つかりました');
+          }
+        } else {
+          console.log('✅ quickStartSetup: キャッシュクリア後の検索で見つかりました');
         }
+      } else {
+        console.log('✅ quickStartSetup: キャッシュクリア後の最初の検索で見つかりました');
       }
       
       // ユーザーが存在する場合、現在のセッションユーザーと一致するかチェック

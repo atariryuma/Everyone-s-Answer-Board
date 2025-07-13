@@ -10,8 +10,14 @@ describe('Core.gs utilities', () => {
       console,
       cacheManager: {
         remove: jest.fn(),
-        invalidateDependents: jest.fn()
-      }
+        invalidateDependents: jest.fn(),
+        clearByPattern: jest.fn()
+      },
+      Utilities: {
+        sleep: jest.fn(),
+        getUuid: () => 'UUID'
+      },
+      fetchUserFromDatabase: jest.fn()
     };
     vm.createContext(context);
     vm.runInContext(code, context);
@@ -44,7 +50,6 @@ describe('Core.gs utilities', () => {
     beforeEach(() => {
       Object.assign(context, {
         Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
-        Utilities: { getUuid: () => 'UUID' },
         findUserByEmail: jest.fn(),
         createUser: jest.fn(),
         updateUser: jest.fn(),
@@ -54,7 +59,8 @@ describe('Core.gs utilities', () => {
           currentDomain: 'example.com', 
           deployDomain: 'example.com', 
           isDomainMatch: true 
-        }))
+        })),
+        findUserById: jest.fn(() => ({ userId: 'UUID', adminEmail: 'admin@example.com' }))
       });
     });
 
