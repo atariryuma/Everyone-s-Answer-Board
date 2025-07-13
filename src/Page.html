@@ -116,6 +116,7 @@ const __SHOW_HIGHLIGHT_TOGGLE__ = '<?= typeof showHighlightToggle !== "undefined
 const __SHOW_SCORE_SORT__ = '<?= typeof showScoreSort !== "undefined" ? showScoreSort : false ?>';
 const __IS_STUDENT_MODE__ = '<?= typeof isStudentMode !== "undefined" ? isStudentMode : true ?>';
 const __IS_ADMIN_USER__ = '<?= typeof isAdminUser !== "undefined" ? isAdminUser : false ?>';
+const __FORM_URL__ = '<?= typeof formUrl !== "undefined" ? formUrl : "" ?>';
 window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : __SHOW_COUNTS__ === 'true';
 window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
 // Store server-provided admin capability but always start in view mode
@@ -125,6 +126,7 @@ window.showHighlightToggle = __SHOW_HIGHLIGHT_TOGGLE__.startsWith('<') ? false :
 window.showScoreSort = __SHOW_SCORE_SORT__.startsWith('<') ? false : __SHOW_SCORE_SORT__ === 'true';
 window.isStudentMode = __IS_STUDENT_MODE__.startsWith('<') ? true : __IS_STUDENT_MODE__ === 'true';
 window.isAdminUser = __IS_ADMIN_USER__.startsWith('<') ? false : __IS_ADMIN_USER__ === 'true';
+const FORM_URL = __FORM_URL__.startsWith('<') ? '' : __FORM_URL__;
 
 // Server configuration processing completed
 const SHEET_NAME = __SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHEET_NAME__;
@@ -3880,20 +3882,25 @@ function displayDomainInfo(info) {
  * フォームリンクを取得して表示する関数
  */
 function loadFormLink() {
-  google.script.run
-    .withSuccessHandler(formInfo => {
-      if (formInfo && formInfo.formUrl) {
-        const formLinkBtn = document.getElementById('form-link-btn');
-        if (formLinkBtn) {
+  const formLinkBtn = document.getElementById('form-link-btn');
+  if (formLinkBtn && FORM_URL) {
+    formLinkBtn.href = FORM_URL;
+    formLinkBtn.classList.remove('hidden');
+  }
+
+  if (window.isAdminUser && typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(formInfo => {
+        if (formInfo && formInfo.formUrl && formLinkBtn) {
           formLinkBtn.href = formInfo.formUrl;
           formLinkBtn.classList.remove('hidden');
         }
-      }
-    })
-    .withFailureHandler(error => {
-      console.warn('フォーム情報の取得に失敗しました:', error);
-    })
-    .getActiveFormInfo(USER_ID);
+      })
+      .withFailureHandler(error => {
+        console.warn('フォーム情報の取得に失敗しました:', error);
+      })
+      .getActiveFormInfo(USER_ID);
+  }
 }
 
 try {
