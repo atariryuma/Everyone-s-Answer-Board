@@ -577,32 +577,156 @@ function updateUser(userId, updateData) {
 }
 
 /**
- * 新規ユーザーをデータベースに作成
+ * 🎯 原子的なユーザー検索・作成操作（Upsert）
+ * 重複を防ぐためのメイン関数
+ * @param {string} adminEmail - ユーザーメールアドレス
+ * @param {object} additionalData - 追加データ（オプション）
+ * @returns {object} { userId, isNewUser, userInfo }
+ */
+function findOrCreateUser(adminEmail, additionalData = {}) {
+  if (!adminEmail || !adminEmail.includes('@')) {
+    throw new Error('有効なメールアドレスが必要です');
+  }
+
+  // 🔒 LockService を使用した原子的操作
+  const lock = LockService.getScriptLock();
+  try {
+    // メールアドレス固有のロック（最大30秒待機）
+    if (!lock.waitLock(30000)) {
+      throw new Error('システムが混雑しています。しばらく後に再試行してください。');
+    }
+
+    debugLog('findOrCreateUser: ロック取得成功', { adminEmail });
+
+    // 1. 既存ユーザー確認
+    let existingUser = findUserByEmail(adminEmail);
+    
+    if (existingUser) {
+      debugLog('findOrCreateUser: 既存ユーザー発見', { userId: existingUser.userId, adminEmail });
+      
+      // 必要に応じて既存ユーザー情報を更新
+      if (Object.keys(additionalData).length > 0) {
+        const updateData = {
+          lastAccessedAt: new Date().toISOString(),
+          isActive: 'true',
+          ...additionalData
+        };
+        updateUser(existingUser.userId, updateData);
+        debugLog('findOrCreateUser: 既存ユーザー更新完了', { userId: existingUser.userId });
+      }
+      
+      return {
+        userId: existingUser.userId,
+        isNewUser: false,
+        userInfo: existingUser
+      };
+    }
+
+    // 2. 新規ユーザー作成
+    debugLog('findOrCreateUser: 新規ユーザー作成開始', { adminEmail });
+    
+    const userId = generateConsistentUserId(adminEmail);
+    const userData = {
+      userId: userId,
+      adminEmail: adminEmail,
+      createdAt: new Date().toISOString(),
+      lastAccessedAt: new Date().toISOString(),
+      isActive: 'true',
+      configJson: '{}',
+      spreadsheetId: '',
+      spreadsheetUrl: '',
+      ...additionalData
+    };
+
+    // 原子的作成（重複チェックなし - ロック内なので安全）
+    createUserAtomic(userData);
+    
+    debugLog('findOrCreateUser: 新規ユーザー作成完了', { userId, adminEmail });
+    
+    return {
+      userId: userId,
+      isNewUser: true,
+      userInfo: userData
+    };
+
+  } catch (error) {
+    console.error('findOrCreateUser エラー:', error);
+    throw error;
+  } finally {
+    // 必ずロックを解除
+    try {
+      lock.releaseLock();
+      debugLog('findOrCreateUser: ロック解除完了', { adminEmail });
+    } catch (e) {
+      console.warn('ロック解除エラー:', e.message);
+    }
+  }
+}
+
+/**
+ * 🔧 一貫したユーザーID生成
+ * メールアドレスから決定論的にUUIDを生成
+ * @param {string} adminEmail - メールアドレス
+ * @returns {string} 一意のユーザーID
+ */
+function generateConsistentUserId(adminEmail) {
+  // メールアドレスからハッシュ値を生成
+  const hash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, adminEmail, Utilities.Charset.UTF_8);
+  const hexString = hash.map(byte => (byte + 256).toString(16).slice(-2)).join('');
+  
+  // UUID v4 フォーマットに整形
+  const uuid = [
+    hexString.slice(0, 8),
+    hexString.slice(8, 12),
+    '4' + hexString.slice(13, 16), // version 4
+    ((parseInt(hexString.slice(16, 17), 16) & 0x3) | 0x8).toString(16) + hexString.slice(17, 20), // variant
+    hexString.slice(20, 32)
+  ].join('-');
+  
+  debugLog('generateConsistentUserId', { adminEmail, userId: uuid });
+  return uuid;
+}
+
+/**
+ * ⚡ 原子的ユーザー作成（重複チェックなし）
+ * findOrCreateUser内でのみ使用 - ロック保護下での高速作成
  * @param {object} userData - 作成するユーザーデータ
  * @returns {object} 作成されたユーザーデータ
  */
-function createUser(userData) {
-  // メールアドレスの重複チェック
-  var existingUser = findUserByEmail(userData.adminEmail);
-  if (existingUser) {
-    throw new Error('このメールアドレスは既に登録されています。');
-  }
+function createUserAtomic(userData) {
+  const props = PropertiesService.getScriptProperties();
+  const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+  const service = getSheetsService();
+  const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
-  var props = PropertiesService.getScriptProperties();
-  var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-  var service = getSheetsService();
-  var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
-
-  var newRow = DB_SHEET_CONFIG.HEADERS.map(function(header) { 
+  const newRow = DB_SHEET_CONFIG.HEADERS.map(function(header) { 
     return userData[header] || ''; 
   });
   
   appendSheetsData(service, dbId, "'" + sheetName + "'!A1", [newRow]);
   
-  // 最適化: 新規ユーザー作成時は対象キャッシュのみ無効化
+  // キャッシュ無効化
   invalidateUserCache(userData.userId, userData.adminEmail, userData.spreadsheetId, false);
   
   return userData;
+}
+
+/**
+ * 🔄 レガシー互換: 新規ユーザーをデータベースに作成
+ * @deprecated findOrCreateUser を使用してください
+ * @param {object} userData - 作成するユーザーデータ
+ * @returns {object} 作成されたユーザーデータ
+ */
+function createUser(userData) {
+  console.warn('createUser は非推奨です。findOrCreateUser を使用してください。');
+  
+  // 既存の動作を維持（後方互換性のため）
+  var existingUser = findUserByEmail(userData.adminEmail);
+  if (existingUser) {
+    throw new Error('このメールアドレスは既に登録されています。');
+  }
+
+  return createUserAtomic(userData);
 }
 
 /**

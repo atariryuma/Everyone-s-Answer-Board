@@ -108,137 +108,91 @@ function getFormUrlSafely(configJson, spreadsheetId) {
 }
 
 /**
- * 新規ユーザーを登録する（データベース登録のみ）
- * フォーム作成はクイックスタートで実行される
+ * 🎯 ユーザーの存在確保（重複防止版）
+ * 新規作成または既存ユーザー更新を安全に実行
+ * @param {string} adminEmail - ユーザーメールアドレス
+ * @returns {object} ユーザー情報とURL
  */
-function registerNewUser(adminEmail) {
-  var activeUser = Session.getActiveUser();
+function ensureUserExists(adminEmail) {
+  const activeUser = Session.getActiveUser();
   if (adminEmail !== activeUser.getEmail()) {
     throw new Error('認証エラー: 操作を実行しているユーザーとメールアドレスが一致しません。');
   }
 
   // ドメイン制限チェック
-  var domainInfo = getDeployUserDomainInfo();
+  const domainInfo = getDeployUserDomainInfo();
   if (domainInfo.deployDomain && domainInfo.deployDomain !== '' && !domainInfo.isDomainMatch) {
     throw new Error(`ドメインアクセスが制限されています。許可されたドメイン: ${domainInfo.deployDomain}, 現在のドメイン: ${domainInfo.currentDomain}`);
   }
 
-  // 既存ユーザーチェック（1ユーザー1行の原則）
-  var existingUser = findUserByEmail(adminEmail);
-  var userId, appUrls;
-  
-  if (existingUser) {
-    // 既存ユーザーの場合は情報を更新
-    userId = existingUser.userId;
-    var existingConfig = JSON.parse(existingUser.configJson || '{}');
-    
-    // 設定をリセット（新規登録状態に戻す）
-    var updatedConfig = {
-      ...existingConfig,
-      setupStatus: 'pending',
-      lastRegistration: new Date().toISOString(),
-      formCreated: false,
-      appPublished: false
-    };
-    
-    // 既存ユーザー情報を更新
-    updateUser(userId, {
-      lastAccessedAt: new Date().toISOString(),
-      isActive: 'true',
-      configJson: JSON.stringify(updatedConfig)
+  debugLog('ensureUserExists: 開始', { adminEmail });
+
+  // 🚀 原子的ユーザー取得・作成
+  const initialConfig = {
+    setupStatus: 'pending',
+    lastRegistration: new Date().toISOString(),
+    formCreated: false,
+    appPublished: false
+  };
+
+  try {
+    const result = findOrCreateUser(adminEmail, {
+      configJson: JSON.stringify(initialConfig)
     });
+
+    const { userId, isNewUser, userInfo } = result;
     
-    // キャッシュを無効化して最新状態を反映
-    invalidateUserCache(userId, adminEmail, existingUser.spreadsheetId, false);
-    
-    // 追加のキャッシュクリア（既存ユーザー更新の即座の反映を保証）
-    cacheManager.remove('user_' + userId);
-    cacheManager.remove('email_' + adminEmail);
-    cacheManager.invalidateDependents('user_change', 'user_' + userId);
-    
-    debugLog('✅ 既存ユーザーのキャッシュクリアを完了しました: ' + userId);
-    
-    debugLog('✅ 既存ユーザー情報を更新しました: ' + adminEmail);
-    appUrls = generateAppUrls(userId);
+    // 既存ユーザーの場合は設定をリセット
+    if (!isNewUser) {
+      const existingConfig = JSON.parse(userInfo.configJson || '{}');
+      const updatedConfig = {
+        ...existingConfig,
+        setupStatus: 'pending',
+        lastRegistration: new Date().toISOString(),
+        formCreated: false,
+        appPublished: false
+      };
+      
+      updateUser(userId, {
+        lastAccessedAt: new Date().toISOString(),
+        isActive: 'true',
+        configJson: JSON.stringify(updatedConfig)
+      });
+      
+      debugLog('ensureUserExists: 既存ユーザー更新完了', { userId, adminEmail });
+    } else {
+      debugLog('ensureUserExists: 新規ユーザー作成完了', { userId, adminEmail });
+    }
+
+    // アプリURLの生成
+    const appUrls = generateAppUrls(userId);
     
     return {
       userId: userId,
       adminUrl: appUrls.adminUrl,
       viewUrl: appUrls.viewUrl,
       setupRequired: true,
-      message: '既存ユーザーの情報を更新しました。クイックスタートで新しいフォームを作成してください。',
-      isExistingUser: true
+      message: isNewUser 
+        ? 'ユーザー登録が完了しました！次にクイックスタートでフォームを作成してください。'
+        : '既存ユーザーの情報を更新しました。クイックスタートで新しいフォームを作成してください。',
+      isExistingUser: !isNewUser
     };
+    
+  } catch (error) {
+    console.error('ensureUserExists エラー:', error);
+    throw new Error(`ユーザー情報の確保に失敗しました: ${error.message}`);
   }
+}
 
-  // 新規ユーザーの場合
-  userId = Utilities.getUuid();
-  
-  var initialConfig = {
-    setupStatus: 'pending',
-    createdAt: new Date().toISOString(),
-    formCreated: false,
-    appPublished: false
-  };
-  
-  var userData = {
-    userId: userId,
-    adminEmail: adminEmail,
-    spreadsheetId: '',
-    spreadsheetUrl: '',
-    createdAt: new Date().toISOString(),
-    configJson: JSON.stringify(initialConfig),
-    lastAccessedAt: new Date().toISOString(),
-    isActive: 'true'
-  };
-
-  try {
-    createUser(userData);
-    debugLog('✅ データベースに新規ユーザーを登録しました: ' + adminEmail);
-    
-    // 生成されたユーザー情報のキャッシュを確実にクリア
-    invalidateUserCache(userId, adminEmail, null, false);
-    
-    // 追加のキャッシュクリア（新規ユーザーの即座の検索を保証）
-    cacheManager.remove('user_' + userId);
-    cacheManager.remove('email_' + adminEmail);
-    cacheManager.invalidateDependents('user_change', 'user_' + userId);
-    
-    // Google Sheetsの書き込み→読み取り一貫性を保証するため短い待機
-    Utilities.sleep(1000); // 1秒待機
-    
-    // ユーザー作成確認のため再取得テスト
-    var verificationUser = findUserById(userId);
-    if (!verificationUser) {
-      console.warn('⚠️ 新規ユーザーの即座検証に失敗。キャッシュを再クリア');
-      cacheManager.clearByPattern('user_');
-      Utilities.sleep(500); // 追加で0.5秒待機
-      verificationUser = findUserById(userId);
-      if (!verificationUser) {
-        console.error('❌ 新規ユーザーの検証に失敗。データベース書き込み問題の可能性');
-      } else {
-        console.log('✅ 新規ユーザーの遅延検証に成功');
-      }
-    } else {
-      console.log('✅ 新規ユーザーの即座検証に成功');
-    }
-    
-    debugLog('✅ 新規ユーザーのキャッシュクリアを完了しました: ' + userId);
-  } catch (e) {
-    console.error('データベースへのユーザー登録に失敗: ' + e.message);
-    throw new Error('ユーザー登録に失敗しました。システム管理者に連絡してください。');
-  }
-
-  // 成功レスポンスを返す
-  appUrls = generateAppUrls(userId);
-  return {
-    userId: userId,
-    adminUrl: appUrls.adminUrl,
-    viewUrl: appUrls.viewUrl,
-    setupRequired: true,
-    message: 'ユーザー登録が完了しました！次にクイックスタートでフォームを作成してください。',
-    isExistingUser: false
-  };
+/**
+ * 🔄 レガシー互換: 新規ユーザーを登録する
+ * @deprecated ensureUserExists を使用してください
+ * @param {string} adminEmail - ユーザーメールアドレス
+ * @returns {object} ユーザー情報とURL
+ */
+function registerNewUser(adminEmail) {
+  console.warn('registerNewUser は非推奨です。ensureUserExists を使用してください。');
+  return ensureUserExists(adminEmail);
 }
 
 /**
@@ -1351,67 +1305,58 @@ function comprehensiveUserSearch(userId) {
 }
 
 /**
- * クイックスタートセットアップ（完全版） (マルチテナント対応版)
- * フォルダ作成、フォーム作成、スプレッドシート作成、ボード公開まで一括実行
- * @param {string} requestUserId - リクエスト元のユーザーID（nullの場合は新規登録も実行）
+ * 🚀 クイックスタートセットアップ（簡素化版）
+ * 重複防止ロジックを統合した高速セットアップ
+ * @param {string} requestUserId - リクエスト元のユーザーID（オプション）
  */
 function quickStartSetup(requestUserId) {
-  var userInfo = null;
-  var activeUserEmail = Session.getActiveUser().getEmail();
+  const activeUserEmail = Session.getActiveUser().getEmail();
+  let userInfo;
   
-  // 新規ユーザー（requestUserIdがundefinedまたはnull）の場合は現在のユーザーでユーザー登録を実行
-  if (!requestUserId) {
-    console.log('quickStartSetup: userIdが未指定。現在のユーザーで新規登録を実行');
-    try {
-      var registrationResult = registerNewUser(activeUserEmail);
-      requestUserId = registrationResult.userId;
-      userInfo = findUserById(requestUserId);
-      if (!userInfo) {
-        throw new Error('ユーザー登録直後の情報取得に失敗しました');
-      }
-      console.log('✅ quickStartSetup: 新規ユーザー登録が完了しました:', requestUserId);
-    } catch (regError) {
-      console.error('quickStartSetup: 新規ユーザー登録エラー:', regError.message);
-      throw new Error(`新規ユーザー登録に失敗しました: ${regError.message}`);
-    }
-  } else {
-    // 既存ユーザーの場合は認証を実行
-    try {
+  debugLog('quickStartSetup: 開始', { requestUserId, activeUserEmail });
+
+  try {
+    // 🎯 ユーザー情報の統一取得・作成
+    if (requestUserId) {
+      // 既存ユーザーIDが指定されている場合
       verifyUserAccess(requestUserId);
       userInfo = findUserById(requestUserId);
-    } catch (error) {
-      // 新規ユーザー作成直後の場合、キャッシュまたはタイミング問題でユーザーが見つからない可能性
-      console.warn('quickStartSetup: verifyUserAccess failed, attempting comprehensive user search:', error.message);
       
-      // マルチレベル検索を実行
-      userInfo = comprehensiveUserSearch(requestUserId);
       if (!userInfo) {
-        throw new Error(`認証エラー: ユーザーID ${requestUserId} が見つかりません。新規登録から再試行してください。`);
+        throw new Error(`ユーザーID ${requestUserId} が見つかりません`);
       }
       
-      // セキュリティチェック
-      if (activeUserEmail !== userInfo.adminEmail) {
-        throw new Error(`権限エラー: ${activeUserEmail} はユーザーID ${requestUserId} のデータにアクセスする権限がありません。`);
+      // メールアドレス一致確認
+      if (userInfo.adminEmail !== activeUserEmail) {
+        throw new Error('ユーザーIDとメールアドレスが一致しません');
       }
       
-      console.log('✅ quickStartSetup: 包括的検索でユーザーを確認しました:', requestUserId);
+      debugLog('quickStartSetup: 既存ユーザー確認完了', { userId: requestUserId });
+    } else {
+      // 新規または既存ユーザーの自動判定
+      const result = findOrCreateUser(activeUserEmail);
+      requestUserId = result.userId;
+      userInfo = result.userInfo;
+      
+      debugLog('quickStartSetup: ユーザー確保完了', { 
+        userId: requestUserId, 
+        isNewUser: result.isNewUser 
+      });
     }
+  } catch (error) {
+    console.error('quickStartSetup: ユーザー確保エラー:', error);
+    throw new Error(`ユーザー情報の確保に失敗しました: ${error.message}`);
   }
+  // 🚀 セットアップ実行
   try {
-    debugLog('🚀 クイックスタートセットアップ開始: ' + requestUserId);
+    debugLog('quickStartSetup: セットアップ開始', { userId: requestUserId });
     
-    // ユーザー情報の取得
-    var userInfo = findUserById(requestUserId);
-    if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません');
-    }
-    
-    var configJson = JSON.parse(userInfo.configJson || '{}');
-    var userEmail = userInfo.adminEmail;
+    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const userEmail = userInfo.adminEmail;
     
     // 既にセットアップ済みかチェック
     if (configJson.formCreated && userInfo.spreadsheetId) {
-      var appUrls = generateAppUrls(requestUserId);
+      const appUrls = generateAppUrls(requestUserId);
       return {
         status: 'already_completed',
         message: 'クイックスタートは既に完了しています。',
