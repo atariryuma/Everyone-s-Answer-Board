@@ -45,10 +45,36 @@
       box-sizing: border-box !important;
     }
     
-    /* Override any framework/external classes with high specificity */
-    .container, .main, .content, .app, .page, div[class*="tailwind"], div[class*="tw-"] {
+    /* Override any framework/external classes with high specificity - but preserve modals */
+    .container:not([id*="modal"]), .main:not([id*="modal"]), .content:not([id*="modal"]), 
+    .app:not([id*="modal"]), .page:not([id*="modal"]), 
+    div[class*="tailwind"]:not([id*="modal"]):not(.glass-panel), 
+    div[class*="tw-"]:not([id*="modal"]):not(.glass-panel) {
       all: unset !important;
       display: block !important;
+    }
+
+    /* Preserve modal and glass-panel styles */
+    .glass-panel, [id*="modal"], [id*="modal"] *, .modal, .modal *, svg, svg * {
+      all: revert !important;
+    }
+
+    /* Specific protection for icons and SVG elements */
+    svg {
+      width: auto !important;
+      height: auto !important;
+      max-width: none !important;
+      max-height: none !important;
+    }
+
+    /* Protection for modal content structure */
+    [id*="modal"] .glass-panel {
+      background: rgba(30, 41, 59, 0.95) !important;
+      backdrop-filter: blur(20px) !important;
+      -webkit-backdrop-filter: blur(20px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
     }
 
     /* Animated background elements */
@@ -623,7 +649,7 @@
       const body = document.body;
       const container = document.getElementById('main-container');
       
-      // GAS-specific: Remove any auto-added classes
+      // GAS-specific: Remove any auto-added classes but preserve modal functionality
       if (body) {
         // Preserve existing classes but override problematic ones
         const classList = body.className.split(' ').filter(cls => 
@@ -631,6 +657,31 @@
         );
         body.className = classList.join(' ');
       }
+
+      // Protect modal elements and SVGs from our aggressive styles
+      const modals = document.querySelectorAll('[id*="modal"], .glass-panel');
+      modals.forEach(modal => {
+        if (modal) {
+          modal.style.all = 'revert';
+          // Recursively protect child elements
+          const children = modal.querySelectorAll('*');
+          children.forEach(child => {
+            child.style.all = 'revert';
+          });
+        }
+      });
+
+      // Specifically protect all SVG elements
+      const svgs = document.querySelectorAll('svg');
+      svgs.forEach(svg => {
+        svg.style.all = 'revert';
+        svg.style.width = 'auto';
+        svg.style.height = 'auto';
+        const svgChildren = svg.querySelectorAll('*');
+        svgChildren.forEach(child => {
+          child.style.all = 'revert';
+        });
+      });
       
       // GAS IFRAME: Force critical styles with maximum specificity
       const criticalStyle = document.createElement('style');
@@ -743,6 +794,13 @@
             applyEmergencyStyles();
             forceCorrectStyles();
           }
+          // Always protect modals on each interval
+          const modals = document.querySelectorAll('[id*="modal"], .glass-panel');
+          modals.forEach(modal => {
+            if (modal) {
+              modal.style.all = 'revert';
+            }
+          });
         }, delay);
       });
     })();
