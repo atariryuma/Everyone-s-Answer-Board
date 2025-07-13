@@ -26,7 +26,7 @@ const DELETE_LOG_SHEET_CONFIG = {
 function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, deleteType) {
   try {
     const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
     
     if (!dbId) {
       console.warn('削除ログの記録をスキップします: データベースIDが設定されていません');
@@ -94,7 +94,7 @@ function getAllUsersForAdmin() {
     }
     
     const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
     
     if (!dbId) {
       throw new Error('データベースIDが設定されていません');
@@ -176,7 +176,7 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
     try {
       // データベースからユーザー行を削除
       const props = PropertiesService.getScriptProperties();
-      const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+      const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
       
       if (!dbId) {
         throw new Error('データベースIDが設定されていません');
@@ -293,7 +293,7 @@ function getDeletionLogs() {
     }
     
     const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
     
     if (!dbId) {
       throw new Error('データベースIDが設定されていません');
@@ -393,7 +393,11 @@ function findUserByEmailNonBlocking(email) {
   try {
     if (!email) return null;
     
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('ユーザー');
+    const props = PropertiesService.getScriptProperties();
+    const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
+    if (!dbId) return null;
+    
+    const sheet = SpreadsheetApp.openById(dbId).getSheetByName('ユーザー');
     if (!sheet) return null;
     
     // ロックなしで軽量検索（読み取り専用）
@@ -429,7 +433,11 @@ function findUserByEmailNonBlocking(email) {
   try {
     if (!email) return null;
     
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('ユーザー');
+    const props = PropertiesService.getScriptProperties();
+    const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
+    if (!dbId) return null;
+    
+    const sheet = SpreadsheetApp.openById(dbId).getSheetByName('ユーザー');
     if (!sheet) return null;
     
     // ロックなしで軽量検索（読み取り専用）

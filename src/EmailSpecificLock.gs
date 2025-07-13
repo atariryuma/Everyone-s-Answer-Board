@@ -108,7 +108,11 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
         ...additionalData
       };
       
-      const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('ユーザー');
+      const props = PropertiesService.getScriptProperties();
+      const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
+      if (!dbId) throw new Error('Database not configured');
+      
+      const sheet = SpreadsheetApp.openById(dbId).getSheetByName('ユーザー');
       const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       const newRow = headers.map(header => userData[header] || '');
       sheet.appendRow(newRow);
