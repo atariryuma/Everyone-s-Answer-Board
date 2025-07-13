@@ -136,7 +136,7 @@ function ensureUserExists(adminEmail) {
   };
 
   try {
-    const result = findOrCreateUser(adminEmail, {
+    const result = findOrCreateUserProduction(adminEmail, {
       configJson: JSON.stringify(initialConfig)
     });
 
@@ -1334,7 +1334,7 @@ function quickStartSetup(requestUserId) {
       debugLog('quickStartSetup: 既存ユーザー確認完了', { userId: requestUserId });
     } else {
       // 新規または既存ユーザーの自動判定
-      const result = findOrCreateUser(activeUserEmail);
+      const result = findOrCreateUserProduction(activeUserEmail);
       requestUserId = result.userId;
       userInfo = result.userInfo;
       
@@ -1345,7 +1345,10 @@ function quickStartSetup(requestUserId) {
     }
   } catch (error) {
     console.error('quickStartSetup: ユーザー確保エラー:', error);
-    throw new Error(`ユーザー情報の確保に失敗しました: ${error.message}`);
+    const message = error.message.startsWith('ユーザー情報の確保に失敗しました')
+      ? error.message
+      : `ユーザー情報の確保に失敗しました: ${error.message}`;
+    throw new Error(message);
   }
   // 🚀 セットアップ実行
   try {
