@@ -147,8 +147,16 @@ function registerNewUser(adminEmail) {
       isActive: 'true',
       configJson: JSON.stringify(updatedConfig)
     });
+    
     // キャッシュを無効化して最新状態を反映
     invalidateUserCache(userId, adminEmail, existingUser.spreadsheetId, false);
+    
+    // 追加のキャッシュクリア（既存ユーザー更新の即座の反映を保証）
+    cacheManager.remove('user_' + userId);
+    cacheManager.remove('email_' + adminEmail);
+    cacheManager.invalidateDependents('user_change', 'user_' + userId);
+    
+    debugLog('✅ 既存ユーザーのキャッシュクリアを完了しました: ' + userId);
     
     debugLog('✅ 既存ユーザー情報を更新しました: ' + adminEmail);
     appUrls = generateAppUrls(userId);
@@ -187,8 +195,16 @@ function registerNewUser(adminEmail) {
   try {
     createUser(userData);
     debugLog('✅ データベースに新規ユーザーを登録しました: ' + adminEmail);
-    // 生成されたユーザー情報のキャッシュをクリア
+    
+    // 生成されたユーザー情報のキャッシュを確実にクリア
     invalidateUserCache(userId, adminEmail, null, false);
+    
+    // 追加のキャッシュクリア（新規ユーザーの即座の検索を保証）
+    cacheManager.remove('user_' + userId);
+    cacheManager.remove('email_' + adminEmail);
+    cacheManager.invalidateDependents('user_change', 'user_' + userId);
+    
+    debugLog('✅ 新規ユーザーのキャッシュクリアを完了しました: ' + userId);
   } catch (e) {
     console.error('データベースへのユーザー登録に失敗: ' + e.message);
     throw new Error('ユーザー登録に失敗しました。システム管理者に連絡してください。');
@@ -1279,7 +1295,32 @@ function toggleHighlight(requestUserId, rowIndex, sheetName) {
 function quickStartSetup(requestUserId) {
   // 新規ユーザー（requestUserIdがundefinedまたはnull）の場合はverifyUserAccessをスキップ
   if (requestUserId) {
-    verifyUserAccess(requestUserId);
+    try {
+      verifyUserAccess(requestUserId);
+    } catch (error) {
+      // 新規ユーザー作成直後の場合、キャッシュまたはタイミング問題でユーザーが見つからない可能性
+      console.warn('quickStartSetup: verifyUserAccess failed, checking if user exists:', error.message);
+      
+      // キャッシュをクリアして、ユーザーが実際に存在するかを直接確認
+      cacheManager.remove('user_' + requestUserId);
+      var userInfo = findUserById(requestUserId);
+      if (!userInfo) {
+        // さらに全体的なキャッシュクリアを試行
+        cacheManager.clearByPattern('user_');
+        userInfo = findUserById(requestUserId);
+        if (!userInfo) {
+          throw new Error(`認証エラー: ユーザーID ${requestUserId} が見つかりません。新規登録から再試行してください。`);
+        }
+      }
+      
+      // ユーザーが存在する場合、現在のセッションユーザーと一致するかチェック
+      var activeUserEmail = Session.getActiveUser().getEmail();
+      if (activeUserEmail !== userInfo.adminEmail) {
+        throw new Error(`権限エラー: ${activeUserEmail} はユーザーID ${requestUserId} のデータにアクセスする権限がありません。`);
+      }
+      
+      console.log('✅ quickStartSetup: 新規ユーザーの認証を確認しました:', requestUserId);
+    }
   }
   try {
     debugLog('🚀 クイックスタートセットアップ開始: ' + requestUserId);

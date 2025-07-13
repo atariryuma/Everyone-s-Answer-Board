@@ -5,7 +5,14 @@ describe('Core.gs utilities', () => {
   const code = fs.readFileSync('src/Core.gs', 'utf8');
   let context;
   beforeEach(() => {
-    context = { debugLog: () => {}, console };
+    context = { 
+      debugLog: () => {}, 
+      console,
+      cacheManager: {
+        remove: jest.fn(),
+        invalidateDependents: jest.fn()
+      }
+    };
     vm.createContext(context);
     vm.runInContext(code, context);
   });
