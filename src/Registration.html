@@ -14,14 +14,15 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      overflow-x: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif !important;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+      min-height: 100vh !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 20px !important;
+      overflow-x: hidden !important;
+      margin: 0 !important;
     }
 
     /* Animated background elements */
@@ -39,17 +40,19 @@
 
     /* Glassmorphism container */
     .glass-container {
-      background: rgba(255, 255, 255, 0.08);
-      backdrop-filter: blur(20px);
-      border-radius: 24px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.08) !important;
+      -webkit-backdrop-filter: blur(20px) !important;
+      backdrop-filter: blur(20px) !important;
+      border-radius: 24px !important;
+      border: 1px solid rgba(255, 255, 255, 0.2) !important;
       box-shadow: 
         0 8px 32px rgba(0, 0, 0, 0.1),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2);
-      width: 100%;
-      max-width: 420px;
-      padding: 40px 32px;
-      position: relative;
+        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+      width: 100% !important;
+      max-width: 420px !important;
+      padding: 40px 32px !important;
+      position: relative !important;
+      z-index: 10 !important;
     }
 
     /* Header */
@@ -251,6 +254,7 @@
     /* Success state */
     .success-container {
       background: rgba(255, 255, 255, 0.08);
+      -webkit-backdrop-filter: blur(20px);
       backdrop-filter: blur(20px);
       border-radius: 20px;
       border: 1px solid rgba(255, 255, 255, 0.2);
@@ -337,7 +341,8 @@
       }
     }
   </style>
-  <?!= include('UnifiedStyles'); ?>
+  <!-- UnifiedStyles disabled to prevent conflicts with glassmorphism design -->
+  <!-- <?!= include('UnifiedStyles'); ?> -->
   <?!= include('SharedUtilities'); ?>
   <?!= include('SharedModals'); ?>
 </head>
@@ -487,9 +492,11 @@
       google.script.run
         .withSuccessHandler(result => {
           registrationRetryCount = 0;
+          console.log('Registration success:', result);
           showSuccessResult(result);
         })
         .withFailureHandler(error => {
+          console.error('Registration error:', error);
           handleRegistrationError(error);
         })
         .quickStartSetup();
@@ -497,7 +504,13 @@
 
     // Handle registration error
     function handleRegistrationError(error) {
-      if (error && error.message && error.message.includes('LOCK_TIMEOUT')) {
+      const errorMessage = error?.message || '';
+      
+      // EmailLock system error types
+      if (errorMessage.includes('LOCK_TIMEOUT') || 
+          errorMessage.includes('SCRIPT_LOCK_TIMEOUT') || 
+          errorMessage.includes('EMAIL_ALREADY_PROCESSING')) {
+        
         if (registrationRetryCount < MAX_REGISTRATION_RETRIES) {
           registrationRetryCount++;
           const waitTime = Math.min(registrationRetryCount * 2, 8);
@@ -512,7 +525,8 @@
           resetRegisterButton();
         }
       } else {
-        showMessage(`エラー: ${error.message || '登録に失敗しました'}`, 'error');
+        isRegistrationInProgress = false;
+        showMessage(`エラー: ${errorMessage || '登録に失敗しました'}`, 'error');
         resetRegisterButton();
       }
     }
@@ -559,8 +573,43 @@
       }
     });
 
+    // Ensure styles are applied (fallback for Google Apps Script environment)
+    function ensureStylesApplied() {
+      const body = document.body;
+      const container = document.getElementById('main-container');
+      
+      // Force critical styles if needed
+      if (!body.style.background) {
+        body.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+        body.style.minHeight = '100vh';
+        body.style.display = 'flex';
+        body.style.alignItems = 'center';
+        body.style.justifyContent = 'center';
+        body.style.padding = '20px';
+        body.style.margin = '0';
+      }
+      
+      // Force glassmorphism container styles if needed
+      if (container && !container.style.background) {
+        container.style.background = 'rgba(255, 255, 255, 0.08)';
+        container.style.backdropFilter = 'blur(20px)';
+        container.style.webkitBackdropFilter = 'blur(20px)';
+        container.style.borderRadius = '24px';
+        container.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+        container.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)';
+        container.style.maxWidth = '420px';
+        container.style.width = '100%';
+        container.style.padding = '40px 32px';
+        container.style.position = 'relative';
+        container.style.zIndex = '10';
+      }
+    }
+
     // Initialize
     document.addEventListener('DOMContentLoaded', async () => {
+      // Ensure styles are applied first
+      ensureStylesApplied();
+      
       try {
         await getUserEmail();
         await checkExistingBoard();
