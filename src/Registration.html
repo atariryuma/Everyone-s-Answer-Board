@@ -299,7 +299,7 @@
     let currentStep = 1;
     let domainInfo = null;
     let registrationRetryCount = 0;
-    const MAX_REGISTRATION_RETRIES = 2;
+    const MAX_REGISTRATION_RETRIES = 3; // 増加: 2回→3回
 
     function escapeHtml(str) {
       if (!str) return '';
@@ -596,6 +596,11 @@
     function executeRegistration() {
       const btn = document.getElementById('register-btn');
 
+      // 既に処理中の場合は重複実行を防止
+      if (btn.disabled) {
+        return;
+      }
+
       if (!userEmail || !validateInput(userEmail, 'email')) {
         showMessage('有効なメールアドレスが必要です。', 'error');
         return;
@@ -705,8 +710,8 @@
           if (error && error.message && error.message.includes('LOCK_TIMEOUT')) {
             if (registrationRetryCount < MAX_REGISTRATION_RETRIES) {
               registrationRetryCount++;
-              const waitTime = registrationRetryCount * 5;
-              showMessage(`システムが混み合っています。${waitTime}秒後に自動で再試行します...`, 'warning');
+              const waitTime = Math.min(registrationRetryCount * 3, 10); // 最大10秒
+              showMessage(`システムが混み合っています。${waitTime}秒後に自動で再試行します... (${registrationRetryCount}/${MAX_REGISTRATION_RETRIES})`, 'warning');
               setTimeout(() => {
                 executeRegistration();
               }, waitTime * 1000);
