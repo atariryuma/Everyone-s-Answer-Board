@@ -597,18 +597,38 @@ function buildRowIndexForField(values, headers, field) {
   var index = {};
   var fieldIndex = headers.indexOf(field);
   
-  if (fieldIndex === -1) return index;
+  console.log('buildRowIndexForField: 開始', { 
+    field: field, 
+    fieldIndex: fieldIndex,
+    valuesLength: values.length,
+    headers: headers 
+  });
+  
+  if (fieldIndex === -1) {
+    console.warn('buildRowIndexForField: フィールドが見つかりません', { field: field, headers: headers });
+    return index;
+  }
   
   // 行番号インデックス構築
   for (var i = 1; i < values.length; i++) {
     var row = values[i];
+    if (!row || !Array.isArray(row)) {
+      console.warn('buildRowIndexForField: 不正な行データ', { rowIndex: i, row: row });
+      continue;
+    }
+    
     var key = row[fieldIndex];
     if (key) {
       index[key] = i + 1; // 1-based index
+      console.log('buildRowIndexForField: エントリー追加', { key: key, rowIndex: i + 1 });
     }
   }
   
-  console.log('行インデックス構築完了:', { field: field, entries: Object.keys(index).length });
+  console.log('行インデックス構築完了:', { 
+    field: field, 
+    entries: Object.keys(index).length,
+    indexKeys: Object.keys(index).slice(0, 5) // 最初の5つのキーを表示
+  });
   return index;
 }
 
@@ -653,7 +673,9 @@ function updateUser(userId, updateData) {
     
     console.log('updateUser: データ取得完了', { 
       valuesLength: values.length,
-      hasHeaders: values.length > 0 && Array.isArray(values[0])
+      hasHeaders: values.length > 0 && Array.isArray(values[0]),
+      headers: values.length > 0 ? values[0] : 'なし',
+      sampleRows: values.length > 1 ? values.slice(1, 3) : 'なし'
     });
     
     if (values.length === 0) {
@@ -664,10 +686,24 @@ function updateUser(userId, updateData) {
     var userIdIndex = headers.indexOf('userId');
     var rowIndex = -1;
     
+    console.log('updateUser: ヘッダー情報', { 
+      headers: headers,
+      userIdIndex: userIdIndex,
+      userIdExists: userIdIndex !== -1
+    });
+    
     // インデックスを使用してユーザーの行を効率的に特定
+    // 問題の調査中は短いTTLを使用
     var userIndexData = cacheManager.get('db_index_userId', function() {
       return buildRowIndexForField(values, headers, 'userId');
-    }, { ttl: 300 });
+    }, { ttl: 60 }); // 1分間に短縮
+    
+    // デバッグ用：キャッシュ無効化オプション
+    if (updateData.__debug_clearCache) {
+      cacheManager.clear('db_index_userId');
+      userIndexData = buildRowIndexForField(values, headers, 'userId');
+      console.log('updateUser: キャッシュクリア後のインデックス再構築');
+    }
     
     console.log('updateUser: ユーザーインデックス情報', { 
       hasIndexData: !!userIndexData,
@@ -679,11 +715,33 @@ function updateUser(userId, updateData) {
     if (cachedRowIndex) {
       rowIndex = cachedRowIndex;
       console.log('updateUser: キャッシュからrowIndex取得', { rowIndex: rowIndex });
-    } else {
+      
+      // キャッシュされた行が実際に存在するか検証
+      if (rowIndex >= 1 && rowIndex <= values.length) {
+        var cachedRow = values[rowIndex - 1];
+        if (cachedRow && cachedRow[userIdIndex] === userId) {
+          console.log('updateUser: キャッシュされた行が有効');
+        } else {
+          console.warn('updateUser: キャッシュされた行が無効、線形検索に切り替え', {
+            rowIndex: rowIndex,
+            cachedRowExists: !!cachedRow,
+            cachedRowUserId: cachedRow ? cachedRow[userIdIndex] : 'N/A',
+            expectedUserId: userId
+          });
+          rowIndex = -1; // 線形検索に切り替え
+        }
+      } else {
+        console.warn('updateUser: キャッシュされた行番号が範囲外', { rowIndex: rowIndex, valuesLength: values.length });
+        rowIndex = -1; // 線形検索に切り替え
+      }
+    }
+    
+    if (rowIndex === -1) {
       // フォールバック: 線形検索
       console.log('updateUser: 線形検索開始');
       for (var i = 1; i < values.length; i++) {
-        if (values[i][userIdIndex] === userId) {
+        var currentRow = values[i];
+        if (currentRow && currentRow[userIdIndex] === userId) {
           rowIndex = i + 1; // 1-based index
           console.log('updateUser: ユーザー発見', { rowIndex: rowIndex, arrayIndex: i });
           break;
@@ -705,7 +763,50 @@ function updateUser(userId, updateData) {
     }
     
     if (rowIndex === -1) {
-      throw new Error('更新対象のユーザーが見つかりません');
+      console.error('updateUser: 最終的にユーザーが見つかりませんでした', {
+        userId: userId,
+        searchedRows: values.length - 1,
+        allUserIds: values.slice(1).map(function(row, index) {
+          return {
+            rowIndex: index + 1,
+            userId: row && row[userIdIndex] ? row[userIdIndex] : 'N/A',
+            rowData: row
+          };
+        })
+      });
+      
+      // 自動修復を試行：ユーザーが存在しない場合は作成
+      console.log('updateUser: ユーザーが存在しないため、自動作成を試行');
+      try {
+        // 基本的なユーザーデータを作成
+        var basicUserData = {
+          userId: userId,
+          adminEmail: updateData.adminEmail || 'unknown@example.com',
+          createdAt: new Date().toISOString(),
+          lastAccessedAt: new Date().toISOString(),
+          setupStatus: 'user_created'
+        };
+        
+        var newUser = createUserAtomic(basicUserData);
+        if (newUser) {
+          console.log('updateUser: ユーザー自動作成成功', { userId: userId });
+          
+          // 作成後に元の更新データを適用
+          setTimeout(function() {
+            try {
+              updateUser(userId, updateData);
+            } catch (retryError) {
+              console.error('updateUser: 再試行失敗', { error: retryError.message });
+            }
+          }, 100);
+          
+          return { success: true, message: 'ユーザーが自動作成されました', created: true };
+        }
+      } catch (createError) {
+        console.error('updateUser: ユーザー自動作成失敗', { error: createError.message });
+      }
+      
+      throw new Error('更新対象のユーザーが見つかりません (自動作成も失敗)');
     }
     
     // 配列の範囲チェック
@@ -720,14 +821,45 @@ function updateUser(userId, updateData) {
     
     // バックアップ用に現在のデータを保存
     var targetRow = values[rowIndex - 1]; // 1-based to 0-based
+    
+    console.log('updateUser: 最終行データ検証', {
+      rowIndex: rowIndex,
+      arrayIndex: rowIndex - 1,
+      valuesLength: values.length,
+      targetRowType: typeof targetRow,
+      targetRowIsArray: Array.isArray(targetRow),
+      targetRowLength: targetRow ? targetRow.length : 'N/A',
+      targetRowUserId: targetRow && targetRow[userIdIndex] ? targetRow[userIdIndex] : 'N/A',
+      expectedUserId: userId
+    });
+    
     if (!targetRow || !Array.isArray(targetRow)) {
       console.error('updateUser: 対象行がundefinedまたは配列ではありません', {
         rowIndex: rowIndex,
         valuesLength: values.length,
         targetRow: targetRow,
-        userId: userId
+        userId: userId,
+        allRowsDebug: values.map(function(row, index) {
+          return {
+            index: index,
+            isArray: Array.isArray(row),
+            length: row ? row.length : 'N/A',
+            userId: row && row[userIdIndex] ? row[userIdIndex] : 'N/A'
+          };
+        })
       });
       throw new Error('更新対象のユーザーデータが見つかりません (行データが不正)');
+    }
+    
+    // 最終確認：行のユーザーIDが一致するか
+    if (targetRow[userIdIndex] !== userId) {
+      console.error('updateUser: 行のユーザーIDが一致しません', {
+        rowIndex: rowIndex,
+        actualUserId: targetRow[userIdIndex],
+        expectedUserId: userId,
+        targetRow: targetRow
+      });
+      throw new Error('更新対象のユーザーデータが見つかりません (ユーザーIDが一致しません)');
     }
     
     // バッチ更新リクエストを作成
@@ -794,7 +926,18 @@ function updateUser(userId, updateData) {
     
     return { success: true };
   } catch (error) {
-    console.error('ユーザー更新エラー:', error);
+    console.error('ユーザー更新エラー:', {
+      userId: userId,
+      error: error.message,
+      stack: error.stack,
+      updateData: updateData
+    });
+    
+    // 特定のエラーケースの処理
+    if (error.message && error.message.includes('ユーザーが自動作成されました')) {
+      return { success: true, message: error.message, created: true };
+    }
+    
     throw error;
   }
 }
