@@ -640,6 +640,8 @@ function getUserWithFallback(userId) {
  */
 function updateUser(userId, updateData) {
   try {
+    console.log('updateUser: 開始', { userId: userId, updateData: updateData });
+    
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
     var service = getSheetsService();
@@ -648,6 +650,11 @@ function updateUser(userId, updateData) {
     // 現在のデータを取得
     var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:I"]);
     var values = data.valueRanges[0].values || [];
+    
+    console.log('updateUser: データ取得完了', { 
+      valuesLength: values.length,
+      hasHeaders: values.length > 0 && Array.isArray(values[0])
+    });
     
     if (values.length === 0) {
       throw new Error('データベースが空です');
@@ -662,14 +669,23 @@ function updateUser(userId, updateData) {
       return buildRowIndexForField(values, headers, 'userId');
     }, { ttl: 300 });
     
+    console.log('updateUser: ユーザーインデックス情報', { 
+      hasIndexData: !!userIndexData,
+      userId: userId,
+      cachedRowIndex: userIndexData ? userIndexData[userId] : 'なし'
+    });
+    
     var cachedRowIndex = userIndexData[userId];
     if (cachedRowIndex) {
       rowIndex = cachedRowIndex;
+      console.log('updateUser: キャッシュからrowIndex取得', { rowIndex: rowIndex });
     } else {
       // フォールバック: 線形検索
+      console.log('updateUser: 線形検索開始');
       for (var i = 1; i < values.length; i++) {
         if (values[i][userIdIndex] === userId) {
           rowIndex = i + 1; // 1-based index
+          console.log('updateUser: ユーザー発見', { rowIndex: rowIndex, arrayIndex: i });
           break;
         }
       }
@@ -692,8 +708,27 @@ function updateUser(userId, updateData) {
       throw new Error('更新対象のユーザーが見つかりません');
     }
     
+    // 配列の範囲チェック
+    if (rowIndex < 1 || rowIndex > values.length) {
+      console.error('updateUser: rowIndexが範囲外です', {
+        rowIndex: rowIndex,
+        valuesLength: values.length,
+        userId: userId
+      });
+      throw new Error('更新対象のユーザーデータが見つかりません (行インデックスが範囲外)');
+    }
+    
     // バックアップ用に現在のデータを保存
-    var originalValues = values[rowIndex - 1].slice(); // 1-based to 0-based
+    var targetRow = values[rowIndex - 1]; // 1-based to 0-based
+    if (!targetRow || !Array.isArray(targetRow)) {
+      console.error('updateUser: 対象行がundefinedまたは配列ではありません', {
+        rowIndex: rowIndex,
+        valuesLength: values.length,
+        targetRow: targetRow,
+        userId: userId
+      });
+      throw new Error('更新対象のユーザーデータが見つかりません (行データが不正)');
+    }
     
     // バッチ更新リクエストを作成
     var requests = Object.keys(updateData).map(function(key) {

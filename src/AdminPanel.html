@@ -3806,6 +3806,21 @@ function syncCheckboxStates(status) {
 
         } catch (error) {
             hideProgressBar();
+            
+            // ユーザーデータ更新失敗の場合は特別な処理
+            if (error.message && error.message.includes('ユーザーデータの更新に失敗しました')) {
+                console.warn('⚠️ フォーム作成は成功しましたが、ユーザーデータの更新に失敗しました:', error.message);
+                showMessage('⚠️ フォーム作成は完了しましたが、一部のユーザーデータ更新に失敗しました。フォームは正常に動作します。', 'warning');
+                
+                // UIを更新して続行
+                try {
+                    await loadStatus();
+                } catch (statusError) {
+                    console.error('ステータス更新に失敗:', statusError);
+                }
+                return;
+            }
+            
             handleError(error, 'createFormWithConfig', 'フォーム作成処理でエラーが発生しました。');
         }
     }

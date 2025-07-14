@@ -196,124 +196,101 @@ const MODAL_CONTENT_TEMPLATES = {
     },
     
     [MODAL_CONFIG.AGE_GROUPS.HIGH_SCHOOL]: {
-      title: "🔒 プライバシーポリシー・個人情報保護方針",
+      title: "🔒 データ保護と技術的セキュリティについて",
       content: `
         <div class="space-y-4">
-          <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border">
-            <h4 class="font-bold text-gray-800 dark:text-gray-200 mb-3">法的根拠と準拠法令</h4>
-            <div class="text-sm text-gray-700 dark:text-gray-300 space-y-2">
-              <p>本システムは以下の法令・ガイドラインに準拠して運用されています：</p>
-              <ul class="ml-4 space-y-1">
-                <li>• 個人情報の保護に関する法律（個人情報保護法）</li>
-                <li>• 学校教育法及び関連政令・省令</li>
-                <li>• 文部科学省「教育情報セキュリティポリシーに関するガイドライン」</li>
-                <li>• 各都道府県教育委員会の個人情報保護条例</li>
-              </ul>
-            </div>
-          </div>
-          
           <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-            <h4 class="font-bold text-blue-700 dark:text-blue-300 mb-3">個人情報の取り扱い詳細</h4>
-            <div class="text-sm space-y-3">
-              <div>
-                <p class="font-semibold text-gray-800 dark:text-gray-200">収集する個人情報</p>
-                <ul class="ml-4 mt-1 space-y-1 text-gray-700 dark:text-gray-300">
-                  <li>• 基本情報：氏名、学年、クラス、生徒番号</li>
-                  <li>• 学習データ：回答内容、意見、コメント、リアクション</li>
-                  <li>• 利用ログ：アクセス日時、利用時間、操作履歴</li>
-                  <li>• 技術情報：IPアドレス、ブラウザ情報（セキュリティ目的）</li>
-                </ul>
-              </div>
-              
-              <div>
-                <p class="font-semibold text-gray-800 dark:text-gray-200">利用目的の詳細</p>
-                <ul class="ml-4 mt-1 space-y-1 text-gray-700 dark:text-gray-300">
-                  <li>• 授業・学習活動の実施と効果的な運営</li>
-                  <li>• 学習成果の測定と個別指導への活用</li>
-                  <li>• 教育方法・教材の改善のための分析</li>
-                  <li>• システムの安全性確保と不正利用防止</li>
-                  <li>• 法令に基づく報告・開示（必要な場合のみ）</li>
-                </ul>
-              </div>
-              
-              <div>
-                <p class="font-semibold text-gray-800 dark:text-gray-200">保存期間と削除</p>
-                <ul class="ml-4 mt-1 space-y-1 text-gray-700 dark:text-gray-300">
-                  <li>• 学習データ：原則として当該学年の終了まで</li>
-                  <li>• 成績処理等で必要な場合は最長3年間</li>
-                  <li>• システムログ：1年間（セキュリティ監査目的）</li>
-                  <li>• 保存期間経過後は完全削除または匿名化処理を実施</li>
-                  <li>• 卒業・転校時は本人の求めに応じて速やかに削除</li>
-                </ul>
-              </div>
-              
-              <div>
-                <p class="font-semibold text-gray-800 dark:text-gray-200">国際データ移転について</p>
-                <ul class="ml-4 mt-1 space-y-1 text-gray-700 dark:text-gray-300">
-                  <li>• Google Workspace for Educationを利用するため、データが米国等に移転される場合があります</li>
-                  <li>• Googleは十分性認定を受けた適切な保護措置を講じています</li>
-                  <li>• データ移転に関する詳細は<a href="#" class="text-blue-600 underline">Google のプライバシーポリシー</a>をご確認ください</li>
-                </ul>
-              </div>
+            <h4 class="font-bold text-blue-700 dark:text-blue-300 mb-3 flex items-center">
+              <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.652-1.652a4.012 4.012 0 000 5.304m-4.306-5.304a4.012 4.012 0 000 5.304M6.343 6.343a8.018 8.018 0 000 11.314m11.314-11.314a8.018 8.018 0 000 11.314"></path>
+              </svg>
+              技術的保護仕組みの理解
+            </h4>
+            <div class="text-sm text-gray-700 dark:text-gray-300 space-y-2">
+              <p>このシステムがどのように皆さんのデータを技術的に保護しているかを理解しましょう：</p>
+              <ul class="ml-4 space-y-1">
+                <li>• <strong>暗号化通信（HTTPS/TLS）</strong>：すべてのデータ送受信は暗号化されています</li>
+                <li>• <strong>アクセス制御</strong>：認証されたユーザーのみがデータにアクセス可能</li>
+                <li>• <strong>データ分離</strong>：各クラス・学校のデータは完全に分離されています</li>
+                <li>• <strong>自動バックアップ</strong>：データ消失を防ぐ定期的なバックアップ</li>
+              </ul>
             </div>
           </div>
           
           <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
-            <h4 class="font-bold text-green-700 dark:text-green-300 mb-3">個人情報保護措置</h4>
-            <div class="text-sm text-gray-700 dark:text-gray-300 space-y-2">
-              <ul class="space-y-1">
-                <li>• <strong>技術的保護措置</strong>：SSL/TLS暗号化、ファイアウォール、侵入検知システム</li>
-                <li>• <strong>管理的保護措置</strong>：アクセス権限管理、定期的な研修、監査</li>
-                <li>• <strong>物理的保護措置</strong>：データセンターの入退室管理、災害対策</li>
-                <li>• <strong>委託先管理</strong>：Google等の委託先との適切な契約と監督</li>
-              </ul>
-            </div>
-          </div>
-          
-          <div class="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4 border border-orange-200 dark:border-orange-800">
-            <h4 class="font-bold text-orange-700 dark:text-orange-300 mb-3">個人情報保護に関する権利の詳細</h4>
-            <div class="text-sm text-gray-700 dark:text-gray-300 space-y-2">
+            <h4 class="font-bold text-green-700 dark:text-green-300 mb-3 flex items-center">
+              <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
+              データの教育的活用
+            </h4>
+            <div class="text-sm space-y-3">
               <div>
-                <p class="font-semibold">データポータビリティ権</p>
-                <p>自分の学習データを構造化されたデータ形式で取得することができます</p>
+                <p class="font-semibold text-gray-800 dark:text-gray-200">学習支援のための情報活用</p>
+                <ul class="ml-4 mt-1 space-y-1 text-gray-700 dark:text-gray-300">
+                  <li>• <strong>学習履歴の可視化</strong>：自分の成長や理解度の把握</li>
+                  <li>• <strong>協働学習の促進</strong>：クラスメートとの意見交換と相互学習</li>
+                  <li>• <strong>個別指導の最適化</strong>：先生が効果的な指導を行うための分析</li>
+                  <li>• <strong>学習環境の改善</strong>：システムの使いやすさとセキュリティの向上</li>
+                </ul>
               </div>
+              
               <div>
-                <p class="font-semibold">自動化された意思決定に関する権利</p>
-                <p>AI等による自動評価が行われる場合、その内容と根拠の説明を求めることができます</p>
-              </div>
-              <div>
-                <p class="font-semibold">プロファイリングの拒否権</p>
-                <p>学習傾向分析等のプロファイリングに対して異議を申し立てることができます</p>
+                <p class="font-semibold text-gray-800 dark:text-gray-200">技術的なデータ管理</p>
+                <ul class="ml-4 mt-1 space-y-1 text-gray-700 dark:text-gray-300">
+                  <li>• <strong>データの最小化</strong>：学習に必要な情報のみを収集・保存</li>
+                  <li>• <strong>アクセス制限</strong>：担当教師と本人のみがデータにアクセス可能</li>
+                  <li>• <strong>自動削除</strong>：不要になったデータは自動的に安全に削除</li>
+                  <li>• <strong>クラウド保護</strong>：Google の高度なセキュリティ技術で保護</li>
+                </ul>
               </div>
             </div>
           </div>
           
           <div class="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
-            <h4 class="font-bold text-purple-700 dark:text-purple-300 mb-3">お問い合わせ・苦情受付</h4>
-            <div class="text-sm text-gray-700 dark:text-gray-300">
-              <p>個人情報の取り扱いに関するお問い合わせ・苦情は以下へお申し出ください：</p>
-              <ul class="ml-4 mt-2 space-y-1">
-                <li>• 第一次対応：担当教員または学年主任</li>
-                <li>• 第二次対応：学校事務室（個人情報保護担当）</li>
-                <li>• 最終対応：教育委員会（所管部署）</li>
-                <li>• 外部機関：個人情報保護委員会（重大な問題の場合）</li>
-              </ul>
-              <p class="mt-2 text-xs bg-purple-100 dark:bg-purple-800 p-2 rounded">
-                <strong>迅速対応保証：</strong>お問い合わせから30日以内に回答いたします。
-                緊急性が高い場合は可能な限り早期に対応いたします。
-              </p>
+            <h4 class="font-bold text-purple-700 dark:text-purple-300 mb-3 flex items-center">
+              <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+              </svg>
+              自分のデータをコントロールする権利
+            </h4>
+            <div class="text-sm text-gray-700 dark:text-gray-300 space-y-3">
+              <div>
+                <p class="font-semibold text-purple-600 dark:text-purple-400">学習者としてできること</p>
+                <ul class="ml-4 mt-1 space-y-1">
+                  <li>• <strong>データの確認</strong>：自分の学習データや投稿履歴を確認</li>
+                  <li>• <strong>間違いの修正</strong>：誤った情報の訂正を先生に依頼</li>
+                  <li>• <strong>削除の要求</strong>：不要になったデータの削除を依頼</li>
+                  <li>• <strong>学習データの取得</strong>：自分の成長記録をファイルで受け取り</li>
+                </ul>
+              </div>
+              <div>
+                <p class="font-semibold text-purple-600 dark:text-purple-400">相談・質問窓口</p>
+                <div class="bg-purple-100 dark:bg-purple-800 p-3 rounded mt-2">
+                  <p class="text-sm">
+                    <strong>まずは担当の先生に相談してください</strong><br>
+                    分からないことや心配なことがあれば、いつでも気軽に質問できます。
+                    先生が解決できない技術的な問題は、システム管理者と連携して対応します。
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
           
-          <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border">
-            <h4 class="font-bold text-gray-800 dark:text-gray-200 mb-3">ポリシーの更新について</h4>
-            <div class="text-sm text-gray-700 dark:text-gray-300">
-              <p>本プライバシーポリシーは法令改正や技術進歩に応じて更新される場合があります。</p>
+          <div class="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4 border border-orange-200 dark:border-orange-800">
+            <h4 class="font-bold text-orange-700 dark:text-orange-300 mb-3 flex items-center">
+              <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              将来への準備：デジタル社会でのデータ管理
+            </h4>
+            <div class="text-sm text-gray-700 dark:text-gray-300 space-y-2">
+              <p>このシステムを通じて、将来のデジタル社会で必要な「データ管理意識」を身につけましょう：</p>
               <ul class="ml-4 mt-2 space-y-1">
-                <li>• 重要な変更の場合：30日前に事前通知</li>
-                <li>• 軽微な変更の場合：ウェブサイト上で公表</li>
-                <li>• 最新版は常に管理画面で確認可能</li>
-                <li>• 変更履歴と理由を透明性をもって公開</li>
+                <li>• <strong>データの価値理解</strong>：個人情報がなぜ大切なのかを実体験で学習</li>
+                <li>• <strong>適切な共有判断</strong>：何を共有し、何を秘密にするかの判断力を養成</li>
+                <li>• <strong>セキュリティ意識</strong>：安全な技術の仕組みを理解し活用する能力</li>
+                <li>• <strong>デジタル・エチケット</strong>：オンライン環境での礼儀と責任ある行動</li>
               </ul>
             </div>
           </div>
@@ -532,22 +509,22 @@ const MODAL_CONTENT_TEMPLATES = {
           </div>
           
           <div class="border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/20 p-4">
-            <h4 class="font-bold text-purple-700 dark:text-purple-300 mb-3">⚖️ デジタル倫理と法的責任</h4>
+            <h4 class="font-bold text-purple-700 dark:text-purple-300 mb-3">🤝 デジタル倫理と社会的責任</h4>
             <div class="space-y-3 text-sm text-gray-700 dark:text-gray-300">
               <div>
-                <p class="font-semibold">法的理解</p>
+                <p class="font-semibold">倫理的な判断力の育成</p>
                 <ul class="ml-4 mt-1 space-y-1">
-                  <li>• 名誉毀損・プライバシー侵害の理解</li>
-                  <li>• 著作権法の基本的な知識</li>
-                  <li>• 個人情報保護の重要性</li>
+                  <li>• <strong>他者への思いやり</strong>：相手の気持ちを考えた言葉選び</li>
+                  <li>• <strong>公正性の重視</strong>：偏見のない客観的な意見表明</li>
+                  <li>• <strong>誠実性の実践</strong>：嘘や誇張のない正直なコミュニケーション</li>
                 </ul>
               </div>
               <div>
-                <p class="font-semibold">倫理的判断</p>
+                <p class="font-semibold">社会的責任の意識</p>
                 <ul class="ml-4 mt-1 space-y-1">
-                  <li>• 他者への影響を考慮した行動</li>
-                  <li>• 社会全体への責任意識</li>
-                  <li>• 長期的な視点での判断</li>
+                  <li>• <strong>コミュニティへの貢献</strong>：みんなの学習を支援する行動</li>
+                  <li>• <strong>建設的な議論</strong>：問題解決につながる前向きな対話</li>
+                  <li>• <strong>継続的な成長</strong>：失敗から学び、改善し続ける姿勢</li>
                 </ul>
               </div>
             </div>
@@ -917,44 +894,147 @@ class UnifiedModalManager {
   }
 
   /**
-   * 統一モーダル表示メソッド
+   * 統一モーダル表示メソッド - GASベストプラクティス準拠
    * @param {object} options - モーダル表示オプション
    * @returns {Promise} モーダル表示Promise
    */
   async showModal(options) {
+    const operationId = this.generateOperationId();
+    
     try {
-      const startTime = performance.now();
+      const startTime = Date.now(); // GAS環境でより安定
       this.performanceMetrics.showCount++;
       
-      // オプションの検証
+      console.log(`[ModalManager:${operationId}] Starting modal display`, options);
+      
+      // オプションの検証（同期的に実行）
       this.validateModalOptions(options);
       
-      // コンテンツの取得
-      const content = this.getModalContent(options.type, options.ageGroup);
-      if (!content) {
-        throw new Error(`Content not found for ${options.type} - ${options.ageGroup}`);
-      }
+      // ロック機能付きコンテンツ取得（重複呼び出し防止）
+      const content = await this.getModalContentWithErrorHandling(options.type, options.ageGroup, operationId);
       
-      // モーダル要素の作成または取得
-      const modalElement = await this.createOrGetModalElement(options.type, content, options);
+      // 段階的モーダル構築（メモリ効率重視）
+      const modalElement = await this.createModalElementSafely(options.type, content, options, operationId);
       
-      // モーダルの表示
-      await this.displayModal(modalElement, options);
+      // 非同期表示とイベント設定
+      await this.displayModalWithErrorHandling(modalElement, options, operationId);
       
-      // パフォーマンス測定
-      const loadTime = performance.now() - startTime;
-      console.log(`[ModalManager] Modal shown in ${loadTime.toFixed(2)}ms`);
+      // 成功メトリクスの記録
+      const loadTime = Date.now() - startTime;
+      this.updatePerformanceMetrics('show_success', loadTime);
+      console.log(`[ModalManager:${operationId}] Modal displayed successfully in ${loadTime}ms`);
       
-      return new Promise((resolve, reject) => {
-        // モーダル結果の処理
-        this.setupModalResultHandlers(modalElement, options, resolve, reject);
-      });
+      // Promise の適切な処理
+      return this.createModalPromiseWithTimeout(modalElement, options, operationId);
       
     } catch (error) {
-      this.performanceMetrics.errorCount++;
-      console.error('[ModalManager] Show modal failed:', error);
-      throw error;
+      this.handleModalError(error, operationId, options);
+      throw this.createUserFriendlyError(error, 'モーダル表示');
     }
+  }
+
+  /**
+   * 操作IDの生成（デバッグとトレース用）
+   * @returns {string} 一意の操作ID
+   */
+  generateOperationId() {
+    return `modal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * エラーハンドリング付きコンテンツ取得
+   * @param {string} type - モーダルタイプ
+   * @param {string} ageGroup - 年齢グループ
+   * @param {string} operationId - 操作ID
+   * @returns {Promise<Object>} コンテンツオブジェクト
+   */
+  async getModalContentWithErrorHandling(type, ageGroup, operationId) {
+    try {
+      const content = this.getModalContent(type, ageGroup);
+      if (!content) {
+        console.warn(`[ModalManager:${operationId}] No content found, using fallback`);
+        return this.getFallbackContentSafe(type);
+      }
+      return content;
+    } catch (error) {
+      console.error(`[ModalManager:${operationId}] Content fetch error:`, error);
+      return this.getFallbackContentSafe(type);
+    }
+  }
+
+  /**
+   * 安全なモーダル要素作成
+   * @param {string} type - モーダルタイプ
+   * @param {Object} content - コンテンツオブジェクト
+   * @param {Object} options - オプション
+   * @param {string} operationId - 操作ID
+   * @returns {Promise<Element>} モーダル要素
+   */
+  async createModalElementSafely(type, content, options, operationId) {
+    try {
+      // 既存要素の確認とクリーンアップ
+      const existingModal = document.getElementById(`unified-modal-${type}`);
+      if (existingModal) {
+        this.cleanupModalEventListeners(existingModal);
+        existingModal.remove();
+      }
+
+      // 新しいモーダル要素の作成
+      const modalElement = this.buildModalElement(type, content, options);
+      modalElement.id = `unified-modal-${type}`;
+      modalElement.setAttribute('data-operation-id', operationId);
+      
+      // DOM に追加
+      document.body.appendChild(modalElement);
+      
+      console.log(`[ModalManager:${operationId}] Modal element created successfully`);
+      return modalElement;
+      
+    } catch (error) {
+      console.error(`[ModalManager:${operationId}] Modal element creation failed:`, error);
+      throw new Error(`モーダル要素の作成に失敗しました: ${error.message}`);
+    }
+  }
+
+  /**
+   * エラーハンドリング付きモーダル表示
+   * @param {Element} modalElement - モーダル要素
+   * @param {Object} options - オプション
+   * @param {string} operationId - 操作ID
+   * @returns {Promise<void>}
+   */
+  async displayModalWithErrorHandling(modalElement, options, operationId) {
+    try {
+      // アニメーション前の準備
+      modalElement.style.display = 'flex';
+      modalElement.style.opacity = '0';
+      
+      // DOM 更新の確実な実行
+      await this.nextTick();
+      
+      // フェードインアニメーション
+      modalElement.style.transition = `opacity ${this.config.ANIMATION.FADE_DURATION}ms ease`;
+      modalElement.style.opacity = '1';
+      
+      // アクセシビリティ設定
+      this.setupAccessibility(modalElement);
+      
+      console.log(`[ModalManager:${operationId}] Modal displayed with animation`);
+      
+    } catch (error) {
+      console.error(`[ModalManager:${operationId}] Modal display error:`, error);
+      // フォールバック: アニメーションなしで表示
+      modalElement.style.display = 'flex';
+      modalElement.style.opacity = '1';
+    }
+  }
+
+  /**
+   * 次のイベントループまで待機
+   * @returns {Promise<void>}
+   */
+  nextTick() {
+    return new Promise(resolve => setTimeout(resolve, 0));
   }
 
   /**
@@ -1305,6 +1385,218 @@ function initializeModalSystem(options = {}) {
 function setModalAgeGroup(ageGroup) {
   return unifiedModalManager.setAgeGroup(ageGroup);
 }
+
+// UnifiedModalManagerクラスに追加の補助メソッドを追加
+UnifiedModalManager.prototype.updatePerformanceMetrics = function(action, value) {
+  try {
+    this.performanceMetrics[action] = (this.performanceMetrics[action] || 0) + 1;
+    if (value && action.includes('time')) {
+      this.performanceMetrics.avgLoadTime = (this.performanceMetrics.avgLoadTime + value) / 2;
+    }
+  } catch (error) {
+    console.warn('[ModalManager] Performance metrics update failed:', error);
+  }
+};
+
+UnifiedModalManager.prototype.createModalPromiseWithTimeout = function(modalElement, options, operationId) {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      console.error(`[ModalManager:${operationId}] Modal timeout`);
+      reject(new Error('モーダル操作がタイムアウトしました'));
+    }, 30000); // 30秒タイムアウト
+
+    this.setupModalResultHandlers(modalElement, options, (result) => {
+      clearTimeout(timeoutId);
+      resolve(result);
+    }, (error) => {
+      clearTimeout(timeoutId);
+      reject(error);
+    });
+  });
+};
+
+UnifiedModalManager.prototype.handleModalError = function(error, operationId, options) {
+  this.performanceMetrics.errorCount++;
+  console.error(`[ModalManager:${operationId}] Error:`, error);
+  
+  // エラー情報をローカルストレージに記録（デバッグ用）
+  try {
+    const errorLog = {
+      timestamp: new Date().toISOString(),
+      operationId: operationId,
+      error: error.message,
+      options: options
+    };
+    const existingLogs = JSON.parse(localStorage.getItem('modalManager_errorLogs') || '[]');
+    existingLogs.push(errorLog);
+    // 最新50件のみ保持
+    if (existingLogs.length > 50) {
+      existingLogs.splice(0, existingLogs.length - 50);
+    }
+    localStorage.setItem('modalManager_errorLogs', JSON.stringify(existingLogs));
+  } catch (logError) {
+    console.warn('[ModalManager] Error logging failed:', logError);
+  }
+};
+
+UnifiedModalManager.prototype.createUserFriendlyError = function(originalError, context) {
+  const userFriendlyMessages = {
+    'モーダル表示': 'モーダルウィンドウの表示中にエラーが発生しました。ページを再読み込みしてもう一度お試しください。',
+    'コンテンツ取得': 'コンテンツの読み込み中にエラーが発生しました。インターネット接続を確認してください。',
+    '要素作成': 'ページの構築中にエラーが発生しました。ブラウザを更新してください。'
+  };
+  
+  const friendlyMessage = userFriendlyMessages[context] || 'システムエラーが発生しました。';
+  const error = new Error(friendlyMessage);
+  error.originalError = originalError;
+  return error;
+};
+
+UnifiedModalManager.prototype.getFallbackContentSafe = function(type) {
+  try {
+    const fallbackContent = getFallbackContent(type);
+    return fallbackContent;
+  } catch (error) {
+    console.error('[ModalManager] Fallback content creation failed:', error);
+    return {
+      title: 'システム情報',
+      content: '<p>コンテンツを読み込んでいます...</p>',
+      actionText: 'OK'
+    };
+  }
+};
+
+UnifiedModalManager.prototype.buildModalElement = function(type, content, options) {
+  const modal = document.createElement('div');
+  modal.className = 'fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4';
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  
+  const modalContent = document.createElement('div');
+  modalContent.className = 'glass-panel rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto';
+  
+  modalContent.innerHTML = `
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="text-2xl font-bold text-cyan-400">${this.escapeHtml(content.title)}</h3>
+      <button type="button" class="modal-close p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+    
+    <div class="modal-body text-gray-300">
+      ${content.content}
+    </div>
+    
+    <div class="flex justify-end gap-3 mt-6">
+      <button type="button" class="modal-cancel btn btn-secondary">キャンセル</button>
+      <button type="button" class="modal-action btn btn-primary">
+        ${this.escapeHtml(content.actionText || '続行')}
+      </button>
+    </div>
+  `;
+  
+  modal.appendChild(modalContent);
+  return modal;
+};
+
+UnifiedModalManager.prototype.setupAccessibility = function(modalElement) {
+  try {
+    // フォーカストラップの設定
+    const focusableElements = modalElement.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    const firstFocusable = focusableElements[0];
+    const lastFocusable = focusableElements[focusableElements.length - 1];
+    
+    if (firstFocusable) {
+      firstFocusable.focus();
+    }
+    
+    // Tab キーでフォーカスがループするように
+    modalElement.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') {
+        if (e.shiftKey) {
+          if (document.activeElement === firstFocusable) {
+            e.preventDefault();
+            lastFocusable.focus();
+          }
+        } else {
+          if (document.activeElement === lastFocusable) {
+            e.preventDefault();
+            firstFocusable.focus();
+          }
+        }
+      }
+    });
+  } catch (error) {
+    console.warn('[ModalManager] Accessibility setup failed:', error);
+  }
+};
+
+UnifiedModalManager.prototype.setupModalResultHandlers = function(modalElement, options, resolve, reject) {
+  try {
+    const handleClose = () => {
+      this.closeModalSafely(modalElement);
+      resolve({ action: 'cancelled' });
+    };
+    
+    const handleAction = () => {
+      this.closeModalSafely(modalElement);
+      resolve({ action: 'confirmed' });
+      
+      // コールバック実行
+      if (options.onContinue) options.onContinue();
+      if (options.onAccept) options.onAccept();
+    };
+    
+    // イベントリスナーの設定
+    modalElement.querySelector('.modal-close')?.addEventListener('click', handleClose);
+    modalElement.querySelector('.modal-cancel')?.addEventListener('click', handleClose);
+    modalElement.querySelector('.modal-action')?.addEventListener('click', handleAction);
+    
+    // ESCキーでの終了
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleClose();
+        document.removeEventListener('keydown', handleEsc);
+      }
+    };
+    document.addEventListener('keydown', handleEsc);
+    
+    // オーバーレイクリックでの終了
+    modalElement.addEventListener('click', (e) => {
+      if (e.target === modalElement) {
+        handleClose();
+      }
+    });
+    
+  } catch (error) {
+    console.error('[ModalManager] Result handler setup failed:', error);
+    reject(error);
+  }
+};
+
+UnifiedModalManager.prototype.closeModalSafely = function(modalElement) {
+  try {
+    // フェードアウトアニメーション
+    modalElement.style.opacity = '0';
+    
+    setTimeout(() => {
+      if (modalElement.parentNode) {
+        this.cleanupModalEventListeners(modalElement);
+        modalElement.remove();
+      }
+    }, this.config.ANIMATION.FADE_DURATION);
+    
+  } catch (error) {
+    console.error('[ModalManager] Modal close failed:', error);
+    // フォールバック: 即座に削除
+    if (modalElement.parentNode) {
+      modalElement.remove();
+    }
+  }
+};
 
 /**
  * フロントエンドからのモーダルコンテンツ取得用関数
