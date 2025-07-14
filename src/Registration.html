@@ -279,6 +279,67 @@
       color: white !important;
       border: 1px solid rgba(255, 255, 255, 0.2) !important;
     }
+  /* =================================================================== */
+    /* ★★★ 登録ページ限定・CSS変数によるモーダルスタイル適用 ★★★ */
+    /* =================================================================== */
+    .registration-page {
+      /* 登録ページのデザインをCSS変数として定義 */
+      --reg-bg: rgba(255, 255, 255, 0.08) !important;
+      --reg-backdrop-filter: blur(20px) !important;
+      --reg-border: 1px solid rgba(255, 255, 255, 0.2) !important;
+      --reg-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+      --reg-title-color: white !important;
+      --reg-text-color: rgba(255, 255, 255, 0.8) !important;
+      --reg-btn-primary-bg: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%) !important;
+      --reg-btn-secondary-bg: rgba(255, 255, 255, 0.1) !important;
+      --reg-btn-secondary-border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    }
+
+    /* モーダルが画面中央に表示されるよう強制 */
+    .registration-page .fixed.inset-0 {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+
+    /* モーダルの各要素に、上で定義した変数を適用 */
+    .registration-page #enhanced-privacy-modal .glass-panel,
+    .registration-page #enhanced-digital-citizenship-modal .glass-panel {
+      background: var(--reg-bg);
+      -webkit-backdrop-filter: var(--reg-backdrop-filter);
+      backdrop-filter: var(--reg-backdrop-filter);
+      border: var(--reg-border);
+      box-shadow: var(--reg-shadow);
+      max-width: 640px !important; /* コンテンツが見やすいように幅を調整 */
+      padding: 2rem !important;
+    }
+
+    .registration-page #enhanced-privacy-modal h3,
+    .registration-page #enhanced-digital-citizenship-modal h3 {
+      color: var(--reg-title-color);
+      font-size: 24px !important;
+      font-weight: 700 !important;
+    }
+
+    .registration-page #enhanced-privacy-modal-content,
+    .registration-page #enhanced-digital-citizenship-modal-content {
+      color: var(--reg-text-color);
+    }
+    
+    /* ボタンのスタイルも完全に統一 */
+    .registration-page #enhanced-privacy-modal .btn-primary,
+    .registration-page #enhanced-digital-citizenship-modal .btn-primary {
+      background: var(--reg-btn-primary-bg);
+      color: var(--reg-title-color);
+      border: none !important;
+    }
+    
+    .registration-page #enhanced-privacy-modal .btn-secondary,
+    .registration-page #enhanced-digital-citizenship-modal .btn-secondary {
+      background: var(--reg-btn-secondary-bg);
+      color: var(--reg-title-color);
+      border: var(--reg-btn-secondary-border);
+    }
   </style>
 
   <?!= include('UnifiedStyles'); ?>
