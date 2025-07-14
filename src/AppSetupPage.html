@@ -408,16 +408,20 @@
             google.script.run
                 .withSuccessHandler((webAppUrl) => {
                     const targetUrl = webAppUrl + '?mode=admin&userId=' + __USER_ID__;
-                    try {
-                        // iframeの場合は親ウィンドウに移動
-                        if (window.parent !== window) {
-                            window.parent.location.href = targetUrl;
-                        } else {
+                    
+                    // Use iframe-safe navigation
+                    if (window.sharedUtilities && window.sharedUtilities.navigation) {
+                        window.sharedUtilities.navigation.safeNavigate(targetUrl, {
+                            fallbackMessage: '管理パネルに移動中...',
+                            method: 'auto'
+                        });
+                    } else {
+                        // Fallback for legacy browsers
+                        try {
                             window.location.href = targetUrl;
+                        } catch (e) {
+                            window.open(targetUrl, '_blank');
                         }
-                    } catch (e) {
-                        // フォールバック: 新しいタブで開く
-                        window.open(targetUrl, '_blank');
                     }
                 })
                 .withFailureHandler((error) => {
@@ -425,14 +429,19 @@
                     // フォールバック: 現在のURLを使用
                     const currentUrl = window.location.href.split('?')[0];
                     const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__;
-                    try {
-                        if (window.parent !== window) {
-                            window.parent.location.href = targetUrl;
-                        } else {
+                    
+                    // Use iframe-safe navigation for fallback too
+                    if (window.sharedUtilities && window.sharedUtilities.navigation) {
+                        window.sharedUtilities.navigation.safeNavigate(targetUrl, {
+                            fallbackMessage: '管理パネルに移動中...',
+                            method: 'auto'
+                        });
+                    } else {
+                        try {
                             window.location.href = targetUrl;
+                        } catch (e) {
+                            window.open(targetUrl, '_blank');
                         }
-                    } catch (e) {
-                        window.open(targetUrl, '_blank');
                     }
                 })
                 .getWebAppUrlCached();

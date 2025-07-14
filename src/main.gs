@@ -114,15 +114,20 @@ function htmlEncode(text) {
  * @param {HtmlOutput} htmlOutput - 設定対象のHtmlOutput
  * @returns {HtmlOutput} 設定後のHtmlOutput
  */
-function safeSetXFrameOptionsDeny(htmlOutput) {
+function safeSetXFrameOptionsAllowAll(htmlOutput) {
   try {
     if (htmlOutput && typeof htmlOutput.setXFrameOptionsMode === 'function' &&
         HtmlService && HtmlService.XFrameOptionsMode &&
-        HtmlService.XFrameOptionsMode.DENY) {
-      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+        HtmlService.XFrameOptionsMode.ALLOWALL) {
+      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+    if (htmlOutput && typeof htmlOutput.setSandboxMode === 'function' &&
+        HtmlService && HtmlService.SandboxMode &&
+        HtmlService.SandboxMode.IFRAME) {
+      htmlOutput.setSandboxMode(HtmlService.SandboxMode.IFRAME);
     }
   } catch (e) {
-    console.warn('Failed to set XFrameOptionsMode:', e.message);
+    console.warn('Failed to set frame options and sandbox mode:', e.message);
   }
   return htmlOutput;
 }
@@ -265,8 +270,10 @@ function showRegistrationPage() {
   var template = HtmlService.createTemplateFromFile('Registration');
   template.include = include;
   var output = template.evaluate()
-    .setTitle('新規ユーザー登録 - StudyQuest');
-  return safeSetXFrameOptionsDeny(output);
+    .setTitle('新規ユーザー登録 - StudyQuest')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+  return output;
 }
 
 /**
@@ -378,7 +385,7 @@ function doGet(e) {
       );
     }
     
-    return safeSetXFrameOptionsDeny(errorHtml);
+    return safeSetXFrameOptionsAllowAll(errorHtml);
   }
 }
 
@@ -407,7 +414,7 @@ function handleDirectExecAccess(userEmail) {
       console.log('handleDirectExecAccess - System not setup, showing setup page');
       const t = HtmlService.createTemplateFromFile('SetupPage');
       t.include = include;
-      return safeSetXFrameOptionsDeny(t.evaluate().setTitle('初回セットアップ - StudyQuest'));
+      return safeSetXFrameOptionsAllowAll(t.evaluate().setTitle('初回セットアップ - StudyQuest'));
     }
     
     if (!userEmail) {
@@ -453,7 +460,89 @@ function buildUserAdminUrl(userId) {
 }
 
 /**
- * セキュアなリダイレクトHTMLを作成
+ * サーバーサイドでのナビゲーション処理
+ * @param {string} targetUrl リダイレクト先URL
+ * @param {string} message 表示メッセージ
+ * @return {HtmlOutput}
+ */
+function createServerSideNavigation(targetUrl, message) {
+  return HtmlService.createHtmlOutput(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta http-equiv="refresh" content="1;url=${targetUrl}">
+      <title>移動中...</title>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%);
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          margin: 0;
+          text-align: center;
+        }
+        .container {
+          background: rgba(255, 255, 255, 0.08);
+          backdrop-filter: blur(20px);
+          border-radius: 16px;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          padding: 40px;
+          max-width: 400px;
+        }
+        .spinner {
+          width: 40px;
+          height: 40px;
+          border: 3px solid rgba(255, 255, 255, 0.3);
+          border-top: 3px solid #06b6d4;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+          margin: 0 auto 20px;
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .btn {
+          display: inline-block;
+          background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);
+          color: white;
+          padding: 12px 24px;
+          text-decoration: none;
+          border-radius: 8px;
+          margin-top: 20px;
+          transition: transform 0.2s;
+        }
+        .btn:hover {
+          transform: translateY(-1px);
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="spinner"></div>
+        <h2>${message}</h2>
+        <p>自動的に移動しない場合は下のボタンをクリックしてください</p>
+        <a href="${targetUrl}" class="btn">続行</a>
+      </div>
+      <script>
+        // Fallback navigation after 2 seconds
+        setTimeout(function() {
+          window.location.href = '${targetUrl}';
+        }, 2000);
+      </script>
+    </body>
+    </html>
+  `)
+  .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+  .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+}
+
+/**
+ * セキュアなリダイレクトHTMLを作成（レガシー用）
  * @param {string} targetUrl リダイレクト先URL
  * @param {string} message 表示メッセージ
  * @return {HtmlOutput}
@@ -511,6 +600,62 @@ function createSecureRedirect(targetUrl, message) {
     </body>
     </html>
   `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * サーバーサイドナビゲーション処理関数
+ * フロントエンドから呼び出し可能
+ * @param {string} targetUrl 移動先URL
+ * @param {string} message 表示メッセージ
+ * @return {Object} 移動情報
+ */
+function performServerSideNavigation(targetUrl, message = '移動中...') {
+  try {
+    // URLの妥当性チェック
+    if (!targetUrl) {
+      throw new Error('移動先URLが指定されていません');
+    }
+    
+    // 相対URLの場合は絶対URLに変換
+    if (targetUrl.startsWith('?') || targetUrl.startsWith('/')) {
+      const baseUrl = getWebAppUrl();
+      targetUrl = targetUrl.startsWith('?') ? baseUrl + targetUrl : baseUrl + targetUrl;
+    }
+    
+    console.log('performServerSideNavigation:', { targetUrl, message });
+    
+    return {
+      success: true,
+      redirectUrl: targetUrl,
+      message: message,
+      method: 'server_navigation'
+    };
+  } catch (error) {
+    console.error('performServerSideNavigation error:', error);
+    return {
+      success: false,
+      error: error.message,
+      method: 'server_navigation'
+    };
+  }
+}
+
+/**
+ * 登録後のナビゲーション処理
+ * @param {string} userId ユーザーID
+ * @return {Object} 移動情報
+ */
+function navigateToAdminPanel(userId) {
+  try {
+    const adminUrl = buildUserAdminUrl(userId);
+    return performServerSideNavigation(adminUrl, '管理パネルに移動中...');
+  } catch (error) {
+    console.error('navigateToAdminPanel error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
 }
 
 /**
@@ -621,7 +766,7 @@ function handleSetupPages(params, userEmail) {
   if (!isSystemSetup() && !params.isDirectPageAccess) {
     const t = HtmlService.createTemplateFromFile('SetupPage');
     t.include = include;
-    return safeSetXFrameOptionsDeny(t.evaluate().setTitle('初回セットアップ - StudyQuest'));
+    return safeSetXFrameOptionsAllowAll(t.evaluate().setTitle('初回セットアップ - StudyQuest'));
   }
 
   if (params.setupParam === 'true' && params.mode === 'appsetup') {
@@ -636,7 +781,7 @@ function handleSetupPages(params, userEmail) {
         '<p>編集者として登録され、かつアクティブ状態である必要があります。</p>' +
         '<p>現在のドメイン: ' + (domainInfo.currentDomain || '不明') + '</p>'
       );
-      return safeSetXFrameOptionsDeny(errorHtml);
+      return safeSetXFrameOptionsAllowAll(errorHtml);
     }
     const appSetupTemplate = HtmlService.createTemplateFromFile('AppSetupPage');
     appSetupTemplate.include = include;
@@ -649,13 +794,13 @@ function handleSetupPages(params, userEmail) {
     console.log('AppSetupPage - currentUserEmail:', currentUserEmail);
     console.log('AppSetupPage - userId set to:', appSetupTemplate.userId);
     
-    return safeSetXFrameOptionsDeny(appSetupTemplate.evaluate().setTitle('アプリ設定 - StudyQuest'));
+    return safeSetXFrameOptionsAllowAll(appSetupTemplate.evaluate().setTitle('アプリ設定 - StudyQuest'));
   }
 
   if (params.setupParam === 'true') {
     const explicit = HtmlService.createTemplateFromFile('SetupPage');
     explicit.include = include;
-    return safeSetXFrameOptionsDeny(explicit.evaluate().setTitle('StudyQuest - サービスアカウント セットアップ'));
+    return safeSetXFrameOptionsAllowAll(explicit.evaluate().setTitle('StudyQuest - サービスアカウント セットアップ'));
   }
 
   // システムセットアップが完了している場合のみ、userEmailをチェック
@@ -694,7 +839,7 @@ function renderAdminPanel(userInfo, mode) {
   return adminTemplate.evaluate()
     .setTitle('みんなの回答ボード 管理パネル')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .setSandboxMode(HtmlService.SandboxMode.NATIVE);
+    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
 }
 
 /**

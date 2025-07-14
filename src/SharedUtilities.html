@@ -780,19 +780,26 @@ window.sharedUtilities.navigation = {
                                      google.script.host &&
                                      typeof google.script.host.close === 'function';
     
+    // Check if google.script.run is available (for server-side navigation)
+    const hasGoogleScriptRun = typeof google !== 'undefined' && 
+                               google.script && 
+                               google.script.run;
+    
     // Check current URL origin vs target
     const currentOrigin = window.location.origin;
     
     console.log('Navigation context:', {
       isIframe,
       hasGoogleScriptHostClose,
+      hasGoogleScriptRun,
       currentOrigin
     });
     
-    if (hasGoogleScriptHostClose) {
+    // For iframe environments, prefer direct redirect
+    if (isIframe) {
+      return 'redirect';
+    } else if (hasGoogleScriptHostClose) {
       return 'close';
-    } else if (isIframe) {
-      return 'message';
     } else {
       return 'redirect';
     }
@@ -902,23 +909,73 @@ window.sharedUtilities.navigation = {
     }, 10000);
   },
   
+  // Server-side navigation for iframe environments
+  navigateWithServer: function(url, message = '移動中...') {
+    try {
+      console.log('Using server-side navigation method');
+      
+      // Show immediate feedback
+      this.showNavigationMessage(message, 5000);
+      
+      // Call server-side navigation function
+      google.script.run
+        .withSuccessHandler(result => {
+          if (result && result.success && result.redirectUrl) {
+            // Server provided a redirect URL, try to navigate
+            console.log('Server navigation success, redirecting to:', result.redirectUrl);
+            setTimeout(() => {
+              try {
+                window.location.href = result.redirectUrl;
+              } catch (e) {
+                console.warn('Direct navigation failed, showing manual dialog');
+                this.showManualNavigationDialog(result.redirectUrl, result.message || message);
+              }
+            }, 1000);
+          } else {
+            console.warn('Server navigation failed:', result);
+            this.showManualNavigationDialog(url, 'サーバー側の移動処理に失敗しました');
+          }
+        })
+        .withFailureHandler(error => {
+          console.error('Server navigation error:', error);
+          this.showManualNavigationDialog(url, 'ナビゲーション処理でエラーが発生しました');
+        })
+        .performServerSideNavigation(url, message);
+      
+      return true;
+    } catch (e) {
+      console.warn('Server-side navigation failed:', e);
+      return false;
+    }
+  },
+  
   // Quick navigation to admin panel (commonly used)
   goToAdminPanel: function(adminUrl, delay = 2000) {
-    this.safeNavigate(adminUrl, {
-      delay: delay,
-      fallbackMessage: '管理パネルに移動中...',
-      method: 'auto'
-    });
+    // Try server-side navigation first for iframe environments
+    if (window !== window.top) {
+      this.navigateWithServer(adminUrl, '管理パネルに移動中...');
+    } else {
+      this.safeNavigate(adminUrl, {
+        delay: delay,
+        fallbackMessage: '管理パネルに移動中...',
+        method: 'auto'
+      });
+    }
   },
   
   // Quick navigation with success message
   navigateWithSuccess: function(url, successMessage = '処理が完了しました', delay = 3000) {
     this.showNavigationMessage(successMessage, delay);
     setTimeout(() => {
-      this.safeNavigate(url, {
-        delay: 1000,
-        method: 'auto'
-      });
+      // Use server-side navigation for iframe environments
+      if (window !== window.top) {
+        this.navigateWithServer(url, successMessage);
+      } else {
+        this.safeNavigate(url, {
+          delay: 1000,
+          method: 'auto'
+        });
+      }
     }, delay - 1000);
   }
 };
@@ -932,5 +989,5 @@ window.goToAdminPanel = function(adminUrl, delay) {
   window.sharedUtilities.navigation.goToAdminPanel(adminUrl, delay);
 };
 
-console.log('✅ SharedUtilities loaded successfully - Version 1.1.0');
+console.log('✅ SharedUtilities loaded successfully - Version 1.2.0 (iframe navigation fixed)');
 </script>

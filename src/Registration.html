@@ -257,12 +257,42 @@
         successContainer.style.display = 'block';
         if (result?.adminUrl) {
           adminPanelBtn.href = result.adminUrl;
-          // Use iframe-safe navigation instead of window.top.location.href
-          window.sharedUtilities.navigation.navigateWithSuccess(
-            result.adminUrl, 
-            '登録完了！管理パネルに移動中...',
-            3000
-          );
+          // Use iframe-safe navigation with server-side support
+          if (result?.userId) {
+            // Use server-side navigation for better iframe support
+            google.script.run
+              .withSuccessHandler(navResult => {
+                if (navResult && navResult.success) {
+                  console.log('Server navigation prepared:', navResult.redirectUrl);
+                  setTimeout(() => {
+                    window.location.href = navResult.redirectUrl;
+                  }, 2000);
+                } else {
+                  // Fallback to client-side navigation
+                  window.sharedUtilities.navigation.navigateWithSuccess(
+                    result.adminUrl, 
+                    '登録完了！管理パネルに移動中...',
+                    3000
+                  );
+                }
+              })
+              .withFailureHandler(error => {
+                console.warn('Server navigation failed, using client fallback:', error);
+                window.sharedUtilities.navigation.navigateWithSuccess(
+                  result.adminUrl, 
+                  '登録完了！管理パネルに移動中...',
+                  3000
+                );
+              })
+              .navigateToAdminPanel(result.userId);
+          } else {
+            // Fallback to client-side navigation
+            window.sharedUtilities.navigation.navigateWithSuccess(
+              result.adminUrl, 
+              '登録完了！管理パネルに移動中...',
+              3000
+            );
+          }
         }
       };
       
@@ -290,7 +320,23 @@
         google.script.run
           .withSuccessHandler(result => {
             if (result?.status === 'existing_user') {
-              window.sharedUtilities.navigation.goToAdminPanel(result.adminUrl, 1000);
+              if (result?.userId) {
+                // Use server-side navigation for existing users too
+                google.script.run
+                  .withSuccessHandler(navResult => {
+                    if (navResult && navResult.success) {
+                      window.location.href = navResult.redirectUrl;
+                    } else {
+                      window.sharedUtilities.navigation.goToAdminPanel(result.adminUrl, 1000);
+                    }
+                  })
+                  .withFailureHandler(() => {
+                    window.sharedUtilities.navigation.goToAdminPanel(result.adminUrl, 1000);
+                  })
+                  .navigateToAdminPanel(result.userId);
+              } else {
+                window.sharedUtilities.navigation.goToAdminPanel(result.adminUrl, 1000);
+              }
               return;
             }
             google.script.run
