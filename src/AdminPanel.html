@@ -1582,40 +1582,7 @@
       }
     }
 
-    // アプリケーション状態を管理するオブジェクト
-    const appState = {
-      userId: '',
-      selectedSheet: '',
-      currentActiveSheet: '',
-      webAppUrl: '',
-      currentSpreadsheetUrl: '',
-      currentStatus: null,
-      isLoading: false
-    };
-
-    // ユーザーIDをテンプレートまたはmetaタグから安全に取得
-    (function() {
-      try {
-        const templateUserId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
-        if (templateUserId && templateUserId.trim() !== '') {
-          appState.userId = templateUserId;
-          console.log('✅  - appState.userId from template:', appState.userId);
-        } else {
-          const userIdMeta = document.querySelector('meta[name="user-id"]');
-          if (userIdMeta && userIdMeta.content) {
-            appState.userId = userIdMeta.content;
-            console.log('✅  - appState.userId from meta:', appState.userId);
-          }
-        }
-
-        if (!appState.userId) {
-          console.error('❌  - appState.userId not found in template or meta');
-        }
-      } catch (e) {
-        console.error('❌  - appState.userId initialization error:', e);
-        appState.userId = '';
-      }
-    })();
+    // Global appState defined in AdminPanelLogic
 
     // Detect jsdom test environment to disable auto-loading
     var IS_TEST_ENV = typeof navigator !== 'undefined' &&
