@@ -4,31 +4,76 @@
  */
 
 // =================================================================
-// ユーザー情報キャッシュ（関数実行中の重複取得を防ぐ）
+// 統合キャッシュシステム（実行レベル + 永続キャッシュ）
 // =================================================================
 
-var _executionUserInfoCache = null;
+var _executionUserInfoCache = new Map(); // 複数ユーザー対応でMapに変更
 
 /**
- * 関数実行中のユーザー情報キャッシュをクリア
+ * 関数実行中のユーザー情報キャッシュをクリア（全体または特定ユーザー）
+ * @param {string} [userId] 特定のユーザーIDのみクリア。未指定時は全体クリア
  */
-function clearExecutionUserInfoCache() {
-  _executionUserInfoCache = null;
+function clearExecutionUserInfoCache(userId = null) {
+  if (userId) {
+    _executionUserInfoCache.delete(userId);
+    console.log('🗑️ 実行キャッシュクリア (特定ユーザー):', userId);
+  } else {
+    _executionUserInfoCache.clear();
+    console.log('🗑️ 実行キャッシュクリア (全体)');
+  }
 }
 
 /**
- * ユーザー情報を取得（実行中はキャッシュを使用）
+ * 統合ユーザー情報取得（実行レベル → L1キャッシュ → L2キャッシュ → DB の階層検索）
+ * @param {string} userId ユーザーID
+ * @param {boolean} bypassCache キャッシュを無視してDBから直接取得
+ * @returns {Object} ユーザー情報
+ */
+function getCachedUserInfoUnified(userId, bypassCache = false) {
+  console.log('🔍 getCachedUserInfoUnified: 開始', { userId, bypassCache });
+  
+  if (!userId) {
+    console.warn('getCachedUserInfoUnified: userIdが空です');
+    return null;
+  }
+
+  // キャッシュバイパス時は直接DB検索
+  if (bypassCache) {
+    console.log('🔍 キャッシュバイパス: DB直接検索');
+    const userInfo = fetchUserFromDatabase('userId', userId);
+    if (userInfo) {
+      // 取得後にキャッシュを更新
+      _executionUserInfoCache.set(userId, userInfo);
+    }
+    return userInfo;
+  }
+
+  // 1. 実行レベルキャッシュ確認
+  if (_executionUserInfoCache.has(userId)) {
+    console.log('💨 実行キャッシュヒット:', userId);
+    return _executionUserInfoCache.get(userId);
+  }
+
+  // 2. L1/L2キャッシュ → DB検索（既存のfindUserByIdを利用）
+  console.log('🔍 下位キャッシュ/DB検索開始:', userId);
+  const userInfo = findUserById(userId);
+  
+  // 3. 実行レベルキャッシュに保存
+  if (userInfo) {
+    _executionUserInfoCache.set(userId, userInfo);
+    console.log('💾 実行キャッシュに保存:', userId);
+  }
+  
+  return userInfo;
+}
+
+/**
+ * レガシー互換: 既存コードとの互換性を保つためのエイリアス
  * @param {string} userId ユーザーID
  * @returns {Object} ユーザー情報
  */
 function getCachedUserInfo(userId) {
-  if (_executionUserInfoCache && _executionUserInfoCache.userId === userId) {
-    return _executionUserInfoCache.userInfo;
-  }
-  
-  const userInfo = findUserById(userId);
-  _executionUserInfoCache = { userId, userInfo };
-  return userInfo;
+  return getCachedUserInfoUnified(userId);
 }
 
 // =================================================================
@@ -259,22 +304,40 @@ function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
  * requestUserId のデータにアクセスする権限を持っているかを確認します。
  * 権限がない場合はエラーをスローします。
  * @param {string} requestUserId - アクセスを要求しているユーザーのID
+ * @param {boolean} forceRefresh - キャッシュを無視して最新データを取得
  * @throws {Error} 認証エラーまたは権限エラー
  */
-function verifyUserAccess(requestUserId) {
-  clearExecutionUserInfoCache(); // キャッシュをクリアして最新のユーザー情報を取得
+function verifyUserAccess(requestUserId, forceRefresh = false) {
   const activeUserEmail = Session.getActiveUser().getEmail();
-  const requestedUserInfo = findUserById(requestUserId);
+  
+  // 強制リフレッシュが指定された場合のみキャッシュクリア
+  if (forceRefresh) {
+    clearExecutionUserInfoCache(requestUserId);
+    console.log('🔄 verifyUserAccess: 強制リフレッシュでキャッシュクリア');
+  }
+  
+  const requestedUserInfo = getCachedUserInfoUnified(requestUserId, forceRefresh);
 
   if (!requestedUserInfo) {
-    throw new Error(`認証エラー: 指定されたユーザーID (${requestUserId}) が見つかりません。`);
+    // キャッシュクリアして再試行
+    clearExecutionUserInfoCache(requestUserId);
+    const retryUserInfo = getCachedUserInfoUnified(requestUserId, true);
+    
+    if (!retryUserInfo) {
+      throw new Error(`認証エラー: 指定されたユーザーID (${requestUserId}) が見つかりません。`);
+    }
+    
+    console.log('⚠️ verifyUserAccess: キャッシュクリア後に再試行成功');
   }
 
+  const finalUserInfo = requestedUserInfo || retryUserInfo;
+  
   // リクエストユーザーのメールアドレスと、要求されたユーザーIDのadminEmailが一致するか検証
-  if (activeUserEmail !== requestedUserInfo.adminEmail) {
+  if (activeUserEmail !== finalUserInfo.adminEmail) {
     throw new Error(`権限エラー: ${activeUserEmail} はユーザーID ${requestUserId} のデータにアクセスする権限がありません。`);
   }
-  debugLog(`✅ ユーザーアクセス検証成功: ${activeUserEmail} は ${requestUserId} のデータにアクセスできます。`);
+  
+  console.log(`✅ ユーザーアクセス検証成功: ${activeUserEmail} は ${requestUserId} のデータにアクセスできます。`);
 }
 
 /**
@@ -283,8 +346,7 @@ function verifyUserAccess(requestUserId) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function getPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode, bypassCache) {
-  verifyUserAccess(requestUserId);
-  clearExecutionUserInfoCache(); // キャッシュをクリアして最新のユーザー情報を取得
+  verifyUserAccess(requestUserId, bypassCache);
 
   try {
     // キャッシュキー生成（パフォーマンス向上）
@@ -292,7 +354,7 @@ function getPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode,
 
     // キャッシュバイパス時は直接実行
     if (bypassCache === true) {
-      debugLog('🔄 キャッシュバイパス：最新データを直接取得');
+      console.log('🔄 キャッシュバイパス：最新データを直接取得');
       return executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode);
     }
 
@@ -302,6 +364,7 @@ function getPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode,
   } finally {
     // 実行終了時にユーザー情報キャッシュをクリア
     clearExecutionUserInfoCache();
+    console.log('🗑️ getPublishedSheetData: 実行終了、キャッシュクリア');
   }
 }
 
@@ -675,7 +738,7 @@ function getAppConfig(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
     var currentUserId = requestUserId;
-    var userInfo = findUserById(currentUserId);
+    var userInfo = getCachedUserInfoUnified(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -3302,6 +3365,133 @@ function isDeployUser() {
 }
 
 // =================================================================
+// 非同期処理状態管理
+// =================================================================
+
+/**
+ * 非同期リソース作成の進捗状態をチェック
+ * @param {string} userId - ユーザーID
+ * @returns {Object} 非同期処理の状態情報
+ */
+function checkAsyncResourceCreationStatus(userId) {
+  try {
+    console.log('🔍 checkAsyncResourceCreationStatus: 開始', { userId });
+    
+    const userInfo = getCachedUserInfoUnified(userId);
+    if (!userInfo) {
+      return {
+        status: 'user_not_found',
+        message: 'ユーザー情報が見つかりません'
+      };
+    }
+    
+    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const setupStatus = userInfo.setupStatus || configJson.setupStatus || 'unknown';
+    
+    // リソース作成の状態を詳細に分析
+    const hasSpreadsheetId = !!(userInfo.spreadsheetId);
+    const hasFormUrl = !!(configJson.formUrl);
+    const hasPublishedSheet = !!(configJson.publishedSheetName);
+    const isAppPublished = !!(configJson.appPublished);
+    
+    console.log('🔍 リソース状態分析:', {
+      userId,
+      setupStatus,
+      hasSpreadsheetId,
+      hasFormUrl,
+      hasPublishedSheet,
+      isAppPublished
+    });
+    
+    // 状態判定ロジック
+    if (setupStatus === 'account_created' || setupStatus === 'basic') {
+      if (!hasSpreadsheetId && !hasFormUrl) {
+        return {
+          status: 'pending',
+          phase: 'resource_creation',
+          message: 'フォームとスプレッドシートを作成中...',
+          progress: 10,
+          estimatedTimeRemaining: '30-60秒'
+        };
+      } else if (hasSpreadsheetId && !hasFormUrl) {
+        return {
+          status: 'in_progress',
+          phase: 'form_creation',
+          message: 'フォームを作成中...',
+          progress: 50,
+          estimatedTimeRemaining: '10-20秒'
+        };
+      } else if (hasSpreadsheetId && hasFormUrl && !hasPublishedSheet) {
+        return {
+          status: 'in_progress',
+          phase: 'configuration',
+          message: '設定を完了中...',
+          progress: 80,
+          estimatedTimeRemaining: '5-10秒'
+        };
+      }
+    }
+    
+    if (hasSpreadsheetId && hasFormUrl) {
+      return {
+        status: 'completed',
+        phase: 'ready',
+        message: 'リソース作成完了',
+        progress: 100,
+        readyForConfiguration: true
+      };
+    }
+    
+    // 不明な状態
+    return {
+      status: 'unknown',
+      phase: 'analysis',
+      message: '状態を確認中...',
+      progress: 0,
+      details: { setupStatus, hasSpreadsheetId, hasFormUrl }
+    };
+    
+  } catch (error) {
+    console.error('checkAsyncResourceCreationStatus エラー:', error);
+    return {
+      status: 'error',
+      phase: 'error',
+      message: '進捗確認中にエラーが発生しました: ' + error.message,
+      progress: 0
+    };
+  }
+}
+
+/**
+ * 軽量ステータスチェック（ポーリング用）
+ * @param {string} userId - ユーザーID
+ * @returns {Object} 簡易ステータス情報
+ */
+function getLightweightStatus(userId) {
+  try {
+    const userInfo = getCachedUserInfoUnified(userId);
+    if (!userInfo) {
+      return { status: 'user_not_found' };
+    }
+    
+    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const hasResources = !!(userInfo.spreadsheetId && configJson.formUrl);
+    
+    return {
+      status: hasResources ? 'ready' : 'pending',
+      hasSpreadsheetId: !!userInfo.spreadsheetId,
+      hasFormUrl: !!configJson.formUrl,
+      setupStatus: userInfo.setupStatus || 'unknown',
+      lastUpdate: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    console.error('getLightweightStatus エラー:', error);
+    return { status: 'error', message: error.message };
+  }
+}
+
+// =================================================================
 // マルチテナント対応関数（同時アクセス対応）
 // =================================================================
 
@@ -3609,6 +3799,10 @@ function getStatus(requestUserId, forceRefresh = false) {
       }
     }
     
+    // 非同期リソース作成の進捗状態をチェック
+    const asyncResourceStatus = checkAsyncResourceCreationStatus(requestUserId);
+    console.log('getStatus: 非同期リソース作成状態', asyncResourceStatus);
+
     const returnObject = {
       status: 'success',
       userInfo: userInfo,
@@ -3628,13 +3822,20 @@ function getStatus(requestUserId, forceRefresh = false) {
       appUrls: generateAppUrls(requestUserId),
       customFormInfo: customFormInfo,
       currentTopic: topic,
+      // 非同期処理の状態情報を追加
+      asyncResourceCreation: asyncResourceStatus,
+      // リソース作成の進捗を UI に表示するためのフラグ
+      showResourceCreationProgress: asyncResourceStatus.status === 'pending' || asyncResourceStatus.status === 'in_progress',
+      resourceCreationMessage: asyncResourceStatus.message || null,
+      resourceCreationProgress: asyncResourceStatus.progress || 0,
       // デバッグ情報
       setupDebug: {
         originalSetupStatus: userInfo.setupStatus,
         hasSpreadsheet: !!(userInfo.spreadsheetId && userInfo.spreadsheetUrl),
         hasForm: !!(configJson.formUrl),
         hasSheetConfig: !!(configJson.publishedSheetName),
-        isPublished: isPublished
+        isPublished: isPublished,
+        asyncResourcePhase: asyncResourceStatus.phase || 'unknown'
       }
     };
     

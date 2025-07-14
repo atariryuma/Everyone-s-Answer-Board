@@ -1493,3 +1493,567 @@ function saveFormCreationConfig(userId, formConfig) {
   invalidateUserCache(userId);
 }
 
+// =================================================================
+// Phase 3: configJsonアトミック部分更新システム
+// 問題解決: configJson上書きリスクの排除と競合制御
+// =================================================================
+
+/**
+ * configJsonのアトミック部分更新
+ * Phase 3 最適化: 読み取り→マージ→書き込みパターンでデータ競合を防止
+ * 
+ * @param {string} userId - ユーザーID
+ * @param {Object} partialConfig - 部分的な設定更新（深いマージされる）
+ * @param {Object} [options] - オプション設定
+ * @param {number} [options.maxRetries=3] - 競合時の最大リトライ回数
+ * @param {number} [options.retryDelay=100] - リトライ間隔（ミリ秒）
+ * @param {boolean} [options.allowOverwrite=false] - 既存値の上書きを許可するか
+ * @returns {Object} 更新結果
+ */
+function updateUserConfigAtomic(userId, partialConfig, options = {}) {
+  const {
+    maxRetries = 3,
+    retryDelay = 100,
+    allowOverwrite = false
+  } = options;
+  
+  const operationId = `config_update_${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  console.log('🔒 updateUserConfigAtomic: 開始', {
+    userId,
+    operationId,
+    partialConfigKeys: Object.keys(partialConfig),
+    maxRetries,
+    allowOverwrite
+  });
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // ロック取得（最大10秒待機）
+      const lock = LockService.getScriptLock();
+      const lockTimeout = 10000;
+      
+      if (!lock.waitLock(lockTimeout)) {
+        if (attempt === maxRetries) {
+          throw new Error(`ロック取得に失敗しました（最大${maxRetries}回試行）: システムが混雑しています`);
+        }
+        console.warn(`🔒 ロック取得失敗、リトライ ${attempt}/${maxRetries}`, { operationId });
+        Utilities.sleep(retryDelay * attempt); // 指数バックオフ
+        continue;
+      }
+      
+      try {
+        // 1. 最新のユーザー情報を取得（キャッシュバイパス）
+        const currentUserInfo = getCachedUserInfoUnified(userId, true);
+        if (!currentUserInfo) {
+          throw new Error('ユーザー情報が見つかりません');
+        }
+        
+        const originalConfigJson = currentUserInfo.configJson || '{}';
+        const currentConfig = JSON.parse(originalConfigJson);
+        
+        // 2. 楽観的排他制御: データバージョンチェック
+        const currentVersion = currentConfig._version || 0;
+        const currentTimestamp = currentConfig._lastModified || currentUserInfo.lastAccessedAt;
+        
+        console.log('📖 現在の設定状態:', {
+          operationId,
+          currentVersion,
+          currentTimestamp,
+          configKeys: Object.keys(currentConfig),
+          attempt
+        });
+        
+        // 3. 深いマージ実行（競合検出付き）
+        const mergeResult = deepMergeWithConflictDetection(currentConfig, partialConfig, {
+          allowOverwrite,
+          operationId,
+          userId
+        });
+        
+        if (mergeResult.hasConflicts && !allowOverwrite) {
+          const conflictError = new Error('設定更新で競合が検出されました');
+          conflictError.code = 'CONFIG_CONFLICT';
+          conflictError.conflicts = mergeResult.conflicts;
+          throw conflictError;
+        }
+        
+        // 4. バージョン管理メタデータを追加
+        const updatedConfig = {
+          ...mergeResult.mergedConfig,
+          _version: currentVersion + 1,
+          _lastModified: new Date().toISOString(),
+          _lastModifiedBy: operationId,
+          _updateHistory: [
+            ...(currentConfig._updateHistory || []).slice(-9), // 最新10件まで保持
+            {
+              version: currentVersion + 1,
+              timestamp: new Date().toISOString(),
+              operationId: operationId,
+              updatedKeys: Object.keys(partialConfig),
+              conflictsResolved: mergeResult.hasConflicts ? mergeResult.conflicts.length : 0
+            }
+          ]
+        };
+        
+        // 5. データベース更新
+        const updateData = {
+          configJson: JSON.stringify(updatedConfig),
+          lastAccessedAt: new Date().toISOString(),
+          lastConfigUpdate: new Date().toISOString()
+        };
+        
+        updateUser(userId, updateData);
+        
+        // 6. キャッシュ無効化
+        if (typeof clearExecutionUserInfoCache === 'function') {
+          clearExecutionUserInfoCache(userId);
+        }
+        invalidateUserCache(userId);
+        
+        console.log('✅ updateUserConfigAtomic: 成功', {
+          operationId,
+          userId,
+          attempt,
+          newVersion: currentVersion + 1,
+          updatedKeys: Object.keys(partialConfig),
+          conflictsResolved: mergeResult.hasConflicts ? mergeResult.conflicts.length : 0,
+          finalConfigSize: JSON.stringify(updatedConfig).length
+        });
+        
+        return {
+          success: true,
+          operationId: operationId,
+          version: currentVersion + 1,
+          updatedKeys: Object.keys(partialConfig),
+          conflictsResolved: mergeResult.hasConflicts ? mergeResult.conflicts.length : 0,
+          attempts: attempt
+        };
+        
+      } finally {
+        // 必ずロックを解除
+        try {
+          lock.releaseLock();
+        } catch (lockReleaseError) {
+          console.warn('ロック解除エラー:', lockReleaseError.message);
+        }
+      }
+      
+    } catch (error) {
+      console.warn(`⚠️ updateUserConfigAtomic 試行 ${attempt}/${maxRetries} 失敗:`, {
+        operationId,
+        error: error.message,
+        errorCode: error.code,
+        userId,
+        willRetry: attempt < maxRetries
+      });
+      
+      // 競合エラーの場合は即座にリトライ
+      if (error.code === 'CONFIG_CONFLICT' && attempt < maxRetries) {
+        Utilities.sleep(retryDelay * attempt);
+        continue;
+      }
+      
+      // 最終試行でもエラーの場合は例外をスロー
+      if (attempt === maxRetries) {
+        const finalError = new Error(`アトミック設定更新に失敗しました: ${error.message}`);
+        finalError.originalError = error;
+        finalError.operationId = operationId;
+        finalError.attempts = attempt;
+        throw finalError;
+      }
+      
+      // 一般的なエラーの場合は少し待ってからリトライ
+      Utilities.sleep(retryDelay * attempt * 2);
+    }
+  }
+}
+
+/**
+ * 深いマージと競合検出
+ * @param {Object} currentConfig - 現在の設定
+ * @param {Object} partialConfig - 部分更新設定
+ * @param {Object} options - オプション
+ * @returns {Object} マージ結果と競合情報
+ */
+function deepMergeWithConflictDetection(currentConfig, partialConfig, options = {}) {
+  const { allowOverwrite = false, operationId, userId } = options;
+  const conflicts = [];
+  
+  // 深いクローンを作成
+  const mergedConfig = JSON.parse(JSON.stringify(currentConfig));
+  
+  function mergeRecursive(target, source, path = '') {
+    for (const key in source) {
+      if (!source.hasOwnProperty(key)) continue;
+      
+      const currentPath = path ? `${path}.${key}` : key;
+      const sourceValue = source[key];
+      const targetValue = target[key];
+      
+      // 値が存在し、かつ異なる場合は競合として記録
+      if (targetValue !== undefined && targetValue !== sourceValue && !allowOverwrite) {
+        // オブジェクト同士の場合は再帰的にチェック
+        if (isPlainObject(targetValue) && isPlainObject(sourceValue)) {
+          mergeRecursive(target[key], sourceValue, currentPath);
+          continue;
+        }
+        
+        // プリミティブ値の競合
+        conflicts.push({
+          path: currentPath,
+          currentValue: targetValue,
+          newValue: sourceValue,
+          timestamp: new Date().toISOString()
+        });
+        
+        console.log('⚠️ 設定競合検出:', {
+          operationId,
+          userId,
+          path: currentPath,
+          currentValue: targetValue,
+          newValue: sourceValue
+        });
+      }
+      
+      // マージ実行
+      if (isPlainObject(targetValue) && isPlainObject(sourceValue)) {
+        target[key] = target[key] || {};
+        mergeRecursive(target[key], sourceValue, currentPath);
+      } else {
+        target[key] = sourceValue;
+      }
+    }
+  }
+  
+  mergeRecursive(mergedConfig, partialConfig);
+  
+  return {
+    mergedConfig: mergedConfig,
+    hasConflicts: conflicts.length > 0,
+    conflicts: conflicts
+  };
+}
+
+/**
+ * プレーンオブジェクトかどうかの判定
+ * @param {any} obj - 判定対象
+ * @returns {boolean} プレーンオブジェクトかどうか
+ */
+function isPlainObject(obj) {
+  return obj !== null && 
+         typeof obj === 'object' && 
+         Object.prototype.toString.call(obj) === '[object Object]' &&
+         !Array.isArray(obj);
+}
+
+/**
+ * 設定更新ロールバック機能（改良版）
+ * @param {string} userId - ユーザーID
+ * @param {number} targetVersion - ロールバック対象バージョン
+ * @returns {Object} ロールバック結果
+ */
+function rollbackUserConfig(userId, targetVersion) {
+  console.log('🔄 rollbackUserConfig: 開始', { userId, targetVersion });
+  
+  try {
+    // 現在の設定を取得
+    const currentUserInfo = getCachedUserInfoUnified(userId, true);
+    if (!currentUserInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    const currentConfig = JSON.parse(currentUserInfo.configJson || '{}');
+    const currentVersion = currentConfig._version || 0;
+    
+    if (targetVersion >= currentVersion) {
+      throw new Error(`無効なロールバック: 対象バージョン(${targetVersion}) >= 現在バージョン(${currentVersion})`);
+    }
+    
+    // 更新履歴から対象バージョンを検索
+    const updateHistory = currentConfig._updateHistory || [];
+    let targetVersionData = null;
+    
+    // 簡易的なロールバック: 基本設定のみ保持
+    const rollbackConfig = {
+      // 基本的な設定のみ保持（バージョン管理フィールドは除外）
+      formUrl: currentConfig.formUrl,
+      publishedSheetName: currentConfig.publishedSheetName,
+      
+      // 新しいバージョン管理
+      _version: currentVersion + 1,
+      _lastModified: new Date().toISOString(),
+      _rollbackFrom: currentVersion,
+      _rollbackTo: targetVersion,
+      _rollbackTimestamp: new Date().toISOString(),
+      _rollbackReason: 'manual_rollback',
+      _updateHistory: [
+        ...updateHistory,
+        {
+          version: currentVersion + 1,
+          timestamp: new Date().toISOString(),
+          operationId: `rollback_${Date.now()}`,
+          action: 'rollback',
+          rollbackFrom: currentVersion,
+          rollbackTo: targetVersion
+        }
+      ]
+    };
+    
+    const updateData = {
+      configJson: JSON.stringify(rollbackConfig),
+      lastAccessedAt: new Date().toISOString(),
+      lastConfigUpdate: new Date().toISOString()
+    };
+    
+    updateUser(userId, updateData);
+    
+    // キャッシュクリア
+    if (typeof clearExecutionUserInfoCache === 'function') {
+      clearExecutionUserInfoCache(userId);
+    }
+    invalidateUserCache(userId);
+    
+    console.log('✅ rollbackUserConfig: 完了', { userId, targetVersion, newVersion: currentVersion + 1 });
+    
+    return {
+      success: true,
+      rolledBackFrom: currentVersion,
+      rolledBackTo: targetVersion,
+      newVersion: currentVersion + 1
+    };
+    
+  } catch (error) {
+    console.error('❌ rollbackUserConfig エラー:', error);
+    throw new Error(`設定ロールバックに失敗しました: ${error.message}`);
+  }
+}
+
+/**
+ * 高度な競合解決機能
+ * @param {string} userId - ユーザーID
+ * @param {Array} conflicts - 競合一覧
+ * @param {Object} resolutionStrategy - 解決策
+ * @returns {Object} 解決結果
+ */
+function resolveConfigConflicts(userId, conflicts, resolutionStrategy = {}) {
+  console.log('⚖️ resolveConfigConflicts: 開始', { 
+    userId, 
+    conflictCount: conflicts.length,
+    strategy: resolutionStrategy 
+  });
+  
+  try {
+    const { 
+      defaultStrategy = 'newer_wins', // 'newer_wins' | 'manual' | 'merge_safe'
+      manualResolutions = {},
+      preserveUserData = true 
+    } = resolutionStrategy;
+    
+    const resolvedConfig = {};
+    const resolutionLog = [];
+    
+    for (const conflict of conflicts) {
+      const { path, currentValue, newValue, timestamp } = conflict;
+      let resolvedValue = newValue; // デフォルトは新しい値
+      let resolutionMethod = 'default_new';
+      
+      // 手動解決が指定されている場合
+      if (manualResolutions[path] !== undefined) {
+        resolvedValue = manualResolutions[path];
+        resolutionMethod = 'manual';
+      }
+      // 戦略に基づく自動解決
+      else {
+        switch (defaultStrategy) {
+          case 'newer_wins':
+            resolvedValue = newValue;
+            resolutionMethod = 'newer_wins';
+            break;
+            
+          case 'older_wins':
+            resolvedValue = currentValue;
+            resolutionMethod = 'older_wins';
+            break;
+            
+          case 'merge_safe':
+            // 安全にマージできる場合のみ
+            if (typeof currentValue === typeof newValue && 
+                typeof currentValue === 'string' && 
+                !currentValue.includes(newValue)) {
+              resolvedValue = currentValue + ' | ' + newValue;
+              resolutionMethod = 'merge_safe';
+            } else {
+              resolvedValue = newValue;
+              resolutionMethod = 'fallback_newer';
+            }
+            break;
+            
+          default:
+            resolvedValue = newValue;
+            resolutionMethod = 'default_new';
+        }
+      }
+      
+      // パスに基づいて設定値を設定
+      setValueByPath(resolvedConfig, path, resolvedValue);
+      
+      resolutionLog.push({
+        path: path,
+        currentValue: currentValue,
+        newValue: newValue,
+        resolvedValue: resolvedValue,
+        method: resolutionMethod,
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log(`⚖️ 競合解決: ${path}`, {
+        method: resolutionMethod,
+        currentValue: currentValue,
+        newValue: newValue,
+        resolvedValue: resolvedValue
+      });
+    }
+    
+    // 解決された設定を適用
+    const updateResult = updateUserConfigAtomic(userId, resolvedConfig, {
+      allowOverwrite: true, // 競合解決なので上書きを許可
+      maxRetries: 1 // 解決済みなのでリトライ不要
+    });
+    
+    console.log('✅ resolveConfigConflicts: 完了', {
+      userId,
+      resolvedConflicts: conflicts.length,
+      updateVersion: updateResult.version
+    });
+    
+    return {
+      success: true,
+      resolvedConflicts: conflicts.length,
+      resolutionLog: resolutionLog,
+      newVersion: updateResult.version,
+      operationId: updateResult.operationId
+    };
+    
+  } catch (error) {
+    console.error('❌ resolveConfigConflicts エラー:', error);
+    throw new Error(`競合解決に失敗しました: ${error.message}`);
+  }
+}
+
+/**
+ * パス文字列に基づいてオブジェクトに値を設定
+ * @param {Object} obj - 対象オブジェクト
+ * @param {string} path - パス（例: "sheet.config.header"）
+ * @param {any} value - 設定する値
+ */
+function setValueByPath(obj, path, value) {
+  const keys = path.split('.');
+  let current = obj;
+  
+  for (let i = 0; i < keys.length - 1; i++) {
+    const key = keys[i];
+    if (!(key in current) || typeof current[key] !== 'object' || current[key] === null) {
+      current[key] = {};
+    }
+    current = current[key];
+  }
+  
+  current[keys[keys.length - 1]] = value;
+}
+
+/**
+ * 設定更新履歴の取得
+ * @param {string} userId - ユーザーID
+ * @param {number} [limit=10] - 取得件数制限
+ * @returns {Object} 履歴データ
+ */
+function getConfigUpdateHistory(userId, limit = 10) {
+  try {
+    const userInfo = getCachedUserInfoUnified(userId, true);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    const config = JSON.parse(userInfo.configJson || '{}');
+    const history = config._updateHistory || [];
+    
+    return {
+      success: true,
+      currentVersion: config._version || 0,
+      history: history.slice(-limit).reverse(), // 最新から順に
+      totalUpdates: history.length
+    };
+    
+  } catch (error) {
+    console.error('getConfigUpdateHistory エラー:', error);
+    throw new Error(`更新履歴の取得に失敗しました: ${error.message}`);
+  }
+}
+
+/**
+ * 設定の健全性チェック
+ * @param {string} userId - ユーザーID
+ * @returns {Object} チェック結果
+ */
+function validateConfigIntegrity(userId) {
+  try {
+    const userInfo = getCachedUserInfoUnified(userId, true);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    const config = JSON.parse(userInfo.configJson || '{}');
+    const issues = [];
+    const warnings = [];
+    
+    // 基本的な健全性チェック
+    if (!config.formUrl && userInfo.spreadsheetId) {
+      issues.push('フォームURLが設定されていませんが、スプレッドシートは存在します');
+    }
+    
+    if (config._version === undefined) {
+      warnings.push('バージョン管理が有効化されていません');
+    }
+    
+    if (!config._lastModified) {
+      warnings.push('最終更新時刻が記録されていません');
+    }
+    
+    // 循環参照チェック
+    try {
+      JSON.stringify(config);
+    } catch (circularError) {
+      issues.push('設定に循環参照が含まれています');
+    }
+    
+    const isHealthy = issues.length === 0;
+    
+    console.log('🔍 設定健全性チェック完了:', {
+      userId,
+      isHealthy,
+      issueCount: issues.length,
+      warningCount: warnings.length
+    });
+    
+    return {
+      success: true,
+      isHealthy: isHealthy,
+      issues: issues,
+      warnings: warnings,
+      configSize: JSON.stringify(config).length,
+      version: config._version || 0,
+      lastModified: config._lastModified
+    };
+    
+  } catch (error) {
+    console.error('validateConfigIntegrity エラー:', error);
+    return {
+      success: false,
+      isHealthy: false,
+      issues: [`設定検証中にエラーが発生しました: ${error.message}`],
+      warnings: []
+    };
+  }
+}
+

@@ -371,12 +371,22 @@ function getSheetsService() {
 
 
 /**
- * ユーザー情報を効率的に検索（キャッシュ優先）
+ * ユーザー情報を効率的に検索（統合キャッシュ優先）
  * @param {string} userId - ユーザーID
+ * @param {boolean} bypassCache - キャッシュを無視してDB直接検索
  * @returns {object|null} ユーザー情報
  */
-function findUserById(userId) {
-  console.log('🔍 findUserById: 検索開始', { userId });
+function findUserById(userId, bypassCache = false) {
+  console.log('🔍 findUserById: 検索開始', { userId, bypassCache });
+  
+  // Core.gsの統合キャッシュシステムが利用可能な場合はそれを使用
+  if (typeof getCachedUserInfoUnified === 'function') {
+    console.log('🔍 統合キャッシュシステム使用');
+    return getCachedUserInfoUnified(userId, bypassCache);
+  }
+  
+  // フォールバック: 従来のキャッシュシステム
+  console.log('🔍 従来キャッシュシステム使用');
   var cacheKey = 'user_' + userId;
   const result = cacheManager.get(
     cacheKey,
@@ -916,13 +926,30 @@ function updateUser(userId, updateData) {
       }
     }
     
-    // 最適化: 変更された内容に基づいてキャッシュを選択的に無効化
-    var userInfo = findUserById(userId);
+    // 統合キャッシュシステムに対応した無効化処理
+    
+    // 1. 実行レベルキャッシュを即座にクリア
+    if (typeof clearExecutionUserInfoCache === 'function') {
+      clearExecutionUserInfoCache(userId);
+      console.log('✅ 実行レベルキャッシュクリア完了: updateUser後');
+    }
+    
+    // 2. 従来のキャッシュシステムも無効化
+    var userInfo = findUserById(userId, true); // キャッシュバイパスして最新情報を取得
     var email = updateData.adminEmail || (userInfo ? userInfo.adminEmail : null);
     var spreadsheetId = updateData.spreadsheetId || (userInfo ? userInfo.spreadsheetId : null);
     
-    // キャッシュを無効化（必要最小限）
+    // 3. 段階的キャッシュ無効化（部分 → 全体）
     invalidateUserCache(userId, email, spreadsheetId, false);
+    
+    // 4. データベースインデックスキャッシュも更新が必要な場合はクリア
+    if (updateData.adminEmail || updateData.userId) {
+      // ユーザーIDやメールアドレスが変更された場合はインデックスキャッシュもクリア
+      cacheManager.clearByPattern('db_index_');
+      console.log('✅ データベースインデックスキャッシュもクリア');
+    }
+    
+    console.log('✅ updateUser: キャッシュ無効化完了', { userId, email, spreadsheetId });
     
     return { success: true };
   } catch (error) {
