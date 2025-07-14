@@ -206,7 +206,7 @@ function createLightweightUser(adminEmail, additionalData = {}) {
       configJson: '{}', // 空の設定
       spreadsheetId: '', // 未設定
       spreadsheetUrl: '', // 未設定
-      setupStatus: 'basic', // 基本作成完了
+      setupStatus: 'account_created', // SETUP_STATUS.ACCOUNT_CREATED に対応
       ...additionalData
     };
     

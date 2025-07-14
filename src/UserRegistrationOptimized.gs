@@ -362,7 +362,7 @@ function createUserResourcesAsync(userId) {
       spreadsheetId: spreadsheetId,
       spreadsheetUrl: spreadsheetUrl,
       configJson: JSON.stringify(config),
-      setupStatus: 'complete'
+      setupStatus: 'data_prepared'  // SETUP_STATUS.DATA_PREPARED に対応
     };
     
     updateUser(userId, updateData);
@@ -397,7 +397,7 @@ function checkResourceCreationStatus(userId) {
       return { status: 'error', message: 'ユーザーが見つかりません' };
     }
     
-    if (userInfo.spreadsheetId && userInfo.setupStatus === 'complete') {
+    if (userInfo.spreadsheetId && (userInfo.setupStatus === 'complete' || userInfo.setupStatus === 'data_prepared')) {
       // リソース作成完了
       const config = userInfo.configJson ? JSON.parse(userInfo.configJson) : {};
       return {
@@ -407,8 +407,8 @@ function checkResourceCreationStatus(userId) {
         spreadsheetUrl: userInfo.spreadsheetUrl || '',
         adminUrl: getWebAppUrl() + '?page=admin&userId=' + userId
       };
-    } else if (userInfo.setupStatus === 'basic') {
-      // リソース作成待ち
+    } else if (userInfo.setupStatus === 'basic' || userInfo.setupStatus === 'account_created') {
+      // リソース作成待ち (旧basic状態と新account_created状態の両方をサポート)
       return {
         status: 'pending',
         message: 'フォーム・スプレッドシートを作成中です...'

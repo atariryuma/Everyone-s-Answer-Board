@@ -276,9 +276,15 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
               </svg>
             </div>
-            <div>
+            <div class="flex-1">
               <span class="text-sm font-medium text-white" id="guidance-text">セットアップを開始してください</span>
-              <div class="text-xs text-gray-400 mt-1">3ステップで簡単セットアップ</div>
+              <div class="text-xs text-gray-400 mt-1" id="step-description">3ステップで簡単セットアップ</div>
+            </div>
+            <!-- 次のアクションボタン -->
+            <div id="next-action-container" class="hidden">
+              <button id="next-action-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                <span id="next-action-text">次へ</span>
+              </button>
             </div>
           </div>
           
@@ -2638,6 +2644,9 @@ function syncCheckboxStates(status) {
       // ステップインジケーターを更新
       updateStepIndicators(status.setupStep);
       
+      // セクションの表示/非表示を更新
+      updateSectionVisibility(status.setupStep);
+      
       setLoading(false);
     }
 
@@ -2845,6 +2854,9 @@ function syncCheckboxStates(status) {
       // ステップインジケーターを更新
       updateStepIndicators(status.setupStep);
       
+      // セクションの表示/非表示を更新
+      updateSectionVisibility(status.setupStep);
+      
       // 列設定を読み込み
       loadConfigForSelected();
       
@@ -2885,6 +2897,9 @@ function syncCheckboxStates(status) {
       console.log('👣 [DEBUG] updateFooterAndGuidance called with status:', status);
       const footer = document.getElementById('admin-footer');
       const guidanceText = document.getElementById('guidance-text');
+      const stepDescription = document.getElementById('step-description');
+      const nextActionContainer = document.getElementById('next-action-container');
+      const nextActionText = document.getElementById('next-action-text');
       
       if (!footer || !guidanceText) return;
 
@@ -2921,19 +2936,52 @@ function syncCheckboxStates(status) {
         guidanceText.textContent = '回答ボードは現在公開中です。';
       } else {
         footer.classList.add('hidden');
-        // ガイダンスのテキストをステップに応じて設定
-        switch(status.setupStep) {
-          case 1:
-            guidanceText.textContent = 'ステップ1: ボードを作成または既存のリソースを追加してください。';
-            break;
-          case 2:
-            guidanceText.textContent = 'ステップ2: 表示したいシートを選択してください。';
-            break;
-          case 3:
-            guidanceText.textContent = 'ステップ3: 列を設定してボードを公開しましょう。';
-            break;
-          default:
-            guidanceText.textContent = 'セットアップを開始してください。';
+        // ガイダンスのテキストとステップの説明を動的に設定
+        if (status.nextAction) {
+          guidanceText.textContent = status.nextAction;
+        } else {
+          // フォールバック: ステップ番号に基づくデフォルトメッセージ
+          switch(status.setupStep) {
+            case 1:
+              guidanceText.textContent = 'ステップ1: アカウント作成が完了しました。';
+              break;
+            case 2:
+              guidanceText.textContent = 'ステップ2: データ準備中です。スプレッドシートとフォームを作成しています...';
+              break;
+            case 3:
+              guidanceText.textContent = 'ステップ3: データ準備完了！表示したいシートを選択してください。';
+              break;
+            case 4:
+              guidanceText.textContent = 'ステップ4: 列を設定して表示内容をカスタマイズしましょう。';
+              break;
+            case 5:
+              guidanceText.textContent = 'ステップ5: プレビューを確認して公開設定を行いましょう。';
+              break;
+            case 6:
+              guidanceText.textContent = 'ステップ6: 回答ボードが公開されました！';
+              break;
+            default:
+              guidanceText.textContent = 'セットアップを開始してください。';
+          }
+        }
+        
+        // ステップの説明を更新
+        if (stepDescription && status.stepDescription) {
+          stepDescription.textContent = status.stepDescription;
+        }
+        
+        // 次のアクションボタンを表示・更新
+        if (nextActionContainer && nextActionText && status.nextAction && status.setupStep < 6) {
+          nextActionText.textContent = getActionButtonText(status.setupStep);
+          nextActionContainer.classList.remove('hidden');
+          
+          // ボタンのクリックイベントを設定
+          const nextActionBtn = document.getElementById('next-action-btn');
+          if (nextActionBtn) {
+            nextActionBtn.onclick = () => executeNextAction(status.setupStep);
+          }
+        } else if (nextActionContainer) {
+          nextActionContainer.classList.add('hidden');
         }
       }
       
@@ -2959,11 +3007,27 @@ function syncCheckboxStates(status) {
     }
 
     /**
-     * ステップインジケーターのUIを更新する
-     * @param {number} currentStep - 現在のステップ番号 (1, 2, or 3)
+     * ステップインジケーターのUIを更新する（6ステップシステムを3ステップUIにマッピング）
+     * @param {number} currentStep - 現在のステップ番号 (1-6)
      */
     function updateStepIndicators(currentStep) {
       console.log('📊 [DEBUG] updateStepIndicators called with currentStep:', currentStep);
+      
+      // 6ステップシステムを3ステップUIにマッピング
+      // Step 1-2 (アカウント作成・データ準備) → UI Step 1 (データ準備)
+      // Step 3-4 (データ投入・シート選択) → UI Step 2 (シート選択) 
+      // Step 5-6 (プレビュー・公開) → UI Step 3 (設定・公開)
+      let uiStep;
+      if (currentStep <= 2) {
+        uiStep = 1;
+      } else if (currentStep <= 4) {
+        uiStep = 2;
+      } else {
+        uiStep = 3;
+      }
+      
+      console.log('📊 [DEBUG] Mapping step', currentStep, 'to UI step', uiStep);
+      
       const steps = [
         document.getElementById('step-1-indicator'),
         document.getElementById('step-2-indicator'),
@@ -2976,12 +3040,12 @@ function syncCheckboxStates(status) {
         const circle = step.querySelector('div');
         const text = step.querySelector('span');
 
-        if (stepNumber < currentStep) {
+        if (stepNumber < uiStep) {
           // 完了したステップ
           circle.className = 'w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all';
           text.classList.remove('text-gray-500');
           text.classList.add('text-gray-300');
-        } else if (stepNumber === currentStep) {
+        } else if (stepNumber === uiStep) {
           // 現在のステップ
           circle.className = 'w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all ring-2 ring-blue-400 ring-offset-2 ring-offset-gray-800';
           text.classList.remove('text-gray-500');
@@ -2993,6 +3057,213 @@ function syncCheckboxStates(status) {
           text.classList.add('text-gray-500');
         }
       });
+    }
+
+    /**
+     * ステップに応じた次のアクションボタンのテキストを取得
+     * @param {number} setupStep - 現在のセットアップステップ (1-6)
+     * @returns {string} ボタンテキスト
+     */
+    function getActionButtonText(setupStep) {
+      switch (setupStep) {
+        case 1:
+          return 'データ準備を開始';
+        case 2:
+          return 'リソース作成を確認';
+        case 3:
+          return 'シートを選択';
+        case 4:
+          return '列設定に進む';
+        case 5:
+          return 'プレビューを確認';
+        default:
+          return '次へ';
+      }
+    }
+
+    /**
+     * ステップに応じた次のアクションを実行
+     * @param {number} setupStep - 現在のセットアップステップ (1-6)
+     */
+    function executeNextAction(setupStep) {
+      console.log('🎬 [DEBUG] executeNextAction called for step:', setupStep);
+      
+      switch (setupStep) {
+        case 1:
+          // アカウント作成完了 -> データ準備を開始
+          triggerDataPreparation();
+          break;
+        case 2:
+          // データ準備中 -> 状況を確認して次へ
+          checkResourceCreationStatus();
+          break;
+        case 3:
+          // データ準備完了 -> シート選択にスクロール
+          scrollToSheetSelection();
+          break;
+        case 4:
+          // シート選択完了 -> 列設定にスクロール
+          scrollToColumnConfig();
+          break;
+        case 5:
+          // 列設定完了 -> プレビュー/公開設定にスクロール
+          scrollToPublishConfig();
+          break;
+        default:
+          console.log('不明なステップです:', setupStep);
+      }
+    }
+
+    /**
+     * データ準備を開始する
+     */
+    function triggerDataPreparation() {
+      console.log('🚀 Starting data preparation...');
+      // ボード作成ボタンをクリック
+      const createBoardBtn = document.getElementById('create-board-btn');
+      if (createBoardBtn && !createBoardBtn.disabled) {
+        createBoardBtn.click();
+      } else {
+        console.log('Create board button not available');
+        // 代替: 直接関数を呼び出し
+        if (typeof createBoard === 'function') {
+          createBoard();
+        }
+      }
+    }
+
+    /**
+     * リソース作成状況を確認する
+     */
+    function checkResourceCreationStatus() {
+      console.log('🔍 Checking resource creation status...');
+      // 状況更新のためにgetStatusを再実行
+      refreshStatus();
+    }
+
+    /**
+     * シート選択セクションにスクロール
+     */
+    function scrollToSheetSelection() {
+      const sheetSection = document.getElementById('sheet-selection-section');
+      if (sheetSection) {
+        sheetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // 少し遅延してからシート選択ドロップダウンにフォーカス
+        setTimeout(() => {
+          const sheetSelect = document.getElementById('sheet-select');
+          if (sheetSelect) {
+            sheetSelect.focus();
+          }
+        }, 500);
+      }
+    }
+
+    /**
+     * 列設定セクションにスクロール
+     */
+    function scrollToColumnConfig() {
+      const configSection = document.getElementById('config-section');
+      if (configSection) {
+        configSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    /**
+     * 公開設定セクションにスクロール
+     */
+    function scrollToPublishConfig() {
+      const configSection = document.getElementById('config-section');
+      if (configSection) {
+        configSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // 公開ボタンを強調
+        setTimeout(() => {
+          const publishBtn = document.getElementById('publish-btn');
+          if (publishBtn) {
+            publishBtn.focus();
+            publishBtn.classList.add('ring-2', 'ring-blue-400');
+          }
+        }, 500);
+      }
+    }
+
+    /**
+     * セクションの表示/非表示を6ステップシステムに応じて制御する
+     * @param {number} currentStep - 現在のステップ番号 (1-6)
+     */
+    function updateSectionVisibility(currentStep) {
+      console.log('📊 [DEBUG] updateSectionVisibility called with currentStep:', currentStep);
+      
+      const dataSetupSection = document.getElementById('data-setup-section');
+      const sheetSelectionSection = document.getElementById('sheet-selection-section');
+      const configSection = document.getElementById('config-section');
+      
+      // デフォルトで全セクションを表示
+      if (dataSetupSection) dataSetupSection.style.display = 'block';
+      if (sheetSelectionSection) sheetSelectionSection.style.display = 'block';
+      if (configSection) configSection.style.display = 'block';
+      
+      // ステップに応じてセクションの強調表示と操作性を制御
+      switch (currentStep) {
+        case 1:
+        case 2:
+          // データ準備段階 - データセットアップセクションを強調
+          if (dataSetupSection) {
+            dataSetupSection.style.opacity = '1';
+            dataSetupSection.style.transform = 'scale(1)';
+          }
+          if (sheetSelectionSection) {
+            sheetSelectionSection.style.opacity = '0.6';
+            sheetSelectionSection.style.pointerEvents = 'none';
+          }
+          if (configSection) {
+            configSection.style.opacity = '0.6';
+            configSection.style.pointerEvents = 'none';
+          }
+          break;
+          
+        case 3:
+        case 4:
+          // データ投入・シート選択段階 - シート選択セクションを強調
+          if (dataSetupSection) {
+            dataSetupSection.style.opacity = '0.8';
+          }
+          if (sheetSelectionSection) {
+            sheetSelectionSection.style.opacity = '1';
+            sheetSelectionSection.style.pointerEvents = 'auto';
+            sheetSelectionSection.style.transform = 'scale(1)';
+          }
+          if (configSection) {
+            configSection.style.opacity = '0.6';
+            configSection.style.pointerEvents = 'none';
+          }
+          break;
+          
+        case 5:
+        case 6:
+          // プレビュー・公開段階 - 設定セクションを強調
+          if (dataSetupSection) {
+            dataSetupSection.style.opacity = '0.8';
+          }
+          if (sheetSelectionSection) {
+            sheetSelectionSection.style.opacity = '0.8';
+          }
+          if (configSection) {
+            configSection.style.opacity = '1';
+            configSection.style.pointerEvents = 'auto';
+            configSection.style.transform = 'scale(1)';
+          }
+          break;
+          
+        default:
+          // 全セクション有効
+          [dataSetupSection, sheetSelectionSection, configSection].forEach(section => {
+            if (section) {
+              section.style.opacity = '1';
+              section.style.pointerEvents = 'auto';
+              section.style.transform = 'scale(1)';
+            }
+          });
+      }
     }
 
     /**

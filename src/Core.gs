@@ -3546,12 +3546,78 @@ function getStatus(requestUserId, forceRefresh = false) {
       topic = sheetConfig.opinionHeader || configJson.publishedSheetName;
     }
 
+    // セットアップ進行状況を判定
+    const setupProgress = determineSetupProgress(userInfo);
+    console.log('getStatus: セットアップ進行状況', setupProgress);
+    
+    // 自動リソース作成: account_created 状態のユーザーを自動的にリソース作成に進める
+    if (setupProgress.status === SETUP_STATUS.ACCOUNT_CREATED && 
+        !userInfo.spreadsheetId && 
+        !configJson.resourceCreationInProgress) {
+      
+      console.log('getStatus: account_created ユーザーの自動リソース作成をトリガー', {
+        userId: requestUserId,
+        setupStatus: setupProgress.status
+      });
+      
+      // リソース作成フラグを設定して重複実行を防ぐ
+      configJson.resourceCreationInProgress = true;
+      configJson.resourceCreationStartedAt = new Date().toISOString();
+      
+      updateUser(requestUserId, {
+        configJson: JSON.stringify(configJson)
+      });
+      
+      // 非同期でリソース作成を実行
+      try {
+        const resourceResult = createUserResourcesAsync(requestUserId);
+        if (resourceResult.status === 'success') {
+          console.log('getStatus: 自動リソース作成完了', resourceResult);
+          
+          // 完了フラグを設定
+          const updatedConfig = JSON.parse(userInfo.configJson || '{}');
+          delete updatedConfig.resourceCreationInProgress;
+          updatedConfig.resourceCreationCompletedAt = new Date().toISOString();
+          
+          updateUser(requestUserId, {
+            configJson: JSON.stringify(updatedConfig)
+          });
+          
+          // ユーザー情報を再取得して最新状態を反映
+          userInfo = findUserById(requestUserId);
+          configJson = JSON.parse(userInfo.configJson || '{}');
+          
+          // セットアップ進行状況を再判定
+          const updatedSetupProgress = determineSetupProgress(userInfo);
+          console.log('getStatus: リソース作成後のセットアップ進行状況', updatedSetupProgress);
+          
+          // 戻り値のsetupProgressを更新
+          Object.assign(setupProgress, updatedSetupProgress);
+        }
+      } catch (error) {
+        console.error('getStatus: 自動リソース作成失敗', error);
+        
+        // エラー時はフラグをクリア
+        const errorConfig = JSON.parse(userInfo.configJson || '{}');
+        delete errorConfig.resourceCreationInProgress;
+        errorConfig.resourceCreationError = error.message;
+        errorConfig.resourceCreationErrorAt = new Date().toISOString();
+        
+        updateUser(requestUserId, {
+          configJson: JSON.stringify(errorConfig)
+        });
+      }
+    }
+    
     const returnObject = {
       status: 'success',
       userInfo: userInfo,
       sheetNames: sheetNames,  // Keep for backward compatibility
       allSheets: sheetNames,   // Add for AdminPanel.html compatibility
-      setupStep: configJson.setupStatus === 'completed' ? 3 : 2,
+      setupStep: setupProgress.step,
+      setupStatus: setupProgress.status,
+      nextAction: setupProgress.nextAction,
+      stepDescription: setupProgress.description,
       activeSheetName: configJson.publishedSheetName || '',
       publishedSheetName: configJson.publishedSheetName || null,
       isPublished: isPublished,
@@ -3561,7 +3627,15 @@ function getStatus(requestUserId, forceRefresh = false) {
       webAppUrl: getWebAppUrlCached(),
       appUrls: generateAppUrls(requestUserId),
       customFormInfo: customFormInfo,
-      currentTopic: topic
+      currentTopic: topic,
+      // デバッグ情報
+      setupDebug: {
+        originalSetupStatus: userInfo.setupStatus,
+        hasSpreadsheet: !!(userInfo.spreadsheetId && userInfo.spreadsheetUrl),
+        hasForm: !!(configJson.formUrl),
+        hasSheetConfig: !!(configJson.publishedSheetName),
+        isPublished: isPublished
+      }
     };
     
     debugLog('getStatus: Returning object with sheetNames/allSheets:', returnObject.allSheets ? returnObject.allSheets.length : 0, 'sheets');

@@ -679,6 +679,92 @@ function navigateToAdminPanel(userId) {
 }
 
 /**
+ * セットアップ状態とステップを判定
+ * @param {Object} userInfo ユーザー情報
+ * @return {Object} 状態とステップ情報
+ */
+function determineSetupProgress(userInfo) {
+  try {
+    if (!userInfo) {
+      return {
+        status: SETUP_STATUS.UNREGISTERED,
+        step: SETUP_STEPS.ACCOUNT,
+        nextAction: 'アカウントを作成してください',
+        description: 'まずはアカウント登録から始めましょう'
+      };
+    }
+
+    const config = JSON.parse(userInfo.configJson || '{}');
+    const hasSpreadsheet = !!(userInfo.spreadsheetId && userInfo.spreadsheetUrl);
+    const hasForm = !!(config.formUrl);
+    const hasSheetConfig = !!(config.publishedSheetName);
+    const isPublished = !!(config.appPublished && config.publishedSpreadsheetId);
+
+    console.log('determineSetupProgress: 状態分析', {
+      setupStatus: userInfo.setupStatus,
+      hasSpreadsheet,
+      hasForm,
+      hasSheetConfig,
+      isPublished
+    });
+
+    // 状態判定ロジック
+    if (isPublished) {
+      return {
+        status: SETUP_STATUS.PUBLISHED,
+        step: SETUP_STEPS.PUBLISHED,
+        nextAction: '回答ボードが公開中です',
+        description: 'ボードの管理と監視を行えます'
+      };
+    }
+    
+    if (hasSheetConfig && hasSpreadsheet && hasForm) {
+      return {
+        status: SETUP_STATUS.CONFIGURED,
+        step: SETUP_STEPS.PREVIEW,
+        nextAction: 'プレビューを確認して公開する',
+        description: '設定が完了しました。プレビューを確認して公開しましょう'
+      };
+    }
+    
+    if (hasSpreadsheet && hasForm) {
+      return {
+        status: SETUP_STATUS.DATA_PREPARED,
+        step: SETUP_STEPS.DATA_INPUT,
+        nextAction: 'シートを選択して列を設定する',
+        description: 'データの準備ができました。シートと列の設定を行いましょう'
+      };
+    }
+    
+    if (userInfo.setupStatus === 'basic' || userInfo.setupStatus === 'account_created') {
+      return {
+        status: SETUP_STATUS.ACCOUNT_CREATED,
+        step: SETUP_STEPS.DATA_PREP,
+        nextAction: 'データ準備を完了する',
+        description: 'スプレッドシートとフォームを作成しましょう'
+      };
+    }
+    
+    // フォールバック
+    return {
+      status: userInfo.setupStatus || SETUP_STATUS.ACCOUNT_CREATED,
+      step: SETUP_STEPS.DATA_PREP,
+      nextAction: 'セットアップを続行する',
+      description: 'セットアップを完了しましょう'
+    };
+
+  } catch (error) {
+    console.error('determineSetupProgress error:', error);
+    return {
+      status: SETUP_STATUS.ACCOUNT_CREATED,
+      step: SETUP_STEPS.DATA_PREP,
+      nextAction: 'セットアップを確認する',
+      description: 'セットアップ状況を確認してください'
+    };
+  }
+}
+
+/**
  * ユーザーの存在確認
  * @param {string} userId ユーザーID
  * @return {Object} 確認結果
