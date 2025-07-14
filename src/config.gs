@@ -1431,3 +1431,65 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
 
 
 
+
+/**
+ * ユーザーの設定オブジェクトを取得・パースします。
+ * @param {string} userId - 対象のユーザーID。
+ * @returns {object} パースされた設定オブジェクト。
+ */
+function _getUserConfig(userId) {
+  const user = findUserById(userId);
+  if (!user || !user.configJson) {
+    return {};
+  }
+  try {
+    return JSON.parse(user.configJson);
+  } catch (e) {
+    console.error(`_getUserConfig: JSONのパースに失敗しました。 UserID: ${userId}`);
+    return {};
+  }
+}
+
+/**
+ * ユーザーの設定オブジェクトをデータベースに保存します。
+ * @param {string} userId - 対象のユーザーID。
+ * @param {object} config - 保存する設定オブジェクト。
+ */
+function _setUserConfig(userId, config) {
+  const configJson = JSON.stringify(config, null, 2);
+  updateUser(userId, { configJson: configJson });
+}
+
+/**
+ * 特定のシートの設定を更新します。
+ * @param {string} userId - 対象のユーザーID。
+ * @param {string} sheetName - 対象のシート名。
+ * @param {object} newSheetConfig - 新しいシート設定。
+ */
+function updateSheetConfig(userId, sheetName, newSheetConfig) {
+  const config = _getUserConfig(userId);
+  const sheetKey = `sheet_${sheetName}`;
+  config[sheetKey] = Object.assign({}, config[sheetKey] || {}, newSheetConfig);
+  _setUserConfig(userId, config);
+  invalidateUserCache(userId);
+  return { status: 'success', message: `${sheetName} の設定を更新しました。` };
+}
+
+/**
+ * フォーム作成時の情報をconfigに保存する
+ * @param {string} userId ユーザーID
+ * @param {object} formConfig フォーム設定
+ */
+function saveFormCreationConfig(userId, formConfig) {
+  const config = _getUserConfig(userId);
+  config.formUrl = formConfig.formUrl;
+  config.editFormUrl = formConfig.editFormUrl;
+  config.lastFormCreatedAt = new Date().toISOString();
+  const sheetKey = `sheet_${formConfig.sheetName}`;
+  config[sheetKey] = {
+    opinionHeader: formConfig.opinionHeader,
+  };
+  _setUserConfig(userId, config);
+  invalidateUserCache(userId);
+}
+
