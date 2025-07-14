@@ -48,128 +48,6 @@ function updateUserDisplay(email) {
   if (registerBtn) {
     registerBtn.disabled = false;
   }
-  
-  // Initialize enhanced UI after authentication
-  initializeEnhancedUI();
-}
-
-/**
- * Initialize enhanced UI components progressively
- */
-function initializeEnhancedUI() {
-  if (uiInitialized) return;
-  uiInitialized = true;
-
-  // Progressive UI display with delays
-  setTimeout(() => showInfoCards(), 300);
-  setTimeout(() => showAgeSelector(), 600);
-  setTimeout(() => showHelpSystem(), 900);
-  setTimeout(() => showEnhancedFooter(), 1200);
-  
-  // Detect age group from URL
-  detectAndSetAgeGroup();
-}
-
-/**
- * Show information cards with animation
- */
-function showInfoCards() {
-  const infoCardsContainer = document.getElementById('info-cards-container');
-  if (infoCardsContainer) {
-    infoCardsContainer.style.display = 'grid';
-    setTimeout(() => infoCardsContainer.classList.add('show'), 50);
-  }
-}
-
-/**
- * Show age selector if not specified in URL
- */
-function showAgeSelector() {
-  const urlParams = new URLSearchParams(window.location.search);
-  if (!urlParams.get('ageGroup')) {
-    const ageSelectorContainer = document.getElementById('age-selector-container');
-    if (ageSelectorContainer) {
-      ageSelectorContainer.style.display = 'block';
-      setTimeout(() => ageSelectorContainer.classList.add('show'), 50);
-    }
-  }
-}
-
-/**
- * Show help system
- */
-function showHelpSystem() {
-  const helpSystem = document.getElementById('help-system');
-  if (helpSystem) {
-    helpSystem.style.display = 'block';
-    setTimeout(() => helpSystem.classList.add('show'), 50);
-  }
-}
-
-/**
- * Show enhanced footer and hide legacy footer
- */
-function showEnhancedFooter() {
-  const enhancedFooter = document.getElementById('enhanced-footer');
-  const legacyFooter = document.getElementById('legacy-footer');
-  
-  if (enhancedFooter) {
-    enhancedFooter.style.display = 'block';
-    setTimeout(() => enhancedFooter.classList.add('show'), 50);
-    
-    if (legacyFooter) {
-      legacyFooter.style.display = 'none';
-    }
-  }
-}
-
-/**
- * Detect and set age group from URL parameters
- */
-function detectAndSetAgeGroup() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const ageFromUrl = urlParams.get('ageGroup');
-  
-  if (ageFromUrl) {
-    selectedAgeGroup = ageFromUrl;
-    const gradeSelect = document.getElementById('grade-select');
-    if (gradeSelect) {
-      gradeSelect.value = ageFromUrl;
-    }
-    console.log('Age group detected from URL:', ageFromUrl);
-  } else {
-    selectedAgeGroup = 'elementary-upper';
-  }
-}
-
-/**
- * Handle age group change
- * @param {string} newAgeGroup - New age group selection
- */
-function handleAgeGroupChange(newAgeGroup) {
-  selectedAgeGroup = newAgeGroup;
-  console.log('Age group changed to:', newAgeGroup);
-  
-  const displayName = getAgeGroupDisplayName(newAgeGroup);
-  if (window.sharedUtilities) {
-    window.sharedUtilities.message.showSimple(`${displayName}向けの内容で表示します`, 'info');
-  }
-}
-
-/**
- * Get display name for age group
- * @param {string} ageGroup - Age group code
- * @returns {string} Display name
- */
-function getAgeGroupDisplayName(ageGroup) {
-  const displayNames = {
-    'elementary-lower': '小学校低学年',
-    'elementary-upper': '小学校高学年',
-    'junior-high': '中学校',
-    'high-school': '高等学校',
-    'teacher': '教師'
-  };
-  return displayNames[ageGroup] || '一般';
 }
 
 // =============================================================================
@@ -177,20 +55,13 @@ function getAgeGroupDisplayName(ageGroup) {
 // =============================================================================
 
 /**
- * Execute registration process with confirmation
+ * Execute registration process
  */
 function executeRegistrationWithConfirmation() {
   if (isRegistrationInProgress || !userEmail) return;
 
-  const ageGroup = selectedAgeGroup || 'elementary-upper';
-  
-  if (window.showAgeAppropriateModals) {
-    window.showAgeAppropriateModals(() => {
-      executeRegistration();
-    });
-  } else {
-    executeRegistration();
-  }
+  // Directly execute registration without age-specific modals
+  executeRegistration();
 }
 
 /**
@@ -556,13 +427,10 @@ if (document.readyState === 'loading') {
 window.registrationUtilities = {
   state: {
     userEmail: () => userEmail,
-    selectedAgeGroup: () => selectedAgeGroup,
     isInProgress: () => isRegistrationInProgress
   },
   ui: {
-    updateUserDisplay: updateUserDisplay,
-    initializeEnhanced: initializeEnhancedUI,
-    handleAgeGroupChange: handleAgeGroupChange
+    updateUserDisplay: updateUserDisplay
   },
   process: {
     execute: executeRegistration,

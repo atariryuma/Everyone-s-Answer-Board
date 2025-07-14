@@ -379,7 +379,7 @@
         </div>
         
         <!-- 初期状態/ローディング表示 -->
-        <div id="header-domain-initial" class="glass-panel bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-3 border border-blue-400/30">
+        <div id="header-domain-initial" class="glass-panel bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-3 border border-blue-400/30 hidden">
           <div class="flex items-center gap-2">
             <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -427,35 +427,24 @@
 
   <script>
     /* =============================================================================
-       Registration.html - Minimal JavaScript 
-       Main logic moved to RegistrationLogic.html and SharedJavaScript.html
+       Registration.html - Minimal JavaScript
+       The main logic is in RegistrationLogic.html.
        ============================================================================= */
     
-    // Backward compatibility functions using shared utilities
-    var showMessage = window.registrationUtilities?.legacy?.showMessage || 
-                     window.sharedUtilities?.message?.show || 
-                     function(msg, type) { console.log(`[${type}] ${msg}`); };
-    
-    var executeRegistration = window.registrationUtilities?.actions?.executeRegistration || function() {
-        console.log('Registration function not available');
-    };
-    
-    var executeRegistrationWithConfirmation = window.registrationUtilities?.actions?.executeRegistrationWithConfirmation || function() {
-        console.log('Registration with confirmation function not available');
-    };
-    
-    // Initialize on DOM ready
+    // Initialize the page when the DOM is fully loaded.
+    // The initializeRegistrationPage function is defined in RegistrationLogic.html.
     document.addEventListener('DOMContentLoaded', function() {
-        console.log('🔧 Registration: Using unified utilities and logic files');
-        
-        // Initialize registration utilities if available
-        if (window.registrationUtilities) {
-            console.log('✅ Registration: Registration utilities loaded');
+      if (typeof initializeRegistrationPage === 'function') {
+        initializeRegistrationPage();
+      } else {
+        console.error('Fatal Error: initializeRegistrationPage() not found.');
+        // Display an error message to the user
+        const statusText = document.getElementById('status-text');
+        if (statusText) {
+          statusText.textContent = 'ページの読み込みに失敗しました。';
+          statusText.style.color = '#ef4444';
         }
-        
-        if (window.sharedUtilities) {
-            console.log('✅ Registration: Shared utilities loaded');
-        }
+      }
     });
   </script>
 </body>
