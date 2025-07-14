@@ -183,6 +183,7 @@ sequenceDiagram
   * **`Registration.html`**: 新規ユーザー登録画面。
   * **`AdminPanel.html`**: 教師向けの管理画面。
   * **`Page.html`**: 生徒や一般閲覧者向けのメインの回答ボード画面。
+  * **`SharedModals.html`**: プライバシーやデジタル・シティズンシップなど、共通モーダルをまとめたテンプレート。
 
 ### 4.2. 詳細フロントエンドフロー
 
