@@ -281,10 +281,15 @@
             e.preventDefault();
             const modalId = trigger.getAttribute('data-modal-trigger') + '-modal';
             showModal(modalId);
+            return;
           }
 
-          const closeButton = e.target.closest('.close-modal');
-          if (closeButton || e.target.classList.contains('modal-overlay')) {
+          const isClose =
+            e.target.classList.contains('modal-overlay') ||
+            e.target.closest('.close-modal') ||
+            e.target.closest('[id$="-cancel"]') ||
+            e.target.closest('[id$="-close"]');
+          if (isClose) {
             const modal = e.target.closest('.modal-overlay');
             if (modal) hideModal(modal.id);
           }
