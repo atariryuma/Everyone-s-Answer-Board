@@ -13,7 +13,8 @@
 | 1.0 | 2025/07/04 | Gemini | 初期バージョンの作成 |
 | 2.0 | 2025/07/05 | Gemini | 機能要件の拡充、非機能要件の追加、画面フローの明記 |
 | 3.0 | 2025/07/05 | Gemini | 開発者向けに、ユーザー体験向上と運用保守性強化のための要件を追加 |
-| 4.0 | 2025/07/05 | Gemini | **【本バージョン】** 機能のシンプル化と、各要件の超詳細化を実施。 |
+| 4.0 | 2025/07/05 | Gemini | 機能のシンプル化と、各要件の超詳細化を実施。 |
+| 5.0 | 2025/07/14 | Gemini | マルチテナント化と自動テスト環境(Jest)の導入。 |
 
 ### 0.3. 用語集
 
@@ -99,6 +100,7 @@
   * **フロントエンド**: **HTML/CSS/JavaScript** で構築し、スタイリングにはTailwind CSSのCDNを利用します。
   * **データベース**: **Google Sheets** を主要なデータストアとして使用します。
   * **認証**: Googleアカウント認証と、APIアクセスのための**サービスアカウントモデル**を採用します。
+  * **マルチテナント構成**: 管理者ごとに専用のシートとフォームを生成し、データを隔離します。
 
 ### 2.2. データフロー
 
@@ -133,6 +135,12 @@ sequenceDiagram
     B-->>F: Final reaction state
     F->>F: Sync UI with server state
 ```
+
+### 2.3. 追加アーキテクチャ要素
+
+  * **Event-Driven Registration**: `AdvancedArchitecture.gs` 内の `UserRegistrationEvent` クラスでユーザー登録イベントを管理。
+  * **Circuit Breaker & Bulkhead**: 同ファイルの `CircuitBreaker` と `ResourcePool` により高負荷時の安定性を確保。
+  * **Predictive Cache**: `PredictiveCache` がアクセスパターンを学習し、関連データを先読みします。
 
 -----
 
@@ -296,8 +304,8 @@ sequenceDiagram
 
 | テスト種別 | 対象 | ツール/手法 |
 | :--- | :--- | :--- |
-| **単体テスト** | GASの各関数（特にロジックが複雑なもの） | `src/test.gs`内のテストスイート (`UltraTestSuite`) |
-| **結合テスト** | フロントエンドとバックエンドの連携 | `tests/integration_test.js` (Jest) |
+| **単体テスト** | GASの各関数（特にロジックが複雑なもの） | `tests/*.test.js` (Jest) |
+| **結合テスト** | フロントエンドとバックエンドの連携 | `tests/*integration*.test.js` (Jest) |
 | **E2Eテスト** | ユーザー登録からボード表示までの一連のシナリオ | 手動テスト（テストケースを別途作成） |
 | **UIテスト** | 各画面の表示とインタラクション | `tests/*.test.js` (Jest + JSDOM) |
 
