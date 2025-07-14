@@ -188,9 +188,9 @@
     </button>
 
     <div class="footer">
-      <a data-modal-trigger="privacy">プライバシーポリシー</a>
+      <a data-modal-trigger="enhanced-privacy">プライバシーポリシー</a>
       および
-      <a data-modal-trigger="digital-citizenship">デジタル・シティズンシップ</a>
+      <a data-modal-trigger="enhanced-digital-citizenship">デジタル・シティズンシップ</a>
       に同意の上で作成されます
     </div>
   </div>
@@ -202,21 +202,8 @@
     <a href="#" class="action-btn primary" id="admin-panel-btn">管理画面を開く</a>
   </div>
 
-  <div id="privacy-modal" class="modal-overlay">
-    <div class="modal-content">
-      <h2 class="title">プライバシーポリシー</h2>
-      <p>ここにプライバシーポリシーの内容が入ります。個人情報は適切に保護され、教育目的でのみ使用されます。</p>
-      <button class="action-btn secondary" data-close>閉じる</button>
-    </div>
-  </div>
-  
-  <div id="digital-citizenship-modal" class="modal-overlay">
-    <div class="modal-content">
-      <h2 class="title">デジタル・シティズンシップ</h2>
-      <p>デジタル社会における責任ある市民として、技術を適切かつ効果的に使用する能力です。この回答ボードを通じて、他者への配慮や情報倫理について実践的に学びましょう。</p>
-      <button class="action-btn secondary" data-close>閉じる</button>
-    </div>
-  </div>
+  <!-- 統合モーダルシステムを使用 -->
+  <?!= include('SharedModals'); ?>
 
 
   <script>
@@ -387,26 +374,42 @@
           .getExistingBoard();
       };
       
-      // --- モーダル制御 ---
+      // --- 統合モーダル制御 ---
       const modalTriggers = document.querySelectorAll('[data-modal-trigger]');
       modalTriggers.forEach(trigger => {
-        trigger.addEventListener('click', () => {
-          const modalId = trigger.getAttribute('data-modal-trigger') + '-modal';
-          document.getElementById(modalId)?.classList.add('is-visible');
+        trigger.addEventListener('click', (e) => {
+          e.preventDefault();
+          const modalType = trigger.getAttribute('data-modal-trigger');
+          
+          // 年齢グループを自動判定
+          const ageGroup = window.sharedModals ? window.sharedModals.detectAgeGroup() : 'elementary-upper';
+          
+          if (modalType === 'enhanced-privacy') {
+            // 統合プライバシーモーダルを表示
+            if (window.showEnhancedPrivacyModal) {
+              window.showEnhancedPrivacyModal(ageGroup);
+            } else {
+              // フォールバック
+              window.showPrivacyModal();
+            }
+          } else if (modalType === 'enhanced-digital-citizenship') {
+            // 統合デジタル・シティズンシップモーダルを表示
+            if (window.showEnhancedDigitalCitizenshipModal) {
+              window.showEnhancedDigitalCitizenshipModal(ageGroup);
+            } else {
+              // フォールバック
+              window.showDigitalCitizenshipModal();
+            }
+          } else {
+            // レガシー対応
+            const modalId = modalType + '-modal';
+            const modal = document.getElementById(modalId);
+            if (modal) {
+              modal.classList.remove('hidden');
+              modal.classList.add('is-visible');
+            }
+          }
         });
-      });
-
-      const modals = document.querySelectorAll('.modal-overlay');
-      modals.forEach(modal => {
-        const closeModal = () => modal.classList.remove('is-visible');
-        modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
-        modal.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', closeModal));
-      });
-
-      document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') {
-          document.querySelectorAll('.modal-overlay.is-visible').forEach(modal => modal.classList.remove('is-visible'));
-        }
       });
       
       // --- イベントリスナーと初期化 ---
