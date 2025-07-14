@@ -163,6 +163,101 @@
       overflow-y: auto !important;
       color: rgba(255, 255, 255, 0.9) !important;
     }
+
+    /* ================================================= */
+    /* ★★★ 教師向けシンプル情報アクセス ★★★ */
+    /* ================================================= */
+    .teacher-info-access {
+      margin-top: 16px !important;
+      text-align: center !important;
+    }
+
+    .security-details {
+      background: rgba(255, 255, 255, 0.05) !important;
+      border-radius: 12px !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      overflow: hidden !important;
+    }
+
+    .info-summary {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 8px !important;
+      padding: 12px 16px !important;
+      cursor: pointer !important;
+      user-select: none !important;
+      color: rgba(255, 255, 255, 0.8) !important;
+      font-size: 14px !important;
+      font-weight: 500 !important;
+      transition: all 0.3s ease !important;
+    }
+
+    .security-details:hover .info-summary {
+      background: rgba(255, 255, 255, 0.05) !important;
+      color: white !important;
+    }
+
+    .info-chevron {
+      transition: transform 0.3s ease !important;
+      font-size: 12px !important;
+    }
+
+    .security-details[open] .info-chevron {
+      transform: rotate(180deg) !important;
+    }
+
+    .info-content {
+      padding: 16px !important;
+      border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 8px !important;
+    }
+
+    .info-link {
+      display: flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+      padding: 8px 12px !important;
+      border-radius: 8px !important;
+      text-decoration: none !important;
+      color: rgba(255, 255, 255, 0.8) !important;
+      font-size: 13px !important;
+      transition: all 0.3s ease !important;
+      background: rgba(255, 255, 255, 0.02) !important;
+    }
+
+    .info-link:hover {
+      background: rgba(255, 255, 255, 0.08) !important;
+      color: white !important;
+      transform: translateX(2px) !important;
+    }
+
+    /* 教師向けレスポンシブ対応 */
+    @media (max-width: 640px) {
+      .teacher-info-access {
+        margin-top: 12px !important;
+      }
+      
+      .info-summary {
+        padding: 10px 12px !important;
+        font-size: 13px !important;
+      }
+      
+      .info-content {
+        padding: 12px !important;
+      }
+      
+      .info-link {
+        padding: 6px 10px !important;
+        font-size: 12px !important;
+      }
+      
+      .footer {
+        font-size: 11px !important;
+      }
+    }
   </style>
 
   <?!= include('SharedUtilities'); ?>
@@ -181,17 +276,42 @@
       <div class="user-email" id="user-email"></div>
     </div>
 
+    <!-- 教師向けシンプル情報アクセス -->
+    <div class="teacher-info-access" id="teacher-info-access" style="display: none;">
+      <details class="security-details">
+        <summary class="info-summary">
+          <span class="info-icon">🔒</span>
+          <span class="info-text">セキュリティとプライバシーについて</span>
+          <span class="info-chevron">▼</span>
+        </summary>
+        <div class="info-content">
+          <a href="#" data-modal-trigger="enhanced-privacy" class="info-link">
+            <span class="link-icon">📋</span>
+            <span class="link-text">データ保護の技術的詳細</span>
+          </a>
+          <a href="#" data-modal-trigger="enhanced-digital-citizenship" class="info-link">
+            <span class="link-icon">📖</span>
+            <span class="link-text">デジタル・シティズンシップ指導ガイド</span>
+          </a>
+        </div>
+      </details>
+    </div>
+
     <div class="message-area" id="message-area"></div>
 
     <button class="register-btn" id="register-btn" disabled>
       <span id="btn-content">回答ボードを作成</span>
     </button>
 
-    <div class="footer">
-      <a data-modal-trigger="enhanced-privacy">プライバシーポリシー</a>
-      および
-      <a data-modal-trigger="enhanced-digital-citizenship">デジタル・シティズンシップ</a>
-      に同意の上で作成されます
+    <!-- シンプルフッター（教師向け） -->
+    <div class="footer teacher-footer">
+      <span class="footer-text">
+        システムの
+        <a data-modal-trigger="enhanced-privacy" class="footer-link">セキュリティ詳細</a>
+        と
+        <a data-modal-trigger="enhanced-digital-citizenship" class="footer-link">指導ガイドライン</a>
+        について
+      </span>
     </div>
   </div>
 
@@ -224,6 +344,8 @@
 
       let userEmail = '';
       let isRegistrationInProgress = false;
+      let selectedAgeGroup = '';
+      let uiInitialized = false;
 
       // --- 関数定義 ---
       const showMessage = (message, type = 'info') => {
@@ -237,7 +359,112 @@
         userEmailEl.textContent = email;
         registerBtn.disabled = false;
         showMessage('回答ボードを作成できます', 'success');
+        
+        // 認証成功後にUIを段階的に表示
+        initializeEnhancedUI();
       };
+
+      // --- 新しいUI関数 ---
+      const initializeEnhancedUI = () => {
+        if (uiInitialized) return;
+        uiInitialized = true;
+
+        // 情報カードを段階的に表示
+        setTimeout(() => showInfoCards(), 300);
+        
+        // 年齢層選択を表示（オプション）
+        setTimeout(() => showAgeSelector(), 600);
+        
+        // ヘルプシステムを表示
+        setTimeout(() => showHelpSystem(), 900);
+        
+        // 強化されたフッターを表示
+        setTimeout(() => showEnhancedFooter(), 1200);
+        
+        // 年齢グループの自動判定を試行
+        detectAndSetAgeGroup();
+      };
+
+      const showInfoCards = () => {
+        const infoCardsContainer = document.getElementById('info-cards-container');
+        if (infoCardsContainer) {
+          infoCardsContainer.style.display = 'grid';
+          setTimeout(() => infoCardsContainer.classList.add('show'), 50);
+        }
+      };
+
+      const showAgeSelector = () => {
+        // URLパラメータで年齢層が指定されていない場合のみ表示
+        const urlParams = new URLSearchParams(window.location.search);
+        if (!urlParams.get('ageGroup')) {
+          const ageSelectorContainer = document.getElementById('age-selector-container');
+          if (ageSelectorContainer) {
+            ageSelectorContainer.style.display = 'block';
+            setTimeout(() => ageSelectorContainer.classList.add('show'), 50);
+          }
+        }
+      };
+
+      const showHelpSystem = () => {
+        const helpSystem = document.getElementById('help-system');
+        if (helpSystem) {
+          helpSystem.style.display = 'block';
+          setTimeout(() => helpSystem.classList.add('show'), 50);
+        }
+      };
+
+      const showEnhancedFooter = () => {
+        const enhancedFooter = document.getElementById('enhanced-footer');
+        const legacyFooter = document.getElementById('legacy-footer');
+        
+        if (enhancedFooter) {
+          enhancedFooter.style.display = 'block';
+          setTimeout(() => enhancedFooter.classList.add('show'), 50);
+          
+          // レガシーフッターを非表示
+          if (legacyFooter) {
+            legacyFooter.style.display = 'none';
+          }
+        }
+      };
+
+      const detectAndSetAgeGroup = () => {
+        // URLパラメータから年齢グループを取得
+        const urlParams = new URLSearchParams(window.location.search);
+        const ageFromUrl = urlParams.get('ageGroup');
+        
+        if (ageFromUrl) {
+          selectedAgeGroup = ageFromUrl;
+          const gradeSelect = document.getElementById('grade-select');
+          if (gradeSelect) {
+            gradeSelect.value = ageFromUrl;
+          }
+          console.log('Age group detected from URL:', ageFromUrl);
+        } else {
+          // デフォルト値を設定
+          selectedAgeGroup = 'elementary-upper';
+        }
+      };
+
+      const handleAgeGroupChange = (newAgeGroup) => {
+        selectedAgeGroup = newAgeGroup;
+        console.log('Age group changed to:', newAgeGroup);
+        
+        // 将来的に年齢層に応じてUIをカスタマイズする場合はここに追加
+        showMessage(`${getAgeGroupDisplayName(newAgeGroup)}向けの内容で表示します`, 'info');
+      };
+
+      const getAgeGroupDisplayName = (ageGroup) => {
+        const displayNames = {
+          'elementary-lower': '小学校低学年',
+          'elementary-upper': '小学校高学年',
+          'junior-high': '中学校',
+          'high-school': '高等学校',
+          'teacher': '教師'
+        };
+        return displayNames[ageGroup] || '一般';
+      };
+
 
       const showSuccessResult = (result) => {
         mainContainer.style.display = 'none';
@@ -374,47 +601,81 @@
           .getExistingBoard();
       };
       
-      // --- 統合モーダル制御 ---
-      const modalTriggers = document.querySelectorAll('[data-modal-trigger]');
-      modalTriggers.forEach(trigger => {
-        trigger.addEventListener('click', (e) => {
-          e.preventDefault();
-          const modalType = trigger.getAttribute('data-modal-trigger');
-          
-          // 年齢グループを自動判定
-          const ageGroup = window.sharedModals ? window.sharedModals.detectAgeGroup() : 'elementary-upper';
-          
-          if (modalType === 'enhanced-privacy') {
-            // 統合プライバシーモーダルを表示
-            if (window.showEnhancedPrivacyModal) {
-              window.showEnhancedPrivacyModal(ageGroup);
+      // --- 統合モーダル制御の強化 ---
+      const setupModalTriggers = () => {
+        const modalTriggers = document.querySelectorAll('[data-modal-trigger]');
+        modalTriggers.forEach(trigger => {
+          trigger.addEventListener('click', (e) => {
+            e.preventDefault();
+            const modalType = trigger.getAttribute('data-modal-trigger');
+            
+            // 教師向け固定
+            const ageGroup = 'teacher';
+            
+            console.log(`Opening modal: ${modalType} for age group: ${ageGroup}`);
+            
+            if (modalType === 'enhanced-privacy') {
+              // 統合プライバシーモーダルを表示
+              if (window.showEnhancedPrivacyModal) {
+                window.showEnhancedPrivacyModal(ageGroup);
+              } else {
+                // フォールバック
+                window.showPrivacyModal();
+              }
+            } else if (modalType === 'enhanced-digital-citizenship') {
+              // 統合デジタル・シティズンシップモーダルを表示
+              if (window.showEnhancedDigitalCitizenshipModal) {
+                window.showEnhancedDigitalCitizenshipModal(ageGroup);
+              } else {
+                // フォールバック
+                window.showDigitalCitizenshipModal();
+              }
             } else {
-              // フォールバック
-              window.showPrivacyModal();
+              // レガシー対応
+              const modalId = modalType + '-modal';
+              const modal = document.getElementById(modalId);
+              if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('is-visible');
+              }
             }
-          } else if (modalType === 'enhanced-digital-citizenship') {
-            // 統合デジタル・シティズンシップモーダルを表示
-            if (window.showEnhancedDigitalCitizenshipModal) {
-              window.showEnhancedDigitalCitizenshipModal(ageGroup);
-            } else {
-              // フォールバック
-              window.showDigitalCitizenshipModal();
-            }
-          } else {
-            // レガシー対応
-            const modalId = modalType + '-modal';
-            const modal = document.getElementById(modalId);
-            if (modal) {
-              modal.classList.remove('hidden');
-              modal.classList.add('is-visible');
-            }
-          }
+          });
         });
-      });
-      
-      // --- イベントリスナーと初期化 ---
-      registerBtn.addEventListener('click', executeRegistration);
+      };
+
+
+      // --- 登録前確認プロセスの強化 ---
+      const executeRegistrationWithConfirmation = () => {
+        if (isRegistrationInProgress || !userEmail) return;
+
+        // 年齢に応じたモーダルを先に表示
+        const ageGroup = selectedAgeGroup || 'elementary-upper';
+        
+        if (window.showAgeAppropriateModals) {
+          // 統合モーダルシステムを使用
+          window.showAgeAppropriateModals(() => {
+            executeRegistration();
+          });
+        } else {
+          // フォールバック: 直接登録実行
+          executeRegistration();
+        }
+      };
+
+      // --- 初期化とイベントリスナーの設定 ---
+      const initializeEventListeners = () => {
+        // 基本的なイベントリスナー
+        registerBtn.addEventListener('click', executeRegistrationWithConfirmation);
+        
+        // 新しいUI要素のイベントリスナー
+        setupModalTriggers();
+        
+        console.log('Enhanced UI event listeners initialized');
+      };
+
+      // --- メイン初期化 ---
       initializePage();
+      initializeEventListeners();
     });
   </script>
 </body>
