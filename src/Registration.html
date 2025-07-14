@@ -125,53 +125,110 @@
     @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-    /* ================================================= */
-    /* ★★★ ここからが修正されたモーダルのスタイル ★★★ */
-    /* ================================================= */
-    .modal-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(15, 23, 42, 0.8);
-      /* Remove redundant backdrop-filter to avoid conflicts */
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 50;
-      padding: 20px;
-      
-      /* 表示・非表示のアニメーション */
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.3s ease, visibility 0s 0.3s;
-    }
-    
-    .modal-overlay.hidden {
-      display: none;
+    /* ドメイン情報表示のスタイル */
+    .domain-info {
+      width: 100% !important;
+      text-align: center !important;
     }
 
-    /* SharedModalsと統一された表示パターン */
-    .modal-overlay:not(.hidden) {
-      opacity: 1;
-      visibility: visible;
-      transition: opacity 0.3s ease, visibility 0s;
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.05) !important;
+      border-radius: 12px !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      transition: all 0.3s ease !important;
     }
 
-    .modal-content {
-      background: rgba(30, 41, 59, 0.95);
-      -webkit-backdrop-filter: blur(12px);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 16px;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-      width: 100%;
-      max-width: 600px;
-      padding: 24px 32px;
-      max-height: 90vh;
-      overflow-y: auto;
-      color: rgba(255, 255, 255, 0.9);
-      position: relative;
-      z-index: 1;
+    .hidden {
+      display: none !important;
     }
+
+    .flex {
+      display: flex !important;
+    }
+
+    .items-center {
+      align-items: center !important;
+    }
+
+    .gap-2 {
+      gap: 8px !important;
+    }
+
+    /* グラデーション背景の調整 */
+    .bg-gradient-to-r {
+      background: linear-gradient(90deg, var(--tw-gradient-from), var(--tw-gradient-to)) !important;
+    }
+
+    .from-green-500\/10 {
+      --tw-gradient-from: rgba(34, 197, 94, 0.1) !important;
+    }
+
+    .to-emerald-500\/10 {
+      --tw-gradient-to: rgba(16, 185, 129, 0.1) !important;
+    }
+
+    .from-yellow-500\/10 {
+      --tw-gradient-from: rgba(234, 179, 8, 0.1) !important;
+    }
+
+    .to-orange-500\/10 {
+      --tw-gradient-to: rgba(249, 115, 22, 0.1) !important;
+    }
+
+    .from-blue-500\/10 {
+      --tw-gradient-from: rgba(59, 130, 246, 0.1) !important;
+    }
+
+    .to-purple-500\/10 {
+      --tw-gradient-to: rgba(168, 85, 247, 0.1) !important;
+    }
+
+    /* ボーダーカラー */
+    .border-green-400\/30 {
+      border-color: rgba(74, 222, 128, 0.3) !important;
+    }
+
+    .border-yellow-400\/30 {
+      border-color: rgba(251, 191, 36, 0.3) !important;
+    }
+
+    .border-blue-400\/30 {
+      border-color: rgba(96, 165, 250, 0.3) !important;
+    }
+
+    /* テキストカラー */
+    .text-green-400 {
+      color: rgba(74, 222, 128, 1) !important;
+    }
+
+    .text-yellow-400 {
+      color: rgba(251, 191, 36, 1) !important;
+    }
+
+    .text-blue-400 {
+      color: rgba(96, 165, 250, 1) !important;
+    }
+
+    .text-sm {
+      font-size: 14px !important;
+    }
+
+    .font-semibold {
+      font-weight: 600 !important;
+    }
+
+    .w-4 {
+      width: 16px !important;
+    }
+
+    .h-4 {
+      height: 16px !important;
+    }
+
+    .p-3 {
+      padding: 12px !important;
+    }
+
 
     /* ================================================= */
     /* ★★★ 教師向けシンプル情報アクセス ★★★ */
@@ -278,6 +335,39 @@
       <div class="logo">S</div>
       <h1 class="title">StudyQuest</h1>
       <p class="subtitle">教育用回答ボードシステム</p>
+      
+      <!-- ドメイン情報表示 -->
+      <div class="domain-info" id="domain-info" style="margin-top: 16px;">
+        <!-- ドメイン一致表示 -->
+        <div id="header-domain-match" class="glass-panel bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-3 border border-green-400/30 hidden">
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div class="text-green-400 font-semibold text-sm" id="header-domain-match-text">G Suite ドメイン</div>
+          </div>
+        </div>
+        
+        <!-- ドメイン不一致表示 -->
+        <div id="header-domain-mismatch" class="glass-panel bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg p-3 border border-yellow-400/30 hidden">
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+            <div class="text-yellow-400 font-semibold text-sm" id="header-domain-mismatch-text">ドメイン不一致</div>
+          </div>
+        </div>
+        
+        <!-- 初期状態/ローディング表示 -->
+        <div id="header-domain-initial" class="glass-panel bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-3 border border-blue-400/30">
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div class="text-blue-400 font-semibold text-sm" id="header-domain-name-initial">ドメイン確認中</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="status-card">
@@ -368,6 +458,12 @@
         userEmailEl.textContent = email;
         registerBtn.disabled = false;
         showMessage('回答ボードを作成できます', 'success');
+        
+        // 教師向け情報アクセス機能を表示
+        const teacherInfoAccess = document.getElementById('teacher-info-access');
+        if (teacherInfoAccess) {
+          teacherInfoAccess.style.display = 'block';
+        }
         
         // 認証成功後にUIを段階的に表示
         initializeEnhancedUI();
@@ -610,7 +706,7 @@
           .getExistingBoard();
       };
       
-      // --- 統合モーダル制御の強化 ---
+      // --- 統合モーダル制御 ---
       const setupModalTriggers = () => {
         const modalTriggers = document.querySelectorAll('[data-modal-trigger]');
         modalTriggers.forEach(trigger => {
@@ -623,29 +719,11 @@
             
             console.log(`Opening modal: ${modalType} for age group: ${ageGroup}`);
             
+            // SharedModalsの統合システムを使用
             if (modalType === 'enhanced-privacy') {
-              // 統合プライバシーモーダルを表示
-              if (window.showEnhancedPrivacyModal) {
-                window.showEnhancedPrivacyModal(ageGroup);
-              } else {
-                // フォールバック
-                window.showPrivacyModal();
-              }
+              window.showEnhancedPrivacyModal && window.showEnhancedPrivacyModal(ageGroup);
             } else if (modalType === 'enhanced-digital-citizenship') {
-              // 統合デジタル・シティズンシップモーダルを表示
-              if (window.showEnhancedDigitalCitizenshipModal) {
-                window.showEnhancedDigitalCitizenshipModal(ageGroup);
-              } else {
-                // フォールバック
-                window.showDigitalCitizenshipModal();
-              }
-            } else {
-              // レガシー対応 - SharedModalsと統一されたパターン
-              const modalId = modalType + '-modal';
-              const modal = document.getElementById(modalId);
-              if (modal) {
-                modal.classList.remove('hidden');
-              }
+              window.showEnhancedDigitalCitizenshipModal && window.showEnhancedDigitalCitizenshipModal(ageGroup);
             }
           });
         });
@@ -681,9 +759,54 @@
         console.log('Enhanced UI event listeners initialized');
       };
 
+      // --- ドメイン情報取得・表示関数 ---
+      const fetchAndDisplayDomainInfo = () => {
+        google.script.run
+          .withSuccessHandler(displayDomainInfo)
+          .withFailureHandler(error => {
+            console.error('ドメイン情報の取得に失敗しました:', error);
+          })
+          .getDeployUserDomainInfo();
+      };
+
+      const displayDomainInfo = (info) => {
+        const headerDomainMatch = document.getElementById('header-domain-match');
+        const headerDomainMismatch = document.getElementById('header-domain-mismatch');
+        const headerDomainInitial = document.getElementById('header-domain-initial');
+        const headerDomainMatchText = document.getElementById('header-domain-match-text');
+        const headerDomainMismatchText = document.getElementById('header-domain-mismatch-text');
+
+        // 全てのドメイン表示を非表示
+        if (headerDomainMatch) headerDomainMatch.classList.add('hidden');
+        if (headerDomainMismatch) headerDomainMismatch.classList.add('hidden');
+        if (headerDomainInitial) headerDomainInitial.classList.add('hidden');
+
+        if (!info || info.error) {
+          console.warn('ドメイン情報エラー:', info?.error || 'Unknown error');
+          return;
+        }
+
+        if (info.domainMatch) {
+          // ドメインが一致している場合
+          if (headerDomainMatch && headerDomainMatchText) {
+            headerDomainMatch.classList.remove('hidden');
+            headerDomainMatchText.textContent = `${info.deployDomain} ドメイン`;
+          }
+        } else {
+          // ドメイン不一致の場合
+          if (headerDomainMismatch && headerDomainMismatchText) {
+            headerDomainMismatch.classList.remove('hidden');
+            headerDomainMismatchText.textContent = `外部アクセス (${info.deployDomain} 管理)`;
+          }
+        }
+      };
+
       // --- メイン初期化 ---
       initializePage();
       initializeEventListeners();
+      
+      // ドメイン情報を取得
+      fetchAndDisplayDomainInfo();
     });
   </script>
 </body>
