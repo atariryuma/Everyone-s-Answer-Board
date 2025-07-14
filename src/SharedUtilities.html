@@ -597,5 +597,302 @@ window.switchToAnotherAccount = function() {
   window.sharedUtilities.auth.switchToAnotherAccount();
 };
 
-console.log('✅ SharedUtilities loaded successfully - Version 1.0.0');
+// =============================================================================
+// SECURITY UTILITIES
+// =============================================================================
+
+// Security utilities for safe HTML and URL handling
+window.sharedUtilities.security = {
+  // HTML escape function for preventing XSS
+  escapeHtml: function(text) {
+    if (!text) return '';
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  },
+  
+  // URL validation for safe navigation
+  isValidUrl: function(url) {
+    try {
+      new URL(url);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
+  
+  // Safe URL construction for relative paths
+  buildSafeUrl: function(base, params = {}) {
+    try {
+      const url = new URL(base);
+      Object.keys(params).forEach(key => {
+        url.searchParams.set(key, params[key]);
+      });
+      return url.toString();
+    } catch (e) {
+      console.warn('Invalid URL construction:', e);
+      return base;
+    }
+  }
+};
+
+// =============================================================================
+// IFRAME-SAFE NAVIGATION UTILITIES
+// =============================================================================
+
+// Navigation utilities for Google Apps Script iframe context
+window.sharedUtilities.navigation = {
+  
+  // Safely navigate to a URL within iframe constraints
+  safeNavigate: function(url, options = {}) {
+    const {
+      delay = 1000,
+      fallbackMessage = '画面を移動中...',
+      useClose = false,
+      method = 'auto'
+    } = options;
+    
+    console.log('safeNavigate:', { url, method, delay, useClose });
+    
+    // Method selection based on context
+    const actualMethod = method === 'auto' ? this.detectBestMethod() : method;
+    
+    switch (actualMethod) {
+      case 'close':
+        this.navigateWithClose(url, delay);
+        break;
+      case 'message':
+        this.navigateWithMessage(url, fallbackMessage);
+        break;
+      case 'redirect':
+        this.navigateWithRedirect(url, delay);
+        break;
+      default:
+        this.navigateWithFallback(url, fallbackMessage);
+    }
+  },
+  
+  // Method 1: Use google.script.host.close() if available
+  navigateWithClose: function(url, delay = 1000) {
+    try {
+      if (typeof google !== 'undefined' && google.script && google.script.host) {
+        console.log('Using google.script.host.close() method');
+        setTimeout(() => {
+          google.script.host.close();
+        }, delay);
+        this.showNavigationMessage('アプリを閉じています...', delay);
+        return true;
+      }
+    } catch (e) {
+      console.warn('google.script.host.close() failed:', e);
+    }
+    return false;
+  },
+  
+  // Method 2: Use window messaging to parent
+  navigateWithMessage: function(url, message) {
+    try {
+      console.log('Using parent messaging method');
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'navigate',
+          url: url,
+          source: 'StudyQuest'
+        }, '*');
+        this.showNavigationMessage(message, 2000);
+        return true;
+      }
+    } catch (e) {
+      console.warn('Parent messaging failed:', e);
+    }
+    return false;
+  },
+  
+  // Method 3: Direct redirect (for same-origin)
+  navigateWithRedirect: function(url, delay = 1000) {
+    try {
+      console.log('Using direct redirect method');
+      setTimeout(() => {
+        window.location.href = url;
+      }, delay);
+      this.showNavigationMessage('ページを移動中...', delay);
+      return true;
+    } catch (e) {
+      console.warn('Direct redirect failed:', e);
+    }
+    return false;
+  },
+  
+  // Method 4: User-triggered fallback
+  navigateWithFallback: function(url, message) {
+    console.log('Using manual fallback method');
+    this.showManualNavigationDialog(url, message);
+  },
+  
+  // Detect the best navigation method for current context
+  detectBestMethod: function() {
+    // Check if we're in an iframe
+    const isIframe = window !== window.top;
+    
+    // Check if google.script.host is available
+    const hasGoogleScriptHost = typeof google !== 'undefined' && 
+                                google.script && 
+                                google.script.host;
+    
+    // Check current URL origin vs target
+    const currentOrigin = window.location.origin;
+    
+    console.log('Navigation context:', {
+      isIframe,
+      hasGoogleScriptHost,
+      currentOrigin
+    });
+    
+    if (hasGoogleScriptHost) {
+      return 'close';
+    } else if (isIframe) {
+      return 'message';
+    } else {
+      return 'redirect';
+    }
+  },
+  
+  // Show navigation message to user
+  showNavigationMessage: function(message, duration = 2000) {
+    const messageDiv = document.createElement('div');
+    messageDiv.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(30, 41, 59, 0.95);
+      color: white;
+      padding: 20px 30px;
+      border-radius: 10px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      z-index: 10000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 16px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      text-align: center;
+    `;
+    messageDiv.textContent = message;
+    
+    document.body.appendChild(messageDiv);
+    
+    setTimeout(() => {
+      if (messageDiv.parentNode) {
+        messageDiv.parentNode.removeChild(messageDiv);
+      }
+    }, duration);
+  },
+  
+  // Show manual navigation dialog when automatic methods fail
+  showManualNavigationDialog: function(url, message) {
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    `;
+    
+    dialog.innerHTML = `
+      <div style="
+        background: rgba(30, 41, 59, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        width: 100%; max-width: 500px;
+        padding: 24px 32px;
+        margin: 20px;
+        color: white;
+        text-align: center;
+      ">
+        <h3 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 600;">
+          ${message}
+        </h3>
+        <p style="margin: 0 0 24px 0; color: rgba(255, 255, 255, 0.8); line-height: 1.5;">
+          自動的に移動できません。下のボタンをクリックして続行してください。
+        </p>
+        <button onclick="window.open('${url}', '_blank'); this.parentElement.parentElement.remove();" style="
+          background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);
+          border: none;
+          border-radius: 8px;
+          color: white;
+          padding: 12px 24px;
+          font-size: 16px;
+          font-weight: 600;
+          cursor: pointer;
+          margin-right: 12px;
+          transition: transform 0.2s ease;
+        " onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">
+          新しいタブで開く
+        </button>
+        <button onclick="window.location.href='${url}'" style="
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 8px;
+          color: white;
+          padding: 12px 24px;
+          font-size: 16px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        " onmouseover="this.style.background='rgba(255, 255, 255, 0.15)'" onmouseout="this.style.background='rgba(255, 255, 255, 0.1)'">
+          このタブで開く
+        </button>
+      </div>
+    `;
+    
+    document.body.appendChild(dialog);
+    
+    // Auto-close after 10 seconds
+    setTimeout(() => {
+      if (dialog.parentNode) {
+        dialog.parentNode.removeChild(dialog);
+      }
+    }, 10000);
+  },
+  
+  // Quick navigation to admin panel (commonly used)
+  goToAdminPanel: function(adminUrl, delay = 2000) {
+    this.safeNavigate(adminUrl, {
+      delay: delay,
+      fallbackMessage: '管理パネルに移動中...',
+      method: 'auto'
+    });
+  },
+  
+  // Quick navigation with success message
+  navigateWithSuccess: function(url, successMessage = '処理が完了しました', delay = 3000) {
+    this.showNavigationMessage(successMessage, delay);
+    setTimeout(() => {
+      this.safeNavigate(url, {
+        delay: 1000,
+        method: 'auto'
+      });
+    }, delay - 1000);
+  }
+};
+
+// Global convenience functions
+window.safeNavigate = function(url, options) {
+  window.sharedUtilities.navigation.safeNavigate(url, options);
+};
+
+window.goToAdminPanel = function(adminUrl, delay) {
+  window.sharedUtilities.navigation.goToAdminPanel(adminUrl, delay);
+};
+
+console.log('✅ SharedUtilities loaded successfully - Version 1.1.0');
 </script>

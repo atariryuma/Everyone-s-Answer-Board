@@ -2347,7 +2347,15 @@ function handleDeleteRequest() {
             setLoading(false);
             showMessage(response, 'success');
             setTimeout(function() {
-              window.top.location.href = '?page=Registration';
+              // Use iframe-safe navigation
+              if (window.sharedUtilities && window.sharedUtilities.navigation) {
+                window.sharedUtilities.navigation.safeNavigate('?page=Registration', {
+                  fallbackMessage: '登録ページに移動中...',
+                  method: 'auto'
+                });
+              } else {
+                window.location.href = '?page=Registration';
+              }
             }, 2000);
           })
           .catch(function(error) {

@@ -257,7 +257,12 @@
         successContainer.style.display = 'block';
         if (result?.adminUrl) {
           adminPanelBtn.href = result.adminUrl;
-          setTimeout(() => { window.top.location.href = result.adminUrl; }, 3000);
+          // Use iframe-safe navigation instead of window.top.location.href
+          window.sharedUtilities.navigation.navigateWithSuccess(
+            result.adminUrl, 
+            '登録完了！管理パネルに移動中...',
+            3000
+          );
         }
       };
       
@@ -285,7 +290,7 @@
         google.script.run
           .withSuccessHandler(result => {
             if (result?.status === 'existing_user') {
-              window.top.location.href = result.adminUrl;
+              window.sharedUtilities.navigation.goToAdminPanel(result.adminUrl, 1000);
               return;
             }
             google.script.run

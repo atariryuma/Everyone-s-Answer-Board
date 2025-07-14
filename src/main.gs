@@ -484,17 +484,25 @@ function createSecureRedirect(targetUrl, message) {
         function handleRedirectClick(event) {
           event.preventDefault();
           try {
-            // ユーザーアクションによるリダイレクト
-            window.top.location.href = '${targetUrl}';
+            // Use iframe-safe navigation
+            if (window.sharedUtilities && window.sharedUtilities.navigation) {
+              window.sharedUtilities.navigation.safeNavigate('${targetUrl}', { method: 'redirect' });
+            } else {
+              window.location.href = '${targetUrl}';
+            }
           } catch(e) {
             window.location.href = '${targetUrl}';
           }
         }
         
-        // 2秒後の自動リダイレクト（ユーザーアクション後）
+        // 2秒後の自動リダイレクト（iframe対応）
         setTimeout(function() {
           try {
-            window.top.location.href = '${targetUrl}';
+            if (window.sharedUtilities && window.sharedUtilities.navigation) {
+              window.sharedUtilities.navigation.safeNavigate('${targetUrl}', { method: 'redirect' });
+            } else {
+              window.location.href = '${targetUrl}';
+            }
           } catch(e) {
             window.location.href = '${targetUrl}';
           }

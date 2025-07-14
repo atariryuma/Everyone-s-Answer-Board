@@ -283,7 +283,15 @@
 
             google.script.run
                 .withSuccessHandler(function(url) {
-                    window.top.location.href = url;
+                    // Use iframe-safe navigation
+                    if (window.sharedUtilities && window.sharedUtilities.navigation) {
+                        window.sharedUtilities.navigation.safeNavigate(url, {
+                            fallbackMessage: 'StudyQuestを開始中...',
+                            method: 'auto'
+                        });
+                    } else {
+                        window.location.href = url;
+                    }
                 })
                 .withFailureHandler(function(error) {
                     alert('アプリケーションのURL取得に失敗しました: ' + error.message);
