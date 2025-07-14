@@ -18,6 +18,7 @@ describe('User Duplication Prevention Tests', () => {
       LockService: {
         getScriptLock: jest.fn(() => ({
           waitLock: jest.fn(() => true),
+          tryLock: jest.fn(() => true),
           releaseLock: jest.fn()
         }))
       },
@@ -41,7 +42,7 @@ describe('User Duplication Prevention Tests', () => {
       },
       DB_SHEET_CONFIG: {
         SHEET_NAME: 'Users',
-        HEADERS: ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'createdAt', 'configJson', 'lastAccessedAt', 'isActive']
+        HEADERS: ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'createdAt', 'configJson', 'setupStatus', 'lastAccessedAt', 'isActive']
       },
       // Mock functions
       findUserByEmail: jest.fn(),
