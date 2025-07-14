@@ -284,15 +284,16 @@
             return;
           }
 
-          const isClose =
-            e.target.classList.contains('modal-overlay') ||
+          const modal = e.target.closest('[id$="-modal"]');
+          if (!modal) return;
+
+          const shouldClose =
+            e.target === modal ||
             e.target.closest('.close-modal') ||
             e.target.closest('[id$="-cancel"]') ||
             e.target.closest('[id$="-close"]');
-          if (isClose) {
-            const modal = e.target.closest('.modal-overlay');
-            if (modal) hideModal(modal.id);
-          }
+
+          if (shouldClose) hideModal(modal.id);
         });
       };
 

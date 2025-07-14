@@ -560,29 +560,12 @@ class SharedModals {
       }
     });
 
-    // クローズボタンの設定
-    const closeButtons = [
-      'digital-citizenship-modal-close',
-      'digital-citizenship-modal-close-btn',
-      'teacherGuideModal-close',
-      'teacherGuideModal-close-btn',
-      'usage-guide-modal-close',
-      'usage-guide-modal-close-btn'
-    ];
-    
-    closeButtons.forEach(buttonId => {
-      const button = document.getElementById(buttonId);
-      if (button) {
-        button.onclick = () => {
-          if (buttonId.includes('digital-citizenship')) {
-            this.hideModal('digital-citizenship-modal');
-          } else if (buttonId.includes('teacherGuide')) {
-            this.hideModal('teacherGuideModal');
-          } else if (buttonId.includes('usage-guide')) {
-            this.hideModal('usage-guide-modal');
-          }
-        };
-      }
+    // クローズ/キャンセルボタンの委任イベント
+    document.addEventListener('click', e => {
+      const closeTrigger = e.target.closest('[id$="-close"], [id$="-cancel"]');
+      if (!closeTrigger) return;
+      const modal = closeTrigger.closest('[id$="-modal"]');
+      if (modal) this.hideModal(modal.id);
     });
   }
 
