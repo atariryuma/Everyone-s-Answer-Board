@@ -444,7 +444,7 @@ function findUserByEmail(email) {
 }
 
 /**
- * データベースからユーザーを取得
+ * データベースからユーザーを取得（インデックス最適化版）
  * サービスアカウント専用でデータベースにアクセス
  * @param {string} field - 検索フィールド
  * @param {string} value - 検索値
@@ -456,7 +456,94 @@ function fetchUserFromDatabase(field, value) {
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
-    // サービスアカウント専用でアクセス
+    // インデックスキャッシュを利用
+    var indexCacheKey = 'db_index_' + field;
+    var userData = cacheManager.get(indexCacheKey, function() {
+      return buildDatabaseIndex(field);
+    }, { ttl: 600, enableMemoization: true }); // 10分間キャッシュ
+    
+    // インデックスから直接検索
+    var targetUser = userData[value];
+    if (targetUser) {
+      console.log('fetchUserFromDatabase (Indexed) - Found user:', {
+        field: field,
+        value: value,
+        userId: targetUser.userId,
+        adminEmail: targetUser.adminEmail
+      });
+      return targetUser;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('ユーザー検索エラー (' + field + ':' + value + '):', error);
+    // フォールバック: 従来の線形検索
+    console.warn('インデックス検索失敗、線形検索にフォールバック');
+    try {
+      return fetchUserFromDatabaseLinear(field, value);
+    } catch (fallbackError) {
+      const processedError = processError(fallbackError, {
+        function: 'fetchUserFromDatabase',
+        field: field,
+        value: value,
+        operation: 'user_search'
+      });
+      throw new Error(processedError.userMessage);
+    }
+  }
+}
+
+/**
+ * データベースインデックスを構築
+ * @param {string} field - インデックス対象フィールド
+ * @returns {object} フィールド値をキーとするユーザーオブジェクト
+ */
+function buildDatabaseIndex(field) {
+  var props = PropertiesService.getScriptProperties();
+  var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+  var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+  
+  var service = getSheetsService();
+  var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:I"]);
+  var values = data.valueRanges[0].values || [];
+  
+  var index = {};
+  if (values.length === 0) return index;
+  
+  var headers = values[0];
+  var fieldIndex = headers.indexOf(field);
+  
+  if (fieldIndex === -1) return index;
+  
+  // インデックス構築（O(n)の一回限り）
+  for (var i = 1; i < values.length; i++) {
+    var row = values[i];
+    var key = row[fieldIndex];
+    if (key) {
+      var user = {};
+      headers.forEach(function(header, index) {
+        user[header] = row[index] || '';
+      });
+      index[key] = user;
+    }
+  }
+  
+  console.log('データベースインデックス構築完了:', { field: field, entries: Object.keys(index).length });
+  return index;
+}
+
+/**
+ * 従来の線形検索（フォールバック用）
+ * @param {string} field - 検索フィールド
+ * @param {string} value - 検索値
+ * @returns {object|null} ユーザー情報
+ */
+function fetchUserFromDatabaseLinear(field, value) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+    
     var service = getSheetsService();
     var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:I"]);
     var values = data.valueRanges[0].values || [];
@@ -475,7 +562,7 @@ function fetchUserFromDatabase(field, value) {
           user[header] = values[i][index] || '';
         });
         
-        console.log('fetchUserFromDatabase (Service Account) - Found user:', {
+        console.log('fetchUserFromDatabaseLinear - Found user:', {
           field: field,
           value: value,
           userId: user.userId,
@@ -488,9 +575,41 @@ function fetchUserFromDatabase(field, value) {
     
     return null;
   } catch (error) {
-    console.error('ユーザー検索エラー (' + field + ':' + value + '):', error);
-    throw new Error('データベースからのユーザー検索に失敗しました: ' + error.message);
+    console.error('線形検索エラー (' + field + ':' + value + '):', error);
+    const processedError = handleSheetsApiError(error, {
+      function: 'fetchUserFromDatabaseLinear',
+      field: field,
+      value: value,
+      operation: 'linear_search'
+    });
+    throw new Error(processedError.userMessage);
   }
+}
+
+/**
+ * 行番号インデックスを構築
+ * @param {array} values - シートのデータ行
+ * @param {array} headers - ヘッダー行
+ * @param {string} field - インデックス対象フィールド
+ * @returns {object} フィールド値をキーとする行番号マップ
+ */
+function buildRowIndexForField(values, headers, field) {
+  var index = {};
+  var fieldIndex = headers.indexOf(field);
+  
+  if (fieldIndex === -1) return index;
+  
+  // 行番号インデックス構築
+  for (var i = 1; i < values.length; i++) {
+    var row = values[i];
+    var key = row[fieldIndex];
+    if (key) {
+      index[key] = i + 1; // 1-based index
+    }
+  }
+  
+  console.log('行インデックス構築完了:', { field: field, entries: Object.keys(index).length });
+  return index;
 }
 
 /**
@@ -538,11 +657,21 @@ function updateUser(userId, updateData) {
     var userIdIndex = headers.indexOf('userId');
     var rowIndex = -1;
     
-    // ユーザーの行を特定
-    for (var i = 1; i < values.length; i++) {
-      if (values[i][userIdIndex] === userId) {
-        rowIndex = i + 1; // 1-based index
-        break;
+    // インデックスを使用してユーザーの行を効率的に特定
+    var userIndexData = cacheManager.get('db_index_userId', function() {
+      return buildRowIndexForField(values, headers, 'userId');
+    }, { ttl: 300 });
+    
+    var cachedRowIndex = userIndexData[userId];
+    if (cachedRowIndex) {
+      rowIndex = cachedRowIndex;
+    } else {
+      // フォールバック: 線形検索
+      for (var i = 1; i < values.length; i++) {
+        if (values[i][userIdIndex] === userId) {
+          rowIndex = i + 1; // 1-based index
+          break;
+        }
       }
     }
     
@@ -1061,38 +1190,123 @@ function createSheetsService(accessToken) {
 }
 
 /**
- * バッチ取得
+ * 強化されたバッチ取得（最適化版）
  * @param {object} service - Sheetsサービス
  * @param {string} spreadsheetId - スプレッドシートID
  * @param {string[]} ranges - 取得範囲の配列
+ * @param {object} options - オプション { priority, maxRetries, batchSize }
  * @returns {object} レスポンス
  */
-function batchGetSheetsData(service, spreadsheetId, ranges) {
-  // API呼び出しをキャッシュ化（短期間）
-  var cacheKey = `batchGet_${spreadsheetId}_${JSON.stringify(ranges)}`;
+function batchGetSheetsData(service, spreadsheetId, ranges, options = {}) {
+  const { 
+    priority = 'normal',
+    maxRetries = 2,
+    batchSize = 10 // 1回のAPIコールで処理する範囲数の上限
+  } = options;
+
+  // 入力検証
+  if (!ranges || ranges.length === 0) {
+    return { valueRanges: [] };
+  }
+
+  // キャッシュキーの最適化（範囲が多い場合はハッシュ化）
+  const rangesKey = ranges.length > 5 ? 
+    Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify(ranges))
+      .map(byte => (byte + 256).toString(16).slice(-2)).join('').substr(0, 16) :
+    JSON.stringify(ranges);
+    
+  const cacheKey = `batchGet_${spreadsheetId}_${rangesKey}`;
   
   return cacheManager.get(cacheKey, () => {
     try {
-      var url = service.baseUrl + '/' + spreadsheetId + '/values:batchGet?' + 
-        ranges.map(function(range) { return 'ranges=' + encodeURIComponent(range); }).join('&');
-      
-      var response = UrlFetchApp.fetch(url, {
-        headers: { 'Authorization': 'Bearer ' + service.accessToken },
-        muteHttpExceptions: true,
-        followRedirects: true,
-        validateHttpsCertificates: true
-      });
-      
-      if (response.getResponseCode() !== 200) {
-        throw new Error('Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText());
+      // 大量の範囲を分割して処理
+      if (ranges.length > batchSize) {
+        return processLargeBatch(service, spreadsheetId, ranges, batchSize, maxRetries);
       }
       
-      return JSON.parse(response.getContentText());
+      // 通常のバッチ処理
+      return executeBatchGet(service, spreadsheetId, ranges, maxRetries);
+      
     } catch (error) {
-      console.error('batchGetSheetsData error:', error.message);
-      throw new Error('データ取得に失敗しました: ' + error.message);
+      const processedError = handleSheetsApiError(error, {
+        function: 'batchGetSheetsData',
+        spreadsheetId: spreadsheetId,
+        rangeCount: ranges.length,
+        operation: 'batch_get'
+      });
+      throw new Error(processedError.userMessage);
     }
-  }, { ttl: 120 }); // 2分間キャッシュ（API制限対策）
+  }, { 
+    ttl: priority === 'high' ? 60 : 180, // 高優先度は短いキャッシュ
+    priority: priority 
+  });
+}
+
+/**
+ * 大量バッチの分割処理
+ * @private
+ */
+function processLargeBatch(service, spreadsheetId, ranges, batchSize, maxRetries) {
+  const results = { valueRanges: [] };
+  const chunks = [];
+  
+  // 範囲を分割
+  for (let i = 0; i < ranges.length; i += batchSize) {
+    chunks.push(ranges.slice(i, i + batchSize));
+  }
+  
+  console.log(`[BatchGet] 大量データを${chunks.length}個のチャンクに分割`);
+  
+  // 各チャンクを順次処理（並列処理は API制限回避のため避ける）
+  for (let i = 0; i < chunks.length; i++) {
+    try {
+      const chunkResult = executeBatchGet(service, spreadsheetId, chunks[i], maxRetries);
+      results.valueRanges.push(...chunkResult.valueRanges);
+      
+      // レート制限対策（チャンク間で少し待機）
+      if (i < chunks.length - 1) {
+        Utilities.sleep(100); // 100ms待機
+      }
+      
+    } catch (error) {
+      console.error(`[BatchGet] チャンク ${i + 1} の処理に失敗:`, error.message);
+      throw error;
+    }
+  }
+  
+  return results;
+}
+
+/**
+ * バッチ取得の実行
+ * @private
+ */
+function executeBatchGet(service, spreadsheetId, ranges, maxRetries) {
+  return retryWithBackoff(() => {
+    const url = service.baseUrl + '/' + spreadsheetId + '/values:batchGet?' + 
+      ranges.map(range => 'ranges=' + encodeURIComponent(range)).join('&') +
+      '&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING';
+    
+    const response = UrlFetchApp.fetch(url, {
+      headers: { 'Authorization': 'Bearer ' + service.accessToken },
+      muteHttpExceptions: true,
+      followRedirects: true,
+      validateHttpsCertificates: true
+    });
+    
+    if (response.getResponseCode() !== 200) {
+      const errorMsg = `Sheets API error: ${response.getResponseCode()} - ${response.getContentText()}`;
+      console.error('[BatchGet]', errorMsg);
+      throw new Error(errorMsg);
+    }
+    
+    return JSON.parse(response.getContentText());
+    
+  }, { 
+    maxRetries: maxRetries,
+    baseDelay: 1000,
+    maxDelay: 5000
+  });
 }
 
 /**
