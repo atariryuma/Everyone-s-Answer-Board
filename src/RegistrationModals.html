@@ -1,0 +1,271 @@
+<!-- RegistrationModals.html - 登録ページ専用モーダルコンポーネント -->
+
+<!-- 統合プライバシーモーダル（動的コンテンツ対応） -->
+<div id="enhanced-privacy-modal" class="fixed inset-0 bg-black/80 z-[60] hidden" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-3">
+          <svg class="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+          </svg>
+          <h3 id="enhanced-privacy-modal-title" class="text-2xl font-bold text-yellow-400">プライバシーとデータ保護</h3>
+        </div>
+        <button type="button" id="enhanced-privacy-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500" aria-label="閉じる">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <div id="enhanced-privacy-modal-content" class="text-gray-300">
+        <!-- 動的コンテンツがここに挿入されます -->
+      </div>
+      
+      <div class="flex justify-end gap-3 mt-6">
+        <button type="button" id="enhanced-privacy-modal-cancel" class="btn btn-secondary">キャンセル</button>
+        <button type="button" id="enhanced-privacy-modal-continue" class="btn btn-primary">
+          <span id="enhanced-privacy-modal-action-text">理解しました、継続</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 統合デジタルシティズンシップモーダル（動的コンテンツ対応） -->
+<div id="enhanced-digital-citizenship-modal" class="fixed inset-0 bg-black/80 z-[60] hidden" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-3">
+          <svg class="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9m0 0l3-3m-3 3l-3-3"></path>
+          </svg>
+          <h3 id="enhanced-digital-citizenship-modal-title" class="text-2xl font-bold text-cyan-400">デジタル・シティズンシップ</h3>
+        </div>
+        <button type="button" id="enhanced-digital-citizenship-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <div id="enhanced-digital-citizenship-modal-content" class="text-gray-300">
+        <!-- 動的コンテンツがここに挿入されます -->
+      </div>
+      
+      <div class="flex justify-end gap-3 mt-6">
+        <button type="button" id="enhanced-digital-citizenship-modal-cancel" class="btn btn-secondary">戻る</button>
+        <button type="button" id="enhanced-digital-citizenship-modal-accept" class="btn btn-primary">
+          <span id="enhanced-digital-citizenship-modal-action-text">理解しました</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ローディングモーダル -->
+<div id="loading-modal" class="fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-md w-full text-center">
+      <div class="spinner mx-auto mb-4"></div>
+      <h3 id="loading-modal-title" class="text-xl font-bold text-cyan-400 mb-2">処理中...</h3>
+      <p id="loading-modal-message" class="text-gray-300">しばらくお待ちください</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// RegistrationModals.html - 登録ページ専用モーダル管理クラス
+class RegistrationModals {
+  constructor() {
+    this.cache = new Map();
+    this.setupEventListeners();
+    this.loadingStates = new Map();
+  }
+
+  showLoading(title = '処理中...', message = 'しばらくお待ちください') {
+    const modal = document.getElementById('loading-modal');
+    const titleEl = document.getElementById('loading-modal-title');
+    const messageEl = document.getElementById('loading-modal-message');
+    
+    if (titleEl) titleEl.textContent = title;
+    if (messageEl) messageEl.textContent = message;
+    
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  hideModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+  }
+
+  setupEventListeners() {
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const modals = [
+          'enhanced-privacy-modal',
+          'enhanced-digital-citizenship-modal',
+          'loading-modal' // Add loading modal to be closed by ESC
+        ];
+        
+        modals.forEach(modalId => {
+          const modal = document.getElementById(modalId);
+          if (modal && !modal.classList.contains('hidden')) {
+            this.hideModal(modalId);
+          }
+        });
+      }
+    });
+
+    const closeButtons = [
+      'enhanced-privacy-modal-close',
+      'enhanced-digital-citizenship-modal-close'
+    ];
+    
+    closeButtons.forEach(buttonId => {
+      const button = document.getElementById(buttonId);
+      if (button) {
+        button.onclick = () => {
+          if (buttonId.includes('enhanced-privacy')) {
+            this.hideModal('enhanced-privacy-modal');
+          } else if (buttonId.includes('enhanced-digital-citizenship')) {
+            this.hideModal('enhanced-digital-citizenship-modal');
+          }
+        };
+      }
+    });
+  }
+
+  async showEnhancedPrivacyModal(ageGroup = 'elementary-upper', onContinue) {
+    try {
+      this.showLoading('プライバシー情報を読み込み中');
+      
+      const cacheKey = `privacy-${ageGroup}`;
+      let content = this.cache.get(cacheKey);
+      
+      if (!content) {
+        content = await new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .getModalContent('privacy-policy', ageGroup);
+        });
+        
+        this.cache.set(cacheKey, content);
+        setTimeout(() => this.cache.delete(cacheKey), 300000);
+      }
+      
+      this.hideModal('loading-modal');
+      this.displayEnhancedModal('enhanced-privacy-modal', content, onContinue);
+      
+    } catch (error) {
+      this.hideModal('loading-modal');
+      console.error('プライバシーモーダル表示エラー:', error);
+      // Fallback logic removed as legacy modals are not included
+    }
+  }
+
+  async showEnhancedDigitalCitizenshipModal(ageGroup = 'elementary-upper', onAccept) {
+    try {
+      this.showLoading('デジタル・シティズンシップ情報を読み込み中');
+      
+      const cacheKey = `digital-citizenship-${ageGroup}`;
+      let content = this.cache.get(cacheKey);
+      
+      if (!content) {
+        content = await new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .getModalContent('digital-citizenship', ageGroup);
+        });
+        
+        this.cache.set(cacheKey, content);
+        setTimeout(() => this.cache.delete(cacheKey), 300000);
+      }
+      
+      this.hideModal('loading-modal');
+      this.displayEnhancedModal('enhanced-digital-citizenship-modal', content, onAccept);
+      
+    } catch (error) {
+      this.hideModal('loading-modal');
+      console.error('デジタル・シティズンシップモーダル表示エラー:', error);
+      // Fallback logic removed as legacy modals are not included
+    }
+  }
+
+  displayEnhancedModal(modalId, content, onAction) {
+    const modal = document.getElementById(modalId);
+    if (!modal) {
+      console.error(`モーダル ${modalId} が見つかりません`);
+      return;
+    }
+
+    const titleEl = modal.querySelector(`#${modalId}-title`);
+    const contentEl = modal.querySelector(`#${modalId}-content`);
+    const actionTextEl = modal.querySelector(`#${modalId}-action-text`);
+    const continueBtn = modal.querySelector(`#${modalId.replace('enhanced-', '').replace('-modal', '')}-modal-continue, #${modalId}-continue, #${modalId}-accept`);
+    const cancelBtn = modal.querySelector(`#${modalId.replace('enhanced-', '').replace('-modal', '')}-modal-cancel, #${modalId}-cancel`);
+
+    if (titleEl && content.title) titleEl.textContent = content.title;
+    if (contentEl && content.content) contentEl.innerHTML = content.content;
+    if (actionTextEl && content.actionText) actionTextEl.textContent = content.actionText;
+
+    modal.classList.remove('hidden');
+
+    if (continueBtn) {
+      continueBtn.onclick = () => {
+        this.hideModal(modalId);
+        if (onAction) onAction();
+      };
+    }
+
+    if (cancelBtn) {
+      cancelBtn.onclick = () => this.hideModal(modalId);
+    }
+
+    const closeBtn = modal.querySelector(`#${modalId}-close`);
+    if (closeBtn) {
+      closeBtn.onclick = () => this.hideModal(modalId);
+    }
+  }
+
+  detectAgeGroup() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const ageFromUrl = urlParams.get('ageGroup');
+    if (ageFromUrl) return ageFromUrl;
+
+    const metaAge = document.querySelector('meta[name="age-group"]');
+    if (metaAge) return metaAge.content;
+
+    return 'elementary-upper';
+  }
+}
+
+window.registrationModals = new RegistrationModals();
+
+window.showEnhancedPrivacyModal = function(ageGroup, onContinue) {
+  ageGroup = ageGroup || window.registrationModals.detectAgeGroup();
+  return window.registrationModals.showEnhancedPrivacyModal(ageGroup, onContinue);
+};
+
+window.showEnhancedDigitalCitizenshipModal = function(ageGroup, onAccept) {
+  ageGroup = ageGroup || window.registrationModals.detectAgeGroup();
+  return window.registrationModals.showEnhancedDigitalCitizenshipModal(ageGroup, onAccept);
+};
+
+window.showAgeAppropriateModals = function(onComplete) {
+  const ageGroup = window.registrationModals.detectAgeGroup();
+  console.log('Detected age group:', ageGroup);
+  
+  window.showEnhancedPrivacyModal(ageGroup, () => {
+    window.showEnhancedDigitalCitizenshipModal(ageGroup, () => {
+      if (onComplete) onComplete();
+    });
+  });
+};
+</script>
