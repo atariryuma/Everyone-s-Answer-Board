@@ -61,14 +61,14 @@
     
     // マルチテナント対応: 新しいrunGasWithUserId関数
     function runGasWithUserId(functionName, ...args) {
-      if (!userId) {
+      if (!appState.userId) {
         console.error('❌  - No userId available for:', functionName);
         throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
       }
-      
-      console.log('✅  - runGasWithUserId:', functionName, 'userId:', userId);
+
+      console.log('✅  - runGasWithUserId:', functionName, 'userId:', appState.userId);
       // userIdを第一引数として追加
-      return gasOptimizer.call(functionName, userId, ...args);
+      return gasOptimizer.call(functionName, appState.userId, ...args);
     }
     
     // callWithCache 関数 - 読み取り専用操作用
@@ -80,14 +80,14 @@
     
     // マルチテナント対応: callWithCacheWithUserId関数
     function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
-      if (!userId) {
+      if (!appState.userId) {
         console.error('❌  - No userId available for cached call:', functionName);
         throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
       }
-      
+
       return unifiedCache.getOrSet(cacheKey, function() {
-        console.log('✅  - callWithCacheWithUserId:', functionName, 'userId:', userId);
-        return gasOptimizer.call(functionName, userId, ...args);
+        console.log('✅  - callWithCacheWithUserId:', functionName, 'userId:', appState.userId);
+        return gasOptimizer.call(functionName, appState.userId, ...args);
       }, ttl);
     }
   }
@@ -1498,7 +1498,7 @@
     function publishBoard() {
       console.log('Publishing board automatically...');
       
-      if (!selectedSheet) {
+      if (!appState.selectedSheet) {
         console.error('No sheet selected for publishing');
         return;
       }
@@ -1507,7 +1507,7 @@
       showLoadingState('公開中...');
       
       // 公開処理を実行（activateSheet関数を使用）
-      runGasWithUserId('activateSheetSimple', selectedSheet)
+      runGasWithUserId('activateSheetSimple', appState.selectedSheet)
         .then(function(result) {
           console.log('Board published successfully:', result);
           hideLoadingState();
@@ -1542,46 +1542,47 @@
           showPublishConfirmDialog();
           
           // フラグをリセットして重複表示を防ぐ
-          if (currentStatus) {
-            currentStatus.autoShowPublishDialog = false;
+          if (appState.currentStatus) {
+            appState.currentStatus.autoShowPublishDialog = false;
           }
         }, 1000);
       }
     }
 
-    // マルチテナント対応: ユーザーIDの安全な初期化
-    var userId = '';
-    
-    // マルチテナント対応: テンプレート変数とmetaタグから安全にデータを取得
+    // アプリケーション状態を管理するオブジェクト
+    const appState = {
+      userId: '',
+      selectedSheet: '',
+      currentActiveSheet: '',
+      webAppUrl: '',
+      currentSpreadsheetUrl: '',
+      currentStatus: null,
+      isLoading: false
+    };
+
+    // ユーザーIDをテンプレートまたはmetaタグから安全に取得
     (function() {
       try {
-        // テンプレート変数から直接取得
-        var templateUserId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
+        const templateUserId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
         if (templateUserId && templateUserId.trim() !== '') {
-          userId = templateUserId;
-          console.log('✅  - userId from template:', userId);
+          appState.userId = templateUserId;
+          console.log('✅  - appState.userId from template:', appState.userId);
         } else {
-          // フォールバック: metaタグから取得
-          var userIdMeta = document.querySelector('meta[name="user-id"]');
+          const userIdMeta = document.querySelector('meta[name="user-id"]');
           if (userIdMeta && userIdMeta.content) {
-            userId = userIdMeta.content;
-            console.log('✅  - userId from meta:', userId);
+            appState.userId = userIdMeta.content;
+            console.log('✅  - appState.userId from meta:', appState.userId);
           }
         }
-        
-        if (!userId) {
-          console.error('❌  - userId not found in template or meta');
+
+        if (!appState.userId) {
+          console.error('❌  - appState.userId not found in template or meta');
         }
       } catch (e) {
-        console.error('❌  - userId initialization error:', e);
-        userId = '';
+        console.error('❌  - appState.userId initialization error:', e);
+        appState.userId = '';
       }
     })();
-    var selectedSheet = '';
-    var currentActiveSheet = '';
-    var webAppUrl = '';
-    var currentSpreadsheetUrl = '';
-    var currentStatus = null; // 現在のステータス情報を保存
 
     // Detect jsdom test environment to disable auto-loading
     var IS_TEST_ENV = typeof navigator !== 'undefined' &&
@@ -1637,8 +1638,8 @@
       console.log('DOM状態:', document.readyState);
       console.log('CSS読み込み:', document.styleSheets.length + ' stylesheets');
       console.log('GAS環境:', typeof google !== 'undefined' ? 'Available' : 'Not Available');
-      console.log('管理者状態:', typeof currentStatus !== 'undefined' && currentStatus ? 'Authenticated' : 'Unknown');
-      console.log('スプレッドシートURL:', typeof currentSpreadsheetUrl !== 'undefined' ? (currentSpreadsheetUrl ? 'Set' : 'Not Set') : 'Unknown');
+      console.log('管理者状態:', typeof appState.currentStatus !== 'undefined' && appState.currentStatus ? 'Authenticated' : 'Unknown');
+      console.log('スプレッドシートURL:', typeof appState.currentSpreadsheetUrl !== 'undefined' ? (appState.currentSpreadsheetUrl ? 'Set' : 'Not Set') : 'Unknown');
       console.groupEnd();
     }
 
@@ -2066,11 +2067,11 @@ function setupEventListeners() {
   // Sheet selection
       if (elements.sheetSelect) {
         elements.sheetSelect.addEventListener('change', function(e) {
-          selectedSheet = e.target.value;
+          appState.selectedSheet = e.target.value;
           
           // selectedSheetが文字列であることを確認
-          if (typeof selectedSheet !== 'string' || selectedSheet === '[object Object]') {
-            console.error('selectedSheetが無効です:', selectedSheet);
+          if (typeof appState.selectedSheet !== 'string' || appState.selectedSheet === '[object Object]') {
+            console.error('selectedSheetが無効です:', appState.selectedSheet);
             console.error('選択されたオプション:', e.target.options[e.target.selectedIndex]);
             return;
           }
@@ -2078,8 +2079,8 @@ function setupEventListeners() {
           updateUIForSelectedSheet();
           
           // 公開中のシートの場合は列情報の読み込みをスキップ
-          if (!(currentStatus && currentStatus.appPublished && 
-                (selectedSheet === currentActiveSheet || selectedSheet === currentStatus.publishedSheetName))) {
+          if (!(appState.currentStatus && appState.currentStatus.appPublished &&
+                (appState.selectedSheet === appState.currentActiveSheet || appState.selectedSheet === appState.currentStatus.publishedSheetName))) {
             loadConfigForSelected();
           }
         });
@@ -2408,8 +2409,8 @@ function updateDatabaseInfo(status) {
 
   // スプレッドシートURLを設定
   if (status.userInfo.spreadsheetUrl) {
-    currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
-    console.log('✅ [DEBUG] currentSpreadsheetUrl set to:', currentSpreadsheetUrl);
+    appState.currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
+    console.log('✅ [DEBUG] currentSpreadsheetUrl set to:', appState.currentSpreadsheetUrl);
   }
 
   // 既存のフィールドを更新
@@ -2552,14 +2553,14 @@ function syncCheckboxStates(status) {
      * ページ読み込み時に、現在のステータスをサーバーから取得してUIに反映する
      * @param {boolean} forceRefresh - キャッシュを無視して強制的に再取得するか
      */
-    function loadStatus(forceRefresh = false) {
+    async function loadStatus(forceRefresh = false) {
       // パフォーマンス最適化: 短時間内の連続呼び出しを防ぐクールダウン
       const now = Date.now();
       const cooldownPeriod = 2000; // 2秒のクールダウン
       
       if (!forceRefresh && loadStatus.lastCall && (now - loadStatus.lastCall) < cooldownPeriod) {
         console.log('✅ loadStatus: クールダウン中のため呼び出しをスキップ');
-        return Promise.resolve(currentStatus);
+        return appState.currentStatus;
       }
       
       loadStatus.lastCall = now;
@@ -2570,7 +2571,7 @@ function syncCheckboxStates(status) {
       setLoading(true, '最新のステータス情報を読み込んでいます...');
       
       // キャッシュキーを定義
-      const cacheKey = 'status_' + (userId || 'guest');
+      const cacheKey = 'status_' + (appState.userId || 'guest');
       const cacheTime = 60000; // 60秒キャッシュ
       
       if (forceRefresh) {
@@ -2579,33 +2580,31 @@ function syncCheckboxStates(status) {
           unifiedCache.delete(cacheKey);
         }
         // キャッシュされたステータスを取得（強制リフレッシュ）
-        return getCachedStatus(true)
-          .then(function(status) {
-            console.log('✅ Status loaded (forced refresh)', status);
-            updateUIWithNewStatus(status);
-            setLoading(false);
-            return status;
-          })
-          .catch(function(error) {
-            console.error('❌ getCachedStatus failed:', error);
-            handleError(error, 'loadStatus');
-            setLoading(false);
-            throw error;
-          });
+        try {
+          const status = await getCachedStatus(true);
+          console.log('✅ Status loaded (forced refresh)', status);
+          updateUIWithNewStatus(status);
+          setLoading(false);
+          return status;
+        } catch (error) {
+          console.error('❌ getCachedStatus failed:', error);
+          handleError(error, 'loadStatus');
+          setLoading(false);
+          throw error;
+        }
       } else {
         // キャッシュされたステータスを取得（通常読み込み）
-        return getCachedStatus(false)
-          .then(function(status) {
-            console.log('✅ Status loaded (cached)', status);
-            updateUIWithNewStatus(status);
-            setLoading(false);
-            return status;
-          })
-          .catch(function(error) {
-            handleError(error, 'loadStatus');
-            setLoading(false);
-            throw error;
-          });
+        try {
+          const status = await getCachedStatus(false);
+          console.log('✅ Status loaded (cached)', status);
+          updateUIWithNewStatus(status);
+          setLoading(false);
+          return status;
+        } catch (error) {
+          handleError(error, 'loadStatus');
+          setLoading(false);
+          throw error;
+        }
       }
     }
 
@@ -2614,7 +2613,7 @@ function syncCheckboxStates(status) {
      * @param {object} status - getStatusから返されるステータスオブジェクト
      */
     function updateUIWithNewStatus(status) {
-      currentStatus = status;
+      appState.currentStatus = status;
       
       // 1. 静的なUI要素の更新
       updateStaticUI(status);
@@ -3137,8 +3136,8 @@ function syncCheckboxStates(status) {
      */
     function checkResourceCreationStatus() {
       console.log('🔍 Checking resource creation status...');
-      // 状況更新のためにgetStatusを再実行
-      refreshStatus();
+      // 状況更新のためにloadStatusを強制リフレッシュで再実行
+      loadStatus(true);
     }
 
     /**
@@ -3312,20 +3311,20 @@ function syncCheckboxStates(status) {
       // アクティブなシート名が渡された場合はそれを優先
       if (activeSheetName) {
         select.value = activeSheetName;
-        selectedSheet = activeSheetName;
+        appState.selectedSheet = activeSheetName;
         console.log('populateSheetSelect: Set select.value to activeSheetName:', activeSheetName);
-      } else if (selectedSheet) {
+      } else if (appState.selectedSheet) {
         // 未公開状態などでactiveSheetNameが無い場合は現在の選択を維持
-        select.value = selectedSheet;
-        console.log('populateSheetSelect: Keep existing selectedSheet:', selectedSheet);
+        select.value = appState.selectedSheet;
+        console.log('populateSheetSelect: Keep existing selectedSheet:', appState.selectedSheet);
       } else {
         select.value = '';
         console.log('populateSheetSelect: Reset select.value to empty');
       }
       
       // 選択状態に応じてUIを更新
-      selectedSheet = select.value;
-      console.log('populateSheetSelect: Final selectedSheet:', selectedSheet);
+      appState.selectedSheet = select.value;
+      console.log('populateSheetSelect: Final selectedSheet:', appState.selectedSheet);
       updateUIForSelectedSheet();
     }
 
@@ -3336,7 +3335,7 @@ function syncCheckboxStates(status) {
       const configArea = document.getElementById('config-area');
       const placeholder = document.getElementById('config-placeholder');
       
-      if (selectedSheet) {
+      if (appState.selectedSheet) {
         configArea.classList.remove('hidden');
         placeholder.classList.add('hidden');
         // AI判定ボタンを有効化
@@ -3354,23 +3353,23 @@ function syncCheckboxStates(status) {
      * 選択されたシートの設定を読み込む
      */
     function loadConfigForSelected() {
-      if (!selectedSheet) return;
+      if (!appState.selectedSheet) return;
       
       console.log('🔎 [DEBUG] Load config check:', {
-        selectedSheet: selectedSheet,
-        currentActiveSheet: currentStatus.activeSheetName,
-        appPublished: currentStatus.isPublished,
-        publishedSheetName: currentStatus.publishedSheetName
+        selectedSheet: appState.selectedSheet,
+        currentActiveSheet: appState.currentStatus.activeSheetName,
+        appPublished: appState.currentStatus.isPublished,
+        publishedSheetName: appState.currentStatus.publishedSheetName
       });
 
       // 公開中かつ選択中のシートが公開シートと同じ場合は、UIをロックする
-      if (currentStatus.isPublished && selectedSheet === currentStatus.publishedSheetName) {
+      if (appState.currentStatus.isPublished && appState.selectedSheet === appState.currentStatus.publishedSheetName) {
         setLoading(true, '公開中の設定を読み込んでいます...');
       } else {
         setLoading(true, '列情報を読み込んでいます...');
       }
-      
-      runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
+
+      runGasWithUserId('getSheetDetails', appState.currentStatus.userInfo.spreadsheetId, appState.selectedSheet)
         .then(handleSheetDetailsSuccess)
         .catch(handleSheetDetailsError);
     }
@@ -3467,13 +3466,13 @@ function syncCheckboxStates(status) {
      * AIによる列判定を実行
      */
     function runHeaderGuessing() {
-      if (!selectedSheet) {
+      if (!appState.selectedSheet) {
         showMessage('シートを選択してください。', 'warning');
         return;
       }
       setLoading(true, 'AI搭載高精度列判定システムが分析中...');
       
-      runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
+      runGasWithUserId('getSheetDetails', appState.currentStatus.userInfo.spreadsheetId, appState.selectedSheet)
         .then(function(details) {
           const configToUse = {
             ...details.guessedConfig,
@@ -3553,7 +3552,7 @@ function syncCheckboxStates(status) {
 
       // マルチテナント対応: 設定データをオブジェクトとして送信
       const settingsData = {
-        selectedSheet: selectedSheet,
+        selectedSheet: appState.selectedSheet,
         opinionHeader: config.opinionHeader,
         reasonHeader: config.reasonHeader,
         nameHeader: config.nameHeader,
@@ -3583,7 +3582,7 @@ function syncCheckboxStates(status) {
           setLoading(false);
           console.error('❌  saveAndPublish failed, falling back to legacy:', error);
           // フォールバック: 従来の方法
-          runGasWithUserId('saveAndPublish', selectedSheet, config)
+          runGasWithUserId('saveAndPublish', appState.selectedSheet, config)
             .then(function(status) {
               setLoading(false);
               showMessage('設定が保存され、ボードが公開されました！', 'success');
@@ -3954,8 +3953,8 @@ function syncCheckboxStates(status) {
      * データベースのスプレッドシートを開く
      */
     function openDatabaseSpreadsheet() {
-        if (currentSpreadsheetUrl) {
-            window.open(currentSpreadsheetUrl, '_blank');
+        if (appState.currentSpreadsheetUrl) {
+            window.open(appState.currentSpreadsheetUrl, '_blank');
         } else {
             showMessage('スプレッドシートのURLが見つかりません。', 'warning');
         }
@@ -3965,8 +3964,8 @@ function syncCheckboxStates(status) {
      * 連携しているフォームを開く
      */
     function openForm() {
-        if (currentStatus && currentStatus.formUrl) {
-            window.open(currentStatus.formUrl, '_blank');
+        if (appState.currentStatus && appState.currentStatus.formUrl) {
+            window.open(appState.currentStatus.formUrl, '_blank');
         } else {
             showMessage('連携しているフォームが見つかりません。', 'warning');
         }
@@ -4044,7 +4043,7 @@ function syncCheckboxStates(status) {
         getCachedStatus(false)
           .then(function(status) {
             // 変更があった場合のみUIを更新
-            if (JSON.stringify(status) !== JSON.stringify(currentStatus)) {
+            if (JSON.stringify(status) !== JSON.stringify(appState.currentStatus)) {
               updateUIWithNewStatus(status);
               console.log('📊 システム状態が更新されました');
             }
