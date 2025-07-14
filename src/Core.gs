@@ -3922,7 +3922,7 @@ function createCustomFormUI(requestUserId, config) {
       console.warn('createCustomFormUI - user not found:', requestUserId);
     }
     
-    return {
+    const response = {
       status: 'success',
       message: 'カスタムフォームが正常に作成されました！',
       formUrl: result.formUrl,
@@ -3931,8 +3931,17 @@ function createCustomFormUI(requestUserId, config) {
       formTitle: result.formTitle,
       spreadsheetId: result.spreadsheetId,
       sheetName: result.sheetName,
-      autoPublishReady: true
+      autoPublishReady: true,
     };
+
+    saveFormCreationConfig(requestUserId, {
+      formUrl: response.formUrl,
+      editFormUrl: response.editFormUrl,
+      sheetName: response.sheetName,
+      opinionHeader: config.opinionHeader,
+    });
+
+    return response;
   } catch (error) {
     console.error('createCustomFormUI error:', error.message);
     return {
@@ -3952,7 +3961,7 @@ function createCustomFormUI(requestUserId, config) {
  */
 function autoSaveAndPublishAfterFormCreation(requestUserId, sheetName, formData) {
   try {
-    verifyUserAccess(requestUserId);
+    AuthorizationService.verifyUserAccess(requestUserId);
     console.log('autoSaveAndPublishAfterFormCreation 開始 - userId:', requestUserId, 'sheetName:', sheetName);
     
     // 基本設定オブジェクトを作成
