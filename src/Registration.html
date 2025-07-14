@@ -54,9 +54,11 @@
       max-width: 420px !important;
       padding: 40px 32px !important;
       position: relative !important;
-      z-index: 10 !important;
+      z-index: 1 !important;
       text-align: center !important;
       animation: fadeIn 0.6s ease-out;
+      /* Prevent creating a new stacking context that blocks modals */
+      isolation: auto !important;
     }
 
     .header { margin-bottom: 40px !important; }
@@ -127,142 +129,149 @@
     /* ★★★ ここからが修正されたモーダルのスタイル ★★★ */
     /* ================================================= */
     .modal-overlay {
-      position: fixed !important;
-      top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
-      background: rgba(15, 23, 42, 0.8) !important;
-      backdrop-filter: blur(8px) !important;
-      -webkit-backdrop-filter: blur(8px) !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      z-index: 9999 !important;
-      padding: 20px !important;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.8);
+      /* Remove redundant backdrop-filter to avoid conflicts */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 20px;
       
       /* 表示・非表示のアニメーション */
-      opacity: 0 !important;
-      visibility: hidden !important;
-      transition: opacity 0.3s ease, visibility 0s 0.3s !important;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0s 0.3s;
+    }
+    
+    .modal-overlay.hidden {
+      display: none;
     }
 
-    /* JavaScriptでこのクラスを付けて表示します */
-    .modal-overlay.is-visible {
-      opacity: 1 !important;
-      visibility: visible !important;
-      transition: opacity 0.3s ease, visibility 0s !important;
+    /* SharedModalsと統一された表示パターン */
+    .modal-overlay:not(.hidden) {
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 0.3s ease, visibility 0s;
     }
 
     .modal-content {
-      background: rgba(30, 41, 59, 0.95) !important;
-      border: 1px solid rgba(255, 255, 255, 0.1) !important;
-      border-radius: 16px !important;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
-      width: 100% !important;
-      max-width: 600px !important;
-      padding: 24px 32px !important;
-      max-height: 90vh !important;
-      overflow-y: auto !important;
-      color: rgba(255, 255, 255, 0.9) !important;
+      background: rgba(30, 41, 59, 0.95);
+      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      width: 100%;
+      max-width: 600px;
+      padding: 24px 32px;
+      max-height: 90vh;
+      overflow-y: auto;
+      color: rgba(255, 255, 255, 0.9);
+      position: relative;
+      z-index: 1;
     }
 
     /* ================================================= */
     /* ★★★ 教師向けシンプル情報アクセス ★★★ */
     /* ================================================= */
-    .teacher-info-access {
-      margin-top: 16px !important;
-      text-align: center !important;
+    .registration-page .teacher-info-access {
+      margin-top: 16px;
+      text-align: center;
     }
 
-    .security-details {
-      background: rgba(255, 255, 255, 0.05) !important;
-      border-radius: 12px !important;
-      border: 1px solid rgba(255, 255, 255, 0.1) !important;
-      overflow: hidden !important;
+    .registration-page .security-details {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      overflow: hidden;
     }
 
-    .info-summary {
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: 8px !important;
-      padding: 12px 16px !important;
-      cursor: pointer !important;
-      user-select: none !important;
-      color: rgba(255, 255, 255, 0.8) !important;
-      font-size: 14px !important;
-      font-weight: 500 !important;
-      transition: all 0.3s ease !important;
+    .registration-page .info-summary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 16px;
+      cursor: pointer;
+      user-select: none;
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.3s ease;
     }
 
-    .security-details:hover .info-summary {
-      background: rgba(255, 255, 255, 0.05) !important;
-      color: white !important;
+    .registration-page .security-details:hover .info-summary {
+      background: rgba(255, 255, 255, 0.05);
+      color: white;
     }
 
-    .info-chevron {
-      transition: transform 0.3s ease !important;
-      font-size: 12px !important;
+    .registration-page .info-chevron {
+      transition: transform 0.3s ease;
+      font-size: 12px;
     }
 
-    .security-details[open] .info-chevron {
-      transform: rotate(180deg) !important;
+    .registration-page .security-details[open] .info-chevron {
+      transform: rotate(180deg);
     }
 
-    .info-content {
-      padding: 16px !important;
-      border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
-      display: flex !important;
-      flex-direction: column !important;
-      gap: 8px !important;
+    .registration-page .info-content {
+      padding: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
 
-    .info-link {
-      display: flex !important;
-      align-items: center !important;
-      gap: 8px !important;
-      padding: 8px 12px !important;
-      border-radius: 8px !important;
-      text-decoration: none !important;
-      color: rgba(255, 255, 255, 0.8) !important;
-      font-size: 13px !important;
-      transition: all 0.3s ease !important;
-      background: rgba(255, 255, 255, 0.02) !important;
+    .registration-page .info-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      text-decoration: none;
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 13px;
+      transition: all 0.3s ease;
+      background: rgba(255, 255, 255, 0.02);
     }
 
-    .info-link:hover {
-      background: rgba(255, 255, 255, 0.08) !important;
-      color: white !important;
-      transform: translateX(2px) !important;
+    .registration-page .info-link:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: white;
+      transform: translateX(2px);
     }
 
     /* 教師向けレスポンシブ対応 */
     @media (max-width: 640px) {
-      .teacher-info-access {
-        margin-top: 12px !important;
+      .registration-page .teacher-info-access {
+        margin-top: 12px;
       }
       
-      .info-summary {
-        padding: 10px 12px !important;
-        font-size: 13px !important;
+      .registration-page .info-summary {
+        padding: 10px 12px;
+        font-size: 13px;
       }
       
-      .info-content {
-        padding: 12px !important;
+      .registration-page .info-content {
+        padding: 12px;
       }
       
-      .info-link {
-        padding: 6px 10px !important;
-        font-size: 12px !important;
+      .registration-page .info-link {
+        padding: 6px 10px;
+        font-size: 12px;
       }
       
-      .footer {
-        font-size: 11px !important;
+      .registration-page .footer {
+        font-size: 11px;
       }
     }
   </style>
 
   <?!= include('SharedUtilities'); ?>
 </head>
-<body>
+<body class="registration-page">
 
   <div class="glass-container" id="main-container">
     <div class="header">
@@ -631,12 +640,11 @@
                 window.showDigitalCitizenshipModal();
               }
             } else {
-              // レガシー対応
+              // レガシー対応 - SharedModalsと統一されたパターン
               const modalId = modalType + '-modal';
               const modal = document.getElementById(modalId);
               if (modal) {
                 modal.classList.remove('hidden');
-                modal.classList.add('is-visible');
               }
             }
           });
