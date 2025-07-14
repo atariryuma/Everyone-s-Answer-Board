@@ -660,28 +660,48 @@ window.sharedUtilities.navigation = {
     // Method selection based on context
     const actualMethod = method === 'auto' ? this.detectBestMethod() : method;
     
+    // Try methods in sequence with fallbacks
+    let success = false;
+    
     switch (actualMethod) {
       case 'close':
-        this.navigateWithClose(url, delay);
+        success = this.navigateWithClose(url, delay);
+        if (!success) success = this.navigateWithMessage(url, fallbackMessage);
+        if (!success) success = this.navigateWithRedirect(url, delay);
         break;
       case 'message':
-        this.navigateWithMessage(url, fallbackMessage);
+        success = this.navigateWithMessage(url, fallbackMessage);
+        if (!success) success = this.navigateWithRedirect(url, delay);
         break;
       case 'redirect':
-        this.navigateWithRedirect(url, delay);
+        success = this.navigateWithRedirect(url, delay);
         break;
       default:
-        this.navigateWithFallback(url, fallbackMessage);
+        success = this.navigateWithRedirect(url, delay);
+    }
+    
+    // Final fallback if all methods fail
+    if (!success) {
+      this.navigateWithFallback(url, fallbackMessage);
     }
   },
   
   // Method 1: Use google.script.host.close() if available
   navigateWithClose: function(url, delay = 1000) {
     try {
-      if (typeof google !== 'undefined' && google.script && google.script.host) {
+      if (typeof google !== 'undefined' && 
+          google.script && 
+          google.script.host &&
+          typeof google.script.host.close === 'function') {
         console.log('Using google.script.host.close() method');
         setTimeout(() => {
-          google.script.host.close();
+          try {
+            google.script.host.close();
+          } catch (closeError) {
+            console.warn('google.script.host.close() execution failed:', closeError);
+            // Fallback to next method
+            this.navigateWithMessage(url, 'アプリを閉じています...');
+          }
         }, delay);
         this.showNavigationMessage('アプリを閉じています...', delay);
         return true;
@@ -697,11 +717,28 @@ window.sharedUtilities.navigation = {
     try {
       console.log('Using parent messaging method');
       if (window.parent && window.parent !== window) {
-        window.parent.postMessage({
-          type: 'navigate',
-          url: url,
-          source: 'StudyQuest'
-        }, '*');
+        // Try multiple messaging approaches
+        try {
+          window.parent.postMessage({
+            type: 'navigate',
+            url: url,
+            source: 'StudyQuest'
+          }, '*');
+        } catch (e) {
+          console.warn('PostMessage failed, trying alternative method:', e);
+        }
+        
+        // Google Apps Script specific: Try to navigate parent directly
+        try {
+          setTimeout(() => {
+            window.parent.location.href = url;
+          }, 1000);
+        } catch (e) {
+          console.warn('Parent navigation failed:', e);
+          // Fall back to redirect method
+          return this.navigateWithRedirect(url, 1000);
+        }
+        
         this.showNavigationMessage(message, 2000);
         return true;
       }
@@ -737,21 +774,22 @@ window.sharedUtilities.navigation = {
     // Check if we're in an iframe
     const isIframe = window !== window.top;
     
-    // Check if google.script.host is available
-    const hasGoogleScriptHost = typeof google !== 'undefined' && 
-                                google.script && 
-                                google.script.host;
+    // Check if google.script.host.close is available
+    const hasGoogleScriptHostClose = typeof google !== 'undefined' && 
+                                     google.script && 
+                                     google.script.host &&
+                                     typeof google.script.host.close === 'function';
     
     // Check current URL origin vs target
     const currentOrigin = window.location.origin;
     
     console.log('Navigation context:', {
       isIframe,
-      hasGoogleScriptHost,
+      hasGoogleScriptHostClose,
       currentOrigin
     });
     
-    if (hasGoogleScriptHost) {
+    if (hasGoogleScriptHostClose) {
       return 'close';
     } else if (isIframe) {
       return 'message';
