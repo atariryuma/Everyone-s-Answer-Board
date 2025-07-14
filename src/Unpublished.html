@@ -5,10 +5,19 @@
     <base target="_top">
     <title>StudyQuest -みんなの回答ボード- - 準備中</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#1a1b26" />
+    <meta name="description" content="StudyQuest回答ボード - 現在準備中です" />
+    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
+    
     <!-- TailwindCSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <?= include('UnifiedStyles'); ?>
-    <?= include('SharedUtilities'); ?>
+    
+    <!-- Unified Styles and Shared Components -->
+    <?!= include('UnifiedStyles'); ?>
+    <?!= include('SharedUtilities'); ?>
+    <?!= include('SharedJavaScript'); ?>
+    <?!= include('UnpublishedLogic'); ?>
+    
     <style>
         .pulse-slow {
             animation: pulse 2s infinite;
@@ -167,116 +176,42 @@
     <div id="message-area" class="fixed top-4 right-4 z-50" aria-live="polite" role="status"></div>
 
     <script>
-        function copyBoardUrl() {
-            const urlInput = document.getElementById('board-url');
-            if (urlInput && urlInput.value) {
-                try {
-                    if (navigator.clipboard && window.isSecureContext) {
-                        navigator.clipboard.writeText(urlInput.value).then(() => {
-                            showMessage('URLをコピーしました', 'success');
-                        });
-                    } else {
-                        urlInput.select();
-                        document.execCommand('copy');
-                        showMessage('URLをコピーしました', 'success');
-                    }
-                } catch (error) {
-                    showMessage('コピーに失敗しました', 'error');
-                }
-            } else {
-                showMessage('URLが設定されていません', 'error');
-            }
-        }
-
-        function showMessage(message, type = 'info') {
-            const messageArea = document.getElementById('message-area');
-            if (messageArea) {
-                const colors = {
-                    success: 'bg-green-600 border-green-500',
-                    error: 'bg-red-600 border-red-500', 
-                    info: 'bg-blue-600 border-blue-500',
-                    warning: 'bg-yellow-600 border-yellow-500'
-                };
-                
-                const messageDiv = document.createElement('div');
-                messageDiv.className = `${colors[type] || colors.info} text-white px-4 py-3 rounded-lg shadow-lg border-l-4 mb-2 transform transition-all duration-300 translate-x-0`;
-                messageDiv.innerHTML = `
-                    <div class="flex items-center gap-2">
-                        <span class="font-medium">${message}</span>
-                        <button onclick="this.parentElement.parentElement.remove()" class="ml-auto hover:bg-white/20 rounded p-1">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
-                        </button>
-                    </div>
-                `;
-                
-                messageArea.appendChild(messageDiv);
-                
-                // Auto remove after 4 seconds
-                setTimeout(() => {
-                    if (messageDiv.parentElement) {
-                        messageDiv.style.transform = 'translateX(100%)';
-                        messageDiv.style.opacity = '0';
-                        setTimeout(() => messageDiv.remove(), 300);
-                    }
-                }, 4000);
-            }
-        }
-
-        // 管理者用機能
-        <? if (typeof isOwner !== 'undefined' && isOwner) { ?>
-        // 再公開ボタン
-        document.getElementById('republish-btn')?.addEventListener('click', function() {
-            const button = this;
-            const originalHTML = button.innerHTML;
-            
-            // ローディング状態に変更
-            button.disabled = true;
-            button.className = button.className.replace('hover:scale-105', '');
-            button.innerHTML = `
-                <div class="flex items-center justify-center gap-2">
-                    <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                    </svg>
-                    <span>再公開中...</span>
-                </div>
-            `;
-            
-            showMessage('回答ボードを再公開しています...', 'info');
-            
-            // サーバーに再公開リクエスト
-            google.script.run
-                .withSuccessHandler((result) => {
-                    showMessage('回答ボードが再公開されました！', 'success');
-                    // 公開後はページをリロードして公開状態を表示
-                    setTimeout(() => {
-                        location.reload();
-                    }, 1500);
-                })
-                .withFailureHandler((error) => {
-                    showMessage('再公開に失敗しました: ' + (error.message || '不明なエラー'), 'error');
-                    button.disabled = false;
-                    button.innerHTML = originalHTML;
-                })
-                .republishBoard();
-        });
+        /* =============================================================================
+           Unpublished.html - Minimal JavaScript 
+           Main logic moved to UnpublishedLogic.html and SharedJavaScript.html
+           ============================================================================= */
         
-        // 管理パネルボタン
-        document.getElementById('admin-panel-btn')?.addEventListener('click', function() {
-            showMessage('管理パネルに移動しています...', 'info');
-            
-            // 管理パネルURLに移動
-            <? if (typeof adminPanelUrl !== 'undefined' && adminPanelUrl) { ?>
-            window.location.href = '<?= adminPanelUrl ?>';
-            <? } else { ?>
-            // フォールバック: 現在のURLでadminモードに変更
-            const currentUrl = new URL(window.location.href);
-            currentUrl.searchParams.set('mode', 'admin');
-            window.location.href = currentUrl.toString();
-            <? } ?>
-        });
+        // Set admin panel URL from template if available
+        <? if (typeof adminPanelUrl !== 'undefined' && adminPanelUrl) { ?>
+        window.adminPanelUrl = '<?= adminPanelUrl ?>';
         <? } ?>
+        
+        // Backward compatibility functions using shared utilities
+        var copyBoardUrl = window.unpublishedUtilities?.actions?.copyBoardUrl || function() {
+            console.log('Copy board URL function not available');
+        };
+        
+        var showMessage = window.unpublishedUtilities?.legacy?.showMessage || 
+                         window.sharedUtilities?.message?.show || 
+                         function(msg, type) { console.log(`[${type}] ${msg}`); };
+        
+        // Initialize on DOM ready
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔧 Unpublished: Using unified utilities and logic files');
+            
+            // Detect owner mode and initialize accordingly
+            const isOwner = <?= typeof isOwner !== 'undefined' ? (isOwner ? 'true' : 'false') : 'false' ?>;
+            const adminUrl = window.adminPanelUrl || '';
+            
+            if (window.unpublishedUtilities && window.unpublishedUtilities.init) {
+                window.unpublishedUtilities.init(isOwner, adminUrl);
+                console.log('✅ Unpublished: Utilities initialized with owner mode:', isOwner);
+            }
+            
+            if (window.sharedUtilities) {
+                console.log('✅ Unpublished: Shared utilities loaded');
+            }
+        });
     </script>
 </body>
 </html>

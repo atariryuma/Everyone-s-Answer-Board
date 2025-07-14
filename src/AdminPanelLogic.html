@@ -1,0 +1,783 @@
+<script>
+/* =============================================================================
+   StudyQuest - Admin Panel Logic
+   Extracted from AdminPanel.html for better maintainability
+   Handles all admin-specific functionality and business logic
+   ============================================================================= */
+
+// =============================================================================
+// APPLICATION STATE MANAGEMENT
+// =============================================================================
+
+// Application state object
+const appState = {
+  userId: '',
+  selectedSheet: '',
+  currentActiveSheet: '',
+  webAppUrl: '',
+  currentSpreadsheetUrl: '',
+  currentStatus: null,
+  isLoading: false
+};
+
+// Get user ID safely from template or meta tag
+(function() {
+  try {
+    const templateUserId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
+    if (templateUserId && templateUserId.trim() !== '') {
+      appState.userId = templateUserId;
+      console.log('✅ appState.userId from template:', appState.userId);
+    } else {
+      const userIdMeta = document.querySelector('meta[name="user-id"]');
+      if (userIdMeta && userIdMeta.content) {
+        appState.userId = userIdMeta.content;
+        console.log('✅ appState.userId from meta:', appState.userId);
+      }
+    }
+
+    if (!appState.userId) {
+      console.error('❌ appState.userId not found in template or meta');
+    }
+  } catch (e) {
+    console.error('❌ appState.userId initialization error:', e);
+    appState.userId = '';
+  }
+})();
+
+// =============================================================================
+// ADMIN ERROR HANDLING SYSTEM
+// =============================================================================
+
+/**
+ * Translate technical error messages to user-friendly Japanese messages
+ * @param {string} errorMsg - Original error message
+ * @param {string} context - Error context
+ * @returns {string} User-friendly error message
+ */
+function translateErrorMessage(errorMsg, context) {
+  if (!errorMsg || typeof errorMsg !== 'string') {
+    return 'エラーが発生しました。しばらく待ってから再試行してください。';
+  }
+
+  const lowerMsg = errorMsg.toLowerCase();
+  
+  // Spreadsheet related errors
+  if (lowerMsg.includes('範囲の列数には') || lowerMsg.includes('range')) {
+    return `📊 スプレッドシートにデータが正しく入力されていません。
+💡 解決方法：スプレッドシートを開いて、1行目にヘッダー（列名）が入力されているか確認してください。`;
+  }
+  
+  if (lowerMsg.includes('シート情報の取得に失敗') || lowerMsg.includes('sheet')) {
+    return `📋 シートの情報を読み込めませんでした。
+💡 解決方法：
+• スプレッドシートが正しく共有されているか確認
+• シートにデータが入力されているか確認
+• しばらく待ってから再試行`;
+  }
+  
+  // Permission related errors
+  if (lowerMsg.includes('permission') || lowerMsg.includes('権限') || lowerMsg.includes('access denied')) {
+    return `🔒 アクセス権限がありません。
+💡 解決方法：
+• スプレッドシートの共有設定を確認
+• 編集権限があることを確認
+• アカウントでログインし直してみる`;
+  }
+  
+  // Network related errors
+  if (lowerMsg.includes('network') || lowerMsg.includes('timeout') || lowerMsg.includes('fetch')) {
+    return `🌐 インターネット接続の問題が発生しました。
+💡 解決方法：
+• インターネット接続を確認
+• しばらく待ってから再試行
+• ページを再読み込み`;
+  }
+  
+  // Form related errors
+  if (lowerMsg.includes('form') && lowerMsg.includes('not found')) {
+    return `📝 フォームが見つかりません。
+💡 解決方法：
+• フォームが作成されているか確認
+• フォームが削除されていないか確認
+• 新しいフォームを作成`;
+  }
+  
+  // Validation related errors
+  if (lowerMsg.includes('validation') || lowerMsg.includes('invalid')) {
+    return `⚠️ 入力内容に問題があります。
+💡 解決方法：
+• 必須項目がすべて入力されているか確認
+• 入力形式が正しいか確認
+• 特殊文字が含まれていないか確認`;
+  }
+  
+  // Authentication related errors
+  if (lowerMsg.includes('authentication') || lowerMsg.includes('login') || lowerMsg.includes('unauthorized')) {
+    return `🔐 認証に問題があります。
+💡 解決方法：
+• ログイン状態を確認
+• ページを再読み込み
+• 再度ログインしてみる`;
+  }
+  
+  // Server related errors
+  if (lowerMsg.includes('server error') || lowerMsg.includes('500') || lowerMsg.includes('503')) {
+    return `⚡ システムが一時的に利用できません。
+💡 解決方法：
+• 数分待ってから再試行
+• 問題が続く場合は管理者に連絡`;
+  }
+  
+  // Configuration related errors
+  if (context && context.includes('config') || lowerMsg.includes('configuration')) {
+    return `⚙️ 設定の保存に問題があります。
+💡 解決方法：
+• すべての必須項目が入力されているか確認
+• 設定内容に問題がないか確認
+• しばらく待ってから再試行`;
+  }
+  
+  // Other common errors
+  if (lowerMsg.includes('failed') || lowerMsg.includes('error')) {
+    return `❌ 操作が正常に完了しませんでした。
+💡 解決方法：
+• しばらく待ってから再試行
+• ページを再読み込み
+• 問題が続く場合は別のブラウザを試す`;
+  }
+  
+  // Fallback
+  return `⚠️ 予期しないエラーが発生しました。
+💡 解決方法：
+• ページを再読み込み
+• しばらく待ってから再試行
+• 問題が続く場合はサポートにお問い合わせください`;
+}
+
+/**
+ * Centralized error handling for admin panel
+ * @param {Error} error - Error object
+ * @param {string} context - Context description
+ * @param {string} userMessage - Custom user message
+ */
+function handleAdminError(error, context, userMessage) {
+  const errorMsg = error && error.message ? error.message : String(error);
+  console.error('[' + (context || 'Admin') + '] Error:', errorMsg);
+  
+  const displayMessage = userMessage || translateErrorMessage(errorMsg, context);
+  
+  // Use shared utilities for message display
+  if (window.sharedUtilities && window.sharedUtilities.message) {
+    window.sharedUtilities.message.show(displayMessage, 'error');
+  } else {
+    showMessage(displayMessage, 'error');
+  }
+  
+  return false;
+}
+
+// =============================================================================
+// LOADING STATE MANAGEMENT
+// =============================================================================
+
+/**
+ * Set loading state with message
+ * @param {boolean} isLoading - Loading state
+ * @param {string} message - Loading message
+ */
+function setAdminLoading(isLoading, message = '') {
+  const loader = document.getElementById('loading-overlay');
+  const loaderMessage = document.getElementById('loading-message');
+  
+  if (!loader) return;
+
+  if (isLoading) {
+    if (loaderMessage) loaderMessage.textContent = message;
+    loader.classList.remove('hidden');
+  } else {
+    loader.classList.add('hidden');
+  }
+}
+
+/**
+ * Progress bar system for multi-step operations
+ * @param {number} currentStep - Current step number
+ * @param {number} totalSteps - Total number of steps
+ * @param {string} message - Progress message
+ */
+function showProgressStep(currentStep, totalSteps, message) {
+  let progressContainer = document.getElementById('progress-container');
+  
+  if (!progressContainer) {
+    progressContainer = document.createElement('div');
+    progressContainer.id = 'progress-container';
+    progressContainer.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+    progressContainer.innerHTML = `
+      <div class="glass-panel p-6 max-w-md w-full mx-4">
+        <div class="text-center mb-4">
+          <h3 class="text-lg font-semibold text-white">フォーム作成進行中</h3>
+        </div>
+        <div class="mb-4">
+          <div class="bg-gray-700 rounded-full h-3 overflow-hidden">
+            <div id="progress-bar" class="bg-gradient-to-r from-cyan-500 to-purple-500 h-full transition-all duration-500 ease-out" style="width: 0%"></div>
+          </div>
+        </div>
+        <div class="text-center">
+          <p id="progress-message" class="text-sm text-gray-300"></p>
+          <p class="text-xs text-gray-400 mt-2">
+            ステップ <span id="progress-current">1</span> / <span id="progress-total">5</span>
+          </p>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(progressContainer);
+  }
+  
+  const progressBar = document.getElementById('progress-bar');
+  const progressMessage = document.getElementById('progress-message');
+  const progressCurrent = document.getElementById('progress-current');
+  const progressTotal = document.getElementById('progress-total');
+  
+  if (progressBar) {
+    const percentage = (currentStep / totalSteps) * 100;
+    progressBar.style.width = percentage + '%';
+  }
+  
+  if (progressMessage) progressMessage.textContent = message;
+  if (progressCurrent) progressCurrent.textContent = currentStep;
+  if (progressTotal) progressTotal.textContent = totalSteps;
+  
+  progressContainer.classList.remove('hidden');
+}
+
+/**
+ * Hide progress bar
+ */
+function hideProgressBar() {
+  const progressContainer = document.getElementById('progress-container');
+  if (progressContainer) {
+    progressContainer.classList.add('hidden');
+    setTimeout(() => {
+      if (progressContainer.parentNode) {
+        progressContainer.parentNode.removeChild(progressContainer);
+      }
+    }, 500);
+  }
+}
+
+// =============================================================================
+// MODAL MANAGEMENT SYSTEM
+// =============================================================================
+
+/**
+ * Show confirmation modal with custom title and message
+ * @param {string} title - Modal title
+ * @param {string} message - Modal message
+ * @param {Function} onConfirm - Callback on confirmation
+ */
+function showConfirmationModal(title, message, onConfirm) {
+  const modal = document.getElementById('confirmation-modal');
+  const modalTitle = document.getElementById('modal-title');
+  const modalMessage = document.getElementById('modal-message');
+  
+  if (modalTitle) modalTitle.textContent = title;
+  if (modalMessage) modalMessage.textContent = message;
+  
+  if (!modal) {
+    console.error('確認モーダルが見つかりません');
+    return;
+  }
+  
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+
+  const confirmBtn = document.getElementById('modal-confirm-btn');
+  const cancelBtn = document.getElementById('modal-cancel-btn');
+
+  const confirmHandler = function() {
+    onConfirm();
+    hideConfirmationModal();
+    confirmBtn.removeEventListener('click', confirmHandler);
+    cancelBtn.removeEventListener('click', cancelHandler);
+  };
+
+  const cancelHandler = function() {
+    hideConfirmationModal();
+    confirmBtn.removeEventListener('click', confirmHandler);
+    cancelBtn.removeEventListener('click', cancelHandler);
+  };
+
+  confirmBtn.addEventListener('click', confirmHandler);
+  cancelBtn.addEventListener('click', cancelHandler);
+}
+
+/**
+ * Hide confirmation modal
+ */
+function hideConfirmationModal() {
+  const modal = document.getElementById('confirmation-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+}
+
+/**
+ * Show privacy modal before sensitive operations
+ * @param {Function} onContinue - Callback on continue
+ */
+function showPrivacyModal(onContinue) {
+  const modal = document.getElementById('privacy-modal');
+  if (!modal) {
+    console.error('プライバシーモーダルが見つかりません');
+    return;
+  }
+  
+  modal.classList.remove('hidden');
+  
+  const continueBtn = document.getElementById('privacy-modal-continue');
+  const cancelBtn = document.getElementById('privacy-modal-cancel');
+  
+  if (continueBtn) {
+    const newContinueBtn = continueBtn.cloneNode(true);
+    continueBtn.parentNode.replaceChild(newContinueBtn, continueBtn);
+    newContinueBtn.addEventListener('click', function() {
+      hidePrivacyModal();
+      if (onContinue) onContinue();
+    });
+  }
+  
+  if (cancelBtn) {
+    const newCancelBtn = cancelBtn.cloneNode(true);
+    cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+    newCancelBtn.addEventListener('click', hidePrivacyModal);
+  }
+  
+  const escapeHandler = function(e) {
+    if (e.key === 'Escape') {
+      hidePrivacyModal();
+      document.removeEventListener('keydown', escapeHandler);
+    }
+  };
+  document.addEventListener('keydown', escapeHandler);
+}
+
+/**
+ * Hide privacy modal
+ */
+function hidePrivacyModal() {
+  const modal = document.getElementById('privacy-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+}
+
+// =============================================================================
+// ADMIN UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Safely set text content of an element
+ * @param {string} elementId - Element ID
+ * @param {string} value - Value to set
+ * @param {string} prefix - Optional prefix
+ */
+function safeSetAdminText(elementId, value, prefix = '') {
+  const element = document.getElementById(elementId);
+  if (element) {
+    element.textContent = value ? prefix + value : '-';
+    console.log(`✅ Updated ${elementId}:`, element.textContent);
+  } else {
+    console.warn(`❌ Element not found: ${elementId}`);
+  }
+}
+
+/**
+ * Update publication status UI
+ * @param {boolean} isPublished - Publication status
+ */
+function updatePublicationStatusUI(isPublished) {
+  const statusIndicator = document.getElementById('info-publish-indicator');
+  const statusText = document.getElementById('info-publish-text');
+  const unpublishBtn = document.getElementById('unpublish-board-btn');
+  const savePublishBtn = document.getElementById('save-publish-btn');
+  
+  if (statusIndicator && statusText) {
+    if (isPublished) {
+      statusIndicator.className = 'w-3 h-3 rounded-full bg-green-500';
+      statusText.textContent = '公開中';
+      statusText.className = 'text-green-400';
+    } else {
+      statusIndicator.className = 'w-3 h-3 rounded-full bg-red-500';
+      statusText.textContent = '非公開';
+      statusText.className = 'text-red-400';
+    }
+  }
+  
+  if (unpublishBtn) {
+    unpublishBtn.style.display = isPublished ? 'inline-flex' : 'none';
+  }
+  
+  if (savePublishBtn) {
+    const text = isPublished ? '設定を更新' : '設定保存・公開';
+    savePublishBtn.textContent = text;
+  }
+}
+
+/**
+ * Toggle progressive disclosure sections
+ * @param {string} sectionId - Section ID to toggle
+ */
+function toggleAdminSection(sectionId) {
+  const section = document.getElementById(sectionId);
+  const icon = document.getElementById(sectionId.replace('content', 'icon'));
+  
+  if (!section) return;
+  
+  const isExpanded = section.classList.contains('expanded');
+  
+  if (isExpanded) {
+    section.classList.remove('expanded');
+    section.classList.add('collapsed');
+    if (icon) {
+      if (sectionId === 'step1-content') {
+        icon.style.transform = 'rotate(0deg)';
+      } else if (sectionId === 'step2-content' || sectionId === 'step3-content') {
+        icon.style.transform = 'rotate(90deg)';
+      }
+    }
+  } else {
+    section.classList.remove('collapsed');
+    section.classList.add('expanded');
+    if (icon) {
+      if (sectionId === 'step1-content') {
+        icon.style.transform = 'rotate(180deg)';
+      } else if (sectionId === 'step2-content' || sectionId === 'step3-content') {
+        icon.style.transform = 'rotate(0deg)';
+      }
+    }
+  }
+}
+
+// =============================================================================
+// ADMIN PANEL SPECIFIC FUNCTIONS
+// =============================================================================
+
+/**
+ * Update database info panel with status data
+ * @param {Object} status - Status object from server
+ */
+function updateDatabaseInfo(status) {
+  console.log('🔧 updateDatabaseInfo called with status:', status);
+  
+  if (!status || !status.userInfo) {
+    console.warn('システム情報を更新できませんでした: ユーザー情報がありません。', status);
+    return;
+  }
+
+  console.log('✅ User info found, updating system panel:', status.userInfo);
+
+  // Set spreadsheet URL
+  if (status.userInfo.spreadsheetUrl) {
+    appState.currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
+    console.log('✅ currentSpreadsheetUrl set to:', appState.currentSpreadsheetUrl);
+  }
+
+  // Update existing fields
+  safeSetAdminText('info-admin-email', status.userInfo.adminEmail);
+  safeSetAdminText('info-user-id', status.userInfo.userId);
+  
+  // Published sheet name
+  let publishedSheetName = status.publishedSheetName || status.activeSheetName;
+  if (!publishedSheetName && status.userInfo && status.userInfo.configJson) {
+    try {
+      const config = JSON.parse(status.userInfo.configJson);
+      publishedSheetName = config.publishedSheetName;
+    } catch (e) {
+      console.warn('ConfigJSON parse error in published sheet name:', e);
+    }
+  }
+  safeSetAdminText('info-published-sheet', publishedSheetName || 'なし');
+  safeSetAdminText('info-answer-count', status.answerCount || '0');
+  safeSetAdminText('info-reaction-count', status.totalReactions || '0');
+
+  // Update publication status
+  const isPublished = status && (
+    status.isPublished || 
+    status.appPublished || 
+    (status.publishedSheetName && status.publishedSheetName !== 'なし')
+  );
+  updatePublicationStatusUI(isPublished);
+
+  // Display mode
+  const displayMode = status.showNames ? '名前表示' : '匿名表示';
+  safeSetAdminText('info-display-mode', displayMode);
+
+  // Count display
+  const showCounts = status.showCounts !== undefined ? (status.showCounts ? '表示' : '非表示') : '表示';
+  safeSetAdminText('info-show-counts', showCounts);
+  
+  // Update button states
+  updateAdminButtonStates(status);
+}
+
+/**
+ * Update admin button states based on status
+ * @param {Object} status - Status object
+ */
+function updateAdminButtonStates(status) {
+  const openSpreadsheetBtns = document.querySelectorAll('#open-spreadsheet-btn, #open-spreadsheet-btn-step2');
+  const openFormBtn = document.getElementById('open-form-btn');
+  const openLinkedFormBtn = document.getElementById('open-linked-form-btn');
+  
+  openSpreadsheetBtns.forEach(btn => {
+    if (btn) {
+      const hasSpreadsheetUrl = status.userInfo && status.userInfo.spreadsheetUrl;
+      btn.disabled = !hasSpreadsheetUrl;
+      btn.title = hasSpreadsheetUrl ? 'スプレッドシートを開く' : 'スプレッドシートが設定されていません';
+    }
+  });
+  
+  if (openFormBtn) {
+    const formUrl = status.formUrl || (status.userInfo && status.userInfo.formUrl);
+    const hasFormUrl = formUrl && formUrl.trim() !== "";
+    openFormBtn.disabled = !hasFormUrl;
+    openFormBtn.title = hasFormUrl ? 'フォームを開く' : 'フォームが設定されていません';
+  }
+
+  if (openLinkedFormBtn) {
+    const hasFormUrl = status.formUrl && status.formUrl.trim() !== '';
+    openLinkedFormBtn.disabled = !hasFormUrl;
+    openLinkedFormBtn.title = hasFormUrl ? '連携しているGoogleフォームを開きます' : '連携しているフォームが設定されていません';
+  }
+}
+
+/**
+ * Handle account deletion request with double confirmation
+ */
+function handleDeleteRequest() {
+  showPrivacyModal(function() {
+    showConfirmationModal(
+      'アカウントの完全削除',
+      '本当にこのアカウントを削除しますか？この操作は元に戻せず、すべてのデータが失われます。',
+      function() {
+        setAdminLoading(true, 'アカウントを完全に削除しています...');
+        
+        if (window.sharedUtilities && window.sharedUtilities.gas) {
+          window.sharedUtilities.gas.call(
+            'deleteCurrentUserAccount',
+            function(response) {
+              setAdminLoading(false);
+              if (window.sharedUtilities.message) {
+                window.sharedUtilities.message.show(response, 'success');
+              }
+              setTimeout(function() {
+                if (window.sharedUtilities.navigation) {
+                  window.sharedUtilities.navigation.safeNavigate('?page=Registration', {
+                    fallbackMessage: '登録ページに移動中...',
+                    method: 'auto'
+                  });
+                } else {
+                  window.location.href = '?page=Registration';
+                }
+              }, 2000);
+            },
+            function(error) {
+              setAdminLoading(false);
+              handleAdminError(error, 'アカウント削除');
+            },
+            [appState.userId],
+            'アカウント削除'
+          );
+        }
+      }
+    );
+  });
+}
+
+/**
+ * Admin system flow display for debugging
+ */
+function showAdminSystemFlow() {
+  const DEBUG_MODE = <?= typeof DEBUG_MODE !== 'undefined' ? DEBUG_MODE : false ?>;
+  if (!DEBUG_MODE) return;
+  
+  console.group('🔄 StudyQuest 管理パネル システムフロー');
+  console.log('📋 Phase 1: 管理パネル初期化');
+  console.log('  ├─ 管理者権限確認');
+  console.log('  ├─ ユーザー情報取得');
+  console.log('  ├─ スプレッドシート接続');
+  console.log('  └─ UI要素初期化');
+  
+  console.log('🎨 Phase 2: レイアウト構築');
+  console.log('  ├─ 左パネル（メイン操作）');
+  console.log('  ├─ 右パネル（システム情報）');
+  console.log('  ├─ フッター（公開URL表示）');
+  console.log('  └─ レスポンシブ対応');
+  
+  console.log('📡 Phase 3: データ連携');
+  console.log('  ├─ スプレッドシートデータ取得');
+  console.log('  ├─ シート一覧取得');
+  console.log('  ├─ 列ヘッダー自動判定');
+  console.log('  └─ 公開状態確認');
+  
+  console.log('🏗️ Phase 4: 設定UI構築');
+  console.log('  ├─ ステップインジケーター');
+  console.log('  ├─ シート選択ドロップダウン');
+  console.log('  ├─ 列設定フォーム');
+  console.log('  └─ プレビュー表示');
+  
+  console.log('⚡ Phase 5: 管理機能');
+  console.log('  ├─ ボード作成・公開');
+  console.log('  ├─ 設定変更');
+  console.log('  ├─ URLコピー機能');
+  console.log('  └─ リアルタイム更新');
+  
+  console.log('🔧 Phase 6: 最適化・監視');
+  console.log('  ├─ キャッシュ管理');
+  console.log('  ├─ エラーハンドリング');
+  console.log('  ├─ パフォーマンス監視');
+  console.log('  └─ デバッグ情報出力');
+  
+  console.groupEnd();
+  
+  console.group('📊 管理パネル現在状態');
+  console.log('DOM状態:', document.readyState);
+  console.log('CSS読み込み:', document.styleSheets.length + ' stylesheets');
+  console.log('GAS環境:', typeof google !== 'undefined' ? 'Available' : 'Not Available');
+  console.log('管理者状態:', typeof appState.currentStatus !== 'undefined' && appState.currentStatus ? 'Authenticated' : 'Unknown');
+  console.log('スプレッドシートURL:', typeof appState.currentSpreadsheetUrl !== 'undefined' ? (appState.currentSpreadsheetUrl ? 'Set' : 'Not Set') : 'Unknown');
+  console.groupEnd();
+}
+
+// =============================================================================
+// CACHE MANAGEMENT SYSTEM
+// =============================================================================
+
+/**
+ * Frontend cache manager for admin panel
+ */
+class AdminCacheManager {
+  constructor() {
+    this.caches = new Map();
+    this.defaultTTL = 30000; // 30 seconds
+    this.dependencies = new Map();
+    this._initializeDependencies();
+  }
+  
+  _initializeDependencies() {
+    this.dependencies.set('user_data_change', ['status', 'userInfo', 'formUrls']);
+    this.dependencies.set('form_creation', ['status', 'formUrls', 'sheetDetails']);
+    this.dependencies.set('config_change', ['status', 'sheetDetails']);
+  }
+  
+  get(key, defaultValue = null) {
+    const cached = this.caches.get(key);
+    if (!cached) return defaultValue;
+    
+    const now = Date.now();
+    if (now - cached.timestamp > cached.ttl) {
+      this.caches.delete(key);
+      console.log(`📊 [Cache] Expired and removed: ${key}`);
+      return defaultValue;
+    }
+    
+    console.log(`📊 [Cache] Hit: ${key}`);
+    return cached.value;
+  }
+  
+  set(key, value, ttl = this.defaultTTL) {
+    this.caches.set(key, {
+      value: value,
+      timestamp: Date.now(),
+      ttl: ttl
+    });
+    console.log(`📊 [Cache] Set: ${key} (TTL: ${ttl}ms)`);
+  }
+  
+  invalidate(key) {
+    this.caches.delete(key);
+    console.log(`📊 [Cache] Invalidated: ${key}`);
+  }
+  
+  invalidateDependents(changeType) {
+    const dependents = this.dependencies.get(changeType) || [];
+    dependents.forEach(key => this.invalidate(key));
+    console.log(`📊 [Cache] Invalidated dependents of ${changeType}:`, dependents);
+  }
+  
+  clear() {
+    this.caches.clear();
+    console.log('📊 [Cache] Cleared all caches');
+  }
+}
+
+// Global cache manager instance
+window.adminCacheManager = new AdminCacheManager();
+
+// =============================================================================
+// INITIALIZATION
+// =============================================================================
+
+/**
+ * Initialize admin panel specific functionality
+ */
+function initializeAdminPanel() {
+  console.log('🔧 Initializing Admin Panel Logic...');
+  
+  // Show system flow for debugging
+  showAdminSystemFlow();
+  
+  // Set up global error handler for admin panel
+  window.addEventListener('error', (event) => {
+    console.error('Admin Panel Global Error:', event.error);
+    if (window.sharedUtilities && window.sharedUtilities.message) {
+      window.sharedUtilities.message.show('管理パネルでエラーが発生しました', 'error');
+    }
+  });
+  
+  console.log('✅ Admin Panel Logic initialized');
+}
+
+// Auto-initialize when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeAdminPanel);
+} else {
+  initializeAdminPanel();
+}
+
+// =============================================================================
+// EXPORT TO GLOBAL SCOPE
+// =============================================================================
+
+// Export admin utilities to global scope for easy access
+window.adminUtilities = {
+  state: appState,
+  error: {
+    handle: handleAdminError,
+    translate: translateErrorMessage
+  },
+  loading: {
+    set: setAdminLoading,
+    showProgress: showProgressStep,
+    hideProgress: hideProgressBar
+  },
+  modal: {
+    showConfirmation: showConfirmationModal,
+    hideConfirmation: hideConfirmationModal,
+    showPrivacy: showPrivacyModal,
+    hidePrivacy: hidePrivacyModal
+  },
+  ui: {
+    setText: safeSetAdminText,
+    updatePublicationStatus: updatePublicationStatusUI,
+    updateDatabaseInfo: updateDatabaseInfo,
+    toggleSection: toggleAdminSection
+  },
+  cache: window.adminCacheManager,
+  actions: {
+    handleDeleteRequest: handleDeleteRequest
+  }
+};
+
+</script>

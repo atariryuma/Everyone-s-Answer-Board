@@ -1,0 +1,625 @@
+<script>
+/* =============================================================================
+   StudyQuest - Shared JavaScript Utilities
+   Consolidated common functions from all HTML files
+   GAS Compatible - Optimized for Google Apps Script
+   ============================================================================= */
+
+// =============================================================================
+// UNIVERSAL MESSAGE SYSTEM
+// =============================================================================
+
+/**
+ * Universal message display function - consolidated from all files
+ * Compatible with both glassmorphism and standard designs
+ * @param {string} message - Message to display
+ * @param {string} type - Message type: 'success', 'error', 'warning', 'info'
+ * @param {number} duration - Auto-hide duration in milliseconds (default: 4000)
+ */
+function showMessage(message, type = 'info', duration = 4000) {
+  const messageArea = document.getElementById('message-area');
+  if (!messageArea) {
+    console.warn('Message area not found');
+    return;
+  }
+
+  const colors = {
+    success: 'bg-green-600/20 border-green-500/50 text-green-100',
+    error: 'bg-red-600/20 border-red-500/50 text-red-100',
+    warning: 'bg-yellow-600/20 border-yellow-500/50 text-yellow-100',
+    info: 'bg-blue-600/20 border-blue-500/50 text-blue-100'
+  };
+
+  const icons = {
+    success: '✅',
+    error: '❌', 
+    warning: '⚠️',
+    info: 'ℹ️'
+  };
+
+  // Clear existing messages
+  messageArea.innerHTML = '';
+  
+  const messageDiv = document.createElement('div');
+  messageDiv.className = `message show glass-panel rounded-lg p-4 border ${colors[type] || colors.info}`;
+  messageDiv.innerHTML = `
+    <div class="flex items-center">
+      <div class="mr-3">${icons[type] || icons.info}</div>
+      <div class="flex-1">${message}</div>
+      <button onclick="this.closest('.message').style.display='none'" class="ml-4 text-gray-400 hover:text-white">✕</button>
+    </div>
+  `;
+  
+  messageArea.appendChild(messageDiv);
+  
+  // Auto remove after specified duration
+  if (duration > 0) {
+    setTimeout(() => {
+      if (messageDiv.parentElement) {
+        messageDiv.style.opacity = '0';
+        messageDiv.style.transform = 'translateY(-20px)';
+        setTimeout(() => messageDiv.remove(), 300);
+      }
+    }, duration);
+  }
+}
+
+/**
+ * Simple message display for message-area elements (Registration.html style)
+ * @param {string} message - Message text
+ * @param {string} type - Message type
+ */
+function displaySimpleMessage(message, type = 'info') {
+  const messageAreaEl = document.getElementById('message-area');
+  if (messageAreaEl) {
+    messageAreaEl.textContent = message;
+    messageAreaEl.className = `message-area ${type}`;
+  }
+}
+
+// =============================================================================
+// GOOGLE APPS SCRIPT API UTILITIES
+// =============================================================================
+
+/**
+ * Enhanced error handler for Google Apps Script calls
+ * Provides user-friendly error messages and logging
+ * @param {Error} error - Error object from GAS
+ * @param {string} context - Context description for debugging
+ */
+function handleGASError(error, context = '操作') {
+  console.error(`GAS Error in ${context}:`, error);
+  
+  let userMessage = `${context}に失敗しました`;
+  
+  if (error.message) {
+    // Common error translations
+    const errorTranslations = {
+      'Exception: Timeout': 'タイムアウトしました。しばらく待ってから再試行してください。',
+      'Exception: Service invoked too many times': 'サービスの利用制限に達しました。しばらく待ってから再試行してください。',
+      'Exception: Lock could not be obtained': 'システムが他の処理で使用中です。しばらく待ってから再試行してください。',
+      'Exception: Permission denied': '権限がありません。管理者にお問い合わせください。',
+      'Exception: Not found': '対象が見つかりませんでした。',
+      'User authentication required': '認証が必要です。ページを再読み込みしてください。'
+    };
+    
+    // Check for specific error patterns
+    for (const [pattern, translation] of Object.entries(errorTranslations)) {
+      if (error.message.includes(pattern)) {
+        userMessage = translation;
+        break;
+      }
+    }
+    
+    // If no specific translation found, use original message if it's user-friendly
+    if (userMessage === `${context}に失敗しました` && error.message.length < 100) {
+      userMessage = `${context}に失敗しました: ${error.message}`;
+    }
+  }
+  
+  showMessage(userMessage, 'error');
+  return userMessage;
+}
+
+/**
+ * Standardized GAS API call wrapper with consistent error handling
+ * @param {Function} gasFunction - GAS function to call
+ * @param {Function} successCallback - Success handler
+ * @param {Function} errorCallback - Error handler (optional)
+ * @param {Array} args - Arguments to pass to GAS function
+ * @param {string} context - Context for error messages
+ */
+function callGAS(gasFunction, successCallback, errorCallback, args = [], context = '操作') {
+  const runner = google.script.run
+    .withSuccessHandler(successCallback)
+    .withFailureHandler((error) => {
+      const errorMessage = handleGASError(error, context);
+      if (errorCallback) {
+        errorCallback(error, errorMessage);
+      }
+    });
+  
+  // Apply arguments to the function call
+  if (args.length === 0) {
+    runner[gasFunction.name]();
+  } else {
+    runner[gasFunction.name].apply(runner, args);
+  }
+}
+
+// =============================================================================
+// DOM MANIPULATION UTILITIES
+// =============================================================================
+
+/**
+ * Safe element selection with error handling
+ * @param {string} selector - CSS selector or element ID
+ * @param {boolean} required - Whether element is required (throws error if not found)
+ * @returns {Element|null} Found element or null
+ */
+function getSafeElement(selector, required = false) {
+  let element;
+  
+  // Try ID first, then querySelector
+  if (selector.startsWith('#') || !selector.includes(' ')) {
+    element = document.getElementById(selector.replace('#', ''));
+  }
+  
+  if (!element) {
+    element = document.querySelector(selector);
+  }
+  
+  if (!element && required) {
+    console.error(`Required element not found: ${selector}`);
+    showMessage('画面の読み込みでエラーが発生しました', 'error');
+  }
+  
+  return element;
+}
+
+/**
+ * Safe content update with null checks
+ * @param {string} elementId - Element ID
+ * @param {string} content - Content to set
+ * @param {string} method - Method to use: 'text', 'html', 'value'
+ */
+function updateElementSafely(elementId, content, method = 'text') {
+  const element = getSafeElement(elementId);
+  if (!element) return false;
+  
+  try {
+    switch (method) {
+      case 'text':
+        element.textContent = content;
+        break;
+      case 'html':
+        element.innerHTML = content;
+        break;
+      case 'value':
+        element.value = content;
+        break;
+      default:
+        element.textContent = content;
+    }
+    return true;
+  } catch (error) {
+    console.error(`Error updating element ${elementId}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Toggle element visibility with animation
+ * @param {string} elementId - Element ID
+ * @param {boolean} show - Whether to show or hide
+ * @param {string} displayType - CSS display value when shown
+ */
+function toggleElementVisibility(elementId, show, displayType = 'block') {
+  const element = getSafeElement(elementId);
+  if (!element) return;
+  
+  if (show) {
+    element.style.display = displayType;
+    element.classList.remove('hidden');
+    setTimeout(() => {
+      element.style.opacity = '1';
+      element.style.transform = 'translateY(0)';
+    }, 10);
+  } else {
+    element.style.opacity = '0';
+    element.style.transform = 'translateY(-20px)';
+    setTimeout(() => {
+      element.style.display = 'none';
+      element.classList.add('hidden');
+    }, 300);
+  }
+}
+
+// =============================================================================
+// LOADING STATE MANAGEMENT
+// =============================================================================
+
+/**
+ * Button loading state manager
+ * Handles loading spinners and disabled states
+ */
+class ButtonStateManager {
+  constructor() {
+    this.originalStates = new Map();
+  }
+  
+  /**
+   * Set button to loading state
+   * @param {string} buttonId - Button element ID
+   * @param {string} loadingText - Text to show during loading
+   */
+  setLoading(buttonId, loadingText = '処理中...') {
+    const button = getSafeElement(buttonId);
+    if (!button) return;
+    
+    // Store original state
+    this.originalStates.set(buttonId, {
+      innerHTML: button.innerHTML,
+      disabled: button.disabled,
+      className: button.className
+    });
+    
+    // Set loading state
+    button.disabled = true;
+    button.innerHTML = `<span class="spinner"></span>${loadingText}`;
+    button.classList.add('loading');
+  }
+  
+  /**
+   * Restore button to original state
+   * @param {string} buttonId - Button element ID
+   */
+  restoreState(buttonId) {
+    const button = getSafeElement(buttonId);
+    const originalState = this.originalStates.get(buttonId);
+    
+    if (!button || !originalState) return;
+    
+    button.innerHTML = originalState.innerHTML;
+    button.disabled = originalState.disabled;
+    button.className = originalState.className;
+    
+    this.originalStates.delete(buttonId);
+  }
+  
+  /**
+   * Clear all stored states
+   */
+  clearAll() {
+    this.originalStates.clear();
+  }
+}
+
+// Global button state manager instance
+window.buttonStateManager = new ButtonStateManager();
+
+// =============================================================================
+// MODAL MANAGEMENT UTILITIES
+// =============================================================================
+
+/**
+ * Generic modal show/hide functions
+ * Compatible with existing modal systems
+ */
+function showModal(modalId) {
+  const modal = getSafeElement(modalId);
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function hideModal(modalId) {
+  const modal = getSafeElement(modalId);
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+    document.body.style.overflow = 'auto';
+  }
+}
+
+/**
+ * Setup modal close handlers
+ * @param {string} modalId - Modal element ID
+ */
+function setupModalCloseHandlers(modalId) {
+  const modal = getSafeElement(modalId);
+  if (!modal) return;
+  
+  // Close on backdrop click
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      hideModal(modalId);
+    }
+  });
+  
+  // Close on Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+      hideModal(modalId);
+    }
+  });
+  
+  // Close button handlers
+  const closeButtons = modal.querySelectorAll('[data-close-modal]');
+  closeButtons.forEach(button => {
+    button.addEventListener('click', () => hideModal(modalId));
+  });
+}
+
+// =============================================================================
+// NAVIGATION UTILITIES
+// =============================================================================
+
+/**
+ * Safe navigation utility for iframe environments
+ * Compatible with GAS web apps
+ * @param {string} url - Target URL
+ * @param {Object} options - Navigation options
+ */
+function safeNavigate(url, options = {}) {
+  const defaultOptions = {
+    fallbackMessage: '移動中...',
+    method: 'auto', // 'auto', 'parent', 'top', 'replace'
+    delay: 0
+  };
+  
+  const config = { ...defaultOptions, ...options };
+  
+  if (config.delay > 0) {
+    setTimeout(() => performNavigation(url, config), config.delay);
+  } else {
+    performNavigation(url, config);
+  }
+}
+
+function performNavigation(url, config) {
+  showMessage(config.fallbackMessage, 'info');
+  
+  try {
+    switch (config.method) {
+      case 'parent':
+        if (window.parent && window.parent.location) {
+          window.parent.location.href = url;
+        } else {
+          window.location.href = url;
+        }
+        break;
+      case 'top':
+        window.top.location.href = url;
+        break;
+      case 'replace':
+        window.location.replace(url);
+        break;
+      case 'auto':
+      default:
+        // Try different methods in order of preference
+        if (window.parent && window.parent !== window) {
+          window.parent.location.href = url;
+        } else if (window.top && window.top !== window) {
+          window.top.location.href = url;
+        } else {
+          window.location.href = url;
+        }
+        break;
+    }
+  } catch (error) {
+    console.warn('Navigation failed, trying fallback:', error);
+    window.open(url, '_blank');
+  }
+}
+
+/**
+ * Show manual navigation dialog as fallback
+ * @param {string} url - Target URL
+ * @param {string} message - Dialog message
+ */
+function showManualNavigationDialog(url, message = 'ページに移動') {
+  const dialog = `
+    <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                background: var(--color-surface); border: 1px solid var(--color-border); 
+                border-radius: 16px; padding: 24px; z-index: 10000; max-width: 400px;
+                backdrop-filter: blur(20px); box-shadow: var(--shadow-glass);">
+      <h3 style="color: white; margin-bottom: 16px;">${message}</h3>
+      <p style="color: var(--color-text-secondary); margin-bottom: 20px;">
+        下記のリンクをクリックして移動してください：
+      </p>
+      <a href="${url}" target="_top" style="display: block; background: var(--gradient-primary); 
+         color: white; padding: 12px 20px; border-radius: 8px; text-decoration: none; 
+         text-align: center; font-weight: 600;">
+        ページを開く
+      </a>
+    </div>
+  `;
+  
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999;';
+  overlay.innerHTML = dialog;
+  document.body.appendChild(overlay);
+  
+  // Auto-remove after 10 seconds
+  setTimeout(() => overlay.remove(), 10000);
+}
+
+// =============================================================================
+// FORM VALIDATION UTILITIES
+// =============================================================================
+
+/**
+ * Email validation
+ * @param {string} email - Email address to validate
+ * @returns {boolean} Is valid email
+ */
+function isValidEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+/**
+ * Form field validation with visual feedback
+ * @param {string} fieldId - Form field element ID
+ * @param {Function} validator - Validation function
+ * @param {string} errorMessage - Error message to display
+ * @returns {boolean} Is valid
+ */
+function validateField(fieldId, validator, errorMessage) {
+  const field = getSafeElement(fieldId);
+  if (!field) return false;
+  
+  const isValid = validator(field.value);
+  
+  if (isValid) {
+    field.style.borderColor = 'var(--color-success)';
+    field.classList.remove('error');
+  } else {
+    field.style.borderColor = 'var(--color-error)';
+    field.classList.add('error');
+    showMessage(errorMessage, 'error');
+  }
+  
+  return isValid;
+}
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Debounce function to limit rapid function calls
+ * @param {Function} func - Function to debounce
+ * @param {number} delay - Delay in milliseconds
+ * @returns {Function} Debounced function
+ */
+function debounce(func, delay = 300) {
+  let timeoutId;
+  return function (...args) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func.apply(this, args), delay);
+  };
+}
+
+/**
+ * Copy text to clipboard with fallback
+ * @param {string} text - Text to copy
+ * @param {string} successMessage - Success message
+ * @param {string} errorMessage - Error message
+ */
+function copyToClipboard(text, successMessage = 'コピーしました', errorMessage = 'コピーに失敗しました') {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(() => {
+        showMessage(successMessage, 'success');
+      });
+    } else {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'absolute';
+      textArea.style.left = '-999999px';
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      showMessage(successMessage, 'success');
+    }
+  } catch (error) {
+    console.error('Copy failed:', error);
+    showMessage(errorMessage, 'error');
+  }
+}
+
+/**
+ * Format date in Japanese locale
+ * @param {Date|string} date - Date to format
+ * @returns {string} Formatted date string
+ */
+function formatJapaneseDate(date) {
+  const d = new Date(date);
+  return d.toLocaleString('ja-JP', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+// =============================================================================
+// INITIALIZATION
+// =============================================================================
+
+/**
+ * Initialize shared utilities when DOM is ready
+ */
+function initializeSharedUtilities() {
+  // Setup global error handler
+  window.addEventListener('error', (event) => {
+    console.error('Global error:', event.error);
+    showMessage('予期しないエラーが発生しました', 'error');
+  });
+  
+  // Setup common modal handlers if modals exist
+  const modals = document.querySelectorAll('[id$="-modal"]');
+  modals.forEach(modal => {
+    setupModalCloseHandlers(modal.id);
+  });
+  
+  console.log('SharedJavaScript utilities initialized');
+}
+
+// Auto-initialize when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeSharedUtilities);
+} else {
+  initializeSharedUtilities();
+}
+
+// =============================================================================
+// GLOBAL NAMESPACE
+// =============================================================================
+
+// Export utilities to global scope for easy access
+window.sharedUtilities = {
+  message: {
+    show: showMessage,
+    showSimple: displaySimpleMessage
+  },
+  gas: {
+    call: callGAS,
+    handleError: handleGASError
+  },
+  dom: {
+    getSafe: getSafeElement,
+    updateSafely: updateElementSafely,
+    toggleVisibility: toggleElementVisibility
+  },
+  loading: {
+    setButton: (id, text) => window.buttonStateManager.setLoading(id, text),
+    restoreButton: (id) => window.buttonStateManager.restoreState(id)
+  },
+  modal: {
+    show: showModal,
+    hide: hideModal
+  },
+  navigation: {
+    safeNavigate: safeNavigate,
+    showManualNavigationDialog: showManualNavigationDialog
+  },
+  validation: {
+    email: isValidEmail,
+    field: validateField
+  },
+  utils: {
+    debounce: debounce,
+    copyToClipboard: copyToClipboard,
+    formatDate: formatJapaneseDate
+  }
+};
+
+</script>

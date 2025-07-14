@@ -345,6 +345,8 @@
   <?!= include('UnifiedStyles'); ?>
 
   <?!= include('SharedUtilities'); ?>
+  <?!= include('SharedJavaScript'); ?>
+  <?!= include('RegistrationLogic'); ?>
 </head>
 <body class="registration-page">
 
@@ -424,381 +426,36 @@
 
 
   <script>
-    // -------------------------------------------
-    // ★★★ 登録処理とモーダル制御のスクリプト ★★★
-    // -------------------------------------------
-    document.addEventListener('DOMContentLoaded', () => {
-
-      // --- 要素の取得 ---
-      const mainContainer = document.getElementById('main-container');
-      const successContainer = document.getElementById('success-container');
-      const registerBtn = document.getElementById('register-btn');
-      const btnContent = document.getElementById('btn-content');
-      const statusTextEl = document.getElementById('status-text');
-      const userEmailEl = document.getElementById('user-email');
-      const messageAreaEl = document.getElementById('message-area');
-      const adminPanelBtn = document.getElementById('admin-panel-btn');
-
-      let userEmail = '';
-      let isRegistrationInProgress = false;
-      let selectedAgeGroup = '';
-      let uiInitialized = false;
-
-      // --- 関数定義 ---
-      const showMessage = (message, type = 'info') => {
-        messageAreaEl.textContent = message;
-        messageAreaEl.className = `message-area ${type}`;
-      };
-
-      const updateUserDisplay = (email) => {
-        userEmail = email;
-        statusTextEl.textContent = '認証済み';
-        userEmailEl.textContent = email;
-        registerBtn.disabled = false;
-        showMessage('回答ボードを作成できます', 'success');
+    /* =============================================================================
+       Registration.html - Minimal JavaScript 
+       Main logic moved to RegistrationLogic.html and SharedJavaScript.html
+       ============================================================================= */
+    
+    // Backward compatibility functions using shared utilities
+    var showMessage = window.registrationUtilities?.legacy?.showMessage || 
+                     window.sharedUtilities?.message?.show || 
+                     function(msg, type) { console.log(`[${type}] ${msg}`); };
+    
+    var executeRegistration = window.registrationUtilities?.actions?.executeRegistration || function() {
+        console.log('Registration function not available');
+    };
+    
+    var executeRegistrationWithConfirmation = window.registrationUtilities?.actions?.executeRegistrationWithConfirmation || function() {
+        console.log('Registration with confirmation function not available');
+    };
+    
+    // Initialize on DOM ready
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('🔧 Registration: Using unified utilities and logic files');
         
-        // 認証成功後にUIを段階的に表示
-        initializeEnhancedUI();
-      };
-
-      // --- 新しいUI関数 ---
-      const initializeEnhancedUI = () => {
-        if (uiInitialized) return;
-        uiInitialized = true;
-
-        // 情報カードを段階的に表示
-        setTimeout(() => showInfoCards(), 300);
-        
-        // 年齢層選択を表示（オプション）
-        setTimeout(() => showAgeSelector(), 600);
-        
-        // ヘルプシステムを表示
-        setTimeout(() => showHelpSystem(), 900);
-        
-        // 強化されたフッターを表示
-        setTimeout(() => showEnhancedFooter(), 1200);
-        
-        // 年齢グループの自動判定を試行
-        detectAndSetAgeGroup();
-      };
-
-      const showInfoCards = () => {
-        const infoCardsContainer = document.getElementById('info-cards-container');
-        if (infoCardsContainer) {
-          infoCardsContainer.style.display = 'grid';
-          setTimeout(() => infoCardsContainer.classList.add('show'), 50);
+        // Initialize registration utilities if available
+        if (window.registrationUtilities) {
+            console.log('✅ Registration: Registration utilities loaded');
         }
-      };
-
-      const showAgeSelector = () => {
-        // URLパラメータで年齢層が指定されていない場合のみ表示
-        const urlParams = new URLSearchParams(window.location.search);
-        if (!urlParams.get('ageGroup')) {
-          const ageSelectorContainer = document.getElementById('age-selector-container');
-          if (ageSelectorContainer) {
-            ageSelectorContainer.style.display = 'block';
-            setTimeout(() => ageSelectorContainer.classList.add('show'), 50);
-          }
-        }
-      };
-
-      const showHelpSystem = () => {
-        const helpSystem = document.getElementById('help-system');
-        if (helpSystem) {
-          helpSystem.style.display = 'block';
-          setTimeout(() => helpSystem.classList.add('show'), 50);
-        }
-      };
-
-      const showEnhancedFooter = () => {
-        const enhancedFooter = document.getElementById('enhanced-footer');
-        const legacyFooter = document.getElementById('legacy-footer');
         
-        if (enhancedFooter) {
-          enhancedFooter.style.display = 'block';
-          setTimeout(() => enhancedFooter.classList.add('show'), 50);
-          
-          // レガシーフッターを非表示
-          if (legacyFooter) {
-            legacyFooter.style.display = 'none';
-          }
+        if (window.sharedUtilities) {
+            console.log('✅ Registration: Shared utilities loaded');
         }
-      };
-
-      const detectAndSetAgeGroup = () => {
-        // URLパラメータから年齢グループを取得
-        const urlParams = new URLSearchParams(window.location.search);
-        const ageFromUrl = urlParams.get('ageGroup');
-        
-        if (ageFromUrl) {
-          selectedAgeGroup = ageFromUrl;
-          const gradeSelect = document.getElementById('grade-select');
-          if (gradeSelect) {
-            gradeSelect.value = ageFromUrl;
-          }
-          console.log('Age group detected from URL:', ageFromUrl);
-        } else {
-          // デフォルト値を設定
-          selectedAgeGroup = 'elementary-upper';
-        }
-      };
-
-      const handleAgeGroupChange = (newAgeGroup) => {
-        selectedAgeGroup = newAgeGroup;
-        console.log('Age group changed to:', newAgeGroup);
-        
-        // 将来的に年齢層に応じてUIをカスタマイズする場合はここに追加
-        showMessage(`${getAgeGroupDisplayName(newAgeGroup)}向けの内容で表示します`, 'info');
-      };
-
-      const getAgeGroupDisplayName = (ageGroup) => {
-        const displayNames = {
-          'elementary-lower': '小学校低学年',
-          'elementary-upper': '小学校高学年',
-          'junior-high': '中学校',
-          'high-school': '高等学校',
-          'teacher': '教師'
-        };
-        return displayNames[ageGroup] || '一般';
-      };
-
-
-      const showSuccessResult = (result) => {
-        mainContainer.style.display = 'none';
-        successContainer.style.display = 'block';
-        if (result?.adminUrl && result?.userId) {
-          adminPanelBtn.href = result.adminUrl;
-          
-          console.log('Registration complete, verifying user before navigation:', { 
-            adminUrl: result.adminUrl, 
-            userId: result.userId 
-          });
-          
-          // Verify user exists before navigation
-          google.script.run
-            .withSuccessHandler(userExists => {
-              console.log('User verification result:', userExists);
-              if (userExists && userExists.found) {
-                console.log('User verified, proceeding with navigation');
-                
-                // Show manual navigation dialog for reliability
-                setTimeout(() => {
-                  window.sharedUtilities.navigation.showManualNavigationDialog(
-                    result.adminUrl, 
-                    '登録完了！管理パネルに移動します'
-                  );
-                }, 2000);
-                
-                // Also try automatic navigation
-                google.script.run
-                  .withSuccessHandler(navResult => {
-                    if (navResult && navResult.success) {
-                      console.log('Server navigation prepared:', navResult.redirectUrl);
-                      try {
-                        if (window.parent && window.parent.location) {
-                          window.parent.location.replace(navResult.redirectUrl);
-                        } else {
-                          window.open(navResult.redirectUrl, '_top');
-                        }
-                      } catch (e) {
-                        console.log('Automatic navigation failed, user will use manual dialog');
-                      }
-                    }
-                  })
-                  .withFailureHandler(error => {
-                    console.warn('Server navigation failed:', error);
-                  })
-                  .navigateToAdminPanel(result.userId);
-              } else {
-                console.error('User verification failed, showing error message');
-                showMessage('アカウント作成は完了しましたが、データベースでの確認ができませんでした。しばらく待ってから管理パネルにアクセスしてください。', 'warning');
-                
-                // Still show navigation option but with delay
-                setTimeout(() => {
-                  window.sharedUtilities.navigation.showManualNavigationDialog(
-                    result.adminUrl, 
-                    'データベース同期待ち - 管理パネルにアクセス'
-                  );
-                }, 5000);
-              }
-            })
-            .withFailureHandler(error => {
-              console.error('User verification error:', error);
-              showMessage('ユーザー確認でエラーが発生しました。管理パネルに直接アクセスしてください。', 'error');
-              
-              setTimeout(() => {
-                window.sharedUtilities.navigation.showManualNavigationDialog(
-                  result.adminUrl, 
-                  'エラー発生 - 管理パネルにアクセス'
-                );
-              }, 3000);
-            })
-            .verifyUserExists(result.userId);
-        }
-      };
-      
-      const executeRegistration = () => {
-        if (isRegistrationInProgress || !userEmail) return;
-
-        isRegistrationInProgress = true;
-        registerBtn.disabled = true;
-        btnContent.innerHTML = '<span class="spinner"></span>登録処理中...';
-        showMessage('', 'info');
-
-        google.script.run
-          .withSuccessHandler(showSuccessResult)
-          .withFailureHandler(error => {
-            console.error('Registration error:', error);
-            showMessage(error.message || '登録に失敗しました', 'error');
-            registerBtn.disabled = false;
-            btnContent.textContent = '回答ボードを作成';
-            isRegistrationInProgress = false;
-          })
-          .quickStartSetup();
-      };
-      
-      const initializePage = () => {
-        google.script.run
-          .withSuccessHandler(result => {
-            if (result?.status === 'existing_user') {
-              if (result?.userId) {
-                // Use server-side navigation for existing users too
-                google.script.run
-                  .withSuccessHandler(navResult => {
-                    if (navResult && navResult.success) {
-                      window.location.href = navResult.redirectUrl;
-                    } else {
-                      window.sharedUtilities.navigation.goToAdminPanel(result.adminUrl, 1000);
-                    }
-                  })
-                  .withFailureHandler(() => {
-                    window.sharedUtilities.navigation.goToAdminPanel(result.adminUrl, 1000);
-                  })
-                  .navigateToAdminPanel(result.userId);
-              } else {
-                window.sharedUtilities.navigation.goToAdminPanel(result.adminUrl, 1000);
-              }
-              return;
-            }
-            google.script.run
-              .withSuccessHandler(authResult => {
-                if (authResult?.email || authResult?.userEmail) {
-                  updateUserDisplay(authResult.email || authResult.userEmail);
-                } else {
-                  throw new Error('メールアドレスが取得できませんでした');
-                }
-              })
-              .withFailureHandler(err => {
-                statusTextEl.textContent = '認証エラー';
-                showMessage('ページの再読み込みが必要です', 'error');
-                console.error(err);
-              })
-              .verifyUserAuthentication();
-          })
-          .getExistingBoard();
-      };
-      
-      // --- 統合モーダル制御 ---
-      const setupModalTriggers = () => {
-        const modalTriggers = document.querySelectorAll('[data-modal-trigger]');
-        modalTriggers.forEach(trigger => {
-          trigger.addEventListener('click', (e) => {
-            e.preventDefault();
-            const modalType = trigger.getAttribute('data-modal-trigger');
-            
-            // 教師向け固定
-            const ageGroup = 'teacher';
-            
-            console.log(`Opening modal: ${modalType} for age group: ${ageGroup}`);
-            
-            // SharedModalsの統合システムを使用
-            if (modalType === 'enhanced-privacy') {
-              window.showEnhancedPrivacyModal && window.showEnhancedPrivacyModal(ageGroup);
-            } else if (modalType === 'enhanced-digital-citizenship') {
-              window.showEnhancedDigitalCitizenshipModal && window.showEnhancedDigitalCitizenshipModal(ageGroup);
-            }
-          });
-        });
-      };
-
-
-      // --- 登録前確認プロセスの強化 ---
-      const executeRegistrationWithConfirmation = () => {
-        if (isRegistrationInProgress || !userEmail) return;
-
-        // 年齢に応じたモーダルを先に表示
-        const ageGroup = selectedAgeGroup || 'elementary-upper';
-        
-        if (window.showAgeAppropriateModals) {
-          // 統合モーダルシステムを使用
-          window.showAgeAppropriateModals(() => {
-            executeRegistration();
-          });
-        } else {
-          // フォールバック: 直接登録実行
-          executeRegistration();
-        }
-      };
-
-      // --- 初期化とイベントリスナーの設定 ---
-      const initializeEventListeners = () => {
-        // 基本的なイベントリスナー
-        registerBtn.addEventListener('click', executeRegistrationWithConfirmation);
-        
-        // 新しいUI要素のイベントリスナー
-        setupModalTriggers();
-        
-        console.log('Enhanced UI event listeners initialized');
-      };
-
-      // --- ドメイン情報取得・表示関数 ---
-      const fetchAndDisplayDomainInfo = () => {
-        google.script.run
-          .withSuccessHandler(displayDomainInfo)
-          .withFailureHandler(error => {
-            console.error('ドメイン情報の取得に失敗しました:', error);
-          })
-          .getDeployUserDomainInfo();
-      };
-
-      const displayDomainInfo = (info) => {
-        const headerDomainMatch = document.getElementById('header-domain-match');
-        const headerDomainMismatch = document.getElementById('header-domain-mismatch');
-        const headerDomainInitial = document.getElementById('header-domain-initial');
-        const headerDomainMatchText = document.getElementById('header-domain-match-text');
-        const headerDomainMismatchText = document.getElementById('header-domain-mismatch-text');
-
-        // 全てのドメイン表示を非表示
-        if (headerDomainMatch) headerDomainMatch.classList.add('hidden');
-        if (headerDomainMismatch) headerDomainMismatch.classList.add('hidden');
-        if (headerDomainInitial) headerDomainInitial.classList.add('hidden');
-
-        if (!info || info.error) {
-          console.warn('ドメイン情報エラー:', info?.error || 'Unknown error');
-          return;
-        }
-
-        if (info.currentDomain === info.deployDomain) {
-          // ドメインが一致している場合
-          if (headerDomainMatch && headerDomainMatchText) {
-            headerDomainMatch.classList.remove('hidden');
-            headerDomainMatchText.textContent = `${info.deployDomain} ドメイン`;
-          }
-        } else {
-          // ドメイン不一致の場合
-          if (headerDomainMismatch && headerDomainMismatchText) {
-            headerDomainMismatch.classList.remove('hidden');
-            headerDomainMismatchText.textContent = `外部アクセス (User: ${info.currentDomain} | Deploy: ${info.deployDomain})`;
-          }
-        }
-      };
-
-      // --- メイン初期化 ---
-      initializePage();
-      initializeEventListeners();
-      
-      // ドメイン情報を取得
-      fetchAndDisplayDomainInfo();
     });
   </script>
 </body>

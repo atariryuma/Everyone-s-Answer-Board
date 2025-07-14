@@ -1,0 +1,338 @@
+<script>
+/* =============================================================================
+   StudyQuest - Unpublished Page Logic
+   Extracted from Unpublished.html for better maintainability
+   Handles unpublished state management and admin controls
+   ============================================================================= */
+
+// =============================================================================
+// UNPUBLISHED PAGE STATE MANAGEMENT
+// =============================================================================
+
+let isOwnerMode = false;
+let adminPanelUrl = '';
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Copy board URL to clipboard
+ */
+function copyBoardUrl() {
+  const urlInput = document.getElementById('board-url');
+  if (!urlInput || !urlInput.value) {
+    if (window.sharedUtilities && window.sharedUtilities.message) {
+      window.sharedUtilities.message.show('URLが設定されていません', 'error');
+    } else {
+      showMessage('URLが設定されていません', 'error');
+    }
+    return;
+  }
+  
+  try {
+    if (window.sharedUtilities && window.sharedUtilities.utils) {
+      window.sharedUtilities.utils.copyToClipboard(
+        urlInput.value,
+        'URLをコピーしました',
+        'コピーに失敗しました'
+      );
+    } else {
+      // Fallback clipboard functionality
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(urlInput.value).then(() => {
+          if (window.sharedUtilities && window.sharedUtilities.message) {
+            window.sharedUtilities.message.show('URLをコピーしました', 'success');
+          } else {
+            showMessage('URLをコピーしました', 'success');
+          }
+        });
+      } else {
+        urlInput.select();
+        document.execCommand('copy');
+        if (window.sharedUtilities && window.sharedUtilities.message) {
+          window.sharedUtilities.message.show('URLをコピーしました', 'success');
+        } else {
+          showMessage('URLをコピーしました', 'success');
+        }
+      }
+    }
+  } catch (error) {
+    const message = 'コピーに失敗しました';
+    if (window.sharedUtilities && window.sharedUtilities.message) {
+      window.sharedUtilities.message.show(message, 'error');
+    } else {
+      showMessage(message, 'error');
+    }
+  }
+}
+
+// =============================================================================
+// ADMIN FUNCTIONALITY
+// =============================================================================
+
+/**
+ * Handle board republishing
+ */
+function handleRepublish() {
+  const button = document.getElementById('republish-btn');
+  if (!button) return;
+  
+  const originalHTML = button.innerHTML;
+  
+  // Set loading state
+  button.disabled = true;
+  button.className = button.className.replace('hover:scale-105', '');
+  button.innerHTML = `
+    <div class="flex items-center justify-center gap-2">
+      <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+      </svg>
+      <span>再公開中...</span>
+    </div>
+  `;
+  
+  // Show progress message
+  if (window.sharedUtilities && window.sharedUtilities.message) {
+    window.sharedUtilities.message.show('回答ボードを再公開しています...', 'info');
+  } else {
+    showMessage('回答ボードを再公開しています...', 'info');
+  }
+  
+  // Execute republish via GAS
+  if (window.sharedUtilities && window.sharedUtilities.gas) {
+    window.sharedUtilities.gas.call(
+      'republishBoard',
+      function(result) {
+        if (window.sharedUtilities.message) {
+          window.sharedUtilities.message.show('回答ボードが再公開されました！', 'success');
+        } else {
+          showMessage('回答ボードが再公開されました！', 'success');
+        }
+        
+        // Reload page after republishing
+        setTimeout(() => {
+          location.reload();
+        }, 1500);
+      },
+      function(error) {
+        const message = '再公開に失敗しました: ' + (error.message || '不明なエラー');
+        if (window.sharedUtilities && window.sharedUtilities.message) {
+          window.sharedUtilities.message.show(message, 'error');
+        } else {
+          showMessage(message, 'error');
+        }
+        
+        // Reset button state
+        button.disabled = false;
+        button.innerHTML = originalHTML;
+      },
+      [],
+      'ボード再公開'
+    );
+  } else {
+    // Fallback to direct GAS call
+    google.script.run
+      .withSuccessHandler((result) => {
+        showMessage('回答ボードが再公開されました！', 'success');
+        setTimeout(() => {
+          location.reload();
+        }, 1500);
+      })
+      .withFailureHandler((error) => {
+        showMessage('再公開に失敗しました: ' + (error.message || '不明なエラー'), 'error');
+        button.disabled = false;
+        button.innerHTML = originalHTML;
+      })
+      .republishBoard();
+  }
+}
+
+/**
+ * Navigate to admin panel
+ */
+function navigateToAdminPanel() {
+  if (window.sharedUtilities && window.sharedUtilities.message) {
+    window.sharedUtilities.message.show('管理パネルに移動しています...', 'info');
+  } else {
+    showMessage('管理パネルに移動しています...', 'info');
+  }
+  
+  if (adminPanelUrl) {
+    // Use provided admin panel URL
+    if (window.sharedUtilities && window.sharedUtilities.navigation) {
+      window.sharedUtilities.navigation.safeNavigate(adminPanelUrl, {
+        fallbackMessage: '管理パネルに移動中...',
+        method: 'auto'
+      });
+    } else {
+      window.location.href = adminPanelUrl;
+    }
+  } else {
+    // Fallback: modify current URL to admin mode
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.set('mode', 'admin');
+    
+    if (window.sharedUtilities && window.sharedUtilities.navigation) {
+      window.sharedUtilities.navigation.safeNavigate(currentUrl.toString(), {
+        fallbackMessage: '管理パネルに移動中...',
+        method: 'auto'
+      });
+    } else {
+      window.location.href = currentUrl.toString();
+    }
+  }
+}
+
+// =============================================================================
+// EVENT LISTENERS SETUP
+// =============================================================================
+
+/**
+ * Setup event listeners for admin functionality
+ */
+function setupAdminEventListeners() {
+  // Republish button
+  const republishBtn = document.getElementById('republish-btn');
+  if (republishBtn) {
+    republishBtn.addEventListener('click', handleRepublish);
+  }
+  
+  // Admin panel button
+  const adminPanelBtn = document.getElementById('admin-panel-btn');
+  if (adminPanelBtn) {
+    adminPanelBtn.addEventListener('click', navigateToAdminPanel);
+  }
+  
+  console.log('Admin event listeners initialized');
+}
+
+/**
+ * Setup event listeners for general functionality
+ */
+function setupGeneralEventListeners() {
+  // Copy URL functionality is available globally via copyBoardUrl function
+  console.log('General event listeners initialized');
+}
+
+// =============================================================================
+// BACKWARD COMPATIBILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Legacy message display function for backward compatibility
+ * @param {string} message - Message to display
+ * @param {string} type - Message type
+ */
+function showMessage(message, type = 'info') {
+  if (window.sharedUtilities && window.sharedUtilities.message) {
+    window.sharedUtilities.message.show(message, type);
+    return;
+  }
+  
+  // Fallback for legacy support
+  const messageArea = document.getElementById('message-area');
+  if (!messageArea) return;
+  
+  const colors = {
+    success: 'bg-green-600 border-green-500',
+    error: 'bg-red-600 border-red-500', 
+    info: 'bg-blue-600 border-blue-500',
+    warning: 'bg-yellow-600 border-yellow-500'
+  };
+  
+  const messageDiv = document.createElement('div');
+  messageDiv.className = `${colors[type] || colors.info} text-white px-4 py-3 rounded-lg shadow-lg border-l-4 mb-2 transform transition-all duration-300 translate-x-0`;
+  messageDiv.innerHTML = `
+    <div class="flex items-center gap-2">
+      <span class="font-medium">${message}</span>
+      <button onclick="this.parentElement.parentElement.remove()" class="ml-auto hover:bg-white/20 rounded p-1">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+  `;
+  
+  messageArea.appendChild(messageDiv);
+  
+  // Auto remove after 4 seconds
+  setTimeout(() => {
+    if (messageDiv.parentElement) {
+      messageDiv.style.transform = 'translateX(100%)';
+      messageDiv.style.opacity = '0';
+      setTimeout(() => messageDiv.remove(), 300);
+    }
+  }, 4000);
+}
+
+// =============================================================================
+// INITIALIZATION
+// =============================================================================
+
+/**
+ * Initialize unpublished page functionality
+ * @param {boolean} isOwner - Whether current user is owner
+ * @param {string} adminUrl - Admin panel URL
+ */
+function initializeUnpublishedPage(isOwner = false, adminUrl = '') {
+  console.log('🔧 Initializing Unpublished Page Logic...');
+  
+  // Set global state
+  isOwnerMode = isOwner;
+  adminPanelUrl = adminUrl;
+  
+  // Setup appropriate event listeners
+  if (isOwnerMode) {
+    setupAdminEventListeners();
+  }
+  setupGeneralEventListeners();
+  
+  console.log('✅ Unpublished Page Logic initialized');
+}
+
+// Auto-initialize when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() {
+    // Try to detect owner mode from template variables or DOM
+    let isOwner = false;
+    let adminUrl = '';
+    
+    try {
+      // Check if we can find admin controls in the DOM
+      isOwner = !!document.getElementById('republish-btn');
+      
+      // Try to get admin URL from template or fallback
+      adminUrl = window.adminPanelUrl || '';
+    } catch (e) {
+      console.warn('Could not detect owner mode:', e);
+    }
+    
+    initializeUnpublishedPage(isOwner, adminUrl);
+  });
+} else {
+  initializeUnpublishedPage();
+}
+
+// =============================================================================
+// EXPORT TO GLOBAL SCOPE
+// =============================================================================
+
+// Export unpublished utilities to global scope
+window.unpublishedUtilities = {
+  state: {
+    isOwnerMode: () => isOwnerMode,
+    adminPanelUrl: () => adminPanelUrl
+  },
+  actions: {
+    copyBoardUrl: copyBoardUrl,
+    handleRepublish: handleRepublish,
+    navigateToAdminPanel: navigateToAdminPanel
+  },
+  legacy: {
+    showMessage: showMessage
+  },
+  init: initializeUnpublishedPage
+};
+
+</script>
