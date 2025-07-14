@@ -129,18 +129,16 @@
     /* ================================================= */
     .modal-overlay {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(15, 23, 42, 0.8);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 50;
+      z-index: 50; /* z-indexを標準化 */
       padding: 20px;
+      
       opacity: 0;
       visibility: hidden;
       transition: opacity 0.3s ease, visibility 0s 0.3s;
@@ -152,22 +150,25 @@
       transition: opacity 0.3s ease, visibility 0s;
     }
 
-    .modal-overlay .glass-panel {
-      background: rgba(30, 41, 59, 0.9);
-      border: 1px solid rgba(255, 255, 255, 0.15);
+    .modal-content {
+      background: rgba(30, 41, 59, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 16px;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
       width: 100%;
-      max-width: 640px;
+      max-width: 600px;
+      padding: 24px 32px;
       max-height: 90vh;
-      transform: scale(0.95) translateY(10px);
-      transition: transform 0.3s ease-out;
+      overflow-y: auto;
+      color: rgba(255, 255, 255, 0.9);
+      transform: scale(0.95);
+      transition: transform 0.3s ease;
     }
 
-    .modal-overlay.is-visible .glass-panel {
-      transform: scale(1) translateY(0);
+    .modal-overlay.is-visible .modal-content {
+      transform: scale(1);
     }
-
+    
     .hidden {
       display: none !important;
     }
@@ -176,7 +177,7 @@
 <body class="registration-page">
 
   <!-- ★★★ 修正点: モーダルをメインコンテナの外、body直下に移動 ★★★ -->
-  <?!= include('SharedModals'); ?>
+  <?!= include('RegistrationModals'); ?>
 
   <!-- メインコンテンツ -->
   <div class="glass-container" id="main-container">
@@ -216,9 +217,11 @@
 
   <script>
     // -------------------------------------------
-    // ★★★ 登録処理とモーダル制御ロジック ★★★
+    // 登録処理とモーダル制御のスクリプト
     // -------------------------------------------
     document.addEventListener('DOMContentLoaded', () => {
+
+      // --- 要素の取得 ---
       const mainContainer = document.getElementById('main-container');
       const successContainer = document.getElementById('success-container');
       const registerBtn = document.getElementById('register-btn');
@@ -226,87 +229,96 @@
       const statusTextEl = document.getElementById('status-text');
       const userEmailEl = document.getElementById('user-email');
       const messageAreaEl = document.getElementById('message-area');
+      const adminPanelBtn = document.getElementById('admin-panel-btn');
 
       let userEmail = '';
       let isRegistrationInProgress = false;
 
-      const initializePage = () => {
-        google.script.run
-          .withSuccessHandler(result => {
-            if (result?.status === 'existing_user') {
-              window.sharedUtilities.navigation.goToAdminPanel(result.adminUrl, 1000);
-              return;
-            }
-            google.script.run
-              .withSuccessHandler(authResult => {
-                if (authResult?.email || authResult?.userEmail) {
-                  userEmail = authResult.email || authResult.userEmail;
-                  statusTextEl.textContent = '認証済み';
-                  userEmailEl.textContent = userEmail;
-                  registerBtn.disabled = false;
-                  showMessage('回答ボードを作成できます', 'success');
-                } else {
-                  throw new Error('メールアドレスが取得できませんでした');
-                }
-              })
-              .withFailureHandler(err => {
-                statusTextEl.textContent = '認証エラー';
-                showMessage('ページの再読み込みが必要です', 'error');
-              })
-              .verifyUserAuthentication();
-          })
-          .getExistingBoard();
+      // --- 関数定義 ---
+      const showMessage = (message, type = 'info') => {
+        messageAreaEl.textContent = message;
+        messageAreaEl.className = `message-area ${type}`;
       };
 
-      const showModal = modalId => {
-        const modal = document.getElementById(modalId);
-        if (modal) {
-          modal.classList.remove('hidden');
-          requestAnimationFrame(() => modal.classList.add('is-visible'));
+      const updateUserDisplay = (email) => {
+        userEmail = email;
+        statusTextEl.textContent = '認証済み';
+        userEmailEl.textContent = email;
+        registerBtn.disabled = false;
+        showMessage('回答ボードを作成できます', 'success');
+      };
+
+      const showSuccessResult = (result) => {
+        mainContainer.style.display = 'none';
+        successContainer.style.display = 'block';
+        if (result?.adminUrl && result?.userId) {
+          adminPanelBtn.href = result.adminUrl;
+          
+          console.log('Registration complete, verifying user before navigation:', { 
+            adminUrl: result.adminUrl, 
+            userId: result.userId 
+          });
+          
+          google.script.run
+            .withSuccessHandler(userExists => {
+              if (userExists && userExists.found) {
+                setTimeout(() => {
+                  window.sharedUtilities.navigation.showManualNavigationDialog(
+                    result.adminUrl, 
+                    '登録完了！管理パネルに移動します'
+                  );
+                }, 2000);
+                
+                google.script.run
+                  .withSuccessHandler(navResult => {
+                    if (navResult && navResult.success) {
+                      try {
+                        if (window.parent && window.parent.location) {
+                          window.parent.location.replace(navResult.redirectUrl);
+                        } else {
+                          window.open(navResult.redirectUrl, '_top');
+                        }
+                      } catch (e) {
+                        console.log('Automatic navigation failed');
+                      }
+                    }
+                  })
+                  .navigateToAdminPanel(result.userId);
+              } else {
+                showMessage('アカウント作成は完了しましたが、データベースでの確認ができませんでした。しばらく待ってから管理パネルにアクセスしてください。', 'warning');
+                setTimeout(() => {
+                  window.sharedUtilities.navigation.showManualNavigationDialog(
+                    result.adminUrl, 
+                    'データベース同期待ち - 管理パネルにアクセス'
+                  );
+                }, 5000);
+              }
+            })
+            .withFailureHandler(error => {
+              showMessage('ユーザー確認でエラーが発生しました。管理パネルに直接アクセスしてください。', 'error');
+              setTimeout(() => {
+                window.sharedUtilities.navigation.showManualNavigationDialog(
+                  result.adminUrl, 
+                  'エラー発生 - 管理パネルにアクセス'
+                );
+              }, 3000);
+            })
+            .verifyUserExists(result.userId);
         }
       };
-
-      const hideModal = modalId => {
-        const modal = document.getElementById(modalId);
-        if (modal) {
-          modal.classList.remove('is-visible');
-          modal.addEventListener('transitionend', () => modal.classList.add('hidden'), { once: true });
-        }
-      };
-
-      const setupModalControls = () => {
-        document.body.addEventListener('click', e => {
-          const trigger = e.target.closest('[data-modal-trigger]');
-          if (trigger) {
-            e.preventDefault();
-            const modalId = trigger.getAttribute('data-modal-trigger') + '-modal';
-            showModal(modalId);
-          }
-
-          const closeButton = e.target.closest('.close-modal');
-          if (closeButton || e.target.classList.contains('modal-overlay')) {
-            const modal = e.target.closest('.modal-overlay');
-            if (modal) hideModal(modal.id);
-          }
-        });
-      };
-
+      
       const executeRegistration = () => {
         if (isRegistrationInProgress || !userEmail) return;
+
         isRegistrationInProgress = true;
         registerBtn.disabled = true;
         btnContent.innerHTML = '<span class="spinner"></span>登録処理中...';
         showMessage('', 'info');
 
         google.script.run
-          .withSuccessHandler(result => {
-            mainContainer.style.display = 'none';
-            successContainer.style.display = 'block';
-            if (result?.adminUrl) {
-              document.getElementById('admin-panel-btn').href = result.adminUrl;
-            }
-          })
+          .withSuccessHandler(showSuccessResult)
           .withFailureHandler(error => {
+            console.error('Registration error:', error);
             showMessage(error.message || '登録に失敗しました', 'error');
             registerBtn.disabled = false;
             btnContent.textContent = '回答ボードを作成';
@@ -314,30 +326,104 @@
           })
           .quickStartSetup();
       };
+      
+      const initializePage = () => {
+        google.script.run
+          .withSuccessHandler(result => {
+            if (result?.status === 'existing_user') {
+              if (result?.userId) {
+                google.script.run
+                  .withSuccessHandler(navResult => {
+                    if (navResult && navResult.success) {
+                      window.location.href = navResult.redirectUrl;
+                    } else {
+                      window.sharedUtilities.navigation.goToAdminPanel(result.adminUrl, 1000);
+                    }
+                  })
+                  .withFailureHandler(() => {
+                    window.sharedUtilities.navigation.goToAdminPanel(result.adminUrl, 1000);
+                  })
+                  .navigateToAdminPanel(result.userId);
+              } else {
+                window.sharedUtilities.navigation.goToAdminPanel(result.adminUrl, 1000);
+              }
+              return;
+            }
+            google.script.run
+              .withSuccessHandler(authResult => {
+                if (authResult?.email || authResult?.userEmail) {
+                  updateUserDisplay(authResult.email || authResult.userEmail);
+                } else {
+                  throw new Error('メールアドレスが取得できませんでした');
+                }
+              })
+              .withFailureHandler(err => {
+                statusTextEl.textContent = '認証エラー';
+                showMessage('ページの再読み込みが必要です', 'error');
+                console.error(err);
+              })
+              .verifyUserAuthentication();
+          })
+          .getExistingBoard();
+      };
 
-      const handleRegistrationRequest = () => {
-        showModal('enhanced-privacy-modal');
+      // --- モーダル表示/非表示ロジック ---
+      const showModal = (modalId) => {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+          modal.classList.remove('hidden');
+          requestAnimationFrame(() => {
+            modal.classList.add('is-visible');
+          });
+        }
+      };
 
-        const privacyConfirmBtn = document.getElementById('enhanced-privacy-modal-continue');
-        privacyConfirmBtn.addEventListener('click', () => {
-          hideModal('enhanced-privacy-modal');
-          showModal('enhanced-digital-citizenship-modal');
-
-          const citizenshipConfirmBtn = document.getElementById('enhanced-digital-citizenship-modal-accept');
-          citizenshipConfirmBtn.addEventListener('click', () => {
-            hideModal('enhanced-digital-citizenship-modal');
-            executeRegistration();
+      const hideModal = (modalId) => {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+          modal.classList.remove('is-visible');
+          modal.addEventListener('transitionend', () => {
+            modal.classList.add('hidden');
           }, { once: true });
-        }, { once: true });
+        }
+      };
+      
+      // --- 統合モーダル制御 ---
+      const setupModalTriggers = () => {
+        document.body.addEventListener('click', (e) => {
+          const trigger = e.target.closest('[data-modal-trigger]');
+          if (trigger) {
+            e.preventDefault();
+            const modalType = trigger.getAttribute('data-modal-trigger');
+            const ageGroup = 'teacher'; // 教師向けに固定
+            
+            if (modalType === 'enhanced-privacy') {
+              window.showEnhancedPrivacyModal && window.showEnhancedPrivacyModal(ageGroup, () => {});
+            } else if (modalType === 'enhanced-digital-citizenship') {
+              window.showEnhancedDigitalCitizenshipModal && window.showEnhancedDigitalCitizenshipModal(ageGroup, () => {});
+            }
+          }
+        });
       };
 
-      const showMessage = (message, type = 'info') => {
-        messageAreaEl.textContent = message;
-        messageAreaEl.className = `message-area ${type}`;
+      // --- 登録前確認プロセス ---
+      const executeRegistrationWithConfirmation = () => {
+        if (isRegistrationInProgress || !userEmail) return;
+
+        const ageGroup = 'teacher';
+        
+        if (window.showAgeAppropriateModals) {
+          window.showAgeAppropriateModals(() => {
+            executeRegistration();
+          });
+        } else {
+          executeRegistration();
+        }
       };
 
-      registerBtn.addEventListener('click', handleRegistrationRequest);
-      setupModalControls();
+      // --- 初期化 ---
+      registerBtn.addEventListener('click', executeRegistrationWithConfirmation);
+      setupModalTriggers();
       initializePage();
     });
   </script>
