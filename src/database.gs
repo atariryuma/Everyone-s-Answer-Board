@@ -674,6 +674,19 @@ function updateUser(userId, updateData) {
         }
       }
     }
+
+    // キャッシュが古く行番号が範囲外の場合は再計算
+    if (rowIndex < 1 || rowIndex > values.length) {
+      for (var i = 1; i < values.length; i++) {
+        if (values[i][userIdIndex] === userId) {
+          rowIndex = i + 1; // 1-based index
+          break;
+        }
+      }
+      if (rowIndex < 1 || rowIndex > values.length) {
+        throw new Error('更新対象のユーザーが見つかりません');
+      }
+    }
     
     if (rowIndex === -1) {
       throw new Error('更新対象のユーザーが見つかりません');
