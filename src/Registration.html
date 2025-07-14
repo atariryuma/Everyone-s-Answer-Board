@@ -326,6 +326,8 @@
     }
   </style>
 
+  <?!= include('UnifiedStyles'); ?>
+
   <?!= include('SharedUtilities'); ?>
 </head>
 <body class="registration-page">
@@ -375,26 +377,6 @@
       <div class="user-email" id="user-email"></div>
     </div>
 
-    <!-- 教師向けシンプル情報アクセス -->
-    <div class="teacher-info-access" id="teacher-info-access" style="display: none;">
-      <details class="security-details">
-        <summary class="info-summary">
-          <span class="info-icon">🔒</span>
-          <span class="info-text">セキュリティとプライバシーについて</span>
-          <span class="info-chevron">▼</span>
-        </summary>
-        <div class="info-content">
-          <a href="#" data-modal-trigger="enhanced-privacy" class="info-link">
-            <span class="link-icon">📋</span>
-            <span class="link-text">データ保護の技術的詳細</span>
-          </a>
-          <a href="#" data-modal-trigger="enhanced-digital-citizenship" class="info-link">
-            <span class="link-icon">📖</span>
-            <span class="link-text">デジタル・シティズンシップ指導ガイド</span>
-          </a>
-        </div>
-      </details>
-    </div>
 
     <div class="message-area" id="message-area"></div>
 
@@ -458,12 +440,6 @@
         userEmailEl.textContent = email;
         registerBtn.disabled = false;
         showMessage('回答ボードを作成できます', 'success');
-        
-        // 教師向け情報アクセス機能を表示
-        const teacherInfoAccess = document.getElementById('teacher-info-access');
-        if (teacherInfoAccess) {
-          teacherInfoAccess.style.display = 'block';
-        }
         
         // 認証成功後にUIを段階的に表示
         initializeEnhancedUI();
@@ -786,7 +762,7 @@
           return;
         }
 
-        if (info.domainMatch) {
+        if (info.userDomain === info.deployDomain) {
           // ドメインが一致している場合
           if (headerDomainMatch && headerDomainMatchText) {
             headerDomainMatch.classList.remove('hidden');
@@ -796,7 +772,7 @@
           // ドメイン不一致の場合
           if (headerDomainMismatch && headerDomainMismatchText) {
             headerDomainMismatch.classList.remove('hidden');
-            headerDomainMismatchText.textContent = `外部アクセス (${info.deployDomain} 管理)`;
+            headerDomainMismatchText.textContent = `外部アクセス (User: ${info.userDomain} | Deploy: ${info.deployDomain})`;
           }
         }
       };
