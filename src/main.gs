@@ -41,7 +41,7 @@ var DB_SHEET_CONFIG = {
   SHEET_NAME: 'Users',
   HEADERS: [
     'userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl',
-    'createdAt', 'configJson', 'lastAccessedAt', 'isActive'
+    'createdAt', 'configJson', 'setupStatus', 'lastAccessedAt', 'isActive'
   ]
 };
 

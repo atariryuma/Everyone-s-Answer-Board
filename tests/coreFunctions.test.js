@@ -5,8 +5,8 @@ describe('Core.gs utilities', () => {
   const code = fs.readFileSync('src/Core.gs', 'utf8');
   let context;
   beforeEach(() => {
-    context = { 
-      debugLog: () => {}, 
+    context = {
+      debugLog: () => {},
       console,
       cacheManager: {
         remove: jest.fn(),
@@ -17,6 +17,11 @@ describe('Core.gs utilities', () => {
         sleep: jest.fn(),
         getUuid: () => 'UUID'
       },
+      findOrCreateUserWithEmailLock: jest.fn(() => ({
+        userId: 'UUID',
+        isNewUser: true,
+        userInfo: { userId: 'UUID', adminEmail: 'admin@example.com', configJson: '{}' }
+      })),
       fetchUserFromDatabase: jest.fn(),
       comprehensiveUserSearch: jest.fn(),
       registerNewUser: jest.fn(() => ({ userId: 'UUID', adminUrl: 'admin', viewUrl: 'view' }))

@@ -103,7 +103,7 @@ function getAllUsersForAdmin() {
     const service = getSheetsService();
     const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
-    const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
+    const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:I`]);
     const values = data.valueRanges[0].values || [];
     
     if (values.length <= 1) {
@@ -196,7 +196,7 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
       }
       
       // データを取得してユーザー行を特定
-      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
+      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:I`]);
       const values = data.valueRanges[0].values || [];
       
       let rowToDelete = -1;
@@ -450,7 +450,7 @@ function fetchUserFromDatabase(field, value) {
     var service = getSheetsService();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
-    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
+    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:I"]);
     var values = data.valueRanges[0].values || [];
     
     if (values.length === 0) return null;
@@ -521,7 +521,7 @@ function updateUser(userId, updateData) {
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
     // 現在のデータを取得
-    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
+    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:I"]);
     var values = data.valueRanges[0].values || [];
     
     if (values.length === 0) {
@@ -1196,7 +1196,7 @@ function getAllUsers() {
     var service = getSheetsService();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
-    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
+    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:I"]);
     var values = data.valueRanges[0].values || [];
     
     if (values.length <= 1) {
@@ -1342,7 +1342,7 @@ function deleteUserAccount(userId) {
       console.log('Found database sheet with sheetId:', targetSheetId);
       
       // データを取得
-      var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
+      var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:I"]);
       var values = data.valueRanges[0].values || [];
       
       // ユーザーIDに基づいて行を探す（A列がIDと仮定）

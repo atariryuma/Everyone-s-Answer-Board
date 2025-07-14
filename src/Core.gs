@@ -138,7 +138,8 @@ function ensureUserExists(adminEmail) {
   try {
     // メール特化ロックシステムのみ使用（競合するロック戦略を排除）
     const result = findOrCreateUserWithEmailLock(adminEmail, {
-      configJson: JSON.stringify(initialConfig)
+      configJson: JSON.stringify(initialConfig),
+      setupStatus: 'PENDING'
     });
 
     const { userId, isNewUser, userInfo } = result;
@@ -157,7 +158,8 @@ function ensureUserExists(adminEmail) {
       updateUser(userId, {
         lastAccessedAt: new Date().toISOString(),
         isActive: 'true',
-        configJson: JSON.stringify(updatedConfig)
+        configJson: JSON.stringify(updatedConfig),
+        setupStatus: 'PENDING'
       });
       
       debugLog('ensureUserExists: 既存ユーザー更新完了', { userId, adminEmail });
@@ -1306,187 +1308,171 @@ function comprehensiveUserSearch(userId) {
 }
 
 /**
- * 🚀 クイックスタートセットアップ（簡素化版）
- * 重複防止ロジックを統合した高速セットアップ
- * @param {string} requestUserId - リクエスト元のユーザーID（オプション）
+ * 🚀 クイックスタートセットアップ（二段階方式）
  */
-function quickStartSetup(requestUserId) {
-  const activeUserEmail = Session.getActiveUser().getEmail();
-  let userInfo;
-
-  console.log('[quickStartSetup] started by:', activeUserEmail);
-  debugLog('quickStartSetup: 開始', { requestUserId, activeUserEmail });
-
+function quickStartSetup() {
   try {
-    // 🎯 ユーザー情報の統一取得・作成
-    if (requestUserId) {
-      // 既存ユーザーIDが指定されている場合
-      verifyUserAccess(requestUserId);
-      userInfo = findUserById(requestUserId);
-      
-      if (!userInfo) {
-        throw new Error(`ユーザーID ${requestUserId} が見つかりません`);
-      }
-      
-      // メールアドレス一致確認
-      if (userInfo.adminEmail !== activeUserEmail) {
-        throw new Error('ユーザーIDとメールアドレスが一致しません');
-      }
-      
-      debugLog('quickStartSetup: 既存ユーザー確認完了', { userId: requestUserId });
-    } else {
-      // 新規または既存ユーザーの自動判定（メール特化ロックのみ使用）
-      const result = findOrCreateUserWithEmailLock(activeUserEmail);
-      requestUserId = result.userId;
-      userInfo = result.userInfo;
-      
-      debugLog('quickStartSetup: ユーザー確保完了', { 
-        userId: requestUserId, 
-        isNewUser: result.isNewUser 
-      });
+    const userEmail = Session.getActiveUser().getEmail();
+
+    // Phase 1: ユーザーのレコードを予約
+    const userRecord = reserveUserRecord(userEmail);
+
+    if (userRecord.isExisting && userRecord.setupStatus === 'COMPLETED') {
+      const urls = generateAppUrls(userRecord.userId);
+      return { status: 'already_completed', ...urls };
     }
-  } catch (error) {
-    console.error('quickStartSetup: ユーザー確保エラー:', {
-      error: error,
-      activeUserEmail: activeUserEmail
+
+    // Phase 2: Googleリソース作成
+    const resources = createGoogleResourcesForUser(userRecord.userId, userEmail);
+
+    // Phase 3: ユーザー情報を更新
+    const finalInfo = finalizeUserRegistration(userRecord.userId, {
+      ...resources,
+      adminEmail: userEmail
     });
-    const message = error.message.startsWith('ユーザー情報の確保に失敗しました')
-      ? `${error.message} (${activeUserEmail})`
-      : `ユーザー情報の確保に失敗しました: ${error.message} (${activeUserEmail})`;
-    throw new Error(message);
-  }
-  // 🚀 セットアップ実行
-  try {
-    debugLog('quickStartSetup: セットアップ開始', { userId: requestUserId });
-    
-    const configJson = JSON.parse(userInfo.configJson || '{}');
-    const userEmail = userInfo.adminEmail;
-    
-    // 既にセットアップ済みかチェック
-    if (configJson.formCreated && userInfo.spreadsheetId) {
-      const appUrls = generateAppUrls(requestUserId);
-      return {
-        status: 'already_completed',
-        message: 'クイックスタートは既に完了しています。',
-        webAppUrl: appUrls.webAppUrl,
-        adminUrl: appUrls.adminUrl,
-        viewUrl: appUrls.viewUrl,
-        setupUrl: appUrls.setupUrl
-      };
-    }
-    
-    // ステップ1: ユーザー専用フォルダを作成
-    debugLog('📁 ステップ1: フォルダ作成中...');
-    var folder = createUserFolder(userEmail);
-    
-    // ステップ2: Googleフォームとスプレッドシートを作成
-    debugLog('📝 ステップ2: フォーム作成中...');
-    var formAndSsInfo = createStudyQuestForm(userEmail, requestUserId);
-    
-    // 作成したファイルをフォルダに移動
-    if (folder) {
-      try {
-        var formFile = DriveApp.getFileById(formAndSsInfo.formId);
-        var ssFile = DriveApp.getFileById(formAndSsInfo.spreadsheetId);
-        
-        folder.addFile(formFile);
-        folder.addFile(ssFile);
-        
-        // 元の場所から削除（Myドライブから移動）
-        DriveApp.getRootFolder().removeFile(formFile);
-        DriveApp.getRootFolder().removeFile(ssFile);
-        
-        debugLog('📁 ファイルをフォルダに移動しました: ' + folder.getName());
-      } catch (moveError) {
-        // フォルダ移動に失敗しても処理は継続
-        console.warn('ファイル移動に失敗しましたが、処理を継続します: ' + moveError.message);
-      }
-    }
-    
-    // ステップ3: データベースを更新
-    debugLog('💾 ステップ3: データベース更新中...');
-    
-    // クイックスタート用の適切な初期設定を作成
-    var sheetConfigKey = 'sheet_' + formAndSsInfo.sheetName;
-    var quickStartSheetConfig = {
-      opinionHeader: '今日のテーマについて、あなたの考えや意見を聞かせてください',
-      reasonHeader: 'そう考える理由や体験があれば教えてください（任意）',
-      nameHeader: '名前',
-      classHeader: 'クラス',
-      showNames: false,
-      showCounts: false,
-      lastModified: new Date().toISOString()
-    };
-    
-    var updatedConfig = {
-      ...configJson,
-      setupStatus: 'completed',
-      formCreated: true,
-      formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl,
-      editFormUrl: formAndSsInfo.editFormUrl,
-      publishedSpreadsheetId: formAndSsInfo.spreadsheetId,
-      publishedSheetName: formAndSsInfo.sheetName,
-      appPublished: true,
-      folderId: folder ? folder.getId() : '',
-      folderUrl: folder ? folder.getUrl() : '',
-      completedAt: new Date().toISOString(),
-      [sheetConfigKey]: quickStartSheetConfig
-    };
-    
-    updateUser(requestUserId, {
-      spreadsheetId: formAndSsInfo.spreadsheetId,
-      spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
-      configJson: JSON.stringify(updatedConfig)
-    });
-    // セットアップ完了後に関連キャッシュをクリア
-    invalidateUserCache(requestUserId, userEmail, formAndSsInfo.spreadsheetId, true);
-    
-    // ステップ4: 回答ボードを公開状態に設定
-    debugLog('🌐 ステップ4: 回答ボード公開中...');
-    
-    debugLog('✅ クイックスタートセットアップ完了: ' + requestUserId);
-    
-    var appUrls = generateAppUrls(requestUserId);
-    return {
-      status: 'success',
-      message: 'クイックスタートが完了しました！回答ボードをお楽しみください。',
-      webAppUrl: appUrls.webAppUrl,
-      adminUrl: appUrls.adminUrl,
-      viewUrl: appUrls.viewUrl,
-      setupUrl: appUrls.setupUrl,
-      formUrl: updatedConfig.formUrl,
-      editFormUrl: updatedConfig.editFormUrl,
-      spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
-      folderUrl: updatedConfig.folderUrl
-    };
-    
+
+    return { status: 'success', ...finalInfo };
+
   } catch (e) {
-    console.error('❌ quickStartSetup エラー: ' + e.message);
-    
-    // エラー時はセットアップ状態をリセット
-    try {
-      var currentConfig = JSON.parse(userInfo.configJson || '{}');
-      currentConfig.setupStatus = 'error';
-      currentConfig.lastError = e.message;
-      currentConfig.errorAt = new Date().toISOString();
-      
-      updateUser(requestUserId, {
-        configJson: JSON.stringify(currentConfig)
-      });
-      invalidateUserCache(requestUserId, userEmail, null, false);
-    } catch (updateError) {
-      console.error('エラー状態の更新に失敗: ' + updateError.message);
+    console.error('quickStartSetup エラー: ' + e.toString());
+    if (e.message && e.message.includes('SCRIPT_LOCK_TIMEOUT')) {
+      throw new Error('システムが混み合っています。数分待ってから再度お試しください。');
     }
-    
-    return {
-      status: 'error',
-      message: 'クイックスタートセットアップに失敗しました: ' + e.message,
-      webAppUrl: '',
-      adminUrl: '',
-      viewUrl: '',
-      setupUrl: ''
-    };
+    throw e;
   }
+}
+
+/**
+ * [Phase 1] ユーザーのレコードを予約する
+ * @param {string} email
+ * @returns {object}
+ */
+function reserveUserRecord(email) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(15000)) {
+    throw new Error('SCRIPT_LOCK_TIMEOUT: Lock acquisition failed.');
+  }
+  try {
+    const existingUser = findUserByEmail(email);
+    if (existingUser) {
+      return { isExisting: true, ...existingUser };
+    }
+
+    const userId = Utilities.getUuid();
+    const now = new Date().toISOString();
+
+    const userData = {
+      userId: userId,
+      adminEmail: email,
+      spreadsheetId: '',
+      spreadsheetUrl: '',
+      createdAt: now,
+      configJson: '{}',
+      setupStatus: 'PENDING',
+      lastAccessedAt: now,
+      isActive: 'true'
+    };
+
+    createUserAtomic(userData);
+
+    return { isExisting: false, ...userData };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * [Phase 2] Googleリソースを作成
+ * @param {string} userId
+ * @param {string} email
+ * @returns {object}
+ */
+function createGoogleResourcesForUser(userId, email) {
+  const folder = createUserFolder(email);
+  const formAndSsInfo = createStudyQuestForm(email, userId);
+
+  if (folder) {
+    try {
+      const formFile = DriveApp.getFileById(formAndSsInfo.formId);
+      const ssFile = DriveApp.getFileById(formAndSsInfo.spreadsheetId);
+      folder.addFile(formFile);
+      folder.addFile(ssFile);
+      DriveApp.getRootFolder().removeFile(formFile);
+      DriveApp.getRootFolder().removeFile(ssFile);
+      console.log('Files moved to folder:', folder.getName());
+    } catch (e) {
+      console.warn('ファイル移動に失敗しましたが、処理を継続します: ' + e.message);
+    }
+  }
+
+  return {
+    spreadsheetId: formAndSsInfo.spreadsheetId,
+    spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+    formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl,
+    editFormUrl: formAndSsInfo.editFormUrl,
+    sheetName: formAndSsInfo.sheetName,
+    folderId: folder ? folder.getId() : '',
+    folderUrl: folder ? folder.getUrl() : ''
+  };
+}
+
+/**
+ * [Phase 3] ユーザー登録を最終化する
+ * @param {string} userId
+ * @param {object} resources
+ * @returns {object}
+ */
+function finalizeUserRegistration(userId, resources) {
+  const userInfo = findUserById(userId);
+  if (!userInfo) {
+    throw new Error('ユーザーの仮登録レコードが見つかりません。');
+  }
+
+  const configJson = JSON.parse(userInfo.configJson || '{}');
+  const sheetKey = 'sheet_' + resources.sheetName;
+  const sheetConfig = {
+    opinionHeader: '今日のテーマについて、あなたの考えや意見を聞かせてください',
+    reasonHeader: 'そう考える理由や体験があれば教えてください（任意）',
+    nameHeader: '名前',
+    classHeader: 'クラス',
+    showNames: false,
+    showCounts: false,
+    lastModified: new Date().toISOString()
+  };
+
+  const updatedConfig = {
+    ...configJson,
+    setupStatus: 'completed',
+    formCreated: true,
+    formUrl: resources.formUrl,
+    editFormUrl: resources.editFormUrl,
+    publishedSpreadsheetId: resources.spreadsheetId,
+    publishedSheetName: resources.sheetName,
+    appPublished: true,
+    folderId: resources.folderId,
+    folderUrl: resources.folderUrl,
+    completedAt: new Date().toISOString(),
+    [sheetKey]: sheetConfig
+  };
+
+  updateUser(userId, {
+    spreadsheetId: resources.spreadsheetId,
+    spreadsheetUrl: resources.spreadsheetUrl,
+    configJson: JSON.stringify(updatedConfig),
+    setupStatus: 'COMPLETED',
+    lastAccessedAt: new Date().toISOString()
+  });
+
+  invalidateUserCache(userId, resources.adminEmail, resources.spreadsheetId, true);
+
+  const urls = generateAppUrls(userId);
+  return {
+    webAppUrl: urls.webAppUrl,
+    adminUrl: urls.adminUrl,
+    viewUrl: urls.viewUrl,
+    setupUrl: urls.setupUrl,
+    ...resources
+  };
 }
 
 /**

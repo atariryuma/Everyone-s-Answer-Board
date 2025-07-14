@@ -27,12 +27,13 @@ describe('User Management Display', () => {
     
     vm.createContext(context);
     vm.runInContext(code, context);
+    context.batchGetSheetsData = jest.fn();
   });
 
   describe('getAllUsersForAdmin', () => {
     test('should return users with createdAt field from database', () => {
       // Mock database response
-      const mockHeaders = ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'createdAt', 'configJson', 'lastAccessedAt', 'isActive'];
+      const mockHeaders = ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'createdAt', 'configJson', 'setupStatus', 'lastAccessedAt', 'isActive'];
       const mockUserData = [
         'user123', 
         '35t22@naha-okinawa.ed.jp', 
@@ -93,7 +94,7 @@ describe('User Management Display', () => {
   describe('Database column mapping', () => {
     test('should verify DB_SHEET_CONFIG.HEADERS contains createdAt', () => {
       // This test documents the expected database structure
-      const expectedHeaders = ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'createdAt', 'configJson', 'lastAccessedAt', 'isActive'];
+      const expectedHeaders = ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'createdAt', 'configJson', 'setupStatus', 'lastAccessedAt', 'isActive'];
       
       expect(expectedHeaders).toContain('createdAt');
       expect(expectedHeaders).not.toContain('registrationDate');

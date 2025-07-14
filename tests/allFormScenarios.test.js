@@ -47,6 +47,7 @@ describe('All form creation scenarios reaction columns', () => {
     // Load both Core.gs and config.gs
     vm.runInContext(coreCode, context);
     vm.runInContext(configCode, context);
+    context.getSheetsList = jest.fn();
   });
 
   describe('addSpreadsheetUrl scenario', () => {
