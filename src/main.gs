@@ -345,14 +345,39 @@ function doGet(e) {
     return showRegistrationPage();
   } catch (error) {
     console.error(`doGetで致命的なエラー: ${error.stack}`);
-    var errorHtml = HtmlService.createHtmlOutput(
-      '<h1>デバッグ：致命的エラー</h1>' +
-      '<p>doGet関数内でエラーが発生しました</p>' +
-      '<p>エラー詳細: ' + htmlEncode(error.message) + '</p>' +
-      '<p>スタック: ' + htmlEncode(error.stack || 'スタック情報なし') + '</p>' +
-      '<p>時刻: ' + new Date().toISOString() + '</p>' +
-      '<p>executeAs設定: USER_DEPLOYING (テスト中)</p>'
+    
+    var errorMessage = error.message;
+    var isPermissionError = errorMessage && (
+      errorMessage.includes('permission') || 
+      errorMessage.includes('権限') ||
+      errorMessage.includes('access')
     );
+    
+    var errorHtml;
+    if (isPermissionError) {
+      errorHtml = HtmlService.createHtmlOutput(
+        '<h1>データベースアクセスエラー</h1>' +
+        '<p>データベースへのアクセスに失敗しました。</p>' +
+        '<p>このアプリではデータベース操作をサービスアカウント経由でのみ行います。</p>' +
+        '<h2>管理者へ</h2>' +
+        '<ul>' +
+        '<li>サービスアカウントの認証情報が正しく設定されているか確認してください</li>' +
+        '<li>データベーススプレッドシートがサービスアカウントと共有されているか確認してください</li>' +
+        '<li>サービスアカウントがデータベーススプレッドシートの編集者権限を持っているか確認してください</li>' +
+        '</ul>' +
+        '<p><small>セキュリティ設定: データベースはサービスアカウント専用</small></p>'
+      );
+    } else {
+      errorHtml = HtmlService.createHtmlOutput(
+        '<h1>システムエラー</h1>' +
+        '<p>アプリの動作中にエラーが発生しました</p>' +
+        '<p>エラー詳細: ' + htmlEncode(error.message) + '</p>' +
+        '<p>時刻: ' + new Date().toISOString() + '</p>' +
+        '<p>管理者にお問い合わせください。</p>' +
+        '<p><small>executeAs設定: USER_ACCESSING / データベース: サービスアカウント専用</small></p>'
+      );
+    }
+    
     return safeSetXFrameOptionsDeny(errorHtml);
   }
 }

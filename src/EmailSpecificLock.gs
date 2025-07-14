@@ -121,20 +121,8 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
         ...additionalData
       };
       
-      // 既存の安全な作成関数を使用
-      if (typeof createUserAtomic === 'function') {
-        createUserAtomic(userData);
-      } else {
-        // フォールバック: 直接Sheetに追加
-        const props = PropertiesService.getScriptProperties();
-        const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
-        if (!dbId) throw new Error('Database not configured');
-        
-        const sheet = SpreadsheetApp.openById(dbId).getSheetByName('ユーザー');
-        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-        const newRow = headers.map(header => userData[header] || '');
-        sheet.appendRow(newRow);
-      }
+      // サービスアカウント専用でユーザー作成
+      createUserAtomic(userData);
       
       console.log('findOrCreateUserWithEmailLock: 新規ユーザー作成完了', { userId, adminEmail });
       

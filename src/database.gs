@@ -353,21 +353,22 @@ function getDeletionLogs() {
 
 /**
  * 最適化されたSheetsサービスを取得
+ * データベース操作専用：サービスアカウントのみ使用
  * @returns {object} Sheets APIサービス
  */
 function getSheetsService() {
   try {
     var accessToken = getServiceAccountTokenCached();
     if (!accessToken) {
-      console.error('Failed to get service account token');
-      return null;
+      throw new Error('サービスアカウントトークンの取得に失敗しました。データベースにアクセスできません。');
     }
     return createSheetsService(accessToken);
   } catch (error) {
     console.error('getSheetsService error:', error.message);
-    return null;
+    throw new Error('データベースアクセス用サービスアカウントの認証に失敗しました: ' + error.message);
   }
 }
+
 
 /**
  * ユーザー情報を効率的に検索（キャッシュ優先）
@@ -386,6 +387,7 @@ function findUserById(userId) {
 /**
  * ロック競合を避けるための軽量ユーザー検索
  * 登録処理中にhandleDirectExecAccessで使用
+ * サービスアカウント専用でデータベースにアクセス
  * @param {string} email メールアドレス
  * @returns {object|null} ユーザー情報またはnull
  */
@@ -393,30 +395,8 @@ function findUserByEmailNonBlocking(email) {
   try {
     if (!email) return null;
     
-    const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
-    if (!dbId) return null;
-    
-    const sheet = SpreadsheetApp.openById(dbId).getSheetByName('ユーザー');
-    if (!sheet) return null;
-    
-    // ロックなしで軽量検索（読み取り専用）
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0];
-    const emailIndex = headers.indexOf('adminEmail');
-    
-    if (emailIndex === -1) return null;
-    
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][emailIndex] === email) {
-        const user = {};
-        headers.forEach((header, index) => {
-          user[header] = data[i][index];
-        });
-        return user;
-      }
-    }
-    return null;
+    // 軽量検索でもサービスアカウント経由でアクセス
+    return fetchUserFromDatabase('adminEmail', email);
   } catch (error) {
     console.error('findUserByEmailNonBlocking error:', error);
     return null;
@@ -439,6 +419,7 @@ function findUserByEmail(email) {
 
 /**
  * データベースからユーザーを取得
+ * サービスアカウント専用でデータベースにアクセス
  * @param {string} field - 検索フィールド
  * @param {string} value - 検索値
  * @returns {object|null} ユーザー情報
@@ -447,9 +428,10 @@ function fetchUserFromDatabase(field, value) {
   try {
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    var service = getSheetsService();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
+    // サービスアカウント専用でアクセス
+    var service = getSheetsService();
     var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:I"]);
     var values = data.valueRanges[0].values || [];
     
@@ -467,13 +449,11 @@ function fetchUserFromDatabase(field, value) {
           user[header] = values[i][index] || '';
         });
         
-        // デバッグログでマッピングを確認
-        console.log('fetchUserFromDatabase - Found user:', {
+        console.log('fetchUserFromDatabase (Service Account) - Found user:', {
           field: field,
           value: value,
           userId: user.userId,
-          adminEmail: user.adminEmail,
-          createdAt: user.createdAt
+          adminEmail: user.adminEmail
         });
         
         return user;
@@ -483,7 +463,7 @@ function fetchUserFromDatabase(field, value) {
     return null;
   } catch (error) {
     console.error('ユーザー検索エラー (' + field + ':' + value + '):', error);
-    return null;
+    throw new Error('データベースからのユーザー検索に失敗しました: ' + error.message);
   }
 }
 
@@ -880,20 +860,23 @@ function generateConsistentUserId(adminEmail) {
 /**
  * ⚡ 原子的ユーザー作成（重複チェックなし）
  * findOrCreateUser内でのみ使用 - ロック保護下での高速作成
+ * サービスアカウント専用でデータベースにアクセス
  * @param {object} userData - 作成するユーザーデータ
  * @returns {object} 作成されたユーザーデータ
  */
 function createUserAtomic(userData) {
   const props = PropertiesService.getScriptProperties();
   const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-  const service = getSheetsService();
   const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
   const newRow = DB_SHEET_CONFIG.HEADERS.map(function(header) { 
     return userData[header] || ''; 
   });
   
+  // サービスアカウント専用でアクセス
+  const service = getSheetsService();
   appendSheetsData(service, dbId, "'" + sheetName + "'!A1", [newRow]);
+  console.log('User created via Service Account');
   
   // キャッシュ無効化
   invalidateUserCache(userData.userId, userData.adminEmail, userData.spreadsheetId, false);
@@ -1266,28 +1249,12 @@ function batchUpdateSpreadsheet(service, spreadsheetId, requestBody) {
 }
 
 /**
+ * @deprecated この関数は非推奨です。サービスアカウント経由のアクセスを使用してください
  * データベースシートを取得
  * @returns {object} データベースシート
  */
 function getDbSheet() {
-  try {
-    var props = PropertiesService.getScriptProperties();
-    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    if (!dbId) {
-      throw new Error('データベースIDが設定されていません');
-    }
-    
-    var ss = SpreadsheetApp.openById(dbId);
-    var sheet = ss.getSheetByName(DB_SHEET_CONFIG.SHEET_NAME);
-    if (!sheet) {
-      throw new Error('データベースシートが見つかりません: ' + DB_SHEET_CONFIG.SHEET_NAME);
-    }
-    
-    return sheet;
-  } catch (e) {
-    console.error('getDbSheet error:', e.message);
-    throw new Error('データベースシートの取得に失敗しました: ' + e.message);
-  }
+  throw new Error('getDbSheet関数は非推奨です。データベースアクセスはサービスアカウント経由でのみ行ってください。');
 }
 
 /**
@@ -1419,4 +1386,82 @@ function deleteUserAccount(userId) {
     
     throw new Error(errorMessage);
   }
+}
+
+/**
+ * データベースのセキュリティ状態を検証
+ * @returns {object} 検証結果
+ */
+function validateDatabaseSecurity() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    const serviceAccountEmail = getServiceAccountEmail();
+    
+    if (!dbId) {
+      return {
+        isSecure: false,
+        message: 'データベーススプレッドシートIDが設定されていません'
+      };
+    }
+    
+    if (serviceAccountEmail === 'サービスアカウント未設定') {
+      return {
+        isSecure: false,
+        message: 'サービスアカウントが設定されていません'
+      };
+    }
+    
+    // サービスアカウントでのアクセステスト
+    try {
+      const service = getSheetsService();
+      const data = batchGetSheetsData(service, dbId, ["'" + DB_SHEET_CONFIG.SHEET_NAME + "'!A1:A1"]);
+      
+      return {
+        isSecure: true,
+        message: 'データベースはサービスアカウント専用で保護されています',
+        serviceAccount: serviceAccountEmail,
+        databaseId: dbId
+      };
+    } catch (accessError) {
+      return {
+        isSecure: false,
+        message: 'サービスアカウントでデータベースにアクセスできません: ' + accessError.message,
+        serviceAccount: serviceAccountEmail,
+        databaseId: dbId
+      };
+    }
+  } catch (error) {
+    return {
+      isSecure: false,
+      message: 'セキュリティ検証中にエラーが発生しました: ' + error.message
+    };
+  }
+}
+
+/**
+ * データベースセキュリティの状態を管理者向けに表示
+ * @returns {string} セキュリティ状態レポート
+ */
+function getDatabaseSecurityReport() {
+  const validation = validateDatabaseSecurity();
+  
+  let report = '=== データベースセキュリティ状態 ===\n';
+  report += '状態: ' + (validation.isSecure ? '✅ 安全' : '❌ 要注意') + '\n';
+  report += 'メッセージ: ' + validation.message + '\n';
+  
+  if (validation.serviceAccount) {
+    report += 'サービスアカウント: ' + validation.serviceAccount + '\n';
+  }
+  
+  if (validation.databaseId) {
+    report += 'データベースID: ' + validation.databaseId + '\n';
+  }
+  
+  report += '\n=== セキュリティ設定 ===\n';
+  report += '• データベース操作: サービスアカウント専用\n';
+  report += '• 個人スプレッドシート: ユーザー権限\n';
+  report += '• Google Drive操作: ユーザー権限\n';
+  
+  return report;
 }
