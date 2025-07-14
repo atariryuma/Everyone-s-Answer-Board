@@ -231,6 +231,54 @@
 
 
     
+  /* ================================================= */
+    /* ★★★ 登録ページ限定モーダルスタイル ★★★ */
+    /* ================================================= */
+
+    /* モーダル全体の位置を画面中央に固定 */
+    .registration-page .fixed.inset-0 {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+
+    /* モーダルのガラスパネルスタイルを登録ページ本体と統一 */
+    .registration-page #enhanced-privacy-modal .glass-panel,
+    .registration-page #enhanced-digital-citizenship-modal .glass-panel {
+      background: rgba(255, 255, 255, 0.08) !important;
+      -webkit-backdrop-filter: blur(20px) !important;
+      backdrop-filter: blur(20px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.2) !important;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+      max-width: 560px !important; /* 少し幅を広げる */
+    }
+
+    /* モーダルのタイトルスタイル */
+    .registration-page #enhanced-privacy-modal h3,
+    .registration-page #enhanced-digital-citizenship-modal h3 {
+      font-size: 24px !important;
+      font-weight: 700 !important;
+      color: white !important;
+    }
+
+    /* モーダルの本文テキスト */
+    .registration-page #enhanced-privacy-modal-content,
+    .registration-page #enhanced-digital-citizenship-modal-content {
+      color: rgba(255, 255, 255, 0.8) !important;
+    }
+
+    /* モーダルのボタンを登録ボタンと統一 */
+    .registration-page .btn-primary {
+      background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%) !important;
+      color: white !important;
+      border: none !important;
+    }
+    
+    .registration-page .btn-secondary {
+      background: rgba(255, 255, 255, 0.1) !important;
+      color: white !important;
+      border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    }
   </style>
 
   <?!= include('UnifiedStyles'); ?>
