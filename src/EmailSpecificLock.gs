@@ -195,6 +195,8 @@ function createLightweightUser(adminEmail, additionalData = {}) {
     console.log('createLightweightUser: 軽量ユーザー作成開始', { adminEmail });
     
     const userId = generateConsistentUserId(adminEmail);
+    console.log('createLightweightUser: 生成されたユーザーID', { userId, adminEmail });
+    
     const userData = {
       userId: userId,
       adminEmail: adminEmail,
@@ -208,10 +210,21 @@ function createLightweightUser(adminEmail, additionalData = {}) {
       ...additionalData
     };
     
+    console.log('createLightweightUser: 作成するユーザーデータ', userData);
+    
     // 楽観的ロック：作成試行→エラー時既存ユーザー検索
     try {
       createUserAtomic(userData);
       console.log('createLightweightUser: 軽量ユーザー作成完了', { userId, adminEmail });
+      
+      // 作成直後に確認
+      const verificationUser = findUserByEmailNonBlocking(adminEmail);
+      console.log('createLightweightUser: 作成後の確認結果', { 
+        found: !!verificationUser, 
+        foundUserId: verificationUser?.userId,
+        expectedUserId: userId,
+        match: verificationUser?.userId === userId
+      });
       
       return {
         userId: userId,

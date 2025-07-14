@@ -3320,7 +3320,36 @@ function getStatus(requestUserId, forceRefresh = false) {
     const requestedUserInfo = findUserById(requestUserId);
     
     if (!requestedUserInfo) {
-      throw new Error('指定されたユーザーIDが見つかりません: ' + requestUserId);
+      console.error('getStatus: ユーザーIDが見つかりません', { 
+        requestUserId, 
+        currentUserEmail 
+      });
+      
+      // メールアドレスでの検索を試行
+      const userByEmail = findUserByEmailNonBlocking(currentUserEmail);
+      if (userByEmail) {
+        console.log('getStatus: メールアドレスで見つかりました、IDミスマッチの可能性', {
+          requestUserId,
+          foundUserId: userByEmail.userId,
+          currentUserEmail
+        });
+        
+        return {
+          status: 'id_mismatch',
+          message: 'ユーザーIDが一致しません。正しい管理パネルURLにリダイレクトします。',
+          correctUserId: userByEmail.userId,
+          correctUrl: buildUserAdminUrl(userByEmail.userId)
+        };
+      }
+      
+      // 完全にユーザーが見つからない場合
+      return {
+        status: 'user_not_found',
+        message: '指定されたユーザーIDが見つかりません: ' + requestUserId,
+        requestUserId: requestUserId,
+        currentUserEmail: currentUserEmail,
+        suggestion: '新規登録が必要な可能性があります'
+      };
     }
     
     if (requestedUserInfo.adminEmail !== currentUserEmail) {

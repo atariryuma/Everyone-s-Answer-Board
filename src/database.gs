@@ -376,12 +376,28 @@ function getSheetsService() {
  * @returns {object|null} ユーザー情報
  */
 function findUserById(userId) {
+  console.log('🔍 findUserById: 検索開始', { userId });
   var cacheKey = 'user_' + userId;
-  return cacheManager.get(
+  const result = cacheManager.get(
     cacheKey,
-    function() { return fetchUserFromDatabase('userId', userId); },
+    function() { 
+      console.log('🔍 findUserById: キャッシュミス、データベース検索', { userId });
+      const dbResult = fetchUserFromDatabase('userId', userId);
+      console.log('🔍 findUserById: データベース検索結果', { 
+        userId, 
+        found: !!dbResult, 
+        adminEmail: dbResult?.adminEmail 
+      });
+      return dbResult;
+    },
     { ttl: 300, enableMemoization: true }
   );
+  console.log('🔍 findUserById: 最終結果', { 
+    userId, 
+    found: !!result, 
+    adminEmail: result?.adminEmail 
+  });
+  return result;
 }
 
 /**
@@ -393,10 +409,20 @@ function findUserById(userId) {
  */
 function findUserByEmailNonBlocking(email) {
   try {
-    if (!email) return null;
+    console.log('🔍 findUserByEmailNonBlocking: 検索開始', { email });
+    if (!email) {
+      console.log('🔍 findUserByEmailNonBlocking: メールアドレスが空');
+      return null;
+    }
     
     // 軽量検索でもサービスアカウント経由でアクセス
-    return fetchUserFromDatabase('adminEmail', email);
+    const result = fetchUserFromDatabase('adminEmail', email);
+    console.log('🔍 findUserByEmailNonBlocking: 検索結果', { 
+      email, 
+      found: !!result, 
+      userId: result?.userId 
+    });
+    return result;
   } catch (error) {
     console.error('findUserByEmailNonBlocking error:', error);
     return null;

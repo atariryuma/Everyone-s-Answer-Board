@@ -255,44 +255,74 @@
       const showSuccessResult = (result) => {
         mainContainer.style.display = 'none';
         successContainer.style.display = 'block';
-        if (result?.adminUrl) {
+        if (result?.adminUrl && result?.userId) {
           adminPanelBtn.href = result.adminUrl;
-          // Use iframe-safe navigation with server-side support
-          if (result?.userId) {
-            // Use server-side navigation for better iframe support
-            google.script.run
-              .withSuccessHandler(navResult => {
-                if (navResult && navResult.success) {
-                  console.log('Server navigation prepared:', navResult.redirectUrl);
-                  setTimeout(() => {
-                    window.location.href = navResult.redirectUrl;
-                  }, 2000);
-                } else {
-                  // Fallback to client-side navigation
-                  window.sharedUtilities.navigation.navigateWithSuccess(
+          
+          console.log('Registration complete, verifying user before navigation:', { 
+            adminUrl: result.adminUrl, 
+            userId: result.userId 
+          });
+          
+          // Verify user exists before navigation
+          google.script.run
+            .withSuccessHandler(userExists => {
+              console.log('User verification result:', userExists);
+              if (userExists && userExists.found) {
+                console.log('User verified, proceeding with navigation');
+                
+                // Show manual navigation dialog for reliability
+                setTimeout(() => {
+                  window.sharedUtilities.navigation.showManualNavigationDialog(
                     result.adminUrl, 
-                    '登録完了！管理パネルに移動中...',
-                    3000
+                    '登録完了！管理パネルに移動します'
                   );
-                }
-              })
-              .withFailureHandler(error => {
-                console.warn('Server navigation failed, using client fallback:', error);
-                window.sharedUtilities.navigation.navigateWithSuccess(
+                }, 2000);
+                
+                // Also try automatic navigation
+                google.script.run
+                  .withSuccessHandler(navResult => {
+                    if (navResult && navResult.success) {
+                      console.log('Server navigation prepared:', navResult.redirectUrl);
+                      try {
+                        if (window.parent && window.parent.location) {
+                          window.parent.location.replace(navResult.redirectUrl);
+                        } else {
+                          window.open(navResult.redirectUrl, '_top');
+                        }
+                      } catch (e) {
+                        console.log('Automatic navigation failed, user will use manual dialog');
+                      }
+                    }
+                  })
+                  .withFailureHandler(error => {
+                    console.warn('Server navigation failed:', error);
+                  })
+                  .navigateToAdminPanel(result.userId);
+              } else {
+                console.error('User verification failed, showing error message');
+                showMessage('アカウント作成は完了しましたが、データベースでの確認ができませんでした。しばらく待ってから管理パネルにアクセスしてください。', 'warning');
+                
+                // Still show navigation option but with delay
+                setTimeout(() => {
+                  window.sharedUtilities.navigation.showManualNavigationDialog(
+                    result.adminUrl, 
+                    'データベース同期待ち - 管理パネルにアクセス'
+                  );
+                }, 5000);
+              }
+            })
+            .withFailureHandler(error => {
+              console.error('User verification error:', error);
+              showMessage('ユーザー確認でエラーが発生しました。管理パネルに直接アクセスしてください。', 'error');
+              
+              setTimeout(() => {
+                window.sharedUtilities.navigation.showManualNavigationDialog(
                   result.adminUrl, 
-                  '登録完了！管理パネルに移動中...',
-                  3000
+                  'エラー発生 - 管理パネルにアクセス'
                 );
-              })
-              .navigateToAdminPanel(result.userId);
-          } else {
-            // Fallback to client-side navigation
-            window.sharedUtilities.navigation.navigateWithSuccess(
-              result.adminUrl, 
-              '登録完了！管理パネルに移動中...',
-              3000
-            );
-          }
+              }, 3000);
+            })
+            .verifyUserExists(result.userId);
         }
       };
       

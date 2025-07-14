@@ -106,6 +106,16 @@ function upsertUser(adminEmail, additionalData = {}) {
 }
 
 /**
+ * メールアドレスの正規化
+ * @param {string} email - メールアドレス
+ * @returns {string} 正規化されたメールアドレス
+ */
+function normalizeEmail(email) {
+  if (!email) return '';
+  return email.toString().toLowerCase().trim();
+}
+
+/**
  * 🎯 一貫したユーザーID生成
  * メールアドレスから決定論的にUUIDを生成
  * 
@@ -113,8 +123,18 @@ function upsertUser(adminEmail, additionalData = {}) {
  * @returns {string} 一意のユーザーID
  */
 function generateConsistentUserId(adminEmail) {
+  console.log('🔍 generateConsistentUserId - Input email:', adminEmail);
+  
+  // メールアドレスの正規化（共通関数を使用）
+  const normalizedEmail = normalizeEmail(adminEmail);
+  console.log('🔍 generateConsistentUserId - Normalized email:', normalizedEmail);
+  
+  if (!normalizedEmail) {
+    throw new Error('有効なメールアドレスが必要です');
+  }
+  
   // メールアドレスからハッシュ値を生成して、UUIDフォーマットに変換
-  const hash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, adminEmail, Utilities.Charset.UTF_8);
+  const hash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, normalizedEmail, Utilities.Charset.UTF_8);
   const hexString = hash.map(byte => (byte + 256).toString(16).slice(-2)).join('');
   
   // UUID v4 フォーマットに整形
@@ -126,6 +146,7 @@ function generateConsistentUserId(adminEmail) {
     hexString.slice(20, 32)
   ].join('-');
   
+  console.log('🔍 generateConsistentUserId - Generated UUID:', uuid);
   return uuid;
 }
 
@@ -230,9 +251,45 @@ function quickStartSetup() {
       };
     }
     
-    // Step 2: ユーザー作成完了を返す（フォーム作成は後で実行）
-    const adminUrl = getWebAppUrl() + '?page=admin&userId=' + userId;
+    // Step 2: ユーザー作成完了後の確認
     console.log('quickStartSetup: 軽量ユーザー作成完了、リソース作成は後で実行', { userId, userEmail });
+    
+    // 作成されたユーザーを確認（ID検索とメール検索の両方）
+    const userByIdCheck = findUserById(userId);
+    const userByEmailCheck = findUserByEmailNonBlocking(userEmail);
+    
+    console.log('quickStartSetup: ユーザー作成後の確認', {
+      userId,
+      userEmail,
+      foundById: !!userByIdCheck,
+      foundByEmail: !!userByEmailCheck,
+      idMatch: userByIdCheck?.userId === userId,
+      emailMatch: userByEmailCheck?.adminEmail === userEmail,
+      bothFound: !!userByIdCheck && !!userByEmailCheck
+    });
+    
+    // 整合性チェック
+    if (!userByIdCheck || !userByEmailCheck) {
+      console.error('quickStartSetup: ユーザー作成後の確認で不整合発見', {
+        userId,
+        userEmail,
+        userByIdCheck: !!userByIdCheck,
+        userByEmailCheck: !!userByEmailCheck
+      });
+      
+      // キャッシュをクリアして再試行
+      invalidateUserCacheConsistent(userId, userEmail);
+      
+      const retryById = findUserById(userId);
+      const retryByEmail = findUserByEmailNonBlocking(userEmail);
+      
+      console.log('quickStartSetup: キャッシュクリア後の再確認', {
+        retryById: !!retryById,
+        retryByEmail: !!retryByEmail
+      });
+    }
+    
+    const adminUrl = getWebAppUrl() + '?mode=admin&userId=' + userId;
     
     return {
       status: 'partial',

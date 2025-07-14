@@ -854,47 +854,65 @@ window.sharedUtilities.navigation = {
     dialog.innerHTML = `
       <div style="
         background: rgba(30, 41, 59, 0.95);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(6, 182, 212, 0.3);
         border-radius: 16px;
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
         width: 100%; max-width: 500px;
-        padding: 24px 32px;
+        padding: 32px;
         margin: 20px;
         color: white;
         text-align: center;
       ">
-        <h3 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 600;">
+        <div style="
+          width: 48px; height: 48px;
+          background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);
+          border-radius: 50%;
+          margin: 0 auto 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 24px;
+        ">✓</div>
+        <h3 style="margin: 0 0 16px 0; font-size: 22px; font-weight: 600; color: #06b6d4;">
           ${message}
         </h3>
-        <p style="margin: 0 0 24px 0; color: rgba(255, 255, 255, 0.8); line-height: 1.5;">
-          自動的に移動できません。下のボタンをクリックして続行してください。
+        <p style="margin: 0 0 24px 0; color: rgba(255, 255, 255, 0.8); line-height: 1.5; font-size: 16px;">
+          続行するには下のボタンをクリックしてください。
         </p>
-        <button onclick="window.open('${url}', '_blank'); this.parentElement.parentElement.remove();" style="
+        <button onclick="
+          try { 
+            window.parent.location.href='${url}'; 
+          } catch(e) { 
+            window.open('${url}', '_top'); 
+          }
+          this.parentElement.parentElement.remove();
+        " style="
           background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);
           border: none;
           border-radius: 8px;
           color: white;
-          padding: 12px 24px;
+          padding: 14px 28px;
           font-size: 16px;
           font-weight: 600;
           cursor: pointer;
           margin-right: 12px;
           transition: transform 0.2s ease;
-        " onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">
-          新しいタブで開く
+          box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(6, 182, 212, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(6, 182, 212, 0.3)'">
+          管理パネルを開く
         </button>
-        <button onclick="window.location.href='${url}'" style="
+        <button onclick="window.open('${url}', '_blank'); this.parentElement.parentElement.remove();" style="
           background: rgba(255, 255, 255, 0.1);
           border: 1px solid rgba(255, 255, 255, 0.2);
           border-radius: 8px;
           color: white;
-          padding: 12px 24px;
+          padding: 14px 28px;
           font-size: 16px;
           font-weight: 600;
           cursor: pointer;
           transition: all 0.2s ease;
         " onmouseover="this.style.background='rgba(255, 255, 255, 0.15)'" onmouseout="this.style.background='rgba(255, 255, 255, 0.1)'">
-          このタブで開く
+          新しいタブで開く
         </button>
       </div>
     `;
@@ -923,14 +941,42 @@ window.sharedUtilities.navigation = {
           if (result && result.success && result.redirectUrl) {
             // Server provided a redirect URL, try to navigate
             console.log('Server navigation success, redirecting to:', result.redirectUrl);
-            setTimeout(() => {
+            
+            // For iframe environments, try different approaches
+            if (window !== window.top) {
+              console.log('Iframe detected, using alternative navigation');
+              
+              // Method 1: Try to replace the entire parent window
               try {
-                window.location.href = result.redirectUrl;
+                if (window.parent && window.parent.location) {
+                  window.parent.location.replace(result.redirectUrl);
+                  return;
+                }
               } catch (e) {
-                console.warn('Direct navigation failed, showing manual dialog');
-                this.showManualNavigationDialog(result.redirectUrl, result.message || message);
+                console.warn('Parent location.replace failed:', e);
               }
-            }, 1000);
+              
+              // Method 2: Use window.open with _top target
+              try {
+                window.open(result.redirectUrl, '_top');
+                return;
+              } catch (e) {
+                console.warn('window.open _top failed:', e);
+              }
+              
+              // Method 3: Manual dialog as final fallback
+              this.showManualNavigationDialog(result.redirectUrl, result.message || message);
+            } else {
+              // Non-iframe environment
+              setTimeout(() => {
+                try {
+                  window.location.href = result.redirectUrl;
+                } catch (e) {
+                  console.warn('Direct navigation failed, showing manual dialog');
+                  this.showManualNavigationDialog(result.redirectUrl, result.message || message);
+                }
+              }, 1000);
+            }
           } else {
             console.warn('Server navigation failed:', result);
             this.showManualNavigationDialog(url, 'サーバー側の移動処理に失敗しました');

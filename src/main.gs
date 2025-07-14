@@ -69,6 +69,26 @@ var DISPLAY_MODES = {
   NAMED: 'named'
 };
 
+// セットアップ状態定数
+var SETUP_STATUS = {
+  UNREGISTERED: 'unregistered',
+  ACCOUNT_CREATED: 'account_created',    // 旧: basic
+  RESOURCES_PENDING: 'resources_pending', // リソース作成中
+  DATA_PREPARED: 'data_prepared',        // データ準備完了
+  CONFIGURED: 'configured',              // 設定完了
+  PUBLISHED: 'published'                 // 公開済み（旧: complete）
+};
+
+// セットアップステップ定数
+var SETUP_STEPS = {
+  ACCOUNT: 1,      // アカウント作成
+  DATA_PREP: 2,    // データ準備（スプレッドシート・フォーム作成）
+  DATA_INPUT: 3,   // データ投入（シート選択・列設定）
+  PUBLISH_CONFIG: 4, // 公開設定（表示オプション設定）
+  PREVIEW: 5,      // プレビュー確認
+  PUBLISHED: 6     // 回答ボード公開
+};
+
 // リアクション関連定数
 var REACTION_KEYS = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
 
@@ -654,6 +674,58 @@ function navigateToAdminPanel(userId) {
     return {
       success: false,
       error: error.message
+    };
+  }
+}
+
+/**
+ * ユーザーの存在確認
+ * @param {string} userId ユーザーID
+ * @return {Object} 確認結果
+ */
+function verifyUserExists(userId) {
+  try {
+    console.log('verifyUserExists: 確認開始', { userId });
+    
+    if (!userId) {
+      return { found: false, error: 'ユーザーIDが指定されていません' };
+    }
+    
+    // ID検索とメール検索の両方で確認
+    const userById = findUserById(userId);
+    
+    if (userById) {
+      // さらにメールアドレスでの逆引き確認
+      const userByEmail = findUserByEmailNonBlocking(userById.adminEmail);
+      
+      const verification = {
+        found: true,
+        userId: userById.userId,
+        adminEmail: userById.adminEmail,
+        consistency: userByEmail?.userId === userId,
+        details: {
+          foundById: !!userById,
+          foundByEmail: !!userByEmail,
+          idMatch: userByEmail?.userId === userId
+        }
+      };
+      
+      console.log('verifyUserExists: 確認完了', verification);
+      return verification;
+    } else {
+      console.log('verifyUserExists: ユーザーが見つかりません', { userId });
+      return { 
+        found: false, 
+        userId: userId,
+        error: 'ユーザーが見つかりません' 
+      };
+    }
+  } catch (error) {
+    console.error('verifyUserExists error:', error);
+    return {
+      found: false,
+      error: error.message,
+      userId: userId
     };
   }
 }
