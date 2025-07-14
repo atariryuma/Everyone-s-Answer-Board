@@ -83,7 +83,7 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
     // Step 3: 新規ユーザー作成（スクリプトロック使用 - ユーザーロック廃止）
     console.log('findOrCreateUserWithEmailLock: 新規ユーザー作成開始', { adminEmail });
     const lock = LockService.getScriptLock();
-    const timeout = 15000; // 60秒→15秒に短縮（ロック解放を早める）
+    const timeout = 30000; // 30秒に延長（フォーム・スプレッドシート作成時間を考慮）
 
     if (!lock.waitLock(timeout)) {
       const holder = SCRIPT_LOCK_INFO_CACHE.get(SCRIPT_LOCK_HOLDER_KEY);
@@ -97,7 +97,7 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
       throw new Error(`SCRIPT_LOCK_TIMEOUT: Lock held by ${holder || 'unknown'}`);
     }
 
-    SCRIPT_LOCK_INFO_CACHE.put(SCRIPT_LOCK_HOLDER_KEY, adminEmail, 15);
+    SCRIPT_LOCK_INFO_CACHE.put(SCRIPT_LOCK_HOLDER_KEY, adminEmail, 30);
     
     try {
       // ダブルチェック: ロック取得後に再度確認
@@ -110,8 +110,8 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
         };
       }
       
-      // 新規ユーザー作成実行（既存のcreateUserAtomicを使用）
-      const userId = generateUniqueUserId();
+      // 決定論的IDを事前生成
+      const userId = generateConsistentUserId(adminEmail);
       const userData = {
         userId: userId,
         adminEmail: adminEmail,
@@ -121,16 +121,30 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
         ...additionalData
       };
       
-      // サービスアカウント専用でユーザー作成
-      createUserAtomic(userData);
-      
-      console.log('findOrCreateUserWithEmailLock: 新規ユーザー作成完了', { userId, adminEmail });
-      
-      return {
-        userId: userId,
-        isNewUser: true,
-        userInfo: userData
-      };
+      // 楽観的ロック：作成試行→エラー時既存ユーザー検索
+      try {
+        createUserAtomic(userData);
+        console.log('findOrCreateUserWithEmailLock: 新規ユーザー作成完了', { userId, adminEmail });
+        
+        return {
+          userId: userId,
+          isNewUser: true,
+          userInfo: userData
+        };
+      } catch (createError) {
+        // 作成失敗時（重複など）は既存ユーザーを返す
+        console.log('findOrCreateUserWithEmailLock: 作成失敗、既存ユーザー検索', { adminEmail, error: createError.message });
+        const fallbackUser = findUserByEmailNonBlocking(adminEmail);
+        if (fallbackUser) {
+          return {
+            userId: fallbackUser.userId,
+            isNewUser: false,
+            userInfo: fallbackUser
+          };
+        }
+        // それでも見つからない場合は元のエラーを再スロー
+        throw createError;
+      }
       
     } finally {
       lock.releaseLock();
@@ -149,4 +163,76 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
  */
 function cleanupEmailLocks() {
   // CacheService のエントリは自動的に期限切れになるため明示的なクリーンアップは不要
+}
+
+/**
+ * 軽量ユーザー作成（基本情報のみ）
+ * フォーム・スプレッドシート作成は後回し
+ * @param {string} adminEmail - メールアドレス
+ * @param {object} additionalData - 追加データ
+ * @returns {object} 結果
+ */
+function createLightweightUser(adminEmail, additionalData = {}) {
+  // Step 1: メール特化ロック取得
+  if (!acquireEmailLock(adminEmail)) {
+    throw new Error('EMAIL_ALREADY_PROCESSING');
+  }
+  
+  try {
+    // Step 2: 既存ユーザー確認（軽量）
+    let existingUser = findUserByEmailNonBlocking(adminEmail);
+    console.log('createLightweightUser: 既存ユーザー確認結果', { existingUser: !!existingUser, adminEmail });
+    
+    if (existingUser) {
+      return {
+        userId: existingUser.userId,
+        isNewUser: false,
+        userInfo: existingUser
+      };
+    }
+    
+    // Step 3: 軽量ユーザー作成（基本情報のみ）
+    console.log('createLightweightUser: 軽量ユーザー作成開始', { adminEmail });
+    
+    const userId = generateConsistentUserId(adminEmail);
+    const userData = {
+      userId: userId,
+      adminEmail: adminEmail,
+      createdAt: new Date().toISOString(),
+      lastAccessedAt: new Date().toISOString(),
+      isActive: 'true',
+      configJson: '{}', // 空の設定
+      spreadsheetId: '', // 未設定
+      spreadsheetUrl: '', // 未設定
+      setupStatus: 'basic', // 基本作成完了
+      ...additionalData
+    };
+    
+    // 楽観的ロック：作成試行→エラー時既存ユーザー検索
+    try {
+      createUserAtomic(userData);
+      console.log('createLightweightUser: 軽量ユーザー作成完了', { userId, adminEmail });
+      
+      return {
+        userId: userId,
+        isNewUser: true,
+        userInfo: userData
+      };
+    } catch (createError) {
+      console.log('createLightweightUser: 作成失敗、既存ユーザー検索', { adminEmail, error: createError.message });
+      const fallbackUser = findUserByEmailNonBlocking(adminEmail);
+      if (fallbackUser) {
+        return {
+          userId: fallbackUser.userId,
+          isNewUser: false,
+          userInfo: fallbackUser
+        };
+      }
+      throw createError;
+    }
+    
+  } finally {
+    // Step 4: メール特化ロック解放
+    releaseEmailLock(adminEmail);
+  }
 }
