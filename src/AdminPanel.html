@@ -201,10 +201,11 @@
       <p id="loading-message" class="mt-4 text-gray-300">処理中...</p>
     </div>
   </div>
-  <header id="admin-header" class="glass-panel border-b border-gray-700 sticky top-0 z-50">
-    <div class="max-w-6xl mx-auto w-full flex items-center">
+  <header class="glass-panel border-b border-gray-700 sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
+      <div class="flex items-center justify-between">
         <!-- ロゴとタイトル -->
-        <div class="logo-title flex items-center gap-3">
+        <div class="flex items-center gap-3">
           <div class="w-8 h-8 bg-gradient-to-r from-cyan-400 to-purple-400 rounded-lg flex items-center justify-center flex-shrink-0">
             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
@@ -267,7 +268,7 @@
   <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8 pb-40">
     <!-- シンプル統合ステータスバー -->
     <section class="mb-4">
-      <div class="status-bar glass-panel rounded-lg">
+      <div class="glass-panel p-4 rounded-lg">
         <div class="flex items-center justify-between">
           <!-- 左側: ステータス表示 -->
           <div class="flex items-center gap-3">
@@ -289,19 +290,19 @@
           </div>
           
           <!-- 右側: コンパクトステップナビゲーション -->
-          <div class="steps flex items-center gap-2">
+          <div class="flex items-center gap-2">
             <div class="flex items-center gap-1" id="step-1-indicator">
-              <div class="step-badge w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">1</div>
+              <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">1</div>
               <span class="text-xs text-gray-300 hidden sm:inline">データ準備</span>
             </div>
             <div class="w-4 h-px bg-gray-600"></div>
             <div class="flex items-center gap-1" id="step-2-indicator">
-              <div class="step-badge w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">2</div>
+              <div class="w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">2</div>
               <span class="text-xs text-gray-300 hidden sm:inline">シート選択</span>
             </div>
             <div class="w-4 h-px bg-gray-600"></div>
             <div class="flex items-center gap-1" id="step-3-indicator">
-              <div class="step-badge w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">3</div>
+              <div class="w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">3</div>
               <span class="text-xs text-gray-300 hidden sm:inline">設定・公開</span>
             </div>
           </div>
@@ -312,7 +313,7 @@
     <!-- メインコンテンツエリア -->
     <div class="responsive-grid">
       <!-- 左側：セットアップフロー（メインパネル） -->
-      <div class="left-panel">
+      <div class="left-panel space-y-4 lg:space-y-6">
         
         <!-- ステップ1: データ準備 -->
         <div class="glass-panel p-4 lg:p-6" id="data-setup-section">
@@ -869,9 +870,9 @@
   </main>
   
   <!-- 統合フッター -->
-  <footer id="admin-footer" class="fixed bottom-0 left-0 right-0 glass-panel hidden">
-    <div class="max-w-6xl mx-auto">
-      <div class="flex items-center">
+  <footer id="admin-footer" class="fixed bottom-0 left-0 right-0 glass-panel border-t border-gray-700 hidden">
+    <div class="max-w-6xl mx-auto px-6 py-4">
+      <div class="flex items-center justify-between">
         <!-- 左側: 公開中の問題文 -->
         <div class="flex-1">
           <div class="flex items-center gap-2 mb-1">
@@ -882,14 +883,22 @@
           </div>
           <p class="text-blue-300 font-medium text-lg" id="current-topic-text">読み込み中...</p>
         </div>
+        
         <!-- 右側: ボードURL操作 -->
-        <div class="url-container">
-          <label for="board-url" class="url-label">公開中URL:</label>
-          <input type="text" id="board-url" readonly class="url-input px-2 bg-gray-800 border border-gray-600 rounded-lg text-sm cursor-pointer hover:bg-gray-700 focus:ring-2 focus:ring-green-400" onclick="this.select()" placeholder="URLが生成されます">
-          <button type="button" onclick="copyBoardUrl()" class="btn-copy btn btn-secondary px-3" title="URLをコピー" aria-label="生徒用URLをコピー">
-            コピー
+        <div class="flex items-center gap-3">
+          <input type="text" id="board-url" readonly
+                 class="px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-sm cursor-pointer hover:bg-gray-700 focus:ring-2 focus:ring-green-400 min-w-[300px]"
+                 onclick="this.select()" placeholder="URLが生成されます">
+          <button type="button" onclick="copyBoardUrl()" class="btn btn-secondary px-3 py-2 flex items-center" title="URLをコピー" aria-label="生徒用URLをコピー">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+            </svg>
           </button>
-          <a id="view-board-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-open btn btn-primary px-3" title="回答ボードを開く" aria-label="新しいタブで回答ボードを開く">開く</a>
+          <a id="view-board-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary px-3 py-2 flex items-center" title="回答ボードを開く" aria-label="新しいタブで回答ボードを開く">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+            </svg>
+          </a>
         </div>
       </div>
     </div>
@@ -1361,15 +1370,6 @@
         document.body.style.paddingBottom = footerHeight + baseBodyPadding + 'px';
       }
     }
-
-    function adjustFooterPadding() {
-      const footer = document.getElementById('admin-footer');
-      if (footer) {
-        document.body.style.paddingBottom = footer.offsetHeight + 'px';
-      }
-    }
-
-    window.addEventListener('load', adjustFooterPadding);
 
     // プライバシーモーダルの制御関数
     function showPrivacyModal(onContinue) {
