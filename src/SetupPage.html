@@ -9,7 +9,8 @@
     <meta name="description" content="StudyQuestの初回システムセットアップページ" />
     <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
     
-    <!-- TailwindCSS CDN removed - using UnifiedStyles.html custom components -->
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- Unified Styles and Shared Components -->
     <?!= include('UnifiedStyles'); ?>
@@ -17,7 +18,7 @@
     <?!= include('SharedJavaScript'); ?>
     <?!= include('SetupLogic'); ?>
 </head>
-<body class="dark-body">
+<body class="bg-[#1a1b26] text-gray-200 font-sans min-h-screen">
     <div class="max-w-2xl mx-auto">
         <!-- ヘッダー -->
         <div class="text-center mb-8">

@@ -11,7 +11,8 @@
   <!-- User ID from server template -->
   <meta name="user-id" content="<?= typeof userId !== 'undefined' ? userId : '' ?>" id="user-id-meta">
 
-  <!-- TailwindCSS CDN removed - using UnifiedStyles.html custom components -->
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Unified Styles and Shared Components -->
   <?!= include('UnifiedStyles'); ?>
@@ -193,7 +194,7 @@
   }
   </style>
 </head>
-<body class="dark-body">
+<body class="bg-[#1a1b26] text-gray-200 font-sans">
   <div id="loading-overlay" class="loading-overlay hidden">
     <div class="text-center">
       <div class="spinner"></div>
