@@ -430,10 +430,10 @@ function performNavigation(url, config) {
  */
 function showManualNavigationDialog(url, message = 'ページに移動') {
   const dialog = `
-    <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+    <div class="backdrop-blur-lg" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
                 background: var(--color-surface); border: 1px solid var(--color-border); 
                 border-radius: 16px; padding: 24px; z-index: 10000; max-width: 400px;
-                backdrop-filter: blur(20px); box-shadow: var(--shadow-glass);">
+                box-shadow: var(--shadow-glass);">
       <h3 style="color: white; margin-bottom: 16px;">${message}</h3>
       <p style="color: var(--color-text-secondary); margin-bottom: 20px;">
         下記のリンクをクリックして移動してください：

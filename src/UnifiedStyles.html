@@ -149,6 +149,32 @@ body.unified-theme::before {
   isolation: auto;
 }
 
+/* Unified Backdrop Filter System */
+.backdrop-blur-none {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.backdrop-blur-xs {
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.backdrop-blur-sm {
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.backdrop-blur-md {
+  -webkit-backdrop-filter: blur(var(--backdrop-blur));
+  backdrop-filter: blur(var(--backdrop-blur));
+}
+
+.backdrop-blur-lg {
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+
 /* Centered glass containers for main content */
 .unified-theme .centered-glass-layout {
   display: flex;
@@ -920,6 +946,86 @@ body.unified-theme::before {
 .modal-close-btn:hover {
   background: rgba(255,255,255,0.2);
   transform: scale(1.1);
+}
+
+/* StudyQuest Modal Enhancements */
+.modal-close-btn.page-modal { 
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  transform: none;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Modal Animation Classes */
+.modal-fade { 
+  animation: modalFade 0.2s ease-out; 
+}
+
+.modal-scale { 
+  animation: modalScale 0.2s ease-out; 
+}
+
+@keyframes modalFade { 
+  from { opacity: 0; will-change: opacity; } 
+  to { opacity: 1; } 
+}
+
+@keyframes modalScale { 
+  from { transform: scale3d(0.8, 0.8, 1); will-change: transform; } 
+  to { transform: scale3d(1, 1, 1); } 
+}
+
+/* Modal Reaction Border Effects */
+.modal-reaction-border-1 { border-width: 3px !important; }
+.modal-reaction-border-2 { border-width: 4px !important; }
+.modal-reaction-border-3 { border-width: 5px !important; }
+
+/* Modal Reaction Background Colors */
+.modal-reaction-bg-like { 
+  border-color: #ef4444 !important; 
+  border-image: none !important;
+}
+
+.modal-reaction-bg-understand { 
+  border-color: #fbbf24 !important; 
+  border-image: none !important;
+}
+
+.modal-reaction-bg-curious { 
+  border-color: #10b981 !important; 
+  border-image: none !important;
+}
+
+.modal-reaction-bg-like-understand { 
+  border-image: linear-gradient(45deg, #ef4444, #fbbf24) 1 !important; 
+  border-color: transparent !important;
+}
+
+.modal-reaction-bg-like-curious { 
+  border-image: linear-gradient(45deg, #ef4444, #10b981) 1 !important; 
+  border-color: transparent !important;
+}
+
+.modal-reaction-bg-understand-curious { 
+  border-image: linear-gradient(45deg, #fbbf24, #10b981) 1 !important; 
+  border-color: transparent !important;
+}
+
+.modal-reaction-bg-like-understand-curious { 
+  border-image: linear-gradient(45deg, #ef4444, #fbbf24, #10b981) 1 !important; 
+  border-color: transparent !important;
+}
+
+/* Modal Highlight Effects (higher priority than reactions) */
+.modal-highlighted {
+  border-image: linear-gradient(45deg, #9333ea, #c084fc, #9333ea) 1 !important;
+  border-width: 4px !important;
+  box-shadow: 
+    0 0 25px rgba(147, 51, 234, 0.6),
+    inset 0 0 20px rgba(192, 132, 252, 0.1) !important;
+  position: relative;
 }
 
 /* Progressive Disclosure */
