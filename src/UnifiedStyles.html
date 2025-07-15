@@ -57,87 +57,94 @@
   --gradient-radial-accent: radial-gradient(ellipse at top left, rgba(6, 182, 212, 0.1) 0%, transparent 70%), radial-gradient(ellipse at bottom right, rgba(168, 85, 247, 0.08) 0%, transparent 70%);
 }
 
-/* Base Styles - Glassmorphism Foundation */
-html, html[lang="ja"] {
-  background: var(--gradient-background) !important;
-  min-height: 100vh !important;
-  width: 100% !important;
-  margin: 0 !important;
-  padding: 0 !important;
+/* Base Styles - Glassmorphism Foundation with Proper Specificity */
+.unified-theme html, 
+.unified-theme html[lang="ja"],
+html.unified-theme, 
+html[lang="ja"].unified-theme {
+  background: var(--gradient-background);
+  min-height: 100vh;
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
-body { 
-  background: var(--gradient-background) !important;
-  min-height: 100vh !important;
-  margin: 0 !important;
-  padding: 20px !important;
-  color: var(--color-text) !important;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif !important;
+.unified-theme body,
+body.unified-theme { 
+  background: var(--gradient-background);
+  min-height: 100vh;
+  margin: 0;
+  padding: 20px;
+  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   line-height: 1.6;
-  overflow-x: hidden !important;
-  width: 100% !important;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 /* Global radial gradient overlay for glassmorphism effect */
-body::before {
-  content: '' !important;
-  position: fixed !important;
-  top: 0 !important; 
-  left: 0 !important;
-  width: 100% !important; 
-  height: 100% !important;
-  background: var(--gradient-radial-accent) !important;
-  z-index: -1 !important;
+.unified-theme body::before,
+body.unified-theme::before {
+  content: '';
+  position: fixed;
+  top: 0; 
+  left: 0;
+  width: 100%; 
+  height: 100%;
+  background: var(--gradient-radial-accent);
+  z-index: -1;
 }
 
 /* Global box-sizing reset for glassmorphism compatibility */
-html, body, div, span, h1, h2, h3, h4, h5, h6, p, button, a {
-  box-sizing: border-box !important;
+.unified-theme html, .unified-theme body, .unified-theme div, .unified-theme span, 
+.unified-theme h1, .unified-theme h2, .unified-theme h3, .unified-theme h4, .unified-theme h5, .unified-theme h6, 
+.unified-theme p, .unified-theme button, .unified-theme a {
+  box-sizing: border-box;
 }
 
 /* Glass Panel Effects - Glassmorphism System */
-.glass-panel { 
-  background: var(--color-surface) !important;
-  -webkit-backdrop-filter: blur(var(--backdrop-blur)) !important;
-  backdrop-filter: blur(var(--backdrop-blur)) !important;
-  border: 1px solid var(--color-border) !important;
-  box-shadow: var(--shadow-glass) !important;
-  border-radius: 24px !important;
+.unified-theme .glass-panel { 
+  background: var(--color-surface);
+  -webkit-backdrop-filter: blur(var(--backdrop-blur));
+  backdrop-filter: blur(var(--backdrop-blur));
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-glass);
+  border-radius: 24px;
   transition: all var(--transition-duration) var(--transition-easing);
-  position: relative !important;
+  position: relative;
   /* Prevent creating new stacking context that blocks modals */
-  isolation: auto !important;
+  isolation: auto;
 }
 
-.glass-panel:hover { 
-  border-color: var(--color-border-hover) !important;
+.unified-theme .glass-panel:hover { 
+  border-color: var(--color-border-hover);
   will-change: border-color; 
 }
 
 /* Glass Container - Main container for pages */
-.glass-container {
-  background: var(--color-surface) !important;
-  -webkit-backdrop-filter: blur(var(--backdrop-blur)) !important;
-  backdrop-filter: blur(var(--backdrop-blur)) !important;
-  border-radius: 24px !important;
-  border: 1px solid var(--color-border) !important;
-  box-shadow: var(--shadow-glass) !important;
-  width: 100% !important;
-  max-width: 420px !important;
-  padding: 40px 32px !important;
-  position: relative !important;
-  z-index: 1 !important;
-  text-align: center !important;
+.unified-theme .glass-container {
+  background: var(--color-surface);
+  -webkit-backdrop-filter: blur(var(--backdrop-blur));
+  backdrop-filter: blur(var(--backdrop-blur));
+  border-radius: 24px;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-glass);
+  width: 100%;
+  max-width: 420px;
+  padding: 40px 32px;
+  position: relative;
+  z-index: 1;
+  text-align: center;
   animation: fadeIn var(--animation-duration) ease-out;
-  isolation: auto !important;
+  isolation: auto;
 }
 
 /* Centered glass containers for main content */
-.centered-glass-layout {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  min-height: 100vh !important;
+.unified-theme .centered-glass-layout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
 }
 
 /* Google Workspace Integration Styles */
@@ -152,103 +159,103 @@ html, body, div, span, h1, h2, h3, h4, h5, h6, p, button, a {
 }
 
 /* Glassmorphism Button System */
-.btn {
+.unified-theme .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 16px 24px !important;
-  border-radius: 12px !important;
-  font-weight: 600 !important;
-  transition: all var(--transition-duration) var(--transition-easing) !important;
-  cursor: pointer !important;
-  border: none !important;
-  text-decoration: none !important;
+  padding: 16px 24px;
+  border-radius: 12px;
+  font-weight: 600;
+  transition: all var(--transition-duration) var(--transition-easing);
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
   min-height: 44px;
   min-width: 44px;
   position: relative;
   overflow: hidden;
-  font-size: 16px !important;
-  color: white !important;
+  font-size: 16px;
+  color: white;
 }
 
-.btn:disabled { 
-  opacity: 0.6 !important; 
-  cursor: not-allowed !important; 
-  transform: none !important;
+.unified-theme .btn:disabled { 
+  opacity: 0.6; 
+  cursor: not-allowed; 
+  transform: none;
 }
 
-.btn:not(:disabled):hover { 
-  transform: translateY(-1px) !important; 
+.unified-theme .btn:not(:disabled):hover { 
+  transform: translateY(-1px); 
   will-change: transform; 
 }
 
-.btn:not(:disabled):active { 
-  transform: translateY(0) !important; 
+.unified-theme .btn:not(:disabled):active { 
+  transform: translateY(0); 
 }
 
 /* Glassmorphism Button Variants */
-.btn-primary, .register-btn, .cta-button { 
-  width: 100% !important;
-  background: var(--gradient-primary) !important;
-  border: none !important;
-  border-radius: 12px !important;
-  padding: 16px 24px !important;
-  font-size: 16px !important;
-  font-weight: 600 !important;
-  color: white !important;
-  cursor: pointer !important;
-  transition: all var(--transition-duration) var(--transition-easing) !important;
+.unified-theme .btn-primary, .unified-theme .register-btn, .unified-theme .cta-button { 
+  width: 100%;
+  background: var(--gradient-primary);
+  border: none;
+  border-radius: 12px;
+  padding: 16px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: all var(--transition-duration) var(--transition-easing);
   margin-bottom: 24px;
 }
 
-.btn-primary:hover:not(:disabled), .register-btn:hover:not(:disabled) { 
-  transform: translateY(-1px) !important; 
-  box-shadow: 0 8px 25px rgba(6, 182, 212, 0.4) !important; 
+.unified-theme .btn-primary:hover:not(:disabled), .unified-theme .register-btn:hover:not(:disabled) { 
+  transform: translateY(-1px); 
+  box-shadow: 0 8px 25px rgba(6, 182, 212, 0.4); 
 }
 
-.btn-secondary, .action-btn.secondary { 
-  background: rgba(255, 255, 255, 0.1) !important;
-  border: 1px solid var(--color-border) !important;
-  color: var(--color-text) !important;
+.unified-theme .btn-secondary, .unified-theme .action-btn.secondary { 
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
 }
 
-.btn-danger { 
-  background: var(--color-error) !important;
-  color: white !important;
+.unified-theme .btn-danger { 
+  background: var(--color-error);
+  color: white;
 }
 
-.btn-google {
-  background: linear-gradient(135deg, var(--color-google-blue), var(--color-google-green)) !important;
-  color: white !important;
-  font-weight: 700 !important;
+.unified-theme .btn-google {
+  background: linear-gradient(135deg, var(--color-google-blue), var(--color-google-green));
+  color: white;
+  font-weight: 700;
 }
 
-.btn-success {
-  background: var(--color-success) !important;
-  color: white !important;
+.unified-theme .btn-success {
+  background: var(--color-success);
+  color: white;
 }
 
-.btn-warning {
-  background: var(--color-warning) !important;
-  color: white !important;
+.unified-theme .btn-warning {
+  background: var(--color-warning);
+  color: white;
 }
 
 /* Action Buttons */
-.action-btn { 
-  display: block !important; 
-  padding: 14px 24px !important; 
-  border-radius: 10px !important; 
-  border: none !important; 
-  font-size: 15px !important; 
-  font-weight: 600 !important; 
-  text-decoration: none !important; 
-  color: white !important; 
-  margin-top: 12px !important; 
-  cursor: pointer !important; 
+.unified-theme .action-btn { 
+  display: block; 
+  padding: 14px 24px; 
+  border-radius: 10px; 
+  border: none; 
+  font-size: 15px; 
+  font-weight: 600; 
+  text-decoration: none; 
+  color: white; 
+  margin-top: 12px; 
+  cursor: pointer; 
 }
 
-.action-btn.primary { 
-  background: var(--gradient-primary) !important; 
+.unified-theme .action-btn.primary { 
+  background: var(--gradient-primary); 
 }
 
 /* Game-Style Buttons (from Page.html) */
@@ -298,57 +305,57 @@ html, body, div, span, h1, h2, h3, h4, h5, h6, p, button, a {
 }
 
 /* Glassmorphism Header System */
-.header { 
-  margin-bottom: 40px !important; 
+.unified-theme .header { 
+  margin-bottom: 40px; 
 }
 
-.logo {
-  width: 56px !important; 
-  height: 56px !important;
-  background: var(--gradient-primary) !important;
-  border-radius: 16px !important;
-  margin: 0 auto 16px !important;
-  display: flex !important; 
-  align-items: center !important; 
-  justify-content: center !important;
-  font-size: 24px !important; 
-  color: white !important; 
-  font-weight: 600 !important;
+.unified-theme .logo {
+  width: 56px; 
+  height: 56px;
+  background: var(--gradient-primary);
+  border-radius: 16px;
+  margin: 0 auto 16px;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  font-size: 24px; 
+  color: white; 
+  font-weight: 600;
 }
 
-.title { 
-  font-size: 28px !important; 
-  font-weight: 700 !important; 
-  color: white !important; 
-  margin-bottom: 8px !important; 
+.unified-theme .title { 
+  font-size: 28px; 
+  font-weight: 700; 
+  color: white; 
+  margin-bottom: 8px; 
 }
 
-.subtitle { 
-  font-size: 16px !important; 
-  color: var(--color-text-muted) !important; 
-  margin-bottom: 0 !important; 
+.unified-theme .subtitle { 
+  font-size: 16px; 
+  color: var(--color-text-muted); 
+  margin-bottom: 0; 
 }
 
 /* Status Card System */
-.status-card {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border-radius: 16px !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  padding: 20px !important;
-  margin-bottom: 32px !important;
+.unified-theme .status-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  margin-bottom: 32px;
 }
 
-.status-text { 
-  font-size: 14px !important; 
-  color: var(--color-text-secondary) !important; 
-  margin-bottom: 8px !important; 
+.unified-theme .status-text { 
+  font-size: 14px; 
+  color: var(--color-text-secondary); 
+  margin-bottom: 8px; 
 }
 
-.user-email { 
-  font-size: 16px !important; 
-  font-weight: 600 !important; 
-  color: white !important; 
-  word-break: break-all !important; 
+.unified-theme .user-email { 
+  font-size: 16px; 
+  font-weight: 600; 
+  color: white; 
+  word-break: break-all; 
 }
 
 /* Success Container */
@@ -356,17 +363,17 @@ html, body, div, span, h1, h2, h3, h4, h5, h6, p, button, a {
   display: none; 
 }
 
-.success-icon { 
-  width: 64px !important; 
-  height: 64px !important; 
-  background: var(--color-success) !important; 
-  border-radius: 50% !important; 
-  margin: 0 auto 24px !important; 
-  display: flex !important; 
-  align-items: center !important; 
-  justify-content: center !important; 
-  font-size: 28px !important; 
-  color: white !important; 
+.unified-theme .success-icon { 
+  width: 64px; 
+  height: 64px; 
+  background: var(--color-success); 
+  border-radius: 50%; 
+  margin: 0 auto 24px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  font-size: 28px; 
+  color: white; 
 }
 
 /* Form Controls - Glassmorphism Style */
@@ -586,16 +593,16 @@ html, body, div, span, h1, h2, h3, h4, h5, h6, p, button, a {
 }
 
 /* Glassmorphism Spinner System */
-.spinner {
-  width: 20px !important; 
-  height: 20px !important;
-  border: 2px solid rgba(255, 255, 255, 0.3) !important;
-  border-top: 2px solid white !important;
-  border-radius: 50% !important;
-  animation: spin 1s linear infinite !important;
-  display: inline-block !important; 
-  vertical-align: middle !important; 
-  margin-right: 8px !important;
+.unified-theme .spinner {
+  width: 20px; 
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  display: inline-block; 
+  vertical-align: middle; 
+  margin-right: 8px;
 }
 
 .spinner-small {
@@ -617,13 +624,13 @@ html, body, div, span, h1, h2, h3, h4, h5, h6, p, button, a {
 }
 
 /* Domain Info System from Registration.html */
-.domain-info {
-  width: 100% !important;
-  text-align: center !important;
+.unified-theme .domain-info {
+  width: 100%;
+  text-align: center;
 }
 
-.hidden {
-  display: none !important;
+.unified-theme .hidden {
+  display: none;
 }
 
 .flex {
@@ -785,26 +792,26 @@ html, body, div, span, h1, h2, h3, h4, h5, h6, p, button, a {
 }
 
 /* Message System - Glassmorphism Style */
-.message-area { 
-  min-height: 24px !important; 
-  display: flex !important; 
-  align-items: center !important; 
-  justify-content: center !important; 
-  margin-bottom: 24px !important; 
-  font-size: 14px !important; 
-  color: var(--color-text-secondary) !important; 
+.unified-theme .message-area { 
+  min-height: 24px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  margin-bottom: 24px; 
+  font-size: 14px; 
+  color: var(--color-text-secondary); 
 }
 
-.message-area.error { 
-  color: var(--color-error) !important; 
+.unified-theme .message-area.error { 
+  color: var(--color-error); 
 }
 
-.message-area.success { 
-  color: var(--color-success) !important; 
+.unified-theme .message-area.success { 
+  color: var(--color-success); 
 }
 
-.message-area.warning { 
-  color: var(--color-warning) !important; 
+.unified-theme .message-area.warning { 
+  color: var(--color-warning); 
 }
 
 .message {
@@ -822,23 +829,23 @@ html, body, div, span, h1, h2, h3, h4, h5, h6, p, button, a {
 }
 
 /* Glassmorphism Footer */
-.footer { 
-  text-align: center !important; 
-  font-size: 12px !important; 
-  color: rgba(255, 255, 255, 0.5) !important; 
-  margin-top: 8px !important; 
+.unified-theme .footer { 
+  text-align: center; 
+  font-size: 12px; 
+  color: rgba(255, 255, 255, 0.5); 
+  margin-top: 8px; 
 }
 
-.footer a { 
-  color: var(--color-text-muted) !important; 
-  text-decoration: none !important; 
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3) !important; 
-  transition: color 0.2s ease !important; 
-  cursor: pointer !important; 
+.unified-theme .footer a { 
+  color: var(--color-text-muted); 
+  text-decoration: none; 
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3); 
+  transition: color 0.2s ease; 
+  cursor: pointer; 
 }
 
-.footer a:hover { 
-  color: white !important; 
+.unified-theme .footer a:hover { 
+  color: white; 
 }
 
 /* Modal System */
