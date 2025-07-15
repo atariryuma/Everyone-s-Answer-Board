@@ -1034,6 +1034,18 @@ function renderAnswerBoard(userInfo, params) {
 
   if (showBoard) {
     try {
+      // 🔧 レンダリング前に設定の整合性を検証・修復
+      const configValidation = validateAndRepairUserConfig(userInfo.userId);
+      if (configValidation.repaired) {
+        console.log('🔧 [RENDER REPAIR] レンダリング前に設定が自動修復されました:', configValidation.repairs);
+        // 修復後の最新情報を再取得
+        const freshUserInfo = findUserById(userInfo.userId);
+        if (freshUserInfo) {
+          userInfo = freshUserInfo;
+          config = JSON.parse(userInfo.configJson || '{}');
+        }
+      }
+      
       if (userInfo.spreadsheetId) {
         try { addServiceAccountToSpreadsheet(userInfo.spreadsheetId); } catch (err) { console.warn('アクセス権設定警告:', err.message); }
       }
@@ -1042,8 +1054,46 @@ function renderAnswerBoard(userInfo, params) {
       template.ownerName = userInfo.adminEmail;
       template.sheetName = escapeJavaScript(config.publishedSheetName || params.sheetName);
       template.DEBUG_MODE = shouldEnableDebugMode();
-      const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+      
+      // 🔍 デバッグ: テンプレート変数解決の詳細をログ出力
+      console.log('🔍 [TEMPLATE DEBUG] config.publishedSheetName:', config.publishedSheetName);
+      console.log('🔍 [TEMPLATE DEBUG] sheetConfigKey:', sheetConfigKey);
+      console.log('🔍 [TEMPLATE DEBUG] sheetConfig:', JSON.stringify(sheetConfig));
+      console.log('🔍 [TEMPLATE DEBUG] sheetConfig.opinionHeader:', sheetConfig.opinionHeader);
+      
+      // 強化されたopinionHeader解決ロジック
+      let rawOpinionHeader = sheetConfig.opinionHeader;
+      
+      // フォールバック1: publishedSheetNameを使用
+      if (!rawOpinionHeader || rawOpinionHeader.trim() === '') {
+        rawOpinionHeader = config.publishedSheetName;
+        console.log('🔄 [FALLBACK] Using publishedSheetName as opinionHeader:', rawOpinionHeader);
+      }
+      
+      // フォールバック2: 他のシート設定を探索
+      if (!rawOpinionHeader || rawOpinionHeader.trim() === '') {
+        const allSheetKeys = Object.keys(config).filter(key => key.startsWith('sheet_'));
+        console.log('🔍 [FALLBACK] Searching in all sheet configs:', allSheetKeys);
+        
+        for (const key of allSheetKeys) {
+          if (config[key] && config[key].opinionHeader) {
+            rawOpinionHeader = config[key].opinionHeader;
+            console.log('🔄 [FALLBACK] Found opinionHeader in', key, ':', rawOpinionHeader);
+            break;
+          }
+        }
+      }
+      
+      // フォールバック3: デフォルト値
+      if (!rawOpinionHeader || rawOpinionHeader.trim() === '') {
+        rawOpinionHeader = 'お題';
+        console.log('🔄 [FALLBACK] Using default opinionHeader:', rawOpinionHeader);
+      }
+      
+      console.log('🔍 [TEMPLATE DEBUG] rawOpinionHeader resolved to:', rawOpinionHeader);
+      
       template.opinionHeader = escapeJavaScript(rawOpinionHeader);
+      console.log('🔍 [TEMPLATE DEBUG] final template.opinionHeader:', template.opinionHeader);
       template.cacheTimestamp = Date.now();
       template.displayMode = config.displayMode || 'anonymous';
       template.showCounts = config.showCounts !== undefined ? config.showCounts : false;

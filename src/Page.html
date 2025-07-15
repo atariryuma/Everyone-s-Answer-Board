@@ -1090,10 +1090,27 @@ class StudyQuestApp {
     }
   setupCriticalElements() {
     if (this.elements.headingLabel) {
-      // 問題文を常に表示（読み込み中は表示しない）
-      const opinionHeader = __OPINION_HEADER__.startsWith('<') || __OPINION_HEADER__.includes('読み込み')
-        ? 'お題'  // デフォルトテキスト
-        : this.escapeHtml(__OPINION_HEADER__);
+      // 強化された問題文表示ロジック
+      let opinionHeader = 'お題'; // デフォルト値
+      
+      // __OPINION_HEADER__ の詳細検証
+      console.log('🔍 [PAGE DEBUG] Raw __OPINION_HEADER__:', __OPINION_HEADER__);
+      console.log('🔍 [PAGE DEBUG] Type:', typeof __OPINION_HEADER__);
+      
+      if (__OPINION_HEADER__ && 
+          typeof __OPINION_HEADER__ === 'string' && 
+          __OPINION_HEADER__.trim() !== '' &&
+          !__OPINION_HEADER__.startsWith('<') && 
+          !__OPINION_HEADER__.includes('読み込み') &&
+          !__OPINION_HEADER__.includes('undefined') &&
+          !__OPINION_HEADER__.includes('null')) {
+        
+        opinionHeader = this.escapeHtml(__OPINION_HEADER__.trim());
+        console.log('✅ [PAGE DEBUG] Using valid opinionHeader:', opinionHeader);
+      } else {
+        console.log('🔄 [PAGE DEBUG] Using fallback opinionHeader:', opinionHeader);
+      }
+      
       this.elements.headingLabel.textContent = opinionHeader;
     }
 

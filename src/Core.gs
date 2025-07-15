@@ -382,12 +382,25 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       }
       debugLog('getPublishedSheetData: userInfo=%s', JSON.stringify(userInfo));
 
+      // 🔧 設定の整合性を検証・修復
+      const configValidation = validateAndRepairUserConfig(currentUserId);
+      if (configValidation.repaired) {
+        console.log('🔧 [AUTO REPAIR] 設定が自動修復されました:', configValidation.repairs);
+        // 修復後の最新情報を再取得
+        userInfo = getCachedUserInfo(currentUserId, true); // bypassCache = true
+      }
+
       var configJson = JSON.parse(userInfo.configJson || '{}');
       debugLog('getPublishedSheetData: configJson=%s', JSON.stringify(configJson));
 
     // 公開対象のスプレッドシートIDとシート名を取得
     var publishedSpreadsheetId = configJson.publishedSpreadsheetId;
     var publishedSheetName = configJson.publishedSheetName;
+    
+    // 🔍 デバッグ: 設定の詳細をログ出力
+    console.log('🔍 [CONFIG DEBUG] publishedSpreadsheetId:', publishedSpreadsheetId);
+    console.log('🔍 [CONFIG DEBUG] publishedSheetName:', publishedSheetName);
+    console.log('🔍 [CONFIG DEBUG] userInfo.spreadsheetId:', userInfo.spreadsheetId);
 
     if (!publishedSpreadsheetId || !publishedSheetName) {
       throw new Error('公開対象のスプレッドシートまたはシートが設定されていません。');
@@ -396,6 +409,12 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     // シート固有の設定を取得 (sheetKey is based only on sheet name)
     var sheetKey = 'sheet_' + publishedSheetName;
     var sheetConfig = configJson[sheetKey] || {};
+    
+    // 🔍 デバッグ: シート設定の詳細をログ出力
+    console.log('🔍 [SHEET CONFIG DEBUG] sheetKey:', sheetKey);
+    console.log('🔍 [SHEET CONFIG DEBUG] sheetConfig:', JSON.stringify(sheetConfig));
+    console.log('🔍 [SHEET CONFIG DEBUG] opinionHeader:', sheetConfig.opinionHeader);
+    
     debugLog('getPublishedSheetData: sheetConfig=%s', JSON.stringify(sheetConfig));
 
     // Check if current user is the board owner
@@ -4375,6 +4394,179 @@ function activateSheetSimple(requestUserId, sheetName) {
     return activateSheet(requestUserId, userInfo.spreadsheetId, sheetName);
   } catch (error) {
     console.error('activateSheetSimple error:', error.message);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+
+// =================================================================
+// 設定検証・修復関数
+// =================================================================
+
+/**
+ * ユーザー設定の整合性を検証し、問題を自動修復する
+ * @param {string} userId - ユーザーID
+ * @returns {Object} 検証結果と修復の詳細
+ */
+function validateAndRepairUserConfig(userId) {
+  try {
+    console.log('🔍 [CONFIG REPAIR] 設定検証開始:', userId);
+    
+    const userInfo = getCachedUserInfo(userId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    const config = JSON.parse(userInfo.configJson || '{}');
+    const issues = [];
+    const repairs = [];
+    
+    // 1. publishedSpreadsheetId の整合性チェック
+    if (config.publishedSpreadsheetId && config.publishedSpreadsheetId !== userInfo.spreadsheetId) {
+      issues.push({
+        type: 'spreadsheet_id_mismatch',
+        current: config.publishedSpreadsheetId,
+        expected: userInfo.spreadsheetId
+      });
+      
+      config.publishedSpreadsheetId = userInfo.spreadsheetId;
+      repairs.push('publishedSpreadsheetId を userInfo.spreadsheetId に修正');
+    }
+    
+    // 2. シート設定の整合性チェック
+    if (config.publishedSheetName) {
+      const sheetKey = 'sheet_' + config.publishedSheetName;
+      const sheetConfig = config[sheetKey];
+      
+      if (!sheetConfig) {
+        issues.push({
+          type: 'missing_sheet_config',
+          sheetName: config.publishedSheetName,
+          sheetKey: sheetKey
+        });
+        
+        // 他のシート設定から opinionHeader を検索してコピー
+        const allSheetKeys = Object.keys(config).filter(key => key.startsWith('sheet_'));
+        for (const key of allSheetKeys) {
+          if (config[key] && config[key].opinionHeader) {
+            config[sheetKey] = {
+              opinionHeader: config[key].opinionHeader,
+              reasonHeader: config[key].reasonHeader || '',
+              nameHeader: config[key].nameHeader || '',
+              classHeader: config[key].classHeader || ''
+            };
+            repairs.push(`シート設定 ${sheetKey} を ${key} からコピーして作成`);
+            break;
+          }
+        }
+      } else if (!sheetConfig.opinionHeader) {
+        issues.push({
+          type: 'missing_opinion_header',
+          sheetName: config.publishedSheetName,
+          sheetKey: sheetKey
+        });
+        
+        // デフォルト値を設定
+        sheetConfig.opinionHeader = config.publishedSheetName || 'お題';
+        repairs.push(`opinionHeader のデフォルト値を設定: ${sheetConfig.opinionHeader}`);
+      }
+    }
+    
+    // 3. 修復が必要な場合、設定を更新
+    if (repairs.length > 0) {
+      updateUser(userId, { configJson: JSON.stringify(config) });
+      clearExecutionUserInfoCache(userId);
+      
+      // 関連キャッシュを無効化
+      try {
+        if (typeof invalidateUserCache === 'function') {
+          invalidateUserCache(userId);
+        }
+      } catch (e) {
+        console.warn('キャッシュ無効化エラー（継続）:', e.message);
+      }
+      
+      console.log('✅ [CONFIG REPAIR] 設定を修復しました:', repairs);
+    }
+    
+    return {
+      status: 'success',
+      issues: issues,
+      repairs: repairs,
+      repaired: repairs.length > 0
+    };
+    
+  } catch (error) {
+    console.error('❌ [CONFIG REPAIR] 設定検証エラー:', error.message);
+    return {
+      status: 'error',
+      message: error.message,
+      issues: [],
+      repairs: []
+    };
+  }
+}
+
+/**
+ * 質問文表示の完全なテストフロー
+ * @param {string} userId - ユーザーID
+ * @returns {Object} テスト結果の詳細
+ */
+function testQuestionTextDisplayFlow(userId) {
+  try {
+    console.log('🧪 [TEST] 質問文表示フロー検証開始:', userId);
+    
+    // 1. 設定検証・修復
+    const configValidation = validateAndRepairUserConfig(userId);
+    console.log('🧪 [TEST] 設定検証結果:', configValidation);
+    
+    // 2. ユーザー情報取得
+    const userInfo = getCachedUserInfo(userId, true); // 最新情報を取得
+    const config = JSON.parse(userInfo.configJson || '{}');
+    
+    // 3. テンプレート変数解決のシミュレーション
+    const sheetConfigKey = 'sheet_' + config.publishedSheetName;
+    const sheetConfig = config[sheetConfigKey] || {};
+    const resolvedOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+    
+    console.log('🧪 [TEST] 設定解決結果:', {
+      publishedSpreadsheetId: config.publishedSpreadsheetId,
+      publishedSheetName: config.publishedSheetName,
+      sheetConfigKey: sheetConfigKey,
+      sheetConfig: sheetConfig,
+      resolvedOpinionHeader: resolvedOpinionHeader
+    });
+    
+    // 4. データ取得テスト
+    let dataRetrievalResult = null;
+    try {
+      dataRetrievalResult = getPublishedSheetData(userId, '', 'createdAt', false, true);
+      console.log('🧪 [TEST] データ取得成功');
+    } catch (e) {
+      console.warn('🧪 [TEST] データ取得エラー:', e.message);
+      dataRetrievalResult = { error: e.message };
+    }
+    
+    return {
+      status: 'success',
+      configValidation: configValidation,
+      userConfig: {
+        publishedSpreadsheetId: config.publishedSpreadsheetId,
+        publishedSheetName: config.publishedSheetName,
+        userSpreadsheetId: userInfo.spreadsheetId
+      },
+      templateResolution: {
+        sheetConfigKey: sheetConfigKey,
+        sheetConfig: sheetConfig,
+        resolvedOpinionHeader: resolvedOpinionHeader
+      },
+      dataRetrievalTest: dataRetrievalResult !== null ? 'success' : 'failed'
+    };
+    
+  } catch (error) {
+    console.error('❌ [TEST] 質問文表示フロー検証エラー:', error.message);
     return {
       status: 'error',
       message: error.message
