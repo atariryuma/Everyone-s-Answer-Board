@@ -2013,30 +2013,6 @@ function getQuestionConfig(questionType, customConfig) {
   return config;
 }
 
-/**
- * 質問テンプレート取得用 API
- * @returns {ContentService.TextOutput} JSON形式の質問設定
- */
-function doGetQuestionConfig() {
-  try {
-    // 現在の日時を取得してタイトルに含める
-    const now = new Date();
-    const timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
-    
-    const cfg = getQuestionConfig('simple');
-    
-    // タイトルにタイムスタンプを追加
-    cfg.formTitle = `フォーム作成 - ${timestamp}`;
-    
-    return ContentService.createTextOutput(JSON.stringify(cfg)).setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    console.error('doGetQuestionConfig error:', error);
-    return ContentService.createTextOutput(JSON.stringify({
-      error: 'Failed to get question config',
-      details: error.toString()
-    })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
 
 /**
  * クラス選択肢をデータベースに保存
@@ -4580,67 +4556,3 @@ function validateAndRepairUserConfig(userId) {
   }
 }
 
-/**
- * 質問文表示の完全なテストフロー
- * @param {string} userId - ユーザーID
- * @returns {Object} テスト結果の詳細
- */
-function testQuestionTextDisplayFlow(userId) {
-  try {
-    console.log('🧪 [TEST] 質問文表示フロー検証開始:', userId);
-    
-    // 1. 設定検証・修復
-    const configValidation = validateAndRepairUserConfig(userId);
-    console.log('🧪 [TEST] 設定検証結果:', configValidation);
-    
-    // 2. ユーザー情報取得
-    const userInfo = getCachedUserInfo(userId, true); // 最新情報を取得
-    const config = JSON.parse(userInfo.configJson || '{}');
-    
-    // 3. テンプレート変数解決のシミュレーション
-    const sheetConfigKey = 'sheet_' + config.publishedSheetName;
-    const sheetConfig = config[sheetConfigKey] || {};
-    const resolvedOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
-    
-    console.log('🧪 [TEST] 設定解決結果:', {
-      publishedSpreadsheetId: config.publishedSpreadsheetId,
-      publishedSheetName: config.publishedSheetName,
-      sheetConfigKey: sheetConfigKey,
-      sheetConfig: sheetConfig,
-      resolvedOpinionHeader: resolvedOpinionHeader
-    });
-    
-    // 4. データ取得テスト
-    let dataRetrievalResult = null;
-    try {
-      dataRetrievalResult = getPublishedSheetData(userId, '', 'createdAt', false, true);
-      console.log('🧪 [TEST] データ取得成功');
-    } catch (e) {
-      console.warn('🧪 [TEST] データ取得エラー:', e.message);
-      dataRetrievalResult = { error: e.message };
-    }
-    
-    return {
-      status: 'success',
-      configValidation: configValidation,
-      userConfig: {
-        publishedSpreadsheetId: config.publishedSpreadsheetId,
-        publishedSheetName: config.publishedSheetName,
-        userSpreadsheetId: userInfo.spreadsheetId
-      },
-      templateResolution: {
-        sheetConfigKey: sheetConfigKey,
-        sheetConfig: sheetConfig,
-        resolvedOpinionHeader: resolvedOpinionHeader
-      },
-      dataRetrievalTest: dataRetrievalResult !== null ? 'success' : 'failed'
-    };
-    
-  } catch (error) {
-    console.error('❌ [TEST] 質問文表示フロー検証エラー:', error.message);
-    return {
-      status: 'error',
-      message: error.message
-    };
-  }
-}

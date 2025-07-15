@@ -10,15 +10,7 @@
     <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
     
     <!-- TailwindCSS CDN -->
-    <script>
-      window.tailwind = {
-        config: {
-          corePlugins: { preflight: false },
-          prefix: '',
-        }
-      };
-    </script>
-    <script src="https://cdn.tailwindcss.com" defer onerror="console.warn('TailwindCSS failed to load')"></script>
+    <?!= include('TailwindConfig'); ?>
     
     <!-- Unified Styles and Shared Components -->
     <?!= include('UnifiedStyles'); ?>

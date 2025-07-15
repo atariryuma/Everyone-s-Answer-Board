@@ -12,18 +12,7 @@
   <meta name="user-id" content="<?= typeof userId !== 'undefined' ? userId : '' ?>" id="user-id-meta">
 
   <!-- TailwindCSS CDN -->
-  <script>
-    // TailwindCSS 本番警告を抑制
-    window.tailwind = {
-      config: {
-        corePlugins: {
-          preflight: false,
-        },
-        prefix: '',
-      }
-    };
-  </script>
-  <script src="https://cdn.tailwindcss.com" defer onerror="console.warn('TailwindCSS failed to load')"></script>
+  <?!= include('TailwindConfig'); ?>
 
   <!-- Unified Styles and Shared Components -->
   <?!= include('UnifiedStyles'); ?>
