@@ -22,86 +22,33 @@ function upsertUser(adminEmail, additionalData = {}) {
     throw new Error('有効なメールアドレスが必要です');
   }
 
-  // 1. 分散ロック取得（最大30秒待機）
-  const lock = LockService.getScriptLock();
-  const lockKey = `user_registration_${adminEmail}`;
-  
   try {
-    // メールアドレス別のロック（粒度を細かく）
-    if (!lock.waitLock(30000)) {
-      throw new Error('システムが混雑しています。しばらく後に再試行してください。');
-    }
-
-    // 2. 認証確認
-    const activeUser = Session.getActiveUser();
-    if (adminEmail !== activeUser.getEmail()) {
-      throw new Error('認証エラー: 操作権限がありません');
-    }
-
-    // 3. 既存ユーザー確認
-    let existingUser = findUserByEmailDirect(adminEmail);
-    let userId, isNewUser;
-
-    if (existingUser) {
-      // 既存ユーザーの更新
-      userId = existingUser.userId;
-      isNewUser = false;
-      
-      // 必要に応じて情報更新
-      if (Object.keys(additionalData).length > 0) {
-        const updateData = {
-          lastAccessedAt: new Date().toISOString(),
-          isActive: 'true',
-          ...additionalData
-        };
-        updateUserDirect(userId, updateData);
-      }
-      
-      debugLog('upsertUser: 既存ユーザーを更新', { userId, adminEmail });
-      
-    } else {
-      // 新規ユーザー作成
-      isNewUser = true;
-      userId = generateConsistentUserId(adminEmail);
-      
-      const userData = {
-        userId: userId,
-        adminEmail: adminEmail,
-        createdAt: new Date().toISOString(),
-        lastAccessedAt: new Date().toISOString(),
-        isActive: 'true',
-        configJson: '{}',
-        ...additionalData
-      };
-      
-      createUserDirect(userData);
-      debugLog('upsertUser: 新規ユーザーを作成', { userId, adminEmail });
-    }
-
-    // 4. キャッシュ更新
-    invalidateUserCacheConsistent(userId, adminEmail);
+    // メール特化ロックを使用してユーザーを作成または検索
+    const result = findOrCreateUserWithEmailLock(adminEmail, additionalData);
     
-    // 5. 結果の検証
-    const verifiedUser = findUserByIdDirect(userId);
-    if (!verifiedUser) {
-      throw new Error('ユーザー登録の検証に失敗しました');
-    }
+    // キャッシュを無効化して最新の状態を保証
+    invalidateUserCacheConsistent(result.userId, adminEmail);
+    
+    const message = result.isNewUser ? '新規ユーザーを登録しました' : '既存ユーザーの情報を更新しました';
+    console.log('upsertUser:', message, { userId: result.userId, adminEmail });
 
     return {
       status: 'success',
-      userId: userId,
-      isNewUser: isNewUser,
-      userInfo: verifiedUser,
-      message: isNewUser ? '新規ユーザーを登録しました' : '既存ユーザーの情報を更新しました'
+      userId: result.userId,
+      isNewUser: result.isNewUser,
+      userInfo: result.userInfo,
+      message: message
     };
 
-  } finally {
-    // 必ずロックを解除
-    try {
-      lock.releaseLock();
-    } catch (e) {
-      console.warn('ロック解除エラー:', e.message);
+  } catch (e) {
+    console.error('upsertUser エラー:', e.message);
+    // エラーメッセージをフロントエンドに分かりやすく変換
+    if (e.message.includes('EMAIL_ALREADY_PROCESSING')) {
+      throw new Error('現在、同じアカウントで処理が実行中です。しばらく待ってから再度お試しください。');
+    } else if (e.message.includes('SCRIPT_LOCK_TIMEOUT')) {
+      throw new Error('システムが混雑しています。しばらく後に再試行してください。');
     }
+    throw e; // その他のエラーはそのままスロー
   }
 }
 
