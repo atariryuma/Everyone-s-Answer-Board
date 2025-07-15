@@ -62,12 +62,25 @@
     
     // マルチテナント対応: 新しいrunGasWithUserId関数
     function runGasWithUserId(functionName, ...args) {
-      if (!appState.userId) {
-        console.error('❌  - No userId available for:', functionName);
-        throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
+      console.log('📞 runGasWithUserId called:', functionName, 'args:', args);
+      console.log('📝 appState:', appState);
+      
+      if (!appState || !appState.userId) {
+        const errorMsg = 'ユーザーIDが設定されていません。ページを再読み込みしてください。';
+        console.error('❌  - No userId available for:', functionName, 'appState:', appState);
+        showMessage(errorMsg, 'error');
+        return Promise.reject(new Error(errorMsg));
       }
 
       console.log('✅  - runGasWithUserId:', functionName, 'userId:', appState.userId);
+      
+      if (!gasOptimizer || typeof gasOptimizer.call !== 'function') {
+        const errorMsg = 'gasOptimizerが初期化されていません。';
+        console.error('❌  - gasOptimizer not available');
+        showMessage(errorMsg, 'error');
+        return Promise.reject(new Error(errorMsg));
+      }
+      
       // userIdを第一引数として追加
       return gasOptimizer.call(functionName, appState.userId, ...args);
     }
@@ -585,14 +598,14 @@
               
               <!-- 統合アクションボタン -->
               <div class="space-y-3 pt-4">
-                <button type="button" id="save-publish-btn" disabled class="btn btn-primary w-full btn-lg">
+                <button type="button" id="save-publish-btn" class="btn btn-primary w-full btn-lg">
                   <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                   </svg>
                   <span id="save-publish-text">設定を保存して公開</span>
                 </button>
 
-                <button type="button" id="unpublish-board-btn" class="btn btn-warning w-full hidden">
+                <button type="button" id="unpublish-board-btn" class="btn btn-warning w-full">
                   <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636"></path>
                   </svg>
@@ -1506,8 +1519,13 @@
       modal.classList.remove('hidden');
       modal.classList.add('flex');
 
-      var confirmBtn = document.getElementById('modal-confirm-btn');
-      var cancelBtn = document.getElementById('modal-cancel-btn');
+      var confirmBtn = document.getElementById('modal-confirm');
+      var cancelBtn = document.getElementById('modal-cancel');
+
+      if (!confirmBtn || !cancelBtn) {
+        console.error('モーダルボタンが見つかりません');
+        return;
+      }
 
       var confirmHandler = function() {
         onConfirm();
@@ -3540,7 +3558,14 @@ function syncCheckboxStates(status) {
      * 設定が有効かどうかを検証する
      */
     function validateConfig() {
-      return !!document.getElementById('opinionHeader').value;
+      const opinionHeader = document.getElementById('opinionHeader');
+      if (!opinionHeader) {
+        console.warn('opinionHeader element not found');
+        return false;
+      }
+      const isValid = !!opinionHeader.value;
+      console.log('validateConfig:', opinionHeader.value, 'isValid:', isValid);
+      return isValid;
     }
 
     /**
@@ -3549,7 +3574,11 @@ function syncCheckboxStates(status) {
     function updateConfigButtons() {
       const saveBtn = document.getElementById('save-publish-btn');
       if (saveBtn) {
-        saveBtn.disabled = !validateConfig();
+        const isValid = validateConfig();
+        saveBtn.disabled = !isValid;
+        console.log('updateConfigButtons: saveBtn.disabled =', saveBtn.disabled);
+      } else {
+        console.warn('save-publish-btn element not found');
       }
     }
 
@@ -3570,13 +3599,18 @@ function syncCheckboxStates(status) {
      *【新しい推奨】設定を保存し、ボードを公開する
      */
     function saveAndPublish() {
+      console.log('💾 saveAndPublish called');
+      
       if (!validateConfig()) {
+        console.warn('⚠️ Validation failed');
         showMessage('必須項目（回答データ列）が選択されていません。', 'error');
         return;
       }
 
+      console.log('✅ Validation passed, starting save and publish...');
       setLoading(true, '設定を保存し、ボードを公開しています...');
       const config = buildConfigObject();
+      console.log('📜 Config object:', config);
 
       // マルチテナント対応: 設定データをオブジェクトとして送信
       const settingsData = {
@@ -3641,7 +3675,9 @@ function syncCheckboxStates(status) {
      * ボードの公開を停止する
      */
     function unpublishBoard() {
+      console.log('🚫 unpublishBoard called');
       setLoading(true, 'ボードの公開を停止中...');
+      console.log('📤 Calling runGasWithUserId(clearActiveSheet)');
       runGasWithUserId('clearActiveSheet')
         .then(function(response) {
           console.log('公開停止レスポンス:', response);
@@ -4284,6 +4320,35 @@ function syncCheckboxStates(status) {
           </button>
           <button type="button" id="form-config-create" class="flex-1 px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-600 hover:to-blue-600 transition-colors font-medium shadow-lg">
             フォーム作成
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 確認モーダル -->
+  <div id="confirmation-modal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center">
+    <div class="glass-panel rounded-xl max-w-md w-full mx-4">
+      <div class="p-6">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 bg-yellow-500/20 rounded-full flex items-center justify-center">
+            <svg class="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+          </div>
+          <h3 id="modal-title" class="text-xl font-semibold text-white">確認</h3>
+        </div>
+        
+        <div class="mb-6">
+          <p id="modal-message" class="text-gray-300 leading-relaxed whitespace-pre-line">操作を実行しますか？</p>
+        </div>
+        
+        <div class="flex gap-3">
+          <button type="button" id="modal-cancel" class="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors">
+            キャンセル
+          </button>
+          <button type="button" id="modal-confirm" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium">
+            実行
           </button>
         </div>
       </div>
