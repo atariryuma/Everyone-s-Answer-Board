@@ -139,7 +139,7 @@ function safeSetXFrameOptionsAllowAll(htmlOutput) {
     if (htmlOutput && typeof htmlOutput.setXFrameOptionsMode === 'function' &&
         HtmlService && HtmlService.XFrameOptionsMode &&
         HtmlService.XFrameOptionsMode.ALLOWALL) {
-      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN);
     }
     if (htmlOutput && typeof htmlOutput.setSandboxMode === 'function' &&
         HtmlService && HtmlService.SandboxMode &&
@@ -291,7 +291,7 @@ function showLoginPage() {
   template.include = include;
   var output = template.evaluate()
     .setTitle('StudyQuest - ログイン')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN)
     .setSandboxMode(HtmlService.SandboxMode.IFRAME);
   return output;
 }
@@ -544,7 +544,7 @@ function createServerSideNavigation(targetUrl, message) {
     </body>
     </html>
   `)
-  .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+  .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN)
   .setSandboxMode(HtmlService.SandboxMode.IFRAME);
 }
 
@@ -606,7 +606,7 @@ function createSecureRedirect(targetUrl, message) {
       </script>
     </body>
     </html>
-  `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN);
 }
 
 /**
@@ -988,7 +988,7 @@ function renderAdminPanel(userInfo, mode) {
   
   return adminTemplate.evaluate()
     .setTitle('みんなの回答ボード 管理パネル')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN)
     .setSandboxMode(HtmlService.SandboxMode.IFRAME);
 }
 
