@@ -10,16 +10,38 @@
     <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
     
     <!-- TailwindCSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      window.tailwind = {
+        config: {
+          corePlugins: { preflight: false },
+          prefix: '',
+        }
+      };
+    </script>
+    <script src="https://cdn.tailwindcss.com" defer onerror="console.warn('TailwindCSS failed to load')"></script>
     
     <!-- Unified Styles and Shared Components -->
     <?!= include('UnifiedStyles'); ?>
     <?!= include('SharedUtilities'); ?>
     <?!= include('SharedJavaScript'); ?>
+    <?!= include('ClientOptimizer'); ?>
+    <?!= include('UnifiedCache.js'); ?>
     <?!= include('AppSetupLogic'); ?>
     
     <script>
       const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
+      
+      // GAS optimizer initialization
+      if (typeof GASOptimizer !== 'undefined') {
+        var gasOptimizer = new GASOptimizer();
+        var unifiedCache = (typeof UnifiedCache !== 'undefined') 
+          ? new UnifiedCache() 
+          : { getOrSet: function(_, fn) { return fn(); } };
+          
+        function runGas(functionName, ...args) {
+          return gasOptimizer.call(functionName, ...args);
+        }
+      }
     </script>
 </head>
 <body class="unified-theme bg-[#1a1b26] text-gray-200 font-sans min-h-screen">
