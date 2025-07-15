@@ -1018,7 +1018,16 @@ function renderAnswerBoard(userInfo, params) {
   const sheetConfig = config[sheetConfigKey] || {};
   const currentUserEmail = Session.getActiveUser().getEmail();
   const isOwner = currentUserEmail === userInfo.adminEmail;
-  const showBoard = isOwner || isPublished;
+  let hasDomainAccess = false;
+  if (!isOwner) {
+    try {
+      AuthorizationService.verifyBoardAccess(userInfo.adminEmail);
+      hasDomainAccess = true;
+    } catch (e) {
+      console.warn('Domain access denied:', e.message);
+    }
+  }
+  const showBoard = isOwner || (isPublished && hasDomainAccess);
   const file = showBoard ? 'Page' : 'Unpublished';
   const template = HtmlService.createTemplateFromFile(file);
   template.include = include;
