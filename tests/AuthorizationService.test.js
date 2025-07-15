@@ -19,6 +19,7 @@ describe('AuthorizationService', () => {
 
   test('システム管理者はどのユーザーのデータにもアクセスできる', () => {
     context.isDeployUser.mockReturnValue(true);
+    context.Session.getActiveUser.mockReturnValue({ getEmail: () => 'admin@example.com' });
     expect(() => context.AuthorizationService.verifyUserAccess('any_user_id')).not.toThrow();
   });
 
@@ -36,5 +37,15 @@ describe('AuthorizationService', () => {
     context.findUserById.mockReturnValue({ adminEmail: 'another_user@example.com' });
 
     expect(() => context.AuthorizationService.verifyUserAccess('another_user_id')).toThrow('権限エラー');
+  });
+
+  test('同一ドメインならボードにアクセスできる', () => {
+    context.Session.getActiveUser.mockReturnValue({ getEmail: () => 'member@example.com' });
+    expect(() => context.AuthorizationService.verifyBoardAccess('owner@example.com')).not.toThrow();
+  });
+
+  test('異なるドメインならボードアクセスエラー', () => {
+    context.Session.getActiveUser.mockReturnValue({ getEmail: () => 'user@other.com' });
+    expect(() => context.AuthorizationService.verifyBoardAccess('owner@example.com')).toThrow('権限エラー');
   });
 });
