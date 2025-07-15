@@ -1341,7 +1341,7 @@ function enhancedDomainVerification(requestUserId) {
       email: activeUserEmail,
       userDomain: userDomain,
       systemAdminDomain: systemAdminDomain,
-      isSystemAdmin: activeUserEmail === adminEmail,
+      isSystemAdmin: String(activeUserEmail).toLowerCase() === String(adminEmail || '').toLowerCase(),
       isDomainMatch: userDomain === systemAdminDomain,
       isPersonalAccount: isPersonalGoogleAccount(activeUserEmail),
       isWorkspaceAccount: isWorkspaceAccount(activeUserEmail),
@@ -1441,8 +1441,11 @@ function resetUserAuthentication(requestUserId) {
  * @returns {string} アクセスレベル
  */
 function calculateAccessLevel(userEmail, adminEmail, userDomain, systemAdminDomain) {
+  const normalizedUserEmail = String(userEmail).toLowerCase();
+  const normalizedAdminEmail = String(adminEmail || '').toLowerCase();
+
   // システム管理者
-  if (userEmail === adminEmail) {
+  if (normalizedUserEmail === normalizedAdminEmail) {
     return 'SYSTEM_ADMIN';
   }
   

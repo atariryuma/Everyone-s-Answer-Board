@@ -11,7 +11,11 @@ var AuthorizationService = (function() {
    * @returns {string} ドメイン部分
    */
   function getEmailDomain(email) {
-    return email.split('@')[1] || '';
+    if (!email) return '';
+    return String(email)
+      .split('@')[1]
+      .toLowerCase()
+      .trim() || '';
   }
 
   /**
