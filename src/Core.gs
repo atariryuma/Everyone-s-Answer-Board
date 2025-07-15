@@ -3704,26 +3704,67 @@ function getStatus(requestUserId, forceRefresh = false) {
       }
     }
     
-    // フォームURLの取得と修復
-    let formUrl = configJson.formUrl || configJson.editFormUrl;
+    // 🔧 強化されたフォームURL取得と修復
+    let formUrl = null;
+    let editFormUrl = null;
     
-    // フォームURLがない場合、スプレッドシートから取得を試みる
+    // 複数のソースからフォームURLを取得
+    console.log('🔍 [DEBUG] フォームURL取得開始:', {
+      hasConfigFormUrl: !!configJson.formUrl,
+      hasConfigEditFormUrl: !!configJson.editFormUrl,
+      configFormCreated: configJson.formCreated,
+      hasSpreadsheetId: !!userInfo.spreadsheetId
+    });
+    
+    // 1. configJsonから直接取得（最優先）
+    if (configJson.formUrl) {
+      formUrl = configJson.formUrl;
+      console.log('✅ [DEBUG] FormURL found in configJson:', formUrl);
+    }
+    if (configJson.editFormUrl) {
+      editFormUrl = configJson.editFormUrl;
+      console.log('✅ [DEBUG] EditFormURL found in configJson:', editFormUrl);
+    }
+    
+    // 2. フォームURLがない場合の自動修復
     if (!formUrl && userInfo.spreadsheetId && configJson.formCreated) {
       try {
+        console.log('🔄 [DEBUG] スプレッドシートからフォームURL自動取得試行');
         const retrievedFormUrl = getFormUrlSafely(configJson, userInfo.spreadsheetId);
         if (retrievedFormUrl) {
           formUrl = retrievedFormUrl;
-          // configJsonを更新
           configJson.formUrl = formUrl;
+          console.log('✅ [DEBUG] フォームURL自動修復成功:', formUrl);
+          
+          // 修復したURLをデータベースに保存
           updateUser(requestUserId, {
             configJson: JSON.stringify(configJson)
           });
           debugLog('getStatus: フォームURLを自動修復しました:', formUrl);
+        } else {
+          console.warn('⚠️ [DEBUG] スプレッドシートからフォームURL取得失敗');
         }
       } catch (e) {
         console.warn('getStatus: フォームURL自動修復に失敗:', e.message);
       }
     }
+    
+    // 3. editFormURLの生成（formURLがあってeditFormURLがない場合）
+    if (formUrl && !editFormUrl && formUrl.includes('/viewform')) {
+      try {
+        editFormUrl = formUrl.replace('/viewform', '/edit');
+        configJson.editFormUrl = editFormUrl;
+        console.log('✅ [DEBUG] EditFormURL generated from formURL:', editFormUrl);
+      } catch (e) {
+        console.warn('⚠️ [DEBUG] EditFormURL generation failed:', e.message);
+      }
+    }
+    
+    console.log('🔍 [DEBUG] フォームURL取得完了:', {
+      finalFormUrl: formUrl,
+      finalEditFormUrl: editFormUrl,
+      willUpdateConfig: !!(formUrl && !configJson.formUrl) || !!(editFormUrl && !configJson.editFormUrl)
+    });
     
     // 公開状態の判定
     const isPublished = !!(configJson.appPublished && configJson.publishedSpreadsheetId && configJson.publishedSheetName);
@@ -3816,8 +3857,8 @@ function getStatus(requestUserId, forceRefresh = false) {
       publishedSheetName: configJson.publishedSheetName || null,
       isPublished: isPublished,
       appPublished: configJson.appPublished || false,
-      formUrl: configJson.formUrl || null,
-      editFormUrl: configJson.editFormUrl || null,
+      formUrl: formUrl || null,
+      editFormUrl: editFormUrl || null,
       webAppUrl: getWebAppUrlCached(),
       appUrls: generateAppUrls(requestUserId),
       customFormInfo: customFormInfo,
@@ -4165,45 +4206,58 @@ function autoSaveAndPublishAfterFormCreation(requestUserId, sheetName, formData)
     AuthorizationService.verifyUserAccess(requestUserId);
     console.log('autoSaveAndPublishAfterFormCreation 開始 - userId:', requestUserId, 'sheetName:', sheetName);
     
-    // 基本設定オブジェクトを作成
-    const basicConfig = {
-      opinionHeader: formData.opinionHeader || 'お題',  // mainQuestion を opinionHeader に統一
-      displayMode: 'anonymous',
-      showCounts: false
-    };
-    
-    // Step 1: 設定を保存
-    console.log('自動設定保存開始...');
-    saveSheetConfig(requestUserId, formData.spreadsheetId, sheetName, basicConfig);
-    
-    // Step 2: シートをアクティブ化
-    console.log('シート自動アクティブ化開始...');
-    switchToSheet(requestUserId, formData.spreadsheetId, sheetName);
-    
-    // Step 3: 表示オプションを設定
-    const displayOptions = {
-      displayMode: 'anonymous',
-      showCounts: false
-    };
-    setDisplayOptions(requestUserId, displayOptions);
-    
-    // Step 4: 公開状態を更新
-    console.log('自動公開状態更新開始...');
+    // 🔧 データ競合防止: 全ての操作を1つのアトミック更新にまとめる
     const userInfo = getUserInfo(requestUserId);
-    if (userInfo) {
-      const currentConfig = JSON.parse(userInfo.configJson || '{}');
-      currentConfig.appPublished = true;
-      currentConfig.setupStatus = 'published';
-      currentConfig.lastPublishedAt = new Date().toISOString();
-      currentConfig.autoPublishCompleted = true;
-      
-      updateUser(requestUserId, {
-        configJson: JSON.stringify(currentConfig)
-      });
-      
-      // キャッシュクリア
-      invalidateUserCache(requestUserId, userInfo.adminEmail, userInfo.spreadsheetId, true);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
     }
+    
+    console.log('🔄 アトミック設定更新開始: 全設定をまとめて適用');
+    
+    // 現在の設定を取得してマージ
+    const currentConfig = JSON.parse(userInfo.configJson || '{}');
+    
+    // 基本設定をまとめて構築
+    const basicConfig = {
+      opinionHeader: formData.opinionHeader || 'お題',
+      displayMode: 'anonymous',
+      showCounts: false
+    };
+    
+    // シート設定キーを作成
+    const sheetKey = 'sheet_' + sheetName;
+    
+    // すべての設定を1つのオブジェクトにまとめる
+    const consolidatedConfig = {
+      ...currentConfig,
+      // Step 1: シート設定 (saveSheetConfig相当)
+      [sheetKey]: basicConfig,
+      // Step 2: アクティブシート設定 (switchToSheet相当)  
+      publishedSpreadsheetId: formData.spreadsheetId,
+      publishedSheetName: sheetName,
+      // Step 3: 表示オプション (setDisplayOptions相当)
+      displayMode: 'anonymous',
+      showCounts: false,
+      // Step 4: 公開状態更新
+      appPublished: true,
+      setupStatus: 'published',
+      lastPublishedAt: new Date().toISOString(),
+      autoPublishCompleted: true,
+      // メタデータ
+      lastBatchUpdate: new Date().toISOString(),
+      batchUpdateReason: 'autoSaveAndPublishAfterFormCreation'
+    };
+    
+    console.log('💾 単一トランザクションでデータベース更新実行');
+    
+    // 🚀 重要: 1回のupdateUser呼び出しですべてを更新（データ競合を排除）
+    updateUser(requestUserId, {
+      configJson: JSON.stringify(consolidatedConfig)
+    });
+    
+    // 単一のキャッシュクリア
+    console.log('🗑️ 統合キャッシュクリア実行');
+    invalidateUserCache(requestUserId, userInfo.adminEmail, userInfo.spreadsheetId, true);
     
     console.log('autoSaveAndPublishAfterFormCreation 完了');
     

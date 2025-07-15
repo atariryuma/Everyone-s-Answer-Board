@@ -3871,27 +3871,70 @@ function syncCheckboxStates(status) {
      */
     async function updateUIAfterFormCreation(result) {
         try {
-            // キャッシュをクリアして強制リロード
-            cacheManager.invalidateDependents('form_creation');
-            console.log('🔄 [DEBUG] Initiating UI update after form creation');
+            console.log('🚀 [DEBUG] フォーム作成後UI更新開始:', { 
+                hasFormUrl: !!result.formUrl, 
+                hasEditFormUrl: !!result.editFormUrl 
+            });
             
+            // 🔥 強力なキャッシュクリア: 複数の依存関係をクリア
+            cacheManager.invalidateDependents('form_creation');
+            cacheManager.invalidateDependents('user_data_change');
+            cacheManager.invalidateDependents('config_change');
+            
+            // 🔥 追加: 個別キャッシュも強制クリア
+            cacheManager.invalidate('status');
+            cacheManager.invalidate('formUrls');
+            cacheManager.invalidate('sheetDetails');
+            
+            console.log('🗑️ [DEBUG] 全キャッシュクリア完了');
+            
+            // 🔄 段階的UI更新: まず結果データで即座にUI更新
+            if (result.formUrl) {
+                console.log('⚡ [DEBUG] 即座フォールバックUI更新実行');
+                updateFormUrlSection({
+                    formUrl: result.formUrl, 
+                    editFormUrl: result.editFormUrl,
+                    customFormInfo: result.customFormInfo || null
+                });
+            }
+            
+            // 🔄 バックエンドからの最新データで確実にUI更新
             try {
+                console.log('📡 [DEBUG] バックエンドからステータス再取得開始');
+                
+                // 🕐 少し待ってからステータスをリロード（DBの反映を確実にするため）
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
                 const newStatus = await withTimeout(loadStatus(true), 30000, 'ステータス更新がタイムアウトしました');
-                console.log('✅ [DEBUG] UI updated successfully after form creation:', {
+                
+                console.log('✅ [DEBUG] ステータス再取得成功:', {
                     hasFormUrl: !!newStatus.formUrl,
                     hasEditFormUrl: !!newStatus.editFormUrl,
+                    hasUserInfo: !!newStatus.userInfo,
+                    hasConfigJson: !!(newStatus.userInfo && newStatus.userInfo.configJson),
                     formUrl: newStatus.formUrl
                 });
-            } catch (statusError) {
-                console.warn('⚠️ [DEBUG] Status reload failed:', statusError);
-                // フォールバック: 部分的なUI更新
-                if (result.formUrl) {
-                    console.log('🔄 [DEBUG] Attempting fallback UI update with result data');
-                    updateFormUrlSection({formUrl: result.formUrl, editFormUrl: result.editFormUrl});
+                
+                // 🔄 最終UI更新: 最新データでUI全体を更新
+                if (newStatus.formUrl || (newStatus.userInfo && newStatus.userInfo.configJson)) {
+                    console.log('✅ [DEBUG] 最新データでUI最終更新実行');
+                    updateFormUrlSection(newStatus);
+                } else {
+                    console.warn('⚠️ [DEBUG] 最新データにフォームURLなし、結果データを維持');
                 }
+                
+            } catch (statusError) {
+                console.warn('⚠️ [DEBUG] バックエンドステータス取得失敗:', statusError);
+                console.log('🔄 [DEBUG] フォールバックとして結果データのみでUI更新');
             }
+            
         } catch (error) {
-            console.warn('⚠️ [DEBUG] UI update initialization failed:', error);
+            console.error('❌ [DEBUG] UI更新処理で致命的エラー:', error);
+            // 最後の手段: 結果データで強制更新
+            if (result.formUrl) {
+                console.log('🆘 [DEBUG] 緊急フォールバック: 結果データで強制UI更新');
+                updateFormUrlSection({formUrl: result.formUrl, editFormUrl: result.editFormUrl});
+            }
         }
     }
 
