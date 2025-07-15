@@ -987,10 +987,8 @@ function renderAdminPanel(userInfo, mode) {
   adminTemplate.correctUrl = correctUrl;
   adminTemplate.shouldUpdateUrl = true;
   
-  return adminTemplate.evaluate()
-    .setTitle('みんなの回答ボード 管理パネル')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN)
-    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+  const output = adminTemplate.evaluate().setTitle('みんなの回答ボード 管理パネル');
+  return safeSetXFrameOptionsAllowAll(output);
 }
 
 /**
