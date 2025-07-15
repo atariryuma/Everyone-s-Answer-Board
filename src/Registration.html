@@ -191,6 +191,15 @@
       <div class="user-email" id="user-email"></div>
     </div>
 
+    <!-- ドメイン状態表示 -->
+    <div id="domain-status-section" class="status-card hidden" style="margin-top: 12px;">
+      <div class="flex items-center gap-2">
+        <div id="domain-status-icon" class="w-4 h-4 rounded-full"></div>
+        <div id="domain-status-text" class="text-sm font-medium"></div>
+      </div>
+      <div id="domain-status-desc" class="text-xs text-gray-400 mt-1"></div>
+    </div>
+
     <div class="message-area" id="message-area"></div>
 
     <button class="register-btn" id="register-btn" disabled>
@@ -241,10 +250,6 @@
       const initializePage = () => {
         google.script.run
           .withSuccessHandler(result => {
-            if (result?.status === 'existing_user') {
-              window.sharedUtilities.navigation.goToAdminPanel(result.adminUrl, 1000);
-              return;
-            }
             google.script.run
               .withSuccessHandler(authResult => {
                 if (authResult?.email || authResult?.userEmail) {
@@ -253,6 +258,25 @@
                   userEmailEl.textContent = userEmail;
                   registerBtn.disabled = false;
                   showMessage('回答ボードを作成できます', 'success');
+                  
+                  // ドメイン状態表示
+                  const domainSection = document.getElementById('domain-status-section');
+                  const domainIcon = document.getElementById('domain-status-icon');
+                  const domainText = document.getElementById('domain-status-text');
+                  const domainDesc = document.getElementById('domain-status-desc');
+                  
+                  if (authResult?.domainMatch) {
+                    domainIcon.className = 'w-4 h-4 rounded-full bg-green-400';
+                    domainText.textContent = 'ドメイン認証済み';
+                    domainText.className = 'text-sm font-medium text-green-200';
+                    domainDesc.textContent = 'システム管理者ドメインと一致しています';
+                  } else {
+                    domainIcon.className = 'w-4 h-4 rounded-full bg-yellow-400';
+                    domainText.textContent = 'ドメイン未認証';
+                    domainText.className = 'text-sm font-medium text-yellow-200';
+                    domainDesc.textContent = 'システム管理者ドメインと異なります';
+                  }
+                  domainSection.classList.remove('hidden');
                   
                   // システム管理者チェック
                   if (authResult?.isSystemAdmin) {
