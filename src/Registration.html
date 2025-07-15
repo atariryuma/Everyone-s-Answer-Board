@@ -208,9 +208,9 @@
   <!-- 成功画面 -->
   <div class="glass-container success-container" id="success-container">
     <div class="success-icon">✓</div>
-    <h2 class="title">登録完了</h2>
-    <p class="subtitle">回答ボードが正常に作成されました</p>
-    <a href="#" class="action-btn primary" id="admin-panel-btn">管理画面を開く</a>
+    <h2 class="title">ユーザー登録完了</h2>
+    <p class="subtitle">アカウントが正常に作成されました。管理画面でフォームを作成してください</p>
+    <a href="#" class="action-btn primary" id="admin-panel-btn">管理画面でフォーム作成</a>
   </div>
 
 
@@ -318,7 +318,7 @@
             btnContent.textContent = '回答ボードを作成';
             isRegistrationInProgress = false;
           })
-          .quickStartSetup();
+          .createUserWithoutQuickstart();
       };
 
       const handleRegistrationRequest = () => {

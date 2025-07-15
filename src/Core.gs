@@ -1862,6 +1862,7 @@ function addUnifiedQuestions(form, questionType, customConfig) {
   try {
     var config = getQuestionConfig(questionType, customConfig);
 
+    // Email collection enabled automatically (no email question in form, but emails are collected)
     form.setCollectEmail(true);
 
     if (questionType === 'simple') {
@@ -2133,7 +2134,14 @@ function createCustomForm(userEmail, userId, config) {
   try {
     const now = new Date();
     const dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm:ss');
-    const baseTitle = config.formTitle || 'カスタムフォーム';
+    
+    // Auto-generate form title based on question content
+    let baseTitle = 'カスタムフォーム';
+    if (config.opinionHeader) {
+      // Take first 20 characters of the question as title base
+      const questionExcerpt = config.opinionHeader.substring(0, 20);
+      baseTitle = questionExcerpt + (config.opinionHeader.length > 20 ? '...' : '');
+    }
     const formTitle = `${baseTitle} - ${dateTimeString}`;
     
     // AdminPanelのconfig構造を内部形式に変換 (opinionHeaderに統一)
@@ -4100,7 +4108,7 @@ function createCustomFormUI(requestUserId, config) {
       updatedConfigJson.readyForAutoPublish = true;
       
       // カスタムフォーム設定情報を保存 (opinionHeaderに統一)
-      updatedConfigJson.formTitle = config.formTitle;
+      // formTitle は自動生成されるため保存不要
       updatedConfigJson.questionType = config.questionType;
       updatedConfigJson.choices = config.choices;
       updatedConfigJson.includeOthers = config.includeOthers;
