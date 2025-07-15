@@ -289,11 +289,7 @@ function isSystemSetup() {
 function showLoginPage() {
   var template = HtmlService.createTemplateFromFile('LoginPage');
   template.include = include;
-  var output = template.evaluate()
-    .setTitle('StudyQuest - ログイン')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN)
-    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
-  return output;
+  return safeSetXFrameOptionsAllowAll(template.evaluate().setTitle('StudyQuest - ログイン'));
 }
 
 /**
