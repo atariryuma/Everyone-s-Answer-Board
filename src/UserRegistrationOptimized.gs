@@ -632,7 +632,7 @@ function createUserWithoutQuickstart() {
     console.log('createUserWithoutQuickstart: 新規ユーザー作成開始', { userEmail });
     
     // 軽量ユーザー作成（フォーム・スプレッドシートは作成しない）
-    const userId = generateUniqueUserId();
+    const userId = userEmail; // メールアドレスをuserIdとして使用
     const userData = {
       userId: userId,
       adminEmail: userEmail,
