@@ -296,7 +296,7 @@
             </div>
             <!-- 次のアクションボタン -->
             <div id="next-action-container" class="hidden">
-              <button id="next-action-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+              <button type="button" id="next-action-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800">
                 <span id="next-action-text">次へ</span>
               </button>
             </div>
@@ -1622,7 +1622,7 @@
     var IS_TEST_ENV = typeof navigator !== 'undefined' &&
       navigator.userAgent && navigator.userAgent.indexOf('jsdom') !== -1;
 
-    const DEBUG_MODE = <?= typeof DEBUG_MODE !== 'undefined' ? DEBUG_MODE : false ?>;
+    const DEBUG_MODE = false; // デバッグモード（本番では false）
 
     // AdminPanel専用システムフロー表示機能
     function showSystemFlow() {
@@ -4320,6 +4320,99 @@ function syncCheckboxStates(status) {
           </button>
           <button type="button" id="form-config-create" class="flex-1 px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-600 hover:to-blue-600 transition-colors font-medium shadow-lg">
             フォーム作成
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- プライバシーモーダル -->
+  <div id="privacy-modal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center">
+    <div class="glass-panel rounded-xl max-w-md w-full mx-4">
+      <div class="p-6">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
+            <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-white">プライバシーの確認</h3>
+        </div>
+        
+        <div class="mb-6">
+          <p class="text-gray-300 leading-relaxed">この操作を実行する前に、プライバシーポリシーを確認してください。</p>
+        </div>
+        
+        <div class="flex gap-3">
+          <button type="button" id="privacy-modal-cancel" class="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors">
+            キャンセル
+          </button>
+          <button type="button" id="privacy-modal-continue" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium">
+            続行
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- デジタルシティズンシップモーダル -->
+  <div id="digital-citizenship-modal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center">
+    <div class="glass-panel rounded-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-semibold text-white">デジタル・シティズンシップ指導</h3>
+          <button type="button" id="digital-citizenship-modal-close" class="text-gray-400 hover:text-white text-2xl">×</button>
+        </div>
+        
+        <div class="mb-6">
+          <p class="text-gray-300 leading-relaxed mb-4">デジタル・シティズンシップに基づく回答ボード指導のポイント：</p>
+          <ul class="list-disc pl-5 space-y-2 text-gray-300">
+            <li>建設的な意見交換を促進する</li>
+            <li>他者の意見を尊重する態度を育む</li>
+            <li>情報の信頼性を検証する習慣を身につける</li>
+            <li>デジタル環境での適切なコミュニケーションを学ぶ</li>
+          </ul>
+        </div>
+        
+        <div class="text-right">
+          <button type="button" id="digital-citizenship-modal-close-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+            閉じる
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 使用ガイドモーダル -->
+  <div id="usage-guide-modal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center">
+    <div class="glass-panel rounded-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-semibold text-white">使用ガイド</h3>
+          <button type="button" id="usage-guide-modal-close" class="text-gray-400 hover:text-white text-2xl">×</button>
+        </div>
+        
+        <div class="mb-6">
+          <p class="text-gray-300 leading-relaxed mb-4">回答ボードの使用方法：</p>
+          <div class="space-y-3 text-gray-300">
+            <div class="p-3 bg-gray-700/30 rounded-lg">
+              <h4 class="font-medium text-white mb-2">ステップ1: データ準備</h4>
+              <p class="text-sm">GoogleフォームまたはスプレッドシートをWorkspace上で自動作成します。</p>
+            </div>
+            <div class="p-3 bg-gray-700/30 rounded-lg">
+              <h4 class="font-medium text-white mb-2">ステップ2: シート選択</h4>
+              <p class="text-sm">表示したいシートを選択します。</p>
+            </div>
+            <div class="p-3 bg-gray-700/30 rounded-lg">
+              <h4 class="font-medium text-white mb-2">ステップ3: 設定・公開</h4>
+              <p class="text-sm">列設定を行い、回答ボードを公開します。</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="text-right">
+          <button type="button" id="usage-guide-modal-close-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+            閉じる
           </button>
         </div>
       </div>
