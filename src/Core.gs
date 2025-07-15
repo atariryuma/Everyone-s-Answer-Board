@@ -4337,7 +4337,7 @@ function disconnectResources(requestUserId) {
     verifyUserAccess(requestUserId);
     
     // ユーザー情報を取得
-    const userInfo = getUserInfoOptimized(requestUserId);
+    const userInfo = getCachedUserInfo(requestUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません。');
     }
