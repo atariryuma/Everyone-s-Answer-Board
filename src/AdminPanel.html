@@ -226,6 +226,7 @@
     flex-direction: column;
     min-height: 100vh;
     padding-bottom: 5rem; /* space for fixed footer */
+    scroll-behavior: smooth;
   }
   
   main {
@@ -411,25 +412,32 @@
     display: grid;
     gap: 1.5rem;
     grid-template-columns: 1fr;
+    align-items: start;
   }
 
   @media (min-width: 768px) {
     .responsive-grid {
-      grid-template-columns: 1fr 350px;
+      grid-template-columns: 2fr 1fr;
       gap: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
     }
     .right-panel {
-      width: 350px;
+      width: auto;
+      max-width: 380px;
+      position: sticky;
+      top: 6rem;
+      align-self: start;
     }
   }
 
   @media (min-width: 1024px) {
     .responsive-grid {
-      grid-template-columns: 1fr 350px;
-      gap: 2rem;
+      grid-template-columns: 2fr 380px;
+      gap: 2.5rem;
     }
     .right-panel {
-      width: 350px;
+      width: 380px;
     }
   }
   
@@ -511,8 +519,22 @@
     to { opacity: 1; transform: translateY(0); }
   }
   
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  
   .fade-in {
     animation: fadeIn 0.6s ease-out;
+  }
+  
+  .slide-in {
+    animation: slideIn 0.5s ease-out;
+  }
+  
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    transition: transform 0.2s ease;
   }
   </style>
 </head>
@@ -596,15 +618,17 @@
       <div class="left-panel space-y-6">
         
         <!-- ステップ1: データ準備 -->
-        <div class="glass-panel p-6" id="data-setup-section">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-3">
-              <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-xs shadow-lg">
-                1
+        <div class="glass-panel p-6 transition-all duration-300 hover:shadow-xl" id="data-setup-section">
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-4">
+              <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl flex items-center justify-center font-bold shadow-lg">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
               </div>
               <div>
-                <h2 class="text-xl font-semibold text-white">データ準備</h2>
-                <p class="text-sm text-gray-400">スプレッドシートまたはフォームを準備</p>
+                <h2 class="text-xl font-bold text-white mb-1">データ準備</h2>
+                <p class="text-sm text-gray-300">🚀 スプレッドシートまたはフォームを準備</p>
               </div>
             </div>
             <button type="button" class="toggle-section" onclick="toggleSection('step1-content')" aria-expanded="true" aria-label="セクションを展開/折りたたみ">
@@ -683,15 +707,17 @@
         </div>
 
         <!-- ステップ2: シート・列設定 -->
-        <div class="glass-panel p-6" id="sheet-selection-section">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-3">
-              <div class="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl flex items-center justify-center font-bold text-xs shadow-lg">
-                2
+        <div class="glass-panel p-6 transition-all duration-300 hover:shadow-xl" id="sheet-selection-section">
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-4">
+              <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl flex items-center justify-center font-bold shadow-lg">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2v0"></path>
+                </svg>
               </div>
               <div>
-                <h2 class="text-xl font-semibold text-white">シート・列設定</h2>
-                <p class="text-sm text-gray-400">シート選択と列マッピング</p>
+                <h2 class="text-xl font-bold text-white mb-1">シート・列設定</h2>
+                <p class="text-sm text-gray-300">📊 シート選択と列マッピング</p>
               </div>
             </div>
             <button type="button" class="toggle-section" onclick="toggleSection('step2-content')" aria-expanded="true" aria-label="セクションを展開/折りたたみ">
@@ -735,15 +761,18 @@
         </div>
 
         <!-- ステップ3: 公開設定 -->
-        <div class="glass-panel p-6" id="config-section">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-3">
-              <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl flex items-center justify-center font-bold text-xs shadow-lg">
-                3
+        <div class="glass-panel p-6 transition-all duration-300 hover:shadow-xl" id="config-section">
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-4">
+              <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl flex items-center justify-center font-bold shadow-lg">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                </svg>
               </div>
               <div>
-                <h2 class="text-xl font-semibold text-white">公開設定</h2>
-                <p class="text-sm text-gray-400">表示設定と公開</p>
+                <h2 class="text-xl font-bold text-white mb-1">公開設定</h2>
+                <p class="text-sm text-gray-300">🎯 表示設定と公開</p>
               </div>
             </div>
             <button type="button" class="toggle-section" onclick="toggleSection('step3-content')" aria-expanded="true" aria-label="セクションを展開/折りたたみ">
@@ -3053,9 +3082,13 @@ function syncCheckboxStates(status) {
       
       if (!footer || !guidanceText) return;
 
-      const isPublished = status.isPublished;
+      // より厳密な公開状態の判定
+      const isPublished = status && (
+        status.isPublished || 
+        status.appPublished
+      ) && status.appUrls && status.appUrls.viewUrl;
 
-      if (isPublished && status.appUrls && status.appUrls.viewUrl) {
+      if (isPublished) {
         footer.classList.remove('hidden');
         document.getElementById('board-url').value = status.appUrls.viewUrl;
         document.getElementById('view-board-link').href = status.appUrls.viewUrl;

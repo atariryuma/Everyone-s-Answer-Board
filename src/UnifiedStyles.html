@@ -1122,6 +1122,44 @@ body.unified-theme::before {
     padding: 1rem;
   }
   
+  /* AdminPanel responsive improvements */
+  .responsive-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem;
+  }
+  
+  .right-panel {
+    position: static !important;
+    width: 100% !important;
+    max-width: none !important;
+    top: auto !important;
+  }
+  
+  .left-panel .glass-panel {
+    padding: 1rem;
+  }
+  
+  .glass-panel h2 {
+    font-size: 1.25rem;
+  }
+  
+  /* Header responsive */
+  .header .max-w-6xl {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .responsive-grid {
+    grid-template-columns: 1.5fr 1fr !important;
+    gap: 1.5rem;
+  }
+  
+  .right-panel {
+    max-width: 320px;
+  }
+  
   .responsive-grid {
     grid-template-columns: 1fr;
     gap: 1rem;
