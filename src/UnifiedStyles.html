@@ -96,13 +96,13 @@ html, body, div, span, h1, h2, h3, h4, h5, h6, p, button, a {
 }
 
 /* Glass Panel Effects - Glassmorphism System */
-.glass-panel { 
-  background: var(--color-surface) !important;
-  -webkit-backdrop-filter: blur(var(--backdrop-blur)) !important;
-  backdrop-filter: blur(var(--backdrop-blur)) !important;
-  border: 1px solid var(--color-border) !important;
-  box-shadow: var(--shadow-glass) !important;
-  border-radius: 24px !important;
+.glass-panel {
+  background: rgba(255, 255, 255, 0.05) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  backdrop-filter: blur(6px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  border-radius: 12px !important;
   transition: all var(--transition-duration) var(--transition-easing);
   position: relative !important;
   /* Prevent creating new stacking context that blocks modals */
@@ -836,8 +836,101 @@ html, body, div, span, h1, h2, h3, h4, h5, h6, p, button, a {
   cursor: pointer !important; 
 }
 
-.footer a:hover { 
-  color: white !important; 
+.footer a:hover {
+  color: white !important;
+}
+
+/* Admin Panel Header */
+#admin-header {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+}
+
+.logo-title {
+  margin-right: auto;
+}
+
+#header-domain-info {
+  margin-left: auto;
+}
+
+#admin-header {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Status Bar */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+}
+
+.status-bar .steps {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.status-bar .steps > div > div {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+}
+
+/* Left Panel Cards */
+.left-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.left-panel > .glass-panel {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* URL Container */
+.url-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 24px;
+  background: rgba(30, 31, 37, 0.6);
+  border-radius: 12px;
+  backdrop-filter: blur(6px);
+}
+
+.url-label {
+  flex: 0 0 auto;
+  font-size: 14px;
+  color: #a0a0a0;
+}
+
+.url-input {
+  flex: 1;
+  height: 36px;
+}
+
+.btn-copy,
+.btn-open {
+  flex: 0 0 auto;
+  height: 36px;
+}
+
+/* Admin Footer */
+#admin-footer {
+  background: rgba(26, 27, 38, 0.8);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 12px 24px;
+}
+
+#admin-footer .flex {
+  justify-content: space-between;
 }
 
 /* Modal System */
