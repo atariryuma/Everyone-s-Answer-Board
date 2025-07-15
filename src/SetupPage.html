@@ -149,7 +149,7 @@
         };
         
         var startApp = window.setupUtilities?.navigation?.startApp || function() {
-            console.log('Start app function not available');
+            window.location.href = window.location.href.split('?')[0];
         };
         
         // Initialize on DOM ready

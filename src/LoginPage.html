@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <base target="_top">
+  <title>StudyQuest - ログイン</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1a1b26" />
+  <meta name="description" content="StudyQuestログインシステム - 安全で直感的な認証" />
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
+  
+  <?!= include('UnifiedStyles'); ?>
+  <?!= include('SharedUtilities'); ?>
+
+  <style>
+    :root {
+      /* AdminPanelと同じCSS変数 */
+      --bg-primary: #1a1b26;
+      --bg-secondary: #24283b;
+      --bg-tertiary: #414868;
+      --bg-accent: rgba(255, 255, 255, 0.08);
+      
+      --glass-bg: rgba(255, 255, 255, 0.08);
+      --glass-border: rgba(255, 255, 255, 0.2);
+      --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      
+      --accent-cyan: #06b6d4;
+      --accent-purple: #a855f7;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      
+      --text-primary: #ffffff;
+      --text-secondary: #e2e8f0;
+      --text-tertiary: #94a3b8;
+      --text-muted: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      background: var(--bg-primary);
+      min-height: 100vh;
+      width: 100%;
+      margin: 0;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: radial-gradient(ellipse at top left, rgba(6, 182, 212, 0.1) 0%, transparent 70%),
+                  radial-gradient(ellipse at bottom right, rgba(168, 85, 247, 0.08) 0%, transparent 70%);
+      z-index: -1;
+    }
+
+    /* 統合されたガラス効果 */
+    .glass-container {
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 24px;
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow), var(--glass-inset);
+      width: 100%;
+      max-width: 480px;
+      padding: 48px 36px;
+      text-align: center;
+      animation: fadeIn 0.6s ease-out;
+      transition: all 0.3s ease;
+    }
+
+    .glass-container:hover {
+      border-color: rgba(255, 255, 255, 0.3);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15), var(--glass-inset);
+    }
+
+    /* ステップインジケーター */
+    .step-indicator {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 32px;
+      gap: 8px;
+    }
+
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.3s ease;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-tertiary);
+    }
+
+    .step.active {
+      background: rgba(6, 182, 212, 0.2);
+      border-color: rgba(6, 182, 212, 0.4);
+      color: var(--accent-cyan);
+    }
+
+    .step.completed {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: var(--accent-green);
+    }
+
+    .step-number {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: currentColor;
+      color: var(--bg-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    /* ヘッダー */
+    .header {
+      margin-bottom: 40px;
+    }
+
+    .logo {
+      width: 64px;
+      height: 64px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      border-radius: 20px;
+      margin: 0 auto 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      color: white;
+      font-weight: 700;
+      box-shadow: 0 8px 25px rgba(6, 182, 212, 0.3);
+    }
+
+    .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--text-tertiary);
+      margin-bottom: 0;
+    }
+
+    /* ステータスカード */
+    .status-card {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 24px;
+      margin-bottom: 32px;
+      text-align: left;
+      transition: all 0.3s ease;
+    }
+
+    .status-card:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .status-text {
+      font-size: 14px;
+      color: var(--text-tertiary);
+      margin-bottom: 8px;
+    }
+
+    .user-email {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      word-break: break-all;
+    }
+
+    .domain-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .domain-status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .domain-status-text {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .domain-status-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ボタン */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 24px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 16px;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      border: none;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      width: 100%;
+      margin-bottom: 16px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      color: white;
+      box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(6, 182, 212, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-secondary);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* メッセージエリア */
+    .message-area {
+      min-height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      font-size: 14px;
+      color: var(--text-tertiary);
+      border-radius: 8px;
+      padding: 8px 16px;
+      transition: all 0.3s ease;
+    }
+
+    .message-area.error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: var(--accent-red);
+    }
+
+    .message-area.success {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--accent-green);
+    }
+
+    .message-area.warning {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: var(--accent-amber);
+    }
+
+    /* スピナー */
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top: 2px solid white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    /* セキュリティ情報 */
+    .security-info {
+      text-align: center;
+      margin-top: 24px;
+    }
+
+    .security-link {
+      color: var(--accent-cyan);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.3s ease;
+      cursor: pointer;
+    }
+
+    .security-link:hover {
+      color: var(--accent-purple);
+      text-decoration: underline;
+    }
+
+    /* 成功画面 */
+    .success-container {
+      display: none;
+    }
+
+    .success-icon {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, var(--accent-green), #059669);
+      border-radius: 50%;
+      margin: 0 auto 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      color: white;
+      box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+    }
+
+    /* モーダル */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .modal.show {
+      display: flex;
+      opacity: 1;
+    }
+
+    .modal-content {
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      border-radius: 20px;
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow), var(--glass-inset);
+      max-width: 600px;
+      width: 100%;
+      padding: 32px;
+      transform: scale(0.9);
+      transition: transform 0.3s ease;
+    }
+
+    .modal.show .modal-content {
+      transform: scale(1);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .modal-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      transition: color 0.3s ease;
+    }
+
+    .modal-close:hover {
+      color: var(--text-primary);
+    }
+
+    .security-spec {
+      margin-bottom: 24px;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .security-spec h4 {
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .security-spec p {
+      color: var(--text-tertiary);
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* アニメーション */
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* レスポンシブ対応 */
+    @media (max-width: 768px) {
+      body {
+        padding: 16px;
+      }
+      
+      .glass-container {
+        padding: 32px 24px;
+        max-width: 100%;
+      }
+      
+      .step-indicator {
+        flex-direction: column;
+        gap: 4px;
+      }
+      
+      .step {
+        font-size: 11px;
+        padding: 6px 12px;
+      }
+    }
+  </style>
+</head>
+<body class="unified-theme login-page">
+
+  <!-- メインコンテンツ -->
+  <div class="glass-container" id="main-container">
+    <!-- ステップインジケーター -->
+    <div class="step-indicator">
+      <div class="step active" id="step1">
+        <div class="step-number">1</div>
+        <span>ドメイン確認</span>
+      </div>
+      <div class="step" id="step2">
+        <div class="step-number">2</div>
+        <span>メール認証</span>
+      </div>
+      <div class="step" id="step3">
+        <div class="step-number">3</div>
+        <span>ログイン</span>
+      </div>
+    </div>
+
+    <div class="header">
+      <div class="logo">S</div>
+      <h1 class="title">StudyQuest</h1>
+      <p class="subtitle">教育用回答ボードシステム</p>
+    </div>
+
+    <!-- 認証状態パネル -->
+    <div id="auth-status-panel" class="status-card">
+      <div class="status-text">認証情報を確認中...</div>
+    </div>
+
+    <div class="message-area" id="message-area"></div>
+
+    <button class="btn btn-primary" id="login-btn" disabled>
+      <span id="btn-content">ログインして管理画面へ</span>
+    </button>
+
+    <!-- システム管理者用アプリ設定ボタン -->
+    <div id="admin-settings-section" class="hidden">
+      <button type="button" class="btn btn-secondary" id="app-settings-btn">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
+        アプリ設定管理
+      </button>
+      <p class="text-xs text-gray-400 mt-1 text-center">アプリの有効/無効状態を管理できます</p>
+    </div>
+
+    <!-- セキュリティ情報 -->
+    <div class="security-info">
+      <a class="security-link" onclick="showSecurityModal()">
+        <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+        </svg>
+        セキュリティ仕様について
+      </a>
+    </div>
+  </div>
+
+  <!-- 成功画面 -->
+  <div class="glass-container success-container" id="success-container">
+    <div class="success-icon">✓</div>
+    <h2 class="title">ログイン完了</h2>
+    <p class="subtitle">認証が正常に完了しました。管理画面でフォームを作成してください</p>
+    <a href="#" class="btn btn-primary" id="admin-panel-btn">管理画面へ進む</a>
+  </div>
+
+  <!-- セキュリティ仕様モーダル -->
+  <div id="security-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">🔒 セキュリティ仕様</h3>
+        <button class="modal-close" onclick="hideSecurityModal()">&times;</button>
+      </div>
+      
+      <div class="security-spec">
+        <h4>🔐 認証システム</h4>
+        <p>Google OAuth 2.0による安全な認証を実装。多要素認証とセキュアなトークン管理により、不正アクセスを防止します。</p>
+      </div>
+      
+      <div class="security-spec">
+        <h4>🏢 ドメイン認証</h4>
+        <p>組織ドメインとの一致確認により、適切な権限レベルを自動判定。システム管理者、組織ユーザー、外部ユーザーを区別します。</p>
+      </div>
+      
+      <div class="security-spec">
+        <h4>🛡️ データ保護</h4>
+        <p>すべての通信はHTTPS暗号化を使用。セッション管理とデータアクセス制御により、情報漏洩を防止します。</p>
+      </div>
+      
+      <div class="security-spec">
+        <h4>📝 監査ログ</h4>
+        <p>全ての認証試行とアクセスログを記録。セキュリティインシデントの早期発見と対応を可能にします。</p>
+      </div>
+      
+      <div class="security-spec">
+        <h4>🔄 セッション管理</h4>
+        <p>自動タイムアウト、セッション暗号化、不正セッション検出により、セキュアなユーザー体験を提供します。</p>
+      </div>
+    </div>
+  </div>
+
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const mainContainer = document.getElementById('main-container');
+      const successContainer = document.getElementById('success-container');
+      const loginBtn = document.getElementById('login-btn');
+      const btnContent = document.getElementById('btn-content');
+      const messageAreaEl = document.getElementById('message-area');
+      const statusPanel = document.getElementById('auth-status-panel');
+
+      let userEmail = '';
+      let isLoginInProgress = false;
+      let currentStep = 1;
+      let authResult = null;
+
+      const initializePage = () => {
+        google.script.run
+          .withSuccessHandler(authData => {
+            if (authData?.email) {
+              userEmail = authData.email;
+              authResult = authData;
+              updateStepIndicator(2); // ドメイン確認完了
+              loginBtn.disabled = false;
+              btnContent.textContent = 'ログインして管理画面へ';
+              showMessage('認証情報が確認されました', 'success');
+
+              let statusHTML = '';
+
+              // 1. ユーザーメール表示 (共通)
+              statusHTML += `<div class="status-text">アカウント</div><div class="user-email">${userEmail}</div>`;
+
+              // 2. 状態表示
+              statusHTML += `<div style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">`;
+
+              if (authData.isSystemAdmin) {
+                statusHTML += `
+                  <div style="width: 12px; height: 12px; border-radius: 50%; background-color: #818cf8;"></div>
+                  <div style="font-size: 14px; font-weight: 600; color: #a5b4fc;">システム管理者</div>
+                `;
+              } else if (authData.domainMatch) {
+                statusHTML += `
+                  <div style="width: 12px; height: 12px; border-radius: 50%; background-color: #10b981;"></div>
+                  <div style="font-size: 14px; font-weight: 600; color: #34d399;">ドメイン認証済み</div>
+                `;
+              } else {
+                statusHTML += `
+                  <div style="width: 12px; height: 12px; border-radius: 50%; background-color: #f59e0b;"></div>
+                  <div style="font-size: 14px; font-weight: 600; color: #fbbf24;">ドメイン未認証</div>
+                `;
+              }
+              statusHTML += `</div>`;
+              
+              // 3. 説明文
+              statusHTML += `<div style="font-size: 12px; color: rgba(255, 255, 255, 0.6); margin-top: 4px;">`;
+              if (authData.isSystemAdmin) {
+                statusHTML += `アプリの全設定を管理できます。`;
+              } else if (authData.domainMatch) {
+                statusHTML += `システム管理者と同じ組織ドメインです。`;
+              } else {
+                statusHTML += `システム管理者の組織ドメインとは異なります。`;
+              }
+              statusHTML += `</div>`;
+
+              statusPanel.innerHTML = statusHTML;
+
+              // システム管理者用ボタン表示
+              if (authData.isSystemAdmin) {
+                document.getElementById('admin-settings-section').classList.remove('hidden');
+              }
+            } else {
+              statusPanel.innerHTML = `<div class="status-text" style="color: #ef4444;">認証エラー</div><div style="font-size: 12px; color: rgba(255, 255, 255, 0.6); margin-top: 4px;">${authData.error || 'メールアドレスが取得できませんでした。ページを再読み込みしてください。'}</div>`;
+              showMessage('ページの再読み込みが必要です', 'error');
+            }
+          })
+          .withFailureHandler(err => {
+            statusPanel.innerHTML = `<div class="status-text" style="color: #ef4444;">認証エラー</div>`;
+            showMessage(err.message || 'ページの再読み込みが必要です', 'error');
+          })
+          .enhancedDomainVerification();
+      };
+
+      const executeLogin = () => {
+        if (isLoginInProgress || !userEmail) return;
+        isLoginInProgress = true;
+        loginBtn.disabled = true;
+        updateStepIndicator(3); // ログインステップ
+        btnContent.innerHTML = '<span class="spinner"></span>ログイン中...';
+        showMessage('', 'info');
+
+        google.script.run
+          .withSuccessHandler(result => {
+            updateStepIndicator(3, true); // ログイン完了
+            setTimeout(() => {
+              mainContainer.style.display = 'none';
+              successContainer.style.display = 'block';
+              if (result?.adminUrl) {
+                document.getElementById('admin-panel-btn').href = result.adminUrl;
+              }
+            }, 500);
+          })
+          .withFailureHandler(error => {
+            updateStepIndicator(2); // エラー時は前のステップに戻る
+            showMessage(error.message || 'ログインに失敗しました', 'error');
+            loginBtn.disabled = false;
+            btnContent.textContent = 'ログインして管理画面へ';
+            isLoginInProgress = false;
+          })
+          .createUserWithoutQuickstart();
+      };
+
+      const updateStepIndicator = (step, completed = false) => {
+        currentStep = step;
+        
+        // すべてのステップをリセット
+        for (let i = 1; i <= 3; i++) {
+          const stepEl = document.getElementById('step' + i);
+          stepEl.classList.remove('active', 'completed');
+          
+          if (i < step || (i === step && completed)) {
+            stepEl.classList.add('completed');
+          } else if (i === step && !completed) {
+            stepEl.classList.add('active');
+          }
+        }
+      };
+
+      const showMessage = (message, type = 'info') => {
+        messageAreaEl.textContent = message;
+        messageAreaEl.className = `message-area ${type}`;
+      };
+
+      loginBtn.addEventListener('click', executeLogin);
+      
+      document.getElementById('app-settings-btn').addEventListener('click', () => {
+        const baseUrl = window.location.origin + window.location.pathname;
+        const appSetupUrl = baseUrl + '?mode=appsetup';
+        window.open(appSetupUrl, '_blank');
+      });
+      
+      // Security modal functions
+      window.showSecurityModal = function() {
+        document.getElementById('security-modal').classList.add('show');
+      };
+
+      window.hideSecurityModal = function() {
+        document.getElementById('security-modal').classList.remove('show');
+      };
+
+      // 初期化
+      updateStepIndicator(1); // 最初はドメイン確認ステップ
+      initializePage();
+    });
+  </script>
+</body>
+</html>

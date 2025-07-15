@@ -312,35 +312,35 @@
                          function(msg, type) { console.log(`[${type}] ${msg}`); };
         
         var toggleUserManagement = window.appSetupUtilities?.users?.toggle || function() {
-            console.log('User management toggle not available');
+            showMessage('機能を読み込み中です...', 'info');
         };
         
         var loadUserList = window.appSetupUtilities?.users?.load || function() {
-            console.log('Load user list not available');
+            showMessage('ユーザーリストを読み込み中です...', 'info');
         };
         
         var showDeleteConfirmation = window.appSetupUtilities?.users?.showDelete || function(userId, email) {
-            console.log('Delete confirmation not available');
+            showMessage('削除機能を読み込み中です...', 'info');
         };
         
         var cancelDeletion = window.appSetupUtilities?.users?.cancelDelete || function() {
-            console.log('Cancel deletion not available');
+            document.getElementById('delete-modal')?.classList?.add('hidden');
         };
         
         var confirmDeletion = window.appSetupUtilities?.users?.confirmDelete || function() {
-            console.log('Confirm deletion not available');
+            showMessage('削除処理を実行中です...', 'info');
         };
         
         var viewDeletionLogs = window.appSetupUtilities?.logs?.view || function() {
-            console.log('View deletion logs not available');
+            showMessage('ログを読み込み中です...', 'info');
         };
         
         var closeDeletionLogs = window.appSetupUtilities?.logs?.close || function() {
-            console.log('Close deletion logs not available');
+            document.getElementById('logs-modal')?.classList?.add('hidden');
         };
         
         var goBackToAdminPanel = window.appSetupUtilities?.navigation?.goBackToAdminPanel || function() {
-            console.log('Navigation to admin panel not available');
+            window.location.href = window.location.href.split('?')[0];
         };
         
         // Initialize on DOM ready

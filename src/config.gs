@@ -1307,8 +1307,77 @@ function getExistingBoard(requestUserId) {
 }
 
 /**
+ * 強化されたドメイン認証システム
+ * 新しいLoginPage.htmlから呼び出される
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ * @returns {Object} 詳細な認証情報とアクセスレベル
+ */
+function enhancedDomainVerification(requestUserId) {
+  // 新規ユーザー（requestUserIdがundefinedまたはnull）の場合はverifyUserAccessをスキップ
+  if (requestUserId) {
+    verifyUserAccess(requestUserId);
+  }
+  
+  try {
+    const activeUserEmail = Session.getActiveUser().getEmail();
+    if (!activeUserEmail) {
+      return { 
+        authenticated: false, 
+        email: null, 
+        error: 'ユーザーセッションが無効です。再度ログインしてください。' 
+      };
+    }
+
+    const userDomain = getEmailDomain(activeUserEmail);
+    const adminEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
+    const systemAdminDomain = adminEmail ? getEmailDomain(adminEmail) : '';
+    
+    // ドメイン情報取得
+    const domainInfo = getDeployUserDomainInfo();
+    
+    // 認証結果の構築
+    const verificationResult = {
+      authenticated: true,
+      email: activeUserEmail,
+      userDomain: userDomain,
+      systemAdminDomain: systemAdminDomain,
+      isSystemAdmin: activeUserEmail === adminEmail,
+      isDomainMatch: userDomain === systemAdminDomain,
+      isPersonalAccount: isPersonalGoogleAccount(activeUserEmail),
+      isWorkspaceAccount: isWorkspaceAccount(activeUserEmail),
+      deployDomain: domainInfo.deployDomain,
+      currentDomain: domainInfo.currentDomain,
+      accessLevel: calculateAccessLevel(activeUserEmail, adminEmail, userDomain, systemAdminDomain),
+      timestamp: new Date().toISOString()
+    };
+    
+    // アクセス制御チェック
+    if (verificationResult.accessLevel === 'DENIED') {
+      return {
+        authenticated: false,
+        email: null,
+        error: `アクセスが拒否されました。許可されたドメイン: ${systemAdminDomain}, 現在のドメイン: ${userDomain}`
+      };
+    }
+    
+    // 監査ログ記録
+    logAuthenticationAttempt(verificationResult);
+    
+    return verificationResult;
+    
+  } catch (e) {
+    console.error('enhancedDomainVerification エラー: ' + e.message);
+    return { 
+      authenticated: false, 
+      email: null, 
+      error: `認証システムエラー: ${e.message}` 
+    };
+  }
+}
+
+/**
  * ユーザー認証を検証 (マルチテナント対応版)
- * Registration.htmlから呼び出される
+ * Registration.htmlから呼び出される（後方互換性のため保持）
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function verifyUserAuthentication(requestUserId) {
@@ -1360,6 +1429,87 @@ function resetUserAuthentication(requestUserId) {
   } catch (e) {
     console.error('resetUserAuthentication エラー: ' + e.message);
     return { success: false, error: e.message };
+  }
+}
+
+/**
+ * アクセスレベルを計算
+ * @param {string} userEmail - ユーザーのメールアドレス
+ * @param {string} adminEmail - システム管理者のメールアドレス
+ * @param {string} userDomain - ユーザーのドメイン
+ * @param {string} systemAdminDomain - システム管理者のドメイン
+ * @returns {string} アクセスレベル
+ */
+function calculateAccessLevel(userEmail, adminEmail, userDomain, systemAdminDomain) {
+  // システム管理者
+  if (userEmail === adminEmail) {
+    return 'SYSTEM_ADMIN';
+  }
+  
+  // 同じドメインのユーザー
+  if (systemAdminDomain && userDomain === systemAdminDomain) {
+    return 'DOMAIN_USER';
+  }
+  
+  // 個人アカウントの場合
+  if (isPersonalGoogleAccount(userEmail)) {
+    // システム管理者が個人アカウントの場合は外部ユーザーとして扱う
+    if (!systemAdminDomain || systemAdminDomain === '') {
+      return 'EXTERNAL_USER';
+    }
+    // システム管理者が組織アカウントの場合はアクセス拒否
+    return 'DENIED';
+  }
+  
+  // その他の外部ドメイン
+  return 'EXTERNAL_USER';
+}
+
+/**
+ * 個人Googleアカウントかどうかを判定
+ * @param {string} email - メールアドレス
+ * @returns {boolean} 個人アカウントの場合true
+ */
+function isPersonalGoogleAccount(email) {
+  const personalDomains = ['gmail.com', 'googlemail.com'];
+  const domain = getEmailDomain(email);
+  return personalDomains.includes(domain.toLowerCase());
+}
+
+/**
+ * Google Workspaceアカウントかどうかを判定
+ * @param {string} email - メールアドレス
+ * @returns {boolean} Workspaceアカウントの場合true
+ */
+function isWorkspaceAccount(email) {
+  return !isPersonalGoogleAccount(email);
+}
+
+/**
+ * 認証試行を監査ログに記録
+ * @param {Object} authResult - 認証結果
+ */
+function logAuthenticationAttempt(authResult) {
+  try {
+    const logEntry = {
+      timestamp: authResult.timestamp,
+      email: authResult.email,
+      userDomain: authResult.userDomain,
+      systemAdminDomain: authResult.systemAdminDomain,
+      accessLevel: authResult.accessLevel,
+      isSystemAdmin: authResult.isSystemAdmin,
+      isDomainMatch: authResult.isDomainMatch,
+      deployDomain: authResult.deployDomain,
+      currentDomain: authResult.currentDomain
+    };
+    
+    console.log('認証試行ログ:', JSON.stringify(logEntry));
+    
+    // 必要に応じてスプレッドシートやデータベースに記録
+    // recordAuthenticationLog(logEntry);
+    
+  } catch (e) {
+    console.error('認証ログ記録エラー:', e.message);
   }
 }
 
