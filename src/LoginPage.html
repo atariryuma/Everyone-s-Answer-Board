@@ -500,25 +500,9 @@
   <!-- メインコンテンツ -->
   <div class="glass-container" id="main-container">
     <!-- ステップインジケーター -->
-    <div class="step-indicator">
-      <div class="step active" id="step1">
-        <div class="step-number">1</div>
-        <span>ドメイン確認</span>
-      </div>
-      <div class="step" id="step2">
-        <div class="step-number">2</div>
-        <span>メール認証</span>
-      </div>
-      <div class="step" id="step3">
-        <div class="step-number">3</div>
-        <span>ログイン</span>
-      </div>
-    </div>
-
     <div class="header">
       <div class="logo">S</div>
-      <h1 class="title">StudyQuest</h1>
-      <p class="subtitle">教育用回答ボードシステム</p>
+      <h1 class="title">みんなの回答ボード</h1>
     </div>
 
     <!-- 認証状態パネル -->
@@ -608,9 +592,7 @@
       const messageAreaEl = document.getElementById('message-area');
       const statusPanel = document.getElementById('auth-status-panel');
 
-      let userEmail = '';
       let isLoginInProgress = false;
-      let currentStep = 1;
       let authResult = null;
 
       const initializePage = () => {
@@ -619,7 +601,6 @@
             if (authData?.email) {
               userEmail = authData.email;
               authResult = authData;
-              updateStepIndicator(2); // ドメイン確認完了
               loginBtn.disabled = false;
               btnContent.textContent = 'ログインして管理画面へ';
               showMessage('認証情報が確認されました', 'success');
@@ -683,13 +664,11 @@
         if (isLoginInProgress || !userEmail) return;
         isLoginInProgress = true;
         loginBtn.disabled = true;
-        updateStepIndicator(3); // ログインステップ
         btnContent.innerHTML = '<span class="spinner"></span>ログイン中...';
         showMessage('', 'info');
 
         google.script.run
           .withSuccessHandler(result => {
-            updateStepIndicator(3, true); // ログイン完了
             setTimeout(() => {
               mainContainer.style.display = 'none';
               successContainer.style.display = 'block';
@@ -699,29 +678,12 @@
             }, 500);
           })
           .withFailureHandler(error => {
-            updateStepIndicator(2); // エラー時は前のステップに戻る
             showMessage(error.message || 'ログインに失敗しました', 'error');
             loginBtn.disabled = false;
             btnContent.textContent = 'ログインして管理画面へ';
             isLoginInProgress = false;
           })
           .createUserWithoutQuickstart();
-      };
-
-      const updateStepIndicator = (step, completed = false) => {
-        currentStep = step;
-        
-        // すべてのステップをリセット
-        for (let i = 1; i <= 3; i++) {
-          const stepEl = document.getElementById('step' + i);
-          stepEl.classList.remove('active', 'completed');
-          
-          if (i < step || (i === step && completed)) {
-            stepEl.classList.add('completed');
-          } else if (i === step && !completed) {
-            stepEl.classList.add('active');
-          }
-        }
       };
 
       const showMessage = (message, type = 'info') => {
@@ -747,7 +709,6 @@
       };
 
       // 初期化
-      updateStepIndicator(1); // 最初はドメイン確認ステップ
       initializePage();
     });
   </script>
