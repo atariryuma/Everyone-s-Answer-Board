@@ -379,10 +379,30 @@ function getSheetsService() {
 function findUserById(userId, bypassCache = false) {
   console.log('🔍 findUserById: 検索開始', { userId, bypassCache });
   
-  // Core.gsの統合キャッシュシステムが利用可能な場合はそれを使用
-  if (typeof getCachedUserInfoUnified === 'function') {
-    console.log('🔍 統合キャッシュシステム使用');
-    return getCachedUserInfoUnified(userId, bypassCache);
+  // 循環依存防止: 再帰深度の追跡
+  if (!findUserById._recursionDepth) {
+    findUserById._recursionDepth = 0;
+  }
+  
+  if (findUserById._recursionDepth > 2) {
+    console.warn('🚨 findUserById: 循環依存を検出、直接DB検索にフォールバック');
+    findUserById._recursionDepth = 0;
+    return fetchUserFromDatabase('userId', userId);
+  }
+  
+  findUserById._recursionDepth++;
+  
+  try {
+    // Core.gsの統合キャッシュシステムが利用可能な場合はそれを使用
+    if (typeof getCachedUserInfoUnified === 'function') {
+      console.log('🔍 統合キャッシュシステム使用');
+      const result = getCachedUserInfoUnified(userId, bypassCache);
+      findUserById._recursionDepth--;
+      return result;
+    }
+  } catch (error) {
+    findUserById._recursionDepth--;
+    throw error;
   }
   
   // フォールバック: 従来のキャッシュシステム
@@ -407,6 +427,7 @@ function findUserById(userId, bypassCache = false) {
     found: !!result, 
     adminEmail: result?.adminEmail 
   });
+  findUserById._recursionDepth--;
   return result;
 }
 

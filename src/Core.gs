@@ -54,9 +54,9 @@ function getCachedUserInfoUnified(userId, bypassCache = false) {
     return _executionUserInfoCache.get(userId);
   }
 
-  // 2. L1/L2キャッシュ → DB検索（既存のfindUserByIdを利用）
+  // 2. L1/L2キャッシュ → DB検索（直接DB検索で循環依存を回避）
   console.log('🔍 下位キャッシュ/DB検索開始:', userId);
-  const userInfo = findUserById(userId);
+  const userInfo = fetchUserFromDatabase('userId', userId);
   
   // 3. 実行レベルキャッシュに保存
   if (userInfo) {
