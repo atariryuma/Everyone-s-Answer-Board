@@ -284,13 +284,13 @@ function isSystemSetup() {
 }
 
 /**
- * 登録ページを表示する関数
+ * ログインページを表示する関数
  */
-function showRegistrationPage() {
-  var template = HtmlService.createTemplateFromFile('Registration');
+function showLoginPage() {
+  var template = HtmlService.createTemplateFromFile('LoginPage');
   template.include = include;
   var output = template.evaluate()
-    .setTitle('新規ユーザー登録 - StudyQuest')
+    .setTitle('StudyQuest - ログイン')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .setSandboxMode(HtmlService.SandboxMode.IFRAME);
   return output;
@@ -369,7 +369,7 @@ function doGet(e) {
       }
     }
 
-    return showRegistrationPage();
+    return showLoginPage();
   } catch (error) {
     console.error(`doGetで致命的なエラー: ${error.stack}`);
     
@@ -438,17 +438,17 @@ function handleDirectExecAccess(userEmail) {
     }
     
     if (!userEmail) {
-      return showRegistrationPage();
+      return showLoginPage();
     }
     
     // サービスアカウント経由でユーザーがデータベースに登録されているかチェック
     // 認証済みユーザーは常に登録ページを表示（管理パネルへのアクセスはボタン経由）
     console.log('handleDirectExecAccess - Authenticated user, showing registration page');
     debugLog('Authenticated user, showing registration page');
-    return showRegistrationPage();
+    return showLoginPage();
   } catch (error) {
     console.error('handleDirectExecAccess error:', error);
-    return showRegistrationPage();
+    return showLoginPage();
   }
 }
 
@@ -948,9 +948,14 @@ function handleSetupPages(params, userEmail) {
     return safeSetXFrameOptionsAllowAll(explicit.evaluate().setTitle('StudyQuest - サービスアカウント セットアップ'));
   }
 
+  // LoginPageページのリクエストを処理
+  if (params.page === 'LoginPage') {
+    return showLoginPage();
+  }
+
   // システムセットアップが完了している場合のみ、userEmailをチェック
   if (!userEmail && !params.isDirectPageAccess) {
-    return showRegistrationPage();
+    return showLoginPage();
   }
 
   return null;
