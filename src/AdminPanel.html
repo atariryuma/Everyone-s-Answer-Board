@@ -407,49 +407,49 @@
     background: rgba(255, 255, 255, 0.08);
   }
   
-  /* Layout */
+  /* Layout - AdminPanel Specific with High Priority */
   .responsive-grid {
-    display: grid;
-    gap: 1.5rem;
-    grid-template-columns: 1fr;
-    align-items: start;
+    display: grid !important;
+    gap: 1.5rem !important;
+    grid-template-columns: 1fr !important;
+    align-items: start !important;
   }
 
   @media (min-width: 768px) {
     .responsive-grid {
-      grid-template-columns: 2fr 1fr;
-      gap: 2rem;
-      max-width: 1200px;
-      margin: 0 auto;
+      grid-template-columns: 2fr 1fr !important;
+      gap: 2rem !important;
+      max-width: 1200px !important;
+      margin: 0 auto !important;
     }
     .right-panel {
-      width: auto;
-      max-width: 380px;
-      position: sticky;
-      top: 6rem;
-      align-self: start;
+      width: auto !important;
+      max-width: 380px !important;
+      position: sticky !important;
+      top: 6rem !important;
+      align-self: start !important;
     }
   }
 
   @media (min-width: 1024px) {
     .responsive-grid {
-      grid-template-columns: 2fr 380px;
-      gap: 2.5rem;
+      grid-template-columns: 2fr 380px !important;
+      gap: 2.5rem !important;
     }
     .right-panel {
-      width: 380px;
+      width: 380px !important;
     }
   }
   
   main.flex-1 {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
   }
   
   .left-panel {
-    flex: 1;
-    min-height: 0;
+    flex: 1 !important;
+    min-height: 0 !important;
   }
   
   /* Status Indicators */
@@ -555,11 +555,11 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
             </svg>
           </div>
-          <div class="hidden sm:block">
-            <h1 class="text-xl sm:text-2xl font-bold text-white leading-tight">みんなの回答ボード 管理パネル</h1>
-            <p class="text-sm text-gray-400">StudyQuest</p>
+          <div class="hidden sm:block" style="display: block !important;">
+            <h1 class="text-xl sm:text-2xl font-bold text-white leading-tight" style="display: block !important; visibility: visible !important;">みんなの回答ボード 管理パネル</h1>
+            <p class="text-sm text-gray-400" style="display: block !important; visibility: visible !important;">StudyQuest</p>
           </div>
-          <div class="sm:hidden">
+          <div class="sm:hidden" style="display: none;">
             <h1 class="text-xl font-bold text-white">みんなの回答ボード</h1>
           </div>
         </div>
@@ -1054,7 +1054,7 @@
     </div>
   </main>
   
-  <footer id="admin-footer" class="fixed bottom-0 left-0 w-full z-40">
+  <footer id="admin-footer" class="fixed bottom-0 left-0 w-full z-40 hidden" style="display: none !important;">
     <div class="glass-panel rounded-none border-t border-gray-700/50 backdrop-blur-md">
       <div class="max-w-6xl mx-auto px-6 py-4">
         <div class="flex items-center justify-between">
@@ -3082,14 +3082,16 @@ function syncCheckboxStates(status) {
       
       if (!footer || !guidanceText) return;
 
-      // より厳密な公開状態の判定
+      // より厳密な公開状態の判定 - 安全なオプショナルチェーン
       const isPublished = status && (
-        status.isPublished || 
-        status.appPublished
-      ) && status.appUrls && status.appUrls.viewUrl;
+        status.isPublished === true || 
+        status.appPublished === true
+      ) && status.appUrls?.viewUrl;
 
-      if (isPublished) {
+      if (isPublished && status.appUrls?.viewUrl) {
         footer.classList.remove('hidden');
+        footer.style.display = 'block';
+        footer.style.removeProperty('display');
         document.getElementById('board-url').value = status.appUrls.viewUrl;
         document.getElementById('view-board-link').href = status.appUrls.viewUrl;
         
@@ -3118,7 +3120,9 @@ function syncCheckboxStates(status) {
         
         guidanceText.textContent = '回答ボードは現在公開中です。';
       } else {
+        // 非公開時は確実にフッターを非表示
         footer.classList.add('hidden');
+        footer.style.display = 'none';
         // ガイダンスのテキストとステップの説明を動的に設定
         if (status.nextAction) {
           guidanceText.textContent = status.nextAction;

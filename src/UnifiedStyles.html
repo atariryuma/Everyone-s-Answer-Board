@@ -939,7 +939,7 @@ body.unified-theme::before {
 }
 
 /* Responsive Grid System */
-.responsive-grid {
+.page-grid {
   display: grid;
   gap: 1rem;
   grid-template-columns: 1fr;
@@ -1122,17 +1122,17 @@ body.unified-theme::before {
     padding: 1rem;
   }
   
-  /* AdminPanel responsive improvements */
-  .responsive-grid {
-    grid-template-columns: 1fr !important;
+  /* AdminPanel responsive improvements - Remove conflicting rules */
+  .admin-responsive-grid {
+    grid-template-columns: 1fr;
     gap: 1rem;
   }
   
-  .right-panel {
-    position: static !important;
-    width: 100% !important;
-    max-width: none !important;
-    top: auto !important;
+  .admin-right-panel {
+    position: static;
+    width: 100%;
+    max-width: none;
+    top: auto;
   }
   
   .left-panel .glass-panel {
@@ -1151,19 +1151,15 @@ body.unified-theme::before {
 }
 
 @media (min-width: 769px) and (max-width: 1024px) {
-  .responsive-grid {
-    grid-template-columns: 1.5fr 1fr !important;
+  .page-responsive-grid {
+    grid-template-columns: 1.5fr 1fr;
     gap: 1.5rem;
   }
   
-  .right-panel {
+  .page-right-panel {
     max-width: 320px;
   }
-  
-  .responsive-grid {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
+}
   
   .answer-card {
     padding: 1rem;
@@ -1183,14 +1179,14 @@ body.unified-theme::before {
 }
 
 @media (min-width: 768px) {
-  .responsive-grid {
+  .page-grid {
     grid-template-columns: 1fr 1fr;
     gap: 2rem;
   }
 }
 
 @media (min-width: 1024px) {
-  .responsive-grid {
+  .page-grid {
     grid-template-columns: 2fr 1fr;
     gap: 2rem;
     padding: 2rem;
