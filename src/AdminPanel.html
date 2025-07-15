@@ -265,7 +265,7 @@
         </div>
     </div>
   </header>
-  <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8 pb-40">
+  <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8 pb-24">
     <!-- シンプル統合ステータスバー -->
     <section class="mb-4">
       <div class="glass-panel p-6 rounded-lg">
@@ -365,6 +365,31 @@
                       <span id="create-additional-form-text" class="text-gray-200">新規のフォームを作成</span>
                     </button>
                     <p class="text-xs text-gray-400 mt-1">現在のボードに連携する新しいフォームを作成</p>
+                    
+                    <!-- 作成されたフォーム表示 -->
+                    <div class="space-y-3 hidden mt-4" id="form-url-section">
+                      <div class="success-state">
+                        <div class="flex items-center gap-2 mb-2">
+                          <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                          </svg>
+                          <span class="font-medium text-green-200">フォームが作成されました</span>
+                        </div>
+                        <div class="flex gap-2">
+                          <input type="url" id="form-url-input" class="form-control flex-1" readonly placeholder="フォームURLが生成されます">
+                          <button type="button" id="copy-form-url-btn" class="btn btn-secondary px-3" title="URLをコピー">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                            </svg>
+                          </button>
+                          <a id="edit-form-url-link" href="#" target="_blank" class="btn btn-primary px-3" title="フォームを編集">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -407,36 +432,6 @@
                 </div>
               </div>
             </details>
-            
-            <!-- 作成されたリソース表示 -->
-            <div class="space-y-3 hidden" id="form-url-section">
-              <div class="success-state">
-                <div class="flex items-center gap-2 mb-2">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  <span class="font-medium">フォームが作成されました</span>
-                </div>
-                <div class="flex gap-2">
-                  <input type="url" id="form-url-input" class="form-control flex-1 text-sm" readonly placeholder="フォームURLが生成されます">
-                  <button type="button" id="copy-form-url-btn" class="btn btn-secondary" title="URLをコピー">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                    </svg>
-                  </button>
-                  <a id="open-form-url-link" href="#" target="_blank" class="btn btn-secondary" title="フォームを開く">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                    </svg>
-                  </a>
-                  <a id="edit-form-url-link" href="#" target="_blank" class="btn btn-primary" title="フォームを編集">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                    </svg>
-                  </a>
-                </div>
-              </div>
-            </div>
             
             <!-- カスタムフォーム情報表示エリア -->
             <div id="custom-form-info-section" class="hidden mt-4">
@@ -889,12 +884,12 @@
           <input type="text" id="board-url" readonly
                  class="px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-sm cursor-pointer hover:bg-gray-700 focus:ring-2 focus:ring-green-400 min-w-[300px]"
                  onclick="this.select()" placeholder="URLが生成されます">
-          <button type="button" onclick="copyBoardUrl()" class="btn btn-secondary px-3 py-2 flex items-center" title="URLをコピー" aria-label="生徒用URLをコピー">
+          <button type="button" onclick="copyBoardUrl()" class="btn btn-secondary px-4 py-2 flex items-center" title="URLをコピー" aria-label="生徒用URLをコピー">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
             </svg>
           </button>
-          <a id="view-board-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary px-3 py-2 flex items-center" title="回答ボードを開く" aria-label="新しいタブで回答ボードを開く">
+          <a id="view-board-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary px-4 py-2 flex items-center" title="回答ボードを開く" aria-label="新しいタブで回答ボードを開く">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
             </svg>
@@ -4129,6 +4124,18 @@ function syncCheckboxStates(status) {
           window.open(setupUrl, '_blank');
         });
     }
+    
+    function switchToAnotherAccount() {
+      // 別のアカウントでログインするために管理パネルを再読み込み
+      if (window.sharedUtilities && window.sharedUtilities.navigation) {
+        window.sharedUtilities.navigation.safeNavigate('?page=AdminPanel&forceAuth=true', {
+          fallbackMessage: '別のアカウントでログイン中...',
+          method: 'auto'
+        });
+      } else {
+        window.location.href = '?page=AdminPanel&forceAuth=true';
+      }
+    }
 
   </script>
 
@@ -4262,6 +4269,15 @@ function syncCheckboxStates(status) {
       setTimeout(setupCharacterCounters, 100); // モーダル表示後にセットアップ
     };
   }
+  
+  // グローバル関数の露出（ボタンイベント用）
+  window.saveAndPublish = saveAndPublish;
+  window.unpublishBoard = unpublishBoard;
+  window.copyBoardUrl = copyBoardUrl;
+  window.openDatabaseSpreadsheet = openDatabaseSpreadsheet;
+  window.openForm = openForm;
+  window.switchToAnotherAccount = switchToAnotherAccount;
+  window.openAppSetupPage = openAppSetupPage;
   </script>
 
 </body>
