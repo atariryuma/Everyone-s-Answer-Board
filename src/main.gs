@@ -442,23 +442,10 @@ function handleDirectExecAccess(userEmail) {
     }
     
     // サービスアカウント経由でユーザーがデータベースに登録されているかチェック
-    // 登録処理中の場合はロック競合を避けるため、軽量チェックを使用
-    const userInfo = findUserByEmailNonBlocking(userEmail);
-    console.log('handleDirectExecAccess - userInfo:', userInfo);
-    console.log('handleDirectExecAccess - userEmail:', userEmail);
-    
-    if (userInfo && userInfo.userId) {
-      // 登録済みユーザー: 管理パネルに自動遷移（リダイレクトではなく直接遷移）
-      console.log('handleDirectExecAccess - Found user, transitioning to admin panel for userId:', userInfo.userId);
-      
-      // ここで直接管理パネルを表示する（リダイレクトしない）
-      return renderAdminPanel(userInfo, 'admin');
-    } else {
-      // 未登録ユーザー: 新規登録画面表示
-      console.log('handleDirectExecAccess - Unregistered user, showing registration page');
-      debugLog('Unregistered user, showing registration page');
-      return showRegistrationPage();
-    }
+    // 認証済みユーザーは常に登録ページを表示（管理パネルへのアクセスはボタン経由）
+    console.log('handleDirectExecAccess - Authenticated user, showing registration page');
+    debugLog('Authenticated user, showing registration page');
+    return showRegistrationPage();
   } catch (error) {
     console.error('handleDirectExecAccess error:', error);
     return showRegistrationPage();
