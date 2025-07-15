@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#1a1b26" />
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
-  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), ambient-light-sensor=(), speaker-selection=(), vibrate=(), xr-spatial-tracking=()" />
   <!-- User ID from server template -->
   <meta name="user-id" content="<?= typeof userId !== 'undefined' ? userId : '' ?>" id="user-id-meta">
 
@@ -82,7 +82,29 @@
       }
       
       // userIdを第一引数として追加
-      return gasOptimizer.call(functionName, appState.userId, ...args);
+      return gasOptimizer.call(functionName, appState.userId, ...args)
+        .catch(function(error) {
+          console.error('GAS呼び出しエラー:', error);
+          
+          // 特定のエラーに対してフォールバック処理
+          if (error.message && error.message.includes('is not a function')) {
+            console.warn('GAS関数が見つかりません。直接呼び出しを試行します。');
+            
+            // google.script.run による直接呼び出し
+            return new Promise(function(resolve, reject) {
+              if (typeof google !== 'undefined' && google.script && google.script.run) {
+                google.script.run
+                  .withSuccessHandler(resolve)
+                  .withFailureHandler(reject)
+                  [functionName](appState.userId, ...args);
+              } else {
+                reject(new Error('google.script.run が利用できません。'));
+              }
+            });
+          }
+          
+          throw error;
+        });
     }
     
     // callWithCache 関数 - 読み取り専用操作用
@@ -234,13 +256,13 @@
         </div>
         
         <!-- ドメイン・ステータス情報 -->
-        <div class="flex items-center gap-2 sm:gap-3">
+        <div class="flex items-center gap-3">
           <!-- ドメイン情報（Registration.htmlスタイル） -->
           <div id="header-domain-info">
             <!-- ドメイン一致表示（緑色パネル） -->
             <!-- ドメイン一致表示（Registration.htmlスタイル） -->
             <div id="header-domain-match" class="glass-panel bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-3 border border-green-400/30 hidden">
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-3">
                 <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
@@ -253,7 +275,7 @@
             
             <!-- ドメイン不一致表示（Registration.htmlスタイル） -->
             <div id="header-domain-mismatch" class="glass-panel bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg p-3 border border-yellow-400/30 hidden">
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-3">
                 <svg class="w-5 h-5 text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
                 </svg>
@@ -266,7 +288,7 @@
             
             <!-- 初期状態表示 -->
             <div id="header-domain-initial" class="glass-panel bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-3 border border-blue-400/30">
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-3">
                 <div id="header-status-dot" class="w-3 h-3 bg-blue-400 rounded-full animate-pulse flex-shrink-0"></div>
                 <div>
                   <div class="text-blue-400 font-semibold text-sm" id="header-domain-name-initial">ドメイン確認中</div>
@@ -282,9 +304,9 @@
     <!-- シンプル統合ステータスバー -->
     <section class="mb-4">
       <div class="glass-panel p-6 rounded-lg">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0">
           <!-- 左側: ステータス表示 -->
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
             <div class="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
               <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
@@ -303,7 +325,7 @@
           </div>
           
           <!-- 右側: コンパクトステップナビゲーション -->
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 sm:gap-3 justify-center sm:justify-end">
             <div class="flex items-center gap-1" id="step-1-indicator">
               <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">1</div>
               <span class="text-sm text-gray-300 hidden sm:inline">データ準備</span>
@@ -390,12 +412,12 @@
                         </div>
                         <div class="flex gap-2">
                           <input type="url" id="form-url-input" class="form-control flex-1" readonly placeholder="フォームURLが生成されます">
-                          <button type="button" id="copy-form-url-btn" class="btn btn-secondary px-3" title="URLをコピー">
+                          <button type="button" id="copy-form-url-btn" class="btn btn-secondary px-4" title="URLをコピー">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                             </svg>
                           </button>
-                          <a id="edit-form-url-link" href="#" target="_blank" class="btn btn-primary px-3" title="フォームを編集">
+                          <a id="edit-form-url-link" href="#" target="_blank" class="btn btn-primary px-4" title="フォームを編集">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                             </svg>
@@ -434,7 +456,7 @@
                       <button type="button" id="add-resource-btn" class="btn btn-primary flex-1">
                         <span id="add-resource-text">リソースを追加</span>
                       </button>
-                      <button type="button" id="open-resource-btn" class="btn btn-secondary px-3" disabled title="フォームまたはスプレッドシートを開く">
+                      <button type="button" id="open-resource-btn" class="btn btn-secondary px-4" disabled title="フォームまたはスプレッドシートを開く">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                         </svg>
@@ -494,7 +516,7 @@
                     <select id="sheet-select" class="form-control flex-1" aria-describedby="sheet-help">
                       <option>読み込み中...</option>
                     </select>
-                    <button type="button" id="open-spreadsheet-btn-step2" class="btn btn-secondary px-3" title="スプレッドシートを開く">
+                    <button type="button" id="open-spreadsheet-btn-step2" class="btn btn-secondary px-4" title="スプレッドシートを開く">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
@@ -547,7 +569,7 @@
                     </div>
                     <div class="flex gap-2">
                       <select id="opinionHeader" class="form-control flex-1" aria-describedby="main-help"></select>
-                      <button type="button" id="reguess-headers-btn" class="btn bg-gradient-to-r from-cyan-600/80 to-purple-600/80 hover:from-cyan-600 hover:to-purple-600 text-white px-3 py-2 relative overflow-hidden group" title="AI搭載 高精度列判定システム">
+                      <button type="button" id="reguess-headers-btn" class="btn bg-gradient-to-r from-cyan-600/80 to-purple-600/80 hover:from-cyan-600 hover:to-purple-600 text-white px-4 py-2 relative overflow-hidden group" title="AI搭載 高精度列判定システム">
                         <span class="relative z-10 flex items-center gap-1">
                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
@@ -653,15 +675,15 @@
                 管理の流れ（3ステップ）
               </h4>
               <div class="space-y-2 text-sm text-amber-100">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-3">
                   <span class="bg-amber-600 text-white text-xs px-2 py-1 rounded font-bold">1</span>
                   <span>データソース連携・AI列判定</span>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-3">
                   <span class="bg-amber-600 text-white text-xs px-2 py-1 rounded font-bold">2</span>
                   <span>表示設定・プライバシー調整</span>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-3">
                   <span class="bg-amber-600 text-white text-xs px-2 py-1 rounded font-bold">3</span>
                   <span>公開して学習者に共有</span>
                 </div>
@@ -683,19 +705,19 @@
                 セキュリティ・機能概要
               </h4>
               <div class="space-y-2 text-sm text-blue-100">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-3">
                   <span class="text-green-400">✓</span>
                   <span>Google Workspace自動連携</span>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-3">
                   <span class="text-green-400">✓</span>
                   <span>AI機能での効率化</span>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-3">
                   <span class="text-green-400">✓</span>
                   <span>完全非公開データベース</span>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-3">
                   <span class="text-green-400">✓</span>
                   <span>リアルタイム更新</span>
                 </div>
@@ -823,13 +845,13 @@
         </h4>
         <div class="space-y-3 text-sm">
           <div class="flex gap-2">
-            <button type="button" id="open-spreadsheet-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded flex items-center justify-center gap-2 transition-all" disabled>
+            <button type="button" id="open-spreadsheet-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded flex items-center justify-center gap-2 transition-all" disabled>
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
               </svg>
               スプレッドシート
             </button>
-            <button type="button" id="open-form-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded flex items-center justify-center gap-2 transition-all" disabled>
+            <button type="button" id="open-form-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center justify-center gap-2 transition-all" disabled>
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
               </svg>
@@ -839,21 +861,21 @@
           
           <!-- リソース削除セクション -->
           <div class="border-t border-gray-600/50 pt-3 mt-3">
-            <div class="bg-red-900/20 border border-red-500/30 rounded-lg p-3">
+            <div class="bg-orange-900/20 border border-orange-500/30 rounded-lg p-3">
               <div class="flex items-center gap-2 mb-2">
-                <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
                 </svg>
-                <span class="text-red-200 font-medium text-sm">危険な操作</span>
+                <span class="text-orange-200 font-medium text-sm">リソース管理</span>
               </div>
-              <button type="button" id="delete-all-resources-btn" class="w-full bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded flex items-center justify-center gap-2 transition-all text-sm font-medium">
+              <button type="button" id="delete-all-resources-btn" class="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded flex items-center justify-center gap-2 transition-all text-sm font-medium">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
                 </svg>
-                全リソースを削除
+                リソース連携を解除
               </button>
-              <p class="text-red-300 text-xs mt-2">
-                ⚠️ データベース内の全リソース情報が完全に削除されます
+              <p class="text-orange-300 text-xs mt-2">
+                ℹ️ アプリとの連携を解除します（フォーム・スプレッドシートは保持されます）
               </p>
             </div>
           </div>
@@ -4258,20 +4280,24 @@ function syncCheckboxStates(status) {
     }
     
     function deleteAllResources() {
-      // 全リソース削除の実行
-      setLoading(true, '全リソースを削除中...');
-      runGasWithUserId('deleteAllResources')
-        .then(function(response) {
-          console.log('リソース削除レスポンス:', response);
-          showMessage(response.message || '✅ 全リソースを削除しました。', 'success');
+      // リソース連携解除の実行（フォーム・スプレッドシートは保持）
+      setLoading(true, 'リソース連携を解除中...');
+      
+      // runGasWithUserId の代わりに google.script.run を直接使用
+      google.script.run
+        .withSuccessHandler(function(response) {
+          console.log('リソース連携解除レスポンス:', response);
+          showMessage(response.message || '✅ リソース連携を解除しました。フォームとスプレッドシートは保持されています。', 'success');
           setLoading(false);
           // UIをリフレッシュ
           loadStatus(true);
         })
-        .catch(function(error) {
-          handleError(error, 'deleteAllResources');
+        .withFailureHandler(function(error) {
+          console.error('リソース連携解除エラー:', error);
+          handleError(error, 'リソース連携解除');
           setLoading(false);
-        });
+        })
+        .disconnectResources(appState.userId);
     }
 
   </script>
