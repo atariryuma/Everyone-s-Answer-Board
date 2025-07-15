@@ -366,8 +366,8 @@
       width: 100%;
       height: 100%;
       background: rgba(15, 23, 42, 0.8);
-      backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
       z-index: 1000;
       align-items: center;
       justify-content: center;
@@ -528,7 +528,7 @@
 
     <div class="message-area" id="message-area"></div>
 
-    <button class="btn btn-primary" id="login-btn" disabled>
+    <button type="button" class="btn btn-primary" id="login-btn" disabled>
       <span id="btn-content">ログインして管理画面へ</span>
     </button>
 
@@ -568,7 +568,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h3 class="modal-title">🔒 セキュリティ仕様</h3>
-        <button class="modal-close" onclick="hideSecurityModal()">&times;</button>
+        <button type="button" class="modal-close" onclick="hideSecurityModal()">&times;</button>
       </div>
       
       <div class="security-spec">
