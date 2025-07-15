@@ -193,11 +193,11 @@
 
     <!-- ドメイン状態表示 -->
     <div id="domain-status-section" class="status-card hidden" style="margin-top: 12px;">
-      <div class="flex items-center gap-2">
-        <div id="domain-status-icon" class="w-4 h-4 rounded-full"></div>
-        <div id="domain-status-text" class="text-sm font-medium"></div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div id="domain-status-icon" style="width: 12px; height: 12px; border-radius: 50%;"></div>
+        <div id="domain-status-text" style="font-size: 14px; font-weight: 600;"></div>
       </div>
-      <div id="domain-status-desc" class="text-xs text-gray-400 mt-1"></div>
+      <div id="domain-status-desc" style="font-size: 12px; color: rgba(255, 255, 255, 0.6); margin-top: 4px;"></div>
     </div>
 
     <div class="message-area" id="message-area"></div>
@@ -266,14 +266,14 @@
                   const domainDesc = document.getElementById('domain-status-desc');
                   
                   if (authResult?.domainMatch) {
-                    domainIcon.className = 'w-4 h-4 rounded-full bg-green-400';
+                    domainIcon.style.backgroundColor = '#10b981';
                     domainText.textContent = 'ドメイン認証済み';
-                    domainText.className = 'text-sm font-medium text-green-200';
+                    domainText.style.color = '#34d399';
                     domainDesc.textContent = 'システム管理者ドメインと一致しています';
                   } else {
-                    domainIcon.className = 'w-4 h-4 rounded-full bg-yellow-400';
+                    domainIcon.style.backgroundColor = '#f59e0b';
                     domainText.textContent = 'ドメイン未認証';
-                    domainText.className = 'text-sm font-medium text-yellow-200';
+                    domainText.style.color = '#fbbf24';
                     domainDesc.textContent = 'システム管理者ドメインと異なります';
                   }
                   domainSection.classList.remove('hidden');
