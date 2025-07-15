@@ -197,6 +197,14 @@
       <span id="btn-content">回答ボードを作成</span>
     </button>
 
+    <!-- システム管理者用アプリ設定ボタン -->
+    <div id="admin-settings-section" class="hidden" style="margin-top: 16px;">
+      <button type="button" class="btn btn-secondary w-full" id="app-settings-btn">
+        <span>⚙️ アプリ設定管理</span>
+      </button>
+      <p class="text-xs text-gray-400 mt-1 text-center">アプリの有効/無効状態を管理できます</p>
+    </div>
+
     <div class="footer">
       <a data-modal-trigger="enhanced-privacy">プライバシーポリシー</a>
       および
@@ -245,6 +253,11 @@
                   userEmailEl.textContent = userEmail;
                   registerBtn.disabled = false;
                   showMessage('回答ボードを作成できます', 'success');
+                  
+                  // システム管理者チェック
+                  if (authResult?.isSystemAdmin) {
+                    document.getElementById('admin-settings-section').classList.remove('hidden');
+                  }
                 } else {
                   throw new Error('メールアドレスが取得できませんでした');
                 }
@@ -343,6 +356,14 @@
       };
 
       registerBtn.addEventListener('click', handleRegistrationRequest);
+      
+      // アプリ設定ボタンのイベントリスナー
+      document.getElementById('app-settings-btn').addEventListener('click', () => {
+        const baseUrl = window.location.origin + window.location.pathname;
+        const appSetupUrl = baseUrl + '?mode=appsetup';
+        window.open(appSetupUrl, '_blank');
+      });
+      
       setupModalControls();
       initializePage();
     });
