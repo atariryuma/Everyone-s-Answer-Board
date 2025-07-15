@@ -1023,153 +1023,14 @@
     
     var handleError = window.adminUtilities?.error?.handle || function(error, context) {
       console.error(`[${context}]`, error);
-      
-      // Enhanced error handling with user-friendly messages
-      let userMessage = 'エラーが発生しました。';
-      let errorDetails = '';
-      
-      if (error && typeof error === 'object') {
-        errorDetails = error.message || error.toString();
-        
-        // Map common errors to user-friendly messages
-        if (errorDetails.includes('network') || errorDetails.includes('fetch')) {
-          userMessage = 'ネットワーク接続に問題があります。インターネット接続を確認してください。';
-        } else if (errorDetails.includes('permission') || errorDetails.includes('auth')) {
-          userMessage = '権限が不足しています。管理者権限でアクセスしているか確認してください。';
-        } else if (errorDetails.includes('timeout')) {
-          userMessage = '処理がタイムアウトしました。しばらく待ってから再試行してください。';
-        } else if (errorDetails.includes('spreadsheet') || errorDetails.includes('sheet')) {
-          userMessage = 'スプレッドシートへのアクセスに失敗しました。設定を確認してください。';
-        } else if (errorDetails.includes('form')) {
-          userMessage = 'Googleフォームの処理中にエラーが発生しました。';
-        } else if (context) {
-          userMessage = `${context}中にエラーが発生しました。`;
-        }
-      } else {
-        errorDetails = String(error);
-      }
-      
-      // Log detailed error for debugging
-      console.group('🚨 Error Details');
-      console.log('Context:', context);
-      console.log('Error Object:', error);
-      console.log('Error Details:', errorDetails);
-      console.log('User Message:', userMessage);
-      console.log('Timestamp:', new Date().toISOString());
-      console.groupEnd();
-      
-      // Show user-friendly message
-      showMessage(userMessage, 'error');
-      
-      // Log to debug if DEBUG_MODE is enabled
-      if (DEBUG_MODE) {
-        showMessage(`Debug: ${errorDetails}`, 'warning');
-      }
     };
     
     var setLoading = window.adminUtilities?.loading?.set || function(loading, message) {
       console.log(`Loading: ${loading} - ${message}`);
-      
-      // Enhanced loading state management
-      if (loading) {
-        // Show loading message
-        if (message) {
-          showMessage(message, 'info');
-        }
-        
-        // Add loading class to body for global loading styles
-        document.body.classList.add('loading');
-        
-        // Disable interactive elements during loading
-        const buttons = document.querySelectorAll('button:not([data-loading-safe])');
-        buttons.forEach(btn => {
-          btn.disabled = true;
-          btn.setAttribute('data-was-disabled', 'true');
-        });
-        
-        console.log('🔄 Loading started:', message);
-      } else {
-        // Remove loading state
-        document.body.classList.remove('loading');
-        
-        // Re-enable interactive elements
-        const buttons = document.querySelectorAll('button[data-was-disabled]');
-        buttons.forEach(btn => {
-          btn.disabled = false;
-          btn.removeAttribute('data-was-disabled');
-        });
-        
-        console.log('✅ Loading completed');
-      }
     };
     
     var updateDatabaseInfo = window.adminUtilities?.ui?.updateDatabaseInfo || function(status) {
       console.log('Update database info:', status);
-    };
-    
-    // Enhanced debug logging system
-    var debugLog = {
-      info: function(message, data) {
-        if (DEBUG_MODE) {
-          console.log(`ℹ️  [INFO] ${message}`, data);
-        }
-      },
-      
-      warn: function(message, data) {
-        console.warn(`⚠️  [WARN] ${message}`, data);
-      },
-      
-      error: function(message, data) {
-        console.error(`❌ [ERROR] ${message}`, data);
-      },
-      
-      debug: function(message, data) {
-        if (DEBUG_MODE) {
-          console.debug(`🔍 [DEBUG] ${message}`, data);
-        }
-      },
-      
-      // System state logging
-      systemState: function() {
-        if (!DEBUG_MODE) return;
-        
-        console.group('🔍 System State Debug');
-        console.log('DOM State:', document.readyState);
-        console.log('Window loaded:', document.readyState === 'complete');
-        console.log('Page URL:', window.location.href);
-        console.log('User Agent:', navigator.userAgent);
-        console.log('Available utilities:', {
-          adminUtilities: !!window.adminUtilities,
-          sharedUtilities: !!window.sharedUtilities,
-          gasOptimizer: !!window.gasOptimizer
-        });
-        console.log('Elements check:', {
-          messageArea: !!document.getElementById('message-area'),
-          header: !!document.querySelector('header'),
-          footer: !!document.getElementById('admin-footer'),
-          main: !!document.querySelector('main')
-        });
-        console.groupEnd();
-      },
-      
-      // Performance monitoring
-      performance: function(label, operation) {
-        if (!DEBUG_MODE) return operation();
-        
-        const startTime = performance.now();
-        console.log(`⏱️  [PERF] Starting: ${label}`);
-        
-        try {
-          const result = operation();
-          const endTime = performance.now();
-          console.log(`⏱️  [PERF] Completed: ${label} in ${(endTime - startTime).toFixed(2)}ms`);
-          return result;
-        } catch (error) {
-          const endTime = performance.now();
-          console.error(`⏱️  [PERF] Failed: ${label} in ${(endTime - startTime).toFixed(2)}ms`, error);
-          throw error;
-        }
-      }
     };
     
     var toggleSection = window.adminUtilities?.ui?.toggleSection || function(sectionId) {
@@ -1194,64 +1055,10 @@
       }
     }
     
-    // Basic functionality test
-    function testBasicFunctionality() {
-      debugLog.info('Running basic functionality tests');
-      
-      try {
-        // Test message system
-        showMessage('システムテスト: メッセージ表示テスト', 'info');
-        
-        // Test layout functions
-        adjustLayout();
-        
-        // Test error handling
-        handleError(new Error('テストエラー'), 'テストコンテキスト');
-        
-        // Test elements existence
-        const elements = {
-          messageArea: document.getElementById('message-area'),
-          header: document.querySelector('header'),
-          footer: document.getElementById('admin-footer'),
-          main: document.querySelector('main')
-        };
-        
-        debugLog.info('Element check results:', elements);
-        
-        // Test modals
-        const modals = [
-          'privacy-modal',
-          'digital-citizenship-modal', 
-          'usage-guide-modal',
-          'confirmation-modal',
-          'form-config-modal'
-        ];
-        
-        const modalCheck = {};
-        modals.forEach(modalId => {
-          modalCheck[modalId] = !!document.getElementById(modalId);
-        });
-        
-        debugLog.info('Modal availability check:', modalCheck);
-        
-        debugLog.info('Basic functionality tests completed successfully');
-        
-      } catch (error) {
-        debugLog.error('Basic functionality test failed:', error);
-      }
-    }
-    
     // Initialize on DOM ready
     document.addEventListener('DOMContentLoaded', function() {
       if (!IS_TEST_ENV) {
         console.log('🔧 AdminPanel: Using unified utilities and logic files');
-        
-        // Log system state for debugging
-        debugLog.systemState();
-        
-        // Initialize layout and positioning
-        initializeLayout();
-        
         setupCharacterCounters();
         
         // Initialize admin utilities if available
@@ -1261,14 +1068,6 @@
         
         if (window.sharedUtilities) {
           console.log('✅ AdminPanel: Shared utilities loaded');
-        }
-        
-        // Log successful initialization
-        debugLog.info('AdminPanel initialization completed');
-        
-        // Test basic functionality after initialization
-        if (DEBUG_MODE) {
-          testBasicFunctionality();
         }
       }
     });
@@ -1643,43 +1442,13 @@
     function adjustLayout() {
       if (IS_TEST_ENV) return;
       if (typeof baseBodyPadding === 'undefined') {
-        baseBodyPadding = parseFloat(getComputedStyle(document.body).paddingBottom) || 20; // Default 20px padding
+        baseBodyPadding = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
       }
-      
       const footer = document.getElementById('admin-footer');
-      if (footer && !footer.classList.contains('hidden')) {
-        // Footer is visible, calculate actual height
-        const footerHeight = footer.offsetHeight || 60; // Default 60px if height cannot be calculated
-        document.body.style.paddingBottom = Math.max(footerHeight + 20, 100) + 'px'; // Minimum 100px
-      } else {
-        // Footer is hidden, use main content bottom padding
-        document.body.style.paddingBottom = baseBodyPadding + 'px';
+      if (footer) {
+        const footerHeight = footer.offsetHeight;
+        document.body.style.paddingBottom = footerHeight + baseBodyPadding + 'px';
       }
-    }
-    
-    // Enhanced layout initialization
-    function initializeLayout() {
-      // Ensure proper viewport handling
-      const header = document.querySelector('header');
-      const main = document.querySelector('main');
-      const footer = document.getElementById('admin-footer');
-      
-      if (header) {
-        header.style.position = 'sticky';
-        header.style.top = '0';
-        header.style.zIndex = '50';
-      }
-      
-      if (main) {
-        // Ensure main content has proper spacing
-        main.style.paddingBottom = '6rem'; // 96px default
-      }
-      
-      // Initial layout adjustment
-      adjustLayout();
-      
-      // Adjust on window resize
-      window.addEventListener('resize', adjustLayout);
     }
 
     // プライバシーモーダルの制御関数
@@ -2380,8 +2149,7 @@ elements = {
     // `setupEventListeners` 関数の中にこのリスナーを追加
 function setupEventListeners() {
   // ... 既存のリスナーはそのまま ...
-  window.addEventListener('resize', adjustLayout);
-  // Sheet selection
+  window.addEventListener('resize', adjustLayout);  // Sheet selection
       if (elements.sheetSelect) {
         elements.sheetSelect.addEventListener('change', function(e) {
           appState.selectedSheet = e.target.value;
@@ -3235,7 +3003,6 @@ function syncCheckboxStates(status) {
 
       if (isPublished && status.appUrls && status.appUrls.viewUrl) {
         footer.classList.remove('hidden');
-        adjustLayout(); // Adjust layout when footer becomes visible
         document.getElementById('board-url').value = status.appUrls.viewUrl;
         document.getElementById('view-board-link').href = status.appUrls.viewUrl;
         
@@ -3265,7 +3032,6 @@ function syncCheckboxStates(status) {
         guidanceText.textContent = '回答ボードは現在公開中です。';
       } else {
         footer.classList.add('hidden');
-        adjustLayout(); // Adjust layout when footer becomes hidden
         // ガイダンスのテキストとステップの説明を動的に設定
         if (status.nextAction) {
           guidanceText.textContent = status.nextAction;
