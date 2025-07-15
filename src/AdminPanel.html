@@ -220,11 +220,12 @@
     overflow-x: hidden;
     background: var(--bg-primary);
   }
-  
+
   body {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    padding-bottom: 5rem; /* space for fixed footer */
   }
   
   main {
@@ -411,24 +412,24 @@
     gap: 1.5rem;
     grid-template-columns: 1fr;
   }
-  
+
   @media (min-width: 768px) {
     .responsive-grid {
-      grid-template-columns: 2fr 1fr;
+      grid-template-columns: 1fr 350px;
       gap: 2rem;
     }
     .right-panel {
-      min-width: 200px;
+      width: 350px;
     }
   }
 
   @media (min-width: 1024px) {
     .responsive-grid {
-      grid-template-columns: minmax(400px, 1fr) 350px;
+      grid-template-columns: 1fr 350px;
       gap: 2rem;
     }
     .right-panel {
-      min-width: 300px;
+      width: 350px;
     }
   }
   
@@ -867,6 +868,14 @@
               <span class="text-white font-semibold" id="info-published-sheet">-</span>
             </div>
             <div class="flex justify-between items-center">
+              <span class="text-gray-400">表示モード:</span>
+              <span class="text-white" id="info-display-mode">-</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-400">カウント表示:</span>
+              <span class="text-white" id="info-show-counts">-</span>
+            </div>
+            <div class="flex justify-between items-center">
               <span class="text-gray-400">総回答数:</span>
               <span class="text-white font-bold text-base" id="info-answer-count">-</span>
             </div>
@@ -905,6 +914,10 @@
               <span class="text-tertiary">メール:</span>
               <span class="text-primary font-medium truncate" id="info-admin-email">-</span>
             </div>
+            <div class="flex justify-between items-center">
+              <span class="text-tertiary">ユーザーID:</span>
+              <span class="text-primary font-mono text-sm bg-gray-700 px-1.5 py-0.5 rounded" id="info-user-id">-</span>
+            </div>
             <div class="space-y-2">
               <a href="#" onclick="switchToAnotherAccount(); return false;" class="block text-center text-cyan-400 hover:text-cyan-300 hover:underline text-sm py-2">
                 別のアカウントでログイン
@@ -926,7 +939,7 @@
     </div>
   </main>
   
-  <footer id="admin-footer" class="sticky bottom-0 z-40">
+  <footer id="admin-footer" class="fixed bottom-0 left-0 w-full z-40">
     <div class="glass-panel rounded-none border-t border-gray-700/50 backdrop-blur-md">
       <div class="max-w-6xl mx-auto px-6 py-4">
         <div class="flex items-center justify-between">
