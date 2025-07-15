@@ -9,8 +9,7 @@
     <meta name="description" content="StudyQuest回答ボード - 現在準備中です" />
     <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
     
-    <!-- TailwindCSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- TailwindCSS CDN removed - using UnifiedStyles.html custom components -->
     
     <!-- Unified Styles and Shared Components -->
     <?!= include('UnifiedStyles'); ?>
@@ -36,7 +35,7 @@
         }
     </style>
 </head>
-<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white min-h-screen flex items-center justify-center">
+<body class="dark-body flex items-center justify-center">
     <div class="container mx-auto px-4 py-8 max-w-4xl">
         <? if (typeof isOwner !== 'undefined' && isOwner) { ?>
             <!-- 管理者用画面：公開終了後 -->
