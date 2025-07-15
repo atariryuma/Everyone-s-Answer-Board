@@ -2019,7 +2019,7 @@ elements = {
       if (!IS_TEST_ENV) {
         showSystemFlow(); // デバッグフロー表示
         loadStatus();
-        adjustLayout();
+        // Layout adjustment removed - using flexbox layout
         loadAdminDomainInfo();
       }
       setupEventListeners();
@@ -2231,7 +2231,7 @@ elements = {
     // `setupEventListeners` 関数の中にこのリスナーを追加
 function setupEventListeners() {
   // ... 既存のリスナーはそのまま ...
-  window.addEventListener('resize', adjustLayout);  // Sheet selection
+  // Layout adjustment removed - using flexbox layout
       if (elements.sheetSelect) {
         elements.sheetSelect.addEventListener('change', function(e) {
           appState.selectedSheet = e.target.value;
