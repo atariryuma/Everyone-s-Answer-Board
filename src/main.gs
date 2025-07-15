@@ -880,9 +880,14 @@ function validateUserSession(currentUserEmail, params) {
       }
       
       console.log('validateUserSession - valid user found:', userInfo.userId);
-    } else {
-      console.warn('validateUserSession - userId not found:', params.userId);
-    }
+      } else {
+        console.warn('validateUserSession - userId not found:', params.userId);
+        var fallbackByEmail = findUserByEmail(currentUserEmail);
+        if (fallbackByEmail) {
+          console.log('validateUserSession - fallback found user by email:', fallbackByEmail.userId);
+          userInfo = fallbackByEmail;
+        }
+      }
   } else if (params.isDirectPageAccess) {
     // 直接ページアクセスの場合は、emailベースでフォールバック
     console.log('validateUserSession - direct page access, looking up by email');

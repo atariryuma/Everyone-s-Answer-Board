@@ -1589,9 +1589,10 @@ function createUserAtomic(userData) {
   const service = getSheetsService();
   appendSheetsData(service, dbId, "'" + sheetName + "'!A1", [newRow]);
   console.log('User created via Service Account');
-  
+
   // キャッシュ無効化
   invalidateUserCache(userData.userId, userData.adminEmail, userData.spreadsheetId, false);
+  cacheManager.clearByPattern('db_index_');
   
   return userData;
 }
