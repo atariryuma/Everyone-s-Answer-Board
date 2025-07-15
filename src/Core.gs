@@ -4329,6 +4329,69 @@ function deleteCurrentUserAccount(requestUserId) {
 }
 
 /**
+ * リソース連携を解除する関数（フォーム・スプレッドシートは保持）
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ */
+function disconnectResources(requestUserId) {
+  try {
+    verifyUserAccess(requestUserId);
+    
+    // ユーザー情報を取得
+    const userInfo = getUserInfoOptimized(requestUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません。');
+    }
+    
+    // データベースからユーザー情報を削除（リソース連携解除）
+    const database = getDatabase();
+    if (!database) {
+      throw new Error('データベースにアクセスできません。');
+    }
+    
+    const sheet = database.getSheetByName(DB_SHEET_CONFIG.SHEET_NAME);
+    if (!sheet) {
+      throw new Error('ユーザーシートが見つかりません。');
+    }
+    
+    // ユーザー行を特定して削除
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const userIdIndex = headers.indexOf('userId');
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][userIdIndex] === requestUserId) {
+        sheet.deleteRow(i + 1);
+        
+        // 操作ログを記録
+        logActivity(requestUserId, 'resource_disconnect', {
+          action: 'リソース連携解除',
+          timestamp: new Date().toISOString(),
+          note: 'フォーム・スプレッドシートは保持'
+        });
+        
+        return {
+          status: 'success',
+          message: 'リソース連携を解除しました。フォームとスプレッドシートは保持されています。',
+          data: {
+            spreadsheetUrl: userInfo.spreadsheetUrl,
+            formUrl: userInfo.configJson ? JSON.parse(userInfo.configJson).formUrl : null
+          }
+        };
+      }
+    }
+    
+    throw new Error('ユーザーデータが見つかりません。');
+    
+  } catch (error) {
+    console.error('disconnectResources error:', error.message);
+    return {
+      status: 'error',
+      message: error.message || 'リソース連携解除中にエラーが発生しました。'
+    };
+  }
+}
+
+/**
  * 既存ユーザーのconfigJsonを修復する関数
  * フォーム作成済みだがpublishedSpreadsheetIdが欠如している場合に使用
  */

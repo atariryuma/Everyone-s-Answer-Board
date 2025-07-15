@@ -7,12 +7,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#1a1b26" />
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
-  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), ambient-light-sensor=(), speaker-selection=(), vibrate=(), xr-spatial-tracking=()" />
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), ambient-light-sensor=(), speaker-selection=(), vibrate=(), vr=(), xr-spatial-tracking=()" />
   <!-- User ID from server template -->
   <meta name="user-id" content="<?= typeof userId !== 'undefined' ? userId : '' ?>" id="user-id-meta">
 
   <!-- TailwindCSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // TailwindCSS 本番警告を抑制
+    if (typeof tailwind !== 'undefined') {
+      tailwind.config = {
+        corePlugins: {
+          preflight: false,
+        },
+        prefix: '',
+      };
+    }
+  </script>
 
   <!-- Unified Styles and Shared Components -->
   <?!= include('UnifiedStyles'); ?>
@@ -32,9 +43,24 @@
     if (typeof clearTimeout === 'undefined') {
       function clearTimeout(){ }
     }
-    // グローバルエラーハンドリング
+    // 統合グローバルエラーハンドリング（重複防止）
+    let lastErrorTime = 0;
+    let lastErrorMessage = '';
+    
     window.addEventListener('error', function(event) {
+      const now = Date.now();
+      const currentMessage = event.error?.message || 'Unknown error';
+      
+      // 重複エラーのログを防ぐ（1秒以内の同じエラー）
+      if (now - lastErrorTime < 1000 && currentMessage === lastErrorMessage) {
+        return;
+      }
+      
+      lastErrorTime = now;
+      lastErrorMessage = currentMessage;
+      
       console.error('Global error caught:', event.error);
+      
       if (event.error && event.error.message && event.error.message.includes('document.write')) {
         console.warn('document.write エラーが検出されました。安全なDOM操作に切り替えています。');
         event.preventDefault();
@@ -1091,6 +1117,22 @@
         if (window.sharedUtilities) {
           console.log('✅ AdminPanel: Shared utilities loaded');
         }
+        
+        // リソース連携解除機能のテスト（デバッグモードのみ）
+        if (DEBUG_MODE) {
+          window.testDisconnectResources = function() {
+            console.log('🧪 Testing disconnectResources function...');
+            return runGasWithUserId('disconnectResources')
+              .then(function(response) {
+                console.log('✅ disconnectResources test successful:', response);
+                return response;
+              })
+              .catch(function(error) {
+                console.error('❌ disconnectResources test failed:', error);
+                throw error;
+              });
+          };
+        }
       }
     });
   </script>
@@ -1696,6 +1738,26 @@
       navigator.userAgent && navigator.userAgent.indexOf('jsdom') !== -1;
 
     const DEBUG_MODE = false;
+    
+    // プロダクション環境でのログ制御
+    const originalConsoleLog = console.log;
+    const originalConsoleDebug = console.debug;
+    
+    if (!DEBUG_MODE) {
+      // プロダクションでは詳細ログを抑制
+      console.log = function(...args) {
+        // エラーや重要な情報のみログ出力
+        if (args[0] && (typeof args[0] === 'string')) {
+          if (args[0].includes('✅') || args[0].includes('❌') || args[0].includes('⚠️') || args[0].includes('Error:')) {
+            originalConsoleLog.apply(console, args);
+          }
+        }
+      };
+      
+      console.debug = function() {
+        // プロダクションではdebugログを完全に無効化
+      };
+    }
 
     // AdminPanel専用システムフロー表示機能
     function showSystemFlow() {
@@ -4283,21 +4345,26 @@ function syncCheckboxStates(status) {
       // リソース連携解除の実行（フォーム・スプレッドシートは保持）
       setLoading(true, 'リソース連携を解除中...');
       
-      // runGasWithUserId の代わりに google.script.run を直接使用
-      google.script.run
-        .withSuccessHandler(function(response) {
+      // 改善されたリソース連携解除処理
+      runGasWithUserId('disconnectResources')
+        .then(function(response) {
           console.log('リソース連携解除レスポンス:', response);
-          showMessage(response.message || '✅ リソース連携を解除しました。フォームとスプレッドシートは保持されています。', 'success');
-          setLoading(false);
-          // UIをリフレッシュ
-          loadStatus(true);
+          
+          if (response && response.status === 'success') {
+            showMessage(response.message, 'success');
+            // UIをリフレッシュ
+            loadStatus(true);
+          } else {
+            throw new Error(response?.message || '不明なエラーが発生しました。');
+          }
         })
-        .withFailureHandler(function(error) {
+        .catch(function(error) {
           console.error('リソース連携解除エラー:', error);
           handleError(error, 'リソース連携解除');
-          setLoading(false);
         })
-        .disconnectResources(appState.userId);
+        .finally(function() {
+          setLoading(false);
+        });
     }
 
   </script>
