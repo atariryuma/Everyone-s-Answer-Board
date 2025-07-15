@@ -609,6 +609,31 @@ function updateUserDirect(userId, updateData) {
 }
 
 /**
+ * 汎用的なウェブアプリURLを構築します。
+ * @param {Object} params - URLクエリパラメータのキーと値のペア。
+ * @param {string} [mode='exec'] - 実行モード ('exec' または 'dev')。
+ * @returns {string} 構築されたURL。
+ */
+function constructWebAppUrl(params, mode) {
+  mode = mode || 'exec'; // デフォルトは 'exec'
+  var baseUrl = getWebAppUrlCached();
+
+  // /dev または /exec を削除してベースURLを正規化
+  baseUrl = baseUrl.replace(/\/(dev|exec)$/, '');
+
+  // 指定されたモードを追加
+  baseUrl += '/' + mode;
+
+  var queryString = Object.keys(params)
+    .map(function(key) {
+      return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
+    })
+    .join('&');
+
+  return baseUrl + (queryString ? '?' + queryString : '');
+}
+
+/**
  * クイックスタートを廃止し、ユーザー作成のみ行う新しい登録フロー
  * フォーム作成は管理画面で手動で行う
  * @returns {Object} 登録結果
@@ -616,28 +641,11 @@ function updateUserDirect(userId, updateData) {
 function createUserWithoutQuickstart() {
   try {
     const userEmail = Session.getActiveUser().getEmail();
-    
-    // 既存ユーザーチェック  
-    const existingUser = findUserByEmail(userEmail);
-    if (existingUser) {
-      console.log('createUserWithoutQuickstart: 既存ユーザーを検出', { userEmail });
-      return {
-        status: 'existing_user',
-        userId: existingUser.userId,
-        userEmail: userEmail,
-        adminUrl: constructWebAppUrl({ userId: existingUser.userId })
-      };
-    }
-    
-    console.log('createUserWithoutQuickstart: 新規ユーザー作成開始', { userEmail });
-    
-    // 軽量ユーザー作成（フォーム・スプレッドシートは作成しない）
-    const userId = userEmail; // メールアドレスをuserIdとして使用
-    const userData = {
-      userId: userId,
-      adminEmail: userEmail,
+    console.log('createUserWithoutQuickstart: ユーザー登録処理開始', { userEmail });
+
+    // upsertUserを使用して、ユーザーの作成または既存情報の取得を行う
+    const additionalData = {
       setupStatus: 'registered', // quickstartではなく、registered状態
-      createdAt: new Date().toISOString(),
       configJson: JSON.stringify({
         setupMethod: 'custom_only', // quickstartではなくカスタムのみ
         version: 1,
@@ -645,16 +653,27 @@ function createUserWithoutQuickstart() {
       })
     };
     
-    const createdUser = createUser(userData);
-    console.log('createUserWithoutQuickstart: ユーザー作成完了', { userId, userEmail });
-    
-    return {
-      status: 'success',
-      message: 'ユーザー登録が完了しました。管理画面でフォームを作成してください。',
-      userId: userId,
-      userEmail: userEmail,
-      adminUrl: constructWebAppUrl({ userId: userId })
-    };
+    const result = upsertUser(userEmail, additionalData);
+    const adminUrl = constructWebAppUrl({ userId: result.userId, page: 'admin' });
+
+    if (result.isNewUser) {
+      console.log('createUserWithoutQuickstart: 新規ユーザー作成成功', { userId: result.userId, userEmail });
+      return {
+        status: 'success',
+        message: 'ユーザー登録が完了しました。管理画面でフォームを作成してください。',
+        userId: result.userId,
+        userEmail: userEmail,
+        adminUrl: adminUrl
+      };
+    } else {
+      console.log('createUserWithoutQuickstart: 既存ユーザーを検出', { userId: result.userId, userEmail });
+      return {
+        status: 'existing_user',
+        userId: result.userId,
+        userEmail: userEmail,
+        adminUrl: adminUrl
+      };
+    }
     
   } catch (error) {
     console.error('createUserWithoutQuickstart エラー:', error);
