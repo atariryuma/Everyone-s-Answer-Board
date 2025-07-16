@@ -24,37 +24,43 @@
       <h1 class="title">みんなの回答ボード</h1>
     </div>
 
-    <!-- 認証状態パネル -->
-    <div id="auth-status-panel" class="status-card">
-      <div class="status-text">認証情報を確認中...</div>
+    <div id="account-info-group" class="mb-8">
+      <!-- 認証状態パネル -->
+      <div id="auth-status-panel" class="status-card">
+        <div class="status-text">認証情報を確認中...</div>
+      </div>
     </div>
 
-    <div class="message-area" id="message-area"></div>
+    <div id="login-action-group" class="mb-8">
+      <div class="message-area" id="message-area"></div>
 
-    <button type="button" class="btn btn-primary" id="login-btn" disabled>
-      <span id="btn-content">ログインして管理画面へ</span>
-    </button>
-
-    <!-- システム管理者用アプリ設定ボタン -->
-    <div id="admin-settings-section" class="hidden">
-      <button type="button" class="btn btn-secondary" id="app-settings-btn">
-        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-        </svg>
-        アプリ設定管理
+      <button type="button" class="btn btn-primary cta-button" id="login-btn" disabled>
+        <span id="btn-content">ログインして管理画面へ</span>
       </button>
-      <p class="text-xs text-gray-400 mt-1 text-center">アプリの有効/無効状態を管理できます</p>
     </div>
 
-    <!-- セキュリティ情報 -->
-    <div class="security-info">
-      <a class="security-link" onclick="showSecurityModal()">
-        <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-        </svg>
-        セキュリティ仕様について
-      </a>
+    <div id="settings-action-group" class="space-y-4">
+      <!-- システム管理者用アプリ設定ボタン -->
+      <div id="admin-settings-section" class="hidden">
+        <button type="button" class="btn btn-ghost" id="app-settings-btn">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+          アプリ設定管理
+        </button>
+        <p class="text-xs text-gray-400 mt-1 text-center">アプリの有効/無効状態を管理できます</p>
+      </div>
+
+      <!-- セキュリティ情報 -->
+      <div class="security-info">
+        <button type="button" class="btn btn-ghost" onclick="showSecurityModal()">
+          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+          </svg>
+          セキュリティ仕様について
+        </button>
+      </div>
     </div>
     </div>
 
@@ -67,49 +73,7 @@
     </div>
   </div>
 
-  <!-- セキュリティ仕様モーダル -->
-  <div id="security-modal" class="modal-overlay fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
-    <div class="flex items-center justify-center min-h-full p-4">
-      <div class="glass-panel rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div class="flex items-center justify-between mb-6">
-          <h3 class="text-2xl font-bold text-cyan-400">セキュリティ仕様</h3>
-          <button type="button" id="security-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる" onclick="hideSecurityModal()">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div class="space-y-6 text-gray-300">
-          <div class="glass-panel bg-blue-500/10 rounded-lg p-4 border border-blue-400/30">
-            <h4 class="font-semibold text-blue-400 mb-2">🔐 認証システム</h4>
-            <p class="text-sm">Google OAuth 2.0による安全な認証を実装。多要素認証とセキュアなトークン管理により、不正アクセスを防止します。</p>
-          </div>
-
-          <div class="glass-panel bg-green-500/10 rounded-lg p-4 border border-green-400/30">
-            <h4 class="font-semibold text-green-400 mb-2">🏢 ドメイン認証</h4>
-            <p class="text-sm">組織ドメインとの一致確認により、適切な権限レベルを自動判定。システム管理者、組織ユーザー、外部ユーザーを区別します。</p>
-          </div>
-
-          <div class="glass-panel bg-purple-500/10 rounded-lg p-4 border border-purple-400/30">
-            <h4 class="font-semibold text-purple-400 mb-2">🛡️ データ保護</h4>
-            <p class="text-sm">すべての通信はHTTPS暗号化を使用。セッション管理とデータアクセス制御により、情報漏洩を防止します。</p>
-          </div>
-
-          <div class="glass-panel bg-amber-500/10 rounded-lg p-4 border border-amber-400/30">
-            <h4 class="font-semibold text-amber-400 mb-2">📝 監査ログ</h4>
-            <p class="text-sm">全ての認証試行とアクセスログを記録。セキュリティインシデントの早期発見と対応を可能にします。</p>
-          </div>
-
-          <div class="glass-panel bg-red-500/10 rounded-lg p-4 border border-red-400/30">
-            <h4 class="font-semibold text-red-400 mb-2">🔄 セッション管理</h4>
-            <p class="text-sm">自動タイムアウト、セッション暗号化、不正セッション検出により、セキュアなユーザー体験を提供します。</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
+  <?!= include('SharedModals'); ?>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -139,28 +103,37 @@
               statusHTML += `<div class="status-text">アカウント</div><div class="user-email">${userEmail}</div>`;
 
               // 2. 状態表示
-              statusHTML += `<div style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">`;
+              statusHTML += `<div class="mt-3">`;
 
               if (authData.isSystemAdmin) {
                 statusHTML += `
-                  <div style="width: 12px; height: 12px; border-radius: 50%; background-color: #818cf8;"></div>
-                  <div style="font-size: 14px; font-weight: 600; color: #a5b4fc;">システム管理者</div>
-                `;
+                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-semibold">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    システム管理者
+                  </span>`;
               } else if (authData.domainMatch) {
                 statusHTML += `
-                  <div style="width: 12px; height: 12px; border-radius: 50%; background-color: #10b981;"></div>
-                  <div style="font-size: 14px; font-weight: 600; color: #34d399;">ドメイン認証済み</div>
-                `;
+                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/20 text-green-300 text-xs font-semibold">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    ドメイン認証済み
+                  </span>`;
               } else {
                 statusHTML += `
-                  <div style="width: 12px; height: 12px; border-radius: 50%; background-color: #f59e0b;"></div>
-                  <div style="font-size: 14px; font-weight: 600; color: #fbbf24;">ドメイン未認証</div>
-                `;
+                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-300 text-xs font-semibold">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    ドメイン未認証
+                  </span>`;
               }
               statusHTML += `</div>`;
-              
+
               // 3. 説明文
-              statusHTML += `<div style="font-size: 12px; color: rgba(255, 255, 255, 0.6); margin-top: 4px;">`;
+              statusHTML += `<div class="text-xs text-gray-400 mt-1">`;
               if (authData.isSystemAdmin) {
                 statusHTML += `アプリの全設定を管理できます。`;
               } else if (authData.domainMatch) {
