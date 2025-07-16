@@ -402,41 +402,7 @@
     box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
     background: rgba(255, 255, 255, 0.08);
   }
-  
-  /* Layout - AdminPanel Specific with High Priority */
-  .responsive-grid {
-    display: grid !important;
-    gap: 1.5rem !important;
-    grid-template-columns: 1fr !important;
-    align-items: start !important;
-  }
-
-  @media (min-width: 768px) {
-    .responsive-grid {
-      grid-template-columns: 2fr 1fr !important;
-      gap: 2rem !important;
-      max-width: 1200px !important;
-      margin: 0 auto !important;
-    }
-    .right-panel {
-      width: auto !important;
-      max-width: 380px !important;
-      position: sticky !important;
-      top: 6rem !important;
-      align-self: start !important;
-    }
-  }
-
-  @media (min-width: 1024px) {
-    .responsive-grid {
-      grid-template-columns: 2fr 380px !important;
-      gap: 2.5rem !important;
-    }
-    .right-panel {
-      width: 380px !important;
-    }
-  }
-  
+    
   main.flex-1 {
     display: flex !important;
     flex-direction: column !important;
