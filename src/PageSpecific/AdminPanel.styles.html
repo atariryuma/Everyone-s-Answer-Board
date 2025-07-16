@@ -1,256 +1,54 @@
 <style>
-/* =============================================================================
-   StudyQuest - Admin Panel Specific Styles
-   Page-specific customizations for admin panel layout
-   ============================================================================= */
-
-@layer page-specific {
-  /* Admin Panel Container */
-  .admin-panel {
-    max-width: 1152px; /* max-w-6xl */
-    margin: 0 auto;
-    padding: var(--section-spacing-lg);
-  }
-  
-  /* Admin Panel Header */
-  .admin-panel .header {
-    text-align: center;
-    margin-bottom: var(--section-spacing-xl);
-  }
-  
-  .admin-panel .header h1 {
-    font-size: var(--font-size-4xl);
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-bottom: var(--spacing-sm);
-  }
-  
-  /* Step Navigation */
-  .admin-panel .step-nav {
-    display: flex;
-    justify-content: center;
-    gap: var(--content-spacing-md);
-    margin-bottom: var(--section-spacing-xl);
-  }
-  
-  .admin-panel .step-nav .step {
-    display: flex;
-    align-items: center;
-    gap: var(--content-spacing-sm);
-    padding: var(--content-spacing-md) var(--content-spacing-lg);
-    background: var(--glass-bg-secondary);
-    border: var(--glass-border);
-    border-radius: var(--radius-lg);
-    color: var(--text-muted);
-    font-size: var(--font-size-sm);
-    transition: all var(--duration-normal) var(--easing-standard);
-    min-height: var(--size-control-md);
-  }
-  
-  .admin-panel .step-nav .step.active {
-    background: var(--glass-bg-hover);
-    color: var(--color-primary);
-    border-color: var(--color-primary);
-  }
-  
-  .admin-panel .step-nav .step.completed {
-    background: var(--glass-success);
-    color: var(--color-success);
-    border-color: var(--color-success);
-  }
-  
-  /* Step Content */
-  .admin-panel .step-content {
-    display: none;
-    animation: fadeIn var(--duration-normal) var(--easing-standard);
-  }
-  
-  .admin-panel .step-content.active {
-    display: block;
-  }
-  
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  
-  /* Form Sections */
-  .admin-panel .form-section {
-    margin-bottom: var(--section-spacing-lg);
-  }
-  
-  .admin-panel .form-section h3 {
-    font-size: var(--font-size-lg);
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: var(--content-spacing-lg);
-  }
-  
-  .admin-panel .form-section:last-child {
-    margin-bottom: 0;
-  }
-  
-  /* Data Table Styling */
-  .admin-panel .data-table {
-    background: var(--glass-bg-primary);
-    border-radius: var(--radius-xl);
-    overflow: hidden;
-    box-shadow: var(--glass-shadow);
-  }
-  
-  .admin-panel .data-table thead {
-    background: var(--glass-bg-secondary);
-    border-bottom: 1px solid var(--border-primary);
-  }
-  
-  .admin-panel .data-table th {
-    padding: var(--content-spacing-lg) var(--content-spacing-lg);
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-align: left;
-  }
-  
-  .admin-panel .data-table td {
-    padding: var(--content-spacing-lg) var(--content-spacing-lg);
-    font-size: var(--font-size-sm);
-    color: var(--text-primary);
-    border-bottom: 1px solid var(--border-secondary);
-  }
-  
-  .admin-panel .data-table tr:hover {
-    background: var(--glass-bg-hover);
-  }
-  
-  /* Action Buttons */
-  .admin-panel .action-buttons {
-    display: flex;
-    gap: var(--content-spacing-md);
-    justify-content: center;
-    margin-top: var(--section-spacing-lg);
-  }
-  
-  .admin-panel .action-buttons .btn {
-    min-width: 140px;
-    min-height: var(--size-control-md);
-  }
-  
-  /* Configuration Panel */
-  .admin-panel .config-panel {
+  /* 管理パネルの基本レイアウト */
+  .admin-grid-layout {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--section-spacing-lg);
-    margin-bottom: var(--section-spacing-lg);
+    grid-template-rows: auto 1fr auto; /* ヘッダー、メイン、フッター */
+    height: 100vh;
+    overflow: hidden; /* ページ全体のスクロールを禁止 */
+  }
+
+  /* ヘッダーとフッターのスタイル */
+  .admin-grid-layout > header,
+  .admin-grid-layout > footer {
+    position: sticky;
+    z-index: 50;
   }
   
-  .admin-panel .config-section {
-    background: var(--glass-bg-secondary);
-    border: var(--glass-border);
-    border-radius: var(--radius-lg);
-    padding: var(--content-spacing-xl);
+  .admin-grid-layout > header {
+    top: 0;
   }
   
-  .admin-panel .config-section h4 {
-    font-size: var(--font-size-base);
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: var(--content-spacing-lg);
+  .admin-grid-layout > footer {
+    bottom: 0;
   }
-  
-  /* Progress Indicator */
-  .admin-panel .progress-indicator {
-    background: var(--glass-bg-secondary);
-    border-radius: var(--radius-full);
-    height: 8px;
-    overflow: hidden;
-    margin-bottom: var(--section-spacing-md);
+
+  /* メインコンテンツエリア */
+  .admin-grid-layout > main {
+    overflow-y: auto; /* メインコンテンツのみスクロールを許可 */
+    padding: 1.5rem;
   }
-  
-  .admin-panel .progress-bar {
-    height: 100%;
-    background: var(--gradient-primary);
-    border-radius: var(--radius-full);
-    transition: width var(--duration-slow) var(--easing-standard);
+
+  /* 2カラムレイアウト */
+  .admin-responsive-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr; /* 左パネルを右パネルの2倍の幅に */
+    gap: 1.5rem;
+    align-items: start; /* パネルの高さを揃えない */
   }
-  
-  /* レスポンシブ調整 */
+
+  /* レスポンシブ対応：画面幅が1024px以下で1カラムに */
   @media (max-width: 1024px) {
-    .admin-panel {
-      padding: var(--section-spacing-md);
+    .admin-responsive-grid {
+      grid-template-columns: 1fr; /* 1カラムレイアウト */
     }
     
-    .admin-panel .config-panel {
-      grid-template-columns: 1fr;
-      gap: var(--section-spacing-md);
-    }
-    
-    .admin-panel .step-nav {
-      flex-wrap: wrap;
-      gap: var(--content-spacing-sm);
+    .admin-grid-layout > main {
+      padding: 1rem;
     }
   }
-  
-  @media (max-width: 640px) {
-    .admin-panel {
-      padding: var(--section-spacing-sm);
-    }
-    
-    .admin-panel .header {
-      margin-bottom: var(--section-spacing-lg);
-    }
-    
-    .admin-panel .header h1 {
-      font-size: var(--font-size-3xl);
-    }
-    
-    .admin-panel .step-nav {
-      flex-direction: column;
-      align-items: center;
-      gap: var(--content-spacing-sm);
-    }
-    
-    .admin-panel .step-nav .step {
-      width: 100%;
-      justify-content: center;
-    }
-    
-    .admin-panel .action-buttons {
-      flex-direction: column;
-      gap: var(--content-spacing-sm);
-    }
-    
-    .admin-panel .data-table {
-      font-size: var(--font-size-xs);
-    }
-    
-    .admin-panel .data-table th,
-    .admin-panel .data-table td {
-      padding: var(--content-spacing-md);
-    }
+
+  /* 左パネルと右パネルのスタイル */
+  .left-panel, .right-panel {
+    min-width: 0; /* flexbox/gridアイテムの幅が縮小できるように */
   }
-  
-  @media (max-width: 480px) {
-    .admin-panel .header {
-      margin-bottom: var(--section-spacing-md);
-    }
-    
-    .admin-panel .header h1 {
-      font-size: var(--font-size-2xl);
-    }
-    
-    .admin-panel .config-section {
-      padding: var(--content-spacing-lg);
-    }
-    
-    .admin-panel .form-section {
-      margin-bottom: var(--section-spacing-md);
-    }
-  }
-}
 </style>
