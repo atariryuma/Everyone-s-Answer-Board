@@ -593,7 +593,8 @@ if (document.readyState === 'loading') {
 // =============================================================================
 
 // Export utilities to global scope for easy access
-window.sharedUtilities = {
+window.sharedUtilities = window.sharedUtilities || {};
+Object.assign(window.sharedUtilities, {
   message: {
     show: showMessage,
     showSimple: displaySimpleMessage
@@ -628,6 +629,6 @@ window.sharedUtilities = {
     copyToClipboard: copyToClipboard,
     formatDate: formatJapaneseDate
   }
-};
+});
 
 </script>
