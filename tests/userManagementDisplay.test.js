@@ -42,13 +42,14 @@ describe('User Management Display', () => {
       // Mock database response
       const mockHeaders = ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'createdAt', 'configJson', 'setupStatus', 'lastAccessedAt', 'isActive'];
       const mockUserData = [
-        'user123', 
-        '35t22@naha-okinawa.ed.jp', 
-        'sheet123', 
-        'https://example.com/sheet', 
+        'user123',
+        '35t22@naha-okinawa.ed.jp',
+        'sheet123',
+        'https://example.com/sheet',
         '2025-01-01T10:00:00.000Z',  // This is createdAt
-        '{}', 
-        '2025-07-13T12:00:00.000Z', 
+        '{}',
+        'INITIALIZED', // setupStatus
+        '2025-07-13T12:00:00.000Z',
         'true'
       ];
       
