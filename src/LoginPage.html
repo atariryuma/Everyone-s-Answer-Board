@@ -10,9 +10,10 @@
   <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
   
   <?!= include('UnifiedStyles'); ?>
+  <?!= include('PageSpecific/LoginPage.styles'); ?>
   <?!= include('SharedUtilities'); ?>
 
-  <!-- Styles consolidated in UnifiedStyles.html -->
+  <!-- Styles consolidated in UnifiedStyles.html with page-specific overrides -->
 </head>
 <body class="unified-theme login-page">
   <div class="centered-glass-layout">
@@ -40,26 +41,28 @@
     </div>
 
     <div id="settings-action-group" class="space-y-4 mb-8">
-      <!-- システム管理者用アプリ設定ボタン -->
+      <!-- システム管理者用アプリ設定リンク -->
       <div id="admin-settings-section" class="hidden">
-        <button type="button" class="btn btn-ghost" id="app-settings-btn">
-          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-          </svg>
-          アプリ設定管理
-        </button>
-        <p class="text-xs text-gray-400 mt-1 text-center">アプリの有効/無効状態を管理できます</p>
+        <div class="text-center">
+          <a href="#" class="text-primary hover:text-primary-light text-sm font-medium inline-flex items-center" id="app-settings-link">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+            アプリ設定管理
+          </a>
+          <p class="text-xs text-muted mt-1">アプリの有効/無効状態を管理</p>
+        </div>
       </div>
 
       <!-- セキュリティ情報 -->
-      <div class="security-info">
-        <button type="button" class="btn btn-ghost" onclick="showSecurityModal()">
+      <div class="security-info text-center">
+        <a href="#" class="text-muted hover:text-secondary text-xs font-medium inline-flex items-center" onclick="showSecurityModal(); return false;">
           <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
           </svg>
           セキュリティ仕様について
-        </button>
+        </a>
       </div>
     </div>
     </div>
@@ -194,7 +197,8 @@
 
       loginBtn.addEventListener('click', executeLogin);
       
-      document.getElementById('app-settings-btn').addEventListener('click', () => {
+      document.getElementById('app-settings-link').addEventListener('click', (e) => {
+        e.preventDefault();
         google.script.run
           .withSuccessHandler((webAppUrl) => {
             const appSetupUrl = webAppUrl + '?setup=true&mode=appsetup';
