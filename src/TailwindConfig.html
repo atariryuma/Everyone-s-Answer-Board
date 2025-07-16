@@ -303,3 +303,293 @@ body.admin-grid-layout .admin-responsive-grid .right-panel {
   }
 });
 </script>
+
+<!-- 統合レイアウトシステム - iframe対応 -->
+<script>
+// 統合レイアウト管理システム（iframe環境対応）
+window.unifiedLayoutSystem = {
+  initialized: false,
+  
+  // メインの初期化関数
+  init: function() {
+    if (this.initialized) return;
+    
+    console.log('🚀 [UNIFIED LAYOUT] System initialization...');
+    
+    // iframe環境での即座の対応
+    if (window.iframeLayoutSystem) {
+      window.iframeLayoutSystem.init();
+    }
+    
+    // DOM準備完了後の処理
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => this.setupLayout());
+    } else {
+      this.setupLayout();
+    }
+    
+    // TailwindCSS読み込み後の処理
+    setTimeout(() => this.injectAdminStyles(), 150);
+    
+    this.initialized = true;
+  },
+  
+  // レイアウトセットアップ
+  setupLayout: function() {
+    console.log('🔧 [UNIFIED LAYOUT] Setting up layout...');
+    
+    // body要素にレイアウトクラスを追加
+    if (document.body) {
+      document.body.classList.add('admin-grid-layout');
+      
+      // iframe環境の場合は追加のクラス
+      if (window !== window.top) {
+        document.body.classList.add('iframe-environment');
+      }
+    }
+    
+    // 少し遅らせてスタイルを注入
+    setTimeout(() => this.injectAdminStyles(), 50);
+  },
+  
+  // Admin Panel専用スタイルの注入
+  injectAdminStyles: function() {
+    // 既存のスタイルシートをチェック
+    if (document.getElementById('unified-admin-layout')) {
+      console.log('⚠️ [UNIFIED LAYOUT] Admin styles already injected');
+      return;
+    }
+    
+    console.log('💉 [UNIFIED LAYOUT] Injecting admin panel styles...');
+    
+    const unifiedStylesheet = document.createElement('style');
+    unifiedStylesheet.id = 'unified-admin-layout';
+    unifiedStylesheet.innerHTML = `
+/* =============================================================================
+   Unified Admin Layout System - 統合レイアウトシステム
+   iframe環境とネイティブ環境の両方に対応
+   ============================================================================= */
+
+/* 基本的なAdmin Panel グリッドレイアウト */
+body.admin-grid-layout .admin-responsive-grid,
+.admin-responsive-grid {
+  display: grid !important;
+  grid-template-columns: 2fr 1fr !important;
+  gap: 2rem !important;
+  align-items: start !important;
+  max-width: 84rem !important;
+  margin: 0 auto !important;
+  padding: 0 1rem !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  min-height: 0 !important;
+}
+
+/* パネルの基本設定 */
+body.admin-grid-layout .admin-responsive-grid .left-panel,
+body.admin-grid-layout .admin-responsive-grid .right-panel,
+.admin-responsive-grid .left-panel,
+.admin-responsive-grid .right-panel {
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1.5rem !important;
+  flex: none !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+}
+
+/* 左パネル */
+body.admin-grid-layout .admin-responsive-grid .left-panel,
+.admin-responsive-grid .left-panel {
+  grid-column: 1 !important;
+  min-width: 0 !important;
+}
+
+/* 右パネル */
+body.admin-grid-layout .admin-responsive-grid .right-panel,
+.admin-responsive-grid .right-panel {
+  grid-column: 2 !important;
+  position: sticky !important;
+  top: 1.5rem !important;
+  max-height: calc(100vh - 3rem) !important;
+  overflow-y: auto !important;
+  min-width: 0 !important;
+}
+
+/* iframe環境での追加強化 */
+body.iframe-environment .admin-responsive-grid {
+  isolation: isolate !important;
+  contain: layout style paint !important;
+}
+
+/* モバイル対応 */
+@media (max-width: 1024px) {
+  body.admin-grid-layout .admin-responsive-grid,
+  .admin-responsive-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1.5rem !important;
+    padding: 0 !important;
+  }
+  
+  body.admin-grid-layout .admin-responsive-grid .left-panel,
+  .admin-responsive-grid .left-panel {
+    order: 2 !important;
+    grid-column: auto !important;
+  }
+  
+  body.admin-grid-layout .admin-responsive-grid .right-panel,
+  .admin-responsive-grid .right-panel {
+    order: 1 !important;
+    grid-column: auto !important;
+    position: static !important;
+    max-height: none !important;
+    overflow-y: visible !important;
+  }
+}
+
+/* Tailwind上書き防止の追加保護 */
+.tailwind-override-protection .admin-responsive-grid {
+  display: grid !important;
+  grid-template-columns: 2fr 1fr !important;
+}
+
+/* デバッグ用の視覚的確認 */
+.debug-layout .admin-responsive-grid {
+  outline: 2px solid #06b6d4 !important;
+}
+
+.debug-layout .left-panel {
+  outline: 1px solid #10b981 !important;
+}
+
+.debug-layout .right-panel {
+  outline: 1px solid #a855f7 !important;
+}
+`;
+    
+    // 最高優先度で注入
+    document.head.appendChild(unifiedStylesheet);
+    
+    // 注入後の検証
+    setTimeout(() => this.verifyLayout(), 100);
+  },
+  
+  // レイアウト検証
+  verifyLayout: function() {
+    console.group('🔍 [UNIFIED LAYOUT] Layout Verification');
+    
+    const adminGrid = document.querySelector('.admin-responsive-grid');
+    if (adminGrid) {
+      const computedStyle = window.getComputedStyle(adminGrid);
+      const isCorrectLayout = computedStyle.gridTemplateColumns.includes('2fr 1fr') ||
+                             (computedStyle.gridTemplateColumns.includes('2fr') && 
+                              computedStyle.gridTemplateColumns.includes('1fr'));
+      
+      console.log('📐 Grid Status:');
+      console.log('  ├─ Found:', '✅ YES');
+      console.log('  ├─ Display:', computedStyle.display);
+      console.log('  ├─ Columns:', computedStyle.gridTemplateColumns);
+      console.log('  ├─ Gap:', computedStyle.gap);
+      console.log('  ├─ Width:', computedStyle.width);
+      console.log('  └─ Layout Correct:', isCorrectLayout ? '✅ YES' : '❌ NO');
+      
+      // パネル状態の確認
+      const leftPanel = adminGrid.querySelector('.left-panel');
+      const rightPanel = adminGrid.querySelector('.right-panel');
+      
+      if (leftPanel && rightPanel) {
+        console.log('📱 Panel Status:');
+        console.log('  ├─ Left Width:', leftPanel.offsetWidth + 'px');
+        console.log('  ├─ Right Width:', rightPanel.offsetWidth + 'px');
+        console.log('  └─ Ratio:', leftPanel.offsetWidth && rightPanel.offsetWidth ? 
+                   (leftPanel.offsetWidth / rightPanel.offsetWidth).toFixed(2) + ':1' : 'N/A');
+      }
+      
+      // 問題がある場合は緊急修復
+      if (!isCorrectLayout) {
+        console.warn('⚠️ [UNIFIED LAYOUT] Layout issue detected, attempting emergency repair...');
+        this.emergencyRepair();
+      }
+    } else {
+      console.log('❌ Admin grid not found');
+    }
+    
+    console.groupEnd();
+  },
+  
+  // 緊急修復
+  emergencyRepair: function() {
+    console.log('🚨 [UNIFIED LAYOUT] Emergency repair initiated');
+    
+    const adminGrid = document.querySelector('.admin-responsive-grid');
+    if (adminGrid) {
+      // 緊急修復クラスを追加
+      adminGrid.classList.add('emergency-2col');
+      
+      // iframe修復システムがあれば実行
+      if (window.iframeLayoutSystem) {
+        window.iframeLayoutSystem.forceRepair();
+      }
+      
+      // bodyにデバッグクラスを追加
+      document.body.classList.add('tailwind-override-protection');
+      
+      console.log('🔧 [UNIFIED LAYOUT] Emergency repair completed');
+      
+      // 修復後に再検証
+      setTimeout(() => this.verifyLayout(), 200);
+    }
+  },
+  
+  // 手動修復用グローバル関数
+  manualRepair: function() {
+    console.log('🔧 [UNIFIED LAYOUT] Manual repair requested');
+    this.emergencyRepair();
+  }
+};
+
+// グローバルアクセス用関数
+window.fixAdminLayout = function() {
+  window.unifiedLayoutSystem.manualRepair();
+};
+
+// デバッグモード切り替え
+window.debugLayout = function(enable = true) {
+  if (enable) {
+    document.body.classList.add('debug-layout');
+    console.log('🐛 Layout debug mode enabled');
+  } else {
+    document.body.classList.remove('debug-layout');
+    console.log('🐛 Layout debug mode disabled');
+  }
+};
+
+// レイアウト監視
+if (typeof ResizeObserver !== 'undefined') {
+  const layoutObserver = new ResizeObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.target.classList.contains('admin-responsive-grid')) {
+        console.log('📐 [UNIFIED LAYOUT] Size change detected:', {
+          width: entry.contentRect.width,
+          height: entry.contentRect.height,
+          timestamp: new Date().toLocaleTimeString()
+        });
+      }
+    });
+  });
+  
+  // 監視開始
+  setTimeout(() => {
+    const adminGrid = document.querySelector('.admin-responsive-grid');
+    if (adminGrid) {
+      layoutObserver.observe(adminGrid);
+      console.log('👁️ [UNIFIED LAYOUT] Monitoring started');
+    }
+  }, 300);
+}
+
+// システム初期化
+window.unifiedLayoutSystem.init();
+</script>

@@ -784,12 +784,30 @@ window.adminCacheManager = new AdminCacheManager();
 // =============================================================================
 
 /**
+ * 統合レイアウトシステムとの連携強化
  * iframe内でのAdmin Panel 2カラムレイアウト修正
  */
 function injectAdminLayoutFix() {
-  console.log('🎯 iframe内レイアウト修正開始...');
+  console.log('🎯 [ADMIN PANEL] Layout fix initialization...');
   
-  // 即座にCSSを注入
+  // 統合レイアウトシステムがあるかチェック
+  if (window.unifiedLayoutSystem) {
+    console.log('🔗 [ADMIN PANEL] Using unified layout system');
+    window.unifiedLayoutSystem.init();
+    return;
+  }
+  
+  // iframe専用レイアウトシステムがあるかチェック
+  if (window.iframeLayoutSystem) {
+    console.log('🔗 [ADMIN PANEL] Using iframe layout system');
+    window.iframeLayoutSystem.init();
+    window.iframeLayoutSystem.forceRepair();
+    return;
+  }
+  
+  // フォールバック: 直接CSS注入
+  console.log('🎯 [ADMIN PANEL] Fallback: direct CSS injection...');
+  
   const adminStyleFix = document.createElement('style');
   adminStyleFix.id = 'admin-layout-fix-iframe';
   adminStyleFix.innerHTML = `
@@ -804,6 +822,7 @@ body.admin-grid-layout .admin-responsive-grid,
   margin: 0 auto !important;
   padding: 0 1rem !important;
   width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 body.admin-grid-layout .admin-responsive-grid .left-panel,
@@ -816,6 +835,7 @@ body.admin-grid-layout .admin-responsive-grid .right-panel,
   gap: 1.5rem !important;
   flex: none !important;
   margin: 0 !important;
+  box-sizing: border-box !important;
 }
 
 body.admin-grid-layout .admin-responsive-grid .left-panel,
@@ -832,7 +852,7 @@ body.admin-grid-layout .admin-responsive-grid .right-panel,
   overflow-y: auto !important;
 }
 
-/* Mobile Override */
+/* Mobile Override for iframe */
 @media (max-width: 1024px) {
   body.admin-grid-layout .admin-responsive-grid,
   .admin-responsive-grid {
@@ -877,17 +897,23 @@ body {
     document.body.classList.add('admin-grid-layout');
   }
   
-  console.log('✅ iframe内レイアウト修正CSS注入完了');
+  // iframe環境クラスを追加
+  if (window !== window.top) {
+    document.body.classList.add('iframe-environment');
+  }
+  
+  console.log('✅ [ADMIN PANEL] Fallback CSS injection completed');
   
   // 少し遅延してから確認
   setTimeout(function() {
     const grid = document.querySelector('.admin-responsive-grid');
     if (grid) {
       const style = window.getComputedStyle(grid);
-      console.group('🔍 iframe内レイアウト確認結果');
+      console.group('🔍 [ADMIN PANEL] Layout verification results');
       console.log('Grid Display:', style.display);
       console.log('Grid Template Columns:', style.gridTemplateColumns);
       console.log('Gap:', style.gap);
+      console.log('Is 2-column layout:', style.gridTemplateColumns.includes('2fr 1fr') ? '✅ YES' : '❌ NO');
       
       const leftPanel = grid.querySelector('.left-panel');
       const rightPanel = grid.querySelector('.right-panel');
@@ -896,15 +922,44 @@ body {
         console.log('Right Panel Width:', rightPanel.offsetWidth + 'px');
         if (leftPanel.offsetWidth > 0 && rightPanel.offsetWidth > 0) {
           const ratio = (leftPanel.offsetWidth / rightPanel.offsetWidth).toFixed(2);
-          console.log('幅の比率:', ratio + ':1');
-          console.log('2カラム状態:', ratio > 1.5 ? '✅ 正常' : '❌ 異常');
+          console.log('Width Ratio:', ratio + ':1');
+          console.log('2-Column Status:', ratio > 1.5 ? '✅ Normal' : '❌ Abnormal');
         }
       }
       console.groupEnd();
     } else {
-      console.log('❌ iframe内でもGrid要素が見つかりません');
+      console.log('❌ [ADMIN PANEL] Grid element not found in iframe');
     }
   }, 100);
+}
+
+/**
+ * 手動修復関数 - コンソールから呼び出し可能
+ */
+function fixAdminPanelLayout() {
+  console.log('🔧 [ADMIN PANEL] Manual layout repair requested');
+  
+  // 統合システムを優先使用
+  if (window.fixAdminLayout) {
+    window.fixAdminLayout();
+    return;
+  }
+  
+  // フォールバック: 直接修復
+  const adminGrid = document.querySelector('.admin-responsive-grid');
+  if (adminGrid) {
+    adminGrid.classList.add('emergency-2col');
+    adminGrid.style.cssText = `
+      display: grid !important;
+      grid-template-columns: 2fr 1fr !important;
+      gap: 2rem !important;
+      max-width: 84rem !important;
+      margin: 0 auto !important;
+      padding: 0 1rem !important;
+      width: 100% !important;
+    `;
+    console.log('🔧 [ADMIN PANEL] Emergency repair applied');
+  }
 }
 
 // =============================================================================

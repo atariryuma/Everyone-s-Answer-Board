@@ -58,10 +58,12 @@
   --border-error: var(--color-error);
   --border-success: var(--color-success);
   
-  /* Glass Effect System */
+  /* Enhanced Glass Effect System - iframe対応強化 */
   --glass-blur: 20px;
   --glass-blur-strong: 32px;
+  --glass-blur-subtle: 10px;
   --glass-border: 1px solid var(--border-primary);
+  --glass-border-thick: 2px solid var(--border-primary);
   --glass-shadow: 
     0 8px 32px rgba(0, 0, 0, 0.12),
     0 2px 8px rgba(0, 0, 0, 0.08),
@@ -70,6 +72,24 @@
     0 12px 40px rgba(0, 0, 0, 0.15),
     0 4px 12px rgba(0, 0, 0, 0.10),
     inset 0 1px 0 rgba(6, 182, 212, 0.15);
+  --glass-shadow-focus:
+    0 0 0 3px rgba(6, 182, 212, 0.3),
+    0 12px 40px rgba(0, 0, 0, 0.15),
+    0 4px 12px rgba(0, 0, 0, 0.10);
+  
+  /* Glassmorphism Component Variants */
+  --glass-panel-primary: var(--glass-bg-primary);
+  --glass-panel-secondary: var(--glass-bg-secondary);
+  --glass-panel-elevated: rgba(26, 27, 38, 0.8);
+  --glass-panel-overlay: rgba(15, 23, 42, 0.95);
+  
+  /* iframe Specific Glass Enhancements */
+  --glass-iframe-boost: rgba(6, 182, 212, 0.05);
+  --glass-iframe-border: rgba(6, 182, 212, 0.2);
+  --glass-iframe-shadow:
+    0 16px 64px rgba(0, 0, 0, 0.25),
+    0 8px 32px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(6, 182, 212, 0.2);
   
   /* Unified Spacing System - 8px base grid */
   --spacing-xs: 4px;
@@ -78,6 +98,13 @@
   --spacing-lg: 24px;
   --spacing-xl: 32px;
   --spacing-2xl: 48px;
+  
+  /* Responsive Breakpoint System - iframe対応統一ブレークポイント */
+  --breakpoint-mobile: 640px;        /* タブレット縦向き以下 */
+  --breakpoint-tablet: 768px;        /* タブレット横向き */
+  --breakpoint-desktop: 1024px;      /* デスクトップ - 2カラム切り替え */
+  --breakpoint-wide: 1280px;         /* ワイドデスクトップ */
+  --breakpoint-ultrawide: 1536px;    /* ウルトラワイド */
   --spacing-3xl: 64px;
   
   /* Typography Scale */
