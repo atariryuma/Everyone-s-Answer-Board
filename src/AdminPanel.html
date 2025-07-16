@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#1a1b26" />
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
-  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=()" />
   <!-- User ID from server template -->
   <meta name="user-id" content="<?= typeof userId !== 'undefined' ? userId : '' ?>" id="user-id-meta">
 
@@ -262,19 +262,18 @@
       <div class="left-panel">
         
         <!-- ステップ1: データ準備 -->
-        <div class="glass-panel backdrop-blur-lg p-6 transition-all duration-300 hover:shadow-xl" id="data-setup-section">
-          <div class="flex items-center justify-between mb-6">
-            <div class="flex items-center gap-4">
-              <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl flex items-center justify-center font-bold shadow-lg">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-              </div>
-              <div>
-                <h2 class="text-xl font-bold text-white mb-1">データ準備</h2>
-                <p class="text-sm text-gray-300">🚀 スプレッドシートまたはフォームを準備</p>
-              </div>
+        <div class="panel-section" id="data-setup-section">
+          <div class="step-header">
+            <div class="step-icon">
+              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
             </div>
+            <div>
+              <h2 class="step-title">データ準備</h2>
+              <p class="step-description">🚀 スプレッドシートまたはフォームを準備</p>
+            </div>
+          </div>
             <button type="button" class="toggle-section" onclick="toggleSection('step1-content')" aria-expanded="true" aria-label="セクションを展開/折りたたみ">
               <svg class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>

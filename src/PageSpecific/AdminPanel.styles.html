@@ -1,4 +1,130 @@
 <style>
+  /* =============================================================================
+     AdminPanel Simplified Styles - HTML構造簡素化対応
+     ============================================================================= */
+  
+  /* シンプルなユーティリティクラス */
+  .step-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+    color: white;
+    border-radius: var(--radius-xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    box-shadow: var(--glass-shadow);
+  }
+  
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .step-title {
+    font-size: var(--font-size-xl);
+    font-weight: bold;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+  }
+  
+  .step-description {
+    font-size: var(--font-size-sm);
+    color: var(--text-tertiary);
+  }
+  
+  .panel-section {
+    background: var(--glass-panel-primary);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: var(--glass-border);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-xl);
+    margin-bottom: var(--spacing-lg);
+    transition: all 0.3s ease;
+    box-shadow: var(--glass-shadow);
+  }
+  
+  .panel-section:hover {
+    box-shadow: var(--glass-shadow-hover);
+    border-color: var(--border-hover);
+  }
+  
+  .action-buttons {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+  }
+  
+  .btn-primary {
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+    color: white;
+    border: none;
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+  
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(6, 182, 212, 0.3);
+  }
+  
+  .btn-secondary {
+    background: var(--glass-bg-secondary);
+    color: var(--text-secondary);
+    border: var(--glass-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+  
+  .btn-secondary:hover {
+    background: var(--glass-bg-hover);
+    border-color: var(--border-hover);
+  }
+  
+  .status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-lg);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+  }
+  
+  .status-success {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--color-success);
+    border: 1px solid var(--color-success);
+  }
+  
+  .status-warning {
+    background: rgba(245, 158, 11, 0.2);
+    color: var(--color-warning);
+    border: 1px solid var(--color-warning);
+  }
+  
+  .status-error {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--color-error);
+    border: 1px solid var(--color-error);
+  }
+  
   /* 管理パネルの基本レイアウト - 改善版 */
   .admin-grid-layout {
     display: grid;

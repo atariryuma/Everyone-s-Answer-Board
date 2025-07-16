@@ -136,15 +136,22 @@ function htmlEncode(text) {
  */
 function safeSetXFrameOptionsAllowAll(htmlOutput) {
   try {
+    // より安全なフレームオプション設定
     if (htmlOutput && typeof htmlOutput.setXFrameOptionsMode === 'function' &&
-        HtmlService && HtmlService.XFrameOptionsMode &&
-        HtmlService.XFrameOptionsMode.ALLOWALL) {
+        HtmlService && HtmlService.XFrameOptionsMode) {
       htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN);
     }
+    
+    // セキュリティを強化したサンドボックス設定
     if (htmlOutput && typeof htmlOutput.setSandboxMode === 'function' &&
-        HtmlService && HtmlService.SandboxMode &&
-        HtmlService.SandboxMode.IFRAME) {
-      htmlOutput.setSandboxMode(HtmlService.SandboxMode.IFRAME);
+        HtmlService && HtmlService.SandboxMode) {
+      // NATIVE モードを使用してサンドボックス警告を回避
+      if (HtmlService.SandboxMode.NATIVE) {
+        htmlOutput.setSandboxMode(HtmlService.SandboxMode.NATIVE);
+      } else {
+        // フォールバック: IFRAME モード
+        htmlOutput.setSandboxMode(HtmlService.SandboxMode.IFRAME);
+      }
     }
   } catch (e) {
     console.warn('Failed to set frame options and sandbox mode:', e.message);
