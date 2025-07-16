@@ -67,36 +67,44 @@
   </div>
 
   <!-- セキュリティ仕様モーダル -->
-  <div id="security-modal" class="modal backdrop-blur-sm">
-    <div class="modal-content backdrop-blur-lg">
-      <div class="modal-header">
-        <h3 class="modal-title">🔒 セキュリティ仕様</h3>
-        <button type="button" class="modal-close" onclick="hideSecurityModal()">&times;</button>
-      </div>
-      
-      <div class="security-spec">
-        <h4>🔐 認証システム</h4>
-        <p>Google OAuth 2.0による安全な認証を実装。多要素認証とセキュアなトークン管理により、不正アクセスを防止します。</p>
-      </div>
-      
-      <div class="security-spec">
-        <h4>🏢 ドメイン認証</h4>
-        <p>組織ドメインとの一致確認により、適切な権限レベルを自動判定。システム管理者、組織ユーザー、外部ユーザーを区別します。</p>
-      </div>
-      
-      <div class="security-spec">
-        <h4>🛡️ データ保護</h4>
-        <p>すべての通信はHTTPS暗号化を使用。セッション管理とデータアクセス制御により、情報漏洩を防止します。</p>
-      </div>
-      
-      <div class="security-spec">
-        <h4>📝 監査ログ</h4>
-        <p>全ての認証試行とアクセスログを記録。セキュリティインシデントの早期発見と対応を可能にします。</p>
-      </div>
-      
-      <div class="security-spec">
-        <h4>🔄 セッション管理</h4>
-        <p>自動タイムアウト、セッション暗号化、不正セッション検出により、セキュアなユーザー体験を提供します。</p>
+  <div id="security-modal" class="modal-overlay fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
+    <div class="flex items-center justify-center min-h-full p-4">
+      <div class="glass-panel rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-2xl font-bold text-cyan-400">セキュリティ仕様</h3>
+          <button type="button" id="security-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる" onclick="hideSecurityModal()">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="space-y-6 text-gray-300">
+          <div class="glass-panel bg-blue-500/10 rounded-lg p-4 border border-blue-400/30">
+            <h4 class="font-semibold text-blue-400 mb-2">🔐 認証システム</h4>
+            <p class="text-sm">Google OAuth 2.0による安全な認証を実装。多要素認証とセキュアなトークン管理により、不正アクセスを防止します。</p>
+          </div>
+
+          <div class="glass-panel bg-green-500/10 rounded-lg p-4 border border-green-400/30">
+            <h4 class="font-semibold text-green-400 mb-2">🏢 ドメイン認証</h4>
+            <p class="text-sm">組織ドメインとの一致確認により、適切な権限レベルを自動判定。システム管理者、組織ユーザー、外部ユーザーを区別します。</p>
+          </div>
+
+          <div class="glass-panel bg-purple-500/10 rounded-lg p-4 border border-purple-400/30">
+            <h4 class="font-semibold text-purple-400 mb-2">🛡️ データ保護</h4>
+            <p class="text-sm">すべての通信はHTTPS暗号化を使用。セッション管理とデータアクセス制御により、情報漏洩を防止します。</p>
+          </div>
+
+          <div class="glass-panel bg-amber-500/10 rounded-lg p-4 border border-amber-400/30">
+            <h4 class="font-semibold text-amber-400 mb-2">📝 監査ログ</h4>
+            <p class="text-sm">全ての認証試行とアクセスログを記録。セキュリティインシデントの早期発見と対応を可能にします。</p>
+          </div>
+
+          <div class="glass-panel bg-red-500/10 rounded-lg p-4 border border-red-400/30">
+            <h4 class="font-semibold text-red-400 mb-2">🔄 セッション管理</h4>
+            <p class="text-sm">自動タイムアウト、セッション暗号化、不正セッション検出により、セキュアなユーザー体験を提供します。</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -218,13 +226,19 @@
         window.open(appSetupUrl, '_blank');
       });
       
-      // Security modal functions
+      // Security modal functions using UnifiedStyles modal system
       window.showSecurityModal = function() {
-        document.getElementById('security-modal').classList.add('show');
+        const modal = document.getElementById('security-modal');
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        requestAnimationFrame(() => modal.classList.add('is-visible'));
       };
 
       window.hideSecurityModal = function() {
-        document.getElementById('security-modal').classList.remove('show');
+        const modal = document.getElementById('security-modal');
+        if (!modal) return;
+        modal.classList.remove('is-visible');
+        modal.addEventListener('transitionend', () => modal.classList.add('hidden'), { once: true });
       };
 
       // 初期化
