@@ -622,10 +622,15 @@ body.unified-theme::before {
   width: 100%;
   height: 100%;
   background: rgba(0,0,0,0.8);
-  display: flex;
   align-items: center;
   justify-content: center;
   z-index: var(--z-overlay);
+}
+.loading-overlay.hidden {
+  display: none;
+}
+.loading-overlay:not(.hidden) {
+  display: flex;
 }
 
 /* Glassmorphism Spinner System */
