@@ -404,14 +404,14 @@
   }
     
   main.flex-1 {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
   }
-  
+
   .left-panel {
-    flex: 1 !important;
-    min-height: 0 !important;
+    flex: 1;
+    min-height: 0;
   }
   
   /* Status Indicators */
@@ -517,9 +517,9 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
             </svg>
           </div>
-          <div class="hidden sm:block" style="display: block !important;">
-            <h1 class="text-xl sm:text-2xl font-bold text-white leading-tight" style="display: block !important; visibility: visible !important;">みんなの回答ボード 管理パネル</h1>
-            <p class="text-sm text-gray-400" style="display: block !important; visibility: visible !important;">StudyQuest</p>
+          <div class="hidden sm:block">
+            <h1 class="text-xl sm:text-2xl font-bold text-white leading-tight">みんなの回答ボード 管理パネル</h1>
+            <p class="text-sm text-gray-400">StudyQuest</p>
           </div>
           <div class="sm:hidden" style="display: none;">
             <h1 class="text-xl font-bold text-white">みんなの回答ボード</h1>
@@ -571,13 +571,13 @@
         </div>
     </div>
   </header>
-  <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8 min-h-0">
+  <main class="flex flex-col flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8 min-h-0">
     
 
     <!-- メインコンテンツエリア -->
     <div class="admin-responsive-grid">
       <!-- 左側：セットアップフロー（メインパネル） -->
-      <div class="left-panel space-y-6">
+      <div class="left-panel flex-1 min-h-0 space-y-6">
         
         <!-- ステップ1: データ準備 -->
         <div class="glass-panel backdrop-blur-lg p-6 transition-all duration-300 hover:shadow-xl" id="data-setup-section">
@@ -1016,7 +1016,7 @@
     </div>
   </main>
   
-  <footer id="admin-footer" class="fixed bottom-0 left-0 w-full z-40 hidden" style="display: none !important;">
+  <footer id="admin-footer" class="fixed bottom-0 left-0 w-full z-40 hidden">
     <div class="glass-panel rounded-none border-t border-gray-700/50 backdrop-blur-md">
       <div class="max-w-6xl mx-auto px-6 py-4">
         <div class="flex items-center justify-between">

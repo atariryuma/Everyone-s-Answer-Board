@@ -305,10 +305,15 @@ header {
   right: 0;
   bottom: 0;
   background: rgba(26, 27, 38, 0.8);
-  display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+}
+.loading-overlay.hidden {
+  display: none;
+}
+.loading-overlay:not(.hidden) {
+  display: flex;
 }
 .spinner {
   width: 40px;
