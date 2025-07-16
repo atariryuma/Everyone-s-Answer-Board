@@ -56,7 +56,9 @@ var AuthorizationService = (function() {
     const activeDomain = getEmailDomain(activeUserEmail);
     const adminDomain = getEmailDomain(adminEmail);
 
-    if (activeDomain === adminDomain) {
+    // ドメインの柔軟な比較: activeDomainがadminDomainで終わるかをチェック
+    // これにより、サブドメインや部分的な一致を許容します。
+    if (activeDomain.endsWith(adminDomain)) {
       console.log(`[Auth] Domain access granted (${activeDomain})`);
       return true;
     }
