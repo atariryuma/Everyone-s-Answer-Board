@@ -195,7 +195,7 @@
   body .admin-responsive-grid,
   html body .admin-responsive-grid {
     display: grid !important;
-    grid-template-columns: 2fr 1fr !important;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) !important;
     gap: var(--spacing-xl) !important;
     align-items: start !important;
     max-width: 84rem !important;
@@ -210,7 +210,7 @@
   [class*="grid"].admin-responsive-grid,
   [class*="flex"].admin-responsive-grid {
     display: grid !important;
-    grid-template-columns: 2fr 1fr !important;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) !important;
   }
 
   /* レスポンシブ対応：画面幅が1024px以下で1カラムに */
