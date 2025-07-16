@@ -252,7 +252,7 @@ window.unifiedLayoutSystem = {
 body.admin-grid-layout .admin-responsive-grid,
 .admin-responsive-grid {
   display: grid !important;
-  grid-template-columns: 2fr 1fr !important;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) !important;
   gap: 2rem !important;
   align-items: start !important;
   max-width: 84rem !important;
@@ -332,7 +332,7 @@ body.iframe-environment .admin-responsive-grid {
 body.admin-grid-layout .tailwind-override-protection .admin-responsive-grid,
 html body.admin-grid-layout .tailwind-override-protection .admin-responsive-grid {
   display: grid !important;
-  grid-template-columns: 2fr 1fr !important;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) !important;
   gap: 2rem !important;
   width: 100% !important;
   box-sizing: border-box !important;
@@ -343,7 +343,7 @@ html body.admin-grid-layout .tailwind-override-protection .admin-responsive-grid
 body .admin-responsive-grid.emergency-2col,
 html body .admin-responsive-grid.emergency-2col {
   display: grid !important;
-  grid-template-columns: 2fr 1fr !important;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) !important;
   gap: 2rem !important;
   align-items: start !important;
   max-width: 84rem !important;
@@ -387,7 +387,7 @@ html body .admin-responsive-grid.emergency-2col .right-panel {
 body.iframe-environment .iframe-force-admin-grid,
 html body.iframe-environment .iframe-force-admin-grid {
   display: grid !important;
-  grid-template-columns: 2fr 1fr !important;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) !important;
   gap: 2rem !important;
   contain: layout style paint !important;
   isolation: isolate !important;
@@ -516,6 +516,7 @@ html body.iframe-environment .iframe-force-admin-grid {
     
     // 様々な2fr 1frの形式を検証
     const validPatterns = [
+      /minmax\(0(?:px)?,\s*2fr\)\s+minmax\(0(?:px)?,\s*1fr\)/,
       /2fr\s+1fr/,
       /2fr 1fr/,
       /(.*)\s*2fr\s+(.*)\s*1fr.*/,
@@ -576,7 +577,7 @@ html body.iframe-environment .iframe-force-admin-grid {
     
     // CSS変数を直接設定
     adminGrid.style.setProperty('display', 'grid', 'important');
-    adminGrid.style.setProperty('grid-template-columns', '2fr 1fr', 'important');
+    adminGrid.style.setProperty('grid-template-columns', 'minmax(0, 2fr) minmax(0, 1fr)', 'important');
     adminGrid.style.setProperty('gap', '2rem', 'important');
     adminGrid.style.setProperty('align-items', 'start', 'important');
     adminGrid.style.setProperty('max-width', '84rem', 'important');

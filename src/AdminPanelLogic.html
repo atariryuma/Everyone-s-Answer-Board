@@ -815,7 +815,7 @@ function injectAdminLayoutFix() {
 body.admin-grid-layout .admin-responsive-grid,
 .admin-responsive-grid {
   display: grid !important;
-  grid-template-columns: 2fr 1fr !important;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) !important;
   gap: 2rem !important;
   align-items: start !important;
   max-width: 84rem !important;
@@ -951,7 +951,7 @@ function fixAdminPanelLayout() {
     adminGrid.classList.add('emergency-2col');
     adminGrid.style.cssText = `
       display: grid !important;
-      grid-template-columns: 2fr 1fr !important;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) !important;
       gap: 2rem !important;
       max-width: 84rem !important;
       margin: 0 auto !important;
