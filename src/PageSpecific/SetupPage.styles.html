@@ -10,13 +10,13 @@
     /* カスタムレイアウト */
     max-width: 672px; /* max-w-2xl */
     margin: 0 auto;
-    padding: var(--spacing-lg);
+    padding: var(--section-spacing-lg);
   }
   
   /* Setup Page Header */
   .setup-page .header {
     text-align: center;
-    margin-bottom: var(--spacing-2xl);
+    margin-bottom: var(--section-spacing-xl);
   }
   
   .setup-page .header h1 {
@@ -33,7 +33,7 @@
   
   /* Setup Form Specific Styling */
   .setup-page .glass-panel {
-    margin-bottom: var(--spacing-xl);
+    margin-bottom: var(--section-spacing-lg);
   }
   
   .setup-page .form-control {
@@ -46,6 +46,15 @@
     box-shadow: 
       var(--glass-shadow-hover),
       0 0 0 3px rgba(6, 182, 212, 0.2);
+  }
+  
+  /* Form Section Spacing */
+  .setup-page .form-section {
+    margin-bottom: var(--section-spacing-md);
+  }
+  
+  .setup-page .form-section:last-child {
+    margin-bottom: 0;
   }
   
   /* テストセクション */
@@ -70,7 +79,9 @@
     border-color: var(--color-primary);
     font-weight: 700;
     min-height: var(--size-control-lg);
-    padding: var(--spacing-md) var(--spacing-2xl);
+    padding: var(--content-spacing-lg) var(--spacing-2xl);
+    width: 100%;
+    justify-content: center;
   }
   
   .setup-page .btn-primary:hover {
@@ -80,18 +91,35 @@
     transform: translateY(-2px);
   }
   
+  /* Button Group Spacing */
+  .setup-page .button-group {
+    display: flex;
+    gap: var(--content-spacing-md);
+    justify-content: center;
+    margin-top: var(--section-spacing-md);
+  }
+  
+  .setup-page .button-group .btn {
+    flex: 1;
+    min-width: 120px;
+  }
+  
   /* ヘルプセクションのスタイリング */
   .setup-page details {
     cursor: pointer;
-    padding: var(--spacing-md);
+    padding: var(--content-spacing-lg);
     background: var(--glass-bg-secondary);
     border-radius: var(--radius-lg);
-    margin-bottom: var(--spacing-sm);
+    margin-bottom: var(--content-spacing-md);
     transition: all var(--duration-normal) var(--easing-standard);
   }
   
   .setup-page details:hover {
     background: var(--glass-bg-hover);
+  }
+  
+  .setup-page details:last-child {
+    margin-bottom: 0;
   }
   
   .setup-page details summary {
@@ -100,7 +128,8 @@
     list-style: none;
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: var(--content-spacing-sm);
+    margin-bottom: var(--content-spacing-md);
   }
   
   .setup-page details summary::before {
@@ -120,7 +149,11 @@
   /* レスポンシブ調整 */
   @media (max-width: 640px) {
     .setup-page {
-      padding: var(--spacing-md);
+      padding: var(--section-spacing-md);
+    }
+    
+    .setup-page .header {
+      margin-bottom: var(--section-spacing-lg);
     }
     
     .setup-page .header h1 {
@@ -133,17 +166,22 @@
     
     .setup-page .btn-primary {
       min-height: var(--size-control-md);
-      padding: var(--spacing-sm) var(--spacing-xl);
+      padding: var(--content-spacing-md) var(--spacing-xl);
+    }
+    
+    .setup-page .button-group {
+      flex-direction: column;
+      gap: var(--content-spacing-sm);
     }
   }
   
   @media (max-width: 480px) {
     .setup-page {
-      padding: var(--spacing-sm);
+      padding: var(--section-spacing-sm);
     }
     
     .setup-page .header {
-      margin-bottom: var(--spacing-xl);
+      margin-bottom: var(--section-spacing-md);
     }
     
     .setup-page .header h1 {
@@ -155,7 +193,11 @@
     }
     
     .setup-page .glass-panel {
-      margin-bottom: var(--spacing-lg);
+      margin-bottom: var(--section-spacing-md);
+    }
+    
+    .setup-page details {
+      padding: var(--content-spacing-md);
     }
   }
 }

@@ -9,13 +9,13 @@
   .admin-panel {
     max-width: 1152px; /* max-w-6xl */
     margin: 0 auto;
-    padding: var(--spacing-lg);
+    padding: var(--section-spacing-lg);
   }
   
   /* Admin Panel Header */
   .admin-panel .header {
     text-align: center;
-    margin-bottom: var(--spacing-2xl);
+    margin-bottom: var(--section-spacing-xl);
   }
   
   .admin-panel .header h1 {
@@ -29,21 +29,22 @@
   .admin-panel .step-nav {
     display: flex;
     justify-content: center;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-2xl);
+    gap: var(--content-spacing-md);
+    margin-bottom: var(--section-spacing-xl);
   }
   
   .admin-panel .step-nav .step {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm) var(--spacing-md);
+    gap: var(--content-spacing-sm);
+    padding: var(--content-spacing-md) var(--content-spacing-lg);
     background: var(--glass-bg-secondary);
     border: var(--glass-border);
     border-radius: var(--radius-lg);
     color: var(--text-muted);
     font-size: var(--font-size-sm);
     transition: all var(--duration-normal) var(--easing-standard);
+    min-height: var(--size-control-md);
   }
   
   .admin-panel .step-nav .step.active {
@@ -81,14 +82,18 @@
   
   /* Form Sections */
   .admin-panel .form-section {
-    margin-bottom: var(--spacing-xl);
+    margin-bottom: var(--section-spacing-lg);
   }
   
   .admin-panel .form-section h3 {
     font-size: var(--font-size-lg);
     font-weight: 600;
     color: var(--text-primary);
-    margin-bottom: var(--spacing-md);
+    margin-bottom: var(--content-spacing-lg);
+  }
+  
+  .admin-panel .form-section:last-child {
+    margin-bottom: 0;
   }
   
   /* Data Table Styling */
@@ -105,7 +110,7 @@
   }
   
   .admin-panel .data-table th {
-    padding: var(--spacing-md) var(--spacing-lg);
+    padding: var(--content-spacing-lg) var(--content-spacing-lg);
     font-size: var(--font-size-sm);
     font-weight: 600;
     color: var(--text-secondary);
@@ -113,7 +118,7 @@
   }
   
   .admin-panel .data-table td {
-    padding: var(--spacing-md) var(--spacing-lg);
+    padding: var(--content-spacing-lg) var(--content-spacing-lg);
     font-size: var(--font-size-sm);
     color: var(--text-primary);
     border-bottom: 1px solid var(--border-secondary);
@@ -126,35 +131,36 @@
   /* Action Buttons */
   .admin-panel .action-buttons {
     display: flex;
-    gap: var(--spacing-md);
+    gap: var(--content-spacing-md);
     justify-content: center;
-    margin-top: var(--spacing-xl);
+    margin-top: var(--section-spacing-lg);
   }
   
   .admin-panel .action-buttons .btn {
-    min-width: 120px;
+    min-width: 140px;
+    min-height: var(--size-control-md);
   }
   
   /* Configuration Panel */
   .admin-panel .config-panel {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-xl);
-    margin-bottom: var(--spacing-xl);
+    gap: var(--section-spacing-lg);
+    margin-bottom: var(--section-spacing-lg);
   }
   
   .admin-panel .config-section {
     background: var(--glass-bg-secondary);
     border: var(--glass-border);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-lg);
+    padding: var(--content-spacing-xl);
   }
   
   .admin-panel .config-section h4 {
     font-size: var(--font-size-base);
     font-weight: 600;
     color: var(--text-primary);
-    margin-bottom: var(--spacing-md);
+    margin-bottom: var(--content-spacing-lg);
   }
   
   /* Progress Indicator */
@@ -163,7 +169,7 @@
     border-radius: var(--radius-full);
     height: 8px;
     overflow: hidden;
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: var(--section-spacing-md);
   }
   
   .admin-panel .progress-bar {
@@ -176,22 +182,27 @@
   /* レスポンシブ調整 */
   @media (max-width: 1024px) {
     .admin-panel {
-      padding: var(--spacing-md);
+      padding: var(--section-spacing-md);
     }
     
     .admin-panel .config-panel {
       grid-template-columns: 1fr;
-      gap: var(--spacing-lg);
+      gap: var(--section-spacing-md);
     }
     
     .admin-panel .step-nav {
       flex-wrap: wrap;
+      gap: var(--content-spacing-sm);
     }
   }
   
   @media (max-width: 640px) {
     .admin-panel {
-      padding: var(--spacing-sm);
+      padding: var(--section-spacing-sm);
+    }
+    
+    .admin-panel .header {
+      margin-bottom: var(--section-spacing-lg);
     }
     
     .admin-panel .header h1 {
@@ -201,6 +212,7 @@
     .admin-panel .step-nav {
       flex-direction: column;
       align-items: center;
+      gap: var(--content-spacing-sm);
     }
     
     .admin-panel .step-nav .step {
@@ -210,6 +222,7 @@
     
     .admin-panel .action-buttons {
       flex-direction: column;
+      gap: var(--content-spacing-sm);
     }
     
     .admin-panel .data-table {
@@ -218,13 +231,13 @@
     
     .admin-panel .data-table th,
     .admin-panel .data-table td {
-      padding: var(--spacing-sm);
+      padding: var(--content-spacing-md);
     }
   }
   
   @media (max-width: 480px) {
     .admin-panel .header {
-      margin-bottom: var(--spacing-xl);
+      margin-bottom: var(--section-spacing-md);
     }
     
     .admin-panel .header h1 {
@@ -232,11 +245,11 @@
     }
     
     .admin-panel .config-section {
-      padding: var(--spacing-md);
+      padding: var(--content-spacing-lg);
     }
     
     .admin-panel .form-section {
-      margin-bottom: var(--spacing-lg);
+      margin-bottom: var(--section-spacing-md);
     }
   }
 }
