@@ -385,14 +385,41 @@ class GASUtilities {
     });
   }
   
-  // Simple GAS function call
-  call(functionName, ...args) {
-    return new Promise((resolve, reject) => {
-      google.script.run
-        .withSuccessHandler(resolve)
-        .withFailureHandler(reject)
-        [functionName](...args);
-    });
+  // Simple GAS function call with enhanced argument handling
+  call(functionName, successHandler, failureHandler, args = [], operationName = '') {
+    // Handle both new signature and legacy ...args pattern
+    if (typeof successHandler === 'function' && typeof failureHandler === 'function') {
+      // New signature: call(functionName, successHandler, failureHandler, args, operationName)
+      try {
+        const gasFunction = google.script.run
+          .withSuccessHandler(successHandler)
+          .withFailureHandler(failureHandler)
+          [functionName];
+        
+        if (Array.isArray(args) && args.length > 0) {
+          gasFunction.apply(null, args);
+        } else {
+          gasFunction();
+        }
+      } catch (error) {
+        console.error(`GAS call error for ${functionName}:`, error);
+        if (failureHandler) failureHandler(error);
+      }
+    } else {
+      // Legacy signature: call(functionName, ...args) - return Promise
+      const allArgs = [successHandler, failureHandler, ...args];
+      return new Promise((resolve, reject) => {
+        try {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            [functionName](...allArgs);
+        } catch (error) {
+          console.error(`GAS call error for ${functionName}:`, error);
+          reject(error);
+        }
+      });
+    }
   }
   
   // Check if running in GAS environment

@@ -104,75 +104,91 @@ async function handleSetupSubmission(e) {
     
     // Execute setup via GAS
     await new Promise((resolve, reject) => {
-      if (window.sharedUtilities && window.sharedUtilities.gas) {
-        window.sharedUtilities.gas.call(
-          'setupApplication',
-          function(result) {
-            if (window.sharedUtilities.message) {
-              window.sharedUtilities.message.show('✅ セットアップが正常に完了しました！', 'success');
-            } else {
-              showMessage('✅ セットアップが正常に完了しました！', 'success');
-            }
-            
-            // Show test section
-            const testSection = document.getElementById('test-section');
-            if (testSection) testSection.classList.remove('hidden');
-            
-            resolve(result);
-          },
-          function(error) {
-            console.error('Setup error:', error);
-            let displayMessage = `❌ セットアップに失敗しました: ${error.message || error}`;
-            
-            if (error.message && error.message.includes('スプレッドシートの共有設定が「制限付き」になっていません')) {
-              displayMessage = `
-                <p class="font-bold">${error.message}</p>
-                <p class="mt-2">セキュリティのため、データベースとして使用するスプレッドシートの共有設定を「制限付き」に変更してください。</p>
-                <p>変更方法: スプレッドシートを開き、「共有」ボタン → 「一般的なアクセス」を「制限付き」に変更。</p>
-              `;
-            }
-            
-            if (window.sharedUtilities && window.sharedUtilities.message) {
-              window.sharedUtilities.message.show(displayMessage, 'error');
-            } else {
-              showMessage(displayMessage, 'error');
-            }
-            
-            reject(error);
-          },
-          [serviceAccountJson, databaseId],
-          'アプリケーションセットアップ'
-        );
+      if (window.sharedUtilities && window.sharedUtilities.gas && window.sharedUtilities.gas.call) {
+        try {
+          window.sharedUtilities.gas.call(
+            'setupApplication',
+            function(result) {
+              if (window.sharedUtilities && window.sharedUtilities.message) {
+                window.sharedUtilities.message.show('✅ セットアップが正常に完了しました！', 'success');
+              } else {
+                showMessage('✅ セットアップが正常に完了しました！', 'success');
+              }
+              
+              // Show test section
+              const testSection = document.getElementById('test-section');
+              if (testSection) testSection.classList.remove('hidden');
+              
+              resolve(result);
+            },
+            function(error) {
+              console.error('Setup error:', error);
+              let displayMessage = `❌ セットアップに失敗しました: ${error.message || error}`;
+              
+              if (error.message && error.message.includes('スプレッドシートの共有設定が「制限付き」になっていません')) {
+                displayMessage = `
+                  <p class="font-bold">${error.message}</p>
+                  <p class="mt-2">セキュリティのため、データベースとして使用するスプレッドシートの共有設定を「制限付き」に変更してください。</p>
+                  <p>変更方法: スプレッドシートを開き、「共有」ボタン → 「一般的なアクセス」を「制限付き」に変更。</p>
+                `;
+              }
+              
+              if (window.sharedUtilities && window.sharedUtilities.message) {
+                window.sharedUtilities.message.show(displayMessage, 'error');
+              } else {
+                showMessage(displayMessage, 'error');
+              }
+              
+              reject(error);
+            },
+            [serviceAccountJson, databaseId],
+            'アプリケーションセットアップ'
+          );
+        } catch (utilityError) {
+          console.error('SharedUtilities call error:', utilityError);
+          reject(new Error('共有ユーティリティの呼び出しに失敗しました: ' + utilityError.message));
+        }
       } else {
         // Fallback to direct GAS call
-        google.script.run
-          .withSuccessHandler((result) => {
-            showMessage('✅ セットアップが正常に完了しました！', 'success');
-            const testSection = document.getElementById('test-section');
-            if (testSection) testSection.classList.remove('hidden');
-            resolve(result);
-          })
-          .withFailureHandler((error) => {
-            console.error('Setup error:', error);
-            let displayMessage = `❌ セットアップに失敗しました: ${error.message || error}`;
-            
-            if (error.message && error.message.includes('スプレッドシートの共有設定が「制限付き」になっていません')) {
-              displayMessage = `
-                <p class="font-bold">${error.message}</p>
-                <p class="mt-2">セキュリティのため、データベースとして使用するスプレッドシートの共有設定を「制限付き」に変更してください。</p>
-                <p>変更方法: スプレッドシートを開き、「共有」ボタン → 「一般的なアクセス」を「制限付き」に変更。</p>
-              `;
-            }
-            
-            showMessage(displayMessage, 'error');
-            reject(error);
-          })
-          .setupApplication(serviceAccountJson, databaseId);
+        try {
+          if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run
+              .withSuccessHandler((result) => {
+                showMessage('✅ セットアップが正常に完了しました！', 'success');
+                const testSection = document.getElementById('test-section');
+                if (testSection) testSection.classList.remove('hidden');
+                resolve(result);
+              })
+              .withFailureHandler((error) => {
+                console.error('Setup error:', error);
+                let displayMessage = `❌ セットアップに失敗しました: ${error.message || error}`;
+                
+                if (error.message && error.message.includes('スプレッドシートの共有設定が「制限付き」になっていません')) {
+                  displayMessage = `
+                    <p class="font-bold">${error.message}</p>
+                    <p class="mt-2">セキュリティのため、データベースとして使用するスプレッドシートの共有設定を「制限付き」に変更してください。</p>
+                    <p>変更方法: スプレッドシートを開き、「共有」ボタン → 「一般的なアクセス」を「制限付き」に変更。</p>
+                  `;
+                }
+                
+                showMessage(displayMessage, 'error');
+                reject(error);
+              })
+              .setupApplication(serviceAccountJson, databaseId);
+          } else {
+            reject(new Error('Google Apps Script環境が利用できません'));
+          }
+        } catch (gasError) {
+          console.error('Direct GAS call error:', gasError);
+          reject(new Error('Google Apps Scriptの呼び出しに失敗しました: ' + gasError.message));
+        }
       }
     });
         
   } catch (error) {
-    const message = `❌ ${error.message}`;
+    console.error('Setup submission error:', error);
+    const message = `❌ ${error.message || 'セットアップ中に予期しないエラーが発生しました'}`;
+    
     if (window.sharedUtilities && window.sharedUtilities.message) {
       window.sharedUtilities.message.show(message, 'error');
     } else {
