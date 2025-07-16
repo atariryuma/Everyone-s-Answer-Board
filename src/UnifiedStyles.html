@@ -2097,7 +2097,8 @@ input[type="radio"]:disabled {
 .items-center { align-items: center; }
 .justify-center { justify-content: center; }
 .justify-between { justify-content: space-between; }
-.flex-1 { flex: 1 1 0%; }
+/* Exclude admin panel from flex-1 utility */
+.flex-1:not(.admin-responsive-grid *) { flex: 1 1 0%; }
 
 /* Grid Utilities */
 .grid { display: grid; }
