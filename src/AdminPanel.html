@@ -3487,7 +3487,10 @@ function syncCheckboxStates(status) {
     function showFormConfigModal() {
         const modal = document.getElementById('form-config-modal');
         if (modal) {
+            const panel = modal.querySelector('.glass-panel');
             modal.classList.remove('hidden');
+            modal.classList.add('modal-fade');
+            if (panel) panel.classList.add('modal-scale');
 
             // サーバーから質問テンプレートを読み込み
             initQuestionConfig();
@@ -3534,7 +3537,10 @@ function syncCheckboxStates(status) {
     function hideFormConfigModal() {
         const modal = document.getElementById('form-config-modal');
         if (modal) {
+            const panel = modal.querySelector('.glass-panel');
             modal.classList.add('hidden');
+            modal.classList.remove('modal-fade');
+            if (panel) panel.classList.remove('modal-scale');
         }
     }
 
