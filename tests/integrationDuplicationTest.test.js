@@ -142,9 +142,21 @@ describe('Integration Test: Duplicate User Prevention', () => {
       // シナリオ: 同じメールアドレスから常に同じIDが生成される
       const email = 'consistent@example.com';
       
+      // 簡易SHA256ハッシュシミュレーション
+      const mockSHA256 = (input) => {
+        let hash = 0;
+        for (let i = 0; i < input.length; i++) {
+          const char = input.charCodeAt(i);
+          hash = ((hash << 5) - hash) + char;
+          hash = hash & hash; // 32bit整数に変換
+        }
+        return Math.abs(hash).toString(16).padStart(8, '0');
+      };
+      
       const generateUserIdFromEmail = (email) => {
-        // For testing consistency, return a fixed valid UUID
-        return 'a0a0a0a0-b1b1-4c2c-8d3d-e4e4e4e4e4e4';
+        const hash = mockSHA256(email);
+        // UUID v4 フォーマットに変換
+        return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(12, 15)}-8${hash.slice(15, 18)}-${hash.slice(18, 30)}`;
       };
       
       // 複数回実行

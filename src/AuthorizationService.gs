@@ -11,11 +11,7 @@ var AuthorizationService = (function() {
    * @returns {string} ドメイン部分
    */
   function getEmailDomain(email) {
-    if (!email) return '';
-    return String(email)
-      .split('@')[1]
-      .toLowerCase()
-      .trim() || '';
+    return email.split('@')[1] || '';
   }
 
   /**
@@ -56,9 +52,7 @@ var AuthorizationService = (function() {
     const activeDomain = getEmailDomain(activeUserEmail);
     const adminDomain = getEmailDomain(adminEmail);
 
-    // ドメインの柔軟な比較: activeDomainがadminDomainで終わるかをチェック
-    // これにより、サブドメインや部分的な一致を許容します。
-    if (activeDomain.endsWith(adminDomain)) {
+    if (activeDomain === adminDomain) {
       console.log(`[Auth] Domain access granted (${activeDomain})`);
       return true;
     }

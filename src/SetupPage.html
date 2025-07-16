@@ -7,18 +7,18 @@
     <title>StudyQuest - 初回セットアップ</title>
     <meta name="theme-color" content="#1a1b26" />
     <meta name="description" content="StudyQuestの初回システムセットアップページ" />
+    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
     
-    <!-- TailwindCSS Configuration -->
-    <?!= include('TailwindConfig'); ?>
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- Unified Styles and Shared Components -->
     <?!= include('UnifiedStyles'); ?>
-    <?!= include('PageSpecific/SetupPage.styles'); ?>
     <?!= include('SharedUtilities'); ?>
     <?!= include('SharedJavaScript'); ?>
     <?!= include('SetupLogic'); ?>
 </head>
-<body class="unified-theme bg-[#1a1b26] text-gray-200 font-sans min-h-screen">
+<body class="bg-[#1a1b26] text-gray-200 font-sans min-h-screen"">
     <div class="max-w-2xl mx-auto">
         <!-- ヘッダー -->
         <div class="text-center mb-8">
@@ -27,8 +27,8 @@
             <p class="text-sm text-gray-400 mt-2">システムを使用開始するための設定を行います</p>
         </div>
 
-        <!-- インラインメッセージエリア -->
-        <div id="inline-message-area" class="mb-6"></div>
+        <!-- メッセージエリア -->
+        <div id="message-area" class="mb-6"></div>
 
         <!-- セットアップフォーム -->
         <div class="glass-panel rounded-xl p-6 mb-6">
@@ -44,27 +44,27 @@
                         id="service-account-json" 
                         name="serviceAccountJson"
                         rows="8" 
-                        class="form-control font-mono text-xs"
+                        class="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 font-mono text-xs resize-vertical focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
                         placeholder='{"type": "service_account", "project_id": "...", "private_key_id": "...", ...}'
                         required></textarea>
                     <p class="text-xs text-gray-400 mt-1">Google Cloud ConsoleからダウンロードしたサービスアカウントのJSONファイルの内容を貼り付けてください</p>
                 </div>
 
                 <!-- データベーススプレッドシートID -->
-                <div class="space-y-2">
-                    <label for="database-id" class="block text-sm font-medium text-gray-300">
+                <div>
+                    <label for="database-id" class="block text-sm font-medium text-gray-300 mb-2">
                         📊 データベーススプレッドシートID
                     </label>
                     <input 
                         type="text" 
                         id="database-id" 
                         name="databaseId"
-                        class="form-control font-mono text-sm"
+                        class="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 font-mono focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
                         placeholder="1BcD3fGhIjKlMnOpQrStUvWxYz0123456789ABCDEFGH"
                         pattern="[a-zA-Z0-9_\-]{44}"
                         maxlength="44"
                         required>
-                    <p class="text-xs text-gray-400">データベース用スプレッドシートのIDを入力してください（44文字）</p>
+                    <p class="text-xs text-gray-400 mt-1">データベース用スプレッドシートのIDを入力してください（44文字）</p>
                 </div>
 
                 <!-- セットアップボタン -->
@@ -149,7 +149,7 @@
         };
         
         var startApp = window.setupUtilities?.navigation?.startApp || function() {
-            window.location.href = window.location.href.split('?')[0];
+            console.log('Start app function not available');
         };
         
         // Initialize on DOM ready

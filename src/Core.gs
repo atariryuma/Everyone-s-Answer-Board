@@ -1862,7 +1862,6 @@ function addUnifiedQuestions(form, questionType, customConfig) {
   try {
     var config = getQuestionConfig(questionType, customConfig);
 
-    // Email collection enabled automatically (no email question in form, but emails are collected)
     form.setCollectEmail(true);
 
     if (questionType === 'simple') {
@@ -2013,6 +2012,30 @@ function getQuestionConfig(questionType, customConfig) {
   return config;
 }
 
+/**
+ * 質問テンプレート取得用 API
+ * @returns {ContentService.TextOutput} JSON形式の質問設定
+ */
+function doGetQuestionConfig() {
+  try {
+    // 現在の日時を取得してタイトルに含める
+    const now = new Date();
+    const timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
+    
+    const cfg = getQuestionConfig('simple');
+    
+    // タイトルにタイムスタンプを追加
+    cfg.formTitle = `フォーム作成 - ${timestamp}`;
+    
+    return ContentService.createTextOutput(JSON.stringify(cfg)).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    console.error('doGetQuestionConfig error:', error);
+    return ContentService.createTextOutput(JSON.stringify({
+      error: 'Failed to get question config',
+      details: error.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
 
 /**
  * クラス選択肢をデータベースに保存
@@ -2110,14 +2133,7 @@ function createCustomForm(userEmail, userId, config) {
   try {
     const now = new Date();
     const dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm:ss');
-    
-    // Auto-generate form title based on question content
-    let baseTitle = 'カスタムフォーム';
-    if (config.opinionHeader) {
-      // Take first 20 characters of the question as title base
-      const questionExcerpt = config.opinionHeader.substring(0, 20);
-      baseTitle = questionExcerpt + (config.opinionHeader.length > 20 ? '...' : '');
-    }
+    const baseTitle = config.formTitle || 'カスタムフォーム';
     const formTitle = `${baseTitle} - ${dateTimeString}`;
     
     // AdminPanelのconfig構造を内部形式に変換 (opinionHeaderに統一)
@@ -4084,7 +4100,7 @@ function createCustomFormUI(requestUserId, config) {
       updatedConfigJson.readyForAutoPublish = true;
       
       // カスタムフォーム設定情報を保存 (opinionHeaderに統一)
-      // formTitle は自動生成されるため保存不要
+      updatedConfigJson.formTitle = config.formTitle;
       updatedConfigJson.questionType = config.questionType;
       updatedConfigJson.choices = config.choices;
       updatedConfigJson.includeOthers = config.includeOthers;
@@ -4305,69 +4321,6 @@ function deleteCurrentUserAccount(requestUserId) {
 }
 
 /**
- * リソース連携を解除する関数（フォーム・スプレッドシートは保持）
- * @param {string} requestUserId - リクエスト元のユーザーID
- */
-function disconnectResources(requestUserId) {
-  try {
-    verifyUserAccess(requestUserId);
-    
-    // ユーザー情報を取得
-    const userInfo = getCachedUserInfo(requestUserId);
-    if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません。');
-    }
-    
-    // データベースからユーザー情報を削除（リソース連携解除）
-    const database = getDatabase();
-    if (!database) {
-      throw new Error('データベースにアクセスできません。');
-    }
-    
-    const sheet = database.getSheetByName(DB_SHEET_CONFIG.SHEET_NAME);
-    if (!sheet) {
-      throw new Error('ユーザーシートが見つかりません。');
-    }
-    
-    // ユーザー行を特定して削除
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0];
-    const userIdIndex = headers.indexOf('userId');
-    
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][userIdIndex] === requestUserId) {
-        sheet.deleteRow(i + 1);
-        
-        // 操作ログを記録
-        logActivity(requestUserId, 'resource_disconnect', {
-          action: 'リソース連携解除',
-          timestamp: new Date().toISOString(),
-          note: 'フォーム・スプレッドシートは保持'
-        });
-        
-        return {
-          status: 'success',
-          message: 'リソース連携を解除しました。フォームとスプレッドシートは保持されています。',
-          data: {
-            spreadsheetUrl: userInfo.spreadsheetUrl,
-            formUrl: userInfo.configJson ? JSON.parse(userInfo.configJson).formUrl : null
-          }
-        };
-      }
-    }
-    
-    throw new Error('ユーザーデータが見つかりません。');
-    
-  } catch (error) {
-    console.error('disconnectResources error:', error.message);
-    return {
-      status: 'error',
-      message: error.message || 'リソース連携解除中にエラーが発生しました。'
-    };
-  }
-}
-
-/**
  * 既存ユーザーのconfigJsonを修復する関数
  * フォーム作成済みだがpublishedSpreadsheetIdが欠如している場合に使用
  */
@@ -4556,3 +4509,67 @@ function validateAndRepairUserConfig(userId) {
   }
 }
 
+/**
+ * 質問文表示の完全なテストフロー
+ * @param {string} userId - ユーザーID
+ * @returns {Object} テスト結果の詳細
+ */
+function testQuestionTextDisplayFlow(userId) {
+  try {
+    console.log('🧪 [TEST] 質問文表示フロー検証開始:', userId);
+    
+    // 1. 設定検証・修復
+    const configValidation = validateAndRepairUserConfig(userId);
+    console.log('🧪 [TEST] 設定検証結果:', configValidation);
+    
+    // 2. ユーザー情報取得
+    const userInfo = getCachedUserInfo(userId, true); // 最新情報を取得
+    const config = JSON.parse(userInfo.configJson || '{}');
+    
+    // 3. テンプレート変数解決のシミュレーション
+    const sheetConfigKey = 'sheet_' + config.publishedSheetName;
+    const sheetConfig = config[sheetConfigKey] || {};
+    const resolvedOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+    
+    console.log('🧪 [TEST] 設定解決結果:', {
+      publishedSpreadsheetId: config.publishedSpreadsheetId,
+      publishedSheetName: config.publishedSheetName,
+      sheetConfigKey: sheetConfigKey,
+      sheetConfig: sheetConfig,
+      resolvedOpinionHeader: resolvedOpinionHeader
+    });
+    
+    // 4. データ取得テスト
+    let dataRetrievalResult = null;
+    try {
+      dataRetrievalResult = getPublishedSheetData(userId, '', 'createdAt', false, true);
+      console.log('🧪 [TEST] データ取得成功');
+    } catch (e) {
+      console.warn('🧪 [TEST] データ取得エラー:', e.message);
+      dataRetrievalResult = { error: e.message };
+    }
+    
+    return {
+      status: 'success',
+      configValidation: configValidation,
+      userConfig: {
+        publishedSpreadsheetId: config.publishedSpreadsheetId,
+        publishedSheetName: config.publishedSheetName,
+        userSpreadsheetId: userInfo.spreadsheetId
+      },
+      templateResolution: {
+        sheetConfigKey: sheetConfigKey,
+        sheetConfig: sheetConfig,
+        resolvedOpinionHeader: resolvedOpinionHeader
+      },
+      dataRetrievalTest: dataRetrievalResult !== null ? 'success' : 'failed'
+    };
+    
+  } catch (error) {
+    console.error('❌ [TEST] 質問文表示フロー検証エラー:', error.message);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
+}

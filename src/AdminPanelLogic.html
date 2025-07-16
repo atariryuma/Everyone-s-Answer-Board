@@ -563,46 +563,32 @@ function handleDeleteRequest() {
       function() {
         setAdminLoading(true, 'アカウントを完全に削除しています...');
         
-        if (window.sharedUtilities && window.sharedUtilities.gas && window.sharedUtilities.gas.call) {
-          try {
-            window.sharedUtilities.gas.call(
-              'deleteCurrentUserAccount',
-              function(response) {
-                setAdminLoading(false);
-                if (window.sharedUtilities.message) {
-                  window.sharedUtilities.message.show(response, 'success');
+        if (window.sharedUtilities && window.sharedUtilities.gas) {
+          window.sharedUtilities.gas.call(
+            'deleteCurrentUserAccount',
+            function(response) {
+              setAdminLoading(false);
+              if (window.sharedUtilities.message) {
+                window.sharedUtilities.message.show(response, 'success');
+              }
+              setTimeout(function() {
+                if (window.sharedUtilities.navigation) {
+                  window.sharedUtilities.navigation.safeNavigate('?page=Registration', {
+                    fallbackMessage: '登録ページに移動中...',
+                    method: 'auto'
+                  });
+                } else {
+                  window.location.href = '?page=Registration';
                 }
-                setTimeout(function() {
-                  if (window.sharedUtilities.navigation) {
-                    window.sharedUtilities.navigation.safeNavigate('?page=LoginPage', {
-                      fallbackMessage: '登録ページに移動中...',
-                      method: 'auto'
-                    });
-                  } else {
-                    window.location.href = '?page=LoginPage';
-                  }
-                }, 2000);
-              },
-              function(error) {
-                setAdminLoading(false);
-                handleAdminError(error, 'アカウント削除');
-              },
-              [appState.userId],
-              'アカウント削除'
-            );
-          } catch (utilityError) {
-            console.error('SharedUtilities call error:', utilityError);
-            setAdminLoading(false);
-            if (window.sharedUtilities && window.sharedUtilities.message) {
-              window.sharedUtilities.message.show('共有ユーティリティの呼び出しに失敗しました', 'error');
-            }
-          }
-        } else {
-          setAdminLoading(false);
-          console.error('SharedUtilities gas.call not available');
-          if (window.sharedUtilities && window.sharedUtilities.message) {
-            window.sharedUtilities.message.show('システムエラー：削除機能が利用できません', 'error');
-          }
+              }, 2000);
+            },
+            function(error) {
+              setAdminLoading(false);
+              handleAdminError(error, 'アカウント削除');
+            },
+            [appState.userId],
+            'アカウント削除'
+          );
         }
       }
     );
@@ -610,11 +596,11 @@ function handleDeleteRequest() {
 }
 
 /**
- * Admin system flow display for debugging - Enhanced version
+ * Admin system flow display for debugging
  */
 function showAdminSystemFlow() {
-  // Always show detailed debug info for admin panel
-  const DEBUG_MODE = true;
+  const DEBUG_MODE = <?= typeof DEBUG_MODE !== 'undefined' ? DEBUG_MODE : false ?>;
+  if (!DEBUG_MODE) return;
   
   console.group('🔄 StudyQuest 管理パネル システムフロー');
   console.log('📋 Phase 1: 管理パネル初期化');
@@ -655,62 +641,12 @@ function showAdminSystemFlow() {
   
   console.groupEnd();
   
-  console.group('📊 管理パネル現在状態 - 詳細情報');
-  
-  // DOM & Layout Information
-  console.log('🔍 DOM状態:', document.readyState);
-  console.log('📄 CSS読み込み:', document.styleSheets.length + ' stylesheets');
-  
-  // Layout Debugging
-  const adminGrid = document.querySelector('.admin-responsive-grid');
-  if (adminGrid) {
-    const computedStyle = window.getComputedStyle(adminGrid);
-    console.log('📐 Grid Layout情報:');
-    console.log('  ├─ Display:', computedStyle.display);
-    console.log('  ├─ Grid Template Columns:', computedStyle.gridTemplateColumns);
-    console.log('  ├─ Gap:', computedStyle.gap);
-    console.log('  ├─ Width:', computedStyle.width);
-    console.log('  └─ Max Width:', computedStyle.maxWidth);
-  } else {
-    console.log('❌ Grid container not found');
-  }
-  
-  // Panel Information
-  const leftPanel = document.querySelector('.left-panel');
-  const rightPanel = document.querySelector('.right-panel');
-  if (leftPanel && rightPanel) {
-    console.log('📱 Panel情報:');
-    console.log('  ├─ Left Panel Display:', window.getComputedStyle(leftPanel).display);
-    console.log('  ├─ Left Panel Flex:', window.getComputedStyle(leftPanel).flex);
-    console.log('  ├─ Right Panel Display:', window.getComputedStyle(rightPanel).display);
-    console.log('  └─ Right Panel Position:', window.getComputedStyle(rightPanel).position);
-  }
-  
-  // Tailwind Override Status
-  const overrideStyle = document.getElementById('admin-panel-override');
-  console.log('🎨 Tailwind Override:', overrideStyle ? 'Applied' : 'Not Applied');
-  
-  // Application State
-  console.log('🌐 GAS環境:', typeof google !== 'undefined' ? 'Available' : 'Not Available');
-  console.log('👤 管理者状態:', typeof appState.currentStatus !== 'undefined' && appState.currentStatus ? 'Authenticated' : 'Unknown');
-  console.log('📊 スプレッドシートURL:', typeof appState.currentSpreadsheetUrl !== 'undefined' ? (appState.currentSpreadsheetUrl ? 'Set' : 'Not Set') : 'Unknown');
-  
-  // User Information
-  if (typeof appState !== 'undefined') {
-    console.log('🆔 AppState詳細:');
-    console.log('  ├─ User ID:', appState.userId || 'Not Set');
-    console.log('  ├─ Selected Sheet:', appState.selectedSheet || 'Not Set');
-    console.log('  ├─ Web App URL:', appState.webAppUrl || 'Not Set');
-    console.log('  └─ Loading State:', appState.isLoading || false);
-  }
-  
-  // Window Size Information
-  console.log('📏 画面情報:');
-  console.log('  ├─ Window Width:', window.innerWidth + 'px');
-  console.log('  ├─ Window Height:', window.innerHeight + 'px');
-  console.log('  ├─ Device Pixel Ratio:', window.devicePixelRatio);
-  console.log('  └─ Mobile Layout:', window.innerWidth <= 1024 ? 'Yes' : 'No');
-  
+  console.group('📊 管理パネル現在状態');
+  console.log('DOM状態:', document.readyState);
+  console.log('CSS読み込み:', document.styleSheets.length + ' stylesheets');
+  console.log('GAS環境:', typeof google !== 'undefined' ? 'Available' : 'Not Available');
+  console.log('管理者状態:', typeof appState.currentStatus !== 'undefined' && appState.currentStatus ? 'Authenticated' : 'Unknown');
+  console.log('スプレッドシートURL:', typeof appState.currentSpreadsheetUrl !== 'undefined' ? (appState.currentSpreadsheetUrl ? 'Set' : 'Not Set') : 'Unknown');
   console.groupEnd();
 }
 
@@ -780,189 +716,6 @@ class AdminCacheManager {
 window.adminCacheManager = new AdminCacheManager();
 
 // =============================================================================
-// IFRAME LAYOUT FIX - 最優先実行
-// =============================================================================
-
-/**
- * 統合レイアウトシステムとの連携強化
- * iframe内でのAdmin Panel 2カラムレイアウト修正
- */
-function injectAdminLayoutFix() {
-  console.log('🎯 [ADMIN PANEL] Layout fix initialization...');
-  
-  // 統合レイアウトシステムがあるかチェック
-  if (window.unifiedLayoutSystem) {
-    console.log('🔗 [ADMIN PANEL] Using unified layout system');
-    window.unifiedLayoutSystem.init();
-    return;
-  }
-  
-  // iframe専用レイアウトシステムがあるかチェック
-  if (window.iframeLayoutSystem) {
-    console.log('🔗 [ADMIN PANEL] Using iframe layout system');
-    window.iframeLayoutSystem.init();
-    window.iframeLayoutSystem.forceRepair();
-    return;
-  }
-  
-  // フォールバック: 直接CSS注入
-  console.log('🎯 [ADMIN PANEL] Fallback: direct CSS injection...');
-  
-  const adminStyleFix = document.createElement('style');
-  adminStyleFix.id = 'admin-layout-fix-iframe';
-  adminStyleFix.innerHTML = `
-/* IFRAME内 Admin Panel Layout Fix - 最高優先度 */
-body.admin-grid-layout .admin-responsive-grid,
-.admin-responsive-grid {
-  display: grid !important;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) !important;
-  gap: 2rem !important;
-  align-items: start !important;
-  max-width: 84rem !important;
-  margin: 0 auto !important;
-  padding: 0 1rem !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
-}
-
-body.admin-grid-layout .admin-responsive-grid .left-panel,
-body.admin-grid-layout .admin-responsive-grid .right-panel,
-.admin-responsive-grid .left-panel,
-.admin-responsive-grid .right-panel {
-  min-width: 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 1.5rem !important;
-  flex: none !important;
-  margin: 0 !important;
-  box-sizing: border-box !important;
-}
-
-body.admin-grid-layout .admin-responsive-grid .left-panel,
-.admin-responsive-grid .left-panel {
-  grid-column: 1 !important;
-}
-
-body.admin-grid-layout .admin-responsive-grid .right-panel,
-.admin-responsive-grid .right-panel {
-  grid-column: 2 !important;
-  position: sticky !important;
-  top: 1.5rem !important;
-  max-height: calc(100vh - 3rem) !important;
-  overflow-y: auto !important;
-}
-
-/* Mobile Override for iframe */
-@media (max-width: 1024px) {
-  body.admin-grid-layout .admin-responsive-grid,
-  .admin-responsive-grid {
-    grid-template-columns: 1fr !important;
-    gap: 1.5rem !important;
-    padding: 0 !important;
-  }
-  
-  body.admin-grid-layout .admin-responsive-grid .left-panel,
-  .admin-responsive-grid .left-panel {
-    order: 2 !important;
-    grid-column: auto !important;
-  }
-  
-  body.admin-grid-layout .admin-responsive-grid .right-panel,
-  .admin-responsive-grid .right-panel {
-    order: 1 !important;
-    grid-column: auto !important;
-    position: static !important;
-    max-height: none !important;
-    overflow-y: visible !important;
-  }
-}
-
-/* Tailwindクラス無効化 */
-.admin-responsive-grid > * {
-  flex: none !important;
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-}
-
-/* Bodyクラス確実適用 */
-body {
-  background: #1a1b26 !important;
-}
-  `;
-  
-  document.head.appendChild(adminStyleFix);
-  
-  // Bodyクラスを確実に設定
-  if (!document.body.classList.contains('admin-grid-layout')) {
-    document.body.classList.add('admin-grid-layout');
-  }
-  
-  // iframe環境クラスを追加
-  if (window !== window.top) {
-    document.body.classList.add('iframe-environment');
-  }
-  
-  console.log('✅ [ADMIN PANEL] Fallback CSS injection completed');
-  
-  // 少し遅延してから確認
-  setTimeout(function() {
-    const grid = document.querySelector('.admin-responsive-grid');
-    if (grid) {
-      const style = window.getComputedStyle(grid);
-      console.group('🔍 [ADMIN PANEL] Layout verification results');
-      console.log('Grid Display:', style.display);
-      console.log('Grid Template Columns:', style.gridTemplateColumns);
-      console.log('Gap:', style.gap);
-      console.log('Is 2-column layout:', style.gridTemplateColumns.includes('2fr 1fr') ? '✅ YES' : '❌ NO');
-      
-      const leftPanel = grid.querySelector('.left-panel');
-      const rightPanel = grid.querySelector('.right-panel');
-      if (leftPanel && rightPanel) {
-        console.log('Left Panel Width:', leftPanel.offsetWidth + 'px');
-        console.log('Right Panel Width:', rightPanel.offsetWidth + 'px');
-        if (leftPanel.offsetWidth > 0 && rightPanel.offsetWidth > 0) {
-          const ratio = (leftPanel.offsetWidth / rightPanel.offsetWidth).toFixed(2);
-          console.log('Width Ratio:', ratio + ':1');
-          console.log('2-Column Status:', ratio > 1.5 ? '✅ Normal' : '❌ Abnormal');
-        }
-      }
-      console.groupEnd();
-    } else {
-      console.log('❌ [ADMIN PANEL] Grid element not found in iframe');
-    }
-  }, 100);
-}
-
-/**
- * 手動修復関数 - コンソールから呼び出し可能
- */
-function fixAdminPanelLayout() {
-  console.log('🔧 [ADMIN PANEL] Manual layout repair requested');
-  
-  // 統合システムを優先使用
-  if (window.fixAdminLayout) {
-    window.fixAdminLayout();
-    return;
-  }
-  
-  // フォールバック: 直接修復
-  const adminGrid = document.querySelector('.admin-responsive-grid');
-  if (adminGrid) {
-    adminGrid.classList.add('emergency-2col');
-    adminGrid.style.cssText = `
-      display: grid !important;
-      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) !important;
-      gap: 2rem !important;
-      max-width: 84rem !important;
-      margin: 0 auto !important;
-      padding: 0 1rem !important;
-      width: 100% !important;
-    `;
-    console.log('🔧 [ADMIN PANEL] Emergency repair applied');
-  }
-}
-
-// =============================================================================
 // INITIALIZATION
 // =============================================================================
 
@@ -971,9 +724,6 @@ function fixAdminPanelLayout() {
  */
 function initializeAdminPanel() {
   console.log('🔧 Initializing Admin Panel Logic...');
-  
-  // IFRAME内でのレイアウト修正を最優先で実行
-  injectAdminLayoutFix();
   
   // Show system flow for debugging
   showAdminSystemFlow();

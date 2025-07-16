@@ -385,45 +385,14 @@ class GASUtilities {
     });
   }
   
-  // Simple GAS function call with enhanced argument handling
-  call(functionName, successHandler, failureHandler, args = [], operationName = '') {
-    // Handle both new signature and legacy ...args pattern
-    if (typeof successHandler === 'function' && typeof failureHandler === 'function') {
-      // New signature: call(functionName, successHandler, failureHandler, args, operationName)
-      try {
-        if (!this.isGASEnvironment() || typeof google.script.run[functionName] !== 'function') {
-          throw new Error(`GAS function ${functionName} is not available`);
-        }
-
-        const runner = google.script.run
-          .withSuccessHandler(successHandler)
-          .withFailureHandler(failureHandler);
-        const gasFunction = runner[functionName];
-
-        if (Array.isArray(args) && args.length > 0) {
-          gasFunction.apply(runner, args);
-        } else {
-          gasFunction.call(runner);
-        }
-      } catch (error) {
-        console.error(`GAS call error for ${functionName}:`, error);
-        if (failureHandler) failureHandler(error);
-      }
-    } else {
-      // Legacy signature: call(functionName, ...args) - return Promise
-      const allArgs = [successHandler, failureHandler, ...args];
-      return new Promise((resolve, reject) => {
-        try {
-          google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
-            [functionName](...allArgs);
-        } catch (error) {
-          console.error(`GAS call error for ${functionName}:`, error);
-          reject(error);
-        }
-      });
-    }
+  // Simple GAS function call
+  call(functionName, ...args) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject)
+        [functionName](...args);
+    });
   }
   
   // Check if running in GAS environment
@@ -487,109 +456,6 @@ window.getSharedUtilitiesStats = function() {
     loadingStates: Object.fromEntries(window.sharedUtilities.loading.loadingStates),
     gasEnvironment: window.sharedUtilities.gas.isGASEnvironment()
   };
-};
-
-// Debugging utilities for UI state and user interactions
-window.sharedUtilities.debug = {
-  // Log button clicks with position and disabled state
-  enableClickLogging: function() {
-    document.addEventListener(
-      'click',
-      function(e) {
-        if (e.target && e.target.tagName === 'BUTTON') {
-          var rect = e.target.getBoundingClientRect();
-          console.log('[CLICK]', {
-            id: e.target.id,
-            text: e.target.textContent.trim(),
-            disabled: e.target.disabled,
-            position: { x: rect.x, y: rect.y },
-            time: new Date().toISOString()
-          });
-        }
-      },
-      true
-    );
-  },
-
-  // Output current UI state to the console
-  logUiState: function(selector) {
-    var root = selector
-      ? typeof selector === 'string'
-        ? document.querySelector(selector)
-        : selector
-      : document.body;
-    if (!root) {
-      console.warn('logUiState: root element not found', selector);
-      return;
-    }
-    var buttons = root.querySelectorAll('button');
-    var info = {
-      readyState: document.readyState,
-      viewport: { width: window.innerWidth, height: window.innerHeight },
-      rootSelector: selector || 'body',
-      buttonCount: buttons.length,
-      buttons: []
-    };
-    buttons.forEach(function(btn) {
-      var rect = btn.getBoundingClientRect();
-      info.buttons.push({
-        id: btn.id,
-        text: btn.textContent.trim(),
-        disabled: btn.disabled,
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
-        visible:
-          !!(btn.offsetWidth || btn.offsetHeight || btn.getClientRects().length)
-      });
-    });
-    console.group('[UI State] - 詳細情報');
-    console.log('📊 基本情報:', info);
-    
-    // Additional layout debugging
-    if (typeof document !== 'undefined') {
-      console.log('🎯 レイアウト詳細:');
-      
-      // Admin grid specific debugging
-      const adminGrid = document.querySelector('.admin-responsive-grid');
-      if (adminGrid) {
-        const computedStyle = window.getComputedStyle(adminGrid);
-        console.log('  ├─ Admin Grid Found: YES');
-        console.log('  ├─ Display Type:', computedStyle.display);
-        console.log('  ├─ Grid Columns:', computedStyle.gridTemplateColumns);
-        console.log('  ├─ Gap:', computedStyle.gap);
-        console.log('  └─ Computed Width:', computedStyle.width);
-        
-        // Check panel visibility
-        const leftPanel = adminGrid.querySelector('.left-panel');
-        const rightPanel = adminGrid.querySelector('.right-panel');
-        
-        if (leftPanel && rightPanel) {
-          console.log('  📱 Panel状態:');
-          console.log('    ├─ Left Panel Visible:', leftPanel.offsetWidth > 0);
-          console.log('    ├─ Right Panel Visible:', rightPanel.offsetWidth > 0);
-          console.log('    ├─ Left Panel Width:', leftPanel.offsetWidth + 'px');
-          console.log('    └─ Right Panel Width:', rightPanel.offsetWidth + 'px');
-        }
-      } else {
-        console.log('  ❌ Admin Grid Not Found');
-      }
-      
-      // Override style check
-      const overrideStyle = document.getElementById('admin-panel-override');
-      console.log('🎨 Override Status:', overrideStyle ? 'Applied' : 'Missing');
-      
-      // Viewport information
-      console.log('📐 Viewport情報:');
-      console.log('  ├─ Inner Width:', window.innerWidth + 'px');
-      console.log('  ├─ Inner Height:', window.innerHeight + 'px');
-      console.log('  └─ Layout Mode:', window.innerWidth <= 1024 ? 'Mobile' : 'Desktop');
-    }
-    
-    console.groupEnd();
-    return info;
-  }
 };
 
 // Performance monitoring
@@ -803,11 +669,6 @@ window.sharedUtilities.navigation = {
     // Try other methods in sequence with fallbacks
     
     switch (actualMethod) {
-      case 'server':
-        if (!success) success = this.navigateWithServer(url, fallbackMessage);
-        if (!success) success = this.navigateWithMessage(url, fallbackMessage);
-        if (!success) success = this.navigateWithRedirect(url, delay);
-        break;
       case 'close':
         if (!success) success = this.navigateWithClose(url, delay);
         if (!success) success = this.navigateWithMessage(url, fallbackMessage);
@@ -913,65 +774,38 @@ window.sharedUtilities.navigation = {
     this.showManualNavigationDialog(url, message);
   },
   
-  // Enhanced method detection for iframe optimization
+  // Detect the best navigation method for current context
   detectBestMethod: function() {
-    // Advanced iframe environment detection
+    // Check if we're in an iframe
     const isIframe = window !== window.top;
-    const isGoogleAppsScript = window.location.hostname.includes('googleusercontent.com') || 
-                               window.location.hostname.includes('script.google.com');
-    const isSandboxed = window.location.href.includes('sandbox');
     
-    // Check Google Apps Script API availability
+    // Check if google.script.host.close is available
     const hasGoogleScriptHostClose = typeof google !== 'undefined' && 
                                      google.script && 
                                      google.script.host &&
                                      typeof google.script.host.close === 'function';
     
+    // Check if google.script.run is available (for server-side navigation)
     const hasGoogleScriptRun = typeof google !== 'undefined' && 
                                google.script && 
                                google.script.run;
     
-    // Check for unified layout system presence
-    const hasUnifiedLayoutSystem = typeof window.unifiedLayoutSystem !== 'undefined';
-    const hasIframeLayoutSystem = typeof window.iframeLayoutSystem !== 'undefined';
+    // Check current URL origin vs target
+    const currentOrigin = window.location.origin;
     
-    // Enhanced context analysis
-    const context = {
+    console.log('Navigation context:', {
       isIframe,
-      isGoogleAppsScript,
-      isSandboxed,
       hasGoogleScriptHostClose,
       hasGoogleScriptRun,
-      hasUnifiedLayoutSystem,
-      hasIframeLayoutSystem,
-      currentOrigin: window.location.origin,
-      userAgent: navigator.userAgent,
-      viewportWidth: window.innerWidth
-    };
+      currentOrigin
+    });
     
-    console.log('📱 [NAV] Enhanced navigation context:', context);
-    
-    // Optimized method selection for iframe environments
-    if (isIframe && isGoogleAppsScript) {
-      // Google Apps Script iframe environment - prefer server-side navigation
-      if (hasGoogleScriptRun) {
-        console.log('🔄 [NAV] Using server-side navigation for GAS iframe');
-        return 'server';
-      } else {
-        console.log('🔄 [NAV] Using direct redirect for GAS iframe');
-        return 'redirect';
-      }
-    } else if (isIframe) {
-      // Generic iframe environment - prefer message passing
-      console.log('🔄 [NAV] Using message passing for generic iframe');
-      return 'message';
+    // For iframe environments, prefer direct redirect
+    if (isIframe) {
+      return 'redirect';
     } else if (hasGoogleScriptHostClose) {
-      // Native GAS environment with host.close available
-      console.log('🔄 [NAV] Using host.close for native GAS');
       return 'close';
     } else {
-      // Standard web environment
-      console.log('🔄 [NAV] Using standard redirect');
       return 'redirect';
     }
   },
@@ -992,7 +826,7 @@ window.sharedUtilities.navigation = {
       z-index: 10000;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       font-size: 16px;
-      /* Backdrop blur handled by unified CSS classes */
+      backdrop-filter: blur(10px);
       border: 1px solid rgba(255, 255, 255, 0.1);
       text-align: center;
     `;
@@ -1014,7 +848,7 @@ window.sharedUtilities.navigation = {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(15, 23, 42, 0.9);
-      /* Backdrop blur handled by unified CSS classes */
+      backdrop-filter: blur(8px);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1194,61 +1028,10 @@ window.sharedUtilities.navigation = {
         });
       }
     }, delay - 1000);
-  },
-  
-  // iframe専用のナビゲーション最適化関数
-  iframeOptimizedNavigate: function(url, options = {}) {
-    const {
-      message = 'ページを移動中...',
-      useLayoutRepair = true,
-      verifyLayout = true
-    } = options;
-    
-    console.log('🔧 [NAV] iframe-optimized navigation starting...', { url, options });
-    
-    // レイアウト修復を実行（必要に応じて）
-    if (useLayoutRepair && window.fixAdminLayout) {
-      console.log('🔧 [NAV] Applying layout repair before navigation');
-      window.fixAdminLayout();
-    }
-    
-    // レイアウト検証を実行（必要に応じて）
-    if (verifyLayout && window.debugLayout) {
-      console.log('🔍 [NAV] Verifying layout before navigation');
-      window.debugLayout(true);
-      setTimeout(() => window.debugLayout(false), 2000);
-    }
-    
-    // 統合ナビゲーションシステムを使用
-    this.safeNavigate(url, {
-      method: 'auto',
-      fallbackMessage: message,
-      delay: 1500
-    });
-  },
-  
-  // レスポンシブ対応ナビゲーション
-  responsiveNavigate: function(url, options = {}) {
-    const isMobile = window.innerWidth <= 1024;
-    const isTablet = window.innerWidth > 640 && window.innerWidth <= 1024;
-    
-    const optimizedOptions = {
-      ...options,
-      delay: isMobile ? 2000 : 1500,
-      fallbackMessage: isMobile ? 'モバイル向けに最適化中...' : 'デスクトップ向けに最適化中...'
-    };
-    
-    console.log('📱 [NAV] Responsive navigation:', { isMobile, isTablet, url });
-    
-    if (window !== window.top) {
-      this.iframeOptimizedNavigate(url, optimizedOptions);
-    } else {
-      this.safeNavigate(url, optimizedOptions);
-    }
   }
 };
 
-// Global convenience functions - iframe最適化版
+// Global convenience functions
 window.safeNavigate = function(url, options) {
   window.sharedUtilities.navigation.safeNavigate(url, options);
 };
@@ -1256,30 +1039,6 @@ window.safeNavigate = function(url, options) {
 window.goToAdminPanel = function(adminUrl, delay) {
   window.sharedUtilities.navigation.goToAdminPanel(adminUrl, delay);
 };
-
-// iframe専用グローバル関数
-window.iframeNavigate = function(url, options) {
-  window.sharedUtilities.navigation.iframeOptimizedNavigate(url, options);
-};
-
-window.responsiveNavigate = function(url, options) {
-  window.sharedUtilities.navigation.responsiveNavigate(url, options);
-};
-
-// レイアウト修復付きナビゲーション
-window.navigateWithLayoutFix = function(url, message = '最適化中...') {
-  window.sharedUtilities.navigation.iframeOptimizedNavigate(url, {
-    message: message,
-    useLayoutRepair: true,
-    verifyLayout: true
-  });
-};
-
-// Log initial UI state and start click monitoring
-window.onDOMReady(function() {
-  window.sharedUtilities.debug.logUiState();
-  window.sharedUtilities.debug.enableClickLogging();
-});
 
 console.log('✅ SharedUtilities loaded successfully - Version 1.2.0 (iframe navigation fixed)');
 </script>

@@ -23,35 +23,28 @@ let userToDelete = null;
  * Load and display current app status
  */
 function loadCurrentStatus() {
-  if (window.sharedUtilities && window.sharedUtilities.gas && window.sharedUtilities.gas.call) {
-    try {
-      window.sharedUtilities.gas.call(
-        'getCurrentUserStatus',
-        function(result) {
-          if (result.status === 'success') {
-            currentUserInfo = result.userInfo;
-            updateStatusDisplay(result.userInfo);
-            enableControls();
-          } else {
-            if (window.sharedUtilities.message) {
-              window.sharedUtilities.message.show(`ステータス取得に失敗しました: ${result.message}`, 'error');
-            }
-          }
-        },
-        function(error) {
+  if (window.sharedUtilities && window.sharedUtilities.gas) {
+    window.sharedUtilities.gas.call(
+      'getCurrentUserStatus',
+      function(result) {
+        if (result.status === 'success') {
+          currentUserInfo = result.userInfo;
+          updateStatusDisplay(result.userInfo);
+          enableControls();
+        } else {
           if (window.sharedUtilities.message) {
-            window.sharedUtilities.message.show(`ステータス取得エラー: ${error.message || error}`, 'error');
+            window.sharedUtilities.message.show(`ステータス取得に失敗しました: ${result.message}`, 'error');
           }
-        },
-        [__USER_ID__],
-        'ステータス取得'
-      );
-    } catch (error) {
-      console.error('GAS call error in loadCurrentStatus:', error);
-      if (window.sharedUtilities && window.sharedUtilities.message) {
-        window.sharedUtilities.message.show(`システムエラー: ${error.message || error}`, 'error');
-      }
-    }
+        }
+      },
+      function(error) {
+        if (window.sharedUtilities.message) {
+          window.sharedUtilities.message.show(`ステータス取得エラー: ${error.message || error}`, 'error');
+        }
+      },
+      [__USER_ID__],
+      'ステータス取得'
+    );
   } else {
     // Fallback to direct GAS call
     google.script.run
@@ -168,38 +161,31 @@ function updateIsActiveStatus(isActive) {
       showMessage(message, 'info');
     }
     
-    if (window.sharedUtilities && window.sharedUtilities.gas && window.sharedUtilities.gas.call) {
-      try {
-        window.sharedUtilities.gas.call(
-          'updateIsActiveStatus',
-          function(result) {
-            if (result.status === 'success') {
-              if (window.sharedUtilities.message) {
-                window.sharedUtilities.message.show(`✅ ${result.message}`, 'success');
-              }
-              // Reload status
-              loadCurrentStatus();
-            } else {
-              if (window.sharedUtilities.message) {
-                window.sharedUtilities.message.show(`❌ ${result.message}`, 'error');
-              }
-            }
-          },
-          function(error) {
-            console.error('Update error:', error);
+    if (window.sharedUtilities && window.sharedUtilities.gas) {
+      window.sharedUtilities.gas.call(
+        'updateIsActiveStatus',
+        function(result) {
+          if (result.status === 'success') {
             if (window.sharedUtilities.message) {
-              window.sharedUtilities.message.show(`❌ 更新に失敗しました: ${error.message || error}`, 'error');
+              window.sharedUtilities.message.show(`✅ ${result.message}`, 'success');
             }
-          },
-          [__USER_ID__, isActive],
-          'ステータス更新'
-        );
-      } catch (error) {
-        console.error('GAS call error in updateIsActiveStatus:', error);
-        if (window.sharedUtilities && window.sharedUtilities.message) {
-          window.sharedUtilities.message.show(`システムエラー: ${error.message || error}`, 'error');
-        }
-      }
+            // Reload status
+            loadCurrentStatus();
+          } else {
+            if (window.sharedUtilities.message) {
+              window.sharedUtilities.message.show(`❌ ${result.message}`, 'error');
+            }
+          }
+        },
+        function(error) {
+          console.error('Update error:', error);
+          if (window.sharedUtilities.message) {
+            window.sharedUtilities.message.show(`❌ 更新に失敗しました: ${error.message || error}`, 'error');
+          }
+        },
+        [__USER_ID__, isActive],
+        'ステータス更新'
+      );
     } else {
       // Fallback to direct GAS call
       google.script.run
@@ -268,37 +254,29 @@ function loadUserList() {
   if (loadingDiv) loadingDiv.classList.remove('hidden');
   if (contentDiv) contentDiv.classList.add('hidden');
   
-  if (window.sharedUtilities && window.sharedUtilities.gas && window.sharedUtilities.gas.call) {
-    try {
-      window.sharedUtilities.gas.call(
-        'getAllUsersForAdminForUI',
-        function(result) {
-          if (result.status === 'success') {
-            currentUserList = result.users;
-            displayUserList(result.users);
-          } else {
-            if (window.sharedUtilities.message) {
-              window.sharedUtilities.message.show(`ユーザー一覧の取得に失敗しました: ${result.message}`, 'error');
-            }
-          }
-          if (loadingDiv) loadingDiv.classList.add('hidden');
-        },
-        function(error) {
+  if (window.sharedUtilities && window.sharedUtilities.gas) {
+    window.sharedUtilities.gas.call(
+      'getAllUsersForAdminForUI',
+      function(result) {
+        if (result.status === 'success') {
+          currentUserList = result.users;
+          displayUserList(result.users);
+        } else {
           if (window.sharedUtilities.message) {
-            window.sharedUtilities.message.show(`エラー: ${error.message || error}`, 'error');
+            window.sharedUtilities.message.show(`ユーザー一覧の取得に失敗しました: ${result.message}`, 'error');
           }
-          if (loadingDiv) loadingDiv.classList.add('hidden');
-        },
-        [__USER_ID__],
-        'ユーザー一覧取得'
-      );
-    } catch (error) {
-      console.error('GAS call error in loadUserList:', error);
-      if (window.sharedUtilities && window.sharedUtilities.message) {
-        window.sharedUtilities.message.show(`システムエラー: ${error.message || error}`, 'error');
-      }
-      if (loadingDiv) loadingDiv.classList.add('hidden');
-    }
+        }
+        if (loadingDiv) loadingDiv.classList.add('hidden');
+      },
+      function(error) {
+        if (window.sharedUtilities.message) {
+          window.sharedUtilities.message.show(`エラー: ${error.message || error}`, 'error');
+        }
+        if (loadingDiv) loadingDiv.classList.add('hidden');
+      },
+      [__USER_ID__],
+      'ユーザー一覧取得'
+    );
   } else {
     // Fallback to direct GAS call
     google.script.run
@@ -432,49 +410,38 @@ function confirmDeletion() {
     confirmBtn.textContent = '削除中...';
   }
   
-  if (window.sharedUtilities && window.sharedUtilities.gas && window.sharedUtilities.gas.call) {
-    try {
-      window.sharedUtilities.gas.call(
-        'deleteUserAccountByAdminForUI',
-        function(result) {
-          if (result.status === 'success') {
-            if (window.sharedUtilities.message) {
-              window.sharedUtilities.message.show(`✅ ${result.message}`, 'success');
-            }
-            cancelDeletion();
-            loadUserList(); // Reload user list
-          } else {
-            if (window.sharedUtilities.message) {
-              window.sharedUtilities.message.show(`❌ ${result.message}`, 'error');
-            }
-          }
-          if (confirmBtn) {
-            confirmBtn.disabled = false;
-            confirmBtn.textContent = '削除実行';
-          }
-        },
-        function(error) {
+  if (window.sharedUtilities && window.sharedUtilities.gas) {
+    window.sharedUtilities.gas.call(
+      'deleteUserAccountByAdminForUI',
+      function(result) {
+        if (result.status === 'success') {
           if (window.sharedUtilities.message) {
-            window.sharedUtilities.message.show(`❌ 削除に失敗しました: ${error.message || error}`, 'error');
+            window.sharedUtilities.message.show(`✅ ${result.message}`, 'success');
           }
-          if (confirmBtn) {
-            confirmBtn.disabled = false;
-            confirmBtn.textContent = '削除実行';
+          cancelDeletion();
+          loadUserList(); // Reload user list
+        } else {
+          if (window.sharedUtilities.message) {
+            window.sharedUtilities.message.show(`❌ ${result.message}`, 'error');
           }
-        },
-        [__USER_ID__, userToDelete.userId, reason],
-        'ユーザー削除'
-      );
-    } catch (error) {
-      console.error('GAS call error in confirmDeletion:', error);
-      if (window.sharedUtilities && window.sharedUtilities.message) {
-        window.sharedUtilities.message.show(`システムエラー: ${error.message || error}`, 'error');
-      }
-      if (confirmBtn) {
-        confirmBtn.disabled = false;
-        confirmBtn.textContent = '削除実行';
-      }
-    }
+        }
+        if (confirmBtn) {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = '削除実行';
+        }
+      },
+      function(error) {
+        if (window.sharedUtilities.message) {
+          window.sharedUtilities.message.show(`❌ 削除に失敗しました: ${error.message || error}`, 'error');
+        }
+        if (confirmBtn) {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = '削除実行';
+        }
+      },
+      [__USER_ID__, userToDelete.userId, reason],
+      'ユーザー削除'
+    );
   } else {
     // Fallback to direct GAS call
     google.script.run
@@ -518,36 +485,28 @@ function viewDeletionLogs() {
   if (loadingDiv) loadingDiv.classList.remove('hidden');
   if (contentDiv) contentDiv.classList.add('hidden');
   
-  if (window.sharedUtilities && window.sharedUtilities.gas && window.sharedUtilities.gas.call) {
-    try {
-      window.sharedUtilities.gas.call(
-        'getDeletionLogsForUI',
-        function(result) {
-          if (result.status === 'success') {
-            displayDeletionLogs(result.logs);
-          } else {
-            if (window.sharedUtilities.message) {
-              window.sharedUtilities.message.show(`ログの取得に失敗しました: ${result.message}`, 'error');
-            }
-          }
-          if (loadingDiv) loadingDiv.classList.add('hidden');
-        },
-        function(error) {
+  if (window.sharedUtilities && window.sharedUtilities.gas) {
+    window.sharedUtilities.gas.call(
+      'getDeletionLogsForUI',
+      function(result) {
+        if (result.status === 'success') {
+          displayDeletionLogs(result.logs);
+        } else {
           if (window.sharedUtilities.message) {
-            window.sharedUtilities.message.show(`エラー: ${error.message || error}`, 'error');
+            window.sharedUtilities.message.show(`ログの取得に失敗しました: ${result.message}`, 'error');
           }
-          if (loadingDiv) loadingDiv.classList.add('hidden');
-        },
-        [__USER_ID__],
-        '削除ログ取得'
-      );
-    } catch (error) {
-      console.error('GAS call error in viewDeletionLogs:', error);
-      if (window.sharedUtilities && window.sharedUtilities.message) {
-        window.sharedUtilities.message.show(`システムエラー: ${error.message || error}`, 'error');
-      }
-      if (loadingDiv) loadingDiv.classList.add('hidden');
-    }
+        }
+        if (loadingDiv) loadingDiv.classList.add('hidden');
+      },
+      function(error) {
+        if (window.sharedUtilities.message) {
+          window.sharedUtilities.message.show(`エラー: ${error.message || error}`, 'error');
+        }
+        if (loadingDiv) loadingDiv.classList.add('hidden');
+      },
+      [__USER_ID__],
+      '削除ログ取得'
+    );
   } else {
     // Fallback to direct GAS call
     google.script.run
@@ -622,49 +581,35 @@ function closeDeletionLogs() {
  * Navigate back to admin panel
  */
 function goBackToAdminPanel() {
-  if (window.sharedUtilities && window.sharedUtilities.gas && window.sharedUtilities.gas.call) {
-    try {
-      window.sharedUtilities.gas.call(
-        'getWebAppUrlCached',
-        function(webAppUrl) {
-          const targetUrl = webAppUrl + '?mode=admin&userId=' + __USER_ID__;
-          
-          if (window.sharedUtilities.navigation) {
-            window.sharedUtilities.navigation.safeNavigate(targetUrl, {
-              fallbackMessage: '管理パネルに移動中...',
-              method: 'auto'
-            });
-          }
-        },
-        function(error) {
-          console.error('WebApp URL取得エラー:', error);
-          // Fallback: use current URL
-          const currentUrl = window.location.href.split('?')[0];
-          const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__;
-          
-          if (window.sharedUtilities && window.sharedUtilities.navigation) {
-            window.sharedUtilities.navigation.safeNavigate(targetUrl, {
-              fallbackMessage: '管理パネルに移動中...',
-              method: 'auto'
-            });
-          }
-        },
-        [],
-        'URL取得'
-      );
-    } catch (error) {
-      console.error('GAS call error in goBackToAdminPanel:', error);
-      // Fallback: use current URL
-      const currentUrl = window.location.href.split('?')[0];
-      const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__;
-      
-      if (window.sharedUtilities && window.sharedUtilities.navigation) {
-        window.sharedUtilities.navigation.safeNavigate(targetUrl, {
-          fallbackMessage: '管理パネルに移動中...',
-          method: 'auto'
-        });
-      }
-    }
+  if (window.sharedUtilities && window.sharedUtilities.gas) {
+    window.sharedUtilities.gas.call(
+      'getWebAppUrlCached',
+      function(webAppUrl) {
+        const targetUrl = webAppUrl + '?mode=admin&userId=' + __USER_ID__;
+        
+        if (window.sharedUtilities.navigation) {
+          window.sharedUtilities.navigation.safeNavigate(targetUrl, {
+            fallbackMessage: '管理パネルに移動中...',
+            method: 'auto'
+          });
+        }
+      },
+      function(error) {
+        console.error('WebApp URL取得エラー:', error);
+        // Fallback: use current URL
+        const currentUrl = window.location.href.split('?')[0];
+        const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__;
+        
+        if (window.sharedUtilities && window.sharedUtilities.navigation) {
+          window.sharedUtilities.navigation.safeNavigate(targetUrl, {
+            fallbackMessage: '管理パネルに移動中...',
+            method: 'auto'
+          });
+        }
+      },
+      [],
+      'URL取得'
+    );
   } else {
     // Fallback to direct GAS call
     google.script.run

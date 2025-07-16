@@ -19,11 +19,7 @@ describe('Reaction columns functionality', () => {
     };
     
     context = {
-      console: {
-        log: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn()
-      },
+      console,
       debugLog: jest.fn(),
       SpreadsheetApp: {
         openById: jest.fn(() => mockSpreadsheet)
@@ -67,7 +63,7 @@ describe('Reaction columns functionality', () => {
       
       // Verify no new headers were added
       expect(mockRange.setValues).not.toHaveBeenCalled();
-      expect(context.console.log).toHaveBeenCalledWith('All reaction columns already exist, skipping addition');
+      expect(console.log).toHaveBeenCalledWith('All reaction columns already exist, skipping addition');
     });
 
     test('should add only missing reaction headers', () => {

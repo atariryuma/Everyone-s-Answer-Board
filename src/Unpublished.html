@@ -7,9 +7,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#1a1b26" />
     <meta name="description" content="StudyQuest回答ボード - 現在準備中です" />
+    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
     
-    <!-- TailwindCSS Configuration -->
-    <?!= include('TailwindConfig'); ?>
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- Unified Styles and Shared Components -->
     <?!= include('UnifiedStyles'); ?>
@@ -17,9 +18,25 @@
     <?!= include('SharedJavaScript'); ?>
     <?!= include('UnpublishedLogic'); ?>
     
-<!-- Styles consolidated in UnifiedStyles.html -->
+    <style>
+        .pulse-slow {
+            animation: pulse 2s infinite;
+        }
+        .fade-in {
+            animation: fadeIn 0.8s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .admin-controls {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            backdrop-filter: blur(10px);
+        }
+    </style>
 </head>
-<body class="unified-theme bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white min-h-screen flex items-center justify-center">
+<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white min-h-screen flex items-center justify-center">
     <div class="container mx-auto px-4 py-8 max-w-4xl">
         <? if (typeof isOwner !== 'undefined' && isOwner) { ?>
             <!-- 管理者用画面：公開終了後 -->
@@ -62,7 +79,7 @@
                 </div>
 
                 <!-- 管理者向けコントロール -->
-                <div class="admin-controls backdrop-blur-sm rounded-2xl p-6 mb-6">
+                <div class="admin-controls rounded-2xl p-6 mb-6">
                     <h2 class="text-xl font-bold mb-4 text-cyan-300 flex items-center justify-center gap-2">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>

@@ -136,22 +136,15 @@ function htmlEncode(text) {
  */
 function safeSetXFrameOptionsAllowAll(htmlOutput) {
   try {
-    // より安全なフレームオプション設定
     if (htmlOutput && typeof htmlOutput.setXFrameOptionsMode === 'function' &&
-        HtmlService && HtmlService.XFrameOptionsMode) {
-      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN);
+        HtmlService && HtmlService.XFrameOptionsMode &&
+        HtmlService.XFrameOptionsMode.ALLOWALL) {
+      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
-    
-    // セキュリティを強化したサンドボックス設定
     if (htmlOutput && typeof htmlOutput.setSandboxMode === 'function' &&
-        HtmlService && HtmlService.SandboxMode) {
-      // NATIVE モードを使用してサンドボックス警告を回避
-      if (HtmlService.SandboxMode.NATIVE) {
-        htmlOutput.setSandboxMode(HtmlService.SandboxMode.NATIVE);
-      } else {
-        // フォールバック: IFRAME モード
-        htmlOutput.setSandboxMode(HtmlService.SandboxMode.IFRAME);
-      }
+        HtmlService && HtmlService.SandboxMode &&
+        HtmlService.SandboxMode.IFRAME) {
+      htmlOutput.setSandboxMode(HtmlService.SandboxMode.IFRAME);
     }
   } catch (e) {
     console.warn('Failed to set frame options and sandbox mode:', e.message);
@@ -291,12 +284,16 @@ function isSystemSetup() {
 }
 
 /**
- * ログインページを表示する関数
+ * 登録ページを表示する関数
  */
-function showLoginPage() {
-  var template = HtmlService.createTemplateFromFile('LoginPage');
+function showRegistrationPage() {
+  var template = HtmlService.createTemplateFromFile('Registration');
   template.include = include;
-  return safeSetXFrameOptionsAllowAll(template.evaluate().setTitle('StudyQuest - ログイン'));
+  var output = template.evaluate()
+    .setTitle('新規ユーザー登録 - StudyQuest')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+  return output;
 }
 
 /**
@@ -310,16 +307,7 @@ function doGet(e) {
     
     const params = parseRequestParams(e);
     const currentUserEmail = Session.getActiveUser().getEmail();
-
-    if (params.forceAuth) {
-      try {
-        resetUserAuthentication(params.userId);
-      } catch (authResetError) {
-        console.warn('forceAuth reset failed:', authResetError.message);
-      }
-      return showLoginPage();
-    }
-
+    
     // マルチテナント対応: 認証確認のみでセッション依存を削除
     console.log('doGet - currentUserEmail:', currentUserEmail, 'requestedUserId:', params.userId);
     
@@ -381,7 +369,7 @@ function doGet(e) {
       }
     }
 
-    return showLoginPage();
+    return showRegistrationPage();
   } catch (error) {
     console.error(`doGetで致命的なエラー: ${error.stack}`);
     
@@ -450,17 +438,30 @@ function handleDirectExecAccess(userEmail) {
     }
     
     if (!userEmail) {
-      return showLoginPage();
+      return showRegistrationPage();
     }
     
     // サービスアカウント経由でユーザーがデータベースに登録されているかチェック
-    // 認証済みユーザーは常に登録ページを表示（管理パネルへのアクセスはボタン経由）
-    console.log('handleDirectExecAccess - Authenticated user, showing registration page');
-    debugLog('Authenticated user, showing registration page');
-    return showLoginPage();
+    // 登録処理中の場合はロック競合を避けるため、軽量チェックを使用
+    const userInfo = findUserByEmailNonBlocking(userEmail);
+    console.log('handleDirectExecAccess - userInfo:', userInfo);
+    console.log('handleDirectExecAccess - userEmail:', userEmail);
+    
+    if (userInfo && userInfo.userId) {
+      // 登録済みユーザー: 管理パネルに自動遷移（リダイレクトではなく直接遷移）
+      console.log('handleDirectExecAccess - Found user, transitioning to admin panel for userId:', userInfo.userId);
+      
+      // ここで直接管理パネルを表示する（リダイレクトしない）
+      return renderAdminPanel(userInfo, 'admin');
+    } else {
+      // 未登録ユーザー: 新規登録画面表示
+      console.log('handleDirectExecAccess - Unregistered user, showing registration page');
+      debugLog('Unregistered user, showing registration page');
+      return showRegistrationPage();
+    }
   } catch (error) {
     console.error('handleDirectExecAccess error:', error);
-    return showLoginPage();
+    return showRegistrationPage();
   }
 }
 
@@ -556,7 +557,7 @@ function createServerSideNavigation(targetUrl, message) {
     </body>
     </html>
   `)
-  .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN)
+  .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
   .setSandboxMode(HtmlService.SandboxMode.IFRAME);
 }
 
@@ -618,7 +619,7 @@ function createSecureRedirect(targetUrl, message) {
       </script>
     </body>
     </html>
-  `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN);
+  `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 /**
@@ -847,28 +848,17 @@ function getWebAppUrl() {
 /**
  * doGet のリクエストパラメータを解析
  * @param {Object} e Event object
- * @return {{mode:string,page:(string|null),userId:(string|null),setupParam:(string|null),spreadsheetId:(string|null),sheetName:(string|null),forceAuth:boolean,isDirectPageAccess:boolean}}
+ * @return {{mode:string,userId:string|null,setupParam:string|null,spreadsheetId:string|null,sheetName:string|null,isDirectPageAccess:boolean}}
  */
 function parseRequestParams(e) {
   const p = (e && e.parameter) || {};
   const mode = p.mode || 'admin';
-  const page = p.page || null;
   const userId = p.userId || null;
   const setupParam = p.setup || null;
   const spreadsheetId = p.spreadsheetId || null;
   const sheetName = p.sheetName || null;
-  const forceAuth = p.forceAuth === 'true';
   const isDirectPageAccess = !!(userId && mode === 'view');
-  return {
-    mode,
-    page,
-    userId,
-    setupParam,
-    spreadsheetId,
-    sheetName,
-    forceAuth,
-    isDirectPageAccess,
-  };
+  return { mode, userId, setupParam, spreadsheetId, sheetName, isDirectPageAccess };
 }
 
 
@@ -907,14 +897,9 @@ function validateUserSession(currentUserEmail, params) {
       }
       
       console.log('validateUserSession - valid user found:', userInfo.userId);
-      } else {
-        console.warn('validateUserSession - userId not found:', params.userId);
-        var fallbackByEmail = findUserByEmail(currentUserEmail);
-        if (fallbackByEmail) {
-          console.log('validateUserSession - fallback found user by email:', fallbackByEmail.userId);
-          userInfo = fallbackByEmail;
-        }
-      }
+    } else {
+      console.warn('validateUserSession - userId not found:', params.userId);
+    }
   } else if (params.isDirectPageAccess) {
     // 直接ページアクセスの場合は、emailベースでフォールバック
     console.log('validateUserSession - direct page access, looking up by email');
@@ -976,14 +961,9 @@ function handleSetupPages(params, userEmail) {
     return safeSetXFrameOptionsAllowAll(explicit.evaluate().setTitle('StudyQuest - サービスアカウント セットアップ'));
   }
 
-  // LoginPageページのリクエストを処理
-  if (params.page === 'LoginPage') {
-    return showLoginPage();
-  }
-
   // システムセットアップが完了している場合のみ、userEmailをチェック
   if (!userEmail && !params.isDirectPageAccess) {
-    return showLoginPage();
+    return showRegistrationPage();
   }
 
   return null;
@@ -1014,8 +994,10 @@ function renderAdminPanel(userInfo, mode) {
   adminTemplate.correctUrl = correctUrl;
   adminTemplate.shouldUpdateUrl = true;
   
-  const output = adminTemplate.evaluate().setTitle('みんなの回答ボード 管理パネル');
-  return safeSetXFrameOptionsAllowAll(output);
+  return adminTemplate.evaluate()
+    .setTitle('みんなの回答ボード 管理パネル')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
 }
 
 /**

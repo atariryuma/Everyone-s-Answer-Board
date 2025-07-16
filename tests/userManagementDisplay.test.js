@@ -20,14 +20,7 @@ describe('User Management Display', () => {
       DB_SHEET_CONFIG: {
         SHEET_NAME: 'Users'
       },
-      getSheetsService: jest.fn(() => ({
-        spreadsheets: {
-          values: {
-            batchGet: jest.fn(() => ({})),
-          },
-        },
-      })),
-      getServiceAccountTokenCached: jest.fn(() => 'mock-token'),
+      getSheetsService: jest.fn(),
       batchGetSheetsData: jest.fn(),
       debugLog: jest.fn()
     };
@@ -42,14 +35,13 @@ describe('User Management Display', () => {
       // Mock database response
       const mockHeaders = ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'createdAt', 'configJson', 'setupStatus', 'lastAccessedAt', 'isActive'];
       const mockUserData = [
-        'user123',
-        '35t22@naha-okinawa.ed.jp',
-        'sheet123',
-        'https://example.com/sheet',
+        'user123', 
+        '35t22@naha-okinawa.ed.jp', 
+        'sheet123', 
+        'https://example.com/sheet', 
         '2025-01-01T10:00:00.000Z',  // This is createdAt
-        '{}',
-        'INITIALIZED', // setupStatus
-        '2025-07-13T12:00:00.000Z',
+        '{}', 
+        '2025-07-13T12:00:00.000Z', 
         'true'
       ];
       

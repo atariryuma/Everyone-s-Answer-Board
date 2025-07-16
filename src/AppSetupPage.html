@@ -7,35 +7,22 @@
     <title>StudyQuest - アプリ設定</title>
     <meta name="theme-color" content="#1a1b26" />
     <meta name="description" content="StudyQuestのアプリケーション設定管理パネル" />
+    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
     
     <!-- TailwindCSS CDN -->
-    <?!= include('TailwindConfig'); ?>
+    <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- Unified Styles and Shared Components -->
     <?!= include('UnifiedStyles'); ?>
     <?!= include('SharedUtilities'); ?>
     <?!= include('SharedJavaScript'); ?>
-    <?!= include('ClientOptimizer'); ?>
-    <?!= include('UnifiedCache.js'); ?>
     <?!= include('AppSetupLogic'); ?>
     
     <script>
       const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
-      
-      // GAS optimizer initialization
-      if (typeof GASOptimizer !== 'undefined') {
-        var gasOptimizer = new GASOptimizer();
-        var unifiedCache = (typeof UnifiedCache !== 'undefined') 
-          ? new UnifiedCache() 
-          : { getOrSet: function(_, fn) { return fn(); } };
-          
-        function runGas(functionName, ...args) {
-          return gasOptimizer.call(functionName, ...args);
-        }
-      }
     </script>
 </head>
-<body class="unified-theme bg-[#1a1b26] text-gray-200 font-sans min-h-screen">
+<body class="bg-[#1a1b26] text-gray-200 font-sans min-h-screen"">
     <div class="max-w-4xl mx-auto p-6">
         <!-- ヘッダー -->
         <div class="text-center mb-8">
@@ -44,14 +31,14 @@
             <p class="text-sm text-gray-400 mt-2">このページでアプリの有効/無効を切り替えることができます</p>
         </div>
 
-        <!-- インラインメッセージエリア -->
-        <div id="inline-message-area" class="mb-6"></div>
+        <!-- メッセージエリア -->
+        <div id="message-area" class="mb-6"></div>
 
         <!-- 現在のステータス表示 -->
         <div class="glass-panel rounded-xl p-6 mb-6">
             <h2 class="text-xl font-semibold text-white mb-4">📊 現在のステータス</h2>
             <div id="status-display" class="space-y-3">
-                <div class="flex items-center justify-between p-3 glass-bg-secondary rounded-lg">
+                <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
                     <div class="flex items-center">
                         <span class="text-gray-300 mr-3">アプリ状態:</span>
                         <span id="current-status" class="px-3 py-1 rounded-full text-sm font-medium">
@@ -60,13 +47,13 @@
                         </span>
                     </div>
                 </div>
-                <div class="flex items-center justify-between p-3 glass-bg-secondary rounded-lg">
+                <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
                     <div class="flex items-center">
                         <span class="text-gray-300 mr-3">管理者:</span>
                         <span id="current-admin" class="text-cyan-400">読み込み中...</span>
                     </div>
                 </div>
-                <div class="flex items-center justify-between p-3 glass-bg-secondary rounded-lg">
+                <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
                     <div class="flex items-center">
                         <span class="text-gray-300 mr-3">最終更新:</span>
                         <span id="last-updated" class="text-gray-400">読み込み中...</span>
@@ -81,7 +68,7 @@
             
             <div class="space-y-6">
                 <!-- isActive トグル -->
-                <div class="p-4 glass-bg-secondary rounded-lg">
+                <div class="p-4 bg-gray-800 rounded-lg">
                     <div class="flex items-center justify-between mb-3">
                         <div>
                             <h3 class="text-lg font-medium text-white">アプリケーション有効化</h3>
@@ -90,7 +77,7 @@
                         <div class="flex items-center">
                             <label class="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" id="isActiveToggle" class="sr-only peer" disabled>
-                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600/50 peer-checked:bg-blue-600"></div>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                             </label>
                         </div>
                     </div>
@@ -112,7 +99,7 @@
                 </div>
 
                 <!-- 使用シナリオの説明 -->
-                <div class="p-4 glass-bg-primary rounded-lg">
+                <div class="p-4 bg-gray-900 rounded-lg">
                     <h4 class="text-md font-medium text-cyan-400 mb-3">🎯 使用シナリオ</h4>
                     <div class="grid md:grid-cols-2 gap-4 text-sm text-gray-300">
                         <div>
@@ -161,14 +148,14 @@
                         </div>
                     </div>
                     
-                    <div id="user-table-wrapper" class="glass-bg-secondary rounded-lg overflow-hidden">
+                    <div id="user-table-wrapper" class="bg-gray-800 rounded-lg overflow-hidden">
                         <div id="user-loading" class="p-8 text-center text-gray-400">
-                            <div class="loading-spinner w-8 h-8 border-2 border-gray-400/50 border-t-transparent rounded-full mx-auto mb-2"></div>
+                            <div class="loading-spinner w-8 h-8 border-2 border-gray-400 border-t-transparent rounded-full mx-auto mb-2"></div>
                             ユーザー一覧を読み込み中...
                         </div>
                         <div id="user-table-content" class="hidden">
                             <table class="w-full">
-                                <thead class="glass-bg-primary">
+                                <thead class="bg-gray-900">
                                     <tr>
                                         <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">メールアドレス</th>
                                         <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">登録日</th>
@@ -213,21 +200,21 @@
             
             <div class="mb-4">
                 <p class="text-gray-300 mb-2">以下のユーザーを削除しますか？</p>
-                <div class="glass-bg-secondary p-3 rounded-lg">
+                <div class="bg-gray-800 p-3 rounded-lg">
                     <p class="text-cyan-400 font-medium" id="delete-user-email"></p>
                     <p class="text-sm text-gray-400" id="delete-user-id"></p>
                 </div>
             </div>
             
-            <div class="space-y-2">
-                <label class="block text-sm font-medium text-gray-300">削除理由 <span class="text-red-400">*</span></label>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-300 mb-2">削除理由 <span class="text-red-400">*</span></label>
                 <textarea 
                     id="deletion-reason"
-                    class="form-control resize-none text-sm"
+                    class="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white resize-none"
                     rows="3"
                     placeholder="削除理由を入力してください（必須）"
                     required></textarea>
-                <p class="text-xs text-gray-400">この情報は監査ログに記録されます</p>
+                <p class="text-xs text-gray-400 mt-1">この情報は監査ログに記録されます</p>
             </div>
             
             <div class="bg-red-900/20 border border-red-500/50 p-3 rounded-lg mb-4">
@@ -239,7 +226,7 @@
             <div class="flex gap-3">
                 <button 
                     onclick="cancelDeletion()"
-                    class="flex-1 btn glass-bg-secondary hover:glass-bg-hover text-white py-2 px-4 rounded-lg">
+                    class="flex-1 btn bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg">
                     キャンセル
                 </button>
                 <button 
@@ -264,13 +251,13 @@
             
             <div id="logs-content">
                 <div id="logs-loading" class="p-8 text-center text-gray-400">
-                    <div class="loading-spinner w-8 h-8 border-2 border-gray-400/50 border-t-transparent rounded-full mx-auto mb-2"></div>
+                    <div class="loading-spinner w-8 h-8 border-2 border-gray-400 border-t-transparent rounded-full mx-auto mb-2"></div>
                     削除ログを読み込み中...
                 </div>
                 <div id="logs-table-content" class="hidden">
-                    <div class="glass-bg-secondary rounded-lg overflow-hidden">
+                    <div class="bg-gray-800 rounded-lg overflow-hidden">
                         <table class="w-full">
-                            <thead class="glass-bg-primary">
+                            <thead class="bg-gray-900">
                                 <tr>
                                     <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">削除日時</th>
                                     <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">実行者</th>
@@ -303,35 +290,35 @@
                          function(msg, type) { console.log(`[${type}] ${msg}`); };
         
         var toggleUserManagement = window.appSetupUtilities?.users?.toggle || function() {
-            showMessage('機能を読み込み中です...', 'info');
+            console.log('User management toggle not available');
         };
         
         var loadUserList = window.appSetupUtilities?.users?.load || function() {
-            showMessage('ユーザーリストを読み込み中です...', 'info');
+            console.log('Load user list not available');
         };
         
         var showDeleteConfirmation = window.appSetupUtilities?.users?.showDelete || function(userId, email) {
-            showMessage('削除機能を読み込み中です...', 'info');
+            console.log('Delete confirmation not available');
         };
         
         var cancelDeletion = window.appSetupUtilities?.users?.cancelDelete || function() {
-            document.getElementById('delete-modal')?.classList?.add('hidden');
+            console.log('Cancel deletion not available');
         };
         
         var confirmDeletion = window.appSetupUtilities?.users?.confirmDelete || function() {
-            showMessage('削除処理を実行中です...', 'info');
+            console.log('Confirm deletion not available');
         };
         
         var viewDeletionLogs = window.appSetupUtilities?.logs?.view || function() {
-            showMessage('ログを読み込み中です...', 'info');
+            console.log('View deletion logs not available');
         };
         
         var closeDeletionLogs = window.appSetupUtilities?.logs?.close || function() {
-            document.getElementById('logs-modal')?.classList?.add('hidden');
+            console.log('Close deletion logs not available');
         };
         
         var goBackToAdminPanel = window.appSetupUtilities?.navigation?.goBackToAdminPanel || function() {
-            window.location.href = window.location.href.split('?')[0];
+            console.log('Navigation to admin panel not available');
         };
         
         // Initialize on DOM ready
