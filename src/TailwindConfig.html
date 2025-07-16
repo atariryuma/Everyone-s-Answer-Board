@@ -1,11 +1,22 @@
 <script>
-// TailwindCSS 共通設定
+// TailwindCSS 共通設定 - プリフライト無効化とカスタムスタイル優先
 window.tailwind = {
   config: {
     corePlugins: {
       preflight: false,
     },
     prefix: '',
+    important: false,
+    theme: {
+      extend: {
+        zIndex: {
+          'base': '1',
+          'ui': '10',
+          'dropdown': '100',
+          'modal': '1100',
+        }
+      }
+    }
   }
 };
 </script>

@@ -103,6 +103,7 @@ body.unified-theme::before {
   height: 100%;
   background: var(--gradient-radial-accent);
   z-index: var(--z-base);
+  pointer-events: none;
 }
 
 /* Global box-sizing reset for glassmorphism compatibility */
@@ -122,6 +123,7 @@ body.unified-theme::before {
   border-radius: 24px;
   transition: all var(--transition-duration) var(--transition-easing);
   position: relative;
+  z-index: 2;
   /* Prevent creating new stacking context that blocks modals */
   isolation: auto;
 }
@@ -209,6 +211,7 @@ body.unified-theme::before {
   min-height: 44px;
   min-width: 44px;
   position: relative;
+  z-index: 10;
   overflow: hidden;
   font-size: 16px;
   color: white;
@@ -317,14 +320,6 @@ body.unified-theme::before {
 }
 
 /* CTA Button with Shimmer Effect */
-.cta-button {
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(135deg, var(--color-primary), #50fa7b);
-  color: #000;
-  font-weight: 700;
-}
-
 .cta-button::before {
   content: '';
   position: absolute;
@@ -424,6 +419,8 @@ body.unified-theme::before {
   font-size: 16px;
   min-height: 52px;
   line-height: 1.5;
+  position: relative;
+  z-index: 10;
 }
 
 .form-control:focus {
@@ -674,17 +671,6 @@ body.unified-theme::before {
   display: none;
 }
 
-.flex {
-  display: flex;
-}
-
-.items-center {
-  align-items: center;
-}
-
-.gap-2 {
-  gap: 8px;
-}
 
 /* Gradient backgrounds */
 .bg-gradient-to-r {
@@ -1166,11 +1152,6 @@ body.unified-theme::before {
   100% { opacity: 1; will-change: auto; }
 }
 
-@keyframes modalScale {
-  0% { transform: scale(0.9); will-change: transform; }
-  100% { transform: scale(1); will-change: auto; }
-}
-
 @keyframes slideIn {
   0% { opacity: 0; transform: translateX(-20px); will-change: opacity, transform; }
   100% { opacity: 1; transform: translateX(0); will-change: auto; }
@@ -1371,20 +1352,12 @@ body.unified-theme::before {
 .max-w-4xl { max-width: 56rem; margin: 0 auto; }
 .max-w-6xl { max-width: 72rem; margin: 0 auto; }
 
-/* Flexbox Utilities */
+/* Essential Flexbox Utilities */
 .flex { display: flex; }
-.flex-col { flex-direction: column; }
-.flex-row { flex-direction: row; }
-.flex-wrap { flex-wrap: wrap; }
 .items-center { align-items: center; }
-.items-start { align-items: flex-start; }
-.items-end { align-items: flex-end; }
 .justify-center { justify-content: center; }
 .justify-between { justify-content: space-between; }
-.justify-start { justify-content: flex-start; }
-.justify-end { justify-content: flex-end; }
 .flex-1 { flex: 1 1 0%; }
-.flex-none { flex: none; }
 
 /* Grid Utilities */
 .grid { display: grid; }
@@ -1397,30 +1370,13 @@ body.unified-theme::before {
 .gap-6 { gap: 1.5rem; }
 .gap-8 { gap: 2rem; }
 
-/* Spacing Utilities */
-.p-2 { padding: 0.5rem; }
+/* Essential Spacing Utilities */
 .p-4 { padding: 1rem; }
-.p-6 { padding: 1.5rem; }
-.p-8 { padding: 2rem; }
-.px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
 .px-4 { padding-left: 1rem; padding-right: 1rem; }
-.px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
-.py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
 .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
-.py-6 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
-.m-2 { margin: 0.5rem; }
-.m-4 { margin: 1rem; }
-.m-6 { margin: 1.5rem; }
 .mx-auto { margin-left: auto; margin-right: auto; }
-.mb-2 { margin-bottom: 0.5rem; }
 .mb-4 { margin-bottom: 1rem; }
-.mb-6 { margin-bottom: 1.5rem; }
-.mb-8 { margin-bottom: 2rem; }
-.mt-2 { margin-top: 0.5rem; }
 .mt-4 { margin-top: 1rem; }
-.mt-6 { margin-top: 1.5rem; }
-.mr-2 { margin-right: 0.5rem; }
-.ml-2 { margin-left: 0.5rem; }
 
 /* Typography */
 .text-xs { font-size: 0.75rem; line-height: 1rem; }
