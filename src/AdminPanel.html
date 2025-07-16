@@ -3862,6 +3862,42 @@ function syncCheckboxStates(status) {
     }
 
     /**
+     * 連携しているフォーム(編集画面)を開く
+     */
+    function openLinkedForm() {
+        const link = document.getElementById('open-form-url-link');
+        const url = link && link.href ? link.href : (appState.currentStatus && appState.currentStatus.formUrl);
+        if (url) {
+            window.open(url, '_blank');
+        } else {
+            showMessage('連携しているフォームが見つかりません。', 'warning');
+        }
+    }
+
+    /**
+     * シート選択をクリアしてUIをリセットする
+     */
+    function clearSheetSelection() {
+        const select = document.getElementById('sheet-select');
+        if (select) {
+            select.value = '';
+        }
+        appState.selectedSheet = '';
+        updateUIForSelectedSheet();
+        clearConfigFields();
+    }
+
+    /**
+     * ステータスを強制再取得してUIを更新する
+     */
+    function refreshBoardDataFromAdmin() {
+        setLoading(true, '最新情報を取得中...');
+        loadStatus(true)
+          .catch(function(error) { handleError(error, 'refreshBoardDataFromAdmin'); })
+          .finally(function() { setLoading(false); });
+    }
+
+    /**
      * ボードのURLをクリップボードにコピーする
      */
     function copyBoardUrl() {
@@ -4267,6 +4303,9 @@ function syncCheckboxStates(status) {
   window.copyBoardUrl = copyBoardUrl;
   window.openDatabaseSpreadsheet = openDatabaseSpreadsheet;
   window.openForm = openForm;
+  window.openLinkedForm = openLinkedForm;
+  window.clearSheetSelection = clearSheetSelection;
+  window.refreshBoardDataFromAdmin = refreshBoardDataFromAdmin;
   window.switchToAnotherAccount = switchToAnotherAccount;
   window.openAppSetupPage = openAppSetupPage;
   window.deleteAllResources = deleteAllResources;
