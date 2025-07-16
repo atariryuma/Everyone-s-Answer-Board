@@ -31,6 +31,11 @@
         <div class="status-text" id="status-text">認証情報を確認中...</div>
         <div class="user-email" id="user-email-display"></div>
         <div id="user-role-badge" class="mt-2 hidden"></div>
+        <div id="user-status-badge" class="mt-2 hidden"></div>
+      </div>
+      <div id="domain-info" class="text-xs text-muted text-center mt-2"></div>
+      <div class="text-center mt-2">
+        <a href="#" id="switch-account-link" class="text-muted hover:text-secondary text-xs">別のアカウントでログイン</a>
       </div>
     </div>
 
@@ -90,11 +95,14 @@
       const statusTextEl = document.getElementById('status-text');
       const userEmailEl = document.getElementById('user-email-display');
       const roleBadgeEl = document.getElementById('user-role-badge');
+      const statusBadgeEl = document.getElementById('user-status-badge');
+      const domainInfoEl = document.getElementById('domain-info');
+      const switchAccountLink = document.getElementById('switch-account-link');
 
       let isLoginInProgress = false;
       let authResult = null;
 
-      const initializePage = () => {
+      const fetchAuthInfo = () => {
         google.script.run
           .withSuccessHandler(authData => {
             if (authData?.email) {
@@ -133,6 +141,44 @@
           .enhancedDomainVerification();
       };
 
+      const fetchDomainInfo = () => {
+        google.script.run
+          .withSuccessHandler(info => {
+            if (info && info.deployDomain) {
+              domainInfoEl.textContent = `管理ドメイン: ${info.deployDomain}`;
+            }
+          })
+          .withFailureHandler(() => {})
+          .getDeployUserDomainInfo();
+      };
+
+      const initializePage = () => {
+        google.script.run
+          .withSuccessHandler(result => {
+            if (result?.status === 'existing_user' || result?.status === 'setup_required') {
+              const badgeHTML = `
+                <span class="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 text-emerald-300 text-sm font-medium rounded-full border border-emerald-400/30">
+                    登録済み
+                </span>`;
+              statusBadgeEl.innerHTML = badgeHTML;
+              statusBadgeEl.classList.remove('hidden');
+            } else if (result?.status === 'new_user') {
+              const badgeHTML = `
+                <span class="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 text-amber-300 text-sm font-medium rounded-full border border-amber-400/30">
+                    未登録
+                </span>`;
+              statusBadgeEl.innerHTML = badgeHTML;
+              statusBadgeEl.classList.remove('hidden');
+            }
+            fetchAuthInfo();
+          })
+          .withFailureHandler(() => {
+            fetchAuthInfo();
+          })
+          .getExistingBoard();
+        fetchDomainInfo();
+      };
+
       const executeLogin = () => {
         if (isLoginInProgress || !userEmail) return;
         isLoginInProgress = true;
@@ -165,6 +211,17 @@
       };
 
       loginBtn.addEventListener('click', executeLogin);
+
+      if (switchAccountLink) {
+        switchAccountLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (window.sharedUtilities && window.sharedUtilities.auth) {
+            window.sharedUtilities.auth.switchToAnotherAccount();
+          } else if (typeof switchToAnotherAccount === 'function') {
+            switchToAnotherAccount();
+          }
+        });
+      }
       
       document.getElementById('app-settings-link').addEventListener('click', (e) => {
         e.preventDefault();
