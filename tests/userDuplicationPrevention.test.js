@@ -9,6 +9,7 @@ const vm = require('vm');
 describe('User Duplication Prevention Tests', () => {
   const databaseCode = fs.readFileSync('src/database.gs', 'utf8');
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
+  const errorHandlerCode = fs.readFileSync('src/errorHandler.gs', 'utf8');
   let context;
   
   beforeEach(() => {
@@ -16,11 +17,24 @@ describe('User Duplication Prevention Tests', () => {
     context = {
       console,
       LockService: {
-        getScriptLock: jest.fn(() => ({
-          waitLock: jest.fn(() => true),
-          tryLock: jest.fn(() => true),
-          releaseLock: jest.fn()
-        }))
+        getScriptLock: jest.fn(() => {
+          const mockLockInstance = {
+            waitLock: jest.fn((timeout) => {
+              if (context.lockFail) {
+                return false;
+              }
+              return true;
+            }),
+            tryLock: jest.fn((timeout) => {
+              if (context.lockFail) {
+                return false;
+              }
+              return true;
+            }),
+            releaseLock: jest.fn()
+          };
+          return mockLockInstance;
+        })
       },
       PropertiesService: {
         getScriptProperties: jest.fn(() => ({
@@ -28,14 +42,91 @@ describe('User Duplication Prevention Tests', () => {
         }))
       },
       Session: {
-        getActiveUser: jest.fn(() => ({
-          getEmail: jest.fn(() => 'test@example.com')
+        getActiveUser: jest.fn(function() {
+          return {
+            getEmail: jest.fn(() => this.currentTestEmail || 'test@example.com')
+          };
+        }.bind(context))
+      },
+      FormApp: {
+        create: jest.fn(() => ({
+          setDescription: jest.fn(),
+          setCollectEmail: jest.fn(),
+          addListItem: jest.fn(() => ({
+            setTitle: jest.fn(),
+            setChoiceValues: jest.fn(),
+            setRequired: jest.fn()
+          })),
+          addTextItem: jest.fn(() => ({
+            setTitle: jest.fn(),
+            setRequired: jest.fn()
+          })),
+          addParagraphTextItem: jest.fn(() => ({
+            setTitle: jest.fn(),
+            setHelpText: jest.fn(),
+            setRequired: jest.fn(),
+            setValidation: jest.fn()
+          })),
+          addCheckboxItem: jest.fn(() => ({
+            setTitle: jest.fn(),
+            setChoiceValues: jest.fn(),
+            showOtherOption: jest.fn(),
+            setRequired: jest.fn()
+          })),
+          addMultipleChoiceItem: jest.fn(() => ({
+            setTitle: jest.fn(),
+            setChoiceValues: jest.fn(),
+            showOtherOption: jest.fn(),
+            setRequired: jest.fn()
+          })),
+          getPublishedUrl: jest.fn(() => 'https://mock.form.url/view'),
+          getEditUrl: jest.fn(() => 'https://mock.form.url/edit'),
+          getId: jest.fn(() => 'mock-form-id')
+        })),
+        createParagraphTextValidation: jest.fn(() => ({
+          requireTextLengthLessThanOrEqualTo: jest.fn(() => ({
+            build: jest.fn(() => ({})),
+          })),
+        })),
+      },
+      DriveApp: {
+        getFoldersByName: jest.fn(() => ({
+          hasNext: jest.fn(() => false),
+          next: jest.fn()
+        })),
+        createFolder: jest.fn(() => ({
+          getFoldersByName: jest.fn(() => ({
+            hasNext: jest.fn(() => false),
+            next: jest.fn()
+          })),
+          createFolder: jest.fn(() => ({
+            addFile: jest.fn(),
+            getId: jest.fn(() => 'mock-folder-id'),
+            getUrl: jest.fn(() => 'https://mock.drive.url/folder')
+          })),
+          addFile: jest.fn(),
+          getId: jest.fn(() => 'mock-folder-id'),
+          getUrl: jest.fn(() => 'https://mock.drive.url/folder')
+        })),
+        getFileById: jest.fn(() => ({
+          getName: jest.fn(),
+          getId: jest.fn(() => 'mock-file-id')
+        })),
+        getRootFolder: jest.fn(() => ({
+          removeFile: jest.fn()
         }))
       },
       Utilities: {
         computeDigest: jest.fn(() => [0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0]),
         DigestAlgorithm: { SHA_256: 'sha256' },
-        Charset: { UTF_8: 'utf8' }
+        Charset: { UTF_8: 'utf8' },
+        formatDate: jest.fn(() => '2025-07-16'),
+        getUuid: jest.fn(() => 'a0a0a0a0-b1b1-c2c2-d3d3-e4e4e4e4e4e4') // A valid UUID format
+      },
+      console: {
+        log: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn()
       },
       SCRIPT_PROPS_KEYS: {
         DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID'
@@ -55,13 +146,65 @@ describe('User Duplication Prevention Tests', () => {
       generateAppUrls: jest.fn(() => ({
         adminUrl: 'https://admin.example.com',
         viewUrl: 'https://view.example.com'
-      }))
+      })),
+      cacheManager: {
+        get: jest.fn((key, callback) => callback()), // Simulate cache miss, always call callback
+        remove: jest.fn()
+      }
     };
     
-    vm.createContext(context);
-    vm.runInContext(databaseCode, context);
-    vm.runInContext(coreCode, context);
-  });
+    };
+
+    context.testUserEmail = 'test@example.com'; // Default email for tests
+
+    context.findUserById = jest.fn((userId) => {
+      if (userId === 'existing-123') {
+        return {
+          userId: 'existing-123',
+          adminEmail: 'test@example.com',
+          configJson: '{}'
+        };
+      }
+      if (userId === 'completed-123') {
+        return {
+          userId: 'completed-123',
+          adminEmail: 'test@example.com',
+          configJson: '{"formCreated": true, "setupStatus": "COMPLETED"}',
+          spreadsheetId: 'existing-sheet'
+        };
+      }
+      return null;
+    });
+
+    context.getServiceAccountTokenCached = jest.fn(() => 'mock-token');
+
+    context.SpreadsheetApp = {
+      create: jest.fn(() => ({
+        getId: jest.fn(() => 'mock-spreadsheet-id'),
+        getUrl: jest.fn(() => 'https://mock.spreadsheet.url'),
+        getSheetByName: jest.fn(() => ({
+          getLastRow: jest.fn(() => 1),
+          getLastColumn: jest.fn(() => 1),
+          getRange: jest.fn(() => ({
+            getValues: jest.fn(() => ([[]])),
+            setValues: jest.fn(),
+          })),
+        })),
+        getFormUrl: jest.fn(() => 'https://mock.form.url'),
+      })),
+      openById: jest.fn(() => ({
+        getSheets: jest.fn(() => ([{ getName: () => 'Sheet1' }])),
+        getSheetByName: jest.fn(() => ({
+          getLastRow: jest.fn(() => 1),
+          getLastColumn: jest.fn(() => 1),
+          getRange: jest.fn(() => ({
+            getValues: jest.fn(() => ([[]])),
+            setValues: jest.fn(),
+          })),
+        })),
+        getFormUrl: jest.fn(() => 'https://mock.form.url'),
+      })),
+    };
 
   describe('findOrCreateUser - Atomic User Operations', () => {
     test('should create new user when not exists', () => {
@@ -69,7 +212,7 @@ describe('User Duplication Prevention Tests', () => {
       context.findUserByEmail.mockReturnValue(null);
       
       // Execute: 新規ユーザー作成
-      const result = context.findOrCreateUser('newuser@example.com');
+      const result = context.findOrCreateUserWithEmailLock('newuser@example.com');
       
       // Verify: 新規ユーザーが作成される
       expect(result).toHaveProperty('userId');
@@ -92,7 +235,7 @@ describe('User Duplication Prevention Tests', () => {
       context.findUserByEmail.mockReturnValue(existingUser);
       
       // Execute: 既存ユーザー取得
-      const result = context.findOrCreateUser('existing@example.com');
+      const result = context.findOrCreateUserWithEmailLock('existing@example.com', { lastAccessedAt: new Date().toISOString(), isActive: 'true' });
       
       // Verify: 既存ユーザーが返される
       expect(result).toHaveProperty('userId', 'existing-user-123');
@@ -104,32 +247,23 @@ describe('User Duplication Prevention Tests', () => {
 
     test('should handle concurrent access with lock', () => {
       // Setup: ロックが成功する
-      const mockLock = {
-        waitLock: jest.fn(() => true),
-        releaseLock: jest.fn()
-      };
-      context.LockService.getScriptLock.mockReturnValue(mockLock);
       context.findUserByEmail.mockReturnValue(null);
       
       // Execute
-      context.findOrCreateUser('concurrent@example.com');
+      context.findOrCreateUserWithEmailLock('concurrent@example.com');
       
       // Verify: ロックが適切に取得・解放される
-      expect(mockLock.waitLock).toHaveBeenCalledWith(10000);
-      expect(mockLock.releaseLock).toHaveBeenCalled();
+      expect(context.LockService.getScriptLock().waitLock).toHaveBeenCalledWith(10000);
+      expect(context.LockService.getScriptLock().releaseLock).toHaveBeenCalled();
     });
 
     test('should throw error when lock fails', () => {
       // Setup: ロック取得失敗
-      const mockLock = {
-        waitLock: jest.fn(() => false),
-        releaseLock: jest.fn()
-      };
-      context.LockService.getScriptLock.mockReturnValue(mockLock);
+      context.lockFail = true; // Simulate lock failure
       
       // Execute & Verify: エラーが投げられる
       expect(() => {
-        context.findOrCreateUser('lockfail@example.com');
+        context.findOrCreateUserWithEmailLock('lockfail@example.com');
       }).toThrow('システムが混雑しています');
     });
 
@@ -138,8 +272,8 @@ describe('User Duplication Prevention Tests', () => {
       context.findUserByEmail.mockReturnValue(null);
       
       // Execute: 同じメールアドレスで複数回実行
-      const result1 = context.findOrCreateUser('consistent@example.com');
-      const result2 = context.findOrCreateUser('consistent@example.com');
+      const result1 = context.findOrCreateUserWithEmailLock('consistent@example.com');
+      const result2 = context.findOrCreateUserWithEmailLock('consistent@example.com');
       
       // Verify: 同じUserIDが生成される（決定論的）
       expect(result1.userId).toBe(result2.userId);
@@ -150,6 +284,7 @@ describe('User Duplication Prevention Tests', () => {
     test('should use findOrCreateUser for safe registration', () => {
       // Setup
       context.findUserByEmail.mockReturnValue(null);
+      context.testUserEmail = 'newuser@example.com'; // Set the email for this test
       
       // Execute
       const result = context.ensureUserExists('newuser@example.com');

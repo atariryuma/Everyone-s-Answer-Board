@@ -20,7 +20,14 @@ describe('User Management Display', () => {
       DB_SHEET_CONFIG: {
         SHEET_NAME: 'Users'
       },
-      getSheetsService: jest.fn(),
+      getSheetsService: jest.fn(() => ({
+        spreadsheets: {
+          values: {
+            batchGet: jest.fn(() => ({})),
+          },
+        },
+      })),
+      getServiceAccountTokenCached: jest.fn(() => 'mock-token'),
       batchGetSheetsData: jest.fn(),
       debugLog: jest.fn()
     };
