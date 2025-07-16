@@ -31,11 +31,29 @@ module.exports = {
           presets: ['@babel/preset-env'],
         },
       },
+      {
+        test: /\.css$/,
+        use: [
+          'style-loader',
+          'css-loader',
+          {
+            loader: 'postcss-loader',
+            options: {
+              postcssOptions: {
+                plugins: [
+                  require('tailwindcss'),
+                  require('autoprefixer'),
+                ],
+              },
+            },
+          },
+        ],
+      },
     ],
   },
   plugins: [
     new HtmlWebpackPlugin({
-      template: './src/index.html', // Your main HTML file for the web app
+      template: './src/LoginPage.html', // Your main HTML file for the web app
       filename: 'index.html',
       inject: 'body',
       chunks: ['main'], // Ensure this matches your entry point

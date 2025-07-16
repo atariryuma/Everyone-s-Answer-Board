@@ -1548,6 +1548,11 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
+      console.log('🚀 AdminPanel DOMContentLoaded - Starting initialization...');
+      
+      // Initialize elements first
+      initializeElements();
+      
       // 初期ロード状態を表示
       setLoading(true, '設定を読み込み中...');
       
@@ -1556,8 +1561,9 @@
         setLoading(false);
         showMessage('初期設定の読み込みに時間がかかっています。ページを再読み込みしてください。', 'warning');
       }, 20000);
-      // `elements` オブジェクトの定義を修正
-elements = {
+      
+      // Remove duplicate elements assignment - now handled by initializeElements()
+      /* elements = {
   // ... 既存の要素はそのまま ...
   sheetSelect: document.getElementById('sheet-select'),
   configArea: document.getElementById('config-area'),
@@ -1616,7 +1622,7 @@ elements = {
   adminFooter: document.getElementById('admin-footer'),
   currentTopicText: document.getElementById('current-topic-text')
   // ★★★ ここまで追加 ★★★
-};
+}; */
       // アカウント管理セクションの表示制御
       const accountManagementSection = document.getElementById('account-management-section');
       const accountDeletionWrapper = document.getElementById('account-deletion-wrapper');
@@ -1855,11 +1861,49 @@ elements = {
     // 重複していたDOMContentLoadedイベントリスナーを削除
     // 既に上記で設定済み
 
+    // Initialize elements object function
+    function initializeElements() {
+      console.log('🔧 Initializing elements object...');
+      elements = {
+        sheetSelect: document.getElementById('sheet-select'),
+        configArea: document.getElementById('config-area'),
+        configPlaceholder: document.getElementById('config-placeholder'),
+        opinionHeader: document.getElementById('opinionHeader'),
+        reasonHeader: document.getElementById('reasonHeader'),
+        nameHeader: document.getElementById('nameHeader'),
+        classHeader: document.getElementById('classHeader'),
+        saveConfigBtn: document.getElementById('save-config-btn'),
+        detailOptions: document.getElementById('detail-options'),
+        boardUrl: document.getElementById('board-url'),
+        viewBoardLink: document.getElementById('view-board-link'),
+        setupProgress: document.getElementById('setup-progress'),
+        setupProgressMobile: document.getElementById('setup-progress-mobile'),
+        setupProgressText: document.getElementById('setup-progress-text'),
+        setupProgressTextMobile: document.getElementById('setup-progress-text-mobile'),
+        headerStatusDot: document.getElementById('header-status-dot'),
+        headerStatusText: document.getElementById('header-status-text'),
+        configStatus: document.getElementById('config-status'),
+        addSpreadsheetText: document.getElementById('add-spreadsheet-text'),
+        clearSelectionBtn: document.getElementById('clear-selection-btn'),
+        createBoardBtn: document.getElementById('create-board-btn'),
+        addResourceBtn: document.getElementById('add-resource-btn'),
+        resourceUrlInput: document.getElementById('resource-url-input')
+      };
+      console.log('✅ Elements object initialized');
+    }
+
     // `setupEventListeners` 関数の中にこのリスナーを追加
 function setupEventListeners() {
-  // ... 既存のリスナーはそのまま ...
-  // Layout adjustment removed - using flexbox layout
-      if (elements.sheetSelect) {
+  console.log('🔧 Setting up event listeners...');
+  
+  // Ensure elements object is properly initialized
+  if (!elements || typeof elements !== 'object') {
+    console.warn('Elements object not found, initializing...');
+    initializeElements();
+  }
+  
+  // Sheet selection handler
+  if (elements.sheetSelect) {
         elements.sheetSelect.addEventListener('change', function(e) {
           appState.selectedSheet = e.target.value;
           

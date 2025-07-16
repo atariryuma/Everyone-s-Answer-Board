@@ -3,6 +3,8 @@
  * V8ランタイム、最新パフォーマンス技術、安定性強化を統合
  */
 
+import './styles.css';
+
 /**
  * HTML ファイルを読み込む include ヘルパー
  * @param {string} path ファイルパス
