@@ -39,7 +39,7 @@
       </button>
     </div>
 
-    <div id="settings-action-group" class="space-y-4">
+    <div id="settings-action-group" class="space-y-4 mb-8">
       <!-- システム管理者用アプリ設定ボタン -->
       <div id="admin-settings-section" class="hidden">
         <button type="button" class="btn btn-ghost" id="app-settings-btn">
@@ -195,9 +195,17 @@
       loginBtn.addEventListener('click', executeLogin);
       
       document.getElementById('app-settings-btn').addEventListener('click', () => {
-        const baseUrl = window.location.origin + window.location.pathname;
-        const appSetupUrl = baseUrl + '?mode=appsetup';
-        window.open(appSetupUrl, '_blank');
+        google.script.run
+          .withSuccessHandler((webAppUrl) => {
+            const appSetupUrl = webAppUrl + '?setup=true&mode=appsetup';
+            window.open(appSetupUrl, '_blank');
+          })
+          .withFailureHandler(() => {
+            const currentUrl = window.location.href.split('?')[0];
+            const fallbackUrl = currentUrl + '?setup=true&mode=appsetup';
+            window.open(fallbackUrl, '_blank');
+          })
+          .getWebAppUrlCached();
       });
       
       // Security modal functions using UnifiedStyles modal system
