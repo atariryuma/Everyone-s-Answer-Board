@@ -1,3 +1,56 @@
 <style>
-  /* Page-specific styles can be added here if needed in the future. */
+  /* 管理パネルの基本レイアウト */
+  .admin-grid-layout {
+    display: grid;
+    grid-template-rows: auto 1fr auto; /* ヘッダー、メイン、フッター */
+    height: 100vh;
+    overflow: hidden; /* ページ全体のスクロールを禁止 */
+  }
+
+  /* ヘッダーとフッターのスタイル */
+  .admin-grid-layout > header,
+  .admin-grid-layout > footer {
+    position: sticky;
+    z-index: 50;
+  }
+  
+  .admin-grid-layout > header {
+    top: 0;
+  }
+  
+  .admin-grid-layout > footer {
+    bottom: 0;
+  }
+
+  /* メインコンテンツエリア */
+  .admin-grid-layout > main {
+    overflow-y: auto; /* メインコンテンツのみスクロールを許可 */
+    padding: 1.5rem;
+  }
+
+  /* 2カラムレイアウト */
+  .admin-responsive-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr; /* 左パネルを右パネルの2倍の幅に */
+    gap: 1.5rem;
+    align-items: start; /* パネルの高さを揃えない */
+    max-width: 80rem; /* 1280px */
+    margin: 0 auto; /* 中央揃え */
+  }
+
+  /* レスポンシブ対応：画面幅が1024px以下で1カラムに */
+  @media (max-width: 1024px) {
+    .admin-responsive-grid {
+      grid-template-columns: 1fr; /* 1カラムレイアウト */
+    }
+    
+    .admin-grid-layout > main {
+      padding: 1rem;
+    }
+  }
+
+  /* 左パネルと右パネルのスタイル */
+  .left-panel, .right-panel {
+    min-width: 0; /* flexbox/gridアイテムの幅が縮小できるように */
+  }
 </style>
