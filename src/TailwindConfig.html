@@ -171,3 +171,74 @@ window.tailwind = {
 </style>
 
 <script src="https://cdn.tailwindcss.com" defer onerror="console.warn('TailwindCSS failed to load')"></script>
+
+<!-- AdminPanel Layout Override Script - Executes after Tailwind CDN loads -->
+<script>
+// Wait for Tailwind to load and then inject admin panel styles
+document.addEventListener('DOMContentLoaded', function() {
+  // Delay to ensure Tailwind CDN has loaded
+  setTimeout(function() {
+    const adminStylesheet = document.createElement('style');
+    adminStylesheet.id = 'admin-panel-override';
+    adminStylesheet.innerHTML = `
+/* Admin Panel Layout Override - Higher specificity to override Tailwind CDN */
+body.admin-grid-layout .admin-responsive-grid {
+  display: grid !important;
+  grid-template-columns: 2fr 1fr !important;
+  gap: 2rem !important;
+  align-items: start !important;
+  max-width: 84rem !important;
+  margin: 0 auto !important;
+  padding: 0 1rem !important;
+  width: 100% !important;
+}
+
+body.admin-grid-layout .admin-responsive-grid .left-panel,
+body.admin-grid-layout .admin-responsive-grid .right-panel {
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1.5rem !important;
+  flex: none !important;
+  margin: 0 !important;
+}
+
+body.admin-grid-layout .admin-responsive-grid .left-panel {
+  grid-column: 1 !important;
+}
+
+body.admin-grid-layout .admin-responsive-grid .right-panel {
+  grid-column: 2 !important;
+  position: sticky !important;
+  top: 1.5rem !important;
+  max-height: calc(100vh - 3rem) !important;
+  overflow-y: auto !important;
+}
+
+/* Mobile Override */
+@media (max-width: 1024px) {
+  body.admin-grid-layout .admin-responsive-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1.5rem !important;
+    padding: 0 !important;
+  }
+  
+  body.admin-grid-layout .admin-responsive-grid .left-panel {
+    order: 2 !important;
+    grid-column: auto !important;
+  }
+  
+  body.admin-grid-layout .admin-responsive-grid .right-panel {
+    order: 1 !important;
+    grid-column: auto !important;
+    position: static !important;
+    max-height: none !important;
+    overflow-y: visible !important;
+  }
+}
+`;
+    document.head.appendChild(adminStylesheet);
+    console.log('✅ Admin panel layout override applied');
+  }, 100); // 100ms delay to ensure Tailwind has loaded
+});
+</script>
