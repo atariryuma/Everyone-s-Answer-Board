@@ -30,6 +30,11 @@ describe('All form creation scenarios reaction columns', () => {
           getEmail: jest.fn(() => 'test@example.com')
         }))
       },
+      PropertiesService: {
+        getScriptProperties: jest.fn(() => ({
+          getProperty: jest.fn()
+        }))
+      },
       COLUMN_HEADERS: {
         UNDERSTAND: 'なるほど！',
         LIKE: 'いいね！',

@@ -391,11 +391,15 @@ class GASUtilities {
     if (typeof successHandler === 'function' && typeof failureHandler === 'function') {
       // New signature: call(functionName, successHandler, failureHandler, args, operationName)
       try {
+        if (!this.isGASEnvironment() || typeof google.script.run[functionName] !== 'function') {
+          throw new Error(`GAS function ${functionName} is not available`);
+        }
+
         const gasFunction = google.script.run
           .withSuccessHandler(successHandler)
           .withFailureHandler(failureHandler)
           [functionName];
-        
+
         if (Array.isArray(args) && args.length > 0) {
           gasFunction.apply(null, args);
         } else {

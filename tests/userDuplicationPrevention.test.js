@@ -152,8 +152,6 @@ describe('User Duplication Prevention Tests', () => {
         remove: jest.fn()
       }
     };
-    
-    };
 
     context.testUserEmail = 'test@example.com'; // Default email for tests
 
