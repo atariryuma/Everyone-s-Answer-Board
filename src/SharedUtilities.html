@@ -395,15 +395,15 @@ class GASUtilities {
           throw new Error(`GAS function ${functionName} is not available`);
         }
 
-        const gasFunction = google.script.run
+        const runner = google.script.run
           .withSuccessHandler(successHandler)
-          .withFailureHandler(failureHandler)
-          [functionName];
+          .withFailureHandler(failureHandler);
+        const gasFunction = runner[functionName];
 
         if (Array.isArray(args) && args.length > 0) {
-          gasFunction.apply(null, args);
+          gasFunction.apply(runner, args);
         } else {
-          gasFunction();
+          gasFunction.call(runner);
         }
       } catch (error) {
         console.error(`GAS call error for ${functionName}:`, error);
