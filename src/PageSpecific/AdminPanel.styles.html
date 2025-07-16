@@ -189,16 +189,28 @@
     background-clip: padding-box;
   }
 
-  /* 2カラムレイアウト - シンプルで確実な実装 */
-  .admin-responsive-grid {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: var(--spacing-xl);
-    align-items: start;
-    max-width: 84rem;
-    margin: 0 auto;
-    padding: 0 var(--spacing-md);
-    width: 100%;
+  /* 2カラムレイアウト - 最強優先度の確実な実装 */
+  .admin-responsive-grid,
+  div.admin-responsive-grid,
+  body .admin-responsive-grid,
+  html body .admin-responsive-grid {
+    display: grid !important;
+    grid-template-columns: 2fr 1fr !important;
+    gap: var(--spacing-xl) !important;
+    align-items: start !important;
+    max-width: 84rem !important;
+    margin: 0 auto !important;
+    padding: 0 var(--spacing-md) !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    contain: layout style !important;
+  }
+  
+  /* 追加の保護層 - Tailwind override対策 */
+  [class*="grid"].admin-responsive-grid,
+  [class*="flex"].admin-responsive-grid {
+    display: grid !important;
+    grid-template-columns: 2fr 1fr !important;
   }
 
   /* レスポンシブ対応：画面幅が1024px以下で1カラムに */
@@ -214,26 +226,52 @@
     }
   }
 
-  /* パネルスタイル - シンプルで確実 */
-  .admin-responsive-grid .left-panel, 
-  .admin-responsive-grid .right-panel {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-lg);
+  /* パネルスタイル - 最強優先度で確実な実装 */
+  .admin-responsive-grid .left-panel,
+  div.admin-responsive-grid .left-panel,
+  body .admin-responsive-grid .left-panel,
+  html body .admin-responsive-grid .left-panel,
+  .admin-responsive-grid .right-panel,
+  div.admin-responsive-grid .right-panel,
+  body .admin-responsive-grid .right-panel,
+  html body .admin-responsive-grid .right-panel {
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--spacing-lg) !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    flex: none !important;
   }
 
-  .admin-responsive-grid .left-panel {
-    grid-column: 1;
+  .admin-responsive-grid .left-panel,
+  div.admin-responsive-grid .left-panel,
+  body .admin-responsive-grid .left-panel,
+  html body .admin-responsive-grid .left-panel {
+    grid-column: 1 !important;
   }
 
-  .admin-responsive-grid .right-panel {
-    grid-column: 2;
-    position: sticky;
-    top: var(--spacing-lg);
-    max-height: calc(100vh - var(--spacing-2xl));
-    overflow-y: auto;
-    scroll-behavior: smooth;
+  .admin-responsive-grid .right-panel,
+  div.admin-responsive-grid .right-panel,
+  body .admin-responsive-grid .right-panel,
+  html body .admin-responsive-grid .right-panel {
+    grid-column: 2 !important;
+    position: sticky !important;
+    top: var(--spacing-lg) !important;
+    max-height: calc(100vh - var(--spacing-2xl)) !important;
+    overflow-y: auto !important;
+    scroll-behavior: smooth !important;
+  }
+  
+  /* Tailwind競合対策 - 特定クラスの無効化 */
+  .admin-responsive-grid .left-panel[class*="w-"],
+  .admin-responsive-grid .right-panel[class*="w-"] {
+    width: auto !important;
+  }
+  
+  .admin-responsive-grid .left-panel[class*="flex-"],
+  .admin-responsive-grid .right-panel[class*="flex-"] {
+    flex: none !important;
   }
 
   /* モバイル対応 */

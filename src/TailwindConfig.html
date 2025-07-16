@@ -327,10 +327,95 @@ body.iframe-environment .admin-responsive-grid {
   }
 }
 
-/* Tailwind上書き防止の追加保護 */
-.tailwind-override-protection .admin-responsive-grid {
+/* Tailwind上書き防止の追加保護 - 最強優先度 */
+.tailwind-override-protection .admin-responsive-grid,
+body.admin-grid-layout .tailwind-override-protection .admin-responsive-grid,
+html body.admin-grid-layout .tailwind-override-protection .admin-responsive-grid {
   display: grid !important;
   grid-template-columns: 2fr 1fr !important;
+  gap: 2rem !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* 緊急修復クラス - 最高優先度 */
+.admin-responsive-grid.emergency-2col,
+body .admin-responsive-grid.emergency-2col,
+html body .admin-responsive-grid.emergency-2col {
+  display: grid !important;
+  grid-template-columns: 2fr 1fr !important;
+  gap: 2rem !important;
+  align-items: start !important;
+  max-width: 84rem !important;
+  margin: 0 auto !important;
+  padding: 0 1rem !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  contain: layout style !important;
+  isolation: isolate !important;
+}
+
+/* パネル強制修復 */
+.admin-responsive-grid.emergency-2col .left-panel,
+body .admin-responsive-grid.emergency-2col .left-panel,
+html body .admin-responsive-grid.emergency-2col .left-panel {
+  grid-column: 1 !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1.5rem !important;
+  margin: 0 !important;
+}
+
+.admin-responsive-grid.emergency-2col .right-panel,
+body .admin-responsive-grid.emergency-2col .right-panel,
+html body .admin-responsive-grid.emergency-2col .right-panel {
+  grid-column: 2 !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1.5rem !important;
+  margin: 0 !important;
+  position: sticky !important;
+  top: 1.5rem !important;
+  max-height: calc(100vh - 3rem) !important;
+  overflow-y: auto !important;
+}
+
+/* iframe専用強制修復 */
+.iframe-force-admin-grid,
+body.iframe-environment .iframe-force-admin-grid,
+html body.iframe-environment .iframe-force-admin-grid {
+  display: grid !important;
+  grid-template-columns: 2fr 1fr !important;
+  gap: 2rem !important;
+  contain: layout style paint !important;
+  isolation: isolate !important;
+}
+
+/* iframe環境での追加Flexコンテナ修復 */
+.iframe-override-flex {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.iframe-override-grid {
+  display: grid !important;
+}
+
+/* CSS Grid直接操作による強制修復 */
+@supports (display: grid) {
+  .admin-responsive-grid.emergency-2col {
+    grid-template-areas: "left right" !important;
+  }
+  
+  .admin-responsive-grid.emergency-2col .left-panel {
+    grid-area: left !important;
+  }
+  
+  .admin-responsive-grid.emergency-2col .right-panel {
+    grid-area: right !important;
+  }
 }
 
 /* デバッグ用の視覚的確認 */
@@ -345,6 +430,12 @@ body.iframe-environment .admin-responsive-grid {
 .debug-layout .right-panel {
   outline: 1px solid #a855f7 !important;
 }
+
+/* アニメーション無効化による安定化 */
+.admin-responsive-grid.emergency-2col * {
+  transition: none !important;
+  animation: none !important;
+}
 `;
     
     // 最高優先度で注入
@@ -354,24 +445,27 @@ body.iframe-environment .admin-responsive-grid {
     setTimeout(() => this.verifyLayout(), 100);
   },
   
-  // レイアウト検証
+  // レイアウト検証（強化版）
   verifyLayout: function() {
     console.group('🔍 [UNIFIED LAYOUT] Layout Verification');
     
     const adminGrid = document.querySelector('.admin-responsive-grid');
     if (adminGrid) {
       const computedStyle = window.getComputedStyle(adminGrid);
-      const isCorrectLayout = computedStyle.gridTemplateColumns.includes('2fr 1fr') ||
-                             (computedStyle.gridTemplateColumns.includes('2fr') && 
-                              computedStyle.gridTemplateColumns.includes('1fr'));
+      
+      // より厳密な2カラムレイアウト検証
+      const gridColumns = computedStyle.gridTemplateColumns;
+      const isCorrectLayout = this.validateGridLayout(gridColumns);
+      const isDesktopSize = window.innerWidth >= 1024;
       
       console.log('📐 Grid Status:');
       console.log('  ├─ Found:', '✅ YES');
       console.log('  ├─ Display:', computedStyle.display);
-      console.log('  ├─ Columns:', computedStyle.gridTemplateColumns);
+      console.log('  ├─ Columns:', gridColumns);
       console.log('  ├─ Gap:', computedStyle.gap);
       console.log('  ├─ Width:', computedStyle.width);
-      console.log('  └─ Layout Correct:', isCorrectLayout ? '✅ YES' : '❌ NO');
+      console.log('  ├─ Desktop Size:', isDesktopSize ? '✅ YES' : '❌ NO');
+      console.log('  └─ Layout Correct:', isCorrectLayout && isDesktopSize ? '✅ YES' : '❌ NO');
       
       // パネル状態の確認
       const leftPanel = adminGrid.querySelector('.left-panel');
@@ -381,18 +475,33 @@ body.iframe-environment .admin-responsive-grid {
         console.log('📱 Panel Status:');
         console.log('  ├─ Left Width:', leftPanel.offsetWidth + 'px');
         console.log('  ├─ Right Width:', rightPanel.offsetWidth + 'px');
+        console.log('  ├─ Left Grid Col:', window.getComputedStyle(leftPanel).gridColumn);
+        console.log('  ├─ Right Grid Col:', window.getComputedStyle(rightPanel).gridColumn);
         console.log('  └─ Ratio:', leftPanel.offsetWidth && rightPanel.offsetWidth ? 
                    (leftPanel.offsetWidth / rightPanel.offsetWidth).toFixed(2) + ':1' : 'N/A');
       }
       
-      // 問題がある場合は緊急修復（最大試行回数制限付き）
-      if (!isCorrectLayout && this.repairAttempts < this.maxRepairAttempts) {
+      // CSS クラス状態の確認
+      console.log('🔧 CSS Class Status:');
+      console.log('  ├─ Emergency 2col:', adminGrid.classList.contains('emergency-2col') ? '✅' : '❌');
+      console.log('  ├─ Iframe Force:', adminGrid.classList.contains('iframe-force-admin-grid') ? '✅' : '❌');
+      console.log('  ├─ Body Layout:', document.body.classList.contains('admin-grid-layout') ? '✅' : '❌');
+      console.log('  └─ Override Protection:', document.body.classList.contains('tailwind-override-protection') ? '✅' : '❌');
+      
+      // 問題がある場合は緊急修復（デスクトップサイズの場合のみ）
+      if ((!isCorrectLayout || !this.validatePanelPositions(leftPanel, rightPanel)) && 
+          isDesktopSize && 
+          this.repairAttempts < this.maxRepairAttempts) {
         console.warn(`⚠️ [UNIFIED LAYOUT] Layout issue detected, attempting emergency repair... (${this.repairAttempts + 1}/${this.maxRepairAttempts})`);
         this.repairAttempts++;
         this.emergencyRepair();
-      } else if (!isCorrectLayout) {
+      } else if (!isCorrectLayout && isDesktopSize) {
         console.error('❌ [UNIFIED LAYOUT] Max repair attempts reached. Manual intervention required.');
         console.error('💡 [UNIFIED LAYOUT] Try: window.fixAdminLayout() or window.debugLayout(true)');
+      } else if (!isDesktopSize) {
+        console.log('📱 [UNIFIED LAYOUT] Mobile layout - validation skipped');
+      } else {
+        console.log('✅ [UNIFIED LAYOUT] Layout verification passed');
       }
     } else {
       console.log('❌ Admin grid not found');
@@ -401,30 +510,104 @@ body.iframe-environment .admin-responsive-grid {
     console.groupEnd();
   },
   
+  // グリッドレイアウト検証（厳密版）
+  validateGridLayout: function(gridColumns) {
+    if (!gridColumns) return false;
+    
+    // 様々な2fr 1frの形式を検証
+    const validPatterns = [
+      /2fr\s+1fr/,
+      /2fr 1fr/,
+      /(.*)\s*2fr\s+(.*)\s*1fr.*/,
+      /.*2fr.*1fr.*/
+    ];
+    
+    return validPatterns.some(pattern => pattern.test(gridColumns));
+  },
+  
+  // パネル位置検証
+  validatePanelPositions: function(leftPanel, rightPanel) {
+    if (!leftPanel || !rightPanel) return false;
+    
+    const leftColumn = window.getComputedStyle(leftPanel).gridColumn;
+    const rightColumn = window.getComputedStyle(rightPanel).gridColumn;
+    
+    // グリッドカラムが正しく設定されているかチェック
+    const leftValid = leftColumn === '1' || leftColumn.startsWith('1 ');
+    const rightValid = rightColumn === '2' || rightColumn.startsWith('2 ');
+    
+    return leftValid && rightValid;
+  },
+  
   // 緊急修復（無限ループ防止機能付き）
   emergencyRepair: function() {
     console.log(`🚨 [UNIFIED LAYOUT] Emergency repair initiated (attempt ${this.repairAttempts})`);
     
     const adminGrid = document.querySelector('.admin-responsive-grid');
     if (adminGrid) {
-      // 緊急修復クラスを追加
+      // 複数の修復クラスを段階的に適用
       adminGrid.classList.add('emergency-2col');
+      adminGrid.classList.add('iframe-force-admin-grid');
+      
+      // bodyに複数の保護クラスを追加
+      document.body.classList.add('tailwind-override-protection');
+      document.body.classList.add('admin-grid-layout');
       
       // iframe修復を統合システム内で実行
       this.applyIframeRepair();
       
-      // bodyにデバッグクラスを追加
-      document.body.classList.add('tailwind-override-protection');
+      // CSS直接操作による強制修復
+      this.forceDirectCSS(adminGrid);
       
-      console.log('🔧 [UNIFIED LAYOUT] Emergency repair completed');
+      console.log('🔧 [UNIFIED LAYOUT] Emergency repair completed with multi-level protection');
       
       // 修復後に再検証（試行回数制限内の場合のみ）
       if (this.repairAttempts < this.maxRepairAttempts) {
-        setTimeout(() => this.verifyLayout(), 500); // 長めの遅延で安定化
+        setTimeout(() => this.verifyLayout(), 700); // より長い遅延で安定化
       } else {
         console.log('🔧 [UNIFIED LAYOUT] Verification skipped to prevent infinite loop');
       }
     }
+  },
+  
+  // CSS直接操作による強制修復
+  forceDirectCSS: function(adminGrid) {
+    console.log('🔧 [UNIFIED LAYOUT] Applying direct CSS manipulation');
+    
+    // CSS変数を直接設定
+    adminGrid.style.setProperty('display', 'grid', 'important');
+    adminGrid.style.setProperty('grid-template-columns', '2fr 1fr', 'important');
+    adminGrid.style.setProperty('gap', '2rem', 'important');
+    adminGrid.style.setProperty('align-items', 'start', 'important');
+    adminGrid.style.setProperty('max-width', '84rem', 'important');
+    adminGrid.style.setProperty('margin', '0 auto', 'important');
+    adminGrid.style.setProperty('padding', '0 1rem', 'important');
+    adminGrid.style.setProperty('width', '100%', 'important');
+    adminGrid.style.setProperty('box-sizing', 'border-box', 'important');
+    
+    // パネルの強制修復
+    const leftPanel = adminGrid.querySelector('.left-panel');
+    const rightPanel = adminGrid.querySelector('.right-panel');
+    
+    if (leftPanel) {
+      leftPanel.style.setProperty('grid-column', '1', 'important');
+      leftPanel.style.setProperty('min-width', '0', 'important');
+      leftPanel.style.setProperty('display', 'flex', 'important');
+      leftPanel.style.setProperty('flex-direction', 'column', 'important');
+      leftPanel.style.setProperty('gap', '1.5rem', 'important');
+    }
+    
+    if (rightPanel) {
+      rightPanel.style.setProperty('grid-column', '2', 'important');
+      rightPanel.style.setProperty('min-width', '0', 'important');
+      rightPanel.style.setProperty('display', 'flex', 'important');
+      rightPanel.style.setProperty('flex-direction', 'column', 'important');
+      rightPanel.style.setProperty('gap', '1.5rem', 'important');
+      rightPanel.style.setProperty('position', 'sticky', 'important');
+      rightPanel.style.setProperty('top', '1.5rem', 'important');
+    }
+    
+    console.log('✅ [UNIFIED LAYOUT] Direct CSS manipulation applied');
   },
   
   // 手動修復用グローバル関数
