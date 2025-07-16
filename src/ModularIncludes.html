@@ -1,0 +1,25 @@
+<!-- =============================================================================
+     StudyQuest - Modular CSS Includes
+     New modular CSS architecture for better customization
+     ============================================================================= -->
+
+<!-- Phase 1: Core System (Always Required) -->
+<?!= include('DesignTokens'); ?>
+<?!= include('TailwindConfig'); ?>
+<?!= include('BaseStyles'); ?>
+
+<!-- Phase 2: Components (Load as needed) -->
+<?!= include('GlassPanel'); ?>
+<?!= include('Buttons'); ?>
+<?!= include('Forms'); ?>
+<?!= include('Modals'); ?>
+
+<!-- Phase 3: Utilities and Shared JavaScript -->
+<?!= include('SharedUtilities'); ?>
+<?!= include('SharedJavaScript'); ?>
+
+<!-- Phase 4: Page-Specific Styles (Override in individual pages) -->
+<!-- Example usage in pages:
+<?!= include('ModularIncludes'); ?>
+<?!= include('PageSpecific/SetupPage.styles'); ?>
+-->

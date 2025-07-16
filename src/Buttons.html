@@ -1,0 +1,273 @@
+<style>
+/* =============================================================================
+   StudyQuest - Button Component
+   Modern glassmorphism buttons with variants and states
+   ============================================================================= */
+
+/* Base Button Foundation */
+.btn {
+  /* Layout & Sizing */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg);
+  min-height: var(--size-control-md);
+  
+  /* Typography */
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  line-height: var(--line-height-normal);
+  text-decoration: none;
+  
+  /* Visual Design */
+  background: var(--glass-bg-secondary);
+  border: var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow);
+  color: var(--text-primary);
+  cursor: pointer;
+  
+  /* Interactive States */
+  transition: all var(--duration-normal) var(--easing-standard);
+  position: relative;
+  z-index: var(--z-raised);
+  
+  /* Accessibility */
+  outline: none;
+  
+  /* Performance */
+  will-change: transform, box-shadow;
+  contain: layout style;
+}
+
+/* Button States */
+.btn:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--border-hover);
+  box-shadow: var(--glass-shadow-hover);
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  background: var(--glass-bg-active);
+  transform: translateY(0);
+  transition-duration: var(--duration-fast);
+}
+
+.btn:focus-visible {
+  border-color: var(--border-focus);
+  box-shadow: 
+    var(--glass-shadow),
+    0 0 0 3px rgba(6, 182, 212, 0.2);
+}
+
+.btn:disabled { 
+  background: var(--glass-bg-disabled);
+  color: var(--text-disabled);
+  border-color: var(--border-secondary);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Button Variants */
+.btn-primary,
+.register-btn,
+.cta-button {
+  background: var(--gradient-primary);
+  border: 1px solid var(--color-primary);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.btn-primary:hover,
+.register-btn:hover,
+.cta-button:hover {
+  border-color: var(--color-primary-light);
+  box-shadow: 
+    var(--glass-shadow-hover),
+    0 0 32px rgba(6, 182, 212, 0.3);
+  transform: translateY(-2px);
+}
+
+.btn-secondary,
+.action-btn.secondary {
+  background: var(--glass-bg-secondary);
+  border-color: var(--border-primary);
+  color: var(--text-secondary);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--border-primary);
+  color: var(--text-secondary);
+}
+
+.btn-ghost:hover {
+  background: var(--glass-bg-hover);
+  box-shadow: none;
+  transform: none;
+}
+
+.btn-success {
+  background: var(--glass-success);
+  border-color: var(--color-success);
+  color: var(--color-success-light);
+}
+
+.btn-danger {
+  background: var(--glass-error);
+  border-color: var(--color-error);
+  color: var(--color-error-light);
+}
+
+.btn-warning {
+  background: var(--glass-warning);
+  border-color: var(--color-warning);
+  color: var(--color-warning-light);
+}
+
+.btn-info {
+  background: var(--glass-info);
+  border-color: var(--color-info);
+  color: var(--color-info-light);
+}
+
+/* Button Sizes */
+.btn-sm {
+  padding: var(--spacing-sm) var(--spacing-md);
+  min-height: var(--size-control-sm);
+  font-size: var(--font-size-xs);
+}
+
+.btn-lg {
+  padding: var(--spacing-lg) var(--spacing-xl);
+  min-height: var(--size-control-lg);
+  font-size: var(--font-size-base);
+}
+
+.btn-xl {
+  padding: var(--spacing-xl) var(--spacing-2xl);
+  min-height: var(--size-control-xl);
+  font-size: var(--font-size-lg);
+}
+
+/* Button Styles */
+.btn-outline {
+  background: transparent;
+  border: 2px solid var(--border-primary);
+}
+
+.btn-outline:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--border-hover);
+}
+
+.btn-solid {
+  background: var(--glass-bg-primary);
+  border: none;
+  box-shadow: var(--glass-shadow);
+}
+
+.btn-rounded {
+  border-radius: var(--radius-full);
+}
+
+/* Icon Button */
+.btn-icon {
+  padding: var(--spacing-md);
+  width: var(--size-control-md);
+  height: var(--size-control-md);
+  min-height: auto;
+}
+
+.btn-icon.btn-sm {
+  padding: var(--spacing-sm);
+  width: var(--size-control-sm);
+  height: var(--size-control-sm);
+}
+
+.btn-icon.btn-lg {
+  padding: var(--spacing-lg);
+  width: var(--size-control-lg);
+  height: var(--size-control-lg);
+}
+
+/* Loading State */
+.btn .spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Button Group */
+.btn-group {
+  display: inline-flex;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.btn-group .btn {
+  border-radius: 0;
+  border-right: none;
+}
+
+.btn-group .btn:first-child {
+  border-top-left-radius: var(--radius-lg);
+  border-bottom-left-radius: var(--radius-lg);
+}
+
+.btn-group .btn:last-child {
+  border-top-right-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+  border-right: var(--glass-border);
+}
+
+.btn-group .btn:only-child {
+  border-radius: var(--radius-lg);
+  border-right: var(--glass-border);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 640px) {
+  .btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    min-height: var(--size-control-sm);
+    font-size: var(--font-size-xs);
+  }
+  
+  .btn-lg {
+    padding: var(--spacing-md) var(--spacing-lg);
+    min-height: var(--size-control-md);
+    font-size: var(--font-size-sm);
+  }
+  
+  .btn-xl {
+    padding: var(--spacing-lg) var(--spacing-xl);
+    min-height: var(--size-control-lg);
+    font-size: var(--font-size-base);
+  }
+}
+
+@media (max-width: 480px) {
+  .btn {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-xs);
+  }
+  
+  .btn-sm {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 11px;
+  }
+}
+</style>

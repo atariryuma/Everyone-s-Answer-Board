@@ -1,0 +1,196 @@
+<style>
+/* =============================================================================
+   StudyQuest - Base Styles
+   Foundation layout and typography without component-specific overrides
+   ============================================================================= */
+
+/* HTML & Body Foundation */
+.unified-theme html, 
+.unified-theme html[lang="ja"],
+html.unified-theme, 
+html[lang="ja"].unified-theme {
+  background: var(--gradient-background);
+  min-height: 100vh;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  scroll-behavior: smooth;
+}
+
+.unified-theme body,
+body.unified-theme { 
+  background: var(--gradient-background);
+  min-height: 100vh;
+  margin: 0;
+  padding: var(--spacing-lg);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Inter', sans-serif;
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  overflow-x: hidden;
+  width: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Atmospheric Background Overlay */
+.unified-theme body::before,
+body.unified-theme::before {
+  content: '';
+  position: fixed;
+  top: 0; 
+  left: 0;
+  width: 100%; 
+  height: 100%;
+  background: var(--gradient-overlay);
+  z-index: var(--z-base);
+  pointer-events: none;
+}
+
+/* Global box-sizing reset for glassmorphism compatibility */
+.unified-theme html, .unified-theme body, .unified-theme div, .unified-theme span, 
+.unified-theme h1, .unified-theme h2, .unified-theme h3, .unified-theme h4, .unified-theme h5, .unified-theme h6, 
+.unified-theme p, .unified-theme button, .unified-theme a {
+  box-sizing: border-box;
+}
+
+/* Typography Foundation */
+.unified-theme h1, .unified-theme h2, .unified-theme h3, 
+.unified-theme h4, .unified-theme h5, .unified-theme h6 {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin: 0;
+  line-height: var(--line-height-tight);
+}
+
+.unified-theme h1 { font-size: var(--font-size-4xl); }
+.unified-theme h2 { font-size: var(--font-size-3xl); }
+.unified-theme h3 { font-size: var(--font-size-2xl); }
+.unified-theme h4 { font-size: var(--font-size-xl); }
+.unified-theme h5 { font-size: var(--font-size-lg); }
+.unified-theme h6 { font-size: var(--font-size-base); }
+
+.unified-theme p {
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: var(--line-height-relaxed);
+}
+
+.unified-theme a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color var(--duration-normal) var(--easing-standard);
+}
+
+.unified-theme a:hover {
+  color: var(--color-primary-light);
+}
+
+/* Utility Classes */
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-tertiary { color: var(--text-tertiary); }
+.text-muted { color: var(--text-muted); }
+.text-disabled { color: var(--text-disabled); }
+
+.bg-primary { background-color: var(--color-bg-primary); }
+.bg-secondary { background-color: var(--color-bg-secondary); }
+.bg-tertiary { background-color: var(--color-bg-tertiary); }
+
+/* Spacing Utilities */
+.space-y-1 > * + * { margin-top: var(--spacing-xs); }
+.space-y-2 > * + * { margin-top: var(--spacing-sm); }
+.space-y-3 > * + * { margin-top: var(--spacing-md); }
+.space-y-4 > * + * { margin-top: var(--spacing-lg); }
+.space-y-6 > * + * { margin-top: var(--spacing-xl); }
+.space-y-8 > * + * { margin-top: var(--spacing-2xl); }
+
+.mb-1 { margin-bottom: var(--spacing-xs); }
+.mb-2 { margin-bottom: var(--spacing-sm); }
+.mb-3 { margin-bottom: var(--spacing-md); }
+.mb-4 { margin-bottom: var(--spacing-lg); }
+.mb-6 { margin-bottom: var(--spacing-xl); }
+.mb-8 { margin-bottom: var(--spacing-2xl); }
+
+.mt-1 { margin-top: var(--spacing-xs); }
+.mt-2 { margin-top: var(--spacing-sm); }
+.mt-3 { margin-top: var(--spacing-md); }
+.mt-4 { margin-top: var(--spacing-lg); }
+.mt-6 { margin-top: var(--spacing-xl); }
+.mt-8 { margin-top: var(--spacing-2xl); }
+
+.p-1 { padding: var(--spacing-xs); }
+.p-2 { padding: var(--spacing-sm); }
+.p-3 { padding: var(--spacing-md); }
+.p-4 { padding: var(--spacing-lg); }
+.p-6 { padding: var(--spacing-xl); }
+.p-8 { padding: var(--spacing-2xl); }
+
+/* Layout Utilities */
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.flex-row { flex-direction: row; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.justify-start { justify-content: flex-start; }
+.justify-end { justify-content: flex-end; }
+
+.grid { display: grid; }
+.block { display: block; }
+.inline-block { display: inline-block; }
+.hidden { display: none; }
+
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.min-h-screen { min-height: 100vh; }
+
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+
+.font-bold { font-weight: 700; }
+.font-semibold { font-weight: 600; }
+.font-medium { font-weight: 500; }
+.font-normal { font-weight: 400; }
+
+.text-xs { font-size: var(--font-size-xs); }
+.text-sm { font-size: var(--font-size-sm); }
+.text-base { font-size: var(--font-size-base); }
+.text-lg { font-size: var(--font-size-lg); }
+.text-xl { font-size: var(--font-size-xl); }
+.text-2xl { font-size: var(--font-size-2xl); }
+.text-3xl { font-size: var(--font-size-3xl); }
+.text-4xl { font-size: var(--font-size-4xl); }
+
+.rounded-sm { border-radius: var(--radius-sm); }
+.rounded-md { border-radius: var(--radius-md); }
+.rounded-lg { border-radius: var(--radius-lg); }
+.rounded-xl { border-radius: var(--radius-xl); }
+.rounded-2xl { border-radius: var(--radius-2xl); }
+.rounded-full { border-radius: var(--radius-full); }
+
+.max-w-2xl { max-width: 672px; }
+.max-w-4xl { max-width: 896px; }
+.max-w-6xl { max-width: 1152px; }
+.mx-auto { margin-left: auto; margin-right: auto; }
+
+/* Responsive Utilities */
+@media (max-width: 640px) {
+  .unified-theme body,
+  body.unified-theme {
+    padding: var(--spacing-md);
+  }
+  
+  .text-4xl { font-size: var(--font-size-3xl); }
+  .text-3xl { font-size: var(--font-size-2xl); }
+  .text-2xl { font-size: var(--font-size-xl); }
+}
+
+@media (max-width: 480px) {
+  .unified-theme body,
+  body.unified-theme {
+    padding: var(--spacing-sm);
+  }
+}
+</style>

@@ -1,0 +1,267 @@
+<style>
+/* =============================================================================
+   StudyQuest - Login Page Specific Styles
+   Page-specific customizations for login page layout
+   ============================================================================= */
+
+@layer page-specific {
+  /* Login Page Layout */
+  .login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-lg);
+  }
+  
+  /* Centered Glass Layout */
+  .login-page .centered-glass-layout {
+    width: 100%;
+    max-width: 480px;
+    position: relative;
+  }
+  
+  /* Login Container */
+  .login-page .glass-container {
+    background: var(--glass-bg-primary);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: var(--glass-border);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--glass-shadow-hover);
+    padding: var(--spacing-2xl);
+    text-align: center;
+    animation: slideUp var(--duration-slow) var(--easing-standard);
+  }
+  
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Logo and Header */
+  .login-page .logo {
+    width: 64px;
+    height: 64px;
+    background: var(--gradient-primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 auto var(--spacing-lg);
+  }
+  
+  .login-page .title {
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .login-page .subtitle {
+    font-size: var(--font-size-base);
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-2xl);
+  }
+  
+  /* Status Card */
+  .login-page .status-card {
+    background: var(--glass-bg-secondary);
+    border: var(--glass-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+    text-align: left;
+  }
+  
+  .login-page .status-text {
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .login-page .user-email {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--text-primary);
+    font-family: monospace;
+  }
+  
+  /* CTA Button */
+  .login-page .cta-button {
+    width: 100%;
+    background: var(--gradient-primary);
+    border: 1px solid var(--color-primary);
+    color: var(--text-primary);
+    font-weight: 700;
+    font-size: var(--font-size-base);
+    padding: var(--spacing-md) var(--spacing-lg);
+    min-height: var(--size-control-lg);
+    border-radius: var(--radius-lg);
+    transition: all var(--duration-normal) var(--easing-standard);
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .login-page .cta-button:hover:not(:disabled) {
+    box-shadow: 
+      var(--glass-shadow-hover),
+      0 0 32px rgba(6, 182, 212, 0.4);
+    transform: translateY(-2px);
+  }
+  
+  .login-page .cta-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+  
+  /* Loading Spinner */
+  .login-page .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: var(--spacing-sm);
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  /* Message Area */
+  .login-page .message-area {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    text-align: center;
+    margin-bottom: var(--spacing-md);
+    transition: all var(--duration-normal) var(--easing-standard);
+  }
+  
+  .login-page .message-area.success {
+    background: var(--glass-success);
+    color: var(--color-success);
+    border: 1px solid var(--color-success);
+  }
+  
+  .login-page .message-area.error {
+    background: var(--glass-error);
+    color: var(--color-error);
+    border: 1px solid var(--color-error);
+  }
+  
+  .login-page .message-area.info {
+    background: var(--glass-info);
+    color: var(--color-info);
+    border: 1px solid var(--color-info);
+  }
+  
+  /* Security Info */
+  .login-page .security-info {
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--border-secondary);
+  }
+  
+  .login-page .security-info .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border-primary);
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+  
+  .login-page .security-info .btn-ghost:hover {
+    background: var(--glass-bg-hover);
+    color: var(--text-primary);
+  }
+  
+  /* Success Container */
+  .login-page .success-container {
+    display: none;
+    animation: slideUp var(--duration-slow) var(--easing-standard);
+  }
+  
+  .login-page .success-container.active {
+    display: block;
+  }
+  
+  .login-page .success-icon {
+    width: 64px;
+    height: 64px;
+    background: var(--color-success);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-2xl);
+    color: white;
+    margin: 0 auto var(--spacing-lg);
+  }
+  
+  /* レスポンシブ調整 */
+  @media (max-width: 640px) {
+    .login-page {
+      padding: var(--spacing-md);
+    }
+    
+    .login-page .glass-container {
+      padding: var(--spacing-xl);
+    }
+    
+    .login-page .title {
+      font-size: var(--font-size-xl);
+    }
+    
+    .login-page .subtitle {
+      font-size: var(--font-size-sm);
+    }
+    
+    .login-page .cta-button {
+      font-size: var(--font-size-sm);
+      padding: var(--spacing-sm) var(--spacing-md);
+      min-height: var(--size-control-md);
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .login-page {
+      padding: var(--spacing-sm);
+    }
+    
+    .login-page .glass-container {
+      padding: var(--spacing-lg);
+    }
+    
+    .login-page .logo {
+      width: 48px;
+      height: 48px;
+      font-size: var(--font-size-lg);
+    }
+    
+    .login-page .title {
+      font-size: var(--font-size-lg);
+    }
+    
+    .login-page .status-card {
+      padding: var(--spacing-md);
+    }
+    
+    .login-page .user-email {
+      font-size: var(--font-size-sm);
+    }
+  }
+}
+</style>
