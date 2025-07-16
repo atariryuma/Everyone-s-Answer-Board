@@ -479,11 +479,11 @@
                     <select id="classHeader" class="form-control"></select>
                   </label>
                   <div class="flex items-center mt-4">
-                    <input type="checkbox" id="showNames" name="showNames" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <input type="checkbox" id="showNames" name="showNames">
                     <label for="showNames" class="ml-2 block text-base text-gray-300">名前を表示する</label>
                   </div>
                   <div class="flex items-center mt-2">
-                    <input type="checkbox" id="showCounts" name="showCounts" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <input type="checkbox" id="showCounts" name="showCounts">
                     <label for="showCounts" class="ml-2 block text-base text-gray-300">リアクション数を表示する</label>
                   </div>
                 </div>
@@ -643,7 +643,7 @@
                       </svg>
                       <span class="text-orange-200 font-medium text-sm">リソース管理</span>
                     </div>
-                    <button type="button" id="delete-all-resources-btn" class="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded flex items-center justify-center gap-2 transition-all text-sm font-medium">
+                    <button type="button" id="delete-all-resources-btn" class="w-full btn btn-danger text-sm font-medium flex items-center justify-center gap-2">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
                       </svg>
@@ -4046,7 +4046,7 @@ function syncCheckboxStates(status) {
             <textarea 
               id="custom-main-question" 
               rows="3" 
-              class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors" 
+              class="form-control text-sm" 
               placeholder="例：今日の授業で学んだことの中で、最も印象に残ったことは何ですか？"
               maxlength="500"
             ></textarea>
@@ -4062,7 +4062,7 @@ function syncCheckboxStates(status) {
               <div class="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">2</div>
               <h4 class="text-lg font-semibold text-green-400">回答方法を選択</h4>
             </div>
-            <select id="main-question-type" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm focus:border-green-400 focus:ring-1 focus:ring-green-400 transition-colors" title="回答方法を選択してください">
+            <select id="main-question-type" class="form-control text-sm" title="回答方法を選択してください">
               <option value="choice" selected>選択肢（単一選択）</option>
               <option value="multiple">選択肢（複数選択可）</option>
               <option value="text">短文テキスト（1行回答）</option>
@@ -4076,12 +4076,12 @@ function syncCheckboxStates(status) {
               <div class="w-6 h-6 bg-yellow-500 text-white rounded-full flex items-center justify-center text-sm font-bold">3</div>
               <h4 class="text-lg font-semibold text-yellow-400">選択肢を設定</h4>
             </div>
-            <textarea id="main-question-choices" rows="4" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-colors" placeholder="例：&#10;気づいたことがある。&#10;疑問に思うことがある。&#10;もっと知りたいことがある。"></textarea>
+            <textarea id="main-question-choices" rows="4" class="form-control text-sm" placeholder="例：&#10;気づいたことがある。&#10;疑問に思うことがある。&#10;もっと知りたいことがある。"></textarea>
             <p class="text-xs text-gray-400 mt-2">💡 学習者が選択できる選択肢を1行に1つずつ入力してください。例のような評価軸や、具体的な選択肢を設定できます。</p>
             
             <div class="mt-4">
               <label class="flex items-center">
-                <input type="checkbox" id="include-others-option" class="mr-2 rounded bg-gray-700 border-gray-600 text-yellow-500 focus:ring-yellow-400" checked>
+                <input type="checkbox" id="include-others-option" checked>
                 <span class="text-sm text-gray-300">「その他...」選択肢を追加する</span>
               </label>
               <p class="text-xs text-gray-400 mt-1 ml-6">チェックすると、学習者が自由に回答を入力できる「その他...」オプションが自動的に追加されます</p>
@@ -4097,12 +4097,12 @@ function syncCheckboxStates(status) {
             </div>
             <div class="mb-3">
               <label class="flex items-center">
-                <input type="checkbox" id="enable-class-selection" class="mr-2 rounded bg-gray-700 border-gray-600 text-purple-500 focus:ring-purple-400" checked>
+                <input type="checkbox" id="enable-class-selection" checked>
                 <span class="text-sm text-gray-300">クラス選択を有効にする</span>
               </label>
             </div>
             <div id="class-choices-container">
-              <textarea id="class-choices" rows="3" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition-colors" placeholder="例：&#10;クラス1&#10;クラス2&#10;クラス3&#10;クラス4"></textarea>
+              <textarea id="class-choices" rows="3" class="form-control text-sm" placeholder="例：&#10;クラス1&#10;クラス2&#10;クラス3&#10;クラス4"></textarea>
               <p class="text-xs text-gray-400 mt-2">1行に1つずつクラス名を入力してください</p>
             </div>
           </div>
