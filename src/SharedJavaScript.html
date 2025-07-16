@@ -146,12 +146,15 @@ function callGAS(gasFunction, successCallback, errorCallback, args = [], context
         errorCallback(error, errorMessage);
       }
     });
-  
+
+  // Support both function objects and function names (string)
+  const functionName = typeof gasFunction === 'string' ? gasFunction : gasFunction.name;
+
   // Apply arguments to the function call
   if (args.length === 0) {
-    runner[gasFunction.name]();
+    runner[functionName]();
   } else {
-    runner[gasFunction.name].apply(runner, args);
+    runner[functionName].apply(runner, args);
   }
 }
 
