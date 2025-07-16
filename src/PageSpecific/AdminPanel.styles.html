@@ -344,6 +344,186 @@
     margin-top: var(--spacing-xl);
   }
 
+  /* =============================================================================
+     システム状況パネル専用スタイル - デスクトップ最適化
+     ============================================================================= */
+
+  /* 情報表示グリッド */
+  .status-info-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-sm) 0;
+    border-bottom: 1px solid var(--border-secondary);
+  }
+
+  .info-row:last-child {
+    border-bottom: none;
+  }
+
+  .info-label {
+    color: var(--text-tertiary);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+  }
+
+  .info-value {
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    text-align: right;
+    max-width: 60%;
+    word-break: break-word;
+  }
+
+  .action-row {
+    display: flex;
+    justify-content: center;
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--border-secondary);
+    margin-top: var(--spacing-sm);
+  }
+
+  /* リソースリンク */
+  .resource-links {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .resource-links .action-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-sm);
+  }
+
+  /* 危険ゾーン */
+  .danger-zone {
+    border-top: 1px solid var(--color-error);
+    padding-top: var(--spacing-md);
+    margin-top: var(--spacing-md);
+  }
+
+  .danger-section {
+    border: 1px solid var(--color-error) !important;
+    background: rgba(239, 68, 68, 0.05) !important;
+  }
+
+  .danger-section .step-icon {
+    background: linear-gradient(135deg, var(--color-error) 0%, #dc2626 100%) !important;
+  }
+
+  /* ステータスインジケーター強化 */
+  .status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-lg);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+  }
+
+  /* =============================================================================
+     デスクトップ最適化 (1024px+)
+     ============================================================================= */
+
+  @media (min-width: 1024px) {
+    /* ヘッダー強化 */
+    .step-header {
+      padding: var(--spacing-lg);
+      margin-bottom: var(--spacing-xl);
+    }
+
+    .step-icon {
+      width: 48px;
+      height: 48px;
+      font-size: var(--font-size-lg);
+    }
+
+    .step-title {
+      font-size: var(--font-size-2xl);
+      margin-bottom: var(--spacing-sm);
+    }
+
+    .step-description {
+      font-size: var(--font-size-base);
+    }
+
+    /* パネルセクション強化 */
+    .admin-panel-section {
+      padding: var(--spacing-2xl);
+      margin-bottom: var(--spacing-xl);
+    }
+
+    .admin-panel-section h2,
+    .admin-panel-section h3 {
+      font-size: var(--font-size-2xl);
+      margin-bottom: var(--spacing-xl);
+    }
+
+    /* ボタン強化 */
+    .btn-primary,
+    .btn-secondary {
+      padding: var(--spacing-lg) var(--spacing-xl);
+      font-size: var(--font-size-base);
+      min-height: 48px;
+    }
+
+    .action-buttons {
+      gap: var(--spacing-lg);
+    }
+
+    .action-buttons .btn-primary,
+    .action-buttons .btn-secondary {
+      padding: var(--spacing-md) var(--spacing-lg);
+    }
+
+    /* 情報表示の改善 */
+    .info-row {
+      padding: var(--spacing-md) 0;
+    }
+
+    .info-label {
+      font-size: var(--font-size-base);
+    }
+
+    .info-value {
+      font-size: var(--font-size-base);
+    }
+
+    /* 右パネルの最適化 */
+    .right-panel {
+      max-height: calc(100vh - 120px);
+      overflow-y: auto;
+      scroll-behavior: smooth;
+    }
+
+    .right-panel .admin-panel-section {
+      margin-bottom: var(--spacing-lg);
+    }
+
+    /* フォーム要素の強化 */
+    .form-control {
+      padding: var(--spacing-md) var(--spacing-lg);
+      font-size: var(--font-size-base);
+      min-height: 48px;
+    }
+
+    /* トグルセクションの改善 */
+    .toggle-section {
+      padding: var(--spacing-md);
+      min-height: 48px;
+      font-size: var(--font-size-base);
+    }
+  }
+
   /* Tailwindクラスの競合解決 */
   .admin-responsive-grid > * {
     flex: none; /* flex-1クラスの無効化 */
