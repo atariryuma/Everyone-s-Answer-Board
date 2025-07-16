@@ -63,8 +63,8 @@
     background-clip: padding-box;
   }
 
-  /* 2カラムレイアウト - 改善版 */
-  .admin-responsive-grid {
+  /* 2カラムレイアウト - 構造的最適化 (管理パネル専用) */
+  .admin-grid-layout main .admin-responsive-grid {
     display: grid;
     grid-template-columns: 2fr 1fr; /* 左パネルを右パネルの2倍の幅に */
     gap: var(--spacing-xl);
@@ -72,11 +72,12 @@
     max-width: 84rem; /* 1344px - より広いレイアウト */
     margin: 0 auto; /* 中央揃え */
     padding: 0 var(--spacing-md);
+    width: 100%;
   }
 
   /* レスポンシブ対応：画面幅が1024px以下で1カラムに */
   @media (max-width: 1024px) {
-    .admin-responsive-grid {
+    .admin-grid-layout main .admin-responsive-grid {
       grid-template-columns: 1fr; /* 1カラムレイアウト */
       gap: var(--spacing-lg);
       padding: 0;
@@ -87,20 +88,23 @@
     }
   }
 
-  /* 左パネルと右パネルのスタイル - 改善版 */
-  .left-panel, .right-panel {
+  /* 左パネルと右パネルのスタイル - 構造的最適化 */
+  .admin-grid-layout main .admin-responsive-grid .left-panel, 
+  .admin-grid-layout main .admin-responsive-grid .right-panel {
     min-width: 0; /* flexbox/gridアイテムの幅が縮小できるように */
     display: flex;
     flex-direction: column;
     gap: var(--spacing-lg);
   }
 
-  .left-panel {
+  .admin-grid-layout main .admin-responsive-grid .left-panel {
     order: 1;
+    grid-column: 1;
   }
 
-  .right-panel {
+  .admin-grid-layout main .admin-responsive-grid .right-panel {
     order: 2;
+    grid-column: 2;
     position: sticky;
     top: var(--spacing-lg);
     max-height: calc(100vh - var(--spacing-2xl));
@@ -110,12 +114,14 @@
 
   /* モバイルでの順序変更 */
   @media (max-width: 1024px) {
-    .left-panel {
+    .admin-grid-layout main .admin-responsive-grid .left-panel {
       order: 2;
+      grid-column: auto;
     }
     
-    .right-panel {
+    .admin-grid-layout main .admin-responsive-grid .right-panel {
       order: 1;
+      grid-column: auto;
       position: static;
       max-height: none;
       overflow-y: visible;
@@ -174,6 +180,34 @@
 
   .admin-content-spacing-lg > * + * {
     margin-top: var(--spacing-xl);
+  }
+
+  /* Tailwind CSSクラスとの競合を自然に解決 */
+  .admin-grid-layout main .admin-responsive-grid {
+    /* Grid layoutの確実な適用 */
+    display: grid;
+    /* 確実に2カラムレイアウトを維持 */
+    grid-template-columns: 2fr 1fr;
+  }
+
+  .admin-grid-layout main .admin-responsive-grid > * {
+    /* Grid itemsのflex無効化 */
+    flex: none;
+  }
+
+  /* Space-y クラスの影響を無効化 */
+  .admin-grid-layout main .admin-responsive-grid > .left-panel,
+  .admin-grid-layout main .admin-responsive-grid > .right-panel {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+  /* 最終確認：デスクトップでの確実な2カラム */
+  @media (min-width: 1025px) {
+    .admin-grid-layout main .admin-responsive-grid {
+      grid-template-columns: 2fr 1fr;
+      display: grid;
+    }
   }
 
   /* =============================================================================

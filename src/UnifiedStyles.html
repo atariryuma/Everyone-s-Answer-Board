@@ -1881,14 +1881,17 @@ input[type="radio"]:disabled {
   width: 100%;
 }
 
-/* Unified Grid System */
-.responsive-grid {
+/* Unified Grid System - For general pages (not admin panel) */
+.page-container .responsive-grid,
+.responsive-grid:not(.admin-responsive-grid) {
   display: grid;
   gap: var(--spacing-lg);
   grid-template-columns: 1fr;
   align-items: start;
   width: 100%;
 }
+
+/* Admin Panel uses its own dedicated grid system in PageSpecific/AdminPanel.styles.html */
 
 
 
@@ -1934,12 +1937,14 @@ input[type="radio"]:disabled {
     padding: 0 var(--spacing-sm);
   }
   
-  .responsive-grid,
-  .admin-responsive-grid,
+  .page-container .responsive-grid,
+  .responsive-grid:not(.admin-responsive-grid),
   .page-responsive-grid {
     gap: var(--spacing-md);
     padding: 0 var(--spacing-sm);
   }
+  
+  /* Admin responsive grid handled separately in AdminPanel.styles.html */
   
   .glass-panel {
     margin: 0;
@@ -1961,11 +1966,14 @@ input[type="radio"]:disabled {
 
 /* Tablet Portrait */
 @media (min-width: 640px) and (max-width: 1023px) {
-  .responsive-grid.two-column,
+  .page-container .responsive-grid.two-column,
+  .responsive-grid.two-column:not(.admin-responsive-grid),
   .page-responsive-grid {
     grid-template-columns: 1.8fr 1fr;
     gap: var(--spacing-xl);
   }
+  
+  /* Admin responsive grid maintains its own 2fr 1fr layout */
   
   .side-panel,
   .right-panel,
@@ -1979,11 +1987,14 @@ input[type="radio"]:disabled {
 
 /* Desktop */
 @media (min-width: 1024px) {
-  .responsive-grid.two-column,
+  .page-container .responsive-grid.two-column,
+  .responsive-grid.two-column:not(.admin-responsive-grid),
   .page-responsive-grid {
     grid-template-columns: 2fr 380px;
     gap: var(--spacing-2xl);
   }
+  
+  /* Admin responsive grid maintains its own dedicated layout */
   
   .side-panel,
   .right-panel,
@@ -2006,11 +2017,14 @@ input[type="radio"]:disabled {
     max-width: 1400px;
   }
   
-  .responsive-grid.two-column,
+  .page-container .responsive-grid.two-column,
+  .responsive-grid.two-column:not(.admin-responsive-grid),
   .page-responsive-grid {
     grid-template-columns: 2fr 400px;
     gap: var(--spacing-3xl);
   }
+  
+  /* Admin responsive grid uses its own optimized layout */
   
   .side-panel,
   .right-panel,
