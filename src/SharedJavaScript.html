@@ -394,10 +394,16 @@ function performNavigation(url, config) {
   showMessage(config.fallbackMessage, 'info');
 
   try {
-    const isSandboxed =
-      window.frameElement &&
-      window.frameElement.hasAttribute &&
-      window.frameElement.hasAttribute('sandbox');
+    let isSandboxed = false;
+    try {
+      isSandboxed =
+        window.frameElement &&
+        typeof window.frameElement.hasAttribute === 'function' &&
+        window.frameElement.hasAttribute('sandbox');
+    } catch (e) {
+      // If frameElement access fails, assume sandboxed
+      isSandboxed = true;
+    }
 
     switch (config.method) {
       case 'parent':
