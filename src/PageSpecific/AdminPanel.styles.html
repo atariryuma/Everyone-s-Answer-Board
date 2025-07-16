@@ -1,56 +1,436 @@
 <style>
-  /* 管理パネルの基本レイアウト */
+  /* 管理パネルの基本レイアウト - 改善版 */
   .admin-grid-layout {
     display: grid;
     grid-template-rows: auto 1fr auto; /* ヘッダー、メイン、フッター */
     height: 100vh;
     overflow: hidden; /* ページ全体のスクロールを禁止 */
+    background: var(--color-bg-primary);
+    position: relative;
   }
 
   /* ヘッダーとフッターのスタイル */
   .admin-grid-layout > header,
   .admin-grid-layout > footer {
     position: sticky;
-    z-index: 50;
+    z-index: var(--z-sticky);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
   }
   
   .admin-grid-layout > header {
     top: 0;
+    background: var(--glass-bg-primary);
+    border-bottom: var(--glass-border);
+    padding: var(--spacing-md) var(--spacing-xl);
   }
   
   .admin-grid-layout > footer {
     bottom: 0;
+    background: var(--glass-bg-primary);
+    border-top: var(--glass-border);
+    padding: var(--spacing-md) var(--spacing-xl);
   }
 
-  /* メインコンテンツエリア */
+  /* メインコンテンツエリア - 改善版 */
   .admin-grid-layout > main {
     overflow-y: auto; /* メインコンテンツのみスクロールを許可 */
-    padding: 1.5rem;
+    padding: var(--spacing-xl);
+    scroll-behavior: smooth;
+    
+    /* カスタムスクロールバー */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-primary) transparent;
   }
 
-  /* 2カラムレイアウト */
+  .admin-grid-layout > main::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .admin-grid-layout > main::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .admin-grid-layout > main::-webkit-scrollbar-thumb {
+    background: var(--border-primary);
+    border-radius: var(--radius-full);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .admin-grid-layout > main::-webkit-scrollbar-thumb:hover {
+    background: var(--border-hover);
+    background-clip: padding-box;
+  }
+
+  /* 2カラムレイアウト - 改善版 */
   .admin-responsive-grid {
     display: grid;
     grid-template-columns: 2fr 1fr; /* 左パネルを右パネルの2倍の幅に */
-    gap: 1.5rem;
+    gap: var(--spacing-xl);
     align-items: start; /* パネルの高さを揃えない */
-    max-width: 80rem; /* 1280px */
+    max-width: 84rem; /* 1344px - より広いレイアウト */
     margin: 0 auto; /* 中央揃え */
+    padding: 0 var(--spacing-md);
   }
 
   /* レスポンシブ対応：画面幅が1024px以下で1カラムに */
   @media (max-width: 1024px) {
     .admin-responsive-grid {
       grid-template-columns: 1fr; /* 1カラムレイアウト */
+      gap: var(--spacing-lg);
+      padding: 0;
     }
     
     .admin-grid-layout > main {
-      padding: 1rem;
+      padding: var(--spacing-lg);
     }
   }
 
-  /* 左パネルと右パネルのスタイル */
+  /* 左パネルと右パネルのスタイル - 改善版 */
   .left-panel, .right-panel {
     min-width: 0; /* flexbox/gridアイテムの幅が縮小できるように */
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
   }
+
+  .left-panel {
+    order: 1;
+  }
+
+  .right-panel {
+    order: 2;
+    position: sticky;
+    top: var(--spacing-lg);
+    max-height: calc(100vh - var(--spacing-2xl));
+    overflow-y: auto;
+    scroll-behavior: smooth;
+  }
+
+  /* モバイルでの順序変更 */
+  @media (max-width: 1024px) {
+    .left-panel {
+      order: 2;
+    }
+    
+    .right-panel {
+      order: 1;
+      position: static;
+      max-height: none;
+      overflow-y: visible;
+    }
+  }
+
+  /* パネル内の統一されたスペーシング */
+  .admin-panel-section {
+    background: var(--glass-bg-primary);
+    border: var(--glass-border);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-xl);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    box-shadow: var(--glass-shadow);
+    transition: all var(--duration-normal) var(--easing-standard);
+  }
+
+  .admin-panel-section:hover {
+    box-shadow: var(--glass-shadow-hover);
+    transform: translateY(-2px);
+  }
+
+  .admin-panel-section h2 {
+    color: var(--text-primary);
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    margin-bottom: var(--spacing-lg);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .admin-panel-section h3 {
+    color: var(--text-secondary);
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    margin-bottom: var(--spacing-md);
+  }
+
+  .admin-panel-section p {
+    color: var(--text-tertiary);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-relaxed);
+    margin-bottom: var(--spacing-md);
+  }
+
+  /* コンテンツ間のスペーシング改善 */
+  .admin-content-spacing > * + * {
+    margin-top: var(--spacing-lg);
+  }
+
+  .admin-content-spacing-sm > * + * {
+    margin-top: var(--spacing-md);
+  }
+
+  .admin-content-spacing-lg > * + * {
+    margin-top: var(--spacing-xl);
+  }
+
+  /* =============================================================================
+     ENHANCED MOBILE RESPONSIVENESS
+     ============================================================================= */
+
+  /* Tablet Breakpoint - 768px */
+  @media (max-width: 768px) {
+    .admin-grid-layout > header {
+      padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .admin-grid-layout > footer {
+      padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .admin-responsive-grid {
+      gap: var(--spacing-md);
+    }
+
+    .admin-panel-section {
+      padding: var(--spacing-lg);
+    }
+
+    .admin-panel-section h2 {
+      font-size: var(--font-size-lg);
+    }
+
+    .admin-panel-section h3 {
+      font-size: var(--font-size-base);
+    }
+
+    .right-panel {
+      max-height: none;
+      overflow-y: visible;
+    }
+  }
+
+  /* Mobile Breakpoint - 640px */
+  @media (max-width: 640px) {
+    .admin-grid-layout > header {
+      padding: var(--spacing-xs) var(--spacing-sm);
+    }
+
+    .admin-grid-layout > footer {
+      padding: var(--spacing-xs) var(--spacing-sm);
+    }
+
+    .admin-grid-layout > main {
+      padding: var(--spacing-md);
+    }
+
+    .admin-responsive-grid {
+      gap: var(--spacing-sm);
+      padding: 0;
+    }
+
+    .admin-panel-section {
+      padding: var(--spacing-md);
+      border-radius: var(--radius-lg);
+    }
+
+    .admin-panel-section h2 {
+      font-size: var(--font-size-base);
+      margin-bottom: var(--spacing-md);
+    }
+
+    .admin-panel-section h3 {
+      font-size: var(--font-size-sm);
+      margin-bottom: var(--spacing-sm);
+    }
+
+    .admin-panel-section p {
+      font-size: var(--font-size-xs);
+    }
+
+    .left-panel,
+    .right-panel {
+      gap: var(--spacing-md);
+    }
+
+    /* Stack form elements on mobile */
+    .form-row {
+      flex-direction: column;
+      gap: var(--spacing-sm);
+    }
+
+    .form-actions {
+      flex-direction: column;
+      gap: var(--spacing-sm);
+    }
+
+    .form-actions .btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    /* Mobile-optimized progressive sections */
+    .progressive-section {
+      border-radius: var(--radius-md);
+      margin: var(--spacing-xs) 0;
+    }
+
+    .toggle-section {
+      padding: var(--spacing-xs) var(--spacing-sm);
+      font-size: var(--font-size-sm);
+    }
+  }
+
+  /* Small Mobile Breakpoint - 480px */
+  @media (max-width: 480px) {
+    .admin-grid-layout > main {
+      padding: var(--spacing-sm);
+    }
+
+    .admin-panel-section {
+      padding: var(--spacing-sm);
+      border-radius: var(--radius-md);
+    }
+
+    .admin-panel-section h2 {
+      font-size: var(--font-size-sm);
+      margin-bottom: var(--spacing-sm);
+    }
+
+    .admin-panel-section h3 {
+      font-size: var(--font-size-xs);
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .admin-responsive-grid {
+      gap: var(--spacing-xs);
+    }
+
+    .left-panel,
+    .right-panel {
+      gap: var(--spacing-sm);
+    }
+
+    /* Ultra-compact button layout */
+    .form-actions {
+      gap: var(--spacing-xs);
+    }
+
+    .form-actions .btn {
+      padding: var(--spacing-sm) var(--spacing-md);
+      font-size: var(--font-size-xs);
+    }
+
+    /* Mobile-optimized form steps */
+    .form-steps {
+      flex-direction: column;
+      gap: var(--spacing-sm);
+    }
+
+    .form-step {
+      justify-content: flex-start;
+    }
+
+    .form-step::after {
+      display: none;
+    }
+
+    .form-step-number {
+      width: 24px;
+      height: 24px;
+      font-size: var(--font-size-xs);
+    }
+  }
+
+  /* Landscape Mobile Optimization */
+  @media (max-width: 768px) and (orientation: landscape) {
+    .admin-grid-layout {
+      height: auto;
+      min-height: 100vh;
+    }
+
+    .admin-grid-layout > main {
+      overflow-y: visible;
+    }
+
+    .right-panel {
+      position: static;
+      max-height: none;
+    }
+  }
+
+  /* Touch-specific optimizations */
+  @media (hover: none) and (pointer: coarse) {
+    .toggle-section {
+      padding: var(--spacing-md) var(--spacing-lg);
+      min-height: 44px; /* Apple's minimum touch target size */
+    }
+
+    .btn {
+      min-height: 44px;
+      padding: var(--spacing-md) var(--spacing-lg);
+    }
+
+    .form-control {
+      min-height: 44px;
+      padding: var(--spacing-md) var(--spacing-lg);
+    }
+
+    /* Larger tap targets for mobile */
+    .btn-icon-enhanced {
+      width: 44px;
+      height: 44px;
+      padding: var(--spacing-md);
+    }
+  }
+
+  /* Dark mode considerations for mobile */
+  @media (prefers-color-scheme: dark) and (max-width: 640px) {
+    .admin-panel-section {
+      background: var(--glass-bg-secondary);
+      border-color: var(--border-secondary);
+    }
+
+    /* Increase contrast for small screens */
+    .admin-panel-section h2,
+    .admin-panel-section h3 {
+      color: var(--text-primary);
+    }
+
+    .admin-panel-section p {
+      color: var(--text-secondary);
+    }
+  }
+
+  /* Print styles for admin panel */
+  @media print {
+    .admin-grid-layout > header,
+    .admin-grid-layout > footer {
+      display: none;
+    }
+
+    .admin-responsive-grid {
+      grid-template-columns: 1fr;
+      gap: var(--spacing-lg);
+    }
+
+    .admin-panel-section {
+      background: white;
+      border: 1px solid #ccc;
+      box-shadow: none;
+      break-inside: avoid;
+    }
+
+    .btn {
+      display: none;
+    }
+
+    .progressive-section.collapsed {
+      max-height: none;
+      opacity: 1;
+    }
+  }
+
 </style>

@@ -270,4 +270,149 @@
     font-size: 11px;
   }
 }
+
+/* =============================================================================
+   ENHANCED BUTTON HIERARCHY - ADMIN PANEL SPECIFIC
+   ============================================================================= */
+
+/* Primary Action Buttons - For main actions like save, publish */
+.btn-primary-action {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
+  border: 1px solid var(--color-primary);
+  color: white;
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  padding: var(--spacing-md) var(--spacing-xl);
+  min-height: var(--size-control-md);
+  box-shadow: 
+    var(--glass-shadow),
+    0 0 20px rgba(6, 182, 212, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary-action::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.btn-primary-action:hover::before {
+  left: 100%;
+}
+
+.btn-primary-action:hover {
+  background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
+  box-shadow: 
+    var(--glass-shadow-hover),
+    0 0 32px rgba(6, 182, 212, 0.4);
+  transform: translateY(-2px);
+}
+
+/* Secondary Action Buttons - For supporting actions */
+.btn-secondary-action {
+  background: var(--glass-bg-secondary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  font-weight: 500;
+  transition: all var(--duration-normal) var(--easing-standard);
+}
+
+.btn-secondary-action:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+/* Danger Action Buttons - For destructive actions */
+.btn-danger-action {
+  background: linear-gradient(135deg, var(--color-error), var(--color-error-light));
+  border: 1px solid var(--color-error);
+  color: white;
+  font-weight: 600;
+  box-shadow: 
+    var(--glass-shadow),
+    0 0 20px rgba(239, 68, 68, 0.25);
+}
+
+.btn-danger-action:hover {
+  background: linear-gradient(135deg, var(--color-error-dark), var(--color-error));
+  box-shadow: 
+    var(--glass-shadow-hover),
+    0 0 32px rgba(239, 68, 68, 0.4);
+  transform: translateY(-2px);
+}
+
+/* Subtle Action Buttons - For minimal actions */
+.btn-subtle {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-tertiary);
+  font-weight: 400;
+  transition: all var(--duration-fast) var(--easing-standard);
+}
+
+.btn-subtle:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+  transform: none;
+}
+
+/* Success Action Buttons - For positive actions */
+.btn-success-action {
+  background: linear-gradient(135deg, var(--color-success), var(--color-success-light));
+  border: 1px solid var(--color-success);
+  color: white;
+  font-weight: 600;
+  box-shadow: 
+    var(--glass-shadow),
+    0 0 20px rgba(16, 185, 129, 0.25);
+}
+
+.btn-success-action:hover {
+  background: linear-gradient(135deg, var(--color-success-dark), var(--color-success));
+  box-shadow: 
+    var(--glass-shadow-hover),
+    0 0 32px rgba(16, 185, 129, 0.4);
+  transform: translateY(-2px);
+}
+
+/* Icon Button Improvements */
+.btn-icon-enhanced {
+  background: var(--glass-bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-sm);
+  width: var(--size-control-md);
+  height: var(--size-control-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--duration-normal) var(--easing-standard);
+}
+
+.btn-icon-enhanced:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--border-hover);
+  transform: translateY(-1px);
+}
+
+.btn-icon-enhanced svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+  transition: color var(--duration-normal) var(--easing-standard);
+}
+
+.btn-icon-enhanced:hover svg {
+  color: var(--text-primary);
+}
+
 </style>

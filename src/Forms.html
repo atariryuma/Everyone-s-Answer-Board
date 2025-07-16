@@ -301,4 +301,236 @@ input[type="file"]:hover {
     margin-bottom: var(--spacing-md);
   }
 }
+
+/* =============================================================================
+   ENHANCED FORM STYLES - ADMIN PANEL VISUAL CONSISTENCY
+   ============================================================================= */
+
+/* Form Section Grouping */
+.form-section {
+  background: var(--glass-bg-secondary);
+  border: var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  margin-bottom: var(--spacing-lg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+.form-section h3 {
+  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  margin-bottom: var(--spacing-lg);
+  border-bottom: 1px solid var(--border-secondary);
+  padding-bottom: var(--spacing-sm);
+}
+
+/* Enhanced Form Labels */
+.form-label-enhanced {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.form-label-enhanced .label-required {
+  color: var(--color-error);
+  font-size: var(--font-size-xs);
+}
+
+.form-label-enhanced .label-optional {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+}
+
+/* Input Group Enhancement */
+.input-group {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  margin-bottom: var(--spacing-md);
+}
+
+.input-group-prepend,
+.input-group-append {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--glass-bg-primary);
+  border: var(--glass-border);
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.input-group-prepend {
+  border-right: none;
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+}
+
+.input-group-append {
+  border-left: none;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+}
+
+.input-group .form-control {
+  border-radius: 0;
+  margin-bottom: 0;
+}
+
+.input-group .form-control:first-child {
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+}
+
+.input-group .form-control:last-child {
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+}
+
+.input-group .form-control:only-child {
+  border-radius: var(--radius-lg);
+}
+
+/* Form Actions */
+.form-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg) 0;
+  margin-top: var(--spacing-xl);
+  border-top: 1px solid var(--border-secondary);
+  justify-content: flex-end;
+}
+
+.form-actions.centered {
+  justify-content: center;
+}
+
+.form-actions.spaced {
+  justify-content: space-between;
+}
+
+/* Form Status Messages */
+.form-status {
+  padding: var(--spacing-md);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--spacing-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  border: 1px solid transparent;
+}
+
+.form-status.success {
+  background: var(--glass-success);
+  border-color: var(--color-success);
+  color: var(--color-success-light);
+}
+
+.form-status.error {
+  background: var(--glass-error);
+  border-color: var(--color-error);
+  color: var(--color-error-light);
+}
+
+.form-status.warning {
+  background: var(--glass-warning);
+  border-color: var(--color-warning);
+  color: var(--color-warning-light);
+}
+
+.form-status.info {
+  background: var(--glass-info);
+  border-color: var(--color-info);
+  color: var(--color-info-light);
+}
+
+/* Progress Form Steps */
+.form-steps {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-xl);
+  padding: var(--spacing-md) 0;
+}
+
+.form-step {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  position: relative;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.form-step.active {
+  color: var(--color-primary);
+}
+
+.form-step.completed {
+  color: var(--color-success);
+}
+
+.form-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -50%;
+  width: 100%;
+  height: 2px;
+  background: var(--border-secondary);
+  transform: translateY(-50%);
+}
+
+.form-step.completed:not(:last-child)::after {
+  background: var(--color-success);
+}
+
+.form-step-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--glass-bg-secondary);
+  border: 2px solid var(--border-secondary);
+  margin-right: var(--spacing-sm);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  position: relative;
+  z-index: 2;
+}
+
+.form-step.active .form-step-number {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+}
+
+.form-step.completed .form-step-number {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: white;
+}
+
+/* Compact Form Layout */
+.form-compact .form-group {
+  margin-bottom: var(--spacing-md);
+}
+
+.form-compact .form-control {
+  min-height: var(--size-control-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-xs);
+}
+
+.form-compact .form-actions {
+  padding: var(--spacing-md) 0;
+  margin-top: var(--spacing-lg);
+}
+
 </style>
