@@ -303,7 +303,16 @@ function doGet(e) {
     
     const params = parseRequestParams(e);
     const currentUserEmail = Session.getActiveUser().getEmail();
-    
+
+    if (params.forceAuth) {
+      try {
+        resetUserAuthentication(params.userId);
+      } catch (authResetError) {
+        console.warn('forceAuth reset failed:', authResetError.message);
+      }
+      return showLoginPage();
+    }
+
     // マルチテナント対応: 認証確認のみでセッション依存を削除
     console.log('doGet - currentUserEmail:', currentUserEmail, 'requestedUserId:', params.userId);
     
@@ -831,17 +840,28 @@ function getWebAppUrl() {
 /**
  * doGet のリクエストパラメータを解析
  * @param {Object} e Event object
- * @return {{mode:string,userId:string|null,setupParam:string|null,spreadsheetId:string|null,sheetName:string|null,isDirectPageAccess:boolean}}
+ * @return {{mode:string,page:(string|null),userId:(string|null),setupParam:(string|null),spreadsheetId:(string|null),sheetName:(string|null),forceAuth:boolean,isDirectPageAccess:boolean}}
  */
 function parseRequestParams(e) {
   const p = (e && e.parameter) || {};
   const mode = p.mode || 'admin';
+  const page = p.page || null;
   const userId = p.userId || null;
   const setupParam = p.setup || null;
   const spreadsheetId = p.spreadsheetId || null;
   const sheetName = p.sheetName || null;
+  const forceAuth = p.forceAuth === 'true';
   const isDirectPageAccess = !!(userId && mode === 'view');
-  return { mode, userId, setupParam, spreadsheetId, sheetName, isDirectPageAccess };
+  return {
+    mode,
+    page,
+    userId,
+    setupParam,
+    spreadsheetId,
+    sheetName,
+    forceAuth,
+    isDirectPageAccess,
+  };
 }
 
 
