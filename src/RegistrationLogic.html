@@ -90,19 +90,26 @@ function executeRegistration() {
   }
 
   // Call Google Apps Script
-  if (window.sharedUtilities) {
-    window.sharedUtilities.gas.call(
-      'quickStartSetup',
-      showSuccessResult,
-      function(error) {
-        console.error('Registration error:', error);
-        window.sharedUtilities.message.showSimple(error.message || '登録に失敗しました', 'error');
-        window.sharedUtilities.loading.restoreButton('register-btn');
-        isRegistrationInProgress = false;
-      },
-      [],
-      '登録処理'
-    );
+  if (window.sharedUtilities && window.sharedUtilities.gas && window.sharedUtilities.gas.call) {
+    try {
+      window.sharedUtilities.gas.call(
+        'quickStartSetup',
+        showSuccessResult,
+        function(error) {
+          console.error('Registration error:', error);
+          window.sharedUtilities.message.showSimple(error.message || '登録に失敗しました', 'error');
+          window.sharedUtilities.loading.restoreButton('register-btn');
+          isRegistrationInProgress = false;
+        },
+        [],
+        '登録処理'
+      );
+    } catch (utilityError) {
+      console.error('SharedUtilities call error:', utilityError);
+      window.sharedUtilities.message.showSimple('共有ユーティリティの呼び出しに失敗しました', 'error');
+      window.sharedUtilities.loading.restoreButton('register-btn');
+      isRegistrationInProgress = false;
+    }
   } else {
     google.script.run
       .withSuccessHandler(showSuccessResult)

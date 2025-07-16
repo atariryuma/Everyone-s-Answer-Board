@@ -100,36 +100,50 @@ function handleRepublish() {
   }
   
   // Execute republish via GAS
-  if (window.sharedUtilities && window.sharedUtilities.gas) {
-    window.sharedUtilities.gas.call(
-      'republishBoard',
-      function(result) {
-        if (window.sharedUtilities.message) {
-          window.sharedUtilities.message.show('回答ボードが再公開されました！', 'success');
-        } else {
-          showMessage('回答ボードが再公開されました！', 'success');
-        }
-        
-        // Reload page after republishing
-        setTimeout(() => {
-          location.reload();
-        }, 1500);
-      },
-      function(error) {
-        const message = '再公開に失敗しました: ' + (error.message || '不明なエラー');
-        if (window.sharedUtilities && window.sharedUtilities.message) {
-          window.sharedUtilities.message.show(message, 'error');
-        } else {
-          showMessage(message, 'error');
-        }
-        
-        // Reset button state
-        button.disabled = false;
-        button.innerHTML = originalHTML;
-      },
-      [],
-      'ボード再公開'
-    );
+  if (window.sharedUtilities && window.sharedUtilities.gas && window.sharedUtilities.gas.call) {
+    try {
+      window.sharedUtilities.gas.call(
+        'republishBoard',
+        function(result) {
+          if (window.sharedUtilities && window.sharedUtilities.message) {
+            window.sharedUtilities.message.show('回答ボードが再公開されました！', 'success');
+          } else {
+            showMessage('回答ボードが再公開されました！', 'success');
+          }
+          
+          // Reload page after republishing
+          setTimeout(() => {
+            location.reload();
+          }, 1500);
+        },
+        function(error) {
+          const message = '再公開に失敗しました: ' + (error.message || '不明なエラー');
+          if (window.sharedUtilities && window.sharedUtilities.message) {
+            window.sharedUtilities.message.show(message, 'error');
+          } else {
+            showMessage(message, 'error');
+          }
+          
+          // Reset button state
+          button.disabled = false;
+          button.innerHTML = originalHTML;
+        },
+        [],
+        'ボード再公開'
+      );
+    } catch (utilityError) {
+      console.error('SharedUtilities call error:', utilityError);
+      const message = '共有ユーティリティの呼び出しに失敗しました: ' + utilityError.message;
+      if (window.sharedUtilities && window.sharedUtilities.message) {
+        window.sharedUtilities.message.show(message, 'error');
+      } else {
+        showMessage(message, 'error');
+      }
+      
+      // Reset button state
+      button.disabled = false;
+      button.innerHTML = originalHTML;
+    }
   } else {
     // Fallback to direct GAS call
     google.script.run

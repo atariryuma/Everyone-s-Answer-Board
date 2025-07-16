@@ -563,32 +563,46 @@ function handleDeleteRequest() {
       function() {
         setAdminLoading(true, 'アカウントを完全に削除しています...');
         
-        if (window.sharedUtilities && window.sharedUtilities.gas) {
-          window.sharedUtilities.gas.call(
-            'deleteCurrentUserAccount',
-            function(response) {
-              setAdminLoading(false);
-              if (window.sharedUtilities.message) {
-                window.sharedUtilities.message.show(response, 'success');
-              }
-              setTimeout(function() {
-                if (window.sharedUtilities.navigation) {
-                  window.sharedUtilities.navigation.safeNavigate('?page=LoginPage', {
-                    fallbackMessage: '登録ページに移動中...',
-                    method: 'auto'
-                  });
-                } else {
-                  window.location.href = '?page=LoginPage';
+        if (window.sharedUtilities && window.sharedUtilities.gas && window.sharedUtilities.gas.call) {
+          try {
+            window.sharedUtilities.gas.call(
+              'deleteCurrentUserAccount',
+              function(response) {
+                setAdminLoading(false);
+                if (window.sharedUtilities.message) {
+                  window.sharedUtilities.message.show(response, 'success');
                 }
-              }, 2000);
-            },
-            function(error) {
-              setAdminLoading(false);
-              handleAdminError(error, 'アカウント削除');
-            },
-            [appState.userId],
-            'アカウント削除'
-          );
+                setTimeout(function() {
+                  if (window.sharedUtilities.navigation) {
+                    window.sharedUtilities.navigation.safeNavigate('?page=LoginPage', {
+                      fallbackMessage: '登録ページに移動中...',
+                      method: 'auto'
+                    });
+                  } else {
+                    window.location.href = '?page=LoginPage';
+                  }
+                }, 2000);
+              },
+              function(error) {
+                setAdminLoading(false);
+                handleAdminError(error, 'アカウント削除');
+              },
+              [appState.userId],
+              'アカウント削除'
+            );
+          } catch (utilityError) {
+            console.error('SharedUtilities call error:', utilityError);
+            setAdminLoading(false);
+            if (window.sharedUtilities && window.sharedUtilities.message) {
+              window.sharedUtilities.message.show('共有ユーティリティの呼び出しに失敗しました', 'error');
+            }
+          }
+        } else {
+          setAdminLoading(false);
+          console.error('SharedUtilities gas.call not available');
+          if (window.sharedUtilities && window.sharedUtilities.message) {
+            window.sharedUtilities.message.show('システムエラー：削除機能が利用できません', 'error');
+          }
         }
       }
     );

@@ -218,37 +218,51 @@ function handleSystemTest() {
   testBtn.disabled = true;
   testBtn.innerHTML = '<div class="loading-spinner w-4 h-4 border-2 border-white border-t-transparent rounded-full mx-auto"></div>';
   
-  if (window.sharedUtilities && window.sharedUtilities.gas) {
-    window.sharedUtilities.gas.call(
-      'testSetup',
-      function(result) {
-        const message = result.message;
-        const type = result.status === 'success' ? 'success' : 'warning';
-        
-        if (window.sharedUtilities.message) {
-          window.sharedUtilities.message.show(message, type);
-        } else {
-          showMessage(message, type);
-        }
-        
-        testBtn.disabled = false;
-        testBtn.innerHTML = originalContent;
-      },
-      function(error) {
-        const message = `テスト実行に失敗しました: ${error.message || error}`;
-        
-        if (window.sharedUtilities && window.sharedUtilities.message) {
-          window.sharedUtilities.message.show(message, 'error');
-        } else {
-          showMessage(message, 'error');
-        }
-        
-        testBtn.disabled = false;
-        testBtn.innerHTML = originalContent;
-      },
-      [],
-      'システムテスト'
-    );
+  if (window.sharedUtilities && window.sharedUtilities.gas && window.sharedUtilities.gas.call) {
+    try {
+      window.sharedUtilities.gas.call(
+        'testSetup',
+        function(result) {
+          const message = result.message;
+          const type = result.status === 'success' ? 'success' : 'warning';
+          
+          if (window.sharedUtilities && window.sharedUtilities.message) {
+            window.sharedUtilities.message.show(message, type);
+          } else {
+            showMessage(message, type);
+          }
+          
+          testBtn.disabled = false;
+          testBtn.innerHTML = originalContent;
+        },
+        function(error) {
+          const message = `テスト実行に失敗しました: ${error.message || error}`;
+          
+          if (window.sharedUtilities && window.sharedUtilities.message) {
+            window.sharedUtilities.message.show(message, 'error');
+          } else {
+            showMessage(message, 'error');
+          }
+          
+          testBtn.disabled = false;
+          testBtn.innerHTML = originalContent;
+        },
+        [],
+        'システムテスト'
+      );
+    } catch (utilityError) {
+      console.error('SharedUtilities call error:', utilityError);
+      const message = '共有ユーティリティの呼び出しに失敗しました: ' + utilityError.message;
+      
+      if (window.sharedUtilities && window.sharedUtilities.message) {
+        window.sharedUtilities.message.show(message, 'error');
+      } else {
+        showMessage(message, 'error');
+      }
+      
+      testBtn.disabled = false;
+      testBtn.innerHTML = originalContent;
+    }
   } else {
     // Fallback to direct GAS call
     google.script.run
@@ -319,36 +333,52 @@ function startApp() {
     btn.disabled = true;
   }
 
-  if (window.sharedUtilities && window.sharedUtilities.gas) {
-    window.sharedUtilities.gas.call(
-      'getWebAppUrl',
-      function(url) {
-        if (window.sharedUtilities.navigation) {
-          window.sharedUtilities.navigation.safeNavigate(url, {
-            fallbackMessage: 'StudyQuestを開始中...',
-            method: 'auto'
-          });
-        } else {
-          window.location.href = url;
-        }
-      },
-      function(error) {
-        const errorMessage = 'アプリケーションのURL取得に失敗しました: ' + error.message;
-        
-        if (window.sharedUtilities && window.sharedUtilities.message) {
-          window.sharedUtilities.message.show(errorMessage, 'error');
-        } else {
-          alert(errorMessage);
-        }
-        
-        if (btn) {
-          btn.innerHTML = '📚 StudyQuestを開始';
-          btn.disabled = false;
-        }
-      },
-      [],
-      'URL取得'
-    );
+  if (window.sharedUtilities && window.sharedUtilities.gas && window.sharedUtilities.gas.call) {
+    try {
+      window.sharedUtilities.gas.call(
+        'getWebAppUrl',
+        function(url) {
+          if (window.sharedUtilities && window.sharedUtilities.navigation) {
+            window.sharedUtilities.navigation.safeNavigate(url, {
+              fallbackMessage: 'StudyQuestを開始中...',
+              method: 'auto'
+            });
+          } else {
+            window.location.href = url;
+          }
+        },
+        function(error) {
+          const errorMessage = 'アプリケーションのURL取得に失敗しました: ' + error.message;
+          
+          if (window.sharedUtilities && window.sharedUtilities.message) {
+            window.sharedUtilities.message.show(errorMessage, 'error');
+          } else {
+            alert(errorMessage);
+          }
+          
+          if (btn) {
+            btn.innerHTML = '📚 StudyQuestを開始';
+            btn.disabled = false;
+          }
+        },
+        [],
+        'URL取得'
+      );
+    } catch (utilityError) {
+      console.error('SharedUtilities call error:', utilityError);
+      const errorMessage = '共有ユーティリティの呼び出しに失敗しました: ' + utilityError.message;
+      
+      if (window.sharedUtilities && window.sharedUtilities.message) {
+        window.sharedUtilities.message.show(errorMessage, 'error');
+      } else {
+        alert(errorMessage);
+      }
+      
+      if (btn) {
+        btn.innerHTML = '📚 StudyQuestを開始';
+        btn.disabled = false;
+      }
+    }
   } else {
     // Fallback to direct GAS call
     google.script.run
