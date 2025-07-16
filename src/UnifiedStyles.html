@@ -1238,13 +1238,15 @@ body.unified-theme::before {
     padding: 1rem;
   }
   
-  /* AdminPanel responsive improvements - Remove conflicting rules */
+  /* AdminPanel responsive layout */
   .admin-responsive-grid {
+    display: grid;
+    gap: 1.5rem;
     grid-template-columns: 1fr;
-    gap: 1rem;
+    align-items: start;
   }
-  
-  .admin-right-panel {
+
+  .right-panel {
     position: static;
     width: 100%;
     max-width: none;
@@ -1263,6 +1265,32 @@ body.unified-theme::before {
   .header .max-w-6xl {
     padding-left: 1rem;
     padding-right: 1rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .admin-responsive-grid {
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .right-panel {
+    width: auto;
+    max-width: 380px;
+    position: sticky;
+    top: 6rem;
+    align-self: start;
+  }
+}
+
+@media (min-width: 1024px) {
+  .admin-responsive-grid {
+    grid-template-columns: 2fr 300px;
+    gap: 2.5rem;
+  }
+  .right-panel {
+    width: 300px;
   }
 }
 
