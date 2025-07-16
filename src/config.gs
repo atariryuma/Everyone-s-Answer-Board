@@ -1310,68 +1310,28 @@ function getExistingBoard(requestUserId) {
  * 強化されたドメイン認証システム
  * 新しいLoginPage.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
- * @returns {Object} 詳細な認証情報とアクセスレベル
+ * @returns {{email: (string|null), role: (string|null), error?: string}} ユーザーの役割情報
  */
 function enhancedDomainVerification(requestUserId) {
-  // 新規ユーザー（requestUserIdがundefinedまたはnull）の場合はverifyUserAccessをスキップ
   if (requestUserId) {
     verifyUserAccess(requestUserId);
   }
-  
+
   try {
     const activeUserEmail = Session.getActiveUser().getEmail();
     if (!activeUserEmail) {
-      return { 
-        authenticated: false, 
-        email: null, 
-        error: 'ユーザーセッションが無効です。再度ログインしてください。' 
+      return {
+        email: null,
+        role: null,
+        error: 'ユーザーセッションが無効です。再度ログインしてください。'
       };
     }
 
-    const userDomain = getEmailDomain(activeUserEmail);
-    const adminEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
-    const systemAdminDomain = adminEmail ? getEmailDomain(adminEmail) : '';
-    
-    // ドメイン情報取得
-    const domainInfo = getDeployUserDomainInfo();
-    
-    // 認証結果の構築
-    const verificationResult = {
-      authenticated: true,
-      email: activeUserEmail,
-      userDomain: userDomain,
-      systemAdminDomain: systemAdminDomain,
-      isSystemAdmin: String(activeUserEmail).toLowerCase() === String(adminEmail || '').toLowerCase(),
-      isDomainMatch: userDomain === systemAdminDomain,
-      isPersonalAccount: isPersonalGoogleAccount(activeUserEmail),
-      isWorkspaceAccount: isWorkspaceAccount(activeUserEmail),
-      deployDomain: domainInfo.deployDomain,
-      currentDomain: domainInfo.currentDomain,
-      accessLevel: calculateAccessLevel(activeUserEmail, adminEmail, userDomain, systemAdminDomain),
-      timestamp: new Date().toISOString()
-    };
-    
-    // アクセス制御チェック
-    if (verificationResult.accessLevel === 'DENIED') {
-      return {
-        authenticated: false,
-        email: null,
-        error: `アクセスが拒否されました。許可されたドメイン: ${systemAdminDomain}, 現在のドメイン: ${userDomain}`
-      };
-    }
-    
-    // 監査ログ記録
-    logAuthenticationAttempt(verificationResult);
-    
-    return verificationResult;
-    
+    const role = isDeployUser() ? 'SystemAdmin' : 'GeneralUser';
+    return { email: activeUserEmail, role: role };
   } catch (e) {
     console.error('enhancedDomainVerification エラー: ' + e.message);
-    return { 
-      authenticated: false, 
-      email: null, 
-      error: `認証システムエラー: ${e.message}` 
-    };
+    return { email: null, role: null, error: `認証システムエラー: ${e.message}` };
   }
 }
 

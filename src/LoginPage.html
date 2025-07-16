@@ -28,7 +28,9 @@
     <div id="account-info-group" class="mb-8">
       <!-- 認証状態パネル -->
       <div id="auth-status-panel" class="status-card">
-        <div class="status-text">認証情報を確認中...</div>
+        <div class="status-text" id="status-text">認証情報を確認中...</div>
+        <div class="user-email" id="user-email-display"></div>
+        <div id="user-role-badge" class="mt-2 hidden"></div>
       </div>
     </div>
 
@@ -57,7 +59,7 @@
 
       <!-- セキュリティ情報 -->
       <div class="security-info text-center">
-        <a href="#" class="text-muted hover:text-secondary text-xs font-medium inline-flex items-center" onclick="showSecurityModal(); return false;">
+        <a href="#" id="security-modal-trigger" class="text-muted hover:text-secondary text-xs font-medium inline-flex items-center">
           <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
           </svg>
@@ -85,7 +87,9 @@
       const loginBtn = document.getElementById('login-btn');
       const btnContent = document.getElementById('btn-content');
       const messageAreaEl = document.getElementById('message-area');
-      const statusPanel = document.getElementById('auth-status-panel');
+      const statusTextEl = document.getElementById('status-text');
+      const userEmailEl = document.getElementById('user-email-display');
+      const roleBadgeEl = document.getElementById('user-role-badge');
 
       let isLoginInProgress = false;
       let authResult = null;
@@ -97,68 +101,33 @@
               userEmail = authData.email;
               authResult = authData;
               loginBtn.disabled = false;
-              btnContent.textContent = 'ログインして管理画面へ';
-              showMessage('認証情報が確認されました', 'success');
+              btnContent.textContent = `${userEmail}としてログイン`;
+              if (userEmailEl) userEmailEl.textContent = userEmail;
+              if (statusTextEl) statusTextEl.textContent = 'アカウント';
 
-              let statusHTML = '';
-
-              // 1. ユーザーメール表示 (共通)
-              statusHTML += `<div class="status-text">アカウント</div><div class="user-email">${userEmail}</div>`;
-
-              // 2. 状態表示
-              statusHTML += `<div class="mt-3">`;
-
-              if (authData.isSystemAdmin) {
-                statusHTML += `
-                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-semibold">
+              if (authData.role === 'SystemAdmin') {
+                const badgeHTML = `
+                <span class="inline-flex items-center gap-2 px-3 py-1 bg-purple-500/20 text-purple-300 text-sm font-medium rounded-full border border-purple-400/30">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                     システム管理者
-                  </span>`;
-              } else if (authData.domainMatch) {
-                statusHTML += `
-                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/20 text-green-300 text-xs font-semibold">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    ドメイン認証済み
-                  </span>`;
-              } else {
-                statusHTML += `
-                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-300 text-xs font-semibold">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                    ドメイン未認証
-                  </span>`;
-              }
-              statusHTML += `</div>`;
-
-              // 3. 説明文
-              statusHTML += `<div class="text-xs text-gray-400 mt-1">`;
-              if (authData.isSystemAdmin) {
-                statusHTML += `アプリの全設定を管理できます。`;
-              } else if (authData.domainMatch) {
-                statusHTML += `システム管理者と同じ組織ドメインです。`;
-              } else {
-                statusHTML += `システム管理者の組織ドメインとは異なります。`;
-              }
-              statusHTML += `</div>`;
-
-              statusPanel.innerHTML = statusHTML;
-
-              // システム管理者用ボタン表示
-              if (authData.isSystemAdmin) {
+                </span>`;
+                roleBadgeEl.innerHTML = badgeHTML;
+                roleBadgeEl.classList.remove('hidden');
                 document.getElementById('admin-settings-section').classList.remove('hidden');
               }
             } else {
-              statusPanel.innerHTML = `<div class="status-text" style="color: #ef4444;">認証エラー</div><div style="font-size: 12px; color: rgba(255, 255, 255, 0.6); margin-top: 4px;">${authData.error || 'メールアドレスが取得できませんでした。ページを再読み込みしてください。'}</div>`;
+              statusTextEl.textContent = '認証エラー';
+              if (userEmailEl) userEmailEl.textContent = '';
+              roleBadgeEl.classList.add('hidden');
               showMessage('ページの再読み込みが必要です', 'error');
             }
           })
           .withFailureHandler(err => {
-            statusPanel.innerHTML = `<div class="status-text" style="color: #ef4444;">認証エラー</div>`;
+            statusTextEl.textContent = '認証エラー';
+            if (userEmailEl) userEmailEl.textContent = '';
+            roleBadgeEl.classList.add('hidden');
             showMessage(err.message || 'ページの再読み込みが必要です', 'error');
           })
           .enhancedDomainVerification();
@@ -184,7 +153,7 @@
           .withFailureHandler(error => {
             showMessage(error.message || 'ログインに失敗しました', 'error');
             loginBtn.disabled = false;
-            btnContent.textContent = 'ログインして管理画面へ';
+            btnContent.textContent = `${userEmail}としてログイン`;
             isLoginInProgress = false;
           })
           .createUserWithoutQuickstart();
@@ -212,20 +181,17 @@
           .getWebAppUrlCached();
       });
       
-      // Security modal functions using UnifiedStyles modal system
-      window.showSecurityModal = function() {
-        const modal = document.getElementById('security-modal');
-        if (!modal) return;
-        modal.classList.remove('hidden');
-        requestAnimationFrame(() => modal.classList.add('is-visible'));
-      };
-
-      window.hideSecurityModal = function() {
-        const modal = document.getElementById('security-modal');
-        if (!modal) return;
-        modal.classList.remove('is-visible');
-        modal.addEventListener('transitionend', () => modal.classList.add('hidden'), { once: true });
-      };
+      const securityTrigger = document.getElementById('security-modal-trigger');
+      if (securityTrigger) {
+        securityTrigger.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (window.sharedModals && typeof window.sharedModals.show === 'function') {
+            window.sharedModals.show('security-modal');
+          } else {
+            document.getElementById('security-modal').classList.add('show');
+          }
+        });
+      }
 
       // 初期化
       initializePage();
