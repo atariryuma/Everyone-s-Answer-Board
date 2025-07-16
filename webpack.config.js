@@ -7,6 +7,7 @@ module.exports = {
   mode: 'development',
   entry: {
     main: './src/main.gs', // Your main GAS file
+    'dev-styles': './src/dev-entry.js', // For local development styles
     // Add other entry points if you have multiple independent GAS files
   },
   output: {
@@ -21,7 +22,12 @@ module.exports = {
     rules: [
       {
         test: /\.html$/,
-        use: 'html-loader',
+        use: {
+          loader: 'html-loader',
+          options: {
+            sources: false,
+          },
+        },
       },
       {
         test: /\.gs$/,
@@ -56,7 +62,7 @@ module.exports = {
       template: './src/LoginPage.html', // Your main HTML file for the web app
       filename: 'index.html',
       inject: 'body',
-      chunks: ['main'], // Ensure this matches your entry point
+      chunks: ['main', 'dev-styles'], // Ensure this matches your entry point
     }),
     new GasPlugin(),
     new CopyWebpackPlugin({
