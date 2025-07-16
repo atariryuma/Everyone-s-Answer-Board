@@ -17,13 +17,9 @@
  * @param {number} duration - Auto-hide duration in milliseconds (default: 4000)
  */
 function showMessage(message, type = 'info', duration = 4000) {
-  // Try to find message area with fallback to inline version
-  let messageArea = document.getElementById('message-area');
+  const messageArea = document.getElementById('message-area');
   if (!messageArea) {
-    messageArea = document.getElementById('inline-message-area');
-  }
-  if (!messageArea) {
-    console.warn('Message area not found (tried both message-area and inline-message-area)');
+    console.warn('Message area not found');
     return;
   }
 
@@ -74,11 +70,7 @@ function showMessage(message, type = 'info', duration = 4000) {
  * @param {string} type - Message type
  */
 function displaySimpleMessage(message, type = 'info') {
-  // Try to find message area with fallback to inline version
-  let messageAreaEl = document.getElementById('message-area');
-  if (!messageAreaEl) {
-    messageAreaEl = document.getElementById('inline-message-area');
-  }
+  const messageAreaEl = document.getElementById('message-area');
   if (messageAreaEl) {
     messageAreaEl.textContent = message;
     messageAreaEl.className = `message-area ${type}`;
@@ -146,15 +138,12 @@ function callGAS(gasFunction, successCallback, errorCallback, args = [], context
         errorCallback(error, errorMessage);
       }
     });
-
-  // Support both function objects and function names (string)
-  const functionName = typeof gasFunction === 'string' ? gasFunction : gasFunction.name;
-
+  
   // Apply arguments to the function call
   if (args.length === 0) {
-    runner[functionName]();
+    runner[gasFunction.name]();
   } else {
-    runner[functionName].apply(runner, args);
+    runner[gasFunction.name].apply(runner, args);
   }
 }
 
@@ -392,33 +381,18 @@ function safeNavigate(url, options = {}) {
 
 function performNavigation(url, config) {
   showMessage(config.fallbackMessage, 'info');
-
+  
   try {
-    let isSandboxed = false;
-    try {
-      isSandboxed =
-        window.frameElement &&
-        typeof window.frameElement.hasAttribute === 'function' &&
-        window.frameElement.hasAttribute('sandbox');
-    } catch (e) {
-      // If frameElement access fails, assume sandboxed
-      isSandboxed = true;
-    }
-
     switch (config.method) {
       case 'parent':
-        if (!isSandboxed && window.parent && window.parent.location) {
+        if (window.parent && window.parent.location) {
           window.parent.location.href = url;
         } else {
           window.location.href = url;
         }
         break;
       case 'top':
-        if (!isSandboxed && window.top) {
-          window.top.location.href = url;
-        } else {
-          window.location.href = url;
-        }
+        window.top.location.href = url;
         break;
       case 'replace':
         window.location.replace(url);
@@ -426,9 +400,9 @@ function performNavigation(url, config) {
       case 'auto':
       default:
         // Try different methods in order of preference
-        if (!isSandboxed && window.parent && window.parent !== window) {
+        if (window.parent && window.parent !== window) {
           window.parent.location.href = url;
-        } else if (!isSandboxed && window.top && window.top !== window) {
+        } else if (window.top && window.top !== window) {
           window.top.location.href = url;
         } else {
           window.location.href = url;
@@ -448,10 +422,10 @@ function performNavigation(url, config) {
  */
 function showManualNavigationDialog(url, message = 'ページに移動') {
   const dialog = `
-    <div class="backdrop-blur-lg" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+    <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
                 background: var(--color-surface); border: 1px solid var(--color-border); 
                 border-radius: 16px; padding: 24px; z-index: 10000; max-width: 400px;
-                box-shadow: var(--shadow-glass);">
+                backdrop-filter: blur(20px); box-shadow: var(--shadow-glass);">
       <h3 style="color: white; margin-bottom: 16px;">${message}</h3>
       <p style="color: var(--color-text-secondary); margin-bottom: 20px;">
         下記のリンクをクリックして移動してください：
@@ -611,8 +585,7 @@ if (document.readyState === 'loading') {
 // =============================================================================
 
 // Export utilities to global scope for easy access
-window.sharedUtilities = window.sharedUtilities || {};
-Object.assign(window.sharedUtilities, {
+window.sharedUtilities = {
   message: {
     show: showMessage,
     showSimple: displaySimpleMessage
@@ -647,6 +620,6 @@ Object.assign(window.sharedUtilities, {
     copyToClipboard: copyToClipboard,
     formatDate: formatJapaneseDate
   }
-});
+};
 
 </script>

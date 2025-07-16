@@ -1,81 +1,274 @@
-# Gemini 指示書 for "StudyQuest：みんなの回答ボード"
+# Coding Style Guide
 
-## 1. プロジェクト概要 (Project Overview)
+## 1. Role & Mindset
 
-このプロジェクトは、教育現場における双方向学習を促進するためのWebアプリケーション「StudyQuest：みんなの回答ボード」です。Google Apps Script (GAS)をバックエンド、Googleスプレッドシートをデータベースとして利用し、サーバーレスアーキテクチャで構築されています。
+* **Full-Stack Development Partner**
+  Own the process from requirements → proposal → implementation → refinement.
+* **Requirements First**
+  Every feature or fix must trace back to `README.md`.
+* **UX-Driven**
+  Continually ask “How can teachers and students use this most intuitively?”
 
-**コアコンセプト:**
-* **サービスアカウントモデル:** 従来の権限問題を解決し、導入を容易にします。
-* **教師中心の管理:** 教師ユーザーがボード（回答データシート）を自由に作成・管理できます。
-* **リアルタイム性と安全性:** 生徒はリアルタイムで回答を共有・閲覧でき、管理者はドメイン内のアクセス制御や匿名モードで安全な環境を維持できます。
+---
 
-## 2. アーキテクチャと主要ファイル (Architecture & Key Files)
+## 2. Common Coding Conventions
 
-* **バックエンド (`/src/*.gs`):**
-    * Google Apps Script (V8ランタイム) でビジネスロジックを実装します。
-    * `main.gs`: `doGet(e)` を起点とするリクエストのルーティングを行います。
-    * `database.gs`: Googleスプレッドシート（中央DB、回答データシート）とのデータ連携を担当します。
-    * `AuthorizationService.gs`: ユーザー認証・認可ロジックを管理します。
-    * `Core.gs`: ユーザー登録やボード作成などのコア機能を提供します。
-* **フロントエンド (`/src/*.html`):**
-    * HTML、CSS (Tailwind CSS)、JavaScriptでUIを構築します。
-    * `AdminPanel.html`: 教師向けの管理画面です。
-    * `Page.html`: 生徒向けの回答ボード閲覧画面です。
-    * `Registration.html`: 新規ユーザー登録画面です。
-    * `SharedUtilities.html` / `UnifiedStyles.html`: 共通のJSユーティリティとCSSスタイルを定義しています。
-    * `ClientOptimizer.html`: `google.script.run` の呼び出しを最適化するクライアントサイドのライブラリです。
-* **テスト (`/tests/*.test.js`):**
-    * Jestフレームワークを使用した単体テストおよび結合テストです。
-* **設定ファイル:**
-    * `appsscript.json`: OAuthスコープやデプロイ設定を定義します。
-    * `package.json`: claspやJestなどの開発用ライブラリを管理します。
+### 2.1 Indentation & Whitespace
 
-## 3. コーディング規約 (Coding Conventions)
+* Use **2 spaces** per indent level.
+* Remove trailing whitespace on every line.
+* End every file with exactly one newline.
 
-`agents/AGENTS.md` の規約に厳密に従ってください。
+### 2.2 Naming
 
-* **命名規則:**
-    * 変数・関数: `camelCase`
-    * 定数: `UPPER_SNAKE_CASE`
-    * クラス・コンストラクタ: `PascalCase`
-* **JSDoc:** 全てのサーバーサイド関数には、引数 (`@param`) と戻り値 (`@returns`) を含む詳細なJSDocを記述してください。
-    ```javascript
+* **Variables & functions**: `camelCase`
+* **Constants**: `UPPER_SNAKE_CASE`
+* **Classes / constructors**: `PascalCase`
+* **File names**: short English words; extensions: `.gs`, `.html`, `.css.html`, `.js.html`.
+
+### 2.3 Syntax & Style
+
+* Always use semicolons.
+* Prefer single quotes (`'string'`).
+* Allow trailing commas in objects/arrays for cleaner diffs.
+* Use guard clauses to keep nesting shallow:
+
+  ```js
+  if (!user) return;
+  // safe to use user here
+  ```
+
+### 2.4 Comments & Documentation
+
+* Document every function with **JSDoc**:
+
+  ```js
+  /**
+   * Fetches user data by ID.
+   * @param {string} userId – The ID of the user.
+   * @returns {Object} User data object.
+   */
+  function fetchUserData(userId) { … }
+  ```
+* Add detailed inline comments for complex logic or external-spec integrations.
+* Mark todos/fixes with ticket numbers:
+
+  ```js
+  // TODO #123: update API endpoint
+  ```
+
+---
+
+## 3. Client / Server Separation
+
+### 3.1 Server-Side (Apps Script)
+
+* Implement **only** business logic—no DOM/UI code.
+* Entry points: `doGet(e)` / `doPost(e)` only. Delegate other logic to modules.
+* All data retrieval and updates occur in server functions.
+
+### 3.2 Client-Side (HTML/CSS/JS)
+
+* Build UI entirely in HTML templates + external JS/CSS.
+* **Load data asynchronously**; initial HTML shows placeholders:
+
+  ```html
+  <body>
+    <div id="content">Loading…</div>
+    <?!= include('scripts/main.js.html'); ?>
+  </body>
+  ```
+
+  ```js
+  // main.js.html
+  <script>
+    window.addEventListener('load', () => {
+      google.script.run
+        .withSuccessHandler(renderContent)
+        .fetchInitialData();
+    });
+    function renderContent(data) {
+      document.getElementById('content').textContent = data.text;
+    }
+  </script>
+  ```
+
+---
+
+## 4. Drive API / Sheets API Guidelines
+
+### 4.1 Service Wrapper Modules
+
+* Never call `DriveApp` or `SpreadsheetApp` directly in business logic.
+* Wrap API calls in a module for easy mocking and future changes:
+
+  ```js
+  // driveService.gs
+  var DriveService = (function() {
     /**
-     * 指定されたIDのユーザー情報を取得します。
-     * @param {string} userId - ユーザーの一意なID。
-     * @returns {object | null} ユーザー情報オブジェクト。見つからない場合はnull。
+     * Gets a file by ID.
+     * @param {string} fileId
+     * @returns {GoogleAppsScript.Drive.File}
      */
-    function findUserById(userId) { /* ... */ }
-    ```
-* **クライアント/サーバー分離:**
-    * **サーバーサイド(.gs):** ビジネスロジックのみを実装します。DOM操作は一切含めません。
-    * **クライアントサイド(.html):** UIの構築と、`google.script.run` を介した非同期なデータ操作に専念します。
+    function getFileById(fileId) {
+      return DriveApp.getFileById(fileId);
+    }
+    return { getFileById };
+  })();
+  ```
 
-## 4. 主要なロジックとデータモデル (Core Logic & Data Models)
+### 4.2 Field Filtering
 
-### 4.1. データモデル
+* When using Advanced Drive Service, always specify `fields`:
 
-* **中央データベース (`Users`シート):**
-    * `userId`: 一意なユーザーID (UUID)
-    * `adminEmail`: 管理者のメールアドレス
-    * `spreadsheetId`: 回答データシートのID
-    * `configJson`: 各ボードの設定を格納するJSON文字列。この中には `publishedSheet` (公開中のシート名) や列マッピング情報が含まれます。
-* **回答データシート:**
-    * `タイムスタンプ`, `メールアドレス`は必須列です。
-    * `回答`, `理由`, `名前`, `クラス` の列は `configJson` で動的にマッピングされます。
-    * `なるほど！`, `いいね！`, `もっと知りたい！`: リアクションしたユーザーのメールアドレスがカンマ区切りで入ります。
-    * `ハイライト`: `TRUE`/`FALSE`でハイライト状態を管理します。
+  ```js
+  Drive.Files.get(fileId, { fields: 'id,name,mimeType' });
+  ```
 
-### 4.2. ショートカットプロンプト (Shortcut Prompts)
+### 4.3 Batch Operations
 
-**一般的なタスク:**
-* `test:unit @path/to/file.gs`: 指定されたGASファイルの関数に対するJestの単体テストコードを `tests/` ディレクトリに生成してください。
-* `doc:jsdoc @path/to/file.gs`: 指定されたファイルの全ての関数に、規約に沿ったJSDocコメントを追加してください。
-* `refactor:clean @path/to/file.gs`: 指定されたファイルを、コーディング規約（特に `guard clauses` の使用）に従ってリファクタリングしてください。
+* For multiple sheet updates, use `batchUpdate`:
 
-**フロントエンド開発:**
-* `ui:component 新しい設定項目用のトグルスイッチ`: `AdminPanel.html` に、`UnifiedStyles.html` のデザインシステムを使って、指定されたUIコンポーネントを追加してください。
-* `gas:call "getPublishedSheetData"`: `Page.html` 内で、指定されたサーバーサイド関数を呼び出すための `google.script.run` を使ったJavaScriptコードを記述してください。`ClientOptimizer.html` の `runGas` ラッパー関数を使用してください。
+  ```js
+  var requests = [
+    { updateCells: { /* … */ } },
+    { appendDimension: { /* … */ } }
+  ];
+  Sheets.Spreadsheets.batchUpdate({ requests }, SPREADSHEET_ID);
+  ```
 
-**仕様に基づく実装:**
-* `impl:feature ADM-005`: `README.md` の機能要件ID `ADM-005`（列マッピング設定）を実装するためのサーバーサイド関数 `saveSheetConfig()` と、それを呼び出すクライアントサイドのコードを記述してください。
+### 4.4 Idempotency & Retry
+
+* Implement exponential back-off for network errors or quota limits:
+
+  ```js
+  function retry(fn, attempts) {
+    try {
+      return fn();
+    } catch (e) {
+      if (attempts > 0) {
+        Utilities.sleep(Math.pow(2, attempts) * 1000);
+        return retry(fn, attempts - 1);
+      }
+      throw e;
+    }
+  }
+  var values = retry(() => Sheets.Spreadsheets.Values.get(id, range), 5);
+  ```
+
+### 4.5 Caching
+
+* **CacheService**: cache infrequently changing reference data for minutes.
+* **localStorage** (client-side): cache UI data to reduce server calls.
+
+### 4.6 Logging & Monitoring
+
+* Log key flows and errors via `console.log()` (Stackdriver).
+* Use a consistent prefix:
+
+  ```js
+  console.log('[DriveService] getFileById:', fileId);
+  ```
+
+### 4.7 Testing with Mocks
+
+* In CI unit tests, mock service wrappers.
+* **Jest example**:
+
+  ```js
+  jest.mock('../server/services/driveService', () => ({
+    getFileById: jest.fn().mockReturnValue({ id: '123', name: 'Test' })
+  }));
+  ```
+
+---
+
+## 5. HTML Service Best Practices
+
+1. **Separate HTML / CSS / JS**
+
+   * `.css.html` files contain `<style>…</style>`.
+   * `.js.html` files contain `<script>…</script>`.
+   * Main templates include them via `<?!= include('…'); ?>`.
+
+2. **HTML5 Doctype**
+
+   ```html
+   <!DOCTYPE html>
+   <html lang="en"> … </html>
+   ```
+
+3. **HTTPS Only**
+
+   * All external scripts/styles must use `https://`.
+
+4. **Load scripts at end of `<body>`**
+
+   * Prioritize HTML/CSS rendering.
+
+5. **Asynchronous Data Fetching**
+
+   * Initial UI shows placeholders; data rendered via `google.script.run`.
+
+6. **Optional jQuery Use**
+
+   * If needed, load via CDN:
+
+     ```html
+     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+     ```
+
+---
+
+## 6. Performance Optimization
+
+* Minimize API calls by batching reads/writes.
+* Use `LockService` to prevent concurrent trigger conflicts.
+* CacheService / localStorage to avoid redundant fetches.
+
+---
+
+## 7. Security Measures
+
+* Store secrets in `PropertiesService`—never hard-code API keys.
+* Limit OAuth scopes to the minimum required.
+* Enforce Content Security Policy and sanitize all user input.
+
+---
+
+## 8. Testing & Debugging
+
+* Write unit tests (QUnit / Jest) covering server-side logic.
+* Mock external calls in tests.
+* Use `Logger.log()` or `console.log()` appropriately.
+* Integrate tests into CI (clasp + GitHub Actions) to run `npm test`.
+
+---
+
+## 9. Git Workflow & Pull Requests
+
+* **Conventional Commits**:
+
+  ```
+  feat(server): add fetchData function
+  fix(ui): correct modal close behavior
+  test(services): add retry logic tests
+  ```
+* **Branch Naming**: `feature/…`, `bugfix/…`, `chore/…`.
+* Keep PRs small, focused, and include clear “What”, “Why”, and “How”.
+
+---
+
+## 10. Trigger Management
+
+* Register only necessary triggers.
+* Remove obsolete triggers immediately.
+* Specify time zones explicitly for time-based triggers.
+
+---
+
+## 11. Documentation
+
+* **README.md**: Keep project overview and setup instructions up to date.
+* **CHANGELOG.md**: Record major feature additions and breaking changes.
+* In-code comments should explain intent and any gotchas.

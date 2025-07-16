@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <base target="_top">
+  <title>StudyQuest - 登録</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <?!= include('UnifiedStyles'); ?>
+  <?!= include('SharedUtilities'); ?>
+
+  <style>
+    /* =================================================================== */
+    /* ★★★ 登録ページレイアウト修正 ★★★ */
+    /* =================================================================== */
+
+    /* 基本レイアウト */
+    html, body {
+      background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%);
+      min-height: 100vh;
+      width: 100%;
+      margin: 0;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: radial-gradient(ellipse at top left, rgba(6, 182, 212, 0.1) 0%, transparent 70%),
+                  radial-gradient(ellipse at bottom right, rgba(168, 85, 247, 0.08) 0%, transparent 70%);
+      z-index: -1;
+    }
+
+    /* メインコンテンツコンテナ */
+    .glass-container {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      width: 100%;
+      max-width: 420px;
+      padding: 40px 32px;
+      text-align: center;
+      animation: fadeIn 0.6s ease-out;
+      /* z-indexとposition:relativeを削除し、スタッキングコンテキストの生成を抑制 */
+    }
+
+    /* 成功画面はデフォルトで非表示 */
+    .success-container {
+      display: none;
+    }
+
+    /* 共通スタイル */
+    .header { margin-bottom: 40px; }
+    .logo {
+      width: 56px; height: 56px;
+      background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);
+      border-radius: 16px;
+      margin: 0 auto 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; color: white; font-weight: 600;
+    }
+    .title { font-size: 28px; font-weight: 700; color: white; margin-bottom: 8px; }
+    .subtitle { font-size: 16px; color: rgba(255, 255, 255, 0.7); margin-bottom: 0; }
+
+    .status-card {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 20px;
+      margin-bottom: 32px;
+    }
+    .status-text { font-size: 14px; color: rgba(255, 255, 255, 0.8); margin-bottom: 8px; }
+    .user-email { font-size: 16px; font-weight: 600; color: white; word-break: break-all; }
+
+    .register-btn {
+      width: 100%;
+      background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);
+      border: none;
+      border-radius: 12px;
+      padding: 16px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-bottom: 24px;
+    }
+    .register-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(6, 182, 212, 0.4); }
+    .register-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top: 2px solid white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      display: inline-block; vertical-align: middle; margin-right: 8px;
+    }
+
+    .message-area { min-height: 24px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; font-size: 14px; color: rgba(255, 255, 255, 0.8); }
+    .message-area.error { color: #ef4444; }
+    .message-area.success { color: #10b981; }
+    .message-area.warning { color: #f59e0b; }
+
+    .footer { text-align: center; font-size: 12px; color: rgba(255, 255, 255, 0.5); margin-top: 8px; }
+    .footer a { color: rgba(255, 255, 255, 0.7); text-decoration: none; border-bottom: 1px solid rgba(255, 255, 255, 0.3); transition: color 0.2s ease; cursor: pointer; }
+    .footer a:hover { color: white; }
+
+    .success-icon { width: 64px; height: 64px; background: #10b981; border-radius: 50%; margin: 0 auto 24px; display: flex; align-items: center; justify-content: center; font-size: 28px; color: white; }
+    .action-btn { display: block; padding: 14px 24px; border-radius: 10px; border: none; font-size: 15px; font-weight: 600; text-decoration: none; color: white; margin-top: 12px; cursor: pointer; }
+    .action-btn.primary { background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%); }
+    .action-btn.secondary { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* ================================================= */
+    /* ★★★ 修正されたモーダルのスタイル ★★★ */
+    /* ================================================= */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 20px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0s 0.3s;
+    }
+
+    .modal-overlay.is-visible {
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 0.3s ease, visibility 0s;
+    }
+
+    .modal-overlay .glass-panel {
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+      width: 100%;
+      max-width: 640px;
+      max-height: 90vh;
+      transform: scale(0.95) translateY(10px);
+      transition: transform 0.3s ease-out;
+    }
+
+    .modal-overlay.is-visible .glass-panel {
+      transform: scale(1) translateY(0);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body class="registration-page">
+
+  <!-- ★★★ 修正点: モーダルをメインコンテナの外、body直下に移動 ★★★ -->
+  <?!= include('SharedModals'); ?>
+
+  <!-- メインコンテンツ -->
+  <div class="glass-container" id="main-container">
+    <div class="header">
+      <div class="logo">S</div>
+      <h1 class="title">StudyQuest</h1>
+      <p class="subtitle">教育用回答ボードシステム</p>
+    </div>
+
+    <div class="status-card">
+      <div class="status-text" id="status-text">認証情報を確認中</div>
+      <div class="user-email" id="user-email"></div>
+    </div>
+
+    <div class="message-area" id="message-area"></div>
+
+    <button class="register-btn" id="register-btn" disabled>
+      <span id="btn-content">回答ボードを作成</span>
+    </button>
+
+    <div class="footer">
+      <a data-modal-trigger="enhanced-privacy">プライバシーポリシー</a>
+      および
+      <a data-modal-trigger="enhanced-digital-citizenship">デジタル・シティズンシップ</a>
+      に同意の上で作成されます
+    </div>
+  </div>
+
+  <!-- 成功画面 -->
+  <div class="glass-container success-container" id="success-container">
+    <div class="success-icon">✓</div>
+    <h2 class="title">登録完了</h2>
+    <p class="subtitle">回答ボードが正常に作成されました</p>
+    <a href="#" class="action-btn primary" id="admin-panel-btn">管理画面を開く</a>
+  </div>
+
+
+  <script>
+    // -------------------------------------------
+    // ★★★ 登録処理とモーダル制御ロジック ★★★
+    // -------------------------------------------
+    document.addEventListener('DOMContentLoaded', () => {
+      const mainContainer = document.getElementById('main-container');
+      const successContainer = document.getElementById('success-container');
+      const registerBtn = document.getElementById('register-btn');
+      const btnContent = document.getElementById('btn-content');
+      const statusTextEl = document.getElementById('status-text');
+      const userEmailEl = document.getElementById('user-email');
+      const messageAreaEl = document.getElementById('message-area');
+
+      let userEmail = '';
+      let isRegistrationInProgress = false;
+
+      const initializePage = () => {
+        google.script.run
+          .withSuccessHandler(result => {
+            if (result?.status === 'existing_user') {
+              window.sharedUtilities.navigation.goToAdminPanel(result.adminUrl, 1000);
+              return;
+            }
+            google.script.run
+              .withSuccessHandler(authResult => {
+                if (authResult?.email || authResult?.userEmail) {
+                  userEmail = authResult.email || authResult.userEmail;
+                  statusTextEl.textContent = '認証済み';
+                  userEmailEl.textContent = userEmail;
+                  registerBtn.disabled = false;
+                  showMessage('回答ボードを作成できます', 'success');
+                } else {
+                  throw new Error('メールアドレスが取得できませんでした');
+                }
+              })
+              .withFailureHandler(err => {
+                statusTextEl.textContent = '認証エラー';
+                showMessage('ページの再読み込みが必要です', 'error');
+              })
+              .verifyUserAuthentication();
+          })
+          .getExistingBoard();
+      };
+
+      const showModal = modalId => {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+          modal.classList.remove('hidden');
+          requestAnimationFrame(() => modal.classList.add('is-visible'));
+        }
+      };
+
+      const hideModal = modalId => {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+          modal.classList.remove('is-visible');
+          modal.addEventListener('transitionend', () => modal.classList.add('hidden'), { once: true });
+        }
+      };
+
+      const setupModalControls = () => {
+        document.body.addEventListener('click', e => {
+          const trigger = e.target.closest('[data-modal-trigger]');
+          if (trigger) {
+            e.preventDefault();
+            const modalId = trigger.getAttribute('data-modal-trigger') + '-modal';
+            showModal(modalId);
+            return;
+          }
+
+          const modal = e.target.closest('[id$="-modal"]');
+          if (!modal) return;
+
+          const shouldClose =
+            e.target === modal ||
+            e.target.closest('.close-modal') ||
+            e.target.closest('[id$="-cancel"]') ||
+            e.target.closest('[id$="-close"]');
+
+          if (shouldClose) hideModal(modal.id);
+        });
+      };
+
+      const executeRegistration = () => {
+        if (isRegistrationInProgress || !userEmail) return;
+        isRegistrationInProgress = true;
+        registerBtn.disabled = true;
+        btnContent.innerHTML = '<span class="spinner"></span>登録処理中...';
+        showMessage('', 'info');
+
+        google.script.run
+          .withSuccessHandler(result => {
+            mainContainer.style.display = 'none';
+            successContainer.style.display = 'block';
+            if (result?.adminUrl) {
+              document.getElementById('admin-panel-btn').href = result.adminUrl;
+            }
+          })
+          .withFailureHandler(error => {
+            showMessage(error.message || '登録に失敗しました', 'error');
+            registerBtn.disabled = false;
+            btnContent.textContent = '回答ボードを作成';
+            isRegistrationInProgress = false;
+          })
+          .quickStartSetup();
+      };
+
+      const handleRegistrationRequest = () => {
+        showModal('enhanced-privacy-modal');
+
+        const privacyConfirmBtn = document.getElementById('enhanced-privacy-modal-continue');
+        privacyConfirmBtn.addEventListener('click', () => {
+          hideModal('enhanced-privacy-modal');
+          showModal('enhanced-digital-citizenship-modal');
+
+          const citizenshipConfirmBtn = document.getElementById('enhanced-digital-citizenship-modal-accept');
+          citizenshipConfirmBtn.addEventListener('click', () => {
+            hideModal('enhanced-digital-citizenship-modal');
+            executeRegistration();
+          }, { once: true });
+        }, { once: true });
+      };
+
+      const showMessage = (message, type = 'info') => {
+        messageAreaEl.textContent = message;
+        messageAreaEl.className = `message-area ${type}`;
+      };
+
+      registerBtn.addEventListener('click', handleRegistrationRequest);
+      setupModalControls();
+      initializePage();
+    });
+  </script>
+</body>
+</html>

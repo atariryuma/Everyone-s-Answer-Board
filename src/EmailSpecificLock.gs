@@ -10,23 +10,6 @@ const SCRIPT_LOCK_INFO_CACHE = CacheService.getScriptCache();
 const SCRIPT_LOCK_HOLDER_KEY = 'scriptLockHolder';
 
 /**
- * Tries to acquire a script lock with retries.
- * @param {number} totalTimeout - Total time to wait in ms.
- * @param {number} [interval=1000] - Interval between attempts in ms.
- * @returns {GoogleAppsScript.Lock.Lock|null} Obtained lock or null.
- */
-function acquireScriptLockWithRetry(totalTimeout, interval) {
-  interval = interval || 1000;
-  var start = Date.now();
-  var lock = LockService.getScriptLock();
-
-  while (Date.now() - start < totalTimeout) {
-    if (lock.tryLock(interval)) return lock;
-  }
-  return null;
-}
-
-/**
  * メール特化ロック：同一メールの重複処理を防止
  * @param {string} adminEmail - メールアドレス
  * @returns {boolean} ロック取得成功かどうか
@@ -99,10 +82,10 @@ function findOrCreateUserWithEmailLock(adminEmail, additionalData = {}) {
     
     // Step 3: 新規ユーザー作成（スクリプトロック使用 - ユーザーロック廃止）
     console.log('findOrCreateUserWithEmailLock: 新規ユーザー作成開始', { adminEmail });
+    const lock = LockService.getScriptLock();
     const timeout = 30000; // 30秒に延長（フォーム・スプレッドシート作成時間を考慮）
-    const lock = acquireScriptLockWithRetry(timeout);
 
-    if (!lock) {
+    if (!lock.waitLock(timeout)) {
       const holder = SCRIPT_LOCK_INFO_CACHE.get(SCRIPT_LOCK_HOLDER_KEY);
       console.error('findOrCreateUserWithEmailLock: スクリプトロックタイムアウト', {
         adminEmail,

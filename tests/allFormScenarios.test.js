@@ -25,16 +25,6 @@ describe('All form creation scenarios reaction columns', () => {
       SpreadsheetApp: {
         openById: jest.fn(() => mockSpreadsheet)
       },
-      Session: {
-        getActiveUser: jest.fn(() => ({
-          getEmail: jest.fn(() => 'test@example.com')
-        }))
-      },
-      PropertiesService: {
-        getScriptProperties: jest.fn(() => ({
-          getProperty: jest.fn()
-        }))
-      },
       COLUMN_HEADERS: {
         UNDERSTAND: 'なるほど！',
         LIKE: 'いいね！',
@@ -50,8 +40,7 @@ describe('All form creation scenarios reaction columns', () => {
       getSheetsList: jest.fn(),
       addServiceAccountToSpreadsheet: jest.fn(),
       updateUser: jest.fn(),
-      invalidateUserCache: jest.fn(),
-      fetchUserFromDatabase: jest.fn(() => ({ userId: 'mock-user-id', adminEmail: 'test@example.com' }))
+      invalidateUserCache: jest.fn()
     };
     
     vm.createContext(context);

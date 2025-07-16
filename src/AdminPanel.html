@@ -3,19 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <base target="_top">
-  <title>みんなの回答ボード 管理パネル - StudyQuest</title>
+  <title>みんなの回答ボード	管理パネル - StudyQuest</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#1a1b26" />
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
   <!-- User ID from server template -->
   <meta name="user-id" content="<?= typeof userId !== 'undefined' ? userId : '' ?>" id="user-id-meta">
 
   <!-- TailwindCSS CDN -->
-  <?!= include('TailwindConfig'); ?>
+  <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Unified Styles and Shared Components -->
   <?!= include('UnifiedStyles'); ?>
-  <?!= include('PageSpecific/AdminPanel.styles'); ?>
   <?!= include('SharedUtilities'); ?>
   <?!= include('SharedJavaScript'); ?>
   <?!= include('AdminPanelLogic'); ?>
@@ -32,24 +32,9 @@
     if (typeof clearTimeout === 'undefined') {
       function clearTimeout(){ }
     }
-    // 統合グローバルエラーハンドリング（重複防止）
-    let lastErrorTime = 0;
-    let lastErrorMessage = '';
-    
+    // グローバルエラーハンドリング
     window.addEventListener('error', function(event) {
-      const now = Date.now();
-      const currentMessage = event.error?.message || 'Unknown error';
-      
-      // 重複エラーのログを防ぐ（1秒以内の同じエラー）
-      if (now - lastErrorTime < 1000 && currentMessage === lastErrorMessage) {
-        return;
-      }
-      
-      lastErrorTime = now;
-      lastErrorMessage = currentMessage;
-      
       console.error('Global error caught:', event.error);
-      
       if (event.error && event.error.message && event.error.message.includes('document.write')) {
         console.warn('document.write エラーが検出されました。安全なDOM操作に切り替えています。');
         event.preventDefault();
@@ -77,49 +62,14 @@
     
     // マルチテナント対応: 新しいrunGasWithUserId関数
     function runGasWithUserId(functionName, ...args) {
-      console.log('📞 runGasWithUserId called:', functionName, 'args:', args);
-      console.log('📝 appState:', appState);
-      
-      if (!appState || !appState.userId) {
-        const errorMsg = 'ユーザーIDが設定されていません。ページを再読み込みしてください。';
-        console.error('❌  - No userId available for:', functionName, 'appState:', appState);
-        showMessage(errorMsg, 'error');
-        return Promise.reject(new Error(errorMsg));
+      if (!appState.userId) {
+        console.error('❌  - No userId available for:', functionName);
+        throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
       }
 
       console.log('✅  - runGasWithUserId:', functionName, 'userId:', appState.userId);
-      
-      if (!gasOptimizer || typeof gasOptimizer.call !== 'function') {
-        const errorMsg = 'gasOptimizerが初期化されていません。';
-        console.error('❌  - gasOptimizer not available');
-        showMessage(errorMsg, 'error');
-        return Promise.reject(new Error(errorMsg));
-      }
-      
       // userIdを第一引数として追加
-      return gasOptimizer.call(functionName, appState.userId, ...args)
-        .catch(function(error) {
-          console.error('GAS呼び出しエラー:', error);
-          
-          // 特定のエラーに対してフォールバック処理
-          if (error.message && error.message.includes('is not a function')) {
-            console.warn('GAS関数が見つかりません。直接呼び出しを試行します。');
-            
-            // google.script.run による直接呼び出し
-            return new Promise(function(resolve, reject) {
-              if (typeof google !== 'undefined' && google.script && google.script.run) {
-                google.script.run
-                  .withSuccessHandler(resolve)
-                  .withFailureHandler(reject)
-                  [functionName](appState.userId, ...args);
-              } else {
-                reject(new Error('google.script.run が利用できません。'));
-              }
-            });
-          }
-          
-          throw error;
-        });
+      return gasOptimizer.call(functionName, appState.userId, ...args);
     }
     
     // callWithCache 関数 - 読み取り専用操作用
@@ -180,17 +130,80 @@
   
   <!-- CSS already included above, removing duplicate -->
   
+  <!-- レイアウト修正用の追加CSS -->
+  <style>
+  * {
+    box-sizing: border-box;
+  }
+  
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    overflow-x: hidden;
+  }
+  
+  body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  
+  main {
+    flex: 1;
+    width: 100%;
+  }
+  
+  /* Admin Panel Layout Fixes */
+  .responsive-grid {
+    display: grid;
+    gap: 1rem; /* モバイルのギャップ */
+    grid-template-columns: 1fr; /* モバイル: 単一カラム */
+  }
+  
+  @media (min-width: 768px) { /* タブレット向けブレークポイント */
+    .responsive-grid {
+      grid-template-columns: 2fr 1fr; /* 左: 2/3、右: 1/3 */
+      gap: 1rem; /* タブレットのギャップ */
+    }
+    .right-panel {
+      min-width: 200px; /* タブレットでの右パネルの最小幅 */
+    }
+  }
+
+  @media (min-width: 1024px) { /* デスクトップ向けブレークポイント */
+    .responsive-grid {
+      grid-template-columns: minmax(400px, 1fr) 350px; /* 左: 最小400px、柔軟。右: 固定350px */
+      gap: 1.5rem; /* デスクトップのギャップ */
+    }
+    .right-panel {
+      min-width: 300px; /* デスクトップでの右パネルの最小幅（安全のため） */
+    }
+  }
+  
+  /* Ensure proper main content layout */
+  main.flex-1 {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .left-panel {
+    flex: 1;
+    min-height: 0;
+  }
+  </style>
 </head>
-<body class="unified-theme bg-[#1a1b26] text-gray-200 font-sans admin-grid-layout">
+<body class="bg-[#1a1b26] text-gray-200 font-sans">
   <div id="loading-overlay" class="loading-overlay hidden">
     <div class="text-center">
       <div class="spinner"></div>
       <p id="loading-message" class="mt-4 text-gray-300">処理中...</p>
     </div>
   </div>
-  <header class="glass-panel compact backdrop-blur-md border-b border-gray-700 sticky top-0 z-50">
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 py-2 sm:py-3">
-      <div class="flex items-center justify-start gap-4 sm:gap-8">
+  <header class="glass-panel border-b border-gray-700 sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
+      <div class="flex items-center justify-between">
         <!-- ロゴとタイトル -->
         <div class="flex items-center gap-3">
           <div class="w-8 h-8 bg-gradient-to-r from-cyan-400 to-purple-400 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -199,22 +212,22 @@
             </svg>
           </div>
           <div class="hidden sm:block">
-            <h1 class="text-xl sm:text-2xl font-bold text-white leading-tight">みんなの回答ボード 管理パネル</h1>
-            <p class="text-sm text-gray-400">StudyQuest</p>
+            <h1 class="text-lg sm:text-xl font-bold text-white leading-tight">みんなの回答ボード	管理パネル</h1>
+            <p class="text-xs text-gray-400">StudyQuest</p>
           </div>
           <div class="sm:hidden">
-            <h1 class="text-xl font-bold text-white">みんなの回答ボード</h1>
+            <h1 class="text-lg font-bold text-white">みんなの回答ボード</h1>
           </div>
         </div>
         
         <!-- ドメイン・ステータス情報 -->
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 sm:gap-3">
           <!-- ドメイン情報（Registration.htmlスタイル） -->
           <div id="header-domain-info">
             <!-- ドメイン一致表示（緑色パネル） -->
             <!-- ドメイン一致表示（Registration.htmlスタイル） -->
-            <div id="header-domain-match" class="glass-panel backdrop-blur-md bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-3 border border-green-400/30 hidden">
-              <div class="flex items-center gap-3">
+            <div id="header-domain-match" class="glass-panel bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-3 border border-green-400/30 hidden">
+              <div class="flex items-center gap-2">
                 <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
@@ -226,8 +239,8 @@
             </div>
             
             <!-- ドメイン不一致表示（Registration.htmlスタイル） -->
-            <div id="header-domain-mismatch" class="glass-panel backdrop-blur-md bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg p-3 border border-yellow-400/30 hidden">
-              <div class="flex items-center gap-3">
+            <div id="header-domain-mismatch" class="glass-panel bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg p-3 border border-yellow-400/30 hidden">
+              <div class="flex items-center gap-2">
                 <svg class="w-5 h-5 text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
                 </svg>
@@ -239,8 +252,8 @@
             </div>
             
             <!-- 初期状態表示 -->
-            <div id="header-domain-initial" class="glass-panel backdrop-blur-md bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-3 border border-blue-400/30">
-              <div class="flex items-center gap-3">
+            <div id="header-domain-initial" class="glass-panel bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-3 border border-blue-400/30">
+              <div class="flex items-center gap-2">
                 <div id="header-status-dot" class="w-3 h-3 bg-blue-400 rounded-full animate-pulse flex-shrink-0"></div>
                 <div>
                   <div class="text-blue-400 font-semibold text-sm" id="header-domain-name-initial">ドメイン確認中</div>
@@ -252,27 +265,68 @@
         </div>
     </div>
   </header>
-  <main class="min-h-0">
-    
-
-    <!-- メインコンテンツエリア -->
-    <div class="admin-responsive-grid">
-      <!-- 左側：セットアップフロー（メインパネル） -->
-      <div class="left-panel">
-        
-        <!-- ステップ1: データ準備 -->
-        <div class="panel-section" id="data-setup-section">
-          <div class="step-header">
-            <div class="step-icon">
-              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+  <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8 pb-40">
+    <!-- シンプル統合ステータスバー -->
+    <section class="mb-4">
+      <div class="glass-panel p-4 rounded-lg">
+        <div class="flex items-center justify-between">
+          <!-- 左側: ステータス表示 -->
+          <div class="flex items-center gap-3">
+            <div class="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
               </svg>
             </div>
-            <div>
-              <h2 class="step-title">データ準備</h2>
-              <p class="step-description">🚀 スプレッドシートまたはフォームを準備</p>
+            <div class="flex-1">
+              <span class="text-sm font-medium text-white" id="guidance-text">セットアップを開始してください</span>
+              <div class="text-xs text-gray-400 mt-1" id="step-description">3ステップで簡単セットアップ</div>
+            </div>
+            <!-- 次のアクションボタン -->
+            <div id="next-action-container" class="hidden">
+              <button id="next-action-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                <span id="next-action-text">次へ</span>
+              </button>
             </div>
           </div>
+          
+          <!-- 右側: コンパクトステップナビゲーション -->
+          <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1" id="step-1-indicator">
+              <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">1</div>
+              <span class="text-xs text-gray-300 hidden sm:inline">データ準備</span>
+            </div>
+            <div class="w-4 h-px bg-gray-600"></div>
+            <div class="flex items-center gap-1" id="step-2-indicator">
+              <div class="w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">2</div>
+              <span class="text-xs text-gray-300 hidden sm:inline">シート選択</span>
+            </div>
+            <div class="w-4 h-px bg-gray-600"></div>
+            <div class="flex items-center gap-1" id="step-3-indicator">
+              <div class="w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">3</div>
+              <span class="text-xs text-gray-300 hidden sm:inline">設定・公開</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- メインコンテンツエリア -->
+    <div class="responsive-grid">
+      <!-- 左側：セットアップフロー（メインパネル） -->
+      <div class="left-panel space-y-4 lg:space-y-6">
+        
+        <!-- ステップ1: データ準備 -->
+        <div class="glass-panel p-4 lg:p-6" id="data-setup-section">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-lg">
+                1
+              </div>
+              <div>
+                <h2 class="text-lg font-semibold text-white">データ準備</h2>
+                <p class="text-xs text-gray-400">スプレッドシートまたはフォームを準備</p>
+              </div>
+            </div>
             <button type="button" class="toggle-section" onclick="toggleSection('step1-content')" aria-expanded="true" aria-label="セクションを展開/折りたたみ">
               <svg class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -281,13 +335,22 @@
           </div>
           
           <div id="step1-content" class="progressive-section expanded">
-            <!-- フォーム作成・自動設定 -->
-            <div class="mb-4">
-              <div class="google-integration p-4 rounded-lg text-white">
-                <h3 class="text-lg font-semibold mb-3">フォーム作成・自動設定</h3>
+            <!-- 初心者向け：簡単作成 -->
+            <div class="mb-6">
+              <div class="google-integration p-4 rounded-xl text-white">
+                <div class="flex items-center gap-3 mb-3">
+                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                  <h3 class="font-semibold">推奨：自動セットアップ</h3>
+                </div>
+                <p class="text-sm mb-4 opacity-90">GoogleフォームとスプレッドシートをWorkspace上で自動作成します</p>
                 <div class="space-y-2">
-                  <button type="button" id="create-board-btn" class="btn-primary w-full">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <button type="button" id="create-board-btn" class="btn btn-google w-full">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                     </svg>
                     <span id="create-board-text">新しいボードを作成</span>
@@ -295,72 +358,105 @@
                   
                   <!-- 既存ユーザー向けの新しいフォーム作成 -->
                   <div id="existing-user-section" class="hidden">
-                    <button type="button" id="create-additional-form-btn" class="btn-secondary w-full">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button type="button" id="create-additional-form-btn" class="btn btn-secondary w-full text-sm">
+                      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                       </svg>
-                      <span id="create-additional-form-text">新規のフォームを作成</span>
+                      <span id="create-additional-form-text" class="text-gray-200">新規のフォームを作成</span>
                     </button>
-                    <p class="text-xs text-gray-400">現在のボードに連携する新しいフォームを作成</p>
-                    
-                    <!-- 作成されたフォーム表示 -->
-                    <div class="space-y-2 hidden" id="form-url-section">
-                      <div class="success-state bg-green-500/10 border border-green-400/30 rounded-lg p-4">
-                        <div class="flex items-center gap-2 mb-3">
-                          <div class="w-6 h-6 bg-green-500/20 rounded-full flex items-center justify-center">
-                            <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                          </div>
-                          <span class="font-medium text-green-200">フォームが作成されました</span>
-                        </div>
-                        <a id="edit-form-url-link" href="#" target="_blank" class="btn-primary w-full" title="フォームを編集">
-                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                          </svg>
-                          フォームを編集
-                        </a>
-                      </div>
-                    </div>
+                    <p class="text-xs text-gray-400 mt-1">現在のボードに連携する新しいフォームを作成</p>
                   </div>
                 </div>
               </div>
             </div>
             
-            <!-- 外部リソースインポート -->
-            <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
-              <h4 class="text-base font-medium text-gray-200 mb-3">外部リソースインポート</h4>
-              <div class="space-y-2">
-                <input type="url" 
-                       id="resource-url-input" 
-                       placeholder="GoogleフォームまたはスプレッドシートのURL"
-                       class="form-control text-sm">
-                <button type="button" id="add-resource-btn" class="btn-primary w-full">
-                  <span id="add-resource-text">リソースを追加</span>
-                </button>
+            <!-- 外部リソースの連携 (上級者向け) -->
+            <details class="bg-gray-800/30 border border-gray-600/30 rounded-xl">
+              <summary class="p-4 cursor-pointer text-sm font-medium text-gray-300 hover:text-white flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                </svg>
+                外部リソースの連携 (上級者向け)
+              </summary>
+              <div class="p-4 pt-0 space-y-4">
+                <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
+                  <label class="block text-sm font-medium text-purple-200 mb-2">
+                    GoogleフォームまたはスプレッドシートのURL
+                  </label>
+                  <div class="space-y-3">
+                    <input type="url" 
+                           id="resource-url-input" 
+                           placeholder="https://docs.google.com/forms/d/... または https://docs.google.com/spreadsheets/d/..."
+                           class="form-control"
+                           aria-describedby="resource-url-help">
+                    <p id="resource-url-help" class="text-xs text-purple-300 mt-1">
+                      既存のGoogleフォームまたはスプレッドシートのURLを貼り付けてください
+                    </p>
+                    <div class="flex gap-2">
+                      <button type="button" id="add-resource-btn" class="btn btn-primary flex-1">
+                        <span id="add-resource-text">リソースを追加</span>
+                      </button>
+                      <button type="button" id="open-resource-btn" class="btn btn-secondary px-3" disabled title="フォームまたはスプレッドシートを開く">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                        </svg>
+                        <span id="open-resource-text" class="ml-1 text-xs hidden sm:inline">開く</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </details>
+            
+            <!-- 作成されたリソース表示 -->
+            <div class="space-y-3 hidden" id="form-url-section">
+              <div class="success-state">
+                <div class="flex items-center gap-2 mb-2">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <span class="font-medium">フォームが作成されました</span>
+                </div>
+                <div class="flex gap-2">
+                  <input type="url" id="form-url-input" class="form-control flex-1 text-sm" readonly placeholder="フォームURLが生成されます">
+                  <button type="button" id="copy-form-url-btn" class="btn btn-secondary" title="URLをコピー">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                  </button>
+                  <a id="open-form-url-link" href="#" target="_blank" class="btn btn-secondary" title="フォームを開く">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                  </a>
+                  <a id="edit-form-url-link" href="#" target="_blank" class="btn btn-primary" title="フォームを編集">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                    </svg>
+                  </a>
+                </div>
               </div>
             </div>
             
             <!-- カスタムフォーム情報表示エリア -->
-            <div id="custom-form-info-section" class="hidden">
+            <div id="custom-form-info-section" class="hidden mt-4">
               <!-- updateCustomFormInfo()で動的に内容が設定される -->
             </div>
           </div>
         </div>
 
-        <!-- ステップ2: シート・列設定 -->
-        <div class="panel-section" id="sheet-selection-section">
-          <div class="step-header">
-            <div class="step-icon">
-              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2v0"></path>
-              </svg>
+        <!-- ステップ2: シート選択 -->
+        <div class="glass-panel p-4 lg:p-6" id="sheet-selection-section">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-lg">
+                2
+              </div>
+              <div>
+                <h2 class="text-lg font-semibold text-white">シート選択</h2>
+                <p class="text-xs text-gray-400">表示したいシートを選択</p>
+              </div>
             </div>
-            <div>
-              <h2 class="step-title">シート・列設定</h2>
-              <p class="step-description">📊 シート選択と列マッピング</p>
-            </div>
-          </div>
             <button type="button" class="toggle-section" onclick="toggleSection('step2-content')" aria-expanded="true" aria-label="セクションを展開/折りたたみ">
               <svg class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -369,8 +465,8 @@
           </div>
           
           <div id="step2-content" class="progressive-section expanded">
-            <div class="space-y-2">
-              <div class="space-y-2">
+            <div class="space-y-4">
+              <div class="space-y-3">
                 <!-- シート選択の説明 -->
                 <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-3">
                   <div class="flex items-center gap-2 mb-2">
@@ -379,7 +475,7 @@
                     </svg>
                     <span class="text-sm font-medium text-green-200">シート選択</span>
                   </div>
-                  <p class="text-sm text-green-300">スプレッドシートのシートを回答ボードとして表示するシートに指定します</p>
+                  <p class="text-xs text-green-300">スプレッドシートのシートを回答ボードとして表示するシートに指定します</p>
                 </div>
                 
                 <!-- シンプルシート選択 -->
@@ -387,10 +483,10 @@
                   表示したいシートを選択
                 </label>
                 <div class="flex gap-2">
-                    <select id="sheet-select" class="form-control text-sm flex-1" aria-describedby="sheet-help">
+                    <select id="sheet-select" class="form-control flex-1" aria-describedby="sheet-help">
                       <option>読み込み中...</option>
                     </select>
-                    <button type="button" id="open-spreadsheet-btn-step2" class="btn-secondary" title="スプレッドシートを開く">
+                    <button type="button" id="open-spreadsheet-btn-step2" class="btn btn-secondary px-3" title="スプレッドシートを開く">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
@@ -401,20 +497,18 @@
           </div>
         </div>
 
-        <!-- ステップ3: 公開設定 -->
-        <div class="panel-section" id="config-section">
-          <div class="step-header">
-            <div class="step-icon">
-              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-              </svg>
+        <!-- ステップ3: 設定・公開 -->
+        <div class="glass-panel p-4 lg:p-6" id="config-section">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-lg">
+                3
+              </div>
+              <div>
+                <h2 class="text-lg font-semibold text-white">設定・公開</h2>
+                <p class="text-xs text-gray-400">列設定を行い公開</p>
+              </div>
             </div>
-            <div>
-              <h2 class="step-title">公開設定</h2>
-              <p class="step-description">🎯 表示設定と公開</p>
-            </div>
-          </div>
             <button type="button" class="toggle-section" onclick="toggleSection('step3-content')" aria-expanded="true" aria-label="セクションを展開/折りたたみ">
               <svg class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -423,20 +517,20 @@
           </div>
           
           <div id="step3-content" class="progressive-section expanded">
-            <div id="config-area" class="space-y-2 hidden">
+            <div id="config-area" class="space-y-4 hidden">
               <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
                 <div class="flex items-center gap-2 mb-2">
                   <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                   </svg>
-                  <span class="text-base font-medium text-purple-200">列マッピング設定</span>
+                  <span class="text-sm font-medium text-purple-200">列マッピング設定</span>
                 </div>
-                <p class="text-sm text-purple-300">スプレッドシートの列を回答ボードの項目に割り当てます</p>
+                <p class="text-xs text-purple-300">スプレッドシートの列を回答ボードの項目に割り当てます</p>
               </div>
               
               <!-- 必須設定 -->
-              <div class="space-y-2">
+              <div class="space-y-4">
                 <div class="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
                   <label class="block">
                     <div class="flex items-center gap-2 mb-2">
@@ -444,8 +538,8 @@
                       <span class="px-2 py-1 bg-red-500 text-white text-xs rounded-full">必須</span>
                     </div>
                     <div class="flex gap-2">
-                      <select id="opinionHeader" class="form-control text-sm flex-1" aria-describedby="main-help"></select>
-                      <button type="button" id="reguess-headers-btn" class="btn bg-gradient-to-r from-cyan-600/80 to-purple-600/80 hover:from-cyan-600 hover:to-purple-600 text-white px-4 py-2 relative overflow-hidden group" title="AI搭載 高精度列判定システム">
+                      <select id="opinionHeader" class="form-control flex-1" aria-describedby="main-help"></select>
+                      <button type="button" id="reguess-headers-btn" class="btn bg-gradient-to-r from-cyan-600/80 to-purple-600/80 hover:from-cyan-600 hover:to-purple-600 text-white px-3 py-2 relative overflow-hidden group" title="AI搭載 高精度列判定システム">
                         <span class="relative z-10 flex items-center gap-1">
                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
@@ -455,271 +549,364 @@
                         <div class="absolute inset-0 bg-gradient-to-r from-cyan-400/20 to-purple-400/20 transform translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
                       </button>
                     </div>
-                    <p id="main-help" class="text-sm text-red-300">
+                    <p id="main-help" class="text-xs text-red-300 mt-1">
                       回答内容が含まれる列を選択してください
                     </p>
                   </label>
                 </div>
                 
                 <!-- オプション設定 -->
-                <div class="space-y-2" id="detail-options">
-                  <label class="block space-y-2">
-                    <span class="text-sm text-gray-300 block">理由・詳細列</span>
-                    <select id="reasonHeader" class="form-control text-sm"></select>
-                  </label>
-                  <label class="block space-y-2">
-                    <span class="text-sm text-gray-300 block">名前列</span>
-                    <select id="nameHeader" class="form-control text-sm"></select>
-                  </label>
-                  <label class="block space-y-2">
-                    <span class="text-sm text-gray-300 block">クラス列</span>
-                    <select id="classHeader" class="form-control text-sm"></select>
-                  </label>
-                  <div class="flex items-center">
-                    <input type="checkbox" id="showNames" name="showNames">
-                    <label for="showNames" class="ml-2 block text-sm text-gray-300">名前を表示する</label>
+                <details class="bg-gray-800/30 border border-gray-600/30 rounded-xl">
+                  <summary class="p-4 cursor-pointer text-sm font-medium text-gray-300 hover:text-white flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+                    </svg>
+                    オプション設定（任意）
+                  </summary>
+                  <div class="p-4 pt-0 space-y-4" id="detail-options">
+                    <label class="block">
+                      <span class="text-sm text-gray-300 mb-2 block">理由・詳細列</span>
+                      <select id="reasonHeader" class="form-control"></select>
+                    </label>
+                    <label class="block">
+                      <span class="text-sm text-gray-300 mb-2 block">名前列</span>
+                      <select id="nameHeader" class="form-control"></select>
+                    </label>
+                    <label class="block">
+                      <span class="text-sm text-gray-300 mb-2 block">クラス列</span>
+                      <select id="classHeader" class="form-control"></select>
+                    </label>
+                    <div class="flex items-center mt-4">
+                      <input type="checkbox" id="showNames" name="showNames" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                      <label for="showNames" class="ml-2 block text-sm text-gray-300">名前を表示する</label>
+                    </div>
+                    <div class="flex items-center mt-2">
+                      <input type="checkbox" id="showCounts" name="showCounts" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                      <label for="showCounts" class="ml-2 block text-sm text-gray-300">リアクション数を表示する</label>
+                    </div>
                   </div>
-                  <div class="flex items-center">
-                    <input type="checkbox" id="showCounts" name="showCounts">
-                    <label for="showCounts" class="ml-2 block text-sm text-gray-300">リアクション数を表示する</label>
-                  </div>
-                </div>
+                </details>
               </div>
               
-            <!-- 統合アクションボタン -->
-            <div class="action-buttons pt-4" id="publish-actions">
-              <button type="button" id="save-publish-btn" class="btn-primary w-full">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                <span id="save-publish-text">設定を保存して公開</span>
-              </button>
+              <!-- 統合アクションボタン -->
+              <div class="space-y-3 pt-4">
+                <button type="button" id="save-publish-btn" disabled class="btn btn-primary w-full btn-lg">
+                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                  </svg>
+                  <span id="save-publish-text">設定を保存して公開</span>
+                </button>
 
-              <button type="button" id="unpublish-board-btn" class="btn-secondary w-full">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636"></path>
-                </svg>
-                <span id="unpublish-board-text">公開を停止</span>
-              </button>
+                <button type="button" id="unpublish-board-btn" class="btn btn-warning w-full hidden">
+                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636"></path>
+                  </svg>
+                  <span id="unpublish-board-text">公開を停止</span>
+                </button>
+              </div>
             </div>
             
             <div id="config-placeholder" class="text-center py-8">
-              <div class="w-8 h-8 bg-gray-700 rounded-xl flex items-center justify-center mx-auto mb-3">
+              <div class="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-3">
                 <div class="loading-skeleton w-full h-full rounded-full hidden" id="config-loading"></div>
                 <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
                 </svg>
               </div>
-              <p class="text-gray-400 text-base">シートを選択すると列設定が表示されます</p>
+              <p class="text-gray-400 text-sm">シートを選択すると列設定が表示されます</p>
             </div>
           </div>
         </div>
       </div>
       
-      <!-- 右パネル：システム情報 -->
-      <div class="right-panel">
-        <!-- システム状況 -->
-        <div id="system-info-panel" class="panel-section">
-          <div class="step-header">
-            <div class="step-icon">
-              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+      <!-- 右側：情報・ヘルプパネル -->
+      <div class="space-y-4 lg:space-y-6">
+        
+        
+
+        <!-- 使い方ガイド -->
+        <div class="glass-panel p-4 lg:p-6">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-8 h-8 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
               </svg>
             </div>
-            <div>
-              <h2 class="step-title">システム状況</h2>
-              <p class="step-description">📊 リアルタイム監視</p>
-            </div>
+            <h3 class="font-semibold text-amber-400">使い方ガイド</h3>
           </div>
-
-          <div class="admin-content-spacing">
-            <!-- アカウント情報 -->
-            <div class="admin-panel-section">
-              <h3>アカウント</h3>
-              <div class="status-info-grid">
-                <div class="info-row">
-                  <span class="info-label">メールアドレス:</span>
-                  <span class="info-value" id="info-admin-email">-</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">ユーザーID:</span>
-                  <span class="info-value font-mono" id="info-user-id">-</span>
-                </div>
-                <div class="action-row">
-                  <button type="button" onclick="switchToAnotherAccount()" class="btn-secondary text-sm">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                    </svg>
-                    別のアカウントでログイン
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- 公開設定 -->
-            <div class="admin-panel-section">
-              <h3>公開設定</h3>
-              <div class="status-info-grid">
-                <div class="info-row">
-                  <span class="info-label">公開状態:</span>
-                  <span class="status-indicator" id="info-publish-status">
-                    <div class="w-2 h-2 rounded-full" id="info-publish-indicator"></div>
-                    <span id="info-publish-text">確認中</span>
-                  </span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">公開シート:</span>
-                  <span class="info-value font-semibold" id="info-published-sheet">-</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">表示モード:</span>
-                  <span class="info-value" id="info-display-mode">-</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">カウント表示:</span>
-                  <span class="info-value" id="info-show-counts">-</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- データ状況 -->
-            <div class="admin-panel-section">
-              <h3>データ状況</h3>
-              <div class="status-info-grid">
-                <div class="info-row">
-                  <span class="info-label">総回答数:</span>
-                  <span class="info-value font-bold text-lg" id="info-answer-count">-</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">総リアクション数:</span>
-                  <span class="info-value font-bold text-lg" id="info-reaction-count">-</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- リソース -->
-            <div class="admin-panel-section">
-              <h3>リソース</h3>
-              <div class="resource-links">
-                <div class="action-buttons">
-                  <a id="open-spreadsheet-btn" class="btn-secondary" disabled>
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                    スプレッドシート
-                  </a>
-                  <a id="open-form-btn" class="btn-secondary" disabled>
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                    フォーム
-                  </a>
-                </div>
-                
-                <!-- リソース削除セクション -->
-                <div class="danger-zone">
-                  <button type="button" id="delete-all-resources-btn" class="btn-secondary text-red-400 w-full">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                    </svg>
-                    リソース連携を解除
-                  </button>
-                  <p class="text-xs text-gray-500">
-                    アプリとの連携のみを解除します。フォームやスプレッドシート自体は削除されません。
-                  </p>
-                </div>
-              </div>
-            </div>
-            
-            <!-- アプリ設定リンク -->
-            <div class="admin-panel-section">
-              <h3>管理機能</h3>
-              <div class="action-buttons">
-                <button type="button" onclick="openAppSetupPage()" class="btn-secondary w-full">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                  </svg>
-                  アプリ設定管理
-                  <svg class="w-4 h-4 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                  </svg>
-                </button>
-              </div>
-              <p class="text-xs text-gray-500">
-                アプリの有効/無効状態を管理できます
-              </p>
-            </div>
-            
-            <!-- アカウント管理 -->
-            <details class="admin-panel-section danger-section">
-              <summary class="step-header cursor-pointer">
-                <div class="step-icon bg-red-500">
-                  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                  </svg>
-                </div>
-                <div>
-                  <h3 class="step-title text-red-300">アカウントの管理</h3>
-                  <p class="step-description text-red-400">⚠️ 危険な操作</p>
-                </div>
-                <svg class="w-4 h-4 transition-transform ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+          
+          <div class="space-y-4">
+            <!-- 簡潔な管理フロー -->
+            <div class="bg-amber-900/20 border border-amber-500/30 rounded-lg p-4">
+              <h4 class="font-medium text-amber-200 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                 </svg>
-              </summary>
-              <div class="danger-zone">
-                <p class="text-xs text-red-200/80 mb-3">
-                  この操作は元に戻せません。アカウントを削除すると、作成したすべてのボードと設定が完全に消去されます。
-                </p>
-                <button type="button" id="delete-account-btn" class="btn-secondary text-red-400 w-full">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                  </svg>
-                  自分のアカウントを完全に削除する
-                </button>
+                管理の流れ（3ステップ）
+              </h4>
+              <div class="space-y-2 text-xs text-amber-100">
+                <div class="flex items-center gap-2">
+                  <span class="bg-amber-600 text-white text-xs px-2 py-1 rounded font-bold">1</span>
+                  <span>データソース連携・AI列判定</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="bg-amber-600 text-white text-xs px-2 py-1 rounded font-bold">2</span>
+                  <span>表示設定・プライバシー調整</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="bg-amber-600 text-white text-xs px-2 py-1 rounded font-bold">3</span>
+                  <span>公開して学習者に共有</span>
+                </div>
               </div>
-            </details>
+              <button type="button" id="show-usage-guide" class="btn btn-secondary w-full text-sm py-2 mt-3">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+                詳細ガイドを開く
+              </button>
+            </div>
+            
+            <!-- セキュリティ・機能 -->
+            <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+              <h4 class="font-medium text-blue-200 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+                セキュリティ・機能概要
+              </h4>
+              <div class="space-y-2 text-xs text-blue-100">
+                <div class="flex items-center gap-2">
+                  <span class="text-green-400">✓</span>
+                  <span>Google Workspace自動連携</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-green-400">✓</span>
+                  <span>AI機能での効率化</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-green-400">✓</span>
+                  <span>完全非公開データベース</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-green-400">✓</span>
+                  <span>リアルタイム更新</span>
+                </div>
+              </div>
+              <div class="mt-3 text-xs text-blue-200 bg-blue-800/30 rounded p-2">
+                💡 詳細ガイドでセキュリティ仕様をご確認ください
+              </div>
+            </div>
+            
+            <!-- デジタルシティズンシップガイド -->
+            <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+              <h4 class="font-medium text-blue-200 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+                デジタル・シティズンシップ指導
+              </h4>
+              <p class="text-xs text-blue-100 mb-3">デジタル・シティズンシップに基づく回答ボード指導のポイントを確認しましょう</p>
+              <button type="button" id="show-digital-citizenship-guide" class="btn btn-secondary w-full text-sm py-2">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                指導ガイドを開く
+              </button>
+            </div>
+            
           </div>
         </div>
+        <!-- システム状況 -->
+        <div id="system-info-panel" class="glass-panel p-4 lg:p-6">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-8 h-8 bg-gradient-to-br from-gray-500 to-gray-600 rounded-xl flex items-center justify-center">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"></path></svg>
+      </div>
+      <h3 class="font-semibold text-gray-300">システム状況</h3>
+    </div>
+
+    <div class="space-y-4">
+      <!-- アカウント情報 -->
+      <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+        <h4 class="text-sm font-medium text-gray-200 mb-3 flex items-center gap-2">
+          <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+          </svg>
+          アカウント
+        </h4>
+        <div class="space-y-2 text-xs">
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">メールアドレス:</span>
+            <span class="text-white font-medium" id="info-admin-email">-</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">ユーザーID:</span>
+            <span class="text-white font-mono text-xs bg-gray-700 px-1.5 py-0.5 rounded" id="info-user-id">-</span>
+          </div>
+          <div class="text-right pt-2">
+            <a href="#" onclick="switchToAnotherAccount(); return false;" class="text-cyan-400 hover:text-cyan-300 hover:underline text-xs">
+              別のアカウントでログイン
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 公開設定 -->
+      <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+        <h4 class="text-sm font-medium text-gray-200 mb-3 flex items-center gap-2">
+          <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+          </svg>
+          公開設定
+        </h4>
+        <div class="space-y-2 text-xs">
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">公開状態:</span>
+            <span class="px-2 py-1 rounded text-xs font-medium" id="info-publish-status">
+              <span class="inline-flex items-center gap-1">
+                <div class="w-2 h-2 rounded-full" id="info-publish-indicator"></div>
+                <span id="info-publish-text">確認中</span>
+              </span>
+            </span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">公開シート:</span>
+            <span class="text-white font-semibold" id="info-published-sheet">-</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">表示モード:</span>
+            <span class="text-white" id="info-display-mode">-</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">カウント表示:</span>
+            <span class="text-white" id="info-show-counts">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- データ状況 -->
+      <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+        <h4 class="text-sm font-medium text-gray-200 mb-3 flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+          </svg>
+          データ状況
+        </h4>
+        <div class="space-y-2 text-xs">
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">総回答数:</span>
+            <span class="text-white font-bold text-lg" id="info-answer-count">-</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">総リアクション数:</span>
+            <span class="text-white font-bold text-lg" id="info-reaction-count">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- リソース -->
+      <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+        <h4 class="text-sm font-medium text-gray-200 mb-3 flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+          </svg>
+          リソース
+        </h4>
+        <div class="space-y-3 text-xs">
+          <div class="flex gap-2">
+            <button type="button" id="open-spreadsheet-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded flex items-center justify-center gap-2 transition-all" disabled>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+              </svg>
+              スプレッドシート
+            </button>
+            <button type="button" id="open-form-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded flex items-center justify-center gap-2 transition-all" disabled>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              フォーム
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- アプリ設定リンク -->
+      <div id="app-setup-link" class="bg-blue-900/10 border border-blue-500/30 rounded-lg p-3 transition-all hover:border-blue-500/50">
+        <button type="button" onclick="openAppSetupPage()" class="w-full flex items-center justify-between text-sm font-medium text-blue-300 hover:text-blue-200 transition-colors">
+          <div class="flex items-center">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+            <span>アプリ設定管理</span>
+          </div>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+          </svg>
+        </button>
+        <p class="text-xs text-blue-200/70 mt-2 ml-6">
+          アプリの有効/無効状態を管理できます
+        </p>
+      </div>
+      
+      <details id="account-deletion-section" class="bg-red-900/10 border border-red-500/30 rounded-lg transition-all hover:border-red-500/50">
+        <summary class="p-3 cursor-pointer text-sm font-medium text-red-300 hover:text-red-200 flex items-center justify-between">
+          <span>アカウントの管理</span>
+          <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </summary>
+        <div class="p-3 pt-0">
+          <p class="text-xs text-red-200/80 mb-3">
+            この操作は元に戻せません。アカウントを削除すると、作成したすべてのボードと設定が完全に消去されます。
+          </p>
+          <button type="button" id="delete-account-btn" class="btn btn-danger w-full text-sm py-2">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            <span>自分のアカウントを完全に削除する</span>
+          </button>
+        </div>
+      </details>
       </div>
     </div>
   </main>
   
-  <footer id="admin-footer" class="fixed bottom-0 left-0 w-full z-40 hidden">
-    <div class="glass-panel rounded-none border-t border-gray-700/50 backdrop-blur-md">
-      <div class="max-w-4xl mx-auto px-6 py-4">
-        <div class="flex items-center justify-between">
-          <!-- 左側: 公開中のボード情報 -->
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1">
-              <div class="status-indicator status-active">
-                <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <span class="text-green-400 font-semibold text-sm">公開中</span>
-              </div>
-            </div>
-            <p class="text-cyan-300 font-medium text-base truncate" id="current-topic-text">読み込み中...</p>
+  <!-- 統合フッター -->
+  <footer id="admin-footer" class="fixed bottom-0 left-0 right-0 glass-panel border-t border-gray-700 hidden">
+    <div class="max-w-6xl mx-auto px-6 py-4">
+      <div class="flex items-center justify-between">
+        <!-- 左側: 公開中の問題文 -->
+        <div class="flex-1">
+          <div class="flex items-center gap-2 mb-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span class="text-green-400 font-semibold text-sm">公開中:</span>
           </div>
-          
-          <!-- 右側: ボードURL操作 -->
-          <div class="flex items-center gap-3">
-            <input type="text" id="board-url" readonly
-                   class="form-control text-sm min-w-[280px]"
-                   onclick="this.select()" placeholder="URLが生成されます">
-            <button type="button" onclick="copyBoardUrl()" class="btn-secondary" title="URLをコピー" aria-label="生徒用URLをコピー">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-              </svg>
-            </button>
-            <a id="view-board-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-primary" title="回答ボードを開く" aria-label="新しいタブで回答ボードを開く">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <p class="text-blue-300 font-medium text-lg" id="current-topic-text">読み込み中...</p>
+        </div>
+        
+        <!-- 右側: ボードURL操作 -->
+        <div class="flex items-center gap-3">
+          <input type="text" id="board-url" readonly
+                 class="px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-sm cursor-pointer hover:bg-gray-700 focus:ring-2 focus:ring-green-400 min-w-[300px]"
+                 onclick="this.select()" placeholder="URLが生成されます">
+          <button type="button" onclick="copyBoardUrl()" class="btn btn-secondary px-3 py-2 flex items-center" title="URLをコピー" aria-label="生徒用URLをコピー">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+            </svg>
+          </button>
+          <a id="view-board-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary px-3 py-2 flex items-center" title="回答ボードを開く" aria-label="新しいタブで回答ボードを開く">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
             </svg>
           </a>
-  <div id="message-area" class="message-area fixed top-20 right-6 z-50" aria-live="polite" role="status"></div>
+        </div>
+      </div>
+    </div>
+  </footer>
+  <div id="message-area" class="fixed top-20 right-6 z-50" aria-live="polite" role="status"></div>
   
-  <!-- 共通モーダルコンポーネント（直接埋め込み済み） -->
+  <!-- 共通モーダルコンポーネントを読み込み -->
+  <?!= include('SharedModals'); ?>
   <script>
     /* =============================================================================
        AdminPanel.html - Minimal JavaScript 
@@ -752,58 +939,6 @@
     // Essential functions using shared utilities
     var showMessage = window.sharedUtilities?.message?.show || function(msg, type) {
       console.log(`[${type}] ${msg}`);
-      
-      // Fallback message display implementation
-      const messageArea = document.getElementById('message-area');
-      if (!messageArea) {
-        console.warn('Message area not found, creating fallback');
-        return;
-      }
-      
-      // Create message element
-      const messageElement = document.createElement('div');
-      messageElement.className = `message glass-panel px-4 py-3 rounded-lg shadow-lg mb-3 transition-all duration-300 transform translate-x-0`;
-      
-      // Set message styling based on type
-      switch (type) {
-        case 'success':
-          messageElement.className += ' bg-green-500/20 border border-green-500/50 text-green-200';
-          break;
-        case 'error':
-          messageElement.className += ' bg-red-500/20 border border-red-500/50 text-red-200';
-          break;
-        case 'warning':
-          messageElement.className += ' bg-yellow-500/20 border border-yellow-500/50 text-yellow-200';
-          break;
-        case 'info':
-        default:
-          messageElement.className += ' bg-blue-500/20 border border-blue-500/50 text-blue-200';
-          break;
-      }
-      
-      // Set message content
-      messageElement.innerHTML = `
-        <div class="flex items-center justify-between">
-          <span class="text-sm font-medium">${msg}</span>
-          <button type="button" class="text-current opacity-70 hover:opacity-100 ml-3 text-lg" onclick="this.parentElement.parentElement.remove()">×</button>
-        </div>
-      `;
-      
-      // Add to message area
-      messageArea.appendChild(messageElement);
-      
-      // Auto-remove after 5 seconds
-      setTimeout(() => {
-        if (messageElement.parentElement) {
-          messageElement.style.opacity = '0';
-          messageElement.style.transform = 'translateX(100%)';
-          setTimeout(() => {
-            if (messageElement.parentElement) {
-              messageElement.remove();
-            }
-          }, 300);
-        }
-      }, 5000);
     };
     
     var handleError = window.adminUtilities?.error?.handle || function(error, context) {
@@ -853,22 +988,6 @@
         
         if (window.sharedUtilities) {
           console.log('✅ AdminPanel: Shared utilities loaded');
-        }
-        
-        // リソース連携解除機能のテスト（デバッグモードのみ）
-        if (DEBUG_MODE) {
-          window.testDisconnectResources = function() {
-            console.log('🧪 Testing disconnectResources function...');
-            return runGasWithUserId('disconnectResources')
-              .then(function(response) {
-                console.log('✅ disconnectResources test successful:', response);
-                return response;
-              })
-              .catch(function(error) {
-                console.error('❌ disconnectResources test failed:', error);
-                throw error;
-              });
-          };
         }
       }
     });
@@ -1238,9 +1357,112 @@
       element.classList.add(type === 'success' ? 'success-pulse' : 'error-shake');
     }
 
-    // Layout adjustment function - removed since footer is now in flex layout
+    // Layout adjustment function for footer padding
+    let baseBodyPadding;
+    function adjustLayout() {
+      if (IS_TEST_ENV) return;
+      if (typeof baseBodyPadding === 'undefined') {
+        baseBodyPadding = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+      }
+      const footer = document.getElementById('admin-footer');
+      if (footer) {
+        const footerHeight = footer.offsetHeight;
+        document.body.style.paddingBottom = footerHeight + baseBodyPadding + 'px';
+      }
+    }
 
+    // プライバシーモーダルの制御関数
+    function showPrivacyModal(onContinue) {
+      var modal = document.getElementById('privacy-modal');
+      if (!modal) {
+        console.error('プライバシーモーダルが見つかりません');
+        return;
+      }
+      
+      modal.classList.remove('hidden');
+      
+      // イベントリスナーを設定（重複を防ぐため一度クリア）
+      var continueBtn = document.getElementById('privacy-modal-continue');
+      var cancelBtn = document.getElementById('privacy-modal-cancel');
+      
+      // 既存のリスナーを削除
+      if (continueBtn) {
+        var newContinueBtn = continueBtn.cloneNode(true);
+        continueBtn.parentNode.replaceChild(newContinueBtn, continueBtn);
+        newContinueBtn.addEventListener('click', function() {
+          hidePrivacyModal();
+          if (onContinue) onContinue();
+        });
+      }
+      
+      if (cancelBtn) {
+        var newCancelBtn = cancelBtn.cloneNode(true);
+        cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+        newCancelBtn.addEventListener('click', hidePrivacyModal);
+      }
+      
+      // Escapeキーでモーダルを閉じる
+      var escapeHandler = function(e) {
+        if (e.key === 'Escape') {
+          hidePrivacyModal();
+          document.removeEventListener('keydown', escapeHandler);
+        }
+      };
+      document.addEventListener('keydown', escapeHandler);
+    }
     
+    function hidePrivacyModal() {
+      var modal = document.getElementById('privacy-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+    }
+
+    // デジタルシティズンシップモーダルの制御関数
+    function showDigitalCitizenshipModal() {
+      var modal = document.getElementById('digital-citizenship-modal');
+      if (!modal) {
+        console.error('デジタルシティズンシップモーダルが見つかりません');
+        return;
+      }
+      
+      modal.classList.remove('hidden');
+      
+      // 閉じるボタンのイベントリスナーを設定
+      var closeBtn = document.getElementById('digital-citizenship-modal-close');
+      var closeBtnBottom = document.getElementById('digital-citizenship-modal-close-btn');
+      
+      if (closeBtn) {
+        closeBtn.onclick = hideDigitalCitizenshipModal;
+      }
+      
+      if (closeBtnBottom) {
+        closeBtnBottom.onclick = hideDigitalCitizenshipModal;
+      }
+      
+      // Escapeキーでモーダルを閉じる
+      var escapeHandler = function(e) {
+        if (e.key === 'Escape') {
+          hideDigitalCitizenshipModal();
+          document.removeEventListener('keydown', escapeHandler);
+        }
+      };
+      document.addEventListener('keydown', escapeHandler);
+      
+      // モーダルの背景をクリックしたときに閉じる
+      modal.onclick = function(e) {
+        if (e.target === modal) {
+          hideDigitalCitizenshipModal();
+        }
+      };
+    }
+    
+    function hideDigitalCitizenshipModal() {
+      var modal = document.getElementById('digital-citizenship-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+    }
 
     /**
      * 設定エリアを非表示にし、プレースホルダーを表示する
@@ -1268,13 +1490,8 @@
       modal.classList.remove('hidden');
       modal.classList.add('flex');
 
-      var confirmBtn = document.getElementById('modal-confirm');
-      var cancelBtn = document.getElementById('modal-cancel');
-
-      if (!confirmBtn || !cancelBtn) {
-        console.error('モーダルボタンが見つかりません');
-        return;
-      }
+      var confirmBtn = document.getElementById('modal-confirm-btn');
+      var cancelBtn = document.getElementById('modal-cancel-btn');
 
       var confirmHandler = function() {
         onConfirm();
@@ -1371,27 +1588,7 @@
     var IS_TEST_ENV = typeof navigator !== 'undefined' &&
       navigator.userAgent && navigator.userAgent.indexOf('jsdom') !== -1;
 
-    const DEBUG_MODE = false;
-    
-    // プロダクション環境でのログ制御
-    const originalConsoleLog = console.log;
-    const originalConsoleDebug = console.debug;
-    
-    if (!DEBUG_MODE) {
-      // プロダクションでは詳細ログを抑制
-      console.log = function(...args) {
-        // エラーや重要な情報のみログ出力
-        if (args[0] && (typeof args[0] === 'string')) {
-          if (args[0].includes('✅') || args[0].includes('❌') || args[0].includes('⚠️') || args[0].includes('Error:')) {
-            originalConsoleLog.apply(console, args);
-          }
-        }
-      };
-      
-      console.debug = function() {
-        // プロダクションではdebugログを完全に無効化
-      };
-    }
+    const DEBUG_MODE = <?= typeof DEBUG_MODE !== 'undefined' ? DEBUG_MODE : false ?>;
 
     // AdminPanel専用システムフロー表示機能
     function showSystemFlow() {
@@ -1553,11 +1750,6 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-      console.log('🚀 AdminPanel DOMContentLoaded - Starting initialization...');
-      
-      // Initialize elements first
-      initializeElements();
-      
       // 初期ロード状態を表示
       setLoading(true, '設定を読み込み中...');
       
@@ -1566,9 +1758,8 @@
         setLoading(false);
         showMessage('初期設定の読み込みに時間がかかっています。ページを再読み込みしてください。', 'warning');
       }, 20000);
-      
-      // Remove duplicate elements assignment - now handled by initializeElements()
-      /* elements = {
+      // `elements` オブジェクトの定義を修正
+elements = {
   // ... 既存の要素はそのまま ...
   sheetSelect: document.getElementById('sheet-select'),
   configArea: document.getElementById('config-area'),
@@ -1585,6 +1776,7 @@
   setupProgressMobile: document.getElementById('setup-progress-mobile'),
   setupProgressText: document.getElementById('setup-progress-text'),
   setupProgressTextMobile: document.getElementById('setup-progress-text-mobile'),
+  headerDomainName: document.getElementById('header-domain-name'),
   headerStatusDot: document.getElementById('header-status-dot'),
   headerStatusText: document.getElementById('header-status-text'),
   configStatus: document.getElementById('config-status'),
@@ -1627,37 +1819,40 @@
   adminFooter: document.getElementById('admin-footer'),
   currentTopicText: document.getElementById('current-topic-text')
   // ★★★ ここまで追加 ★★★
-}; */
-      // アカウント管理セクションの表示制御
-      const accountManagementSection = document.getElementById('account-management-section');
-      const accountDeletionWrapper = document.getElementById('account-deletion-wrapper');
+};
+      // AppSetupPageリンクとアカウント削除セクションの表示制御
+      var appSetupLink = document.getElementById('app-setup-link');
+      var accountDeletionSection = document.getElementById('account-deletion-section');
+      
+      console.log('Display control - isSystemAdmin:', window.isSystemAdmin);
+      console.log('Display control - appSetupLink element:', appSetupLink);
+      console.log('Display control - accountDeletionSection element:', accountDeletionSection);
 
       if (window.isSystemAdmin) {
-        // システム管理者の場合、アカウント管理セクション自体を非表示
-        if (accountManagementSection) {
-          accountManagementSection.style.display = 'none';
-          console.log('✅ Account management section hidden for system admin');
+        // システム管理者の場合：AppSetupPageリンクを表示、削除セクションを非表示
+        if (appSetupLink) {
+          appSetupLink.style.display = 'block';
+          console.log('✅ AppSetupPage link shown for deploy user');
+        }
+        if (accountDeletionSection) {
+          accountDeletionSection.style.display = 'none';
+          console.log('✅ Account deletion section hidden for deploy user');
         }
       } else {
-        // 一般ユーザーの場合、アカウント削除ボタンを追加
-        if (accountDeletionWrapper) {
-          const deleteButtonHTML = `
-            <div class="border-t border-red-700/50 pt-3 mt-3">
-              <p class="text-xs text-red-300/80 mb-2">この操作は元に戻せません。アカウントを削除すると、作成したすべてのボードと設定が完全に消去されます。</p>
-              <button type="button" id="delete-account-btn" class="btn btn-danger w-full text-sm py-2">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                <span>自分のアカウントを完全に削除する</span>
-              </button>
-            </div>
-          `;
-          accountDeletionWrapper.innerHTML = deleteButtonHTML;
-          console.log('ℹ️ Account deletion button shown for non-system admin');
+        // 一般ユーザーの場合：AppSetupPageリンクを非表示、削除セクションを表示
+        if (appSetupLink) {
+          appSetupLink.style.display = 'none';
+          console.log('ℹ️ AppSetupPage link hidden for non-deploy user');
+        }
+        if (accountDeletionSection) {
+          accountDeletionSection.style.display = 'block';
+          console.log('ℹ️ Account deletion section shown for non-deploy user');
         }
       }
       if (!IS_TEST_ENV) {
         showSystemFlow(); // デバッグフロー表示
         loadStatus();
-        // Layout adjustment removed - using flexbox layout
+        adjustLayout();
         loadAdminDomainInfo();
       }
       setupEventListeners();
@@ -1866,49 +2061,11 @@
     // 重複していたDOMContentLoadedイベントリスナーを削除
     // 既に上記で設定済み
 
-    // Initialize elements object function
-    function initializeElements() {
-      console.log('🔧 Initializing elements object...');
-      elements = {
-        sheetSelect: document.getElementById('sheet-select'),
-        configArea: document.getElementById('config-area'),
-        configPlaceholder: document.getElementById('config-placeholder'),
-        opinionHeader: document.getElementById('opinionHeader'),
-        reasonHeader: document.getElementById('reasonHeader'),
-        nameHeader: document.getElementById('nameHeader'),
-        classHeader: document.getElementById('classHeader'),
-        saveConfigBtn: document.getElementById('save-config-btn'),
-        detailOptions: document.getElementById('detail-options'),
-        boardUrl: document.getElementById('board-url'),
-        viewBoardLink: document.getElementById('view-board-link'),
-        setupProgress: document.getElementById('setup-progress'),
-        setupProgressMobile: document.getElementById('setup-progress-mobile'),
-        setupProgressText: document.getElementById('setup-progress-text'),
-        setupProgressTextMobile: document.getElementById('setup-progress-text-mobile'),
-        headerStatusDot: document.getElementById('header-status-dot'),
-        headerStatusText: document.getElementById('header-status-text'),
-        configStatus: document.getElementById('config-status'),
-        addSpreadsheetText: document.getElementById('add-spreadsheet-text'),
-        clearSelectionBtn: document.getElementById('clear-selection-btn'),
-        createBoardBtn: document.getElementById('create-board-btn'),
-        addResourceBtn: document.getElementById('add-resource-btn'),
-        resourceUrlInput: document.getElementById('resource-url-input')
-      };
-      console.log('✅ Elements object initialized');
-    }
-
     // `setupEventListeners` 関数の中にこのリスナーを追加
 function setupEventListeners() {
-  console.log('🔧 Setting up event listeners...');
-  
-  // Ensure elements object is properly initialized
-  if (!elements || typeof elements !== 'object') {
-    console.warn('Elements object not found, initializing...');
-    initializeElements();
-  }
-  
-  // Sheet selection handler
-  if (elements.sheetSelect) {
+  // ... 既存のリスナーはそのまま ...
+  // Sheet selection
+      if (elements.sheetSelect) {
         elements.sheetSelect.addEventListener('change', function(e) {
           appState.selectedSheet = e.target.value;
           
@@ -1961,18 +2118,6 @@ function setupEventListeners() {
             '公開を停止',
             'ボードの公開を停止します。この操作により、ボードにアクセスできなくなります。継続しますか？',
             unpublishBoard
-          );
-        });
-      }
-      
-      // 全リソース削除ボタンのイベントハンドラー
-      var deleteAllResourcesBtn = document.getElementById('delete-all-resources-btn');
-      if (deleteAllResourcesBtn) {
-        deleteAllResourcesBtn.addEventListener('click', function() {
-          showConfirmationModal(
-            '全リソースの削除',
-            '⚠️ この操作は取り消しできません。\n\nデータベース内の以下の情報が完全に削除されます：\n・ スプレッドシート情報\n・ フォーム情報\n・ 設定情報\n・ 公開状態\n\n続行しますか？',
-            deleteAllResources
           );
         });
       }
@@ -2211,12 +2356,12 @@ function handleDeleteRequest() {
             setTimeout(function() {
               // Use iframe-safe navigation
               if (window.sharedUtilities && window.sharedUtilities.navigation) {
-                window.sharedUtilities.navigation.safeNavigate('?page=LoginPage', {
+                window.sharedUtilities.navigation.safeNavigate('?page=Registration', {
                   fallbackMessage: '登録ページに移動中...',
                   method: 'auto'
                 });
               } else {
-                window.location.href = '?page=LoginPage';
+                window.location.href = '?page=Registration';
               }
             }, 2000);
           })
@@ -2757,16 +2902,10 @@ function syncCheckboxStates(status) {
       
       if (!footer || !guidanceText) return;
 
-      // より厳密な公開状態の判定 - 安全なオプショナルチェーン
-      const isPublished = status && (
-        status.isPublished === true || 
-        status.appPublished === true
-      ) && status.appUrls?.viewUrl;
+      const isPublished = status.isPublished;
 
-      if (isPublished && status.appUrls?.viewUrl) {
+      if (isPublished && status.appUrls && status.appUrls.viewUrl) {
         footer.classList.remove('hidden');
-        footer.style.display = 'block';
-        footer.style.removeProperty('display');
         document.getElementById('board-url').value = status.appUrls.viewUrl;
         document.getElementById('view-board-link').href = status.appUrls.viewUrl;
         
@@ -2795,9 +2934,7 @@ function syncCheckboxStates(status) {
         
         guidanceText.textContent = '回答ボードは現在公開中です。';
       } else {
-        // 非公開時は確実にフッターを非表示
         footer.classList.add('hidden');
-        footer.style.display = 'none';
         // ガイダンスのテキストとステップの説明を動的に設定
         if (status.nextAction) {
           guidanceText.textContent = status.nextAction;
@@ -2865,7 +3002,7 @@ function syncCheckboxStates(status) {
          console.log(`✅ [DEBUG] Set footer topic text fallback to: ${fallbackTopic}`);
       }
 
-      // Layout adjustment removed - using flexbox layout
+      adjustLayout();
     }
 
     /**
@@ -3375,14 +3512,7 @@ function syncCheckboxStates(status) {
      * 設定が有効かどうかを検証する
      */
     function validateConfig() {
-      const opinionHeader = document.getElementById('opinionHeader');
-      if (!opinionHeader) {
-        console.warn('opinionHeader element not found');
-        return false;
-      }
-      const isValid = !!opinionHeader.value;
-      console.log('validateConfig:', opinionHeader.value, 'isValid:', isValid);
-      return isValid;
+      return !!document.getElementById('opinionHeader').value;
     }
 
     /**
@@ -3391,11 +3521,7 @@ function syncCheckboxStates(status) {
     function updateConfigButtons() {
       const saveBtn = document.getElementById('save-publish-btn');
       if (saveBtn) {
-        const isValid = validateConfig();
-        saveBtn.disabled = !isValid;
-        console.log('updateConfigButtons: saveBtn.disabled =', saveBtn.disabled);
-      } else {
-        console.warn('save-publish-btn element not found');
+        saveBtn.disabled = !validateConfig();
       }
     }
 
@@ -3416,18 +3542,13 @@ function syncCheckboxStates(status) {
      *【新しい推奨】設定を保存し、ボードを公開する
      */
     function saveAndPublish() {
-      console.log('💾 saveAndPublish called');
-      
       if (!validateConfig()) {
-        console.warn('⚠️ Validation failed');
         showMessage('必須項目（回答データ列）が選択されていません。', 'error');
         return;
       }
 
-      console.log('✅ Validation passed, starting save and publish...');
       setLoading(true, '設定を保存し、ボードを公開しています...');
       const config = buildConfigObject();
-      console.log('📜 Config object:', config);
 
       // マルチテナント対応: 設定データをオブジェクトとして送信
       const settingsData = {
@@ -3492,9 +3613,7 @@ function syncCheckboxStates(status) {
      * ボードの公開を停止する
      */
     function unpublishBoard() {
-      console.log('🚫 unpublishBoard called');
       setLoading(true, 'ボードの公開を停止中...');
-      console.log('📤 Calling runGasWithUserId(clearActiveSheet)');
       runGasWithUserId('clearActiveSheet')
         .then(function(response) {
           console.log('公開停止レスポンス:', response);
@@ -3536,10 +3655,7 @@ function syncCheckboxStates(status) {
     function showFormConfigModal() {
         const modal = document.getElementById('form-config-modal');
         if (modal) {
-            const panel = modal.querySelector('.glass-panel');
             modal.classList.remove('hidden');
-            modal.classList.add('modal-fade');
-            if (panel) panel.classList.add('modal-scale');
 
             // サーバーから質問テンプレートを読み込み
             initQuestionConfig();
@@ -3586,10 +3702,7 @@ function syncCheckboxStates(status) {
     function hideFormConfigModal() {
         const modal = document.getElementById('form-config-modal');
         if (modal) {
-            const panel = modal.querySelector('.glass-panel');
             modal.classList.add('hidden');
-            modal.classList.remove('modal-fade');
-            if (panel) panel.classList.remove('modal-scale');
         }
     }
 
@@ -3598,6 +3711,7 @@ function syncCheckboxStates(status) {
      * Promiseベースの非同期処理でエラーハンドリングを改善
      */
     async function createFormWithConfig() {
+        const customFormTitle = document.getElementById('custom-form-title').value.trim();
         const customMainQuestion = document.getElementById('custom-main-question').value.trim();
         const mainQuestionType = document.getElementById('main-question-type').value;
         const mainQuestionChoices = document.getElementById('main-question-choices').value.split('\n').filter(choice => choice.trim());
@@ -3605,7 +3719,12 @@ function syncCheckboxStates(status) {
         const enableClassSelection = document.getElementById('enable-class-selection').checked;
         const classChoices = enableClassSelection ? document.getElementById('class-choices').value.split('\n').filter(choice => choice.trim()) : [];
 
-        // バリデーション（タイトルは自動生成のため削除）
+        // バリデーション
+        if (!customFormTitle) {
+            showMessage('フォームタイトルを入力してください。', 'warning');
+            document.getElementById('custom-form-title').focus();
+            return;
+        }
 
         if (!customMainQuestion) {
             showMessage('質問内容を入力してください。', 'warning');
@@ -3620,7 +3739,7 @@ function syncCheckboxStates(status) {
         }
 
         const config = {
-            // formTitle is now auto-generated in backend
+            formTitle: customFormTitle,
             opinionHeader: customMainQuestion,  // mainQuestion を opinionHeader に統一
             questionType: mainQuestionType,
             choices: mainQuestionChoices,
@@ -3911,42 +4030,6 @@ function syncCheckboxStates(status) {
     }
 
     /**
-     * 連携しているフォーム(編集画面)を開く
-     */
-    function openLinkedForm() {
-        const link = document.getElementById('open-form-url-link');
-        const url = link && link.href ? link.href : (appState.currentStatus && appState.currentStatus.formUrl);
-        if (url) {
-            window.open(url, '_blank');
-        } else {
-            showMessage('連携しているフォームが見つかりません。', 'warning');
-        }
-    }
-
-    /**
-     * シート選択をクリアしてUIをリセットする
-     */
-    function clearSheetSelection() {
-        const select = document.getElementById('sheet-select');
-        if (select) {
-            select.value = '';
-        }
-        appState.selectedSheet = '';
-        updateUIForSelectedSheet();
-        clearConfigFields();
-    }
-
-    /**
-     * ステータスを強制再取得してUIを更新する
-     */
-    function refreshBoardDataFromAdmin() {
-        setLoading(true, '最新情報を取得中...');
-        loadStatus(true)
-          .catch(function(error) { handleError(error, 'refreshBoardDataFromAdmin'); })
-          .finally(function() { setLoading(false); });
-    }
-
-    /**
      * ボードのURLをクリップボードにコピーする
      */
     function copyBoardUrl() {
@@ -4052,50 +4135,12 @@ function syncCheckboxStates(status) {
           window.open(setupUrl, '_blank');
         });
     }
-    
-    function switchToAnotherAccount() {
-      // 別のアカウントでログインするために管理パネルを再読み込み
-      if (window.sharedUtilities && window.sharedUtilities.navigation) {
-        window.sharedUtilities.navigation.safeNavigate('?page=AdminPanel&forceAuth=true', {
-          fallbackMessage: '別のアカウントでログイン中...',
-          method: 'auto'
-        });
-      } else {
-        window.location.href = '?page=AdminPanel&forceAuth=true';
-      }
-    }
-    
-    function deleteAllResources() {
-      // リソース連携解除の実行（フォーム・スプレッドシートは保持）
-      setLoading(true, 'リソース連携を解除中...');
-      
-      // 改善されたリソース連携解除処理
-      runGasWithUserId('disconnectResources')
-        .then(function(response) {
-          console.log('リソース連携解除レスポンス:', response);
-          
-          if (response && response.status === 'success') {
-            showMessage(response.message, 'success');
-            // UIをリフレッシュ
-            loadStatus(true);
-          } else {
-            throw new Error(response?.message || '不明なエラーが発生しました。');
-          }
-        })
-        .catch(function(error) {
-          console.error('リソース連携解除エラー:', error);
-          handleError(error, 'リソース連携解除');
-        })
-        .finally(function() {
-          setLoading(false);
-        });
-    }
 
   </script>
 
   <!-- フォーム設定モーダル -->
   <div id="form-config-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 hidden">
-    <div class="glass-panel backdrop-blur-lg rounded-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <div class="glass-panel rounded-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
       <div class="p-8">
         <div class="flex justify-between items-center mb-6">
           <h3 class="text-2xl font-bold text-cyan-400">新しいフォームを作成</h3>
@@ -4108,7 +4153,29 @@ function syncCheckboxStates(status) {
         
         <div class="space-y-6">
           <!-- ステップ0: フォームタイトルの設定 -->
-          <!-- フォームタイトルは自動生成されるため、入力フィールドを削除 -->
+          <div class="glass-panel bg-cyan-500/5 border border-cyan-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-cyan-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm0 2h12v8H4V6z"/>
+                  <path d="M6 8h8v2H6V8zm0 4h6v2H6v-2z"/>
+                </svg>
+              </div>
+              <h4 class="text-lg font-semibold text-cyan-400">フォームタイトル</h4>
+              <span class="text-xs text-gray-400 bg-gray-700/50 px-2 py-1 rounded">必須</span>
+            </div>
+            <input 
+              type="text" 
+              id="custom-form-title" 
+              class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-colors" 
+              placeholder="例：国語の授業振り返り、理科実験レポート、今日の学習まとめ"
+              maxlength="100"
+            >
+            <div class="flex justify-between items-center mt-2">
+              <p class="text-xs text-gray-400">📝 作成されるフォームのタイトルに使用されます（自動で日時が追加されます）</p>
+              <span class="text-xs text-gray-500" id="title-counter">0/100</span>
+            </div>
+          </div>
 
           <!-- ステップ1: 問題文の入力 -->
           <div class="glass-panel bg-blue-500/5 border border-blue-400/20 rounded-lg p-4">
@@ -4120,11 +4187,11 @@ function syncCheckboxStates(status) {
             <textarea 
               id="custom-main-question" 
               rows="3" 
-              class="form-control text-sm" 
+              class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors" 
               placeholder="例：今日の授業で学んだことの中で、最も印象に残ったことは何ですか？"
               maxlength="500"
             ></textarea>
-            <div class="flex justify-between items-center">
+            <div class="flex justify-between items-center mt-2">
               <p class="text-xs text-gray-400">💡 学習者に表示される質問文を入力してください</p>
               <span class="text-xs text-gray-500" id="question-counter">0/500</span>
             </div>
@@ -4136,12 +4203,12 @@ function syncCheckboxStates(status) {
               <div class="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">2</div>
               <h4 class="text-lg font-semibold text-green-400">回答方法を選択</h4>
             </div>
-            <select id="main-question-type" class="form-control text-sm" title="回答方法を選択してください">
+            <select id="main-question-type" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm focus:border-green-400 focus:ring-1 focus:ring-green-400 transition-colors" title="回答方法を選択してください">
               <option value="choice" selected>選択肢（単一選択）</option>
               <option value="multiple">選択肢（複数選択可）</option>
               <option value="text">短文テキスト（1行回答）</option>
             </select>
-            <p class="text-xs text-gray-400">💡 すべての回答方法で、回答の理由を入力する欄が自動的に追加されます</p>
+            <p class="text-xs text-gray-400 mt-2">💡 すべての回答方法で、回答の理由を入力する欄が自動的に追加されます</p>
           </div>
 
           <!-- 選択肢設定（選択肢タイプの場合） -->
@@ -4150,15 +4217,15 @@ function syncCheckboxStates(status) {
               <div class="w-6 h-6 bg-yellow-500 text-white rounded-full flex items-center justify-center text-sm font-bold">3</div>
               <h4 class="text-lg font-semibold text-yellow-400">選択肢を設定</h4>
             </div>
-            <textarea id="main-question-choices" rows="4" class="form-control text-sm" placeholder="例：&#10;気づいたことがある。&#10;疑問に思うことがある。&#10;もっと知りたいことがある。"></textarea>
-            <p class="text-xs text-gray-400">💡 学習者が選択できる選択肢を1行に1つずつ入力してください。例のような評価軸や、具体的な選択肢を設定できます。</p>
+            <textarea id="main-question-choices" rows="4" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-colors" placeholder="例：&#10;気づいたことがある。&#10;疑問に思うことがある。&#10;もっと知りたいことがある。"></textarea>
+            <p class="text-xs text-gray-400 mt-2">💡 学習者が選択できる選択肢を1行に1つずつ入力してください。例のような評価軸や、具体的な選択肢を設定できます。</p>
             
-            <div>
+            <div class="mt-4">
               <label class="flex items-center">
-                <input type="checkbox" id="include-others-option" checked>
+                <input type="checkbox" id="include-others-option" class="mr-2 rounded bg-gray-700 border-gray-600 text-yellow-500 focus:ring-yellow-400" checked>
                 <span class="text-sm text-gray-300">「その他...」選択肢を追加する</span>
               </label>
-              <p class="text-xs text-gray-400 ml-6">チェックすると、学習者が自由に回答を入力できる「その他...」オプションが自動的に追加されます</p>
+              <p class="text-xs text-gray-400 mt-1 ml-6">チェックすると、学習者が自由に回答を入力できる「その他...」オプションが自動的に追加されます</p>
             </div>
           </div>
 
@@ -4171,13 +4238,13 @@ function syncCheckboxStates(status) {
             </div>
             <div class="mb-3">
               <label class="flex items-center">
-                <input type="checkbox" id="enable-class-selection" checked>
+                <input type="checkbox" id="enable-class-selection" class="mr-2 rounded bg-gray-700 border-gray-600 text-purple-500 focus:ring-purple-400" checked>
                 <span class="text-sm text-gray-300">クラス選択を有効にする</span>
               </label>
             </div>
             <div id="class-choices-container">
-              <textarea id="class-choices" rows="3" class="form-control text-sm" placeholder="例：&#10;クラス1&#10;クラス2&#10;クラス3&#10;クラス4"></textarea>
-              <p class="text-xs text-gray-400">1行に1つずつクラス名を入力してください</p>
+              <textarea id="class-choices" rows="3" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition-colors" placeholder="例：&#10;クラス1&#10;クラス2&#10;クラス3&#10;クラス4"></textarea>
+              <p class="text-xs text-gray-400 mt-2">1行に1つずつクラス名を入力してください</p>
             </div>
           </div>
         </div>
@@ -4194,134 +4261,22 @@ function syncCheckboxStates(status) {
     </div>
   </div>
 
-  <!-- プライバシーモーダル -->
-  <div id="privacy-modal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center">
-    <div class="glass-panel rounded-xl max-w-md w-full mx-4">
-      <div class="p-6">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
-            <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-            </svg>
-          </div>
-          <h3 class="text-xl font-semibold text-white">プライバシーの確認</h3>
-        </div>
-        
-        <div class="mb-6">
-          <p class="text-gray-300 leading-relaxed">この操作を実行する前に、プライバシーポリシーを確認してください。</p>
-        </div>
-        
-        <div class="flex gap-3">
-          <button type="button" id="privacy-modal-cancel" class="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors">
-            キャンセル
-          </button>
-          <button type="button" id="privacy-modal-continue" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium">
-            続行
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- デジタルシティズンシップモーダル -->
-  <div id="digital-citizenship-modal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center">
-    <div class="glass-panel rounded-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-      <div class="p-6">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="text-xl font-semibold text-white">デジタル・シティズンシップ指導</h3>
-          <button type="button" id="digital-citizenship-modal-close" class="text-gray-400 hover:text-white text-2xl">×</button>
-        </div>
-        
-        <div class="mb-6">
-          <p class="text-gray-300 leading-relaxed mb-4">デジタル・シティズンシップに基づく回答ボード指導のポイント：</p>
-          <ul class="list-disc pl-5 space-y-2 text-gray-300">
-            <li>建設的な意見交換を促進する</li>
-            <li>他者の意見を尊重する態度を育む</li>
-            <li>情報の信頼性を検証する習慣を身につける</li>
-            <li>デジタル環境での適切なコミュニケーションを学ぶ</li>
-          </ul>
-        </div>
-        
-        <div class="text-right">
-          <button type="button" id="digital-citizenship-modal-close-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
-            閉じる
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 使用ガイドモーダル -->
-  <div id="usage-guide-modal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center">
-    <div class="glass-panel rounded-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-      <div class="p-6">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="text-xl font-semibold text-white">使用ガイド</h3>
-          <button type="button" id="usage-guide-modal-close" class="text-gray-400 hover:text-white text-2xl">×</button>
-        </div>
-        
-        <div class="mb-6">
-          <p class="text-gray-300 leading-relaxed mb-4">回答ボードの使用方法：</p>
-          <div class="space-y-3 text-gray-300">
-            <div class="p-3 bg-gray-700/30 rounded-lg">
-              <h4 class="font-medium text-white mb-2">ステップ1: データ準備</h4>
-              <p class="text-sm">GoogleフォームまたはスプレッドシートをWorkspace上で自動作成します。</p>
-            </div>
-            <div class="p-3 bg-gray-700/30 rounded-lg">
-              <h4 class="font-medium text-white mb-2">ステップ2: シート選択</h4>
-              <p class="text-sm">表示したいシートを選択します。</p>
-            </div>
-            <div class="p-3 bg-gray-700/30 rounded-lg">
-              <h4 class="font-medium text-white mb-2">ステップ3: 設定・公開</h4>
-              <p class="text-sm">列設定を行い、回答ボードを公開します。</p>
-            </div>
-          </div>
-        </div>
-        
-        <div class="text-right">
-          <button type="button" id="usage-guide-modal-close-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
-            閉じる
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 確認モーダル -->
-  <div id="confirmation-modal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center">
-    <div class="glass-panel rounded-xl max-w-md w-full mx-4">
-      <div class="p-6">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="w-10 h-10 bg-yellow-500/20 rounded-full flex items-center justify-center">
-            <svg class="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-            </svg>
-          </div>
-          <h3 id="modal-title" class="text-xl font-semibold text-white">確認</h3>
-        </div>
-        
-        <div class="mb-6">
-          <p id="modal-message" class="text-gray-300 leading-relaxed whitespace-pre-line">操作を実行しますか？</p>
-        </div>
-        
-        <div class="flex gap-3">
-          <button type="button" id="modal-cancel" class="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors">
-            キャンセル
-          </button>
-          <button type="button" id="modal-confirm" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium">
-            実行
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- フォーム設定モーダル用JavaScript -->
   <script>
-  // 文字数カウンター機能（タイトル入力は削除済み）
+  // 文字数カウンター機能
   function setupCharacterCounters() {
+    const titleInput = document.getElementById('custom-form-title');
     const questionTextarea = document.getElementById('custom-main-question');
+    const titleCounter = document.getElementById('title-counter');
     const questionCounter = document.getElementById('question-counter');
+
+    if (titleInput && titleCounter) {
+      titleInput.addEventListener('input', function() {
+        const count = this.value.length;
+        titleCounter.textContent = `${count}/100`;
+        titleCounter.className = count > 90 ? 'text-xs text-red-400' : 'text-xs text-gray-500';
+      });
+    }
 
     if (questionTextarea && questionCounter) {
       questionTextarea.addEventListener('input', function() {
@@ -4345,19 +4300,6 @@ function syncCheckboxStates(status) {
       setTimeout(setupCharacterCounters, 100); // モーダル表示後にセットアップ
     };
   }
-  
-  // グローバル関数の露出（ボタンイベント用）
-  window.saveAndPublish = saveAndPublish;
-  window.unpublishBoard = unpublishBoard;
-  window.copyBoardUrl = copyBoardUrl;
-  window.openDatabaseSpreadsheet = openDatabaseSpreadsheet;
-  window.openForm = openForm;
-  window.openLinkedForm = openLinkedForm;
-  window.clearSheetSelection = clearSheetSelection;
-  window.refreshBoardDataFromAdmin = refreshBoardDataFromAdmin;
-  window.switchToAnotherAccount = switchToAnotherAccount;
-  window.openAppSetupPage = openAppSetupPage;
-  window.deleteAllResources = deleteAllResources;
   </script>
 
 </body>

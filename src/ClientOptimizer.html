@@ -272,7 +272,9 @@ const loadingCSS = `
   cursor: wait;
 }
 
-
+.gas-loading * {
+  pointer-events: none;
+}
 
 .spinner {
   display: inline-block;
@@ -295,15 +297,10 @@ const loadingCSS = `
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
+  display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999;
-}
-.loading-overlay.hidden {
-  display: none;
-}
-.loading-overlay:not(.hidden) {
-  display: flex;
 }
 
 .loading-content {

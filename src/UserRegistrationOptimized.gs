@@ -22,33 +22,86 @@ function upsertUser(adminEmail, additionalData = {}) {
     throw new Error('有効なメールアドレスが必要です');
   }
 
+  // 1. 分散ロック取得（最大30秒待機）
+  const lock = LockService.getScriptLock();
+  const lockKey = `user_registration_${adminEmail}`;
+  
   try {
-    // メール特化ロックを使用してユーザーを作成または検索
-    const result = findOrCreateUserWithEmailLock(adminEmail, additionalData);
+    // メールアドレス別のロック（粒度を細かく）
+    if (!lock.waitLock(30000)) {
+      throw new Error('システムが混雑しています。しばらく後に再試行してください。');
+    }
+
+    // 2. 認証確認
+    const activeUser = Session.getActiveUser();
+    if (adminEmail !== activeUser.getEmail()) {
+      throw new Error('認証エラー: 操作権限がありません');
+    }
+
+    // 3. 既存ユーザー確認
+    let existingUser = findUserByEmailDirect(adminEmail);
+    let userId, isNewUser;
+
+    if (existingUser) {
+      // 既存ユーザーの更新
+      userId = existingUser.userId;
+      isNewUser = false;
+      
+      // 必要に応じて情報更新
+      if (Object.keys(additionalData).length > 0) {
+        const updateData = {
+          lastAccessedAt: new Date().toISOString(),
+          isActive: 'true',
+          ...additionalData
+        };
+        updateUserDirect(userId, updateData);
+      }
+      
+      debugLog('upsertUser: 既存ユーザーを更新', { userId, adminEmail });
+      
+    } else {
+      // 新規ユーザー作成
+      isNewUser = true;
+      userId = generateConsistentUserId(adminEmail);
+      
+      const userData = {
+        userId: userId,
+        adminEmail: adminEmail,
+        createdAt: new Date().toISOString(),
+        lastAccessedAt: new Date().toISOString(),
+        isActive: 'true',
+        configJson: '{}',
+        ...additionalData
+      };
+      
+      createUserDirect(userData);
+      debugLog('upsertUser: 新規ユーザーを作成', { userId, adminEmail });
+    }
+
+    // 4. キャッシュ更新
+    invalidateUserCacheConsistent(userId, adminEmail);
     
-    // キャッシュを無効化して最新の状態を保証
-    invalidateUserCacheConsistent(result.userId, adminEmail);
-    
-    const message = result.isNewUser ? '新規ユーザーを登録しました' : '既存ユーザーの情報を更新しました';
-    console.log('upsertUser:', message, { userId: result.userId, adminEmail });
+    // 5. 結果の検証
+    const verifiedUser = findUserByIdDirect(userId);
+    if (!verifiedUser) {
+      throw new Error('ユーザー登録の検証に失敗しました');
+    }
 
     return {
       status: 'success',
-      userId: result.userId,
-      isNewUser: result.isNewUser,
-      userInfo: result.userInfo,
-      message: message
+      userId: userId,
+      isNewUser: isNewUser,
+      userInfo: verifiedUser,
+      message: isNewUser ? '新規ユーザーを登録しました' : '既存ユーザーの情報を更新しました'
     };
 
-  } catch (e) {
-    console.error('upsertUser エラー:', e.message);
-    // エラーメッセージをフロントエンドに分かりやすく変換
-    if (e.message.includes('EMAIL_ALREADY_PROCESSING')) {
-      throw new Error('現在、同じアカウントで処理が実行中です。しばらく待ってから再度お試しください。');
-    } else if (e.message.includes('SCRIPT_LOCK_TIMEOUT')) {
-      throw new Error('システムが混雑しています。しばらく後に再試行してください。');
+  } finally {
+    // 必ずロックを解除
+    try {
+      lock.releaseLock();
+    } catch (e) {
+      console.warn('ロック解除エラー:', e.message);
     }
-    throw e; // その他のエラーはそのままスロー
   }
 }
 
@@ -552,78 +605,5 @@ function updateUserDirect(userId, updateData) {
   } catch (e) {
     console.error('updateUserDirect エラー:', e.message);
     throw e;
-  }
-}
-
-/**
- * 汎用的なウェブアプリURLを構築します。
- * @param {Object} params - URLクエリパラメータのキーと値のペア。
- * @param {string} [mode='exec'] - 実行モード ('exec' または 'dev')。
- * @returns {string} 構築されたURL。
- */
-function constructWebAppUrl(params, mode) {
-  mode = mode || 'exec'; // デフォルトは 'exec'
-  var baseUrl = getWebAppUrlCached();
-
-  // /dev または /exec を削除してベースURLを正規化
-  baseUrl = baseUrl.replace(/\/(dev|exec)$/, '');
-
-  // 指定されたモードを追加
-  baseUrl += '/' + mode;
-
-  var queryString = Object.keys(params)
-    .map(function(key) {
-      return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
-    })
-    .join('&');
-
-  return baseUrl + (queryString ? '?' + queryString : '');
-}
-
-/**
- * クイックスタートを廃止し、ユーザー作成のみ行う新しい登録フロー
- * フォーム作成は管理画面で手動で行う
- * @returns {Object} 登録結果
- */
-function createUserWithoutQuickstart() {
-  try {
-    const userEmail = Session.getActiveUser().getEmail();
-    console.log('createUserWithoutQuickstart: ユーザー登録処理開始', { userEmail });
-
-    // upsertUserを使用して、ユーザーの作成または既存情報の取得を行う
-    const additionalData = {
-      setupStatus: 'registered', // quickstartではなく、registered状態
-      configJson: JSON.stringify({
-        setupMethod: 'custom_only', // quickstartではなくカスタムのみ
-        version: 1,
-        lastModified: new Date().toISOString()
-      })
-    };
-    
-    const result = upsertUser(userEmail, additionalData);
-    const adminUrl = constructWebAppUrl({ userId: result.userId, page: 'admin' });
-
-    if (result.isNewUser) {
-      console.log('createUserWithoutQuickstart: 新規ユーザー作成成功', { userId: result.userId, userEmail });
-      return {
-        status: 'success',
-        message: 'ユーザー登録が完了しました。管理画面でフォームを作成してください。',
-        userId: result.userId,
-        userEmail: userEmail,
-        adminUrl: adminUrl
-      };
-    } else {
-      console.log('createUserWithoutQuickstart: 既存ユーザーを検出', { userId: result.userId, userEmail });
-      return {
-        status: 'existing_user',
-        userId: result.userId,
-        userEmail: userEmail,
-        adminUrl: adminUrl
-      };
-    }
-    
-  } catch (error) {
-    console.error('createUserWithoutQuickstart エラー:', error);
-    throw new Error(`ユーザー登録に失敗しました: ${error.message}`);
   }
 }
