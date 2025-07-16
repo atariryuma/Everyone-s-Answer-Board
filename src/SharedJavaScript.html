@@ -392,18 +392,27 @@ function safeNavigate(url, options = {}) {
 
 function performNavigation(url, config) {
   showMessage(config.fallbackMessage, 'info');
-  
+
   try {
+    const isSandboxed =
+      window.frameElement &&
+      window.frameElement.hasAttribute &&
+      window.frameElement.hasAttribute('sandbox');
+
     switch (config.method) {
       case 'parent':
-        if (window.parent && window.parent.location) {
+        if (!isSandboxed && window.parent && window.parent.location) {
           window.parent.location.href = url;
         } else {
           window.location.href = url;
         }
         break;
       case 'top':
-        window.top.location.href = url;
+        if (!isSandboxed && window.top) {
+          window.top.location.href = url;
+        } else {
+          window.location.href = url;
+        }
         break;
       case 'replace':
         window.location.replace(url);
@@ -411,9 +420,9 @@ function performNavigation(url, config) {
       case 'auto':
       default:
         // Try different methods in order of preference
-        if (window.parent && window.parent !== window) {
+        if (!isSandboxed && window.parent && window.parent !== window) {
           window.parent.location.href = url;
-        } else if (window.top && window.top !== window) {
+        } else if (!isSandboxed && window.top && window.top !== window) {
           window.top.location.href = url;
         } else {
           window.location.href = url;
