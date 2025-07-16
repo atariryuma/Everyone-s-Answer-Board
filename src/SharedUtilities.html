@@ -458,6 +458,68 @@ window.getSharedUtilitiesStats = function() {
   };
 };
 
+// Debugging utilities for UI state and user interactions
+window.sharedUtilities.debug = {
+  // Log button clicks with position and disabled state
+  enableClickLogging: function() {
+    document.addEventListener(
+      'click',
+      function(e) {
+        if (e.target && e.target.tagName === 'BUTTON') {
+          var rect = e.target.getBoundingClientRect();
+          console.log('[CLICK]', {
+            id: e.target.id,
+            text: e.target.textContent.trim(),
+            disabled: e.target.disabled,
+            position: { x: rect.x, y: rect.y },
+            time: new Date().toISOString()
+          });
+        }
+      },
+      true
+    );
+  },
+
+  // Output current UI state to the console
+  logUiState: function(selector) {
+    var root = selector
+      ? typeof selector === 'string'
+        ? document.querySelector(selector)
+        : selector
+      : document.body;
+    if (!root) {
+      console.warn('logUiState: root element not found', selector);
+      return;
+    }
+    var buttons = root.querySelectorAll('button');
+    var info = {
+      readyState: document.readyState,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      rootSelector: selector || 'body',
+      buttonCount: buttons.length,
+      buttons: []
+    };
+    buttons.forEach(function(btn) {
+      var rect = btn.getBoundingClientRect();
+      info.buttons.push({
+        id: btn.id,
+        text: btn.textContent.trim(),
+        disabled: btn.disabled,
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        visible:
+          !!(btn.offsetWidth || btn.offsetHeight || btn.getClientRects().length)
+      });
+    });
+    console.group('[UI State]');
+    console.log(info);
+    console.groupEnd();
+    return info;
+  }
+};
+
 // Performance monitoring
 window.clearAllSharedUtilities = function() {
   window.sharedUtilities.debounce.clearAll();
@@ -1039,6 +1101,12 @@ window.safeNavigate = function(url, options) {
 window.goToAdminPanel = function(adminUrl, delay) {
   window.sharedUtilities.navigation.goToAdminPanel(adminUrl, delay);
 };
+
+// Log initial UI state and start click monitoring
+window.onDOMReady(function() {
+  window.sharedUtilities.debug.logUiState();
+  window.sharedUtilities.debug.enableClickLogging();
+});
 
 console.log('✅ SharedUtilities loaded successfully - Version 1.2.0 (iframe navigation fixed)');
 </script>
