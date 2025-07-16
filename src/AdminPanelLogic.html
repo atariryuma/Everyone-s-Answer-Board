@@ -610,11 +610,11 @@ function handleDeleteRequest() {
 }
 
 /**
- * Admin system flow display for debugging
+ * Admin system flow display for debugging - Enhanced version
  */
 function showAdminSystemFlow() {
-  const DEBUG_MODE = <?= typeof DEBUG_MODE !== 'undefined' ? DEBUG_MODE : false ?>;
-  if (!DEBUG_MODE) return;
+  // Always show detailed debug info for admin panel
+  const DEBUG_MODE = true;
   
   console.group('🔄 StudyQuest 管理パネル システムフロー');
   console.log('📋 Phase 1: 管理パネル初期化');
@@ -655,12 +655,62 @@ function showAdminSystemFlow() {
   
   console.groupEnd();
   
-  console.group('📊 管理パネル現在状態');
-  console.log('DOM状態:', document.readyState);
-  console.log('CSS読み込み:', document.styleSheets.length + ' stylesheets');
-  console.log('GAS環境:', typeof google !== 'undefined' ? 'Available' : 'Not Available');
-  console.log('管理者状態:', typeof appState.currentStatus !== 'undefined' && appState.currentStatus ? 'Authenticated' : 'Unknown');
-  console.log('スプレッドシートURL:', typeof appState.currentSpreadsheetUrl !== 'undefined' ? (appState.currentSpreadsheetUrl ? 'Set' : 'Not Set') : 'Unknown');
+  console.group('📊 管理パネル現在状態 - 詳細情報');
+  
+  // DOM & Layout Information
+  console.log('🔍 DOM状態:', document.readyState);
+  console.log('📄 CSS読み込み:', document.styleSheets.length + ' stylesheets');
+  
+  // Layout Debugging
+  const adminGrid = document.querySelector('.admin-responsive-grid');
+  if (adminGrid) {
+    const computedStyle = window.getComputedStyle(adminGrid);
+    console.log('📐 Grid Layout情報:');
+    console.log('  ├─ Display:', computedStyle.display);
+    console.log('  ├─ Grid Template Columns:', computedStyle.gridTemplateColumns);
+    console.log('  ├─ Gap:', computedStyle.gap);
+    console.log('  ├─ Width:', computedStyle.width);
+    console.log('  └─ Max Width:', computedStyle.maxWidth);
+  } else {
+    console.log('❌ Grid container not found');
+  }
+  
+  // Panel Information
+  const leftPanel = document.querySelector('.left-panel');
+  const rightPanel = document.querySelector('.right-panel');
+  if (leftPanel && rightPanel) {
+    console.log('📱 Panel情報:');
+    console.log('  ├─ Left Panel Display:', window.getComputedStyle(leftPanel).display);
+    console.log('  ├─ Left Panel Flex:', window.getComputedStyle(leftPanel).flex);
+    console.log('  ├─ Right Panel Display:', window.getComputedStyle(rightPanel).display);
+    console.log('  └─ Right Panel Position:', window.getComputedStyle(rightPanel).position);
+  }
+  
+  // Tailwind Override Status
+  const overrideStyle = document.getElementById('admin-panel-override');
+  console.log('🎨 Tailwind Override:', overrideStyle ? 'Applied' : 'Not Applied');
+  
+  // Application State
+  console.log('🌐 GAS環境:', typeof google !== 'undefined' ? 'Available' : 'Not Available');
+  console.log('👤 管理者状態:', typeof appState.currentStatus !== 'undefined' && appState.currentStatus ? 'Authenticated' : 'Unknown');
+  console.log('📊 スプレッドシートURL:', typeof appState.currentSpreadsheetUrl !== 'undefined' ? (appState.currentSpreadsheetUrl ? 'Set' : 'Not Set') : 'Unknown');
+  
+  // User Information
+  if (typeof appState !== 'undefined') {
+    console.log('🆔 AppState詳細:');
+    console.log('  ├─ User ID:', appState.userId || 'Not Set');
+    console.log('  ├─ Selected Sheet:', appState.selectedSheet || 'Not Set');
+    console.log('  ├─ Web App URL:', appState.webAppUrl || 'Not Set');
+    console.log('  └─ Loading State:', appState.isLoading || false);
+  }
+  
+  // Window Size Information
+  console.log('📏 画面情報:');
+  console.log('  ├─ Window Width:', window.innerWidth + 'px');
+  console.log('  ├─ Window Height:', window.innerHeight + 'px');
+  console.log('  ├─ Device Pixel Ratio:', window.devicePixelRatio);
+  console.log('  └─ Mobile Layout:', window.innerWidth <= 1024 ? 'Yes' : 'No');
+  
   console.groupEnd();
 }
 

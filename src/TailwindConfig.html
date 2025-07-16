@@ -238,7 +238,68 @@ body.admin-grid-layout .admin-responsive-grid .right-panel {
 }
 `;
     document.head.appendChild(adminStylesheet);
-    console.log('✅ Admin panel layout override applied');
+    
+    // Detailed override logging
+    console.group('✅ Admin panel layout override applied - 詳細情報');
+    console.log('📝 Override Stylesheet ID:', adminStylesheet.id);
+    console.log('📍 Injection Time:', new Date().toLocaleTimeString());
+    
+    // Verify the grid immediately after injection
+    setTimeout(function() {
+      const adminGrid = document.querySelector('.admin-responsive-grid');
+      if (adminGrid) {
+        const computedStyle = window.getComputedStyle(adminGrid);
+        console.log('📐 Grid確認結果:');
+        console.log('  ├─ Display:', computedStyle.display);
+        console.log('  ├─ Grid Template Columns:', computedStyle.gridTemplateColumns);
+        console.log('  ├─ Gap:', computedStyle.gap);
+        console.log('  ├─ Max Width:', computedStyle.maxWidth);
+        console.log('  └─ Width:', computedStyle.width);
+        
+        // Check if 2-column layout is working
+        const isCorrectLayout = computedStyle.gridTemplateColumns.includes('2fr 1fr') || 
+                               computedStyle.gridTemplateColumns.includes('2fr') && computedStyle.gridTemplateColumns.includes('1fr');
+        console.log('🎯 2カラムレイアウト:', isCorrectLayout ? '✅ 正常' : '❌ 異常');
+        
+        // Panel width verification
+        const leftPanel = adminGrid.querySelector('.left-panel');
+        const rightPanel = adminGrid.querySelector('.right-panel');
+        if (leftPanel && rightPanel) {
+          console.log('📱 Panel幅確認:');
+          console.log('  ├─ Left Panel:', leftPanel.offsetWidth + 'px');
+          console.log('  ├─ Right Panel:', rightPanel.offsetWidth + 'px');
+          console.log('  └─ 比率:', leftPanel.offsetWidth && rightPanel.offsetWidth ? 
+                     (leftPanel.offsetWidth / rightPanel.offsetWidth).toFixed(2) + ':1' : 'N/A');
+        }
+      } else {
+        console.log('❌ Admin grid not found after override');
+      }
+      console.groupEnd();
+    }, 10);
   }, 100); // 100ms delay to ensure Tailwind has loaded
+  
+  // Add layout change monitoring
+  if (typeof ResizeObserver !== 'undefined') {
+    const resizeObserver = new ResizeObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.target.classList.contains('admin-responsive-grid')) {
+          console.log('📐 Layout変更検出:', {
+            width: entry.contentRect.width,
+            height: entry.contentRect.height,
+            timestamp: new Date().toLocaleTimeString()
+          });
+        }
+      });
+    });
+    
+    // Start observing when grid is available
+    setTimeout(function() {
+      const adminGrid = document.querySelector('.admin-responsive-grid');
+      if (adminGrid) {
+        resizeObserver.observe(adminGrid);
+        console.log('👁️ Layout monitoring started');
+      }
+    }, 200);
+  }
 });
 </script>

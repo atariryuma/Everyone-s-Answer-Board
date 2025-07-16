@@ -544,8 +544,49 @@ window.sharedUtilities.debug = {
           !!(btn.offsetWidth || btn.offsetHeight || btn.getClientRects().length)
       });
     });
-    console.group('[UI State]');
-    console.log(info);
+    console.group('[UI State] - 詳細情報');
+    console.log('📊 基本情報:', info);
+    
+    // Additional layout debugging
+    if (typeof document !== 'undefined') {
+      console.log('🎯 レイアウト詳細:');
+      
+      // Admin grid specific debugging
+      const adminGrid = document.querySelector('.admin-responsive-grid');
+      if (adminGrid) {
+        const computedStyle = window.getComputedStyle(adminGrid);
+        console.log('  ├─ Admin Grid Found: YES');
+        console.log('  ├─ Display Type:', computedStyle.display);
+        console.log('  ├─ Grid Columns:', computedStyle.gridTemplateColumns);
+        console.log('  ├─ Gap:', computedStyle.gap);
+        console.log('  └─ Computed Width:', computedStyle.width);
+        
+        // Check panel visibility
+        const leftPanel = adminGrid.querySelector('.left-panel');
+        const rightPanel = adminGrid.querySelector('.right-panel');
+        
+        if (leftPanel && rightPanel) {
+          console.log('  📱 Panel状態:');
+          console.log('    ├─ Left Panel Visible:', leftPanel.offsetWidth > 0);
+          console.log('    ├─ Right Panel Visible:', rightPanel.offsetWidth > 0);
+          console.log('    ├─ Left Panel Width:', leftPanel.offsetWidth + 'px');
+          console.log('    └─ Right Panel Width:', rightPanel.offsetWidth + 'px');
+        }
+      } else {
+        console.log('  ❌ Admin Grid Not Found');
+      }
+      
+      // Override style check
+      const overrideStyle = document.getElementById('admin-panel-override');
+      console.log('🎨 Override Status:', overrideStyle ? 'Applied' : 'Missing');
+      
+      // Viewport information
+      console.log('📐 Viewport情報:');
+      console.log('  ├─ Inner Width:', window.innerWidth + 'px');
+      console.log('  ├─ Inner Height:', window.innerHeight + 'px');
+      console.log('  └─ Layout Mode:', window.innerWidth <= 1024 ? 'Mobile' : 'Desktop');
+    }
+    
     console.groupEnd();
     return info;
   }
