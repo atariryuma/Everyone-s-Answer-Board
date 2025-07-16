@@ -780,6 +780,134 @@ class AdminCacheManager {
 window.adminCacheManager = new AdminCacheManager();
 
 // =============================================================================
+// IFRAME LAYOUT FIX - 最優先実行
+// =============================================================================
+
+/**
+ * iframe内でのAdmin Panel 2カラムレイアウト修正
+ */
+function injectAdminLayoutFix() {
+  console.log('🎯 iframe内レイアウト修正開始...');
+  
+  // 即座にCSSを注入
+  const adminStyleFix = document.createElement('style');
+  adminStyleFix.id = 'admin-layout-fix-iframe';
+  adminStyleFix.innerHTML = `
+/* IFRAME内 Admin Panel Layout Fix - 最高優先度 */
+body.admin-grid-layout .admin-responsive-grid,
+.admin-responsive-grid {
+  display: grid !important;
+  grid-template-columns: 2fr 1fr !important;
+  gap: 2rem !important;
+  align-items: start !important;
+  max-width: 84rem !important;
+  margin: 0 auto !important;
+  padding: 0 1rem !important;
+  width: 100% !important;
+}
+
+body.admin-grid-layout .admin-responsive-grid .left-panel,
+body.admin-grid-layout .admin-responsive-grid .right-panel,
+.admin-responsive-grid .left-panel,
+.admin-responsive-grid .right-panel {
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1.5rem !important;
+  flex: none !important;
+  margin: 0 !important;
+}
+
+body.admin-grid-layout .admin-responsive-grid .left-panel,
+.admin-responsive-grid .left-panel {
+  grid-column: 1 !important;
+}
+
+body.admin-grid-layout .admin-responsive-grid .right-panel,
+.admin-responsive-grid .right-panel {
+  grid-column: 2 !important;
+  position: sticky !important;
+  top: 1.5rem !important;
+  max-height: calc(100vh - 3rem) !important;
+  overflow-y: auto !important;
+}
+
+/* Mobile Override */
+@media (max-width: 1024px) {
+  body.admin-grid-layout .admin-responsive-grid,
+  .admin-responsive-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1.5rem !important;
+    padding: 0 !important;
+  }
+  
+  body.admin-grid-layout .admin-responsive-grid .left-panel,
+  .admin-responsive-grid .left-panel {
+    order: 2 !important;
+    grid-column: auto !important;
+  }
+  
+  body.admin-grid-layout .admin-responsive-grid .right-panel,
+  .admin-responsive-grid .right-panel {
+    order: 1 !important;
+    grid-column: auto !important;
+    position: static !important;
+    max-height: none !important;
+    overflow-y: visible !important;
+  }
+}
+
+/* Tailwindクラス無効化 */
+.admin-responsive-grid > * {
+  flex: none !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* Bodyクラス確実適用 */
+body {
+  background: #1a1b26 !important;
+}
+  `;
+  
+  document.head.appendChild(adminStyleFix);
+  
+  // Bodyクラスを確実に設定
+  if (!document.body.classList.contains('admin-grid-layout')) {
+    document.body.classList.add('admin-grid-layout');
+  }
+  
+  console.log('✅ iframe内レイアウト修正CSS注入完了');
+  
+  // 少し遅延してから確認
+  setTimeout(function() {
+    const grid = document.querySelector('.admin-responsive-grid');
+    if (grid) {
+      const style = window.getComputedStyle(grid);
+      console.group('🔍 iframe内レイアウト確認結果');
+      console.log('Grid Display:', style.display);
+      console.log('Grid Template Columns:', style.gridTemplateColumns);
+      console.log('Gap:', style.gap);
+      
+      const leftPanel = grid.querySelector('.left-panel');
+      const rightPanel = grid.querySelector('.right-panel');
+      if (leftPanel && rightPanel) {
+        console.log('Left Panel Width:', leftPanel.offsetWidth + 'px');
+        console.log('Right Panel Width:', rightPanel.offsetWidth + 'px');
+        if (leftPanel.offsetWidth > 0 && rightPanel.offsetWidth > 0) {
+          const ratio = (leftPanel.offsetWidth / rightPanel.offsetWidth).toFixed(2);
+          console.log('幅の比率:', ratio + ':1');
+          console.log('2カラム状態:', ratio > 1.5 ? '✅ 正常' : '❌ 異常');
+        }
+      }
+      console.groupEnd();
+    } else {
+      console.log('❌ iframe内でもGrid要素が見つかりません');
+    }
+  }, 100);
+}
+
+// =============================================================================
 // INITIALIZATION
 // =============================================================================
 
@@ -788,6 +916,9 @@ window.adminCacheManager = new AdminCacheManager();
  */
 function initializeAdminPanel() {
   console.log('🔧 Initializing Admin Panel Logic...');
+  
+  // IFRAME内でのレイアウト修正を最優先で実行
+  injectAdminLayoutFix();
   
   // Show system flow for debugging
   showAdminSystemFlow();
