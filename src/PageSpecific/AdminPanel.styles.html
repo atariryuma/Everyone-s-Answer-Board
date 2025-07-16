@@ -7,50 +7,50 @@
     overflow: hidden; /* ページ全体のスクロールを禁止 */
   }
 
-  /* ヘッダーとフッターのスタイル */
   .admin-grid-layout > header,
   .admin-grid-layout > footer {
     position: sticky;
     z-index: 50;
   }
   
-  .admin-grid-layout > header {
-    top: 0;
-  }
-  
-  .admin-grid-layout > footer {
-    bottom: 0;
-  }
+  .admin-grid-layout > header { top: 0; }
+  .admin-grid-layout > footer { bottom: 0; }
 
-  /* メインコンテンツエリア */
   .admin-grid-layout > main {
     overflow-y: auto; /* メインコンテンツのみスクロールを許可 */
-    padding: 1.5rem;
+    padding: 1rem;
   }
 
-  /* 2カラムレイアウト */
+  /* レスポンシブな2カラムレイアウト */
   .admin-responsive-grid {
     display: grid;
-    grid-template-columns: 2fr 1fr; /* 左パネルを右パネルの2倍の幅に */
     gap: 1.5rem;
-    align-items: start; /* パネルの高さを揃えない */
     max-width: 80rem; /* 1280px */
-    margin: 0 auto; /* 中央揃え */
+    margin: 0 auto;
+    align-items: start;
+    grid-template-columns: 1fr; /* モバイルデフォルト */
   }
 
-  /* レスポンシブ対応：画面幅が1024px以下で1カラムに */
-  @media (max-width: 1024px) {
-    .admin-responsive-grid {
-      grid-template-columns: 1fr; /* 1カラムレイアウト */
-    }
-    
+  /* タブレットサイズ (768px以上) */
+  @media (min-width: 768px) {
     .admin-grid-layout > main {
-      padding: 1rem;
+      padding: 1.5rem;
+    }
+    .admin-responsive-grid {
+      grid-template-columns: 1.8fr 1fr; /* 左右比率を変更 */
+      gap: 1.5rem;
     }
   }
 
-  /* 左パネルと右パネルのスタイル */
+  /* デスクトップサイズ (1024px以上) */
+  @media (min-width: 1024px) {
+    .admin-responsive-grid {
+      grid-template-columns: 2fr 1fr; /* 左右比率をさらに変更 */
+      gap: 2rem;
+    }
+  }
+
   .left-panel, .right-panel {
-    min-width: 0; /* flexbox/gridアイテムの幅が縮小できるように */
+    min-width: 0;
   }
 </style>
