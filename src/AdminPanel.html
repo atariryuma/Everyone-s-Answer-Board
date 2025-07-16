@@ -302,10 +302,10 @@
                       </svg>
                       <span id="create-additional-form-text" class="text-gray-200">新規のフォームを作成</span>
                     </button>
-                    <p class="text-xs text-gray-400 mt-1">現在のボードに連携する新しいフォームを作成</p>
+                    <p class="text-xs text-gray-400">現在のボードに連携する新しいフォームを作成</p>
                     
                     <!-- 作成されたフォーム表示 -->
-                    <div class="space-y-3 hidden mt-4" id="form-url-section">
+                    <div class="space-y-2 hidden" id="form-url-section">
                       <div class="success-state bg-green-500/10 border border-green-400/30 rounded-lg p-4">
                         <div class="flex items-center gap-2 mb-3">
                           <div class="w-6 h-6 bg-green-500/20 rounded-full flex items-center justify-center">
@@ -331,11 +331,11 @@
             <!-- 外部リソースインポート -->
             <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
               <h4 class="text-base font-medium text-gray-200 mb-3">外部リソースインポート</h4>
-              <div class="space-y-3">
+              <div class="space-y-2">
                 <input type="url" 
                        id="resource-url-input" 
                        placeholder="GoogleフォームまたはスプレッドシートのURL"
-                       class="form-control">
+                       class="form-control text-sm">
                 <button type="button" id="add-resource-btn" class="btn btn-primary w-full">
                   <span id="add-resource-text">リソースを追加</span>
                 </button>
@@ -343,7 +343,7 @@
             </div>
             
             <!-- カスタムフォーム情報表示エリア -->
-            <div id="custom-form-info-section" class="hidden mt-4">
+            <div id="custom-form-info-section" class="hidden">
               <!-- updateCustomFormInfo()で動的に内容が設定される -->
             </div>
           </div>
@@ -371,25 +371,25 @@
           </div>
           
           <div id="step2-content" class="progressive-section expanded">
-            <div class="space-y-4">
-              <div class="space-y-3">
+            <div class="space-y-2">
+              <div class="space-y-2">
                 <!-- シート選択の説明 -->
                 <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-3">
                   <div class="flex items-center gap-2 mb-2">
                     <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                     </svg>
-                    <span class="text-base font-medium text-green-200">シート選択</span>
+                    <span class="text-sm font-medium text-green-200">シート選択</span>
                   </div>
                   <p class="text-sm text-green-300">スプレッドシートのシートを回答ボードとして表示するシートに指定します</p>
                 </div>
                 
                 <!-- シンプルシート選択 -->
-                <label for="sheet-select" class="block text-base font-medium text-white">
+                <label for="sheet-select" class="block text-sm font-medium text-white">
                   表示したいシートを選択
                 </label>
                 <div class="flex gap-2">
-                    <select id="sheet-select" class="form-control flex-1" aria-describedby="sheet-help">
+                    <select id="sheet-select" class="form-control text-sm flex-1" aria-describedby="sheet-help">
                       <option>読み込み中...</option>
                     </select>
                     <button type="button" id="open-spreadsheet-btn-step2" class="btn btn-secondary px-4" title="スプレッドシートを開く">
@@ -426,7 +426,7 @@
           </div>
           
           <div id="step3-content" class="progressive-section expanded">
-            <div id="config-area" class="space-y-4 hidden">
+            <div id="config-area" class="space-y-2 hidden">
               <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
                 <div class="flex items-center gap-2 mb-2">
                   <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -439,15 +439,15 @@
               </div>
               
               <!-- 必須設定 -->
-              <div class="space-y-4">
+              <div class="space-y-2">
                 <div class="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
                   <label class="block">
                     <div class="flex items-center gap-2 mb-2">
-                      <span class="text-base font-medium text-white">回答データ列</span>
+                      <span class="text-sm font-medium text-white">回答データ列</span>
                       <span class="px-2 py-1 bg-red-500 text-white text-xs rounded-full">必須</span>
                     </div>
                     <div class="flex gap-2">
-                      <select id="opinionHeader" class="form-control flex-1" aria-describedby="main-help"></select>
+                      <select id="opinionHeader" class="form-control text-sm flex-1" aria-describedby="main-help"></select>
                       <button type="button" id="reguess-headers-btn" class="btn bg-gradient-to-r from-cyan-600/80 to-purple-600/80 hover:from-cyan-600 hover:to-purple-600 text-white px-4 py-2 relative overflow-hidden group" title="AI搭載 高精度列判定システム">
                         <span class="relative z-10 flex items-center gap-1">
                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -458,33 +458,33 @@
                         <div class="absolute inset-0 bg-gradient-to-r from-cyan-400/20 to-purple-400/20 transform translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
                       </button>
                     </div>
-                    <p id="main-help" class="text-sm text-red-300 mt-1">
+                    <p id="main-help" class="text-sm text-red-300">
                       回答内容が含まれる列を選択してください
                     </p>
                   </label>
                 </div>
                 
                 <!-- オプション設定 -->
-                <div class="space-y-4" id="detail-options">
-                  <label class="block">
-                    <span class="text-base text-gray-300 mb-2 block">理由・詳細列</span>
-                    <select id="reasonHeader" class="form-control"></select>
+                <div class="space-y-2" id="detail-options">
+                  <label class="block space-y-2">
+                    <span class="text-sm text-gray-300 block">理由・詳細列</span>
+                    <select id="reasonHeader" class="form-control text-sm"></select>
                   </label>
-                  <label class="block">
-                    <span class="text-base text-gray-300 mb-2 block">名前列</span>
-                    <select id="nameHeader" class="form-control"></select>
+                  <label class="block space-y-2">
+                    <span class="text-sm text-gray-300 block">名前列</span>
+                    <select id="nameHeader" class="form-control text-sm"></select>
                   </label>
-                  <label class="block">
-                    <span class="text-base text-gray-300 mb-2 block">クラス列</span>
-                    <select id="classHeader" class="form-control"></select>
+                  <label class="block space-y-2">
+                    <span class="text-sm text-gray-300 block">クラス列</span>
+                    <select id="classHeader" class="form-control text-sm"></select>
                   </label>
-                  <div class="flex items-center mt-4">
+                  <div class="flex items-center">
                     <input type="checkbox" id="showNames" name="showNames">
-                    <label for="showNames" class="ml-2 block text-base text-gray-300">名前を表示する</label>
+                    <label for="showNames" class="ml-2 block text-sm text-gray-300">名前を表示する</label>
                   </div>
-                  <div class="flex items-center mt-2">
+                  <div class="flex items-center">
                     <input type="checkbox" id="showCounts" name="showCounts">
-                    <label for="showCounts" class="ml-2 block text-base text-gray-300">リアクション数を表示する</label>
+                    <label for="showCounts" class="ml-2 block text-sm text-gray-300">リアクション数を表示する</label>
                   </div>
                 </div>
               </div>
@@ -530,7 +530,7 @@
             <h3 class="text-lg font-semibold text-gray-300">システム状況</h3>
           </div>
 
-          <div class="space-y-4">
+          <div class="space-y-2">
             <!-- アカウント情報 -->
             <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
               <h4 class="text-base font-medium text-gray-200 mb-3 flex items-center gap-2">
@@ -635,7 +635,7 @@
                 </div>
                 
                 <!-- リソース削除セクション -->
-                <div class="border-t border-gray-600/50 pt-3 mt-3">
+                <div class="border-t border-gray-600/50 pt-3">
                   <div class="bg-orange-900/20 border border-orange-500/30 rounded-lg p-3">
                     <div class="flex items-center gap-2 mb-2">
                       <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -649,7 +649,7 @@
                       </svg>
                       リソース連携を解除
                     </button>
-                    <p class="text-orange-300 text-xs mt-2">
+                    <p class="text-orange-300 text-xs">
                       ℹ️ アプリとの連携を解除します（フォーム・スプレッドシートは保持されます）
                     </p>
                   </div>
@@ -671,7 +671,7 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                 </svg>
               </button>
-              <p class="text-xs text-blue-200/70 mt-2 ml-6">
+              <p class="text-xs text-blue-200/70 ml-6">
                 アプリの有効/無効状態を管理できます
               </p>
             </div>
@@ -4050,7 +4050,7 @@ function syncCheckboxStates(status) {
               placeholder="例：今日の授業で学んだことの中で、最も印象に残ったことは何ですか？"
               maxlength="500"
             ></textarea>
-            <div class="flex justify-between items-center mt-2">
+            <div class="flex justify-between items-center">
               <p class="text-xs text-gray-400">💡 学習者に表示される質問文を入力してください</p>
               <span class="text-xs text-gray-500" id="question-counter">0/500</span>
             </div>
@@ -4067,7 +4067,7 @@ function syncCheckboxStates(status) {
               <option value="multiple">選択肢（複数選択可）</option>
               <option value="text">短文テキスト（1行回答）</option>
             </select>
-            <p class="text-xs text-gray-400 mt-2">💡 すべての回答方法で、回答の理由を入力する欄が自動的に追加されます</p>
+            <p class="text-xs text-gray-400">💡 すべての回答方法で、回答の理由を入力する欄が自動的に追加されます</p>
           </div>
 
           <!-- 選択肢設定（選択肢タイプの場合） -->
@@ -4077,14 +4077,14 @@ function syncCheckboxStates(status) {
               <h4 class="text-lg font-semibold text-yellow-400">選択肢を設定</h4>
             </div>
             <textarea id="main-question-choices" rows="4" class="form-control text-sm" placeholder="例：&#10;気づいたことがある。&#10;疑問に思うことがある。&#10;もっと知りたいことがある。"></textarea>
-            <p class="text-xs text-gray-400 mt-2">💡 学習者が選択できる選択肢を1行に1つずつ入力してください。例のような評価軸や、具体的な選択肢を設定できます。</p>
+            <p class="text-xs text-gray-400">💡 学習者が選択できる選択肢を1行に1つずつ入力してください。例のような評価軸や、具体的な選択肢を設定できます。</p>
             
-            <div class="mt-4">
+            <div>
               <label class="flex items-center">
                 <input type="checkbox" id="include-others-option" checked>
                 <span class="text-sm text-gray-300">「その他...」選択肢を追加する</span>
               </label>
-              <p class="text-xs text-gray-400 mt-1 ml-6">チェックすると、学習者が自由に回答を入力できる「その他...」オプションが自動的に追加されます</p>
+              <p class="text-xs text-gray-400 ml-6">チェックすると、学習者が自由に回答を入力できる「その他...」オプションが自動的に追加されます</p>
             </div>
           </div>
 
@@ -4103,7 +4103,7 @@ function syncCheckboxStates(status) {
             </div>
             <div id="class-choices-container">
               <textarea id="class-choices" rows="3" class="form-control text-sm" placeholder="例：&#10;クラス1&#10;クラス2&#10;クラス3&#10;クラス4"></textarea>
-              <p class="text-xs text-gray-400 mt-2">1行に1つずつクラス名を入力してください</p>
+              <p class="text-xs text-gray-400">1行に1つずつクラス名を入力してください</p>
             </div>
           </div>
         </div>
