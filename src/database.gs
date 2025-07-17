@@ -371,12 +371,42 @@ function getSheetsService() {
 
 
 /**
- * ユーザー情報を効率的に検索（キャッシュ優先）
+ * ユーザー情報を効率的に検索（統合キャッシュ優先）
  * @param {string} userId - ユーザーID
+ * @param {boolean} bypassCache - キャッシュを無視してDB直接検索
  * @returns {object|null} ユーザー情報
  */
-function findUserById(userId) {
-  console.log('🔍 findUserById: 検索開始', { userId });
+function findUserById(userId, bypassCache = false) {
+  console.log('🔍 findUserById: 検索開始', { userId, bypassCache });
+  
+  // 循環依存防止: 再帰深度の追跡
+  if (!findUserById._recursionDepth) {
+    findUserById._recursionDepth = 0;
+  }
+  
+  if (findUserById._recursionDepth > 2) {
+    console.warn('🚨 findUserById: 循環依存を検出、直接DB検索にフォールバック');
+    findUserById._recursionDepth = 0;
+    return fetchUserFromDatabase('userId', userId);
+  }
+  
+  findUserById._recursionDepth++;
+  
+  try {
+    // Core.gsの統合キャッシュシステムが利用可能な場合はそれを使用
+    if (typeof getCachedUserInfoUnified === 'function') {
+      console.log('🔍 統合キャッシュシステム使用');
+      const result = getCachedUserInfoUnified(userId, bypassCache);
+      findUserById._recursionDepth--;
+      return result;
+    }
+  } catch (error) {
+    findUserById._recursionDepth--;
+    throw error;
+  }
+  
+  // フォールバック: 従来のキャッシュシステム
+  console.log('🔍 従来キャッシュシステム使用');
   var cacheKey = 'user_' + userId;
   const result = cacheManager.get(
     cacheKey,
@@ -397,6 +427,7 @@ function findUserById(userId) {
     found: !!result, 
     adminEmail: result?.adminEmail 
   });
+  findUserById._recursionDepth--;
   return result;
 }
 
@@ -587,6 +618,29 @@ function fetchUserFromDatabaseLinear(field, value) {
 }
 
 /**
+ * データの整合性検証用のシグネチャを生成
+ * @param {array} values - スプレッドシートの値配列
+ * @param {array} headers - ヘッダー行
+ * @returns {string} データシグネチャ
+ */
+function generateDataSignature(values, headers) {
+  try {
+    // データ構造の基本的な特徴をハッシュ化
+    var signature = {
+      headerCount: headers ? headers.length : 0,
+      rowCount: values ? values.length : 0,
+      firstRowLength: (values && values.length > 1 && values[1]) ? values[1].length : 0,
+      headerHash: headers ? headers.join('|').substring(0, 50) : '',
+      timestamp: Date.now()
+    };
+    return JSON.stringify(signature);
+  } catch (e) {
+    console.warn('generateDataSignature: シグネチャ生成エラー', { error: e.message });
+    return JSON.stringify({ error: true, timestamp: Date.now() });
+  }
+}
+
+/**
  * 行番号インデックスを構築
  * @param {array} values - シートのデータ行
  * @param {array} headers - ヘッダー行
@@ -597,6 +651,17 @@ function buildRowIndexForField(values, headers, field) {
   var index = {};
   var fieldIndex = headers.indexOf(field);
   
+  // データ整合性チェック
+  if (!values || !Array.isArray(values) || values.length === 0) {
+    console.warn('buildRowIndexForField: 無効なvalues配列', { values: values });
+    return { index: {}, metadata: { valid: false, reason: 'invalid_values' } };
+  }
+  
+  if (!headers || !Array.isArray(headers)) {
+    console.warn('buildRowIndexForField: 無効なheaders配列', { headers: headers });
+    return { index: {}, metadata: { valid: false, reason: 'invalid_headers' } };
+  }
+  
   console.log('buildRowIndexForField: 開始', { 
     field: field, 
     fieldIndex: fieldIndex,
@@ -606,20 +671,42 @@ function buildRowIndexForField(values, headers, field) {
   
   if (fieldIndex === -1) {
     console.warn('buildRowIndexForField: フィールドが見つかりません', { field: field, headers: headers });
-    return index;
+    return { index: {}, metadata: { valid: false, reason: 'field_not_found' } };
   }
+  
+  // データハッシュを生成してキャッシュ有効性を検証
+  var dataSignature = generateDataSignature(values, headers);
+  var validEntries = 0;
+  var skippedEntries = 0;
   
   // 行番号インデックス構築
   for (var i = 1; i < values.length; i++) {
     var row = values[i];
     if (!row || !Array.isArray(row)) {
       console.warn('buildRowIndexForField: 不正な行データ', { rowIndex: i, row: row });
+      skippedEntries++;
+      continue;
+    }
+    
+    // 行の整合性をチェック
+    if (i + 1 > values.length) {
+      console.error('buildRowIndexForField: 行番号が範囲外', { i: i, valuesLength: values.length });
+      skippedEntries++;
       continue;
     }
     
     var key = row[fieldIndex];
     if (key) {
-      index[key] = i + 1; // 1-based index
+      // 重複キーの検証
+      if (index[key]) {
+        console.warn('buildRowIndexForField: 重複キー検出', { key: key, existingIndex: index[key], newIndex: i + 1 });
+      }
+      index[key] = { 
+        rowIndex: i + 1, // 1-based index
+        arrayIndex: i,   // 0-based index for validation
+        lastValidated: new Date().toISOString()
+      };
+      validEntries++;
       console.log('buildRowIndexForField: エントリー追加', { key: key, rowIndex: i + 1 });
     }
   }
@@ -627,9 +714,193 @@ function buildRowIndexForField(values, headers, field) {
   console.log('行インデックス構築完了:', { 
     field: field, 
     entries: Object.keys(index).length,
+    validEntries: validEntries,
+    skippedEntries: skippedEntries,
     indexKeys: Object.keys(index).slice(0, 5) // 最初の5つのキーを表示
   });
-  return index;
+  
+  return {
+    index: index,
+    metadata: {
+      valid: true,
+      dataSignature: dataSignature,
+      fieldIndex: fieldIndex,
+      totalRows: values.length,
+      validEntries: validEntries,
+      skippedEntries: skippedEntries,
+      createdAt: new Date().toISOString()
+    }
+  };
+}
+
+/**
+ * キャッシュの整合性を検証し、必要に応じて修復する
+ * @param {string} userId - 検証対象のユーザーID
+ * @returns {object} 検証結果
+ */
+function validateAndRepairCache(userId) {
+  try {
+    console.log('🔍 [CACHE_REPAIR] キャッシュ整合性検証開始:', userId);
+    
+    var repairActions = [];
+    var issues = [];
+    
+    // 1. データベースから最新データを取得
+    var props = PropertiesService.getScriptProperties();
+    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    var service = getSheetsService();
+    var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+    
+    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:I"]);
+    var values = data.valueRanges[0].values || [];
+    var headers = values[0];
+    
+    // 2. キャッシュされたインデックスを取得
+    var cachedIndex = cacheManager.get('db_index_userId');
+    if (cachedIndex) {
+      console.log('🔍 [CACHE_REPAIR] キャッシュインデックス検証中');
+      
+      // 新形式か旧形式かを判定
+      var indexData = {};
+      if (cachedIndex.metadata && cachedIndex.index) {
+        indexData = cachedIndex.index;
+        console.log('✅ [CACHE_REPAIR] 新形式インデックス検出');
+      } else if (typeof cachedIndex === 'object') {
+        indexData = cachedIndex;
+        console.log('⚠️ [CACHE_REPAIR] 旧形式インデックス検出（更新推奨）');
+        issues.push('旧形式インデックス使用中');
+      }
+      
+      // 3. 特定ユーザーのインデックス整合性をチェック
+      var cachedUserIndex = indexData[userId];
+      if (cachedUserIndex) {
+        var expectedRowIndex = -1;
+        var userIdIndex = headers.indexOf('userId');
+        
+        // 実際のデータでユーザーを検索
+        for (var i = 1; i < values.length; i++) {
+          if (values[i] && values[i][userIdIndex] === userId) {
+            expectedRowIndex = i + 1;
+            break;
+          }
+        }
+        
+        // インデックスと実際のデータを比較
+        var cachedRowIndex = typeof cachedUserIndex === 'object' ? cachedUserIndex.rowIndex : cachedUserIndex;
+        
+        if (expectedRowIndex !== cachedRowIndex) {
+          console.warn('❌ [CACHE_REPAIR] インデックス不整合検出:', {
+            userId: userId,
+            cachedRowIndex: cachedRowIndex,
+            expectedRowIndex: expectedRowIndex
+          });
+          issues.push(`インデックス不整合: キャッシュ=${cachedRowIndex}, 実際=${expectedRowIndex}`);
+          repairActions.push('インデックス再構築');
+        } else {
+          console.log('✅ [CACHE_REPAIR] インデックス整合性OK');
+        }
+      } else {
+        console.warn('⚠️ [CACHE_REPAIR] ユーザーインデックス未存在:', userId);
+        issues.push('ユーザーインデックス未存在');
+        repairActions.push('インデックス再構築');
+      }
+    } else {
+      console.warn('⚠️ [CACHE_REPAIR] インデックスキャッシュ未存在');
+      issues.push('インデックスキャッシュ未存在');
+      repairActions.push('インデックス初期化');
+    }
+    
+    // 4. 必要に応じて修復を実行
+    if (repairActions.length > 0) {
+      console.log('🔧 [CACHE_REPAIR] 修復実行:', repairActions);
+      
+      // インデックスを再構築
+      cacheManager.clear('db_index_userId');
+      var newIndex = buildRowIndexForField(values, headers, 'userId');
+      cacheManager.set('db_index_userId', newIndex, { ttl: 600 }); // 10分間キャッシュ
+      
+      console.log('✅ [CACHE_REPAIR] インデックス修復完了');
+      repairActions.push('インデックス修復完了');
+    }
+    
+    return {
+      status: 'success',
+      userId: userId,
+      issues: issues,
+      repairActions: repairActions,
+      isHealthy: issues.length === 0
+    };
+    
+  } catch (error) {
+    console.error('❌ [CACHE_REPAIR] 修復エラー:', error.message);
+    return {
+      status: 'error',
+      userId: userId,
+      error: error.message,
+      issues: ['修復処理エラー'],
+      repairActions: [],
+      isHealthy: false
+    };
+  }
+}
+
+/**
+ * システム全体のキャッシュ健全性チェックと自動修復
+ * @returns {object} システム健全性レポート
+ */
+function performSystemCacheHealthCheck() {
+  try {
+    console.log('🔍 [SYSTEM_HEALTH] システムキャッシュ健全性チェック開始');
+    
+    var healthReport = {
+      timestamp: new Date().toISOString(),
+      overallHealth: 'good',
+      issues: [],
+      repairActions: [],
+      cacheStats: {}
+    };
+    
+    // キャッシュ統計を取得
+    try {
+      healthReport.cacheStats = {
+        totalCaches: cacheManager.size || 0,
+        hasDbIndex: !!cacheManager.get('db_index_userId'),
+        memoryUsage: 'unknown' // GASでは取得困難
+      };
+    } catch (e) {
+      console.warn('⚠️ [SYSTEM_HEALTH] キャッシュ統計取得失敗:', e.message);
+    }
+    
+    // 期限切れキャッシュのクリーンアップ
+    try {
+      cacheManager.clearExpired();
+      healthReport.repairActions.push('期限切れキャッシュクリーンアップ');
+    } catch (e) {
+      console.warn('⚠️ [SYSTEM_HEALTH] キャッシュクリーンアップ失敗:', e.message);
+      healthReport.issues.push('キャッシュクリーンアップ失敗');
+    }
+    
+    // 全体的な健全性を判定
+    if (healthReport.issues.length > 0) {
+      healthReport.overallHealth = 'degraded';
+    }
+    if (healthReport.issues.length > 3) {
+      healthReport.overallHealth = 'poor';
+    }
+    
+    console.log('✅ [SYSTEM_HEALTH] 健全性チェック完了:', healthReport);
+    return healthReport;
+    
+  } catch (error) {
+    console.error('❌ [SYSTEM_HEALTH] 健全性チェックエラー:', error.message);
+    return {
+      timestamp: new Date().toISOString(),
+      overallHealth: 'error',
+      issues: ['健全性チェック実行エラー'],
+      repairActions: [],
+      error: error.message
+    };
+  }
 }
 
 /**
@@ -693,46 +964,124 @@ function updateUser(userId, updateData) {
     });
     
     // インデックスを使用してユーザーの行を効率的に特定
-    // 問題の調査中は短いTTLを使用
-    var userIndexData = cacheManager.get('db_index_userId', function() {
+    // 強化されたインデックスシステムを使用
+    var indexResult = cacheManager.get('db_index_userId', function() {
       return buildRowIndexForField(values, headers, 'userId');
     }, { ttl: 60 }); // 1分間に短縮
     
     // デバッグ用：キャッシュ無効化オプション
     if (updateData.__debug_clearCache) {
       cacheManager.clear('db_index_userId');
-      userIndexData = buildRowIndexForField(values, headers, 'userId');
+      indexResult = buildRowIndexForField(values, headers, 'userId');
       console.log('updateUser: キャッシュクリア後のインデックス再構築');
+    }
+    
+    // インデックス結果の検証
+    var userIndexData = {};
+    var indexValid = false;
+    
+    if (indexResult && indexResult.metadata && indexResult.metadata.valid) {
+      userIndexData = indexResult.index;
+      indexValid = true;
+      console.log('updateUser: 有効なインデックス使用', { 
+        validEntries: indexResult.metadata.validEntries,
+        skippedEntries: indexResult.metadata.skippedEntries,
+        dataSignature: indexResult.metadata.dataSignature 
+      });
+    } else if (indexResult && typeof indexResult === 'object' && !indexResult.metadata) {
+      // 旧形式のインデックス（後方互換性）
+      userIndexData = indexResult;
+      indexValid = true;
+      console.warn('updateUser: 旧形式インデックスを使用（更新推奨）');
+    } else {
+      console.error('updateUser: インデックスが無効、線形検索に切り替え', { indexResult: indexResult });
+      indexValid = false;
+      
+      // 🔧 自動修復: インデックスが無効な場合はキャッシュ修復を試行
+      try {
+        console.log('🔧 [AUTO_REPAIR] インデックス無効につき自動修復開始');
+        var repairResult = validateAndRepairCache(userId);
+        if (repairResult.status === 'success' && repairResult.repairActions.length > 0) {
+          console.log('✅ [AUTO_REPAIR] キャッシュ修復成功、再取得試行');
+          // 修復後に再度インデックスを取得
+          indexResult = cacheManager.get('db_index_userId');
+          if (indexResult && indexResult.metadata && indexResult.metadata.valid) {
+            userIndexData = indexResult.index;
+            indexValid = true;
+            console.log('✅ [AUTO_REPAIR] 修復後のインデックス利用可能');
+          }
+        }
+      } catch (repairError) {
+        console.warn('⚠️ [AUTO_REPAIR] 自動修復失敗:', repairError.message);
+      }
     }
     
     console.log('updateUser: ユーザーインデックス情報', { 
       hasIndexData: !!userIndexData,
+      indexValid: indexValid,
       userId: userId,
       cachedRowIndex: userIndexData ? userIndexData[userId] : 'なし'
     });
     
     var cachedRowIndex = userIndexData[userId];
+    var rowIndex = -1;
     if (cachedRowIndex) {
-      rowIndex = cachedRowIndex;
-      console.log('updateUser: キャッシュからrowIndex取得', { rowIndex: rowIndex });
-      
-      // キャッシュされた行が実際に存在するか検証
-      if (rowIndex >= 1 && rowIndex <= values.length) {
-        var cachedRow = values[rowIndex - 1];
-        if (cachedRow && cachedRow[userIdIndex] === userId) {
-          console.log('updateUser: キャッシュされた行が有効');
+      // 新形式（構造化インデックス）か旧形式かを判定
+      if (typeof cachedRowIndex === 'object' && cachedRowIndex.rowIndex) {
+        // 新形式：構造化インデックス
+        rowIndex = cachedRowIndex.rowIndex;
+        var arrayIndex = cachedRowIndex.arrayIndex;
+        console.log('updateUser: 構造化インデックスから取得', { 
+          rowIndex: rowIndex, 
+          arrayIndex: arrayIndex,
+          lastValidated: cachedRowIndex.lastValidated 
+        });
+        
+        // 二重検証：rowIndexとarrayIndexの整合性をチェック
+        if (rowIndex >= 1 && rowIndex <= values.length && arrayIndex >= 0 && arrayIndex < values.length) {
+          var cachedRow = values[arrayIndex];
+          if (cachedRow && cachedRow[userIdIndex] === userId) {
+            console.log('updateUser: 構造化インデックスが有効');
+          } else {
+            console.warn('updateUser: 構造化インデックスが無効、線形検索に切り替え', {
+              rowIndex: rowIndex,
+              arrayIndex: arrayIndex,
+              cachedRowExists: !!cachedRow,
+              cachedRowUserId: cachedRow ? cachedRow[userIdIndex] : 'N/A',
+              expectedUserId: userId
+            });
+            rowIndex = -1;
+          }
         } else {
-          console.warn('updateUser: キャッシュされた行が無効、線形検索に切り替え', {
-            rowIndex: rowIndex,
-            cachedRowExists: !!cachedRow,
-            cachedRowUserId: cachedRow ? cachedRow[userIdIndex] : 'N/A',
-            expectedUserId: userId
+          console.warn('updateUser: 構造化インデックスの範囲が無効', { 
+            rowIndex: rowIndex, 
+            arrayIndex: arrayIndex, 
+            valuesLength: values.length 
           });
-          rowIndex = -1; // 線形検索に切り替え
+          rowIndex = -1;
         }
       } else {
-        console.warn('updateUser: キャッシュされた行番号が範囲外', { rowIndex: rowIndex, valuesLength: values.length });
-        rowIndex = -1; // 線形検索に切り替え
+        // 旧形式：単純な行番号
+        rowIndex = cachedRowIndex;
+        console.log('updateUser: 旧形式インデックスから取得', { rowIndex: rowIndex });
+        
+        if (rowIndex >= 1 && rowIndex <= values.length) {
+          var cachedRow = values[rowIndex - 1];
+          if (cachedRow && cachedRow[userIdIndex] === userId) {
+            console.log('updateUser: 旧形式インデックスが有効');
+          } else {
+            console.warn('updateUser: 旧形式インデックスが無効、線形検索に切り替え', {
+              rowIndex: rowIndex,
+              cachedRowExists: !!cachedRow,
+              cachedRowUserId: cachedRow ? cachedRow[userIdIndex] : 'N/A',
+              expectedUserId: userId
+            });
+            rowIndex = -1;
+          }
+        } else {
+          console.warn('updateUser: 旧形式インデックスが範囲外', { rowIndex: rowIndex, valuesLength: values.length });
+          rowIndex = -1;
+        }
       }
     }
     
@@ -916,13 +1265,30 @@ function updateUser(userId, updateData) {
       }
     }
     
-    // 最適化: 変更された内容に基づいてキャッシュを選択的に無効化
-    var userInfo = findUserById(userId);
+    // 統合キャッシュシステムに対応した無効化処理
+    
+    // 1. 実行レベルキャッシュを即座にクリア
+    if (typeof clearExecutionUserInfoCache === 'function') {
+      clearExecutionUserInfoCache(userId);
+      console.log('✅ 実行レベルキャッシュクリア完了: updateUser後');
+    }
+    
+    // 2. 従来のキャッシュシステムも無効化
+    var userInfo = findUserById(userId, true); // キャッシュバイパスして最新情報を取得
     var email = updateData.adminEmail || (userInfo ? userInfo.adminEmail : null);
     var spreadsheetId = updateData.spreadsheetId || (userInfo ? userInfo.spreadsheetId : null);
     
-    // キャッシュを無効化（必要最小限）
+    // 3. 段階的キャッシュ無効化（部分 → 全体）
     invalidateUserCache(userId, email, spreadsheetId, false);
+    
+    // 4. データベースインデックスキャッシュも更新が必要な場合はクリア
+    if (updateData.adminEmail || updateData.userId) {
+      // ユーザーIDやメールアドレスが変更された場合はインデックスキャッシュもクリア
+      cacheManager.clearByPattern('db_index_');
+      console.log('✅ データベースインデックスキャッシュもクリア');
+    }
+    
+    console.log('✅ updateUser: キャッシュ無効化完了', { userId, email, spreadsheetId });
     
     return { success: true };
   } catch (error) {
