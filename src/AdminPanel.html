@@ -25,15 +25,2601 @@
   </script>
   <script src="https://cdn.tailwindcss.com" defer onerror="console.warn('TailwindCSS failed to load')"></script>
 
+  <!-- Consolidated Unified Styles -->
+  <style>
+/* =============================================================================
+   StudyQuest - Unified CSS Styles
+   Based on AdminPanel.html with additional styles from all HTML files
+   ============================================================================= */
+
+/* CSS Variables - Glassmorphism Design System */
+:root {
+  /* Glassmorphism Color Palette - Based on Registration.html */
+  --color-primary: #06b6d4;
+  --color-primary-end: #a855f7;
+  --color-background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%);
+  --color-surface: rgba(255, 255, 255, 0.08);
+  --color-surface-hover: rgba(255, 255, 255, 0.12);
+  --color-text: #ffffff;
+  --color-text-secondary: rgba(255, 255, 255, 0.8);
+  --color-text-muted: rgba(255, 255, 255, 0.7);
+  --color-border: rgba(255, 255, 255, 0.2);
+  --color-border-hover: rgba(255, 255, 255, 0.3);
+  --color-accent: #facc15;
+  
+  /* Status Colors - Glassmorphism Compatible */
+  --color-success: #10b981;
+  --color-success-bg: rgba(16, 185, 129, 0.1);
+  --color-success-border: rgba(16, 185, 129, 0.3);
+  --color-error: #ef4444;
+  --color-error-bg: rgba(239, 68, 68, 0.1);
+  --color-error-border: rgba(239, 68, 68, 0.3);
+  --color-warning: #f59e0b;
+  --color-warning-bg: rgba(245, 158, 11, 0.1);
+  --color-warning-border: rgba(245, 158, 11, 0.3);
+  --color-info: #3b82f6;
+  --color-info-bg: rgba(59, 130, 246, 0.1);
+  --color-info-border: rgba(59, 130, 246, 0.3);
+  
+  /* Google Workspace Colors */
+  --color-google-blue: #4285f4;
+  --color-google-green: #34a853;
+  --color-google-yellow: #fbbc05;
+  --color-google-red: #ea4335;
+  
+  /* Glassmorphism Shadow System */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.1);
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  
+  /* Animation and Transition System */
+  --transition-duration: 0.3s;
+  --transition-easing: ease;
+  --animation-duration: 0.6s;
+  --backdrop-blur: 20px;
+  
+  /* Gradient System */
+  --gradient-primary: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-end) 100%);
+  --gradient-background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%);
+  --gradient-radial-accent: radial-gradient(ellipse at top left, rgba(6, 182, 212, 0.1) 0%, transparent 70%), radial-gradient(ellipse at bottom right, rgba(168, 85, 247, 0.08) 0%, transparent 70%);
+  
+  /* Additional Consolidated Variables from removed duplicate sections */
+  --bg-primary: #1a1b26;
+  --bg-secondary: #24283b;
+  --bg-tertiary: #414868;
+  --bg-accent: rgba(255, 255, 255, 0.08);
+  --glass-bg: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  --accent-cyan: #06b6d4;
+  --accent-purple: #a855f7;
+  --accent-green: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-red: #ef4444;
+  --text-primary: #ffffff;
+  --text-secondary: #e2e8f0;
+  --text-tertiary: #94a3b8;
+  --text-muted: #64748b;
+}
+
+/* Base Styles - Glassmorphism Foundation with Proper Specificity */
+.unified-theme html, 
+.unified-theme html[lang="ja"],
+html.unified-theme, 
+html[lang="ja"].unified-theme {
+  background: var(--gradient-background);
+  min-height: 100vh;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.unified-theme body,
+body.unified-theme { 
+  background: var(--gradient-background);
+  min-height: 100vh;
+  margin: 0;
+  padding: 20px;
+  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  line-height: 1.6;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* Global radial gradient overlay for glassmorphism effect */
+.unified-theme body::before,
+body.unified-theme::before {
+  content: '';
+  position: fixed;
+  top: 0; 
+  left: 0;
+  width: 100%; 
+  height: 100%;
+  background: var(--gradient-radial-accent);
+  z-index: -1;
+}
+
+/* Global box-sizing reset for glassmorphism compatibility */
+.unified-theme html, .unified-theme body, .unified-theme div, .unified-theme span, 
+.unified-theme h1, .unified-theme h2, .unified-theme h3, .unified-theme h4, .unified-theme h5, .unified-theme h6, 
+.unified-theme p, .unified-theme button, .unified-theme a {
+  box-sizing: border-box;
+}
+
+/* Glass Panel Effects - Glassmorphism System */
+.unified-theme .glass-panel { 
+  background: var(--color-surface);
+  -webkit-backdrop-filter: blur(var(--backdrop-blur));
+  backdrop-filter: blur(var(--backdrop-blur));
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-glass);
+  border-radius: 24px;
+  transition: all var(--transition-duration) var(--transition-easing);
+  position: relative;
+  /* Prevent creating new stacking context that blocks modals */
+  isolation: auto;
+}
+
+.unified-theme .glass-panel:hover { 
+  border-color: var(--color-border-hover);
+  will-change: border-color; 
+}
+
+/* Glass Container - Main container for pages */
+.unified-theme .glass-container {
+  background: var(--color-surface);
+  -webkit-backdrop-filter: blur(var(--backdrop-blur));
+  backdrop-filter: blur(var(--backdrop-blur));
+  border-radius: 24px;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-glass);
+  width: 100%;
+  max-width: 420px;
+  padding: 40px 32px;
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  animation: fadeIn var(--animation-duration) ease-out;
+  isolation: auto;
+}
+
+/* Centered glass containers for main content */
+.unified-theme .centered-glass-layout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+/* Google Workspace Integration Styles */
+.google-integration {
+  background: linear-gradient(135deg, var(--color-google-blue), var(--color-google-green));
+  border: 1px solid rgba(66, 133, 244, 0.3);
+}
+
+.google-integration:hover {
+  border-color: rgba(66, 133, 244, 0.5);
+  box-shadow: 0 4px 20px rgba(66, 133, 244, 0.2);
+}
+
+/* Glassmorphism Button System */
+.unified-theme .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 24px;
+  border-radius: 12px;
+  font-weight: 600;
+  transition: all var(--transition-duration) var(--transition-easing);
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+  min-height: 44px;
+  min-width: 44px;
+  position: relative;
+  overflow: hidden;
+  font-size: 16px;
+  color: white;
+}
+
+.unified-theme .btn:disabled { 
+  opacity: 0.6; 
+  cursor: not-allowed; 
+  transform: none;
+}
+
+.unified-theme .btn:not(:disabled):hover { 
+  transform: translateY(-1px); 
+  will-change: transform; 
+}
+
+.unified-theme .btn:not(:disabled):active { 
+  transform: translateY(0); 
+}
+
+/* Glassmorphism Button Variants */
+.unified-theme .btn-primary, .unified-theme .register-btn, .unified-theme .cta-button { 
+  width: 100%;
+  background: var(--gradient-primary);
+  border: none;
+  border-radius: 12px;
+  padding: 16px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: all var(--transition-duration) var(--transition-easing);
+  margin-bottom: 24px;
+}
+
+.unified-theme .btn-primary:hover:not(:disabled), .unified-theme .register-btn:hover:not(:disabled) { 
+  transform: translateY(-1px); 
+  box-shadow: 0 8px 25px rgba(6, 182, 212, 0.4); 
+}
+
+.unified-theme .btn-secondary, .unified-theme .action-btn.secondary { 
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.unified-theme .btn-danger { 
+  background: var(--color-error);
+  color: white;
+}
+
+.unified-theme .btn-google {
+  background: linear-gradient(135deg, var(--color-google-blue), var(--color-google-green));
+  color: white;
+  font-weight: 700;
+}
+
+.unified-theme .btn-success {
+  background: var(--color-success);
+  color: white;
+}
+
+.unified-theme .btn-warning {
+  background: var(--color-warning);
+  color: white;
+}
+
+/* Action Buttons */
+.unified-theme .action-btn { 
+  display: block; 
+  padding: 14px 24px; 
+  border-radius: 10px; 
+  border: none; 
+  font-size: 15px; 
+  font-weight: 600; 
+  text-decoration: none; 
+  color: white; 
+  margin-top: 12px; 
+  cursor: pointer; 
+}
+
+.unified-theme .action-btn.primary { 
+  background: var(--gradient-primary); 
+}
+
+/* Game-Style Buttons (from Page.html) */
+.game-btn {
+  background: linear-gradient(135deg, var(--color-primary), #50fa7b);
+  color: #000;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+  transition: all 0.1s ease;
+  border: 2px solid transparent;
+}
+
+.game-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 0 rgba(0,0,0,0.2);
+}
+
+.game-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 rgba(0,0,0,0.2);
+}
+
+/* CTA Button with Shimmer Effect */
+.cta-button {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--color-primary), #50fa7b);
+  color: #000;
+  font-weight: 700;
+}
+
+.cta-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.5s ease;
+}
+
+.cta-button:hover::before {
+  left: 100%;
+}
+
+/* Glassmorphism Header System */
+.unified-theme .header { 
+  margin-bottom: 40px; 
+}
+
+.unified-theme .logo {
+  width: 56px; 
+  height: 56px;
+  background: var(--gradient-primary);
+  border-radius: 16px;
+  margin: 0 auto 16px;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  font-size: 24px; 
+  color: white; 
+  font-weight: 600;
+}
+
+.unified-theme .title { 
+  font-size: 28px; 
+  font-weight: 700; 
+  color: white; 
+  margin-bottom: 8px; 
+}
+
+.unified-theme .subtitle { 
+  font-size: 16px; 
+  color: var(--color-text-muted); 
+  margin-bottom: 0; 
+}
+
+/* Status Card System */
+.unified-theme .status-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  margin-bottom: 32px;
+}
+
+.unified-theme .status-text { 
+  font-size: 14px; 
+  color: var(--color-text-secondary); 
+  margin-bottom: 8px; 
+}
+
+.unified-theme .user-email { 
+  font-size: 16px; 
+  font-weight: 600; 
+  color: white; 
+  word-break: break-all; 
+}
+
+/* Success Container */
+.success-container { 
+  display: none; 
+}
+
+.unified-theme .success-icon { 
+  width: 64px; 
+  height: 64px; 
+  background: var(--color-success); 
+  border-radius: 50%; 
+  margin: 0 auto 24px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  font-size: 28px; 
+  color: white; 
+}
+
+/* Form Controls - Glassmorphism Style */
+.form-control {
+  width: 100%;
+  padding: 1rem 1.25rem;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  color: var(--color-text);
+  transition: all var(--transition-duration) var(--transition-easing);
+  font-size: 16px;
+  min-height: 52px;
+  line-height: 1.5;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(139, 233, 253, 0.1);
+  background: rgba(255,255,255,0.08);
+}
+
+.form-control:hover {
+  border-color: rgba(255,255,255,0.3);
+}
+
+.form-control::placeholder {
+  color: rgba(192, 202, 245, 0.5);
+}
+
+/* Status Indicators */
+.status-indicator { 
+  width: 8px; 
+  height: 8px; 
+  border-radius: 50%; 
+  display: inline-block; 
+  margin-right: 8px;
+}
+
+.status-active { 
+  background-color: var(--color-success); 
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); 
+}
+
+.status-inactive { 
+  background-color: var(--color-warning); 
+}
+
+.status-error { 
+  background-color: var(--color-error); 
+}
+
+/* Answer Card System (from Page.html) */
+.answer-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  transition: all var(--transition-duration) var(--transition-easing);
+  position: relative;
+  overflow: hidden;
+}
+
+.answer-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: rgba(255,255,255,0.2);
+}
+
+.answer-card.highlighted {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 20px rgba(250, 204, 21, 0.3);
+  background: rgba(250, 204, 21, 0.05);
+}
+
+.answer-card.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Reaction System */
+.reaction-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  background: rgba(255,255,255,0.05);
+  color: var(--color-text);
+  transition: all var(--transition-duration) var(--transition-easing);
+  cursor: pointer;
+  font-size: 0.875rem;
+  min-height: 36px;
+}
+
+.reaction-btn:hover {
+  background: rgba(255,255,255,0.1);
+  transform: translateY(-1px);
+}
+
+.reaction-btn.reacted {
+  background: rgba(139, 233, 253, 0.2);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* Reaction Button Variants */
+.reaction-bg-like { background: rgba(16, 185, 129, 0.1); }
+.reaction-bg-understand { background: rgba(59, 130, 246, 0.1); }
+.reaction-bg-curious { background: rgba(245, 158, 11, 0.1); }
+
+.reaction-border-1 { border-color: var(--color-success); }
+.reaction-border-2 { border-color: var(--color-info); }
+.reaction-border-3 { border-color: var(--color-warning); }
+
+/* Highlight Button */
+.highlight-btn {
+  background: rgba(250, 204, 21, 0.1);
+  border: 1px solid rgba(250, 204, 21, 0.3);
+  color: var(--color-accent);
+}
+
+.highlight-btn:hover {
+  background: rgba(250, 204, 21, 0.2);
+  border-color: var(--color-accent);
+}
+
+/* Admin Toggle - Subtle button for administrators only */
+.admin-toggle {
+  font-size: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.admin-toggle:hover {
+  transform: translateY(-1px);
+}
+
+/* Step Indicator System (from Registration.html) */
+.step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  border: 2px solid var(--color-border);
+  color: var(--color-text);
+  font-weight: 600;
+  position: relative;
+  transition: all var(--transition-duration) var(--transition-easing);
+}
+
+.step-indicator.completed {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: white;
+}
+
+.step-indicator.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #000;
+  animation: pulse 2s infinite;
+}
+
+/* Feature Cards */
+.feature-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  transition: all var(--transition-duration) var(--transition-easing);
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: rgba(255,255,255,0.2);
+}
+
+/* Loading States */
+.loading-skeleton {
+  background: linear-gradient(90deg, 
+    rgba(255,255,255,0.1) 25%, 
+    rgba(255,255,255,0.2) 50%, 
+    rgba(255,255,255,0.1) 75%);
+  background-size: 200% 100%;
+  animation: loading-skeleton 1.5s infinite;
+  border-radius: 0.5rem;
+  height: 20px;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, 
+    rgba(255,255,255,0.1) 25%, 
+    rgba(255,255,255,0.2) 50%, 
+    rgba(255,255,255,0.1) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: 0.5rem;
+}
+
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+/* Glassmorphism Spinner System */
+.unified-theme .spinner {
+  width: 20px; 
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  display: inline-block; 
+  vertical-align: middle; 
+  margin-right: 8px;
+}
+
+.spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top: 2px solid var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 4px solid rgba(255,255,255,0.3);
+  border-top: 4px solid var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Domain Info System from Registration.html */
+.unified-theme .domain-info {
+  width: 100%;
+  text-align: center;
+}
+
+.unified-theme .hidden {
+  display: none;
+}
+
+.flex {
+  display: flex;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.gap-2 {
+  gap: 8px;
+}
+
+/* Gradient backgrounds */
+.bg-gradient-to-r {
+  background: linear-gradient(90deg, var(--tw-gradient-from), var(--tw-gradient-to));
+}
+
+.from-green-500\/10 {
+  --tw-gradient-from: rgba(34, 197, 94, 0.1);
+}
+
+.to-emerald-500\/10 {
+  --tw-gradient-to: rgba(16, 185, 129, 0.1);
+}
+
+.from-yellow-500\/10 {
+  --tw-gradient-from: rgba(234, 179, 8, 0.1);
+}
+
+.to-orange-500\/10 {
+  --tw-gradient-to: rgba(249, 115, 22, 0.1);
+}
+
+.from-blue-500\/10 {
+  --tw-gradient-from: rgba(59, 130, 246, 0.1);
+}
+
+.to-purple-500\/10 {
+  --tw-gradient-to: rgba(168, 85, 247, 0.1);
+}
+
+/* Border colors */
+.border-green-400\/30 {
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+.border-yellow-400\/30 {
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.border-blue-400\/30 {
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+/* Text colors */
+.text-green-400 {
+  color: rgba(74, 222, 128, 1);
+}
+
+.text-yellow-400 {
+  color: rgba(251, 191, 36, 1);
+}
+
+.text-blue-400 {
+  color: rgba(96, 165, 250, 1);
+}
+
+.text-sm {
+  font-size: 14px;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+.w-4 {
+  width: 16px;
+}
+
+.h-4 {
+  height: 16px;
+}
+
+.p-3 {
+  padding: 12px;
+}
+
+/* Progress Bar System */
+.progress-bar {
+  height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary), #50fa7b);
+  transition: width 0.5s ease;
+  border-radius: 2px;
+}
+
+/* Tooltip System */
+.tooltip { 
+  position: relative; 
+}
+
+.tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.9);
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-duration);
+  z-index: 1000;
+  margin-bottom: 5px;
+}
+
+.tooltip:hover::after { 
+  opacity: 1; 
+}
+
+/* Card Hover Effects */
+.card-hover {
+  transition: all var(--animation-duration) var(--transition-easing);
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(139, 233, 253, 0.15);
+}
+
+/* State Classes */
+.error-state {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  color: #f87171;
+}
+
+.success-state {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  color: #34d399;
+}
+
+/* Message System - Glassmorphism Style */
+.unified-theme .message-area { 
+  min-height: 24px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  margin-bottom: 24px; 
+  font-size: 14px; 
+  color: var(--color-text-secondary); 
+}
+
+.unified-theme .message-area.error { 
+  color: var(--color-error); 
+}
+
+.unified-theme .message-area.success { 
+  color: var(--color-success); 
+}
+
+.unified-theme .message-area.warning { 
+  color: var(--color-warning); 
+}
+
+.message {
+  padding: 1rem;
+  border-radius: 0.75rem;
+  margin-bottom: 1rem;
+  transform: translateY(20px);
+  opacity: 0;
+  transition: all var(--animation-duration) var(--transition-easing);
+}
+
+.message.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Glassmorphism Footer */
+.unified-theme .footer { 
+  text-align: center; 
+  font-size: 12px; 
+  color: rgba(255, 255, 255, 0.5); 
+  margin-top: 8px; 
+}
+
+.unified-theme .footer a { 
+  color: var(--color-text-muted); 
+  text-decoration: none; 
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3); 
+  transition: color 0.2s ease; 
+  cursor: pointer; 
+}
+
+.unified-theme .footer a:hover { 
+  color: white; 
+}
+
+/* Modal System */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 20px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0s 0.3s;
+}
+
+.modal-overlay.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.3s ease, visibility 0s;
+}
+
+.modal-overlay .glass-panel {
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+  width: 100%;
+  max-width: 640px;
+  max-height: 90vh;
+  transform: scale(0.95) translateY(10px);
+  transition: transform 0.3s ease-out;
+}
+
+.modal-overlay.is-visible .glass-panel {
+  transform: scale(1) translateY(0);
+}
+
+.modal-close-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: rgba(255,255,255,0.1);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-duration) var(--transition-easing);
+  color: var(--color-text);
+}
+
+.modal-close-btn:hover {
+  background: rgba(255,255,255,0.2);
+  transform: scale(1.1);
+}
+
+/* Progressive Disclosure */
+.progressive-section {
+  transition: all var(--animation-duration) var(--transition-easing);
+}
+
+.progressive-section.collapsed {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.progressive-section.expanded {
+  max-height: 1000px;
+  opacity: 1;
+}
+
+.toggle-section {
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.toggle-section:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+/* Responsive Grid System */
+.responsive-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+  padding: 1rem;
+}
+
+/* Performance Optimizations */
+.render-optimized {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* Accessibility */
+:focus-visible { 
+  outline: 3px solid var(--color-primary); 
+  outline-offset: 2px; 
+  border-radius: 4px; 
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Animation Classes */
+.success-pulse { animation: successPulse 0.6s ease-out; }
+.error-shake { animation: errorShake 0.5s ease-out; }
+.fade-in { animation: fadeIn var(--animation-duration) ease-out; }
+.slide-up { animation: slideUp var(--animation-duration) ease-out; }
+.fade-out { animation: fadeOut var(--animation-duration) ease-out; }
+
+/* Keyframe Animations */
+@keyframes successPulse {
+  0% { transform: scale3d(1, 1, 1); will-change: transform; }
+  50% { transform: scale3d(1.05, 1.05, 1); }
+  100% { transform: scale3d(1, 1, 1); will-change: auto; }
+}
+
+@keyframes errorShake {
+  0% { transform: translate3d(0, 0, 0); will-change: transform; }
+  25% { transform: translate3d(-5px, 0, 0); }
+  75% { transform: translate3d(5px, 0, 0); }
+  100% { transform: translate3d(0, 0, 0); will-change: auto; }
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; transform: translateY(10px); will-change: opacity, transform; }
+  100% { opacity: 1; transform: translateY(0); will-change: auto; }
+}
+
+@keyframes slideUp {
+  0% { opacity: 0; transform: translateY(20px); will-change: opacity, transform; }
+  100% { opacity: 1; transform: translateY(0); will-change: auto; }
+}
+
+@keyframes fadeOut {
+  0% { opacity: 1; will-change: opacity; }
+  100% { opacity: 0; will-change: auto; }
+}
+
+@keyframes loading-skeleton {
+  0% { background-position: 200% 0; will-change: background-position; }
+  100% { background-position: -200% 0; will-change: auto; }
+}
+
+@keyframes skeleton-loading {
+  0% { background-position: 200% 0; will-change: background-position; }
+  100% { background-position: -200% 0; will-change: auto; }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); will-change: transform; }
+  100% { transform: rotate(360deg); will-change: auto; }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); will-change: transform; }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translate3d(0, 0, 0); will-change: transform; }
+  25% { transform: translate3d(-5px, 0, 0); }
+  75% { transform: translate3d(5px, 0, 0); }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); will-change: transform; }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes modalFade {
+  0% { opacity: 0; will-change: opacity; }
+  100% { opacity: 1; will-change: auto; }
+}
+
+@keyframes modalScale {
+  0% { transform: scale(0.9); will-change: transform; }
+  100% { transform: scale(1); will-change: auto; }
+}
+
+@keyframes slideIn {
+  0% { opacity: 0; transform: translateX(-20px); will-change: opacity, transform; }
+  100% { opacity: 1; transform: translateX(0); will-change: auto; }
+}
+
+/* Font Styles */
+.game-font {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+/* Text Utilities */
+.answer-preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.5;
+}
+
+/* Tailwind CSS Fallback */
+.tailwind-fallback {
+  /* Fallback styles when TailwindCSS fails to load */
+}
+
+/* Media Queries */
+
+/* Performance optimizations for low-end devices */
+@media (max-width: 768px) and (max-resolution: 150dpi) {
+  .glass-panel {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgba(26, 27, 38, 0.95);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --color-border: rgba(255,255,255,0.3);
+    --color-text: #ffffff;
+  }
+}
+
+/* Mobile-first responsive design */
+@media (max-width: 768px) {
+  .btn {
+    min-height: 48px;
+    padding: 1rem 1.5rem;
+    font-size: 16px;
+  }
+  
+  .form-control {
+    padding: 1rem;
+    font-size: 16px;
+  }
+  
+  .glass-panel {
+    margin: 0.5rem;
+    padding: 1rem;
+  }
+  
+  .responsive-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .answer-card {
+    padding: 1rem;
+  }
+  
+  .reaction-btn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+  }
+}
+
+@media (min-width: 640px) {
+  .responsive-grid {
+    gap: 1.5rem;
+    padding: 1.5rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .responsive-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .responsive-grid {
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+    padding: 2rem;
+  }
+}
+
+/* High refresh rate display optimizations */
+@media (min-resolution: 120dpi) {
+  .btn, .form-control, .answer-card {
+    will-change: transform;
+  }
+}
+
+/* Large screen optimizations */
+@media (min-width: 1200px) {
+  .responsive-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* =============================================================================
+   TAILWIND REPLACEMENT UTILITIES
+   ============================================================================= */
+
+/* Layout Utilities */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.max-w-2xl { max-width: 42rem; margin: 0 auto; }
+.max-w-4xl { max-width: 56rem; margin: 0 auto; }
+.max-w-6xl { max-width: 72rem; margin: 0 auto; }
+
+/* Flexbox Utilities */
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.flex-row { flex-direction: row; }
+.flex-wrap { flex-wrap: wrap; }
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.items-end { align-items: flex-end; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.justify-start { justify-content: flex-start; }
+.justify-end { justify-content: flex-end; }
+.flex-1 { flex: 1 1 0%; }
+.flex-none { flex: none; }
+
+/* Grid Utilities */
+.grid { display: grid; }
+.grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.gap-2 { gap: 0.5rem; }
+.gap-4 { gap: 1rem; }
+.gap-6 { gap: 1.5rem; }
+.gap-8 { gap: 2rem; }
+
+/* Spacing Utilities */
+.p-2 { padding: 0.5rem; }
+.p-4 { padding: 1rem; }
+.p-6 { padding: 1.5rem; }
+.p-8 { padding: 2rem; }
+.px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+.py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+.py-6 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+.m-2 { margin: 0.5rem; }
+.m-4 { margin: 1rem; }
+.m-6 { margin: 1.5rem; }
+.mx-auto { margin-left: auto; margin-right: auto; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-4 { margin-bottom: 1rem; }
+.mb-6 { margin-bottom: 1.5rem; }
+.mb-8 { margin-bottom: 2rem; }
+.mt-2 { margin-top: 0.5rem; }
+.mt-4 { margin-top: 1rem; }
+.mt-6 { margin-top: 1.5rem; }
+.mr-2 { margin-right: 0.5rem; }
+.ml-2 { margin-left: 0.5rem; }
+
+/* Typography */
+.text-xs { font-size: 0.75rem; line-height: 1rem; }
+.text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+.text-base { font-size: 1rem; line-height: 1.5rem; }
+.text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+.text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+.text-2xl { font-size: 1.5rem; line-height: 2rem; }
+.text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
+.text-4xl { font-size: 2.25rem; line-height: 2.5rem; }
+.font-normal { font-weight: 400; }
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+
+/* Colors */
+.text-white { color: var(--color-text); }
+.text-gray-200 { color: rgba(255, 255, 255, 0.9); }
+.text-gray-300 { color: var(--color-text-secondary); }
+.text-gray-400 { color: var(--color-text-muted); }
+.text-cyan-400 { color: var(--color-primary); }
+.text-purple-400 { color: var(--color-primary-end); }
+.text-yellow-400 { color: var(--color-accent); }
+.text-green-400 { color: var(--color-success); }
+.text-red-400 { color: var(--color-error); }
+
+/* Background Colors */
+.bg-transparent { background-color: transparent; }
+
+/* Borders */
+.border { border-width: 1px; border-color: var(--color-border); }
+.border-2 { border-width: 2px; }
+.border-gray-600 { border-color: rgba(255, 255, 255, 0.2); }
+.border-gray-700 { border-color: rgba(255, 255, 255, 0.1); }
+.rounded { border-radius: 0.25rem; }
+.rounded-md { border-radius: 0.375rem; }
+.rounded-lg { border-radius: 0.5rem; }
+.rounded-xl { border-radius: 0.75rem; }
+.rounded-2xl { border-radius: 1rem; }
+.rounded-full { border-radius: 9999px; }
+
+/* Position */
+.relative { position: relative; }
+.absolute { position: absolute; }
+.fixed { position: fixed; }
+.top-0 { top: 0; }
+.top-4 { top: 1rem; }
+.top-20 { top: 5rem; }
+.right-0 { right: 0; }
+.right-4 { right: 1rem; }
+.right-6 { right: 1.5rem; }
+.bottom-0 { bottom: 0; }
+.left-0 { left: 0; }
+
+/* Z-index */
+.z-10 { z-index: 10; }
+.z-20 { z-index: 20; }
+.z-30 { z-index: 30; }
+.z-40 { z-index: 40; }
+.z-50 { z-index: 50; }
+
+/* Display */
+.block { display: block; }
+.inline-block { display: inline-block; }
+.inline { display: inline; }
+.hidden { display: none; }
+
+/* Width and Height */
+.w-full { width: 100%; }
+.w-auto { width: auto; }
+.w-4 { width: 1rem; }
+.w-5 { width: 1.25rem; }
+.w-6 { width: 1.5rem; }
+.h-full { height: 100%; }
+.h-auto { height: auto; }
+.h-4 { height: 1rem; }
+.h-5 { height: 1.25rem; }
+.h-6 { height: 1.5rem; }
+.h-screen { height: 100vh; }
+.min-h-screen { min-height: 100vh; }
+
+/* Font Family */
+.font-sans { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+/* Opacity */
+.opacity-0 { opacity: 0; }
+.opacity-50 { opacity: 0.5; }
+.opacity-75 { opacity: 0.75; }
+.opacity-100 { opacity: 1; }
+
+/* Overflow */
+.overflow-hidden { overflow: hidden; }
+.overflow-auto { overflow: auto; }
+.overflow-y-auto { overflow-y: auto; }
+
+/* Cursor */
+.cursor-pointer { cursor: pointer; }
+.cursor-not-allowed { cursor: not-allowed; }
+
+/* Transition */
+.transition { transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter; transition-duration: var(--transition-duration); transition-timing-function: var(--transition-easing); }
+.duration-200 { transition-duration: 200ms; }
+.duration-300 { transition-duration: 300ms; }
+.ease-in-out { transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* Transform */
+.transform { transform: translateZ(0); }
+.scale-105 { transform: scale(1.05); }
+.hover\:scale-105:hover { transform: scale(1.05); }
+
+/* Shadow */
+.shadow { box-shadow: var(--shadow-sm); }
+.shadow-md { box-shadow: var(--shadow-md); }
+.shadow-lg { box-shadow: var(--shadow-lg); }
+
+/* Responsive Utilities */
+@media (min-width: 640px) {
+  .sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sm\:text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+}
+
+@media (min-width: 768px) {
+  .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .md\:p-8 { padding: 2rem; }
+  .md\:text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+}
+
+@media (min-width: 1024px) {
+  .lg\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .lg\:p-12 { padding: 3rem; }
+  .lg\:text-2xl { font-size: 1.5rem; line-height: 2rem; }
+}
+
+/* Dark Theme Body */
+.dark-body {
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+/* Gradient Backgrounds */
+.bg-gradient-to-r { background-image: linear-gradient(to right, var(--tw-gradient-stops)); }
+.bg-gradient-to-br { background-image: linear-gradient(to bottom right, var(--tw-gradient-stops)); }
+
+/* Common Gradient Combinations */
+.from-blue-600 { --tw-gradient-from: #2563eb; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(37, 99, 235, 0)); }
+.to-purple-600 { --tw-gradient-to: #9333ea; }
+.from-purple-600 { --tw-gradient-from: #9333ea; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(147, 51, 234, 0)); }
+.to-pink-600 { --tw-gradient-to: #db2777; }
+.from-gray-600 { --tw-gradient-from: #4b5563; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(75, 85, 99, 0)); }
+.to-gray-700 { --tw-gradient-to: #374151; }
+.from-cyan-400 { --tw-gradient-from: var(--color-primary); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(6, 182, 212, 0)); }
+.to-purple-400 { --tw-gradient-to: var(--color-primary-end); }
+
+/* Hover states for gradients */
+.hover\:from-blue-700:hover { --tw-gradient-from: #1d4ed8; }
+.hover\:to-purple-700:hover { --tw-gradient-to: #7c3aed; }
+.hover\:from-purple-700:hover { --tw-gradient-from: #7c3aed; }
+.hover\:to-pink-700:hover { --tw-gradient-to: #be185d; }
+.hover\:from-gray-700:hover { --tw-gradient-from: #374151; }
+.hover\:to-gray-800:hover { --tw-gradient-to: #1f2937; }
+
+/* Ring utilities */
+.focus\:ring-4:focus { 
+  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(4px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+}
+.ring-blue-300 { --tw-ring-color: rgba(147, 197, 253, 0.5); }
+.dark\:ring-blue-800 { --tw-ring-color: rgba(30, 64, 175, 0.5); }
+
+/* Toggle/Switch styles */
+.peer:checked ~ .peer-checked\:bg-blue-600 { background-color: #2563eb; }
+.peer:checked ~ .peer-checked\:after\:translate-x-full::after { transform: translateX(100%); }
+.peer-focus\:ring-4:focus ~ * { box-shadow: 0 0 0 4px var(--tw-ring-color); }
+.peer-focus\:ring-blue-300:focus ~ * { --tw-ring-color: rgba(147, 197, 253, 0.5); }
+
+/* Additional width/height utilities */
+.w-11 { width: 2.75rem; }
+.h-6 { height: 1.5rem; }
+.w-8 { width: 2rem; }
+.h-8 { height: 2rem; }
+
+/* Flex utilities */
+.flex-shrink-0 { flex-shrink: 0; }
+
+/* Disabled states */
+.disabled\:opacity-50:disabled { opacity: 0.5; }
+.disabled\:cursor-not-allowed:disabled { cursor: not-allowed; }
+
+/* Outline utilities */
+.focus\:outline-none:focus { outline: 2px solid transparent; outline-offset: 2px; }
+
+/* Peer utilities for toggle switches */
+.peer { position: relative; }
+
+/* Pseudo-element utilities */
+.after\:content-\[\'\'\]::after { content: ''; }
+.after\:absolute::after { position: absolute; }
+.after\:top-\[2px\]::after { top: 2px; }
+.after\:left-\[2px\]::after { left: 2px; }
+.after\:bg-white::after { background-color: white; }
+.after\:border::after { border-width: 1px; }
+.after\:border-gray-300::after { border-color: #d1d5db; }
+.after\:rounded-full::after { border-radius: 9999px; }
+.after\:h-5::after { height: 1.25rem; }
+.after\:w-5::after { width: 1.25rem; }
+.after\:transition-all::after { transition: all var(--transition-duration) var(--transition-easing); }
+
+/* Additional background colors */
+.bg-gray-200 { background-color: #e5e7eb; }
+.bg-gray-700 { background-color: #374151; }
+.dark\:bg-gray-700 { background-color: #374151; }
+
+/* Additional border colors */
+.border-gray-300 { border-color: #d1d5db; }
+.dark\:border-gray-600 { border-color: #4b5563; }
+.peer-checked\:after\:border-white:checked::after { border-color: white; }
+</style>
+
+  <!-- Consolidated Admin Panel Logic -->
+  <script>
+/* =============================================================================
+   StudyQuest - Admin Panel Logic
+   Extracted from AdminPanel.html for better maintainability
+   Handles all admin-specific functionality and business logic
+   ============================================================================= */
+
+// =============================================================================
+// APPLICATION STATE MANAGEMENT
+// =============================================================================
+
+// Application state object
+const appState = {
+  userId: '',
+  selectedSheet: '',
+  currentActiveSheet: '',
+  webAppUrl: '',
+  currentSpreadsheetUrl: '',
+  currentStatus: null,
+  isLoading: false
+};
+
+// Get user ID safely from template or meta tag
+(function() {
+  try {
+    const templateUserId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
+    if (templateUserId && templateUserId.trim() !== '') {
+      appState.userId = templateUserId;
+      console.log('✅ appState.userId from template:', appState.userId);
+    } else {
+      const userIdMeta = document.querySelector('meta[name="user-id"]');
+      if (userIdMeta && userIdMeta.content) {
+        appState.userId = userIdMeta.content;
+        console.log('✅ appState.userId from meta:', appState.userId);
+      }
+    }
+
+    if (!appState.userId) {
+      console.error('❌ appState.userId not found in template or meta');
+    }
+  } catch (e) {
+    console.error('❌ appState.userId initialization error:', e);
+    appState.userId = '';
+  }
+})();
+
+// =============================================================================
+// ADMIN ERROR HANDLING SYSTEM
+// =============================================================================
+
+/**
+ * Translate technical error messages to user-friendly Japanese messages
+ * @param {string} errorMsg - Original error message
+ * @param {string} context - Error context
+ * @returns {string} User-friendly error message
+ */
+function translateErrorMessage(errorMsg, context) {
+  if (!errorMsg || typeof errorMsg !== 'string') {
+    return 'エラーが発生しました。しばらく待ってから再試行してください。';
+  }
+
+  const lowerMsg = errorMsg.toLowerCase();
+  
+  // Spreadsheet related errors
+  if (lowerMsg.includes('範囲の列数には') || lowerMsg.includes('range')) {
+    return `📊 スプレッドシートにデータが正しく入力されていません。
+💡 解決方法：スプレッドシートを開いて、1行目にヘッダー（列名）が入力されているか確認してください。`;
+  }
+  
+  if (lowerMsg.includes('シート情報の取得に失敗') || lowerMsg.includes('sheet')) {
+    return `📋 シートの情報を読み込めませんでした。
+💡 解決方法：
+• スプレッドシートが正しく共有されているか確認
+• シートにデータが入力されているか確認
+• しばらく待ってから再試行`;
+  }
+  
+  // Permission related errors
+  if (lowerMsg.includes('permission') || lowerMsg.includes('権限') || lowerMsg.includes('access denied')) {
+    return `🔒 アクセス権限がありません。
+💡 解決方法：
+• スプレッドシートの共有設定を確認
+• 編集権限があることを確認
+• アカウントでログインし直してみる`;
+  }
+  
+  // Network related errors
+  if (lowerMsg.includes('network') || lowerMsg.includes('timeout') || lowerMsg.includes('fetch')) {
+    return `🌐 インターネット接続の問題が発生しました。
+💡 解決方法：
+• インターネット接続を確認
+• しばらく待ってから再試行
+• ページを再読み込み`;
+  }
+  
+  // Form related errors
+  if (lowerMsg.includes('form') && lowerMsg.includes('not found')) {
+    return `📝 フォームが見つかりません。
+💡 解決方法：
+• フォームが作成されているか確認
+• フォームが削除されていないか確認
+• 新しいフォームを作成`;
+  }
+  
+  // Validation related errors
+  if (lowerMsg.includes('validation') || lowerMsg.includes('invalid')) {
+    return `⚠️ 入力内容に問題があります。
+💡 解決方法：
+• 必須項目がすべて入力されているか確認
+• 入力形式が正しいか確認
+• 特殊文字が含まれていないか確認`;
+  }
+  
+  // Authentication related errors
+  if (lowerMsg.includes('authentication') || lowerMsg.includes('login') || lowerMsg.includes('unauthorized')) {
+    return `🔐 認証に問題があります。
+💡 解決方法：
+• ログイン状態を確認
+• ページを再読み込み
+• 再度ログインしてみる`;
+  }
+  
+  // Server related errors
+  if (lowerMsg.includes('server error') || lowerMsg.includes('500') || lowerMsg.includes('503')) {
+    return `⚡ システムが一時的に利用できません。
+💡 解決方法：
+• 数分待ってから再試行
+• 問題が続く場合は管理者に連絡`;
+  }
+  
+  // Configuration related errors
+  if (context && context.includes('config') || lowerMsg.includes('configuration')) {
+    return `⚙️ 設定の保存に問題があります。
+💡 解決方法：
+• すべての必須項目が入力されているか確認
+• 設定内容に問題がないか確認
+• しばらく待ってから再試行`;
+  }
+  
+  // Other common errors
+  if (lowerMsg.includes('failed') || lowerMsg.includes('error')) {
+    return `❌ 操作が正常に完了しませんでした。
+💡 解決方法：
+• しばらく待ってから再試行
+• ページを再読み込み
+• 問題が続く場合は別のブラウザを試す`;
+  }
+  
+  // Fallback
+  return `⚠️ 予期しないエラーが発生しました。
+💡 解決方法：
+• ページを再読み込み
+• しばらく待ってから再試行
+• 問題が続く場合はサポートにお問い合わせください`;
+}
+
+/**
+ * Centralized error handling for admin panel
+ * @param {Error} error - Error object
+ * @param {string} context - Context description
+ * @param {string} userMessage - Custom user message
+ */
+function handleAdminError(error, context, userMessage) {
+  const errorMsg = error && error.message ? error.message : String(error);
+  console.error('[' + (context || 'Admin') + '] Error:', errorMsg);
+  
+  const displayMessage = userMessage || translateErrorMessage(errorMsg, context);
+  
+  // Use shared utilities for message display
+  if (window.sharedUtilities && window.sharedUtilities.message) {
+    window.sharedUtilities.message.show(displayMessage, 'error');
+  } else {
+    showMessage(displayMessage, 'error');
+  }
+  
+  return false;
+}
+
+// =============================================================================
+// LOADING STATE MANAGEMENT
+// =============================================================================
+
+/**
+ * Set loading state with message
+ * @param {boolean} isLoading - Loading state
+ * @param {string} message - Loading message
+ */
+function setAdminLoading(isLoading, message = '') {
+  const loader = document.getElementById('loading-overlay');
+  const loaderMessage = document.getElementById('loading-message');
+  
+  if (!loader) return;
+
+  if (isLoading) {
+    if (loaderMessage) loaderMessage.textContent = message;
+    loader.classList.remove('hidden');
+  } else {
+    loader.classList.add('hidden');
+  }
+}
+
+/**
+ * Progress bar system for multi-step operations
+ * @param {number} currentStep - Current step number
+ * @param {number} totalSteps - Total number of steps
+ * @param {string} message - Progress message
+ */
+function showProgressStep(currentStep, totalSteps, message) {
+  let progressContainer = document.getElementById('progress-container');
+  
+  if (!progressContainer) {
+    progressContainer = document.createElement('div');
+    progressContainer.id = 'progress-container';
+    progressContainer.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+    progressContainer.innerHTML = `
+      <div class="glass-panel p-6 max-w-md w-full mx-4">
+        <div class="text-center mb-4">
+          <h3 class="text-lg font-semibold text-white">フォーム作成進行中</h3>
+        </div>
+        <div class="mb-4">
+          <div class="bg-gray-700 rounded-full h-3 overflow-hidden">
+            <div id="progress-bar" class="bg-gradient-to-r from-cyan-500 to-purple-500 h-full transition-all duration-500 ease-out" style="width: 0%"></div>
+          </div>
+        </div>
+        <div class="text-center">
+          <p id="progress-message" class="text-sm text-gray-300"></p>
+          <p class="text-xs text-gray-400 mt-2">
+            ステップ <span id="progress-current">1</span> / <span id="progress-total">5</span>
+          </p>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(progressContainer);
+  }
+  
+  const progressBar = document.getElementById('progress-bar');
+  const progressMessage = document.getElementById('progress-message');
+  const progressCurrent = document.getElementById('progress-current');
+  const progressTotal = document.getElementById('progress-total');
+  
+  if (progressBar) {
+    const percentage = (currentStep / totalSteps) * 100;
+    progressBar.style.width = percentage + '%';
+  }
+  
+  if (progressMessage) progressMessage.textContent = message;
+  if (progressCurrent) progressCurrent.textContent = currentStep;
+  if (progressTotal) progressTotal.textContent = totalSteps;
+  
+  progressContainer.classList.remove('hidden');
+}
+
+/**
+ * Hide progress bar
+ */
+function hideProgressBar() {
+  const progressContainer = document.getElementById('progress-container');
+  if (progressContainer) {
+    progressContainer.classList.add('hidden');
+    setTimeout(() => {
+      if (progressContainer.parentNode) {
+        progressContainer.parentNode.removeChild(progressContainer);
+      }
+    }, 500);
+  }
+}
+
+// =============================================================================
+// MODAL MANAGEMENT SYSTEM
+// =============================================================================
+
+/**
+ * Show confirmation modal with custom title and message
+ * @param {string} title - Modal title
+ * @param {string} message - Modal message
+ * @param {Function} onConfirm - Callback on confirmation
+ */
+function showConfirmationModal(title, message, onConfirm) {
+  const modal = document.getElementById('confirmation-modal');
+  const modalTitle = document.getElementById('modal-title');
+  const modalMessage = document.getElementById('modal-message');
+  
+  if (modalTitle) modalTitle.textContent = title;
+  if (modalMessage) modalMessage.textContent = message;
+  
+  if (!modal) {
+    console.error('確認モーダルが見つかりません');
+    return;
+  }
+  
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+
+  const confirmBtn = document.getElementById('modal-confirm-btn');
+  const cancelBtn = document.getElementById('modal-cancel-btn');
+
+  const confirmHandler = function() {
+    onConfirm();
+    hideConfirmationModal();
+    confirmBtn.removeEventListener('click', confirmHandler);
+    cancelBtn.removeEventListener('click', cancelHandler);
+  };
+
+  const cancelHandler = function() {
+    hideConfirmationModal();
+    confirmBtn.removeEventListener('click', confirmHandler);
+    cancelBtn.removeEventListener('click', cancelHandler);
+  };
+
+  confirmBtn.addEventListener('click', confirmHandler);
+  cancelBtn.addEventListener('click', cancelHandler);
+}
+
+/**
+ * Hide confirmation modal
+ */
+function hideConfirmationModal() {
+  const modal = document.getElementById('confirmation-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+}
+
+/**
+ * Show privacy modal before sensitive operations
+ * @param {Function} onContinue - Callback on continue
+ */
+function showPrivacyModal(onContinue) {
+  const modal = document.getElementById('privacy-modal');
+  if (!modal) {
+    console.error('プライバシーモーダルが見つかりません');
+    return;
+  }
+  
+  modal.classList.remove('hidden');
+  
+  const continueBtn = document.getElementById('privacy-modal-continue');
+  const cancelBtn = document.getElementById('privacy-modal-cancel');
+  
+  if (continueBtn) {
+    const newContinueBtn = continueBtn.cloneNode(true);
+    continueBtn.parentNode.replaceChild(newContinueBtn, continueBtn);
+    newContinueBtn.addEventListener('click', function() {
+      hidePrivacyModal();
+      if (onContinue) onContinue();
+    });
+  }
+  
+  if (cancelBtn) {
+    const newCancelBtn = cancelBtn.cloneNode(true);
+    cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+    newCancelBtn.addEventListener('click', hidePrivacyModal);
+  }
+  
+  const escapeHandler = function(e) {
+    if (e.key === 'Escape') {
+      hidePrivacyModal();
+      document.removeEventListener('keydown', escapeHandler);
+    }
+  };
+  document.addEventListener('keydown', escapeHandler);
+}
+
+/**
+ * Hide privacy modal
+ */
+function hidePrivacyModal() {
+  const modal = document.getElementById('privacy-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+}
+
+// =============================================================================
+// ADMIN UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Safely set text content of an element
+ * @param {string} elementId - Element ID
+ * @param {string} value - Value to set
+ * @param {string} prefix - Optional prefix
+ */
+function safeSetAdminText(elementId, value, prefix = '') {
+  const element = document.getElementById(elementId);
+  if (element) {
+    element.textContent = value ? prefix + value : '-';
+    console.log(`✅ Updated ${elementId}:`, element.textContent);
+  } else {
+    console.warn(`❌ Element not found: ${elementId}`);
+  }
+}
+
+/**
+ * Update publication status UI
+ * @param {boolean} isPublished - Publication status
+ */
+function updatePublicationStatusUI(isPublished) {
+  const statusIndicator = document.getElementById('info-publish-indicator');
+  const statusText = document.getElementById('info-publish-text');
+  const unpublishBtn = document.getElementById('unpublish-board-btn');
+  const savePublishBtn = document.getElementById('save-publish-btn');
+  
+  if (statusIndicator && statusText) {
+    if (isPublished) {
+      statusIndicator.className = 'w-3 h-3 rounded-full bg-green-500';
+      statusText.textContent = '公開中';
+      statusText.className = 'text-green-400';
+    } else {
+      statusIndicator.className = 'w-3 h-3 rounded-full bg-red-500';
+      statusText.textContent = '非公開';
+      statusText.className = 'text-red-400';
+    }
+  }
+  
+  if (unpublishBtn) {
+    unpublishBtn.style.display = isPublished ? 'inline-flex' : 'none';
+  }
+  
+  if (savePublishBtn) {
+    const text = isPublished ? '設定を更新' : '設定保存・公開';
+    savePublishBtn.textContent = text;
+  }
+}
+
+/**
+ * Toggle progressive disclosure sections
+ * @param {string} sectionId - Section ID to toggle
+ */
+function toggleAdminSection(sectionId) {
+  const section = document.getElementById(sectionId);
+  const icon = document.getElementById(sectionId.replace('content', 'icon'));
+  
+  if (!section) return;
+  
+  const isExpanded = section.classList.contains('expanded');
+  
+  if (isExpanded) {
+    section.classList.remove('expanded');
+    section.classList.add('collapsed');
+    if (icon) {
+      if (sectionId === 'step1-content') {
+        icon.style.transform = 'rotate(0deg)';
+      } else if (sectionId === 'step2-content' || sectionId === 'step3-content') {
+        icon.style.transform = 'rotate(90deg)';
+      }
+    }
+  } else {
+    section.classList.remove('collapsed');
+    section.classList.add('expanded');
+    if (icon) {
+      if (sectionId === 'step1-content') {
+        icon.style.transform = 'rotate(180deg)';
+      } else if (sectionId === 'step2-content' || sectionId === 'step3-content') {
+        icon.style.transform = 'rotate(0deg)';
+      }
+    }
+  }
+}
+
+// =============================================================================
+// ADMIN PANEL SPECIFIC FUNCTIONS
+// =============================================================================
+
+/**
+ * Update database info panel with status data
+ * @param {Object} status - Status object from server
+ */
+function updateDatabaseInfo(status) {
+  console.log('🔧 updateDatabaseInfo called with status:', status);
+  
+  if (!status || !status.userInfo) {
+    console.warn('システム情報を更新できませんでした: ユーザー情報がありません。', status);
+    return;
+  }
+
+  console.log('✅ User info found, updating system panel:', status.userInfo);
+
+  // Set spreadsheet URL
+  if (status.userInfo.spreadsheetUrl) {
+    appState.currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
+    console.log('✅ currentSpreadsheetUrl set to:', appState.currentSpreadsheetUrl);
+  }
+
+  // Update existing fields
+  safeSetAdminText('info-admin-email', status.userInfo.adminEmail);
+  safeSetAdminText('info-user-id', status.userInfo.userId);
+  
+  // Published sheet name
+  let publishedSheetName = status.publishedSheetName || status.activeSheetName;
+  if (!publishedSheetName && status.userInfo && status.userInfo.configJson) {
+    try {
+      const config = JSON.parse(status.userInfo.configJson);
+      publishedSheetName = config.publishedSheetName;
+    } catch (e) {
+      console.warn('ConfigJSON parse error in published sheet name:', e);
+    }
+  }
+  safeSetAdminText('info-published-sheet', publishedSheetName || 'なし');
+  safeSetAdminText('info-answer-count', status.answerCount || '0');
+  safeSetAdminText('info-reaction-count', status.totalReactions || '0');
+
+  // Update publication status
+  const isPublished = status && (
+    status.isPublished || 
+    status.appPublished || 
+    (status.publishedSheetName && status.publishedSheetName !== 'なし')
+  );
+  updatePublicationStatusUI(isPublished);
+
+  // Display mode
+  const displayMode = status.showNames ? '名前表示' : '匿名表示';
+  safeSetAdminText('info-display-mode', displayMode);
+
+  // Count display
+  const showCounts = status.showCounts !== undefined ? (status.showCounts ? '表示' : '非表示') : '表示';
+  safeSetAdminText('info-show-counts', showCounts);
+  
+  // Update button states
+  updateAdminButtonStates(status);
+}
+
+/**
+ * Update admin button states based on status
+ * @param {Object} status - Status object
+ */
+function updateAdminButtonStates(status) {
+  const openSpreadsheetBtns = document.querySelectorAll('#open-spreadsheet-btn, #open-spreadsheet-btn-step2');
+  const openFormBtn = document.getElementById('open-form-btn');
+  const openLinkedFormBtn = document.getElementById('open-linked-form-btn');
+  
+  openSpreadsheetBtns.forEach(btn => {
+    if (btn) {
+      const hasSpreadsheetUrl = status.userInfo && status.userInfo.spreadsheetUrl;
+      btn.disabled = !hasSpreadsheetUrl;
+      btn.title = hasSpreadsheetUrl ? 'スプレッドシートを開く' : 'スプレッドシートが設定されていません';
+    }
+  });
+  
+  if (openFormBtn) {
+    const formUrl = status.formUrl || (status.userInfo && status.userInfo.formUrl);
+    const hasFormUrl = formUrl && formUrl.trim() !== "";
+    openFormBtn.disabled = !hasFormUrl;
+    openFormBtn.title = hasFormUrl ? 'フォームを開く' : 'フォームが設定されていません';
+  }
+
+  if (openLinkedFormBtn) {
+    const hasFormUrl = status.formUrl && status.formUrl.trim() !== '';
+    openLinkedFormBtn.disabled = !hasFormUrl;
+    openLinkedFormBtn.title = hasFormUrl ? '連携しているGoogleフォームを開きます' : '連携しているフォームが設定されていません';
+  }
+}
+
+/**
+ * Handle account deletion request with double confirmation
+ */
+function handleDeleteRequest() {
+  showPrivacyModal(function() {
+    showConfirmationModal(
+      'アカウントの完全削除',
+      '本当にこのアカウントを削除しますか？この操作は元に戻せず、すべてのデータが失われます。',
+      function() {
+        setAdminLoading(true, 'アカウントを完全に削除しています...');
+        
+        if (window.sharedUtilities && window.sharedUtilities.gas) {
+          window.sharedUtilities.gas.call(
+            'deleteCurrentUserAccount',
+            function(response) {
+              setAdminLoading(false);
+              if (window.sharedUtilities.message) {
+                window.sharedUtilities.message.show(response, 'success');
+              }
+              setTimeout(function() {
+                if (window.sharedUtilities.navigation) {
+                  window.sharedUtilities.navigation.safeNavigate('?page=LoginPage', {
+                    fallbackMessage: '登録ページに移動中...',
+                    method: 'auto'
+                  });
+                } else {
+                  window.location.href = '?page=LoginPage';
+                }
+              }, 2000);
+            },
+            function(error) {
+              setAdminLoading(false);
+              handleAdminError(error, 'アカウント削除');
+            },
+            [appState.userId],
+            'アカウント削除'
+          );
+        }
+      }
+    );
+  });
+}
+
+/**
+ * Admin system flow display for debugging
+ */
+function showAdminSystemFlow() {
+  const DEBUG_MODE = <?= typeof DEBUG_MODE !== 'undefined' ? DEBUG_MODE : false ?>;
+  if (!DEBUG_MODE) return;
+  
+  console.group('🔄 StudyQuest 管理パネル システムフロー');
+  console.log('📋 Phase 1: 管理パネル初期化');
+  console.log('  ├─ 管理者権限確認');
+  console.log('  ├─ ユーザー情報取得');
+  console.log('  ├─ スプレッドシート接続');
+  console.log('  └─ UI要素初期化');
+  
+  console.log('🎨 Phase 2: レイアウト構築');
+  console.log('  ├─ 左パネル（メイン操作）');
+  console.log('  ├─ 右パネル（システム情報）');
+  console.log('  ├─ フッター（公開URL表示）');
+  console.log('  └─ レスポンシブ対応');
+  
+  console.log('📡 Phase 3: データ連携');
+  console.log('  ├─ スプレッドシートデータ取得');
+  console.log('  ├─ シート一覧取得');
+  console.log('  ├─ 列ヘッダー自動判定');
+  console.log('  └─ 公開状態確認');
+  
+  console.log('🏗️ Phase 4: 設定UI構築');
+  console.log('  ├─ ステップインジケーター');
+  console.log('  ├─ シート選択ドロップダウン');
+  console.log('  ├─ 列設定フォーム');
+  console.log('  └─ プレビュー表示');
+  
+  console.log('⚡ Phase 5: 管理機能');
+  console.log('  ├─ ボード作成・公開');
+  console.log('  ├─ 設定変更');
+  console.log('  ├─ URLコピー機能');
+  console.log('  └─ リアルタイム更新');
+  
+  console.log('🔧 Phase 6: 最適化・監視');
+  console.log('  ├─ キャッシュ管理');
+  console.log('  ├─ エラーハンドリング');
+  console.log('  ├─ パフォーマンス監視');
+  console.log('  └─ デバッグ情報出力');
+  
+  console.groupEnd();
+  
+  console.group('📊 管理パネル現在状態');
+  console.log('DOM状態:', document.readyState);
+  console.log('CSS読み込み:', document.styleSheets.length + ' stylesheets');
+  console.log('GAS環境:', typeof google !== 'undefined' ? 'Available' : 'Not Available');
+  console.log('管理者状態:', typeof appState.currentStatus !== 'undefined' && appState.currentStatus ? 'Authenticated' : 'Unknown');
+  console.log('スプレッドシートURL:', typeof appState.currentSpreadsheetUrl !== 'undefined' ? (appState.currentSpreadsheetUrl ? 'Set' : 'Not Set') : 'Unknown');
+  console.groupEnd();
+}
+
+// =============================================================================
+// CACHE MANAGEMENT SYSTEM
+// =============================================================================
+
+/**
+ * Frontend cache manager for admin panel
+ */
+class AdminCacheManager {
+  constructor() {
+    this.caches = new Map();
+    this.defaultTTL = 30000; // 30 seconds
+    this.dependencies = new Map();
+    this._initializeDependencies();
+  }
+  
+  _initializeDependencies() {
+    this.dependencies.set('user_data_change', ['status', 'userInfo', 'formUrls']);
+    this.dependencies.set('form_creation', ['status', 'formUrls', 'sheetDetails']);
+    this.dependencies.set('config_change', ['status', 'sheetDetails']);
+  }
+  
+  get(key, defaultValue = null) {
+    const cached = this.caches.get(key);
+    if (!cached) return defaultValue;
+    
+    const now = Date.now();
+    if (now - cached.timestamp > cached.ttl) {
+      this.caches.delete(key);
+      console.log(`📊 [Cache] Expired and removed: ${key}`);
+      return defaultValue;
+    }
+    
+    console.log(`📊 [Cache] Hit: ${key}`);
+    return cached.value;
+  }
+  
+  set(key, value, ttl = this.defaultTTL) {
+    this.caches.set(key, {
+      value: value,
+      timestamp: Date.now(),
+      ttl: ttl
+    });
+    console.log(`📊 [Cache] Set: ${key} (TTL: ${ttl}ms)`);
+  }
+  
+  invalidate(key) {
+    this.caches.delete(key);
+    console.log(`📊 [Cache] Invalidated: ${key}`);
+  }
+  
+  invalidateDependents(changeType) {
+    const dependents = this.dependencies.get(changeType) || [];
+    dependents.forEach(key => this.invalidate(key));
+    console.log(`📊 [Cache] Invalidated dependents of ${changeType}:`, dependents);
+  }
+  
+  clear() {
+    this.caches.clear();
+    console.log('📊 [Cache] Cleared all caches');
+  }
+}
+
+// Global cache manager instance
+window.adminCacheManager = new AdminCacheManager();
+
+// =============================================================================
+// INITIALIZATION
+// =============================================================================
+
+/**
+ * Initialize admin panel specific functionality
+ */
+function initializeAdminPanel() {
+  console.log('🔧 Initializing Admin Panel Logic...');
+  
+  // Show system flow for debugging
+  showAdminSystemFlow();
+  
+  // Set up global error handler for admin panel
+  window.addEventListener('error', (event) => {
+    console.error('Admin Panel Global Error:', event.error);
+    if (window.sharedUtilities && window.sharedUtilities.message) {
+      window.sharedUtilities.message.show('管理パネルでエラーが発生しました', 'error');
+    }
+  });
+  
+  console.log('✅ Admin Panel Logic initialized');
+}
+
+// Auto-initialize when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeAdminPanel);
+} else {
+  initializeAdminPanel();
+}
+
+// =============================================================================
+// EXPORT TO GLOBAL SCOPE
+// =============================================================================
+
+// Export admin utilities to global scope for easy access
+window.adminUtilities = {
+  state: appState,
+  error: {
+    handle: handleAdminError,
+    translate: translateErrorMessage
+  },
+  loading: {
+    set: setAdminLoading,
+    showProgress: showProgressStep,
+    hideProgress: hideProgressBar
+  },
+  modal: {
+    showConfirmation: showConfirmationModal,
+    hideConfirmation: hideConfirmationModal,
+    showPrivacy: showPrivacyModal,
+    hidePrivacy: hidePrivacyModal
+  },
+  ui: {
+    setText: safeSetAdminText,
+    updatePublicationStatus: updatePublicationStatusUI,
+    updateDatabaseInfo: updateDatabaseInfo,
+    toggleSection: toggleAdminSection
+  },
+  cache: window.adminCacheManager,
+  actions: {
+    handleDeleteRequest: handleDeleteRequest
+  }
+};
+
+</script>
+
   <!-- Unified Styles and Shared Components -->
-  <?!= include('UnifiedStyles'); ?>
   <?!= include('SharedUtilities'); ?>
   <?!= include('SharedJavaScript'); ?>
-  <?!= include('AdminPanelLogic'); ?>
   
-  <!-- ClientOptimizer の統合 -->
-  <?!= include('ClientOptimizer'); ?>
-  <?!= include('UnifiedCache.js'); ?>
+  <!-- ClientOptimizer の統合 - Consolidated -->
+  <script>
+/**
+ * @fileoverview クライアントサイド最適化ユーティリティ
+ * GAS HTML Service用の最適化されたクライアント関数群
+ */
+
+class GASOptimizer {
+  constructor() {
+    this.cache = new Map();
+    this.loadingStates = new Map();
+    this.concurrentLimit = 10;
+    this.activeCalls = 0;
+    this.callQueue = [];
+  }
+
+  /**
+   * Promise化されたgoogle.script.run呼び出し
+   * @param {string} functionName - 呼び出す関数名
+   * @param {...any} args - 関数の引数
+   * @returns {Promise} 結果のPromise
+   */
+  async call(functionName, ...args) {
+    return new Promise((resolve, reject) => {
+      // 同時実行制限の確認
+      if (this.activeCalls >= this.concurrentLimit) {
+        this.callQueue.push(() => this.executeCall(functionName, args, resolve, reject));
+        return;
+      }
+
+      this.executeCall(functionName, args, resolve, reject);
+    });
+  }
+
+  /**
+   * 実際の関数呼び出し実行
+   */
+  executeCall(functionName, args, resolve, reject) {
+    this.activeCalls++;
+    
+    // ローディング状態の管理
+    this.setLoadingState(functionName, true);
+
+    google.script.run
+      .withSuccessHandler((result) => {
+        this.activeCalls--;
+        this.setLoadingState(functionName, false);
+        resolve(result);
+        this.processQueue();
+      })
+      .withFailureHandler((error) => {
+        this.activeCalls--;
+        this.setLoadingState(functionName, false);
+        console.error(`GAS Function Error [${functionName}]:`, error);
+        reject(this.enhanceError(error, functionName));
+        this.processQueue();
+      })[functionName](...args);
+  }
+
+  /**
+   * キューの処理
+   */
+  processQueue() {
+    if (this.callQueue.length > 0 && this.activeCalls < this.concurrentLimit) {
+      const nextCall = this.callQueue.shift();
+      nextCall();
+    }
+  }
+
+  /**
+   * エラー情報の拡張
+   */
+  enhanceError(error, functionName) {
+    return {
+      ...error,
+      function: functionName,
+      timestamp: new Date().toISOString(),
+      userMessage: this.getUserFriendlyErrorMessage(error.message)
+    };
+  }
+
+  /**
+   * ユーザーフレンドリーなエラーメッセージ
+   */
+  getUserFriendlyErrorMessage(originalMessage) {
+    const errorMap = {
+      'Exception: 認証エラー': 'ログインセッションが期限切れです。ページを更新してから再度お試しください。',
+      'Exception: 無効なユーザーID': 'アクセス権限に問題があります。管理者にお問い合わせください。',
+      'Exception: データベース': 'データの保存に失敗しました。しばらく待ってから再度お試しください。',
+      'ScriptError': 'システムエラーが発生しました。管理者にお問い合わせください。'
+    };
+
+    for (const [key, message] of Object.entries(errorMap)) {
+      if (originalMessage && originalMessage.includes(key)) {
+        return message;
+      }
+    }
+    
+    return '予期しないエラーが発生しました。しばらく待ってから再度お試しください。';
+  }
+
+  /**
+   * ローディング状態の管理
+   */
+  setLoadingState(functionName, isLoading) {
+    this.loadingStates.set(functionName, isLoading);
+    this.updateGlobalLoadingIndicator();
+  }
+
+  /**
+   * グローバルローディングインジケーターの更新
+   */
+  updateGlobalLoadingIndicator() {
+    const hasActiveLoading = Array.from(this.loadingStates.values()).some(state => state);
+    document.body.classList.toggle('gas-loading', hasActiveLoading);
+  }
+
+  /**
+   * キャッシュ付きの関数呼び出し
+   */
+  async callWithCache(functionName, args, ttl = 5 * 60 * 1000) {
+    const cacheKey = `${functionName}_${JSON.stringify(args)}`;
+    const cached = this.cache.get(cacheKey);
+    
+    if (cached && (Date.now() - cached.timestamp) < ttl) {
+      return cached.data;
+    }
+
+    const result = await this.call(functionName, ...args);
+    this.cache.set(cacheKey, {
+      data: result,
+      timestamp: Date.now()
+    });
+
+    return result;
+  }
+
+  /**
+   * バッチ処理対応の関数呼び出し
+   */
+  async batchCall(calls) {
+    const promises = calls.map(({ functionName, args }) => 
+      this.call(functionName, ...args).catch(error => ({ error, functionName }))
+    );
+
+    return Promise.all(promises);
+  }
+
+  /**
+   * キャッシュのクリア
+   */
+  clearCache() {
+    this.cache.clear();
+  }
+
+  /**
+   * 統計情報の取得
+   */
+  getStats() {
+    return {
+      activeCalls: this.activeCalls,
+      queueLength: this.callQueue.length,
+      cacheSize: this.cache.size,
+      loadingStates: Object.fromEntries(this.loadingStates)
+    };
+  }
+}
+
+// グローバルインスタンスの作成
+window.gasOptimizer = new GASOptimizer();
+
+/**
+ * 便利な関数のエイリアス
+ */
+window.gasCall = (functionName, ...args) => window.gasOptimizer.call(functionName, ...args);
+window.gasCacheCall = (functionName, args, ttl) => window.gasOptimizer.callWithCache(functionName, args, ttl);
+
+/**
+ * メッセージ表示の最適化
+ */
+class MessageManager {
+  constructor() {
+    this.messageContainer = null;
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => this.init());
+    } else {
+      this.init();
+    }
+  }
+
+  init() {
+    // メッセージコンテナの作成
+    if (!document.getElementById('gas-message-container')) {
+      const container = document.createElement('div');
+      container.id = 'gas-message-container';
+      container.className = 'fixed top-4 right-4 z-50 space-y-2';
+      document.body.appendChild(container);
+      this.messageContainer = container;
+    }
+  }
+
+  show(message, type = 'info', duration = 5000) {
+    const messageEl = document.createElement('div');
+    messageEl.className = `
+      p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full
+      ${this.getTypeClasses(type)}
+    `;
+    messageEl.innerHTML = `
+      <div class="flex items-center space-x-2">
+        <div class="flex-shrink-0">
+          ${this.getIcon(type)}
+        </div>
+        <div class="flex-1 text-sm font-medium">${message}</div>
+        <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+          </svg>
+        </button>
+      </div>
+    `;
+
+    this.messageContainer.appendChild(messageEl);
+
+    // アニメーション
+    setTimeout(() => {
+      messageEl.classList.remove('translate-x-full');
+    }, 10);
+
+    // 自動削除
+    if (duration > 0) {
+      setTimeout(() => {
+        if (messageEl.parentElement) {
+          messageEl.classList.add('translate-x-full', 'opacity-0');
+          setTimeout(() => messageEl.remove(), 300);
+        }
+      }, duration);
+    }
+
+    return messageEl;
+  }
+
+  getTypeClasses(type) {
+    const classes = {
+      info: 'bg-blue-500 text-white',
+      success: 'bg-green-500 text-white',
+      warning: 'bg-yellow-500 text-black',
+      error: 'bg-red-500 text-white'
+    };
+    return classes[type] || classes.info;
+  }
+
+  getIcon(type) {
+    const icons = {
+      info: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"/></svg>',
+      success: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>',
+      warning: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"/></svg>',
+      error: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zM12 8a1 1 0 112 0v4a1 1 0 11-2 0V8z"/></svg>'
+    };
+    return icons[type] || icons.info;
+  }
+}
+
+// グローバルメッセージマネージャー
+window.messageManager = new MessageManager();
+window.showMessage = (message, type, duration) => window.messageManager.show(message, type, duration);
+
+// Loading CSS already defined in main <style> section - duplicate removed
+
+// デバッグ用（開発時のみ）
+if (window.location.hostname === 'localhost' || window.location.hostname.includes('script.google.com')) {
+  window.gasDebug = () => console.log('GAS Optimizer Stats:', window.gasOptimizer.getStats());
+}
+</script>
+  <!-- UnifiedCache.js - Consolidated -->
+  <script>
+class UnifiedCache {
+  constructor() {
+    this.cache = new Map();
+  }
+
+  set(key, value, ttl = 300000) {
+    this.cache.set(key, { value, expiry: Date.now() + ttl });
+  }
+
+  get(key) {
+    const entry = this.cache.get(key);
+    if (!entry) return undefined;
+    if (entry.expiry && Date.now() > entry.expiry) {
+      this.cache.delete(key);
+      return undefined;
+    }
+    return entry.value;
+  }
+
+  delete(key) {
+    this.cache.delete(key);
+  }
+
+  clear() {
+    this.cache.clear();
+  }
+
+  getOrSet(key, fn, ttl = 300000) {
+    const existing = this.get(key);
+    if (existing !== undefined) {
+      return Promise.resolve(existing);
+    }
+    const result = fn();
+    if (result && typeof result.then === 'function') {
+      return result.then(value => {
+        this.set(key, value, ttl);
+        return value;
+      });
+    } else {
+      this.set(key, result, ttl);
+      return Promise.resolve(result);
+    }
+  }
+}
+</script>
   
   <script>
   if (typeof GASOptimizer !== 'undefined') {
@@ -189,342 +2775,7 @@
   }
   </script>
   
-  <!-- CSS already included above, removing duplicate -->
-  
-  <!-- Modern AdminPanel CSS with Glassmorphism Design -->
-  <style>
-  :root {
-    /* Color Variables */
-    --bg-primary: #1a1b26;
-    --bg-secondary: #24283b;
-    --bg-tertiary: #414868;
-    --bg-accent: rgba(255, 255, 255, 0.08);
-    
-    /* Glass Effects */
-    --glass-bg: rgba(255, 255, 255, 0.08);
-    --glass-border: rgba(255, 255, 255, 0.2);
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.2);
-    
-    /* Accent Colors */
-    --accent-cyan: #06b6d4;
-    --accent-purple: #a855f7;
-    --accent-green: #10b981;
-    --accent-amber: #f59e0b;
-    --accent-red: #ef4444;
-    
-    /* Text Colors */
-    --text-primary: #ffffff;
-    --text-secondary: #e2e8f0;
-    --text-tertiary: #94a3b8;
-    --text-muted: #64748b;
-  }
-  
-  * {
-    box-sizing: border-box;
-  }
-  
-  html, body {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    overflow-x: hidden;
-    background: var(--bg-primary);
-  }
-  
-  body {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-  }
-  
-  main {
-    flex: 1;
-    width: 100%;
-  }
-  
-  /* Enhanced Glass Panel */
-  .glass-panel {
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-radius: 16px;
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow), var(--glass-inset);
-    transition: all 0.3s ease;
-  }
-  
-  .glass-panel:hover {
-    border-color: rgba(255, 255, 255, 0.3);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15), var(--glass-inset);
-  }
-  
-  /* Step Cards */
-  .step-card {
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-radius: 20px;
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow), var(--glass-inset);
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
-  }
-  
-  .step-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
-  
-  .step-card:hover::before {
-    opacity: 1;
-  }
-  
-  .step-card:hover {
-    border-color: rgba(255, 255, 255, 0.3);
-    transform: translateY(-2px);
-  }
-  
-  /* Step Headers */
-  .step-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 20px;
-    padding: 24px 28px 0;
-  }
-  
-  .step-number {
-    width: 40px;
-    height: 40px;
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 16px;
-    color: white;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    transition: all 0.3s ease;
-  }
-  
-  .step-number.step-1 {
-    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-  }
-  
-  .step-number.step-2 {
-    background: linear-gradient(135deg, #10b981, #059669);
-  }
-  
-  .step-number.step-3 {
-    background: linear-gradient(135deg, #a855f7, #7c3aed);
-  }
-  
-  .step-title {
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
-  }
-  
-  .step-subtitle {
-    font-size: 14px;
-    color: var(--text-tertiary);
-    margin: 2px 0 0 0;
-  }
-  
-  /* Step Content */
-  .step-content {
-    padding: 0 28px 28px;
-  }
-  
-  /* Buttons */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 12px 20px;
-    border-radius: 12px;
-    font-weight: 600;
-    font-size: 14px;
-    text-decoration: none;
-    transition: all 0.3s ease;
-    border: none;
-    cursor: pointer;
-    position: relative;
-    overflow: hidden;
-  }
-  
-  .btn-primary {
-    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
-    color: white;
-    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
-  }
-  
-  .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(6, 182, 212, 0.4);
-  }
-  
-  .btn-secondary {
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--text-secondary);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-  }
-  
-  .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
-  }
-  
-  .btn-warning {
-    background: linear-gradient(135deg, var(--accent-amber), #d97706);
-    color: white;
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
-  }
-  
-  .btn-danger {
-    background: linear-gradient(135deg, var(--accent-red), #dc2626);
-    color: white;
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-  }
-  
-  /* Form Elements */
-  .form-control {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 10px;
-    padding: 12px 16px;
-    color: var(--text-primary);
-    font-size: 14px;
-    transition: all 0.3s ease;
-    width: 100%;
-  }
-  
-  .form-control:focus {
-    outline: none;
-    border-color: var(--accent-cyan);
-    box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
-    background: rgba(255, 255, 255, 0.08);
-  }
-  
-  /* Layout */
-  .responsive-grid {
-    display: grid;
-    gap: 1.5rem;
-    grid-template-columns: 1fr;
-  }
-  
-  @media (min-width: 768px) {
-    .responsive-grid {
-      grid-template-columns: 2fr 1fr;
-      gap: 2rem;
-    }
-    .right-panel {
-      min-width: 200px;
-    }
-  }
-
-  @media (min-width: 1024px) {
-    .responsive-grid {
-      grid-template-columns: minmax(400px, 1fr) 350px;
-      gap: 2rem;
-    }
-    .right-panel {
-      min-width: 300px;
-    }
-  }
-  
-  main.flex-1 {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .left-panel {
-    flex: 1;
-    min-height: 0;
-  }
-  
-  /* Status Indicators */
-  .status-indicator {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  
-  .status-active {
-    background: rgba(16, 185, 129, 0.2);
-    color: var(--accent-green);
-    border: 1px solid rgba(16, 185, 129, 0.3);
-  }
-  
-  .status-inactive {
-    background: rgba(245, 158, 11, 0.2);
-    color: var(--accent-amber);
-    border: 1px solid rgba(245, 158, 11, 0.3);
-  }
-  
-  .status-error {
-    background: rgba(239, 68, 68, 0.2);
-    color: var(--accent-red);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-  }
-  
-  /* Text Color Classes */
-  .text-primary { color: var(--text-primary); }
-  .text-secondary { color: var(--text-secondary); }
-  .text-tertiary { color: var(--text-tertiary); }
-  .text-muted { color: var(--text-muted); }
-  
-  /* Utility Classes */
-  .text-gradient {
-    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  
-  .icon-gradient {
-    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  
-  /* Animations */
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
-  
-  .animate-pulse {
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-  
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  
-  .fade-in {
-    animation: fadeIn 0.6s ease-out;
-  }
-  </style>
+  <!-- Duplicate CSS blocks removed - all styles consolidated in main <style> section above -->
 </head>
 <body class="unified-theme bg-[#1a1b26] text-gray-200 font-sans min-h-screen flex flex-col">
   <div id="loading-overlay" class="loading-overlay hidden">
