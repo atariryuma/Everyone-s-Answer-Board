@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="2;url=<?= targetUrl ?>">
+  <title>リダイレクト中...</title>
+  <style>
+    body { text-align:center; padding:50px; font-family:sans-serif; background-color:#f5f5f5; }
+    div { max-width:600px; margin:0 auto; background:white; padding:40px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.1); }
+    h2 { color:#333; margin-bottom:20px; }
+    p { color:#666; margin-bottom:30px; }
+    a { display:inline-block; background:#4CAF50; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold; }
+    .small { color:#999; font-size:14px; margin-top:20px; }
+  </style>
+</head>
+<body>
+  <div>
+    <h2><?= message ?></h2>
+    <p>2秒後に自動的にリダイレクトされます...</p>
+    <a href="<?= targetUrl ?>" onclick="handleRedirectClick(event)">今すぐ移動</a>
+    <p class="small">自動的にリダイレクトされない場合は上のリンクをクリックしてください。</p>
+  </div>
+  <script>
+    function handleRedirectClick(event) {
+      event.preventDefault();
+      try {
+        window.top.location.href = '<?= targetUrl ?>';
+      } catch(e) {
+        window.location.href = '<?= targetUrl ?>';
+      }
+    }
+    setTimeout(function() {
+      try {
+        window.top.location.href = '<?= targetUrl ?>';
+      } catch(e) {
+        window.location.href = '<?= targetUrl ?>';
+      }
+    }, 2000);
+  </script>
+</body>
+</html>

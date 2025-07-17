@@ -339,211 +339,216 @@ function getSystemDomainInfo() {
  */
 function doGet(e) {
   try {
-    debugLog('doGet called with event object:', e);
-    
+    // パラメータとユーザー情報を取得
     const params = parseRequestParams(e);
-    const currentUserEmail = Session.getActiveUser().getEmail();
-    
-    // マルチテナント対応: 認証確認のみでセッション依存を削除
-    console.log('doGet - currentUserEmail:', currentUserEmail, 'requestedUserId:', params.userId);
-    
-    // /exec直接アクセス時の認証チェック（管理パネルへのアクセスを完全に防止）
-    if (isDirectExecAccess(e)) {
-      return handleDirectExecAccess(currentUserEmail);
-    }
-    
-    // マルチテナント対応: userIdベースでユーザー情報を取得
-    const { userEmail, userInfo } = validateUserSession(currentUserEmail, params);
-    const setupOutput = handleSetupPages(params, userEmail);
-    if (setupOutput) return setupOutput;
+    const userEmail = Session.getActiveUser().getEmail();
 
-    if (userInfo) {
-      // 管理パネルアクセス時の厳格なセキュリティチェック
-      if (params.mode === 'admin') {
-        console.log('Admin panel access - params.userId:', params.userId);
-        console.log('Admin panel access - userInfo.userId:', userInfo.userId);
-        console.log('Admin panel access - currentUserEmail:', currentUserEmail);
-        console.log('Admin panel access - userInfo.adminEmail:', userInfo.adminEmail);
-        
-        if (!params.userId) {
-          // userIdパラメータが無い場合は自分のIDでリダイレクト
-          const correctUrl = buildUserAdminUrl(userInfo.userId);
-          console.log('Missing userId, redirecting to:', correctUrl);
-          return createSecureRedirect(correctUrl, 'ユーザー専用管理パネルにリダイレクトしています...');
-        }
-        
-        if (params.userId !== userInfo.userId) {
-          // 他人のuserIdでアクセスしようとした場合
-          console.warn(`Unauthorized access attempt: ${currentUserEmail} tried to access userId: ${params.userId}`);
-          const correctUrl = buildUserAdminUrl(userInfo.userId);
-          console.log('Unauthorized access, redirecting to:', correctUrl);
-          return createSecureRedirect(correctUrl, '正しい管理パネルにリダイレクトしています...');
-        }
-        
-        // 正当なアクセス（正しいuserIdでのアクセス）
-        console.log('Valid admin panel access for userId:', params.userId);
-        return renderAdminPanel(userInfo, params.mode);
-      }
-      
-      if (params.isDirectPageAccess) {
-        return renderAnswerBoard(userInfo, params);
-      }
-      
-      if (params.mode === 'view') {
-        return renderAnswerBoard(userInfo, params);
-      }
-      
-      // デフォルトは管理パネル
-      const correctUrl = buildUserAdminUrl(userInfo.userId);
-      return createSecureRedirect(correctUrl, '管理パネルにリダイレクトしています...');
-    }
-
-    return showRegistrationPage();
+    // リクエストをルーティング
+    return routeRequest(params, userEmail);
   } catch (error) {
     console.error(`doGetで致命的なエラー: ${error.stack}`);
-    var errorHtml = HtmlService.createHtmlOutput(
-      '<h1>デバッグ：致命的エラー</h1>' +
-      '<p>doGet関数内でエラーが発生しました</p>' +
-      '<p>エラー詳細: ' + htmlEncode(error.message) + '</p>' +
-      '<p>スタック: ' + htmlEncode(error.stack || 'スタック情報なし') + '</p>' +
-      '<p>時刻: ' + new Date().toISOString() + '</p>' +
-      '<p>executeAs設定: USER_DEPLOYING (テスト中)</p>'
-    );
-    return safeSetXFrameOptionsDeny(errorHtml);
+    return showErrorPage('致命的なエラー', 'アプリケーションの処理中に予期せぬエラーが発生しました。', error);
   }
 }
 
 /**
- * /exec直接アクセスかどうかを判定
- * @param {Object} e Event object
- * @return {boolean}
+ * リクエストを適切なハンドラに振り分ける
+ * @param {Object} params - 解析されたリクエストパラメータ
+ * @param {string} userEmail - 現在のユーザーのメールアドレス
+ * @returns {HtmlOutput}
  */
-function isDirectExecAccess(e) {
-  const params = (e && e.parameter) || {};
-  // パラメータが空の場合のみ直接アクセス（管理パネルアクセスを完全防止）
-  return Object.keys(params).length === 0;
+function routeRequest(params, userEmail) {
+  // 1. システムセットアップが最優先
+  if (!isSystemSetup()) {
+    return showSetupPage();
+  }
+
+  // 2. ログインしていないユーザーはログインページへ
+  if (!userEmail) {
+    return showLoginPage();
+  }
+
+  // 3. ユーザー情報を取得（キャッシュ活用）
+  const userInfo = getUserInfo(userEmail, params.userId);
+
+  // 4. ルーティング決定
+  switch (params.mode) {
+    case 'admin':
+      return handleAdminRoute(userInfo, params, userEmail);
+    case 'view':
+      return renderAnswerBoard(userInfo, params);
+    case 'appsetup':
+       // AppSetupPageは特別な権限チェックが必要なため、別途処理
+      if (params.setupParam === 'true' && hasSetupPageAccess()) {
+        return showAppSetupPage();
+      }
+      return showErrorPage('アクセス拒否', 'このページにアクセスする権限がありません。');
+    default:
+      // 不明なモードやパラメータなしの場合は、ユーザーの管理パネルへリダイレクト
+      if (userInfo) {
+        const adminUrl = buildUserAdminUrl(userInfo.userId);
+        return createSecureRedirect(adminUrl, '管理パネルにリダイレクトしています...');
+      }
+      // ユーザー情報がなければログインページへ
+      return showLoginPage();
+  }
 }
 
 /**
- * /exec直接アクセス時の処理
- * @param {string} userEmail ユーザーメールアドレス
- * @return {HtmlOutput}
+ * 管理者ページのルートを処理
+ * @param {Object} userInfo - ユーザー情報
+ * @param {Object} params - リクエストパラメータ
+ * @param {string} userEmail - 現在のユーザーのメールアドレス
+ * @returns {HtmlOutput}
  */
-function handleDirectExecAccess(userEmail) {
-  try {
-    debugLog('Direct /exec access detected for user:', userEmail);
-    
-    // システムセットアップ未完了の場合は、セットアップページを優先表示
-    if (!isSystemSetup()) {
-      console.log('handleDirectExecAccess - System not setup, showing setup page');
-      const t = HtmlService.createTemplateFromFile('SetupPage');
-      t.include = include;
-      return safeSetXFrameOptionsDeny(t.evaluate().setTitle('初回セットアップ - StudyQuest'));
+function handleAdminRoute(userInfo, params, userEmail) {
+  if (!userInfo) {
+    // ユーザー情報が見つからない場合（例: DBに未登録）
+    return showLoginPage();
+  }
+
+  // セキュリティチェック: アクセスしようとしているuserIdが自分のものでなければ、自分の管理画面にリダイレクト
+  if (params.userId && params.userId !== userInfo.userId) {
+    console.warn(`不正アクセス試行: ${userEmail} が userId ${params.userId} にアクセスしようとしました。`);
+    const correctUrl = buildUserAdminUrl(userInfo.userId);
+    return createSecureRedirect(correctUrl, '要求された管理パネルへのアクセス権がありません。');
+  }
+
+  return renderAdminPanel(userInfo, params.mode);
+}
+
+
+/**
+ * ユーザー情報を取得（キャッシュ対応）
+ * @param {string} email - ユーザーのメールアドレス
+ * @param {string} userId - URLパラメータから取得したユーザーID
+ * @returns {Object|null} ユーザー情報オブジェクト、見つからない場合はnull
+ */
+function getUserInfo(email, userId) {
+  const cache = CacheService.getUserCache();
+  const cacheKey = `user_info_${userId || email}`;
+  
+  const cachedInfo = cache.get(cacheKey);
+  if (cachedInfo) {
+    return JSON.parse(cachedInfo);
+  }
+
+  let userInfo = null;
+  if (userId) {
+    userInfo = findUserById(userId);
+    // セキュリティチェック: 取得した情報のemailが現在のユーザーと一致するか確認
+    if (userInfo && userInfo.adminEmail !== email) {
+      return null; // 他人の情報へのアクセスは許可しない
     }
-    
-    // /execアクセス時は常にログインページを表示し、ページ側でリダイレクト処理を行う
-    return showRegistrationPage();
-  } catch (error) {
-    console.error('handleDirectExecAccess error:', error);
-    return showRegistrationPage();
+  } else {
+    userInfo = findUserByEmail(email);
   }
+
+  if (userInfo) {
+    cache.put(cacheKey, JSON.stringify(userInfo), 300); // 5分キャッシュ
+  }
+
+  return userInfo;
 }
 
 /**
- * ユーザー専用の一意の管理パネルURLを構築
- * @param {string} userId ユーザーID
- * @return {string}
+ * ログインページを表示
+ * @returns {HtmlOutput}
  */
-function buildUserAdminUrl(userId) {
-  const baseUrl = getWebAppUrl();
-  const adminUrl = `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
-  console.log('buildUserAdminUrl - baseUrl:', baseUrl);
-  console.log('buildUserAdminUrl - userId:', userId);
-  console.log('buildUserAdminUrl - adminUrl:', adminUrl);
-  return adminUrl;
+function showLoginPage() {
+  const template = HtmlService.createTemplateFromFile('src/LoginPage');
+  return template.evaluate()
+    .setTitle('StudyQuest - ログイン')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 /**
- * セキュアなリダイレクトHTMLを作成
+ * 初回セットアップページを表示
+ * @returns {HtmlOutput}
+ */
+function showSetupPage() {
+  const template = HtmlService.createTemplateFromFile('src/SetupPage');
+  return template.evaluate()
+    .setTitle('StudyQuest - 初回セットアップ')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+}
+
+/**
+ * アプリ設定ページを表示
+ * @returns {HtmlOutput}
+ */
+function showAppSetupPage() {
+    const appSetupTemplate = HtmlService.createTemplateFromFile('src/AppSetupPage');
+    return appSetupTemplate.evaluate()
+      .setTitle('アプリ設定 - StudyQuest')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+}
+
+
+/**
+ * エラーページを表示
+ * @param {string} title - エラータイトル
+ * @param {string} message - エラーメッセージ
+ * @param {Error} [error] - (オプション) エラーオブジェクト
+ * @returns {HtmlOutput}
+ */
+function showErrorPage(title, message, error) {
+  const template = HtmlService.createTemplateFromFile('src/ErrorBoundary');
+  template.title = title;
+  template.message = message;
+  if (DEBUG && error) {
+    template.debugInfo = error.stack;
+  } else {
+    template.debugInfo = '';
+  }
+  return template.evaluate()
+    .setTitle(`エラー - ${title}`)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+}
+
+
+/**
+ * セキュアなリダイレクトHTMLを作成 (テンプレート使用)
  * @param {string} targetUrl リダイレクト先URL
  * @param {string} message 表示メッセージ
  * @return {HtmlOutput}
  */
 function createSecureRedirect(targetUrl, message) {
-  return HtmlService.createHtmlOutput(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <meta http-equiv="refresh" content="2;url=${targetUrl}">
-      <title>リダイレクト中...</title>
-    </head>
-    <body style="text-align:center; padding:50px; font-family:sans-serif; background-color:#f5f5f5;">
-      <div style="max-width:600px; margin:0 auto; background:white; padding:40px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.1);">
-        <h2 style="color:#333; margin-bottom:20px;">${message}</h2>
-        <p style="color:#666; margin-bottom:30px;">2秒後に自動的にリダイレクトされます...</p>
-        <a href="${targetUrl}" 
-           style="display:inline-block; background:#4CAF50; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold;"
-           onclick="handleRedirectClick(event)">
-          管理パネルへ移動
-        </a>
-        <p style="color:#999; font-size:14px; margin-top:20px;">
-          自動的にリダイレクトされない場合は上のボタンをクリックしてください。
-        </p>
-      </div>
-      <script>
-        function handleRedirectClick(event) {
-          event.preventDefault();
-          try {
-            // ユーザーアクションによるリダイレクト
-            window.top.location.href = '${targetUrl}';
-          } catch(e) {
-            window.location.href = '${targetUrl}';
-          }
-        }
-        
-        // 2秒後の自動リダイレクト（ユーザーアクション後）
-        setTimeout(function() {
-          try {
-            window.top.location.href = '${targetUrl}';
-          } catch(e) {
-            window.location.href = '${targetUrl}';
-          }
-        }, 2000);
-      </script>
-    </body>
-    </html>
-  `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  const template = HtmlService.createTemplateFromFile('src/Redirect');
+  template.targetUrl = targetUrl;
+  template.message = message;
+  return template.evaluate().setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 /**
- * 正しいWeb App URLを取得
+ * 正しいWeb App URLを取得 (キャッシュ対応)
  * @return {string}
  */
 function getWebAppUrl() {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'web_app_url';
+  
+  const cachedUrl = cache.get(cacheKey);
+  if (cachedUrl) {
+    return cachedUrl;
+  }
+
   try {
-    // まずScriptApp.getService().getUrl()を試す
-    let url = ScriptApp.getService().getUrl();
-    
-    // URLが正しい形式かチェック
-    if (url && url.includes('/macros/') && url.endsWith('/exec')) {
+    const url = ScriptApp.getService().getUrl();
+    if (url && url.includes('/macros/')) {
+      cache.put(cacheKey, url, 21600); // 6時間キャッシュ
       return url;
     }
-    
-    // フォールバック: 現在のリクエストURLから構築
-    const currentUrl = Session.getActiveUser().getEmail() ? 
-      'https://script.google.com/a/macros/naha-okinawa.ed.jp/s/AKfycby5oABLEuyg46OvwVqt2flUKz15zocFhH-kLD0IuNWm8akKMXiKrOS5kqGCQ7V4DQ-2/exec' :
-      url;
-    
-    console.log('Using Web App URL:', currentUrl);
-    return currentUrl;
-    
+    throw new Error('Invalid URL from getService()');
   } catch (error) {
     console.error('getWebAppUrl error:', error);
-    // ハードコードされたフォールバック
-    return 'https://script.google.com/a/macros/naha-okinawa.ed.jp/s/AKfycby5oABLEuyg46OvwVqt2flUKz15zocFhH-kLD0IuNWm8akKMXiKrOS5kqGCQ7V4DQ-2/exec';
+    // 緊急時のフォールバックURL
+    const fallbackUrl = 'https://script.google.com/a/macros/naha-okinawa.ed.jp/s/AKfycby5oABLEuyg46OvwVqt2flUKz15zocFhH-kLD0IuNWm8akKMXiKrOS5kqGCQ7V4DQ-2/exec';
+    cache.put(cacheKey, fallbackUrl, 21600);
+    return fallbackUrl;
   }
 }
+
 
 /**
  * doGet のリクエストパラメータを解析
