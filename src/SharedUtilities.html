@@ -659,30 +659,25 @@ window.sharedUtilities.navigation = {
     
     // Method selection based on context
     const actualMethod = method === 'auto' ? this.detectBestMethod() : method;
-
-    // Try closing the window first when explicitly requested
+    
+    // Try methods in sequence with fallbacks
     let success = false;
-    if (useClose) {
-      success = this.navigateWithClose(url, delay);
-    }
-
-    // Try other methods in sequence with fallbacks
     
     switch (actualMethod) {
       case 'close':
-        if (!success) success = this.navigateWithClose(url, delay);
+        success = this.navigateWithClose(url, delay);
         if (!success) success = this.navigateWithMessage(url, fallbackMessage);
         if (!success) success = this.navigateWithRedirect(url, delay);
         break;
       case 'message':
-        if (!success) success = this.navigateWithMessage(url, fallbackMessage);
+        success = this.navigateWithMessage(url, fallbackMessage);
         if (!success) success = this.navigateWithRedirect(url, delay);
         break;
       case 'redirect':
-        if (!success) success = this.navigateWithRedirect(url, delay);
+        success = this.navigateWithRedirect(url, delay);
         break;
       default:
-        if (!success) success = this.navigateWithRedirect(url, delay);
+        success = this.navigateWithRedirect(url, delay);
     }
     
     // Final fallback if all methods fail

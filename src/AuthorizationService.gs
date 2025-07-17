@@ -3,16 +3,7 @@
  * システム内のリソースへのアクセス権を検証する機能を提供します。
  */
 
-var AuthorizationService = (function() {
-
-  /**
-   * メールアドレスからドメインを抽出します。
-   * @param {string} email - メールアドレス
-   * @returns {string} ドメイン部分
-   */
-  function getEmailDomain(email) {
-    return email.split('@')[1] || '';
-  }
+const AuthorizationService = (function() {
 
   /**
    * 現在の操作ユーザーが、対象のユーザーデータにアクセスする権限を持っているか検証します。
@@ -41,29 +32,8 @@ var AuthorizationService = (function() {
     throw new Error(`権限エラー: ${activeUserEmail} はユーザーID ${targetUserId} のデータにアクセスする権限がありません。`);
   }
 
-  /**
-   * ボードへのアクセス権をドメイン単位で検証します。
-   * @param {string} adminEmail - ボード管理者のメールアドレス
-   * @returns {boolean} ドメインが一致する場合は true
-   * @throws {Error} ドメインが一致しない場合にエラーをスローします
-   */
-  function verifyBoardAccess(adminEmail) {
-    const activeUserEmail = Session.getActiveUser().getEmail();
-    const activeDomain = getEmailDomain(activeUserEmail);
-    const adminDomain = getEmailDomain(adminEmail);
-
-    if (activeDomain === adminDomain) {
-      console.log(`[Auth] Domain access granted (${activeDomain})`);
-      return true;
-    }
-
-    console.warn(`[Auth] Domain access denied: ${activeDomain} vs ${adminDomain}`);
-    throw new Error('権限エラー: ドメインが一致しません');
-  }
-
   return {
     verifyUserAccess: verifyUserAccess,
-    verifyBoardAccess: verifyBoardAccess,
   };
 })();
 

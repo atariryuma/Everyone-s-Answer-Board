@@ -318,65 +318,36 @@ function quickStartSetup() {
 }
 
 /**
- * フォーム・スプレッドシート作成（進捗監視対応・非同期実行可能）
- * Phase 2 最適化: ステップ分割と進捗状態の詳細管理
+ * フォーム・スプレッドシート作成（ロック保護なし・非同期実行可能）
  * @param {string} userId ユーザーID
  * @returns {object} 作成結果
  */
 function createUserResourcesAsync(userId) {
-  const startTime = new Date().getTime();
-  let currentStep = 'initialization';
-  
   try {
-    console.log('🚀 createUserResourcesAsync: 開始', { userId, startTime });
-    
-    // Step 1: ユーザー情報を取得・検証
-    currentStep = 'user_validation';
+    // ユーザー情報を取得
     const userInfo = findUserById(userId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
     
     const userEmail = userInfo.adminEmail;
-    console.log('✅ Step 1: ユーザー検証完了', { userId, userEmail });
     
     // 既にリソースが作成済みかチェック
     if (userInfo.spreadsheetId) {
-      console.log('ℹ️ リソース作成済み、既存データを返却', { userId, userEmail });
+      console.log('createUserResourcesAsync: リソース作成済み', { userId, userEmail });
       return {
         status: 'existing',
         userId: userId,
         formUrl: userInfo.configJson ? JSON.parse(userInfo.configJson).formUrl : '',
-        spreadsheetUrl: userInfo.spreadsheetUrl,
-        elapsedTime: new Date().getTime() - startTime
+        spreadsheetUrl: userInfo.spreadsheetUrl
       };
     }
     
-    // Step 2: リソース作成の前処理状態を更新
-    currentStep = 'resource_preparation';
-    updateResourceCreationProgress(userId, 'resources_pending', 'リソース作成準備中...', 10);
-    console.log('✅ Step 2: リソース作成準備完了');
-    
-    // Step 3: スプレッドシート作成
-    currentStep = 'spreadsheet_creation';
-    updateResourceCreationProgress(userId, 'resources_pending', 'スプレッドシートを作成中...', 30);
-    console.log('🔨 Step 3: スプレッドシート作成開始', { userId, userEmail });
-    
-    // Step 4: フォームとスプレッドシートを作成
-    currentStep = 'form_and_sheet_creation';
-    updateResourceCreationProgress(userId, 'resources_pending', 'フォームとスプレッドシートを作成中...', 50);
-    
+    // Step 1: フォームとスプレッドシートを作成（ロック保護なし）
+    console.log('createUserResourcesAsync: リソース作成開始', { userId, userEmail });
     const { formUrl, spreadsheetUrl, spreadsheetId } = createStudyQuestForm(userEmail, userId);
-    console.log('✅ Step 4: フォーム・スプレッドシート作成完了', { 
-      userId, 
-      formUrl: formUrl ? 'OK' : 'MISSING', 
-      spreadsheetId: spreadsheetId ? 'OK' : 'MISSING' 
-    });
     
-    // Step 5: 設定データ準備
-    currentStep = 'configuration_setup';
-    updateResourceCreationProgress(userId, 'resources_pending', '設定を準備中...', 70);
-    
+    // Step 2: ユーザー情報を更新
     const config = {
       formUrl: formUrl,
       publishedSheetName: 'フォームの回答 1',
@@ -384,119 +355,30 @@ function createUserResourcesAsync(userId) {
         published: true,
         publishDate: new Date().toISOString(),
         opinionHeader: 'お題'
-      },
-      resourceCreationCompletedAt: new Date().toISOString()
+      }
     };
-    
-    // Step 6: ユーザー情報を更新
-    currentStep = 'data_finalization';
-    updateResourceCreationProgress(userId, 'resources_pending', 'データを最終確定中...', 90);
     
     const updateData = {
       spreadsheetId: spreadsheetId,
       spreadsheetUrl: spreadsheetUrl,
       configJson: JSON.stringify(config),
-      setupStatus: 'data_prepared',  // SETUP_STATUS.DATA_PREPARED に対応
-      lastResourceUpdate: new Date().toISOString()
+      setupStatus: 'data_prepared'  // SETUP_STATUS.DATA_PREPARED に対応
     };
     
     updateUser(userId, updateData);
-    console.log('✅ Step 6: ユーザー情報更新完了');
     
-    // Step 7: 完了状態を更新
-    currentStep = 'completion';
-    updateResourceCreationProgress(userId, 'data_prepared', 'リソース作成完了', 100);
-    
-    const elapsedTime = new Date().getTime() - startTime;
-    console.log('🎉 createUserResourcesAsync: 全工程完了', { 
-      userId, 
-      userEmail, 
-      elapsedTime: elapsedTime + 'ms',
-      steps: 'initialization → user_validation → resource_preparation → spreadsheet_creation → form_and_sheet_creation → configuration_setup → data_finalization → completion'
-    });
+    console.log('createUserResourcesAsync: リソース作成完了', { userId, userEmail });
     
     return {
       status: 'success',
       userId: userId,
       formUrl: formUrl,
-      spreadsheetUrl: spreadsheetUrl,
-      elapsedTime: elapsedTime,
-      completedSteps: ['user_validation', 'resource_preparation', 'spreadsheet_creation', 'form_and_sheet_creation', 'configuration_setup', 'data_finalization', 'completion']
+      spreadsheetUrl: spreadsheetUrl
     };
     
-  } catch (error) {
-    const elapsedTime = new Date().getTime() - startTime;
-    console.error('❌ createUserResourcesAsync エラー:', {
-      userId,
-      currentStep,
-      error: error.message,
-      elapsedTime: elapsedTime + 'ms'
-    });
-    
-    // エラー状態を記録
-    try {
-      updateResourceCreationProgress(userId, 'account_created', `エラー: ${error.message}`, 0, {
-        failedAt: currentStep,
-        errorDetails: error.message,
-        timestamp: new Date().toISOString()
-      });
-    } catch (statusUpdateError) {
-      console.warn('進捗状態更新に失敗:', statusUpdateError.message);
-    }
-    
-    throw new Error(`リソース作成に失敗しました (${currentStep}): ${error.message}`);
-  }
-}
-
-/**
- * リソース作成進捗を更新（内部ヘルパー関数）
- * @param {string} userId - ユーザーID
- * @param {string} setupStatus - セットアップ状態
- * @param {string} message - 進捗メッセージ
- * @param {number} progress - 進捗率 (0-100)
- * @param {Object} [additionalData] - 追加データ
- */
-function updateResourceCreationProgress(userId, setupStatus, message, progress, additionalData = {}) {
-  try {
-    const userInfo = findUserById(userId);
-    if (!userInfo) {
-      console.warn('updateResourceCreationProgress: ユーザーが見つかりません', userId);
-      return;
-    }
-    
-    const existingConfig = JSON.parse(userInfo.configJson || '{}');
-    const progressData = {
-      ...existingConfig,
-      resourceCreationProgress: {
-        message: message,
-        progress: progress,
-        timestamp: new Date().toISOString(),
-        ...additionalData
-      }
-    };
-    
-    const updateData = {
-      setupStatus: setupStatus,
-      configJson: JSON.stringify(progressData),
-      lastProgressUpdate: new Date().toISOString()
-    };
-    
-    updateUser(userId, updateData);
-    
-    console.log('📊 進捗更新:', { 
-      userId, 
-      setupStatus, 
-      message, 
-      progress: progress + '%' 
-    });
-    
-    // 実行レベルキャッシュを即座にクリア（最新状態の反映を保証）
-    if (typeof clearExecutionUserInfoCache === 'function') {
-      clearExecutionUserInfoCache(userId);
-    }
-    
-  } catch (error) {
-    console.warn('updateResourceCreationProgress エラー:', error.message);
+  } catch (e) {
+    console.error('createUserResourcesAsync エラー:', e);
+    throw new Error(`リソース作成に失敗しました: ${e.message}`);
   }
 }
 
