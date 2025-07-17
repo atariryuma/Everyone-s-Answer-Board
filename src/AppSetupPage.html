@@ -526,7 +526,9 @@
                             <td class="px-4 py-3 text-sm text-gray-300">${lastAccess}</td>
                             <td class="px-4 py-3 text-center">
                                 <button 
-                                    onclick="showDeleteConfirmation('${user.userId.replace(/'/g, '\\\'').replace(/"/g, '\\"')}', '${user.adminEmail.replace(/'/g, '\\\'').replace(/"/g, '\\"')}')"
+                                    data-user-id="${user.userId}"
+                                    data-user-email="${user.adminEmail}"
+                                    onclick="showDeleteConfirmation(this.dataset.userId, this.dataset.userEmail)"
                                     class="btn bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs">
                                     削除
                                 </button>
