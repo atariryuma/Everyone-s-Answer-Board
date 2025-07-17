@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#1a1b26">
   <meta name="description" content="StudyQuest 回答ボードシステム - ログイン">
-  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), screen-wake-lock=(), accelerometer=(), gyroscope=(), magnetometer=()" />
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -144,38 +144,40 @@
         const originalWrite = document.write;
         const originalWriteln = document.writeln;
         
-        // Replace with compatible wrapper that handles multiple parameters
-        document.write = function(...args) {
+        // More robust document.write replacement that handles Google library calls
+        document.write = function() {
           try {
+            // Convert arguments to array for better handling
+            var args = Array.prototype.slice.call(arguments);
+            
             if (args.length === 0) {
               console.warn('document.write called with no arguments - ignored in GAS context');
               return;
             }
             
             // Enhanced debugging and monitoring
-            const timestamp = new Date().toISOString();
-            const caller = new Error().stack;
-            const content = args.join('');
+            var timestamp = new Date().toISOString();
+            var content = args.join('');
             
             // Log detailed information for debugging
-            console.group(`📝 document.write blocked [${timestamp}]`);
-            console.log('Arguments:', args);
-            console.log('Content:', content);
-            console.log('Caller stack:', caller);
+            console.group('📝 document.write blocked [' + timestamp + ']');
+            console.log('Arguments count:', args.length);
+            console.log('Content length:', content.length);
+            console.log('Content preview:', content.substring(0, 200) + (content.length > 200 ? '...' : ''));
             
             // Monitor for specific Google library patterns
-            if (content.includes('google') || content.includes('gapi') || content.includes('gsi')) {
+            if (content.indexOf('google') !== -1 || content.indexOf('gapi') !== -1 || content.indexOf('gsi') !== -1) {
               console.log('🔍 Google library detected in document.write call');
             }
             
             // Check for script injection attempts
-            if (content.includes('<script') || content.includes('<\/script>')) {
+            if (content.indexOf('<script') !== -1 || content.indexOf('<\/script>') !== -1) {
               console.warn('⚠️ Script injection via document.write blocked for security');
             }
             
             // Monitor for HTML content
-            if (content.includes('<') && content.includes('>')) {
-              console.log('🏷️ HTML content detected:', content.substring(0, 100) + '...');
+            if (content.indexOf('<') !== -1 && content.indexOf('>') !== -1) {
+              console.log('🏷️ HTML content detected');
             }
             
             console.groupEnd();
@@ -185,12 +187,13 @@
               window.documentWriteCalls = [];
             }
             window.documentWriteCalls.push({
-              timestamp,
-              args,
-              content,
-              caller: caller.split('\n')[1] || 'unknown'
+              timestamp: timestamp,
+              args: args,
+              content: content,
+              source: 'document.write'
             });
             
+            // Always return undefined to prevent further processing
             return undefined;
           } catch (error) {
             console.error('Error in document.write wrapper:', error);
@@ -289,11 +292,15 @@
             if (typeof google !== 'undefined' && google.script && google.script.run) {
               google.script.run
                 .withSuccessHandler(function(result) {
+                  console.log('Server response for GOOGLE_CLIENT_ID:', result);
                   if (result && result.clientId) {
                     window.GOOGLE_CLIENT_ID = result.clientId;
                     console.log('✅ GOOGLE_CLIENT_ID set via server fallback:', window.GOOGLE_CLIENT_ID);
                   } else {
                     console.warn('❌ GOOGLE_CLIENT_ID not available from server');
+                    if (result && result.error) {
+                      console.error('Server error:', result.error);
+                    }
                   }
                 })
                 .withFailureHandler(function(error) {

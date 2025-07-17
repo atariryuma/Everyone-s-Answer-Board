@@ -294,15 +294,26 @@ function showRegistrationPage() {
  */
 function getGoogleClientId() {
   try {
-    var clientId = PropertiesService.getScriptProperties().getProperty('GOOGLE_CLIENT_ID');
+    console.log('Getting GOOGLE_CLIENT_ID from script properties...');
+    var properties = PropertiesService.getScriptProperties();
+    var clientId = properties.getProperty('GOOGLE_CLIENT_ID');
+    
+    console.log('GOOGLE_CLIENT_ID retrieved:', clientId ? 'Found' : 'Not found');
+    
     if (!clientId) {
       console.warn('GOOGLE_CLIENT_ID not found in script properties');
-      return { clientId: '' };
+      
+      // Try to get all properties to see what's available
+      var allProperties = properties.getProperties();
+      console.log('Available properties:', Object.keys(allProperties));
+      
+      return { clientId: '', error: 'GOOGLE_CLIENT_ID not found in script properties' };
     }
-    return { clientId: clientId };
+    
+    return { clientId: clientId, success: true };
   } catch (error) {
     console.error('Error getting GOOGLE_CLIENT_ID:', error);
-    return { clientId: '' };
+    return { clientId: '', error: error.toString() };
   }
 }
 
