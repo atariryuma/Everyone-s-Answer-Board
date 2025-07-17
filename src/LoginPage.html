@@ -224,7 +224,29 @@
     }
   </script>
 
-  <!-- Include login-specific JavaScript -->
-  <?!= include('login.js'); ?>
+  <!-- Direct JavaScript for debugging -->
+  <script>
+    console.log('🔥 DIRECT JAVASCRIPT STARTING');
+    
+    // Initialize immediately
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('🚀 DOM loaded, login page ready');
+      
+      const loginBtn = document.getElementById('login-btn');
+      if (loginBtn) {
+        console.log('✅ Login button found');
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'はじめる';
+        loginBtn.addEventListener('click', function() {
+          console.log('🔄 Login button clicked');
+          alert('ログインボタンが動作しています！次に本格的な機能を実装します。');
+        });
+      } else {
+        console.error('❌ Login button not found');
+      }
+    });
+    
+    console.log('🔥 DIRECT JAVASCRIPT LOADED');
+  </script>
 </body>
 </html>
