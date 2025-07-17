@@ -41,26 +41,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#1a1b26">
   <meta name="description" content="StudyQuest 回答ボードシステム - ログイン">
-  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), screen-wake-lock=(), accelerometer=(), gyroscope=(), magnetometer=(), ambient-light-sensor=(), speaker=(), vibrate=(), vr=()" />
+  
+  <!-- Comprehensive Security Headers -->
+  <?!= getSecurityHeaders('login') ?>
 
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    // Handle Tailwind CDN production warnings and deprecation warnings
-    if (typeof console !== 'undefined' && console.warn) {
-      const originalWarn = console.warn;
-      console.warn = function(...args) {
-        if (args[0] && (
-          args[0].includes('cdn.tailwindcss.com should not be used in production') ||
-          args[0].includes('-ms-high-contrast is in the process of being deprecated') ||
-          args[0].includes('Tailwind CSS in production')
-        )) {
-          return; // Suppress these warnings
-        }
-        originalWarn.apply(console, args);
-      };
-    }
-  </script>
+  <!-- Optimized Tailwind CSS Loading -->
+  <?!= include('TailwindOptimizer'); ?>
 
   <!-- Google Identity Services with enhanced loading -->
   <script>
@@ -126,6 +112,7 @@
   <!-- Include shared styles and utilities -->
   <?!= include('UnifiedStyles'); ?>
   <?!= include('SharedUtilities'); ?>
+  <?!= include('ErrorBoundary'); ?>
   <?!= include('adminPanel.css.html'); ?>
 
   <!-- Login-specific styles -->
@@ -178,34 +165,25 @@
     </div>
   </div>
 
-  <!-- Set global variables for login -->
+  <!-- Consolidated document.write protection and variable initialization -->
   <script>
     (function() {
-      // Ultra-robust document.write replacement for Google Apps Script
+      // Single consolidated document.write protection
       if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-        
-        // Complete replacement strategy
         try {
-          // Store original functions
-          var originalWrite = document.write;
-          var originalWriteln = document.writeln;
+          // Create safe no-op replacement
+          var safeDocumentWrite = function() { return; };
+          var safeDocumentWriteln = function() { return; };
           
-          // Create a safe, no-op replacement
-          var safeDocumentWrite = function() {
-            // Completely silent operation - no logging to avoid recursive calls
-            return;
-          };
+          // Store original functions for debugging
+          window._originalDocumentWrite = document.write;
+          window._originalDocumentWriteln = document.writeln;
           
-          var safeDocumentWriteln = function() {
-            // Completely silent operation - no logging to avoid recursive calls
-            return;
-          };
-          
-          // Replace immediately and definitively
+          // Replace document.write methods
           document.write = safeDocumentWrite;
           document.writeln = safeDocumentWriteln;
           
-          // Ensure they can't be overridden
+          // Lock properties to prevent override
           try {
             Object.defineProperty(document, 'write', {
               value: safeDocumentWrite,
@@ -221,77 +199,57 @@
               configurable: false
             });
           } catch (defineError) {
-            // If defineProperty fails, just keep the simple assignment
             console.warn('Could not lock document.write properties:', defineError);
           }
           
-          // Store references for debugging
-          window._originalDocumentWrite = originalWrite;
-          window._originalDocumentWriteln = originalWriteln;
-          
-          console.log('✅ Document.write completely disabled for Google Apps Script compatibility');
+          console.log('✅ Document.write consolidated protection active');
           
         } catch (error) {
           console.error('❌ Error setting up document.write replacement:', error);
         }
       }
 
-      // Initialize GOOGLE_CLIENT_ID with safe fallback
+      // Initialize GOOGLE_CLIENT_ID
       window.GOOGLE_CLIENT_ID = '';
     })();
   </script>
 
-  <!-- Set GOOGLE_CLIENT_ID with bulletproof template handling -->
+  <!-- Set GOOGLE_CLIENT_ID with server-side only approach -->
   <script>
     (function() {
-      // Bulletproof method to handle template variables
-      var clientIdSetSuccess = false;
+      // Initialize with empty value - will be populated by server
+      window.GOOGLE_CLIENT_ID = '';
       
-      // Method 1: Direct template variable
-      try {
-        var rawClientId = '<?= GOOGLE_CLIENT_ID ?>';
-        if (rawClientId && rawClientId.trim() && rawClientId !== 'undefined' && rawClientId !== '<?= GOOGLE_CLIENT_ID ?>') {
-          window.GOOGLE_CLIENT_ID = rawClientId.trim();
-          console.log('✅ GOOGLE_CLIENT_ID set successfully via template:', window.GOOGLE_CLIENT_ID);
-          clientIdSetSuccess = true;
-        }
-      } catch (error) {
-        console.warn('⚠️ Template variable method failed:', error);
-      }
+      console.log('🔄 Getting GOOGLE_CLIENT_ID from server...');
       
-      // Method 2: Server-side fallback if template method failed
-      if (!clientIdSetSuccess) {
-        console.log('🔄 Attempting server-side fallback for GOOGLE_CLIENT_ID...');
-        
-        // Wait a bit for google.script to be available
-        setTimeout(function() {
-          try {
-            if (typeof google !== 'undefined' && google.script && google.script.run) {
-              google.script.run
-                .withSuccessHandler(function(result) {
-                  console.log('Server response for GOOGLE_CLIENT_ID:', result);
-                  if (result && result.clientId) {
-                    window.GOOGLE_CLIENT_ID = result.clientId;
-                    console.log('✅ GOOGLE_CLIENT_ID set via server fallback:', window.GOOGLE_CLIENT_ID);
-                  } else {
-                    console.warn('❌ GOOGLE_CLIENT_ID not available from server');
-                    if (result && result.error) {
-                      console.error('Server error:', result.error);
-                    }
+      // Wait for google.script to be available
+      setTimeout(function() {
+        try {
+          if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run
+              .withSuccessHandler(function(result) {
+                console.log('Server response for GOOGLE_CLIENT_ID:', result);
+                if (result && result.clientId) {
+                  window.GOOGLE_CLIENT_ID = result.clientId;
+                  console.log('✅ GOOGLE_CLIENT_ID set via server:', window.GOOGLE_CLIENT_ID);
+                } else {
+                  console.warn('❌ GOOGLE_CLIENT_ID not available from server');
+                  if (result && result.error) {
+                    console.error('Server error:', result.error);
                   }
-                })
-                .withFailureHandler(function(error) {
-                  console.error('❌ Failed to get GOOGLE_CLIENT_ID from server:', error);
-                })
-                .getGoogleClientId();
-            } else {
-              console.warn('❌ Google Apps Script not available for fallback');
-            }
-          } catch (fallbackError) {
-            console.error('❌ Error in server fallback:', fallbackError);
+                }
+              })
+              .withFailureHandler(function(error) {
+                console.error('❌ Failed to get GOOGLE_CLIENT_ID from server:', error);
+              })
+              .getGoogleClientId();
+          } else {
+            console.warn('❌ Google Apps Script not available for fallback');
           }
-        }, 1000);
-      }
+        } catch (fallbackError) {
+          console.error('❌ Error in server fallback:', fallbackError);
+        }
+      }, 1000);
     })();
   </script>
 

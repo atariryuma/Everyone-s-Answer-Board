@@ -6,54 +6,10 @@
   let redirectUrl = '/exec';
   let currentUserEmail = '';
 
-  // Initialize login page - simplified flow
+  // Initialize login page - simplified flow with error boundary
   function initializeLoginPage() {
-
-    // Enhanced error handling for document.write issues compatible with Google libraries
-    if (typeof document !== 'undefined' && document.write) {
-      // Only override if not already overridden in LoginPage.html
-      if (!window._originalDocumentWrite) {
-        const originalDocWrite = document.write;
-        const originalDocWriteln = document.writeln;
-        const protoWriteTargets = [Document && Document.prototype, HTMLDocument && HTMLDocument.prototype];
-        protoWriteTargets.forEach(t => {
-          if (!t) return;
-          try {
-            t.write = function() {};
-            t.writeln = function() {};
-            Object.defineProperty(t, 'write', { value: function() {}, writable: false, configurable: false });
-            Object.defineProperty(t, 'writeln', { value: function() {}, writable: false, configurable: false });
-          } catch (e) {
-            t.write = function() {};
-            t.writeln = function() {};
-          }
-        });
-        
-        document.write = function(...args) {
-          try {
-            console.warn('document.write called in login.js.html - args:', args);
-            return undefined;
-          } catch (e) {
-            console.error('document.write error caught:', e);
-            return undefined;
-          }
-        };
-        
-        document.writeln = function(...args) {
-          try {
-            console.warn('document.writeln called in login.js.html - args:', args);
-            return undefined;
-          } catch (e) {
-            console.error('document.writeln error caught:', e);
-            return undefined;
-          }
-        };
-        
-        window._originalDocumentWrite = originalDocWrite;
-        window._originalDocumentWriteln = originalDocWriteln;
-      }
-    }
-
+    // Document.write protection is handled by LoginPage.html - no duplication needed
+    
     setLoading(true, 'Googleアカウントの情報を確認しています...');
 
     console.log('🚀 Initializing login page...');
@@ -71,8 +27,8 @@
 
     console.log('✅ GOOGLE_CLIENT_ID available:', window.GOOGLE_CLIENT_ID);
 
-    // Wait for Google APIs to load
-    waitForGoogleAPIs()
+    // Wait for Google APIs to load with error boundary
+    const apiPromise = waitForGoogleAPIs()
       .then(() => {
         console.log('✅ Google APIs loaded successfully');
         return initializeGoogleAuth();
@@ -80,11 +36,32 @@
       .then(() => {
         console.log('✅ Google Auth initialized');
         return startLoginFlow();
-      })
-      .catch(error => {
+      });
+
+    // Wrap with error boundary
+    if (window.ErrorBoundary) {
+      window.ErrorBoundary.wrapWithErrorBoundary(apiPromise, 'login-initialization', {
+        retryCallback: () => {
+          console.log('🔄 Retrying login initialization...');
+          initializeLoginPage();
+        },
+        reauthenticate: () => {
+          console.log('🔄 Triggering re-authentication...');
+          if (googleAccountsClient) {
+            googleAccountsClient.requestAccessToken({ prompt: 'select_account' });
+          }
+        }
+      }).catch(error => {
         console.error('❌ Login initialization failed:', error);
         handleInitializationError(error);
       });
+    } else {
+      // Fallback without error boundary
+      apiPromise.catch(error => {
+        console.error('❌ Login initialization failed:', error);
+        handleInitializationError(error);
+      });
+    }
   }
 
   // Wait for Google APIs to load with Promise-based approach

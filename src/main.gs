@@ -12,6 +12,7 @@ function include(path) {
   try {
     const tmpl = HtmlService.createTemplateFromFile(path);
     tmpl.include = include;
+    tmpl.getSecurityHeaders = getSecurityHeaders;
     return tmpl.evaluate().getContent();
   } catch (error) {
     console.error(`Error including file ${path}:`, error);
@@ -130,6 +131,142 @@ function safeSetXFrameOptionsDeny(htmlOutput) {
     console.warn('Failed to set XFrameOptionsMode:', e.message);
   }
   return htmlOutput;
+}
+
+/**
+ * 統合セキュリティヘッダーユーティリティ
+ * Google Apps Scriptでは直接HTTPヘッダーを設定できないため、メタタグで実装
+ * @param {string} pageType - ページタイプ（'login', 'admin', 'public', 'setup'）
+ * @returns {string} セキュリティメタタグのHTML
+ */
+function getSecurityHeaders(pageType) {
+  pageType = pageType || 'public';
+  
+  // 基本的なPermissions-Policyディレクティブ
+  var baseDirectives = [
+    'camera=()',
+    'microphone=()',
+    'geolocation=()',
+    'payment=()',
+    'usb=()',
+    'serial=()',
+    'bluetooth=()',
+    'screen-wake-lock=()',
+    'accelerometer=()',
+    'gyroscope=()',
+    'magnetometer=()',
+    'ambient-light-sensor=()',
+    'speaker=()',
+    'vibrate=()',
+    'vr=()',
+    'fullscreen=()',
+    'picture-in-picture=()',
+    'autoplay=()',
+    'encrypted-media=()',
+    'midi=()',
+    'notifications=()',
+    'push=()',
+    'sync-xhr=()',
+    'clipboard-read=()',
+    'clipboard-write=()'
+  ];
+  
+  // ページタイプ別の調整
+  switch (pageType) {
+    case 'login':
+      // ログインページでは一部の機能を許可
+      baseDirectives = baseDirectives.filter(d => !d.startsWith('clipboard-'));
+      break;
+    case 'admin':
+      // 管理パネルでは必要な機能のみ許可
+      baseDirectives = baseDirectives.filter(d => 
+        !d.startsWith('clipboard-read=') && 
+        !d.startsWith('clipboard-write=') &&
+        !d.startsWith('fullscreen=')
+      );
+      break;
+    case 'public':
+      // 公開ページでは最も制限的
+      break;
+    case 'setup':
+      // セットアップページでは必要最小限
+      break;
+  }
+  
+  var permissionsPolicyContent = baseDirectives.join(', ');
+  
+  // Content Security Policy (CSP) をページタイプ別に設定
+  var cspDirectives = [];
+  
+  switch (pageType) {
+    case 'login':
+      cspDirectives = [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com https://cdn.tailwindcss.com",
+        "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com",
+        "font-src 'self' data:",
+        "img-src 'self' data: https:",
+        "connect-src 'self' https://accounts.google.com https://www.googleapis.com",
+        "frame-src https://accounts.google.com",
+        "form-action 'self'",
+        "base-uri 'self'",
+        "object-src 'none'"
+      ];
+      break;
+    case 'admin':
+      cspDirectives = [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://apis.google.com https://cdn.tailwindcss.com",
+        "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com",
+        "font-src 'self' data:",
+        "img-src 'self' data: https:",
+        "connect-src 'self' https://www.googleapis.com",
+        "form-action 'self'",
+        "base-uri 'self'",
+        "object-src 'none'"
+      ];
+      break;
+    case 'public':
+      cspDirectives = [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://apis.google.com https://cdn.tailwindcss.com",
+        "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com",
+        "font-src 'self' data:",
+        "img-src 'self' data:",
+        "connect-src 'self' https://www.googleapis.com",
+        "form-action 'self'",
+        "base-uri 'self'",
+        "object-src 'none'"
+      ];
+      break;
+    case 'setup':
+      cspDirectives = [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com",
+        "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com",
+        "font-src 'self' data:",
+        "img-src 'self' data:",
+        "connect-src 'self'",
+        "form-action 'self'",
+        "base-uri 'self'",
+        "object-src 'none'"
+      ];
+      break;
+  }
+  
+  var cspContent = cspDirectives.join('; ');
+  
+  // セキュリティメタタグのHTML生成
+  var securityHeaders = [
+    '<meta http-equiv="Permissions-Policy" content="' + htmlEncode(permissionsPolicyContent) + '" />',
+    '<meta http-equiv="Content-Security-Policy" content="' + htmlEncode(cspContent) + '" />',
+    '<meta http-equiv="X-Content-Type-Options" content="nosniff" />',
+    '<meta http-equiv="X-Frame-Options" content="DENY" />',
+    '<meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />',
+    '<meta http-equiv="X-XSS-Protection" content="1; mode=block" />'
+  ];
+  
+  return securityHeaders.join('\n  ');
 }
 
 // 安定性を重視してvarを使用
@@ -270,20 +407,15 @@ function showRegistrationPage() {
   try {
     var template = HtmlService.createTemplateFromFile('LoginPage');
     template.include = include;
+    template.getSecurityHeaders = getSecurityHeaders;
     
-    // Set GOOGLE_CLIENT_ID for the login page
-    var clientId = PropertiesService.getScriptProperties().getProperty('GOOGLE_CLIENT_ID');
-    if (!clientId) {
-      console.warn('GOOGLE_CLIENT_ID not found in script properties');
-      clientId = '';
-    }
-    template.GOOGLE_CLIENT_ID = escapeJavaScript(clientId);
+    // No template variable processing - client will get GOOGLE_CLIENT_ID via server function
     
     var output = template.evaluate()
       .setTitle('ログイン - StudyQuest');
     return safeSetXFrameOptionsDeny(output);
   } catch (error) {
-    console.error('Error in doGet:', error);
+    console.error('Error in showRegistrationPage:', error);
     return HtmlService.createHtmlOutput('<h1>システムエラー</h1><p>アプリケーションの読み込みに失敗しました。</p>');
   }
 }
