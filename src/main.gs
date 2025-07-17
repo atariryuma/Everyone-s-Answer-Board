@@ -305,17 +305,6 @@ function getGoogleClientId() {
     return { clientId: '' };
   }
 }
-      <html>
-        <head><title>エラー - StudyQuest</title></head>
-        <body>
-          <h1>システムエラー</h1>
-          <p>ログインページの読み込みに失敗しました。管理者に連絡してください。</p>
-          <p>エラー: ${error.message}</p>
-        </body>
-      </html>
-    `);
-  }
-}
 
 /**
  * Retrieves the administrator domain for the login page.
