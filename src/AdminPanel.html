@@ -610,100 +610,6 @@
       <!-- 右側：情報・ヘルプパネル -->
       <div class="space-y-4 lg:space-y-6">
         
-        
-
-        <!-- 使い方ガイド -->
-        <div class="glass-panel p-4 lg:p-6">
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-8 h-8 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-              </svg>
-            </div>
-            <h3 class="font-semibold text-amber-400">使い方ガイド</h3>
-          </div>
-          
-          <div class="space-y-4">
-            <!-- 簡潔な管理フロー -->
-            <div class="bg-amber-900/20 border border-amber-500/30 rounded-lg p-4">
-              <h4 class="font-medium text-amber-200 mb-3 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                </svg>
-                管理の流れ（3ステップ）
-              </h4>
-              <div class="space-y-2 text-xs text-amber-100">
-                <div class="flex items-center gap-2">
-                  <span class="bg-amber-600 text-white text-xs px-2 py-1 rounded font-bold">1</span>
-                  <span>データソース連携・AI列判定</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span class="bg-amber-600 text-white text-xs px-2 py-1 rounded font-bold">2</span>
-                  <span>表示設定・プライバシー調整</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span class="bg-amber-600 text-white text-xs px-2 py-1 rounded font-bold">3</span>
-                  <span>公開して学習者に共有</span>
-                </div>
-              </div>
-              <button type="button" id="show-usage-guide" class="btn btn-secondary w-full text-sm py-2 mt-3">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                </svg>
-                詳細ガイドを開く
-              </button>
-            </div>
-            
-            <!-- セキュリティ・機能 -->
-            <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-              <h4 class="font-medium text-blue-200 mb-3 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-                </svg>
-                セキュリティ・機能概要
-              </h4>
-              <div class="space-y-2 text-xs text-blue-100">
-                <div class="flex items-center gap-2">
-                  <span class="text-green-400">✓</span>
-                  <span>Google Workspace自動連携</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span class="text-green-400">✓</span>
-                  <span>AI機能での効率化</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span class="text-green-400">✓</span>
-                  <span>完全非公開データベース</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span class="text-green-400">✓</span>
-                  <span>リアルタイム更新</span>
-                </div>
-              </div>
-              <div class="mt-3 text-xs text-blue-200 bg-blue-800/30 rounded p-2">
-                💡 詳細ガイドでセキュリティ仕様をご確認ください
-              </div>
-            </div>
-            
-            <!-- デジタルシティズンシップガイド -->
-            <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-              <h4 class="font-medium text-blue-200 mb-3 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                </svg>
-                デジタル・シティズンシップ指導
-              </h4>
-              <p class="text-xs text-blue-100 mb-3">デジタル・シティズンシップに基づく回答ボード指導のポイントを確認しましょう</p>
-              <button type="button" id="show-digital-citizenship-guide" class="btn btn-secondary w-full text-sm py-2">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                指導ガイドを開く
-              </button>
-            </div>
-            
-          </div>
-        </div>
         <!-- システム状況 -->
         <div id="system-info-panel" class="glass-panel p-4 lg:p-6">
     <div class="flex items-center gap-3 mb-4">
@@ -854,7 +760,83 @@
         </div>
       </details>
       </div>
-    </div>
+
+        <!-- 使い方ガイド -->
+        <div class="glass-panel p-4 lg:p-6">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-8 h-8 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+              </svg>
+            </div>
+            <h3 class="font-semibold text-amber-400">使い方ガイド</h3>
+          </div>
+          
+          <div class="space-y-4">
+            <!-- 簡潔な管理フロー -->
+            <div class="bg-amber-900/20 border border-amber-500/30 rounded-lg p-4">
+              <h4 class="font-medium text-amber-200 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+                管理の流れ（3ステップ）
+              </h4>
+              <div class="space-y-2 text-xs text-amber-100">
+                <div class="flex items-center gap-2">
+                  <span class="bg-amber-600 text-white text-xs px-2 py-1 rounded font-bold">1</span>
+                  <span>データソース連携・AI列判定</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="bg-amber-600 text-white text-xs px-2 py-1 rounded font-bold">2</span>
+                  <span>表示設定・プライバシー調整</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="bg-amber-600 text-white text-xs px-2 py-1 rounded font-bold">3</span>
+                  <span>公開して学習者に共有</span>
+                </div>
+              </div>
+              <button type="button" id="show-usage-guide" class="btn btn-secondary w-full text-sm py-2 mt-3">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+                詳細ガイドを開く
+              </button>
+            </div>
+            
+            <!-- セキュリティ・機能 -->
+            <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+              <h4 class="font-medium text-blue-200 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+                セキュリティ・機能概要
+              </h4>
+              <div class="space-y-2 text-xs text-blue-100">
+                <div class="flex items-center gap-2">
+                  <span class="text-green-400">✓</span>
+                  <span>Google Workspace自動連携</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-green-400">✓</span>
+                  <span>AI機能での効率化</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-green-400">✓</span>
+                  <span>完全非公開データベース</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-green-400">✓</span>
+                  <span>リアルタイム更新</span>
+                </div>
+              </div>
+              <div class="mt-3 text-xs text-blue-200 bg-blue-800/30 rounded p-2">
+                💡 詳細ガイドでセキュリティ仕様をご確認ください
+              </div>
+            </div>
+            
+            
+          </div>
+        </div>
   </main>
   
   <!-- 統合フッター -->
@@ -2037,16 +2019,6 @@ function setupEventListeners() {
         teacherGuideConfirmBtn.addEventListener('click', hideTeacherGuideModal);
       }
       
-      // Digital citizenship guide button
-      var showDigitalCitizenshipBtn = document.getElementById('show-digital-citizenship-guide');
-      if (showDigitalCitizenshipBtn) {
-        showDigitalCitizenshipBtn.addEventListener('click', function() {
-          var modal = document.getElementById('digital-citizenship-modal');
-          if (modal) {
-            modal.classList.remove('hidden');
-          }
-        });
-      }
       
       // Usage guide button
       var showUsageGuideBtn = document.getElementById('show-usage-guide');

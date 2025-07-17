@@ -1,0 +1,517 @@
+<script>
+  // Admin Panel JavaScript
+  
+  // Global variables
+  let currentStep = 1;
+  let selectedSheetId = null;
+  let selectedFormId = null;
+  let availableSheets = [];
+  let availableForms = [];
+  let currentConfig = null;
+  
+  // Initialize admin panel
+  function initializeAdminPanel() {
+    loadUserInfo();
+    loadSystemStatus();
+    setupEventListeners();
+    setupRealtimeUpdates();
+    validateCurrentStep();
+  }
+  
+  // Load user information
+  function loadUserInfo() {
+    if (typeof runGasWithUserId === 'function') {
+      runGasWithUserId('getUserInfo')
+        .then(userInfo => {
+          if (userInfo) {
+            document.getElementById('info-admin-email').textContent = userInfo.email || '-';
+            document.getElementById('info-user-id').textContent = userInfo.userId || '-';
+          }
+        })
+        .catch(error => {
+          console.error('Failed to load user info:', error);
+        });
+    }
+  }
+  
+  // Load system status
+  function loadSystemStatus() {
+    if (typeof runGasWithUserId === 'function') {
+      runGasWithUserId('getSystemStatus')
+        .then(status => {
+          updateSystemStatusDisplay(status);
+        })
+        .catch(error => {
+          console.error('Failed to load system status:', error);
+        });
+    }
+  }
+  
+  // Update system status display
+  function updateSystemStatusDisplay(status) {
+    if (!status) return;
+    
+    // Update publish status
+    const publishIndicator = document.getElementById('info-publish-indicator');
+    const publishText = document.getElementById('info-publish-text');
+    
+    if (status.isPublished) {
+      publishIndicator.className = 'w-2 h-2 rounded-full bg-green-400';
+      publishText.textContent = '公開中';
+    } else {
+      publishIndicator.className = 'w-2 h-2 rounded-full bg-gray-400';
+      publishText.textContent = '非公開';
+    }
+    
+    // Update other status fields
+    document.getElementById('info-published-sheet').textContent = status.sheetName || '-';
+    document.getElementById('info-display-mode').textContent = status.displayMode || '-';
+    document.getElementById('info-show-counts').textContent = status.showCounts ? '表示' : '非表示';
+    document.getElementById('info-answer-count').textContent = status.answerCount || '0';
+    document.getElementById('info-reaction-count').textContent = status.reactionCount || '0';
+    
+    // Enable resource buttons if URLs are available
+    const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
+    const formBtn = document.getElementById('open-form-btn');
+    
+    if (status.spreadsheetUrl) {
+      spreadsheetBtn.disabled = false;
+      spreadsheetBtn.onclick = () => window.open(status.spreadsheetUrl, '_blank');
+    }
+    
+    if (status.formUrl) {
+      formBtn.disabled = false;
+      formBtn.onclick = () => window.open(status.formUrl, '_blank');
+    }
+  }
+  
+  // Setup event listeners
+  function setupEventListeners() {
+    // Step navigation
+    document.querySelectorAll('.step-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const targetStep = parseInt(this.dataset.step);
+        navigateToStep(targetStep);
+      });
+    });
+    
+    // Form submissions
+    const savePublishBtn = document.getElementById('save-publish-btn');
+    if (savePublishBtn) {
+      savePublishBtn.addEventListener('click', handleSaveAndPublish);
+    }
+    
+    const unpublishBtn = document.getElementById('unpublish-board-btn');
+    if (unpublishBtn) {
+      unpublishBtn.addEventListener('click', handleUnpublish);
+    }
+    
+    // Sheet and form selection
+    const sheetSelect = document.getElementById('sheet-select');
+    if (sheetSelect) {
+      sheetSelect.addEventListener('change', handleSheetSelection);
+    }
+    
+    const formSelect = document.getElementById('form-select');
+    if (formSelect) {
+      formSelect.addEventListener('change', handleFormSelection);
+    }
+    
+    // Column mapping
+    document.addEventListener('change', function(e) {
+      if (e.target.classList.contains('column-mapping-select')) {
+        handleColumnMapping(e.target);
+      }
+    });
+    
+    // Toggle switches
+    document.querySelectorAll('.toggle-switch input').forEach(toggle => {
+      toggle.addEventListener('change', handleToggleChange);
+    });
+    
+    // Account management
+    const deleteAccountBtn = document.getElementById('delete-account-btn');
+    if (deleteAccountBtn) {
+      deleteAccountBtn.addEventListener('click', handleAccountDeletion);
+    }
+  }
+  
+  // Setup real-time updates
+  function setupRealtimeUpdates() {
+    // Update system status every 30 seconds
+    setInterval(loadSystemStatus, 30000);
+    
+    // Update answer count every 10 seconds when published
+    setInterval(() => {
+      const publishText = document.getElementById('info-publish-text');
+      if (publishText && publishText.textContent === '公開中') {
+        updateAnswerCount();
+      }
+    }, 10000);
+  }
+  
+  // Navigate to specific step
+  function navigateToStep(step) {
+    currentStep = step;
+    
+    // Update step indicators
+    document.querySelectorAll('.step-indicator').forEach((indicator, index) => {
+      const stepNumber = index + 1;
+      indicator.classList.toggle('completed', stepNumber < step);
+      indicator.classList.toggle('active', stepNumber === step);
+    });
+    
+    // Show/hide step content
+    document.querySelectorAll('.step-content').forEach((content, index) => {
+      const stepNumber = index + 1;
+      content.classList.toggle('hidden', stepNumber !== step);
+    });
+    
+    // Update progress bar
+    const progressBar = document.querySelector('.progress-bar');
+    if (progressBar) {
+      progressBar.style.width = `${(step / 3) * 100}%`;
+    }
+    
+    validateCurrentStep();
+  }
+  
+  // Validate current step
+  function validateCurrentStep() {
+    const savePublishBtn = document.getElementById('save-publish-btn');
+    if (!savePublishBtn) return;
+    
+    let isValid = false;
+    
+    switch (currentStep) {
+      case 1:
+        isValid = selectedSheetId || selectedFormId;
+        break;
+      case 2:
+        isValid = currentConfig && validateConfiguration();
+        break;
+      case 3:
+        isValid = true;
+        break;
+    }
+    
+    savePublishBtn.disabled = !isValid;
+  }
+  
+  // Handle sheet selection
+  function handleSheetSelection(event) {
+    selectedSheetId = event.target.value;
+    selectedFormId = null; // Clear form selection
+    
+    if (selectedSheetId) {
+      loadSheetColumns(selectedSheetId);
+    }
+    
+    validateCurrentStep();
+  }
+  
+  // Handle form selection
+  function handleFormSelection(event) {
+    selectedFormId = event.target.value;
+    selectedSheetId = null; // Clear sheet selection
+    
+    if (selectedFormId) {
+      loadFormColumns(selectedFormId);
+    }
+    
+    validateCurrentStep();
+  }
+  
+  // Load sheet columns
+  function loadSheetColumns(sheetId) {
+    if (typeof runGasWithUserId === 'function') {
+      runGasWithUserId('getSheetColumns', sheetId)
+        .then(columns => {
+          displayColumnMapping(columns);
+        })
+        .catch(error => {
+          console.error('Failed to load sheet columns:', error);
+          showMessage('列の読み込みに失敗しました', 'error');
+        });
+    }
+  }
+  
+  // Load form columns
+  function loadFormColumns(formId) {
+    if (typeof runGasWithUserId === 'function') {
+      runGasWithUserId('getFormColumns', formId)
+        .then(columns => {
+          displayColumnMapping(columns);
+        })
+        .catch(error => {
+          console.error('Failed to load form columns:', error);
+          showMessage('フォーム項目の読み込みに失敗しました', 'error');
+        });
+    }
+  }
+  
+  // Display column mapping interface
+  function displayColumnMapping(columns) {
+    const configPlaceholder = document.getElementById('config-placeholder');
+    const configContent = document.getElementById('config-content');
+    
+    if (configPlaceholder) configPlaceholder.classList.add('hidden');
+    if (configContent) configContent.classList.remove('hidden');
+    
+    const mappingContainer = document.getElementById('column-mappings');
+    if (!mappingContainer) return;
+    
+    mappingContainer.innerHTML = '';
+    
+    columns.forEach((column, index) => {
+      const mappingDiv = document.createElement('div');
+      mappingDiv.className = 'column-mapping';
+      mappingDiv.innerHTML = `
+        <div>
+          <label class="block text-sm font-medium text-gray-200 mb-2">
+            ${column.name}
+            ${column.required ? '<span class="text-red-400">*</span>' : ''}
+          </label>
+          <p class="text-xs text-gray-400">${column.description || ''}</p>
+        </div>
+        <div>
+          <select class="form-control form-select column-mapping-select" data-column="${column.id}">
+            <option value="">選択してください</option>
+            <option value="content">回答内容</option>
+            <option value="author">回答者名</option>
+            <option value="timestamp">回答時刻</option>
+            <option value="reaction">リアクション</option>
+            <option value="ignore">無視</option>
+          </select>
+        </div>
+      `;
+      mappingContainer.appendChild(mappingDiv);
+    });
+  }
+  
+  // Handle column mapping
+  function handleColumnMapping(select) {
+    const columnId = select.dataset.column;
+    const mappingType = select.value;
+    const mappingDiv = select.closest('.column-mapping');
+    
+    // Update visual feedback
+    mappingDiv.classList.remove('required', 'mapped');
+    if (mappingType && mappingType !== 'ignore') {
+      mappingDiv.classList.add('mapped');
+    }
+    
+    // Update configuration
+    if (!currentConfig) currentConfig = {};
+    if (!currentConfig.columnMappings) currentConfig.columnMappings = {};
+    currentConfig.columnMappings[columnId] = mappingType;
+    
+    validateCurrentStep();
+  }
+  
+  // Handle toggle changes
+  function handleToggleChange(event) {
+    const toggleName = event.target.name;
+    const isChecked = event.target.checked;
+    
+    if (!currentConfig) currentConfig = {};
+    currentConfig[toggleName] = isChecked;
+    
+    validateCurrentStep();
+  }
+  
+  // Validate configuration
+  function validateConfiguration() {
+    if (!currentConfig || !currentConfig.columnMappings) return false;
+    
+    const mappings = currentConfig.columnMappings;
+    const hasContent = Object.values(mappings).includes('content');
+    const hasAuthor = Object.values(mappings).includes('author');
+    
+    return hasContent && hasAuthor;
+  }
+  
+  // Handle save and publish
+  function handleSaveAndPublish() {
+    const btn = document.getElementById('save-publish-btn');
+    if (!btn || btn.disabled) return;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner mr-2"></div>保存中...';
+    
+    const config = {
+      sheetId: selectedSheetId,
+      formId: selectedFormId,
+      columnMappings: currentConfig.columnMappings,
+      displaySettings: {
+        showCounts: currentConfig.showCounts || false,
+        allowReactions: currentConfig.allowReactions || true,
+        anonymousMode: currentConfig.anonymousMode || false
+      }
+    };
+    
+    if (typeof runGasWithUserId === 'function') {
+      runGasWithUserId('saveAndPublishBoard', config)
+        .then(result => {
+          if (result.success) {
+            showMessage('設定が保存され、ボードが公開されました', 'success');
+            loadSystemStatus();
+            navigateToStep(3);
+          } else {
+            showMessage(result.message || '保存に失敗しました', 'error');
+          }
+        })
+        .catch(error => {
+          console.error('Save failed:', error);
+          showMessage('保存に失敗しました', 'error');
+        })
+        .finally(() => {
+          btn.disabled = false;
+          btn.innerHTML = '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>設定を保存して公開';
+        });
+    }
+  }
+  
+  // Handle unpublish
+  function handleUnpublish() {
+    if (!confirm('ボードの公開を停止しますか？')) return;
+    
+    const btn = document.getElementById('unpublish-board-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner mr-2"></div>停止中...';
+    
+    if (typeof runGasWithUserId === 'function') {
+      runGasWithUserId('unpublishBoard')
+        .then(result => {
+          if (result.success) {
+            showMessage('ボードの公開を停止しました', 'success');
+            loadSystemStatus();
+          } else {
+            showMessage(result.message || '停止に失敗しました', 'error');
+          }
+        })
+        .catch(error => {
+          console.error('Unpublish failed:', error);
+          showMessage('停止に失敗しました', 'error');
+        })
+        .finally(() => {
+          btn.disabled = false;
+          btn.innerHTML = '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636"></path></svg>公開を停止';
+        });
+    }
+  }
+  
+  // Handle account deletion
+  function handleAccountDeletion() {
+    const confirmText = 'DELETE';
+    const userInput = prompt(`アカウントを完全に削除します。この操作は取り消せません。\n\n続行するには「${confirmText}」と入力してください:`);
+    
+    if (userInput !== confirmText) {
+      showMessage('削除がキャンセルされました', 'info');
+      return;
+    }
+    
+    const btn = document.getElementById('delete-account-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner mr-2"></div>削除中...';
+    
+    if (typeof runGasWithUserId === 'function') {
+      runGasWithUserId('deleteAccount')
+        .then(result => {
+          if (result.success) {
+            showMessage('アカウントが削除されました', 'success');
+            setTimeout(() => {
+              window.location.href = '/login';
+            }, 2000);
+          } else {
+            showMessage(result.message || '削除に失敗しました', 'error');
+          }
+        })
+        .catch(error => {
+          console.error('Account deletion failed:', error);
+          showMessage('削除に失敗しました', 'error');
+        })
+        .finally(() => {
+          btn.disabled = false;
+          btn.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>自分のアカウントを完全に削除する';
+        });
+    }
+  }
+  
+  // Update answer count
+  function updateAnswerCount() {
+    if (typeof runGasWithUserId === 'function') {
+      runGasWithUserId('getAnswerCount')
+        .then(count => {
+          document.getElementById('info-answer-count').textContent = count || '0';
+        })
+        .catch(error => {
+          console.error('Failed to update answer count:', error);
+        });
+    }
+  }
+  
+  // Show message
+  function showMessage(message, type = 'info') {
+    // Create message element
+    const messageEl = document.createElement('div');
+    messageEl.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transition-all duration-300 ${getMessageClasses(type)}`;
+    messageEl.textContent = message;
+    
+    // Add to page
+    document.body.appendChild(messageEl);
+    
+    // Animate in
+    setTimeout(() => {
+      messageEl.classList.add('translate-y-0', 'opacity-100');
+    }, 100);
+    
+    // Remove after delay
+    setTimeout(() => {
+      messageEl.classList.add('translate-y-2', 'opacity-0');
+      setTimeout(() => {
+        document.body.removeChild(messageEl);
+      }, 300);
+    }, 3000);
+  }
+  
+  // Get message classes based on type
+  function getMessageClasses(type) {
+    const baseClasses = 'transform translate-y-2 opacity-0';
+    switch (type) {
+      case 'success':
+        return `${baseClasses} bg-green-600 text-white`;
+      case 'error':
+        return `${baseClasses} bg-red-600 text-white`;
+      case 'warning':
+        return `${baseClasses} bg-yellow-600 text-white`;
+      default:
+        return `${baseClasses} bg-blue-600 text-white`;
+    }
+  }
+  
+  // Switch to another account
+  function switchToAnotherAccount() {
+    if (confirm('別のアカウントに切り替えますか？')) {
+      window.location.href = '/login?switch_account=true';
+    }
+  }
+  
+  // Open app setup page
+  function openAppSetupPage() {
+    window.open('/app-setup', '_blank');
+  }
+  
+  // Initialize when DOM is ready
+  document.addEventListener('DOMContentLoaded', initializeAdminPanel);
+  
+  // Export functions for global access
+  window.adminPanel = {
+    navigateToStep,
+    showMessage,
+    switchToAnotherAccount,
+    openAppSetupPage,
+    loadSystemStatus,
+    updateAnswerCount
+  };
+</script>
