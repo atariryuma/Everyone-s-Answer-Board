@@ -1,50 +1,19 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
     <base target="_top">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StudyQuest - アプリ設定</title>
-    <meta name="theme-color" content="#1a1b26" />
-    <meta name="description" content="StudyQuestのアプリケーション設定管理パネル" />
-    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
-    
-    <!-- TailwindCSS CDN -->
-    <script>
-      window.tailwind = {
-        config: {
-          corePlugins: { preflight: false },
-          prefix: '',
-        }
-      };
-    </script>
-    <script src="https://cdn.tailwindcss.com" defer onerror="console.warn('TailwindCSS failed to load')"></script>
-    
-    <!-- Unified Styles and Shared Components -->
+    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), ambient-light-sensor=(), speaker-selection=(), vibrate=(), vr=()" />
+    <script src="https://cdn.tailwindcss.com"></script>
     <?!= include('UnifiedStyles'); ?>
     <?!= include('SharedUtilities'); ?>
-    <?!= include('SharedJavaScript'); ?>
-    <?!= include('ClientOptimizer'); ?>
-    <?!= include('UnifiedCache.js'); ?>
-    <?!= include('AppSetupLogic'); ?>
-    
     <script>
       const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
-      
-      // GAS optimizer initialization
-      if (typeof GASOptimizer !== 'undefined') {
-        var gasOptimizer = new GASOptimizer();
-        var unifiedCache = (typeof UnifiedCache !== 'undefined') 
-          ? new UnifiedCache() 
-          : { getOrSet: function(_, fn) { return fn(); } };
-          
-        function runGas(functionName, ...args) {
-          return gasOptimizer.call(functionName, ...args);
-        }
-      }
     </script>
 </head>
-<body class="unified-theme bg-[#1a1b26] text-gray-200 font-sans min-h-screen">
+<body>
     <div class="max-w-4xl mx-auto p-6">
         <!-- ヘッダー -->
         <div class="text-center mb-8">
@@ -53,8 +22,8 @@
             <p class="text-sm text-gray-400 mt-2">このページでアプリの有効/無効を切り替えることができます</p>
         </div>
 
-        <!-- インラインメッセージエリア -->
-        <div id="inline-message-area" class="mb-6"></div>
+        <!-- メッセージエリア -->
+        <div id="message-area" class="mb-6"></div>
 
         <!-- 現在のステータス表示 -->
         <div class="glass-panel rounded-xl p-6 mb-6">
@@ -297,65 +266,393 @@
         </div>
     </div>
 
-    <!-- Message area for notifications -->
-    <div id="message-area" class="fixed top-4 right-4 z-50" aria-live="polite" role="status"></div>
-    
     <script>
-        /* =============================================================================
-           AppSetupPage.html - Minimal JavaScript 
-           Main logic moved to AppSetupLogic.html and SharedJavaScript.html
-           ============================================================================= */
-        
-        // Backward compatibility functions using shared utilities
-        var showMessage = window.appSetupUtilities?.legacy?.showMessage || 
-                         window.sharedUtilities?.message?.show || 
-                         function(msg, type) { console.log(`[${type}] ${msg}`); };
-        
-        var toggleUserManagement = window.appSetupUtilities?.users?.toggle || function() {
-            showMessage('機能を読み込み中です...', 'info');
-        };
-        
-        var loadUserList = window.appSetupUtilities?.users?.load || function() {
-            showMessage('ユーザーリストを読み込み中です...', 'info');
-        };
-        
-        var showDeleteConfirmation = window.appSetupUtilities?.users?.showDelete || function(userId, email) {
-            showMessage('削除機能を読み込み中です...', 'info');
-        };
-        
-        var cancelDeletion = window.appSetupUtilities?.users?.cancelDelete || function() {
-            document.getElementById('delete-modal')?.classList?.add('hidden');
-        };
-        
-        var confirmDeletion = window.appSetupUtilities?.users?.confirmDelete || function() {
-            showMessage('削除処理を実行中です...', 'info');
-        };
-        
-        var viewDeletionLogs = window.appSetupUtilities?.logs?.view || function() {
-            showMessage('ログを読み込み中です...', 'info');
-        };
-        
-        var closeDeletionLogs = window.appSetupUtilities?.logs?.close || function() {
-            document.getElementById('logs-modal')?.classList?.add('hidden');
-        };
-        
-        var goBackToAdminPanel = window.appSetupUtilities?.navigation?.goBackToAdminPanel || function() {
-            window.location.href = window.location.href.split('?')[0];
-        };
-        
-        // Initialize on DOM ready
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('🔧 AppSetupPage: Using unified utilities and logic files');
+        let currentUserInfo = null;
+        let setupInProgress = false;
+
+        // メッセージ表示関数
+        function showMessage(message, type = 'info') {
+            const messageArea = document.getElementById('message-area');
+            const colors = {
+                success: 'bg-green-600/20 border-green-500/50 text-green-100',
+                error: 'bg-red-600/20 border-red-500/50 text-red-100',
+                warning: 'bg-yellow-600/20 border-yellow-500/50 text-yellow-100',
+                info: 'bg-blue-600/20 border-blue-500/50 text-blue-100'
+            };
             
-            // Initialize app setup utilities if available
-            if (window.appSetupUtilities) {
-                console.log('✅ AppSetupPage: App setup utilities loaded');
-            }
+            messageArea.innerHTML = `
+                <div class="message show glass-panel rounded-lg p-4 border ${colors[type]}">
+                    <div class="flex items-center">
+                        <div class="mr-3">
+                            ${type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'}
+                        </div>
+                        <div class="flex-1">${message}</div>
+                        <button onclick="this.closest('.message').style.display='none'" class="ml-4 text-gray-400 hover:text-white">✕</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 現在のステータスを取得して表示
+        function loadCurrentStatus() {
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.status === 'success') {
+                        currentUserInfo = result.userInfo;
+                        updateStatusDisplay(result.userInfo);
+                        enableControls();
+                    } else {
+                        showMessage(`ステータス取得に失敗しました: ${result.message}`, 'error');
+                    }
+                })
+                .withFailureHandler((error) => {
+                    showMessage(`ステータス取得エラー: ${error.message || error}`, 'error');
+                })
+                .getCurrentUserStatus(__USER_ID__);
+        }
+
+        // ステータス表示を更新
+        function updateStatusDisplay(userInfo) {
+            const isActive = userInfo.isActive === true || String(userInfo.isActive).toLowerCase() === 'true';
+            const statusElement = document.getElementById('current-status');
+            const adminElement = document.getElementById('current-admin');
+            const lastUpdatedElement = document.getElementById('last-updated');
+            const toggleElement = document.getElementById('isActiveToggle');
+
+            // 現在の状態を表示
+            statusElement.innerHTML = isActive 
+                ? '<span class="bg-green-600 text-green-100 px-3 py-1 rounded-full">🟢 アクティブ</span>'
+                : '<span class="bg-red-600 text-red-100 px-3 py-1 rounded-full">🔴 非アクティブ</span>';
+
+            adminElement.textContent = userInfo.adminEmail || '不明';
+            lastUpdatedElement.textContent = userInfo.lastAccessedAt 
+                ? new Date(userInfo.lastAccessedAt).toLocaleString('ja-JP')
+                : '不明';
+
+            // トグルの状態を設定
+            toggleElement.checked = isActive;
+        }
+
+        // コントロールを有効化
+        function enableControls() {
+            const toggleElement = document.getElementById('isActiveToggle');
+            const updateBtn = document.getElementById('updateStatusBtn');
             
-            if (window.sharedUtilities) {
-                console.log('✅ AppSetupPage: Shared utilities loaded');
+            toggleElement.disabled = false;
+            updateBtn.disabled = false;
+
+            // トグル変更時のイベント
+            toggleElement.addEventListener('change', function() {
+                const newStatus = this.checked;
+                const confirmMessage = newStatus 
+                    ? 'アプリを有効化しますか？ユーザーがアクセスできるようになります。'
+                    : 'アプリを無効化しますか？ユーザーのアクセスが制限されます。';
+                
+                if (confirm(confirmMessage)) {
+                    updateIsActiveStatus(newStatus);
+                } else {
+                    // キャンセル時は元に戻す
+                    this.checked = !newStatus;
+                }
+            });
+        }
+
+        // isActive状態を更新
+        function updateIsActiveStatus(isActive) {
+            if (setupInProgress) return;
+            setupInProgress = true;
+
+            const updateBtn = document.getElementById('updateStatusBtn');
+            const updateText = document.getElementById('update-text');
+            const updateSpinner = document.getElementById('update-spinner');
+            
+            try {
+                // ボタン状態を変更
+                updateBtn.disabled = true;
+                updateText.style.display = 'none';
+                updateSpinner.classList.remove('hidden');
+                
+                showMessage(isActive ? 'アプリを有効化中...' : 'アプリを無効化中...', 'info');
+                
+                google.script.run
+                    .withSuccessHandler((result) => {
+                        if (result.status === 'success') {
+                            showMessage(`✅ ${result.message}`, 'success');
+                            // ステータスを再読み込み
+                            loadCurrentStatus();
+                        } else {
+                            showMessage(`❌ ${result.message}`, 'error');
+                        }
+                    })
+                    .withFailureHandler((error) => {
+                        console.error('Update error:', error);
+                        showMessage(`❌ 更新に失敗しました: ${error.message || error}`, 'error');
+                    })
+                    .updateIsActiveStatus(__USER_ID__, isActive);
+                    
+            } catch (error) {
+                showMessage(`❌ ${error.message}`, 'error');
+            } finally {
+                // ボタン状態をリセット
+                setTimeout(() => {
+                    updateBtn.disabled = false;
+                    updateText.style.display = 'inline';
+                    updateSpinner.classList.add('hidden');
+                    setupInProgress = false;
+                }, 1000);
             }
+        }
+
+        // 管理パネルに戻る
+        function goBackToAdminPanel() {
+            google.script.run
+                .withSuccessHandler((webAppUrl) => {
+                    const targetUrl = webAppUrl + '?mode=admin&userId=' + __USER_ID__;
+                    try {
+                        // iframeの場合は親ウィンドウに移動
+                        if (window.parent !== window) {
+                            window.parent.location.href = targetUrl;
+                        } else {
+                            window.location.href = targetUrl;
+                        }
+                    } catch (e) {
+                        // フォールバック: 新しいタブで開く
+                        window.open(targetUrl, '_blank');
+                    }
+                })
+                .withFailureHandler((error) => {
+                    console.error('WebApp URL取得エラー:', error);
+                    // フォールバック: 現在のURLを使用
+                    const currentUrl = window.location.href.split('?')[0];
+                    const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__;
+                    try {
+                        if (window.parent !== window) {
+                            window.parent.location.href = targetUrl;
+                        } else {
+                            window.location.href = targetUrl;
+                        }
+                    } catch (e) {
+                        window.open(targetUrl, '_blank');
+                    }
+                })
+                .getWebAppUrlCached();
+        }
+
+        // ページ読み込み時の処理
+        window.addEventListener('load', function() {
+            loadCurrentStatus();
         });
+
+        // ユーザー管理機能のJavaScript関数
+        let userManagementVisible = false;
+        let currentUserList = [];
+        let userToDelete = null;
+
+        // ユーザー管理の表示/非表示を切り替え
+        function toggleUserManagement() {
+            const container = document.getElementById('user-list-container');
+            const btn = document.getElementById('manage-users-btn');
+            
+            if (userManagementVisible) {
+                container.classList.add('hidden');
+                btn.textContent = '👥 ユーザー管理を開く';
+                userManagementVisible = false;
+            } else {
+                container.classList.remove('hidden');
+                btn.textContent = '👥 ユーザー管理を閉じる';
+                userManagementVisible = true;
+                loadUserList();
+            }
+        }
+
+        // ユーザー一覧を取得して表示
+        function loadUserList() {
+            const loadingDiv = document.getElementById('user-loading');
+            const contentDiv = document.getElementById('user-table-content');
+            
+            loadingDiv.classList.remove('hidden');
+            contentDiv.classList.add('hidden');
+            
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.status === 'success') {
+                        currentUserList = result.users;
+                        displayUserList(result.users);
+                    } else {
+                        showMessage(`ユーザー一覧の取得に失敗しました: ${result.message}`, 'error');
+                    }
+                    loadingDiv.classList.add('hidden');
+                })
+                .withFailureHandler((error) => {
+                    showMessage(`エラー: ${error.message || error}`, 'error');
+                    loadingDiv.classList.add('hidden');
+                })
+                .getAllUsersForAdminForUI(__USER_ID__);
+        }
+
+        // ユーザー一覧をテーブルに表示
+        function displayUserList(users) {
+            const tableBody = document.getElementById('user-table-body');
+            const contentDiv = document.getElementById('user-table-content');
+            
+            if (users.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-4 py-8 text-center text-gray-400">
+                            登録ユーザーが見つかりません
+                        </td>
+                    </tr>
+                `;
+            } else {
+                tableBody.innerHTML = users.map(user => {
+                    const isActive = user.isActive === true || String(user.isActive).toLowerCase() === 'true';
+                    const statusBadge = isActive 
+                        ? '<span class="px-2 py-1 bg-green-600 text-green-100 rounded-full text-xs">アクティブ</span>'
+                        : '<span class="px-2 py-1 bg-red-600 text-red-100 rounded-full text-xs">非アクティブ</span>';
+                    
+                    const lastAccess = user.lastAccessedAt 
+                        ? new Date(user.lastAccessedAt).toLocaleDateString('ja-JP')
+                        : '不明';
+                    
+                    const registrationDate = user.registrationDate 
+                        ? new Date(user.registrationDate).toLocaleDateString('ja-JP')
+                        : '不明';
+                    
+                    return `
+                        <tr class="hover:bg-gray-700/50">
+                            <td class="px-4 py-3 text-sm text-white">${user.adminEmail}</td>
+                            <td class="px-4 py-3 text-sm text-gray-300">${registrationDate}</td>
+                            <td class="px-4 py-3">${statusBadge}</td>
+                            <td class="px-4 py-3 text-sm text-gray-300">${lastAccess}</td>
+                            <td class="px-4 py-3 text-center">
+                                <button 
+                                    onclick="showDeleteConfirmation('${user.userId}', '${user.adminEmail}')"
+                                    class="btn bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs">
+                                    削除
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+            
+            contentDiv.classList.remove('hidden');
+        }
+
+        // 削除確認モーダルを表示
+        function showDeleteConfirmation(userId, userEmail) {
+            userToDelete = { userId, userEmail };
+            
+            document.getElementById('delete-user-email').textContent = userEmail;
+            document.getElementById('delete-user-id').textContent = `ID: ${userId}`;
+            document.getElementById('deletion-reason').value = '';
+            document.getElementById('delete-modal').classList.remove('hidden');
+        }
+
+        // 削除をキャンセル
+        function cancelDeletion() {
+            userToDelete = null;
+            document.getElementById('delete-modal').classList.add('hidden');
+        }
+
+        // 削除を実行
+        function confirmDeletion() {
+            if (!userToDelete) return;
+            
+            const reason = document.getElementById('deletion-reason').value.trim();
+            if (!reason) {
+                showMessage('削除理由を入力してください', 'warning');
+                return;
+            }
+            
+            const confirmBtn = document.getElementById('confirm-delete-btn');
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = '削除中...';
+            
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.status === 'success') {
+                        showMessage(`✅ ${result.message}`, 'success');
+                        cancelDeletion();
+                        loadUserList(); // ユーザー一覧を再読み込み
+                    } else {
+                        showMessage(`❌ ${result.message}`, 'error');
+                    }
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = '削除実行';
+                })
+                .withFailureHandler((error) => {
+                    showMessage(`❌ 削除に失敗しました: ${error.message || error}`, 'error');
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = '削除実行';
+                })
+                .deleteUserAccountByAdminForUI(__USER_ID__, userToDelete.userId, reason);
+        }
+
+        // 削除ログを表示
+        function viewDeletionLogs() {
+            const modal = document.getElementById('logs-modal');
+            const loadingDiv = document.getElementById('logs-loading');
+            const contentDiv = document.getElementById('logs-table-content');
+            
+            modal.classList.remove('hidden');
+            loadingDiv.classList.remove('hidden');
+            contentDiv.classList.add('hidden');
+            
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.status === 'success') {
+                        displayDeletionLogs(result.logs);
+                    } else {
+                        showMessage(`ログの取得に失敗しました: ${result.message}`, 'error');
+                    }
+                    loadingDiv.classList.add('hidden');
+                })
+                .withFailureHandler((error) => {
+                    showMessage(`エラー: ${error.message || error}`, 'error');
+                    loadingDiv.classList.add('hidden');
+                })
+                .getDeletionLogsForUI(__USER_ID__);
+        }
+
+        // 削除ログをテーブルに表示
+        function displayDeletionLogs(logs) {
+            const tableBody = document.getElementById('logs-table-body');
+            const contentDiv = document.getElementById('logs-table-content');
+            
+            if (logs.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-4 py-8 text-center text-gray-400">
+                            削除ログが見つかりません
+                        </td>
+                    </tr>
+                `;
+            } else {
+                tableBody.innerHTML = logs.map(log => {
+                    const deleteDate = new Date(log.timestamp).toLocaleString('ja-JP');
+                    const typeColor = log.deleteType === 'admin' ? 'text-red-400' : 'text-blue-400';
+                    const typeText = log.deleteType === 'admin' ? '管理者削除' : '自己削除';
+                    
+                    return `
+                        <tr class="hover:bg-gray-700/50">
+                            <td class="px-4 py-3 text-sm text-gray-300">${deleteDate}</td>
+                            <td class="px-4 py-3 text-sm text-white">${log.executorEmail}</td>
+                            <td class="px-4 py-3 text-sm text-cyan-400">${log.targetEmail}</td>
+                            <td class="px-4 py-3 text-sm text-gray-300">${log.reason || '理由なし'}</td>
+                            <td class="px-4 py-3 text-sm ${typeColor}">${typeText}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+            
+            contentDiv.classList.remove('hidden');
+        }
+
+        // 削除ログモーダルを閉じる
+        function closeDeletionLogs() {
+            document.getElementById('logs-modal').classList.add('hidden');
+        }
     </script>
 </body>
 </html>

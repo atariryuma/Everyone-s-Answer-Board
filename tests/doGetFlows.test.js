@@ -38,15 +38,7 @@ describe.skip('doGet flows', () => {
     expect(result).toBe('admin');
   });
 
-  test('renders board for direct view without user session', () => {
-    context.parseRequestParams.mockReturnValue({ userId: '1', mode: 'view', isDirectPageAccess: true });
-    context.validateUserSession.mockReturnValue({ userEmail: null, userInfo: null });
-    const result = context.doGet({});
-    expect(result).toBe('board');
-  });
-
   test('shows registration when userInfo missing', () => {
-    context.parseRequestParams.mockReturnValue({ mode: 'admin', isDirectPageAccess: false });
     context.validateUserSession.mockReturnValue({ userEmail: null, userInfo: null });
     const result = context.doGet({});
     expect(result).toBe('register');

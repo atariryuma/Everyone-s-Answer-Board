@@ -2,21 +2,19 @@
 <!-- GAS include用のモーダルコンポーネント集 -->
 
 <!-- 確認モーダル -->
-<div id="confirmation-modal" class="modal-overlay fixed inset-0 bg-black/80 z-[60] hidden" role="dialog" aria-modal="true">
-  <div class="flex items-center justify-center min-h-full p-4">
-    <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4">
-      <h3 id="modal-title" class="text-xl font-bold text-cyan-400 mb-4"></h3>
-      <p id="modal-message" class="text-gray-300 mb-6"></p>
-      <div class="flex justify-end gap-3">
-        <button type="button" id="modal-cancel-btn" class="btn btn-secondary">キャンセル</button>
-        <button type="button" id="modal-confirm-btn" class="btn btn-primary">はい、実行します</button>
-      </div>
+<div id="confirmation-modal" class="fixed inset-0 bg-black/80 z-[60] hidden items-center justify-center" role="dialog" aria-modal="true">
+  <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4">
+    <h3 id="modal-title" class="text-xl font-bold text-cyan-400 mb-4"></h3>
+    <p id="modal-message" class="text-gray-300 mb-6"></p>
+    <div class="flex justify-end gap-3">
+      <button type="button" id="modal-cancel-btn" class="btn btn-secondary">キャンセル</button>
+      <button type="button" id="modal-confirm-btn" class="btn btn-primary">はい、実行します</button>
     </div>
   </div>
 </div>
 
 <!-- 公開モーダル -->
-<div id="publish-modal" class="modal-overlay fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
+<div id="publish-modal" class="fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
   <div class="flex items-center justify-center min-h-full p-4">
     <div class="glass-panel rounded-xl p-6 max-w-md w-full">
       <h3 class="text-xl font-bold text-cyan-400 mb-4">
@@ -42,40 +40,8 @@
   </div>
 </div>
 
-<!-- 統合プライバシーモーダル（動的コンテンツ対応） -->
-<div id="enhanced-privacy-modal" class="modal-overlay fixed inset-0 bg-black/80 z-[60] hidden" role="dialog" aria-modal="true">
-  <div class="flex items-center justify-center min-h-full p-4">
-    <div class="glass-panel rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-3">
-          <svg class="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-          </svg>
-          <h3 id="enhanced-privacy-modal-title" class="text-2xl font-bold text-yellow-400">プライバシーとデータ保護</h3>
-        </div>
-        <button type="button" id="enhanced-privacy-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500" aria-label="閉じる">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-      
-      <div id="enhanced-privacy-modal-content" class="text-gray-300">
-        <!-- 動的コンテンツがここに挿入されます -->
-      </div>
-      
-      <div class="flex justify-end gap-3 mt-6">
-        <button type="button" id="enhanced-privacy-modal-cancel" class="btn btn-secondary">キャンセル</button>
-        <button type="button" id="enhanced-privacy-modal-continue" class="btn btn-primary">
-          <span id="enhanced-privacy-modal-action-text">理解しました、継続</span>
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- レガシー互換性のためのプライバシーモーダル -->
-<div id="privacy-modal" class="modal-overlay fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
+<!-- プライバシーモーダル -->
+<div id="privacy-modal" class="fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
   <div class="flex items-center justify-center min-h-full p-4">
     <div class="glass-panel rounded-xl p-6 max-w-lg w-full">
       <div class="flex items-center gap-3 mb-4">
@@ -104,40 +70,8 @@
   </div>
 </div>
 
-<!-- 統合デジタルシティズンシップモーダル（動的コンテンツ対応） -->
-<div id="enhanced-digital-citizenship-modal" class="modal-overlay fixed inset-0 bg-black/80 z-[60] hidden" role="dialog" aria-modal="true">
-  <div class="flex items-center justify-center min-h-full p-4">
-    <div class="glass-panel rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-3">
-          <svg class="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9m0 0l3-3m-3 3l-3-3"></path>
-          </svg>
-          <h3 id="enhanced-digital-citizenship-modal-title" class="text-2xl font-bold text-cyan-400">デジタル・シティズンシップ</h3>
-        </div>
-        <button type="button" id="enhanced-digital-citizenship-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-      
-      <div id="enhanced-digital-citizenship-modal-content" class="text-gray-300">
-        <!-- 動的コンテンツがここに挿入されます -->
-      </div>
-      
-      <div class="flex justify-end gap-3 mt-6">
-        <button type="button" id="enhanced-digital-citizenship-modal-cancel" class="btn btn-secondary">戻る</button>
-        <button type="button" id="enhanced-digital-citizenship-modal-accept" class="btn btn-primary">
-          <span id="enhanced-digital-citizenship-modal-action-text">理解しました</span>
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- レガシー互換性のためのデジタルシティズンシップモーダル -->
-<div id="digital-citizenship-modal" class="modal-overlay fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
+<!-- デジタルシティズンシップモーダル -->
+<div id="digital-citizenship-modal" class="fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
   <div class="flex items-center justify-center min-h-full p-4">
     <div class="glass-panel rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between mb-6">
@@ -189,7 +123,7 @@
 </div>
 
 <!-- 教師ガイドモーダル -->
-<div id="teacherGuideModal" class="modal-overlay fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
+<div id="teacherGuideModal" class="fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
   <div class="flex items-center justify-center min-h-full p-4">
     <div class="glass-panel rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between mb-6">
@@ -226,7 +160,7 @@
 </div>
 
 <!-- 汎用アラートモーダル -->
-<div id="alert-modal" class="modal-overlay fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
+<div id="alert-modal" class="fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
   <div class="flex items-center justify-center min-h-full p-4">
     <div class="glass-panel rounded-xl p-6 max-w-md w-full">
       <div class="flex items-center gap-3 mb-4">
@@ -244,7 +178,7 @@
 </div>
 
 <!-- ローディングモーダル -->
-<div id="loading-modal" class="modal-overlay fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
+<div id="loading-modal" class="fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
   <div class="flex items-center justify-center min-h-full p-4">
     <div class="glass-panel rounded-xl p-6 max-w-md w-full text-center">
       <div class="spinner mx-auto mb-4"></div>
@@ -255,7 +189,7 @@
 </div>
 
 <!-- 使い方ガイドモーダル -->
-<div id="usage-guide-modal" class="modal-overlay fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
+<div id="usage-guide-modal" class="fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
   <div class="flex items-center justify-center min-h-full p-4">
     <div class="glass-panel rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between mb-6">
@@ -391,7 +325,7 @@
 </div>
 
 <!-- セキュリティモーダル -->
-<div id="security-modal" class="modal-overlay fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
+<div id="security-modal" class="fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
   <div class="flex items-center justify-center min-h-full p-4">
     <div class="glass-panel rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between mb-6">
@@ -438,12 +372,10 @@
 </div>
 
 <script>
-// 共通モーダル管理クラス - GASベストプラクティス準拠
+// 共通モーダル管理クラス
 class SharedModals {
   constructor() {
-    this.cache = new Map();
     this.setupEventListeners();
-    this.loadingStates = new Map();
   }
 
   // 確認モーダルの表示
@@ -464,9 +396,7 @@ class SharedModals {
     messageEl.textContent = message;
     
     modal.classList.remove('hidden');
-    requestAnimationFrame(() => modal.classList.add('is-visible'));
-    requestAnimationFrame(() => modal.classList.add('is-visible'));
-    requestAnimationFrame(() => modal.classList.add('is-visible'));
+    modal.classList.add('flex');
 
     // イベントリスナーを一度削除してから追加
     confirmBtn.onclick = () => {
@@ -511,7 +441,6 @@ class SharedModals {
     iconEl.querySelector('path').setAttribute('d', config.icon);
     
     modal.classList.remove('hidden');
-    requestAnimationFrame(() => modal.classList.add('is-visible'));
     
     closeBtn.onclick = () => this.hideModal('alert-modal');
   }
@@ -525,18 +454,15 @@ class SharedModals {
     if (titleEl) titleEl.textContent = title;
     if (messageEl) messageEl.textContent = message;
     
-    if (modal) {
-      modal.classList.remove('hidden');
-      requestAnimationFrame(() => modal.classList.add('is-visible'));
-    }
+    if (modal) modal.classList.remove('hidden');
   }
 
   // モーダルの非表示
   hideModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
-      modal.classList.remove('is-visible');
-      modal.addEventListener('transitionend', () => modal.classList.add('hidden'), { once: true });
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
     }
   }
 
@@ -566,12 +492,29 @@ class SharedModals {
       }
     });
 
-    // クローズ/キャンセルボタンの委任イベント
-    document.addEventListener('click', e => {
-      const closeTrigger = e.target.closest('[id$="-close"], [id$="-cancel"]');
-      if (!closeTrigger) return;
-      const modal = closeTrigger.closest('[id$="-modal"]');
-      if (modal) this.hideModal(modal.id);
+    // クローズボタンの設定
+    const closeButtons = [
+      'digital-citizenship-modal-close',
+      'digital-citizenship-modal-close-btn',
+      'teacherGuideModal-close',
+      'teacherGuideModal-close-btn',
+      'usage-guide-modal-close',
+      'usage-guide-modal-close-btn'
+    ];
+    
+    closeButtons.forEach(buttonId => {
+      const button = document.getElementById(buttonId);
+      if (button) {
+        button.onclick = () => {
+          if (buttonId.includes('digital-citizenship')) {
+            this.hideModal('digital-citizenship-modal');
+          } else if (buttonId.includes('teacherGuide')) {
+            this.hideModal('teacherGuideModal');
+          } else if (buttonId.includes('usage-guide')) {
+            this.hideModal('usage-guide-modal');
+          }
+        };
+      }
     });
   }
 
@@ -611,129 +554,6 @@ class SharedModals {
     }
     
     modal.classList.remove('hidden');
-    requestAnimationFrame(() => modal.classList.add('is-visible'));
-  }
-
-  // 統合プライバシーモーダルの表示（年齢別コンテンツ対応）
-  async showEnhancedPrivacyModal(ageGroup = 'elementary-upper', onContinue) {
-    try {
-      this.showLoading('プライバシー情報を読み込み中');
-      
-      // キャッシュからコンテンツを取得または GAS から取得
-      const cacheKey = `privacy-${ageGroup}`;
-      let content = this.cache.get(cacheKey);
-      
-      if (!content) {
-        // GAS ModalManager からコンテンツを取得
-        content = await new Promise((resolve, reject) => {
-          google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
-            .getModalContent('privacy-policy', ageGroup);
-        });
-        
-        // キャッシュに保存（5分間）
-        this.cache.set(cacheKey, content);
-        setTimeout(() => this.cache.delete(cacheKey), 300000);
-      }
-      
-      this.hideModal('loading-modal');
-      
-      // コンテンツを挿入してモーダルを表示
-      this.displayEnhancedModal('enhanced-privacy-modal', content, onContinue);
-      
-    } catch (error) {
-      this.hideModal('loading-modal');
-      console.error('プライバシーモーダル表示エラー:', error);
-      // フォールバック: レガシーモーダルを表示
-      this.showPrivacy(onContinue);
-    }
-  }
-
-  // 統合デジタルシティズンシップモーダルの表示（年齢別コンテンツ対応）
-  async showEnhancedDigitalCitizenshipModal(ageGroup = 'elementary-upper', onAccept) {
-    try {
-      this.showLoading('デジタル・シティズンシップ情報を読み込み中');
-      
-      const cacheKey = `digital-citizenship-${ageGroup}`;
-      let content = this.cache.get(cacheKey);
-      
-      if (!content) {
-        content = await new Promise((resolve, reject) => {
-          google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
-            .getModalContent('digital-citizenship', ageGroup);
-        });
-        
-        this.cache.set(cacheKey, content);
-        setTimeout(() => this.cache.delete(cacheKey), 300000);
-      }
-      
-      this.hideModal('loading-modal');
-      this.displayEnhancedModal('enhanced-digital-citizenship-modal', content, onAccept);
-      
-    } catch (error) {
-      this.hideModal('loading-modal');
-      console.error('デジタル・シティズンシップモーダル表示エラー:', error);
-      this.showDigitalCitizenship();
-    }
-  }
-
-  // 統合モーダル表示の共通処理
-  displayEnhancedModal(modalId, content, onAction) {
-    const modal = document.getElementById(modalId);
-    if (!modal) {
-      console.error(`モーダル ${modalId} が見つかりません`);
-      return;
-    }
-
-    // タイトルとコンテンツを設定
-    const titleEl = modal.querySelector(`#${modalId}-title`);
-    const contentEl = modal.querySelector(`#${modalId}-content`);
-    const actionTextEl = modal.querySelector(`#${modalId}-action-text`);
-    const continueBtn = modal.querySelector(`#${modalId.replace('enhanced-', '').replace('-modal', '')}-modal-continue, #${modalId}-continue, #${modalId}-accept`);
-    const cancelBtn = modal.querySelector(`#${modalId.replace('enhanced-', '').replace('-modal', '')}-modal-cancel, #${modalId}-cancel`);
-
-    if (titleEl && content.title) titleEl.textContent = content.title;
-    if (contentEl && content.content) contentEl.innerHTML = content.content;
-    if (actionTextEl && content.actionText) actionTextEl.textContent = content.actionText;
-
-    // モーダルを表示
-    modal.classList.remove('hidden');
-    requestAnimationFrame(() => modal.classList.add('is-visible'));
-
-    // イベントリスナーを設定
-    if (continueBtn) {
-      continueBtn.onclick = () => {
-        this.hideModal(modalId);
-        if (onAction) onAction();
-      };
-    }
-
-    if (cancelBtn) {
-      cancelBtn.onclick = () => this.hideModal(modalId);
-    }
-
-    // 閉じるボタンも設定
-    const closeBtn = modal.querySelector(`#${modalId}-close`);
-    if (closeBtn) {
-      closeBtn.onclick = () => this.hideModal(modalId);
-    }
-  }
-
-  // 年齢グループの自動判定
-  detectAgeGroup() {
-    // URLパラメータまたはメタタグから年齢グループを取得
-    const urlParams = new URLSearchParams(window.location.search);
-    const ageFromUrl = urlParams.get('ageGroup');
-    if (ageFromUrl) return ageFromUrl;
-
-    const metaAge = document.querySelector('meta[name="age-group"]');
-    if (metaAge) return metaAge.content;
-
-    // デフォルトは小学校高学年
-    return 'elementary-upper';
   }
 }
 
@@ -747,30 +567,5 @@ window.showPrivacyModal = function(onContinue) {
 
 window.showDigitalCitizenshipModal = function() {
   window.sharedModals.showDigitalCitizenship();
-};
-
-// 新しい統合モーダル用グローバル関数
-window.showEnhancedPrivacyModal = function(ageGroup, onContinue) {
-  ageGroup = ageGroup || window.sharedModals.detectAgeGroup();
-  return window.sharedModals.showEnhancedPrivacyModal(ageGroup, onContinue);
-};
-
-window.showEnhancedDigitalCitizenshipModal = function(ageGroup, onAccept) {
-  ageGroup = ageGroup || window.sharedModals.detectAgeGroup();
-  return window.sharedModals.showEnhancedDigitalCitizenshipModal(ageGroup, onAccept);
-};
-
-// 年齢別自動判定版（推奨）
-window.showAgeAppropriateModals = function(onComplete) {
-  const ageGroup = window.sharedModals.detectAgeGroup();
-  console.log('Detected age group:', ageGroup);
-  
-  // プライバシーモーダルを先に表示
-  window.showEnhancedPrivacyModal(ageGroup, () => {
-    // プライバシー承諾後にデジタル・シティズンシップモーダルを表示
-    window.showEnhancedDigitalCitizenshipModal(ageGroup, () => {
-      if (onComplete) onComplete();
-    });
-  });
 };
 </script>

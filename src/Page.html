@@ -8,7 +8,7 @@
 <!-- Content Security Policy for enhanced security -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://fonts.googleapis.com https://script.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https:; img-src 'self' data: https:;">
 <!-- Permissions Policy to silence console warnings -->
-<meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
+<meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), ambient-light-sensor=(), speaker-selection=(), vibrate=(), vr=()">
 <!-- Preload Google Fonts for better performance -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -116,7 +116,6 @@ const __SHOW_HIGHLIGHT_TOGGLE__ = '<?= typeof showHighlightToggle !== "undefined
 const __SHOW_SCORE_SORT__ = '<?= typeof showScoreSort !== "undefined" ? showScoreSort : false ?>';
 const __IS_STUDENT_MODE__ = '<?= typeof isStudentMode !== "undefined" ? isStudentMode : true ?>';
 const __IS_ADMIN_USER__ = '<?= typeof isAdminUser !== "undefined" ? isAdminUser : false ?>';
-const __FORM_URL__ = '<?= typeof formUrl !== "undefined" ? formUrl : "" ?>';
 window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : __SHOW_COUNTS__ === 'true';
 window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
 // Store server-provided admin capability but always start in view mode
@@ -126,7 +125,6 @@ window.showHighlightToggle = __SHOW_HIGHLIGHT_TOGGLE__.startsWith('<') ? false :
 window.showScoreSort = __SHOW_SCORE_SORT__.startsWith('<') ? false : __SHOW_SCORE_SORT__ === 'true';
 window.isStudentMode = __IS_STUDENT_MODE__.startsWith('<') ? true : __IS_STUDENT_MODE__ === 'true';
 window.isAdminUser = __IS_ADMIN_USER__.startsWith('<') ? false : __IS_ADMIN_USER__ === 'true';
-const FORM_URL = __FORM_URL__.startsWith('<') ? '' : __FORM_URL__;
 
 // Server configuration processing completed
 const SHEET_NAME = __SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHEET_NAME__;
@@ -649,7 +647,7 @@ header {
 @keyframes modalScale { from { transform: scale3d(0.8, 0.8, 1); will-change: transform; } to { transform: scale3d(1, 1, 1); } }
 </style>
 </head>
-<body class="unified-theme bg-[#1a1b26] text-gray-200 font-sans">
+<body class="bg-[#1a1b26] text-gray-200 font-sans">
 <!-- Loading Overlay -->
 <div id="loading-overlay" class="loading-overlay hidden">
   <div class="text-center">
@@ -1007,8 +1005,7 @@ class StudyQuestApp {
     // リアクション状態保存用のキー
     this.reactionStorageKey = `reactions_${USER_ID}_${SHEET_NAME}`;
     this.gas = {
-      getPublishedSheetData: (classFilter, sort, adminMode, bypassCache) =>
-        this.runGas('getPublishedSheetData', this.state.userId, classFilter, sort, adminMode, bypassCache),
+      getPublishedSheetData: (sheetName, classFilter, sort, adminMode, bypassCache) => this.runGas('getPublishedSheetData', this.state.userId, sheetName, classFilter, sort, adminMode, bypassCache),
       getIncrementalSheetData: (classFilter, sort, adminMode, sinceRowCount) => this.runGas('getIncrementalSheetData', this.state.userId, classFilter, sort, adminMode, sinceRowCount),
       getAvailableSheets: () => this.runGas('getAvailableSheets', this.state.userId),
       addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', this.state.userId, rowIndex, reaction, sheetName),
@@ -1090,27 +1087,10 @@ class StudyQuestApp {
     }
   setupCriticalElements() {
     if (this.elements.headingLabel) {
-      // 強化された問題文表示ロジック
-      let opinionHeader = 'お題'; // デフォルト値
-      
-      // __OPINION_HEADER__ の詳細検証
-      console.log('🔍 [PAGE DEBUG] Raw __OPINION_HEADER__:', __OPINION_HEADER__);
-      console.log('🔍 [PAGE DEBUG] Type:', typeof __OPINION_HEADER__);
-      
-      if (__OPINION_HEADER__ && 
-          typeof __OPINION_HEADER__ === 'string' && 
-          __OPINION_HEADER__.trim() !== '' &&
-          !__OPINION_HEADER__.startsWith('<') && 
-          !__OPINION_HEADER__.includes('読み込み') &&
-          !__OPINION_HEADER__.includes('undefined') &&
-          !__OPINION_HEADER__.includes('null')) {
-        
-        opinionHeader = this.escapeHtml(__OPINION_HEADER__.trim());
-        console.log('✅ [PAGE DEBUG] Using valid opinionHeader:', opinionHeader);
-      } else {
-        console.log('🔄 [PAGE DEBUG] Using fallback opinionHeader:', opinionHeader);
-      }
-      
+      // 問題文を常に表示（読み込み中は表示しない）
+      const opinionHeader = __OPINION_HEADER__.startsWith('<') || __OPINION_HEADER__.includes('読み込み')
+        ? 'お題'  // デフォルトテキスト
+        : this.escapeHtml(__OPINION_HEADER__);
       this.elements.headingLabel.textContent = opinionHeader;
     }
 
@@ -2196,7 +2176,7 @@ setupEventDelegation() {
             this.hideLoadingOverlay();
           }
         })
-        .getPublishedSheetData(this.state.userId, classFilter, sortOrder, this.state.showAdminFeatures, false);
+        .getPublishedSheetData(classFilter, sortOrder, this.state.showAdminFeatures, false);
       
       
       // Post-processing after successful data load
@@ -3899,25 +3879,20 @@ function displayDomainInfo(info) {
  * フォームリンクを取得して表示する関数
  */
 function loadFormLink() {
-  const formLinkBtn = document.getElementById('form-link-btn');
-  if (formLinkBtn && FORM_URL) {
-    formLinkBtn.href = FORM_URL;
-    formLinkBtn.classList.remove('hidden');
-  }
-
-  if (window.isAdminUser && typeof google !== 'undefined' && google.script && google.script.run) {
-    google.script.run
-      .withSuccessHandler(formInfo => {
-        if (formInfo && formInfo.formUrl && formLinkBtn) {
+  google.script.run
+    .withSuccessHandler(formInfo => {
+      if (formInfo && formInfo.formUrl) {
+        const formLinkBtn = document.getElementById('form-link-btn');
+        if (formLinkBtn) {
           formLinkBtn.href = formInfo.formUrl;
           formLinkBtn.classList.remove('hidden');
         }
-      })
-      .withFailureHandler(error => {
-        console.warn('フォーム情報の取得に失敗しました:', error);
-      })
-      .getActiveFormInfo(USER_ID);
-  }
+      }
+    })
+    .withFailureHandler(error => {
+      console.warn('フォーム情報の取得に失敗しました:', error);
+    })
+    .getActiveFormInfo(USER_ID);
 }
 
 try {

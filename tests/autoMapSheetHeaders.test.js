@@ -24,7 +24,7 @@ describe('autoMapSheetHeaders override', () => {
 
   test('uses overrides for mapping', () => {
     const mapping = context.autoMapSheetHeaders('uid1', 'フォームの回答 1', {
-      opinionHeader: '質問X',  // mainQuestion を opinionHeader に統一
+      mainQuestion: '質問X',
       reasonQuestion: 'そう考える理由や体験があれば教えてください（任意）',
       nameQuestion: '名前',
       classQuestion: 'クラス'

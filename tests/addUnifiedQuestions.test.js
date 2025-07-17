@@ -28,11 +28,8 @@ describe('addUnifiedQuestions other option', () => {
     };
 
     context.addUnifiedQuestions(form, 'custom', {
-      mainQuestion: {
-        type: 'multiple',
-        choices: ['A', 'B'],
-        includeOthers: true
-      },
+      mainQuestionType: 'multiple',
+      mainQuestionChoices: ['A', 'B'],
       customMainQuestion: 'Q',
       enableClassSelection: false
     });
@@ -52,11 +49,8 @@ describe('addUnifiedQuestions other option', () => {
     };
 
     context.addUnifiedQuestions(form, 'custom', {
-      mainQuestion: {
-        type: 'choice',
-        choices: ['A', 'B'],
-        includeOthers: true
-      },
+      mainQuestionType: 'choice',
+      mainQuestionChoices: ['A', 'B'],
       customMainQuestion: 'Q',
       enableClassSelection: false
     });
