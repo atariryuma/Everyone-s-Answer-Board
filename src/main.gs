@@ -283,9 +283,28 @@ function showRegistrationPage() {
       .setTitle('ログイン - StudyQuest');
     return safeSetXFrameOptionsDeny(output);
   } catch (error) {
-    console.error('Error in showRegistrationPage:', error);
-    // Return a fallback error page
-    return HtmlService.createHtmlOutput(`
+    console.error('Error in doGet:', error);
+    return HtmlService.createHtmlOutput('<h1>システムエラー</h1><p>アプリケーションの読み込みに失敗しました。</p>');
+  }
+}
+
+/**
+ * Get Google Client ID for fallback authentication
+ * @return {Object} Object containing client ID
+ */
+function getGoogleClientId() {
+  try {
+    var clientId = PropertiesService.getScriptProperties().getProperty('GOOGLE_CLIENT_ID');
+    if (!clientId) {
+      console.warn('GOOGLE_CLIENT_ID not found in script properties');
+      return { clientId: '' };
+    }
+    return { clientId: clientId };
+  } catch (error) {
+    console.error('Error getting GOOGLE_CLIENT_ID:', error);
+    return { clientId: '' };
+  }
+}
       <html>
         <head><title>エラー - StudyQuest</title></head>
         <body>

@@ -256,16 +256,51 @@
         };
       }
 
+      // Safer method to set GOOGLE_CLIENT_ID with multiple fallbacks
       try {
-        var clientId = '<?= GOOGLE_CLIENT_ID ?>';
+        // Method 1: Direct template variable (most reliable when properly escaped)
+        var rawClientId = '<?= GOOGLE_CLIENT_ID ?>';
+        console.log('Raw GOOGLE_CLIENT_ID from template:', rawClientId);
+        
+        var clientId = (rawClientId && rawClientId !== 'undefined' && rawClientId !== 'null') ? rawClientId : '';
+        console.log('Processed GOOGLE_CLIENT_ID:', clientId);
+        
         if (clientId && typeof clientId === 'string' && clientId.trim()) {
           window.GOOGLE_CLIENT_ID = clientId.trim();
+          console.log('✅ GOOGLE_CLIENT_ID set successfully via template variable');
         } else {
           window.GOOGLE_CLIENT_ID = '';
+          console.warn('⚠️ GOOGLE_CLIENT_ID template variable is empty or invalid');
         }
       } catch (error) {
-        console.error('Error setting GOOGLE_CLIENT_ID:', error);
-        window.GOOGLE_CLIENT_ID = '';
+        console.error('Error setting GOOGLE_CLIENT_ID via template variable:', error);
+        
+        // Method 2: Fallback - try to get from server-side function
+        try {
+          if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run
+              .withSuccessHandler(function(result) {
+                if (result && result.clientId) {
+                  window.GOOGLE_CLIENT_ID = result.clientId;
+                  console.log('GOOGLE_CLIENT_ID set successfully via server call');
+                } else {
+                  window.GOOGLE_CLIENT_ID = '';
+                  console.warn('GOOGLE_CLIENT_ID not available from server');
+                }
+              })
+              .withFailureHandler(function(error) {
+                console.error('Failed to get GOOGLE_CLIENT_ID from server:', error);
+                window.GOOGLE_CLIENT_ID = '';
+              })
+              .getGoogleClientId();
+          } else {
+            window.GOOGLE_CLIENT_ID = '';
+            console.warn('Google Apps Script not available for fallback');
+          }
+        } catch (fallbackError) {
+          console.error('Fallback method also failed:', fallbackError);
+          window.GOOGLE_CLIENT_ID = '';
+        }
       }
     })();
   </script>
