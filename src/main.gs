@@ -676,7 +676,7 @@ function renderAdminPanel(userInfo, mode) {
   adminTemplate.include = include;
   adminTemplate.userInfo = userInfo;
   adminTemplate.userId = userInfo.userId;
-  adminTemplate.mode = mode;
+  adminTemplate.mode = mode || 'admin'; // フォールバックを追加してnullを防止
   adminTemplate.displayMode = 'named';
   adminTemplate.showAdminFeatures = true;
   const deployUserResult = isDeployUser();
