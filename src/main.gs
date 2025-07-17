@@ -41,7 +41,7 @@ var DB_SHEET_CONFIG = {
   SHEET_NAME: 'Users',
   HEADERS: [
     'userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl',
-    'createdAt', 'configJson', 'setupStatus', 'lastAccessedAt', 'isActive'
+    'createdAt', 'configJson', 'lastAccessedAt', 'isActive'
   ]
 };
 
@@ -67,26 +67,6 @@ var COLUMN_HEADERS = {
 var DISPLAY_MODES = {
   ANONYMOUS: 'anonymous',
   NAMED: 'named'
-};
-
-// セットアップ状態定数
-var SETUP_STATUS = {
-  UNREGISTERED: 'unregistered',
-  ACCOUNT_CREATED: 'account_created',    // 旧: basic
-  RESOURCES_PENDING: 'resources_pending', // リソース作成中
-  DATA_PREPARED: 'data_prepared',        // データ準備完了
-  CONFIGURED: 'configured',              // 設定完了
-  PUBLISHED: 'published'                 // 公開済み（旧: complete）
-};
-
-// セットアップステップ定数
-var SETUP_STEPS = {
-  ACCOUNT: 1,      // アカウント作成
-  DATA_PREP: 2,    // データ準備（スプレッドシート・フォーム作成）
-  DATA_INPUT: 3,   // データ投入（シート選択・列設定）
-  PUBLISH_CONFIG: 4, // 公開設定（表示オプション設定）
-  PREVIEW: 5,      // プレビュー確認
-  PUBLISHED: 6     // 回答ボード公開
 };
 
 // リアクション関連定数
@@ -134,47 +114,17 @@ function htmlEncode(text) {
  * @param {HtmlOutput} htmlOutput - 設定対象のHtmlOutput
  * @returns {HtmlOutput} 設定後のHtmlOutput
  */
-/**
- * HtmlOutputに安全にX-Frame-Optionsヘッダーとサンドボックスモードを設定するヘルパー関数
- * @param {HtmlOutput} htmlOutput - 設定対象のHtmlOutput
- * @returns {HtmlOutput} 設定後のHtmlOutput
- */
-function safeSetSecurityOptions(htmlOutput) {
+function safeSetXFrameOptionsDeny(htmlOutput) {
   try {
-    if (htmlOutput && typeof htmlOutput.setXFrameOptionsMode === 'function') {
-      // Verify XFrameOptionsMode enum exists and has valid values
-      if (HtmlService && HtmlService.XFrameOptionsMode) {
-        const frameMode = HtmlService.XFrameOptionsMode.SAMEORIGIN;
-        if (frameMode !== null && frameMode !== undefined) {
-          htmlOutput.setXFrameOptionsMode(frameMode);
-        } else {
-          console.warn('XFrameOptionsMode.SAMEORIGIN is null/undefined, skipping frame options');
-        }
-      } else {
-        console.warn('HtmlService.XFrameOptionsMode is not available, skipping frame options');
-      }
-    }
-    if (htmlOutput && typeof htmlOutput.setSandboxMode === 'function') {
-      // Verify SandboxMode enum exists and has valid values
-      if (HtmlService && HtmlService.SandboxMode) {
-        const sandboxMode = HtmlService.SandboxMode.IFRAME;
-        if (sandboxMode !== null && sandboxMode !== undefined) {
-          htmlOutput.setSandboxMode(sandboxMode);
-        } else {
-          console.warn('SandboxMode.IFRAME is null/undefined, skipping sandbox mode');
-        }
-      } else {
-        console.warn('HtmlService.SandboxMode is not available, skipping sandbox mode');
-      }
+    if (htmlOutput && typeof htmlOutput.setXFrameOptionsMode === 'function' &&
+        HtmlService && HtmlService.XFrameOptionsMode &&
+        HtmlService.XFrameOptionsMode.DENY) {
+      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
     }
   } catch (e) {
-    console.warn('Failed to set frame options and sandbox mode:', e.message);
+    console.warn('Failed to set XFrameOptionsMode:', e.message);
   }
   return htmlOutput;
-}
-
-function safeSetXFrameOptionsAllowAll(htmlOutput) {
-  return safeSetSecurityOptions(htmlOutput);
 }
 
 // 安定性を重視してvarを使用
@@ -309,14 +259,14 @@ function isSystemSetup() {
 }
 
 /**
- * ログインページを表示する関数
+ * 登録ページを表示する関数
  */
-function showLoginPage() {
-  var template = HtmlService.createTemplateFromFile('LoginPage');
+function showRegistrationPage() {
+  var template = HtmlService.createTemplateFromFile('Registration');
   template.include = include;
   var output = template.evaluate()
-    .setTitle('StudyQuest - ログイン');
-  return safeSetSecurityOptions(output);
+    .setTitle('新規ユーザー登録 - StudyQuest');
+  return safeSetXFrameOptionsDeny(output);
 }
 
 /**
@@ -385,50 +335,18 @@ function doGet(e) {
       return createSecureRedirect(correctUrl, '管理パネルにリダイレクトしています...');
     }
 
-    if (params.isDirectPageAccess) {
-      const publicInfo = findUserById(params.userId);
-      if (publicInfo) {
-        return renderAnswerBoard(publicInfo, params);
-      }
-    }
-
-    return showLoginPage();
+    return showRegistrationPage();
   } catch (error) {
     console.error(`doGetで致命的なエラー: ${error.stack}`);
-    
-    var errorMessage = error.message;
-    var isPermissionError = errorMessage && (
-      errorMessage.includes('permission') || 
-      errorMessage.includes('権限') ||
-      errorMessage.includes('access')
+    var errorHtml = HtmlService.createHtmlOutput(
+      '<h1>デバッグ：致命的エラー</h1>' +
+      '<p>doGet関数内でエラーが発生しました</p>' +
+      '<p>エラー詳細: ' + htmlEncode(error.message) + '</p>' +
+      '<p>スタック: ' + htmlEncode(error.stack || 'スタック情報なし') + '</p>' +
+      '<p>時刻: ' + new Date().toISOString() + '</p>' +
+      '<p>executeAs設定: USER_DEPLOYING (テスト中)</p>'
     );
-    
-    var errorHtml;
-    if (isPermissionError) {
-      errorHtml = HtmlService.createHtmlOutput(
-        '<h1>データベースアクセスエラー</h1>' +
-        '<p>データベースへのアクセスに失敗しました。</p>' +
-        '<p>このアプリではデータベース操作をサービスアカウント経由でのみ行います。</p>' +
-        '<h2>管理者へ</h2>' +
-        '<ul>' +
-        '<li>サービスアカウントの認証情報が正しく設定されているか確認してください</li>' +
-        '<li>データベーススプレッドシートがサービスアカウントと共有されているか確認してください</li>' +
-        '<li>サービスアカウントがデータベーススプレッドシートの編集者権限を持っているか確認してください</li>' +
-        '</ul>' +
-        '<p><small>セキュリティ設定: データベースはサービスアカウント専用</small></p>'
-      );
-    } else {
-      errorHtml = HtmlService.createHtmlOutput(
-        '<h1>システムエラー</h1>' +
-        '<p>アプリの動作中にエラーが発生しました</p>' +
-        '<p>エラー詳細: ' + htmlEncode(error.message) + '</p>' +
-        '<p>時刻: ' + new Date().toISOString() + '</p>' +
-        '<p>管理者にお問い合わせください。</p>' +
-        '<p><small>executeAs設定: USER_ACCESSING / データベース: サービスアカウント専用</small></p>'
-      );
-    }
-    
-    return safeSetXFrameOptionsAllowAll(errorHtml);
+    return safeSetXFrameOptionsDeny(errorHtml);
   }
 }
 
@@ -457,21 +375,33 @@ function handleDirectExecAccess(userEmail) {
       console.log('handleDirectExecAccess - System not setup, showing setup page');
       const t = HtmlService.createTemplateFromFile('SetupPage');
       t.include = include;
-      return safeSetXFrameOptionsAllowAll(t.evaluate().setTitle('初回セットアップ - StudyQuest'));
+      return safeSetXFrameOptionsDeny(t.evaluate().setTitle('初回セットアップ - StudyQuest'));
     }
     
     if (!userEmail) {
-      return showLoginPage();
+      return showRegistrationPage();
     }
     
     // サービスアカウント経由でユーザーがデータベースに登録されているかチェック
-    // 認証済みユーザーは常に登録ページを表示（管理パネルへのアクセスはボタン経由）
-    console.log('handleDirectExecAccess - Authenticated user, showing registration page');
-    debugLog('Authenticated user, showing registration page');
-    return showLoginPage();
+    const userInfo = findUserByEmail(userEmail);
+    console.log('handleDirectExecAccess - userInfo:', userInfo);
+    console.log('handleDirectExecAccess - userEmail:', userEmail);
+    
+    if (userInfo && userInfo.userId) {
+      // 登録済みユーザー: 管理パネルに自動遷移（リダイレクトではなく直接遷移）
+      console.log('handleDirectExecAccess - Found user, transitioning to admin panel for userId:', userInfo.userId);
+      
+      // ここで直接管理パネルを表示する（リダイレクトしない）
+      return renderAdminPanel(userInfo, 'admin');
+    } else {
+      // 未登録ユーザー: 新規登録画面表示
+      console.log('handleDirectExecAccess - Unregistered user, showing registration page');
+      debugLog('Unregistered user, showing registration page');
+      return showRegistrationPage();
+    }
   } catch (error) {
     console.error('handleDirectExecAccess error:', error);
-    return showLoginPage();
+    return showRegistrationPage();
   }
 }
 
@@ -490,94 +420,13 @@ function buildUserAdminUrl(userId) {
 }
 
 /**
- * サーバーサイドでのナビゲーション処理
- * @param {string} targetUrl リダイレクト先URL
- * @param {string} message 表示メッセージ
- * @return {HtmlOutput}
- */
-function createServerSideNavigation(targetUrl, message) {
-  var output = HtmlService.createHtmlOutput(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <meta http-equiv="refresh" content="1;url=${targetUrl}">
-      <title>移動中...</title>
-      <style>
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          background: linear-gradient(135deg, #1a1b26 0%, #0f172a 50%, #1e1b4b 100%);
-          color: white;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 100vh;
-          margin: 0;
-          text-align: center;
-        }
-        .container {
-          background: rgba(255, 255, 255, 0.08);
-          backdrop-filter: blur(20px);
-          border-radius: 16px;
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          padding: 40px;
-          max-width: 400px;
-        }
-        .spinner {
-          width: 40px;
-          height: 40px;
-          border: 3px solid rgba(255, 255, 255, 0.3);
-          border-top: 3px solid #06b6d4;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-          margin: 0 auto 20px;
-        }
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        .btn {
-          display: inline-block;
-          background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);
-          color: white;
-          padding: 12px 24px;
-          text-decoration: none;
-          border-radius: 8px;
-          margin-top: 20px;
-          transition: transform 0.2s;
-        }
-        .btn:hover {
-          transform: translateY(-1px);
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="spinner"></div>
-        <h2>${message}</h2>
-        <p>自動的に移動しない場合は下のボタンをクリックしてください</p>
-        <a href="${targetUrl}" class="btn">続行</a>
-      </div>
-      <script>
-        // Fallback navigation after 2 seconds
-        setTimeout(function() {
-          window.location.href = '${targetUrl}';
-        }, 2000);
-      </script>
-    </body>
-    </html>
-  `);
-  return safeSetSecurityOptions(output);
-}
-
-/**
- * セキュアなリダイレクトHTMLを作成（レガシー用）
+ * セキュアなリダイレクトHTMLを作成
  * @param {string} targetUrl リダイレクト先URL
  * @param {string} message 表示メッセージ
  * @return {HtmlOutput}
  */
 function createSecureRedirect(targetUrl, message) {
-  var output = HtmlService.createHtmlOutput(`
+  return HtmlService.createHtmlOutput(`
     <!DOCTYPE html>
     <html>
     <head>
@@ -602,25 +451,17 @@ function createSecureRedirect(targetUrl, message) {
         function handleRedirectClick(event) {
           event.preventDefault();
           try {
-            // Use iframe-safe navigation
-            if (window.sharedUtilities && window.sharedUtilities.navigation) {
-              window.sharedUtilities.navigation.safeNavigate('${targetUrl}', { method: 'redirect' });
-            } else {
-              window.location.href = '${targetUrl}';
-            }
+            // ユーザーアクションによるリダイレクト
+            window.top.location.href = '${targetUrl}';
           } catch(e) {
             window.location.href = '${targetUrl}';
           }
         }
         
-        // 2秒後の自動リダイレクト（iframe対応）
+        // 2秒後の自動リダイレクト（ユーザーアクション後）
         setTimeout(function() {
           try {
-            if (window.sharedUtilities && window.sharedUtilities.navigation) {
-              window.sharedUtilities.navigation.safeNavigate('${targetUrl}', { method: 'redirect' });
-            } else {
-              window.location.href = '${targetUrl}';
-            }
+            window.top.location.href = '${targetUrl}';
           } catch(e) {
             window.location.href = '${targetUrl}';
           }
@@ -628,202 +469,7 @@ function createSecureRedirect(targetUrl, message) {
       </script>
     </body>
     </html>
-  `);
-  return safeSetSecurityOptions(output);
-}
-
-/**
- * サーバーサイドナビゲーション処理関数
- * フロントエンドから呼び出し可能
- * @param {string} targetUrl 移動先URL
- * @param {string} message 表示メッセージ
- * @return {Object} 移動情報
- */
-function performServerSideNavigation(targetUrl, message = '移動中...') {
-  try {
-    // URLの妥当性チェック
-    if (!targetUrl) {
-      throw new Error('移動先URLが指定されていません');
-    }
-    
-    // 相対URLの場合は絶対URLに変換
-    if (targetUrl.startsWith('?') || targetUrl.startsWith('/')) {
-      const baseUrl = getWebAppUrl();
-      targetUrl = targetUrl.startsWith('?') ? baseUrl + targetUrl : baseUrl + targetUrl;
-    }
-    
-    console.log('performServerSideNavigation:', { targetUrl, message });
-    
-    return {
-      success: true,
-      redirectUrl: targetUrl,
-      message: message,
-      method: 'server_navigation'
-    };
-  } catch (error) {
-    console.error('performServerSideNavigation error:', error);
-    return {
-      success: false,
-      error: error.message,
-      method: 'server_navigation'
-    };
-  }
-}
-
-/**
- * 登録後のナビゲーション処理
- * @param {string} userId ユーザーID
- * @return {Object} 移動情報
- */
-function navigateToAdminPanel(userId) {
-  try {
-    const adminUrl = buildUserAdminUrl(userId);
-    return performServerSideNavigation(adminUrl, '管理パネルに移動中...');
-  } catch (error) {
-    console.error('navigateToAdminPanel error:', error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}
-
-/**
- * セットアップ状態とステップを判定
- * @param {Object} userInfo ユーザー情報
- * @return {Object} 状態とステップ情報
- */
-function determineSetupProgress(userInfo) {
-  try {
-    if (!userInfo) {
-      return {
-        status: SETUP_STATUS.UNREGISTERED,
-        step: SETUP_STEPS.ACCOUNT,
-        nextAction: 'アカウントを作成してください',
-        description: 'まずはアカウント登録から始めましょう'
-      };
-    }
-
-    const config = JSON.parse(userInfo.configJson || '{}');
-    const hasSpreadsheet = !!(userInfo.spreadsheetId && userInfo.spreadsheetUrl);
-    const hasForm = !!(config.formUrl);
-    const hasSheetConfig = !!(config.publishedSheetName);
-    const isPublished = !!(config.appPublished && config.publishedSpreadsheetId);
-
-    console.log('determineSetupProgress: 状態分析', {
-      setupStatus: userInfo.setupStatus,
-      hasSpreadsheet,
-      hasForm,
-      hasSheetConfig,
-      isPublished
-    });
-
-    // 状態判定ロジック
-    if (isPublished) {
-      return {
-        status: SETUP_STATUS.PUBLISHED,
-        step: SETUP_STEPS.PUBLISHED,
-        nextAction: '回答ボードが公開中です',
-        description: 'ボードの管理と監視を行えます'
-      };
-    }
-    
-    if (hasSheetConfig && hasSpreadsheet && hasForm) {
-      return {
-        status: SETUP_STATUS.CONFIGURED,
-        step: SETUP_STEPS.PREVIEW,
-        nextAction: 'プレビューを確認して公開する',
-        description: '設定が完了しました。プレビューを確認して公開しましょう'
-      };
-    }
-    
-    if (hasSpreadsheet && hasForm) {
-      return {
-        status: SETUP_STATUS.DATA_PREPARED,
-        step: SETUP_STEPS.DATA_INPUT,
-        nextAction: 'シートを選択して列を設定する',
-        description: 'データの準備ができました。シートと列の設定を行いましょう'
-      };
-    }
-    
-    if (userInfo.setupStatus === 'basic' || userInfo.setupStatus === 'account_created') {
-      return {
-        status: SETUP_STATUS.ACCOUNT_CREATED,
-        step: SETUP_STEPS.DATA_PREP,
-        nextAction: 'データ準備を完了する',
-        description: 'スプレッドシートとフォームを作成しましょう'
-      };
-    }
-    
-    // フォールバック
-    return {
-      status: userInfo.setupStatus || SETUP_STATUS.ACCOUNT_CREATED,
-      step: SETUP_STEPS.DATA_PREP,
-      nextAction: 'セットアップを続行する',
-      description: 'セットアップを完了しましょう'
-    };
-
-  } catch (error) {
-    console.error('determineSetupProgress error:', error);
-    return {
-      status: SETUP_STATUS.ACCOUNT_CREATED,
-      step: SETUP_STEPS.DATA_PREP,
-      nextAction: 'セットアップを確認する',
-      description: 'セットアップ状況を確認してください'
-    };
-  }
-}
-
-/**
- * ユーザーの存在確認
- * @param {string} userId ユーザーID
- * @return {Object} 確認結果
- */
-function verifyUserExists(userId) {
-  try {
-    console.log('verifyUserExists: 確認開始', { userId });
-    
-    if (!userId) {
-      return { found: false, error: 'ユーザーIDが指定されていません' };
-    }
-    
-    // ID検索とメール検索の両方で確認
-    const userById = findUserById(userId);
-    
-    if (userById) {
-      // さらにメールアドレスでの逆引き確認
-      const userByEmail = findUserByEmailNonBlocking(userById.adminEmail);
-      
-      const verification = {
-        found: true,
-        userId: userById.userId,
-        adminEmail: userById.adminEmail,
-        consistency: userByEmail?.userId === userId,
-        details: {
-          foundById: !!userById,
-          foundByEmail: !!userByEmail,
-          idMatch: userByEmail?.userId === userId
-        }
-      };
-      
-      console.log('verifyUserExists: 確認完了', verification);
-      return verification;
-    } else {
-      console.log('verifyUserExists: ユーザーが見つかりません', { userId });
-      return { 
-        found: false, 
-        userId: userId,
-        error: 'ユーザーが見つかりません' 
-      };
-    }
-  } catch (error) {
-    console.error('verifyUserExists error:', error);
-    return {
-      found: false,
-      error: error.message,
-      userId: userId
-    };
-  }
+  `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 /**
@@ -934,7 +580,7 @@ function handleSetupPages(params, userEmail) {
   if (!isSystemSetup() && !params.isDirectPageAccess) {
     const t = HtmlService.createTemplateFromFile('SetupPage');
     t.include = include;
-    return safeSetXFrameOptionsAllowAll(t.evaluate().setTitle('初回セットアップ - StudyQuest'));
+    return safeSetXFrameOptionsDeny(t.evaluate().setTitle('初回セットアップ - StudyQuest'));
   }
 
   if (params.setupParam === 'true' && params.mode === 'appsetup') {
@@ -949,36 +595,22 @@ function handleSetupPages(params, userEmail) {
         '<p>編集者として登録され、かつアクティブ状態である必要があります。</p>' +
         '<p>現在のドメイン: ' + (domainInfo.currentDomain || '不明') + '</p>'
       );
-      return safeSetXFrameOptionsAllowAll(errorHtml);
+      return safeSetXFrameOptionsDeny(errorHtml);
     }
     const appSetupTemplate = HtmlService.createTemplateFromFile('AppSetupPage');
     appSetupTemplate.include = include;
-    
-    // AppSetupPage用のuserIdを設定
-    const currentUserEmail = Session.getActiveUser().getEmail();
-    const currentUserInfo = findUserByEmail(currentUserEmail);
-    appSetupTemplate.userId = currentUserInfo ? currentUserInfo.userId : '';
-    
-    console.log('AppSetupPage - currentUserEmail:', currentUserEmail);
-    console.log('AppSetupPage - userId set to:', appSetupTemplate.userId);
-    
-    return safeSetXFrameOptionsAllowAll(appSetupTemplate.evaluate().setTitle('アプリ設定 - StudyQuest'));
+    return safeSetXFrameOptionsDeny(appSetupTemplate.evaluate().setTitle('アプリ設定 - StudyQuest'));
   }
 
   if (params.setupParam === 'true') {
     const explicit = HtmlService.createTemplateFromFile('SetupPage');
     explicit.include = include;
-    return safeSetXFrameOptionsAllowAll(explicit.evaluate().setTitle('StudyQuest - サービスアカウント セットアップ'));
-  }
-
-  // LoginPageページのリクエストを処理
-  if (params.page === 'LoginPage') {
-    return showLoginPage();
+    return safeSetXFrameOptionsDeny(explicit.evaluate().setTitle('StudyQuest - サービスアカウント セットアップ'));
   }
 
   // システムセットアップが完了している場合のみ、userEmailをチェック
   if (!userEmail && !params.isDirectPageAccess) {
-    return showLoginPage();
+    return showRegistrationPage();
   }
 
   return null;
@@ -1009,9 +641,10 @@ function renderAdminPanel(userInfo, mode) {
   adminTemplate.correctUrl = correctUrl;
   adminTemplate.shouldUpdateUrl = true;
   
-  var output = adminTemplate.evaluate()
-    .setTitle('みんなの回答ボード 管理パネル');
-  return safeSetSecurityOptions(output);
+  return adminTemplate.evaluate()
+    .setTitle('みんなの回答ボード 管理パネル')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setSandboxMode(HtmlService.SandboxMode.NATIVE);
 }
 
 /**
@@ -1030,36 +663,13 @@ function renderAnswerBoard(userInfo, params) {
   const isPublished = !!(config.appPublished && config.publishedSpreadsheetId && config.publishedSheetName);
   const sheetConfigKey = 'sheet_' + (config.publishedSheetName || params.sheetName);
   const sheetConfig = config[sheetConfigKey] || {};
-  const currentUserEmail = Session.getActiveUser().getEmail();
-  const isOwner = currentUserEmail === userInfo.adminEmail;
-  let hasDomainAccess = false;
-  if (!isOwner) {
-    try {
-      AuthorizationService.verifyBoardAccess(userInfo.adminEmail);
-      hasDomainAccess = true;
-    } catch (e) {
-      console.warn('Domain access denied:', e.message);
-    }
-  }
-  const showBoard = isOwner || (isPublished && hasDomainAccess);
+  const showBoard = params.isDirectPageAccess || isPublished;
   const file = showBoard ? 'Page' : 'Unpublished';
   const template = HtmlService.createTemplateFromFile(file);
   template.include = include;
 
   if (showBoard) {
     try {
-      // 🔧 レンダリング前に設定の整合性を検証・修復
-      const configValidation = validateAndRepairUserConfig(userInfo.userId);
-      if (configValidation.repaired) {
-        console.log('🔧 [RENDER REPAIR] レンダリング前に設定が自動修復されました:', configValidation.repairs);
-        // 修復後の最新情報を再取得
-        const freshUserInfo = findUserById(userInfo.userId);
-        if (freshUserInfo) {
-          userInfo = freshUserInfo;
-          config = JSON.parse(userInfo.configJson || '{}');
-        }
-      }
-      
       if (userInfo.spreadsheetId) {
         try { addServiceAccountToSpreadsheet(userInfo.spreadsheetId); } catch (err) { console.warn('アクセス権設定警告:', err.message); }
       }
@@ -1068,54 +678,16 @@ function renderAnswerBoard(userInfo, params) {
       template.ownerName = userInfo.adminEmail;
       template.sheetName = escapeJavaScript(config.publishedSheetName || params.sheetName);
       template.DEBUG_MODE = shouldEnableDebugMode();
-      
-      // 🔍 デバッグ: テンプレート変数解決の詳細をログ出力
-      console.log('🔍 [TEMPLATE DEBUG] config.publishedSheetName:', config.publishedSheetName);
-      console.log('🔍 [TEMPLATE DEBUG] sheetConfigKey:', sheetConfigKey);
-      console.log('🔍 [TEMPLATE DEBUG] sheetConfig:', JSON.stringify(sheetConfig));
-      console.log('🔍 [TEMPLATE DEBUG] sheetConfig.opinionHeader:', sheetConfig.opinionHeader);
-      
-      // 強化されたopinionHeader解決ロジック
-      let rawOpinionHeader = sheetConfig.opinionHeader;
-      
-      // フォールバック1: publishedSheetNameを使用
-      if (!rawOpinionHeader || rawOpinionHeader.trim() === '') {
-        rawOpinionHeader = config.publishedSheetName;
-        console.log('🔄 [FALLBACK] Using publishedSheetName as opinionHeader:', rawOpinionHeader);
-      }
-      
-      // フォールバック2: 他のシート設定を探索
-      if (!rawOpinionHeader || rawOpinionHeader.trim() === '') {
-        const allSheetKeys = Object.keys(config).filter(key => key.startsWith('sheet_'));
-        console.log('🔍 [FALLBACK] Searching in all sheet configs:', allSheetKeys);
-        
-        for (const key of allSheetKeys) {
-          if (config[key] && config[key].opinionHeader) {
-            rawOpinionHeader = config[key].opinionHeader;
-            console.log('🔄 [FALLBACK] Found opinionHeader in', key, ':', rawOpinionHeader);
-            break;
-          }
-        }
-      }
-      
-      // フォールバック3: デフォルト値
-      if (!rawOpinionHeader || rawOpinionHeader.trim() === '') {
-        rawOpinionHeader = 'お題';
-        console.log('🔄 [FALLBACK] Using default opinionHeader:', rawOpinionHeader);
-      }
-      
-      console.log('🔍 [TEMPLATE DEBUG] rawOpinionHeader resolved to:', rawOpinionHeader);
-      
+      const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
       template.opinionHeader = escapeJavaScript(rawOpinionHeader);
-      console.log('🔍 [TEMPLATE DEBUG] final template.opinionHeader:', template.opinionHeader);
       template.cacheTimestamp = Date.now();
       template.displayMode = config.displayMode || 'anonymous';
       template.showCounts = config.showCounts !== undefined ? config.showCounts : false;
       template.showScoreSort = template.showCounts;
+      const currentUserEmail = Session.getActiveUser().getEmail();
       const isOwner = currentUserEmail === userInfo.adminEmail;
       template.showAdminFeatures = isOwner;
       template.isAdminUser = isOwner;
-      template.formUrl = getFormUrlSafely(config, userInfo.spreadsheetId);
     } catch (e) {
       template.opinionHeader = escapeJavaScript('お題の読込エラー');
       template.cacheTimestamp = Date.now();
@@ -1126,10 +698,10 @@ function renderAnswerBoard(userInfo, params) {
       template.displayMode = 'anonymous';
       template.showCounts = false;
       template.showScoreSort = false;
+      const currentUserEmail = Session.getActiveUser().getEmail();
       const isOwner = currentUserEmail === userInfo.adminEmail;
       template.showAdminFeatures = isOwner;
       template.isAdminUser = isOwner;
-      template.formUrl = '';
     }
     return template.evaluate()
       .setTitle('StudyQuest -みんなの回答ボード-')

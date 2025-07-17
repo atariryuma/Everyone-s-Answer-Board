@@ -1,28 +1,3516 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <base target="_top">
-  <title>みんなの回答ボード 管理パネル - StudyQuest</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#1a1b26">
-  <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール">
-  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
+  <title>みんなの回答ボード	管理パネル - StudyQuest</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#1a1b26" />
+  <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), ambient-light-sensor=(), speaker-selection=(), vibrate=(), vr=()" />
+  <!-- User ID from server template -->
   <meta name="user-id" content="<?= typeof userId !== 'undefined' ? userId : '' ?>" id="user-id-meta">
 
-  <script>
-    window.tailwind = { config: { corePlugins: { preflight: false }, prefix: '' } };
-  </script>
-  <script src="https://cdn.tailwindcss.com" defer onerror="console.warn('TailwindCSS failed to load')"></script>
 
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Unified Styles and Shared Components -->
   <?!= include('UnifiedStyles'); ?>
-  <?!= include('AdminPanelStyles'); ?>
   <?!= include('SharedUtilities'); ?>
-  <?!= include('SharedJavaScript'); ?>
+  
+  <!-- ClientOptimizer の統合 -->
+  <?!= include('ClientOptimizer'); ?>
+  <?!= include('UnifiedCache.js'); ?>
+  
+  <script>
+  if (typeof GASOptimizer !== 'undefined') {
+    if (typeof setTimeout === 'undefined') {
+      function setTimeout(fn){ fn(); return 0; }
+    }
+    if (typeof clearTimeout === 'undefined') {
+      function clearTimeout(){ }
+    }
+    // グローバルエラーハンドリング
+    window.addEventListener('error', function(event) {
+      console.error('Global error caught:', event.error);
+      if (event.error && event.error.message && event.error.message.includes('document.write')) {
+        console.warn('document.write エラーが検出されました。安全なDOM操作に切り替えています。');
+        event.preventDefault();
+      }
+    });
+    
+    // Promise rejection のキャッチ
+    window.addEventListener('unhandledrejection', function(event) {
+      console.error('Unhandled promise rejection:', event.reason);
+      event.preventDefault();
+    });
+
+    // GASOptimizer インスタンスの初期化
+    var gasOptimizer = new GASOptimizer();
+    
+    // UnifiedCache インスタンスの初期化
+    var unifiedCache = (typeof UnifiedCache !== 'undefined')
+      ? new UnifiedCache()
+      : { getOrSet: function(_, fn) { return fn(); } };
+    
+    // runGas ラッパー関数 - キャッシュ対応
+    function runGas(functionName, ...args) {
+      return gasOptimizer.call(functionName, ...args);
+    }
+    
+    // マルチテナント対応: 新しいrunGasWithUserId関数
+    function runGasWithUserId(functionName, ...args) {
+      if (!userId) {
+        console.error('❌  - No userId available for:', functionName);
+        throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
+      }
+      
+      console.log('✅  - runGasWithUserId:', functionName, 'userId:', userId);
+      // userIdを第一引数として追加
+      return gasOptimizer.call(functionName, userId, ...args);
+    }
+    
+    // callWithCache 関数 - 読み取り専用操作用
+    function callWithCache(functionName, cacheKey, ttl, ...args) {
+      return unifiedCache.getOrSet(cacheKey, function() {
+        return gasOptimizer.call(functionName, ...args);
+      }, ttl);
+    }
+    
+    // マルチテナント対応: callWithCacheWithUserId関数
+    function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
+      if (!userId) {
+        console.error('❌  - No userId available for cached call:', functionName);
+        throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
+      }
+      
+      return unifiedCache.getOrSet(cacheKey, function() {
+        console.log('✅  - callWithCacheWithUserId:', functionName, 'userId:', userId);
+        return gasOptimizer.call(functionName, userId, ...args);
+      }, ttl);
+    }
+  }
+  </script>
+  <script>
+  const __IS_SYSTEM_ADMIN_RAW__ = '<?= typeof isDeployUser !== "undefined" ? isDeployUser : false ?>';
+  const __IS_SYSTEM_ADMIN__ = __IS_SYSTEM_ADMIN_RAW__ === 'true' || __IS_SYSTEM_ADMIN_RAW__ === true;
+  window.isSystemAdmin = __IS_SYSTEM_ADMIN__;
+  console.log('Template Debug:');
+  console.log('- Raw template value:', __IS_SYSTEM_ADMIN_RAW__);
+  console.log('- Raw template type:', typeof __IS_SYSTEM_ADMIN_RAW__);
+  console.log('- Processed value:', __IS_SYSTEM_ADMIN__);
+  console.log('- window.isSystemAdmin final:', window.isSystemAdmin);
+  
+  // URL更新処理
+  const shouldUpdateUrl = '<?= typeof shouldUpdateUrl !== "undefined" ? shouldUpdateUrl : false ?>';
+  const correctUrl = '<?= typeof correctUrl !== "undefined" ? correctUrl : "" ?>';
+  
+  if (shouldUpdateUrl === 'true' && correctUrl && correctUrl !== '') {
+    console.log('Updating URL to:', correctUrl);
+    try {
+      // セキュリティ制限のため、同一オリジンでのみURL更新を実行
+      const currentOrigin = window.location.origin;
+      const targetUrl = new URL(correctUrl);
+      
+      if (currentOrigin === targetUrl.origin || window.top === window) {
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState({}, '', correctUrl);
+          console.log('URL updated successfully to:', correctUrl);
+        }
+      } else {
+        console.log('URL update skipped due to cross-origin restrictions');
+      }
+    } catch (e) {
+      console.warn('Failed to update URL:', e);
+    }
+  }
+  </script>
+  <!-- 統合CSS -->
+  <?!= include('UnifiedStyles'); ?>
+  
+  <!-- レイアウト修正用の追加CSS -->
+  <style>
+  * {
+    box-sizing: border-box;
+  }
+  
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    overflow-x: hidden;
+  }
+  
+  body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  
+  main {
+    flex: 1;
+    width: 100%;
+  }
+  
+  /* Admin Panel Layout Fixes */
+  .responsive-grid {
+    display: grid;
+    gap: 1rem; /* モバイルのギャップ */
+    grid-template-columns: 1fr; /* モバイル: 単一カラム */
+  }
+  
+  @media (min-width: 768px) { /* タブレット向けブレークポイント */
+    .responsive-grid {
+      grid-template-columns: 2fr 1fr; /* 左: 2/3、右: 1/3 */
+      gap: 1rem; /* タブレットのギャップ */
+    }
+    .right-panel {
+      min-width: 200px; /* タブレットでの右パネルの最小幅 */
+    }
+  }
+
+  @media (min-width: 1024px) { /* デスクトップ向けブレークポイント */
+    .responsive-grid {
+      grid-template-columns: minmax(400px, 1fr) 350px; /* 左: 最小400px、柔軟。右: 固定350px */
+      gap: 1.5rem; /* デスクトップのギャップ */
+    }
+    .right-panel {
+      min-width: 300px; /* デスクトップでの右パネルの最小幅（安全のため） */
+    }
+  }
+  
+  /* Ensure proper main content layout */
+  main.flex-1 {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .left-panel {
+    flex: 1;
+    min-height: 0;
+  }
+  </style>
 </head>
-<body class="unified-theme bg-[#1a1b26] text-gray-200 font-sans min-h-screen flex flex-col">
-  <?!= include('AdminPanelComponents'); ?>
-  <?!= include('AdminPanelState'); ?>
-  <?!= include('AdminPanelLogic'); ?>
+<body class="bg-[#1a1b26] text-gray-200 font-sans">
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="text-center">
+      <div class="spinner"></div>
+      <p id="loading-message" class="mt-4 text-gray-300">処理中...</p>
+    </div>
+  </div>
+  <header class="glass-panel border-b border-gray-700 sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
+      <div class="flex items-center justify-between">
+        <!-- ロゴとタイトル -->
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-gradient-to-r from-cyan-400 to-purple-400 rounded-lg flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+          </div>
+          <div class="hidden sm:block">
+            <h1 class="text-lg sm:text-xl font-bold text-white leading-tight">みんなの回答ボード	管理パネル</h1>
+            <p class="text-xs text-gray-400">StudyQuest</p>
+          </div>
+          <div class="sm:hidden">
+            <h1 class="text-lg font-bold text-white">みんなの回答ボード</h1>
+          </div>
+        </div>
+        
+        <!-- ドメイン・ステータス情報 -->
+        <div class="flex items-center gap-2 sm:gap-3">
+          <!-- ドメイン情報（Registration.htmlスタイル） -->
+          <div id="header-domain-info">
+            <!-- ドメイン一致表示（緑色パネル） -->
+            <!-- ドメイン一致表示（Registration.htmlスタイル） -->
+            <div id="header-domain-match" class="glass-panel bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-3 border border-green-400/30 hidden">
+              <div class="flex items-center gap-2">
+                <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div>
+                  <div class="text-green-400 font-semibold text-sm" id="header-domain-match-text">G Suite ドメイン</div>
+                  <div class="text-green-200 text-xs">セキュアアクセス有効</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- ドメイン不一致表示（Registration.htmlスタイル） -->
+            <div id="header-domain-mismatch" class="glass-panel bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg p-3 border border-yellow-400/30 hidden">
+              <div class="flex items-center gap-2">
+                <svg class="w-5 h-5 text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>
+                <div>
+                  <div class="text-yellow-400 font-semibold text-sm" id="header-domain-mismatch-text">ドメイン不一致</div>
+                  <div class="text-yellow-200 text-xs">アクセス制限あり</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 初期状態表示 -->
+            <div id="header-domain-initial" class="glass-panel bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-3 border border-blue-400/30">
+              <div class="flex items-center gap-2">
+                <div id="header-status-dot" class="w-3 h-3 bg-blue-400 rounded-full animate-pulse flex-shrink-0"></div>
+                <div>
+                  <div class="text-blue-400 font-semibold text-sm" id="header-domain-name-initial">ドメイン確認中</div>
+                  <div class="text-blue-200 text-xs" id="header-status-text-initial">セットアップ中</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+    </div>
+  </header>
+  <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8 pb-40">
+    <!-- シンプル統合ステータスバー -->
+    <section class="mb-4">
+      <div class="glass-panel p-4 rounded-lg">
+        <div class="flex items-center justify-between">
+          <!-- 左側: ステータス表示 -->
+          <div class="flex items-center gap-3">
+            <div class="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
+            </div>
+            <div>
+              <span class="text-sm font-medium text-white" id="guidance-text">セットアップを開始してください</span>
+              <div class="text-xs text-gray-400 mt-1">3ステップで簡単セットアップ</div>
+            </div>
+          </div>
+          
+          <!-- 右側: コンパクトステップナビゲーション -->
+          <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1" id="step-1-indicator">
+              <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">1</div>
+              <span class="text-xs text-gray-300 hidden sm:inline">データ準備</span>
+            </div>
+            <div class="w-4 h-px bg-gray-600"></div>
+            <div class="flex items-center gap-1" id="step-2-indicator">
+              <div class="w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">2</div>
+              <span class="text-xs text-gray-300 hidden sm:inline">シート選択</span>
+            </div>
+            <div class="w-4 h-px bg-gray-600"></div>
+            <div class="flex items-center gap-1" id="step-3-indicator">
+              <div class="w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">3</div>
+              <span class="text-xs text-gray-300 hidden sm:inline">設定・公開</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- メインコンテンツエリア -->
+    <div class="responsive-grid">
+      <!-- 左側：セットアップフロー（メインパネル） -->
+      <div class="left-panel space-y-4 lg:space-y-6">
+        
+        <!-- ステップ1: データ準備 -->
+        <div class="glass-panel p-4 lg:p-6" id="data-setup-section">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-lg">
+                1
+              </div>
+              <div>
+                <h2 class="text-lg font-semibold text-white">データ準備</h2>
+                <p class="text-xs text-gray-400">スプレッドシートまたはフォームを準備</p>
+              </div>
+            </div>
+            <button type="button" class="toggle-section" onclick="toggleSection('step1-content')" aria-expanded="true" aria-label="セクションを展開/折りたたみ">
+              <svg class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+          </div>
+          
+          <div id="step1-content" class="progressive-section expanded">
+            <!-- 初心者向け：簡単作成 -->
+            <div class="mb-6">
+              <div class="google-integration p-4 rounded-xl text-white">
+                <div class="flex items-center gap-3 mb-3">
+                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                  <h3 class="font-semibold">推奨：自動セットアップ</h3>
+                </div>
+                <p class="text-sm mb-4 opacity-90">GoogleフォームとスプレッドシートをWorkspace上で自動作成します</p>
+                <div class="space-y-2">
+                  <button type="button" id="create-board-btn" class="btn btn-google w-full">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    <span id="create-board-text">新しいボードを作成</span>
+                  </button>
+                  
+                  <!-- 既存ユーザー向けの新しいフォーム作成 -->
+                  <div id="existing-user-section" class="hidden">
+                    <button type="button" id="create-additional-form-btn" class="btn btn-secondary w-full text-sm">
+                      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                      </svg>
+                      <span id="create-additional-form-text" class="text-gray-200">新規のフォームを作成</span>
+                    </button>
+                    <p class="text-xs text-gray-400 mt-1">現在のボードに連携する新しいフォームを作成</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 外部リソースの連携 (上級者向け) -->
+            <details class="bg-gray-800/30 border border-gray-600/30 rounded-xl">
+              <summary class="p-4 cursor-pointer text-sm font-medium text-gray-300 hover:text-white flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                </svg>
+                外部リソースの連携 (上級者向け)
+              </summary>
+              <div class="p-4 pt-0 space-y-4">
+                <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
+                  <label class="block text-sm font-medium text-purple-200 mb-2">
+                    GoogleフォームまたはスプレッドシートのURL
+                  </label>
+                  <div class="space-y-3">
+                    <input type="url" 
+                           id="resource-url-input" 
+                           placeholder="https://docs.google.com/forms/d/... または https://docs.google.com/spreadsheets/d/..."
+                           class="form-control"
+                           aria-describedby="resource-url-help">
+                    <p id="resource-url-help" class="text-xs text-purple-300 mt-1">
+                      既存のGoogleフォームまたはスプレッドシートのURLを貼り付けてください
+                    </p>
+                    <div class="flex gap-2">
+                      <button type="button" id="add-resource-btn" class="btn btn-primary flex-1">
+                        <span id="add-resource-text">リソースを追加</span>
+                      </button>
+                      <button type="button" id="open-resource-btn" class="btn btn-secondary px-3" disabled title="フォームまたはスプレッドシートを開く">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                        </svg>
+                        <span id="open-resource-text" class="ml-1 text-xs hidden sm:inline">開く</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </details>
+            
+            <!-- 作成されたリソース表示 -->
+            <div class="space-y-3 hidden" id="form-url-section">
+              <div class="success-state">
+                <div class="flex items-center gap-2 mb-2">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <span class="font-medium">フォームが作成されました</span>
+                </div>
+                <div class="flex gap-2">
+                  <input type="url" id="form-url-input" class="form-control flex-1 text-sm" readonly placeholder="フォームURLが生成されます">
+                  <button type="button" id="copy-form-url-btn" class="btn btn-secondary" title="URLをコピー">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                  </button>
+                  <a id="open-form-url-link" href="#" target="_blank" class="btn btn-secondary" title="フォームを開く">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                  </a>
+                </div>
+              </div>
+            </div>
+            
+            <!-- カスタムフォーム情報表示エリア -->
+            <div id="custom-form-info-section" class="hidden mt-4">
+              <!-- updateCustomFormInfo()で動的に内容が設定される -->
+            </div>
+          </div>
+        </div>
+
+        <!-- ステップ2: シート選択 -->
+        <div class="glass-panel p-4 lg:p-6" id="sheet-selection-section">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-lg">
+                2
+              </div>
+              <div>
+                <h2 class="text-lg font-semibold text-white">シート選択</h2>
+                <p class="text-xs text-gray-400">表示したいシートを選択</p>
+              </div>
+            </div>
+            <button type="button" class="toggle-section" onclick="toggleSection('step2-content')" aria-expanded="true" aria-label="セクションを展開/折りたたみ">
+              <svg class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+          </div>
+          
+          <div id="step2-content" class="progressive-section expanded">
+            <div class="space-y-4">
+              <div class="space-y-3">
+                <!-- シート選択の説明 -->
+                <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-3">
+                  <div class="flex items-center gap-2 mb-2">
+                    <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
+                    <span class="text-sm font-medium text-green-200">シート選択</span>
+                  </div>
+                  <p class="text-xs text-green-300">スプレッドシートのシートを回答ボードとして表示するシートに指定します</p>
+                </div>
+                
+                <!-- シンプルシート選択 -->
+                <label for="sheet-select" class="block text-sm font-medium text-white">
+                  表示したいシートを選択
+                </label>
+                <div class="flex gap-2">
+                    <select id="sheet-select" class="form-control flex-1" aria-describedby="sheet-help">
+                      <option>読み込み中...</option>
+                    </select>
+                    <button type="button" id="open-spreadsheet-btn-step2" class="btn btn-secondary px-3" title="スプレッドシートを開く">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ステップ3: 設定・公開 -->
+        <div class="glass-panel p-4 lg:p-6" id="config-section">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-lg">
+                3
+              </div>
+              <div>
+                <h2 class="text-lg font-semibold text-white">設定・公開</h2>
+                <p class="text-xs text-gray-400">列設定を行い公開</p>
+              </div>
+            </div>
+            <button type="button" class="toggle-section" onclick="toggleSection('step3-content')" aria-expanded="true" aria-label="セクションを展開/折りたたみ">
+              <svg class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+          </div>
+          
+          <div id="step3-content" class="progressive-section expanded">
+            <div id="config-area" class="space-y-4 hidden">
+              <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
+                <div class="flex items-center gap-2 mb-2">
+                  <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  </svg>
+                  <span class="text-sm font-medium text-purple-200">列マッピング設定</span>
+                </div>
+                <p class="text-xs text-purple-300">スプレッドシートの列を回答ボードの項目に割り当てます</p>
+              </div>
+              
+              <!-- 必須設定 -->
+              <div class="space-y-4">
+                <div class="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
+                  <label class="block">
+                    <div class="flex items-center gap-2 mb-2">
+                      <span class="text-sm font-medium text-white">回答データ列</span>
+                      <span class="px-2 py-1 bg-red-500 text-white text-xs rounded-full">必須</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <select id="opinionHeader" class="form-control flex-1" aria-describedby="main-help"></select>
+                      <button type="button" id="reguess-headers-btn" class="btn bg-gradient-to-r from-cyan-600/80 to-purple-600/80 hover:from-cyan-600 hover:to-purple-600 text-white px-3 py-2 relative overflow-hidden group" title="AI搭載 高精度列判定システム">
+                        <span class="relative z-10 flex items-center gap-1">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                          </svg>
+                          <span class="text-xs font-bold">AI判定</span>
+                        </span>
+                        <div class="absolute inset-0 bg-gradient-to-r from-cyan-400/20 to-purple-400/20 transform translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
+                      </button>
+                    </div>
+                    <p id="main-help" class="text-xs text-red-300 mt-1">
+                      回答内容が含まれる列を選択してください
+                    </p>
+                  </label>
+                </div>
+                
+                <!-- オプション設定 -->
+                <details class="bg-gray-800/30 border border-gray-600/30 rounded-xl">
+                  <summary class="p-4 cursor-pointer text-sm font-medium text-gray-300 hover:text-white flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+                    </svg>
+                    オプション設定（任意）
+                  </summary>
+                  <div class="p-4 pt-0 space-y-4" id="detail-options">
+                    <label class="block">
+                      <span class="text-sm text-gray-300 mb-2 block">理由・詳細列</span>
+                      <select id="reasonHeader" class="form-control"></select>
+                    </label>
+                    <label class="block">
+                      <span class="text-sm text-gray-300 mb-2 block">名前列</span>
+                      <select id="nameHeader" class="form-control"></select>
+                    </label>
+                    <label class="block">
+                      <span class="text-sm text-gray-300 mb-2 block">クラス列</span>
+                      <select id="classHeader" class="form-control"></select>
+                    </label>
+                    <div class="flex items-center mt-4">
+                      <input type="checkbox" id="showNames" name="showNames" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                      <label for="showNames" class="ml-2 block text-sm text-gray-300">名前を表示する</label>
+                    </div>
+                    <div class="flex items-center mt-2">
+                      <input type="checkbox" id="showCounts" name="showCounts" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                      <label for="showCounts" class="ml-2 block text-sm text-gray-300">リアクション数を表示する</label>
+                    </div>
+                  </div>
+                </details>
+              </div>
+              
+              <!-- 統合アクションボタン -->
+              <div class="space-y-3 pt-4">
+                <button type="button" id="save-publish-btn" disabled class="btn btn-primary w-full btn-lg">
+                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                  </svg>
+                  <span id="save-publish-text">設定を保存して公開</span>
+                </button>
+
+                <button type="button" id="unpublish-board-btn" class="btn btn-warning w-full hidden">
+                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636"></path>
+                  </svg>
+                  <span id="unpublish-board-text">公開を停止</span>
+                </button>
+              </div>
+            </div>
+            
+            <div id="config-placeholder" class="text-center py-8">
+              <div class="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-3">
+                <div class="loading-skeleton w-full h-full rounded-full hidden" id="config-loading"></div>
+                <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+                </svg>
+              </div>
+              <p class="text-gray-400 text-sm">シートを選択すると列設定が表示されます</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 右側：情報・ヘルプパネル -->
+      <div class="space-y-4 lg:space-y-6">
+        
+        
+
+        <!-- 使い方ガイド -->
+        <div class="glass-panel p-4 lg:p-6">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-8 h-8 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+              </svg>
+            </div>
+            <h3 class="font-semibold text-amber-400">使い方ガイド</h3>
+          </div>
+          
+          <div class="space-y-4">
+            <!-- 簡潔な管理フロー -->
+            <div class="bg-amber-900/20 border border-amber-500/30 rounded-lg p-4">
+              <h4 class="font-medium text-amber-200 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+                管理の流れ（3ステップ）
+              </h4>
+              <div class="space-y-2 text-xs text-amber-100">
+                <div class="flex items-center gap-2">
+                  <span class="bg-amber-600 text-white text-xs px-2 py-1 rounded font-bold">1</span>
+                  <span>データソース連携・AI列判定</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="bg-amber-600 text-white text-xs px-2 py-1 rounded font-bold">2</span>
+                  <span>表示設定・プライバシー調整</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="bg-amber-600 text-white text-xs px-2 py-1 rounded font-bold">3</span>
+                  <span>公開して学習者に共有</span>
+                </div>
+              </div>
+              <button type="button" id="show-usage-guide" class="btn btn-secondary w-full text-sm py-2 mt-3">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+                詳細ガイドを開く
+              </button>
+            </div>
+            
+            <!-- セキュリティ・機能 -->
+            <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+              <h4 class="font-medium text-blue-200 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+                セキュリティ・機能概要
+              </h4>
+              <div class="space-y-2 text-xs text-blue-100">
+                <div class="flex items-center gap-2">
+                  <span class="text-green-400">✓</span>
+                  <span>Google Workspace自動連携</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-green-400">✓</span>
+                  <span>AI機能での効率化</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-green-400">✓</span>
+                  <span>完全非公開データベース</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-green-400">✓</span>
+                  <span>リアルタイム更新</span>
+                </div>
+              </div>
+              <div class="mt-3 text-xs text-blue-200 bg-blue-800/30 rounded p-2">
+                💡 詳細ガイドでセキュリティ仕様をご確認ください
+              </div>
+            </div>
+            
+            <!-- デジタルシティズンシップガイド -->
+            <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+              <h4 class="font-medium text-blue-200 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+                デジタル・シティズンシップ指導
+              </h4>
+              <p class="text-xs text-blue-100 mb-3">デジタル・シティズンシップに基づく回答ボード指導のポイントを確認しましょう</p>
+              <button type="button" id="show-digital-citizenship-guide" class="btn btn-secondary w-full text-sm py-2">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                指導ガイドを開く
+              </button>
+            </div>
+            
+          </div>
+        </div>
+        <!-- システム状況 -->
+        <div id="system-info-panel" class="glass-panel p-4 lg:p-6">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-8 h-8 bg-gradient-to-br from-gray-500 to-gray-600 rounded-xl flex items-center justify-center">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"></path></svg>
+      </div>
+      <h3 class="font-semibold text-gray-300">システム状況</h3>
+    </div>
+
+    <div class="space-y-4">
+      <!-- アカウント情報 -->
+      <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+        <h4 class="text-sm font-medium text-gray-200 mb-3 flex items-center gap-2">
+          <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+          </svg>
+          アカウント
+        </h4>
+        <div class="space-y-2 text-xs">
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">メールアドレス:</span>
+            <span class="text-white font-medium" id="info-admin-email">-</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">ユーザーID:</span>
+            <span class="text-white font-mono text-xs bg-gray-700 px-1.5 py-0.5 rounded" id="info-user-id">-</span>
+          </div>
+          <div class="text-right pt-2">
+            <a href="#" onclick="switchToAnotherAccount(); return false;" class="text-cyan-400 hover:text-cyan-300 hover:underline text-xs">
+              別のアカウントでログイン
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 公開設定 -->
+      <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+        <h4 class="text-sm font-medium text-gray-200 mb-3 flex items-center gap-2">
+          <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+          </svg>
+          公開設定
+        </h4>
+        <div class="space-y-2 text-xs">
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">公開状態:</span>
+            <span class="px-2 py-1 rounded text-xs font-medium" id="info-publish-status">
+              <span class="inline-flex items-center gap-1">
+                <div class="w-2 h-2 rounded-full" id="info-publish-indicator"></div>
+                <span id="info-publish-text">確認中</span>
+              </span>
+            </span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">公開シート:</span>
+            <span class="text-white font-semibold" id="info-published-sheet">-</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">表示モード:</span>
+            <span class="text-white" id="info-display-mode">-</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">カウント表示:</span>
+            <span class="text-white" id="info-show-counts">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- データ状況 -->
+      <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+        <h4 class="text-sm font-medium text-gray-200 mb-3 flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+          </svg>
+          データ状況
+        </h4>
+        <div class="space-y-2 text-xs">
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">総回答数:</span>
+            <span class="text-white font-bold text-lg" id="info-answer-count">-</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">総リアクション数:</span>
+            <span class="text-white font-bold text-lg" id="info-reaction-count">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- リソース -->
+      <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+        <h4 class="text-sm font-medium text-gray-200 mb-3 flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+          </svg>
+          リソース
+        </h4>
+        <div class="space-y-3 text-xs">
+          <div class="flex gap-2">
+            <button type="button" id="open-spreadsheet-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded flex items-center justify-center gap-2 transition-all" disabled>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+              </svg>
+              スプレッドシート
+            </button>
+            <button type="button" id="open-form-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded flex items-center justify-center gap-2 transition-all" disabled>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              フォーム
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- アプリ設定リンク -->
+      <div id="app-setup-link" class="bg-blue-900/10 border border-blue-500/30 rounded-lg p-3 transition-all hover:border-blue-500/50">
+        <button type="button" onclick="openAppSetupPage()" class="w-full flex items-center justify-between text-sm font-medium text-blue-300 hover:text-blue-200 transition-colors">
+          <div class="flex items-center">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+            <span>アプリ設定管理</span>
+          </div>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+          </svg>
+        </button>
+        <p class="text-xs text-blue-200/70 mt-2 ml-6">
+          アプリの有効/無効状態を管理できます
+        </p>
+      </div>
+      
+      <details id="account-deletion-section" class="bg-red-900/10 border border-red-500/30 rounded-lg transition-all hover:border-red-500/50">
+        <summary class="p-3 cursor-pointer text-sm font-medium text-red-300 hover:text-red-200 flex items-center justify-between">
+          <span>アカウントの管理</span>
+          <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </summary>
+        <div class="p-3 pt-0">
+          <p class="text-xs text-red-200/80 mb-3">
+            この操作は元に戻せません。アカウントを削除すると、作成したすべてのボードと設定が完全に消去されます。
+          </p>
+          <button type="button" id="delete-account-btn" class="btn btn-danger w-full text-sm py-2">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            <span>自分のアカウントを完全に削除する</span>
+          </button>
+        </div>
+      </details>
+      </div>
+    </div>
+  </main>
+  
+  <!-- 統合フッター -->
+  <footer id="admin-footer" class="fixed bottom-0 left-0 right-0 glass-panel border-t border-gray-700 hidden">
+    <div class="max-w-6xl mx-auto px-6 py-4">
+      <div class="flex items-center justify-between">
+        <!-- 左側: 公開中の問題文 -->
+        <div class="flex-1">
+          <div class="flex items-center gap-2 mb-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span class="text-green-400 font-semibold text-sm">公開中:</span>
+          </div>
+          <p class="text-blue-300 font-medium text-lg" id="current-topic-text">読み込み中...</p>
+        </div>
+        
+        <!-- 右側: ボードURL操作 -->
+        <div class="flex items-center gap-3">
+          <input type="text" id="board-url" readonly
+                 class="px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-sm cursor-pointer hover:bg-gray-700 focus:ring-2 focus:ring-green-400 min-w-[300px]"
+                 onclick="this.select()" placeholder="URLが生成されます">
+          <button type="button" onclick="copyBoardUrl()" class="btn btn-secondary px-3 py-2 flex items-center" title="URLをコピー" aria-label="生徒用URLをコピー">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+            </svg>
+          </button>
+          <a id="view-board-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary px-3 py-2 flex items-center" title="回答ボードを開く" aria-label="新しいタブで回答ボードを開く">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+  <div id="message-area" class="fixed top-20 right-6 z-50" aria-live="polite" role="status"></div>
+  
+  <!-- 共通モーダルコンポーネントを読み込み -->
+  <?!= include('SharedModals'); ?>
+  <script>
+    // Use SharedUtilities instead of local debounce
+    var debounce = window.debounce || function(func, delay, key) {
+      window.sharedUtilities.debounce.debounce(func, key || 'default', delay);
+    };
+
+    // =============================================================================
+    // DOM UTILITY FUNCTIONS - Use SharedUtilities
+    // =============================================================================
+    
+    // Backward compatibility functions using SharedUtilities
+    var dom = window.sharedUtilities.dom;
+    var createSafeElement = dom.createSafeElement.bind(dom);
+    var getCachedElement = dom.getCachedElement.bind(dom);
+    var safeGetElement = getCachedElement;
+    var setButtonState = dom.setButtonState.bind(dom);
+    var setSafeTextContent = dom.setSafeTextContent.bind(dom);
+    var toggleClass = dom.toggleClass.bind(dom);
+    var addSafeEventListener = dom.addSafeEventListener.bind(dom);
+    var removeSafeEventListener = dom.removeSafeEventListener.bind(dom);
+    var clearElementCache = dom.clearElementCache.bind(dom);
+    var cacheElements = dom.cacheElements.bind(dom);
+    
+    // =============================================================================
+    // EVENT HANDLER UTILITIES - Consolidated patterns
+    // =============================================================================
+    
+    // Utility for setting up multiple event listeners efficiently
+    function setupMultipleListeners(elementHandlerMap) {
+      Object.keys(elementHandlerMap).forEach(function(elementId) {
+        var element = elementId.startsWith('#') ? 
+          document.querySelector(elementId) : 
+          (elements[elementId] || getCachedElement(elementId));
+        
+        if (element) {
+          var handlers = elementHandlerMap[elementId];
+          if (Array.isArray(handlers)) {
+            handlers.forEach(function(handler) {
+              addSafeEventListener(element, handler.event, handler.callback, handler.options);
+            });
+          } else {
+            addSafeEventListener(element, handlers.event, handlers.callback, handlers.options);
+          }
+        }
+      });
+    }
+    
+    // Utility for setting up click handlers with confirmation
+    function setupConfirmationHandler(elementId, confirmTitle, confirmMessage, callback) {
+      var element = elements[elementId] || getCachedElement(elementId);
+      if (element) {
+        addSafeEventListener(element, 'click', function() {
+          showConfirmationModal(confirmTitle, confirmMessage, callback);
+        });
+      }
+    }
+    
+    // Utility for setting up click handlers with privacy modal
+    function setupPrivacyHandler(elementId, callback) {
+      var element = elements[elementId] || getCachedElement(elementId);
+      if (element) {
+        addSafeEventListener(element, 'click', function() {
+          showPrivacyModal(callback);
+        });
+      }
+    }
+    
+    // Utility for delegated event handling
+    function setupDelegatedHandler(parentElement, selector, event, callback) {
+      if (typeof parentElement === 'string') {
+        parentElement = getCachedElement(parentElement);
+      }
+      
+      if (parentElement) {
+        addSafeEventListener(parentElement, event, function(e) {
+          var target = e.target.closest(selector);
+          if (target) {
+            callback.call(target, e);
+          }
+        });
+      }
+    }
+    
+    // =============================================================================
+    // ERROR HANDLING SYSTEM - Centralized error management
+    // =============================================================================
+    
+    // Centralized error handling with consistent formatting
+    function handleError(error, context, userMessage) {
+      // Log error for debugging
+      var errorMsg = error && error.message ? error.message : String(error);
+      console.error('[' + (context || 'Unknown') + '] Error:', errorMsg);
+      
+      // Convert technical errors to user-friendly messages
+      var displayMessage = userMessage || translateErrorMessage(errorMsg, context);
+      showMessage(displayMessage, 'error');
+      
+      // Additional error reporting could be added here
+      return false;
+    }
+
+    /**
+     * 技術的なエラーメッセージをユーザーフレンドリーなメッセージに変換
+     * @param {string} errorMsg - 元のエラーメッセージ
+     * @param {string} context - エラーが発生したコンテキスト
+     * @returns {string} ユーザーフレンドリーなエラーメッセージ
+     */
+    function translateErrorMessage(errorMsg, context) {
+      if (!errorMsg || typeof errorMsg !== 'string') {
+        return 'エラーが発生しました。しばらく待ってから再試行してください。';
+      }
+
+      var lowerMsg = errorMsg.toLowerCase();
+      
+      // スプレッドシート関連のエラー
+      if (lowerMsg.includes('範囲の列数には') || lowerMsg.includes('range')) {
+        return `📊 スプレッドシートにデータが正しく入力されていません。
+💡 解決方法：スプレッドシートを開いて、1行目にヘッダー（列名）が入力されているか確認してください。`;
+      }
+      
+      if (lowerMsg.includes('シート情報の取得に失敗') || lowerMsg.includes('sheet')) {
+        return `📋 シートの情報を読み込めませんでした。
+💡 解決方法：
+• スプレッドシートが正しく共有されているか確認
+• シートにデータが入力されているか確認
+• しばらく待ってから再試行`;
+      }
+      
+      // 権限関連のエラー
+      if (lowerMsg.includes('permission') || lowerMsg.includes('権限') || lowerMsg.includes('access denied')) {
+        return `🔒 アクセス権限がありません。
+💡 解決方法：
+• スプレッドシートの共有設定を確認
+• 編集権限があることを確認
+• アカウントでログインし直してみる`;
+      }
+      
+      // ネットワーク関連のエラー
+      if (lowerMsg.includes('network') || lowerMsg.includes('timeout') || lowerMsg.includes('fetch')) {
+        return `🌐 インターネット接続の問題が発生しました。
+💡 解決方法：
+• インターネット接続を確認
+• しばらく待ってから再試行
+• ページを再読み込み`;
+      }
+      
+      // フォーム関連のエラー
+      if (lowerMsg.includes('form') && lowerMsg.includes('not found')) {
+        return `📝 フォームが見つかりません。
+💡 解決方法：
+• フォームが作成されているか確認
+• フォームが削除されていないか確認
+• 新しいフォームを作成`;
+      }
+      
+      // データ検証関連のエラー
+      if (lowerMsg.includes('validation') || lowerMsg.includes('invalid')) {
+        return `⚠️ 入力内容に問題があります。
+💡 解決方法：
+• 必須項目がすべて入力されているか確認
+• 入力形式が正しいか確認
+• 特殊文字が含まれていないか確認`;
+      }
+      
+      // 認証関連のエラー
+      if (lowerMsg.includes('authentication') || lowerMsg.includes('login') || lowerMsg.includes('unauthorized')) {
+        return `🔐 認証に問題があります。
+💡 解決方法：
+• ログイン状態を確認
+• ページを再読み込み
+• 再度ログインしてみる`;
+      }
+      
+      // サーバー関連のエラー
+      if (lowerMsg.includes('server error') || lowerMsg.includes('500') || lowerMsg.includes('503')) {
+        return `⚡ システムが一時的に利用できません。
+💡 解決方法：
+• 数分待ってから再試行
+• 問題が続く場合は管理者に連絡`;
+      }
+      
+      // 設定関連のエラー
+      if (context && context.includes('config') || lowerMsg.includes('configuration')) {
+        return `⚙️ 設定の保存に問題があります。
+💡 解決方法：
+• すべての必須項目が入力されているか確認
+• 設定内容に問題がないか確認
+• しばらく待ってから再試行`;
+      }
+      
+      // その他の一般的なエラー
+      if (lowerMsg.includes('failed') || lowerMsg.includes('error')) {
+        return `❌ 操作が正常に完了しませんでした。
+💡 解決方法：
+• しばらく待ってから再試行
+• ページを再読み込み
+• 問題が続く場合は別のブラウザを試す`;
+      }
+      
+      // フォールバック
+      return `⚠️ 予期しないエラーが発生しました。
+💡 解決方法：
+• ページを再読み込み
+• しばらく待ってから再試行
+• 問題が続く場合はサポートにお問い合わせください`;
+    }
+    
+    // Wrapper for Google Apps Script calls with consistent error handling
+    function safeGASCall(methodName, successHandler, errorMessage) {
+      return {
+        withSuccessHandler: function(handler) {
+          this._successHandler = handler;
+          return this;
+        },
+        withFailureHandler: function(handler) {
+          this._failureHandler = handler;
+          return this;
+        },
+        execute: function() {
+          var self = this;
+          google.script.run
+            .withSuccessHandler(function(result) {
+              if (self._successHandler) {
+                try {
+                  self._successHandler(result);
+                } catch (err) {
+                  handleError(err, methodName + '.successHandler', 'データの処理中にエラーが発生しました。');
+                }
+              }
+            })
+            .withFailureHandler(function(error) {
+              if (self._failureHandler) {
+                try {
+                  self._failureHandler(error);
+                }
+                catch (err) {
+                  handleError(err, methodName + '.failureHandler');
+                }
+              }
+              else {
+                handleError(error, methodName, errorMessage);
+              }
+            })[methodName].apply(google.script.run, arguments);
+        }
+      };
+    }
+    
+    // Legacy showError function for backward compatibility
+    function showError(error) {
+      handleError(error, 'General', null);
+    }
+
+    // =============================================================================
+    // MESSAGE SYSTEM - Refactored for better maintainability
+    // =============================================================================
+    
+    // Message type configurations
+    var MESSAGE_TYPES = {
+      info: { bgColor: 'bg-blue-500', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+      success: { bgColor: 'bg-green-500', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', extraClass: 'success-pulse' },
+      error: { bgColor: 'bg-red-500', icon: 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z', extraClass: 'error-shake' },
+      warning: { bgColor: 'bg-yellow-500', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.082 16.5c-.77.833.192 2.5 1.732 2.5z', extraClass: 'text-black' },
+      green: { bgColor: 'bg-green-500', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
+      blue: { bgColor: 'bg-blue-500', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+      yellow: { bgColor: 'bg-yellow-500', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.082 16.5c-.77.833.192 2.5 1.732 2.5z', extraClass: 'text-black' }
+    };
+    
+    // Sanitize message content safely
+    function sanitizeMessage(message) {
+      if (typeof message !== 'string') {
+        try {
+          message = String(message);
+        } catch (e) {
+          return 'メッセージ表示エラー';
+        }
+      }
+      
+      // Remove control characters and limit length
+      return message
+        .replace(/[\u0000-\u001F\u007F]/g, '')
+        .replace(/[\'"\\]/g, '')
+        .substring(0, 200);
+    }
+    
+    // Check for duplicate messages and highlight if found
+    function checkDuplicateMessage(messageArea, message) {
+      var existingMessages = Array.from(messageArea.children);
+      for (var i = 0; i < existingMessages.length; i++) {
+        var existing = existingMessages[i];
+        var spanElement = existing.querySelector('span');
+        var existingText = spanElement ? spanElement.textContent : null;
+        if (existingText === message) {
+          // Highlight existing message
+          existing.style.transform = 'scale(1.05)';
+          setTimeout(function() { existing.style.transform = 'scale(1)'; }, 200);
+          return true;
+        }
+      }
+      return false;
+    }
+    
+    // Clean up old messages (keep only 5 most recent)
+    function cleanupOldMessages(messageArea) {
+      while (messageArea.children.length >= 5) {
+        messageArea.children[0].remove();
+      }
+    }
+    
+    // Create message DOM structure
+    function createMessageElement(messageId, message, type) {
+      var typeConfig = MESSAGE_TYPES[type] || MESSAGE_TYPES.info;
+      var messageElement = createSafeElement('div');
+      messageElement.id = messageId;
+      messageElement.className = 'p-4 mb-3 rounded-lg shadow-md flex items-center justify-between text-white transform transition-all duration-300 ease-out slide-up ' + typeConfig.bgColor;
+      
+      if (typeConfig.extraClass) {
+        messageElement.classList.add(typeConfig.extraClass);
+      }
+      
+      // Create message container with icon and text
+      var messageContainer = createSafeElement('div', 'flex items-center');
+      var iconContainer = createSafeElement('div');
+      iconContainer.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="' + typeConfig.icon + '"></path></svg>';
+      
+      var messageSpan = createSafeElement('span', 'ml-2 text-sm font-medium', message);
+      messageContainer.appendChild(iconContainer);
+      messageContainer.appendChild(messageSpan);
+      
+      // Create close button
+      var closeButton = createSafeElement('button', 'ml-4 text-white opacity-70 hover:opacity-100 focus:outline-none');
+      closeButton.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+      closeButton.onclick = function() { removeMessage(messageId); };
+      
+      messageElement.appendChild(messageContainer);
+      messageElement.appendChild(closeButton);
+      
+      return messageElement;
+    }
+    
+    // Set up auto-removal timer for message
+    function setupMessageAutoRemoval(messageId, type) {
+      var timeout = type === 'error' ? 5000 : 2500;
+      return setTimeout(function() {
+        var msgEl = safeGetElement(messageId);
+        if (msgEl && msgEl.parentNode) {
+          msgEl.classList.remove('slide-up');
+          msgEl.classList.add('fade-out');
+          
+          var fallbackTimer = setTimeout(function() {
+            if (msgEl && msgEl.parentNode) {
+              msgEl.remove();
+            }
+          }, 500);
+          
+          msgEl.addEventListener('transitionend', function() {
+            clearTimeout(fallbackTimer);
+            if (msgEl && msgEl.parentNode) {
+              msgEl.remove();
+            }
+          }, { once: true });
+        }
+      }, timeout);
+    }
+    
+    // Main showMessage function - now much cleaner
+    function showMessage(message, type) {
+      if (IS_TEST_ENV) return;
+      try {
+        type = type || 'info';
+        message = sanitizeMessage(message);
+        
+        var messageArea = safeGetElement('message-area');
+        if (!messageArea) return;
+        
+        // Check for duplicates
+        if (checkDuplicateMessage(messageArea, message)) {
+          return;
+        }
+        
+        // Clean up old messages
+        cleanupOldMessages(messageArea);
+        
+        // Create and display new message
+        var messageId = 'msg-' + Date.now();
+        var messageElement = createMessageElement(messageId, message, type);
+        messageArea.appendChild(messageElement);
+        
+        // Set up auto-removal
+        messageElement.removeTimer = setupMessageAutoRemoval(messageId, type);
+        
+      } catch (error) {
+        try {
+          console.error('showMessage function error:', error);
+        } catch (e) {
+          // Silently fail if even logging fails
+        }
+      }
+    }
+
+    function removeMessage(messageId) {
+      var msgEl = document.getElementById(messageId);
+      if (msgEl) {
+        // 自動タイマーをクリア
+        if (msgEl.removeTimer) {
+          clearTimeout(msgEl.removeTimer);
+        }
+        // 即座に削除
+        msgEl.remove();
+      }
+    }
+
+    function addVisualFeedback(element, type) {
+      if (!element) return;
+      element.classList.remove('success-pulse', 'error-shake');
+      void element.offsetWidth; // Trigger reflow
+      element.classList.add(type === 'success' ? 'success-pulse' : 'error-shake');
+    }
+
+    // Layout adjustment function for footer padding
+    let baseBodyPadding;
+    function adjustLayout() {
+      if (IS_TEST_ENV) return;
+      if (typeof baseBodyPadding === 'undefined') {
+        baseBodyPadding = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+      }
+      const footer = document.getElementById('admin-footer');
+      if (footer) {
+        const footerHeight = footer.offsetHeight;
+        document.body.style.paddingBottom = footerHeight + baseBodyPadding + 'px';
+      }
+    }
+
+    // プライバシーモーダルの制御関数
+    function showPrivacyModal(onContinue) {
+      var modal = document.getElementById('privacy-modal');
+      if (!modal) {
+        console.error('プライバシーモーダルが見つかりません');
+        return;
+      }
+      
+      modal.classList.remove('hidden');
+      
+      // イベントリスナーを設定（重複を防ぐため一度クリア）
+      var continueBtn = document.getElementById('privacy-modal-continue');
+      var cancelBtn = document.getElementById('privacy-modal-cancel');
+      
+      // 既存のリスナーを削除
+      if (continueBtn) {
+        var newContinueBtn = continueBtn.cloneNode(true);
+        continueBtn.parentNode.replaceChild(newContinueBtn, continueBtn);
+        newContinueBtn.addEventListener('click', function() {
+          hidePrivacyModal();
+          if (onContinue) onContinue();
+        });
+      }
+      
+      if (cancelBtn) {
+        var newCancelBtn = cancelBtn.cloneNode(true);
+        cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+        newCancelBtn.addEventListener('click', hidePrivacyModal);
+      }
+      
+      // Escapeキーでモーダルを閉じる
+      var escapeHandler = function(e) {
+        if (e.key === 'Escape') {
+          hidePrivacyModal();
+          document.removeEventListener('keydown', escapeHandler);
+        }
+      };
+      document.addEventListener('keydown', escapeHandler);
+    }
+    
+    function hidePrivacyModal() {
+      var modal = document.getElementById('privacy-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+    }
+
+    // デジタルシティズンシップモーダルの制御関数
+    function showDigitalCitizenshipModal() {
+      var modal = document.getElementById('digital-citizenship-modal');
+      if (!modal) {
+        console.error('デジタルシティズンシップモーダルが見つかりません');
+        return;
+      }
+      
+      modal.classList.remove('hidden');
+      
+      // 閉じるボタンのイベントリスナーを設定
+      var closeBtn = document.getElementById('digital-citizenship-modal-close');
+      var closeBtnBottom = document.getElementById('digital-citizenship-modal-close-btn');
+      
+      if (closeBtn) {
+        closeBtn.onclick = hideDigitalCitizenshipModal;
+      }
+      
+      if (closeBtnBottom) {
+        closeBtnBottom.onclick = hideDigitalCitizenshipModal;
+      }
+      
+      // Escapeキーでモーダルを閉じる
+      var escapeHandler = function(e) {
+        if (e.key === 'Escape') {
+          hideDigitalCitizenshipModal();
+          document.removeEventListener('keydown', escapeHandler);
+        }
+      };
+      document.addEventListener('keydown', escapeHandler);
+      
+      // モーダルの背景をクリックしたときに閉じる
+      modal.onclick = function(e) {
+        if (e.target === modal) {
+          hideDigitalCitizenshipModal();
+        }
+      };
+    }
+    
+    function hideDigitalCitizenshipModal() {
+      var modal = document.getElementById('digital-citizenship-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+    }
+
+    /**
+     * 設定エリアを非表示にし、プレースホルダーを表示する
+     */
+    function hideConfigArea() {
+        var configArea = document.getElementById('config-area');
+        var configPlaceholder = document.getElementById('config-placeholder');
+        if (configArea) configArea.classList.add('hidden');
+        if (configPlaceholder) configPlaceholder.classList.remove('hidden');
+    }
+
+    function showConfirmationModal(title, message, onConfirm) {
+      var modal = document.getElementById('confirmation-modal');
+      var modalTitle = document.getElementById('modal-title');
+      var modalMessage = document.getElementById('modal-message');
+      
+      if (modalTitle) modalTitle.textContent = title;
+      if (modalMessage) modalMessage.textContent = message;
+      
+      if (!modal) {
+        console.error('確認モーダルが見つかりません');
+        return;
+      }
+      
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      var confirmBtn = document.getElementById('modal-confirm-btn');
+      var cancelBtn = document.getElementById('modal-cancel-btn');
+
+      var confirmHandler = function() {
+        onConfirm();
+        hideConfirmationModal();
+        confirmBtn.removeEventListener('click', confirmHandler);
+        cancelBtn.removeEventListener('click', cancelHandler);
+      };
+
+      var cancelHandler = function() {
+        hideConfirmationModal();
+        confirmBtn.removeEventListener('click', confirmHandler);
+        cancelBtn.removeEventListener('click', cancelHandler);
+      };
+
+      confirmBtn.addEventListener('click', confirmHandler);
+      cancelBtn.addEventListener('click', cancelHandler);
+    }
+
+    function hideConfirmationModal() {
+      var modal = document.getElementById('confirmation-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+    
+    // 公開確認ダイアログを表示
+    function showPublishConfirmDialog() {
+      showConfirmationModal(
+        '回答ボードを公開しますか？',
+        'フォームの設定が完了しました。生徒がアクセスできるように回答ボードを公開しますか？',
+        function() {
+          publishBoard();
+        }
+      );
+    }
+    
+    // ワンクリックで公開を実行
+    function publishBoard() {
+      console.log('Publishing board automatically...');
+      
+      if (!selectedSheet) {
+        console.error('No sheet selected for publishing');
+        return;
+      }
+      
+      // 表示をロード中に変更
+      showLoadingState('公開中...');
+      
+      // 公開処理を実行（activateSheet関数を使用）
+      runGasWithUserId('activateSheetSimple', selectedSheet)
+        .then(function(result) {
+          console.log('Board published successfully:', result);
+          hideLoadingState();
+          
+          // ステータスを更新
+          updateStatusInfo();
+          
+          // 成功メッセージを表示
+          showToast('回答ボードが公開されました！', 'success');
+        })
+        .catch(function(error) {
+          console.error('Failed to publish board:', error);
+          hideLoadingState();
+          showToast('公開に失敗しました: ' + error.message, 'error');
+        });
+    }
+    
+    // 自動公開ダイアログのチェック
+    function checkAutoPublishDialog(status) {
+      if (status && status.autoShowPublishDialog && status.readyToPublish) {
+        console.log('Auto-showing publish dialog for new/updated form');
+        
+        // 新しいフォームの場合はより積極的に表示
+        const delay = status.isNewForm ? 500 : 1000;
+        
+        setTimeout(function() {
+          showPublishConfirmDialog();
+          
+          // フラグをリセットして重複表示を防ぐ
+          if (currentStatus) {
+            currentStatus.autoShowPublishDialog = false;
+          }
+        }, delay);
+      }
+    }
+
+    // マルチテナント対応: ユーザーIDの安全な初期化
+    var userId = '';
+    
+    // マルチテナント対応: テンプレート変数とmetaタグから安全にデータを取得
+    (function() {
+      try {
+        // テンプレート変数から直接取得
+        var templateUserId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
+        if (templateUserId && templateUserId.trim() !== '') {
+          userId = templateUserId;
+          console.log('✅  - userId from template:', userId);
+        } else {
+          // フォールバック: metaタグから取得
+          var userIdMeta = document.querySelector('meta[name="user-id"]');
+          if (userIdMeta && userIdMeta.content) {
+            userId = userIdMeta.content;
+            console.log('✅  - userId from meta:', userId);
+          }
+        }
+        
+        if (!userId) {
+          console.error('❌  - userId not found in template or meta');
+        }
+      } catch (e) {
+        console.error('❌  - userId initialization error:', e);
+        userId = '';
+      }
+    })();
+    var selectedSheet = '';
+    var currentActiveSheet = '';
+    var webAppUrl = '';
+    var currentSpreadsheetUrl = '';
+    var currentStatus = null; // 現在のステータス情報を保存
+
+    // Detect jsdom test environment to disable auto-loading
+    var IS_TEST_ENV = typeof navigator !== 'undefined' &&
+      navigator.userAgent && navigator.userAgent.indexOf('jsdom') !== -1;
+
+    const DEBUG_MODE = <?= typeof DEBUG_MODE !== 'undefined' ? DEBUG_MODE : false ?>;
+
+    // AdminPanel専用システムフロー表示機能
+    function showSystemFlow() {
+      if (!DEBUG_MODE) return;
+      
+      console.group('🔄 StudyQuest 管理パネル システムフロー');
+      console.log('📋 Phase 1: 管理パネル初期化');
+      console.log('  ├─ 管理者権限確認');
+      console.log('  ├─ ユーザー情報取得');
+      console.log('  ├─ スプレッドシート接続');
+      console.log('  └─ UI要素初期化');
+      
+      console.log('🎨 Phase 2: レイアウト構築');
+      console.log('  ├─ 左パネル（メイン操作）');
+      console.log('  ├─ 右パネル（システム情報）');
+      console.log('  ├─ フッター（公開URL表示）');
+      console.log('  └─ レスポンシブ対応');
+      
+      console.log('📡 Phase 3: データ連携');
+      console.log('  ├─ スプレッドシートデータ取得');
+      console.log('  ├─ シート一覧取得');
+      console.log('  ├─ 列ヘッダー自動判定');
+      console.log('  └─ 公開状態確認');
+      
+      console.log('🏗️ Phase 4: 設定UI構築');
+      console.log('  ├─ ステップインジケーター');
+      console.log('  ├─ シート選択ドロップダウン');
+      console.log('  ├─ 列設定フォーム');
+      console.log('  └─ プレビュー表示');
+      
+      console.log('⚡ Phase 5: 管理機能');
+      console.log('  ├─ ボード作成・公開');
+      console.log('  ├─ 設定変更');
+      console.log('  ├─ URLコピー機能');
+      console.log('  └─ リアルタイム更新');
+      
+      console.log('🔧 Phase 6: 最適化・監視');
+      console.log('  ├─ キャッシュ管理');
+      console.log('  ├─ エラーハンドリング');
+      console.log('  ├─ パフォーマンス監視');
+      console.log('  └─ デバッグ情報出力');
+      
+      console.groupEnd();
+      
+      // AdminPanel固有の状態を表示
+      console.group('📊 管理パネル現在状態');
+      console.log('DOM状態:', document.readyState);
+      console.log('CSS読み込み:', document.styleSheets.length + ' stylesheets');
+      console.log('GAS環境:', typeof google !== 'undefined' ? 'Available' : 'Not Available');
+      console.log('管理者状態:', typeof currentStatus !== 'undefined' && currentStatus ? 'Authenticated' : 'Unknown');
+      console.log('スプレッドシートURL:', typeof currentSpreadsheetUrl !== 'undefined' ? (currentSpreadsheetUrl ? 'Set' : 'Not Set') : 'Unknown');
+      console.groupEnd();
+    }
+
+    function setLoading(isLoading, message = '') {
+      const loader = document.getElementById('loading-overlay');
+      const loaderMessage = document.getElementById('loading-message');
+      if (!loader) return;
+
+      if (isLoading) {
+        if (loaderMessage) loaderMessage.textContent = message;
+        loader.classList.remove('hidden');
+      } else {
+        loader.classList.add('hidden');
+      }
+    }
+
+    var elements = {}; // elementsオブジェクトを初期化
+
+    // Progressive Disclosure Functions - 早期定義
+    function toggleSection(sectionId) {
+      var section = document.getElementById(sectionId);
+      var icon = document.getElementById(sectionId.replace('content', 'icon'));
+      
+      if (!section) return;
+      
+      var isExpanded = section.classList.contains('expanded');
+      
+      if (isExpanded) {
+        section.classList.remove('expanded');
+        section.classList.add('collapsed');
+        if (icon) {
+          if (sectionId === 'step1-content') {
+            icon.style.transform = 'rotate(0deg)'; // Down arrow
+          } else if (sectionId === 'step2-content' || sectionId === 'step3-content') {
+            icon.style.transform = 'rotate(90deg)'; // Right arrow
+          }
+        }
+      } else {
+        section.classList.remove('collapsed');
+        section.classList.add('expanded');
+        if (icon) {
+          if (sectionId === 'step1-content') {
+            icon.style.transform = 'rotate(180deg)'; // Up arrow
+          } else if (sectionId === 'step2-content' || sectionId === 'step3-content') {
+            icon.style.transform = 'rotate(0deg)'; // Down arrow
+          }
+        }
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      // 初期ロード状態を表示
+      setLoading(true, '設定を読み込み中...');
+      
+      // タイムアウト設定（20秒）
+      var initTimeoutId = setTimeout(function() {
+        setLoading(false);
+        showMessage('初期設定の読み込みに時間がかかっています。ページを再読み込みしてください。', 'warning');
+      }, 20000);
+      // `elements` オブジェクトの定義を修正
+elements = {
+  // ... 既存の要素はそのまま ...
+  sheetSelect: document.getElementById('sheet-select'),
+  configArea: document.getElementById('config-area'),
+  configPlaceholder: document.getElementById('config-placeholder'),
+  opinionHeader: document.getElementById('opinionHeader'),
+  reasonHeader: document.getElementById('reasonHeader'),
+  nameHeader: document.getElementById('nameHeader'),
+  classHeader: document.getElementById('classHeader'),
+  saveConfigBtn: document.getElementById('save-config-btn'),
+  detailOptions: document.getElementById('detail-options'),
+  boardUrl: document.getElementById('board-url'),
+  viewBoardLink: document.getElementById('view-board-link'),
+  setupProgress: document.getElementById('setup-progress'),
+  setupProgressMobile: document.getElementById('setup-progress-mobile'),
+  setupProgressText: document.getElementById('setup-progress-text'),
+  setupProgressTextMobile: document.getElementById('setup-progress-text-mobile'),
+  headerDomainName: document.getElementById('header-domain-name'),
+  headerStatusDot: document.getElementById('header-status-dot'),
+  headerStatusText: document.getElementById('header-status-text'),
+  configStatus: document.getElementById('config-status'),
+  addSpreadsheetText: document.getElementById('add-spreadsheet-text'),
+  saveConfigText: document.getElementById('save-config-text'),
+  createBoardBtn: document.getElementById('create-board-btn'),
+  createBoardText: document.getElementById('create-board-text'),
+  formUrlInput: document.getElementById('form-url-input'),
+  copyFormUrlBtn: document.getElementById('copy-form-url-btn'),
+  openFormUrlLink: document.getElementById('open-form-url-link'),
+  openSpreadsheetBtn: document.getElementById('open-spreadsheet-btn'),
+  addSpreadsheetBtn: document.getElementById('add-spreadsheet-btn'),
+  guidanceText: document.getElementById('guidance-text'),
+  // 新しいシート詳細要素
+  sheetDetails: document.getElementById('sheet-details'),
+  sheetColumns: document.getElementById('sheet-columns'),
+  spreadsheetLink: document.getElementById('spreadsheet-link'),
+  formLink: document.getElementById('form-link'),
+  
+  // ★★★ ここから追加 ★★★
+  // システム情報パネルの要素
+  'info-admin-email': document.getElementById('info-admin-email'),
+  'info-user-id': document.getElementById('info-user-id'),
+  'info-published-sheet': document.getElementById('info-published-sheet'),
+  'info-answer-count': document.getElementById('info-answer-count'),
+  'info-reaction-count': document.getElementById('info-reaction-count'),
+  'delete-account-btn': document.getElementById('delete-account-btn'),
+  
+  // 新しいUI要素
+  'info-publish-status': document.getElementById('info-publish-status'),
+  'info-publish-indicator': document.getElementById('info-publish-indicator'),
+  'info-publish-text': document.getElementById('info-publish-text'),
+  'info-display-mode': document.getElementById('info-display-mode'),
+  'info-show-counts': document.getElementById('info-show-counts'),
+  'open-form-btn': document.getElementById('open-form-btn'),
+  'open-linked-form-btn': document.getElementById('open-linked-form-btn'),
+  
+  // 統合フッター要素
+  adminFooter: document.getElementById('admin-footer'),
+  currentTopicText: document.getElementById('current-topic-text')
+  // ★★★ ここまで追加 ★★★
+};
+      // AppSetupPageリンクとアカウント削除セクションの表示制御
+      var appSetupLink = document.getElementById('app-setup-link');
+      var accountDeletionSection = document.getElementById('account-deletion-section');
+      
+      console.log('Display control - isSystemAdmin:', window.isSystemAdmin);
+      console.log('Display control - appSetupLink element:', appSetupLink);
+      console.log('Display control - accountDeletionSection element:', accountDeletionSection);
+
+      if (window.isSystemAdmin) {
+        // システム管理者の場合：AppSetupPageリンクを表示、削除セクションを非表示
+        if (appSetupLink) {
+          appSetupLink.style.display = 'block';
+          console.log('✅ AppSetupPage link shown for deploy user');
+        }
+        if (accountDeletionSection) {
+          accountDeletionSection.style.display = 'none';
+          console.log('✅ Account deletion section hidden for deploy user');
+        }
+      } else {
+        // 一般ユーザーの場合：AppSetupPageリンクを非表示、削除セクションを表示
+        if (appSetupLink) {
+          appSetupLink.style.display = 'none';
+          console.log('ℹ️ AppSetupPage link hidden for non-deploy user');
+        }
+        if (accountDeletionSection) {
+          accountDeletionSection.style.display = 'block';
+          console.log('ℹ️ Account deletion section shown for non-deploy user');
+        }
+      }
+      if (!IS_TEST_ENV) {
+        showSystemFlow(); // デバッグフロー表示
+        loadStatus();
+        adjustLayout();
+        loadAdminDomainInfo();
+      }
+      setupEventListeners();
+      
+      // システム状況のリアルタイム更新を開始
+      startSystemStatusUpdate();
+      
+      // 初期ロード完了後にタイムアウトをクリア
+      setTimeout(function() {
+        clearTimeout(initTimeoutId);
+        setLoading(false);
+      }, 1000);
+    });
+    // ===== 共通ドメイン情報処理関数 =====
+    // AdminPanel.html と Registration.html で共通使用
+    
+    /**
+     * ドメイン情報を取得して表示する共通関数
+     * @param {Function} onSuccess - 成功時のコールバック（オプション）
+     * @param {Function} onError - エラー時のコールバック（オプション）
+     */
+    function loadDomainInfo(onSuccess, onError) {
+      callWithCache('getDeployUserDomainInfo', 'domain_info', 60000)
+        .then(function(info) {
+          displayDomainInfo(info);
+          if (onSuccess) onSuccess(info);
+        })
+        .catch(function(error) {
+          console.error('ドメイン情報の取得に失敗しました:', error);
+          displayDomainInfo({ error: error.message || error });
+          if (onError) onError(error);
+        });
+    }
+
+    /**
+     * ドメイン情報を表示する共通関数
+     * @param {Object} info - ドメイン情報オブジェクト
+     */
+    function displayDomainInfo(info) {
+      var headerDomainMatch = document.getElementById('header-domain-match');
+      var headerDomainMismatch = document.getElementById('header-domain-mismatch');
+      var headerDomainInitial = document.getElementById('header-domain-initial');
+      var headerDomainMatchText = document.getElementById('header-domain-match-text');
+      var headerDomainMismatchText = document.getElementById('header-domain-mismatch-text');
+
+      // 全ての表示を一旦非表示にする
+      if (headerDomainMatch) headerDomainMatch.classList.add('hidden');
+      if (headerDomainMismatch) headerDomainMismatch.classList.add('hidden');
+      if (headerDomainInitial) headerDomainInitial.classList.add('hidden');
+      
+      if (!info || info.error) {
+        console.warn('ドメイン情報エラー:', info && info.error ? info.error : 'Unknown error');
+        if (headerDomainInitial) headerDomainInitial.classList.remove('hidden');
+        return;
+      }
+
+      if (info.isDomainMatch) {
+        // ドメインが一致している場合
+        if (headerDomainMatch && headerDomainMatchText) {
+          headerDomainMatch.classList.remove('hidden');
+          if (info.deployDomain) {
+            headerDomainMatchText.textContent = info.deployDomain + ' ドメイン';
+          } else {
+            headerDomainMatchText.textContent = 'グローバルアクセス';
+          }
+        }
+      } else {
+        // ドメイン不一致の場合
+        if (headerDomainMismatch && headerDomainMismatchText) {
+          headerDomainMismatch.classList.remove('hidden');
+          headerDomainMismatchText.textContent = info.currentDomain;
+        }
+      }
+    }
+
+    // AdminPanel専用のラッパー関数（後方互換性のため）
+    function loadAdminDomainInfo() {
+      loadDomainInfo();
+    }
+
+    function displayAdminDomainInfo(info) {
+      displayDomainInfo(info);
+    }
+    
+    // ステップベースのUI初期化
+    function initializeStepBasedUI() {
+      // ステップ1のみ開く、ステップ2・3は閉じる（既にHTMLで設定済み）
+      // Initialization complete - UI state already set in HTML
+    }
+
+    // 重複していたDOMContentLoadedイベントリスナーを削除
+    // 既に上記で設定済み
+
+    // `setupEventListeners` 関数の中にこのリスナーを追加
+function setupEventListeners() {
+  // ... 既存のリスナーはそのまま ...
+  // Sheet selection
+      if (elements.sheetSelect) {
+        elements.sheetSelect.addEventListener('change', function(e) {
+          selectedSheet = e.target.value;
+          
+          // selectedSheetが文字列であることを確認
+          if (typeof selectedSheet !== 'string' || selectedSheet === '[object Object]') {
+            console.error('selectedSheetが無効です:', selectedSheet);
+            console.error('選択されたオプション:', e.target.options[e.target.selectedIndex]);
+            return;
+          }
+          
+          updateUIForSelectedSheet();
+          
+          // 公開中のシートの場合は列情報の読み込みをスキップ
+          if (!(currentStatus && currentStatus.appPublished && 
+                (selectedSheet === currentActiveSheet || selectedSheet === currentStatus.publishedSheetName))) {
+            loadConfigForSelected();
+          }
+        });
+      }
+
+      // ★★★ ここから追加 ★★★
+      var reguessBtn = document.getElementById('reguess-headers-btn');
+      if (reguessBtn) {
+        reguessBtn.addEventListener('click', runHeaderGuessing);
+      }
+      // ★★★ ここまで追加 ★★★
+
+      // Actions
+      
+      if (elements.clearSelectionBtn) {
+        elements.clearSelectionBtn.addEventListener('click', clearSheetSelection);
+      }
+      // 新しい保存・公開ボタンのイベントリスナー
+      var savePublishBtn = document.getElementById('save-publish-btn');
+      if (savePublishBtn) {
+        savePublishBtn.addEventListener('click', function() {
+          showConfirmationModal(
+            '設定の保存と公開',
+            '現在の設定を保存し、回答ボードを公開します。よろしいですか？',
+            saveAndPublish
+          );
+        });
+      }
+      
+      // 公開停止ボタンのイベントハンドラー
+      var unpublishBtn = document.getElementById('unpublish-board-btn');
+      if (unpublishBtn) {
+        unpublishBtn.addEventListener('click', function() {
+          showConfirmationModal(
+            '公開を停止',
+            'ボードの公開を停止します。この操作により、ボードにアクセスできなくなります。継続しますか？',
+            unpublishBoard
+          );
+        });
+      }
+      
+      var addResourceBtn = document.getElementById('add-resource-btn');
+      if (addResourceBtn) {
+        addResourceBtn.addEventListener('click', addResource);
+      }
+      
+      // Legacy spreadsheet management (keep for compatibility)
+      var addSpreadsheetBtn = document.getElementById('add-spreadsheet-btn');
+      if (addSpreadsheetBtn) {
+        addSpreadsheetBtn.addEventListener('click', addSpreadsheet);
+      }
+      
+      // Create board events
+      if (elements.createBoardBtn) {
+        elements.createBoardBtn.addEventListener('click', createAdditionalForm);
+      }
+      
+      var quickCreateBtn = document.getElementById('quick-create-board-btn');
+      if (quickCreateBtn) {
+        quickCreateBtn.addEventListener('click', createBoard);
+      }
+      
+      // 追加フォーム作成ボタン
+      var createAdditionalFormBtn = document.getElementById('create-additional-form-btn');
+      if (createAdditionalFormBtn) {
+        createAdditionalFormBtn.addEventListener('click', function() {
+          showFormConfigModal();
+        });
+      }
+
+      // フォーム設定モーダルのイベントリスナー
+      var formConfigClose = document.getElementById('form-config-close');
+      var formConfigCancel = document.getElementById('form-config-cancel');
+      var formConfigCreate = document.getElementById('form-config-create');
+      var mainQuestionType = document.getElementById('main-question-type');
+
+      if (formConfigClose) {
+        formConfigClose.addEventListener('click', hideFormConfigModal);
+      }
+      if (formConfigCancel) {
+        formConfigCancel.addEventListener('click', hideFormConfigModal);
+      }
+      if (formConfigCreate) {
+        formConfigCreate.addEventListener('click', createFormWithConfig);
+      }
+
+      // 質問タイプ変更時の処理
+      if (mainQuestionType) {
+        mainQuestionType.addEventListener('change', function() {
+          const choicesDiv = document.getElementById('main-question-choices-div');
+          if (this.value === 'multiple' || this.value === 'choice') {
+            choicesDiv.classList.remove('hidden');
+          } else {
+            choicesDiv.classList.add('hidden');
+          }
+        });
+      }
+
+      // クラス選択の有効/無効切り替え
+      var enableClassSelection = document.getElementById('enable-class-selection');
+      if (enableClassSelection) {
+        enableClassSelection.addEventListener('change', function() {
+          const classChoicesContainer = document.getElementById('class-choices-container');
+          if (this.checked) {
+            classChoicesContainer.classList.remove('hidden');
+          } else {
+            classChoicesContainer.classList.add('hidden');
+          }
+        });
+      }
+
+      var refreshBoardBtn = document.getElementById('refresh-board-btn');
+      if (refreshBoardBtn) {
+        refreshBoardBtn.addEventListener('click', refreshBoardDataFromAdmin);
+      }
+      
+      // Display options
+      if (elements.detailOptions) {
+        elements.detailOptions.addEventListener('change', function(e) {
+          if (e.target.name === 'showNames' || e.target.name === 'showCounts') {
+            updateConfigButtons(); // 設定保存ボタンの状態を更新
+          }
+        });
+      }
+      
+      // Auto-update config when headers change
+      if (elements.opinionHeader) {
+        elements.opinionHeader.addEventListener('change', updateConfigButtons);
+      }
+      
+      // リアルタイムバリデーションの設定
+      setupRealtimeValidation();
+      
+      // リアルタイムバリデーションの設定
+      setupRealtimeValidation();
+      
+      // Digital citizenship button event
+      var digitalCitizenshipBtn = document.getElementById('digital-citizenship-btn');
+      if (digitalCitizenshipBtn) {
+        digitalCitizenshipBtn.addEventListener('click', showDigitalCitizenshipModal);
+      }
+      
+      // Teacher guide modal events
+      var teacherGuideConfirmBtn = document.getElementById('teacherGuideConfirmBtn');
+      if (teacherGuideConfirmBtn) {
+        teacherGuideConfirmBtn.addEventListener('click', hideTeacherGuideModal);
+      }
+      
+      // Digital citizenship guide button
+      var showDigitalCitizenshipBtn = document.getElementById('show-digital-citizenship-guide');
+      if (showDigitalCitizenshipBtn) {
+        showDigitalCitizenshipBtn.addEventListener('click', function() {
+          var modal = document.getElementById('digital-citizenship-modal');
+          if (modal) {
+            modal.classList.remove('hidden');
+          }
+        });
+      }
+      
+      // Usage guide button
+      var showUsageGuideBtn = document.getElementById('show-usage-guide');
+      if (showUsageGuideBtn) {
+        showUsageGuideBtn.addEventListener('click', function() {
+          var modal = document.getElementById('usage-guide-modal');
+          if (modal) {
+            modal.classList.remove('hidden');
+          }
+        });
+      }
+      
+      // Digital citizenship modal close events
+      var digitalCitizenshipCloseBtn = document.getElementById('digital-citizenship-modal-close');
+      var digitalCitizenshipCloseBtnBottom = document.getElementById('digital-citizenship-modal-close-btn');
+      
+      if (digitalCitizenshipCloseBtn) {
+        digitalCitizenshipCloseBtn.addEventListener('click', function() {
+          var modal = document.getElementById('digital-citizenship-modal');
+          if (modal) {
+            modal.classList.add('hidden');
+          }
+        });
+      }
+      
+      if (digitalCitizenshipCloseBtnBottom) {
+        digitalCitizenshipCloseBtnBottom.addEventListener('click', function() {
+          var modal = document.getElementById('digital-citizenship-modal');
+          if (modal) {
+            modal.classList.add('hidden');
+          }
+        });
+      }
+      
+      var openSpreadsheetBtn = document.getElementById('open-spreadsheet-btn');
+      if (openSpreadsheetBtn) {
+        openSpreadsheetBtn.addEventListener('click', openDatabaseSpreadsheet);
+      }
+
+      // Add event listener for the step2 spreadsheet button
+      var openSpreadsheetBtnStep2 = document.getElementById('open-spreadsheet-btn-step2');
+      if (openSpreadsheetBtnStep2) {
+        openSpreadsheetBtnStep2.addEventListener('click', openDatabaseSpreadsheet);
+      }
+
+      var openFormBtn = document.getElementById('open-form-btn');
+      if (openFormBtn) {
+        openFormBtn.addEventListener('click', openForm);
+      }
+
+      // Open linked form button event listener
+      if (elements['open-linked-form-btn']) {
+        elements['open-linked-form-btn'].addEventListener('click', openLinkedForm);
+      }
+
+  // ★★★ ここから追加 ★★★
+  if (elements['delete-account-btn']) {
+    elements['delete-account-btn'].addEventListener('click', handleDeleteRequest);
+  }
+  
+  // セキュリティモーダル関連のイベントリスナー
+  var securityInfoBtn = document.getElementById('security-info-btn');
+  var securityModal = document.getElementById('security-modal');
+  var securityModalClose = document.getElementById('security-modal-close');
+  var securityModalConfirm = document.getElementById('security-modal-confirm');
+  
+  if (securityInfoBtn && securityModal) {
+    securityInfoBtn.addEventListener('click', function() {
+      securityModal.classList.remove('hidden');
+    });
+  }
+  
+  if (securityModalClose && securityModal) {
+    securityModalClose.addEventListener('click', function() {
+      securityModal.classList.add('hidden');
+    });
+  }
+  
+  if (securityModalConfirm && securityModal) {
+    securityModalConfirm.addEventListener('click', function() {
+      securityModal.classList.add('hidden');
+    });
+  }
+  
+  // モーダル外クリックで閉じる
+  if (securityModal) {
+    securityModal.addEventListener('click', function(e) {
+      if (e.target === securityModal) {
+        securityModal.classList.add('hidden');
+      }
+    });
+  }
+  
+  // ★★★ ここまで追加 ★★★
+}
+
+// ★★★ 以下の2つの関数を新しく追加 ★★★
+
+/**
+ * アカウント削除ボタンが押された時の処理（2重チェックのモーダル表示）
+ */
+function handleDeleteRequest() {
+  // プライバシーモーダルを最初に表示
+  showPrivacyModal(function() {
+    // プライバシー確認後、削除確認モーダルを表示
+    showConfirmationModal(
+      'アカウントの完全削除',
+      '本当にこのアカウントを削除しますか？この操作は元に戻せず、すべてのデータが失われます。',
+      function() {
+        setLoading(true, 'アカウントを完全に削除しています...');
+        runGasWithUserId('deleteCurrentUserAccount')
+          .then(function(response) {
+            setLoading(false);
+            showMessage(response, 'success');
+            setTimeout(function() {
+              window.top.location.href = '?page=Registration';
+            }, 2000);
+          })
+          .catch(function(error) {
+            setLoading(false);
+            showError(error);
+          });
+      }
+    );
+  });
+}
+
+// showPrivacyModal function removed - using the one defined earlier in the file
+
+
+/**
+ * UI要素のテキストを安全に設定するヘルパー関数
+ * @param {string} elementId - 要素のID
+ * @param {string} value - 設定する値
+ * @param {string} prefix - プレフィックス（オプション）
+ */
+function safeSetText(elementId, value, prefix = '') {
+  const element = document.getElementById(elementId);
+  if (element) {
+    element.textContent = value ? prefix + value : '-';
+    console.log(`✅ [DEBUG] Updated ${elementId}:`, element.textContent);
+  } else {
+    console.warn(`❌ [DEBUG] Element not found: ${elementId}`);
+  }
+}
+
+/**
+ * サーバーから受け取ったstatusオブジェクトを元に、システム状況パネルを更新します。
+ * @param {object} status - getStatusから返される完全なステータスオブジェクト
+ */
+function updateDatabaseInfo(status) {
+  console.log('🔧 [DEBUG] updateDatabaseInfo called with status:', status);
+  
+  if (!status || !status.userInfo) {
+    console.warn('システム情報を更新できませんでした: ユーザー情報がありません。', status);
+    return;
+  }
+
+  console.log('✅ [DEBUG] User info found, updating system panel:', status.userInfo);
+
+  // スプレッドシートURLを設定
+  if (status.userInfo.spreadsheetUrl) {
+    currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
+    console.log('✅ [DEBUG] currentSpreadsheetUrl set to:', currentSpreadsheetUrl);
+  }
+
+  // 既存のフィールドを更新
+  safeSetText('info-admin-email', status.userInfo.adminEmail);
+  safeSetText('info-user-id', status.userInfo.userId);
+  safeSetText('info-published-sheet', status.publishedSheetName || 'なし');
+  safeSetText('info-answer-count', status.answerCount || '0');
+  safeSetText('info-reaction-count', status.totalReactions || '0');
+
+  // 新しいUI要素を更新
+  
+  // 公開状態の更新
+  const isPublished = status && (status.appPublished || (status.activeSheetName && status.publishedSheetName));
+  updatePublicationStatusUI(isPublished);
+
+  // 表示モードの更新
+  const displayMode = status.showNames ? '名前表示' : '匿名表示';
+  safeSetText('info-display-mode', displayMode);
+
+  // カウント表示の更新
+  const showCounts = status.showCounts !== undefined ? (status.showCounts ? '表示' : '非表示') : '表示';
+  safeSetText('info-show-counts', showCounts);
+  
+  // チェックボックスの状態を同期
+  syncCheckboxStates(status);
+
+  // ボタンの状態を更新
+  const openSpreadsheetBtns = document.querySelectorAll('#open-spreadsheet-btn, #open-spreadsheet-btn-step2');
+  const openFormBtn = document.getElementById('open-form-btn');
+  
+  openSpreadsheetBtns.forEach(btn => {
+    if (btn) {
+      const hasSpreadsheetUrl = status.userInfo && status.userInfo.spreadsheetUrl;
+      btn.disabled = !hasSpreadsheetUrl;
+      if (hasSpreadsheetUrl) {
+        btn.title = 'スプレッドシートを開く';
+      } else {
+        btn.title = 'スプレッドシートが設定されていません';
+      }
+    }
+  });
+  
+  if (openFormBtn) {
+    const formUrl = status.formUrl || (status.userInfo && status.userInfo.formUrl);
+    const hasFormUrl = formUrl && formUrl.trim() !== "";
+    openFormBtn.disabled = !hasFormUrl;
+    if (hasFormUrl) {
+      openFormBtn.title = 'フォームを開く';
+    } else {
+      openFormBtn.title = 'フォームが設定されていません';
+    }
+  }
+
+  // Update open-linked-form-btn state based on formUrl availability
+  const openLinkedFormBtn = elements['open-linked-form-btn'];
+  if (openLinkedFormBtn) {
+    const hasFormUrl = status.formUrl && status.formUrl.trim() !== '';
+    openLinkedFormBtn.disabled = !hasFormUrl;
+    if (hasFormUrl) {
+      openLinkedFormBtn.title = '連携しているGoogleフォームを開きます';
+    } else {
+      openLinkedFormBtn.title = '連携しているフォームが設定されていません';
+    }
+  }
+}
+
+function updatePublicationStatusUI(isPublished) {
+  const statusIndicator = document.getElementById('info-publish-indicator');
+  const statusText = document.getElementById('info-publish-text');
+  const unpublishBtn = document.getElementById('unpublish-board-btn');
+  const savePublishBtn = document.getElementById('save-publish-btn');
+
+  if (isPublished) {
+    if (statusIndicator) {
+      statusIndicator.classList.remove('bg-gray-400');
+      statusIndicator.classList.add('bg-green-400');
+    }
+    if (statusText) statusText.textContent = '公開中';
+    if (unpublishBtn) unpublishBtn.classList.remove('hidden');
+    if (savePublishBtn) savePublishBtn.textContent = '設定を更新して再公開';
+  } else {
+    if (statusIndicator) {
+      statusIndicator.classList.remove('bg-green-400');
+      statusIndicator.classList.add('bg-gray-400');
+    }
+    if (statusText) statusText.textContent = '非公開';
+    if (unpublishBtn) unpublishBtn.classList.add('hidden');
+    if (savePublishBtn) savePublishBtn.textContent = '設定を保存して公開';
+  }
+}
+
+// チェックボックスの状態を同期する関数
+function syncCheckboxStates(status) {
+  // 設定データの優先順位: 公開シート設定 > グローバル設定 > デフォルト値
+  const activeSheetName = status.activeSheetName || status.publishedSheetName;
+  const sheetConfig = activeSheetName && status.systemStatus ? 
+    status.systemStatus[`sheet_${activeSheetName}`] : null;
+  
+  // showNames の値を決定
+  const showNames = sheetConfig?.showNames !== undefined ? 
+    sheetConfig.showNames : 
+    (status.showNames !== undefined ? status.showNames : false);
+    
+  // showCounts の値を決定
+  const showCounts = sheetConfig?.showCounts !== undefined ? 
+    sheetConfig.showCounts : 
+    (status.showCounts !== undefined ? status.showCounts : false);
+  
+  const showNamesCheckbox = document.getElementById('showNames');
+  const showCountsCheckbox = document.getElementById('showCounts');
+
+  if (showNamesCheckbox) showNamesCheckbox.checked = showNames;
+  if (showCountsCheckbox) showCountsCheckbox.checked = showCounts;
+  
+  console.log('🔂 [DEBUG] Checkbox sync:', {
+    activeSheetName,
+    sheetConfig,
+    showNames,
+    showCounts,
+    globalShowNames: status.showNames,
+    globalShowCounts: status.showCounts
+  });
+}
+
+    /**
+     * ページ読み込み時に、現在のステータスをサーバーから取得してUIに反映する
+     * @param {boolean} forceRefresh - キャッシュを無視して強制的に再取得するか
+     */
+    function loadStatus(forceRefresh = false) {
+      // ユーザーアクションによる手動更新の場合、アクティビティを記録
+      updateUserActivity();
+      
+      setLoading(true, '最新のステータス情報を読み込んでいます...');
+      
+      // キャッシュキーを定義
+      const cacheKey = 'status_' + (userId || 'guest');
+      const cacheTime = 60000; // 60秒キャッシュ
+      
+      if (forceRefresh) {
+        // 強制更新時はキャッシュを削除してサーバーから取得
+        if (typeof unifiedCache !== 'undefined') {
+          unifiedCache.delete(cacheKey);
+        }
+        // マルチテナント対応: 新しい関数を使用
+        runGasWithUserId('getStatus')
+          .then(function(status) {
+            console.log('✅ Status loaded ( forced refresh)', status);
+            updateUIWithNewStatus(status);
+            setLoading(false);
+          })
+          .catch(function(error) {
+            console.error('❌  getStatus failed, falling back to legacy:', error);
+            // フォールバック: 従来の方法
+            runGasWithUserId('getStatus', forceRefresh)
+              .then(function(status) {
+                console.log('✅ Status loaded (legacy fallback)', status);
+                updateUIWithNewStatus(status);
+                setLoading(false);
+              })
+              .catch(function(legacyError) {
+                handleError(legacyError, 'loadStatus');
+                setLoading(false);
+              });
+          });
+      } else {
+        // マルチテナント対応: キャッシュ付きで新しい関数を使用
+        callWithCacheWithUserId('getStatus', cacheKey, cacheTime)
+          .then(function(status) {
+            console.log('✅ Status loaded (cached)', status);
+            updateUIWithNewStatus(status);
+            setLoading(false);
+          })
+          .catch(function(error) {
+            handleError(error, 'loadStatus');
+            setLoading(false);
+          });
+      }
+    }
+
+    /**
+     * 新しいステータスオブジェクトでUI全体を更新する
+     * @param {object} status - getStatusから返されるステータスオブジェクト
+     */
+    function updateUIWithNewStatus(status) {
+      currentStatus = status;
+      
+      // 1. 静的なUI要素の更新
+      updateStaticUI(status);
+      console.log('✅ [2/3] Static UI Updated');
+
+      // 2. 動的なコンテンツと最終的なUI調整
+      if (status.activeSheetName) {
+        updateDynamicContent(status);
+      } else {
+        // アクティブなシートがない場合の処理
+        updateUIForNoActiveSheet(status);
+        console.log('✅ [3/3] No active sheet - UI update completed');
+      }
+    }
+
+    /**
+     * アクティブなシートがない場合にUIを更新する
+     * @param {object} status - ステータスオブジェクト
+     */
+    function updateUIForNoActiveSheet(status) {
+      // 設定エリアを隠す
+      hideConfigArea();
+      
+      // フッターとガイダンスを更新
+      updateFooterAndGuidance(status);
+      
+      // ステップインジケーターを更新
+      updateStepIndicators(status.setupStep);
+      
+      setLoading(false);
+    }
+
+    /**
+     * 静的なUI要素（シート選択やボタンの状態など）を更新する
+     * @param {object} status - ステータスオブジェクト
+     */
+    function updateStaticUI(status) {
+      // データベース情報を更新
+      updateDatabaseInfo(status);
+      
+      // 既存ユーザーセクションの表示を更新
+      updateExistingUserSection(status);
+      
+      // シート選択ドロップダウンを更新
+      populateSheetSelect(status.allSheets, status.activeSheetName);
+      
+      // カスタムフォーム情報を表示
+      updateCustomFormInfo(status);
+      
+      // 自動公開ダイアログのチェック
+      checkAutoPublishDialog(status);
+    }
+
+    /**
+     * カスタムフォーム情報を表示する
+     * @param {object} status - ステータスオブジェクト
+     */
+    function updateCustomFormInfo(status) {
+      const customFormInfoSection = document.getElementById('custom-form-info-section');
+      
+      if (!customFormInfoSection) {
+        // セクションが存在しない場合は作成（将来的な拡張用）
+        return;
+      }
+      
+      if (status.customFormInfo && status.customFormInfo.mainQuestion) {
+        // カスタムフォーム情報を表示
+        const formInfo = status.customFormInfo;
+        
+        customFormInfoSection.innerHTML = `
+          <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              <span class="font-medium text-blue-200">現在のカスタムフォーム設定</span>
+            </div>
+            <div class="space-y-2 text-sm">
+              ${formInfo.formTitle ? `<div><span class="text-gray-300">タイトル:</span> <span class="text-white">${escapeHtml(formInfo.formTitle)}</span></div>` : ''}
+              <div><span class="text-gray-300">質問:</span> <span class="text-white">${escapeHtml(formInfo.mainQuestion)}</span></div>
+              <div><span class="text-gray-300">回答形式:</span> <span class="text-white">${getQuestionTypeLabel(formInfo.questionType)}</span></div>
+              ${formInfo.choices && formInfo.choices.length > 0 ? `<div><span class="text-gray-300">選択肢:</span> <span class="text-white">${formInfo.choices.join(', ')}</span></div>` : ''}
+              ${formInfo.enableClass ? `<div><span class="text-gray-300">クラス選択:</span> <span class="text-green-400">有効</span></div>` : ''}
+              <div class="text-xs text-gray-400 mt-2">作成日: ${new Date(formInfo.lastCreated).toLocaleString('ja-JP')}</div>
+            </div>
+          </div>
+        `;
+        
+        customFormInfoSection.classList.remove('hidden');
+        console.log('✅ [DEBUG] Custom form info displayed');
+      } else {
+        customFormInfoSection.classList.add('hidden');
+      }
+    }
+
+    /**
+     * HTMLエスケープ関数
+     */
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    /**
+     * 質問タイプのラベルを取得
+     */
+    function getQuestionTypeLabel(type) {
+      const labels = {
+        'text': 'テキスト入力',
+        'multiple': 'チェックボックス',
+        'choice': 'ラジオボタン',
+        'paragraph': '長文入力'
+      };
+      return labels[type] || type;
+    }
+
+    /**
+     * 動的なコンテンツ（列設定など）を更新する
+     * @param {object} status - ステータスオブジェクト
+     */
+    function updateDynamicContent(status) {
+      // フッターとガイダンスを更新
+      updateFooterAndGuidance(status);
+      
+      // ステップインジケーターを更新
+      updateStepIndicators(status.setupStep);
+      
+      // 列設定を読み込み
+      loadConfigForSelected();
+      
+      console.log('✅ [3/3] Dynamic Content and Final UI Updated');
+    }
+
+    /**
+     * 既存ユーザー向けセクションの表示を更新
+     */
+    function updateExistingUserSection(status) {
+      const existingUserSection = document.getElementById('existing-user-section');
+      const createBoardBtn = document.getElementById('create-board-btn');
+
+      if (!existingUserSection || !createBoardBtn) return;
+      
+      console.log('🕵️ [DEBUG] updateExistingUserSection called with:', status);
+
+      // ユーザー情報とスプレッドシートIDの有無で判断
+      const hasUserInfo = status && status.userInfo && Object.keys(status.userInfo).length > 0;
+      const hasSpreadsheetId = hasUserInfo && status.userInfo.spreadsheetId;
+
+      if (hasUserInfo && hasSpreadsheetId) {
+        existingUserSection.classList.remove('hidden');
+        createBoardBtn.classList.add('hidden');
+        console.log('✅ [DEBUG] Showing existing user section, hiding create button');
+      } else {
+        existingUserSection.classList.add('hidden');
+        createBoardBtn.classList.remove('hidden');
+        console.log('✅ [DEBUG] Hiding existing user section, showing create button');
+      }
+    }
+
+    /**
+     * フッターとガイダンスメッセージを更新する
+     * @param {object} status - ステータスオブジェクト
+     */
+    function updateFooterAndGuidance(status) {
+      console.log('👣 [DEBUG] updateFooterAndGuidance called with status:', status);
+      const footer = document.getElementById('admin-footer');
+      const guidanceText = document.getElementById('guidance-text');
+      
+      if (!footer || !guidanceText) return;
+
+      const isPublished = status.isPublished;
+
+      if (isPublished && status.appUrls && status.appUrls.viewUrl) {
+        footer.classList.remove('hidden');
+        document.getElementById('board-url').value = status.appUrls.viewUrl;
+        document.getElementById('view-board-link').href = status.appUrls.viewUrl;
+        
+        // トピックテキストを設定（問題文を表示）
+        const topicTextElement = document.getElementById('current-topic-text');
+        if (topicTextElement) {
+          let topic = '（問題文未設定）';
+          
+          // カスタムフォーム情報から優先的に取得
+          if (status.customFormInfo && status.customFormInfo.mainQuestion) {
+            topic = status.customFormInfo.mainQuestion;
+            console.log('✅ [DEBUG] Using custom form main question:', topic);
+          } 
+          // フォールバック: 公開中のシート設定から問題文を取得
+          else if (status.publishedSheetName && status.userInfo && status.userInfo.configJson) {
+            try {
+              const config = JSON.parse(status.userInfo.configJson);
+              const sheetKey = 'sheet_' + status.publishedSheetName;
+              const sheetConfig = config[sheetKey] || {};
+              topic = sheetConfig.opinionHeader || status.publishedSheetName || '（問題文未設定）';
+            } catch (e) {
+              console.warn('ConfigJson parsing error:', e);
+              topic = status.publishedSheetName || '（問題文未設定）';
+            }
+          }
+          
+          topicTextElement.textContent = topic;
+          console.log(`✅ [DEBUG] Set footer topic text to: ${topic}`);
+        }
+        
+        guidanceText.textContent = '回答ボードは現在公開中です。';
+      } else {
+        footer.classList.add('hidden');
+        // ガイダンスのテキストをステップに応じて設定
+        switch(status.setupStep) {
+          case 1:
+            guidanceText.textContent = 'ステップ1: ボードを作成または既存のリソースを追加してください。';
+            break;
+          case 2:
+            guidanceText.textContent = 'ステップ2: 表示したいシートを選択してください。';
+            break;
+          case 3:
+            guidanceText.textContent = 'ステップ3: 列を設定してボードを公開しましょう。';
+            break;
+          default:
+            guidanceText.textContent = 'セットアップを開始してください。';
+        }
+      }
+      
+      // fallback for topic text if everything else fails
+      if (isPublished && document.getElementById('current-topic-text').textContent === '読み込み中...') {
+         // フォールバックでも問題文を取得を試みる
+         let fallbackTopic = '（問題文未設定）';
+         if (status.publishedSheetName && status.userInfo && status.userInfo.configJson) {
+           try {
+             const config = JSON.parse(status.userInfo.configJson);
+             const sheetKey = 'sheet_' + status.publishedSheetName;
+             const sheetConfig = config[sheetKey] || {};
+             fallbackTopic = sheetConfig.opinionHeader || status.publishedSheetName || '（問題文未設定）';
+           } catch (e) {
+             fallbackTopic = status.publishedSheetName || '（問題文未設定）';
+           }
+         }
+         document.getElementById('current-topic-text').textContent = fallbackTopic;
+         console.log(`✅ [DEBUG] Set footer topic text fallback to: ${fallbackTopic}`);
+      }
+
+      adjustLayout();
+    }
+
+    /**
+     * ステップインジケーターのUIを更新する
+     * @param {number} currentStep - 現在のステップ番号 (1, 2, or 3)
+     */
+    function updateStepIndicators(currentStep) {
+      console.log('📊 [DEBUG] updateStepIndicators called with currentStep:', currentStep);
+      const steps = [
+        document.getElementById('step-1-indicator'),
+        document.getElementById('step-2-indicator'),
+        document.getElementById('step-3-indicator')
+      ];
+
+      steps.forEach((step, index) => {
+        if (!step) return;
+        const stepNumber = index + 1;
+        const circle = step.querySelector('div');
+        const text = step.querySelector('span');
+
+        if (stepNumber < currentStep) {
+          // 完了したステップ
+          circle.className = 'w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all';
+          text.classList.remove('text-gray-500');
+          text.classList.add('text-gray-300');
+        } else if (stepNumber === currentStep) {
+          // 現在のステップ
+          circle.className = 'w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all ring-2 ring-blue-400 ring-offset-2 ring-offset-gray-800';
+          text.classList.remove('text-gray-500');
+          text.classList.add('text-white', 'font-semibold');
+        } else {
+          // 未完了のステップ
+          circle.className = 'w-6 h-6 bg-gray-600 text-gray-400 rounded-full flex items-center justify-center font-bold text-xs transition-all';
+          text.classList.remove('text-white', 'font-semibold');
+          text.classList.add('text-gray-500');
+        }
+      });
+    }
+
+    /**
+     * シート選択のドロップダウンを生成・更新する
+     * @param {Array<string>} sheetNames - シート名の配列
+     * @param {string} activeSheetName - 現在アクティブなシート名
+     */
+    function populateSheetSelect(sheetNames, activeSheetName) {
+      const select = document.getElementById('sheet-select');
+      if (!select) {
+        console.warn('populateSheetSelect: sheet-select element not found.');
+        return;
+      }
+
+      console.log('populateSheetSelect: Received sheetNames:', sheetNames);
+      console.log('populateSheetSelect: Received activeSheetName:', activeSheetName);
+
+      // ドロップダウンをクリア
+      select.innerHTML = '<option value="">-- シートを選択 --</option>';
+      console.log('populateSheetSelect: After clearing innerHTML:', select.innerHTML);
+
+      if (sheetNames && sheetNames.length > 0) {
+        sheetNames.forEach(name => {
+          const option = document.createElement('option');
+          option.value = name.name; // nameオブジェクトからnameプロパティを使用
+          option.textContent = name.name; // nameオブジェクトからnameプロパティを使用
+          select.appendChild(option);
+        });
+        select.disabled = false;
+        console.log('populateSheetSelect: After adding options, innerHTML:', select.innerHTML);
+      } else {
+        select.innerHTML = '<option value="">利用可能なシートがありません</option>';
+        select.disabled = true;
+        console.log('populateSheetSelect: No sheets available, innerHTML:', select.innerHTML);
+      }
+      
+      // アクティブなシート名が渡された場合はそれを優先
+      if (activeSheetName) {
+        select.value = activeSheetName;
+        selectedSheet = activeSheetName;
+        console.log('populateSheetSelect: Set select.value to activeSheetName:', activeSheetName);
+      } else if (selectedSheet) {
+        // 未公開状態などでactiveSheetNameが無い場合は現在の選択を維持
+        select.value = selectedSheet;
+        console.log('populateSheetSelect: Keep existing selectedSheet:', selectedSheet);
+      } else {
+        select.value = '';
+        console.log('populateSheetSelect: Reset select.value to empty');
+      }
+      
+      // 選択状態に応じてUIを更新
+      selectedSheet = select.value;
+      console.log('populateSheetSelect: Final selectedSheet:', selectedSheet);
+      updateUIForSelectedSheet();
+    }
+
+    /**
+     * シートが選択されたときのUI更新
+     */
+    function updateUIForSelectedSheet() {
+      const configArea = document.getElementById('config-area');
+      const placeholder = document.getElementById('config-placeholder');
+      
+      if (selectedSheet) {
+        configArea.classList.remove('hidden');
+        placeholder.classList.add('hidden');
+        // AI判定ボタンを有効化
+        const reguessBtn = document.getElementById('reguess-headers-btn');
+        if (reguessBtn) reguessBtn.disabled = false;
+      } else {
+        configArea.classList.add('hidden');
+        placeholder.classList.remove('hidden');
+        const reguessBtn = document.getElementById('reguess-headers-btn');
+        if (reguessBtn) reguessBtn.disabled = true;
+      }
+    }
+
+    /**
+     * 選択されたシートの設定を読み込む
+     */
+    function loadConfigForSelected() {
+      if (!selectedSheet) return;
+      
+      console.log('🔎 [DEBUG] Load config check:', {
+        selectedSheet: selectedSheet,
+        currentActiveSheet: currentStatus.activeSheetName,
+        appPublished: currentStatus.isPublished,
+        publishedSheetName: currentStatus.publishedSheetName
+      });
+
+      // 公開中かつ選択中のシートが公開シートと同じ場合は、UIをロックする
+      if (currentStatus.isPublished && selectedSheet === currentStatus.publishedSheetName) {
+        setLoading(true, '公開中の設定を読み込んでいます...');
+      } else {
+        setLoading(true, '列情報を読み込んでいます...');
+      }
+      
+      runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
+        .then(handleSheetDetailsSuccess)
+        .catch(handleSheetDetailsError);
+    }
+
+    /**
+     * getSheetDetails成功時のハンドラ
+     */
+    function handleSheetDetailsSuccess(details) {
+      populateHeaderOptions(details.allHeaders);
+      
+      // 既存設定と推測設定をマージ
+      const configToUse = { 
+        ...details.guessedConfig, 
+        ...details.existingConfig,
+        showNames: details.existingConfig?.showNames || false,
+        showCounts: details.existingConfig?.showCounts !== undefined ? details.existingConfig.showCounts : false
+      };
+      
+      populateConfig(configToUse);
+      updateStepIndicators(3);
+      setLoading(false);
+    }
+
+    /**
+     * getSheetDetails失敗時のハンドラ
+     */
+    function handleSheetDetailsError(error) {
+      handleError(error, 'loadConfig');
+      clearConfigFields();
+      setLoading(false);
+    }
+
+    // ======= Utility functions for column configuration =======
+    /**
+     * 列選択用ドロップダウンにヘッダー一覧を設定する
+     * @param {Array<string>} headers - スプレッドシートの列ヘッダー
+     */
+    function populateHeaderOptions(headers) {
+      var selects = [elements.opinionHeader, elements.reasonHeader, elements.nameHeader, elements.classHeader];
+      selects.forEach(function(sel) {
+        sel.replaceChildren();
+        var opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '-- 選択してください --';
+        sel.appendChild(opt);
+        headers.forEach(function(h) {
+          var option = document.createElement('option');
+          option.value = h;
+          option.textContent = h;
+          sel.appendChild(option);
+        });
+      });
+    }
+
+    /**
+     * 設定オブジェクトをUIに反映する
+     * @param {object} cfg - 列設定と表示オプション
+     */
+    function populateConfig(cfg) {
+      if (!elements.opinionHeader || !elements.reasonHeader || !elements.nameHeader || !elements.classHeader) {
+        console.error('設定用のUI要素が見つかりません。');
+        return;
+      }
+
+      elements.opinionHeader.value = cfg.opinionHeader || '';
+      elements.reasonHeader.value  = cfg.reasonHeader || '';
+      elements.nameHeader.value    = cfg.nameHeader || '';
+      elements.classHeader.value   = cfg.classHeader || '';
+
+      var showNamesCb = document.getElementById('showNames');
+      var showCountsCb = document.getElementById('showCounts');
+      if (showNamesCb) showNamesCb.checked = !!cfg.showNames;
+      if (showCountsCb) showCountsCb.checked = cfg.showCounts !== undefined ? cfg.showCounts : false;
+
+      updateConfigButtons();
+    }
+
+    /**
+     * 列設定UIを初期状態に戻す
+     */
+    function clearConfigFields() {
+      [elements.opinionHeader, elements.reasonHeader, elements.nameHeader, elements.classHeader].forEach(function(sel) {
+        sel.replaceChildren();
+        var opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '-- 選択してください --';
+        sel.appendChild(opt);
+        sel.value = '';
+      });
+      updateConfigButtons();
+    }
+
+    /**
+     * AIによる列判定を実行
+     */
+    function runHeaderGuessing() {
+      if (!selectedSheet) {
+        showMessage('シートを選択してください。', 'warning');
+        return;
+      }
+      setLoading(true, 'AI搭載高精度列判定システムが分析中...');
+      
+      runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
+        .then(function(details) {
+          const configToUse = {
+            ...details.guessedConfig,
+            ...details.existingConfig,
+            showNames: details.existingConfig?.showNames || false,
+            showCounts: details.existingConfig?.showCounts !== undefined ? details.existingConfig.showCounts : false
+          };
+          populateHeaderOptions(details.allHeaders);
+          populateConfig(configToUse);
+          showMessage('🤖 AIによる列判定が完了しました。', 'info');
+          setLoading(false);
+        })
+        .catch(function(error) {
+          handleError(error, 'runHeaderGuessing');
+          setLoading(false);
+        });
+    }
+
+    /**
+     * 設定オブジェクトを現在のUIから構築する
+     */
+    function buildConfigObject() {
+      const showNamesCheckbox = document.getElementById('showNames');
+      const showCountsCheckbox = document.getElementById('showCounts');
+      
+      return {
+        opinionHeader: document.getElementById('opinionHeader').value,
+        reasonHeader: document.getElementById('reasonHeader').value,
+        nameHeader: document.getElementById('nameHeader').value,
+        classHeader: document.getElementById('classHeader').value,
+        showNames: showNamesCheckbox ? showNamesCheckbox.checked : false,
+        showCounts: showCountsCheckbox ? showCountsCheckbox.checked : false,
+      };
+    }
+
+    /**
+     * 設定が有効かどうかを検証する
+     */
+    function validateConfig() {
+      return !!document.getElementById('opinionHeader').value;
+    }
+
+    /**
+     * 設定ボタンの状態を更新する
+     */
+    function updateConfigButtons() {
+      const saveBtn = document.getElementById('save-publish-btn');
+      if (saveBtn) {
+        saveBtn.disabled = !validateConfig();
+      }
+    }
+
+    /**
+     * 入力フィールド変更時に即座にボタン状態を更新する
+     */
+    function setupRealtimeValidation() {
+      const fields = ['opinionHeader', 'reasonHeader', 'nameHeader', 'classHeader'];
+      fields.forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('change', updateConfigButtons);
+        }
+      });
+    }
+
+    /**
+     *【新しい推奨】設定を保存し、ボードを公開する
+     */
+    function saveAndPublish() {
+      if (!validateConfig()) {
+        showMessage('必須項目（回答データ列）が選択されていません。', 'error');
+        return;
+      }
+
+      setLoading(true, '設定を保存し、ボードを公開しています...');
+      const config = buildConfigObject();
+
+      // マルチテナント対応: 設定データをオブジェクトとして送信
+      const settingsData = {
+        selectedSheet: selectedSheet,
+        opinionHeader: config.opinionHeader,
+        reasonHeader: config.reasonHeader,
+        nameHeader: config.nameHeader,
+        classHeader: config.classHeader,
+        showNames: config.showNames,
+        showCounts: config.showCounts,
+        classChoices: config.classChoices
+      };
+      
+      runGasWithUserId('saveAndPublish', settingsData)
+        .then(function(result) {
+          setLoading(false);
+          if (result && result.status === 'success') {
+            showMessage('設定が保存され、ボードが公開されました！', 'success');
+            // マルチテナント版は latestStatus を含むので、それでUIを更新
+            if (result.latestStatus) {
+              updateUIWithNewStatus(result.latestStatus);
+              console.log('✅ saveAndPublish success - UI updated with latest status');
+            } else {
+              loadStatus(true);
+            }
+          } else {
+            showMessage(result.message || '設定の保存に失敗しました', 'error');
+          }
+        })
+        .catch(function(error) {
+          setLoading(false);
+          console.error('❌  saveAndPublish failed, falling back to legacy:', error);
+          // フォールバック: 従来の方法
+          runGasWithUserId('saveAndPublish', selectedSheet, config)
+            .then(function(status) {
+              setLoading(false);
+              showMessage('設定が保存され、ボードが公開されました！', 'success');
+              if (status && typeof status === 'object') {
+                updateUIWithNewStatus(status);
+                console.log('✅ saveAndPublish legacy fallback success');
+              } else {
+                loadStatus(true);
+              }
+            })
+            .catch(function(legacyError) {
+              setLoading(false);
+              handleError(legacyError, 'saveAndPublish');
+            });
+        });
+    }
+
+    function saveConfig() {
+      // この関数は古いので、新しい saveAndPublish に処理を委任するか、
+      // もし下書き保存機能が必要な場合は saveDraftConfig を呼び出すようにします。
+      // 今回はUIから直接呼び出されないため、念の為残しますが、基本的には使いません。
+      console.warn('古いsaveConfig関数が呼び出されました。新しいsaveAndPublishの使用を検討してください。');
+      saveAndPublish(); 
+    }
+
+
+    /**
+     * ボードの公開を停止する
+     */
+    function unpublishBoard() {
+      setLoading(true, 'ボードの公開を停止中...');
+      runGasWithUserId('clearActiveSheet')
+        .then(function(response) {
+          console.log('公開停止レスポンス:', response);
+          showMessage(response.message || '✅ 回答ボードの公開を停止しました。', 'success');
+          setLoading(false);
+          // サーバーレスポンスの最新ステータスでUIを直接更新（追加のAPI呼び出し不要）
+          if (response && typeof response === 'object' && response.success) {
+            updateUIWithNewStatus(response);
+            console.log('✅ unpublishBoard success - UI updated with response status');
+          } else {
+            // フォールバック: レスポンスが期待された形式でない場合のみloadStatus呼び出し
+            loadStatus(true);
+          }
+        })
+        .catch(function(error) {
+          handleError(error, 'unpublishBoard');
+          setLoading(false);
+        });
+    }
+
+    /**
+     * 新しいボードを作成する
+     */
+      function createBoard() {
+        // この関数は現在使用されていません。既存ユーザーはクイックスタートを使用してください。
+        showMessage('既存ユーザーは「新しいフォームを作成」ボタンをご利用ください。', 'info');
+      }
+    
+    /**
+     * 新規フォームを作成する
+     */
+    function createAdditionalForm() {
+        showFormConfigModal();
+    }
+
+    /**
+     * フォーム設定モーダルを表示
+     */
+    function showFormConfigModal() {
+        const modal = document.getElementById('form-config-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+
+            // サーバーから質問テンプレートを読み込み
+            initQuestionConfig();
+        }
+    }
+
+    /**
+     * 管理パネル用の設定初期化（プレースホルダーのみ、デフォルト値は設定しない）
+     */
+    async function initQuestionConfig() {
+        try {
+            // 管理パネルではプレースホルダーのみ表示し、デフォルト値は設定しない
+            // 保存されたクラス選択肢のみ読み込む
+            loadSavedClassChoices();
+            
+        } catch (error) {
+            console.error('Failed to initialize question config:', error);
+            // エラー時もクラス選択肢の読み込みを試行
+            loadSavedClassChoices();
+        }
+    }
+
+    /**
+     * 保存されたクラス選択肢を読み込み
+     */
+    function loadSavedClassChoices() {
+        runGasWithUserId('getSavedClassChoices')
+            .then(function(result) {
+                if (result.status === 'success' && result.classChoices) {
+                    const classChoicesTextarea = document.getElementById('class-choices');
+                    if (classChoicesTextarea) {
+                        classChoicesTextarea.value = result.classChoices.join('\n');
+                    }
+                }
+            })
+            .catch(function(error) {
+                console.warn('保存されたクラス選択肢の読み込みに失敗:', error.message);
+            });
+    }
+
+    /**
+     * フォーム設定モーダルを非表示
+     */
+    function hideFormConfigModal() {
+        const modal = document.getElementById('form-config-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    /**
+     * フォーム設定に基づいてフォームを作成
+     */
+    function createFormWithConfig() {
+        const customFormTitle = document.getElementById('custom-form-title').value.trim();
+        const customMainQuestion = document.getElementById('custom-main-question').value.trim();
+        const mainQuestionType = document.getElementById('main-question-type').value;
+        const mainQuestionChoices = document.getElementById('main-question-choices').value.split('\n').filter(choice => choice.trim());
+        const includeOthersOption = document.getElementById('include-others-option').checked;
+        const enableClassSelection = document.getElementById('enable-class-selection').checked;
+        const classChoices = enableClassSelection ? document.getElementById('class-choices').value.split('\n').filter(choice => choice.trim()) : [];
+
+        // バリデーション
+        if (!customFormTitle) {
+            showMessage('フォームタイトルを入力してください。', 'warning');
+            document.getElementById('custom-form-title').focus();
+            return;
+        }
+
+        if (!customMainQuestion) {
+            showMessage('質問内容を入力してください。', 'warning');
+            document.getElementById('custom-main-question').focus();
+            return;
+        }
+
+        if ((mainQuestionType === 'multiple' || mainQuestionType === 'choice') && mainQuestionChoices.length === 0) {
+            showMessage('選択肢を入力してください。', 'warning');
+            document.getElementById('main-question-choices').focus();
+            return;
+        }
+
+        const config = {
+            formTitle: customFormTitle,
+            mainQuestion: customMainQuestion,
+            questionType: mainQuestionType,
+            choices: mainQuestionChoices,
+            includeOthers: includeOthersOption,
+            enableClass: enableClassSelection,
+            classChoices: classChoices
+        };
+
+        hideFormConfigModal();
+        setLoading(true, '新しいフォームを作成しています...');
+
+        runGasWithUserId('createCustomFormUI', config)
+            .then(function(result) {
+                if (result.status === 'success') {
+                    showMessage('✅ 新しいフォームが作成され、連携されました！', 'success');
+                    if (result.editFormUrl) {
+                        window.open(result.editFormUrl, '_blank');
+                    }
+                    loadStatus(true);
+                    
+                    // クラス選択肢をデータベースに保存（有効な場合）
+                    if (enableClassSelection && classChoices.length > 0) {
+                        saveClassChoicesToDatabase(classChoices);
+                    }
+                } else {
+                    throw new Error(result.message || 'フォーム作成に失敗しました。');
+                }
+            })
+            .catch(function(error) {
+                handleError(error, 'createAdditionalForm');
+            })
+            .finally(function() {
+                setLoading(false);
+            });
+    }
+
+    /**
+     * クラス選択肢をデータベースに保存
+     */
+    function saveClassChoicesToDatabase(classChoices) {
+        runGasWithUserId('saveClassChoices', classChoices)
+            .catch(function(error) {
+                console.warn('クラス選択肢の保存に失敗:', error.message);
+            });
+    }
+
+    /**
+     * 外部リソース（スプレッドシート or フォーム）を追加する
+     */
+    function addResource() {
+      const url = document.getElementById('resource-url-input').value;
+      if (!url) {
+        showMessage('URLを入力してください。', 'warning');
+        return;
+      }
+
+      setLoading(true, 'リソースを追加しています...');
+      runGasWithUserId('addSpreadsheetUrl', url)
+        .then(function(result) {
+          if (result.status === 'success') {
+            showMessage(result.message, 'success');
+            loadStatus(true);
+          } else {
+            throw new Error(result.message);
+          }
+        })
+        .catch(function(error) {
+          handleError(error, 'addResource');
+        })
+        .finally(function() {
+          setLoading(false);
+        });
+    }
+    
+    /**
+     * データベースのスプレッドシートを開く
+     */
+    function openDatabaseSpreadsheet() {
+        if (currentSpreadsheetUrl) {
+            window.open(currentSpreadsheetUrl, '_blank');
+        } else {
+            showMessage('スプレッドシートのURLが見つかりません。', 'warning');
+        }
+    }
+
+    /**
+     * 連携しているフォームを開く
+     */
+    function openForm() {
+        if (currentStatus && currentStatus.formUrl) {
+            window.open(currentStatus.formUrl, '_blank');
+        } else {
+            showMessage('連携しているフォームが見つかりません。', 'warning');
+        }
+    }
+
+    /**
+     * ボードのURLをクリップボードにコピーする
+     */
+    function copyBoardUrl() {
+        const urlInput = document.getElementById('board-url');
+        if (urlInput) {
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(urlInput.value);
+                } else {
+                    urlInput.select();
+                    document.execCommand('copy');
+                }
+                showMessage('URLをコピーしました', 'success');
+            } catch (error) {
+                showMessage('コピーに失敗しました', 'error');
+            }
+        }
+    }
+    
+    /**
+     * システム状況を定期的に更新
+     */
+    // スマートポーリング実装
+    let lastUserActivity = Date.now();
+    let currentPollInterval = 5 * 60 * 1000; // 開始は5分間隔
+    let statusPollTimer = null;
+    
+    function updateUserActivity() {
+      lastUserActivity = Date.now();
+      // ユーザーアクティビティがあった場合、ポーリング間隔をリセット
+      if (currentPollInterval > 2 * 60 * 1000) {
+        currentPollInterval = 2 * 60 * 1000; // 2分に短縮
+        restartStatusPolling();
+      }
+    }
+    
+    function getOptimalPollInterval() {
+      const timeSinceActivity = Date.now() - lastUserActivity;
+      if (timeSinceActivity < 5 * 60 * 1000) {
+        return 2 * 60 * 1000; // 5分以内のアクティビティ: 2分間隔
+      } else if (timeSinceActivity < 15 * 60 * 1000) {
+        return 5 * 60 * 1000; // 15分以内: 5分間隔
+      } else {
+        return 10 * 60 * 1000; // 15分以上: 10分間隔
+      }
+    }
+    
+    function restartStatusPolling() {
+      if (statusPollTimer) {
+        clearInterval(statusPollTimer);
+      }
+      currentPollInterval = getOptimalPollInterval();
+      startSystemStatusUpdate();
+    }
+    
+    function startSystemStatusUpdate() {
+      statusPollTimer = setInterval(function() {
+        // UIが非表示の時は更新しない
+        if (document.hidden) return;
+        
+        // 現在のポーリング間隔を確認し、必要に応じて調整
+        const optimalInterval = getOptimalPollInterval();
+        if (optimalInterval !== currentPollInterval) {
+          restartStatusPolling();
+          return;
+        }
+        
+        // キャッシュを利用して静かに更新
+        runGasWithUserId('getStatus', false)
+          .then(function(status) {
+            // 変更があった場合のみUIを更新
+            if (JSON.stringify(status) !== JSON.stringify(currentStatus)) {
+              updateUIWithNewStatus(status);
+              console.log('📊 システム状態が更新されました');
+            }
+          })
+          .catch(function(error) {
+            // エラーはコンソールにのみ出力
+            console.warn('Silent status update failed:', error.message);
+          });
+      }, currentPollInterval);
+      
+      console.log(`⏰ ステータスポーリング開始: ${currentPollInterval / 1000}秒間隔`);
+    }
+    
+    // ユーザーアクティビティを監視
+    document.addEventListener('click', updateUserActivity);
+    document.addEventListener('keypress', updateUserActivity);
+    document.addEventListener('scroll', updateUserActivity);
+
+    function openAppSetupPage() {
+      // アプリ設定ページを新しいタブで開く
+      runGasWithUserId('getWebAppUrlCached')
+        .then(function(webAppUrl) {
+          const setupUrl = webAppUrl + '?setup=true&mode=appsetup';
+          window.open(setupUrl, '_blank');
+        })
+        .catch(function(error) {
+          console.error('WebApp URL取得エラー:', error);
+          // フォールバック: 現在のURLを使用
+          const currentUrl = window.location.href.split('?')[0];
+          const setupUrl = currentUrl + '?setup=true&mode=appsetup';
+          window.open(setupUrl, '_blank');
+        });
+    }
+
+  </script>
+
+  <!-- フォーム設定モーダル -->
+  <div id="form-config-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 hidden">
+    <div class="glass-panel rounded-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="p-8">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-2xl font-bold text-cyan-400">新しいフォームを作成</h3>
+          <button type="button" id="form-config-close" class="text-gray-400 hover:text-white transition-colors" title="閉じる">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="space-y-6">
+          <!-- ステップ0: フォームタイトルの設定 -->
+          <div class="glass-panel bg-cyan-500/5 border border-cyan-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-cyan-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm0 2h12v8H4V6z"/>
+                  <path d="M6 8h8v2H6V8zm0 4h6v2H6v-2z"/>
+                </svg>
+              </div>
+              <h4 class="text-lg font-semibold text-cyan-400">フォームタイトル</h4>
+              <span class="text-xs text-gray-400 bg-gray-700/50 px-2 py-1 rounded">必須</span>
+            </div>
+            <input 
+              type="text" 
+              id="custom-form-title" 
+              class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-colors" 
+              placeholder="例：国語の授業振り返り、理科実験レポート、今日の学習まとめ"
+              maxlength="100"
+            >
+            <div class="flex justify-between items-center mt-2">
+              <p class="text-xs text-gray-400">📝 作成されるフォームのタイトルに使用されます（自動で日時が追加されます）</p>
+              <span class="text-xs text-gray-500" id="title-counter">0/100</span>
+            </div>
+          </div>
+
+          <!-- ステップ1: 問題文の入力 -->
+          <div class="glass-panel bg-blue-500/5 border border-blue-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
+              <h4 class="text-lg font-semibold text-blue-400">質問内容を入力</h4>
+              <span class="text-xs text-gray-400 bg-gray-700/50 px-2 py-1 rounded">必須</span>
+            </div>
+            <textarea 
+              id="custom-main-question" 
+              rows="3" 
+              class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors" 
+              placeholder="例：今日の授業で学んだことの中で、最も印象に残ったことは何ですか？"
+              maxlength="500"
+            ></textarea>
+            <div class="flex justify-between items-center mt-2">
+              <p class="text-xs text-gray-400">💡 学習者に表示される質問文を入力してください</p>
+              <span class="text-xs text-gray-500" id="question-counter">0/500</span>
+            </div>
+          </div>
+
+          <!-- ステップ2: 回答方法の選択 -->
+          <div class="glass-panel bg-green-500/5 border border-green-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">2</div>
+              <h4 class="text-lg font-semibold text-green-400">回答方法を選択</h4>
+            </div>
+            <select id="main-question-type" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm focus:border-green-400 focus:ring-1 focus:ring-green-400 transition-colors" title="回答方法を選択してください">
+              <option value="choice" selected>選択肢（単一選択）</option>
+              <option value="multiple">選択肢（複数選択可）</option>
+              <option value="text">短文テキスト（1行回答）</option>
+            </select>
+            <p class="text-xs text-gray-400 mt-2">💡 すべての回答方法で、回答の理由を入力する欄が自動的に追加されます</p>
+          </div>
+
+          <!-- 選択肢設定（選択肢タイプの場合） -->
+          <div id="main-question-choices-div" class="glass-panel bg-yellow-500/5 border border-yellow-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-yellow-500 text-white rounded-full flex items-center justify-center text-sm font-bold">3</div>
+              <h4 class="text-lg font-semibold text-yellow-400">選択肢を設定</h4>
+            </div>
+            <textarea id="main-question-choices" rows="4" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-colors" placeholder="例：&#10;気づいたことがある。&#10;疑問に思うことがある。&#10;もっと知りたいことがある。"></textarea>
+            <p class="text-xs text-gray-400 mt-2">💡 学習者が選択できる選択肢を1行に1つずつ入力してください。例のような評価軸や、具体的な選択肢を設定できます。</p>
+            
+            <div class="mt-4">
+              <label class="flex items-center">
+                <input type="checkbox" id="include-others-option" class="mr-2 rounded bg-gray-700 border-gray-600 text-yellow-500 focus:ring-yellow-400" checked>
+                <span class="text-sm text-gray-300">「その他...」選択肢を追加する</span>
+              </label>
+              <p class="text-xs text-gray-400 mt-1 ml-6">チェックすると、学習者が自由に回答を入力できる「その他...」オプションが自動的に追加されます</p>
+            </div>
+          </div>
+
+          <!-- ステップ4: クラス設定（オプション） -->
+          <div class="glass-panel bg-purple-500/5 border border-purple-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-bold">4</div>
+              <h4 class="text-lg font-semibold text-purple-400">クラス設定</h4>
+              <span class="text-xs text-gray-400 bg-gray-700/50 px-2 py-1 rounded">オプション</span>
+            </div>
+            <div class="mb-3">
+              <label class="flex items-center">
+                <input type="checkbox" id="enable-class-selection" class="mr-2 rounded bg-gray-700 border-gray-600 text-purple-500 focus:ring-purple-400" checked>
+                <span class="text-sm text-gray-300">クラス選択を有効にする</span>
+              </label>
+            </div>
+            <div id="class-choices-container">
+              <textarea id="class-choices" rows="3" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition-colors" placeholder="例：&#10;クラス1&#10;クラス2&#10;クラス3&#10;クラス4"></textarea>
+              <p class="text-xs text-gray-400 mt-2">1行に1つずつクラス名を入力してください</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex gap-3 mt-8">
+          <button type="button" id="form-config-cancel" class="flex-1 px-6 py-3 bg-gray-600/80 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors font-medium">
+            キャンセル
+          </button>
+          <button type="button" id="form-config-create" class="flex-1 px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-600 hover:to-blue-600 transition-colors font-medium shadow-lg">
+            フォーム作成
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- フォーム設定モーダル用JavaScript -->
+  <script>
+  // 文字数カウンター機能
+  function setupCharacterCounters() {
+    const titleInput = document.getElementById('custom-form-title');
+    const questionTextarea = document.getElementById('custom-main-question');
+    const titleCounter = document.getElementById('title-counter');
+    const questionCounter = document.getElementById('question-counter');
+
+    if (titleInput && titleCounter) {
+      titleInput.addEventListener('input', function() {
+        const count = this.value.length;
+        titleCounter.textContent = `${count}/100`;
+        titleCounter.className = count > 90 ? 'text-xs text-red-400' : 'text-xs text-gray-500';
+      });
+    }
+
+    if (questionTextarea && questionCounter) {
+      questionTextarea.addEventListener('input', function() {
+        const count = this.value.length;
+        questionCounter.textContent = `${count}/500`;
+        questionCounter.className = count > 450 ? 'text-xs text-red-400' : 'text-xs text-gray-500';
+      });
+    }
+  }
+
+  // モーダル表示時にカウンターを初期化
+  document.addEventListener('DOMContentLoaded', function() {
+    setupCharacterCounters();
+  });
+
+  // フォーム設定モーダルが開かれたときにカウンターをリセット
+  const originalShowFormConfigModal = window.showFormConfigModal;
+  if (typeof originalShowFormConfigModal === 'function') {
+    window.showFormConfigModal = function() {
+      originalShowFormConfigModal();
+      setTimeout(setupCharacterCounters, 100); // モーダル表示後にセットアップ
+    };
+  }
+  </script>
+
 </body>
 </html>
