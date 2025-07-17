@@ -456,7 +456,7 @@ function getUserInfo(email, userId) {
  * @returns {HtmlOutput}
  */
 function showLoginPage() {
-  const template = HtmlService.createTemplateFromFile('src/LoginPage');
+  const template = HtmlService.createTemplateFromFile('LoginPage');
   return template.evaluate()
     .setTitle('StudyQuest - ログイン')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -467,7 +467,7 @@ function showLoginPage() {
  * @returns {HtmlOutput}
  */
 function showSetupPage() {
-  const template = HtmlService.createTemplateFromFile('src/SetupPage');
+  const template = HtmlService.createTemplateFromFile('SetupPage');
   return template.evaluate()
     .setTitle('StudyQuest - 初回セットアップ')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
@@ -478,7 +478,7 @@ function showSetupPage() {
  * @returns {HtmlOutput}
  */
 function showAppSetupPage() {
-    const appSetupTemplate = HtmlService.createTemplateFromFile('src/AppSetupPage');
+    const appSetupTemplate = HtmlService.createTemplateFromFile('AppSetupPage');
     return appSetupTemplate.evaluate()
       .setTitle('アプリ設定 - StudyQuest')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
@@ -493,7 +493,7 @@ function showAppSetupPage() {
  * @returns {HtmlOutput}
  */
 function showErrorPage(title, message, error) {
-  const template = HtmlService.createTemplateFromFile('src/ErrorBoundary');
+  const template = HtmlService.createTemplateFromFile('ErrorBoundary');
   template.title = title;
   template.message = message;
   if (DEBUG && error) {
@@ -514,7 +514,7 @@ function showErrorPage(title, message, error) {
  * @return {HtmlOutput}
  */
 function createSecureRedirect(targetUrl, message) {
-  const template = HtmlService.createTemplateFromFile('src/Redirect');
+  const template = HtmlService.createTemplateFromFile('Redirect');
   template.targetUrl = targetUrl;
   template.message = message;
   return template.evaluate().setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
