@@ -14,6 +14,19 @@
       if (!window._originalDocumentWrite) {
         const originalDocWrite = document.write;
         const originalDocWriteln = document.writeln;
+        const protoWriteTargets = [Document && Document.prototype, HTMLDocument && HTMLDocument.prototype];
+        protoWriteTargets.forEach(t => {
+          if (!t) return;
+          try {
+            t.write = function() {};
+            t.writeln = function() {};
+            Object.defineProperty(t, 'write', { value: function() {}, writable: false, configurable: false });
+            Object.defineProperty(t, 'writeln', { value: function() {}, writable: false, configurable: false });
+          } catch (e) {
+            t.write = function() {};
+            t.writeln = function() {};
+          }
+        });
         
         document.write = function(...args) {
           try {
