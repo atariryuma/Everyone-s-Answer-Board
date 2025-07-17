@@ -371,26 +371,27 @@ function routeRequest(params, userEmail) {
   // 3. ユーザー情報を取得（キャッシュ活用）
   const userInfo = getUserInfo(userEmail, params.userId);
 
-  // 4. ルーティング決定
+  // 4. ユーザー情報がない場合は、どのモードであってもログインページを表示
+  if (!userInfo) {
+    console.warn('No user info found for email:', userEmail, 'or userId:', params.userId, '. Showing login page.');
+    return showLoginPage();
+  }
+
+  // 5. ルーティング決定
   switch (params.mode) {
     case 'admin':
       return handleAdminRoute(userInfo, params, userEmail);
     case 'view':
       return renderAnswerBoard(userInfo, params);
     case 'appsetup':
-       // AppSetupPageは特別な権限チェックが必要なため、別途処理
       if (params.setupParam === 'true' && hasSetupPageAccess()) {
         return showAppSetupPage();
       }
       return showErrorPage('アクセス拒否', 'このページにアクセスする権限がありません。');
     default:
       // 不明なモードやパラメータなしの場合は、ユーザーの管理パネルへリダイレクト
-      if (userInfo) {
-        const adminUrl = buildUserAdminUrl(userInfo.userId);
-        return createSecureRedirect(adminUrl, '管理パネルにリダイレクトしています...');
-      }
-      // ユーザー情報がなければログインページへ
-      return showLoginPage();
+      const adminUrl = buildUserAdminUrl(userInfo.userId);
+      return createSecureRedirect(adminUrl, '管理パネルにリダイレクトしています...');
   }
 }
 
@@ -402,10 +403,7 @@ function routeRequest(params, userEmail) {
  * @returns {HtmlOutput}
  */
 function handleAdminRoute(userInfo, params, userEmail) {
-  if (!userInfo) {
-    // ユーザー情報が見つからない場合（例: DBに未登録）
-    return showLoginPage();
-  }
+  // この関数が呼ばれる時点でuserInfoはnullではないことが保証されている
 
   // セキュリティチェック: アクセスしようとしているuserIdが自分のものでなければ、自分の管理画面にリダイレクト
   if (params.userId && params.userId !== userInfo.userId) {
@@ -672,11 +670,17 @@ function handleSetupPages(params, userEmail) {
  * @return {HtmlOutput} HTMLコンテンツ
  */
 function renderAdminPanel(userInfo, mode) {
+  // ガード節: userInfoが存在しない場合はエラーページを表示して処理を中断
+  if (!userInfo) {
+    console.error('renderAdminPanelにuserInfoがnullで渡されました。これは予期せぬ状態です。');
+    return showErrorPage('エラー', 'ユーザー情報の読み込みに失敗したため、管理パネルを表示できません。');
+  }
+
   const adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
   adminTemplate.include = include;
   adminTemplate.userInfo = userInfo;
   adminTemplate.userId = userInfo.userId;
-  adminTemplate.mode = mode || 'admin'; // フォールバックを追加してnullを防止
+  adminTemplate.mode = mode || 'admin'; // 安全のためのフォールバック
   adminTemplate.displayMode = 'named';
   adminTemplate.showAdminFeatures = true;
   const deployUserResult = isDeployUser();
