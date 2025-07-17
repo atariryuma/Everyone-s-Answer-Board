@@ -12,7 +12,6 @@ function include(path) {
   try {
     const tmpl = HtmlService.createTemplateFromFile(path);
     tmpl.include = include;
-    tmpl.getSecurityHeaders = getSecurityHeaders;
     return tmpl.evaluate().getContent();
   } catch (error) {
     console.error(`Error including file ${path}:`, error);
@@ -407,7 +406,6 @@ function showRegistrationPage() {
   try {
     var template = HtmlService.createTemplateFromFile('LoginPage');
     template.include = include;
-    template.getSecurityHeaders = getSecurityHeaders;
     
     // No template variable processing - client will get GOOGLE_CLIENT_ID via server function
     
