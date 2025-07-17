@@ -8,8 +8,24 @@
   function initializeLoginPage() {
     setLoading(true, 'Googleアカウントの情報を確認しています...');
     
-    // Wait for Google Identity Services and Google APIs to load
+    // Check if client ID is available
+    if (!window.GOOGLE_CLIENT_ID) {
+      setLoading(false, 'Google Client IDが設定されていません');
+      return;
+    }
+    
+    // Wait for Google Identity Services and Google APIs to load with timeout
+    let attempts = 0;
+    const maxAttempts = 100; // 10 seconds timeout
+    
     const checkGoogleAPI = setInterval(() => {
+      attempts++;
+      if (attempts > maxAttempts) {
+        clearInterval(checkGoogleAPI);
+        setLoading(false, 'Google APIの読み込みがタイムアウトしました');
+        return;
+      }
+      
       if (typeof google !== 'undefined' && google.accounts && typeof gapi !== 'undefined') {
         clearInterval(checkGoogleAPI);
         initializeGoogleAuth();
@@ -29,7 +45,7 @@
       });
       
       googleAccountsClient = google.accounts.oauth2.initTokenClient({
-        client_id: '<?= GOOGLE_CLIENT_ID ?>',
+        client_id: window.GOOGLE_CLIENT_ID,
         scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
         callback: handleCredentialResponse,
       });
@@ -159,18 +175,33 @@
     setLoading(false);
     
     const userEmailDisplay = document.getElementById('user-email-display');
-    userEmailDisplay.textContent = 'エラーが発生しました';
-    
-    // Show error message temporarily
     const loginBtn = document.getElementById('login-btn');
+    
+    // Determine error type and show appropriate message
+    let errorMessage = 'エラーが発生しました';
+    if (error && error.message) {
+      if (error.message.includes('network') || error.message.includes('Network')) {
+        errorMessage = 'ネットワークエラー';
+      } else if (error.message.includes('auth') || error.message.includes('Auth')) {
+        errorMessage = '認証エラー';
+      } else if (error.message.includes('timeout') || error.message.includes('Timeout')) {
+        errorMessage = 'タイムアウト';
+      }
+    }
+    
+    userEmailDisplay.textContent = errorMessage;
+    
+    // Show retry button
     loginBtn.innerHTML = 'エラー - 再試行';
     loginBtn.disabled = false;
     
-    // Reset after 3 seconds
+    // Reset after 5 seconds
     setTimeout(() => {
       loginBtn.innerHTML = 'ログイン';
       userEmailDisplay.textContent = '-';
-    }, 3000);
+      // Retry initialization
+      initializeLoginPage();
+    }, 5000);
   }
   
   // Account switching

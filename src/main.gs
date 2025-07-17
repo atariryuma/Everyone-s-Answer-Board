@@ -9,9 +9,14 @@
  * @return {string} HTML content
  */
 function include(path) {
-  const tmpl = HtmlService.createTemplateFromFile(path);
-  tmpl.include = include;
-  return tmpl.evaluate().getContent();
+  try {
+    const tmpl = HtmlService.createTemplateFromFile(path);
+    tmpl.include = include;
+    return tmpl.evaluate().getContent();
+  } catch (error) {
+    console.error(`Error including file ${path}:`, error);
+    return `<!-- Error including ${path}: ${error.message} -->`;
+  }
 }
 
 /**
@@ -262,16 +267,52 @@ function isSystemSetup() {
  * 登録ページを表示する関数
  */
 function showRegistrationPage() {
-  var template = HtmlService.createTemplateFromFile('LoginPage');
-  template.include = include;
-  
-  // Set GOOGLE_CLIENT_ID for the login page
-  var clientId = PropertiesService.getScriptProperties().getProperty('GOOGLE_CLIENT_ID');
-  template.GOOGLE_CLIENT_ID = clientId;
-  
-  var output = template.evaluate()
-    .setTitle('ログイン - StudyQuest');
-  return safeSetXFrameOptionsDeny(output);
+  try {
+    var template = HtmlService.createTemplateFromFile('LoginPage');
+    template.include = include;
+    
+    // Set GOOGLE_CLIENT_ID for the login page
+    var clientId = PropertiesService.getScriptProperties().getProperty('GOOGLE_CLIENT_ID');
+    if (!clientId) {
+      console.warn('GOOGLE_CLIENT_ID not found in script properties');
+      clientId = '';
+    }
+    template.GOOGLE_CLIENT_ID = clientId;
+    
+    var output = template.evaluate()
+      .setTitle('ログイン - StudyQuest');
+    return safeSetXFrameOptionsDeny(output);
+  } catch (error) {
+    console.error('Error in showRegistrationPage:', error);
+    // Return a fallback error page
+    return HtmlService.createHtmlOutput(`
+      <html>
+        <head><title>エラー - StudyQuest</title></head>
+        <body>
+          <h1>システムエラー</h1>
+          <p>ログインページの読み込みに失敗しました。管理者に連絡してください。</p>
+          <p>エラー: ${error.message}</p>
+        </body>
+      </html>
+    `);
+  }
+}
+
+/**
+ * Returns system domain information for the login page.
+ * @returns {Object} adminDomain or error
+ */
+function getSystemDomainInfo() {
+  try {
+    var adminEmail = PropertiesService.getScriptProperties().getProperty('deployUser');
+    if (!adminEmail) {
+      throw new Error('システム管理者が設定されていません。');
+    }
+    var adminDomain = adminEmail.split('@')[1];
+    return { adminDomain: adminDomain };
+  } catch (e) {
+    return { error: e.message };
+  }
 }
 
 /**

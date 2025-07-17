@@ -41,7 +41,7 @@
     
     <!-- Login Actions -->
     <div class="space-y-4">
-      <button id="login-btn" class="login-btn" disabled>
+      <button type="button" id="login-btn" class="login-btn" disabled>
         ログイン
       </button>
       
@@ -59,6 +59,11 @@
       </a>
     </div>
   </div>
+  
+  <!-- Set global variables for login -->
+  <script>
+    window.GOOGLE_CLIENT_ID = '<?= GOOGLE_CLIENT_ID ?>';
+  </script>
   
   <!-- Include login-specific JavaScript -->
   <?!= include('login.js.html'); ?>
