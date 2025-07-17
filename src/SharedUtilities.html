@@ -281,22 +281,36 @@ class ErrorHandler {
   }
 
   logError(error, context = '') {
-    const errorInfo = {
-      message: error.message || error,
-      stack: error.stack,
-      context: context,
-      timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent
-    };
+    try {
+      const errorInfo = {
+        message: error?.message || error?.toString() || 'Unknown error',
+        stack: error?.stack || 'No stack trace available',
+        context: context || 'No context provided',
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        errorType: typeof error,
+        isObject: typeof error === 'object'
+      };
 
-    this.errors.push(errorInfo);
+      this.errors.push(errorInfo);
 
-    // Keep only recent errors
-    if (this.errors.length > this.maxErrors) {
-      this.errors.shift();
+      // Keep only recent errors
+      if (this.errors.length > this.maxErrors) {
+        this.errors.shift();
+      }
+
+      // Better error logging with more details
+      console.group('🚨 Error Logged');
+      console.log('Message:', errorInfo.message);
+      console.log('Type:', errorInfo.errorType);
+      console.log('Context:', errorInfo.context);
+      console.log('Stack:', errorInfo.stack);
+      console.log('Full Error Object:', error);
+      console.groupEnd();
+    } catch (loggingError) {
+      console.error('Error in error logging:', loggingError);
+      console.error('Original error:', error);
     }
-
-    console.error('Error logged:', errorInfo);
   }
 
   getRecentErrors(count = 10) {
