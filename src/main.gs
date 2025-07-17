@@ -134,22 +134,47 @@ function htmlEncode(text) {
  * @param {HtmlOutput} htmlOutput - 設定対象のHtmlOutput
  * @returns {HtmlOutput} 設定後のHtmlOutput
  */
-function safeSetXFrameOptionsAllowAll(htmlOutput) {
+/**
+ * HtmlOutputに安全にX-Frame-Optionsヘッダーとサンドボックスモードを設定するヘルパー関数
+ * @param {HtmlOutput} htmlOutput - 設定対象のHtmlOutput
+ * @returns {HtmlOutput} 設定後のHtmlOutput
+ */
+function safeSetSecurityOptions(htmlOutput) {
   try {
-    if (htmlOutput && typeof htmlOutput.setXFrameOptionsMode === 'function' &&
-        HtmlService && HtmlService.XFrameOptionsMode &&
-        HtmlService.XFrameOptionsMode.ALLOWALL) {
-      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN);
+    if (htmlOutput && typeof htmlOutput.setXFrameOptionsMode === 'function') {
+      // Verify XFrameOptionsMode enum exists and has valid values
+      if (HtmlService && HtmlService.XFrameOptionsMode) {
+        const frameMode = HtmlService.XFrameOptionsMode.SAMEORIGIN;
+        if (frameMode !== null && frameMode !== undefined) {
+          htmlOutput.setXFrameOptionsMode(frameMode);
+        } else {
+          console.warn('XFrameOptionsMode.SAMEORIGIN is null/undefined, skipping frame options');
+        }
+      } else {
+        console.warn('HtmlService.XFrameOptionsMode is not available, skipping frame options');
+      }
     }
-    if (htmlOutput && typeof htmlOutput.setSandboxMode === 'function' &&
-        HtmlService && HtmlService.SandboxMode &&
-        HtmlService.SandboxMode.IFRAME) {
-      htmlOutput.setSandboxMode(HtmlService.SandboxMode.IFRAME);
+    if (htmlOutput && typeof htmlOutput.setSandboxMode === 'function') {
+      // Verify SandboxMode enum exists and has valid values
+      if (HtmlService && HtmlService.SandboxMode) {
+        const sandboxMode = HtmlService.SandboxMode.IFRAME;
+        if (sandboxMode !== null && sandboxMode !== undefined) {
+          htmlOutput.setSandboxMode(sandboxMode);
+        } else {
+          console.warn('SandboxMode.IFRAME is null/undefined, skipping sandbox mode');
+        }
+      } else {
+        console.warn('HtmlService.SandboxMode is not available, skipping sandbox mode');
+      }
     }
   } catch (e) {
     console.warn('Failed to set frame options and sandbox mode:', e.message);
   }
   return htmlOutput;
+}
+
+function safeSetXFrameOptionsAllowAll(htmlOutput) {
+  return safeSetSecurityOptions(htmlOutput);
 }
 
 // 安定性を重視してvarを使用
@@ -290,10 +315,8 @@ function showLoginPage() {
   var template = HtmlService.createTemplateFromFile('LoginPage');
   template.include = include;
   var output = template.evaluate()
-    .setTitle('StudyQuest - ログイン')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN)
-    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
-  return output;
+    .setTitle('StudyQuest - ログイン');
+  return safeSetSecurityOptions(output);
 }
 
 /**
@@ -473,7 +496,7 @@ function buildUserAdminUrl(userId) {
  * @return {HtmlOutput}
  */
 function createServerSideNavigation(targetUrl, message) {
-  return HtmlService.createHtmlOutput(`
+  var output = HtmlService.createHtmlOutput(`
     <!DOCTYPE html>
     <html>
     <head>
@@ -543,9 +566,8 @@ function createServerSideNavigation(targetUrl, message) {
       </script>
     </body>
     </html>
-  `)
-  .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN)
-  .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+  `);
+  return safeSetSecurityOptions(output);
 }
 
 /**
@@ -555,7 +577,7 @@ function createServerSideNavigation(targetUrl, message) {
  * @return {HtmlOutput}
  */
 function createSecureRedirect(targetUrl, message) {
-  return HtmlService.createHtmlOutput(`
+  var output = HtmlService.createHtmlOutput(`
     <!DOCTYPE html>
     <html>
     <head>
@@ -606,7 +628,8 @@ function createSecureRedirect(targetUrl, message) {
       </script>
     </body>
     </html>
-  `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN);
+  `);
+  return safeSetSecurityOptions(output);
 }
 
 /**
@@ -986,10 +1009,9 @@ function renderAdminPanel(userInfo, mode) {
   adminTemplate.correctUrl = correctUrl;
   adminTemplate.shouldUpdateUrl = true;
   
-  return adminTemplate.evaluate()
-    .setTitle('みんなの回答ボード 管理パネル')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.SAMEORIGIN)
-    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+  var output = adminTemplate.evaluate()
+    .setTitle('みんなの回答ボード 管理パネル');
+  return safeSetSecurityOptions(output);
 }
 
 /**
