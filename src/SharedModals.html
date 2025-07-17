@@ -187,69 +187,6 @@
     </div>
   </div>
 </div>
-
-<!-- 使い方ガイドモーダル -->
-<div id="usage-guide-modal" class="fixed inset-0 bg-black/80 z-50 hidden" role="dialog" aria-modal="true">
-  <div class="flex items-center justify-center min-h-full p-4">
-    <div class="glass-panel rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between mb-6">
-        <h3 class="text-2xl font-bold text-amber-400">
-          <svg class="w-8 h-8 inline mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-          </svg>
-          使い方ガイド
-        </h3>
-        <button type="button" id="usage-guide-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500" aria-label="閉じる">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-      
-      <div class="space-y-6 text-gray-300">
-        <!-- 回答ボード管理の流れ -->
-        <div class="glass-panel bg-amber-500/10 rounded-lg p-6 border border-amber-400/30">
-          <h4 class="font-semibold text-amber-400 mb-4 flex items-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-            </svg>
-            回答ボード管理の流れ
-          </h4>
-          <ol class="list-decimal list-inside space-y-3 text-sm">
-            <li><strong class="text-amber-300">データソース準備</strong><br>
-              <span class="text-gray-400">• 自動作成：GoogleフォームとスプレッドシートがWorkspace連携で自動作成</span><br>
-              <span class="text-gray-400">• 外部連携：既存のフォーム・シートもURL入力で連携可能</span><br>
-              <span class="text-gray-400">• サービスアカウント共有：スプレッドシートが自動でサービスアカウントと共有</span>
-            </li>
-            <li><strong class="text-amber-300">シート選択と設定</strong><br>
-              <span class="text-gray-400">• 動的シート検出：連携スプレッドシート内の利用可能シートを自動取得</span><br>
-              <span class="text-gray-400">• シート切り替え：複数シート間での簡単な選択・切り替え</span><br>
-              <span class="text-gray-400">• リアルタイムプレビュー：シートヘッダーとデータ構造の即座確認</span>
-            </li>
-            <li><strong class="text-amber-300">高度な列設定</strong><br>
-              <span class="text-gray-400">• AI自動判定：機械学習による列の用途の自動識別</span><br>
-              <span class="text-gray-400">• 手動調整：ドロップダウンによる精密な列マッピング制御</span><br>
-              <span class="text-gray-400">• 必須・任意設定：回答列（必須）、理由・名前・クラス列（任意）</span>
-            </li>
-            <li><strong class="text-amber-300">表示・公開管理</strong><br>
-              <span class="text-gray-400">• 表示モード制御：匿名・記名表示の切り替え</span><br>
-              <span class="text-gray-400">• リアクション管理：いいね数表示・種類の設定</span><br>
-              <span class="text-gray-400">• 公開ステータス管理：ワンクリックでの公開・非公開切り替え</span>
-            </li>
-            <li><strong class="text-amber-300">ユーザー・アクセス管理</strong><br>
-              <span class="text-gray-400">• ドメインベース制御：G Suite/Workspaceドメインの自動検証</span><br>
-              <span class="text-gray-400">• ユーザー登録システム：一意ID管理による集中ユーザーデータベース</span>
-            </li>
-          </ol>
-          
-          <div class="mt-4 p-3 bg-amber-800/30 rounded text-sm">
-            <strong class="text-amber-300">💡 管理のヒント</strong><br>
-            <span class="text-gray-300">• 公開後は管理モード切り替えで学習者と同じ画面を確認可能</span><br>
-            <span class="text-gray-300">• AI活用：列の自動判定機能で設定時間を大幅短縮</span><br>
-            <span class="text-gray-300">• リアルタイム更新：フォーム回答が即座にボードに反映</span><br>
-            <span class="text-gray-300">• バックアップ機能：設定の自動バックアップでデータ保護</span>
-          </div>
-        </div>
         
         <!-- セキュリティについて -->
         <div class="glass-panel bg-blue-500/10 rounded-lg p-6 border border-blue-400/30">
@@ -316,12 +253,6 @@
           </ul>
         </div>
       </div>
-      
-      <div class="flex justify-end mt-6">
-        <button type="button" id="usage-guide-modal-close-btn" class="btn btn-primary">理解しました</button>
-      </div>
-    </div>
-  </div>
 </div>
 
 <!-- セキュリティモーダル -->
@@ -480,7 +411,7 @@ class SharedModals {
           'alert-modal',
           'loading-modal',
           'security-modal',
-          'usage-guide-modal'
+          
         ];
         
         modals.forEach(modalId => {
@@ -498,8 +429,8 @@ class SharedModals {
       'digital-citizenship-modal-close-btn',
       'teacherGuideModal-close',
       'teacherGuideModal-close-btn',
-      'usage-guide-modal-close',
-      'usage-guide-modal-close-btn'
+      
+      
     ];
     
     closeButtons.forEach(buttonId => {
@@ -510,8 +441,6 @@ class SharedModals {
             this.hideModal('digital-citizenship-modal');
           } else if (buttonId.includes('teacherGuide')) {
             this.hideModal('teacherGuideModal');
-          } else if (buttonId.includes('usage-guide')) {
-            this.hideModal('usage-guide-modal');
           }
         };
       }
