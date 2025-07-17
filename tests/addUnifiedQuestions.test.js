@@ -28,10 +28,12 @@ describe('addUnifiedQuestions other option', () => {
     };
 
     context.addUnifiedQuestions(form, 'custom', {
-      mainQuestionType: 'multiple',
-      mainQuestionChoices: ['A', 'B'],
-      customMainQuestion: 'Q',
-      enableClassSelection: false
+      mainQuestion: {
+        type: 'multiple',
+        choices: ['A', 'B'],
+        includeOthers: true
+      },
+      enableClass: false
     });
 
     expect(mainItem.showOtherOption).toHaveBeenCalledWith(true);
@@ -49,10 +51,12 @@ describe('addUnifiedQuestions other option', () => {
     };
 
     context.addUnifiedQuestions(form, 'custom', {
-      mainQuestionType: 'choice',
-      mainQuestionChoices: ['A', 'B'],
-      customMainQuestion: 'Q',
-      enableClassSelection: false
+      mainQuestion: {
+        type: 'choice',
+        choices: ['A', 'B'],
+        includeOthers: true
+      },
+      enableClass: false
     });
 
     expect(mainItem.showOtherOption).toHaveBeenCalledWith(true);

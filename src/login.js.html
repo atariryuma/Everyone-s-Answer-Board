@@ -3,6 +3,8 @@
 
   let googleAccountsClient;
   let isLoading = false;
+  let redirectUrl = '/exec';
+  let currentUserEmail = '';
 
   // Initialize login page
   function initializeLoginPage() {
@@ -98,19 +100,17 @@
       .then(response => response.json())
       .then(userInfo => {
         if (userInfo.email) {
-          // Update email display
+          currentUserEmail = userInfo.email;
           document.getElementById('user-email-display').textContent = userInfo.email;
 
-          // Check domain match
           const userDomain = userInfo.email.split('@')[1];
           const isAdminDomain = userDomain === serverInfo.adminDomain;
 
-          // Display domain status
           displayDomainStatus(isAdminDomain, serverInfo.adminDomain);
 
-          // Enable login button
           document.getElementById('login-btn').disabled = false;
-          setLoading(false);
+
+          verifyAuthentication();
         } else {
           throw new Error('ユーザー情報の取得に失敗しました');
         }
@@ -155,6 +155,56 @@
       </div>
     `;
     badgeEl.classList.remove('hidden');
+  }
+
+  // Verify authentication with server
+  function verifyAuthentication() {
+    if (window.sharedUtilities && window.sharedUtilities.auth) {
+      window.sharedUtilities.auth.verifyAuthentication()
+        .then(fetchExistingBoard)
+        .catch(handleError);
+    } else {
+      fetchExistingBoard();
+    }
+  }
+
+  // Register account on server for new users
+  function registerAccount() {
+    google.script.run
+      .withSuccessHandler(res => {
+        if (res && res.adminUrl) {
+          redirectUrl = res.adminUrl;
+        }
+        setLoading(false);
+      })
+      .withFailureHandler(handleError)
+      .registerNewUser(currentUserEmail);
+  }
+
+  // Retrieve existing board info from server
+  function fetchExistingBoard() {
+    google.script.run
+      .withSuccessHandler(result => {
+        if (!result) return;
+
+        if (result.status === 'existing_user') {
+          redirectUrl = result.adminUrl;
+          setLoading(false);
+        } else if (result.status === 'setup_required') {
+          redirectUrl = `/exec?mode=admin&userId=${result.userId}`;
+          setLoading(false);
+        } else if (result.status === 'new_user') {
+          registerAccount();
+        } else {
+          console.error('Unexpected getExistingBoard result:', result);
+          setLoading(false);
+        }
+      })
+      .withFailureHandler(error => {
+        console.error('getExistingBoard error:', error);
+        handleError(error);
+      })
+      .getExistingBoard();
   }
 
   // Request user login
@@ -255,8 +305,8 @@
 
       // Add a small delay for better UX
       setTimeout(() => {
-        // Redirect to admin panel
-        window.location.href = '/exec';
+        // Redirect to admin panel or setup page
+        window.location.href = redirectUrl;
       }, 500);
     } else {
       // Request authentication
