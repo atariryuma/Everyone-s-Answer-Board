@@ -1,11 +1,11 @@
 <style>
   /* Login Page Specific Styles */
   
-  /* Modern glassmorphism background - matched with admin panel */
+  /* Modern dark gradient background */
   .login-container {
-    background: linear-gradient(135deg, #1a1b26 0%, #24273a 25%, #1e293b 50%, #1e40af 75%, #1d4ed8 100%);
+    background: linear-gradient(135deg, #0f0f23 0%, #1a1b26 20%, #24273a 40%, #1e293b 60%, #1e40af 80%, #1d4ed8 100%);
     background-size: 400% 400%;
-    animation: gradientShift 15s ease infinite;
+    animation: gradientShift 20s ease infinite;
     min-height: 100vh;
     position: relative;
     overflow: hidden;
@@ -18,8 +18,9 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: radial-gradient(circle at 30% 20%, rgba(139, 92, 246, 0.3) 0%, transparent 50%),
-                radial-gradient(circle at 70% 80%, rgba(59, 130, 246, 0.3) 0%, transparent 50%);
+    background: radial-gradient(circle at 30% 20%, rgba(139, 92, 246, 0.2) 0%, transparent 60%),
+                radial-gradient(circle at 70% 80%, rgba(59, 130, 246, 0.2) 0%, transparent 60%),
+                radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.1) 0%, transparent 70%);
     pointer-events: none;
   }
   
@@ -29,14 +30,14 @@
     100% { background-position: 0% 50%; }
   }
   
-  /* Glassmorphism login card - matched with admin panel */
+  /* Flat glassmorphism login card */
   .login-card {
-    background: rgba(255, 255, 255, 0.05);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    background: rgba(255, 255, 255, 0.03);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     position: relative;
     overflow: hidden;
     transition: all 0.3s ease;
@@ -53,11 +54,12 @@
   }
   
   .login-card:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+    border-color: rgba(255, 255, 255, 0.12);
   }
   
-  /* Title styling */
+  /* Title styling with improved visibility */
   .login-title {
     background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
     -webkit-background-clip: text;
@@ -67,20 +69,22 @@
     font-weight: 700;
     text-align: center;
     margin-bottom: 0.5rem;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    text-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
   }
   
   .login-subtitle {
-    color: #94a3b8;
+    color: #cbd5e1;
     text-align: center;
     font-size: 0.875rem;
     margin-bottom: 2rem;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   }
   
-  /* Account info styling - matched with admin panel */
+  /* Account info styling - flat glassmorphism */
   .account-info {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 12px;
     padding: 1rem;
     margin-bottom: 1.5rem;
@@ -88,21 +92,23 @@
   }
   
   .account-label {
-    color: #64748b;
+    color: #94a3b8;
     font-size: 0.75rem;
     margin-bottom: 0.5rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   }
   
   .user-email {
-    color: #e2e8f0;
+    color: #f1f5f9;
     font-weight: 600;
     font-size: 0.875rem;
     word-break: break-all;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
   }
   
-  /* Domain status badges */
+  /* Domain status badges with organization branding */
   .domain-badge {
     display: inline-flex;
     align-items: center;
@@ -113,21 +119,24 @@
     font-weight: 500;
     margin-top: 0.75rem;
     transition: all 0.2s ease;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   }
   
   .domain-badge.match {
-    background: rgba(34, 197, 94, 0.1);
+    background: rgba(34, 197, 94, 0.15);
     color: #4ade80;
     border: 1px solid rgba(34, 197, 94, 0.3);
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
   }
   
   .domain-badge.mismatch {
-    background: rgba(245, 158, 11, 0.1);
+    background: rgba(245, 158, 11, 0.15);
     color: #fbbf24;
     border: 1px solid rgba(245, 158, 11, 0.3);
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.1);
   }
   
-  /* Login button styling */
+  /* Login button styling with organization branding */
   .login-btn {
     width: 100%;
     padding: 0.875rem 1.5rem;
@@ -142,6 +151,7 @@
     position: relative;
     overflow: hidden;
     box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   }
   
   .login-btn::before {
@@ -180,13 +190,14 @@
     box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
   }
   
-  /* Footer links */
+  /* Footer links with improved visibility */
   .footer-link {
-    color: #64748b;
+    color: #94a3b8;
     text-decoration: none;
     font-size: 0.75rem;
     transition: color 0.2s ease;
     position: relative;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   }
   
   .footer-link::after {
@@ -201,7 +212,7 @@
   }
   
   .footer-link:hover {
-    color: #3b82f6;
+    color: #60a5fa;
   }
   
   .footer-link:hover::after {
@@ -248,11 +259,40 @@
     transition: all 0.2s ease;
   }
   
+  /* Organization info styling */
+  .organization-info {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+  }
+  
+  .organization-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: #34d399;
+    font-weight: 600;
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  .organization-description {
+    color: #9ca3af;
+    font-size: 0.75rem;
+    text-align: center;
+    margin: 0;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+  
   /* Webkit prefix compatibility for Safari */
-  @supports not (backdrop-filter: blur(10px)) {
+  @supports not (backdrop-filter: blur(20px)) {
     .login-card {
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
     }
   }
 </style>

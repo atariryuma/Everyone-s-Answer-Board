@@ -75,6 +75,9 @@
   function getServerSideInfo() {
     google.script.run
       .withSuccessHandler(serverInfo => {
+        // Display organization information
+        displayOrganizationInfo(serverInfo);
+        
         // Check if user is already authenticated
         const token = gapi.client.getToken();
         if (token) {
@@ -116,6 +119,21 @@
         console.error('User info fetch error:', error);
         handleError(error);
       });
+  }
+  
+  // Display organization information
+  function displayOrganizationInfo(serverInfo) {
+    if (serverInfo && serverInfo.adminDomain) {
+      const orgInfoEl = document.getElementById('organization-info');
+      const orgNameEl = document.getElementById('organization-name');
+      
+      // Extract organization name from domain
+      const domainParts = serverInfo.adminDomain.split('.');
+      const orgName = domainParts[0].charAt(0).toUpperCase() + domainParts[0].slice(1);
+      
+      orgNameEl.textContent = orgName;
+      orgInfoEl.style.display = 'block';
+    }
   }
   
   // Display domain status badge
@@ -160,7 +178,7 @@
     getServerSideInfo();
   }
   
-  // Set loading state
+  // Set loading state with improved UX
   function setLoading(loading, message = '') {
     isLoading = loading;
     const loginBtn = document.getElementById('login-btn');
@@ -172,10 +190,12 @@
         <div class="loading-spinner"></div>
         ${message || 'ログイン中...'}
       `;
+      loginBtn.style.cursor = 'not-allowed';
       userEmailDisplay.textContent = message || '認証中...';
     } else {
       loginBtn.disabled = false;
       loginBtn.innerHTML = 'ログイン';
+      loginBtn.style.cursor = 'pointer';
       if (!message) {
         userEmailDisplay.textContent = '-';
       }
@@ -225,7 +245,7 @@
     }
   }
   
-  // Login button handler
+  // Login button handler with improved flow
   function handleLogin() {
     if (isLoading) return;
     
@@ -233,10 +253,14 @@
     if (userEmail && userEmail !== '-' && userEmail !== 'エラーが発生しました') {
       setLoading(true, '管理パネルにリダイレクトしています...');
       
-      // Redirect to admin panel
-      window.location.href = '/exec';
+      // Add a small delay for better UX
+      setTimeout(() => {
+        // Redirect to admin panel
+        window.location.href = '/exec';
+      }, 500);
     } else {
       // Request authentication
+      setLoading(true, 'Googleアカウントでログインしています...');
       requestUserLogin();
     }
   }
