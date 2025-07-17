@@ -9,40 +9,7 @@
 // APPLICATION STATE MANAGEMENT
 // =============================================================================
 
-// Application state object
-const appState = {
-  userId: '',
-  selectedSheet: '',
-  currentActiveSheet: '',
-  webAppUrl: '',
-  currentSpreadsheetUrl: '',
-  currentStatus: null,
-  isLoading: false
-};
-
-// Get user ID safely from template or meta tag
-(function() {
-  try {
-    const templateUserId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
-    if (templateUserId && templateUserId.trim() !== '') {
-      appState.userId = templateUserId;
-      console.log('✅ appState.userId from template:', appState.userId);
-    } else {
-      const userIdMeta = document.querySelector('meta[name="user-id"]');
-      if (userIdMeta && userIdMeta.content) {
-        appState.userId = userIdMeta.content;
-        console.log('✅ appState.userId from meta:', appState.userId);
-      }
-    }
-
-    if (!appState.userId) {
-      console.error('❌ appState.userId not found in template or meta');
-    }
-  } catch (e) {
-    console.error('❌ appState.userId initialization error:', e);
-    appState.userId = '';
-  }
-})();
+// adminState is defined in AdminPanelState.html
 
 // =============================================================================
 // ADMIN ERROR HANDLING SYSTEM
@@ -479,8 +446,8 @@ function updateDatabaseInfo(status) {
 
   // Set spreadsheet URL
   if (status.userInfo.spreadsheetUrl) {
-    appState.currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
-    console.log('✅ currentSpreadsheetUrl set to:', appState.currentSpreadsheetUrl);
+    adminState.currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
+    console.log('✅ currentSpreadsheetUrl set to:', adminState.currentSpreadsheetUrl);
   }
 
   // Update existing fields
@@ -586,7 +553,7 @@ function handleDeleteRequest() {
               setAdminLoading(false);
               handleAdminError(error, 'アカウント削除');
             },
-            [appState.userId],
+            [adminState.userId],
             'アカウント削除'
           );
         }
@@ -645,8 +612,8 @@ function showAdminSystemFlow() {
   console.log('DOM状態:', document.readyState);
   console.log('CSS読み込み:', document.styleSheets.length + ' stylesheets');
   console.log('GAS環境:', typeof google !== 'undefined' ? 'Available' : 'Not Available');
-  console.log('管理者状態:', typeof appState.currentStatus !== 'undefined' && appState.currentStatus ? 'Authenticated' : 'Unknown');
-  console.log('スプレッドシートURL:', typeof appState.currentSpreadsheetUrl !== 'undefined' ? (appState.currentSpreadsheetUrl ? 'Set' : 'Not Set') : 'Unknown');
+  console.log('管理者状態:', typeof adminState.currentStatus !== 'undefined' && adminState.currentStatus ? 'Authenticated' : 'Unknown');
+  console.log('スプレッドシートURL:', typeof adminState.currentSpreadsheetUrl !== 'undefined' ? (adminState.currentSpreadsheetUrl ? 'Set' : 'Not Set') : 'Unknown');
   console.groupEnd();
 }
 
@@ -752,7 +719,7 @@ if (document.readyState === 'loading') {
 
 // Export admin utilities to global scope for easy access
 window.adminUtilities = {
-  state: appState,
+  state: adminState,
   error: {
     handle: handleAdminError,
     translate: translateErrorMessage
