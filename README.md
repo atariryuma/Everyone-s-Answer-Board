@@ -172,7 +172,7 @@ sequenceDiagram
 ### 4.1. 画面一覧
 
   * **`SetupPage.html`**: 初回システムセットアップ画面。
-  * **`Registration.html`**: 新規ユーザー登録画面。
+  * **`Login.html`**: ログイン画面。
   * **`AdminPanel.html`**: 教師向けの管理画面。
   * **`Page.html`**: 生徒や一般閲覧者向けのメインの回答ボード画面。
 
@@ -183,10 +183,10 @@ sequenceDiagram
     1.  **サーバー**: `doGet(e)` は `PropertiesService` にシステム設定がないことを確認し、`SetupPage.html` を返す。
     2.  **クライアント**: 管理者が情報を入力し、`google.script.run.setupApplication()` を実行。
 
-  * **フロー2: 新規ユーザー登録 (`Registration.html`)**
+  * **フロー2: ログイン (`Login.html`)**
 
-    1.  **サーバー**: `doGet(e)` はユーザーが中央DBに未登録と判断し、`Registration.html` を返す。
-    2.  **クライアント**: `google.script.run.getExistingBoard()` を実行し未登録を確認後、`registerNewUser()` を実行。
+    1.  **サーバー**: `/exec` へのアクセス時は必ず `Login.html` を返す。
+    2.  **クライアント**: `google.script.run.getExistingBoard()` を実行し、登録済みの場合は管理パネルURLへリダイレクトする。
     3.  **キャッシュ**: `getExistingBoard` はサーバーサイドでユーザー情報をキャッシュし、DBへの不要なアクセスを削減。
 
   * **フロー3: 管理画面 (`AdminPanel.html`)**
