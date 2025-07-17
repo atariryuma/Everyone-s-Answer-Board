@@ -277,7 +277,7 @@ function showRegistrationPage() {
       console.warn('GOOGLE_CLIENT_ID not found in script properties');
       clientId = '';
     }
-    template.GOOGLE_CLIENT_ID = clientId;
+    template.GOOGLE_CLIENT_ID = escapeJavaScript(clientId);
     
     var output = template.evaluate()
       .setTitle('ログイン - StudyQuest');

@@ -24,7 +24,7 @@
     setLoading(true, 'Googleアカウントの情報を確認しています...');
 
     // Check if client ID is available
-    if (!window.GOOGLE_CLIENT_ID) {
+    if (!window.GOOGLE_CLIENT_ID || window.GOOGLE_CLIENT_ID.trim() === '') {
       setLoading(false, 'Google Client IDが設定されていません');
       return;
     }

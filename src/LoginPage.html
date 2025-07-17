@@ -101,7 +101,17 @@
         };
       }
 
-      window.GOOGLE_CLIENT_ID = '<?= GOOGLE_CLIENT_ID ?>';
+      try {
+        var clientId = '<?= GOOGLE_CLIENT_ID ?>';
+        if (clientId && typeof clientId === 'string' && clientId.trim()) {
+          window.GOOGLE_CLIENT_ID = clientId.trim();
+        } else {
+          window.GOOGLE_CLIENT_ID = '';
+        }
+      } catch (error) {
+        console.error('Error setting GOOGLE_CLIENT_ID:', error);
+        window.GOOGLE_CLIENT_ID = '';
+      }
     })();
   </script>
 
