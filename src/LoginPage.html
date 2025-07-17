@@ -105,13 +105,7 @@
           // Store error for later handling
           window.googleLoadError = error;
           
-          // Try to disable document.write again in case it was reset
-          try {
-            document.write = function() { return; };
-            document.writeln = function() { return; };
-          } catch (writeError) {
-            console.warn('Could not re-disable document.write:', writeError);
-          }
+          // document.write protection is handled globally
         }
       };
       
@@ -180,92 +174,47 @@
     </div>
   </div>
 
-  <!-- Consolidated document.write protection and variable initialization -->
+  <!-- Login system initialization -->
   <script>
-    (function() {
-      // Single consolidated document.write protection
-      if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-        try {
-          // Create safe no-op replacement
-          var safeDocumentWrite = function() { return; };
-          var safeDocumentWriteln = function() { return; };
-          
-          // Store original functions for debugging
-          window._originalDocumentWrite = document.write;
-          window._originalDocumentWriteln = document.writeln;
-          
-          // Replace document.write methods
-          document.write = safeDocumentWrite;
-          document.writeln = safeDocumentWriteln;
-          
-          // Lock properties to prevent override
-          try {
-            Object.defineProperty(document, 'write', {
-              value: safeDocumentWrite,
-              writable: false,
-              enumerable: true,
-              configurable: false
-            });
-            
-            Object.defineProperty(document, 'writeln', {
-              value: safeDocumentWriteln,
-              writable: false,
-              enumerable: true,
-              configurable: false
-            });
-          } catch (defineError) {
-            console.warn('Could not lock document.write properties:', defineError);
-          }
-          
-          console.log('✅ Document.write consolidated protection active');
-          
-        } catch (error) {
-          console.error('❌ Error setting up document.write replacement:', error);
-        }
-      }
-
-      // Initialize GOOGLE_CLIENT_ID
-      window.GOOGLE_CLIENT_ID = '';
-    })();
+    // Initialize login system variables
+    window.GOOGLE_CLIENT_ID = '';
+    window.loginSystemReady = false;
   </script>
 
-  <!-- Set GOOGLE_CLIENT_ID with server-side only approach -->
+  <!-- GOOGLE_CLIENT_ID retrieval function -->
   <script>
-    (function() {
-      // Initialize with empty value - will be populated by server
-      window.GOOGLE_CLIENT_ID = '';
-      
-      console.log('🔄 Getting GOOGLE_CLIENT_ID from server...');
-      
-      // Wait for google.script to be available
-      setTimeout(function() {
-        try {
-          if (typeof google !== 'undefined' && google.script && google.script.run) {
-            google.script.run
-              .withSuccessHandler(function(result) {
-                console.log('Server response for GOOGLE_CLIENT_ID:', result);
-                if (result && result.clientId) {
-                  window.GOOGLE_CLIENT_ID = result.clientId;
-                  console.log('✅ GOOGLE_CLIENT_ID set via server:', window.GOOGLE_CLIENT_ID);
-                } else {
-                  console.warn('❌ GOOGLE_CLIENT_ID not available from server');
-                  if (result && result.error) {
-                    console.error('Server error:', result.error);
-                  }
+    // Function to get GOOGLE_CLIENT_ID from server
+    function getGoogleClientIdFromServer() {
+      return new Promise((resolve, reject) => {
+        console.log('🔄 Getting GOOGLE_CLIENT_ID from server...');
+        
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+          google.script.run
+            .withSuccessHandler(function(result) {
+              console.log('Server response for GOOGLE_CLIENT_ID:', result);
+              if (result && result.clientId) {
+                window.GOOGLE_CLIENT_ID = result.clientId;
+                console.log('✅ GOOGLE_CLIENT_ID set via server:', window.GOOGLE_CLIENT_ID);
+                resolve(result.clientId);
+              } else {
+                console.warn('❌ GOOGLE_CLIENT_ID not available from server');
+                if (result && result.error) {
+                  console.error('Server error:', result.error);
                 }
-              })
-              .withFailureHandler(function(error) {
-                console.error('❌ Failed to get GOOGLE_CLIENT_ID from server:', error);
-              })
-              .getGoogleClientId();
-          } else {
-            console.warn('❌ Google Apps Script not available for fallback');
-          }
-        } catch (fallbackError) {
-          console.error('❌ Error in server fallback:', fallbackError);
+                reject(new Error('GOOGLE_CLIENT_ID not available from server'));
+              }
+            })
+            .withFailureHandler(function(error) {
+              console.error('❌ Failed to get GOOGLE_CLIENT_ID from server:', error);
+              reject(error);
+            })
+            .getGoogleClientId();
+        } else {
+          console.warn('❌ Google Apps Script not available');
+          reject(new Error('Google Apps Script not available'));
         }
-      }, 1000);
-    })();
+      });
+    }
   </script>
 
   <!-- Include login-specific JavaScript -->

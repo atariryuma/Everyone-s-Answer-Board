@@ -6,62 +6,64 @@
   let redirectUrl = '/exec';
   let currentUserEmail = '';
 
-  // Initialize login page - simplified flow with error boundary
+  // Initialize login page - sequenced flow
   function initializeLoginPage() {
-    // Document.write protection is handled by LoginPage.html - no duplication needed
-    
-    setLoading(true, 'Googleアカウントの情報を確認しています...');
-
     console.log('🚀 Initializing login page...');
-    
-    // Set initial loading state
     setLoading(true, 'ログインを準備しています...');
 
-    // Check if client ID is available
-    if (!window.GOOGLE_CLIENT_ID || window.GOOGLE_CLIENT_ID.trim() === '') {
-      console.error('❌ GOOGLE_CLIENT_ID not available');
-      setLoading(false, 'Google Client IDが設定されていません');
-      showRetryButton();
-      return;
-    }
-
-    console.log('✅ GOOGLE_CLIENT_ID available:', window.GOOGLE_CLIENT_ID);
-
-    // Wait for Google APIs to load with error boundary
-    const apiPromise = waitForGoogleAPIs()
+    // Sequenced initialization: Google Services → ClientID → Login
+    initializeLoginSequence()
       .then(() => {
-        console.log('✅ Google APIs loaded successfully');
-        return initializeGoogleAuth();
+        console.log('✅ Login system fully initialized');
+        window.loginSystemReady = true;
       })
-      .then(() => {
-        console.log('✅ Google Auth initialized');
-        return startLoginFlow();
+      .catch(error => {
+        console.error('❌ Login initialization failed:', error);
+        handleInitializationError(error);
       });
+  }
 
-    // Wrap with error boundary
-    if (window.ErrorBoundary) {
-      window.ErrorBoundary.wrapWithErrorBoundary(apiPromise, 'login-initialization', {
-        retryCallback: () => {
-          console.log('🔄 Retrying login initialization...');
-          initializeLoginPage();
-        },
-        reauthenticate: () => {
-          console.log('🔄 Triggering re-authentication...');
-          if (googleAccountsClient) {
-            googleAccountsClient.requestAccessToken({ prompt: 'select_account' });
-          }
-        }
-      }).catch(error => {
-        console.error('❌ Login initialization failed:', error);
-        handleInitializationError(error);
-      });
-    } else {
-      // Fallback without error boundary
-      apiPromise.catch(error => {
-        console.error('❌ Login initialization failed:', error);
-        handleInitializationError(error);
-      });
-    }
+  // Sequenced initialization function
+  function initializeLoginSequence() {
+    return new Promise((resolve, reject) => {
+      console.log('🔄 Step 1: Waiting for Google APIs...');
+      setLoading(true, 'Google APIを読み込み中...');
+      
+      // Step 1: Wait for Google APIs to load
+      waitForGoogleAPIs()
+        .then(() => {
+          console.log('✅ Step 1 complete: Google APIs loaded');
+          console.log('🔄 Step 2: Getting GOOGLE_CLIENT_ID...');
+          setLoading(true, 'Google Client IDを取得中...');
+          
+          // Step 2: Get GOOGLE_CLIENT_ID from server
+          return getGoogleClientIdFromServer();
+        })
+        .then((clientId) => {
+          console.log('✅ Step 2 complete: GOOGLE_CLIENT_ID obtained:', clientId);
+          console.log('🔄 Step 3: Initializing Google Auth...');
+          setLoading(true, 'Google認証を初期化中...');
+          
+          // Step 3: Initialize Google Auth
+          return initializeGoogleAuth();
+        })
+        .then(() => {
+          console.log('✅ Step 3 complete: Google Auth initialized');
+          console.log('🔄 Step 4: Starting login flow...');
+          setLoading(true, 'ログインフローを開始中...');
+          
+          // Step 4: Start login flow
+          return startLoginFlow();
+        })
+        .then(() => {
+          console.log('✅ Step 4 complete: Login flow started');
+          resolve();
+        })
+        .catch(error => {
+          console.error('❌ Initialization sequence failed:', error);
+          reject(error);
+        });
+    });
   }
 
   // Wait for Google APIs to load with Promise-based approach
