@@ -4,12 +4,14 @@
     const userEmailDisplay = document.getElementById('user-email-display');
     let tokenClient;
 
+    // UI状態管理 - 既存バックエンド関数の動作に合わせて最適化
     const setLoading = (flag, text = '') => {
       if (!loginBtn) return;
       loginBtn.disabled = flag;
       loginBtn.textContent = flag ? text || '処理中…' : 'はじめる';
     };
 
+    // 既存のgetGoogleClientId()関数を使用
     const getClientId = () => {
       return new Promise((resolve, reject) => {
         google.script.run
@@ -25,6 +27,7 @@
       });
     };
 
+    // 既存のgetExistingBoard()関数を使用 - 安定動作していた実装
     const fetchBoard = () => {
       return new Promise((resolve, reject) => {
         google.script.run
@@ -34,8 +37,10 @@
       });
     };
 
+    // 既存のregisterNewUser()関数を使用 - バックエンドが期待する引数形式
     const registerUser = () => {
       return new Promise((resolve, reject) => {
+        const currentUserEmail = Session.getActiveUser().getEmail();
         google.script.run
           .withSuccessHandler(res => {
             if (res && res.adminUrl) {
@@ -46,23 +51,29 @@
             }
           })
           .withFailureHandler(reject)
-          .registerNewUser(userEmailDisplay.textContent);
+          .registerNewUser(currentUserEmail);
       });
     };
 
+    // 既存バックエンドの返り値仕様に完全準拠した処理
     const handleToken = response => {
       if (response.error) {
         userEmailDisplay.textContent = '認証に失敗しました';
         setLoading(false);
         return;
       }
+      
+      // バックエンドのgetExistingBoard()が返す3つの状態を処理
       fetchBoard()
         .then(res => {
           if (res.status === 'existing_user') {
+            // 既存ユーザー: 直接管理画面へ
             window.location.href = res.adminUrl;
           } else if (res.status === 'setup_required') {
+            // セットアップ必要: アプリ設定画面へ
             window.location.href = `/exec?mode=admin&userId=${res.userId}`;
           } else if (res.status === 'new_user') {
+            // 新規ユーザー: 登録処理実行
             return registerUser();
           } else {
             throw new Error(res.message || 'unknown status');
@@ -75,6 +86,7 @@
         });
     };
 
+    // 初期化処理 - 既存の安定バックエンド関数を活用
     const init = () => {
       loginBtn.addEventListener('click', () => {
         if (tokenClient) {
@@ -83,6 +95,7 @@
         }
       });
 
+      // 既存のgetGoogleClientId()で認証設定取得
       getClientId()
         .then(id => {
           tokenClient = google.accounts.oauth2.initTokenClient({
@@ -97,6 +110,7 @@
           userEmailDisplay.textContent = '設定エラー';
         });
 
+      // 既存のgetSystemDomainInfo()で組織情報表示
       google.script.run
         .withSuccessHandler(info => {
           if (info && info.adminDomain) {
