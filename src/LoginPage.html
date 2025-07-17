@@ -27,11 +27,58 @@
     }
   </script>
 
-  <!-- Google Identity Services -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-
-  <!-- Google APIs -->
-  <script src="https://apis.google.com/js/api.js" async defer></script>
+  <!-- Google Identity Services with enhanced loading -->
+  <script>
+    // Asynchronous loading strategy for Google services
+    (function() {
+      const loadGoogleScript = (src, id) => {
+        return new Promise((resolve, reject) => {
+          if (document.getElementById(id)) {
+            resolve();
+            return;
+          }
+          
+          const script = document.createElement('script');
+          script.id = id;
+          script.src = src;
+          script.async = true;
+          script.defer = true;
+          
+          script.onload = () => {
+            console.log(`Successfully loaded: ${src}`);
+            resolve();
+          };
+          
+          script.onerror = (error) => {
+            console.error(`Failed to load: ${src}`, error);
+            reject(error);
+          };
+          
+          document.head.appendChild(script);
+        });
+      };
+      
+      // Load Google services sequentially with error handling
+      const loadGoogleServices = async () => {
+        try {
+          await loadGoogleScript('https://accounts.google.com/gsi/client', 'google-gsi-client');
+          await loadGoogleScript('https://apis.google.com/js/api.js', 'google-apis');
+          console.log('All Google services loaded successfully');
+        } catch (error) {
+          console.error('Error loading Google services:', error);
+          // Store error for later handling
+          window.googleLoadError = error;
+        }
+      };
+      
+      // Start loading when DOM is ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadGoogleServices);
+      } else {
+        loadGoogleServices();
+      }
+    })();
+  </script>
 
   <!-- Include shared styles and utilities -->
   <?!= include('UnifiedStyles'); ?>
@@ -93,11 +140,119 @@
     (function() {
       // Global error handling for document.write issues in GAS
       if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-        document.write = () => {
-          console.warn('document.write blocked in GAS context');
+        // Store original functions for potential restoration
+        const originalWrite = document.write;
+        const originalWriteln = document.writeln;
+        
+        // Replace with compatible wrapper that handles multiple parameters
+        document.write = function(...args) {
+          try {
+            if (args.length === 0) {
+              console.warn('document.write called with no arguments - ignored in GAS context');
+              return;
+            }
+            
+            // Enhanced debugging and monitoring
+            const timestamp = new Date().toISOString();
+            const caller = new Error().stack;
+            const content = args.join('');
+            
+            // Log detailed information for debugging
+            console.group(`📝 document.write blocked [${timestamp}]`);
+            console.log('Arguments:', args);
+            console.log('Content:', content);
+            console.log('Caller stack:', caller);
+            
+            // Monitor for specific Google library patterns
+            if (content.includes('google') || content.includes('gapi') || content.includes('gsi')) {
+              console.log('🔍 Google library detected in document.write call');
+            }
+            
+            // Check for script injection attempts
+            if (content.includes('<script') || content.includes('<\/script>')) {
+              console.warn('⚠️ Script injection via document.write blocked for security');
+            }
+            
+            // Monitor for HTML content
+            if (content.includes('<') && content.includes('>')) {
+              console.log('🏷️ HTML content detected:', content.substring(0, 100) + '...');
+            }
+            
+            console.groupEnd();
+            
+            // Store call information for analysis
+            if (!window.documentWriteCalls) {
+              window.documentWriteCalls = [];
+            }
+            window.documentWriteCalls.push({
+              timestamp,
+              args,
+              content,
+              caller: caller.split('\n')[1] || 'unknown'
+            });
+            
+            return undefined;
+          } catch (error) {
+            console.error('Error in document.write wrapper:', error);
+            return undefined;
+          }
         };
-        document.writeln = () => {
-          console.warn('document.writeln blocked in GAS context');
+        
+        document.writeln = function(...args) {
+          try {
+            if (args.length === 0) {
+              console.warn('document.writeln called with no arguments - ignored in GAS context');
+              return;
+            }
+            
+            // Enhanced debugging for writeln
+            const timestamp = new Date().toISOString();
+            const caller = new Error().stack;
+            const content = args.join('');
+            
+            console.group(`📝 document.writeln blocked [${timestamp}]`);
+            console.log('Arguments:', args);
+            console.log('Content:', content);
+            console.log('Caller stack:', caller);
+            console.groupEnd();
+            
+            // Store call information
+            if (!window.documentWritelnCalls) {
+              window.documentWritelnCalls = [];
+            }
+            window.documentWritelnCalls.push({
+              timestamp,
+              args,
+              content,
+              caller: caller.split('\n')[1] || 'unknown'
+            });
+            
+            return undefined;
+          } catch (error) {
+            console.error('Error in document.writeln wrapper:', error);
+            return undefined;
+          }
+        };
+        
+        // Store references for potential restoration
+        window._originalDocumentWrite = originalWrite;
+        window._originalDocumentWriteln = originalWriteln;
+        
+        // Helper function to analyze document.write calls
+        window.analyzeDocumentWriteCalls = function() {
+          console.group('📊 Document.write Call Analysis');
+          console.log('Total write calls:', window.documentWriteCalls?.length || 0);
+          console.log('Total writeln calls:', window.documentWritelnCalls?.length || 0);
+          
+          if (window.documentWriteCalls?.length > 0) {
+            console.log('Recent write calls:', window.documentWriteCalls.slice(-5));
+          }
+          
+          if (window.documentWritelnCalls?.length > 0) {
+            console.log('Recent writeln calls:', window.documentWritelnCalls.slice(-5));
+          }
+          
+          console.groupEnd();
         };
       }
 

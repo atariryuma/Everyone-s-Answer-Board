@@ -8,17 +8,36 @@
 
   // Initialize login page
   function initializeLoginPage() {
-    // Add global error handling for document.write issues
+    // Enhanced error handling for document.write issues compatible with Google libraries
     if (typeof document !== 'undefined' && document.write) {
-      const originalDocWrite = document.write;
-      document.write = function(content) {
-        try {
-          console.warn('document.write called in GAS context - using safe DOM manipulation');
-          return;
-        } catch (e) {
-          console.error('document.write error caught:', e);
-        }
-      };
+      // Only override if not already overridden in LoginPage.html
+      if (!window._originalDocumentWrite) {
+        const originalDocWrite = document.write;
+        const originalDocWriteln = document.writeln;
+        
+        document.write = function(...args) {
+          try {
+            console.warn('document.write called in login.js.html - args:', args);
+            return undefined;
+          } catch (e) {
+            console.error('document.write error caught:', e);
+            return undefined;
+          }
+        };
+        
+        document.writeln = function(...args) {
+          try {
+            console.warn('document.writeln called in login.js.html - args:', args);
+            return undefined;
+          } catch (e) {
+            console.error('document.writeln error caught:', e);
+            return undefined;
+          }
+        };
+        
+        window._originalDocumentWrite = originalDocWrite;
+        window._originalDocumentWriteln = originalDocWriteln;
+      }
     }
 
     setLoading(true, 'Googleアカウントの情報を確認しています...');
@@ -29,23 +48,104 @@
       return;
     }
 
-    // Wait for Google Identity Services and Google APIs to load with timeout
+    // Wait for Google Identity Services and Google APIs to load with enhanced error handling
     let attempts = 0;
     const maxAttempts = 100; // 10 seconds timeout
+    let retryCount = 0;
+    const maxRetries = 3;
 
     const checkGoogleAPI = setInterval(() => {
       attempts++;
-      if (attempts > maxAttempts) {
-        clearInterval(checkGoogleAPI);
-        setLoading(false, 'Google APIの読み込みがタイムアウトしました');
-        return;
-      }
+      
+      try {
+        if (attempts > maxAttempts) {
+          clearInterval(checkGoogleAPI);
+          
+          if (retryCount < maxRetries) {
+            retryCount++;
+            console.warn(`Google API loading attempt ${retryCount}/${maxRetries} - retrying...`);
+            
+            // Retry by reloading the scripts
+            setTimeout(() => {
+              attempts = 0;
+              reloadGoogleScripts();
+            }, 2000);
+          } else {
+            setLoading(false, 'Google APIの読み込みがタイムアウトしました');
+            showGoogleLoadingFallback();
+          }
+          return;
+        }
 
-      if (typeof google !== 'undefined' && google.accounts && typeof gapi !== 'undefined') {
+        // Check for Google APIs availability with detailed logging
+        const googleAvailable = typeof google !== 'undefined';
+        const accountsAvailable = googleAvailable && google.accounts;
+        const gapiAvailable = typeof gapi !== 'undefined';
+        
+        if (attempts % 10 === 0) { // Log every second
+          console.log(`Google API loading status (attempt ${attempts}):`, {
+            google: googleAvailable,
+            accounts: accountsAvailable,
+            gapi: gapiAvailable
+          });
+        }
+
+        if (googleAvailable && accountsAvailable && gapiAvailable) {
+          clearInterval(checkGoogleAPI);
+          initializeGoogleAuth();
+        }
+      } catch (error) {
+        console.error('Error checking Google API availability:', error);
         clearInterval(checkGoogleAPI);
-        initializeGoogleAuth();
+        setLoading(false, 'Google APIの初期化でエラーが発生しました');
       }
     }, 100);
+  }
+
+  // Helper function to reload Google scripts
+  function reloadGoogleScripts() {
+    try {
+      // Remove existing scripts
+      const existingGoogleScripts = document.querySelectorAll('script[src*="google"]');
+      existingGoogleScripts.forEach(script => {
+        if (script.src.includes('gsi/client') || script.src.includes('apis.google.com')) {
+          script.remove();
+        }
+      });
+      
+      // Add fresh scripts
+      const gsiScript = document.createElement('script');
+      gsiScript.src = 'https://accounts.google.com/gsi/client';
+      gsiScript.async = true;
+      gsiScript.defer = true;
+      document.head.appendChild(gsiScript);
+      
+      const gapiScript = document.createElement('script');
+      gapiScript.src = 'https://apis.google.com/js/api.js';
+      gapiScript.async = true;
+      gapiScript.defer = true;
+      document.head.appendChild(gapiScript);
+      
+      console.log('Google scripts reloaded');
+    } catch (error) {
+      console.error('Error reloading Google scripts:', error);
+    }
+  }
+
+  // Show fallback UI when Google libraries fail to load
+  function showGoogleLoadingFallback() {
+    const userEmailDisplay = document.getElementById('user-email-display');
+    const loginBtn = document.getElementById('login-btn');
+    
+    if (userEmailDisplay) {
+      userEmailDisplay.textContent = 'Google認証の読み込みに失敗しました';
+    }
+    
+    if (loginBtn) {
+      loginBtn.innerHTML = 'ページを再読み込みしてください';
+      loginBtn.onclick = () => window.location.reload();
+      loginBtn.disabled = false;
+    }
   }
 
   // Initialize Google OAuth client
