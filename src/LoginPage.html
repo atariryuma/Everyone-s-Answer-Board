@@ -3,11 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <base target="_top">
+  
+  <!-- Critical: Disable document.write immediately -->
+  <script>
+    (function() {
+      if (typeof document !== 'undefined') {
+        document.write = function() { return; };
+        document.writeln = function() { return; };
+        console.log('🔒 Document.write disabled immediately');
+      }
+    })();
+  </script>
+  
   <title>StudyQuest - ログイン</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#1a1b26">
   <meta name="description" content="StudyQuest 回答ボードシステム - ログイン">
-  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), screen-wake-lock=(), accelerometer=(), gyroscope=(), magnetometer=()" />
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), screen-wake-lock=(), accelerometer=(), gyroscope=(), magnetometer=(), ambient-light-sensor=(), speaker=(), vibrate=(), vr=()" />
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -18,7 +30,8 @@
       console.warn = function(...args) {
         if (args[0] && (
           args[0].includes('cdn.tailwindcss.com should not be used in production') ||
-          args[0].includes('-ms-high-contrast is in the process of being deprecated')
+          args[0].includes('-ms-high-contrast is in the process of being deprecated') ||
+          args[0].includes('Tailwind CSS in production')
         )) {
           return; // Suppress these warnings
         }
@@ -68,6 +81,14 @@
           console.error('Error loading Google services:', error);
           // Store error for later handling
           window.googleLoadError = error;
+          
+          // Try to disable document.write again in case it was reset
+          try {
+            document.write = function() { return; };
+            document.writeln = function() { return; };
+          } catch (writeError) {
+            console.warn('Could not re-disable document.write:', writeError);
+          }
         }
       };
       
@@ -138,125 +159,59 @@
   <!-- Set global variables for login -->
   <script>
     (function() {
-      // Global error handling for document.write issues in GAS
+      // Ultra-robust document.write replacement for Google Apps Script
       if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-        // Store original functions for potential restoration
-        const originalWrite = document.write;
-        const originalWriteln = document.writeln;
         
-        // More robust document.write replacement that handles Google library calls
-        document.write = function() {
+        // Complete replacement strategy
+        try {
+          // Store original functions
+          var originalWrite = document.write;
+          var originalWriteln = document.writeln;
+          
+          // Create a safe, no-op replacement
+          var safeDocumentWrite = function() {
+            // Completely silent operation - no logging to avoid recursive calls
+            return;
+          };
+          
+          var safeDocumentWriteln = function() {
+            // Completely silent operation - no logging to avoid recursive calls
+            return;
+          };
+          
+          // Replace immediately and definitively
+          document.write = safeDocumentWrite;
+          document.writeln = safeDocumentWriteln;
+          
+          // Ensure they can't be overridden
           try {
-            // Convert arguments to array for better handling
-            var args = Array.prototype.slice.call(arguments);
-            
-            if (args.length === 0) {
-              console.warn('document.write called with no arguments - ignored in GAS context');
-              return;
-            }
-            
-            // Enhanced debugging and monitoring
-            var timestamp = new Date().toISOString();
-            var content = args.join('');
-            
-            // Log detailed information for debugging
-            console.group('📝 document.write blocked [' + timestamp + ']');
-            console.log('Arguments count:', args.length);
-            console.log('Content length:', content.length);
-            console.log('Content preview:', content.substring(0, 200) + (content.length > 200 ? '...' : ''));
-            
-            // Monitor for specific Google library patterns
-            if (content.indexOf('google') !== -1 || content.indexOf('gapi') !== -1 || content.indexOf('gsi') !== -1) {
-              console.log('🔍 Google library detected in document.write call');
-            }
-            
-            // Check for script injection attempts
-            if (content.indexOf('<script') !== -1 || content.indexOf('<\/script>') !== -1) {
-              console.warn('⚠️ Script injection via document.write blocked for security');
-            }
-            
-            // Monitor for HTML content
-            if (content.indexOf('<') !== -1 && content.indexOf('>') !== -1) {
-              console.log('🏷️ HTML content detected');
-            }
-            
-            console.groupEnd();
-            
-            // Store call information for analysis
-            if (!window.documentWriteCalls) {
-              window.documentWriteCalls = [];
-            }
-            window.documentWriteCalls.push({
-              timestamp: timestamp,
-              args: args,
-              content: content,
-              source: 'document.write'
+            Object.defineProperty(document, 'write', {
+              value: safeDocumentWrite,
+              writable: false,
+              enumerable: true,
+              configurable: false
             });
             
-            // Always return undefined to prevent further processing
-            return undefined;
-          } catch (error) {
-            console.error('Error in document.write wrapper:', error);
-            return undefined;
-          }
-        };
-        
-        document.writeln = function(...args) {
-          try {
-            if (args.length === 0) {
-              console.warn('document.writeln called with no arguments - ignored in GAS context');
-              return;
-            }
-            
-            // Enhanced debugging for writeln
-            const timestamp = new Date().toISOString();
-            const caller = new Error().stack;
-            const content = args.join('');
-            
-            console.group(`📝 document.writeln blocked [${timestamp}]`);
-            console.log('Arguments:', args);
-            console.log('Content:', content);
-            console.log('Caller stack:', caller);
-            console.groupEnd();
-            
-            // Store call information
-            if (!window.documentWritelnCalls) {
-              window.documentWritelnCalls = [];
-            }
-            window.documentWritelnCalls.push({
-              timestamp,
-              args,
-              content,
-              caller: caller.split('\n')[1] || 'unknown'
+            Object.defineProperty(document, 'writeln', {
+              value: safeDocumentWriteln,
+              writable: false,
+              enumerable: true,
+              configurable: false
             });
-            
-            return undefined;
-          } catch (error) {
-            console.error('Error in document.writeln wrapper:', error);
-            return undefined;
-          }
-        };
-        
-        // Store references for potential restoration
-        window._originalDocumentWrite = originalWrite;
-        window._originalDocumentWriteln = originalWriteln;
-        
-        // Helper function to analyze document.write calls
-        window.analyzeDocumentWriteCalls = function() {
-          console.group('📊 Document.write Call Analysis');
-          console.log('Total write calls:', window.documentWriteCalls?.length || 0);
-          console.log('Total writeln calls:', window.documentWritelnCalls?.length || 0);
-          
-          if (window.documentWriteCalls?.length > 0) {
-            console.log('Recent write calls:', window.documentWriteCalls.slice(-5));
+          } catch (defineError) {
+            // If defineProperty fails, just keep the simple assignment
+            console.warn('Could not lock document.write properties:', defineError);
           }
           
-          if (window.documentWritelnCalls?.length > 0) {
-            console.log('Recent writeln calls:', window.documentWritelnCalls.slice(-5));
-          }
+          // Store references for debugging
+          window._originalDocumentWrite = originalWrite;
+          window._originalDocumentWriteln = originalWriteln;
           
-          console.groupEnd();
-        };
+          console.log('✅ Document.write completely disabled for Google Apps Script compatibility');
+          
+        } catch (error) {
+          console.error('❌ Error setting up document.write replacement:', error);
+        }
       }
 
       // Initialize GOOGLE_CLIENT_ID with safe fallback
