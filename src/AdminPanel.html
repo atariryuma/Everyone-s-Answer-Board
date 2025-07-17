@@ -111,7 +111,7 @@
   }
   </script>
   <script>
-  const __IS_SYSTEM_ADMIN_RAW__ = '<?= typeof isDeployUser !== "undefined" ? isDeployUser : false ?>';
+  const __IS_SYSTEM_ADMIN_RAW__ = '<?= typeof isDeployUser !== "undefined" ? isDeployUser : "false" ?>';
   const __IS_SYSTEM_ADMIN__ = __IS_SYSTEM_ADMIN_RAW__ === 'true' || __IS_SYSTEM_ADMIN_RAW__ === true;
   window.isSystemAdmin = __IS_SYSTEM_ADMIN__;
   console.log('Template Debug:');
@@ -121,7 +121,7 @@
   console.log('- window.isSystemAdmin final:', window.isSystemAdmin);
   
   // URL更新処理
-  const shouldUpdateUrl = '<?= typeof shouldUpdateUrl !== "undefined" ? shouldUpdateUrl : false ?>';
+  const shouldUpdateUrl = '<?= typeof shouldUpdateUrl !== "undefined" ? shouldUpdateUrl : "false" ?>';
   const correctUrl = '<?= typeof correctUrl !== "undefined" ? correctUrl : "" ?>';
   
   if (shouldUpdateUrl === 'true' && correctUrl && correctUrl !== '') {

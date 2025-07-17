@@ -43,7 +43,7 @@ window.tailwind = {
 </script>
 <script src="https://cdn.tailwindcss.com" defer onerror="console.warn('TailwindCSS failed to load')"></script>
 <script>
-const DEBUG_MODE = <?= typeof DEBUG_MODE !== 'undefined' ? DEBUG_MODE : false ?>;
+const DEBUG_MODE = '<?= typeof DEBUG_MODE !== "undefined" ? DEBUG_MODE : "false" ?>' === 'true';
 function debugLog() {
   if (DEBUG_MODE && console && console.log) {
     try {
@@ -103,7 +103,7 @@ function showSystemFlow() {
   // Development flow display removed for production
 }
 
-const __SHOW_COUNTS__ = '<?= typeof showCounts !== "undefined" ? showCounts : false ?>';
+const __SHOW_COUNTS__ = '<?= typeof showCounts !== "undefined" ? showCounts : "false" ?>';
 const __DISPLAY_MODE__ = '<?= typeof displayMode !== "undefined" ? displayMode : "anonymous" ?>';
 const __SHEET_NAME__ = '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>';
 const __MAPPING__ = '<?= typeof mapping !== "undefined" ? JSON.stringify(mapping) : "{}" ?>';
@@ -111,11 +111,11 @@ const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
 const __SPREADSHEET_ID__ = '<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>';
 const __OWNER_NAME__ = '<?= typeof ownerName !== "undefined" ? ownerName : "" ?>';
 const __OPINION_HEADER__ = '<?= typeof opinionHeader !== "undefined" ? opinionHeader : "お題" ?>';
-const __SHOW_ADMIN_FEATURES__ = '<?= typeof showAdminFeatures !== "undefined" ? showAdminFeatures : false ?>';
-const __SHOW_HIGHLIGHT_TOGGLE__ = '<?= typeof showHighlightToggle !== "undefined" ? showHighlightToggle : false ?>';
-const __SHOW_SCORE_SORT__ = '<?= typeof showScoreSort !== "undefined" ? showScoreSort : false ?>';
-const __IS_STUDENT_MODE__ = '<?= typeof isStudentMode !== "undefined" ? isStudentMode : true ?>';
-const __IS_ADMIN_USER__ = '<?= typeof isAdminUser !== "undefined" ? isAdminUser : false ?>';
+const __SHOW_ADMIN_FEATURES__ = '<?= typeof showAdminFeatures !== "undefined" ? showAdminFeatures : "false" ?>';
+const __SHOW_HIGHLIGHT_TOGGLE__ = '<?= typeof showHighlightToggle !== "undefined" ? showHighlightToggle : "false" ?>';
+const __SHOW_SCORE_SORT__ = '<?= typeof showScoreSort !== "undefined" ? showScoreSort : "false" ?>';
+const __IS_STUDENT_MODE__ = '<?= typeof isStudentMode !== "undefined" ? isStudentMode : "true" ?>';
+const __IS_ADMIN_USER__ = '<?= typeof isAdminUser !== "undefined" ? isAdminUser : "false" ?>';
 window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : __SHOW_COUNTS__ === 'true';
 window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
 // Store server-provided admin capability but always start in view mode
