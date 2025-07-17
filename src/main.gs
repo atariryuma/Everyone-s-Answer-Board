@@ -299,15 +299,17 @@ function showRegistrationPage() {
 }
 
 /**
- * Returns system domain information for the login page.
- * @returns {Object} adminDomain or error
+ * Retrieves the administrator domain for the login page.
+ * @returns {{adminDomain: string}|{error: string}} Domain info or error message.
  */
 function getSystemDomainInfo() {
   try {
-    var adminEmail = PropertiesService.getScriptProperties().getProperty('deployUser');
+    var props = PropertiesService.getScriptProperties();
+    var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
     if (!adminEmail) {
       throw new Error('システム管理者が設定されていません。');
     }
+
     var adminDomain = adminEmail.split('@')[1];
     return { adminDomain: adminDomain };
   } catch (e) {
