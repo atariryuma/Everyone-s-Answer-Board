@@ -8,6 +8,54 @@
 
   // Initialize login page - simplified flow
   function initializeLoginPage() {
+
+    // Enhanced error handling for document.write issues compatible with Google libraries
+    if (typeof document !== 'undefined' && document.write) {
+      // Only override if not already overridden in LoginPage.html
+      if (!window._originalDocumentWrite) {
+        const originalDocWrite = document.write;
+        const originalDocWriteln = document.writeln;
+        const protoWriteTargets = [Document && Document.prototype, HTMLDocument && HTMLDocument.prototype];
+        protoWriteTargets.forEach(t => {
+          if (!t) return;
+          try {
+            t.write = function() {};
+            t.writeln = function() {};
+            Object.defineProperty(t, 'write', { value: function() {}, writable: false, configurable: false });
+            Object.defineProperty(t, 'writeln', { value: function() {}, writable: false, configurable: false });
+          } catch (e) {
+            t.write = function() {};
+            t.writeln = function() {};
+          }
+        });
+        
+        document.write = function(...args) {
+          try {
+            console.warn('document.write called in login.js.html - args:', args);
+            return undefined;
+          } catch (e) {
+            console.error('document.write error caught:', e);
+            return undefined;
+          }
+        };
+        
+        document.writeln = function(...args) {
+          try {
+            console.warn('document.writeln called in login.js.html - args:', args);
+            return undefined;
+          } catch (e) {
+            console.error('document.writeln error caught:', e);
+            return undefined;
+          }
+        };
+        
+        window._originalDocumentWrite = originalDocWrite;
+        window._originalDocumentWriteln = originalDocWriteln;
+      }
+    }
+
+    setLoading(true, 'Googleアカウントの情報を確認しています...');
+
     console.log('🚀 Initializing login page...');
     
     // Set initial loading state

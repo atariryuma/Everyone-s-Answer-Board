@@ -7,11 +7,33 @@
   <!-- Critical: Disable document.write immediately -->
   <script>
     (function() {
-      if (typeof document !== 'undefined') {
-        document.write = function() { return; };
-        document.writeln = function() { return; };
-        console.log('🔒 Document.write disabled immediately');
+      function disableWrite(target) {
+        if (!target) return;
+        try {
+          target.write = function() {};
+          target.writeln = function() {};
+          Object.defineProperty(target, 'write', {
+            value: function() {},
+            writable: false,
+            configurable: false
+          });
+          Object.defineProperty(target, 'writeln', {
+            value: function() {},
+            writable: false,
+            configurable: false
+          });
+        } catch (e) {
+          // Fallback assignment if defineProperty fails
+          target.write = function() {};
+          target.writeln = function() {};
+        }
       }
+
+      disableWrite(document);
+      disableWrite(Document && Document.prototype);
+      disableWrite(HTMLDocument && HTMLDocument.prototype);
+
+      console.log('🔒 Document.write disabled immediately');
     })();
   </script>
   
