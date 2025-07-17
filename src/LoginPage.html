@@ -7,33 +7,41 @@
   <!-- Critical: Disable document.write immediately -->
   <script>
     (function() {
-      function disableWrite(target) {
-        if (!target) return;
-        try {
-          target.write = function() {};
-          target.writeln = function() {};
-          Object.defineProperty(target, 'write', {
-            value: function() {},
-            writable: false,
-            configurable: false
-          });
-          Object.defineProperty(target, 'writeln', {
-            value: function() {},
-            writable: false,
-            configurable: false
-          });
-        } catch (e) {
-          // Fallback assignment if defineProperty fails
-          target.write = function() {};
-          target.writeln = function() {};
-        }
+      // Store original write functions
+      const originalWrite = document.write;
+      const originalWriteln = document.writeln;
+      
+      function createSafeWrite(original) {
+        return function(...args) {
+          try {
+            // Filter out problematic content
+            const content = args.join('');
+            if (content.includes('missing ) after argument list') || 
+                content.includes('SyntaxError') ||
+                content.includes('eval(') ||
+                content.includes('javascript:')) {
+              console.warn('🚫 Blocked potentially unsafe document.write:', content);
+              return;
+            }
+            
+            // Allow Google Apps Script internal writes
+            if (content.includes('google') || content.includes('gsi') || content.includes('gapi')) {
+              return original.apply(this, args);
+            }
+            
+            // Block everything else
+            console.log('🔒 Document.write call blocked:', content);
+          } catch (e) {
+            console.error('Document.write protection error:', e);
+          }
+        };
       }
-
-      disableWrite(document);
-      disableWrite(Document && Document.prototype);
-      disableWrite(HTMLDocument && HTMLDocument.prototype);
-
-      console.log('🔒 Document.write disabled immediately');
+      
+      // Apply safe write functions
+      document.write = createSafeWrite(originalWrite);
+      document.writeln = createSafeWrite(originalWriteln);
+      
+      console.log('🔒 Document.write protection enabled');
     })();
   </script>
   
