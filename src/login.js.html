@@ -472,7 +472,12 @@
     }
 
     console.log('✅ Authentication successful');
-    
+
+    // Store access token for gapi client usage
+    if (response.access_token && gapi && gapi.client) {
+      gapi.client.setToken({ access_token: response.access_token });
+    }
+
     // Restart the login flow after successful authentication
     setLoading(true, '認証が成功しました。情報を更新しています...');
     
