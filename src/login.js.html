@@ -132,7 +132,7 @@
       const orgName = domainParts[0].charAt(0).toUpperCase() + domainParts[0].slice(1);
       
       orgNameEl.textContent = orgName;
-      orgInfoEl.style.display = 'block';
+      orgInfoEl.classList.remove('hidden');
     }
   }
   
