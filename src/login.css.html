@@ -1,6 +1,6 @@
 <style>
   /* Login Page Specific Styles */
-  
+
   /* Modern dark gradient background */
   .login-container {
     background: linear-gradient(135deg, #0f0f23 0%, #1a1b26 20%, #24273a 40%, #1e293b 60%, #1e40af 80%, #1d4ed8 100%);
@@ -10,7 +10,7 @@
     position: relative;
     overflow: hidden;
   }
-  
+
   .login-container::before {
     content: '';
     position: absolute;
@@ -23,13 +23,13 @@
                 radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.1) 0%, transparent 70%);
     pointer-events: none;
   }
-  
+
   @keyframes gradientShift {
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
   }
-  
+
   /* Flat glassmorphism login card */
   .login-card {
     background: rgba(255, 255, 255, 0.03);
@@ -42,7 +42,7 @@
     overflow: hidden;
     transition: all 0.3s ease;
   }
-  
+
   .login-card::before {
     content: '';
     position: absolute;
@@ -52,13 +52,13 @@
     height: 1px;
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
   }
-  
+
   .login-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
     border-color: rgba(255, 255, 255, 0.12);
   }
-  
+
   /* Title styling with improved visibility */
   .login-title {
     background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
@@ -72,7 +72,7 @@
     text-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
   }
-  
+
   .login-subtitle {
     color: #cbd5e1;
     text-align: center;
@@ -80,7 +80,7 @@
     margin-bottom: 2rem;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   }
-  
+
   /* Account info styling - flat glassmorphism */
   .account-info {
     background: rgba(255, 255, 255, 0.02);
@@ -90,7 +90,7 @@
     margin-bottom: 1.5rem;
     transition: all 0.3s ease;
   }
-  
+
   .account-label {
     color: #94a3b8;
     font-size: 0.75rem;
@@ -99,7 +99,7 @@
     letter-spacing: 0.05em;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   }
-  
+
   .user-email {
     color: #f1f5f9;
     font-weight: 600;
@@ -107,7 +107,7 @@
     word-break: break-all;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
   }
-  
+
   /* Domain status badges with organization branding */
   .domain-badge {
     display: inline-flex;
@@ -121,21 +121,21 @@
     transition: all 0.2s ease;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   }
-  
+
   .domain-badge.match {
     background: rgba(34, 197, 94, 0.15);
     color: #4ade80;
     border: 1px solid rgba(34, 197, 94, 0.3);
     box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
   }
-  
+
   .domain-badge.mismatch {
     background: rgba(245, 158, 11, 0.15);
     color: #fbbf24;
     border: 1px solid rgba(245, 158, 11, 0.3);
     box-shadow: 0 2px 8px rgba(245, 158, 11, 0.1);
   }
-  
+
   /* Login button styling with organization branding */
   .login-btn {
     width: 100%;
@@ -153,7 +153,7 @@
     box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   }
-  
+
   .login-btn::before {
     content: '';
     position: absolute;
@@ -164,32 +164,32 @@
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
     transition: left 0.5s ease;
   }
-  
+
   .login-btn:hover::before {
     left: 100%;
   }
-  
+
   .login-btn:hover {
     transform: translateY(-1px);
     box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
   }
-  
+
   .login-btn:active {
     transform: translateY(0);
   }
-  
+
   .login-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     transform: none;
     box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
   }
-  
+
   .login-btn:disabled:hover {
     transform: none;
     box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
   }
-  
+
   /* Footer links with improved visibility */
   .footer-link {
     color: #94a3b8;
@@ -199,7 +199,7 @@
     position: relative;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   }
-  
+
   .footer-link::after {
     content: '';
     position: absolute;
@@ -210,15 +210,15 @@
     background: linear-gradient(90deg, #3b82f6, #1d4ed8);
     transition: width 0.3s ease;
   }
-  
+
   .footer-link:hover {
     color: #60a5fa;
   }
-  
+
   .footer-link:hover::after {
     width: 100%;
   }
-  
+
   /* Loading spinner */
   .loading-spinner {
     width: 20px;
@@ -229,36 +229,36 @@
     animation: spin 1s linear infinite;
     margin-right: 0.5rem;
   }
-  
+
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
   }
-  
+
   /* Responsive design */
   @media (max-width: 640px) {
     .login-card {
       margin: 1rem;
       padding: 1.5rem;
     }
-    
+
     .login-title {
       font-size: 1.5rem;
     }
   }
-  
+
   /* Focus styles for accessibility */
   .login-btn:focus,
   .footer-link:focus {
     outline: 2px solid #3b82f6;
     outline-offset: 2px;
   }
-  
+
   /* Animation for smooth transitions */
   * {
     transition: all 0.2s ease;
   }
-  
+
   /* Organization info styling */
   .organization-info {
     margin-top: 1rem;
@@ -268,11 +268,11 @@
     border-radius: 8px;
     backdrop-filter: blur(10px);
   }
-  
+
   .organization-info.hidden {
     display: none;
   }
-  
+
   .organization-badge {
     display: flex;
     align-items: center;
@@ -283,7 +283,7 @@
     font-size: 0.875rem;
     margin-bottom: 0.25rem;
   }
-  
+
   .organization-description {
     color: #9ca3af;
     font-size: 0.75rem;
@@ -291,7 +291,7 @@
     margin: 0;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   }
-  
+
   /* Webkit prefix compatibility for Safari */
   @supports not (backdrop-filter: blur(20px)) {
     .login-card {
