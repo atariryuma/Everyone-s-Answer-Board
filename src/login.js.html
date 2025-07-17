@@ -1,9 +1,9 @@
 <script>
   // Login Page JavaScript
-  
+
   let googleAccountsClient;
   let isLoading = false;
-  
+
   // Initialize login page
   function initializeLoginPage() {
     // Add global error handling for document.write issues
@@ -18,19 +18,19 @@
         }
       };
     }
-    
+
     setLoading(true, 'Googleアカウントの情報を確認しています...');
-    
+
     // Check if client ID is available
     if (!window.GOOGLE_CLIENT_ID) {
       setLoading(false, 'Google Client IDが設定されていません');
       return;
     }
-    
+
     // Wait for Google Identity Services and Google APIs to load with timeout
     let attempts = 0;
     const maxAttempts = 100; // 10 seconds timeout
-    
+
     const checkGoogleAPI = setInterval(() => {
       attempts++;
       if (attempts > maxAttempts) {
@@ -38,14 +38,14 @@
         setLoading(false, 'Google APIの読み込みがタイムアウトしました');
         return;
       }
-      
+
       if (typeof google !== 'undefined' && google.accounts && typeof gapi !== 'undefined') {
         clearInterval(checkGoogleAPI);
         initializeGoogleAuth();
       }
     }, 100);
   }
-  
+
   // Initialize Google OAuth client
   function initializeGoogleAuth() {
     try {
@@ -56,13 +56,13 @@
           discoveryDocs: []
         });
       });
-      
+
       googleAccountsClient = google.accounts.oauth2.initTokenClient({
         client_id: window.GOOGLE_CLIENT_ID,
         scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
         callback: handleCredentialResponse,
       });
-      
+
       // Get server-side domain information
       getServerSideInfo();
     } catch (error) {
@@ -70,14 +70,14 @@
       setLoading(false, 'Google認証の初期化に失敗しました');
     }
   }
-  
+
   // Get server-side domain information
   function getServerSideInfo() {
     google.script.run
       .withSuccessHandler(serverInfo => {
         // Display organization information
         displayOrganizationInfo(serverInfo);
-        
+
         // Check if user is already authenticated
         const token = gapi.client.getToken();
         if (token) {
@@ -91,7 +91,7 @@
       .withFailureHandler(handleError)
       .getSystemDomainInfo();
   }
-  
+
   // Update user information display
   function updateUserInfo(accessToken, serverInfo) {
     fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`)
@@ -100,14 +100,14 @@
         if (userInfo.email) {
           // Update email display
           document.getElementById('user-email-display').textContent = userInfo.email;
-          
+
           // Check domain match
           const userDomain = userInfo.email.split('@')[1];
           const isAdminDomain = userDomain === serverInfo.adminDomain;
-          
+
           // Display domain status
           displayDomainStatus(isAdminDomain, serverInfo.adminDomain);
-          
+
           // Enable login button
           document.getElementById('login-btn').disabled = false;
           setLoading(false);
@@ -120,34 +120,34 @@
         handleError(error);
       });
   }
-  
+
   // Display organization information
   function displayOrganizationInfo(serverInfo) {
     if (serverInfo && serverInfo.adminDomain) {
       const orgInfoEl = document.getElementById('organization-info');
       const orgNameEl = document.getElementById('organization-name');
-      
+
       // Extract organization name from domain
       const domainParts = serverInfo.adminDomain.split('.');
       const orgName = domainParts[0].charAt(0).toUpperCase() + domainParts[0].slice(1);
-      
+
       orgNameEl.textContent = orgName;
       orgInfoEl.classList.remove('hidden');
     }
   }
-  
+
   // Display domain status badge
   function displayDomainStatus(isMatch, adminDomain) {
     const badgeEl = document.getElementById('domain-status-badge');
     const badgeClass = isMatch ? 'match' : 'mismatch';
-    const icon = isMatch ? 
+    const icon = isMatch ?
       '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' :
       '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>';
-    
-    const text = isMatch ? 
-      `${adminDomain} ドメインに所属` : 
+
+    const text = isMatch ?
+      `${adminDomain} ドメインに所属` :
       `管理ドメイン(${adminDomain})と不一致`;
-    
+
     badgeEl.innerHTML = `
       <div class="domain-badge ${badgeClass}">
         ${icon}
@@ -156,7 +156,7 @@
     `;
     badgeEl.classList.remove('hidden');
   }
-  
+
   // Request user login
   function requestUserLogin() {
     if (googleAccountsClient) {
@@ -165,7 +165,7 @@
       handleError(new Error('Google認証クライアントが初期化されていません'));
     }
   }
-  
+
   // Handle credential response
   function handleCredentialResponse(response) {
     if (response.error) {
@@ -173,17 +173,17 @@
       handleError(response);
       return;
     }
-    
+
     // Refresh server-side info after successful authentication
     getServerSideInfo();
   }
-  
+
   // Set loading state with improved UX
   function setLoading(loading, message = '') {
     isLoading = loading;
     const loginBtn = document.getElementById('login-btn');
     const userEmailDisplay = document.getElementById('user-email-display');
-    
+
     if (loading) {
       loginBtn.disabled = true;
       loginBtn.innerHTML = `
@@ -201,15 +201,15 @@
       }
     }
   }
-  
+
   // Handle errors
   function handleError(error) {
     console.error('Login error:', error);
     setLoading(false);
-    
+
     const userEmailDisplay = document.getElementById('user-email-display');
     const loginBtn = document.getElementById('login-btn');
-    
+
     // Determine error type and show appropriate message
     let errorMessage = 'エラーが発生しました';
     if (error && error.message) {
@@ -221,13 +221,13 @@
         errorMessage = 'タイムアウト';
       }
     }
-    
+
     userEmailDisplay.textContent = errorMessage;
-    
+
     // Show retry button
     loginBtn.innerHTML = 'エラー - 再試行';
     loginBtn.disabled = false;
-    
+
     // Reset after 5 seconds
     setTimeout(() => {
       loginBtn.innerHTML = 'ログイン';
@@ -236,7 +236,7 @@
       initializeLoginPage();
     }, 5000);
   }
-  
+
   // Account switching
   function switchAccount() {
     if (googleAccountsClient) {
@@ -244,15 +244,15 @@
       googleAccountsClient.requestAccessToken({ prompt: 'select_account' });
     }
   }
-  
+
   // Login button handler with improved flow
   function handleLogin() {
     if (isLoading) return;
-    
+
     const userEmail = document.getElementById('user-email-display').textContent;
     if (userEmail && userEmail !== '-' && userEmail !== 'エラーが発生しました') {
       setLoading(true, '管理パネルにリダイレクトしています...');
-      
+
       // Add a small delay for better UX
       setTimeout(() => {
         // Redirect to admin panel
@@ -264,18 +264,18 @@
       requestUserLogin();
     }
   }
-  
+
   // Initialize when DOM is ready
   document.addEventListener('DOMContentLoaded', () => {
     initializeLoginPage();
-    
+
     // Add event listeners
     document.getElementById('login-btn').addEventListener('click', handleLogin);
     document.getElementById('switch-account-link').addEventListener('click', (e) => {
       e.preventDefault();
       switchAccount();
     });
-    
+
     // Add keyboard support
     document.addEventListener('keypress', (e) => {
       if (e.key === 'Enter' && !document.getElementById('login-btn').disabled) {
@@ -283,14 +283,14 @@
       }
     });
   });
-  
+
   // Handle focus management for accessibility
   document.addEventListener('focusin', (e) => {
     if (e.target.classList.contains('login-btn')) {
       e.target.style.boxShadow = '0 0 0 2px #3b82f6';
     }
   });
-  
+
   document.addEventListener('focusout', (e) => {
     if (e.target.classList.contains('login-btn')) {
       e.target.style.boxShadow = '';

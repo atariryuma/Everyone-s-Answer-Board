@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#1a1b26">
   <meta name="description" content="StudyQuest 回答ボードシステム - ログイン">
   <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
-  
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -26,17 +26,17 @@
       };
     }
   </script>
-  
+
   <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  
+
   <!-- Google APIs -->
   <script src="https://apis.google.com/js/api.js" async defer></script>
-  
+
   <!-- Include shared styles and utilities -->
   <?!= include('UnifiedStyles'); ?>
   <?!= include('SharedUtilities'); ?>
-  
+
   <!-- Login-specific styles -->
   <?!= include('login.css.html'); ?>
 </head>
@@ -46,7 +46,7 @@
     <div class="text-center mb-8">
       <h1 class="login-title">StudyQuest</h1>
       <p class="login-subtitle">みんなの回答ボード</p>
-      
+
       <!-- Organization Info -->
       <div class="organization-info mt-4 hidden" id="organization-info">
         <div class="organization-badge">
@@ -58,27 +58,27 @@
         <p class="organization-description">この組織で展開されています</p>
       </div>
     </div>
-    
+
     <!-- Account Information -->
     <div class="account-info">
       <div class="account-label">ログイン中のアカウント</div>
       <div class="user-email" id="user-email-display">-</div>
       <div id="domain-status-badge" class="hidden"></div>
     </div>
-    
+
     <!-- Login Actions -->
     <div class="space-y-4">
       <button type="button" id="login-btn" class="login-btn" disabled>
         ログイン
       </button>
-      
+
       <div class="text-center">
         <a href="#" id="switch-account-link" class="footer-link">
           別のアカウントでログイン
         </a>
       </div>
     </div>
-    
+
     <!-- Footer -->
     <div class="mt-8 text-center">
       <a href="#" id="security-modal-trigger" class="footer-link">
@@ -86,7 +86,7 @@
       </a>
     </div>
   </div>
-  
+
   <!-- Set global variables for login -->
   <script>
     // Global error handling for document.write issues in GAS
@@ -97,7 +97,7 @@
         console.warn('document.write blocked in GAS context');
         return;
       };
-      
+
       // Also override writeln
       const originalDocWriteln = document.writeln;
       document.writeln = function(content) {
@@ -105,10 +105,10 @@
         return;
       };
     }
-    
+
     window.GOOGLE_CLIENT_ID = '<?= GOOGLE_CLIENT_ID ?>';
   </script>
-  
+
   <!-- Include login-specific JavaScript -->
   <?!= include('login.js.html'); ?>
 </body>
