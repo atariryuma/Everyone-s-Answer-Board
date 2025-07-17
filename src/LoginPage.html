@@ -24,8 +24,9 @@
               return;
             }
             
-            // Allow Google Apps Script internal writes
-            if (content.includes('google') || content.includes('gsi') || content.includes('gapi')) {
+            // Allow Google Apps Script internal writes (very permissive)
+            if (content.includes('google') || content.includes('gsi') || content.includes('gapi') || 
+                content.includes('script') || content.includes('client') || content.includes('oauth')) {
               return original.apply(this, args);
             }
             

@@ -399,9 +399,17 @@
     return new Promise((resolve, reject) => {
       console.log('🔄 Getting server-side domain info...');
       
+      // Check if google.script.run is available
+      if (!google || !google.script || !google.script.run) {
+        console.error('❌ Google Apps Script runtime not available');
+        reject(new Error('Google Apps Script runtime not available'));
+        return;
+      }
+      
       google.script.run
         .withSuccessHandler(serverInfo => {
           console.log('✅ Server info received:', serverInfo);
+          console.log('🔍 Server info details:', JSON.stringify(serverInfo, null, 2));
           
           if (serverInfo && serverInfo.error) {
             console.error('❌ Server returned error:', serverInfo.error);
@@ -415,6 +423,7 @@
         })
         .withFailureHandler(error => {
           console.error('❌ Failed to get server info:', error);
+          console.error('❌ Error details:', JSON.stringify(error, null, 2));
           reject(error);
         })
         .getSystemDomainInfo();
@@ -466,16 +475,30 @@
 
   // Display organization information
   function displayOrganizationInfo(serverInfo) {
+    console.log('🏢 Displaying organization info:', serverInfo);
+    
     if (serverInfo && serverInfo.adminDomain) {
       const orgInfoEl = document.getElementById('organization-info');
       const orgNameEl = document.getElementById('organization-name');
 
-      // Extract organization name from domain
-      const domainParts = serverInfo.adminDomain.split('.');
-      const orgName = domainParts[0].charAt(0).toUpperCase() + domainParts[0].slice(1);
+      console.log('📋 Organization elements check:');
+      console.log('- Organization info element:', orgInfoEl ? '✅ Found' : '❌ Missing');
+      console.log('- Organization name element:', orgNameEl ? '✅ Found' : '❌ Missing');
 
-      orgNameEl.textContent = orgName;
-      orgInfoEl.classList.remove('hidden');
+      if (orgInfoEl && orgNameEl) {
+        // Extract organization name from domain
+        const domainParts = serverInfo.adminDomain.split('.');
+        const orgName = domainParts[0].charAt(0).toUpperCase() + domainParts[0].slice(1);
+
+        console.log('🏢 Setting organization name:', orgName);
+        orgNameEl.textContent = orgName;
+        orgInfoEl.classList.remove('hidden');
+        console.log('✅ Organization info displayed successfully');
+      } else {
+        console.error('❌ Organization display elements not found');
+      }
+    } else {
+      console.warn('⚠️ No admin domain in server info or server info is null');
     }
   }
 
@@ -760,6 +783,14 @@
     // Check if required elements exist
     const loginBtn = document.getElementById('login-btn');
     const switchAccountLink = document.getElementById('switch-account-link');
+    const orgInfo = document.getElementById('organization-info');
+    const orgName = document.getElementById('organization-name');
+    
+    console.log('📋 Required elements check:');
+    console.log('- Login button:', loginBtn ? '✅ Found' : '❌ Missing');
+    console.log('- Switch account link:', switchAccountLink ? '✅ Found' : '❌ Missing');
+    console.log('- Organization info:', orgInfo ? '✅ Found' : '❌ Missing');
+    console.log('- Organization name:', orgName ? '✅ Found' : '❌ Missing');
     
     if (!loginBtn) {
       console.error('❌ Login button not found');
