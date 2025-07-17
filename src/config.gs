@@ -1184,7 +1184,7 @@ function createBoardFromAdmin(requestUserId) {
 
 /**
  * 既存ボード情報を取得 (マルチテナント対応版)
- * Registration.htmlから呼び出される
+ * Login.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function getExistingBoard(requestUserId) {
@@ -1222,7 +1222,7 @@ function getExistingBoard(requestUserId) {
 
 /**
  * ユーザー認証を検証 (マルチテナント対応版)
- * Registration.htmlから呼び出される
+ * Login.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function verifyUserAuthentication(requestUserId) {

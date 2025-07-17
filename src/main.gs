@@ -187,7 +187,7 @@ function debugLog() {
 
 /**
  * デプロイされたWebアプリのドメイン情報と現在のユーザーのドメイン情報を取得
- * AdminPanel.html と Registration.html から共通で呼び出される
+ * AdminPanel.html と Login.html から共通で呼び出される
  */
 function getDeployUserDomainInfo() {
   try {
@@ -262,10 +262,10 @@ function isSystemSetup() {
  * 登録ページを表示する関数
  */
 function showRegistrationPage() {
-  var template = HtmlService.createTemplateFromFile('Registration');
+  var template = HtmlService.createTemplateFromFile('Login');
   template.include = include;
   var output = template.evaluate()
-    .setTitle('新規ユーザー登録 - StudyQuest');
+    .setTitle('ログイン - StudyQuest');
   return safeSetXFrameOptionsDeny(output);
 }
 
@@ -378,27 +378,8 @@ function handleDirectExecAccess(userEmail) {
       return safeSetXFrameOptionsDeny(t.evaluate().setTitle('初回セットアップ - StudyQuest'));
     }
     
-    if (!userEmail) {
-      return showRegistrationPage();
-    }
-    
-    // サービスアカウント経由でユーザーがデータベースに登録されているかチェック
-    const userInfo = findUserByEmail(userEmail);
-    console.log('handleDirectExecAccess - userInfo:', userInfo);
-    console.log('handleDirectExecAccess - userEmail:', userEmail);
-    
-    if (userInfo && userInfo.userId) {
-      // 登録済みユーザー: 管理パネルに自動遷移（リダイレクトではなく直接遷移）
-      console.log('handleDirectExecAccess - Found user, transitioning to admin panel for userId:', userInfo.userId);
-      
-      // ここで直接管理パネルを表示する（リダイレクトしない）
-      return renderAdminPanel(userInfo, 'admin');
-    } else {
-      // 未登録ユーザー: 新規登録画面表示
-      console.log('handleDirectExecAccess - Unregistered user, showing registration page');
-      debugLog('Unregistered user, showing registration page');
-      return showRegistrationPage();
-    }
+    // /execアクセス時は常にログインページを表示し、ページ側でリダイレクト処理を行う
+    return showRegistrationPage();
   } catch (error) {
     console.error('handleDirectExecAccess error:', error);
     return showRegistrationPage();
