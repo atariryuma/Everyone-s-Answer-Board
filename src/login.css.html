@@ -1,9 +1,9 @@
 <style>
   /* Login Page Specific Styles */
   
-  /* Modern glassmorphism background */
+  /* Modern glassmorphism background - matched with admin panel */
   .login-container {
-    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 25%, #1e3a8a 50%, #1e40af 75%, #1d4ed8 100%);
+    background: linear-gradient(135deg, #1a1b26 0%, #24273a 25%, #1e293b 50%, #1e40af 75%, #1d4ed8 100%);
     background-size: 400% 400%;
     animation: gradientShift 15s ease infinite;
     min-height: 100vh;
@@ -29,13 +29,13 @@
     100% { background-position: 0% 50%; }
   }
   
-  /* Glassmorphism login card */
+  /* Glassmorphism login card - matched with admin panel */
   .login-card {
     background: rgba(255, 255, 255, 0.05);
-    -webkit-backdrop-filter: blur(16px);
-    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
+    border-radius: 12px;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     position: relative;
     overflow: hidden;
@@ -53,8 +53,8 @@
   }
   
   .login-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 32px 60px -12px rgba(0, 0, 0, 0.6);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   }
   
   /* Title styling */
@@ -77,13 +77,14 @@
     margin-bottom: 2rem;
   }
   
-  /* Account info styling */
+  /* Account info styling - matched with admin panel */
   .account-info {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
     padding: 1rem;
     margin-bottom: 1.5rem;
+    transition: all 0.3s ease;
   }
   
   .account-label {
@@ -245,5 +246,13 @@
   /* Animation for smooth transitions */
   * {
     transition: all 0.2s ease;
+  }
+  
+  /* Webkit prefix compatibility for Safari */
+  @supports not (backdrop-filter: blur(10px)) {
+    .login-card {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
   }
 </style>

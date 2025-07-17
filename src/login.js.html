@@ -6,6 +6,19 @@
   
   // Initialize login page
   function initializeLoginPage() {
+    // Add global error handling for document.write issues
+    if (typeof document !== 'undefined' && document.write) {
+      const originalDocWrite = document.write;
+      document.write = function(content) {
+        try {
+          console.warn('document.write called in GAS context - using safe DOM manipulation');
+          return;
+        } catch (e) {
+          console.error('document.write error caught:', e);
+        }
+      };
+    }
+    
     setLoading(true, 'Googleアカウントの情報を確認しています...');
     
     // Check if client ID is available
