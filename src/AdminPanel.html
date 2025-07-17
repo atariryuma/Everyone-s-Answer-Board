@@ -7,13 +7,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#1a1b26" />
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
-  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), ambient-light-sensor=(), speaker-selection=(), vibrate=(), vr=()" />
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
   <!-- User ID from server template -->
   <meta name="user-id" content="<?= typeof userId !== 'undefined' ? userId : '' ?>" id="user-id-meta">
 
 
   <!-- TailwindCSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Handle Tailwind CDN production warnings and deprecation warnings
+    if (typeof console !== 'undefined' && console.warn) {
+      const originalWarn = console.warn;
+      console.warn = function(...args) {
+        if (args[0] && (
+          args[0].includes('cdn.tailwindcss.com should not be used in production') ||
+          args[0].includes('-ms-high-contrast is in the process of being deprecated')
+        )) {
+          return; // Suppress these warnings
+        }
+        originalWarn.apply(console, args);
+      };
+    }
+  </script>
 
   <!-- Unified Styles and Shared Components -->
   <?!= include('UnifiedStyles'); ?>
@@ -1556,7 +1571,7 @@
     var IS_TEST_ENV = typeof navigator !== 'undefined' &&
       navigator.userAgent && navigator.userAgent.indexOf('jsdom') !== -1;
 
-    const DEBUG_MODE = <?= typeof DEBUG_MODE !== 'undefined' ? DEBUG_MODE : false ?>;
+    const DEBUG_MODE = '<?= typeof DEBUG_MODE !== "undefined" ? DEBUG_MODE : "false" ?>' === 'true';
 
     // AdminPanel専用システムフロー表示機能
     function showSystemFlow() {

@@ -7,17 +7,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#1a1b26">
   <meta name="description" content="StudyQuest 回答ボードシステム - ログイン">
-  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), ambient-light-sensor=(), speaker-selection=(), vibrate=(), vr=()" />
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    // Handle Tailwind CDN production warnings
-    if (typeof tailwind !== 'undefined' && tailwind.config) {
-      tailwind.config = {
-        corePlugins: {
-          preflight: false
+    // Handle Tailwind CDN production warnings and deprecation warnings
+    if (typeof console !== 'undefined' && console.warn) {
+      const originalWarn = console.warn;
+      console.warn = function(...args) {
+        if (args[0] && (
+          args[0].includes('cdn.tailwindcss.com should not be used in production') ||
+          args[0].includes('-ms-high-contrast is in the process of being deprecated')
+        )) {
+          return; // Suppress these warnings
         }
+        originalWarn.apply(console, args);
       };
     }
   </script>
