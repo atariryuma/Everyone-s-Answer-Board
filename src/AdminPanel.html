@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#1a1b26" />
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
-  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), screen-wake-lock=(), accelerometer=(), gyroscope=(), magnetometer=()" />
   <!-- User ID from server template -->
   <meta name="user-id" content="<?= typeof userId !== 'undefined' ? userId : '' ?>" id="user-id-meta">
 
@@ -111,7 +111,7 @@
   }
   </script>
   <script>
-  const __IS_SYSTEM_ADMIN_RAW__ = '<?= typeof isDeployUser !== "undefined" ? isDeployUser : "false" ?>';
+  const __IS_SYSTEM_ADMIN_RAW__ = '<?= escapeJavaScript(typeof isDeployUser !== "undefined" ? isDeployUser : "false") ?>';
   const __IS_SYSTEM_ADMIN__ = __IS_SYSTEM_ADMIN_RAW__ === 'true' || __IS_SYSTEM_ADMIN_RAW__ === true;
   window.isSystemAdmin = __IS_SYSTEM_ADMIN__;
   console.log('Template Debug:');
@@ -121,8 +121,8 @@
   console.log('- window.isSystemAdmin final:', window.isSystemAdmin);
   
   // URL更新処理
-  const shouldUpdateUrl = '<?= typeof shouldUpdateUrl !== "undefined" ? shouldUpdateUrl : "false" ?>';
-  const correctUrl = '<?= typeof correctUrl !== "undefined" ? correctUrl : "" ?>';
+  const shouldUpdateUrl = '<?= escapeJavaScript(typeof shouldUpdateUrl !== "undefined" ? shouldUpdateUrl : "false") ?>';
+  const correctUrl = '<?= escapeJavaScript(typeof correctUrl !== "undefined" ? correctUrl : "") ?>';
   
   if (shouldUpdateUrl === 'true' && correctUrl && correctUrl !== '') {
     console.log('Updating URL to:', correctUrl);
@@ -1463,7 +1463,7 @@
     (function() {
       try {
         // テンプレート変数から直接取得
-        var templateUserId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
+        var templateUserId = '<?= escapeJavaScript(typeof userId !== "undefined" ? userId : "") ?>';
         if (templateUserId && templateUserId.trim() !== '') {
           userId = templateUserId;
           console.log('✅  - userId from template:', userId);
@@ -1494,7 +1494,7 @@
     var IS_TEST_ENV = typeof navigator !== 'undefined' &&
       navigator.userAgent && navigator.userAgent.indexOf('jsdom') !== -1;
 
-    const DEBUG_MODE = '<?= typeof DEBUG_MODE !== "undefined" ? DEBUG_MODE : "false" ?>' === 'true';
+    const DEBUG_MODE = '<?= escapeJavaScript(typeof DEBUG_MODE !== "undefined" ? DEBUG_MODE : "false") ?>' === 'true';
 
     // AdminPanel専用システムフロー表示機能
     function showSystemFlow() {
