@@ -571,6 +571,20 @@ function refreshBoardData(requestUserId) {
 }
 
 /**
+ * システムステータス取得（AdminPanel.js.html用ラッパー）
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ * @returns {Object} ステータス情報
+ */
+function getSystemStatus(requestUserId) {
+  try {
+    return getAppConfig(requestUserId);
+  } catch (e) {
+    console.error('getSystemStatus error:', e.message);
+    return { status: 'error', message: e.message };
+  }
+}
+
+/**
  * スプレッドシートの生データをフロントエンドが期待する形式にフォーマットするヘルパー関数
  * @param {Array<Object>} rawData - getSheetDataから返された生データ（originalData, reactionCountsなどを含む）
  * @param {Object} mappedIndices - 設定されたヘッダー名と実際の列インデックスのマッピング
