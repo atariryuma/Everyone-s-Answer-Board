@@ -605,8 +605,8 @@
     }
   }
 
-  // Initialize when DOM is ready
-  document.addEventListener('DOMContentLoaded', () => {
+  // Initialize immediately since the script is at the end of the body
+  (function() {
     initializeLoginPage();
 
     // Add event listeners
@@ -622,7 +622,7 @@
         handleLogin();
       }
     });
-  });
+  })();
 
   // Handle focus management for accessibility
   document.addEventListener('focusin', (e) => {
