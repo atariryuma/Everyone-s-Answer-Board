@@ -710,24 +710,43 @@
     }
   }
 
-  // Initialize immediately since the script is at the end of the body
-  (function() {
+  // Initialize when DOM is ready
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 DOM loaded, initializing login page...');
+    
+    // Check if required elements exist
+    const loginBtn = document.getElementById('login-btn');
+    const switchAccountLink = document.getElementById('switch-account-link');
+    
+    if (!loginBtn) {
+      console.error('❌ Login button not found');
+      return;
+    }
+    
+    if (!switchAccountLink) {
+      console.error('❌ Switch account link not found');
+      return;
+    }
+    
+    // Initialize login page
     initializeLoginPage();
 
     // Add event listeners
-    document.getElementById('login-btn').addEventListener('click', handleLogin);
-    document.getElementById('switch-account-link').addEventListener('click', (e) => {
+    loginBtn.addEventListener('click', handleLogin);
+    switchAccountLink.addEventListener('click', (e) => {
       e.preventDefault();
       switchAccount();
     });
 
     // Add keyboard support
     document.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter' && !document.getElementById('login-btn').disabled) {
+      if (e.key === 'Enter' && !loginBtn.disabled) {
         handleLogin();
       }
     });
-  })();
+    
+    console.log('✅ Login page event listeners initialized');
+  });
 
   // Handle focus management for accessibility
   document.addEventListener('focusin', (e) => {

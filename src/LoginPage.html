@@ -119,13 +119,13 @@
   </script>
 
   <!-- Include shared styles and utilities -->
-  <?!= include('UnifiedStyles'); ?>
-  <?!= include('SharedUtilities'); ?>
-  <?!= include('ErrorBoundary'); ?>
-  <?!= include('adminPanel.css'); ?>
+  <?!= include('UnifiedStyles.html'); ?>
+  <?!= include('SharedUtilities.html'); ?>
+  <?!= include('ErrorBoundary.html'); ?>
+  <?!= include('adminPanel.css.html'); ?>
 
   <!-- Login-specific styles -->
-  <?!= include('login.css'); ?>
+  <?!= include('login.css.html'); ?>
 </head>
 <body class="login-container flex items-center justify-center p-4">
   <div class="login-card w-full max-w-md p-8">
@@ -250,6 +250,6 @@
   </script>
 
   <!-- Include login-specific JavaScript -->
-  <?!= include('login.js'); ?>
+  <?!= include('login.js.html'); ?>
 </body>
 </html>
