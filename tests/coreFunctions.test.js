@@ -42,7 +42,8 @@ describe('Core.gs utilities', () => {
         createUser: jest.fn(),
         updateUser: jest.fn(),
         invalidateUserCache: jest.fn(),
-        generateAppUrls: jest.fn(() => ({ adminUrl: 'admin', viewUrl: 'view' }))
+        generateAppUrls: jest.fn(() => ({ adminUrl: 'admin', viewUrl: 'view' })),
+        getDeployUserDomainInfo: jest.fn(() => ({ deployDomain: '', isDomainMatch: true }))
       });
     });
 
