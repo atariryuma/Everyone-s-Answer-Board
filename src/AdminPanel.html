@@ -19,6 +19,9 @@
   <?!= include('UnifiedStyles'); ?>
   <?!= include('SharedUtilities'); ?>
   
+  <!-- Admin Panel Specific Styles -->
+  <?!= include('adminPanel.css'); ?>
+  
   <!-- ClientOptimizer の統合 -->
   <?!= include('ClientOptimizer'); ?>
   <?!= include('UnifiedCache.js'); ?>
@@ -3483,6 +3486,9 @@ function syncCheckboxStates(status) {
     };
   }
   </script>
+  
+  <!-- Admin Panel Specific JavaScript -->
+  <?!= include('adminPanel.js'); ?>
 
 </body>
 </html>
