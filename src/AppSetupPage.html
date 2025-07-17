@@ -526,7 +526,7 @@
                             <td class="px-4 py-3 text-sm text-gray-300">${lastAccess}</td>
                             <td class="px-4 py-3 text-center">
                                 <button 
-                                    onclick="showDeleteConfirmation('${user.userId}', '${user.adminEmail}')"
+                                    onclick="showDeleteConfirmation('<?= escapeJavaScript(user.userId) ?>', '<?= escapeJavaScript(user.adminEmail) ?>')"
                                     class="btn bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs">
                                     削除
                                 </button>

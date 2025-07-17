@@ -303,13 +303,65 @@ function getGoogleClientId() {
       var allProperties = properties.getProperties();
       console.log('Available properties:', Object.keys(allProperties));
       
-      return { clientId: '', error: 'GOOGLE_CLIENT_ID not found in script properties' };
+      return { 
+        clientId: '', 
+        error: 'GOOGLE_CLIENT_ID not found in script properties',
+        setupInstructions: 'Please set GOOGLE_CLIENT_ID in Google Apps Script project settings under Properties > Script Properties'
+      };
     }
     
     return { clientId: clientId, success: true };
   } catch (error) {
     console.error('Error getting GOOGLE_CLIENT_ID:', error);
     return { clientId: '', error: error.toString() };
+  }
+}
+
+/**
+ * システム設定の詳細チェック
+ * @return {Object} システム設定の詳細情報
+ */
+function checkSystemConfiguration() {
+  try {
+    var properties = PropertiesService.getScriptProperties();
+    var allProperties = properties.getProperties();
+    
+    var requiredProperties = [
+      'GOOGLE_CLIENT_ID',
+      'DATABASE_SPREADSHEET_ID', 
+      'ADMIN_EMAIL',
+      'SERVICE_ACCOUNT_CREDS'
+    ];
+    
+    var configStatus = {};
+    var missingProperties = [];
+    
+    requiredProperties.forEach(function(prop) {
+      var value = allProperties[prop];
+      configStatus[prop] = {
+        exists: !!value,
+        hasValue: !!(value && value.trim()),
+        length: value ? value.length : 0
+      };
+      
+      if (!value || !value.trim()) {
+        missingProperties.push(prop);
+      }
+    });
+    
+    return {
+      isFullyConfigured: missingProperties.length === 0,
+      configStatus: configStatus,
+      missingProperties: missingProperties,
+      availableProperties: Object.keys(allProperties),
+      setupComplete: isSystemSetup()
+    };
+  } catch (error) {
+    console.error('Error checking system configuration:', error);
+    return {
+      isFullyConfigured: false,
+      error: error.toString()
+    };
   }
 }
 

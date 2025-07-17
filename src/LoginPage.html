@@ -200,8 +200,11 @@
                 console.warn('❌ GOOGLE_CLIENT_ID not available from server');
                 if (result && result.error) {
                   console.error('Server error:', result.error);
+                  if (result.setupInstructions) {
+                    console.error('Setup instructions:', result.setupInstructions);
+                  }
                 }
-                reject(new Error('GOOGLE_CLIENT_ID not available from server'));
+                reject(new Error(result.error || 'GOOGLE_CLIENT_ID not available from server'));
               }
             })
             .withFailureHandler(function(error) {
@@ -211,6 +214,35 @@
             .getGoogleClientId();
         } else {
           console.warn('❌ Google Apps Script not available');
+          reject(new Error('Google Apps Script not available'));
+        }
+      });
+    }
+
+    // Function to check system configuration
+    function checkSystemConfigurationFromClient() {
+      return new Promise((resolve, reject) => {
+        console.log('🔄 Checking system configuration...');
+        
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+          google.script.run
+            .withSuccessHandler(function(result) {
+              console.group('🔧 System Configuration Status');
+              console.log('Full configuration:', result.isFullyConfigured);
+              console.log('Missing properties:', result.missingProperties);
+              console.log('Available properties:', result.availableProperties);
+              console.log('Setup complete:', result.setupComplete);
+              console.log('Config status:', result.configStatus);
+              console.groupEnd();
+              resolve(result);
+            })
+            .withFailureHandler(function(error) {
+              console.error('❌ Failed to check system configuration:', error);
+              reject(error);
+            })
+            .checkSystemConfiguration();
+        } else {
+          console.warn('❌ Google Apps Script not available for configuration check');
           reject(new Error('Google Apps Script not available'));
         }
       });

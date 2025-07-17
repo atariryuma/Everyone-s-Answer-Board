@@ -26,11 +26,27 @@
   // Sequenced initialization function
   function initializeLoginSequence() {
     return new Promise((resolve, reject) => {
-      console.log('🔄 Step 1: Waiting for Google APIs...');
-      setLoading(true, 'Google APIを読み込み中...');
+      console.log('🔄 Step 0: Checking system configuration...');
+      setLoading(true, 'システム設定を確認中...');
       
-      // Step 1: Wait for Google APIs to load
-      waitForGoogleAPIs()
+      // Step 0: Check system configuration
+      checkSystemConfigurationFromClient()
+        .then((configResult) => {
+          console.log('✅ Step 0 complete: System configuration checked');
+          
+          if (!configResult.isFullyConfigured) {
+            console.warn('⚠️ System is not fully configured. Missing:', configResult.missingProperties);
+            setLoading(false, 'システム設定が不完全です。管理者にお問い合わせください。');
+            showConfigurationError(configResult);
+            return reject(new Error('System configuration incomplete'));
+          }
+          
+          console.log('🔄 Step 1: Waiting for Google APIs...');
+          setLoading(true, 'Google APIを読み込み中...');
+          
+          // Step 1: Wait for Google APIs to load
+          return waitForGoogleAPIs();
+        })
         .then(() => {
           console.log('✅ Step 1 complete: Google APIs loaded');
           console.log('🔄 Step 2: Getting GOOGLE_CLIENT_ID...');
@@ -64,6 +80,29 @@
           reject(error);
         });
     });
+  }
+
+  // Show configuration error to user
+  function showConfigurationError(configResult) {
+    const userEmailDisplay = document.getElementById('user-email-display');
+    const loginBtn = document.getElementById('login-btn');
+    
+    if (userEmailDisplay) {
+      userEmailDisplay.innerHTML = `
+        <div style="color: #ef4444; font-size: 14px;">
+          <strong>システム設定エラー</strong><br>
+          不足している設定: ${configResult.missingProperties.join(', ')}<br>
+          <small>管理者にお問い合わせください</small>
+        </div>
+      `;
+    }
+    
+    if (loginBtn) {
+      loginBtn.innerHTML = 'システム設定を確認';
+      loginBtn.disabled = true;
+      loginBtn.style.backgroundColor = '#6b7280';
+      loginBtn.style.cursor = 'not-allowed';
+    }
   }
 
   // Wait for Google APIs to load with Promise-based approach
@@ -101,14 +140,75 @@
     console.error('Login initialization error:', error);
     
     let errorMessage = 'ログインの初期化に失敗しました';
+    let isRetriable = true;
+    
     if (error.message.includes('timeout')) {
       errorMessage = 'Google APIの読み込みがタイムアウトしました';
     } else if (error.message.includes('network')) {
       errorMessage = 'ネットワークエラーが発生しました';
+    } else if (error.message.includes('GOOGLE_CLIENT_ID')) {
+      errorMessage = 'Google Client IDが設定されていません';
+      isRetriable = false;
+    } else if (error.message.includes('System configuration incomplete')) {
+      errorMessage = 'システム設定が不完全です';
+      isRetriable = false;
     }
     
     setLoading(false, errorMessage);
-    showRetryButton();
+    
+    if (isRetriable) {
+      showRetryButton();
+    } else {
+      showConfigurationButton();
+    }
+  }
+
+  // Show configuration button for non-retriable errors
+  function showConfigurationButton() {
+    const loginBtn = document.getElementById('login-btn');
+    if (loginBtn) {
+      loginBtn.innerHTML = 'システム設定を確認';
+      loginBtn.disabled = false;
+      loginBtn.onclick = () => {
+        checkSystemConfigurationFromClient()
+          .then((result) => {
+            showDetailedConfigurationInfo(result);
+          })
+          .catch((error) => {
+            console.error('Configuration check failed:', error);
+            alert('設定確認に失敗しました: ' + error.message);
+          });
+      };
+    }
+  }
+
+  // Show detailed configuration information
+  function showDetailedConfigurationInfo(configResult) {
+    const userEmailDisplay = document.getElementById('user-email-display');
+    
+    if (userEmailDisplay) {
+      let statusHtml = '<div style="font-size: 14px; line-height: 1.4;">';
+      statusHtml += '<strong>📋 システム設定状況</strong><br>';
+      statusHtml += `<span style="color: ${configResult.isFullyConfigured ? '#10b981' : '#ef4444'};">`;
+      statusHtml += configResult.isFullyConfigured ? '✅ 設定完了' : '❌ 設定不完全';
+      statusHtml += '</span><br><br>';
+      
+      if (configResult.missingProperties && configResult.missingProperties.length > 0) {
+        statusHtml += '<strong>不足している設定:</strong><br>';
+        configResult.missingProperties.forEach(prop => {
+          statusHtml += `• ${prop}<br>`;
+        });
+        statusHtml += '<br>';
+      }
+      
+      statusHtml += '<strong>設定手順:</strong><br>';
+      statusHtml += '1. Google Apps Script エディターを開く<br>';
+      statusHtml += '2. プロジェクトの設定 > スクリプトプロパティ<br>';
+      statusHtml += '3. 不足している項目を追加<br>';
+      statusHtml += '</div>';
+      
+      userEmailDisplay.innerHTML = statusHtml;
+    }
   }
 
   // Show retry button for failed initialization
