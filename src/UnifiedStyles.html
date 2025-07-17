@@ -821,6 +821,30 @@ body {
   }
 }
 
+/* Domain status badges */
+.domain-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 9999px;
+  border-width: 1px;
+}
+
+.domain-badge.match {
+  background-color: rgba(22, 163, 74, 0.15);
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+.domain-badge.mismatch {
+  background-color: rgba(234, 179, 8, 0.15);
+  color: #facc15;
+  border-color: rgba(250, 204, 21, 0.3);
+}
+
 /* Large screen optimizations */
 @media (min-width: 1200px) {
   .responsive-grid {
