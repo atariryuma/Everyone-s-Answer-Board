@@ -9,7 +9,7 @@
   // Initialize login page - sequenced flow
   function initializeLoginPage() {
     console.log('🚀 Initializing login page...');
-    setLoading(true, 'ログインを準備しています...');
+    setLoading(true, 'システムを準備しています...');
 
     // Sequenced initialization: Google Services → ClientID → Login
     initializeLoginSequence()
@@ -343,12 +343,53 @@
     });
   }
 
+  // Show welcome message for new users
+  function showWelcomeMessage() {
+    const userEmailDisplay = document.getElementById('user-email-display');
+    
+    if (userEmailDisplay) {
+      userEmailDisplay.innerHTML = `
+        <div style="color: #10b981; font-size: 14px; line-height: 1.4;">
+          <strong>🎉 ようこそ StudyQuest へ！</strong><br>
+          <span style="color: #6b7280; font-size: 12px;">
+            アカウントが正常に作成されました。<br>
+            次のステップでフォームの作成を開始できます。
+          </span>
+        </div>
+      `;
+    }
+  }
+
+  // Show existing user welcome message
+  function showExistingUserMessage() {
+    const userEmailDisplay = document.getElementById('user-email-display');
+    
+    if (userEmailDisplay) {
+      userEmailDisplay.innerHTML = `
+        <div style="color: #3b82f6; font-size: 14px; line-height: 1.4;">
+          <strong>🚀 おかえりなさい！</strong><br>
+          <span style="color: #6b7280; font-size: 12px;">
+            ${currentUserEmail}<br>
+            管理パネルにアクセスできます。
+          </span>
+        </div>
+      `;
+    }
+  }
+
   // Enable login button for user interaction
   function enableLoginButton() {
     const loginBtn = document.getElementById('login-btn');
     if (loginBtn) {
       loginBtn.disabled = false;
-      loginBtn.innerHTML = 'Googleアカウントでログイン';
+      
+      // Change button text based on user status
+      if (currentUserEmail && redirectUrl && redirectUrl !== '/exec') {
+        loginBtn.innerHTML = '管理パネルを開く';
+      } else {
+        loginBtn.innerHTML = 'Googleアカウントではじめる';
+      }
+      
       loginBtn.onclick = handleLogin;
     }
   }
@@ -482,7 +523,7 @@
     return new Promise((resolve, reject) => {
       console.log('🔄 Registering new user:', currentUserEmail);
       
-      setLoading(true, '新しいアカウントを登録しています...');
+      setLoading(true, '初回セットアップを行っています...');
       
       google.script.run
         .withSuccessHandler(res => {
@@ -490,10 +531,11 @@
           
           if (res && res.adminUrl) {
             redirectUrl = res.adminUrl;
-            setLoading(false, '登録が完了しました');
+            showWelcomeMessage();
+            setLoading(false, 'アカウント作成が完了しました');
             enableLoginButton();
           } else {
-            setLoading(false, '登録は完了しましたが、管理URLが見つかりません');
+            setLoading(false, 'アカウント作成は完了しましたが、管理URLが見つかりません');
             enableLoginButton();
           }
           
@@ -512,7 +554,7 @@
     return new Promise((resolve, reject) => {
       console.log('🔄 Fetching existing board info...');
       
-      setLoading(true, 'ボード情報を確認しています...');
+      setLoading(true, 'アカウント情報を確認しています...');
       
       google.script.run
         .withSuccessHandler(result => {
@@ -527,7 +569,8 @@
           if (result.status === 'existing_user') {
             console.log('✅ Existing user found, redirecting to admin panel');
             redirectUrl = result.adminUrl;
-            setLoading(false, '管理パネルに移動する準備ができました');
+            showExistingUserMessage();
+            setLoading(false, 'アカウント確認が完了しました');
             enableLoginButton();
             resolve(result);
           } else if (result.status === 'setup_required') {
@@ -607,7 +650,7 @@
       userEmailDisplay.textContent = message || '認証中...';
     } else {
       loginBtn.disabled = false;
-      loginBtn.innerHTML = 'ログイン';
+      loginBtn.innerHTML = 'はじめる';
       loginBtn.style.cursor = 'pointer';
       if (!message) {
         userEmailDisplay.textContent = '-';
@@ -696,7 +739,7 @@
     // Check if user is already authenticated and ready to proceed
     if (currentUserEmail && redirectUrl && redirectUrl !== '/exec') {
       console.log('✅ User authenticated, redirecting to:', redirectUrl);
-      setLoading(true, '管理パネルにリダイレクトしています...');
+      setLoading(true, 'アカウントにアクセスしています...');
 
       // Add a small delay for better UX
       setTimeout(() => {
@@ -705,7 +748,7 @@
     } else {
       // Request authentication
       console.log('🔄 Starting authentication process...');
-      setLoading(true, 'Googleアカウントでログインしています...');
+      setLoading(true, 'Googleアカウントで認証しています...');
       requestUserLogin();
     }
   }
