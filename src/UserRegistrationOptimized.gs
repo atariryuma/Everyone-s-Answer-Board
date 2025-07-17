@@ -609,30 +609,30 @@ function updateUserDirect(userId, updateData) {
 }
 
 /**
- * クイックスタートを廃止し、ユーザー作成のみ行う新しい登録フロー
- * フォーム作成は管理画面で手動で行う
+ * ログインページ専用：ユーザー登録のみ実行
+ * フォーム・スプレッドシート作成は管理画面で手動実行
  * @returns {Object} 登録結果
  */
-function createUserWithoutQuickstart() {
+function createUserForLogin() {
   try {
     const userEmail = Session.getActiveUser().getEmail();
     
     // 既存ユーザーチェック  
     const existingUser = findUserByEmail(userEmail);
     if (existingUser) {
-      console.log('createUserWithoutQuickstart: 既存ユーザーを検出', { userEmail });
+      console.log('createUserForLogin: 既存ユーザーを検出', { userEmail });
       return {
         status: 'existing_user',
         userId: existingUser.userId,
         userEmail: userEmail,
-        adminUrl: constructWebAppUrl({ userId: existingUser.userId })
+        adminUrl: buildUserAdminUrl(existingUser.userId)
       };
     }
     
-    console.log('createUserWithoutQuickstart: 新規ユーザー作成開始', { userEmail });
+    console.log('createUserForLogin: 新規ユーザー作成開始', { userEmail });
     
     // 軽量ユーザー作成（フォーム・スプレッドシートは作成しない）
-    const userId = generateUniqueUserId();
+    const userId = generateConsistentUserId(userEmail);
     const userData = {
       userId: userId,
       adminEmail: userEmail,
@@ -646,18 +646,18 @@ function createUserWithoutQuickstart() {
     };
     
     const createdUser = createUser(userData);
-    console.log('createUserWithoutQuickstart: ユーザー作成完了', { userId, userEmail });
+    console.log('createUserForLogin: ユーザー作成完了', { userId, userEmail });
     
     return {
       status: 'success',
       message: 'ユーザー登録が完了しました。管理画面でフォームを作成してください。',
       userId: userId,
       userEmail: userEmail,
-      adminUrl: constructWebAppUrl({ userId: userId })
+      adminUrl: buildUserAdminUrl(userId)
     };
     
   } catch (error) {
-    console.error('createUserWithoutQuickstart エラー:', error);
+    console.error('createUserForLogin エラー:', error);
     throw new Error(`ユーザー登録に失敗しました: ${error.message}`);
   }
 }
