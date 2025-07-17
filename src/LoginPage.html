@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <base target="_top">
   
-  <!-- Critical: Disable document.write immediately -->
+  <!-- Critical: Minimal document.write protection -->
   <script>
     (function() {
       // Store original write functions
@@ -14,24 +14,24 @@
       function createSafeWrite(original) {
         return function(...args) {
           try {
-            // Filter out problematic content
+            // Only block obviously malicious content
             const content = args.join('');
-            if (content.includes('missing ) after argument list') || 
-                content.includes('SyntaxError') ||
+            if (content.includes('<script>alert(') || 
                 content.includes('eval(') ||
-                content.includes('javascript:')) {
+                content.includes('javascript:') ||
+                content.includes('onerror=') ||
+                content.includes('onload=')) {
               console.warn('🚫 Blocked potentially unsafe document.write:', content);
               return;
             }
             
-            // Allow Google Apps Script internal writes (very permissive)
-            if (content.includes('google') || content.includes('gsi') || content.includes('gapi') || 
-                content.includes('script') || content.includes('client') || content.includes('oauth')) {
+            // Allow everything else, including Google Apps Script internal writes
+            try {
               return original.apply(this, args);
+            } catch (e) {
+              // If original fails, silently ignore to prevent breaking the app
+              console.log('🔒 Document.write call silently handled:', e.message);
             }
-            
-            // Block everything else
-            console.log('🔒 Document.write call blocked:', content);
           } catch (e) {
             console.error('Document.write protection error:', e);
           }

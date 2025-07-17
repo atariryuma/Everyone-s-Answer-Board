@@ -776,9 +776,9 @@
     }
   }
 
-  // Initialize when DOM is ready
-  document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 DOM loaded, initializing login page...');
+  // Initialize with multiple fallback methods
+  function initializeLoginSystem() {
+    console.log('🚀 Initializing login system...');
     
     // Check if required elements exist
     const loginBtn = document.getElementById('login-btn');
@@ -820,7 +820,32 @@
     });
     
     console.log('✅ Login page event listeners initialized');
+  }
+
+  // Multiple initialization methods
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeLoginSystem);
+  } else {
+    initializeLoginSystem();
+  }
+  
+  // Fallback initialization
+  window.addEventListener('load', function() {
+    console.log('🔄 Window loaded, checking if login system is initialized...');
+    if (!window.loginSystemReady) {
+      console.log('🔄 Login system not ready, reinitializing...');
+      initializeLoginSystem();
+    }
   });
+
+  // Immediate initialization attempt (for debugging)
+  console.log('🔄 Attempting immediate initialization...');
+  setTimeout(function() {
+    if (document.getElementById('login-btn')) {
+      console.log('🔄 Elements found, attempting immediate initialization...');
+      initializeLoginSystem();
+    }
+  }, 100);
 
   // Handle focus management for accessibility
   document.addEventListener('focusin', (e) => {
