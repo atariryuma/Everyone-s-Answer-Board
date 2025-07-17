@@ -494,6 +494,7 @@ function showErrorPage(title, message, error) {
   const template = HtmlService.createTemplateFromFile('ErrorBoundary');
   template.title = title;
   template.message = message;
+  template.mode = 'admin'; // エラーテンプレートが依存するmode変数にデフォルト値を提供
   if (DEBUG && error) {
     template.debugInfo = error.stack;
   } else {
@@ -502,6 +503,16 @@ function showErrorPage(title, message, error) {
   return template.evaluate()
     .setTitle(`エラー - ${title}`)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+}
+
+/**
+ * ユーザー専用の一意の管理パネルURLを構築
+ * @param {string} userId ユーザーID
+ * @return {string}
+ */
+function buildUserAdminUrl(userId) {
+  const baseUrl = getWebAppUrl();
+  return `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
 }
 
 
