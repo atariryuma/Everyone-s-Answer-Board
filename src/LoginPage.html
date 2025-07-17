@@ -4,47 +4,7 @@
   <meta charset="UTF-8">
   <base target="_top">
   
-  <!-- Critical: Minimal document.write protection -->
-  <script>
-    (function() {
-      // Store original write functions
-      const originalWrite = document.write;
-      const originalWriteln = document.writeln;
-      
-      function createSafeWrite(original) {
-        return function(...args) {
-          try {
-            // Only block obviously malicious content
-            const content = args.join('');
-            if (content.includes('<script>alert(') || 
-                content.includes('eval(') ||
-                content.includes('javascript:') ||
-                content.includes('onerror=') ||
-                content.includes('onload=')) {
-              console.warn('🚫 Blocked potentially unsafe document.write:', content);
-              return;
-            }
-            
-            // Allow everything else, including Google Apps Script internal writes
-            try {
-              return original.apply(this, args);
-            } catch (e) {
-              // If original fails, silently ignore to prevent breaking the app
-              console.log('🔒 Document.write call silently handled:', e.message);
-            }
-          } catch (e) {
-            console.error('Document.write protection error:', e);
-          }
-        };
-      }
-      
-      // Apply safe write functions
-      document.write = createSafeWrite(originalWrite);
-      document.writeln = createSafeWrite(originalWriteln);
-      
-      console.log('🔒 Document.write protection enabled');
-    })();
-  </script>
+  <!-- Security: Let Google Apps Script handle document.write naturally -->
   
   <title>StudyQuest - ログイン</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -52,6 +12,20 @@
   <meta name="description" content="StudyQuest 回答ボードシステム - ログイン">
   
   <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), screen-wake-lock=(), accelerometer=(), gyroscope=(), magnetometer=()" />
+  
+  <!-- Enhanced Security Headers -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self' https://*.google.com https://*.googleapis.com https://*.googleusercontent.com https://cdn.tailwindcss.com;
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.google.com https://*.googleapis.com https://*.googleusercontent.com https://cdn.tailwindcss.com;
+    style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com;
+    connect-src 'self' https://*.google.com https://*.googleapis.com;
+    img-src 'self' data: https:;
+    font-src 'self' https:;
+    frame-src 'self' https://*.google.com;
+  " />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta http-equiv="X-Frame-Options" content="SAMEORIGIN" />
+  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>

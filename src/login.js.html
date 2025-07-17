@@ -475,30 +475,38 @@
 
   // Display organization information
   function displayOrganizationInfo(serverInfo) {
-    console.log('🏢 Displaying organization info:', serverInfo);
+    console.log('🏢 Attempting to display organization info:', serverInfo);
     
-    if (serverInfo && serverInfo.adminDomain) {
-      const orgInfoEl = document.getElementById('organization-info');
-      const orgNameEl = document.getElementById('organization-name');
+    if (!serverInfo) {
+      console.warn('⚠️ Server info is null or undefined');
+      return;
+    }
+    
+    if (!serverInfo.adminDomain) {
+      console.warn('⚠️ No admin domain in server info');
+      return;
+    }
+    
+    const orgInfoEl = document.getElementById('organization-info');
+    const orgNameEl = document.getElementById('organization-name');
 
-      console.log('📋 Organization elements check:');
-      console.log('- Organization info element:', orgInfoEl ? '✅ Found' : '❌ Missing');
-      console.log('- Organization name element:', orgNameEl ? '✅ Found' : '❌ Missing');
+    if (!orgInfoEl || !orgNameEl) {
+      console.error('❌ Organization display elements not found in DOM');
+      return;
+    }
 
-      if (orgInfoEl && orgNameEl) {
-        // Extract organization name from domain
-        const domainParts = serverInfo.adminDomain.split('.');
-        const orgName = domainParts[0].charAt(0).toUpperCase() + domainParts[0].slice(1);
+    try {
+      // Extract organization name from domain
+      const domainParts = serverInfo.adminDomain.split('.');
+      const orgName = domainParts[0].charAt(0).toUpperCase() + domainParts[0].slice(1);
 
-        console.log('🏢 Setting organization name:', orgName);
-        orgNameEl.textContent = orgName;
-        orgInfoEl.classList.remove('hidden');
-        console.log('✅ Organization info displayed successfully');
-      } else {
-        console.error('❌ Organization display elements not found');
-      }
-    } else {
-      console.warn('⚠️ No admin domain in server info or server info is null');
+      console.log('🏢 Setting organization name:', orgName);
+      orgNameEl.textContent = orgName;
+      orgInfoEl.classList.remove('hidden');
+      
+      console.log('✅ Organization info displayed successfully');
+    } catch (error) {
+      console.error('❌ Error displaying organization info:', error);
     }
   }
 
@@ -776,42 +784,33 @@
     }
   }
 
-  // Initialize with multiple fallback methods
+  // Simple and reliable initialization
+  console.log('📦 Login.js loaded successfully');
+  
   function initializeLoginSystem() {
     console.log('🚀 Initializing login system...');
     
-    // Check if required elements exist
     const loginBtn = document.getElementById('login-btn');
     const switchAccountLink = document.getElementById('switch-account-link');
-    const orgInfo = document.getElementById('organization-info');
-    const orgName = document.getElementById('organization-name');
     
-    console.log('📋 Required elements check:');
-    console.log('- Login button:', loginBtn ? '✅ Found' : '❌ Missing');
-    console.log('- Switch account link:', switchAccountLink ? '✅ Found' : '❌ Missing');
-    console.log('- Organization info:', orgInfo ? '✅ Found' : '❌ Missing');
-    console.log('- Organization name:', orgName ? '✅ Found' : '❌ Missing');
-    
-    if (!loginBtn) {
-      console.error('❌ Login button not found');
+    if (!loginBtn || !switchAccountLink) {
+      console.error('❌ Required elements not found, retrying in 500ms...');
+      setTimeout(initializeLoginSystem, 500);
       return;
     }
     
-    if (!switchAccountLink) {
-      console.error('❌ Switch account link not found');
-      return;
-    }
+    console.log('✅ All required elements found');
     
-    // Initialize login page
+    // Initialize the login page
     initializeLoginPage();
-
+    
     // Add event listeners
     loginBtn.addEventListener('click', handleLogin);
     switchAccountLink.addEventListener('click', (e) => {
       e.preventDefault();
       switchAccount();
     });
-
+    
     // Add keyboard support
     document.addEventListener('keypress', (e) => {
       if (e.key === 'Enter' && !loginBtn.disabled) {
@@ -819,33 +818,15 @@
       }
     });
     
-    console.log('✅ Login page event listeners initialized');
+    console.log('✅ Login system initialized successfully');
   }
 
-  // Multiple initialization methods
+  // Start initialization as soon as possible
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeLoginSystem);
   } else {
     initializeLoginSystem();
   }
-  
-  // Fallback initialization
-  window.addEventListener('load', function() {
-    console.log('🔄 Window loaded, checking if login system is initialized...');
-    if (!window.loginSystemReady) {
-      console.log('🔄 Login system not ready, reinitializing...');
-      initializeLoginSystem();
-    }
-  });
-
-  // Immediate initialization attempt (for debugging)
-  console.log('🔄 Attempting immediate initialization...');
-  setTimeout(function() {
-    if (document.getElementById('login-btn')) {
-      console.log('🔄 Elements found, attempting immediate initialization...');
-      initializeLoginSystem();
-    }
-  }, 100);
 
   // Handle focus management for accessibility
   document.addEventListener('focusin', (e) => {
