@@ -6,8 +6,9 @@
   let redirectUrl = '/exec';
   let currentUserEmail = '';
 
-  // Initialize login page
+  // Initialize login page - simplified flow
   function initializeLoginPage() {
+
     // Enhanced error handling for document.write issues compatible with Google libraries
     if (typeof document !== 'undefined' && document.write) {
       // Only override if not already overridden in LoginPage.html
@@ -55,64 +56,93 @@
 
     setLoading(true, 'Googleアカウントの情報を確認しています...');
 
+    console.log('🚀 Initializing login page...');
+    
+    // Set initial loading state
+    setLoading(true, 'ログインを準備しています...');
+
     // Check if client ID is available
     if (!window.GOOGLE_CLIENT_ID || window.GOOGLE_CLIENT_ID.trim() === '') {
+      console.error('❌ GOOGLE_CLIENT_ID not available');
       setLoading(false, 'Google Client IDが設定されていません');
+      showRetryButton();
       return;
     }
 
-    // Wait for Google Identity Services and Google APIs to load with enhanced error handling
-    let attempts = 0;
-    const maxAttempts = 100; // 10 seconds timeout
-    let retryCount = 0;
-    const maxRetries = 3;
+    console.log('✅ GOOGLE_CLIENT_ID available:', window.GOOGLE_CLIENT_ID);
 
-    const checkGoogleAPI = setInterval(() => {
-      attempts++;
+    // Wait for Google APIs to load
+    waitForGoogleAPIs()
+      .then(() => {
+        console.log('✅ Google APIs loaded successfully');
+        return initializeGoogleAuth();
+      })
+      .then(() => {
+        console.log('✅ Google Auth initialized');
+        return startLoginFlow();
+      })
+      .catch(error => {
+        console.error('❌ Login initialization failed:', error);
+        handleInitializationError(error);
+      });
+  }
+
+  // Wait for Google APIs to load with Promise-based approach
+  function waitForGoogleAPIs() {
+    return new Promise((resolve, reject) => {
+      let attempts = 0;
+      const maxAttempts = 50; // 5 seconds timeout
       
-      try {
-        if (attempts > maxAttempts) {
-          clearInterval(checkGoogleAPI);
-          
-          if (retryCount < maxRetries) {
-            retryCount++;
-            console.warn(`Google API loading attempt ${retryCount}/${maxRetries} - retrying...`);
-            
-            // Retry by reloading the scripts
-            setTimeout(() => {
-              attempts = 0;
-              reloadGoogleScripts();
-            }, 2000);
-          } else {
-            setLoading(false, 'Google APIの読み込みがタイムアウトしました');
-            showGoogleLoadingFallback();
-          }
-          return;
-        }
-
-        // Check for Google APIs availability with detailed logging
+      const checkAPIs = () => {
+        attempts++;
+        
         const googleAvailable = typeof google !== 'undefined';
         const accountsAvailable = googleAvailable && google.accounts;
         const gapiAvailable = typeof gapi !== 'undefined';
         
-        if (attempts % 10 === 0) { // Log every second
-          console.log(`Google API loading status (attempt ${attempts}):`, {
-            google: googleAvailable,
-            accounts: accountsAvailable,
-            gapi: gapiAvailable
-          });
-        }
-
         if (googleAvailable && accountsAvailable && gapiAvailable) {
-          clearInterval(checkGoogleAPI);
-          initializeGoogleAuth();
+          resolve();
+          return;
         }
-      } catch (error) {
-        console.error('Error checking Google API availability:', error);
-        clearInterval(checkGoogleAPI);
-        setLoading(false, 'Google APIの初期化でエラーが発生しました');
-      }
-    }, 100);
+        
+        if (attempts >= maxAttempts) {
+          reject(new Error('Google APIs failed to load within timeout'));
+          return;
+        }
+        
+        setTimeout(checkAPIs, 100);
+      };
+      
+      checkAPIs();
+    });
+  }
+
+  // Handle initialization errors
+  function handleInitializationError(error) {
+    console.error('Login initialization error:', error);
+    
+    let errorMessage = 'ログインの初期化に失敗しました';
+    if (error.message.includes('timeout')) {
+      errorMessage = 'Google APIの読み込みがタイムアウトしました';
+    } else if (error.message.includes('network')) {
+      errorMessage = 'ネットワークエラーが発生しました';
+    }
+    
+    setLoading(false, errorMessage);
+    showRetryButton();
+  }
+
+  // Show retry button for failed initialization
+  function showRetryButton() {
+    const loginBtn = document.getElementById('login-btn');
+    if (loginBtn) {
+      loginBtn.innerHTML = '再試行';
+      loginBtn.disabled = false;
+      loginBtn.onclick = () => {
+        loginBtn.onclick = null; // Remove retry handler
+        initializeLoginPage(); // Retry initialization
+      };
+    }
   }
 
   // Helper function to reload Google scripts
@@ -161,58 +191,137 @@
     }
   }
 
-  // Initialize Google OAuth client
+  // Initialize Google OAuth client - improved version
   function initializeGoogleAuth() {
-    try {
-      // Initialize Google API client
-      gapi.load('client', () => {
-        gapi.client.init({
-          apiKey: '',
-          discoveryDocs: []
+    return new Promise((resolve, reject) => {
+      try {
+        console.log('🔧 Initializing Google OAuth client...');
+        
+        // Initialize Google API client
+        gapi.load('client', () => {
+          gapi.client.init({
+            apiKey: '',
+            discoveryDocs: []
+          }).then(() => {
+            console.log('✅ GAPI client initialized');
+          }).catch(error => {
+            console.warn('⚠️ GAPI client init failed:', error);
+            // Continue even if GAPI init fails
+          });
         });
-      });
 
-      googleAccountsClient = google.accounts.oauth2.initTokenClient({
-        client_id: window.GOOGLE_CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
-        callback: handleCredentialResponse,
-      });
+        // Initialize OAuth client
+        googleAccountsClient = google.accounts.oauth2.initTokenClient({
+          client_id: window.GOOGLE_CLIENT_ID,
+          scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
+          callback: handleCredentialResponse,
+        });
 
+        if (googleAccountsClient) {
+          console.log('✅ Google OAuth client initialized');
+          resolve();
+        } else {
+          throw new Error('Failed to initialize OAuth client');
+        }
+      } catch (error) {
+        console.error('❌ Google Auth initialization error:', error);
+        reject(error);
+      }
+    });
+  }
+
+  // Start the login flow - new simplified approach
+  function startLoginFlow() {
+    return new Promise((resolve, reject) => {
+      console.log('🔄 Starting login flow...');
+      
       // Get server-side domain information
-      getServerSideInfo();
-    } catch (error) {
-      console.error('Google Auth initialization error:', error);
-      setLoading(false, 'Google認証の初期化に失敗しました');
+      setLoading(true, 'サーバー情報を取得しています...');
+      
+      getServerSideInfo()
+        .then(serverInfo => {
+          console.log('✅ Server info retrieved:', serverInfo);
+          
+          // Check if user is already authenticated
+          const token = gapi.client.getToken();
+          if (token && token.access_token) {
+            console.log('✅ User already has token');
+            return updateUserInfo(token.access_token, serverInfo);
+          } else {
+            console.log('ℹ️ User needs to authenticate');
+            setLoading(false, 'ログインが必要です');
+            enableLoginButton();
+            return Promise.resolve();
+          }
+        })
+        .then(() => {
+          resolve();
+        })
+        .catch(error => {
+          console.error('❌ Login flow failed:', error);
+          reject(error);
+        });
+    });
+  }
+
+  // Enable login button for user interaction
+  function enableLoginButton() {
+    const loginBtn = document.getElementById('login-btn');
+    if (loginBtn) {
+      loginBtn.disabled = false;
+      loginBtn.innerHTML = 'Googleアカウントでログイン';
+      loginBtn.onclick = handleLogin;
     }
   }
 
-  // Get server-side domain information
+  // Get server-side domain information - Promise-based
   function getServerSideInfo() {
-    google.script.run
-      .withSuccessHandler(serverInfo => {
-        // Display organization information
-        displayOrganizationInfo(serverInfo);
-
-        // Check if user is already authenticated
-        const token = gapi.client.getToken();
-        if (token) {
-          updateUserInfo(token.access_token, serverInfo);
-        } else {
-          // User needs to login
-          setLoading(false, '認証が必要です');
-          requestUserLogin();
-        }
-      })
-      .withFailureHandler(handleError)
-      .getSystemDomainInfo();
+    return new Promise((resolve, reject) => {
+      console.log('🔄 Getting server-side domain info...');
+      
+      google.script.run
+        .withSuccessHandler(serverInfo => {
+          console.log('✅ Server info received:', serverInfo);
+          
+          if (serverInfo && serverInfo.error) {
+            console.error('❌ Server returned error:', serverInfo.error);
+            reject(new Error(serverInfo.error));
+            return;
+          }
+          
+          // Display organization information
+          displayOrganizationInfo(serverInfo);
+          resolve(serverInfo);
+        })
+        .withFailureHandler(error => {
+          console.error('❌ Failed to get server info:', error);
+          reject(error);
+        })
+        .getSystemDomainInfo();
+    });
   }
 
-  // Update user information display
+  // Update user information display - Promise-based
   function updateUserInfo(accessToken, serverInfo) {
-    fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`)
-      .then(response => response.json())
-      .then(userInfo => {
-        if (userInfo.email) {
+    return new Promise((resolve, reject) => {
+      console.log('🔄 Getting user info with access token...');
+      
+      setLoading(true, 'ユーザー情報を取得しています...');
+      
+      fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          return response.json();
+        })
+        .then(userInfo => {
+          console.log('✅ User info received:', userInfo);
+          
+          if (!userInfo.email) {
+            throw new Error('ユーザー情報にメールアドレスが含まれていません');
+          }
+          
           currentUserEmail = userInfo.email;
           document.getElementById('user-email-display').textContent = userInfo.email;
 
@@ -221,17 +330,18 @@
 
           displayDomainStatus(isAdminDomain, serverInfo.adminDomain);
 
-          document.getElementById('login-btn').disabled = false;
-
-          verifyAuthentication();
-        } else {
-          throw new Error('ユーザー情報の取得に失敗しました');
-        }
-      })
-      .catch(error => {
-        console.error('User info fetch error:', error);
-        handleError(error);
-      });
+          // Continue with authentication verification
+          return verifyAuthentication();
+        })
+        .then(() => {
+          console.log('✅ User info updated successfully');
+          resolve();
+        })
+        .catch(error => {
+          console.error('❌ User info update failed:', error);
+          reject(error);
+        });
+    });
   }
 
   // Display organization information
@@ -270,54 +380,99 @@
     badgeEl.classList.remove('hidden');
   }
 
-  // Verify authentication with server
+  // Verify authentication with server - Promise-based
   function verifyAuthentication() {
-    if (window.sharedUtilities && window.sharedUtilities.auth) {
-      window.sharedUtilities.auth.verifyAuthentication()
-        .then(fetchExistingBoard)
-        .catch(handleError);
-    } else {
-      fetchExistingBoard();
-    }
+    return new Promise((resolve, reject) => {
+      console.log('🔄 Verifying authentication...');
+      
+      // Skip shared utilities auth check and go directly to board check
+      fetchExistingBoard()
+        .then(result => {
+          console.log('✅ Authentication verified');
+          resolve(result);
+        })
+        .catch(error => {
+          console.error('❌ Authentication verification failed:', error);
+          reject(error);
+        });
+    });
   }
 
-  // Register account on server for new users
+  // Register account on server for new users - Promise-based
   function registerAccount() {
-    google.script.run
-      .withSuccessHandler(res => {
-        if (res && res.adminUrl) {
-          redirectUrl = res.adminUrl;
-        }
-        setLoading(false);
-      })
-      .withFailureHandler(handleError)
-      .registerNewUser(currentUserEmail);
+    return new Promise((resolve, reject) => {
+      console.log('🔄 Registering new user:', currentUserEmail);
+      
+      setLoading(true, '新しいアカウントを登録しています...');
+      
+      google.script.run
+        .withSuccessHandler(res => {
+          console.log('✅ User registered successfully:', res);
+          
+          if (res && res.adminUrl) {
+            redirectUrl = res.adminUrl;
+            setLoading(false, '登録が完了しました');
+            enableLoginButton();
+          } else {
+            setLoading(false, '登録は完了しましたが、管理URLが見つかりません');
+            enableLoginButton();
+          }
+          
+          resolve(res);
+        })
+        .withFailureHandler(error => {
+          console.error('❌ User registration failed:', error);
+          reject(error);
+        })
+        .registerNewUser(currentUserEmail);
+    });
   }
 
-  // Retrieve existing board info from server
+  // Retrieve existing board info from server - Promise-based
   function fetchExistingBoard() {
-    google.script.run
-      .withSuccessHandler(result => {
-        if (!result) return;
+    return new Promise((resolve, reject) => {
+      console.log('🔄 Fetching existing board info...');
+      
+      setLoading(true, 'ボード情報を確認しています...');
+      
+      google.script.run
+        .withSuccessHandler(result => {
+          console.log('✅ Board info received:', result);
+          
+          if (!result) {
+            console.error('❌ No result returned from getExistingBoard');
+            reject(new Error('サーバーから応答がありませんでした'));
+            return;
+          }
 
-        if (result.status === 'existing_user') {
-          redirectUrl = result.adminUrl;
-          setLoading(false);
-        } else if (result.status === 'setup_required') {
-          redirectUrl = `/exec?mode=admin&userId=${result.userId}`;
-          setLoading(false);
-        } else if (result.status === 'new_user') {
-          registerAccount();
-        } else {
-          console.error('Unexpected getExistingBoard result:', result);
-          setLoading(false);
-        }
-      })
-      .withFailureHandler(error => {
-        console.error('getExistingBoard error:', error);
-        handleError(error);
-      })
-      .getExistingBoard();
+          if (result.status === 'existing_user') {
+            console.log('✅ Existing user found, redirecting to admin panel');
+            redirectUrl = result.adminUrl;
+            setLoading(false, '管理パネルに移動する準備ができました');
+            enableLoginButton();
+            resolve(result);
+          } else if (result.status === 'setup_required') {
+            console.log('ℹ️ Setup required for user');
+            redirectUrl = `/exec?mode=admin&userId=${result.userId}`;
+            setLoading(false, 'セットアップが必要です');
+            enableLoginButton();
+            resolve(result);
+          } else if (result.status === 'new_user') {
+            console.log('ℹ️ New user, registering account');
+            registerAccount()
+              .then(resolve)
+              .catch(reject);
+          } else {
+            console.error('❌ Unexpected getExistingBoard result:', result);
+            reject(new Error('予期しないサーバー応答: ' + result.status));
+          }
+        })
+        .withFailureHandler(error => {
+          console.error('❌ getExistingBoard failed:', error);
+          reject(error);
+        })
+        .getExistingBoard();
+    });
   }
 
   // Request user login
@@ -332,13 +487,24 @@
   // Handle credential response
   function handleCredentialResponse(response) {
     if (response.error) {
-      console.error('Authentication error:', response.error);
+      console.error('❌ Authentication error:', response.error);
       handleError(response);
       return;
     }
 
-    // Refresh server-side info after successful authentication
-    getServerSideInfo();
+    console.log('✅ Authentication successful');
+    
+    // Restart the login flow after successful authentication
+    setLoading(true, '認証が成功しました。情報を更新しています...');
+    
+    startLoginFlow()
+      .then(() => {
+        console.log('✅ Login flow completed after authentication');
+      })
+      .catch(error => {
+        console.error('❌ Login flow failed after authentication:', error);
+        handleError(error);
+      });
   }
 
   // Set loading state with improved UX
@@ -365,9 +531,9 @@
     }
   }
 
-  // Handle errors
+  // Handle errors - enhanced version
   function handleError(error) {
-    console.error('Login error:', error);
+    console.error('❌ Login error:', error);
     setLoading(false);
 
     const userEmailDisplay = document.getElementById('user-email-display');
@@ -375,29 +541,55 @@
 
     // Determine error type and show appropriate message
     let errorMessage = 'エラーが発生しました';
+    let isRetriable = true;
+    
     if (error && error.message) {
       if (error.message.includes('network') || error.message.includes('Network')) {
-        errorMessage = 'ネットワークエラー';
+        errorMessage = 'ネットワークエラー - 接続を確認してください';
       } else if (error.message.includes('auth') || error.message.includes('Auth')) {
-        errorMessage = '認証エラー';
+        errorMessage = '認証エラー - 再度ログインしてください';
       } else if (error.message.includes('timeout') || error.message.includes('Timeout')) {
-        errorMessage = 'タイムアウト';
+        errorMessage = 'タイムアウト - 再試行してください';
+      } else if (error.message.includes('Client ID')) {
+        errorMessage = 'システム設定エラー - 管理者に連絡してください';
+        isRetriable = false;
+      } else if (error.message.includes('Domain')) {
+        errorMessage = 'ドメインアクセスエラー - 許可されたドメインからアクセスしてください';
+        isRetriable = false;
+      } else {
+        errorMessage = `エラー: ${error.message}`;
       }
     }
 
-    userEmailDisplay.textContent = errorMessage;
+    if (userEmailDisplay) {
+      userEmailDisplay.textContent = errorMessage;
+    }
 
-    // Show retry button
-    loginBtn.innerHTML = 'エラー - 再試行';
-    loginBtn.disabled = false;
+    // Show appropriate button based on error type
+    if (loginBtn) {
+      if (isRetriable) {
+        loginBtn.innerHTML = '再試行';
+        loginBtn.disabled = false;
+        loginBtn.onclick = () => {
+          loginBtn.onclick = null;
+          initializeLoginPage();
+        };
+      } else {
+        loginBtn.innerHTML = 'ページを再読み込み';
+        loginBtn.disabled = false;
+        loginBtn.onclick = () => {
+          window.location.reload();
+        };
+      }
+    }
 
-    // Reset after 5 seconds
-    setTimeout(() => {
-      loginBtn.innerHTML = 'ログイン';
-      userEmailDisplay.textContent = '-';
-      // Retry initialization
-      initializeLoginPage();
-    }, 5000);
+    // Auto-retry for network errors after 10 seconds
+    if (isRetriable && error && error.message && error.message.includes('network')) {
+      setTimeout(() => {
+        console.log('🔄 Auto-retrying after network error...');
+        initializeLoginPage();
+      }, 10000);
+    }
   }
 
   // Account switching
@@ -410,19 +602,25 @@
 
   // Login button handler with improved flow
   function handleLogin() {
-    if (isLoading) return;
+    if (isLoading) {
+      console.log('⏳ Login already in progress, ignoring click');
+      return;
+    }
 
     const userEmail = document.getElementById('user-email-display').textContent;
-    if (userEmail && userEmail !== '-' && userEmail !== 'エラーが発生しました') {
+    
+    // Check if user is already authenticated and ready to proceed
+    if (currentUserEmail && redirectUrl && redirectUrl !== '/exec') {
+      console.log('✅ User authenticated, redirecting to:', redirectUrl);
       setLoading(true, '管理パネルにリダイレクトしています...');
 
       // Add a small delay for better UX
       setTimeout(() => {
-        // Redirect to admin panel or setup page
         window.location.href = redirectUrl;
       }, 500);
     } else {
       // Request authentication
+      console.log('🔄 Starting authentication process...');
       setLoading(true, 'Googleアカウントでログインしています...');
       requestUserLogin();
     }
