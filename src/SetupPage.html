@@ -18,7 +18,7 @@
     <?!= include('SharedJavaScript'); ?>
     <?!= include('SetupLogic'); ?>
 </head>
-<body class="bg-[#1a1b26] text-gray-200 font-sans min-h-screen"">
+<body class="unified-theme bg-[#1a1b26] text-gray-200 font-sans min-h-screen">
     <div class="max-w-2xl mx-auto">
         <!-- ヘッダー -->
         <div class="text-center mb-8">
@@ -27,8 +27,8 @@
             <p class="text-sm text-gray-400 mt-2">システムを使用開始するための設定を行います</p>
         </div>
 
-        <!-- メッセージエリア -->
-        <div id="message-area" class="mb-6"></div>
+        <!-- インラインメッセージエリア -->
+        <div id="inline-message-area" class="mb-6"></div>
 
         <!-- セットアップフォーム -->
         <div class="glass-panel rounded-xl p-6 mb-6">
@@ -149,7 +149,7 @@
         };
         
         var startApp = window.setupUtilities?.navigation?.startApp || function() {
-            console.log('Start app function not available');
+            window.location.href = window.location.href.split('?')[0];
         };
         
         // Initialize on DOM ready

@@ -17,9 +17,13 @@
  * @param {number} duration - Auto-hide duration in milliseconds (default: 4000)
  */
 function showMessage(message, type = 'info', duration = 4000) {
-  const messageArea = document.getElementById('message-area');
+  // Try to find message area with fallback to inline version
+  let messageArea = document.getElementById('message-area');
   if (!messageArea) {
-    console.warn('Message area not found');
+    messageArea = document.getElementById('inline-message-area');
+  }
+  if (!messageArea) {
+    console.warn('Message area not found (tried both message-area and inline-message-area)');
     return;
   }
 
@@ -70,7 +74,11 @@ function showMessage(message, type = 'info', duration = 4000) {
  * @param {string} type - Message type
  */
 function displaySimpleMessage(message, type = 'info') {
-  const messageAreaEl = document.getElementById('message-area');
+  // Try to find message area with fallback to inline version
+  let messageAreaEl = document.getElementById('message-area');
+  if (!messageAreaEl) {
+    messageAreaEl = document.getElementById('inline-message-area');
+  }
   if (messageAreaEl) {
     messageAreaEl.textContent = message;
     messageAreaEl.className = `message-area ${type}`;
