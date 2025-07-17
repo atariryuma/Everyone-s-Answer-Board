@@ -363,21 +363,26 @@ function routeRequest(params, userEmail) {
     return showSetupPage();
   }
 
-  // 2. ログインしていないユーザーはログインページへ
+  // 2. パラメータなしのルートアクセスは常にログインページを表示
+  if (!params.mode) {
+    return showLoginPage();
+  }
+
+  // 3. ログインしていないユーザーはログインページへ（パラメータがあっても）
   if (!userEmail) {
     return showLoginPage();
   }
 
-  // 3. ユーザー情報を取得（キャッシュ活用）
+  // 4. ユーザー情報を取得（キャッシュ活用）
   const userInfo = getUserInfo(userEmail, params.userId);
 
-  // 4. ユーザー情報がない場合は、どのモードであってもログインページを表示
+  // 5. ユーザー情報がない場合は、どのモードであってもログインページを表示
   if (!userInfo) {
     console.warn('No user info found for email:', userEmail, 'or userId:', params.userId, '. Showing login page.');
     return showLoginPage();
   }
 
-  // 5. ルーティング決定
+  // 6. ルーティング決定
   switch (params.mode) {
     case 'admin':
       return handleAdminRoute(userInfo, params, userEmail);
@@ -389,9 +394,8 @@ function routeRequest(params, userEmail) {
       }
       return showErrorPage('アクセス拒否', 'このページにアクセスする権限がありません。');
     default:
-      // 不明なモードやパラメータなしの場合は、ユーザーの管理パネルへリダイレクト
-      const adminUrl = buildUserAdminUrl(userInfo.userId);
-      return createSecureRedirect(adminUrl, '管理パネルにリダイレクトしています...');
+      // 不明なモードの場合はログインページへ
+      return showLoginPage();
   }
 }
 
@@ -566,7 +570,7 @@ function getWebAppUrl() {
  */
 function parseRequestParams(e) {
   const p = (e && e.parameter) || {};
-  const mode = p.mode || 'admin';
+  const mode = p.mode || null; // デフォルトを'admin'からnullに変更し、パラメータの有無を明確化
   const userId = p.userId || null;
   const setupParam = p.setup || null;
   const spreadsheetId = p.spreadsheetId || null;
