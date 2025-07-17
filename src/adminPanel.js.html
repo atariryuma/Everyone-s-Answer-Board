@@ -499,7 +499,8 @@
   
   // Open app setup page
   function openAppSetupPage() {
-    window.open('/app-setup', '_blank');
+    var base=window.location.origin+window.location.pathname;
+    window.open(base+'?mode=appsetup&setup=true','_blank');
   }
   
   // Initialize when DOM is ready
