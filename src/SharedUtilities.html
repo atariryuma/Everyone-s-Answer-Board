@@ -404,6 +404,40 @@ class GASUtilities {
 }
 
 // =============================================================================
+// SECURITY UTILITIES
+// =============================================================================
+
+// Security utilities for XSS prevention and data sanitization
+class SecurityUtilities {
+  // Escape HTML characters to prevent XSS attacks
+  escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Sanitize HTML content by removing dangerous tags
+  sanitizeHtml(html) {
+    if (!html) return '';
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    
+    // Remove script tags and other dangerous elements
+    const scripts = div.querySelectorAll('script, object, embed, iframe, form');
+    scripts.forEach(script => script.remove());
+    
+    return div.innerHTML;
+  }
+
+  // Validate email format
+  isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+}
+
+// =============================================================================
 // INITIALIZATION AND GLOBAL SETUP
 // =============================================================================
 
@@ -415,7 +449,8 @@ window.sharedUtilities = {
   cache: new EnhancedCache(),
   errors: new ErrorHandler(),
   loading: new LoadingManager(),
-  gas: new GASUtilities()
+  gas: new GASUtilities(),
+  security: new SecurityUtilities()
 };
 
 // Setup global error handling
@@ -577,10 +612,24 @@ window.sharedUtilities.auth = {
     const container = document.getElementById(containerId);
     if (!container) return;
 
+    // Safely escape email with fallback
+    const safeEmail = window.sharedUtilities && window.sharedUtilities.security 
+      ? window.sharedUtilities.security.escapeHtml(email) 
+      : (email || '').replace(/[<>&"']/g, function(match) {
+          switch (match) {
+            case '<': return '&lt;';
+            case '>': return '&gt;';
+            case '&': return '&amp;';
+            case '"': return '&quot;';
+            case "'": return '&#39;';
+            default: return match;
+          }
+        });
+
     container.innerHTML = `
       <div class="bg-gray-800 rounded-lg p-4 mb-4">
         <p class="text-sm text-gray-400 mb-1">認証済みアカウント:</p>
-        <p class="text-white font-semibold">${window.sharedUtilities.security.escapeHtml(email)}</p>
+        <p class="text-white font-semibold">${safeEmail}</p>
       </div>
       ${showSwitchOption ? `
       <div class="text-right">
