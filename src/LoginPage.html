@@ -14,12 +14,15 @@
   <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   
+  <!-- Google APIs -->
+  <script src="https://apis.google.com/js/api.js" async defer></script>
+  
   <!-- Include shared styles and utilities -->
   <?!= include('UnifiedStyles'); ?>
   <?!= include('SharedUtilities'); ?>
   
   <!-- Login-specific styles -->
-  <?!= include('login.css'); ?>
+  <?!= include('login.css.html'); ?>
 </head>
 <body class="login-container flex items-center justify-center p-4">
   <div class="login-card w-full max-w-md p-8">
@@ -58,6 +61,6 @@
   </div>
   
   <!-- Include login-specific JavaScript -->
-  <?!= include('login.js'); ?>
+  <?!= include('login.js.html'); ?>
 </body>
 </html>

@@ -262,8 +262,13 @@ function isSystemSetup() {
  * 登録ページを表示する関数
  */
 function showRegistrationPage() {
-  var template = HtmlService.createTemplateFromFile('Login');
+  var template = HtmlService.createTemplateFromFile('LoginPage');
   template.include = include;
+  
+  // Set GOOGLE_CLIENT_ID for the login page
+  var clientId = PropertiesService.getScriptProperties().getProperty('GOOGLE_CLIENT_ID');
+  template.GOOGLE_CLIENT_ID = clientId;
+  
   var output = template.evaluate()
     .setTitle('ログイン - StudyQuest');
   return safeSetXFrameOptionsDeny(output);

@@ -20,7 +20,7 @@
   <?!= include('SharedUtilities'); ?>
   
   <!-- Admin Panel Specific Styles -->
-  <?!= include('adminPanel.css'); ?>
+  <?!= include('adminPanel.css.html'); ?>
   
   <!-- ClientOptimizer の統合 -->
   <?!= include('ClientOptimizer'); ?>
@@ -2137,7 +2137,7 @@ function handleDeleteRequest() {
             setLoading(false);
             showMessage(response, 'success');
             setTimeout(function() {
-              window.top.location.href = '?page=Login';
+              window.top.location.href = '?page=LoginPage';
             }, 2000);
           })
           .catch(function(error) {
@@ -3488,7 +3488,7 @@ function syncCheckboxStates(status) {
   </script>
   
   <!-- Admin Panel Specific JavaScript -->
-  <?!= include('adminPanel.js'); ?>
+  <?!= include('adminPanel.js.html'); ?>
 
 </body>
 </html>
