@@ -89,24 +89,19 @@
 
   <!-- Set global variables for login -->
   <script>
-    // Global error handling for document.write issues in GAS
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      // Override document.write to prevent GAS errors
-      const originalDocWrite = document.write;
-      document.write = function(content) {
-        console.warn('document.write blocked in GAS context');
-        return;
-      };
+    (function() {
+      // Global error handling for document.write issues in GAS
+      if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+        document.write = () => {
+          console.warn('document.write blocked in GAS context');
+        };
+        document.writeln = () => {
+          console.warn('document.writeln blocked in GAS context');
+        };
+      }
 
-      // Also override writeln
-      const originalDocWriteln = document.writeln;
-      document.writeln = function(content) {
-        console.warn('document.writeln blocked in GAS context');
-        return;
-      };
-    }
-
-    window.GOOGLE_CLIENT_ID = '<?= GOOGLE_CLIENT_ID ?>';
+      window.GOOGLE_CLIENT_ID = '<?= GOOGLE_CLIENT_ID ?>';
+    })();
   </script>
 
   <!-- Include login-specific JavaScript -->
