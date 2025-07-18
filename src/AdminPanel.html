@@ -232,13 +232,15 @@
       const currentOrigin = window.location.origin;
       const targetUrl = new URL(correctUrl);
       
-      if (currentOrigin === targetUrl.origin || window.top === window) {
-        if (window.history && window.history.replaceState) {
-          window.history.replaceState({}, '', correctUrl);
-          console.log('URL updated successfully to:', correctUrl);
-        }
+      // Google Apps Scriptのhistory APIを使用してURLを更新
+      // 親ウィンドウのURLのハッシュ部分を更新することで、リロード時の状態維持を試みる
+      if (typeof google !== 'undefined' && google.script && google.script.history) {
+        // URLのパスとクエリパラメータをハッシュとして設定
+        const pathAndQuery = targetUrl.pathname + targetUrl.search;
+        google.script.history.replace(pathAndQuery);
+        console.log('URL updated using google.script.history.replace to:', pathAndQuery);
       } else {
-        console.log('URL update skipped due to cross-origin restrictions');
+        console.log('URL update skipped due to cross-origin restrictions (google.script.history not available or cross-origin)');
       }
     } catch (e) {
       console.warn('Failed to update URL:', e);
