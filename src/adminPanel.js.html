@@ -423,7 +423,13 @@
           if (result.success) {
             showMessage('アカウントが削除されました', 'success');
             setTimeout(() => {
-              window.location.href = '/login';
+              // Use the unified URL function from backend for redirect
+              runGasWithUserId('getWebAppUrl').then(webAppUrl => {
+                window.location.href = webAppUrl;
+              }).catch(error => {
+                console.error('Failed to get web app URL:', error);
+                window.location.href = '/login';
+              });
             }, 2000);
           } else {
             showMessage(result.message || '削除に失敗しました', 'error');
@@ -495,14 +501,27 @@
   // Switch to another account
   function switchToAnotherAccount() {
     if (confirm('別のアカウントに切り替えますか？')) {
-      window.location.href = '/login?switch_account=true';
+      // Use the unified URL function from backend
+      runGasWithUserId('getWebAppUrl').then(webAppUrl => {
+        window.location.href = webAppUrl + '?switch_account=true';
+      }).catch(error => {
+        console.error('Failed to get web app URL:', error);
+        window.location.href = '/login?switch_account=true';
+      });
     }
   }
   
   // Open app setup page
   function openAppSetupPage() {
-    var base=window.location.origin+window.location.pathname;
-    window.open(base+'?mode=appsetup&setup=true','_blank');
+    // Use the unified URL function from backend
+    runGasWithUserId('getWebAppUrl').then(webAppUrl => {
+      window.open(webAppUrl + '?mode=appsetup&setup=true', '_blank');
+    }).catch(error => {
+      console.error('Failed to get web app URL:', error);
+      // Fallback to current location
+      var base = window.location.origin + window.location.pathname;
+      window.open(base + '?mode=appsetup&setup=true', '_blank');
+    });
   }
   
   // Initialization is triggered from AdminPanel.html after userId is ready.

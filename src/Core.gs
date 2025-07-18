@@ -1469,9 +1469,7 @@ function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
 // 互換性関数（後方互換性のため）
 // =================================================================
 
-function getWebAppUrl() {
-  return getWebAppUrlCached();
-}
+// getWebAppUrl function removed - now using the unified version from url.gs
 
 
 function getHeaderIndices(spreadsheetId, sheetName) {

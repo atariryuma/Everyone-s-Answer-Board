@@ -587,51 +587,17 @@ function createSecureRedirect(targetUrl, message) {
 }
 
 /**
- * 正しいWeb App URLを取得 (キャッシュ対応)
+ * 正しいWeb App URLを取得 (url.gsのgetWebAppUrlCachedを使用)
  * @return {string}
  */
 function getWebAppUrl() {
-  const cache = CacheService.getScriptCache();
-  const cacheKey = 'web_app_url';
-  
-  const cachedUrl = cache.get(cacheKey);
-  if (cachedUrl) {
-    return cachedUrl;
-  }
-
   try {
-    const url = ScriptApp.getService().getUrl();
-    if (!url) {
-      throw new Error('No URL returned from getService()');
-    }
-    
-    // 開発モードや一時URLを検出
-    const devPatterns = [
-      /^https:\/\/[a-z0-9-]+\.googleusercontent\.com\//, // 開発モード
-      /\/userCodeAppPanel/, // テスト用パネル
-      /\/dev$/, // 開発エンドポイント
-      /\/test$/ // テストエンドポイント
-    ];
-    
-    const isDevUrl = devPatterns.some(pattern => pattern.test(url));
-    
-    if (isDevUrl) {
-      console.warn('開発モードのURLを検出しました: ' + url + ' フォールバックURLを使用します');
-      throw new Error('Development URL detected');
-    }
-    
-    // 有効なURLパターンかチェック
-    const validPattern = /^https:\/\/script\.google\.com\/(a\/macros\/[^\/]+\/)?s\/[A-Za-z0-9_-]+\/exec$/;
-    if (url.includes('/macros/') && validPattern.test(url)) {
-      cache.put(cacheKey, url, 21600); // 6時間キャッシュ
-      return url;
-    }
-    throw new Error('Invalid URL pattern from getService()');
+    // url.gsの統一されたURL取得関数を使用
+    return getWebAppUrlCached();
   } catch (error) {
     console.error('getWebAppUrl error:', error);
     // 緊急時のフォールバックURL
     const fallbackUrl = 'https://script.google.com/a/macros/naha-okinawa.ed.jp/s/AKfycby5oABLEuyg46OvwVqt2flUKz15zocFhH-kLD0IuNWm8akKMXiKrOS5kqGCQ7V4DQ-2/exec';
-    cache.put(cacheKey, fallbackUrl, 21600);
     return fallbackUrl;
   }
 }
