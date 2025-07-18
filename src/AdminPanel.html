@@ -7,44 +7,82 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#1a1b26" />
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
-  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=()" />
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), ambient-light-sensor=(), speaker=(), vibrate=(), vr=()" />
   <!-- User ID will be retrieved dynamically from backend -->
 
 
   <!-- TailwindCSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    // Handle Tailwind CDN and other console warnings suppression
-    if (typeof console !== 'undefined' && console.warn) {
+    // Comprehensive console warnings suppression
+    (function() {
+      // Store original console methods
       const originalWarn = console.warn;
-      console.warn = function(...args) {
-        if (args[0] && (
-          args[0].includes('cdn.tailwindcss.com should not be used in production') ||
-          args[0].includes('-ms-high-contrast is in the process of being deprecated') ||
-          args[0].includes('Feature Policy') ||
-          args[0].includes('Permissions Policy') ||
-          args[0].includes('deprecated') ||
-          args[0].includes('TailwindCSS')
-        )) {
-          return; // Suppress these warnings
-        }
-        originalWarn.apply(console, args);
-      };
-    }
-    
-    // Also suppress console.info and console.log for certain patterns
-    if (typeof console !== 'undefined' && console.info) {
       const originalInfo = console.info;
-      console.info = function(...args) {
-        if (args[0] && (
-          args[0].includes('TailwindCSS') ||
-          args[0].includes('Tailwind CSS')
-        )) {
-          return; // Suppress these info messages
+      const originalLog = console.log;
+      const originalError = console.error;
+      
+      // Patterns to suppress
+      const suppressPatterns = [
+        'cdn.tailwindcss.com should not be used in production',
+        'tailwindcss.com should not be used in production',
+        'TailwindCSS',
+        'Tailwind CSS',
+        'tailwind',
+        '-ms-high-contrast is in the process of being deprecated',
+        'Feature Policy',
+        'Permissions Policy',
+        'Unrecognized feature',
+        'deprecated',
+        'iframe.*sandbox.*allow-scripts.*allow-same-origin',
+        'sandbox attribute can escape its sandboxing',
+        'has both allow-scripts and allow-same-origin',
+        'can escape its sandboxing',
+        'Net state changed from',
+        'warden_bin',
+        'mae_html_user'
+      ];
+      
+      // Helper function to check if message should be suppressed
+      function shouldSuppress(args) {
+        const message = args[0] ? String(args[0]).toLowerCase() : '';
+        return suppressPatterns.some(pattern => {
+          const regex = new RegExp(pattern.toLowerCase(), 'i');
+          return regex.test(message);
+        });
+      }
+      
+      // Override console.warn
+      console.warn = function(...args) {
+        if (!shouldSuppress(args)) {
+          originalWarn.apply(console, args);
         }
-        originalInfo.apply(console, args);
       };
-    }
+      
+      // Override console.info
+      console.info = function(...args) {
+        if (!shouldSuppress(args)) {
+          originalInfo.apply(console, args);
+        }
+      };
+      
+      // Override console.log for specific patterns
+      console.log = function(...args) {
+        if (!shouldSuppress(args)) {
+          originalLog.apply(console, args);
+        }
+      };
+      
+      // Enhanced error filtering but keep important errors
+      console.error = function(...args) {
+        const message = args[0] ? String(args[0]) : '';
+        if (!message.includes('cdn.tailwindcss.com') && 
+            !message.includes('TailwindCSS') &&
+            !message.includes('Tailwind CSS')) {
+          originalError.apply(console, args);
+        }
+      };
+    })();
   </script>
 
   <!-- Unified Styles and Shared Components -->
@@ -60,17 +98,49 @@
   
   <script>
   // GASOptimizer and UnifiedCache are now guaranteed to be defined
-  // グローバルエラーハンドリング
+  // Enhanced Global Error Handling
   window.addEventListener('error', function(event) {
-    console.error('Global error caught:', event.error);
-    if (event.error && event.error.message && event.error.message.includes('document.write')) {
-      console.warn('document.write エラーが検出されました。安全なDOM操作に切り替えています。');
+    const errorMessage = event.error?.message || '';
+    const errorStack = event.error?.stack || '';
+    
+    // Suppress specific Google Apps Script internal errors
+    const suppressedErrors = [
+      'document.write',
+      'Unexpected token',
+      'Failed to execute \'write\' on \'Document\'',
+      'SyntaxError: Failed to execute \'write\'',
+      'mae_html_user_bin_i18n_mae_html_user',
+      'warden_bin_i18n_warden'
+    ];
+    
+    const shouldSuppress = suppressedErrors.some(pattern => 
+      errorMessage.includes(pattern) || errorStack.includes(pattern)
+    );
+    
+    if (shouldSuppress) {
+      // Log suppressed error for debugging (optional)
+      console.debug('Suppressed Google Apps Script internal error:', errorMessage);
       event.preventDefault();
+      return;
     }
+    
+    // Log important errors
+    console.error('Global error caught:', event.error);
   });
   
-  // Promise rejection のキャッチ
+  // Enhanced Promise rejection handling
   window.addEventListener('unhandledrejection', function(event) {
+    const reason = event.reason?.toString() || '';
+    
+    // Suppress Google Apps Script internal promise rejections
+    if (reason.includes('document.write') || 
+        reason.includes('mae_html_user') ||
+        reason.includes('warden_bin')) {
+      console.debug('Suppressed internal promise rejection:', reason);
+      event.preventDefault();
+      return;
+    }
+    
     console.error('Unhandled promise rejection:', event.reason);
     event.preventDefault();
   });
