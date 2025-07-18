@@ -256,7 +256,7 @@
   // =============================================================================
   
   /**
-   * 管理パネルへの即座のリダイレクト (シンプル版)
+   * 管理パネルアクセス成功画面を表示 (ユーザーアクティベーション必須)
    * @param {string} adminUrl - 管理パネルのURL
    * @param {string} message - 表示メッセージ
    */
@@ -269,23 +269,112 @@
         return;
       }
       
-      console.log('管理パネルへの即座のリダイレクト:', adminUrl);
+      console.log('管理パネルアクセス成功画面を表示:', adminUrl);
       
-      // シンプルなリダイレクト（サンドボックス制限を回避）
-      window.top.location.href = adminUrl;
+      // ローディング状態を停止
+      if (typeof setLoading === 'function') {
+        setLoading(false);
+      }
+      
+      // サンドボックス制限準拠: ユーザークリック必須のHTMLアンカー方式
+      const successHtml = `
+        <div class="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 flex items-center justify-center p-4">
+          <div class="bg-gray-800 rounded-2xl p-8 max-w-md w-full shadow-2xl border border-gray-700">
+            <!-- 成功アイコン -->
+            <div class="text-center mb-6">
+              <div class="text-6xl mb-4">✅</div>
+              <h1 class="text-2xl font-bold text-green-400 mb-2">${message || 'ログインが完了しました'}</h1>
+              <p class="text-gray-300">管理パネルにアクセスしてください</p>
+            </div>
+            
+            <!-- メインアクションボタン -->
+            <div class="space-y-4">
+              <a href="${adminUrl}" target="_top" 
+                 class="block w-full bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white font-bold py-4 px-6 rounded-lg text-center transition-all duration-200 transform hover:scale-105 shadow-lg">
+                🚀 管理パネルを開く
+              </a>
+              
+              <!-- URL情報 -->
+              <div class="bg-gray-700 rounded-lg p-4">
+                <h3 class="text-sm font-semibold text-gray-200 mb-2">📱 管理パネルURL:</h3>
+                <div class="bg-gray-900 p-2 rounded text-xs text-cyan-400 font-mono break-all">
+                  ${adminUrl}
+                </div>
+                <button onclick="copyUrlToClipboard('${adminUrl}')" 
+                        class="mt-2 text-xs text-blue-400 hover:text-blue-300 underline">
+                  📋 URLをコピー
+                </button>
+              </div>
+              
+              <!-- 使用上の注意 -->
+              <div class="text-xs text-gray-400 space-y-1">
+                <p>💡 このURLをブックマークすると、次回から直接アクセスできます</p>
+                <p>🔒 セキュリティのため、URLは他人と共有しないでください</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // 現在のコンテンツを成功画面に完全置換
+      document.body.innerHTML = successHtml;
+      
+      console.log('✅ ユーザーアクション待ち画面を表示しました');
       
     } catch (error) {
-      console.error('リダイレクトエラー:', error);
-      // フォールバック: 新しいウィンドウで開く
-      try {
-        window.open(adminUrl, '_top');
-      } catch (fallbackError) {
-        console.error('フォールバックリダイレクトも失敗:', fallbackError);
-        // 最後の手段: URLをコピー可能な形で表示
-        prompt('下記URLをコピーして新しいタブで開いてください:', adminUrl);
+      console.error('成功画面表示エラー:', error);
+      // フォールバック: シンプルなconfirm
+      const userChoice = confirm(`${message || 'ログインが完了しました'}\\n\\n管理パネルにアクセスしますか？`);
+      if (userChoice) {
+        // ユーザーが選択した場合のみリンクを表示
+        const linkElement = document.createElement('a');
+        linkElement.href = adminUrl;
+        linkElement.target = '_top';
+        linkElement.textContent = '管理パネルを開く';
+        linkElement.style.cssText = 'display:block;padding:20px;background:#4CAF50;color:white;text-align:center;text-decoration:none;margin:20px;border-radius:5px;';
+        document.body.innerHTML = '';
+        document.body.appendChild(linkElement);
       }
     }
   }
+
+  /**
+   * URLをクリップボードにコピー (成功画面用)
+   * @param {string} url - コピーするURL
+   */
+  window.copyUrlToClipboard = function(url) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => {
+          // 一時的な成功表示
+          const button = event.target;
+          const originalText = button.textContent;
+          button.textContent = '✅ コピー完了!';
+          button.disabled = true;
+          setTimeout(() => {
+            button.textContent = originalText;
+            button.disabled = false;
+          }, 2000);
+        }).catch((error) => {
+          console.warn('Clipboard API failed:', error);
+          fallbackCopy(url);
+        });
+      } else {
+        fallbackCopy(url);
+      }
+    } catch (error) {
+      console.error('copyUrlToClipboard error:', error);
+      fallbackCopy(url);
+    }
+    
+    function fallbackCopy(url) {
+      // フォールバック: prompt で表示
+      const copied = prompt('下記URLをコピーしてください:', url);
+      if (copied === url) {
+        alert('URLがクリップボードにコピーされました');
+      }
+    }
+  };
 
   /**
    * 管理パネルにリダイレクトする (後方互換性のため残す)

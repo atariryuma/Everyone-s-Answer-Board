@@ -633,35 +633,110 @@ function createSecureRedirect(targetUrl, message) {
   console.log('createSecureRedirect - Original URL:', targetUrl);
   console.log('createSecureRedirect - Sanitized URL:', sanitizedUrl);
   
-  // シンプルなJavaScriptリダイレクト（サンドボックス制限を回避）
-  const simpleRedirectHtml = `
+  // ユーザーアクティベーション必須のHTMLアンカー方式（サンドボックス制限準拠）
+  const userActionRedirectHtml = `
     <!DOCTYPE html>
     <html>
     <head>
-      <title>リダイレクト中...</title>
+      <title>${message || 'アクセス確認'}</title>
       <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <style>
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+          min-height: 100vh;
+          margin: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+        }
+        .container {
+          background: rgba(31, 41, 55, 0.95);
+          border-radius: 16px;
+          padding: 40px;
+          max-width: 500px;
+          width: 100%;
+          text-align: center;
+          box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+          border: 1px solid rgba(75, 85, 99, 0.3);
+        }
+        .icon { font-size: 64px; margin-bottom: 20px; }
+        .title { 
+          color: #10b981; 
+          font-size: 24px; 
+          font-weight: bold; 
+          margin-bottom: 16px; 
+        }
+        .subtitle { 
+          color: #d1d5db; 
+          margin-bottom: 32px; 
+          line-height: 1.5;
+        }
+        .main-button {
+          display: inline-block;
+          background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+          color: white;
+          font-weight: bold;
+          padding: 16px 32px;
+          border-radius: 12px;
+          text-decoration: none;
+          font-size: 18px;
+          transition: all 0.3s ease;
+          margin-bottom: 24px;
+          box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+        .main-button:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(16, 185, 129, 0.6);
+        }
+        .url-info {
+          background: rgba(17, 24, 39, 0.8);
+          border-radius: 8px;
+          padding: 16px;
+          margin: 20px 0;
+          border: 1px solid rgba(75, 85, 99, 0.5);
+        }
+        .url-text {
+          color: #60a5fa;
+          font-family: 'Courier New', monospace;
+          font-size: 12px;
+          word-break: break-all;
+          line-height: 1.4;
+        }
+        .note {
+          color: #9ca3af;
+          font-size: 14px;
+          margin-top: 20px;
+          line-height: 1.4;
+        }
+      </style>
     </head>
     <body>
-      <script>
-        try {
-          console.log('即座にリダイレクト:', '${sanitizedUrl}');
-          window.top.location.href = '${sanitizedUrl}';
-        } catch (error) {
-          console.error('リダイレクトエラー:', error);
-          // フォールバック
-          try {
-            window.open('${sanitizedUrl}', '_top');
-          } catch (fallbackError) {
-            alert('${message || 'リダイレクト中にエラーが発生しました'}\\n\\n手動で下記URLにアクセスしてください:\\n${sanitizedUrl}');
-          }
-        }
-      </script>
-      <p>リダイレクト中です。自動的に移動しない場合は<a href="${sanitizedUrl}">こちらをクリック</a>してください。</p>
+      <div class="container">
+        <div class="icon">🔐</div>
+        <h1 class="title">${message || 'アクセス確認'}</h1>
+        <p class="subtitle">セキュリティのため、下のボタンをクリックして続行してください</p>
+        
+        <a href="${sanitizedUrl}" target="_top" class="main-button">
+          🚀 続行する
+        </a>
+        
+        <div class="url-info">
+          <div class="url-text">${sanitizedUrl}</div>
+        </div>
+        
+        <div class="note">
+          ✓ このリンクは安全です<br>
+          ✓ Google Apps Script公式のセキュリティガイドラインに準拠
+        </div>
+      </div>
     </body>
     </html>
   `;
   
-  return HtmlService.createHtmlOutput(simpleRedirectHtml)
+  return HtmlService.createHtmlOutput(userActionRedirectHtml)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
