@@ -312,24 +312,35 @@ function createFormWithConfig() {
   hideFormConfigModal();
   setLoading(true, '新しいフォームを作成しています...');
 
-  runGasWithUserId('createCustomFormUI', config)
-      .then(function(result) {
-          if (result.status === 'success') {
-              showMessage('✅ 新しいフォームが作成され、連携されました！', 'success');
-              
-              // クラス選択肢をデータベースに保存
-              saveClassChoicesToDatabase(classChoices);
-              
-              // ステータスを更新
-              loadStatus(true);
-          } else {
-              showMessage(result.message || 'フォームの作成に失敗しました。', 'error');
-          }
-          setLoading(false);
-      })
-      .catch(function(error) {
-          handleError(error, 'createFormWithConfig', 'フォームの作成に失敗しました。');
-      });
+  // バックエンドの正しい関数を使用: createCustomForm(userEmail, userId, config)
+  // userEmailは現在のユーザー情報から取得
+  if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.adminEmail) {
+    showMessage('ユーザー情報が取得できません。ページを再読み込みしてください。', 'error');
+    setLoading(false);
+    return;
+  }
+  
+  const userEmail = currentStatus.userInfo.adminEmail;
+  
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result && result.status === 'success') {
+        showMessage('✅ 新しいフォームが作成され、連携されました！', 'success');
+        
+        // クラス選択肢をデータベースに保存
+        saveClassChoicesToDatabase(classChoices);
+        
+        // ステータスを更新
+        loadStatus(true);
+      } else {
+        showMessage(result?.message || 'フォームの作成に失敗しました。', 'error');
+      }
+      setLoading(false);
+    })
+    .withFailureHandler(function(error) {
+      handleError(error, 'createFormWithConfig', 'フォームの作成に失敗しました。');
+    })
+    .createCustomForm(userEmail, userId, config);
 }
 
 // Save class choices to database
@@ -415,7 +426,7 @@ function openForm() {
 
 // Open app setup page
 function openAppSetupPage() {
-  runGasWithUserId('getWebAppUrlCached')
+  runGasWithUserId('getWebAppUrl')
     .then(function(webAppUrl) {
       const setupUrl = webAppUrl + '?setup=true&mode=appsetup';
       window.open(setupUrl, '_blank');
