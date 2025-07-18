@@ -408,20 +408,53 @@ function getSystemDomainInfo() {
  */
 function doGet(e) {
   try {
-    // 1. システムの初期セットアップが完了しているかを確認
+    // 1. システムセットアップの確認 (最優先)
     if (!isSystemSetup()) {
       return showSetupPage();
     }
 
-    // 2. 現在のユーザー情報を取得
+    // 2. URLパラメータの解析
+    const params = parseRequestParams(e);
+
+    // 3. ログイン状態の確認
     const userEmail = Session.getActiveUser().getEmail();
     if (!userEmail) {
-      // ログインしていない場合はログインページを表示
       return showLoginPage();
     }
 
-    // 3. 新しいログインフローに処理を委譲
-    return processLoginFlow(userEmail);
+    // 4. ルーティング
+    // パラメータなしの直接アクセスの場合、認証フローを開始
+    if (!params.mode) {
+      return processLoginFlow(userEmail);
+    }
+
+    // mode=admin の場合
+    if (params.mode === 'admin') {
+      if (!params.userId) {
+        return showErrorPage('不正なリクエスト', 'ユーザーIDが指定されていません。');
+      }
+      // 本人確認
+      if (!verifyAdminAccess(params.userId)) {
+        return showErrorPage('アクセス拒否', 'この管理パネルにアクセスする権限がありません。');
+      }
+      const userInfo = findUserById(params.userId);
+      return renderAdminPanel(userInfo, 'admin');
+    }
+
+    // mode=view の場合
+    if (params.mode === 'view') {
+      if (!params.userId) {
+        return showErrorPage('不正なリクエスト', 'ユーザーIDが指定されていません。');
+      }
+      const userInfo = findUserById(params.userId);
+      if (!userInfo) {
+        return showErrorPage('エラー', '指定されたユーザーが見つかりません。');
+      }
+      return renderAnswerBoard(userInfo, params);
+    }
+    
+    // 不明なモードの場合はログインページへ
+    return showLoginPage();
 
   } catch (error) {
     console.error(`doGetで致命的なエラー: ${error.stack}`);
