@@ -138,20 +138,67 @@
           別のアカウントでログイン
         </a>
       </div>
-      
-      <div class="text-center mt-2">
-        <a href="/" class="footer-link text-xs">
-          ログイン画面に戻る
-        </a>
-      </div>
   </div>
 
   <!-- Footer -->
   <div class="mt-8 text-center">
-    <a href="#" id="security-modal-trigger" class="footer-link">
+    <a href="#" id="security-modal-trigger" class="footer-link" onclick="showSecurityModal()">
       セキュリティ仕様について
     </a>
   </div>
+  </div>
+
+  <!-- セキュリティ仕様モーダル -->
+  <div id="security-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="glass-panel rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-semibold text-white">🔒 セキュリティ仕様</h3>
+        <button onclick="closeSecurityModal()" class="text-gray-400 hover:text-white text-2xl">✕</button>
+      </div>
+      
+      <div class="space-y-4 text-sm text-gray-300">
+        <div class="bg-gray-800 p-4 rounded-lg">
+          <h4 class="font-medium text-cyan-400 mb-2">🏢 ドメイン制限</h4>
+          <p>このシステムは<strong>naha-okinawa.ed.jp</strong>ドメインのユーザーのみアクセス可能です。組織外からのアクセスは制限されています。</p>
+        </div>
+        
+        <div class="bg-gray-800 p-4 rounded-lg">
+          <h4 class="font-medium text-cyan-400 mb-2">🔐 認証システム</h4>
+          <p>Google Workspace内部OAuth認証を使用しており、外部認証は受け付けません。組織のセキュリティポリシーに準拠しています。</p>
+        </div>
+        
+        <div class="bg-gray-800 p-4 rounded-lg">
+          <h4 class="font-medium text-cyan-400 mb-2">🛡️ データ保護</h4>
+          <ul class="list-disc list-inside space-y-1">
+            <li>Content Security Policy (CSP) による外部リソース制限</li>
+            <li>X-Content-Type-Options: nosniff による MIME タイプ保護</li>
+            <li>Referrer-Policy による情報漏洩防止</li>
+            <li>ユーザーデータの暗号化と安全な保存</li>
+          </ul>
+        </div>
+        
+        <div class="bg-gray-800 p-4 rounded-lg">
+          <h4 class="font-medium text-cyan-400 mb-2">👥 アクセス制御</h4>
+          <p>マルチテナント環境での権限分離により、ユーザーは自分のデータのみアクセス可能です。管理者権限は適切に分離されています。</p>
+        </div>
+        
+        <div class="bg-gray-800 p-4 rounded-lg">
+          <h4 class="font-medium text-cyan-400 mb-2">📝 監査ログ</h4>
+          <p>システムの全操作は監査ログに記録され、セキュリティインシデントの追跡と分析が可能です。</p>
+        </div>
+        
+        <div class="bg-gray-800 p-4 rounded-lg">
+          <h4 class="font-medium text-cyan-400 mb-2">⚙️ システム設計</h4>
+          <p>Google Apps Script環境での実行により、Googleのインフラストラクチャのセキュリティ基準を活用しています。</p>
+        </div>
+      </div>
+      
+      <div class="mt-6 text-center">
+        <button onclick="closeSecurityModal()" class="btn bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white py-2 px-6 rounded-lg">
+          閉じる
+        </button>
+      </div>
+    </div>
   </div>
 
   <?!= include('login.js'); ?>

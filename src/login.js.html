@@ -1,4 +1,22 @@
 <script>
+  // グローバルエラーハンドラー
+  window.addEventListener('error', (event) => {
+    console.error('Global error:', event.error);
+    const userEmailDisplay = document.getElementById('user-email-display');
+    if (userEmailDisplay && event.error.message) {
+      userEmailDisplay.textContent = 'システムエラーが発生しました';
+    }
+  });
+
+  // Promise rejection ハンドラー
+  window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason);
+    const userEmailDisplay = document.getElementById('user-email-display');
+    if (userEmailDisplay) {
+      userEmailDisplay.textContent = '通信エラーが発生しました';
+    }
+  });
+
   document.addEventListener('DOMContentLoaded', () => {
     const loginBtn = document.getElementById('login-btn');
     const userEmailDisplay = document.getElementById('user-email-display');
@@ -37,49 +55,102 @@
       });
     };
 
-    // 既存のregisterNewUser()関数を使用 - バックエンドが期待する引数形式
+    // バックエンドの安定した関数を使用してユーザー登録
     const registerUser = () => {
       return new Promise((resolve, reject) => {
-        const currentUserEmail = Session.getActiveUser().getEmail();
+        // getCurrentUserStatus()でユーザーメール取得
         google.script.run
-          .withSuccessHandler(res => {
-            if (res && res.adminUrl) {
-              window.location.href = res.adminUrl;
-              resolve();
-            } else {
-              reject(new Error('registration failed'));
+          .withSuccessHandler(userStatus => {
+            const currentUserEmail = userStatus.adminEmail;
+            if (!currentUserEmail) {
+              reject(new Error('ユーザーメールアドレスを取得できません'));
+              return;
             }
+            
+            // 既存のregisterNewUser()関数を呼び出し
+            google.script.run
+              .withSuccessHandler(res => {
+                if (res && res.adminUrl) {
+                  window.location.href = res.adminUrl;
+                  resolve();
+                } else {
+                  reject(new Error('registration failed'));
+                }
+              })
+              .withFailureHandler(reject)
+              .registerNewUser(currentUserEmail);
           })
           .withFailureHandler(reject)
-          .registerNewUser(currentUserEmail);
+          .getCurrentUserStatus();
       });
+    };
+
+    // 現在のユーザーメールアドレスを表示
+    const displayCurrentUserEmail = () => {
+      google.script.run
+        .withSuccessHandler(userStatus => {
+          if (userStatus && userStatus.adminEmail) {
+            userEmailDisplay.textContent = userStatus.adminEmail;
+          } else {
+            userEmailDisplay.textContent = 'ユーザー情報を取得中...';
+          }
+        })
+        .withFailureHandler(error => {
+          console.warn('User email display failed:', error);
+          userEmailDisplay.textContent = 'ユーザー情報取得エラー';
+        })
+        .getCurrentUserStatus();
     };
 
     // GAS内蔵認証を使用した簡易ログイン処理
     const handleSimpleLogin = () => {
-      setLoading(true, 'ユーザー情報確認中…');
-      
-      // バックエンドのgetExistingBoard()が返す3つの状態を処理
-      fetchBoard()
-        .then(res => {
-          if (res.status === 'existing_user') {
-            // 既存ユーザー: 直接管理画面へ
-            window.location.href = res.adminUrl;
-          } else if (res.status === 'setup_required') {
-            // セットアップ必要: アプリ設定画面へ
-            window.location.href = `/exec?mode=admin&userId=${res.userId}`;
-          } else if (res.status === 'new_user') {
-            // 新規ユーザー: 登録処理実行
-            return registerUser();
-          } else {
-            throw new Error(res.message || 'unknown status');
-          }
-        })
-        .catch(err => {
-          console.error(err);
-          userEmailDisplay.textContent = 'エラーが発生しました';
-          setLoading(false);
-        });
+      try {
+        setLoading(true, 'ユーザー情報確認中…');
+        
+        // バックエンドのgetExistingBoard()が返す3つの状態を処理
+        fetchBoard()
+          .then(res => {
+            try {
+              if (!res || typeof res !== 'object') {
+                throw new Error('無効なレスポンスを受信しました');
+              }
+              
+              if (res.status === 'existing_user') {
+                // 既存ユーザー: 直接管理画面へ
+                if (res.adminUrl) {
+                  window.location.href = res.adminUrl;
+                } else {
+                  throw new Error('管理画面URLが見つかりません');
+                }
+              } else if (res.status === 'setup_required') {
+                // セットアップ必要: アプリ設定画面へ
+                if (res.userId) {
+                  window.location.href = `/exec?mode=admin&userId=${res.userId}`;
+                } else {
+                  throw new Error('ユーザーIDが見つかりません');
+                }
+              } else if (res.status === 'new_user') {
+                // 新規ユーザー: 登録処理実行
+                return registerUser();
+              } else {
+                throw new Error(res.message || `未知のステータス: ${res.status}`);
+              }
+            } catch (innerErr) {
+              console.error('Response handling error:', innerErr);
+              userEmailDisplay.textContent = innerErr.message || 'レスポンス処理エラー';
+              setLoading(false);
+            }
+          })
+          .catch(err => {
+            console.error('Backend error:', err);
+            userEmailDisplay.textContent = 'サーバーエラーが発生しました';
+            setLoading(false);
+          });
+      } catch (err) {
+        console.error('Login function error:', err);
+        userEmailDisplay.textContent = 'ログイン処理エラー';
+        setLoading(false);
+      }
     };
 
     // 初期化処理 - 組織ポリシー制限を回避するため簡易認証を使用
@@ -88,6 +159,9 @@
         // OAuth制限を回避して直接ログイン処理を実行
         handleSimpleLogin();
       });
+
+      // ユーザーメールアドレスを表示
+      displayCurrentUserEmail();
 
       // OAuth設定は省略し、直接初期化完了
       setLoading(false);
@@ -110,5 +184,20 @@
     setLoading(true, '読み込み中…');
     init();
   });
+
+  // セキュリティモーダル制御関数
+  function showSecurityModal() {
+    const modal = document.getElementById('security-modal');
+    if (modal) {
+      modal.classList.remove('hidden');
+    }
+  }
+
+  function closeSecurityModal() {
+    const modal = document.getElementById('security-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+  }
 </script>
 
