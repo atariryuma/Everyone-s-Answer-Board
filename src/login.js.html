@@ -182,20 +182,21 @@
         .withSuccessHandler(info => {
           if (info && info.adminDomain) {
             const orgNameEl = document.getElementById('organization-name');
-            const orgInfoEl = document.getElementById('organization-info');
-            if (orgNameEl && orgInfoEl) {
+            const orgPanelEl = document.getElementById('organization-panel');
+            
+            if (orgNameEl && orgPanelEl) {
               orgNameEl.textContent = info.adminDomain;
-              // 組織情報パネル全体を表示
-              const orgPanelEl = orgInfoEl.closest('.glass-panel');
-              if (orgPanelEl) {
-                orgPanelEl.style.display = 'block';
-              }
-              orgInfoEl.classList.remove('hidden');
+              orgPanelEl.style.display = 'block';
             }
           }
         })
         .withFailureHandler(error => {
           console.warn('Domain info failed:', error);
+          // 組織情報が取得できない場合はパネルを非表示のまま
+          const orgPanelEl = document.getElementById('organization-panel');
+          if (orgPanelEl) {
+            orgPanelEl.style.display = 'none';
+          }
         })
         .getSystemDomainInfo();
     };
@@ -203,6 +204,39 @@
     setLoading(true, '読み込み中…');
     init();
   });
+
+  // アカウント切り替え機能
+  function switchAccount() {
+    const userEmailDisplay = document.getElementById('user-email-display');
+    const switchBtn = document.getElementById('switch-account-btn');
+    
+    if (confirm('別のアカウントでログインしますか？\n現在のセッションがクリアされます。')) {
+      // ボタンを無効化
+      if (switchBtn) {
+        switchBtn.disabled = true;
+        switchBtn.textContent = 'セッションクリア中...';
+      }
+      
+      if (userEmailDisplay) {
+        userEmailDisplay.textContent = 'アカウント切り替え中...';
+      }
+      
+      // バックエンドのセッションクリーンアップ関数を呼び出し
+      google.script.run
+        .withSuccessHandler(result => {
+          console.log('Session cleanup result:', result);
+          // Google認証のログアウトURLにリダイレクト
+          window.location.href = 'https://accounts.google.com/logout';
+        })
+        .withFailureHandler(error => {
+          console.error('Session cleanup failed:', error);
+          alert('セッションクリアに失敗しました。手動でGoogleアカウントからログアウトしてください。');
+          // 失敗時もGoogleログアウトページへ
+          window.location.href = 'https://accounts.google.com/logout';
+        })
+        .resetUserAuthentication();
+    }
+  }
 
   // セキュリティモーダル制御関数
   function showSecurityModal() {
