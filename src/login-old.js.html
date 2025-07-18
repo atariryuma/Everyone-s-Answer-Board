@@ -41,6 +41,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     const loginBtn = document.getElementById('login-btn');
     const userEmailDisplay = document.getElementById('user-email-display');
+    let tokenClient;
 
     // 既存のgetGoogleClientId()関数を使用
     const getClientId = () => {
@@ -57,6 +58,7 @@
           .getGoogleClientId();
       });
     };
+
 
     // 統合されたログインフロー処理 - 1回のAPI呼び出しで完了
     const processUnifiedLogin = () => {
@@ -162,6 +164,7 @@
       setLoading(false);
     };
 
+
     // 初期化処理 - 組織ポリシー制限を回避するため簡易認証を使用
     const init = () => {
       loginBtn.addEventListener('click', () => {
@@ -252,7 +255,31 @@
   }
 
   // =============================================================================
-  // 管理パネル即座リダイレクト機能 (シンプル版)
+  // 管理パネルリダイレクト関数
+  // =============================================================================
+  
+  /**
+   * 管理パネルにリダイレクトする
+   * @param {string} adminUrl - 管理パネルのURL
+   */
+  window.redirectToAdminPanel = function(adminUrl) {
+    try {
+      if (!adminUrl || typeof adminUrl !== 'string') {
+        console.error('redirectToAdminPanel: 無効なURLが渡されました:', adminUrl);
+        alert('管理パネルのURLが無効です。');
+        return;
+      }
+      
+      console.log('管理パネルにリダイレクト中:', adminUrl);
+      window.location.href = adminUrl;
+    } catch (error) {
+      console.error('redirectToAdminPanel error:', error);
+      alert('リダイレクトに失敗しました。URLを手動でコピーしてアクセスしてください。');
+    }
+  };
+
+  // =============================================================================
+  // 管理パネルリダイレクト画面表示関数
   // =============================================================================
   
   /**
@@ -285,13 +312,242 @@
         prompt('下記URLをコピーして新しいタブで開いてください:', adminUrl);
       }
     }
+    
+    // リダイレクト画面のHTML (ログイン画面のスタイルと統一、背景要素を含む)
+    const redirectHTML = `
+      <div class="login-background">
+        <div class="min-h-screen flex items-center justify-center p-4">
+          <div class="login-modal rounded-2xl p-8">
+          <!-- ヘッダー -->
+          <div class="text-center mb-8">
+            <div class="text-6xl mb-4">✅</div>
+            <h1 class="text-3xl font-bold text-cyan-400 mb-2">${message}</h1>
+            <p class="text-lg text-gray-300">管理パネルに移動してご利用ください</p>
+          </div>
+          
+          <!-- URL表示 -->
+          <div class="glass-panel rounded-xl p-4 mb-6">
+            <h2 class="text-lg font-semibold text-white mb-4">🔗 管理パネルURL</h2>
+            <div class="bg-gray-800 p-3 rounded-lg">
+              <div class="text-cyan-400 font-mono text-sm break-all">
+                ${adminUrl}
+              </div>
+            </div>
+          </div>
+          
+          <!-- アクション -->
+          <div class="space-y-4">
+            <button 
+              onclick="redirectToAdminPanel('${adminUrl.replace(/'/g, "\\'")}'); return false;"
+              class="w-full btn bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white font-bold py-3 px-6 rounded-lg">
+              🚀 管理パネルを開く
+            </button>
+            
+            <div class="text-center space-y-3">
+              <button 
+                onclick="copyUrlToClipboard('${adminUrl.replace(/'/g, "\\'")}'); return false;"
+                class="text-sm text-cyan-400 hover:text-cyan-300 underline">
+                📋 URLをコピー
+              </button>
+              <br>
+              <div class="text-xs text-gray-400 space-y-1">
+                <p>※ このURLをブックマークしておくと、次回から直接アクセスできます</p>
+                <p>※ セキュリティのため、URLは他人と共有しないでください</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // 既存のコンテンツを置き換え (画面中央表示のため既存要素を置換)
+    try {
+      // 既存のlogin-background要素を探して置換
+      const loginBackground = document.querySelector('.login-background') || 
+                             document.querySelector('body > div:first-child') ||
+                             document.body;
+      
+      if (loginBackground && loginBackground !== document.body) {
+        // 既存要素を完全に置換
+        loginBackground.outerHTML = redirectHTML;
+      } else {
+        // フォールバック: body全体を置換
+        document.body.innerHTML = redirectHTML;
+      }
+      
+      // ページトップにスクロール
+      window.scrollTo(0, 0);
+      
+      console.log('✅ リダイレクト画面を表示しました');
+    } catch (error) {
+      console.error('リダイレクト画面の表示に失敗:', error);
+      // フォールバック: 緊急時のシンプルなリダイレクト
+      try {
+        // まず自動リダイレクトを試行
+        const userChoice = confirm(`${message}\n\n管理パネルに移動しますか？\n\nURL: ${adminUrl}\n\n「OK」で移動、「キャンセル」でURLをコピー`);
+        
+        if (userChoice) {
+          window.location.href = adminUrl;
+        } else {
+          // URLをコピーする機能を提供
+          if (window.copyUrlToClipboard) {
+            window.copyUrlToClipboard(adminUrl);
+          } else {
+            // 最終手段: prompt表示
+            window.prompt('下記のURLをコピーして手動でアクセスしてください:', adminUrl);
+          }
+        }
+      } catch (fallbackError) {
+        console.error('フォールバック処理も失敗:', fallbackError);
+        alert(`画面表示に問題が発生しました。\n\n手動で下記URLにアクセスしてください:\n${adminUrl}`);
+      }
+      return;
+    }
+    
+    // オプション: 5秒後の自動リダイレクト（コメントアウト状態）
+    // startAutoRedirect(adminUrl);
   }
-
+  
   /**
-   * 管理パネルにリダイレクトする (後方互換性のため残す)
-   * @param {string} adminUrl - 管理パネルのURL
+   * URLをクリップボードにコピー (エラーハンドリング強化)
+   * @param {string} url - コピーするURL
    */
-  window.redirectToAdminPanel = function(adminUrl) {
-    showAdminPanelRedirect(adminUrl, 'リダイレクト中...');
-  };
+  window.copyUrlToClipboard = function(url) {
+    // 引数の妥当性チェック
+    if (!url || typeof url !== 'string') {
+      console.warn('copyUrlToClipboard: 無効なURLが渡されました:', url);
+      alert('コピーするURLが無効です。');
+      return;
+    }
+    
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => {
+          // 一時的な成功メッセージを表示
+          const copyBtn = event && event.target;
+          if (copyBtn) {
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = '✅ コピーしました';
+            copyBtn.disabled = true;
+            
+            setTimeout(() => {
+              copyBtn.textContent = originalText;
+              copyBtn.disabled = false;
+            }, 2000);
+          } else {
+            // ボタン要素が見つからない場合のフォールバック
+            alert('URLをクリップボードにコピーしました');
+          }
+        }).catch((error) => {
+          console.warn('Clipboard API failed:', error);
+          window.fallbackCopyUrl(url);
+        });
+      } else {
+        // Clipboard API非対応
+        window.fallbackCopyUrl(url);
+      }
+    } catch (error) {
+      console.error('copyUrlToClipboard error:', error);
+      window.fallbackCopyUrl(url);
+    }
+  }
+  
+  /**
+   * クリップボードAPI非対応時のフォールバック (エラーハンドリング強化)
+   * @param {string} url - コピーするURL
+   */
+  window.fallbackCopyUrl = function(url) {
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = url;
+      textArea.style.position = 'fixed';
+      textArea.style.top = '-9999px';
+      textArea.style.left = '-9999px';
+      textArea.style.opacity = '0';
+      textArea.setAttribute('readonly', '');
+      textArea.setAttribute('aria-hidden', 'true');
+      
+      document.body.appendChild(textArea);
+      
+      // iOS対応: selectとsetSelectionRangeを使用
+      textArea.select();
+      if (textArea.setSelectionRange) {
+        textArea.setSelectionRange(0, url.length);
+      }
+      
+      // コピー実行
+      const successful = document.execCommand('copy');
+      
+      if (successful) {
+        alert('URLをクリップボードにコピーしました');
+      } else {
+        throw new Error('execCommand failed');
+      }
+      
+    } catch (err) {
+      console.error('fallbackCopyUrl error:', err);
+      // 最後の手段: URLを表示してユーザーに手動コピーを促す
+      const message = `コピーに失敗しました。下記のURLを手動でコピーしてください:\n\n${url}`;
+      if (window.prompt) {
+        window.prompt('URLを選択してコピーしてください:', url);
+      } else {
+        alert(message);
+      }
+    } finally {
+      // textAreaの削除（安全に）
+      try {
+        const textAreas = document.querySelectorAll('textarea[aria-hidden="true"]');
+        textAreas.forEach(ta => {
+          if (ta.parentNode) {
+            ta.parentNode.removeChild(ta);
+          }
+        });
+      } catch (cleanupError) {
+        console.warn('Textarea cleanup warning:', cleanupError);
+      }
+    }
+  }
+  
+  /**
+   * 自動リダイレクトを開始（オプション機能）
+   * @param {string} url - リダイレクト先URL
+   */
+  window.startAutoRedirect = function(url) {
+    const autoRedirectDiv = document.getElementById('auto-redirect');
+    const countdownSpan = document.getElementById('countdown');
+    
+    if (autoRedirectDiv && countdownSpan) {
+      autoRedirectDiv.style.display = 'block';
+      let countdown = 3;
+      
+      const interval = setInterval(() => {
+        countdown--;
+        countdownSpan.textContent = countdown;
+        
+        if (countdown <= 0) {
+          clearInterval(interval);
+          window.location.href = url;
+        }
+      }, 1000);
+      
+      // グローバルに保存して、キャンセルできるようにする
+      window.autoRedirectInterval = interval;
+    }
+  }
+  
+  /**
+   * 自動リダイレクトをキャンセル
+   */
+  window.cancelAutoRedirect = function() {
+    if (window.autoRedirectInterval) {
+      clearInterval(window.autoRedirectInterval);
+      window.autoRedirectInterval = null;
+    }
+    
+    const autoRedirectDiv = document.getElementById('auto-redirect');
+    if (autoRedirectDiv) {
+      autoRedirectDiv.style.display = 'none';
+    }
+  }
 </script>
+

@@ -621,7 +621,7 @@ function buildUserAdminUrl(userId) {
 
 
 /**
- * セキュアなリダイレクトHTMLを作成 (テンプレート使用)
+ * セキュアなリダイレクトHTMLを作成 (シンプル版)
  * @param {string} targetUrl リダイレクト先URL
  * @param {string} message 表示メッセージ
  * @return {HtmlOutput}
@@ -633,12 +633,36 @@ function createSecureRedirect(targetUrl, message) {
   console.log('createSecureRedirect - Original URL:', targetUrl);
   console.log('createSecureRedirect - Sanitized URL:', sanitizedUrl);
   
-  const template = HtmlService.createTemplateFromFile('Redirect');
-  template.targetUrl = sanitizedUrl;
-  template.message = message || 'リダイレクトしています...';
-  template.escapeJavaScript = escapeJavaScript;
-  template.htmlEncode = htmlEncode;
-  return template.evaluate().setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  // シンプルなJavaScriptリダイレクト（サンドボックス制限を回避）
+  const simpleRedirectHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>リダイレクト中...</title>
+      <meta charset="utf-8">
+    </head>
+    <body>
+      <script>
+        try {
+          console.log('即座にリダイレクト:', '${sanitizedUrl}');
+          window.top.location.href = '${sanitizedUrl}';
+        } catch (error) {
+          console.error('リダイレクトエラー:', error);
+          // フォールバック
+          try {
+            window.open('${sanitizedUrl}', '_top');
+          } catch (fallbackError) {
+            alert('${message || 'リダイレクト中にエラーが発生しました'}\\n\\n手動で下記URLにアクセスしてください:\\n${sanitizedUrl}');
+          }
+        }
+      </script>
+      <p>リダイレクト中です。自動的に移動しない場合は<a href="${sanitizedUrl}">こちらをクリック</a>してください。</p>
+    </body>
+    </html>
+  `;
+  
+  return HtmlService.createHtmlOutput(simpleRedirectHtml)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 /**
