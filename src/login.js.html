@@ -22,11 +22,21 @@
     const userEmailDisplay = document.getElementById('user-email-display');
     let tokenClient;
 
-    // UI状態管理 - 既存バックエンド関数の動作に合わせて最適化
+    // UI状態管理 - 管理パネル風の表示に最適化
     const setLoading = (flag, text = '') => {
       if (!loginBtn) return;
       loginBtn.disabled = flag;
-      loginBtn.textContent = flag ? text || '処理中…' : 'はじめる';
+      
+      if (flag) {
+        loginBtn.innerHTML = `
+          <div class="flex items-center justify-center">
+            <div class="loading-spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+            ${text || '処理中…'}
+          </div>
+        `;
+      } else {
+        loginBtn.textContent = 'はじめる';
+      }
     };
 
     // 既存のgetGoogleClientId()関数を使用
@@ -60,25 +70,25 @@
       return new Promise((resolve, reject) => {
         // getCurrentUserStatus()でユーザーメール取得
         google.script.run
-          .withSuccessHandler(userStatus => {
-            const currentUserEmail = userStatus.adminEmail;
-            if (!currentUserEmail) {
+          .withSuccessHandler(response => {
+            if (response && response.status === 'success' && response.userInfo && response.userInfo.adminEmail) {
+              const currentUserEmail = response.userInfo.adminEmail;
+              
+              // 既存のregisterNewUser()関数を呼び出し
+              google.script.run
+                .withSuccessHandler(res => {
+                  if (res && res.adminUrl) {
+                    window.location.href = res.adminUrl;
+                    resolve();
+                  } else {
+                    reject(new Error('registration failed'));
+                  }
+                })
+                .withFailureHandler(reject)
+                .registerNewUser(currentUserEmail);
+            } else {
               reject(new Error('ユーザーメールアドレスを取得できません'));
-              return;
             }
-            
-            // 既存のregisterNewUser()関数を呼び出し
-            google.script.run
-              .withSuccessHandler(res => {
-                if (res && res.adminUrl) {
-                  window.location.href = res.adminUrl;
-                  resolve();
-                } else {
-                  reject(new Error('registration failed'));
-                }
-              })
-              .withFailureHandler(reject)
-              .registerNewUser(currentUserEmail);
           })
           .withFailureHandler(reject)
           .getCurrentUserStatus();
@@ -88,11 +98,12 @@
     // 現在のユーザーメールアドレスを表示
     const displayCurrentUserEmail = () => {
       google.script.run
-        .withSuccessHandler(userStatus => {
-          if (userStatus && userStatus.adminEmail) {
-            userEmailDisplay.textContent = userStatus.adminEmail;
+        .withSuccessHandler(response => {
+          if (response && response.status === 'success' && response.userInfo && response.userInfo.adminEmail) {
+            userEmailDisplay.textContent = response.userInfo.adminEmail;
           } else {
             userEmailDisplay.textContent = 'ユーザー情報を取得中...';
+            console.warn('User email not found in response:', response);
           }
         })
         .withFailureHandler(error => {
@@ -174,9 +185,17 @@
             const orgInfoEl = document.getElementById('organization-info');
             if (orgNameEl && orgInfoEl) {
               orgNameEl.textContent = info.adminDomain;
+              // 組織情報パネル全体を表示
+              const orgPanelEl = orgInfoEl.closest('.glass-panel');
+              if (orgPanelEl) {
+                orgPanelEl.style.display = 'block';
+              }
               orgInfoEl.classList.remove('hidden');
             }
           }
+        })
+        .withFailureHandler(error => {
+          console.warn('Domain info failed:', error);
         })
         .getSystemDomainInfo();
     };

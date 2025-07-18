@@ -3,21 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <base target="_top">
-  
-  <!-- Security: Let Google Apps Script handle document.write naturally -->
-  
   <title>StudyQuest - ログイン</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#1a1b26">
   <meta name="description" content="StudyQuest 回答ボードシステム - ログイン">
-  
-  
-  <!-- Enhanced Security Headers -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.google.com https://*.googleapis.com https://*.googleusercontent.com https://cdn.tailwindcss.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.google.com https://*.googleapis.com https://*.googleusercontent.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; connect-src 'self' https://*.google.com https://*.googleapis.com; img-src 'self' data: https:; font-src 'self' https:; frame-src 'self' https://*.google.com;" />
-  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), screen-wake-lock=(), accelerometer=(), gyroscope=(), magnetometer=()" />
 
-  <!-- Tailwind CSS -->
+  <!-- TailwindCSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     // Handle Tailwind CDN production warnings and deprecation warnings
@@ -26,8 +18,7 @@
       console.warn = function(...args) {
         if (args[0] && (
           args[0].includes('cdn.tailwindcss.com should not be used in production') ||
-          args[0].includes('-ms-high-contrast is in the process of being deprecated') ||
-          args[0].includes('Tailwind CSS in production')
+          args[0].includes('-ms-high-contrast is in the process of being deprecated')
         )) {
           return; // Suppress these warnings
         }
@@ -36,116 +27,57 @@
     }
   </script>
 
-  <!-- Google Identity Services with enhanced loading -->
-  <script>
-    // Asynchronous loading strategy for Google services
-    (function() {
-      const loadGoogleScript = (src, id) => {
-        return new Promise((resolve, reject) => {
-          if (document.getElementById(id)) {
-            resolve();
-            return;
-          }
-          
-          const script = document.createElement('script');
-          script.id = id;
-          script.src = src;
-          script.async = true;
-          script.defer = true;
-          
-          script.onload = () => {
-            console.log(`Successfully loaded: ${src}`);
-            resolve();
-          };
-          
-          script.onerror = (error) => {
-            console.error(`Failed to load: ${src}`, error);
-            reject(error);
-          };
-          
-          document.head.appendChild(script);
-        });
-      };
-      
-      // Load Google services sequentially with error handling
-      const loadGoogleServices = async () => {
-        try {
-          await loadGoogleScript('https://accounts.google.com/gsi/client', 'google-gsi-client');
-          await loadGoogleScript('https://apis.google.com/js/api.js', 'google-apis');
-          console.log('All Google services loaded successfully');
-        } catch (error) {
-          console.error('Error loading Google services:', error);
-          // Store error for later handling
-          window.googleLoadError = error;
-          
-          // document.write protection is handled globally
-        }
-      };
-      
-      // Start loading when DOM is ready
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', loadGoogleServices);
-      } else {
-        loadGoogleServices();
-      }
-    })();
-  </script>
-
-  <!-- Include shared styles and utilities -->
+  <!-- Unified Styles and Shared Components -->
   <?!= include('UnifiedStyles'); ?>
   <?!= include('SharedUtilities'); ?>
-  <?!= include('ErrorBoundary'); ?>
+  
+  <!-- Admin Panel Specific Styles -->
   <?!= include('adminPanel.css'); ?>
-
-  <!-- Login-specific styles -->
-  <?!= include('login.css'); ?>
 </head>
-<body class="login-container flex items-center justify-center p-4">
-  <div class="login-card w-full max-w-md p-8">
-    <!-- Header -->
+<body>
+  <div class="max-w-md mx-auto p-6">
+    <!-- ヘッダー -->
     <div class="text-center mb-8">
-      <h1 class="login-title">StudyQuest</h1>
-      <p class="login-subtitle">アカウント登録・ログイン</p>
+      <h1 class="text-4xl font-bold text-cyan-400 mb-2">🎓 StudyQuest</h1>
+      <p class="text-xl text-gray-300">ログイン</p>
       <p class="text-sm text-gray-400 mt-2">初回利用時は自動的にアカウントが作成されます</p>
+    </div>
 
-      <!-- Organization Info -->
-      <div class="organization-info mt-4 hidden" id="organization-info">
-        <div class="organization-badge">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H3m2 0h4m6 0a7 7 0 11-14 0m2 0a7 7 0 012 0h4a7 7 0 012 0z"/>
-          </svg>
-          <span id="organization-name">組織名</span>
+    <!-- 組織情報 -->
+    <div class="glass-panel rounded-xl p-6 mb-6">
+      <div class="text-center">
+        <div class="organization-info hidden" id="organization-info">
+          <div class="flex items-center justify-center mb-2">
+            <svg class="w-5 h-5 text-cyan-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H3m2 0h4m6 0a7 7 0 11-14 0m2 0a7 7 0 012 0h4a7 7 0 012 0z"/>
+            </svg>
+            <span id="organization-name" class="text-cyan-400 font-medium">組織名</span>
+          </div>
+          <p class="text-sm text-gray-400">この組織で展開されています</p>
         </div>
-        <p class="organization-description">この組織で展開されています</p>
       </div>
     </div>
 
-    <!-- Account Information -->
-    <div class="account-info">
-      <div class="account-label">使用するアカウント</div>
-      <div class="user-email" id="user-email-display">-</div>
-      <div id="domain-status-badge" class="hidden"></div>
+    <!-- アカウント情報 -->
+    <div class="glass-panel rounded-xl p-6 mb-6">
+      <h2 class="text-lg font-semibold text-white mb-4">📧 使用するアカウント</h2>
+      <div class="bg-gray-800 p-3 rounded-lg">
+        <div class="text-cyan-400 font-medium" id="user-email-display">ユーザー情報を取得中...</div>
+      </div>
     </div>
 
-    <!-- Login Actions -->
+    <!-- ログインアクション -->
     <div class="space-y-4">
-      <button type="button" id="login-btn" class="login-btn" disabled>
+      <button type="button" id="login-btn" class="w-full btn bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
         はじめる
       </button>
 
-      <div class="text-center">
-        <a href="#" id="switch-account-link" class="footer-link">
-          別のアカウントでログイン
-        </a>
+      <div class="text-center space-y-2">
+        <button onclick="showSecurityModal()" class="text-sm text-gray-400 hover:text-white underline">
+          セキュリティ仕様について
+        </button>
       </div>
-  </div>
-
-  <!-- Footer -->
-  <div class="mt-8 text-center">
-    <a href="#" id="security-modal-trigger" class="footer-link" onclick="showSecurityModal()">
-      セキュリティ仕様について
-    </a>
-  </div>
+    </div>
   </div>
 
   <!-- セキュリティ仕様モーダル -->
