@@ -57,8 +57,10 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // フォーム設定モーダルが開かれたときにカウンターをリセット
-const originalShowFormConfigModal = window.showFormConfigModal;
-if (typeof originalShowFormConfigModal === 'function') {
+// Note: showFormConfigModal is now defined in adminPanel-ui.js.html
+// We enhance it here to include character counter setup
+if (typeof window.showFormConfigModal === 'function') {
+  const originalShowFormConfigModal = window.showFormConfigModal;
   window.showFormConfigModal = function() {
     originalShowFormConfigModal();
     setTimeout(setupCharacterCounters, 100); // モーダル表示後にセットアップ

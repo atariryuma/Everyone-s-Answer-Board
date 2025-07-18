@@ -500,12 +500,29 @@ function manageFocusForModal(modalId, show) {
 // =============================================================================
 
 // Initialize event listeners when DOM is ready
+// Add additional delay to ensure all JavaScript modules are loaded
+function initializeEventListeners() {
+  // Check if essential functions are loaded before setting up events
+  const requiredFunctions = ['handleQuickStart', 'showFormConfigModal', 'toggleSection'];
+  const missingFunctions = requiredFunctions.filter(func => typeof window[func] !== 'function');
+  
+  if (missingFunctions.length > 0) {
+    console.warn('⚠️ AdminPanel: Waiting for functions to load:', missingFunctions);
+    // Retry after a short delay
+    setTimeout(initializeEventListeners, 200);
+    return;
+  }
+  
+  console.log('✅ AdminPanel: All required functions loaded, setting up event listeners');
+  setupEventListeners();
+}
+
 if (document.readyState !== 'loading') {
-  setTimeout(setupEventListeners, 100);
+  setTimeout(initializeEventListeners, 200);
 } else {
   document.addEventListener('DOMContentLoaded', function() {
-    // Small delay to ensure all elements are rendered
-    setTimeout(setupEventListeners, 100);
+    // Increased delay to ensure all modules are loaded
+    setTimeout(initializeEventListeners, 200);
   });
 }
 
