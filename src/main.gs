@@ -601,11 +601,32 @@ function getWebAppUrl() {
 
   try {
     const url = ScriptApp.getService().getUrl();
-    if (url && url.includes('/macros/')) {
+    if (!url) {
+      throw new Error('No URL returned from getService()');
+    }
+    
+    // 開発モードや一時URLを検出
+    const devPatterns = [
+      /^https:\/\/[a-z0-9-]+\.googleusercontent\.com\//, // 開発モード
+      /\/userCodeAppPanel/, // テスト用パネル
+      /\/dev$/, // 開発エンドポイント
+      /\/test$/ // テストエンドポイント
+    ];
+    
+    const isDevUrl = devPatterns.some(pattern => pattern.test(url));
+    
+    if (isDevUrl) {
+      console.warn('開発モードのURLを検出しました: ' + url + ' フォールバックURLを使用します');
+      throw new Error('Development URL detected');
+    }
+    
+    // 有効なURLパターンかチェック
+    const validPattern = /^https:\/\/script\.google\.com\/(a\/macros\/[^\/]+\/)?s\/[A-Za-z0-9_-]+\/exec$/;
+    if (url.includes('/macros/') && validPattern.test(url)) {
       cache.put(cacheKey, url, 21600); // 6時間キャッシュ
       return url;
     }
-    throw new Error('Invalid URL from getService()');
+    throw new Error('Invalid URL pattern from getService()');
   } catch (error) {
     console.error('getWebAppUrl error:', error);
     // 緊急時のフォールバックURL
@@ -757,10 +778,6 @@ function renderAdminPanel(userInfo, mode) {
   adminTemplate.isDeployUser = deployUserResult;
   adminTemplate.DEBUG_MODE = shouldEnableDebugMode();
   
-  // URL更新用の情報を追加
-  const correctUrl = buildUserAdminUrl(userInfo.userId);
-  adminTemplate.correctUrl = correctUrl;
-  adminTemplate.shouldUpdateUrl = true;
   
   return adminTemplate.evaluate()
     .setTitle('みんなの回答ボード 管理パネル')

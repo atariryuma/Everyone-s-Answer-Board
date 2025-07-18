@@ -20,12 +20,36 @@ function computeWebAppUrl() {
 
     url = url.replace(/\/$/, '');
 
+    // 開発モードやテスト用の一時URLを検出して除外
+    var devPatterns = [
+      /^https:\/\/[a-z0-9-]+\.googleusercontent\.com\//, // 開発モード
+      /\/userCodeAppPanel/, // テスト用パネル
+      /\/dev$/, // 開発エンドポイント
+      /\/test$/ // テストエンドポイント
+    ];
+    
+    var isDevUrl = devPatterns.some(function(pattern) {
+      return pattern.test(url);
+    });
+    
+    if (isDevUrl) {
+      console.warn('開発モードのURLを検出しました: ' + url + ' フォールバックURLを使用します');
+      return getFallbackUrl();
+    }
+
     // \"https://script.google.com/a/<domain>/macros/s/...\" 形式を
     // \"https://script.google.com/a/macros/<domain>/s/...\" に補正
     var wrongPattern = /^https:\/\/script\.google\.com\/a\/([^\/]+)\/macros\//;
     var match = url.match(wrongPattern);
     if (match) {
       url = url.replace(wrongPattern, 'https://script.google.com/a/macros/' + match[1] + '/');
+    }
+
+    // 有効なURLパターンかチェック
+    var validPattern = /^https:\/\/script\.google\.com\/(a\/macros\/[^\/]+\/)?s\/[A-Za-z0-9_-]+\/exec$/;
+    if (!validPattern.test(url)) {
+      console.warn('無効なURLパターンを検出しました: ' + url + ' フォールバックURLを使用します');
+      return getFallbackUrl();
     }
 
     return url;
@@ -94,6 +118,12 @@ function generateAppUrls(userId) {
     }
     
     var webAppUrl = getWebAppUrlCached();
+    
+    // 最終的なURL検証
+    if (!webAppUrl || webAppUrl.includes('googleusercontent.com') || webAppUrl.includes('userCodeAppPanel')) {
+      console.warn('無効なURLが返されました。フォールバックURLを使用します: ' + webAppUrl);
+      webAppUrl = getFallbackUrl();
+    }
     
     if (!webAppUrl) {
       return {
