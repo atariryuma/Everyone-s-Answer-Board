@@ -273,6 +273,7 @@ function showRegistrationPage() {
     var template = HtmlService.createTemplateFromFile('LoginPage');
     template.include = include;
     
+  
     // No template variable processing - client will get GOOGLE_CLIENT_ID via server function
     
     var output = template.evaluate()
@@ -415,19 +416,8 @@ function routeRequest(params, userEmail) {
     return showSetupPage();
   }
 
-  // 2. パラメータなしのルートアクセス
+  // 2. パラメータなしのルートアクセスは常にログインページを表示
   if (!params.mode) {
-    // ログインしていない場合はログインページを表示
-    if (!userEmail) {
-      return showLoginPage();
-    }
-    // ログインしているユーザーの場合、管理パネルにリダイレクト
-    const userInfo = getUserInfo(userEmail, null);
-    if (userInfo) {
-      const adminUrl = buildUserAdminUrl(userInfo.userId);
-      return createSecureRedirect(adminUrl, '管理パネルにリダイレクト中...');
-    }
-    // ユーザー情報がない場合はログインページを表示
     return showLoginPage();
   }
 
@@ -472,14 +462,8 @@ function routeRequest(params, userEmail) {
 function handleAdminRoute(userInfo, params, userEmail) {
   // この関数が呼ばれる時点でuserInfoはnullではないことが保証されている
 
-  // userIdパラメータが無い場合、正しいURLにリダイレクト
-  if (!params.userId) {
-    const correctUrl = buildUserAdminUrl(userInfo.userId);
-    return createSecureRedirect(correctUrl, '適切なURLにリダイレクト中...');
-  }
-
   // セキュリティチェック: アクセスしようとしているuserIdが自分のものでなければ、自分の管理画面にリダイレクト
-  if (params.userId !== userInfo.userId) {
+  if (params.userId && params.userId !== userInfo.userId) {
     console.warn(`不正アクセス試行: ${userEmail} が userId ${params.userId} にアクセスしようとしました。`);
     const correctUrl = buildUserAdminUrl(userInfo.userId);
     return createSecureRedirect(correctUrl, '要求された管理パネルへのアクセス権がありません。');
@@ -773,6 +757,10 @@ function renderAdminPanel(userInfo, mode) {
   adminTemplate.isDeployUser = deployUserResult;
   adminTemplate.DEBUG_MODE = shouldEnableDebugMode();
   
+  // URL更新用の情報を追加
+  const correctUrl = buildUserAdminUrl(userInfo.userId);
+  adminTemplate.correctUrl = correctUrl;
+  adminTemplate.shouldUpdateUrl = true;
   
   return adminTemplate.evaluate()
     .setTitle('みんなの回答ボード 管理パネル')
