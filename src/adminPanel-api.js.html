@@ -195,18 +195,8 @@ function saveAndPublish() {
   setLoading(true, '設定を保存し、ボードを公開しています...');
   
   const config = buildConfigObject();
-  const settingsData = {
-    sheetName: selectedSheet,
-    opinionColumn: config.opinionColumn,
-    nameColumn: config.nameColumn,
-    classColumn: config.classColumn,
-    timestampColumn: config.timestampColumn,
-    showNames: config.showNames,
-    showCounts: config.showCounts,
-    classChoices: config.classChoices
-  };
   
-  runGasWithUserId('saveAndPublish', settingsData)
+  runGasWithUserId('saveAndPublish', selectedSheet, config)
     .then(function(result) {
       setLoading(false);
       if (result && result.status === 'success') {
@@ -217,18 +207,7 @@ function saveAndPublish() {
       }
     })
     .catch(function(error) {
-      setLoading(false);
-      console.error('❌  saveAndPublish failed, falling back to legacy:', error);
-      // フォールバック: 従来の方法
-      runGasWithUserId('saveAndPublish', selectedSheet, config)
-        .then(function(status) {
-          setLoading(false);
-          showMessage('設定が保存され、ボードが公開されました！', 'success');
-          updateUIWithNewStatus(status);
-        })
-        .catch(function(fallbackError) {
-          handleError(fallbackError, 'saveAndPublish', '設定の保存に失敗しました。');
-        });
+      handleError(error, 'saveAndPublish', '設定の保存に失敗しました。');
     });
 }
 
