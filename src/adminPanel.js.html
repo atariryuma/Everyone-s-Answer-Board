@@ -2,6 +2,7 @@
   // Admin Panel JavaScript
   
   // Global variables
+  let userId = null; // Will be set on initialization
   let currentStep = 1;
   let selectedSheetId = null;
   let selectedFormId = null;
@@ -10,7 +11,8 @@
   let currentConfig = null;
   
   // Initialize admin panel
-  function initializeAdminPanel() {
+  function initializeAdminPanel(incomingUserId) {
+    userId = incomingUserId; // Set the userId from parameter
     loadUserInfo();
     loadSystemStatus();
     setupEventListeners();
@@ -503,11 +505,11 @@
     window.open(base+'?mode=appsetup&setup=true','_blank');
   }
   
-  // Initialize when DOM is ready
-  document.addEventListener('DOMContentLoaded', initializeAdminPanel);
+  // Initialization is triggered from AdminPanel.html after userId is ready.
   
   // Export functions for global access
   window.adminPanel = {
+    initializeAdminPanel,
     navigateToStep,
     showMessage,
     switchToAnotherAccount,

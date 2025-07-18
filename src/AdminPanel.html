@@ -2000,6 +2000,19 @@ function setupEventListeners() {
       if (digitalCitizenshipBtn) {
         digitalCitizenshipBtn.addEventListener('click', showDigitalCitizenshipModal);
       }
+
+      // Initialize admin panel once userId is available
+      userIdPromise.then(userId => {
+        if (window.adminPanel && typeof window.adminPanel.initializeAdminPanel === 'function') {
+          window.adminPanel.initializeAdminPanel(userId);
+        }
+      }).catch(error => {
+        console.error('Failed to initialize admin panel due to userId issue:', error);
+        showMessage('管理パネルの初期化に失敗しました。ユーザー情報を取得できませんでした。', 'error');
+      });
+    });
+        digitalCitizenshipBtn.addEventListener('click', showDigitalCitizenshipModal);
+      }
       
       // Teacher guide modal events
       var teacherGuideConfirmBtn = document.getElementById('teacherGuideConfirmBtn');
