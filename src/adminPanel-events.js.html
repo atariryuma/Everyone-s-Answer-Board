@@ -66,6 +66,14 @@ function setupEventListeners() {
     });
   }
   
+  // クイックスタートボタンのイベントリスナー
+  var quickstartBtn = document.getElementById('quickstart-btn');
+  if (quickstartBtn) {
+    quickstartBtn.addEventListener('click', function() {
+      handleQuickStart();
+    });
+  }
+
   // Create additional form button
   var createAdditionalFormBtn = document.getElementById('create-additional-form-btn');
   if (createAdditionalFormBtn) {

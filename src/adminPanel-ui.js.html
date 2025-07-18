@@ -173,6 +173,10 @@ function populateSheetSelect(sheetNames, activeSheetName) {
     selectedSheet = activeSheetName;
   }
   
+  // Add change event listener for data preview
+  select.removeEventListener('change', handleSheetSelectionChange);
+  select.addEventListener('change', handleSheetSelectionChange);
+  
   // Update UI for selected sheet
   updateUIForSelectedSheet();
 }
@@ -592,6 +596,77 @@ function initializeUI() {
   
   // Load initial status
   loadStatus();
+}
+
+// =============================================================================
+// DATA PREVIEW FUNCTIONALITY
+// =============================================================================
+
+// Handle sheet selection change for data preview
+function handleSheetSelectionChange(event) {
+  const selectedSheet = event.target.value;
+  const previewSection = document.getElementById('data-preview-section');
+  
+  if (selectedSheet && previewSection) {
+    previewSection.classList.remove('hidden');
+    loadDataPreview(selectedSheet);
+  } else if (previewSection) {
+    previewSection.classList.add('hidden');
+  }
+}
+
+// Load data preview for selected sheet
+function loadDataPreview(sheetName) {
+  const previewContent = document.getElementById('data-preview-content');
+  if (!previewContent) return;
+  
+  // Show loading state
+  previewContent.innerHTML = `
+    <div class="animate-pulse">
+      <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
+      <div class="h-4 bg-gray-700 rounded w-1/2"></div>
+    </div>
+  `;
+  
+  if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
+    previewContent.innerHTML = '<p class="text-red-400">スプレッドシート情報が見つかりません</p>';
+    return;
+  }
+  
+  runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, sheetName)
+    .then(function(details) {
+      if (details && details.headers) {
+        const headersList = details.headers.slice(0, 5); // First 5 headers
+        const moreHeaders = details.headers.length > 5 ? `...他${details.headers.length - 5}列` : '';
+        
+        previewContent.innerHTML = `
+          <div class="text-sm">
+            <div class="mb-2">
+              <span class="text-gray-400">列数:</span>
+              <span class="text-white font-medium">${details.headers.length}列</span>
+            </div>
+            <div class="mb-2">
+              <span class="text-gray-400">主要な列:</span>
+              <div class="flex flex-wrap gap-1 mt-1">
+                ${headersList.map(header => `
+                  <span class="px-2 py-1 bg-blue-500/20 text-blue-200 rounded text-xs">${header}</span>
+                `).join('')}
+                ${moreHeaders ? `<span class="text-gray-400 text-xs">${moreHeaders}</span>` : ''}
+              </div>
+            </div>
+            <div class="text-xs text-gray-400 mt-2">
+              データの内容を確認して、次のステップで列設定を行ってください
+            </div>
+          </div>
+        `;
+      } else {
+        previewContent.innerHTML = '<p class="text-yellow-400">データを取得できませんでした</p>';
+      }
+    })
+    .catch(function(error) {
+      console.error('Data preview error:', error);
+      previewContent.innerHTML = '<p class="text-red-400">プレビューの読み込みに失敗しました</p>';
+    });
 }
 
 // Initialize when DOM is ready

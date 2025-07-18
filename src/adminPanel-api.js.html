@@ -475,6 +475,59 @@ function startSystemStatusUpdate() {
 }
 
 // =============================================================================
+// QUICKSTART FUNCTIONALITY
+// =============================================================================
+
+// Handle quick start setup
+function handleQuickStart() {
+  const quickstartBtn = document.getElementById('quickstart-btn');
+  const quickstartText = document.getElementById('quickstart-text');
+  
+  if (!quickstartBtn || !quickstartText) {
+    console.error('QuickStart elements not found');
+    return;
+  }
+  
+  // Update button state
+  quickstartBtn.disabled = true;
+  quickstartText.textContent = 'セットアップ中...';
+  
+  // Show loading message
+  setLoading(true, 'クイックスタートを実行中...');
+  
+  runGasWithUserId('quickStartSetup')
+    .then(function(result) {
+      if (result && result.status === 'success') {
+        showMessage('✅ クイックスタートが完了しました！フォームとボードが自動作成されました。', 'success');
+        
+        // Update status after quick start
+        loadStatus(true);
+        
+        // Reset button state
+        quickstartBtn.disabled = false;
+        quickstartText.textContent = 'クイックスタート完了';
+        
+        // Show success state
+        setTimeout(() => {
+          quickstartText.textContent = 'クイックスタートを開始';
+          quickstartBtn.disabled = false;
+        }, 3000);
+      } else {
+        showMessage(result?.message || 'クイックスタートに失敗しました。', 'error');
+        quickstartBtn.disabled = false;
+        quickstartText.textContent = 'クイックスタートを開始';
+      }
+      setLoading(false);
+    })
+    .catch(function(error) {
+      console.error('QuickStart error:', error);
+      handleError(error, 'handleQuickStart', 'クイックスタートに失敗しました。');
+      quickstartBtn.disabled = false;
+      quickstartText.textContent = 'クイックスタートを開始';
+    });
+}
+
+// =============================================================================
 // INITIALIZATION
 // =============================================================================
 
