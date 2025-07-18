@@ -3447,23 +3447,30 @@ function syncCheckboxStates(status) {
   
   // セキュリティ情報表示関数
   function showSecurityInfo() {
-    alert('🔒 セキュリティ仕様\n\n' +
-          '・Google Workspace内部OAuth認証\n' +
-          '・naha-okinawa.ed.jpドメイン制限\n' +
-          '・CSP、MIME保護、参照元ポリシー\n' +
-          '・マルチテナント権限分離\n' +
-          '・監査ログとGASセキュリティ基準');
+    showModal('security-details-modal');
   }
   
   // Google連携の利点表示関数
   function showGoogleIntegrationInfo() {
-    alert('📊 Google連携の利点\n\n' +
-          '・Googleスプレッドシートとの直接連携\n' +
-          '・Googleフォームでのデータ収集\n' +
-          '・シームレスなSSO認証\n' +
-          '・リアルタイムデータ同期\n' +
-          '・組織内でのセキュアな運用\n' +
-          '・Googleインフラの信頼性活用');
+    showModal('google-integration-modal');
+  }
+  
+  // モーダル表示関数
+  function showModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+  }
+  
+  // モーダル非表示関数
+  function hideModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
   }
 
   // モーダル表示時にカウンターを初期化
@@ -3480,6 +3487,180 @@ function syncCheckboxStates(status) {
     };
   }
   </script>
+
+  <!-- セキュリティ詳細モーダル -->
+  <div id="security-details-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <div class="glass-panel rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center p-6 border-b border-gray-600/30">
+        <h2 class="text-xl font-semibold text-white">🔒 セキュリティについて</h2>
+        <button onclick="hideModal('security-details-modal')" class="text-gray-400 hover:text-white text-2xl">✕</button>
+      </div>
+      
+      <div class="p-6 space-y-6">
+        <!-- データベースアクセス制御 -->
+        <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+          <h3 class="text-lg font-medium text-cyan-400 mb-4 flex items-center gap-2">
+            🔒 データベースアクセス制御
+          </h3>
+          <ul class="space-y-2 text-sm text-gray-300">
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>限定アクセス：</strong>データベースにアクセスできるのはウェブアプリをデプロイしたユーザーとサービスアカウントのみ
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>完全非公開設定：</strong>システム上、データベースは非公開設定が必須となっており、外部からのアクセスは一切不可能
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>個別データ分離：</strong>各ユーザーのデータは専用スプレッドシートで完全分離
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>自動権限管理：</strong>サービスアカウントへの編集権限付与を自動実行
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- 多層セキュリティ対策 -->
+        <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+          <h3 class="text-lg font-medium text-cyan-400 mb-4 flex items-center gap-2">
+            🛡️ 多層セキュリティ対策
+          </h3>
+          <ul class="space-y-2 text-sm text-gray-300">
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>暗号化認証：</strong>JWT ベースのサービスアカウント認証とトークン自動更新
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>ドメイン制限：</strong>組織展開時のドメインベースアクセス制御
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>入力検証：</strong>全入力データの包括的検証とサニタイゼーション
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>監査ログ：</strong>システム活動の完全追跡とログ記録
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- ユーザー保護 -->
+        <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+          <h3 class="text-lg font-medium text-cyan-400 mb-4 flex items-center gap-2">
+            👥 ユーザー保護
+          </h3>
+          <ul class="space-y-2 text-sm text-gray-300">
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>学習者データ保護：</strong>一般ユーザーは他の回答者データや基盤データベースにアクセス不可
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>管理者権限分離：</strong>階層的アクセスレベルによる適切な権限管理
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>セッションセキュリティ：</strong>自動クリーンアップ機能付きセキュアセッション管理
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- 重要事項 -->
+        <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+          <h3 class="text-lg font-medium text-blue-300 mb-3 flex items-center gap-2">
+            📋 重要
+          </h3>
+          <p class="text-sm text-blue-200">
+            回答ボード使用者の個人情報や回答データは厳重に保護され、教育目的以外での使用や第三者による不正アクセスを防ぐ設計となっています。
+          </p>
+        </div>
+      </div>
+      
+      <div class="p-6 border-t border-gray-600/30 text-center">
+        <button onclick="hideModal('security-details-modal')" class="btn bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white py-2 px-6 rounded-lg">
+          閉じる
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Google連携の利点モーダル -->
+  <div id="google-integration-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <div class="glass-panel rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center p-6 border-b border-gray-600/30">
+        <h2 class="text-xl font-semibold text-white">📊 Google連携の利点</h2>
+        <button onclick="hideModal('google-integration-modal')" class="text-gray-400 hover:text-white text-2xl">✕</button>
+      </div>
+      
+      <div class="p-6 space-y-4">
+        <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+          <ul class="space-y-3 text-sm text-gray-300">
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>自動フォーム作成：</strong>回答収集フォームの即座生成
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>リアルタイム同期：</strong>フォーム回答の即座反映
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>セキュアな共有：</strong>学校ドメイン内でのデータ管理
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>バックアップ機能：</strong>Google Drive による自動バックアップ
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>分析活用：</strong>Google Sheets での詳細データ分析
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="p-6 border-t border-gray-600/30 text-center">
+        <button onclick="hideModal('google-integration-modal')" class="btn bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white py-2 px-6 rounded-lg">
+          閉じる
+        </button>
+      </div>
+    </div>
+  </div>
   
   <!-- Admin Panel Specific JavaScript -->
   <?!= include('adminPanel.js'); ?>
