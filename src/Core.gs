@@ -3546,3 +3546,221 @@ function activateSheetSimple(requestUserId, sheetName) {
     };
   }
 }
+
+/**
+ * 現在ログイン中のユーザーのメールアドレスを取得する簡易関数
+ * @returns {string} ユーザーのメールアドレス
+ */
+function getCurrentUserEmail() {
+  try {
+    return Session.getActiveUser().getEmail() || '';
+  } catch (error) {
+    console.error('getCurrentUserEmail error:', error);
+    return '';
+  }
+}
+
+/**
+ * セキュリティ強化とキャッシュ最適化のパフォーマンステスト
+ * @returns {object} パフォーマンステスト結果
+ */
+function runPerformanceTest() {
+  try {
+    const startTime = Date.now();
+    const testResults = {
+      timestamp: new Date().toISOString(),
+      testDuration: 0,
+      cacheHealth: null,
+      loginFlowPerformance: null,
+      securityVerificationPerformance: null,
+      overallStatus: 'unknown',
+      recommendations: []
+    };
+
+    console.log('🚀 パフォーマンステスト開始');
+
+    // 1. キャッシュの健全性チェック
+    testResults.cacheHealth = cacheManager.getHealth();
+    console.log('📊 キャッシュ健全性:', testResults.cacheHealth);
+
+    // 2. ログインフロー性能テスト (統合前後の比較)
+    const loginStartTime = Date.now();
+    try {
+      const loginResult = processLoginFlow();
+      const loginDuration = Date.now() - loginStartTime;
+      
+      testResults.loginFlowPerformance = {
+        duration: loginDuration,
+        status: loginResult.status,
+        success: !!loginResult.adminUrl,
+        cacheHit: loginDuration < 500 // 500ms以下はキャッシュヒットと推定
+      };
+      console.log('⚡ ログインフロー性能:', testResults.loginFlowPerformance);
+    } catch (error) {
+      testResults.loginFlowPerformance = {
+        duration: Date.now() - loginStartTime,
+        error: error.message,
+        success: false
+      };
+    }
+
+    // 3. セキュリティ検証機能の性能テスト
+    const activeUserEmail = Session.getActiveUser().getEmail();
+    if (activeUserEmail) {
+      const userInfo = findUserByEmail(activeUserEmail);
+      if (userInfo && userInfo.userId) {
+        const securityStartTime = Date.now();
+        const verificationResult = verifyAdminAccess(userInfo.userId);
+        const securityDuration = Date.now() - securityStartTime;
+        
+        testResults.securityVerificationPerformance = {
+          duration: securityDuration,
+          success: verificationResult,
+          efficient: securityDuration < 200, // 200ms以下が効率的
+          cacheOptimized: securityDuration < 100 // 100ms以下はキャッシュ最適化済み
+        };
+        console.log('🔒 セキュリティ検証性能:', testResults.securityVerificationPerformance);
+      }
+    }
+
+    // 4. 全体的な評価とステータス決定
+    const totalDuration = Date.now() - startTime;
+    testResults.testDuration = totalDuration;
+
+    // パフォーマンス評価
+    const cacheHitRate = parseFloat(testResults.cacheHealth.stats.hitRate);
+    const loginEfficient = testResults.loginFlowPerformance?.duration < 1000;
+    const securityEfficient = testResults.securityVerificationPerformance?.efficient !== false;
+
+    if (cacheHitRate > 80 && loginEfficient && securityEfficient) {
+      testResults.overallStatus = 'excellent';
+    } else if (cacheHitRate > 60 && (loginEfficient || securityEfficient)) {
+      testResults.overallStatus = 'good';
+    } else if (cacheHitRate > 40) {
+      testResults.overallStatus = 'acceptable';
+    } else {
+      testResults.overallStatus = 'needs_improvement';
+    }
+
+    // 5. 推奨事項の生成
+    if (cacheHitRate < 70) {
+      testResults.recommendations.push('キャッシュヒット率が低いです。キャッシュキーの見直しやTTL調整を検討してください。');
+    }
+    if (testResults.loginFlowPerformance?.duration > 2000) {
+      testResults.recommendations.push('ログインフローが2秒以上かかっています。processLoginFlow関数の最適化を検討してください。');
+    }
+    if (testResults.securityVerificationPerformance?.duration > 500) {
+      testResults.recommendations.push('セキュリティ検証が500ms以上かかっています。verifyAdminAccess関数のキャッシュ戦略を見直してください。');
+    }
+    if (testResults.recommendations.length === 0) {
+      testResults.recommendations.push('✅ パフォーマンスは良好です。現在の最適化が効果的に機能しています。');
+    }
+
+    console.log('🎯 パフォーマンステスト完了:', testResults.overallStatus, 'テスト時間:', totalDuration + 'ms');
+    return testResults;
+
+  } catch (error) {
+    console.error('❌ パフォーマンステストエラー:', error);
+    return {
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      overallStatus: 'error',
+      recommendations: ['テスト実行中にエラーが発生しました。システムの状態を確認してください。']
+    };
+  }
+}
+
+/**
+ * 統合ログインフロー処理 - セキュリティ強化とパフォーマンス最適化
+ * 従来の複数API呼び出し（getCurrentUserStatus → getExistingBoard → registerNewUser）を1回に集約
+ * @returns {object} ログイン結果とリダイレクトURL
+ */
+function processLoginFlow() {
+  try {
+    // アクティブユーザーのメールアドレスを取得
+    var activeUserEmail = Session.getActiveUser().getEmail();
+    if (!activeUserEmail) {
+      return {
+        status: 'error',
+        message: 'ログインユーザーの情報を取得できませんでした。'
+      };
+    }
+
+    console.log('processLoginFlow: ログインフロー開始 -', activeUserEmail);
+
+    // ログインフロー専用の短期キャッシュをチェック（30秒キャッシュ）
+    var cacheKey = 'login_flow_' + activeUserEmail;
+    var cached = cacheManager.get(cacheKey);
+    if (cached) {
+      console.log('processLoginFlow: キャッシュから高速返却');
+      return cached;
+    }
+
+    // ユーザー情報をメールアドレスで検索（キャッシュ活用）
+    var userInfo = cacheManager.get(
+      'email_' + activeUserEmail,
+      function() { return findUserByEmail(activeUserEmail); },
+      { ttl: 300, enableMemoization: true }
+    );
+
+    var result;
+
+    if (userInfo && (userInfo.isActive === true || String(userInfo.isActive).toLowerCase() === 'true')) {
+      // 既存アクティブユーザー - 直接管理パネルへリダイレクト
+      var appUrls = generateAppUrls(userInfo.userId);
+      result = {
+        status: 'existing_user',
+        userId: userInfo.userId,
+        adminUrl: appUrls.adminUrl,
+        viewUrl: appUrls.viewUrl,
+        message: 'ログインが完了しました'
+      };
+      console.log('processLoginFlow: 既存アクティブユーザー -', userInfo.userId);
+
+    } else if (userInfo && (userInfo.isActive === false || String(userInfo.isActive).toLowerCase() === 'false')) {
+      // 既存だが非アクティブユーザー - セットアップ必要
+      var appUrls = generateAppUrls(userInfo.userId);
+      result = {
+        status: 'setup_required',
+        userId: userInfo.userId,
+        adminUrl: appUrls.adminUrl,
+        viewUrl: appUrls.viewUrl,
+        message: 'セットアップを完了してください'
+      };
+      console.log('processLoginFlow: 既存非アクティブユーザー -', userInfo.userId);
+
+    } else {
+      // 新規ユーザー - 自動登録処理
+      console.log('processLoginFlow: 新規ユーザー登録開始 -', activeUserEmail);
+      
+      // registerNewUser を呼び出して新規登録
+      var registrationResult = registerNewUser(activeUserEmail);
+      
+      if (registrationResult && registrationResult.adminUrl) {
+        result = {
+          status: 'new_user',
+          userId: registrationResult.userId,
+          adminUrl: registrationResult.adminUrl,
+          viewUrl: registrationResult.viewUrl,
+          message: '新規ユーザー登録が完了しました'
+        };
+        console.log('processLoginFlow: 新規ユーザー登録完了 -', registrationResult.userId);
+      } else {
+        throw new Error('新規ユーザー登録に失敗しました: ' + (registrationResult ? registrationResult.message : '不明なエラー'));
+      }
+    }
+
+    // 結果を短期キャッシュに保存（30秒）
+    cacheManager.put(cacheKey, result, 30);
+    
+    console.log('processLoginFlow: 処理完了 -', result.status, result.userId);
+    return result;
+
+  } catch (error) {
+    console.error('processLoginFlow: エラー発生 -', error.message);
+    return {
+      status: 'error',
+      message: 'ログイン処理中にエラーが発生しました: ' + error.message
+    };
+  }
+}

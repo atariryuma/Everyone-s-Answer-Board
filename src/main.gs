@@ -505,6 +505,17 @@ function handleAdminRoute(userInfo, params, userEmail) {
     return createSecureRedirect(correctUrl, '要求された管理パネルへのアクセス権がありません。');
   }
 
+  // 強化されたセキュリティ検証: 指定されたIDの登録メールアドレスと現在ログイン中のGoogleアカウントが一致するかを検証
+  if (params.userId) {
+    const isVerified = verifyAdminAccess(params.userId);
+    if (!isVerified) {
+      console.warn(`セキュリティ検証失敗: userId ${params.userId} への不正アクセス試行をブロックしました。`);
+      const correctUrl = buildUserAdminUrl(userInfo.userId);
+      return createSecureRedirect(correctUrl, 'セキュリティ検証に失敗しました。正しい管理パネルにリダイレクトします。');
+    }
+    console.log(`✅ セキュリティ検証成功: userId ${params.userId} への正当なアクセスを確認しました。`);
+  }
+
   return renderAdminPanel(userInfo, params.mode);
 }
 

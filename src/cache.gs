@@ -451,3 +451,182 @@ function clearDatabaseCache() {
   }
 }
 
+/**
+ * 頻繁にアクセスされるデータを事前にキャッシュに読み込みます（プリウォーミング）
+ * @param {string} activeUserEmail - 現在のユーザーのメールアドレス
+ * @returns {object} プリウォーミング結果
+ */
+function preWarmCache(activeUserEmail) {
+  const startTime = Date.now();
+  const results = {
+    timestamp: new Date().toISOString(),
+    preWarmedItems: [],
+    errors: [],
+    duration: 0,
+    success: true
+  };
+
+  try {
+    console.log('🔥 キャッシュプリウォーミング開始:', activeUserEmail);
+
+    // 1. サービスアカウントトークンの事前取得
+    try {
+      getServiceAccountTokenCached();
+      results.preWarmedItems.push('service_account_token');
+      debugLog('[Cache] Pre-warmed service account token');
+    } catch (error) {
+      results.errors.push('service_account_token: ' + error.message);
+    }
+
+    // 2. ユーザー情報の事前取得（メール/ID両方）
+    if (activeUserEmail) {
+      try {
+        const userInfo = findUserByEmail(activeUserEmail);
+        if (userInfo) {
+          results.preWarmedItems.push('user_by_email');
+          
+          // ユーザーIDベースのキャッシュも事前取得
+          if (userInfo.userId) {
+            findUserById(userInfo.userId);
+            results.preWarmedItems.push('user_by_id');
+          }
+          
+          // スプレッドシート情報の事前取得
+          if (userInfo.spreadsheetId) {
+            try {
+              const config = JSON.parse(userInfo.configJson || '{}');
+              if (config.publishedSheetName) {
+                getHeadersCached(userInfo.spreadsheetId, config.publishedSheetName);
+                results.preWarmedItems.push('sheet_headers');
+              }
+            } catch (configError) {
+              results.errors.push('sheet_headers: ' + configError.message);
+            }
+          }
+        }
+        debugLog('[Cache] Pre-warmed user data for:', activeUserEmail);
+      } catch (error) {
+        results.errors.push('user_data: ' + error.message);
+      }
+    }
+
+    // 3. システム設定の事前取得
+    try {
+      getWebAppUrlCached();
+      results.preWarmedItems.push('webapp_url');
+      debugLog('[Cache] Pre-warmed webapp URL');
+    } catch (error) {
+      results.errors.push('webapp_url: ' + error.message);
+    }
+
+    // 4. ドメイン情報の事前取得
+    try {
+      getDeployUserDomainInfo();
+      results.preWarmedItems.push('domain_info');
+      debugLog('[Cache] Pre-warmed domain info');
+    } catch (error) {
+      results.errors.push('domain_info: ' + error.message);
+    }
+
+    results.duration = Date.now() - startTime;
+    results.success = results.errors.length === 0;
+
+    console.log('✅ キャッシュプリウォーミング完了:', results.preWarmedItems.length, 'items,', results.duration + 'ms');
+    
+    if (results.errors.length > 0) {
+      console.warn('⚠️ プリウォーミング中のエラー:', results.errors);
+    }
+
+    return results;
+
+  } catch (error) {
+    results.duration = Date.now() - startTime;
+    results.success = false;
+    results.errors.push('fatal_error: ' + error.message);
+    console.error('❌ キャッシュプリウォーミングエラー:', error);
+    return results;
+  }
+}
+
+/**
+ * キャッシュ効率化のための統計情報とチューニング推奨事項を提供
+ * @returns {object} キャッシュ分析結果
+ */
+function analyzeCacheEfficiency() {
+  try {
+    const health = cacheManager.getHealth();
+    const analysis = {
+      timestamp: new Date().toISOString(),
+      currentHealth: health,
+      efficiency: 'unknown',
+      recommendations: [],
+      optimizationOpportunities: []
+    };
+
+    const hitRate = parseFloat(health.stats.hitRate);
+    const errorRate = parseFloat(health.stats.errorRate);
+    const totalOps = health.stats.totalOperations;
+
+    // 効率レベルの判定
+    if (hitRate >= 85 && errorRate < 5 && totalOps > 50) {
+      analysis.efficiency = 'excellent';
+    } else if (hitRate >= 70 && errorRate < 10) {
+      analysis.efficiency = 'good';
+    } else if (hitRate >= 50 && errorRate < 15) {
+      analysis.efficiency = 'acceptable';
+    } else {
+      analysis.efficiency = 'poor';
+    }
+
+    // 推奨事項の生成
+    if (hitRate < 70) {
+      analysis.recommendations.push({
+        priority: 'high',
+        action: 'キャッシュヒット率向上',
+        details: 'TTL設定の見直し、メモ化の活用、キャッシュキー設計の最適化を検討してください。'
+      });
+    }
+
+    if (errorRate > 10) {
+      analysis.recommendations.push({
+        priority: 'medium',
+        action: 'エラー率削減',
+        details: 'キャッシュアクセスエラーの原因調査とエラーハンドリングの改善が必要です。'
+      });
+    }
+
+    if (health.memoCacheSize > 1000) {
+      analysis.recommendations.push({
+        priority: 'low',
+        action: 'メモリ使用量最適化',
+        details: 'メモ化キャッシュサイズが大きくなっています。定期的なクリアを検討してください。'
+      });
+    }
+
+    // 最適化機会の特定
+    if (totalOps > 100 && hitRate < 80) {
+      analysis.optimizationOpportunities.push('プリウォーミング戦略の導入');
+    }
+
+    if (errorRate < 5 && hitRate > 60) {
+      analysis.optimizationOpportunities.push('TTL延長によるさらなる高速化');
+    }
+
+    debugLog('[Cache] Efficiency analysis completed:', analysis.efficiency);
+    return analysis;
+
+  } catch (error) {
+    console.error('analyzeCacheEfficiency error:', error);
+    return {
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      efficiency: 'error',
+      recommendations: [{
+        priority: 'high',
+        action: '分析エラー対応',
+        details: 'キャッシュ分析中にエラーが発生しました。システムの状態を確認してください。'
+      }]
+    };
+  }
+}
+

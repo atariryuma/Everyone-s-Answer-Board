@@ -119,3 +119,59 @@ function getServiceAccountEmail() {
     return 'サービスアカウント設定エラー';
   }
 }
+
+/**
+ * 指定されたuserIdと現在ログイン中のユーザーのメールアドレスが一致し、
+ * かつアクティブな管理者権限を持っているかを確認します。
+ * @param {string} userId - URLパラメータから受け取ったユーザーID
+ * @returns {boolean} 検証に成功した場合は true、それ以外は false
+ */
+function verifyAdminAccess(userId) {
+  try {
+    // 引数チェック
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      console.warn('verifyAdminAccess: 無効なuserIdが渡されました:', userId);
+      return false;
+    }
+
+    // 現在操作しているGoogleアカウントのメールアドレスを取得
+    var activeUserEmail = Session.getActiveUser().getEmail();
+    if (!activeUserEmail) {
+      console.warn('verifyAdminAccess: アクティブユーザーのメールアドレスが取得できませんでした');
+      return false;
+    }
+
+    // データベースから指定されたIDのユーザー情報を取得（キャッシュ活用）
+    var userFromDb = cacheManager.get(
+      'user_' + userId,
+      function() { return findUserById(userId); },
+      { ttl: 300, enableMemoization: true }
+    );
+
+    if (!userFromDb) {
+      console.warn('verifyAdminAccess: 指定されたIDのユーザーが存在しません。ID:', userId);
+      return false;
+    }
+
+    // データベースのメールアドレスと、現在ログイン中のメールアドレスを比較
+    var isEmailMatched = userFromDb.adminEmail && 
+                        userFromDb.adminEmail.toLowerCase() === activeUserEmail.toLowerCase();
+    
+    // ユーザーがアクティブであるかを確認
+    var isActive = userFromDb.isActive === true || String(userFromDb.isActive).toLowerCase() === 'true';
+
+    if (isEmailMatched && isActive) {
+      console.log('✅ 管理者本人によるアクセスを確認しました:', activeUserEmail, 'UserID:', userId);
+      return true; // メールが一致し、かつアクティブであれば成功
+    } else {
+      console.warn('⚠️ 不正なアクセス試行をブロックしました。' +
+                  'DB Email: ' + userFromDb.adminEmail + 
+                  ', Active Email: ' + activeUserEmail + 
+                  ', Is Active: ' + isActive);
+      return false; // 一致しない、またはアクティブでない場合は失敗
+    }
+  } catch (e) {
+    console.error('verifyAdminAccess: 管理者検証中にエラーが発生しました:', e.message);
+    return false;
+  }
+}

@@ -59,43 +59,29 @@
       });
     };
 
-    // 既存のgetExistingBoard()関数を使用 - 安定動作していた実装
-    const fetchBoard = () => {
-      return new Promise((resolve, reject) => {
-        google.script.run
-          .withSuccessHandler(resolve)
-          .withFailureHandler(reject)
-          .getExistingBoard();
-      });
-    };
 
-    // バックエンドの安定した関数を使用してユーザー登録
-    const registerUser = () => {
+    // 統合されたログインフロー処理 - 1回のAPI呼び出しで完了
+    const processUnifiedLogin = () => {
       return new Promise((resolve, reject) => {
-        // getCurrentUserStatus()でユーザーメール取得
         google.script.run
           .withSuccessHandler(response => {
-            if (response && response.status === 'success' && response.userInfo && response.userInfo.adminEmail) {
-              const currentUserEmail = response.userInfo.adminEmail;
+            if (response && response.status && response.adminUrl) {
+              // 成功時のメッセージを状態に応じて決定
+              let message = 'ログインが完了しました';
+              if (response.status === 'new_user') {
+                message = '新規ユーザー登録が完了しました';
+              } else if (response.status === 'setup_required') {
+                message = 'セットアップを完了してください';
+              }
               
-              // 既存のregisterNewUser()関数を呼び出し
-              google.script.run
-                .withSuccessHandler(res => {
-                  if (res && res.adminUrl) {
-                    showAdminPanelRedirect(res.adminUrl, '新規ユーザー登録が完了しました');
-                    resolve();
-                  } else {
-                    reject(new Error('registration failed'));
-                  }
-                })
-                .withFailureHandler(reject)
-                .registerNewUser(currentUserEmail);
+              showAdminPanelRedirect(response.adminUrl, message);
+              resolve();
             } else {
-              reject(new Error('ユーザーメールアドレスを取得できません'));
+              reject(new Error(response.message || 'ログイン処理に失敗しました'));
             }
           })
           .withFailureHandler(reject)
-          .getCurrentUserStatus();
+          .processLoginFlow();
       });
     };
 
@@ -103,8 +89,9 @@
     const displayCurrentUserEmail = () => {
       google.script.run
         .withSuccessHandler(response => {
-          if (response && response.status === 'success' && response.userInfo && response.userInfo.adminEmail) {
-            userEmailDisplay.textContent = response.userInfo.adminEmail;
+          // Session.getActiveUser().getEmail() の結果を直接表示
+          if (response) {
+            userEmailDisplay.textContent = response;
           } else {
             userEmailDisplay.textContent = 'ユーザー情報を取得中...';
             console.warn('User email not found in response:', response);
@@ -114,7 +101,7 @@
           console.warn('User email display failed:', error);
           userEmailDisplay.textContent = 'ユーザー情報取得エラー';
         })
-        .getCurrentUserStatus();
+        .getCurrentUserEmail();
     };
 
     // GAS内蔵認証を使用した簡易ログイン処理
@@ -126,17 +113,15 @@
         google.script.run
           .withSuccessHandler(() => {
             console.log('URL system reset completed');
-            // バックエンドのgetExistingBoard()が返す3つの状態を処理
-            fetchBoard()
-              .then(handleFetchBoardResponse)
-              .catch(handleFetchBoardError);
+            // 統合されたログインフローを実行
+            processUnifiedLogin()
+              .catch(handleLoginError);
           })
           .withFailureHandler((error) => {
             console.warn('URL system reset failed:', error);
             // リセットに失敗してもログイン処理は続行
-            fetchBoard()
-              .then(handleFetchBoardResponse)
-              .catch(handleFetchBoardError);
+            processUnifiedLogin()
+              .catch(handleLoginError);
           })
           .forceUrlSystemReset();
       } catch (err) {
@@ -146,44 +131,10 @@
       }
     };
 
-    // fetchBoard の結果を処理する関数
-    const handleFetchBoardResponse = (res) => {
-      try {
-        if (!res || typeof res !== 'object') {
-          throw new Error('無効なレスポンスを受信しました');
-        }
-        
-        if (res.status === 'existing_user') {
-          // 既存ユーザー: 管理画面リダイレクト画面を表示
-          if (res.adminUrl) {
-            showAdminPanelRedirect(res.adminUrl, 'ログインが完了しました');
-          } else {
-            throw new Error('管理画面URLが見つかりません');
-          }
-        } else if (res.status === 'setup_required') {
-          // セットアップ必要: 管理画面リダイレクト画面を表示
-          if (res.adminUrl) {
-            showAdminPanelRedirect(res.adminUrl, 'セットアップを完了してください');
-          } else {
-            throw new Error('管理画面URLが見つかりません');
-          }
-        } else if (res.status === 'new_user') {
-          // 新規ユーザー: 登録処理実行
-          return registerUser();
-        } else {
-          throw new Error(res.message || `未知のステータス: ${res.status}`);
-        }
-      } catch (innerErr) {
-        console.error('Response handling error:', innerErr);
-        userEmailDisplay.textContent = innerErr.message || 'レスポンス処理エラー';
-        setLoading(false);
-      }
-    };
-
-    // fetchBoard のエラーを処理する関数
-    const handleFetchBoardError = (err) => {
-      console.error('Backend error:', err);
-      userEmailDisplay.textContent = 'サーバーエラーが発生しました';
+    // ログインエラーを処理する関数
+    const handleLoginError = (err) => {
+      console.error('Login error:', err);
+      userEmailDisplay.textContent = err.message || 'ログイン処理エラーが発生しました';
       setLoading(false);
     };
 
