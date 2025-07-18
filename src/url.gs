@@ -111,6 +111,70 @@ function getFallbackUrl() {
 }
 
 /**
+ * URLキャッシュをクリアして再初期化
+ */
+function clearUrlCache() {
+  try {
+    var cache = CacheService.getScriptCache();
+    cache.remove(URL_CACHE_KEY);
+    console.log('URL cache cleared successfully');
+    
+    // 新しいURLを即座に生成してキャッシュ
+    var newUrl = computeWebAppUrl();
+    if (newUrl && !newUrl.includes('googleusercontent.com') && !newUrl.includes('userCodeAppPanel')) {
+      cache.put(URL_CACHE_KEY, newUrl, URL_CACHE_TTL);
+      console.log('New URL cached:', newUrl);
+    }
+    
+    return newUrl;
+  } catch (e) {
+    console.error('clearUrlCache error:', e.message);
+    return getFallbackUrl();
+  }
+}
+
+/**
+ * 強制的にURLシステムをリセット（公開API）
+ * フロントエンドから呼び出し可能
+ */
+function forceUrlSystemReset() {
+  try {
+    console.log('Forcing URL system reset...');
+    
+    // 全てのURLキャッシュをクリア
+    var cache = CacheService.getScriptCache();
+    cache.remove(URL_CACHE_KEY);
+    
+    // 新しいURLを生成
+    var newUrl = computeWebAppUrl();
+    console.log('New URL generated:', newUrl);
+    
+    // 開発URLチェック
+    if (newUrl && (newUrl.includes('googleusercontent.com') || newUrl.includes('userCodeAppPanel'))) {
+      console.warn('Development URL detected, using fallback');
+      newUrl = getFallbackUrl();
+    }
+    
+    // 新しいURLをキャッシュ
+    if (newUrl) {
+      cache.put(URL_CACHE_KEY, newUrl, URL_CACHE_TTL);
+    }
+    
+    return {
+      status: 'success',
+      message: 'URLシステムがリセットされました',
+      newUrl: newUrl
+    };
+  } catch (e) {
+    console.error('forceUrlSystemReset error:', e.message);
+    return {
+      status: 'error',
+      message: 'URLシステムリセットに失敗しました: ' + e.message
+    };
+  }
+}
+
+/**
  * アプリケーション用のURL群を生成
  * @param {string} userId - ユーザーID
  * @returns {object} URL群
@@ -139,17 +203,24 @@ function generateAppUrls(userId) {
         console.warn('無効なURLが返されました（試行 ' + (i + 1) + '/' + maxRetries + '）: ' + webAppUrl);
         
         // キャッシュをクリアして再取得
-        var cache = CacheService.getScriptCache();
-        cache.remove(URL_CACHE_KEY);
+        webAppUrl = clearUrlCache();
         
         if (i < maxRetries - 1) {
+          // 再試行
           webAppUrl = computeWebAppUrl();
         } else {
+          // 最後の試行でもダメな場合はフォールバック
           webAppUrl = getFallbackUrl();
         }
       } else {
         break;
       }
+    }
+    
+    // 最終チェック: まだ開発URLが含まれている場合は強制的にフォールバック
+    if (webAppUrl && (webAppUrl.includes('googleusercontent.com') || webAppUrl.includes('userCodeAppPanel'))) {
+      console.error('開発URLが最終チェックで検出されました。フォールバックURLを使用します: ' + webAppUrl);
+      webAppUrl = getFallbackUrl();
     }
     
     if (!webAppUrl) {

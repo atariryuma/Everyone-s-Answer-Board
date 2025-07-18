@@ -214,7 +214,9 @@ function getDeployUserDomainInfo() {
   try {
     var activeUserEmail = Session.getActiveUser().getEmail();
     var currentDomain = getEmailDomain(activeUserEmail);
-    var webAppUrl = ScriptApp.getService().getUrl();
+    
+    // 統一されたURL取得システムを使用（開発URL除去機能付き）
+    var webAppUrl = getWebAppUrlCached();
     var deployDomain = ''; // 個人アカウント/グローバルアクセスの場合、デフォルトで空
 
     if (webAppUrl) {

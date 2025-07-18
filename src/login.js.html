@@ -118,51 +118,71 @@
       try {
         setLoading(true, 'ユーザー情報確認中…');
         
-        // バックエンドのgetExistingBoard()が返す3つの状態を処理
-        fetchBoard()
-          .then(res => {
-            try {
-              if (!res || typeof res !== 'object') {
-                throw new Error('無効なレスポンスを受信しました');
-              }
-              
-              if (res.status === 'existing_user') {
-                // 既存ユーザー: 直接管理画面へ
-                if (res.adminUrl) {
-                  window.location.href = res.adminUrl;
-                } else {
-                  throw new Error('管理画面URLが見つかりません');
-                }
-              } else if (res.status === 'setup_required') {
-                // セットアップ必要: アプリ設定画面へ
-                if (res.adminUrl) {
-                  window.location.href = res.adminUrl;
-                } else {
-                  throw new Error('管理画面URLが見つかりません');
-                }
-              } else if (res.status === 'new_user') {
-                // 新規ユーザー: 登録処理実行
-                return registerUser();
-              } else {
-                throw new Error(res.message || `未知のステータス: ${res.status}`);
-              }
-            } catch (innerErr) {
-              console.error('Response handling error:', innerErr);
-              userEmailDisplay.textContent = innerErr.message || 'レスポンス処理エラー';
-              setLoading(false);
-            }
+        // URL システムのリセットを事前に実行
+        google.script.run
+          .withSuccessHandler(() => {
+            console.log('URL system reset completed');
+            // バックエンドのgetExistingBoard()が返す3つの状態を処理
+            fetchBoard()
+              .then(handleFetchBoardResponse)
+              .catch(handleFetchBoardError);
           })
-          .catch(err => {
-            console.error('Backend error:', err);
-            userEmailDisplay.textContent = 'サーバーエラーが発生しました';
-            setLoading(false);
-          });
+          .withFailureHandler((error) => {
+            console.warn('URL system reset failed:', error);
+            // リセットに失敗してもログイン処理は続行
+            fetchBoard()
+              .then(handleFetchBoardResponse)
+              .catch(handleFetchBoardError);
+          })
+          .forceUrlSystemReset();
       } catch (err) {
         console.error('Login function error:', err);
         userEmailDisplay.textContent = 'ログイン処理エラー';
         setLoading(false);
       }
     };
+
+    // fetchBoard の結果を処理する関数
+    const handleFetchBoardResponse = (res) => {
+      try {
+        if (!res || typeof res !== 'object') {
+          throw new Error('無効なレスポンスを受信しました');
+        }
+        
+        if (res.status === 'existing_user') {
+          // 既存ユーザー: 直接管理画面へ
+          if (res.adminUrl) {
+            window.location.href = res.adminUrl;
+          } else {
+            throw new Error('管理画面URLが見つかりません');
+          }
+        } else if (res.status === 'setup_required') {
+          // セットアップ必要: アプリ設定画面へ
+          if (res.adminUrl) {
+            window.location.href = res.adminUrl;
+          } else {
+            throw new Error('管理画面URLが見つかりません');
+          }
+        } else if (res.status === 'new_user') {
+          // 新規ユーザー: 登録処理実行
+          return registerUser();
+        } else {
+          throw new Error(res.message || `未知のステータス: ${res.status}`);
+        }
+      } catch (innerErr) {
+        console.error('Response handling error:', innerErr);
+        userEmailDisplay.textContent = innerErr.message || 'レスポンス処理エラー';
+        setLoading(false);
+      }
+    };
+
+    // fetchBoard のエラーを処理する関数
+    const handleFetchBoardError = (err) => {
+      console.error('Backend error:', err);
+      userEmailDisplay.textContent = 'サーバーエラーが発生しました';
+      setLoading(false);
+    };
+
 
     // 初期化処理 - 組織ポリシー制限を回避するため簡易認証を使用
     const init = () => {
