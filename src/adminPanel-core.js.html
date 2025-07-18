@@ -213,12 +213,57 @@ function setLoading(flag, text = '') {
 }
 
 // =============================================================================
+// URL NAVIGATION UTILITIES
+// =============================================================================
+
+// Initialize navigation from URL parameters
+function initializeFromUrl() {
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const step = parseInt(urlParams.get('step')) || 1;
+    
+    // Validate step range
+    if (step >= 1 && step <= 3) {
+      console.log('Initializing from URL step:', step);
+      if (typeof navigateToStep === 'function') {
+        // Navigate without updating URL (prevent duplicate history entry)
+        currentStep = step;
+        navigateToStep(step);
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to initialize from URL:', error);
+  }
+}
+
+// Handle browser back/forward navigation
+function handlePopState(event) {
+  if (event.state && event.state.step) {
+    console.log('Navigating to step from browser history:', event.state.step);
+    if (typeof navigateToStep === 'function') {
+      navigateToStep(event.state.step);
+    }
+  } else {
+    // If no state, read from URL
+    initializeFromUrl();
+  }
+}
+
+// =============================================================================
 // INITIALIZATION
 // =============================================================================
 
 // Initialize layout on load
 document.addEventListener('DOMContentLoaded', function() {
   adjustLayout();
+  
+  // Initialize URL-based navigation
+  setTimeout(function() {
+    initializeFromUrl();
+    
+    // Set up browser navigation handling
+    window.addEventListener('popstate', handlePopState);
+  }, 100);
 });
 
 // Update layout on resize

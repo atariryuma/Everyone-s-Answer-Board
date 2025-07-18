@@ -156,6 +156,9 @@
   function navigateToStep(step) {
     currentStep = step;
     
+    // Update URL with current step
+    updateUrlForStep(step);
+    
     // Update step indicators
     document.querySelectorAll('.step-indicator').forEach((indicator, index) => {
       const stepNumber = index + 1;
@@ -176,6 +179,21 @@
     }
     
     validateCurrentStep();
+  }
+  
+  // Update URL with step parameter
+  function updateUrlForStep(step) {
+    try {
+      const url = new URL(window.location);
+      url.searchParams.set('step', step);
+      
+      // Update browser history without reloading
+      window.history.pushState({ step: step }, '', url.toString());
+      
+      console.log('URL updated for step:', step);
+    } catch (error) {
+      console.warn('Failed to update URL:', error);
+    }
   }
   
   // Validate current step

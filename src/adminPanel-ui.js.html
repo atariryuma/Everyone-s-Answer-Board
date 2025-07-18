@@ -414,6 +414,46 @@ function updateGuidanceForStep(step, guidanceElement) {
 }
 
 // =============================================================================
+// SECTION TOGGLE FUNCTIONALITY
+// =============================================================================
+
+// Toggle section expansion/collapse
+function toggleSection(sectionId) {
+  const section = document.getElementById(sectionId);
+  if (!section) {
+    console.warn('Section not found:', sectionId);
+    return;
+  }
+  
+  // Find the toggle button for this section
+  const toggleBtn = document.querySelector(`[onclick*="${sectionId}"]`);
+  const arrow = toggleBtn ? toggleBtn.querySelector('.fa-chevron-down, .fa-chevron-up') : null;
+  
+  // Toggle the section visibility
+  if (section.classList.contains('hidden')) {
+    // Show section
+    section.classList.remove('hidden');
+    if (toggleBtn) {
+      toggleBtn.setAttribute('aria-expanded', 'true');
+    }
+    if (arrow) {
+      arrow.classList.remove('fa-chevron-up');
+      arrow.classList.add('fa-chevron-down');
+    }
+  } else {
+    // Hide section
+    section.classList.add('hidden');
+    if (toggleBtn) {
+      toggleBtn.setAttribute('aria-expanded', 'false');
+    }
+    if (arrow) {
+      arrow.classList.remove('fa-chevron-down');
+      arrow.classList.add('fa-chevron-up');
+    }
+  }
+}
+
+// =============================================================================
 // MODAL MANAGEMENT
 // =============================================================================
 
