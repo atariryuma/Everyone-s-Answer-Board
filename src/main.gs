@@ -408,9 +408,13 @@ function getSystemDomainInfo() {
  */
 function doGet(e) {
   try {
+    console.log('doGet - Raw request object:', JSON.stringify(e));
+    
     // パラメータとユーザー情報を取得
     const params = parseRequestParams(e);
     const userEmail = Session.getActiveUser().getEmail();
+    
+    console.log('doGet - User email:', userEmail);
 
     // リクエストをルーティング
     return routeRequest(params, userEmail);
@@ -427,23 +431,30 @@ function doGet(e) {
  * @returns {HtmlOutput}
  */
 function routeRequest(params, userEmail) {
+  // デバッグログを追加
+  console.log('routeRequest - params:', JSON.stringify(params), 'userEmail:', userEmail);
+  
   // 1. システムセットアップが最優先
   if (!isSystemSetup()) {
+    console.log('routeRequest - System not setup, showing setup page');
     return showSetupPage();
   }
 
   // 2. パラメータなしのルートアクセスは常にログインページを表示
   if (!params.mode) {
+    console.log('routeRequest - No mode parameter, showing login page');
     return showLoginPage();
   }
 
   // 3. ログインしていないユーザーはログインページへ（パラメータがあっても）
   if (!userEmail) {
+    console.log('routeRequest - No user email, showing login page');
     return showLoginPage();
   }
 
   // 4. ユーザー情報を取得（キャッシュ活用）
   const userInfo = getUserInfo(userEmail, params.userId);
+  console.log('routeRequest - userInfo found:', !!userInfo, 'for email:', userEmail);
 
   // 5. ユーザー情報がない場合は、どのモードであってもログインページを表示
   if (!userInfo) {
@@ -452,18 +463,27 @@ function routeRequest(params, userEmail) {
   }
 
   // 6. ルーティング決定
+  console.log('routeRequest - Routing to mode:', params.mode);
   switch (params.mode) {
     case 'admin':
+      console.log('routeRequest - Admin mode accessed');
       return handleAdminRoute(userInfo, params, userEmail);
     case 'view':
+      console.log('routeRequest - View mode accessed');
       return renderAnswerBoard(userInfo, params);
     case 'appsetup':
+      console.log('appsetup mode - setupParam:', params.setupParam, 'hasSetupPageAccess:', hasSetupPageAccess());
       if (params.setupParam === 'true' && hasSetupPageAccess()) {
         return showAppSetupPage();
       }
-      return showErrorPage('アクセス拒否', 'このページにアクセスする権限がありません。');
+      // setup パラメータがない場合やアクセス権限がない場合のエラー
+      const errorMsg = params.setupParam !== 'true' 
+        ? 'setup=true パラメータが必要です。'
+        : 'このページにアクセスする権限がありません。';
+      return showErrorPage('アクセス拒否', errorMsg);
     default:
       // 不明なモードの場合はログインページへ
+      console.log('routeRequest - Unknown mode, showing login page');
       return showLoginPage();
   }
 }
@@ -696,10 +716,15 @@ function parseRequestParams(e) {
   const p = (e && e.parameter) || {};
   const mode = p.mode || null; // デフォルトを'admin'からnullに変更し、パラメータの有無を明確化
   const userId = p.userId || null;
-  const setupParam = p.setup || null;
+  const setupParam = p.setup || null; // setup パラメータを正しく取得
   const spreadsheetId = p.spreadsheetId || null;
   const sheetName = p.sheetName || null;
   const isDirectPageAccess = !!(userId && mode === 'view');
+  
+  // デバッグログを追加
+  console.log('parseRequestParams - Received parameters:', JSON.stringify(p));
+  console.log('parseRequestParams - Parsed mode:', mode, 'setupParam:', setupParam);
+  
   return { mode, userId, setupParam, spreadsheetId, sheetName, isDirectPageAccess };
 }
 
