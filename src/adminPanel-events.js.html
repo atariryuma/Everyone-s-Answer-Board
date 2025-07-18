@@ -482,8 +482,13 @@ function manageFocusForModal(modalId, show) {
 // =============================================================================
 
 // Initialize event listeners when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-  // Small delay to ensure all elements are rendered
+if (document.readyState !== 'loading') {
   setTimeout(setupEventListeners, 100);
-});
+} else {
+  document.addEventListener('DOMContentLoaded', function() {
+    // Small delay to ensure all elements are rendered
+    setTimeout(setupEventListeners, 100);
+  });
+}
+
 </script>

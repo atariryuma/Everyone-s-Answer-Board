@@ -254,17 +254,23 @@ function handlePopState(event) {
 // =============================================================================
 
 // Initialize layout on load
-document.addEventListener('DOMContentLoaded', function() {
+function initCore() {
   adjustLayout();
-  
+
   // Initialize URL-based navigation
   setTimeout(function() {
     initializeFromUrl();
-    
+
     // Set up browser navigation handling
     window.addEventListener('popstate', handlePopState);
   }, 100);
-});
+}
+
+if (document.readyState !== 'loading') {
+  initCore();
+} else {
+  document.addEventListener('DOMContentLoaded', initCore);
+}
 
 // Update layout on resize
 window.addEventListener('resize', debounce(adjustLayout, 250, 'layout-resize'));

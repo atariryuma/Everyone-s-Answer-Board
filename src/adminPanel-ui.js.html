@@ -710,7 +710,11 @@ function loadDataPreview(sheetName) {
 }
 
 // Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
+if (document.readyState !== 'loading') {
   setTimeout(initializeUI, 300);
-});
+} else {
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(initializeUI, 300);
+  });
+}
 </script>
