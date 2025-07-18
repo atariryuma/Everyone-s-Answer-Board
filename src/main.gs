@@ -20,13 +20,27 @@ function include(path) {
 }
 
 /**
- * JavaScript文字列エスケープ関数
+ * JavaScript文字列エスケープ関数 (URL対応版)
  * @param {string} str エスケープする文字列
  * @return {string} エスケープされた文字列
  */
 function escapeJavaScript(str) {
   if (!str) return '';
-  return str.toString()
+  
+  const strValue = str.toString();
+  
+  // URL判定: HTTP/HTTPSで始まり、すでに適切にエスケープされている場合は最小限の処理
+  if (strValue.match(/^https?:\/\/[^\s<>"']+$/)) {
+    // URLの場合はバックスラッシュと改行文字のみエスケープ
+    return strValue
+      .replace(/\\/g, '\\\\')
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r')
+      .replace(/\t/g, '\\t');
+  }
+  
+  // 通常のテキストの場合は従来通りの完全エスケープ
+  return strValue
     .replace(/\\/g, '\\\\')
     .replace(/'/g, "\\'")
     .replace(/"/g, '\\"')
@@ -605,22 +619,45 @@ function sanitizeRedirectUrl(url) {
   }
   
   try {
-    // 先頭と末尾のクォートを除去
     let cleanUrl = String(url).trim();
-    if ((cleanUrl.startsWith('"') && cleanUrl.endsWith('"')) ||
-        (cleanUrl.startsWith("'") && cleanUrl.endsWith("'"))) {
-      cleanUrl = cleanUrl.slice(1, -1);
+    
+    // 複数レベルのクォート除去（JSON文字列化による多重クォートに対応）
+    let previousUrl = '';
+    while (cleanUrl !== previousUrl) {
+      previousUrl = cleanUrl;
+      
+      // 先頭と末尾のクォートを除去
+      if ((cleanUrl.startsWith('"') && cleanUrl.endsWith('"')) ||
+          (cleanUrl.startsWith("'") && cleanUrl.endsWith("'"))) {
+        cleanUrl = cleanUrl.slice(1, -1);
+      }
+      
+      // エスケープされたクォートを除去
+      cleanUrl = cleanUrl.replace(/\\"/g, '"').replace(/\\'/g, "'");
+      
+      // URL内に埋め込まれた別のURLを検出
+      const embeddedUrlMatch = cleanUrl.match(/https?:\/\/[^\s<>"']+/);
+      if (embeddedUrlMatch && embeddedUrlMatch[0] !== cleanUrl) {
+        console.log('Extracting embedded URL:', embeddedUrlMatch[0]);
+        cleanUrl = embeddedUrlMatch[0];
+      }
     }
     
     // 基本的なURL形式チェック
-    if (!cleanUrl.match(/^https?:\/\//)) {
-      console.warn('Invalid URL format:', cleanUrl);
+    if (!cleanUrl.match(/^https?:\/\/[^\s<>"']+$/)) {
+      console.warn('Invalid URL format after sanitization:', cleanUrl);
       return getWebAppUrlCached();
     }
     
     // 開発モードURLのチェック
     if (cleanUrl.includes('googleusercontent.com') || cleanUrl.includes('userCodeAppPanel')) {
       console.warn('Development URL detected in redirect, using fallback:', cleanUrl);
+      return getWebAppUrlCached();
+    }
+    
+    // 最終的な URL 妥当性チェック
+    if (!cleanUrl.includes('script.google.com') && !cleanUrl.includes('localhost')) {
+      console.warn('Suspicious URL detected:', cleanUrl);
       return getWebAppUrlCached();
     }
     

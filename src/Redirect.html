@@ -21,22 +21,51 @@
     <p class="small">自動的にリダイレクトされない場合は上のリンクをクリックしてください。</p>
   </div>
   <script>
-    // Safe URL variable with proper escaping
+    // Safe URL variable with robust handling
     var safeTargetUrl = '<?= escapeJavaScript(targetUrl) ?>';
+    
+    // URL validation and cleanup
+    function validateAndCleanUrl(url) {
+      if (!url) return '';
+      
+      // Remove any quotes that might have been added
+      var cleanUrl = url.replace(/^["']|["']$/g, '');
+      
+      // Basic URL validation
+      if (cleanUrl.match(/^https?:\/\/[^\s<>"']+$/)) {
+        return cleanUrl;
+      }
+      
+      console.warn('Invalid URL format:', cleanUrl);
+      return '';
+    }
     
     function handleRedirectClick(event) {
       event.preventDefault();
+      var finalUrl = validateAndCleanUrl(safeTargetUrl);
+      if (!finalUrl) {
+        console.error('Invalid redirect URL');
+        return;
+      }
+      
       try {
-        window.top.location.href = safeTargetUrl;
+        window.top.location.href = finalUrl;
       } catch(e) {
-        window.location.href = safeTargetUrl;
+        window.location.href = finalUrl;
       }
     }
+    
     setTimeout(function() {
+      var finalUrl = validateAndCleanUrl(safeTargetUrl);
+      if (!finalUrl) {
+        console.error('Invalid redirect URL for auto-redirect');
+        return;
+      }
+      
       try {
-        window.top.location.href = safeTargetUrl;
+        window.top.location.href = finalUrl;
       } catch(e) {
-        window.location.href = safeTargetUrl;
+        window.location.href = finalUrl;
       }
     }, 2000);
   </script>
