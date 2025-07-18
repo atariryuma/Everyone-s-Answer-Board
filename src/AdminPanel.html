@@ -54,86 +54,79 @@
   <!-- Admin Panel Specific Styles -->
   <?!= include('adminPanel.css'); ?>
   
-  <!-- ClientOptimizer の統合 -->
+  <!-- Core JavaScript Libraries (must be loaded first) -->
   <?!= include('ClientOptimizer'); ?>
   <?!= include('UnifiedCache.js'); ?>
   
   <script>
-  if (typeof GASOptimizer !== 'undefined') {
-    if (typeof setTimeout === 'undefined') {
-      function setTimeout(fn){ fn(); return 0; }
-    }
-    if (typeof clearTimeout === 'undefined') {
-      function clearTimeout(){ }
-    }
-    // グローバルエラーハンドリング
-    window.addEventListener('error', function(event) {
-      console.error('Global error caught:', event.error);
-      if (event.error && event.error.message && event.error.message.includes('document.write')) {
-        console.warn('document.write エラーが検出されました。安全なDOM操作に切り替えています。');
-        event.preventDefault();
-      }
-    });
-    
-    // Promise rejection のキャッチ
-    window.addEventListener('unhandledrejection', function(event) {
-      console.error('Unhandled promise rejection:', event.reason);
+  // GASOptimizer and UnifiedCache are now guaranteed to be defined
+  // グローバルエラーハンドリング
+  window.addEventListener('error', function(event) {
+    console.error('Global error caught:', event.error);
+    if (event.error && event.error.message && event.error.message.includes('document.write')) {
+      console.warn('document.write エラーが検出されました。安全なDOM操作に切り替えています。');
       event.preventDefault();
-    });
+    }
+  });
+  
+  // Promise rejection のキャッチ
+  window.addEventListener('unhandledrejection', function(event) {
+    console.error('Unhandled promise rejection:', event.reason);
+    event.preventDefault();
+  });
 
-    // GASOptimizer インスタンスの初期化
-    var gasOptimizer = new GASOptimizer();
-    
-    // UnifiedCache インスタンスの初期化
-    var unifiedCache = (typeof UnifiedCache !== 'undefined')
-      ? new UnifiedCache()
-      : { getOrSet: function(_, fn) { return fn(); } };
-    
-    // runGas ラッパー関数 - キャッシュ対応
-    function runGas(functionName, ...args) {
-      return gasOptimizer.call(functionName, ...args);
-    }
-    
-    // マルチテナント対応: 新しいrunGasWithUserId関数
-    function runGasWithUserId(functionName, ...args) {
-      // userIdが設定されていない場合は初期化を待つ
-      if (!userId) {
-        return userIdPromise.then(() => {
-          if (!userId) {
-            console.error('❌  - No userId available for:', functionName);
-            throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
-          }
-          
-          console.log('✅  - runGasWithUserId (after init):', functionName, 'userId:', userId);
-          // userIdを第一引数として追加
-          return gasOptimizer.call(functionName, userId, ...args);
-        });
-      }
-      
-      console.log('✅  - runGasWithUserId:', functionName, 'userId:', userId);
-      // userIdを第一引数として追加
-      return gasOptimizer.call(functionName, userId, ...args);
-    }
-    
-    // callWithCache 関数 - 読み取り専用操作用
-    function callWithCache(functionName, cacheKey, ttl, ...args) {
-      return unifiedCache.getOrSet(cacheKey, function() {
-        return gasOptimizer.call(functionName, ...args);
-      }, ttl);
-    }
-    
-    // マルチテナント対応: callWithCacheWithUserId関数
-    function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
-      if (!userId) {
-        console.error('❌  - No userId available for cached call:', functionName);
-        throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
-      }
-      
-      return unifiedCache.getOrSet(cacheKey, function() {
-        console.log('✅  - callWithCacheWithUserId:', functionName, 'userId:', userId);
+  // GASOptimizer インスタンスの初期化
+  var gasOptimizer = new GASOptimizer();
+  
+  // UnifiedCache インスタンスの初期化
+  var unifiedCache = (typeof UnifiedCache !== 'undefined')
+    ? new UnifiedCache()
+    : { getOrSet: function(_, fn) { return fn(); } };
+  
+  // runGas ラッパー関数 - キャッシュ対応
+  function runGas(functionName, ...args) {
+    return gasOptimizer.call(functionName, ...args);
+  }
+  
+  // マルチテナント対応: 新しいrunGasWithUserId関数
+  function runGasWithUserId(functionName, ...args) {
+    // userIdが設定されていない場合は初期化を待つ
+    if (!userId) {
+      return userIdPromise.then(() => {
+        if (!userId) {
+          console.error('❌  - No userId available for:', functionName);
+          throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
+        }
+        
+        console.log('✅  - runGasWithUserId (after init):', functionName, 'userId:', userId);
+        // userIdを第一引数として追加
         return gasOptimizer.call(functionName, userId, ...args);
-      }, ttl);
+      });
     }
+    
+    console.log('✅  - runGasWithUserId:', functionName, 'userId:', userId);
+    // userIdを第一引数として追加
+    return gasOptimizer.call(functionName, userId, ...args);
+  }
+  
+  // callWithCache 関数 - 読み取り専用操作用
+  function callWithCache(functionName, cacheKey, ttl, ...args) {
+    return unifiedCache.getOrSet(cacheKey, function() {
+      return gasOptimizer.call(functionName, ...args);
+    }, ttl);
+  }
+  
+  // マルチテナント対応: callWithCacheWithUserId関数
+  function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
+    if (!userId) {
+      console.error('❌  - No userId available for cached call:', functionName);
+      throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
+    }
+    
+    return unifiedCache.getOrSet(cacheKey, function() {
+      console.log('✅  - callWithCacheWithUserId:', functionName, 'userId:', userId);
+      return gasOptimizer.call(functionName, userId, ...args);
+    }, ttl);
   }
   </script>
   <script>
