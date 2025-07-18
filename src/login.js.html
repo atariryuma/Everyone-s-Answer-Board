@@ -342,10 +342,11 @@
       // エラーが発生しても処理を続行
     }
     
-    // リダイレクト画面のHTML (ログイン画面のスタイルと統一)
+    // リダイレクト画面のHTML (ログイン画面のスタイルと統一、背景要素を含む)
     const redirectHTML = `
-      <div class="min-h-screen flex items-center justify-center p-4">
-        <div class="login-modal rounded-2xl p-8">
+      <div class="login-background">
+        <div class="min-h-screen flex items-center justify-center p-4">
+          <div class="login-modal rounded-2xl p-8">
           <!-- ヘッダー -->
           <div class="text-center mb-8">
             <div class="text-6xl mb-4">✅</div>
@@ -388,15 +389,46 @@
       </div>
     `;
     
-    // 既存のコンテンツを置き換え (エラーハンドリング付き)
+    // 既存のコンテンツを置き換え (画面中央表示のため既存要素を置換)
     try {
-      document.body.insertAdjacentHTML('beforeend', redirectHTML);
+      // 既存のlogin-background要素を探して置換
+      const loginBackground = document.querySelector('.login-background') || 
+                             document.querySelector('body > div:first-child') ||
+                             document.body;
+      
+      if (loginBackground && loginBackground !== document.body) {
+        // 既存要素を完全に置換
+        loginBackground.outerHTML = redirectHTML;
+      } else {
+        // フォールバック: body全体を置換
+        document.body.innerHTML = redirectHTML;
+      }
+      
+      // ページトップにスクロール
+      window.scrollTo(0, 0);
+      
       console.log('✅ リダイレクト画面を表示しました');
     } catch (error) {
       console.error('リダイレクト画面の表示に失敗:', error);
-      // フォールバック: シンプルなリダイレクト
-      if (confirm(`ログインが完了しました。管理パネルに移動しますか？\n\nURL: ${adminUrl}`)) {
-        window.location.href = adminUrl;
+      // フォールバック: 緊急時のシンプルなリダイレクト
+      try {
+        // まず自動リダイレクトを試行
+        const userChoice = confirm(`${message}\n\n管理パネルに移動しますか？\n\nURL: ${adminUrl}\n\n「OK」で移動、「キャンセル」でURLをコピー`);
+        
+        if (userChoice) {
+          window.location.href = adminUrl;
+        } else {
+          // URLをコピーする機能を提供
+          if (window.copyUrlToClipboard) {
+            window.copyUrlToClipboard(adminUrl);
+          } else {
+            // 最終手段: prompt表示
+            window.prompt('下記のURLをコピーして手動でアクセスしてください:', adminUrl);
+          }
+        }
+      } catch (fallbackError) {
+        console.error('フォールバック処理も失敗:', fallbackError);
+        alert(`画面表示に問題が発生しました。\n\n手動で下記URLにアクセスしてください:\n${adminUrl}`);
       }
       return;
     }
