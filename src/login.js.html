@@ -278,126 +278,203 @@
   // =============================================================================
   
   /**
-   * 管理パネルへのリダイレクト画面を表示
+   * 管理パネルへのリダイレクト画面を表示 (エラーハンドリング強化)
    * @param {string} adminUrl - 管理パネルのURL
    * @param {string} message - 表示メッセージ
    */
   function showAdminPanelRedirect(adminUrl, message) {
-    // ローディング画面を非表示
-    hideLoadingScreen();
-    
-    // メインコンテンツを非表示
-    const mainContent = document.querySelector('.auth-container');
-    if (mainContent) {
-      mainContent.style.display = 'none';
+    try {
+      // 引数の妥当性チェック
+      if (!adminUrl || typeof adminUrl !== 'string') {
+        console.error('showAdminPanelRedirect: 無効なadminUrlが渡されました:', adminUrl);
+        alert('管理パネルのURLが無効です。ページを再読み込みしてください。');
+        return;
+      }
+      
+      if (!message || typeof message !== 'string') {
+        message = 'ログインが完了しました'; // デフォルトメッセージ
+      }
+      
+      // ローディング状態を停止 (既存のsetLoading関数を使用)
+      if (typeof setLoading === 'function') {
+        setLoading(false);
+      } else {
+        console.warn('setLoading function not found, skipping loading state reset');
+      }
+      
+      // ログインモーダルを非表示 (実際の要素構造に合わせて修正)
+      const mainContent = document.querySelector('.login-modal');
+      if (mainContent) {
+        mainContent.style.display = 'none';
+      } else {
+        console.warn('login-modal element not found, proceeding with redirect display');
+      }
+    } catch (error) {
+      console.error('showAdminPanelRedirect initialization error:', error);
+      // エラーが発生しても処理を続行
     }
     
-    // リダイレクト画面のHTML
+    // リダイレクト画面のHTML (ログイン画面のスタイルと統一)
     const redirectHTML = `
-      <div class="redirect-container max-w-2xl mx-auto p-6 text-center">
-        <div class="glass-panel rounded-xl p-8 space-y-6">
-          <!-- 成功アイコン -->
-          <div class="text-6xl mb-4">✅</div>
-          
-          <!-- メッセージ -->
-          <h2 class="text-2xl font-bold text-white mb-4">${message}</h2>
-          <p class="text-gray-300 mb-6">管理パネルに移動してご利用ください</p>
+      <div class="min-h-screen flex items-center justify-center p-4">
+        <div class="login-modal rounded-2xl p-8">
+          <!-- ヘッダー -->
+          <div class="text-center mb-8">
+            <div class="text-6xl mb-4">✅</div>
+            <h1 class="text-3xl font-bold text-cyan-400 mb-2">${message}</h1>
+            <p class="text-lg text-gray-300">管理パネルに移動してご利用ください</p>
+          </div>
           
           <!-- URL表示 -->
-          <div class="bg-gray-800/50 border border-gray-600/30 rounded-lg p-4 mb-6">
-            <p class="text-sm text-gray-400 mb-2">管理パネルURL:</p>
-            <div class="text-cyan-400 font-mono text-sm break-all bg-gray-900/50 p-3 rounded border">
-              ${adminUrl}
+          <div class="glass-panel rounded-xl p-4 mb-6">
+            <h2 class="text-lg font-semibold text-white mb-4">🔗 管理パネルURL</h2>
+            <div class="bg-gray-800 p-3 rounded-lg">
+              <div class="text-cyan-400 font-mono text-sm break-all">
+                ${adminUrl}
+              </div>
             </div>
           </div>
           
-          <!-- 移動ボタン -->
+          <!-- アクション -->
           <div class="space-y-4">
             <button 
               onclick="window.location.href='${adminUrl}'"
-              class="btn bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white w-full font-semibold py-3 px-6 rounded-lg text-lg transition-all duration-200">
+              class="w-full btn bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white font-bold py-3 px-6 rounded-lg">
               🚀 管理パネルを開く
             </button>
             
-            <!-- URLコピーボタン -->
-            <button 
-              onclick="copyUrlToClipboard('${adminUrl}')"
-              class="btn bg-gray-600 hover:bg-gray-700 text-white w-full py-2 px-4 rounded-lg text-sm transition-colors">
-              📋 URLをコピー
-            </button>
+            <div class="text-center space-y-3">
+              <button 
+                onclick="copyUrlToClipboard('${adminUrl}')"
+                class="text-sm text-cyan-400 hover:text-cyan-300 underline">
+                📋 URLをコピー
+              </button>
+              <br>
+              <div class="text-xs text-gray-400 space-y-1">
+                <p>※ このURLをブックマークしておくと、次回から直接アクセスできます</p>
+                <p>※ セキュリティのため、URLは他人と共有しないでください</p>
+              </div>
+            </div>
           </div>
-          
-          <!-- 注意事項 -->
-          <div class="text-xs text-gray-400 mt-6 space-y-1">
-            <p>※ このURLをブックマークしておくと、次回から直接アクセスできます</p>
-            <p>※ セキュリティのため、URLは他人と共有しないでください</p>
-          </div>
-        </div>
-        
-        <!-- 自動リダイレクトのカウントダウン（オプション） -->
-        <div id="auto-redirect" class="text-center mt-4 text-gray-400 text-sm" style="display: none;">
-          <p>3秒後に自動的に移動します... <span id="countdown">3</span></p>
-          <button onclick="cancelAutoRedirect()" class="text-cyan-400 hover:text-cyan-300 underline ml-2">
-            キャンセル
-          </button>
         </div>
       </div>
     `;
     
-    // 既存のコンテンツを置き換え
-    document.body.insertAdjacentHTML('beforeend', redirectHTML);
+    // 既存のコンテンツを置き換え (エラーハンドリング付き)
+    try {
+      document.body.insertAdjacentHTML('beforeend', redirectHTML);
+      console.log('✅ リダイレクト画面を表示しました');
+    } catch (error) {
+      console.error('リダイレクト画面の表示に失敗:', error);
+      // フォールバック: シンプルなリダイレクト
+      if (confirm(`ログインが完了しました。管理パネルに移動しますか？\n\nURL: ${adminUrl}`)) {
+        window.location.href = adminUrl;
+      }
+      return;
+    }
     
     // オプション: 5秒後の自動リダイレクト（コメントアウト状態）
     // startAutoRedirect(adminUrl);
   }
   
   /**
-   * URLをクリップボードにコピー
+   * URLをクリップボードにコピー (エラーハンドリング強化)
    * @param {string} url - コピーするURL
    */
   function copyUrlToClipboard(url) {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(url).then(() => {
-        // 一時的な成功メッセージを表示
-        const copyBtn = event.target;
-        const originalText = copyBtn.textContent;
-        copyBtn.textContent = '✅ コピーしました';
-        copyBtn.disabled = true;
-        
-        setTimeout(() => {
-          copyBtn.textContent = originalText;
-          copyBtn.disabled = false;
-        }, 2000);
-      }).catch(() => {
-        // フォールバック
+    // 引数の妥当性チェック
+    if (!url || typeof url !== 'string') {
+      console.warn('copyUrlToClipboard: 無効なURLが渡されました:', url);
+      alert('コピーするURLが無効です。');
+      return;
+    }
+    
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => {
+          // 一時的な成功メッセージを表示
+          const copyBtn = event && event.target;
+          if (copyBtn) {
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = '✅ コピーしました';
+            copyBtn.disabled = true;
+            
+            setTimeout(() => {
+              copyBtn.textContent = originalText;
+              copyBtn.disabled = false;
+            }, 2000);
+          } else {
+            // ボタン要素が見つからない場合のフォールバック
+            alert('URLをクリップボードにコピーしました');
+          }
+        }).catch((error) => {
+          console.warn('Clipboard API failed:', error);
+          fallbackCopyUrl(url);
+        });
+      } else {
+        // Clipboard API非対応
         fallbackCopyUrl(url);
-      });
-    } else {
-      // 古いブラウザ対応
+      }
+    } catch (error) {
+      console.error('copyUrlToClipboard error:', error);
       fallbackCopyUrl(url);
     }
   }
   
   /**
-   * クリップボードAPI非対応時のフォールバック
+   * クリップボードAPI非対応時のフォールバック (エラーハンドリング強化)
    * @param {string} url - コピーするURL
    */
   function fallbackCopyUrl(url) {
-    const textArea = document.createElement('textarea');
-    textArea.value = url;
-    textArea.style.position = 'fixed';
-    textArea.style.opacity = '0';
-    document.body.appendChild(textArea);
-    textArea.select();
-    
     try {
-      document.execCommand('copy');
-      alert('URLをクリップボードにコピーしました');
+      const textArea = document.createElement('textarea');
+      textArea.value = url;
+      textArea.style.position = 'fixed';
+      textArea.style.top = '-9999px';
+      textArea.style.left = '-9999px';
+      textArea.style.opacity = '0';
+      textArea.setAttribute('readonly', '');
+      textArea.setAttribute('aria-hidden', 'true');
+      
+      document.body.appendChild(textArea);
+      
+      // iOS対応: selectとsetSelectionRangeを使用
+      textArea.select();
+      if (textArea.setSelectionRange) {
+        textArea.setSelectionRange(0, url.length);
+      }
+      
+      // コピー実行
+      const successful = document.execCommand('copy');
+      
+      if (successful) {
+        alert('URLをクリップボードにコピーしました');
+      } else {
+        throw new Error('execCommand failed');
+      }
+      
     } catch (err) {
-      alert('コピーに失敗しました。URLを手動で選択してコピーしてください。');
+      console.error('fallbackCopyUrl error:', err);
+      // 最後の手段: URLを表示してユーザーに手動コピーを促す
+      const message = `コピーに失敗しました。下記のURLを手動でコピーしてください:\n\n${url}`;
+      if (window.prompt) {
+        window.prompt('URLを選択してコピーしてください:', url);
+      } else {
+        alert(message);
+      }
+    } finally {
+      // textAreaの削除（安全に）
+      try {
+        const textAreas = document.querySelectorAll('textarea[aria-hidden="true"]');
+        textAreas.forEach(ta => {
+          if (ta.parentNode) {
+            ta.parentNode.removeChild(ta);
+          }
+        });
+      } catch (cleanupError) {
+        console.warn('Textarea cleanup warning:', cleanupError);
+      }
     }
-    
-    document.body.removeChild(textArea);
   }
   
   /**
