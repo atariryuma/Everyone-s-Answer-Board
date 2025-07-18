@@ -70,7 +70,25 @@ function setupEventListeners() {
   var quickstartBtn = document.getElementById('quickstart-btn');
   if (quickstartBtn) {
     quickstartBtn.addEventListener('click', function() {
-      handleQuickStart();
+      if (typeof handleQuickStart === 'function') {
+        handleQuickStart();
+      } else {
+        console.error('handleQuickStart function not found');
+        showMessage('クイックスタート機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
+      }
+    });
+  }
+
+  // Create board button
+  var createBoardBtn = document.getElementById('create-board-btn');
+  if (createBoardBtn) {
+    createBoardBtn.addEventListener('click', function() {
+      if (typeof showFormConfigModal === 'function') {
+        showFormConfigModal();
+      } else {
+        console.error('showFormConfigModal function not found');
+        showMessage('フォーム作成機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
+      }
     });
   }
 
