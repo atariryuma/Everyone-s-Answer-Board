@@ -78,7 +78,7 @@
               google.script.run
                 .withSuccessHandler(res => {
                   if (res && res.adminUrl) {
-                    window.location.href = res.adminUrl;
+                    showAdminPanelRedirect(res.adminUrl, '新規ユーザー登録が完了しました');
                     resolve();
                   } else {
                     reject(new Error('registration failed'));
@@ -150,16 +150,16 @@
         }
         
         if (res.status === 'existing_user') {
-          // 既存ユーザー: 直接管理画面へ
+          // 既存ユーザー: 管理画面リダイレクト画面を表示
           if (res.adminUrl) {
-            window.location.href = res.adminUrl;
+            showAdminPanelRedirect(res.adminUrl, 'ログインが完了しました');
           } else {
             throw new Error('管理画面URLが見つかりません');
           }
         } else if (res.status === 'setup_required') {
-          // セットアップ必要: アプリ設定画面へ
+          // セットアップ必要: 管理画面リダイレクト画面を表示
           if (res.adminUrl) {
-            window.location.href = res.adminUrl;
+            showAdminPanelRedirect(res.adminUrl, 'セットアップを完了してください');
           } else {
             throw new Error('管理画面URLが見つかりません');
           }
@@ -270,6 +270,175 @@
     const modal = document.getElementById('security-modal');
     if (modal) {
       modal.classList.add('hidden');
+    }
+  }
+
+  // =============================================================================
+  // 管理パネルリダイレクト画面表示関数
+  // =============================================================================
+  
+  /**
+   * 管理パネルへのリダイレクト画面を表示
+   * @param {string} adminUrl - 管理パネルのURL
+   * @param {string} message - 表示メッセージ
+   */
+  function showAdminPanelRedirect(adminUrl, message) {
+    // ローディング画面を非表示
+    hideLoadingScreen();
+    
+    // メインコンテンツを非表示
+    const mainContent = document.querySelector('.auth-container');
+    if (mainContent) {
+      mainContent.style.display = 'none';
+    }
+    
+    // リダイレクト画面のHTML
+    const redirectHTML = `
+      <div class="redirect-container max-w-2xl mx-auto p-6 text-center">
+        <div class="glass-panel rounded-xl p-8 space-y-6">
+          <!-- 成功アイコン -->
+          <div class="text-6xl mb-4">✅</div>
+          
+          <!-- メッセージ -->
+          <h2 class="text-2xl font-bold text-white mb-4">${message}</h2>
+          <p class="text-gray-300 mb-6">管理パネルに移動してご利用ください</p>
+          
+          <!-- URL表示 -->
+          <div class="bg-gray-800/50 border border-gray-600/30 rounded-lg p-4 mb-6">
+            <p class="text-sm text-gray-400 mb-2">管理パネルURL:</p>
+            <div class="text-cyan-400 font-mono text-sm break-all bg-gray-900/50 p-3 rounded border">
+              ${adminUrl}
+            </div>
+          </div>
+          
+          <!-- 移動ボタン -->
+          <div class="space-y-4">
+            <button 
+              onclick="window.location.href='${adminUrl}'"
+              class="btn bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white w-full font-semibold py-3 px-6 rounded-lg text-lg transition-all duration-200">
+              🚀 管理パネルを開く
+            </button>
+            
+            <!-- URLコピーボタン -->
+            <button 
+              onclick="copyUrlToClipboard('${adminUrl}')"
+              class="btn bg-gray-600 hover:bg-gray-700 text-white w-full py-2 px-4 rounded-lg text-sm transition-colors">
+              📋 URLをコピー
+            </button>
+          </div>
+          
+          <!-- 注意事項 -->
+          <div class="text-xs text-gray-400 mt-6 space-y-1">
+            <p>※ このURLをブックマークしておくと、次回から直接アクセスできます</p>
+            <p>※ セキュリティのため、URLは他人と共有しないでください</p>
+          </div>
+        </div>
+        
+        <!-- 自動リダイレクトのカウントダウン（オプション） -->
+        <div id="auto-redirect" class="text-center mt-4 text-gray-400 text-sm" style="display: none;">
+          <p>3秒後に自動的に移動します... <span id="countdown">3</span></p>
+          <button onclick="cancelAutoRedirect()" class="text-cyan-400 hover:text-cyan-300 underline ml-2">
+            キャンセル
+          </button>
+        </div>
+      </div>
+    `;
+    
+    // 既存のコンテンツを置き換え
+    document.body.insertAdjacentHTML('beforeend', redirectHTML);
+    
+    // オプション: 5秒後の自動リダイレクト（コメントアウト状態）
+    // startAutoRedirect(adminUrl);
+  }
+  
+  /**
+   * URLをクリップボードにコピー
+   * @param {string} url - コピーするURL
+   */
+  function copyUrlToClipboard(url) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(() => {
+        // 一時的な成功メッセージを表示
+        const copyBtn = event.target;
+        const originalText = copyBtn.textContent;
+        copyBtn.textContent = '✅ コピーしました';
+        copyBtn.disabled = true;
+        
+        setTimeout(() => {
+          copyBtn.textContent = originalText;
+          copyBtn.disabled = false;
+        }, 2000);
+      }).catch(() => {
+        // フォールバック
+        fallbackCopyUrl(url);
+      });
+    } else {
+      // 古いブラウザ対応
+      fallbackCopyUrl(url);
+    }
+  }
+  
+  /**
+   * クリップボードAPI非対応時のフォールバック
+   * @param {string} url - コピーするURL
+   */
+  function fallbackCopyUrl(url) {
+    const textArea = document.createElement('textarea');
+    textArea.value = url;
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    document.body.appendChild(textArea);
+    textArea.select();
+    
+    try {
+      document.execCommand('copy');
+      alert('URLをクリップボードにコピーしました');
+    } catch (err) {
+      alert('コピーに失敗しました。URLを手動で選択してコピーしてください。');
+    }
+    
+    document.body.removeChild(textArea);
+  }
+  
+  /**
+   * 自動リダイレクトを開始（オプション機能）
+   * @param {string} url - リダイレクト先URL
+   */
+  function startAutoRedirect(url) {
+    const autoRedirectDiv = document.getElementById('auto-redirect');
+    const countdownSpan = document.getElementById('countdown');
+    
+    if (autoRedirectDiv && countdownSpan) {
+      autoRedirectDiv.style.display = 'block';
+      let countdown = 3;
+      
+      const interval = setInterval(() => {
+        countdown--;
+        countdownSpan.textContent = countdown;
+        
+        if (countdown <= 0) {
+          clearInterval(interval);
+          window.location.href = url;
+        }
+      }, 1000);
+      
+      // グローバルに保存して、キャンセルできるようにする
+      window.autoRedirectInterval = interval;
+    }
+  }
+  
+  /**
+   * 自動リダイレクトをキャンセル
+   */
+  function cancelAutoRedirect() {
+    if (window.autoRedirectInterval) {
+      clearInterval(window.autoRedirectInterval);
+      window.autoRedirectInterval = null;
+    }
+    
+    const autoRedirectDiv = document.getElementById('auto-redirect');
+    if (autoRedirectDiv) {
+      autoRedirectDiv.style.display = 'none';
     }
   }
 </script>
