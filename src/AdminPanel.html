@@ -7,25 +7,42 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#1a1b26" />
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
-  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), screen-wake-lock=(), accelerometer=(), gyroscope=(), magnetometer=()" />
-  <!-- User ID from server template -->
-  <meta name="user-id" content="<?= typeof userId !== 'undefined' ? userId : '' ?>" id="user-id-meta">
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=()" />
+  <!-- User ID will be retrieved dynamically from backend -->
 
 
   <!-- TailwindCSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    // Handle Tailwind CDN production warnings and deprecation warnings
+    // Handle Tailwind CDN and other console warnings suppression
     if (typeof console !== 'undefined' && console.warn) {
       const originalWarn = console.warn;
       console.warn = function(...args) {
         if (args[0] && (
           args[0].includes('cdn.tailwindcss.com should not be used in production') ||
-          args[0].includes('-ms-high-contrast is in the process of being deprecated')
+          args[0].includes('-ms-high-contrast is in the process of being deprecated') ||
+          args[0].includes('Feature Policy') ||
+          args[0].includes('Permissions Policy') ||
+          args[0].includes('deprecated') ||
+          args[0].includes('TailwindCSS')
         )) {
           return; // Suppress these warnings
         }
         originalWarn.apply(console, args);
+      };
+    }
+    
+    // Also suppress console.info and console.log for certain patterns
+    if (typeof console !== 'undefined' && console.info) {
+      const originalInfo = console.info;
+      console.info = function(...args) {
+        if (args[0] && (
+          args[0].includes('TailwindCSS') ||
+          args[0].includes('Tailwind CSS')
+        )) {
+          return; // Suppress these info messages
+        }
+        originalInfo.apply(console, args);
       };
     }
   </script>
@@ -79,9 +96,18 @@
     
     // マルチテナント対応: 新しいrunGasWithUserId関数
     function runGasWithUserId(functionName, ...args) {
+      // userIdが設定されていない場合は初期化を待つ
       if (!userId) {
-        console.error('❌  - No userId available for:', functionName);
-        throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
+        return userIdPromise.then(() => {
+          if (!userId) {
+            console.error('❌  - No userId available for:', functionName);
+            throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
+          }
+          
+          console.log('✅  - runGasWithUserId (after init):', functionName, 'userId:', userId);
+          // userIdを第一引数として追加
+          return gasOptimizer.call(functionName, userId, ...args);
+        });
       }
       
       console.log('✅  - runGasWithUserId:', functionName, 'userId:', userId);
@@ -760,6 +786,28 @@
         <p class="text-xs text-blue-200/70 mt-2 ml-6">
           アプリの有効/無効状態を管理できます
         </p>
+      </div>
+      
+      <!-- セキュリティと統合情報 -->
+      <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+        <h4 class="text-sm font-medium text-gray-200 mb-3 flex items-center gap-2">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+          </svg>
+          セキュリティと統合
+        </h4>
+        <div class="space-y-2 text-xs">
+          <div class="flex items-center justify-between">
+            <a href="#" onclick="showSecurityInfo(); return false;" class="text-cyan-400 hover:text-cyan-300 hover:underline">
+              セキュリティ仕様について
+            </a>
+          </div>
+          <div class="flex items-center justify-between">
+            <a href="#" onclick="showGoogleIntegrationInfo(); return false;" class="text-cyan-400 hover:text-cyan-300 hover:underline">
+              Google連携の利点
+            </a>
+          </div>
+        </div>
       </div>
       
       <details id="account-deletion-section" class="bg-red-900/10 border border-red-500/30 rounded-lg transition-all hover:border-red-500/50">
@@ -1459,31 +1507,30 @@
     // マルチテナント対応: ユーザーIDの安全な初期化
     var userId = '';
     
-    // マルチテナント対応: テンプレート変数とmetaタグから安全にデータを取得
-    (function() {
-      try {
-        // テンプレート変数から直接取得
-        var templateUserId = '<?= escapeJavaScript(typeof userId !== "undefined" ? userId : "") ?>';
-        if (templateUserId && templateUserId.trim() !== '') {
-          userId = templateUserId;
-          console.log('✅  - userId from template:', userId);
-        } else {
-          // フォールバック: metaタグから取得
-          var userIdMeta = document.querySelector('meta[name="user-id"]');
-          if (userIdMeta && userIdMeta.content) {
-            userId = userIdMeta.content;
-            console.log('✅  - userId from meta:', userId);
-          }
-        }
-        
-        if (!userId) {
-          console.error('❌  - userId not found in template or meta');
-        }
-      } catch (e) {
-        console.error('❌  - userId initialization error:', e);
-        userId = '';
-      }
-    })();
+    // マルチテナント対応: バックエンドから安全にユーザーIDを取得
+    function initializeUserId() {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(response => {
+            if (response && response.status === 'success' && response.userInfo && response.userInfo.userId) {
+              userId = response.userInfo.userId;
+              console.log('✅ - userId from backend:', userId);
+              resolve(userId);
+            } else {
+              console.error('❌ - Failed to get userId from backend:', response);
+              reject(new Error('ユーザーIDの取得に失敗しました'));
+            }
+          })
+          .withFailureHandler(error => {
+            console.error('❌ - Backend error getting userId:', error);
+            reject(error);
+          })
+          .getCurrentUserStatus();
+      });
+    }
+    
+    // ユーザーID取得の完了を待つPromise
+    const userIdPromise = initializeUserId();
     var selectedSheet = '';
     var currentActiveSheet = '';
     var webAppUrl = '';
@@ -3396,6 +3443,27 @@ function syncCheckboxStates(status) {
         questionCounter.className = count > 450 ? 'text-xs text-red-400' : 'text-xs text-gray-500';
       });
     }
+  }
+  
+  // セキュリティ情報表示関数
+  function showSecurityInfo() {
+    alert('🔒 セキュリティ仕様\n\n' +
+          '・Google Workspace内部OAuth認証\n' +
+          '・naha-okinawa.ed.jpドメイン制限\n' +
+          '・CSP、MIME保護、参照元ポリシー\n' +
+          '・マルチテナント権限分離\n' +
+          '・監査ログとGASセキュリティ基準');
+  }
+  
+  // Google連携の利点表示関数
+  function showGoogleIntegrationInfo() {
+    alert('📊 Google連携の利点\n\n' +
+          '・Googleスプレッドシートとの直接連携\n' +
+          '・Googleフォームでのデータ収集\n' +
+          '・シームレスなSSO認証\n' +
+          '・リアルタイムデータ同期\n' +
+          '・組織内でのセキュアな運用\n' +
+          '・Googleインフラの信頼性活用');
   }
 
   // モーダル表示時にカウンターを初期化
