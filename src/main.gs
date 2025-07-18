@@ -580,10 +580,55 @@ function buildUserAdminUrl(userId) {
  * @return {HtmlOutput}
  */
 function createSecureRedirect(targetUrl, message) {
+  // URL検証とサニタイゼーション
+  const sanitizedUrl = sanitizeRedirectUrl(targetUrl);
+  
+  console.log('createSecureRedirect - Original URL:', targetUrl);
+  console.log('createSecureRedirect - Sanitized URL:', sanitizedUrl);
+  
   const template = HtmlService.createTemplateFromFile('Redirect');
-  template.targetUrl = targetUrl;
-  template.message = message;
+  template.targetUrl = sanitizedUrl;
+  template.message = message || 'リダイレクトしています...';
+  template.escapeJavaScript = escapeJavaScript;
+  template.htmlEncode = htmlEncode;
   return template.evaluate().setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * リダイレクト用URLの検証とサニタイゼーション
+ * @param {string} url 検証対象のURL
+ * @return {string} サニタイズされたURL
+ */
+function sanitizeRedirectUrl(url) {
+  if (!url) {
+    return getWebAppUrlCached();
+  }
+  
+  try {
+    // 先頭と末尾のクォートを除去
+    let cleanUrl = String(url).trim();
+    if ((cleanUrl.startsWith('"') && cleanUrl.endsWith('"')) ||
+        (cleanUrl.startsWith("'") && cleanUrl.endsWith("'"))) {
+      cleanUrl = cleanUrl.slice(1, -1);
+    }
+    
+    // 基本的なURL形式チェック
+    if (!cleanUrl.match(/^https?:\/\//)) {
+      console.warn('Invalid URL format:', cleanUrl);
+      return getWebAppUrlCached();
+    }
+    
+    // 開発モードURLのチェック
+    if (cleanUrl.includes('googleusercontent.com') || cleanUrl.includes('userCodeAppPanel')) {
+      console.warn('Development URL detected in redirect, using fallback:', cleanUrl);
+      return getWebAppUrlCached();
+    }
+    
+    return cleanUrl;
+  } catch (e) {
+    console.error('URL sanitization error:', e.message);
+    return getWebAppUrlCached();
+  }
 }
 
 /**

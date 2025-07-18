@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="refresh" content="2;url=<?= targetUrl ?>">
+  <meta http-equiv="refresh" content="2;url=<?= htmlEncode(targetUrl) ?>">
   <title>リダイレクト中...</title>
   <style>
     body { text-align:center; padding:50px; font-family:sans-serif; background-color:#f5f5f5; }
@@ -17,23 +17,26 @@
   <div>
     <h2><?= message ?></h2>
     <p>2秒後に自動的にリダイレクトされます...</p>
-    <a href="<?= targetUrl ?>" onclick="handleRedirectClick(event)">今すぐ移動</a>
+    <a href="<?= htmlEncode(targetUrl) ?>" onclick="handleRedirectClick(event)">今すぐ移動</a>
     <p class="small">自動的にリダイレクトされない場合は上のリンクをクリックしてください。</p>
   </div>
   <script>
+    // Safe URL variable with proper escaping
+    var safeTargetUrl = '<?= escapeJavaScript(targetUrl) ?>';
+    
     function handleRedirectClick(event) {
       event.preventDefault();
       try {
-        window.top.location.href = '<?= targetUrl ?>';
+        window.top.location.href = safeTargetUrl;
       } catch(e) {
-        window.location.href = '<?= targetUrl ?>';
+        window.location.href = safeTargetUrl;
       }
     }
     setTimeout(function() {
       try {
-        window.top.location.href = '<?= targetUrl ?>';
+        window.top.location.href = safeTargetUrl;
       } catch(e) {
-        window.location.href = '<?= targetUrl ?>';
+        window.location.href = safeTargetUrl;
       }
     }, 2000);
   </script>
