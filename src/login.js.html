@@ -135,10 +135,10 @@
                 }
               } else if (res.status === 'setup_required') {
                 // セットアップ必要: アプリ設定画面へ
-                if (res.userId) {
-                  window.location.href = `/exec?mode=admin&userId=${res.userId}`;
+                if (res.adminUrl) {
+                  window.location.href = res.adminUrl;
                 } else {
-                  throw new Error('ユーザーIDが見つかりません');
+                  throw new Error('管理画面URLが見つかりません');
                 }
               } else if (res.status === 'new_user') {
                 // 新規ユーザー: 登録処理実行

@@ -221,31 +221,6 @@
   console.log('- Processed value:', __IS_SYSTEM_ADMIN__);
   console.log('- window.isSystemAdmin final:', window.isSystemAdmin);
   
-  // URL更新処理
-  const shouldUpdateUrl = '<?= escapeJavaScript(typeof shouldUpdateUrl !== "undefined" ? shouldUpdateUrl : "false") ?>';
-  const correctUrl = '<?= escapeJavaScript(typeof correctUrl !== "undefined" ? correctUrl : "") ?>';
-  
-  if (shouldUpdateUrl === 'true' && correctUrl && correctUrl !== '') {
-    console.log('Updating URL to:', correctUrl);
-    try {
-      // セキュリティ制限のため、同一オリジンでのみURL更新を実行
-      const currentOrigin = window.location.origin;
-      const targetUrl = new URL(correctUrl);
-      
-      // Google Apps Scriptのhistory APIを使用してURLを更新
-      // 親ウィンドウのURLのハッシュ部分を更新することで、リロード時の状態維持を試みる
-      if (typeof google !== 'undefined' && google.script && google.script.history) {
-        // URLのパスとクエリパラメータをハッシュとして設定
-        const pathAndQuery = targetUrl.pathname + targetUrl.search;
-        google.script.history.replace(pathAndQuery);
-        console.log('URL updated using google.script.history.replace to:', pathAndQuery);
-      } else {
-        console.log('URL update skipped due to cross-origin restrictions (google.script.history not available or cross-origin)');
-      }
-    } catch (e) {
-      console.warn('Failed to update URL:', e);
-    }
-  }
   </script>
   <!-- 統合CSS -->
   <?!= include('UnifiedStyles'); ?>
