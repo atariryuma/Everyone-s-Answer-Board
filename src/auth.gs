@@ -142,8 +142,11 @@ function verifyAdminAccess(userId) {
     }
 
     // データベースから指定されたIDのユーザー情報を取得（キャッシュ活用）
+    // セキュリティ検証のため、最新データを確実に取得
+    var cacheKey = 'user_' + userId;
+    cacheManager.remove(cacheKey); // 古いキャッシュを削除して最新データを取得
     var userFromDb = cacheManager.get(
-      'user_' + userId,
+      cacheKey,
       function() { return findUserById(userId); },
       { ttl: 300, enableMemoization: true }
     );
@@ -157,8 +160,12 @@ function verifyAdminAccess(userId) {
     var isEmailMatched = userFromDb.adminEmail && 
                         userFromDb.adminEmail.toLowerCase() === activeUserEmail.toLowerCase();
     
-    // ユーザーがアクティブであるかを確認
-    var isActive = userFromDb.isActive === true || String(userFromDb.isActive).toLowerCase() === 'true';
+    // ユーザーがアクティブであるかを確認（型安全な判定）
+    console.log('Debug - userFromDb.isActive:', userFromDb.isActive, 'type:', typeof userFromDb.isActive);
+    var isActive = (userFromDb.isActive === true || 
+                    userFromDb.isActive === 'true' || 
+                    String(userFromDb.isActive).toLowerCase() === 'true');
+    console.log('Debug - isActive result:', isActive);
 
     if (isEmailMatched && isActive) {
       console.log('✅ 管理者本人によるアクセスを確認しました:', activeUserEmail, 'UserID:', userId);
