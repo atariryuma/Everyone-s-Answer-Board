@@ -108,7 +108,7 @@ function initializeUserId() {
       .withSuccessHandler(response => {
         if (response && response.status === 'success' && response.userInfo && response.userInfo.userId) {
           userId = response.userInfo.userId;
-          console.log('✅ - userId from backend:', userId);
+          console.log('✅ AdminPanel: User authenticated');
           resolve(userId);
         } else {
           console.error('❌ - Failed to get userId from backend:', response);

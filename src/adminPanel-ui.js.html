@@ -15,7 +15,7 @@ function updateUIWithNewStatus(status) {
   }
   
   currentStatus = status;
-  console.log('🔄 Updating UI with status:', status);
+  console.log('✅ AdminPanel: Status updated');
   
   // Update static UI elements first
   updateStaticUI(status);
@@ -32,8 +32,6 @@ function updateUIWithNewStatus(status) {
   
   // Update step indicators
   updateStepIndicators(status.setupStep || 1);
-  
-  console.log('✅ UI update completed');
 }
 
 // Update static UI elements
@@ -59,19 +57,14 @@ function updateStaticUI(status) {
 // =============================================================================
 
 function updateDatabaseInfo(status) {
-  console.log('🔧 [DEBUG] updateDatabaseInfo called with status:', status);
-  
   if (!status || !status.userInfo) {
-    console.warn('システム情報を更新できませんでした: ユーザー情報がありません。', status);
+    console.warn('System info update failed: No user info available');
     return;
   }
-
-  console.log('✅ [DEBUG] User info found, updating system panel:', status.userInfo);
 
   // スプレッドシートURLを設定
   if (status.userInfo.spreadsheetUrl) {
     currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
-    console.log('✅ [DEBUG] currentSpreadsheetUrl set to:', currentSpreadsheetUrl);
   }
 
   // 基本情報の更新
@@ -595,12 +588,10 @@ function checkAutoPublishDialog(status) {
 
 // Initialize UI components
 function initializeUI() {
-  console.log('🎨 Initializing UI components...');
+  console.log('✅ AdminPanel: UI components ready');
   
   // Load initial status
   loadStatus();
-  
-  console.log('✅ UI components initialized');
 }
 
 // Initialize when DOM is ready

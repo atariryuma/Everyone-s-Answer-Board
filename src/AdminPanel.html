@@ -31,7 +31,7 @@
         'tailwind',
         '-ms-high-contrast is in the process of being deprecated',
         'Feature Policy',
-        'Permissions Policy',
+        'Permissions Policy', 
         'Unrecognized feature',
         'deprecated',
         'iframe.*sandbox.*allow-scripts.*allow-same-origin',
@@ -40,7 +40,14 @@
         'can escape its sandboxing',
         'Net state changed from',
         'warden_bin',
-        'mae_html_user'
+        'mae_html_user',
+        'ambient-light-sensor',
+        'speaker',
+        'vibrate',
+        'vr',
+        'Explain Console errors by using Copilot',
+        'Learn more',
+        'Don\'t show again'
       ];
       
       // Helper function to check if message should be suppressed
@@ -109,8 +116,13 @@
       'Unexpected token',
       'Failed to execute \'write\' on \'Document\'',
       'SyntaxError: Failed to execute \'write\'',
+      'Identifier \'userId\' has already been declared',
       'mae_html_user_bin_i18n_mae_html_user',
-      'warden_bin_i18n_warden'
+      'warden_bin_i18n_warden',
+      'ambient-light-sensor',
+      'speaker',
+      'vibrate',
+      'vr'
     ];
     
     const shouldSuppress = suppressedErrors.some(pattern => 
@@ -600,24 +612,28 @@
                   </summary>
                   <div class="p-4 pt-0 space-y-4" id="detail-options">
                     <label class="block">
-                      <span class="text-sm text-gray-300 mb-2 block">理由・詳細列</span>
-                      <select id="reasonHeader" class="form-control"></select>
+                      <span class="text-sm text-gray-300 mb-2 block">回答データ列（必須）</span>
+                      <select id="opinion-column" class="form-control"></select>
                     </label>
                     <label class="block">
                       <span class="text-sm text-gray-300 mb-2 block">名前列</span>
-                      <select id="nameHeader" class="form-control"></select>
+                      <select id="name-column" class="form-control"></select>
                     </label>
                     <label class="block">
                       <span class="text-sm text-gray-300 mb-2 block">クラス列</span>
-                      <select id="classHeader" class="form-control"></select>
+                      <select id="class-column" class="form-control"></select>
+                    </label>
+                    <label class="block">
+                      <span class="text-sm text-gray-300 mb-2 block">タイムスタンプ列</span>
+                      <select id="timestamp-column" class="form-control"></select>
                     </label>
                     <div class="flex items-center mt-4">
-                      <input type="checkbox" id="showNames" name="showNames" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                      <label for="showNames" class="ml-2 block text-sm text-gray-300">名前を表示する</label>
+                      <input type="checkbox" id="show-names" name="show-names" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                      <label for="show-names" class="ml-2 block text-sm text-gray-300">名前を表示する</label>
                     </div>
                     <div class="flex items-center mt-2">
-                      <input type="checkbox" id="showCounts" name="showCounts" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                      <label for="showCounts" class="ml-2 block text-sm text-gray-300">リアクション数を表示する</label>
+                      <input type="checkbox" id="show-counts" name="show-counts" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                      <label for="show-counts" class="ml-2 block text-sm text-gray-300">リアクション数を表示する</label>
                     </div>
                   </div>
                 </details>

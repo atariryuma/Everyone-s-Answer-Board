@@ -490,7 +490,7 @@ function startSystemStatusUpdate() {
 
 // Initialize API communications
 function initializeAPI() {
-  console.log('🔗 Initializing API communications...');
+  console.log('✅ AdminPanel: API communications ready');
   
   // Start background status updates
   startSystemStatusUpdate();
@@ -499,8 +499,6 @@ function initializeAPI() {
   document.addEventListener('click', updateUserActivity);
   document.addEventListener('keypress', updateUserActivity);
   document.addEventListener('scroll', updateUserActivity);
-  
-  console.log('✅ API communications initialized');
 }
 
 // Initialize when DOM is ready
