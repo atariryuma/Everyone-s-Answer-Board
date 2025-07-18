@@ -17,27 +17,31 @@
     }
   });
 
+  // UI状態管理 - グローバルスコープに移動して他の関数からアクセス可能にする
+  window.setLoading = function(flag, text = '') {
+    const loginBtn = document.getElementById('login-btn');
+    if (!loginBtn) {
+      console.warn('login-btn element not found, skipping loading state change');
+      return;
+    }
+    loginBtn.disabled = flag;
+    
+    if (flag) {
+      loginBtn.innerHTML = `
+        <div class="flex items-center justify-center">
+          <div class="loading-spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+          ${text || '処理中…'}
+        </div>
+      `;
+    } else {
+      loginBtn.textContent = 'はじめる';
+    }
+  };
+
   document.addEventListener('DOMContentLoaded', () => {
     const loginBtn = document.getElementById('login-btn');
     const userEmailDisplay = document.getElementById('user-email-display');
     let tokenClient;
-
-    // UI状態管理 - 管理パネル風の表示に最適化
-    const setLoading = (flag, text = '') => {
-      if (!loginBtn) return;
-      loginBtn.disabled = flag;
-      
-      if (flag) {
-        loginBtn.innerHTML = `
-          <div class="flex items-center justify-center">
-            <div class="loading-spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-            ${text || '処理中…'}
-          </div>
-        `;
-      } else {
-        loginBtn.textContent = 'はじめる';
-      }
-    };
 
     // 既存のgetGoogleClientId()関数を使用
     const getClientId = () => {
@@ -274,6 +278,30 @@
   }
 
   // =============================================================================
+  // 管理パネルリダイレクト関数
+  // =============================================================================
+  
+  /**
+   * 管理パネルにリダイレクトする
+   * @param {string} adminUrl - 管理パネルのURL
+   */
+  window.redirectToAdminPanel = function(adminUrl) {
+    try {
+      if (!adminUrl || typeof adminUrl !== 'string') {
+        console.error('redirectToAdminPanel: 無効なURLが渡されました:', adminUrl);
+        alert('管理パネルのURLが無効です。');
+        return;
+      }
+      
+      console.log('管理パネルにリダイレクト中:', adminUrl);
+      window.location.href = adminUrl;
+    } catch (error) {
+      console.error('redirectToAdminPanel error:', error);
+      alert('リダイレクトに失敗しました。URLを手動でコピーしてアクセスしてください。');
+    }
+  };
+
+  // =============================================================================
   // 管理パネルリダイレクト画面表示関数
   // =============================================================================
   
@@ -338,14 +366,14 @@
           <!-- アクション -->
           <div class="space-y-4">
             <button 
-              onclick="window.location.href='${adminUrl}'"
+              onclick="redirectToAdminPanel('${adminUrl.replace(/'/g, "\\'")}'); return false;"
               class="w-full btn bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white font-bold py-3 px-6 rounded-lg">
               🚀 管理パネルを開く
             </button>
             
             <div class="text-center space-y-3">
               <button 
-                onclick="copyUrlToClipboard('${adminUrl}')"
+                onclick="copyUrlToClipboard('${adminUrl.replace(/'/g, "\\'")}'); return false;"
                 class="text-sm text-cyan-400 hover:text-cyan-300 underline">
                 📋 URLをコピー
               </button>
@@ -381,7 +409,7 @@
    * URLをクリップボードにコピー (エラーハンドリング強化)
    * @param {string} url - コピーするURL
    */
-  function copyUrlToClipboard(url) {
+  window.copyUrlToClipboard = function(url) {
     // 引数の妥当性チェック
     if (!url || typeof url !== 'string') {
       console.warn('copyUrlToClipboard: 無効なURLが渡されました:', url);
@@ -409,15 +437,15 @@
           }
         }).catch((error) => {
           console.warn('Clipboard API failed:', error);
-          fallbackCopyUrl(url);
+          window.fallbackCopyUrl(url);
         });
       } else {
         // Clipboard API非対応
-        fallbackCopyUrl(url);
+        window.fallbackCopyUrl(url);
       }
     } catch (error) {
       console.error('copyUrlToClipboard error:', error);
-      fallbackCopyUrl(url);
+      window.fallbackCopyUrl(url);
     }
   }
   
@@ -425,7 +453,7 @@
    * クリップボードAPI非対応時のフォールバック (エラーハンドリング強化)
    * @param {string} url - コピーするURL
    */
-  function fallbackCopyUrl(url) {
+  window.fallbackCopyUrl = function(url) {
     try {
       const textArea = document.createElement('textarea');
       textArea.value = url;
@@ -481,7 +509,7 @@
    * 自動リダイレクトを開始（オプション機能）
    * @param {string} url - リダイレクト先URL
    */
-  function startAutoRedirect(url) {
+  window.startAutoRedirect = function(url) {
     const autoRedirectDiv = document.getElementById('auto-redirect');
     const countdownSpan = document.getElementById('countdown');
     
@@ -507,7 +535,7 @@
   /**
    * 自動リダイレクトをキャンセル
    */
-  function cancelAutoRedirect() {
+  window.cancelAutoRedirect = function() {
     if (window.autoRedirectInterval) {
       clearInterval(window.autoRedirectInterval);
       window.autoRedirectInterval = null;
