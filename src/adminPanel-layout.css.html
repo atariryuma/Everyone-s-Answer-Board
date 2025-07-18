@@ -1,0 +1,62 @@
+<style>
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main {
+  flex: 1;
+  width: 100%;
+}
+
+/* Admin Panel Layout Fixes */
+.responsive-grid {
+  display: grid;
+  gap: 1rem; /* モバイルのギャップ */
+  grid-template-columns: 1fr; /* モバイル: 単一カラム */
+}
+
+@media (min-width: 768px) { /* タブレット向けブレークポイント */
+  .responsive-grid {
+    grid-template-columns: 2fr 1fr; /* 左: 2/3、右: 1/3 */
+    gap: 1rem; /* タブレットのギャップ */
+  }
+  .right-panel {
+    min-width: 200px; /* タブレットでの右パネルの最小幅 */
+  }
+}
+
+@media (min-width: 1024px) { /* デスクトップ向けブレークポイント */
+  .responsive-grid {
+    grid-template-columns: minmax(400px, 1fr) 350px; /* 左: 最小400px、柔軟。右: 固定350px */
+    gap: 1.5rem; /* デスクトップのギャップ */
+  }
+  .right-panel {
+    min-width: 300px; /* デスクトップでの右パネルの最小幅（安全のため） */
+  }
+}
+
+/* Ensure proper main content layout */
+main.flex-1 {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.left-panel {
+  flex: 1;
+  min-height: 0;
+}
+</style>

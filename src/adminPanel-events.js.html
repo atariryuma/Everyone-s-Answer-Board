@@ -1,0 +1,481 @@
+<script>
+// =============================================================================
+// ADMIN PANEL EVENT LISTENERS & UI INTERACTIONS
+// =============================================================================
+
+// DOM Elements Cache
+var elements = {};
+
+// =============================================================================
+// MAIN EVENT LISTENERS SETUP
+// =============================================================================
+
+function setupEventListeners() {
+  console.log('🎯 Setting up event listeners...');
+  
+  // Cache frequently used elements
+  elements = {
+    'sheet-select': getCachedElement('sheet-select'),
+    'save-publish-btn': getCachedElement('save-publish-btn'),
+    'unpublish-board-btn': getCachedElement('unpublish-board-btn'),
+    'delete-account-btn': getCachedElement('delete-account-btn'),
+    'open-spreadsheet-btn': getCachedElement('open-spreadsheet-btn'),
+    'open-form-btn': getCachedElement('open-form-btn')
+  };
+  
+  // Sheet selection handler
+  if (elements['sheet-select']) {
+    elements['sheet-select'].addEventListener('change', function(e) {
+      selectedSheet = e.target.value;
+      updateUIForSelectedSheet();
+      
+      if (selectedSheet) {
+        console.log('Sheet selected:', selectedSheet);
+        loadConfigForSelected();
+      } else {
+        clearConfigFields();
+      }
+    });
+  }
+  
+  // AI column detection button
+  var reguessBtn = document.getElementById('reguess-headers-btn');
+  if (reguessBtn) {
+    reguessBtn.addEventListener('click', runHeaderGuessing);
+  }
+  
+  // Save and publish button
+  if (elements['save-publish-btn']) {
+    elements['save-publish-btn'].addEventListener('click', function() {
+      if (!selectedSheet) {
+        showMessage('まずシートを選択してください。', 'warning');
+        return;
+      }
+      saveAndPublish();
+    });
+  }
+  
+  // Unpublish button
+  if (elements['unpublish-board-btn']) {
+    elements['unpublish-board-btn'].addEventListener('click', function() {
+      showConfirmationModal(
+        '公開停止の確認',
+        '回答ボードの公開を停止しますか？',
+        unpublishBoard
+      );
+    });
+  }
+  
+  // Create additional form button
+  var createAdditionalFormBtn = document.getElementById('create-additional-form-btn');
+  if (createAdditionalFormBtn) {
+    createAdditionalFormBtn.addEventListener('click', function() {
+      if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
+        showMessage('スプレッドシートの情報が見つかりません。', 'error');
+        return;
+      }
+      showFormConfigModal();
+    });
+  }
+  
+  // Form configuration modal handlers
+  setupFormConfigModalHandlers();
+  
+  // Resource management
+  setupResourceHandlers();
+  
+  // Account management
+  setupAccountManagementHandlers();
+  
+  // External links
+  setupExternalLinkHandlers();
+  
+  // Modal handlers
+  setupModalHandlers();
+  
+  // Real-time validation
+  setupRealtimeValidation();
+  
+  console.log('✅ Event listeners setup complete');
+}
+
+// =============================================================================
+// FORM CONFIGURATION MODAL HANDLERS
+// =============================================================================
+
+function setupFormConfigModalHandlers() {
+  var formConfigClose = document.getElementById('form-config-close');
+  var formConfigCancel = document.getElementById('form-config-cancel');
+  var formConfigCreate = document.getElementById('form-config-create');
+  
+  if (formConfigClose) {
+    formConfigClose.addEventListener('click', hideFormConfigModal);
+  }
+  
+  if (formConfigCancel) {
+    formConfigCancel.addEventListener('click', hideFormConfigModal);
+  }
+  
+  if (formConfigCreate) {
+    formConfigCreate.addEventListener('click', createFormWithConfig);
+  }
+}
+
+// =============================================================================
+// RESOURCE MANAGEMENT HANDLERS
+// =============================================================================
+
+function setupResourceHandlers() {
+  var addResourceBtn = document.getElementById('add-resource-btn');
+  var resourceUrlInput = document.getElementById('resource-url-input');
+  
+  if (addResourceBtn) {
+    addResourceBtn.addEventListener('click', addResource);
+  }
+  
+  if (resourceUrlInput) {
+    resourceUrlInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addResource();
+      }
+    });
+  }
+}
+
+// =============================================================================
+// ACCOUNT MANAGEMENT HANDLERS
+// =============================================================================
+
+function setupAccountManagementHandlers() {
+  // Delete account handler
+  if (elements['delete-account-btn']) {
+    elements['delete-account-btn'].addEventListener('click', handleDeleteRequest);
+  }
+  
+  // Switch account handlers
+  var switchAccountBtns = document.querySelectorAll('[onclick*="switchToAnotherAccount"]');
+  switchAccountBtns.forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      switchToAnotherAccount();
+    });
+  });
+}
+
+// =============================================================================
+// EXTERNAL LINK HANDLERS
+// =============================================================================
+
+function setupExternalLinkHandlers() {
+  // Open spreadsheet
+  if (elements['open-spreadsheet-btn']) {
+    elements['open-spreadsheet-btn'].addEventListener('click', openDatabaseSpreadsheet);
+  }
+  
+  // Open form
+  if (elements['open-form-btn']) {
+    elements['open-form-btn'].addEventListener('click', openForm);
+  }
+  
+  // Digital citizenship
+  var digitalCitizenshipBtn = document.getElementById('digital-citizenship-btn');
+  if (digitalCitizenshipBtn) {
+    digitalCitizenshipBtn.addEventListener('click', showDigitalCitizenshipModal);
+  }
+  
+  // Copy board URL
+  var copyUrlBtn = document.getElementById('copy-url-btn');
+  if (copyUrlBtn) {
+    copyUrlBtn.addEventListener('click', copyBoardUrl);
+  }
+}
+
+// =============================================================================
+// MODAL HANDLERS
+// =============================================================================
+
+function setupModalHandlers() {
+  // Privacy modal
+  var privacyClose = document.getElementById('privacy-modal-close');
+  var privacyCancel = document.getElementById('privacy-modal-cancel');
+  
+  if (privacyClose) {
+    privacyClose.addEventListener('click', hidePrivacyModal);
+  }
+  
+  if (privacyCancel) {
+    privacyCancel.addEventListener('click', hidePrivacyModal);
+  }
+  
+  // Digital citizenship modal
+  var dcClose = document.getElementById('digital-citizenship-close');
+  if (dcClose) {
+    dcClose.addEventListener('click', hideDigitalCitizenshipModal);
+  }
+  
+  // Confirmation modal
+  var confirmClose = document.getElementById('confirmation-modal-close');
+  var confirmCancel = document.getElementById('confirmation-modal-cancel');
+  
+  if (confirmClose) {
+    confirmClose.addEventListener('click', hideConfirmationModal);
+  }
+  
+  if (confirmCancel) {
+    confirmCancel.addEventListener('click', hideConfirmationModal);
+  }
+  
+  // Close modals on backdrop click
+  setupBackdropClickHandlers();
+}
+
+// =============================================================================
+// BACKDROP CLICK HANDLERS
+// =============================================================================
+
+function setupBackdropClickHandlers() {
+  var modals = [
+    'form-config-modal',
+    'privacy-modal',
+    'digital-citizenship-modal',
+    'confirmation-modal'
+  ];
+  
+  modals.forEach(function(modalId) {
+    var modal = document.getElementById(modalId);
+    if (modal) {
+      modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+          // Close modal when clicking backdrop
+          switch(modalId) {
+            case 'form-config-modal':
+              hideFormConfigModal();
+              break;
+            case 'privacy-modal':
+              hidePrivacyModal();
+              break;
+            case 'digital-citizenship-modal':
+              hideDigitalCitizenshipModal();
+              break;
+            case 'confirmation-modal':
+              hideConfirmationModal();
+              break;
+          }
+        }
+      });
+    }
+  });
+}
+
+// =============================================================================
+// REAL-TIME VALIDATION
+// =============================================================================
+
+function setupRealtimeValidation() {
+  // Opinion column validation
+  var opinionSelect = document.getElementById('opinion-column');
+  if (opinionSelect) {
+    opinionSelect.addEventListener('change', updateConfigButtons);
+  }
+  
+  // Show names checkbox
+  var showNamesCheckbox = document.getElementById('show-names');
+  if (showNamesCheckbox) {
+    showNamesCheckbox.addEventListener('change', updateConfigButtons);
+  }
+  
+  // Show counts checkbox
+  var showCountsCheckbox = document.getElementById('show-counts');
+  if (showCountsCheckbox) {
+    showCountsCheckbox.addEventListener('change', updateConfigButtons);
+  }
+  
+  // Name column validation
+  var nameSelect = document.getElementById('name-column');
+  if (nameSelect) {
+    nameSelect.addEventListener('change', function() {
+      var showNamesCheckbox = document.getElementById('show-names');
+      if (showNamesCheckbox && this.value) {
+        showNamesCheckbox.disabled = false;
+      } else if (showNamesCheckbox) {
+        showNamesCheckbox.disabled = true;
+        showNamesCheckbox.checked = false;
+      }
+      updateConfigButtons();
+    });
+  }
+}
+
+// =============================================================================
+// SPECIFIC EVENT HANDLERS
+// =============================================================================
+
+// Handle delete account request
+function handleDeleteRequest() {
+  showConfirmationModal(
+    'アカウント削除の確認',
+    '本当にこのアカウントを削除しますか？この操作は元に戻せず、すべてのデータが失われます。',
+    function() {
+      setLoading(true, 'アカウントを完全に削除しています...');
+      runGasWithUserId('deleteCurrentUserAccount')
+        .then(function(response) {
+          setLoading(false);
+          showMessage(response, 'success');
+          // Redirect to login or show confirmation
+          setTimeout(function() {
+            window.location.reload();
+          }, 3000);
+        })
+        .catch(function(error) {
+          setLoading(false);
+          handleError(error, 'deleteAccount', 'アカウントの削除に失敗しました。');
+        });
+    }
+  );
+}
+
+// Switch to another account
+function switchToAnotherAccount() {
+  showConfirmationModal(
+    'アカウント切り替え',
+    '別のアカウントでログインしますか？現在のセッションがクリアされます。',
+    function() {
+      setLoading(true, 'セッションをクリアしています...');
+      runGasWithUserId('resetUserAuthentication')
+        .then(function(result) {
+          console.log('Session cleanup result:', result);
+          window.location.href = 'https://accounts.google.com/logout';
+        })
+        .catch(function(error) {
+          console.error('Session cleanup failed:', error);
+          alert('セッションクリアに失敗しました。手動でGoogleアカウントからログアウトしてください。');
+          window.location.href = 'https://accounts.google.com/logout';
+        });
+    }
+  );
+}
+
+// Update UI for selected sheet
+function updateUIForSelectedSheet() {
+  var hasSelection = selectedSheet && selectedSheet.trim() !== '';
+  
+  // Update step indicators
+  updateStepIndicators(hasSelection ? 3 : 2);
+  
+  // Enable/disable configuration section
+  var configSection = document.getElementById('config-section');
+  if (configSection) {
+    if (hasSelection) {
+      configSection.classList.remove('opacity-50', 'pointer-events-none');
+    } else {
+      configSection.classList.add('opacity-50', 'pointer-events-none');
+    }
+  }
+  
+  // Update guidance text
+  var guidanceText = document.getElementById('guidance-text');
+  if (guidanceText) {
+    if (hasSelection) {
+      guidanceText.textContent = 'ステップ3: 列を設定してボードを公開しましょう。';
+    } else {
+      guidanceText.textContent = 'ステップ2: 表示したいシートを選択してください。';
+    }
+  }
+}
+
+// =============================================================================
+// KEYBOARD SHORTCUTS
+// =============================================================================
+
+// Setup keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+  // Ctrl/Cmd + S for save and publish
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    if (selectedSheet && elements['save-publish-btn'] && !elements['save-publish-btn'].disabled) {
+      saveAndPublish();
+    }
+  }
+  
+  // Escape to close modals
+  if (e.key === 'Escape') {
+    var openModals = document.querySelectorAll('.modal:not(.hidden)');
+    if (openModals.length > 0) {
+      var lastModal = openModals[openModals.length - 1];
+      var modalId = lastModal.id;
+      
+      switch(modalId) {
+        case 'form-config-modal':
+          hideFormConfigModal();
+          break;
+        case 'privacy-modal':
+          hidePrivacyModal();
+          break;
+        case 'digital-citizenship-modal':
+          hideDigitalCitizenshipModal();
+          break;
+        case 'confirmation-modal':
+          hideConfirmationModal();
+          break;
+      }
+    }
+  }
+});
+
+// =============================================================================
+// TOUCH AND MOBILE INTERACTIONS
+// =============================================================================
+
+// Handle touch interactions for mobile
+if ('ontouchstart' in window) {
+  // Add touch-friendly classes
+  document.body.classList.add('touch-device');
+  
+  // Improve button tap targets
+  var buttons = document.querySelectorAll('button, .btn');
+  buttons.forEach(function(button) {
+    button.classList.add('touch-target');
+  });
+}
+
+// =============================================================================
+// ACCESSIBILITY ENHANCEMENTS
+// =============================================================================
+
+// Focus management for modals
+function manageFocusForModal(modalId, show) {
+  var modal = document.getElementById(modalId);
+  if (!modal) return;
+  
+  if (show) {
+    // Store currently focused element
+    modal.setAttribute('data-previous-focus', document.activeElement?.id || '');
+    
+    // Focus first interactive element in modal
+    var firstFocusable = modal.querySelector('button, input, textarea, select, [tabindex]:not([tabindex="-1"])');
+    if (firstFocusable) {
+      firstFocusable.focus();
+    }
+  } else {
+    // Restore focus to previous element
+    var previousFocusId = modal.getAttribute('data-previous-focus');
+    if (previousFocusId) {
+      var previousElement = document.getElementById(previousFocusId);
+      if (previousElement) {
+        previousElement.focus();
+      }
+    }
+  }
+}
+
+// =============================================================================
+// INITIALIZATION
+// =============================================================================
+
+// Initialize event listeners when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+  // Small delay to ensure all elements are rendered
+  setTimeout(setupEventListeners, 100);
+});
+</script>

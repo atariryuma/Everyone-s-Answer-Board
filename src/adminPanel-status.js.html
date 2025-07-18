@@ -1,0 +1,286 @@
+<script>
+// =============================================================================
+// ADMIN PANEL ERROR HANDLING & STATUS MANAGEMENT
+// =============================================================================
+
+// =============================================================================
+// ERROR HANDLING SYSTEM
+// =============================================================================
+
+function handleError(error, context, userMessage) {
+  console.error(`❌ Error in ${context}:`, error);
+  
+  if (error && typeof error === 'object') {
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+  }
+
+  var displayMessage = userMessage || translateErrorMessage(error?.message || String(error), context);
+  showMessage(displayMessage, 'error');
+  setLoading(false);
+}
+
+// Error message translation for better UX
+function translateErrorMessage(errorMsg, context) {
+  const lowerMsg = errorMsg.toLowerCase();
+  
+  // 範囲エラー
+  if (lowerMsg.includes('範囲の列数には') || lowerMsg.includes('range')) {
+    return '選択した範囲にデータが見つかりません。シートにデータがあることを確認してください。';
+  }
+  
+  // シート情報取得エラー
+  if (lowerMsg.includes('シート情報の取得に失敗') || lowerMsg.includes('sheet')) {
+    return 'シート情報の取得に失敗しました。スプレッドシートのアクセス権限を確認してください。';
+  }
+  
+  // 権限エラー
+  if (lowerMsg.includes('permission') || lowerMsg.includes('権限') || lowerMsg.includes('access denied')) {
+    return 'スプレッドシートへのアクセス権限がありません。管理者に権限を確認してください。';
+  }
+  
+  // ネットワークエラー
+  if (lowerMsg.includes('network') || lowerMsg.includes('timeout') || lowerMsg.includes('fetch')) {
+    return 'ネットワークエラーが発生しました。インターネット接続を確認して再試行してください。';
+  }
+  
+  // フォーム関連エラー
+  if (lowerMsg.includes('form') && lowerMsg.includes('not found')) {
+    return 'フォームが見つかりません。新しいフォームを作成してください。';
+  }
+  
+  // バリデーションエラー
+  if (lowerMsg.includes('validation') || lowerMsg.includes('invalid')) {
+    return '入力内容に問題があります。必須項目が入力されているか確認してください。';
+  }
+  
+  // 認証エラー
+  if (lowerMsg.includes('authentication') || lowerMsg.includes('login') || lowerMsg.includes('unauthorized')) {
+    return '認証が必要です。ページを再読み込みしてください。';
+  }
+  
+  // サーバーエラー
+  if (lowerMsg.includes('server error') || lowerMsg.includes('500') || lowerMsg.includes('503')) {
+    return 'サーバーエラーが発生しました。しばらく待ってから再試行してください。';
+  }
+  
+  // 設定エラー
+  if (context && context.includes('config') || lowerMsg.includes('configuration')) {
+    return '設定の保存に失敗しました。入力内容を確認して再試行してください。';
+  }
+  
+  // 一般的なエラー
+  if (lowerMsg.includes('failed') || lowerMsg.includes('error')) {
+    return '処理に失敗しました。しばらく待ってから再試行してください。';
+  }
+  
+  return errorMsg || '不明なエラーが発生しました。';
+}
+
+// Safe GAS call wrapper with error handling
+function safeGASCall(methodName, successHandler, errorMessage) {
+  return function(...args) {
+    try {
+      return google.script.run
+        .withSuccessHandler(successHandler)
+        .withFailureHandler(function(error) {
+          handleError(error, methodName, errorMessage);
+        })[methodName](...args);
+    } catch (e) {
+      handleError(e, methodName, errorMessage);
+    }
+  };
+}
+
+// Show error with context
+function showError(error) {
+  handleError(error, 'UI', null);
+}
+
+// =============================================================================
+// MESSAGE SYSTEM
+// =============================================================================
+
+var MESSAGE_TYPES = {
+  info: {
+    bgColor: 'bg-blue-500',
+    icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+    duration: 5000
+  },
+  success: {
+    bgColor: 'bg-green-500',
+    icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>',
+    duration: 4000,
+    extraClass: 'success-pulse'
+  },
+  warning: {
+    bgColor: 'bg-yellow-500',
+    icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.502 0L4.732 15.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>',
+    duration: 6000
+  },
+  error: {
+    bgColor: 'bg-red-500',
+    icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+    duration: 8000,
+    extraClass: 'error-shake'
+  }
+};
+
+// Sanitize message content to prevent XSS
+function sanitizeMessage(message) {
+  var div = document.createElement('div');
+  div.textContent = message;
+  return div.innerHTML;
+}
+
+// Check for duplicate messages
+function checkDuplicateMessage(messageArea, message) {
+  var existingMessages = messageArea.querySelectorAll('.message-content');
+  for (var i = 0; i < existingMessages.length; i++) {
+    if (existingMessages[i].textContent.trim() === message.trim()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Cleanup old messages (keep only latest 3)
+function cleanupOldMessages(messageArea) {
+  var messages = messageArea.querySelectorAll('.message-item');
+  if (messages.length > 3) {
+    for (var i = 0; i < messages.length - 3; i++) {
+      messageArea.removeChild(messages[i]);
+    }
+  }
+}
+
+// Create message element
+function createMessageElement(messageId, message, type) {
+  var messageType = MESSAGE_TYPES[type] || MESSAGE_TYPES.info;
+  var sanitizedMessage = sanitizeMessage(message);
+  
+  var messageElement = document.createElement('div');
+  messageElement.id = messageId;
+  messageElement.className = `message-item ${messageType.bgColor} text-white p-3 rounded-lg mb-2 flex items-start gap-3 shadow-lg transition-all duration-300 transform translate-x-0 ${messageType.extraClass || ''}`;
+  
+  messageElement.innerHTML = `
+    <div class="flex-shrink-0 mt-0.5">
+      ${messageType.icon}
+    </div>
+    <div class="flex-1">
+      <div class="message-content font-medium text-sm">${sanitizedMessage}</div>
+    </div>
+    <button onclick="removeMessage('${messageId}')" class="flex-shrink-0 ml-2 text-white hover:text-gray-200 transition-colors" aria-label="メッセージを閉じる">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+      </svg>
+    </button>
+  `;
+  
+  return messageElement;
+}
+
+// Setup auto-removal for messages
+function setupMessageAutoRemoval(messageId, type) {
+  var messageType = MESSAGE_TYPES[type] || MESSAGE_TYPES.info;
+  setTimeout(function() {
+    removeMessage(messageId);
+  }, messageType.duration);
+}
+
+// Main message display function
+function showMessage(message, type = 'info') {
+  if (!message) return;
+  
+  var messageArea = document.getElementById('message-area');
+  if (!messageArea) {
+    console.warn('Message area not found');
+    return;
+  }
+  
+  // Check for duplicate messages
+  if (checkDuplicateMessage(messageArea, message)) {
+    return;
+  }
+  
+  // Cleanup old messages
+  cleanupOldMessages(messageArea);
+  
+  // Create new message
+  var messageId = 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  var messageElement = createMessageElement(messageId, message, type);
+  
+  // Insert at top
+  messageArea.insertBefore(messageElement, messageArea.firstChild);
+  
+  // Setup auto-removal
+  setupMessageAutoRemoval(messageId, type);
+  
+  // Scroll message area into view if needed
+  if (messageArea.scrollIntoView) {
+    messageArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+// Remove message function
+function removeMessage(messageId) {
+  var messageElement = document.getElementById(messageId);
+  if (messageElement) {
+    messageElement.style.transform = 'translateX(100%)';
+    messageElement.style.opacity = '0';
+    setTimeout(function() {
+      if (messageElement.parentNode) {
+        messageElement.parentNode.removeChild(messageElement);
+      }
+    }, 300);
+  }
+}
+
+// =============================================================================
+// STATUS VALIDATION AND UPDATES
+// =============================================================================
+
+// Validate current status and update UI accordingly
+function validateStatus(status) {
+  if (!status) {
+    console.warn('No status received');
+    return false;
+  }
+  
+  if (!status.userInfo) {
+    console.warn('No user info in status');
+    return false;
+  }
+  
+  return true;
+}
+
+// Update user activity timestamp for polling optimization
+function updateUserActivity() {
+  lastUserActivity = Date.now();
+}
+
+// =============================================================================
+// INITIALIZATION HELPERS
+// =============================================================================
+
+// Initialize message area
+function initializeMessageArea() {
+  var messageArea = document.getElementById('message-area');
+  if (!messageArea) {
+    // Create message area if it doesn't exist
+    messageArea = document.createElement('div');
+    messageArea.id = 'message-area';
+    messageArea.className = 'fixed top-4 right-4 z-50 max-w-sm';
+    document.body.appendChild(messageArea);
+  }
+}
+
+// Initialize on DOM ready
+document.addEventListener('DOMContentLoaded', function() {
+  initializeMessageArea();
+});
+</script>

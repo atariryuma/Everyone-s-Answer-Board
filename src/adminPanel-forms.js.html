@@ -1,0 +1,67 @@
+<script>
+// 文字数カウンター機能
+function setupCharacterCounters() {
+  const titleInput = document.getElementById('custom-form-title');
+  const questionTextarea = document.getElementById('custom-main-question');
+  const titleCounter = document.getElementById('title-counter');
+  const questionCounter = document.getElementById('question-counter');
+
+  if (titleInput && titleCounter) {
+    titleInput.addEventListener('input', function() {
+      const count = this.value.length;
+      titleCounter.textContent = `${count}/100`;
+      titleCounter.className = count > 90 ? 'text-xs text-red-400' : 'text-xs text-gray-500';
+    });
+  }
+
+  if (questionTextarea && questionCounter) {
+    questionTextarea.addEventListener('input', function() {
+      const count = this.value.length;
+      questionCounter.textContent = `${count}/500`;
+      questionCounter.className = count > 450 ? 'text-xs text-red-400' : 'text-xs text-gray-500';
+    });
+  }
+}
+
+// セキュリティ情報表示関数
+function showSecurityInfo() {
+  showModal('security-details-modal');
+}
+
+// Google連携の利点表示関数
+function showGoogleIntegrationInfo() {
+  showModal('google-integration-modal');
+}
+
+// モーダル表示関数
+function showModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+}
+
+// モーダル非表示関数
+function hideModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+}
+
+// モーダル表示時にカウンターを初期化
+document.addEventListener('DOMContentLoaded', function() {
+  setupCharacterCounters();
+});
+
+// フォーム設定モーダルが開かれたときにカウンターをリセット
+const originalShowFormConfigModal = window.showFormConfigModal;
+if (typeof originalShowFormConfigModal === 'function') {
+  window.showFormConfigModal = function() {
+    originalShowFormConfigModal();
+    setTimeout(setupCharacterCounters, 100); // モーダル表示後にセットアップ
+  };
+}
+</script>

@@ -1,0 +1,510 @@
+<script>
+// =============================================================================
+// ADMIN PANEL API COMMUNICATIONS & BACKEND CALLS
+// =============================================================================
+
+// =============================================================================
+// BACKEND FUNCTION WRAPPERS
+// =============================================================================
+
+// マルチテナント対応: 新しいrunGasWithUserId関数
+function runGasWithUserId(functionName, ...args) {
+  // userIdが設定されていない場合は初期化を待つ
+  if (!userId) {
+    return userIdPromise.then(() => {
+      if (!userId) {
+        console.error('❌  - No userId available for:', functionName);
+        throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
+      }
+      
+      console.log('✅  - runGasWithUserId (after init):', functionName, 'userId:', userId);
+      // userIdを第一引数として追加
+      return gasOptimizer.call(functionName, userId, ...args);
+    });
+  }
+  
+  console.log('✅  - runGasWithUserId:', functionName, 'userId:', userId);
+  // userIdを第一引数として追加
+  return gasOptimizer.call(functionName, userId, ...args);
+}
+
+// callWithCache 関数 - 読み取り専用操作用
+function callWithCache(functionName, cacheKey, ttl, ...args) {
+  return unifiedCache.getOrSet(cacheKey, function() {
+    return gasOptimizer.call(functionName, ...args);
+  }, ttl);
+}
+
+// runGasWithUserId with cache support
+function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
+  if (!userId) {
+    return userIdPromise.then(() => {
+      if (!userId) {
+        throw new Error('ユーザーIDが設定されていません。');
+      }
+      return unifiedCache.getOrSet(cacheKey, function() {
+        return gasOptimizer.call(functionName, userId, ...args);
+      }, ttl);
+    });
+  }
+  
+  return unifiedCache.getOrSet(cacheKey, function() {
+    return gasOptimizer.call(functionName, userId, ...args);
+  }, ttl);
+}
+
+// =============================================================================
+// STATUS AND DATA LOADING
+// =============================================================================
+
+// Load current status from backend
+function loadStatus(forceRefresh = false) {
+  updateUserActivity();
+  setLoading(true, '最新のステータス情報を読み込んでいます...');
+  
+  const cacheKey = 'status_' + (userId || 'guest');
+  const cacheTime = 60000; // 1分キャッシュ
+  
+  if (forceRefresh) {
+    // キャッシュを削除してから取得
+    if (unifiedCache && unifiedCache.delete) {
+      unifiedCache.delete(cacheKey);
+    }
+    // マルチテナント対応: 新しい関数を使用
+    runGasWithUserId('getStatus')
+      .then(function(status) {
+        console.log('✅ Status loaded ( forced refresh)', status);
+        updateUIWithNewStatus(status);
+        setLoading(false);
+      })
+      .catch(function(error) {
+        console.error('❌  getStatus failed, falling back to legacy:', error);
+        // フォールバック: 従来の方法
+        runGasWithUserId('getStatus', forceRefresh)
+          .then(function(status) {
+            console.log('✅ Status loaded (legacy fallback)', status);
+            updateUIWithNewStatus(status);
+            setLoading(false);
+          })
+          .catch(function(error) {
+            handleError(error, 'loadStatus', 'ステータスの読み込みに失敗しました。');
+          });
+      });
+  } else {
+    // キャッシュ利用
+    callWithCacheWithUserId('getStatus', cacheKey, cacheTime)
+      .then(function(status) {
+        console.log('✅ Status loaded (cached)', status);
+        updateUIWithNewStatus(status);
+        setLoading(false);
+      })
+      .catch(function(error) {
+        handleError(error, 'loadStatus', 'ステータスの読み込みに失敗しました。');
+      });
+  }
+}
+
+// Load sheet configuration for selected sheet
+function loadConfigForSelected() {
+  if (!selectedSheet) {
+    console.warn('No sheet selected for config loading');
+    return;
+  }
+  
+  if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
+    showMessage('スプレッドシートの情報が見つかりません。', 'error');
+    return;
+  }
+  
+  setLoading(true, '列情報を読み込んでいます...');
+  
+  runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
+    .then(handleSheetDetailsSuccess)
+    .catch(handleSheetDetailsError);
+}
+
+// Handle successful sheet details loading
+function handleSheetDetailsSuccess(details) {
+  console.log('✅ Sheet details loaded:', details);
+  
+  if (details && details.headers) {
+    populateHeaderOptions(details.headers);
+    
+    if (details.guessedConfig) {
+      populateConfig(details.guessedConfig);
+      showMessage('AI列判定が完了しました。設定を確認してください。', 'success');
+    }
+  } else {
+    showMessage('シートの詳細情報を取得できませんでした。', 'warning');
+  }
+  
+  setLoading(false);
+}
+
+// Handle sheet details loading error
+function handleSheetDetailsError(error) {
+  console.error('❌ Sheet details failed:', error);
+  handleError(error, 'loadConfigForSelected', 'シート情報の読み込みに失敗しました。');
+}
+
+// =============================================================================
+// AI COLUMN DETECTION
+// =============================================================================
+
+// Run AI-powered header guessing
+function runHeaderGuessing() {
+  if (!selectedSheet) {
+    showMessage('シートを選択してください。', 'warning');
+    return;
+  }
+  
+  if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
+    showMessage('スプレッドシートの情報が見つかりません。', 'error');
+    return;
+  }
+  
+  setLoading(true, 'AI搭載高精度列判定システムが分析中...');
+  
+  runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
+    .then(function(details) {
+      const configToUse = {
+        ...details.guessedConfig,
+        sheetName: selectedSheet
+      };
+      
+      populateConfig(configToUse);
+      showMessage('AI列判定が完了しました！設定を確認して「保存・公開」を押してください。', 'success');
+      setLoading(false);
+    })
+    .catch(function(error) {
+      handleError(error, 'runHeaderGuessing', 'AI列判定に失敗しました。');
+    });
+}
+
+// =============================================================================
+// SAVE AND PUBLISH OPERATIONS
+// =============================================================================
+
+// Save configuration and publish board
+function saveAndPublish() {
+  if (!validateConfig()) {
+    showMessage('必須項目（回答データ列）が選択されていません。', 'error');
+    return;
+  }
+  
+  setLoading(true, '設定を保存し、ボードを公開しています...');
+  
+  const config = buildConfigObject();
+  const settingsData = {
+    sheetName: selectedSheet,
+    opinionColumn: config.opinionColumn,
+    nameColumn: config.nameColumn,
+    classColumn: config.classColumn,
+    timestampColumn: config.timestampColumn,
+    showNames: config.showNames,
+    showCounts: config.showCounts,
+    classChoices: config.classChoices
+  };
+  
+  runGasWithUserId('saveAndPublish', settingsData)
+    .then(function(result) {
+      setLoading(false);
+      if (result && result.status === 'success') {
+        showMessage('✅ 設定が保存され、ボードが公開されました！', 'success');
+        loadStatus(true); // 強制リフレッシュでUIを更新
+      } else {
+        showMessage(result.message || '設定の保存に失敗しました。', 'error');
+      }
+    })
+    .catch(function(error) {
+      setLoading(false);
+      console.error('❌  saveAndPublish failed, falling back to legacy:', error);
+      // フォールバック: 従来の方法
+      runGasWithUserId('saveAndPublish', selectedSheet, config)
+        .then(function(status) {
+          setLoading(false);
+          showMessage('設定が保存され、ボードが公開されました！', 'success');
+          updateUIWithNewStatus(status);
+        })
+        .catch(function(fallbackError) {
+          handleError(fallbackError, 'saveAndPublish', '設定の保存に失敗しました。');
+        });
+    });
+}
+
+// Unpublish board
+function unpublishBoard() {
+  setLoading(true, 'ボードの公開を停止中...');
+  runGasWithUserId('clearActiveSheet')
+    .then(function(response) {
+      console.log('公開停止レスポンス:', response);
+      showMessage(response.message || '✅ 回答ボードの公開を停止しました。', 'success');
+      setLoading(false);
+      loadStatus(true); // ステータスを強制更新
+    })
+    .catch(function(error) {
+      handleError(error, 'unpublishBoard', 'ボードの公開停止に失敗しました。');
+    });
+}
+
+// =============================================================================
+// FORM MANAGEMENT
+// =============================================================================
+
+// Load saved class choices
+function loadSavedClassChoices() {
+    runGasWithUserId('getSavedClassChoices')
+        .then(function(result) {
+            if (result.status === 'success' && result.classChoices) {
+                const classChoicesTextarea = document.getElementById('class-choices');
+                if (classChoicesTextarea) {
+                    classChoicesTextarea.value = result.classChoices.join('\n');
+                }
+            }
+        })
+        .catch(function(error) {
+            console.warn('保存されたクラス選択肢の読み込みに失敗:', error.message);
+        });
+}
+
+// Create form with custom configuration
+function createFormWithConfig() {
+  const titleInput = document.getElementById('custom-form-title');
+  const questionTextarea = document.getElementById('custom-main-question');
+  const classChoicesTextarea = document.getElementById('class-choices');
+  const includeOthersOption = document.getElementById('include-others-option').checked;
+  
+  if (!titleInput || !questionTextarea || !classChoicesTextarea) {
+    showMessage('フォーム作成に必要な要素が見つかりません。', 'error');
+    return;
+  }
+  
+  const title = titleInput.value.trim();
+  const question = questionTextarea.value.trim();
+  const classChoicesText = classChoicesTextarea.value.trim();
+  
+  if (!title || !question) {
+    showMessage('タイトルと問題文は必須です。', 'warning');
+    return;
+  }
+  
+  if (!classChoicesText) {
+    showMessage('クラス選択肢を入力してください。', 'warning');
+    return;
+  }
+  
+  const classChoices = classChoicesText.split('\n')
+    .map(choice => choice.trim())
+    .filter(choice => choice.length > 0);
+  
+  if (classChoices.length === 0) {
+    showMessage('有効なクラス選択肢を入力してください。', 'warning');
+    return;
+  }
+  
+  const config = {
+    title: title,
+    mainQuestion: question,
+    classChoices: classChoices,
+    includeOthers: includeOthersOption,
+  };
+  
+  hideFormConfigModal();
+  setLoading(true, '新しいフォームを作成しています...');
+
+  runGasWithUserId('createCustomFormUI', config)
+      .then(function(result) {
+          if (result.status === 'success') {
+              showMessage('✅ 新しいフォームが作成され、連携されました！', 'success');
+              
+              // クラス選択肢をデータベースに保存
+              saveClassChoicesToDatabase(classChoices);
+              
+              // ステータスを更新
+              loadStatus(true);
+          } else {
+              showMessage(result.message || 'フォームの作成に失敗しました。', 'error');
+          }
+          setLoading(false);
+      })
+      .catch(function(error) {
+          handleError(error, 'createFormWithConfig', 'フォームの作成に失敗しました。');
+      });
+}
+
+// Save class choices to database
+function saveClassChoicesToDatabase(classChoices) {
+    runGasWithUserId('saveClassChoices', classChoices)
+        .catch(function(error) {
+            console.warn('クラス選択肢の保存に失敗:', error.message);
+        });
+}
+
+// =============================================================================
+// RESOURCE MANAGEMENT
+// =============================================================================
+
+// Add spreadsheet resource
+function addResource() {
+  const urlInput = document.getElementById('resource-url-input');
+  if (!urlInput) {
+    showMessage('URL入力フィールドが見つかりません。', 'error');
+    return;
+  }
+  
+  const url = urlInput.value.trim();
+  if (!url) {
+    showMessage('URLを入力してください。', 'warning');
+    return;
+  }
+
+  setLoading(true, 'リソースを追加しています...');
+  runGasWithUserId('addSpreadsheetUrl', url)
+    .then(function(result) {
+      if (result.status === 'success') {
+        showMessage(result.message, 'success');
+        urlInput.value = ''; // Clear input
+        loadStatus(true); // Refresh status
+      } else {
+        showMessage(result.message || 'リソースの追加に失敗しました。', 'error');
+      }
+      setLoading(false);
+    })
+    .catch(function(error) {
+      handleError(error, 'addResource', 'リソースの追加に失敗しました。');
+    });
+}
+
+// =============================================================================
+// EXTERNAL LINKS AND NAVIGATION
+// =============================================================================
+
+// Copy board URL to clipboard
+function copyBoardUrl() {
+  const urlInput = document.getElementById('board-url');
+  if (urlInput) {
+    urlInput.select();
+    urlInput.setSelectionRange(0, 99999); // For mobile devices
+    
+    try {
+      document.execCommand('copy');
+      showMessage('URLがクリップボードにコピーされました！', 'success');
+    } catch (err) {
+      showMessage('URLのコピーに失敗しました。手動でコピーしてください。', 'warning');
+    }
+  }
+}
+
+// Open database spreadsheet
+function openDatabaseSpreadsheet() {
+  if (currentSpreadsheetUrl) {
+    window.open(currentSpreadsheetUrl, '_blank');
+  } else {
+    showMessage('スプレッドシートのURLが見つかりません。', 'warning');
+  }
+}
+
+// Open form
+function openForm() {
+  if (currentStatus && currentStatus.customFormInfo && currentStatus.customFormInfo.formUrl) {
+    window.open(currentStatus.customFormInfo.formUrl, '_blank');
+  } else {
+    showMessage('フォームのURLが見つかりません。先にフォームを作成してください。', 'warning');
+  }
+}
+
+// Open app setup page
+function openAppSetupPage() {
+  runGasWithUserId('getWebAppUrlCached')
+    .then(function(webAppUrl) {
+      const setupUrl = webAppUrl + '?setup=true&mode=appsetup';
+      window.open(setupUrl, '_blank');
+    })
+    .catch(function(error) {
+      console.error('Failed to get web app URL:', error);
+      showMessage('アプリ設定ページのURLを取得できませんでした。', 'error');
+    });
+}
+
+// =============================================================================
+// POLLING AND REAL-TIME UPDATES
+// =============================================================================
+
+// System status polling variables
+let lastUserActivity = Date.now();
+let currentPollInterval = 5 * 60 * 1000; // 開始は5分間隔
+let statusPollTimer = null;
+
+// Get optimal polling interval based on user activity
+function getOptimalPollInterval() {
+  const timeSinceActivity = Date.now() - lastUserActivity;
+  
+  if (timeSinceActivity < 2 * 60 * 1000) { // 2分以内
+    return 30 * 1000; // 30秒間隔
+  } else if (timeSinceActivity < 10 * 60 * 1000) { // 10分以内
+    return 2 * 60 * 1000; // 2分間隔
+  } else {
+    return 10 * 60 * 1000; // 10分間隔
+  }
+}
+
+// Restart status polling with new interval
+function restartStatusPolling() {
+  if (statusPollTimer) {
+    clearInterval(statusPollTimer);
+  }
+  currentPollInterval = getOptimalPollInterval();
+  startSystemStatusUpdate();
+}
+
+// Start system status update polling
+function startSystemStatusUpdate() {
+  statusPollTimer = setInterval(function() {
+    // UIが非表示の時は更新しない
+    if (document.hidden) return;
+    
+    // 現在のポーリング間隔を確認し、必要に応じて調整
+    const optimalInterval = getOptimalPollInterval();
+    if (Math.abs(currentPollInterval - optimalInterval) > 30000) { // 30秒以上の差
+      restartStatusPolling();
+      return;
+    }
+    
+    // キャッシュを利用して静かに更新
+    runGasWithUserId('getStatus', false)
+      .then(function(status) {
+        // 変更があった場合のみUIを更新
+        if (JSON.stringify(status) !== JSON.stringify(currentStatus)) {
+          updateUIWithNewStatus(status);
+        }
+      })
+      .catch(function(error) {
+        console.warn('Background status update failed:', error);
+      });
+  }, currentPollInterval);
+}
+
+// =============================================================================
+// INITIALIZATION
+// =============================================================================
+
+// Initialize API communications
+function initializeAPI() {
+  console.log('🔗 Initializing API communications...');
+  
+  // Start background status updates
+  startSystemStatusUpdate();
+  
+  // Setup user activity tracking
+  document.addEventListener('click', updateUserActivity);
+  document.addEventListener('keypress', updateUserActivity);
+  document.addEventListener('scroll', updateUserActivity);
+  
+  console.log('✅ API communications initialized');
+}
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(initializeAPI, 200);
+});
+</script>
