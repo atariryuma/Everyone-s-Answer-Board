@@ -227,11 +227,11 @@ function processLoginFlow(userEmail) {
       };
       
       // 3b. データベースに作成
-      const createdUser = createUser(newUser);
-      console.log('processLoginFlow: 新規ユーザー作成完了:', createdUser.userId);
+      createUser(newUser);
+      console.log('processLoginFlow: 新規ユーザー作成完了:', newUser.userId);
       
       // 3c. 新規ユーザーの管理パネルへリダイレクト
-      const adminUrl = buildUserAdminUrl(createdUser.userId);
+      const adminUrl = buildUserAdminUrl(newUser.userId);
       return createSecureRedirect(adminUrl, 'ようこそ！セットアップが完了しました');
     }
   } catch (error) {
