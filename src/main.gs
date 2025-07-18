@@ -408,16 +408,21 @@ function getSystemDomainInfo() {
  */
 function doGet(e) {
   try {
-    console.log('doGet - Raw request object:', JSON.stringify(e));
-    
-    // パラメータとユーザー情報を取得
-    const params = parseRequestParams(e);
-    const userEmail = Session.getActiveUser().getEmail();
-    
-    console.log('doGet - User email:', userEmail);
+    // 1. システムの初期セットアップが完了しているかを確認
+    if (!isSystemSetup()) {
+      return showSetupPage();
+    }
 
-    // リクエストをルーティング
-    return routeRequest(params, userEmail);
+    // 2. 現在のユーザー情報を取得
+    const userEmail = Session.getActiveUser().getEmail();
+    if (!userEmail) {
+      // ログインしていない場合はログインページを表示
+      return showLoginPage();
+    }
+
+    // 3. 新しいログインフローに処理を委譲
+    return processLoginFlow(userEmail);
+
   } catch (error) {
     console.error(`doGetで致命的なエラー: ${error.stack}`);
     return showErrorPage('致命的なエラー', 'アプリケーションの処理中に予期せぬエラーが発生しました。', error);

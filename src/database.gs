@@ -410,7 +410,7 @@ function fetchUserFromDatabase(field, value) {
     var service = getSheetsService();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
-    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
+    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:Z"]);
     var values = data.valueRanges[0].values || [];
     
     if (values.length === 0) return null;

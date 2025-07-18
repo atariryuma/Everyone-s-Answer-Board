@@ -41,7 +41,7 @@ function generateNewServiceAccountToken() {
     throw new Error('サービスアカウント認証情報にclient_emailまたはprivate_keyが含まれていません。');
   }
   
-  var privateKey = serviceAccountCreds.private_key.replace(/\\n/g, '\n'); // 改行文字を正規化
+  var privateKey = serviceAccountCreds.private_key.replace(/\n/g, '\n'); // 改行文字を正規化
   var clientEmail = serviceAccountCreds.client_email;
   var tokenUrl = "https://www.googleapis.com/oauth2/v4/token";
   
@@ -180,5 +180,62 @@ function verifyAdminAccess(userId) {
   } catch (e) {
     console.error('verifyAdminAccess: 管理者検証中にエラーが発生しました:', e.message);
     return false;
+  }
+}
+
+/**
+ * ログインフローを処理し、適切なページにリダイレクトする
+ * @param {string} userEmail ログインユーザーのメールアドレス
+ * @returns {HtmlOutput} 表示するHTMLコンテンツ
+ */
+function processLoginFlow(userEmail) {
+  try {
+    // 1. ユーザー情報をデータベースから取得
+    var userInfo = findUserByEmail(userEmail);
+
+    // 2. 既存ユーザーの処理
+    if (userInfo) {
+      // 2a. アクティブユーザーの場合
+      if (isTrue(userInfo.isActive)) {
+        console.log('processLoginFlow: 既存アクティブユーザー:', userEmail);
+        const adminUrl = buildUserAdminUrl(userInfo.userId);
+        return createSecureRedirect(adminUrl, '管理パネルへようこそ');
+      } 
+      // 2b. 非アクティブユーザーの場合
+      else {
+        console.warn('processLoginFlow: 既存だが非アクティブなユーザー:', userEmail);
+        return showErrorPage(
+          'アカウントが無効です', 
+          'あなたのアカウントは現在無効化されています。管理者にお問い合わせください。'
+        );
+      }
+    } 
+    // 3. 新規ユーザーの処理
+    else {
+      console.log('processLoginFlow: 新規ユーザー登録開始:', userEmail);
+      
+      // 3a. 新規ユーザーデータを準備
+      const newUser = {
+        userId: Utilities.getUuid(),
+        adminEmail: userEmail,
+        createdAt: new Date().toISOString(),
+        isActive: true, // 即時有効化
+        configJson: '{}',
+        spreadsheetId: '',
+        spreadsheetUrl: '',
+        lastAccessedAt: new Date().toISOString()
+      };
+      
+      // 3b. データベースに作成
+      const createdUser = createUser(newUser);
+      console.log('processLoginFlow: 新規ユーザー作成完了:', createdUser.userId);
+      
+      // 3c. 新規ユーザーの管理パネルへリダイレクト
+      const adminUrl = buildUserAdminUrl(createdUser.userId);
+      return createSecureRedirect(adminUrl, 'ようこそ！セットアップが完了しました');
+    }
+  } catch (error) {
+    console.error('processLoginFlowでエラー:', error.stack);
+    return showErrorPage('ログインエラー', 'ログイン処理中にエラーが発生しました。', error);
   }
 }
