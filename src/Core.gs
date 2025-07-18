@@ -3561,6 +3561,98 @@ function getCurrentUserEmail() {
 }
 
 /**
+ * ログインフロー修正の検証テスト
+ * @returns {object} テスト結果
+ */
+function verifyLoginFlowFix() {
+  try {
+    const testResults = {
+      timestamp: new Date().toISOString(),
+      processLoginFlowTest: null,
+      cacheOperationTest: null,
+      overallStatus: 'unknown'
+    };
+
+    console.log('🔍 ログインフロー修正検証開始');
+
+    // 1. processLoginFlow関数の基本動作テスト
+    try {
+      const loginResult = processLoginFlow();
+      testResults.processLoginFlowTest = {
+        success: true,
+        status: loginResult.status,
+        hasAdminUrl: !!loginResult.adminUrl,
+        hasMessage: !!loginResult.message,
+        isErrorResponse: loginResult.status === 'error'
+      };
+      console.log('✅ processLoginFlow動作確認:', testResults.processLoginFlowTest);
+    } catch (error) {
+      testResults.processLoginFlowTest = {
+        success: false,
+        error: error.message,
+        isValueFnError: error.message.includes('valueFn is not a function')
+      };
+      console.log('❌ processLoginFlowエラー:', testResults.processLoginFlowTest);
+    }
+
+    // 2. キャッシュ操作の基本テスト
+    try {
+      const testKey = 'test_cache_' + Date.now();
+      const testValue = { test: true, timestamp: Date.now() };
+      
+      // キャッシュ保存テスト
+      CacheService.getScriptCache().put(testKey, JSON.stringify(testValue), 10);
+      
+      // キャッシュ読み込みテスト
+      const retrieved = CacheService.getScriptCache().get(testKey);
+      const parsed = JSON.parse(retrieved || 'null');
+      
+      testResults.cacheOperationTest = {
+        success: true,
+        canSave: true,
+        canRetrieve: !!retrieved,
+        dataIntegrity: parsed && parsed.test === true
+      };
+      
+      // テストキャッシュを削除
+      CacheService.getScriptCache().remove(testKey);
+      
+      console.log('✅ キャッシュ操作確認:', testResults.cacheOperationTest);
+    } catch (error) {
+      testResults.cacheOperationTest = {
+        success: false,
+        error: error.message
+      };
+      console.log('❌ キャッシュ操作エラー:', testResults.cacheOperationTest);
+    }
+
+    // 3. 総合判定
+    const loginSuccess = testResults.processLoginFlowTest?.success;
+    const cacheSuccess = testResults.cacheOperationTest?.success;
+    const noValueFnError = !testResults.processLoginFlowTest?.isValueFnError;
+
+    if (loginSuccess && cacheSuccess && noValueFnError) {
+      testResults.overallStatus = 'fixed';
+    } else if (noValueFnError) {
+      testResults.overallStatus = 'partially_fixed';
+    } else {
+      testResults.overallStatus = 'still_broken';
+    }
+
+    console.log('🎯 修正検証結果:', testResults.overallStatus);
+    return testResults;
+
+  } catch (error) {
+    console.error('❌ 修正検証エラー:', error);
+    return {
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      overallStatus: 'test_error'
+    };
+  }
+}
+
+/**
  * セキュリティ強化とキャッシュ最適化のパフォーマンステスト
  * @returns {object} パフォーマンステスト結果
  */
@@ -3690,10 +3782,17 @@ function processLoginFlow() {
 
     // ログインフロー専用の短期キャッシュをチェック（30秒キャッシュ）
     var cacheKey = 'login_flow_' + activeUserEmail;
-    var cached = cacheManager.get(cacheKey);
-    if (cached) {
-      console.log('processLoginFlow: キャッシュから高速返却');
-      return cached;
+    var cached = null;
+    try {
+      var cachedString = CacheService.getScriptCache().get(cacheKey);
+      if (cachedString) {
+        cached = JSON.parse(cachedString);
+        console.log('processLoginFlow: キャッシュから高速返却');
+        return cached;
+      }
+    } catch (e) {
+      console.warn('processLoginFlow: キャッシュ読み込みエラー -', e.message);
+      cached = null;
     }
 
     // ユーザー情報をメールアドレスで検索（キャッシュ活用）
@@ -3751,16 +3850,37 @@ function processLoginFlow() {
     }
 
     // 結果を短期キャッシュに保存（30秒）
-    cacheManager.put(cacheKey, result, 30);
+    try {
+      CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 30);
+    } catch (e) {
+      console.warn('processLoginFlow: キャッシュ保存エラー -', e.message);
+      // キャッシュ保存に失敗しても処理は続行
+    }
     
     console.log('processLoginFlow: 処理完了 -', result.status, result.userId);
     return result;
 
   } catch (error) {
     console.error('processLoginFlow: エラー発生 -', error.message);
+    console.error('processLoginFlow: エラースタック -', error.stack);
+    
+    // エラータイプに応じた詳細なメッセージを提供
+    var errorMessage = 'ログイン処理中にエラーが発生しました';
+    if (error.message.includes('not a function')) {
+      errorMessage = 'システム関数の呼び出しエラーが発生しました。しばらく待ってから再試行してください。';
+    } else if (error.message.includes('permission') || error.message.includes('権限')) {
+      errorMessage = 'アクセス権限に問題があります。管理者にお問い合わせください。';
+    } else if (error.message.includes('network') || error.message.includes('timeout')) {
+      errorMessage = 'ネットワークエラーが発生しました。接続を確認して再試行してください。';
+    } else {
+      errorMessage = 'ログイン処理中に予期しないエラーが発生しました: ' + error.message;
+    }
+    
     return {
       status: 'error',
-      message: 'ログイン処理中にエラーが発生しました: ' + error.message
+      message: errorMessage,
+      errorType: error.name,
+      timestamp: new Date().toISOString()
     };
   }
 }

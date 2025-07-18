@@ -134,7 +134,33 @@
     // ログインエラーを処理する関数
     const handleLoginError = (err) => {
       console.error('Login error:', err);
-      userEmailDisplay.textContent = err.message || 'ログイン処理エラーが発生しました';
+      
+      // エラーメッセージの改善
+      let displayMessage = 'ログイン処理エラーが発生しました';
+      if (err && err.message) {
+        displayMessage = err.message;
+      } else if (typeof err === 'string') {
+        displayMessage = err;
+      }
+      
+      // エラータイプに応じた追加処理
+      if (displayMessage.includes('システム関数の呼び出しエラー')) {
+        // 3秒後に自動リトライボタンを表示
+        setTimeout(() => {
+          if (userEmailDisplay && userEmailDisplay.textContent.includes('システム関数の呼び出しエラー')) {
+            const retryButton = document.createElement('button');
+            retryButton.textContent = '🔄 再試行';
+            retryButton.className = 'mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600';
+            retryButton.onclick = () => {
+              retryButton.remove();
+              handleSimpleLogin();
+            };
+            userEmailDisplay.parentNode.appendChild(retryButton);
+          }
+        }, 3000);
+      }
+      
+      userEmailDisplay.textContent = displayMessage;
       setLoading(false);
     };
 
