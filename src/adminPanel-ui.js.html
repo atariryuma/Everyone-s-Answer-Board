@@ -323,34 +323,69 @@ function populateHeaderOptions(headers) {
 function populateConfig(cfg) {
   if (!cfg) return;
   
+  console.group('🤖 populateConfig');
+  console.log('📝 AI Config received:', cfg);
+  
   const mappings = {
-    'opinion-column': cfg.opinionColumn,
-    'name-column': cfg.nameColumn,
-    'class-column': cfg.classColumn,
+    // Main opinion dropdown (primary target)
+    'opinionHeader': cfg.opinionHeader || cfg.opinionColumn,
+    
+    // Detail configuration dropdowns (secondary targets with property name fixes)
+    'opinion-column': cfg.opinionColumn || cfg.opinionHeader,
+    'name-column': cfg.nameColumn || cfg.nameHeader,
+    'class-column': cfg.classColumn || cfg.classHeader,
     'timestamp-column': cfg.timestampColumn,
     'show-names': cfg.showNames,
     'show-counts': cfg.showCounts
   };
   
+  console.log('🎯 Mappings to apply:', mappings);
+  
   Object.keys(mappings).forEach(elementId => {
     const element = document.getElementById(elementId);
     const value = mappings[elementId];
     
+    console.log(`🔍 Setting ${elementId}:`, { 
+      element: !!element, 
+      value: value,
+      valueType: typeof value 
+    });
+    
     if (element && value !== undefined) {
       if (element.type === 'checkbox') {
         element.checked = Boolean(value);
+        console.log(`☑️ Checkbox ${elementId} set to:`, element.checked);
       } else {
         element.value = value;
+        console.log(`📋 Dropdown ${elementId} set to:`, element.value);
+        
+        // Verify the option exists in the dropdown
+        const hasOption = Array.from(element.options).some(option => option.value === value);
+        if (!hasOption) {
+          console.warn(`⚠️ Option "${value}" not found in ${elementId} dropdown`);
+          console.log(`Available options:`, Array.from(element.options).map(opt => opt.value));
+        } else {
+          console.log(`✅ Option "${value}" successfully selected in ${elementId}`);
+        }
+      }
+    } else {
+      if (!element) {
+        console.warn(`❌ Element not found: ${elementId}`);
+      }
+      if (value === undefined) {
+        console.log(`⚪ No value for: ${elementId}`);
       }
     }
   });
   
+  console.groupEnd();
   updateConfigButtons();
 }
 
 // Clear configuration fields
 function clearConfigFields() {
   const fieldIds = [
+    'opinionHeader',      // Main required field
     'opinion-column',
     'name-column',
     'class-column', 
