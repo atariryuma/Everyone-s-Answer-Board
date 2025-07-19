@@ -2715,7 +2715,20 @@ function getSheetsList(userId) {
       spreadsheetUrl: userInfo.spreadsheetUrl
     });
     
-    if (!userInfo.spreadsheetId) {      console.warn('getSheetsList: No spreadsheet ID for user:', userId);      return [];    }    debugLog('getSheetsList: User\'s spreadsheetId:', userInfo.spreadsheetId); // Added debug log    var service = getSheetsService();    debugLog('getSheetsList: SheetsService obtained, attempting to fetch spreadsheet data...');
+    if (!userInfo.spreadsheetId) {
+      console.warn('getSheetsList: No spreadsheet ID for user:', userId);
+      return [];
+    }
+
+    debugLog('getSheetsList: User\'s spreadsheetId:', userInfo.spreadsheetId);
+
+    var service = getSheetsService();
+    if (!service) {
+      console.error('getSheetsList: Sheets service not initialized');
+      return { error: true, message: 'Sheets service initialization failed' };
+    }
+
+    debugLog('getSheetsList: SheetsService obtained, attempting to fetch spreadsheet data...');
     
     var spreadsheet;
     try {
