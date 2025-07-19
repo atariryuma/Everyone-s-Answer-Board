@@ -8,48 +8,48 @@
 // =============================================================================
 
 // マルチテナント対応: 新しいrunGasWithUserId関数
-function runGasWithUserId(functionName, ...args) {
+function runGasWithUserId(serverFunction, ...args) {
   // userIdが設定されていない場合は初期化を待つ
   if (!userId) {
     return userIdPromise.then(() => {
       if (!userId) {
-        console.error('❌  - No userId available for:', functionName);
+        console.error('❌  - No userId available for:', serverFunction.name || 'anonymousFunction');
         throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
       }
       
-      console.log('✅  - runGasWithUserId (after init):', functionName, 'userId:', userId);
+      console.log('✅  - runGasWithUserId (after init):', serverFunction.name || 'anonymousFunction', 'userId:', userId);
       // userIdを第一引数として追加
-      return gasOptimizer.call(functionName, userId, ...args);
+      return gasOptimizer.call(serverFunction, userId, ...args);
     });
   }
   
-  console.log('✅  - runGasWithUserId:', functionName, 'userId:', userId);
+  console.log('✅  - runGasWithUserId:', serverFunction.name || 'anonymousFunction', 'userId:', userId);
   // userIdを第一引数として追加
-  return gasOptimizer.call(functionName, userId, ...args);
+  return gasOptimizer.call(serverFunction, userId, ...args);
 }
 
 // callWithCache 関数 - 読み取り専用操作用
-function callWithCache(functionName, cacheKey, ttl, ...args) {
+function callWithCache(serverFunction, cacheKey, ttl, ...args) {
   return unifiedCache.getOrSet(cacheKey, function() {
-    return gasOptimizer.call(functionName, ...args);
+    return gasOptimizer.call(serverFunction, ...args);
   }, ttl);
 }
 
 // runGasWithUserId with cache support
-function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
+function callWithCacheWithUserId(serverFunction, cacheKey, ttl, ...args) {
   if (!userId) {
     return userIdPromise.then(() => {
       if (!userId) {
         throw new Error('ユーザーIDが設定されていません。');
       }
       return unifiedCache.getOrSet(cacheKey, function() {
-        return gasOptimizer.call(functionName, userId, ...args);
+        return gasOptimizer.call(serverFunction, userId, ...args);
       }, ttl);
     });
   }
   
   return unifiedCache.getOrSet(cacheKey, function() {
-    return gasOptimizer.call(functionName, userId, ...args);
+    return gasOptimizer.call(serverFunction, userId, ...args);
   }, ttl);
 }
 
@@ -71,7 +71,7 @@ function loadStatus(forceRefresh = false) {
       unifiedCache.delete(cacheKey);
     }
     // マルチテナント対応: 新しい関数を使用
-    runGasWithUserId('getStatus')
+    runGasWithUserId(google.script.run.getStatus)
       .then(function(status) {
         console.log('✅ Status loaded ( forced refresh)', status);
         updateUIWithNewStatus(status);
@@ -80,7 +80,7 @@ function loadStatus(forceRefresh = false) {
       .catch(function(error) {
         console.error('❌  getStatus failed, falling back to legacy:', error);
         // フォールバック: 従来の方法
-        runGasWithUserId('getStatus', forceRefresh)
+        runGasWithUserId(google.script.run.getStatus, forceRefresh)
           .then(function(status) {
             console.log('✅ Status loaded (legacy fallback)', status);
             updateUIWithNewStatus(status);
@@ -92,7 +92,7 @@ function loadStatus(forceRefresh = false) {
       });
   } else {
     // キャッシュ利用
-    callWithCacheWithUserId('getStatus', cacheKey, cacheTime)
+    callWithCacheWithUserId(google.script.run.getStatus, cacheKey, cacheTime)
       .then(function(status) {
         console.log('✅ Status loaded (cached)', status);
         updateUIWithNewStatus(status);
@@ -118,7 +118,7 @@ function loadConfigForSelected() {
   
   setLoading(true, '列情報を読み込んでいます...');
   
-  runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
+  runGasWithUserId(google.script.run.getSheetDetails, currentStatus.userInfo.spreadsheetId, selectedSheet)
     .then(handleSheetDetailsSuccess)
     .catch(handleSheetDetailsError);
 }
@@ -165,7 +165,7 @@ function runHeaderGuessing() {
   
   setLoading(true, 'AI搭載高精度列判定システムが分析中...');
   
-  runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
+  runGasWithUserId(google.script.run.getSheetDetails, currentStatus.userInfo.spreadsheetId, selectedSheet)
     .then(function(details) {
       const configToUse = {
         ...details.guessedConfig,
@@ -196,7 +196,7 @@ function saveAndPublish() {
   
   const config = buildConfigObject();
   
-  runGasWithUserId('saveAndPublish', selectedSheet, config)
+  runGasWithUserId(google.script.run.saveAndPublish, selectedSheet, config)
     .then(function(result) {
       setLoading(false);
       if (result && result.status === 'success') {
@@ -214,7 +214,7 @@ function saveAndPublish() {
 // Unpublish board
 function unpublishBoard() {
   setLoading(true, 'ボードの公開を停止中...');
-  runGasWithUserId('clearActiveSheet')
+  runGasWithUserId(google.script.run.clearActiveSheet)
     .then(function(response) {
       console.log('公開停止レスポンス:', response);
       showMessage(response.message || '✅ 回答ボードの公開を停止しました。', 'success');
@@ -232,7 +232,7 @@ function unpublishBoard() {
 
 // Load saved class choices
 function loadSavedClassChoices() {
-    runGasWithUserId('getSavedClassChoices')
+    runGasWithUserId(google.script.run.getSavedClassChoices)
         .then(function(result) {
             if (result.status === 'success' && result.classChoices) {
                 const classChoicesTextarea = document.getElementById('class-choices');
@@ -324,7 +324,7 @@ function createFormWithConfig() {
 
 // Save class choices to database
 function saveClassChoicesToDatabase(classChoices) {
-    runGasWithUserId('saveClassChoices', classChoices)
+    runGasWithUserId(google.script.run.saveClassChoices, classChoices)
         .catch(function(error) {
             console.warn('クラス選択肢の保存に失敗:', error.message);
         });
@@ -349,7 +349,7 @@ function addResource() {
   }
 
   setLoading(true, 'リソースを追加しています...');
-  runGasWithUserId('addSpreadsheetUrl', url)
+  runGasWithUserId(google.script.run.addSpreadsheetUrl, url)
     .then(function(result) {
       if (result.status === 'success') {
         showMessage(result.message, 'success');
@@ -405,7 +405,7 @@ function openForm() {
 
 // Open app setup page
 function openAppSetupPage() {
-  runGasWithUserId('getWebAppUrl')
+  runGasWithUserId(google.script.run.getWebAppUrl)
     .then(function(webAppUrl) {
       const setupUrl = webAppUrl + '?setup=true&mode=appsetup';
       window.open(setupUrl, '_blank');
@@ -461,7 +461,7 @@ function startSystemStatusUpdate() {
     }
     
     // キャッシュを利用して静かに更新
-    runGasWithUserId('getStatus', false)
+    runGasWithUserId(google.script.run.getStatus, false)
       .then(function(status) {
         // 変更があった場合のみUIを更新
         if (JSON.stringify(status) !== JSON.stringify(currentStatus)) {
@@ -495,7 +495,7 @@ function handleQuickStart() {
   // Show loading message
   setLoading(true, 'クイックスタートを実行中...');
   
-  runGasWithUserId('quickStartSetup')
+  runGasWithUserId(google.script.run.quickStartSetup)
     .then(function(result) {
       if (result && result.status === 'success') {
         showMessage('✅ クイックスタートが完了しました！フォームとボードが自動作成されました。', 'success');
