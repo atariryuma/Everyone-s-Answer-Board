@@ -4120,4 +4120,3 @@ function confirmUserRegistration() {
     return { status: 'error', message: error.message };
   }
 }
-}
