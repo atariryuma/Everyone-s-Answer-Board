@@ -111,11 +111,11 @@
   <style>
     /* ヘッダー固定対応 */
     .responsive-grid {
-      padding-top: 6rem !important; /* 96px - ヘッダー高さ + 余白 */
+      padding-top: 5rem !important; /* 80px - ヘッダー高さ + 余白（マージン調整済み） */
     }
     @media (min-width: 640px) {
       .responsive-grid {
-        padding-top: 6.5rem !important; /* 104px - ヘッダー高さ + 余白 */
+        padding-top: 5.5rem !important; /* 88px - ヘッダー高さ + 余白（マージン調整済み） */
       }
     }
   </style>
@@ -244,7 +244,7 @@
       <p id="loading-message" class="mt-4 text-gray-300">処理中...</p>
     </div>
   </div>
-  <header class="glass-panel border-b border-gray-700 fixed top-0 left-0 right-0 z-50">
+  <header class="glass-panel border-b border-gray-700 fixed top-2 sm:top-3 left-2 right-2 sm:left-4 sm:right-4 z-50 rounded-lg sm:rounded-xl shadow-lg">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
       <div class="flex items-center justify-between gap-4">
         <!-- ロゴとタイトル -->
@@ -310,7 +310,7 @@
         </div>
     </div>
   </header>
-  <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6 pt-24 sm:pt-28 py-4 sm:py-8 pb-40">
+  <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6 pt-20 sm:pt-24 py-4 sm:py-8 pb-24">
     <!-- シンプル統合ステータスバー -->
     <section>
       <div class="glass-panel p-4 rounded-lg">
@@ -332,12 +332,12 @@
           <div class="flex items-center gap-2">
             <div class="flex items-center gap-1" id="step-1-indicator">
               <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">1</div>
-              <span class="text-xs text-gray-300 hidden sm:inline">データソース</span>
+              <span class="text-xs text-gray-300 hidden sm:inline">データ準備</span>
             </div>
             <div class="w-4 h-px bg-gray-600"></div>
             <div class="flex items-center gap-1" id="step-2-indicator">
               <div class="w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">2</div>
-              <span class="text-xs text-gray-300 hidden sm:inline">データシート</span>
+              <span class="text-xs text-gray-300 hidden sm:inline">シート設定</span>
             </div>
             <div class="w-4 h-px bg-gray-600"></div>
             <div class="flex items-center gap-1" id="step-3-indicator">
@@ -350,19 +350,19 @@
     </section>
 
     <!-- メインコンテンツエリア -->
-    <div class="responsive-grid mt-4 lg:mt-6">
+    <div class="responsive-grid mt-3 lg:mt-4">
       <!-- 左側：セットアップフロー（メインパネル） -->
-      <div class="left-panel space-y-4 lg:space-y-6">
+      <div class="left-panel space-y-3 lg:space-y-4">
         
         <!-- ステップ1: データソース設定 -->
         <div class="glass-panel p-4 lg:p-6" id="data-setup-section">
-          <div class="flex items-center justify-between mb-6">
+          <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-4">
               <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-lg">
                 1
               </div>
               <div>
-                <h2 class="text-lg font-semibold text-white">データソース設定</h2>
+                <h2 class="text-lg font-semibold text-white">データ準備</h2>
                 <p class="text-xs text-gray-400">フォームやスプレッドシートを設定</p>
               </div>
             </div>
@@ -374,8 +374,9 @@
           </div>
           
           <div id="step1-content" class="progressive-section expanded">
-            <!-- クイックスタート：推奨アクション -->
-            <div class="mb-6">
+            <!-- 統合されたセットアップオプション -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+              <!-- クイックスタート -->
               <div class="bg-gradient-to-r from-emerald-500/20 to-blue-500/20 border border-emerald-400/30 rounded-xl p-4">
                 <div class="flex items-center gap-3 mb-3">
                   <div class="w-8 h-8 bg-gradient-to-br from-emerald-500 to-blue-500 rounded-lg flex items-center justify-center">
@@ -389,123 +390,120 @@
                   </div>
                 </div>
                 <p class="text-sm text-emerald-100 mb-4">
-                  フォーム・スプレッドシート・回答ボードを一括作成し、即座に利用開始できます
+                  フォーム・スプレッドシート・回答ボードを一括作成
                 </p>
                 <button type="button" id="quickstart-btn" class="btn bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white w-full font-semibold">
                   <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
                   </svg>
-                  <span id="quickstart-text">クイックスタートを開始</span>
+                  <span id="quickstart-text">クイックスタート開始</span>
                 </button>
-                
-                <!-- QuickStart Progress Sequence Bar -->
-                <div id="quickstart-progress" class="hidden mt-4 bg-gray-800/30 border border-emerald-400/30 rounded-lg p-4">
-                  <div class="flex items-center gap-2 mb-3">
-                    <svg class="w-5 h-5 text-emerald-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                    </svg>
-                    <h4 class="text-sm font-semibold text-emerald-300">進捗状況</h4>
-                  </div>
-                  
-                  <!-- Progress Steps -->
-                  <div class="space-y-3">
-                    <!-- Step 1 -->
-                    <div class="flex items-center gap-3" id="progress-step-1">
-                      <div class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
-                        <div class="w-2 h-2 rounded-full bg-gray-400" id="progress-step-1-dot"></div>
-                      </div>
-                      <div class="flex-1">
-                        <div class="text-sm text-gray-300" id="progress-step-1-text">ユーザー専用フォルダの作成</div>
-                        <div class="text-xs text-gray-500" id="progress-step-1-detail">待機中...</div>
-                      </div>
-                    </div>
-                    
-                    <!-- Step 2 -->
-                    <div class="flex items-center gap-3" id="progress-step-2">
-                      <div class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
-                        <div class="w-2 h-2 rounded-full bg-gray-400" id="progress-step-2-dot"></div>
-                      </div>
-                      <div class="flex-1">
-                        <div class="text-sm text-gray-300" id="progress-step-2-text">Googleフォームとスプレッドシートの作成</div>
-                        <div class="text-xs text-gray-500" id="progress-step-2-detail">待機中...</div>
-                      </div>
-                    </div>
-                    
-                    <!-- Step 3 -->
-                    <div class="flex items-center gap-3" id="progress-step-3">
-                      <div class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
-                        <div class="w-2 h-2 rounded-full bg-gray-400" id="progress-step-3-dot"></div>
-                      </div>
-                      <div class="flex-1">
-                        <div class="text-sm text-gray-300" id="progress-step-3-text">回答ボードの設定と公開</div>
-                        <div class="text-xs text-gray-500" id="progress-step-3-detail">待機中...</div>
-                      </div>
-                    </div>
-                    
-                    <!-- Step 4 -->
-                    <div class="flex items-center gap-3" id="progress-step-4">
-                      <div class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
-                        <div class="w-2 h-2 rounded-full bg-gray-400" id="progress-step-4-dot"></div>
-                      </div>
-                      <div class="flex-1">
-                        <div class="text-sm text-gray-300" id="progress-step-4-text">セットアップ完了</div>
-                        <div class="text-xs text-gray-500" id="progress-step-4-detail">待機中...</div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <!-- Overall Progress Bar -->
-                  <div class="mt-4">
-                    <div class="flex items-center justify-between mb-2">
-                      <span class="text-xs text-gray-400">全体の進捗</span>
-                      <span class="text-xs text-emerald-400" id="progress-percentage">0%</span>
-                    </div>
-                    <div class="w-full bg-gray-700 rounded-full h-2">
-                      <div class="bg-gradient-to-r from-emerald-500 to-blue-500 h-2 rounded-full transition-all duration-500" style="width: 0%" id="progress-bar"></div>
-                    </div>
-                  </div>
-                  
-                  <!-- Current Status Message -->
-                  <div class="mt-3 text-center">
-                    <p class="text-sm text-emerald-300" id="progress-status">初期化中...</p>
-                  </div>
-                </div>
               </div>
-            </div>
 
-            <!-- 詳細セットアップ -->
-            <div class="mb-6">
+              <!-- カスタムセットアップ -->
               <div class="google-integration p-4 rounded-xl text-white">
                 <div class="flex items-center gap-3 mb-3">
-                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                  <svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                     <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                   </svg>
-                  <h3 class="font-semibold">詳細セットアップ</h3>
+                  <div>
+                    <h3 class="font-semibold">カスタムセットアップ</h3>
+                    <p class="text-xs opacity-90">詳細な設定でフォーム作成</p>
+                  </div>
                 </div>
-                <p class="text-sm mb-4 opacity-90">カスタマイズされたフォームとスプレッドシートを作成</p>
-                <div class="space-y-2">
-                  <button type="button" id="create-board-btn" class="btn btn-google w-full">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                    </svg>
-                    <span id="create-board-text">新しいボードを作成</span>
-                  </button>
-                  
-                  <!-- 既存ユーザー向けの新しいフォーム作成 -->
-                  <div id="existing-user-section" class="hidden">
-                    <button type="button" id="create-additional-form-btn" class="btn btn-secondary w-full text-sm">
-                      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                      </svg>
-                      <span id="create-additional-form-text" class="text-gray-200">新規のフォームを作成</span>
-                    </button>
-                    <p class="text-xs text-gray-400 mt-1">現在のボードに連携する新しいフォームを作成</p>
+                <p class="text-sm mb-4 opacity-90">
+                  カスタマイズされたフォームとスプレッドシートを作成
+                </p>
+                <button type="button" id="create-board-btn" class="btn btn-google w-full">
+                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                  </svg>
+                  <span id="create-board-text">カスタムボード作成</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- QuickStart Progress (共通プログレス表示) -->
+            <div id="quickstart-progress" class="hidden bg-gray-800/30 border border-emerald-400/30 rounded-lg p-4 mb-4">
+              <div class="flex items-center gap-2 mb-3">
+                <svg class="w-5 h-5 text-emerald-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                <h4 class="text-sm font-semibold text-emerald-300">セットアップ進行中</h4>
+              </div>
+              
+              <!-- Progress Steps -->
+              <div class="space-y-3">
+                <div class="flex items-center gap-3" id="progress-step-1">
+                  <div class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
+                    <div class="w-2 h-2 rounded-full bg-gray-400" id="progress-step-1-dot"></div>
+                  </div>
+                  <div class="flex-1">
+                    <div class="text-sm text-gray-300" id="progress-step-1-text">ユーザー専用フォルダの作成</div>
+                    <div class="text-xs text-gray-500" id="progress-step-1-detail">待機中...</div>
+                  </div>
+                </div>
+                
+                <div class="flex items-center gap-3" id="progress-step-2">
+                  <div class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
+                    <div class="w-2 h-2 rounded-full bg-gray-400" id="progress-step-2-dot"></div>
+                  </div>
+                  <div class="flex-1">
+                    <div class="text-sm text-gray-300" id="progress-step-2-text">Googleフォームとスプレッドシートの作成</div>
+                    <div class="text-xs text-gray-500" id="progress-step-2-detail">待機中...</div>
+                  </div>
+                </div>
+                
+                <div class="flex items-center gap-3" id="progress-step-3">
+                  <div class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
+                    <div class="w-2 h-2 rounded-full bg-gray-400" id="progress-step-3-dot"></div>
+                  </div>
+                  <div class="flex-1">
+                    <div class="text-sm text-gray-300" id="progress-step-3-text">回答ボードの設定と公開</div>
+                    <div class="text-xs text-gray-500" id="progress-step-3-detail">待機中...</div>
+                  </div>
+                </div>
+                
+                <div class="flex items-center gap-3" id="progress-step-4">
+                  <div class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
+                    <div class="w-2 h-2 rounded-full bg-gray-400" id="progress-step-4-dot"></div>
+                  </div>
+                  <div class="flex-1">
+                    <div class="text-sm text-gray-300" id="progress-step-4-text">セットアップ完了</div>
+                    <div class="text-xs text-gray-500" id="progress-step-4-detail">待機中...</div>
                   </div>
                 </div>
               </div>
+              
+              <!-- Overall Progress Bar -->
+              <div class="mt-4">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-xs text-gray-400">全体の進捗</span>
+                  <span class="text-xs text-emerald-400" id="progress-percentage">0%</span>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-2">
+                  <div class="bg-gradient-to-r from-emerald-500 to-blue-500 h-2 rounded-full transition-all duration-500" style="width: 0%" id="progress-bar"></div>
+                </div>
+              </div>
+              
+              <div class="mt-3 text-center">
+                <p class="text-sm text-emerald-300" id="progress-status">初期化中...</p>
+              </div>
+            </div>
+
+            <!-- 既存ユーザー向けの追加オプション -->
+            <div id="existing-user-section" class="hidden bg-gray-800/30 border border-gray-600/30 rounded-xl p-4 mb-4">
+              <h4 class="text-sm font-semibold text-gray-300 mb-3">追加オプション</h4>
+              <button type="button" id="create-additional-form-btn" class="btn btn-secondary w-full text-sm">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <span id="create-additional-form-text" class="text-gray-200">新規のフォームを作成</span>
+              </button>
+              <p class="text-xs text-gray-400 mt-2">現在のボードに連携する新しいフォームを作成</p>
             </div>
             
             <!-- 外部リソースの連携 (上級者向け) -->
@@ -580,13 +578,13 @@
 
         <!-- ステップ2: データシート設定 -->
         <div class="glass-panel p-4 lg:p-6" id="sheet-selection-section">
-          <div class="flex items-center justify-between mb-6">
+          <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-4">
               <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-lg">
                 2
               </div>
               <div>
-                <h2 class="text-lg font-semibold text-white">データシート設定</h2>
+                <h2 class="text-lg font-semibold text-white">シート設定</h2>
                 <p class="text-xs text-gray-400">表示するデータシートを選択</p>
               </div>
             </div>
@@ -659,7 +657,7 @@
 
         <!-- ステップ3: 表示設定・公開 -->
         <div class="glass-panel p-4 lg:p-6" id="config-section">
-          <div class="flex items-center justify-between mb-6">
+          <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-4">
               <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-lg">
                 3
@@ -791,7 +789,7 @@
       </div>
       
       <!-- 右側：情報・ヘルプパネル -->
-      <div class="space-y-4 lg:space-y-6">
+      <div class="space-y-3 lg:space-y-4">
         
         <!-- システム状況 -->
         <div id="system-info-panel" class="glass-panel p-4 lg:p-6">
@@ -821,8 +819,8 @@
             <span class="text-white font-mono text-xs bg-gray-700 px-1.5 py-0.5 rounded" id="info-user-id">-</span>
           </div>
           <div class="text-right pt-2">
-            <a href="#" onclick="switchToAnotherAccount(); return false;" class="text-cyan-400 hover:text-cyan-300 hover:underline text-xs">
-              別のアカウントでログイン
+            <a href="/" class="text-cyan-400 hover:text-cyan-300 hover:underline text-xs">
+              ログイン画面に戻る
             </a>
           </div>
         </div>

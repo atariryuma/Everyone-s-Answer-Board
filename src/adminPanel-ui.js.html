@@ -1374,15 +1374,54 @@ function updateSystemStatusDisplay(status) {
   // Enable resource buttons if URLs are available
   const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
   const formBtn = document.getElementById('open-form-btn');
+  const resourceBtn = document.getElementById('open-resource-btn');
   
   if (status.spreadsheetUrl) {
-    spreadsheetBtn.disabled = false;
-    spreadsheetBtn.onclick = () => window.open(status.spreadsheetUrl, '_blank');
+    if (spreadsheetBtn) {
+      spreadsheetBtn.disabled = false;
+      spreadsheetBtn.onclick = () => window.open(status.spreadsheetUrl, '_blank');
+    }
   }
   
   if (status.formUrl) {
-    formBtn.disabled = false;
-    formBtn.onclick = () => window.open(status.formUrl, '_blank');
+    if (formBtn) {
+      formBtn.disabled = false;
+      formBtn.onclick = () => window.open(status.formUrl, '_blank');
+    }
+    
+    // Update form URL input field
+    const formUrlInput = document.getElementById('form-url-input');
+    if (formUrlInput) {
+      formUrlInput.value = status.formUrl;
+    }
+    
+    // Update form URL link
+    const formUrlLink = document.getElementById('open-form-url-link');
+    if (formUrlLink) {
+      formUrlLink.href = status.formUrl;
+    }
+  }
+  
+  // Handle generic resource button in Step 1
+  if (resourceBtn && (status.formUrl || status.spreadsheetUrl)) {
+    resourceBtn.disabled = false;
+    resourceBtn.onclick = () => {
+      // Priority: Form first, then spreadsheet
+      if (status.formUrl) {
+        window.open(status.formUrl, '_blank');
+      } else if (status.spreadsheetUrl) {
+        window.open(status.spreadsheetUrl, '_blank');
+      }
+    };
+    
+    // Update button title based on available resources
+    if (status.formUrl && status.spreadsheetUrl) {
+      resourceBtn.title = 'フォームを開く (スプレッドシートも利用可能)';
+    } else if (status.formUrl) {
+      resourceBtn.title = 'フォームを開く';
+    } else if (status.spreadsheetUrl) {
+      resourceBtn.title = 'スプレッドシートを開く';
+    }
   }
 }
 
@@ -1791,15 +1830,54 @@ function updateSystemStatusDisplay(status) {
   // Enable resource buttons if URLs are available
   const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
   const formBtn = document.getElementById('open-form-btn');
+  const resourceBtn = document.getElementById('open-resource-btn');
   
   if (status.spreadsheetUrl) {
-    spreadsheetBtn.disabled = false;
-    spreadsheetBtn.onclick = () => window.open(status.spreadsheetUrl, '_blank');
+    if (spreadsheetBtn) {
+      spreadsheetBtn.disabled = false;
+      spreadsheetBtn.onclick = () => window.open(status.spreadsheetUrl, '_blank');
+    }
   }
   
   if (status.formUrl) {
-    formBtn.disabled = false;
-    formBtn.onclick = () => window.open(status.formUrl, '_blank');
+    if (formBtn) {
+      formBtn.disabled = false;
+      formBtn.onclick = () => window.open(status.formUrl, '_blank');
+    }
+    
+    // Update form URL input field
+    const formUrlInput = document.getElementById('form-url-input');
+    if (formUrlInput) {
+      formUrlInput.value = status.formUrl;
+    }
+    
+    // Update form URL link
+    const formUrlLink = document.getElementById('open-form-url-link');
+    if (formUrlLink) {
+      formUrlLink.href = status.formUrl;
+    }
+  }
+  
+  // Handle generic resource button in Step 1
+  if (resourceBtn && (status.formUrl || status.spreadsheetUrl)) {
+    resourceBtn.disabled = false;
+    resourceBtn.onclick = () => {
+      // Priority: Form first, then spreadsheet
+      if (status.formUrl) {
+        window.open(status.formUrl, '_blank');
+      } else if (status.spreadsheetUrl) {
+        window.open(status.spreadsheetUrl, '_blank');
+      }
+    };
+    
+    // Update button title based on available resources
+    if (status.formUrl && status.spreadsheetUrl) {
+      resourceBtn.title = 'フォームを開く (スプレッドシートも利用可能)';
+    } else if (status.formUrl) {
+      resourceBtn.title = 'フォームを開く';
+    } else if (status.spreadsheetUrl) {
+      resourceBtn.title = 'スプレッドシートを開く';
+    }
   }
 }
 

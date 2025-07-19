@@ -215,6 +215,12 @@ function setupExternalLinkHandlers() {
   if (copyUrlBtn) {
     copyUrlBtn.addEventListener('click', copyBoardUrl);
   }
+  
+  // Copy form URL
+  var copyFormUrlBtn = document.getElementById('copy-form-url-btn');
+  if (copyFormUrlBtn) {
+    copyFormUrlBtn.addEventListener('click', copyFormUrl);
+  }
 }
 
 // =============================================================================

@@ -473,6 +473,35 @@ function copyBoardUrl() {
   }
 }
 
+// Copy form URL to clipboard
+function copyFormUrl() {
+  const urlInput = document.getElementById('form-url-input');
+  if (urlInput && urlInput.value) {
+    urlInput.select();
+    urlInput.setSelectionRange(0, 99999); // For mobile devices
+    
+    try {
+      // Try modern clipboard API first
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(urlInput.value).then(() => {
+          showMessage('フォームURLがクリップボードにコピーされました！', 'success');
+        }).catch(() => {
+          // Fallback to execCommand
+          document.execCommand('copy');
+          showMessage('フォームURLがクリップボードにコピーされました！', 'success');
+        });
+      } else {
+        document.execCommand('copy');
+        showMessage('フォームURLがクリップボードにコピーされました！', 'success');
+      }
+    } catch (err) {
+      showMessage('URLのコピーに失敗しました。手動でコピーしてください。', 'warning');
+    }
+  } else {
+    showMessage('コピーするフォームURLがありません。', 'warning');
+  }
+}
+
 // Open database spreadsheet
 function openDatabaseSpreadsheet() {
   if (currentSpreadsheetUrl) {
@@ -496,7 +525,7 @@ function openAppSetupPage() {
   runGasWithUserId('getWebAppUrl')
     .then(function(webAppUrl) {
       const setupUrl = webAppUrl + '?setup=true&mode=appsetup';
-      window.open(setupUrl, '_blank');
+      window.location.href = setupUrl;
     })
     .catch(function(error) {
       console.error('Failed to get web app URL:', error);
