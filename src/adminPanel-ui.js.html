@@ -170,7 +170,7 @@ function populateSheetSelect(sheetNames, activeSheetName) {
   if (sheetNames && sheetNames.length > 0) {
     sheetNames.forEach(sheet => {
       const option = document.createElement('option');
-      option.value = sheet.name;
+      option.value = sheet.id;
       option.textContent = sheet.name;
       select.appendChild(option);
     });

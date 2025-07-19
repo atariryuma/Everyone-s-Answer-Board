@@ -583,9 +583,10 @@ function getAvailableSheets(requestUserId) {
     }
 
     // Page.html期待形式に変換: [{name: string}]
-    return sheets.map(function(sheet) {
+    return filteredSheets.map(function(sheet) {
       return {
-        name: typeof sheet === 'string' ? sheet : (sheet.name || sheet.title || sheet)
+        name: sheet.properties.title,
+        id: sheet.properties.sheetId
       };
     });
   } catch (e) {
