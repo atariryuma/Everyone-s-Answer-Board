@@ -40,7 +40,7 @@ class GASOptimizer {
     // ローディング状態の管理
     this.setLoadingState(functionName, true);
 
-    google.script.run
+    google.script.run[functionName](...args) // Corrected line
       .withSuccessHandler((result) => {
         this.activeCalls--;
         this.setLoadingState(functionName, false);
@@ -53,7 +53,7 @@ class GASOptimizer {
         console.error(`GAS Function Error [${functionName}]:`, error);
         reject(this.enhanceError(error, functionName));
         this.processQueue();
-      })[functionName](...args);
+      });
   }
 
   /**
