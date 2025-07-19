@@ -21,14 +21,17 @@ function updateUIWithNewStatus(status) {
   const setupStatus = getSetupStatusFromUserInfo(status.userInfo);
   console.log('🔧 Setup Status:', setupStatus);
   
-  // セットアップ未完了時の専用処理
-  if (setupStatus === 'pending') {
-    updateUIForSetupPending(status);
-    return; // セットアップ未完了時は通常のUI更新をスキップ
-  }
+  // 固定表示要素をクリア（setupStatus関係なく実行）
+  clearInitialDisplayElements();
   
-  // Update static UI elements first
+  // Update static UI elements first（常に実行）
   updateStaticUI(status);
+  
+  // セットアップ未完了時の追加処理
+  if (setupStatus === 'pending') {
+    updateButtonStatesForSetup(status);
+    console.log('🔧 セットアップ未完了: ボタン状態を調整しました');
+  }
   
   // Update dynamic content based on state
   if (status.activeSheetName) {
@@ -738,8 +741,19 @@ function getSetupStatusFromUserInfo(userInfo) {
       ? JSON.parse(userInfo.configJson) 
       : userInfo.configJson;
     
-    // setupStatusが明示的に設定されている場合はそれを使用
+    // setupStatusが明示的に設定されている場合はそれを使用（configJson内の値を優先）
     if (config.setupStatus) {
+      console.log('🔧 configJson setupStatus:', config.setupStatus);
+      
+      // userInfo直下のsetupStatusとの不整合を警告
+      if (userInfo.setupStatus && userInfo.setupStatus !== config.setupStatus) {
+        console.warn('⚠️ setupStatus不整合検出:', {
+          userInfoSetupStatus: userInfo.setupStatus,
+          configJsonSetupStatus: config.setupStatus,
+          message: 'configJson内の値を優先使用'
+        });
+      }
+      
       return config.setupStatus;
     }
     
@@ -756,167 +770,75 @@ function getSetupStatusFromUserInfo(userInfo) {
   }
 }
 
+
 /**
- * セットアップ未完了時の専用UI処理
+ * 固定表示要素をクリア（「ドメイン確認中」「セットアップ中」等）
+ */
+function clearInitialDisplayElements() {
+  // AdminPanel.htmlで固定表示されている初期要素をクリア
+  const elementsToHide = [
+    'header-domain-initial',      // ドメイン確認中コンテナ
+    'header-domain-name-initial', // ドメイン確認中テキスト
+    'header-status-text-initial'  // セットアップ中テキスト
+  ];
+  
+  elementsToHide.forEach(elementId => {
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.style.display = 'none';
+      console.log(`✅ 初期表示要素を非表示: ${elementId}`);
+    }
+  });
+  
+  // 既存のセットアップガイドも削除
+  const existingGuides = [
+    document.getElementById('setup-pending-guide'),
+    document.querySelector('.setup-guide')
+  ];
+  
+  existingGuides.forEach(guide => {
+    if (guide) {
+      guide.remove();
+      console.log('✅ 既存セットアップガイドを削除');
+    }
+  });
+}
+
+/**
+ * セットアップ状況に応じてボタン状態を更新
  * @param {Object} status - ステータスオブジェクト
  */
-function updateUIForSetupPending(status) {
-  console.log('🔧 セットアップ未完了モードでUI更新開始');
+function updateButtonStatesForSetup(status) {
+  // より穏やかなUI制御（完全無効化ではなく、適切なガイダンス）
   
-  try {
-    // 1. 全体的なメッセージ表示
-    showSetupPendingMessage();
-    
-    // 2. 公開関連ボタンを無効化
-    disablePublishingButtons();
-    
-    // 3. セットアップガイドを表示
-    showSetupGuide(status);
-    
-    // 4. 基本的な静的UI要素は更新（ユーザー情報等）
-    updateBasicStaticUI(status);
-    
-    console.log('✅ セットアップ未完了モード UI更新完了');
-    
-  } catch (error) {
-    console.error('updateUIForSetupPending エラー:', error);
-    // フォールバック: 通常のUI更新を実行
-    updateStaticUI(status);
-  }
-}
-
-/**
- * セットアップ未完了メッセージを表示
- */
-function showSetupPendingMessage() {
-  // 実際に存在するメインコンテンツエリアを取得（左パネルをターゲット）
-  const messageContainer = document.querySelector('.left-panel') || 
-                          document.querySelector('.responsive-grid') ||
-                          document.getElementById('data-setup-section');
-  
-  if (messageContainer) {
-    // 既存コンテンツの前に挿入（置換ではなく）
-    const setupGuide = document.createElement('div');
-    setupGuide.id = 'setup-pending-guide';
-    setupGuide.className = 'setup-pending-overlay glass-panel p-6 mb-6';
-    setupGuide.innerHTML = `
-      <div class="text-center">
-        <div class="text-4xl mb-4">⚙️</div>
-        <h2 class="text-xl font-bold text-gray-800 mb-3">セットアップを完了してください</h2>
-        <p class="text-gray-600 mb-4 text-sm">管理パネルを使用するには、以下の手順でセットアップを進めてください</p>
-        <div class="setup-steps text-left max-w-sm mx-auto">
-          <div class="step-item flex items-center mb-2 p-2 bg-white/50 rounded-lg">
-            <span class="step-number bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center mr-2 text-xs font-bold">1</span>
-            <span class="text-gray-700 text-sm">📊 データ準備</span>
-          </div>
-          <div class="step-item flex items-center mb-2 p-2 bg-white/50 rounded-lg">
-            <span class="step-number bg-gray-400 text-white rounded-full w-6 h-6 flex items-center justify-center mr-2 text-xs font-bold">2</span>
-            <span class="text-gray-500 text-sm">🎛️ シート・列設定</span>
-          </div>
-          <div class="step-item flex items-center mb-2 p-2 bg-white/50 rounded-lg">
-            <span class="step-number bg-gray-400 text-white rounded-full w-6 h-6 flex items-center justify-center mr-2 text-xs font-bold">3</span>
-            <span class="text-gray-500 text-sm">🚀 公開設定</span>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    // 既存のガイドがあれば削除
-    const existingGuide = document.getElementById('setup-pending-guide');
-    if (existingGuide) {
-      existingGuide.remove();
-    }
-    
-    // 最初の子要素として挿入
-    messageContainer.insertBefore(setupGuide, messageContainer.firstChild);
-  } else {
-    console.warn('showSetupPendingMessage: メッセージコンテナが見つかりませんでした');
-  }
-}
-
-/**
- * 公開関連ボタンを無効化（setupStatus未完了時）
- */
-function disablePublishingButtons() {
-  // 実際に存在する公開関連ボタンのみ
-  const publishButtons = [
+  // 最低限無効化すべき公開関連ボタンのみ
+  const criticalPublishButtons = [
     'save-publish-btn',
     'unpublish-board-btn'
   ];
   
-  // 段階的UI制御で無効化すべき追加要素
-  const setupRelatedElements = [
-    'open-spreadsheet-btn',
-    'open-form-btn', 
-    'open-resource-btn',
-    'reguess-headers-btn',
-    'add-resource-btn'
-  ];
-  
-  // 設定関連の入力要素
-  const configElements = [
-    'sheet-select',
-    'opinion-column',
-    'name-column',
-    'class-column',
-    'timestamp-column',
-    'show-names',
-    'show-counts'
-  ];
-  
-  const allElementsToDisable = [...publishButtons, ...setupRelatedElements, ...configElements];
-  
-  let disabledCount = 0;
-  let notFoundCount = 0;
-  
-  allElementsToDisable.forEach(elementId => {
-    const element = document.getElementById(elementId);
-    if (element) {
-      element.disabled = true;
-      element.classList.add('opacity-50', 'cursor-not-allowed');
-      element.title = 'セットアップを完了してください';
-      disabledCount++;
-    } else {
-      notFoundCount++;
-      console.debug(`disablePublishingButtons: 要素が見つかりません: ${elementId}`);
+  criticalPublishButtons.forEach(buttonId => {
+    const button = document.getElementById(buttonId);
+    if (button) {
+      // データが不足している場合のみ無効化
+      const hasSpreadsheet = status.userInfo && status.userInfo.spreadsheetId;
+      const hasActiveSheet = status.activeSheetName;
+      
+      if (!hasSpreadsheet || !hasActiveSheet) {
+        button.disabled = true;
+        button.classList.add('opacity-75');
+        button.title = '先にデータソースとシートを設定してください';
+      } else {
+        button.disabled = false;
+        button.classList.remove('opacity-75');
+        button.title = '';
+      }
     }
   });
   
-  console.log(`✅ UI要素無効化完了: ${disabledCount}個無効化, ${notFoundCount}個未発見`);
+  console.log('✅ ボタン状態を適切に更新しました');
 }
 
-/**
- * セットアップガイドを表示
- * @param {Object} status - ステータスオブジェクト
- */
-function showSetupGuide(status) {
-  // 実際に存在する左パネルにセットアップガイドを表示
-  const leftPanel = document.querySelector('.left-panel') || 
-                   document.getElementById('system-info-panel');
-  
-  if (leftPanel) {
-    // 既存のガイドがあれば削除
-    const existingGuide = leftPanel.querySelector('.setup-guide');
-    if (existingGuide) {
-      existingGuide.remove();
-    }
-    
-    const guideElement = document.createElement('div');
-    guideElement.className = 'setup-guide bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4';
-    guideElement.innerHTML = `
-      <h3 class="text-sm font-semibold text-yellow-800 mb-2">📋 セットアップガイド</h3>
-      <ol class="text-xs text-yellow-700 space-y-1">
-        <li>1. Googleスプレッドシートを作成</li>
-        <li>2. データ列を設定</li>
-        <li>3. シート名と列マッピングを設定</li>
-        <li>4. アプリを公開</li>
-      </ol>
-    `;
-    leftPanel.insertBefore(guideElement, leftPanel.firstChild);
-  } else {
-    console.warn('showSetupGuide: 左パネルが見つかりませんでした');
-  }
-}
 
 /**
  * 基本的な静的UI要素のみ更新
