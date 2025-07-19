@@ -648,7 +648,7 @@ function initializeUI() {
   console.log('✅ AdminPanel: UI components ready');
   
   // Load initial status
-  loadStatus();
+  loadStatus(true); // 強制的にキャッシュをバイパスして最新のステータス情報を取得
 }
 
 // =============================================================================
