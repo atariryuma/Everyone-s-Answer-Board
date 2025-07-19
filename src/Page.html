@@ -2000,8 +2000,10 @@ setupEventDelegation() {
       this.startPolling();
     });
     
-    // Load sheets in background
-    this.loadAvailableSheets();
+    // Load sheets in background only for administrators
+    if (this.state.isAdminUser) {
+      this.loadAvailableSheets();
+    }
   }
   
   showMinimalSkeleton() {

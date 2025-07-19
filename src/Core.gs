@@ -255,8 +255,13 @@ function verifyUserAccess(requestUserId) {
     throw new Error(`認証エラー: 指定されたユーザーID (${requestUserId}) が見つかりません。`);
   }
 
-  // リクエストユーザーのメールアドレスと、要求されたユーザーIDのadminEmailが一致するか検証
+  // 管理者かどうかを確認
   if (activeUserEmail !== requestedUserInfo.adminEmail) {
+    const config = JSON.parse(requestedUserInfo.configJson || '{}');
+    if (config.appPublished === true) {
+      debugLog(`✅ 公開ボード閲覧許可: ${activeUserEmail} -> ${requestUserId}`);
+      return;
+    }
     throw new Error(`権限エラー: ${activeUserEmail} はユーザーID ${requestUserId} のデータにアクセスする権限がありません。`);
   }
   debugLog(`✅ ユーザーアクセス検証成功: ${activeUserEmail} は ${requestUserId} のデータにアクセスできます。`);
