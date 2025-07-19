@@ -21,17 +21,30 @@ main {
   width: 100%;
 }
 
+/* ヘッダー固定に対応したレイアウト調整 */
+header {
+  height: 72px; /* モバイル: py-3 (12px * 2) + アイコン高さ (32px) + 余白 ≈ 72px */
+}
+
+@media (min-width: 640px) {
+  header {
+    height: 80px; /* デスクトップ: py-4 (16px * 2) + アイコン高さ (32px) + 余白 ≈ 80px */
+  }
+}
+
 /* Admin Panel Layout Fixes */
 .responsive-grid {
   display: grid;
   gap: 1rem; /* モバイルのギャップ */
   grid-template-columns: 1fr; /* モバイル: 単一カラム */
+  padding: 1rem; /* 全体的な余白を追加 */
 }
 
 @media (min-width: 768px) { /* タブレット向けブレークポイント */
   .responsive-grid {
     grid-template-columns: 2fr 1fr; /* 左: 2/3、右: 1/3 */
     gap: 1rem; /* タブレットのギャップ */
+    padding: 1.5rem; /* タブレットでの余白を増加 */
   }
   .right-panel {
     min-width: 200px; /* タブレットでの右パネルの最小幅 */
@@ -42,6 +55,7 @@ main {
   .responsive-grid {
     grid-template-columns: minmax(400px, 1fr) 350px; /* 左: 最小400px、柔軟。右: 固定350px */
     gap: 1.5rem; /* デスクトップのギャップ */
+    padding: 2rem; /* デスクトップでの余白をさらに増加 */
   }
   .right-panel {
     min-width: 300px; /* デスクトップでの右パネルの最小幅（安全のため） */
