@@ -172,7 +172,7 @@ function updateUIWithNewStatus(status) {
     console.log('📋 Initial load: Loading config for active sheet:', status.activeSheetName);
     // Ensure selectedSheet is correctly set before calling loadConfigForSelected
     selectedSheet = status.activeSheetName; // This might be redundant if populateSheetSelect already did it, but ensures it.
-    loadConfigForSelected();
+    loadConfigForSelected(status.activeSheetName, status.userInfo.spreadsheetId);
   }
   // --- END NEW ADDITION ---
   
@@ -1155,7 +1155,7 @@ function handleSheetSelectionChange(event) {
   
   console.log('📊 Sheet selection changed:', {
     previousSheet: selectedSheet,
-    newSheet: newSelectedSheet,
+    newSelectedSheet: newSelectedSheet,
     hasPreviewSection: !!previewSection
   });
   
@@ -1167,11 +1167,28 @@ function handleSheetSelectionChange(event) {
     console.log('📋 Loading preview and config for sheet:', newSelectedSheet);
     previewSection.classList.remove('hidden');
     
-    // Load both preview and column configuration
-    loadDataPreview(newSelectedSheet);
-    loadConfigForSelected();
-    
-    // Update UI state
+    // Show loading state for preview
+    const previewContent = document.getElementById('data-preview-content');
+    if (previewContent) {
+      previewContent.innerHTML = `
+        <div class="animate-pulse">
+          <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
+          <div class="h-4 bg-gray-700 rounded w-1/2"></div>
+        </div>
+      `;
+    }
+
+    // Call getSheetDetails once and use its result for both preview and config
+    if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
+      console.error('スプレッドシート情報が見つかりません');
+      if (previewContent) previewContent.innerHTML = '<p class="text-red-400">スプレッドシート情報が見つかりません</p>';
+      return;
+    }
+
+    // Call loadConfigForSelected which now handles getSheetDetails and populates UI
+    loadConfigForSelected(newSelectedSheet, currentStatus.userInfo.spreadsheetId);
+
+    // Update UI state (this might need to be moved inside the .then() block if it depends on details)
     updateUIForSelectedSheet();
   } else if (previewSection) {
     console.log('📋 Hiding preview section');
@@ -1179,58 +1196,112 @@ function handleSheetSelectionChange(event) {
   }
 }
 
+// Load configuration for selected sheet
+function loadConfigForSelected(sheetName, spreadsheetId) {
+  console.log('📋 Loading config for:', { selectedSheet: sheetName, spreadsheetId: spreadsheetId });
+
+  if (!spreadsheetId || !sheetName) {
+    console.error('スプレッドシート情報が不足しています。');
+    return;
+  }
+
+  runGasWithUserId('getSheetDetails', spreadsheetId, sheetName)
+    .then(function(details) {
+      console.log('✅ Sheet details loaded for config:', details);
+      populateConfig(details.guessedConfig);
+      populateHeaderOptions(details.allHeaders);
+    })
+    .catch(function(error) {
+      console.error('Failed to load sheet config:', error);
+      showMessage('シート設定の読み込みに失敗しました', 'error');
+    });
+}
+
 // Load data preview for selected sheet
-function loadDataPreview(sheetName) {
+function loadDataPreview(sheetName, details) {
   const previewContent = document.getElementById('data-preview-content');
   if (!previewContent) return;
   
-  // Show loading state
-  previewContent.innerHTML = `
-    <div class="animate-pulse">
-      <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-      <div class="h-4 bg-gray-700 rounded w-1/2"></div>
-    </div>
-  `;
-  
-  if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
-    previewContent.innerHTML = '<p class="text-red-400">スプレッドシート情報が見つかりません</p>';
-    return;
+  // Show loading state (if details are not yet available)
+  if (!details) {
+    previewContent.innerHTML = `
+      <div class="animate-pulse">
+        <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
+        <div class="h-4 bg-gray-700 rounded w-1/2"></div>
+      </div>
+    `;
   }
-  
-  runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, sheetName)
-    .then(function(details) {
-      if (details && details.headers) {
-        const headersList = details.headers.slice(0, 5); // First 5 headers
-        const moreHeaders = details.headers.length > 5 ? `...他${details.headers.length - 5}列` : '';
-        
-        previewContent.innerHTML = `
-          <div class="text-sm">
-            <div class="mb-2">
-              <span class="text-gray-400">列数:</span>
-              <span class="text-white font-medium">${details.headers.length}列</span>
-            </div>
-            <div class="mb-2">
-              <span class="text-gray-400">主要な列:</span>
-              <div class="flex flex-wrap gap-1 mt-1">
-                ${headersList.map(header => `
-                  <span class="px-2 py-1 bg-blue-500/20 text-blue-200 rounded text-xs">${header}</span>
-                `).join('')}
-                ${moreHeaders ? `<span class="text-gray-400 text-xs">${moreHeaders}</span>` : ''}
-              </div>
-            </div>
-            <div class="text-xs text-gray-400 mt-2">
-              データの内容を確認して、次のステップで列設定を行ってください
+
+  // If details are provided, use them directly
+  if (details) {
+    if (details && details.headers) {
+      const headersList = details.headers.slice(0, 5); // First 5 headers
+      const moreHeaders = details.headers.length > 5 ? `...他${details.headers.length - 5}列` : '';
+      
+      previewContent.innerHTML = `
+        <div class="text-sm">
+          <div class="mb-2">
+            <span class="text-gray-400">列数:</span>
+            <span class="text-white font-medium">${details.headers.length}列</span>
+          </div>
+          <div class="mb-2">
+            <span class="text-gray-400">主要な列:</span>
+            <div class="flex flex-wrap gap-1 mt-1">
+              ${headersList.map(header => `
+                <span class="px-2 py-1 bg-blue-500/20 text-blue-200 rounded text-xs">${header}</span>
+              `).join('')}
+              ${moreHeaders ? `<span class="text-gray-400 text-xs">${moreHeaders}</span>` : ''}
             </div>
           </div>
-        `;
-      } else {
-        previewContent.innerHTML = '<p class="text-yellow-400">データを取得できませんでした</p>';
-      }
-    })
-    .catch(function(error) {
-      console.error('Data preview error:', error);
-      previewContent.innerHTML = '<p class="text-red-400">プレビューの読み込みに失敗しました</p>';
-    });
+          <div class="text-xs text-gray-400 mt-2">
+            データの内容を確認して、次のステップで列設定を行ってください
+          </div>
+        </div>
+      `;
+    } else {
+      previewContent.innerHTML = '<p class="text-yellow-400">データを取得できませんでした</p>';
+    }
+  } else { // Fallback if details are not provided (should not happen after refactoring handleSheetSelectionChange)
+    if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
+      previewContent.innerHTML = '<p class="text-red-400">スプレッドシート情報が見つかりません</p>';
+      return;
+    }
+    
+    runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, sheetName)
+      .then(function(details) {
+        if (details && details.headers) {
+          const headersList = details.headers.slice(0, 5); // First 5 headers
+          const moreHeaders = details.headers.length > 5 ? `...他${details.headers.length - 5}列` : '';
+          
+          previewContent.innerHTML = `
+            <div class="text-sm">
+              <div class="mb-2">
+                <span class="text-gray-400">列数:</span>
+                <span class="text-white font-medium">${details.headers.length}列</span>
+              </div>
+              <div class="mb-2">
+                <span class="text-gray-400">主要な列:</span>
+                <div class="flex flex-wrap gap-1 mt-1">
+                  ${headersList.map(header => `
+                    <span class="px-2 py-1 bg-blue-500/20 text-blue-200 rounded text-xs">${header}</span>
+                  `).join('')}
+                  ${moreHeaders ? `<span class="text-gray-400 text-xs">${moreHeaders}</span>` : ''}
+                </div>
+              </div>
+              <div class="text-xs text-gray-400 mt-2">
+                データの内容を確認して、次のステップで列設定を行ってください
+              </div>
+            </div>
+          `;
+        } else {
+          previewContent.innerHTML = '<p class="text-yellow-400">データを取得できませんでした</p>';
+        }
+      })
+      .catch(function(error) {
+        console.error('Data preview error:', error);
+        previewContent.innerHTML = '<p class="text-red-400">プレビューの読み込みに失敗しました</p>';
+      });
+  }
 }
 
 // =============================================================================
