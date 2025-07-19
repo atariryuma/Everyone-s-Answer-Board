@@ -736,24 +736,14 @@ function getSetupStatusFromUserInfo(userInfo) {
     if (!userInfo || !userInfo.configJson) {
       return 'pending'; // ユーザー情報がない場合はセットアップ未完了とみなす
     }
-    
-    const config = typeof userInfo.configJson === 'string' 
-      ? JSON.parse(userInfo.configJson) 
+
+    const config = typeof userInfo.configJson === 'string'
+      ? JSON.parse(userInfo.configJson)
       : userInfo.configJson;
-    
-    // setupStatusが明示的に設定されている場合はそれを使用（configJson内の値を優先）
+
+    // setupStatusが明示的に設定されている場合はそれを使用
     if (config.setupStatus) {
       console.log('🔧 configJson setupStatus:', config.setupStatus);
-      
-      // userInfo直下のsetupStatusとの不整合を警告
-      if (userInfo.setupStatus && userInfo.setupStatus !== config.setupStatus) {
-        console.warn('⚠️ setupStatus不整合検出:', {
-          userInfoSetupStatus: userInfo.setupStatus,
-          configJsonSetupStatus: config.setupStatus,
-          message: 'configJson内の値を優先使用'
-        });
-      }
-      
       return config.setupStatus;
     }
     
