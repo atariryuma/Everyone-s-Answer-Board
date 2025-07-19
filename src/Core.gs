@@ -3287,7 +3287,7 @@ function isDeployUser() {
  * @param {string} requestUserId - リクエストされたユーザーID（第一引数）
  * @returns {Object} ステータス情報
  */
-function getStatus(requestUserId) {
+function getSystemStatus(requestUserId) {
   try {
     console.log('getStatus - requestUserId:', requestUserId);
     
