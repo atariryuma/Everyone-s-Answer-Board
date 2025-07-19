@@ -772,25 +772,20 @@ function getSetupStatusFromUserInfo(userInfo) {
 
 
 /**
- * 固定表示要素をクリア（「ドメイン確認中」「セットアップ中」等）
+ * 初期表示要素をクリアして適切なドメイン表示に切り替え
  */
 function clearInitialDisplayElements() {
-  // AdminPanel.htmlで固定表示されている初期要素をクリア
-  const elementsToHide = [
-    'header-domain-initial',      // ドメイン確認中コンテナ
-    'header-domain-name-initial', // ドメイン確認中テキスト
-    'header-status-text-initial'  // セットアップ中テキスト
-  ];
+  // 初期表示を非表示にして、適切なドメイン表示に切り替え
+  const initialContainer = document.getElementById('header-domain-initial');
+  if (initialContainer) {
+    initialContainer.style.display = 'none';
+    console.log('✅ 初期ドメイン表示を非表示');
+  }
   
-  elementsToHide.forEach(elementId => {
-    const element = document.getElementById(elementId);
-    if (element) {
-      element.style.display = 'none';
-      console.log(`✅ 初期表示要素を非表示: ${elementId}`);
-    }
-  });
+  // 適切なドメイン情報を表示
+  showAppropriateHeaderStatus();
   
-  // 既存のセットアップガイドも削除
+  // 既存のセットアップガイドのみ削除
   const existingGuides = [
     document.getElementById('setup-pending-guide'),
     document.querySelector('.setup-guide')
@@ -802,6 +797,29 @@ function clearInitialDisplayElements() {
       console.log('✅ 既存セットアップガイドを削除');
     }
   });
+}
+
+/**
+ * ヘッダーに適切なステータス表示を設定
+ */
+function showAppropriateHeaderStatus() {
+  // ドメイン一致表示（仮）を表示
+  const domainMatch = document.getElementById('header-domain-match');
+  const domainMismatch = document.getElementById('header-domain-mismatch');
+  
+  if (domainMatch && domainMismatch) {
+    // 現在はドメイン一致として表示（実際のドメインチェックは別途実装）
+    domainMatch.style.display = 'block';
+    domainMismatch.style.display = 'none';
+    
+    // ドメイン名を適切に設定
+    const domainText = document.getElementById('header-domain-match-text');
+    if (domainText) {
+      domainText.textContent = 'naha-okinawa.ed.jp';
+    }
+    
+    console.log('✅ ドメイン一致表示を有効化');
+  }
 }
 
 /**
