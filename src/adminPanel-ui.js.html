@@ -78,8 +78,15 @@ function updateStaticUI(status) {
   // Update existing user section
   updateExistingUserSection(status);
   
-  // Populate sheet selection
-  populateSheetSelect(status.allSheets, status.activeSheetName);
+  // Populate sheet selection - fix property name mismatch
+  console.log('🔍 Debug: Checking sheet data properties', {
+    allSheets: status.allSheets,
+    sheetNames: status.sheetNames,
+    activeSheetName: status.activeSheetName
+  });
+  
+  const sheetsData = status.sheetNames || status.allSheets || [];
+  populateSheetSelect(sheetsData, status.activeSheetName);
   
   // Update custom form info
   updateCustomFormInfo(status);
@@ -187,18 +194,42 @@ function populateSheetSelect(sheetNames, activeSheetName) {
     return;
   }
 
+  console.log('📋 Populating sheet select with data:', {
+    sheetNames: sheetNames,
+    activeSheetName: activeSheetName,
+    dataType: typeof sheetNames,
+    isArray: Array.isArray(sheetNames)
+  });
+
   // Clear existing options
   select.innerHTML = '<option value="">-- シートを選択 --</option>';
   
   if (sheetNames && sheetNames.length > 0) {
-    sheetNames.forEach(sheet => {
+    console.log('✅ Adding sheets to dropdown:', sheetNames.length);
+    
+    sheetNames.forEach((sheet, index) => {
       const option = document.createElement('option');
-      option.value = sheet.name; // sheet.id から sheet.name に変更
-      option.textContent = sheet.name;
+      
+      // Handle both object and string formats
+      if (typeof sheet === 'object' && sheet.name) {
+        option.value = sheet.name;
+        option.textContent = sheet.name;
+        console.log(`📄 Sheet ${index + 1}: ${sheet.name} (ID: ${sheet.id})`);
+      } else if (typeof sheet === 'string') {
+        option.value = sheet;
+        option.textContent = sheet;
+        console.log(`📄 Sheet ${index + 1}: ${sheet}`);
+      } else {
+        console.warn('⚠️ Unknown sheet format:', sheet);
+        return;
+      }
+      
       select.appendChild(option);
     });
     select.disabled = false;
+    console.log('✅ Sheet dropdown populated successfully');
   } else {
+    console.warn('⚠️ No sheets available:', sheetNames);
     select.innerHTML = '<option value="">利用可能なシートがありません</option>';
     select.disabled = true;
   }
@@ -207,6 +238,7 @@ function populateSheetSelect(sheetNames, activeSheetName) {
   if (activeSheetName) {
     select.value = activeSheetName;
     selectedSheet = activeSheetName;
+    console.log('✅ Active sheet set:', activeSheetName);
   }
   
   // Add change event listener for data preview
@@ -512,11 +544,7 @@ function collapseCompletedSection(stepNumber) {
     }
   }
   
-  // Add visual indicator for completed section
-  const sectionContainer = section.closest('.glass-panel');
-  if (sectionContainer) {
-    sectionContainer.classList.add('section-completed');
-  }
+  // Note: Visual indicators are now managed by manageSectionStates()
 }
 
 // Automatically expand active section
@@ -541,30 +569,58 @@ function expandActiveSection(stepNumber) {
     }
   }
   
-  // Remove completed indicator
-  const sectionContainer = section.closest('.glass-panel');
-  if (sectionContainer) {
-    sectionContainer.classList.remove('section-completed');
-  }
+  // Note: Visual indicators are now managed by manageSectionStates()
 }
 
 // Manage section states based on current step
 function manageSectionStates(currentStep) {
   console.log(`🔄 Managing section states for step ${currentStep}`);
   
-  // Collapse all completed sections (previous steps)
-  for (let i = 1; i < currentStep; i++) {
-    collapseCompletedSection(i);
-  }
+  // Determine if sections are truly completed based on setup status
+  const isStepCompleted = (stepNumber) => {
+    if (stepNumber === 1) {
+      // Step 1 is completed if we have spreadsheet data
+      return currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId;
+    } else if (stepNumber === 2) {
+      // Step 2 is completed if we have active sheet
+      return currentStatus && currentStatus.activeSheetName;
+    } else if (stepNumber === 3) {
+      // Step 3 is completed if app is published
+      return currentStatus && currentStatus.appPublished;
+    }
+    return false;
+  };
   
-  // Expand current section
-  expandActiveSection(currentStep);
-  
-  // Keep future sections expanded but remove completed styling
-  for (let i = currentStep + 1; i <= 3; i++) {
+  // Update all sections based on their true state
+  for (let i = 1; i <= 3; i++) {
     const sectionContainer = document.getElementById(`step${i}-content`)?.closest('.glass-panel');
-    if (sectionContainer) {
-      sectionContainer.classList.remove('section-completed');
+    if (!sectionContainer) continue;
+    
+    // Clear all state classes
+    sectionContainer.classList.remove('section-completed', 'section-active', 'section-future', 'show-checkmark');
+    
+    const isCompleted = isStepCompleted(i);
+    const isActive = i === currentStep;
+    const isFuture = i > currentStep;
+    
+    if (isCompleted && i < currentStep) {
+      // Truly completed sections get checkmark
+      sectionContainer.classList.add('section-completed', 'show-checkmark');
+      collapseCompletedSection(i);
+      console.log(`✅ Step ${i}: Completed with checkmark`);
+    } else if (isActive) {
+      // Current active section
+      sectionContainer.classList.add('section-active');
+      expandActiveSection(i);
+      console.log(`🔄 Step ${i}: Active`);
+    } else if (isFuture) {
+      // Future sections
+      sectionContainer.classList.add('section-future');
+      console.log(`⏳ Step ${i}: Future`);
+    } else {
+      // Completed but current step - no checkmark yet
+      expandActiveSection(i);
+      console.log(`📋 Step ${i}: Current (no checkmark)`);
     }
   }
 }
@@ -760,13 +816,30 @@ function initializeUI() {
 
 // Handle sheet selection change for data preview
 function handleSheetSelectionChange(event) {
-  const selectedSheet = event.target.value;
+  const newSelectedSheet = event.target.value;
   const previewSection = document.getElementById('data-preview-section');
   
-  if (selectedSheet && previewSection) {
+  console.log('📊 Sheet selection changed:', {
+    previousSheet: selectedSheet,
+    newSheet: newSelectedSheet,
+    hasPreviewSection: !!previewSection
+  });
+  
+  // Update global selected sheet variable
+  selectedSheet = newSelectedSheet;
+  
+  if (newSelectedSheet && previewSection) {
+    console.log('📋 Loading preview and config for sheet:', newSelectedSheet);
     previewSection.classList.remove('hidden');
-    loadDataPreview(selectedSheet);
+    
+    // Load both preview and column configuration
+    loadDataPreview(newSelectedSheet);
+    loadConfigForSelected();
+    
+    // Update UI state
+    updateUIForSelectedSheet();
   } else if (previewSection) {
+    console.log('📋 Hiding preview section');
     previewSection.classList.add('hidden');
   }
 }

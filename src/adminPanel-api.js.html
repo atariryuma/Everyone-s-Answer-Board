@@ -135,17 +135,31 @@ function loadStatus(forceRefresh = false) {
 
 // Load sheet configuration for selected sheet
 function loadConfigForSelected() {
+  console.group('🔧 loadConfigForSelected');
+  
   if (!selectedSheet) {
-    console.warn('No sheet selected for config loading');
+    console.warn('❌ No sheet selected for config loading');
+    console.groupEnd();
     return;
   }
   
   if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
+    console.error('❌ Missing required data:', {
+      hasCurrentStatus: !!currentStatus,
+      hasUserInfo: !!(currentStatus && currentStatus.userInfo),
+      hasSpreadsheetId: !!(currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId)
+    });
     showMessage('スプレッドシートの情報が見つかりません。', 'error');
+    console.groupEnd();
     return;
   }
   
-  setLoading(true, '列情報を読み込んでいます...');
+  console.log('📊 Loading config for:', {
+    selectedSheet: selectedSheet,
+    spreadsheetId: currentStatus.userInfo.spreadsheetId
+  });
+  
+  setLoading(true, '📋 列情報を読み込んでいます...');
   
   runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
     .then(handleSheetDetailsSuccess)
@@ -157,17 +171,23 @@ function handleSheetDetailsSuccess(details) {
   console.log('✅ Sheet details loaded:', details);
   
   if (details && details.headers) {
+    console.log('📋 Populating header options with:', details.headers);
     populateHeaderOptions(details.headers);
     
     if (details.guessedConfig) {
+      console.log('🤖 AI config available:', details.guessedConfig);
       populateConfig(details.guessedConfig);
       showMessage('AI列判定が完了しました。設定を確認してください。', 'success');
+    } else {
+      console.log('⚠️ No AI config available');
     }
   } else {
+    console.warn('⚠️ No headers in sheet details:', details);
     showMessage('シートの詳細情報を取得できませんでした。', 'warning');
   }
   
   setLoading(false);
+  console.groupEnd();
 }
 
 // Handle sheet details loading error
