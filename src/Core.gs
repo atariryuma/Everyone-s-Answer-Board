@@ -3,6 +3,30 @@
  * 主要な業務ロジックとAPI エンドポイント
  */
 
+/**
+ * セットアップステップを統一的に判定する関数
+ * @param {Object} userInfo - ユーザー情報
+ * @param {Object} configJson - 設定JSON
+ * @returns {number} セットアップステップ (1-3)
+ */
+function determineSetupStep(userInfo, configJson) {
+  // Step 1: 基本ユーザー情報のみ（データソース未設定）
+  if (!userInfo || !userInfo.spreadsheetId || userInfo.spreadsheetId.trim() === '') {
+    console.log('determineSetupStep: Step 1 - データソース未設定');
+    return 1;
+  }
+  
+  // Step 2: データソース準備済み（フォーム未作成またはセットアップ未完了）
+  if (!configJson || configJson.setupStatus !== 'completed' || !configJson.formCreated) {
+    console.log('determineSetupStep: Step 2 - データソース設定済み、セットアップ未完了');
+    return 2;
+  }
+  
+  // Step 3: 全セットアップ完了
+  console.log('determineSetupStep: Step 3 - 全セットアップ完了');
+  return 3;
+}
+
 // =================================================================
 // ユーザー情報キャッシュ（関数実行中の重複取得を防ぐ）
 // =================================================================
@@ -777,8 +801,8 @@ function getAppConfig(requestUserId) {
         appPublished: configJson.appPublished || false,
         lastUpdated: new Date().toISOString()
       },
-      // ユーザーのセットアップ段階を判定
-      setupStep: (userInfo && userInfo.spreadsheetId) ? (configJson.publishedSheetName ? 3 : 2) : 1
+      // ユーザーのセットアップ段階を判定（統一化されたロジック）
+      setupStep: determineSetupStep(userInfo, configJson)
     };
   } catch (e) {
     console.error('アプリ設定取得エラー: ' + e.message);
@@ -3287,7 +3311,7 @@ function getStatus(requestUserId) {
       status: 'success',
       userInfo: userInfo,
       sheetNames: sheetNames,
-      setupStep: configJson.setupStatus === 'completed' ? 3 : 2,
+      setupStep: determineSetupStep(userInfo, configJson),
       activeSheetName: configJson.publishedSheetName || '',
       webAppUrl: getWebAppUrlCached(),
       appUrls: {
