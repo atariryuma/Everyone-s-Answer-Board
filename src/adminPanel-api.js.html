@@ -190,8 +190,12 @@ function handleSheetDetailsSuccess(details) {
     
     if (details.guessedConfig) {
       console.log('🤖 AI config available:', details.guessedConfig);
-      populateConfig(details.guessedConfig);
-      showMessage('AI列判定が完了しました。設定を確認してください。', 'success');
+      // populateConfig(details.guessedConfig); // ここを修正
+      // DOMの更新が完了するのを待ってからpopulateConfigを呼び出す
+      setTimeout(() => {
+        populateConfig(details.guessedConfig);
+        showMessage('AI列判定が完了しました。設定を確認してください。', 'success');
+      }, 0); // 0msのsetTimeoutでイベントループの最後に実行
     } else {
       console.log('⚠️ No AI config available');
     }
@@ -235,9 +239,11 @@ function runHeaderGuessing() {
         sheetName: selectedSheet
       };
       
-      populateConfig(configToUse);
-      showMessage('AI列判定が完了しました！設定を確認して「保存・公開」を押してください。', 'success');
-      setLoading(false);
+      setTimeout(() => {
+        populateConfig(configToUse);
+        showMessage('AI列判定が完了しました！設定を確認して「保存・公開」を押してください。', 'success');
+        setLoading(false);
+      }, 0);
     })
     .catch(function(error) {
       handleError(error, 'runHeaderGuessing', 'AI列判定に失敗しました。');
