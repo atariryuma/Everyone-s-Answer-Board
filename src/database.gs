@@ -407,28 +407,92 @@ function fetchUserFromDatabase(field, value) {
   try {
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    
+    if (!dbId) {
+      console.error('fetchUserFromDatabase: データベースIDが設定されていません');
+      return null;
+    }
+    
     var service = getSheetsService();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+    
+    console.log('fetchUserFromDatabase - 検索開始:', {
+      field: field,
+      value: value,
+      dbId: dbId,
+      sheetName: sheetName
+    });
     
     var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
     var values = data.valueRanges[0].values || [];
     
-    if (values.length === 0) return null;
+    console.log('fetchUserFromDatabase - スプレッドシートデータ取得完了:', {
+      totalRows: values.length,
+      hasHeaders: values.length > 0,
+      headers: values.length > 0 ? values[0] : 'なし'
+    });
+    
+    if (values.length === 0) {
+      console.warn('fetchUserFromDatabase: データが見つかりません');
+      return null;
+    }
     
     var headers = values[0];
     var fieldIndex = headers.indexOf(field);
     
-    if (fieldIndex === -1) return null;
+    if (fieldIndex === -1) {
+      console.error('fetchUserFromDatabase: 指定されたフィールドが見つかりません:', {
+        field: field,
+        availableHeaders: headers
+      });
+      return null;
+    }
+    
+    console.log('fetchUserFromDatabase - フィールド検索開始:', {
+      fieldIndex: fieldIndex,
+      searchValue: value,
+      searchValueType: typeof value
+    });
     
     for (var i = 1; i < values.length; i++) {
-      if (values[i][fieldIndex] === value) {
+      var currentRow = values[i];
+      var currentValue = currentRow[fieldIndex];
+      
+      // 値の比較を厳密に行う（文字列の trim と型変換）
+      var normalizedCurrentValue = currentValue ? String(currentValue).trim() : '';
+      var normalizedSearchValue = value ? String(value).trim() : '';
+      
+      console.log('fetchUserFromDatabase - 行比較:', {
+        rowIndex: i,
+        currentValue: currentValue,
+        normalizedCurrentValue: normalizedCurrentValue,
+        searchValue: value,
+        normalizedSearchValue: normalizedSearchValue,
+        isMatch: normalizedCurrentValue === normalizedSearchValue
+      });
+      
+      if (normalizedCurrentValue === normalizedSearchValue) {
         var user = {};
         headers.forEach(function(header, index) {
-          user[header] = values[i][index] || '';
+          var rawValue = currentRow[index];
+          // 空文字の場合は undefined ではなく空文字を保持
+          user[header] = rawValue !== undefined && rawValue !== null ? rawValue : '';
         });
         
+        // isActive フィールドの型変換を確実に行う
+        if (user.hasOwnProperty('isActive')) {
+          if (user.isActive === true || user.isActive === 'true' || user.isActive === 'TRUE') {
+            user.isActive = true;
+          } else if (user.isActive === false || user.isActive === 'false' || user.isActive === 'FALSE') {
+            user.isActive = false;
+          } else {
+            // デフォルトでアクティブとする
+            user.isActive = true;
+          }
+        }
+        
         // デバッグログでマッピングを確認
-        console.log('fetchUserFromDatabase - Found user:', {
+        console.log('fetchUserFromDatabase - ユーザー発見:', {
           field: field,
           value: value,
           userId: user.userId,
@@ -436,17 +500,24 @@ function fetchUserFromDatabase(field, value) {
           createdAt: user.createdAt,
           isActive: user.isActive,
           isActiveType: typeof user.isActive,
-          configJson: user.configJson ? '設定あり' : '設定なし',
-          allFields: Object.keys(user)
+          configJson: user.configJson ? '設定あり(' + String(user.configJson).length + '文字)' : '設定なし',
+          allFields: Object.keys(user),
+          rawRowData: currentRow
         });
         
         return user;
       }
     }
     
+    console.warn('fetchUserFromDatabase - ユーザーが見つかりません:', {
+      field: field,
+      value: value,
+      totalSearchedRows: values.length - 1
+    });
+    
     return null;
   } catch (error) {
-    console.error('ユーザー検索エラー (' + field + ':' + value + '):', error);
+    console.error('fetchUserFromDatabase - エラー発生 (' + field + ':' + value + '):', error.message, error.stack);
     return null;
   }
 }

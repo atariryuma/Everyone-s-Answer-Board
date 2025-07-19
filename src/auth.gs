@@ -143,13 +143,27 @@ function verifyAdminAccess(userId) {
 
     // データベースから指定されたIDのユーザー情報を取得（キャッシュ活用）
     // セキュリティ検証のため、最新データを確実に取得
+    console.log('verifyAdminAccess: ユーザー検索開始 - userId:', userId);
+    
+    // キャッシュを完全にクリアして最新データを取得
     var cacheKey = 'user_' + userId;
-    cacheManager.remove(cacheKey); // 古いキャッシュを削除して最新データを取得
-    var userFromDb = cacheManager.get(
-      cacheKey,
-      function() { return findUserById(userId); },
-      { ttl: 300, enableMemoization: true }
-    );
+    var emailCacheKey = 'email_' + activeUserEmail;
+    
+    console.log('verifyAdminAccess: キャッシュクリア実行');
+    cacheManager.remove(cacheKey);
+    cacheManager.remove(emailCacheKey);
+    
+    // 直接データベースから取得（キャッシュを経由しない）
+    console.log('verifyAdminAccess: データベースから直接ユーザー検索');
+    var userFromDb = fetchUserFromDatabase('userId', userId);
+    
+    console.log('verifyAdminAccess: データベース検索結果:', {
+      found: !!userFromDb,
+      userId: userFromDb ? userFromDb.userId : 'なし',
+      adminEmail: userFromDb ? userFromDb.adminEmail : 'なし',
+      isActive: userFromDb ? userFromDb.isActive : 'なし',
+      activeUserEmail: activeUserEmail
+    });
 
     if (!userFromDb) {
       console.warn('verifyAdminAccess: 指定されたIDのユーザーが存在しません。ID:', userId);
@@ -157,15 +171,23 @@ function verifyAdminAccess(userId) {
     }
 
     // データベースのメールアドレスと、現在ログイン中のメールアドレスを比較
-    var isEmailMatched = userFromDb.adminEmail && 
-                        userFromDb.adminEmail.toLowerCase() === activeUserEmail.toLowerCase();
+    var dbEmail = userFromDb.adminEmail ? String(userFromDb.adminEmail).trim() : '';
+    var currentEmail = activeUserEmail ? String(activeUserEmail).trim() : '';
+    var isEmailMatched = dbEmail && currentEmail && 
+                        dbEmail.toLowerCase() === currentEmail.toLowerCase();
+    
+    console.log('verifyAdminAccess: メールアドレス照合:', {
+      dbEmail: dbEmail,
+      currentEmail: currentEmail,
+      isEmailMatched: isEmailMatched
+    });
     
     // ユーザーがアクティブであるかを確認（型安全な判定）
-    console.log('Debug - userFromDb.isActive:', userFromDb.isActive, 'type:', typeof userFromDb.isActive);
+    console.log('verifyAdminAccess: isActive検証 - raw:', userFromDb.isActive, 'type:', typeof userFromDb.isActive);
     var isActive = (userFromDb.isActive === true || 
                     userFromDb.isActive === 'true' || 
                     String(userFromDb.isActive).toLowerCase() === 'true');
-    console.log('Debug - isActive result:', isActive);
+    console.log('verifyAdminAccess: isActive結果:', isActive);
 
     if (isEmailMatched && isActive) {
       console.log('✅ 管理者本人によるアクセスを確認しました:', activeUserEmail, 'UserID:', userId);

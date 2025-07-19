@@ -398,3 +398,139 @@
   }
 })();
 </script>
+
+<!-- サーバーサイドエラー表示部分 -->
+<? if (typeof title !== 'undefined' && title) { ?>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= title || 'エラー' ?> - StudyQuest</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+        .error-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+        }
+        .error-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            animation: bounce 2s infinite;
+        }
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+            60% { transform: translateY(-5px); }
+        }
+        .error-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #e53e3e;
+            margin-bottom: 16px;
+        }
+        .error-message {
+            font-size: 16px;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+        .error-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+        .btn-secondary {
+            background: #f7fafc;
+            color: #4a5568;
+            border: 1px solid #e2e8f0;
+        }
+        .btn-secondary:hover {
+            background: #edf2f7;
+        }
+        .debug-info {
+            margin-top: 20px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #17a2b8;
+            text-align: left;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            color: #495057;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .timestamp {
+            color: #6c757d;
+            font-size: 12px;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-icon">⚠️</div>
+        <h1 class="error-title"><?= htmlEncode(title || 'エラーが発生しました') ?></h1>
+        <p class="error-message"><?= htmlEncode(message || 'システムエラーが発生しました。管理者にお問い合わせください。') ?></p>
+        
+        <div class="error-actions">
+            <button class="btn btn-primary" onclick="location.reload()">
+                🔄 ページを再読み込み
+            </button>
+            <button class="btn btn-secondary" onclick="history.back()">
+                ← 前のページに戻る
+            </button>
+        </div>
+        
+        <? if (typeof debugInfo !== 'undefined' && debugInfo) { ?>
+        <div class="debug-info">
+            <strong>デバッグ情報:</strong><br>
+            <?= htmlEncode(debugInfo) ?>
+        </div>
+        <? } ?>
+        
+        <div class="timestamp">
+            エラー発生時刻: <?= new Date().toLocaleString('ja-JP') ?>
+        </div>
+    </div>
+</body>
+</html>
+<? } ?>
