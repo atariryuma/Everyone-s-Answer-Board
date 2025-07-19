@@ -625,7 +625,6 @@ function getSheetsList(userId) {
     console.error('getSheetsList エラー: ' + e.message);
     return [];
   }
-}
 
 /**
  * ボードデータを再読み込み (マルチテナント対応版)
