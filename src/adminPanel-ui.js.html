@@ -257,35 +257,66 @@ function populateSheetSelect(sheetNames, activeSheetName) {
 
 // Populate header options for configuration
 function populateHeaderOptions(headers) {
+  console.group('🎯 populateHeaderOptions');
+  console.log('📝 Headers to populate:', headers.length, headers);
+  
   const selects = [
-    'opinion-column',
+    'opinionHeader',      // Main required field
+    'opinion-column',     // Optional details field (backup)
     'name-column', 
     'class-column',
     'timestamp-column'
   ];
   
+  console.log('🎯 Target dropdown elements:', selects);
+  
   selects.forEach(selectId => {
+    console.log(`🔍 Looking for element: ${selectId}`);
     const select = document.getElementById(selectId);
+    
     if (select) {
+      console.log(`✅ Found element: ${selectId}`);
+      
       // Store current value
       const currentValue = select.value;
+      console.log(`📄 Current value: "${currentValue}"`);
       
       // Clear and repopulate
       select.innerHTML = '<option value="">-- 列を選択 --</option>';
+      console.log(`🧹 Cleared dropdown: ${selectId}`);
       
+      let optionsAdded = 0;
       headers.forEach(header => {
         const option = document.createElement('option');
         option.value = header;
         option.textContent = header;
         select.appendChild(option);
+        optionsAdded++;
       });
+      
+      console.log(`📋 Added ${optionsAdded} options to ${selectId}`);
+      console.log(`📊 Total options in ${selectId}:`, select.options.length);
       
       // Restore previous value if still valid
       if (currentValue && headers.includes(currentValue)) {
         select.value = currentValue;
+        console.log(`♻️ Restored value: "${currentValue}" for ${selectId}`);
       }
+      
+      // Debug final state
+      console.log(`🎯 Final state of ${selectId}:`, {
+        value: select.value,
+        optionsCount: select.options.length,
+        visible: !select.hidden,
+        disabled: select.disabled
+      });
+      
+    } else {
+      console.error(`❌ Element not found: ${selectId}`);
     }
   });
+  
+  console.groupEnd();
 }
 
 // Populate configuration with guessed values
