@@ -65,4 +65,20 @@ main.flex-1 {
   flex: 1;
   min-height: 0;
 }
+
+/* Adjust fixed header and main padding for extra height */
+#admin-header {
+  height: calc(4rem + 1mm);
+}
+#admin-main {
+  padding-top: calc(4rem + 1mm);
+}
+@media (min-width: 640px) {
+  #admin-header {
+    height: calc(5rem + 1mm);
+  }
+  #admin-main {
+    padding-top: calc(5rem + 1mm);
+  }
+}
 </style>
