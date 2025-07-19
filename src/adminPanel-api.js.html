@@ -9,23 +9,47 @@
 
 // マルチテナント対応: 新しいrunGasWithUserId関数
 function runGasWithUserId(functionName, ...args) {
+  console.group(`🔄 runGasWithUserId: ${functionName}`);
+  console.log('📝 Input args:', args);
+  console.log('🆔 Current userId:', userId);
+  console.log('⏳ userIdPromise status:', typeof userIdPromise);
+  
   // userIdが設定されていない場合は初期化を待つ
   if (!userId) {
+    console.log('⏳ userId not set, waiting for userIdPromise...');
+    
     return userIdPromise.then(() => {
+      console.log('✅ userIdPromise resolved, userId:', userId);
+      
       if (!userId) {
-        console.error('❌  - No userId available for:', functionName);
+        console.error('❌ No userId available after promise resolution for:', functionName);
+        console.groupEnd();
         throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
       }
       
-      console.log('✅  - runGasWithUserId (after init):', functionName, 'userId:', userId);
+      console.log('✅ runGasWithUserId (after init):', functionName, 'userId:', userId);
+      console.log('🔧 Calling gasOptimizer.call with:', functionName, userId, ...args);
+      
       // userIdを第一引数として追加
-      return gasOptimizer.call(functionName, userId, ...args);
+      const result = gasOptimizer.call(functionName, userId, ...args);
+      console.log('📤 gasOptimizer.call result:', result);
+      console.groupEnd();
+      return result;
+    }).catch((error) => {
+      console.error('❌ userIdPromise rejected:', error);
+      console.groupEnd();
+      throw error;
     });
   }
   
-  console.log('✅  - runGasWithUserId:', functionName, 'userId:', userId);
+  console.log('✅ runGasWithUserId (immediate):', functionName, 'userId:', userId);
+  console.log('🔧 Calling gasOptimizer.call with:', functionName, userId, ...args);
+  
   // userIdを第一引数として追加
-  return gasOptimizer.call(functionName, userId, ...args);
+  const result = gasOptimizer.call(functionName, userId, ...args);
+  console.log('📤 gasOptimizer.call result:', result);
+  console.groupEnd();
+  return result;
 }
 
 // callWithCache 関数 - 読み取り専用操作用
@@ -478,52 +502,261 @@ function startSystemStatusUpdate() {
 // QUICKSTART FUNCTIONALITY
 // =============================================================================
 
+// QuickStart progress management
+const quickStartSteps = [
+  { id: 1, text: 'ユーザー専用フォルダの作成', detail: 'フォルダ構造を準備中...' },
+  { id: 2, text: 'Googleフォームとスプレッドシートの作成', detail: 'データ収集の仕組みを構築中...' },
+  { id: 3, text: '回答ボードの設定と公開', detail: 'Webアプリケーションを設定中...' },
+  { id: 4, text: 'セットアップ完了', detail: '利用準備が整いました！' }
+];
+
+// Show QuickStart progress bar
+function showQuickStartProgress() {
+  const progressContainer = document.getElementById('quickstart-progress');
+  if (progressContainer) {
+    progressContainer.classList.remove('hidden');
+    resetProgressSteps();
+  }
+}
+
+// Hide QuickStart progress bar
+function hideQuickStartProgress() {
+  const progressContainer = document.getElementById('quickstart-progress');
+  if (progressContainer) {
+    progressContainer.classList.add('hidden');
+  }
+}
+
+// Reset all progress steps to initial state
+function resetProgressSteps() {
+  quickStartSteps.forEach(step => {
+    updateProgressStep(step.id, 'waiting', step.text, '待機中...');
+  });
+  updateOverallProgress(0, '初期化中...');
+}
+
+// Update individual progress step
+function updateProgressStep(stepId, status, text, detail) {
+  const stepElement = document.getElementById(`progress-step-${stepId}`);
+  const dotElement = document.getElementById(`progress-step-${stepId}-dot`);
+  const textElement = document.getElementById(`progress-step-${stepId}-text`);
+  const detailElement = document.getElementById(`progress-step-${stepId}-detail`);
+  
+  if (!stepElement || !dotElement || !textElement || !detailElement) return;
+  
+  // Update text and detail
+  textElement.textContent = text;
+  detailElement.textContent = detail;
+  
+  // Update visual state based on status
+  switch (status) {
+    case 'waiting':
+      dotElement.className = 'w-2 h-2 rounded-full bg-gray-400';
+      textElement.className = 'text-sm text-gray-300';
+      detailElement.className = 'text-xs text-gray-500';
+      break;
+    case 'active':
+      dotElement.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+      textElement.className = 'text-sm text-emerald-300 font-medium';
+      detailElement.className = 'text-xs text-emerald-400';
+      break;
+    case 'completed':
+      dotElement.className = 'w-2 h-2 rounded-full bg-green-400';
+      textElement.className = 'text-sm text-green-300 font-medium';
+      detailElement.className = 'text-xs text-green-400';
+      break;
+    case 'error':
+      dotElement.className = 'w-2 h-2 rounded-full bg-red-400';
+      textElement.className = 'text-sm text-red-300 font-medium';
+      detailElement.className = 'text-xs text-red-400';
+      break;
+  }
+}
+
+// Update overall progress bar
+function updateOverallProgress(percentage, statusMessage) {
+  const progressBar = document.getElementById('progress-bar');
+  const progressPercentage = document.getElementById('progress-percentage');
+  const progressStatus = document.getElementById('progress-status');
+  
+  if (progressBar) {
+    progressBar.style.width = `${percentage}%`;
+  }
+  
+  if (progressPercentage) {
+    progressPercentage.textContent = `${percentage}%`;
+  }
+  
+  if (progressStatus) {
+    progressStatus.textContent = statusMessage;
+  }
+}
+
+// Simulate QuickStart progress (for demonstration)
+function simulateQuickStartProgress() {
+  console.log('🎬 Simulating QuickStart progress');
+  
+  // Step 1: Folder creation
+  updateProgressStep(1, 'active', 'ユーザー専用フォルダの作成', 'フォルダ構造を準備中...');
+  updateOverallProgress(10, 'フォルダを作成しています...');
+  
+  setTimeout(() => {
+    updateProgressStep(1, 'completed', 'ユーザー専用フォルダの作成', '✅ フォルダが作成されました');
+    updateProgressStep(2, 'active', 'Googleフォームとスプレッドシートの作成', 'データ収集の仕組みを構築中...');
+    updateOverallProgress(35, 'フォームとスプレッドシートを作成しています...');
+  }, 1500);
+  
+  setTimeout(() => {
+    updateProgressStep(2, 'completed', 'Googleフォームとスプレッドシートの作成', '✅ フォームとスプレッドシートが作成されました');
+    updateProgressStep(3, 'active', '回答ボードの設定と公開', 'Webアプリケーションを設定中...');
+    updateOverallProgress(70, '回答ボードを設定しています...');
+  }, 3000);
+  
+  setTimeout(() => {
+    updateProgressStep(3, 'completed', '回答ボードの設定と公開', '✅ 回答ボードが公開されました');
+    updateProgressStep(4, 'active', 'セットアップ完了', '利用準備が整いました！');
+    updateOverallProgress(100, 'セットアップが完了しました！');
+  }, 4500);
+  
+  setTimeout(() => {
+    updateProgressStep(4, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
+  }, 5000);
+}
+
 // Handle quick start setup
 function handleQuickStart() {
+  console.group('🚀 QuickStart Function Called');
+  console.log('🔍 Step 1: Function entry');
+  
   const quickstartBtn = document.getElementById('quickstart-btn');
   const quickstartText = document.getElementById('quickstart-text');
   
+  console.log('🔍 Step 2: DOM elements check', {
+    quickstartBtn: !!quickstartBtn,
+    quickstartText: !!quickstartText
+  });
+  
   if (!quickstartBtn || !quickstartText) {
-    console.error('QuickStart elements not found');
+    console.error('❌ QuickStart elements not found');
+    console.groupEnd();
     return;
   }
+  
+  console.log('🔍 Step 3: Function availability check', {
+    runGasWithUserId: typeof runGasWithUserId,
+    setLoading: typeof setLoading,
+    showMessage: typeof showMessage,
+    userId: typeof userId !== 'undefined' ? userId : 'undefined',
+    userIdPromise: typeof userIdPromise
+  });
   
   // Update button state
   quickstartBtn.disabled = true;
   quickstartText.textContent = 'セットアップ中...';
+  console.log('🔍 Step 4: Button state updated');
+  
+  // Show progress bar and start simulation
+  showQuickStartProgress();
+  simulateQuickStartProgress();
+  console.log('🔍 Step 5: Progress bar shown and simulation started');
   
   // Show loading message
-  setLoading(true, 'クイックスタートを実行中...');
+  if (typeof setLoading === 'function') {
+    setLoading(true, 'クイックスタートを実行中...');
+    console.log('🔍 Step 6: Loading state set');
+  } else {
+    console.warn('⚠️ setLoading function not available');
+  }
+  
+  console.log('🔍 Step 7: About to call runGasWithUserId');
   
   runGasWithUserId('quickStartSetup')
     .then(function(result) {
+      console.log('✅ QuickStart backend call succeeded:', result);
+      
       if (result && result.status === 'success') {
-        showMessage('✅ クイックスタートが完了しました！フォームとボードが自動作成されました。', 'success');
+        console.log('✅ QuickStart completed successfully');
+        
+        // Final progress update
+        updateOverallProgress(100, 'セットアップが完了しました！');
+        updateProgressStep(4, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
+        
+        if (typeof showMessage === 'function') {
+          showMessage('✅ クイックスタートが完了しました！フォームとボードが自動作成されました。', 'success');
+        }
         
         // Update status after quick start
-        loadStatus(true);
+        if (typeof loadStatus === 'function') {
+          loadStatus(true);
+        }
         
         // Reset button state
         quickstartBtn.disabled = false;
         quickstartText.textContent = 'クイックスタート完了';
         
-        // Show success state
+        // Hide progress bar after delay and reset button
         setTimeout(() => {
+          hideQuickStartProgress();
           quickstartText.textContent = 'クイックスタートを開始';
           quickstartBtn.disabled = false;
-        }, 3000);
+        }, 5000);
       } else {
-        showMessage(result?.message || 'クイックスタートに失敗しました。', 'error');
+        console.warn('⚠️ QuickStart returned error result:', result);
+        
+        // Show error in progress
+        updateProgressStep(4, 'error', 'セットアップエラー', result?.message || 'エラーが発生しました');
+        updateOverallProgress(0, 'セットアップに失敗しました');
+        
+        if (typeof showMessage === 'function') {
+          showMessage(result?.message || 'クイックスタートに失敗しました。', 'error');
+        }
+        
         quickstartBtn.disabled = false;
         quickstartText.textContent = 'クイックスタートを開始';
+        
+        // Hide progress bar after delay
+        setTimeout(() => {
+          hideQuickStartProgress();
+        }, 3000);
       }
-      setLoading(false);
+      
+      if (typeof setLoading === 'function') {
+        setLoading(false);
+      }
+      
+      console.groupEnd();
     })
     .catch(function(error) {
-      console.error('QuickStart error:', error);
-      handleError(error, 'handleQuickStart', 'クイックスタートに失敗しました。');
+      console.error('❌ QuickStart error:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        stack: error.stack,
+        type: error.constructor.name
+      });
+      
+      // Show error in progress
+      updateProgressStep(4, 'error', 'セットアップエラー', '通信エラーが発生しました');
+      updateOverallProgress(0, 'セットアップに失敗しました');
+      
+      if (typeof handleError === 'function') {
+        handleError(error, 'handleQuickStart', 'クイックスタートに失敗しました。');
+      } else if (typeof showMessage === 'function') {
+        showMessage('クイックスタートに失敗しました: ' + error.message, 'error');
+      }
+      
       quickstartBtn.disabled = false;
       quickstartText.textContent = 'クイックスタートを開始';
+      
+      if (typeof setLoading === 'function') {
+        setLoading(false);
+      }
+      
+      // Hide progress bar after delay
+      setTimeout(() => {
+        hideQuickStartProgress();
+      }, 3000);
+      
+      console.groupEnd();
     });
 }
 

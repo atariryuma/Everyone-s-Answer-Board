@@ -197,26 +197,7 @@
     return gasOptimizer.call(functionName, ...args);
   }
   
-  // マルチテナント対応: 新しいrunGasWithUserId関数
-  function runGasWithUserId(functionName, ...args) {
-    // userIdが設定されていない場合は初期化を待つ
-    if (!userId) {
-      return userIdPromise.then(() => {
-        if (!userId) {
-          console.error('❌  - No userId available for:', functionName);
-          throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
-        }
-        
-        console.log('✅  - runGasWithUserId (after init):', functionName, 'userId:', userId);
-        // userIdを第一引数として追加
-        return gasOptimizer.call(functionName, userId, ...args);
-      });
-    }
-    
-    console.log('✅  - runGasWithUserId:', functionName, 'userId:', userId);
-    // userIdを第一引数として追加
-    return gasOptimizer.call(functionName, userId, ...args);
-  }
+  // runGasWithUserId function is defined in adminPanel-api.js.html to avoid duplication
   
   // callWithCache 関数 - 読み取り専用操作用
   function callWithCache(functionName, cacheKey, ttl, ...args) {
@@ -416,6 +397,79 @@
                   </svg>
                   <span id="quickstart-text">クイックスタートを開始</span>
                 </button>
+                
+                <!-- QuickStart Progress Sequence Bar -->
+                <div id="quickstart-progress" class="hidden mt-4 bg-gray-800/30 border border-emerald-400/30 rounded-lg p-4">
+                  <div class="flex items-center gap-2 mb-3">
+                    <svg class="w-5 h-5 text-emerald-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <h4 class="text-sm font-semibold text-emerald-300">進捗状況</h4>
+                  </div>
+                  
+                  <!-- Progress Steps -->
+                  <div class="space-y-3">
+                    <!-- Step 1 -->
+                    <div class="flex items-center gap-3" id="progress-step-1">
+                      <div class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
+                        <div class="w-2 h-2 rounded-full bg-gray-400" id="progress-step-1-dot"></div>
+                      </div>
+                      <div class="flex-1">
+                        <div class="text-sm text-gray-300" id="progress-step-1-text">ユーザー専用フォルダの作成</div>
+                        <div class="text-xs text-gray-500" id="progress-step-1-detail">待機中...</div>
+                      </div>
+                    </div>
+                    
+                    <!-- Step 2 -->
+                    <div class="flex items-center gap-3" id="progress-step-2">
+                      <div class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
+                        <div class="w-2 h-2 rounded-full bg-gray-400" id="progress-step-2-dot"></div>
+                      </div>
+                      <div class="flex-1">
+                        <div class="text-sm text-gray-300" id="progress-step-2-text">Googleフォームとスプレッドシートの作成</div>
+                        <div class="text-xs text-gray-500" id="progress-step-2-detail">待機中...</div>
+                      </div>
+                    </div>
+                    
+                    <!-- Step 3 -->
+                    <div class="flex items-center gap-3" id="progress-step-3">
+                      <div class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
+                        <div class="w-2 h-2 rounded-full bg-gray-400" id="progress-step-3-dot"></div>
+                      </div>
+                      <div class="flex-1">
+                        <div class="text-sm text-gray-300" id="progress-step-3-text">回答ボードの設定と公開</div>
+                        <div class="text-xs text-gray-500" id="progress-step-3-detail">待機中...</div>
+                      </div>
+                    </div>
+                    
+                    <!-- Step 4 -->
+                    <div class="flex items-center gap-3" id="progress-step-4">
+                      <div class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
+                        <div class="w-2 h-2 rounded-full bg-gray-400" id="progress-step-4-dot"></div>
+                      </div>
+                      <div class="flex-1">
+                        <div class="text-sm text-gray-300" id="progress-step-4-text">セットアップ完了</div>
+                        <div class="text-xs text-gray-500" id="progress-step-4-detail">待機中...</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Overall Progress Bar -->
+                  <div class="mt-4">
+                    <div class="flex items-center justify-between mb-2">
+                      <span class="text-xs text-gray-400">全体の進捗</span>
+                      <span class="text-xs text-emerald-400" id="progress-percentage">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-full h-2">
+                      <div class="bg-gradient-to-r from-emerald-500 to-blue-500 h-2 rounded-full transition-all duration-500" style="width: 0%" id="progress-bar"></div>
+                    </div>
+                  </div>
+                  
+                  <!-- Current Status Message -->
+                  <div class="mt-3 text-center">
+                    <p class="text-sm text-emerald-300" id="progress-status">初期化中...</p>
+                  </div>
+                </div>
               </div>
             </div>
 
