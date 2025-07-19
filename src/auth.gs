@@ -185,11 +185,16 @@ function verifyAdminAccess(userId) {
 
 /**
  * ログインフローを処理し、適切なページにリダイレクトする
+ * 既存ユーザーの設定を保護しつつ、セットアップ状況に応じたメッセージを表示
  * @param {string} userEmail ログインユーザーのメールアドレス
  * @returns {HtmlOutput} 表示するHTMLコンテンツ
  */
 function processLoginFlow(userEmail) {
   try {
+    if (!userEmail) {
+      throw new Error('ユーザーメールアドレスが指定されていません');
+    }
+
     // 1. ユーザー情報をデータベースから取得
     var userInfo = findUserByEmail(userEmail);
 
@@ -198,8 +203,22 @@ function processLoginFlow(userEmail) {
       // 2a. アクティブユーザーの場合
       if (isTrue(userInfo.isActive)) {
         console.log('processLoginFlow: 既存アクティブユーザー:', userEmail);
+        
+        // 最終アクセス時刻を更新（設定は保護）
+        updateUserLastAccess(userInfo.userId);
+        
+        // セットアップ状況を確認してメッセージを調整
+        const setupStatus = getSetupStatusFromConfig(userInfo.configJson);
+        let welcomeMessage = '管理パネルへようこそ';
+        
+        if (setupStatus === 'pending') {
+          welcomeMessage = 'セットアップを続行してください';
+        } else if (setupStatus === 'completed') {
+          welcomeMessage = 'おかえりなさい！';
+        }
+        
         const adminUrl = buildUserAdminUrl(userInfo.userId);
-        return createSecureRedirect(adminUrl, '管理パネルへようこそ');
+        return createSecureRedirect(adminUrl, welcomeMessage);
       } 
       // 2b. 非アクティブユーザーの場合
       else {
@@ -214,13 +233,20 @@ function processLoginFlow(userEmail) {
     else {
       console.log('processLoginFlow: 新規ユーザー登録開始:', userEmail);
       
-      // 3a. 新規ユーザーデータを準備
+      // 3a. 新規ユーザーデータを準備（初期設定でpending状態）
+      const initialConfig = {
+        setupStatus: 'pending',
+        createdAt: new Date().toISOString(),
+        formCreated: false,
+        appPublished: false
+      };
+      
       const newUser = {
         userId: Utilities.getUuid(),
         adminEmail: userEmail,
         createdAt: new Date().toISOString(),
         isActive: true, // 即時有効化
-        configJson: '{}',
+        configJson: JSON.stringify(initialConfig),
         spreadsheetId: '',
         spreadsheetUrl: '',
         lastAccessedAt: new Date().toISOString()
@@ -232,10 +258,63 @@ function processLoginFlow(userEmail) {
       
       // 3c. 新規ユーザーの管理パネルへリダイレクト
       const adminUrl = buildUserAdminUrl(newUser.userId);
-      return createSecureRedirect(adminUrl, 'ようこそ！セットアップが完了しました');
+      return createSecureRedirect(adminUrl, 'ようこそ！セットアップを開始してください');
     }
   } catch (error) {
     console.error('processLoginFlowでエラー:', error.stack);
     return showErrorPage('ログインエラー', 'ログイン処理中にエラーが発生しました。', error);
+  }
+}
+
+/**
+ * ユーザーの最終アクセス時刻のみを更新（設定は保護）
+ * @param {string} userId - 更新対象のユーザーID
+ */
+function updateUserLastAccess(userId) {
+  try {
+    if (!userId) {
+      console.warn('updateUserLastAccess: userIdが指定されていません');
+      return;
+    }
+    
+    const now = new Date().toISOString();
+    console.log('最終アクセス時刻を更新:', userId, now);
+    
+    // lastAccessedAtフィールドのみを更新（他の設定は保護）
+    updateUserField(userId, 'lastAccessedAt', now);
+    
+  } catch (error) {
+    console.error('updateUserLastAccess エラー:', error.message);
+  }
+}
+
+/**
+ * configJsonからsetupStatusを安全に取得
+ * @param {string} configJsonString - JSONエンコードされた設定文字列
+ * @returns {string} setupStatus ('pending', 'completed', 'error')
+ */
+function getSetupStatusFromConfig(configJsonString) {
+  try {
+    if (!configJsonString || configJsonString.trim() === '' || configJsonString === '{}') {
+      return 'pending'; // 空の場合はセットアップ未完了とみなす
+    }
+    
+    const config = JSON.parse(configJsonString);
+    
+    // setupStatusが明示的に設定されている場合はそれを使用
+    if (config.setupStatus) {
+      return config.setupStatus;
+    }
+    
+    // setupStatusがない場合、他のフィールドから推測
+    if (config.appPublished === true && config.formCreated === true) {
+      return 'completed';
+    }
+    
+    return 'pending';
+    
+  } catch (error) {
+    console.warn('getSetupStatusFromConfig JSON解析エラー:', error.message);
+    return 'pending'; // エラー時はセットアップ未完了とみなす
   }
 }

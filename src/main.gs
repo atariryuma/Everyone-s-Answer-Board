@@ -1047,7 +1047,15 @@ function renderAnswerBoard(userInfo, params) {
       template.ownerName = userInfo.adminEmail;
       template.sheetName = escapeJavaScript(config.publishedSheetName || params.sheetName);
       template.DEBUG_MODE = shouldEnableDebugMode();
-      const rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+      // setupStatus未完了時の安全なopinionHeader取得
+      const setupStatus = config.setupStatus || 'pending';
+      let rawOpinionHeader;
+      
+      if (setupStatus === 'pending') {
+        rawOpinionHeader = 'セットアップ中...';
+      } else {
+        rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+      }
       template.opinionHeader = escapeJavaScript(rawOpinionHeader);
       template.cacheTimestamp = Date.now();
       template.displayMode = config.displayMode || 'anonymous';

@@ -17,6 +17,16 @@ function updateUIWithNewStatus(status) {
   currentStatus = status;
   console.log('✅ AdminPanel: Status updated');
   
+  // セットアップ状況を確認
+  const setupStatus = getSetupStatusFromUserInfo(status.userInfo);
+  console.log('🔧 Setup Status:', setupStatus);
+  
+  // セットアップ未完了時の専用処理
+  if (setupStatus === 'pending') {
+    updateUIForSetupPending(status);
+    return; // セットアップ未完了時は通常のUI更新をスキップ
+  }
+  
   // Update static UI elements first
   updateStaticUI(status);
   
@@ -707,6 +717,156 @@ function loadDataPreview(sheetName) {
       console.error('Data preview error:', error);
       previewContent.innerHTML = '<p class="text-red-400">プレビューの読み込みに失敗しました</p>';
     });
+}
+
+// =============================================================================
+// SETUP STATUS HANDLING FUNCTIONS
+// =============================================================================
+
+/**
+ * userInfoからsetupStatusを安全に取得
+ * @param {Object} userInfo - ユーザー情報オブジェクト
+ * @returns {string} setupStatus ('pending', 'completed', 'error')
+ */
+function getSetupStatusFromUserInfo(userInfo) {
+  try {
+    if (!userInfo || !userInfo.configJson) {
+      return 'pending'; // ユーザー情報がない場合はセットアップ未完了とみなす
+    }
+    
+    const config = typeof userInfo.configJson === 'string' 
+      ? JSON.parse(userInfo.configJson) 
+      : userInfo.configJson;
+    
+    // setupStatusが明示的に設定されている場合はそれを使用
+    if (config.setupStatus) {
+      return config.setupStatus;
+    }
+    
+    // setupStatusがない場合、他のフィールドから推測
+    if (config.appPublished === true && config.formCreated === true) {
+      return 'completed';
+    }
+    
+    return 'pending';
+    
+  } catch (error) {
+    console.warn('getSetupStatusFromUserInfo JSON解析エラー:', error.message);
+    return 'pending'; // エラー時はセットアップ未完了とみなす
+  }
+}
+
+/**
+ * セットアップ未完了時の専用UI処理
+ * @param {Object} status - ステータスオブジェクト
+ */
+function updateUIForSetupPending(status) {
+  console.log('🔧 セットアップ未完了モードでUI更新開始');
+  
+  try {
+    // 1. 全体的なメッセージ表示
+    showSetupPendingMessage();
+    
+    // 2. 公開関連ボタンを無効化
+    disablePublishingButtons();
+    
+    // 3. セットアップガイドを表示
+    showSetupGuide(status);
+    
+    // 4. 基本的な静的UI要素は更新（ユーザー情報等）
+    updateBasicStaticUI(status);
+    
+    console.log('✅ セットアップ未完了モード UI更新完了');
+    
+  } catch (error) {
+    console.error('updateUIForSetupPending エラー:', error);
+    // フォールバック: 通常のUI更新を実行
+    updateStaticUI(status);
+  }
+}
+
+/**
+ * セットアップ未完了メッセージを表示
+ */
+function showSetupPendingMessage() {
+  const messageContainer = document.getElementById('main-content-area');
+  if (messageContainer) {
+    messageContainer.innerHTML = `
+      <div class="setup-pending-overlay bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg p-8 text-center">
+        <div class="text-6xl mb-4">⚙️</div>
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">セットアップを完了してください</h2>
+        <p class="text-gray-600 mb-6">管理パネルを使用するには、以下の手順でセットアップを進めてください</p>
+        <div class="setup-steps text-left max-w-md mx-auto">
+          <div class="step-item flex items-center mb-3 p-3 bg-white rounded-lg shadow-sm">
+            <span class="step-number bg-blue-500 text-white rounded-full w-8 h-8 flex items-center justify-center mr-3 text-sm font-bold">1</span>
+            <span class="text-gray-700">📊 データ準備（スプレッドシート接続）</span>
+          </div>
+          <div class="step-item flex items-center mb-3 p-3 bg-white rounded-lg shadow-sm">
+            <span class="step-number bg-gray-400 text-white rounded-full w-8 h-8 flex items-center justify-center mr-3 text-sm font-bold">2</span>
+            <span class="text-gray-500">🎛️ シート・列設定</span>
+          </div>
+          <div class="step-item flex items-center mb-3 p-3 bg-white rounded-lg shadow-sm">
+            <span class="step-number bg-gray-400 text-white rounded-full w-8 h-8 flex items-center justify-center mr-3 text-sm font-bold">3</span>
+            <span class="text-gray-500">🚀 公開設定</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+/**
+ * 公開関連ボタンを無効化
+ */
+function disablePublishingButtons() {
+  const buttonsToDisable = [
+    'save-publish-btn',
+    'unpublish-board-btn',
+    'preview-btn'
+  ];
+  
+  buttonsToDisable.forEach(buttonId => {
+    const button = document.getElementById(buttonId);
+    if (button) {
+      button.disabled = true;
+      button.classList.add('opacity-50', 'cursor-not-allowed');
+      button.title = 'セットアップを完了してください';
+    }
+  });
+}
+
+/**
+ * セットアップガイドを表示
+ * @param {Object} status - ステータスオブジェクト
+ */
+function showSetupGuide(status) {
+  // 左サイドバーにセットアップガイドを表示
+  const sidebar = document.querySelector('.sidebar');
+  if (sidebar) {
+    const guideElement = document.createElement('div');
+    guideElement.className = 'setup-guide bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4';
+    guideElement.innerHTML = `
+      <h3 class="text-sm font-semibold text-yellow-800 mb-2">📋 セットアップガイド</h3>
+      <ol class="text-xs text-yellow-700 space-y-1">
+        <li>1. Googleスプレッドシートを作成</li>
+        <li>2. データ列を設定</li>
+        <li>3. シート名と列マッピングを設定</li>
+        <li>4. アプリを公開</li>
+      </ol>
+    `;
+    sidebar.insertBefore(guideElement, sidebar.firstChild);
+  }
+}
+
+/**
+ * 基本的な静的UI要素のみ更新
+ * @param {Object} status - ステータスオブジェクト
+ */
+function updateBasicStaticUI(status) {
+  // ユーザー情報など最低限の情報のみ更新
+  if (status.userInfo) {
+    updateUserInfoDisplay(status.userInfo);
+  }
 }
 
 // Initialize when DOM is ready

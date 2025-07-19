@@ -292,11 +292,23 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       var configJson = JSON.parse(userInfo.configJson || '{}');
       debugLog('getPublishedSheetData: configJson=%s', JSON.stringify(configJson));
 
+    // セットアップ状況を確認
+    var setupStatus = configJson.setupStatus || 'pending';
+    
     // 公開対象のスプレッドシートIDとシート名を取得
     var publishedSpreadsheetId = configJson.publishedSpreadsheetId;
     var publishedSheetName = configJson.publishedSheetName;
 
     if (!publishedSpreadsheetId || !publishedSheetName) {
+      if (setupStatus === 'pending') {
+        // セットアップ未完了の場合は適切なメッセージを返す
+        return {
+          status: 'setup_required',
+          message: 'セットアップを完了してください。データ準備、シート・列設定、公開設定の順番で進めてください。',
+          data: [],
+          setupStatus: setupStatus
+        };
+      }
       throw new Error('公開対象のスプレッドシートまたはシートが設定されていません。');
     }
 
@@ -318,11 +330,25 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     }
 
     // Page.html期待形式に変換
-    // 設定からヘッダー名を取得。未定義の場合のみデフォルト値を使用。
-    var mainHeaderName = sheetConfig.opinionHeader || COLUMN_HEADERS.OPINION;
-    var reasonHeaderName = sheetConfig.reasonHeader || COLUMN_HEADERS.REASON;
-    var classHeaderName = sheetConfig.classHeader !== undefined ? sheetConfig.classHeader : COLUMN_HEADERS.CLASS;
-    var nameHeaderName = sheetConfig.nameHeader !== undefined ? sheetConfig.nameHeader : COLUMN_HEADERS.NAME;
+    // 設定からヘッダー名を取得。setupStatus未完了時は安全なデフォルト値を使用。
+    var mainHeaderName;
+    if (setupStatus === 'pending') {
+      mainHeaderName = 'セットアップ中...';
+    } else {
+      mainHeaderName = sheetConfig.opinionHeader || COLUMN_HEADERS.OPINION;
+    }
+    
+    // その他のヘッダーフィールドも安全に取得
+    var reasonHeaderName, classHeaderName, nameHeaderName;
+    if (setupStatus === 'pending') {
+      reasonHeaderName = 'セットアップ中...';
+      classHeaderName = 'セットアップ中...';
+      nameHeaderName = 'セットアップ中...';
+    } else {
+      reasonHeaderName = sheetConfig.reasonHeader || COLUMN_HEADERS.REASON;
+      classHeaderName = sheetConfig.classHeader !== undefined ? sheetConfig.classHeader : COLUMN_HEADERS.CLASS;
+      nameHeaderName = sheetConfig.nameHeader !== undefined ? sheetConfig.nameHeader : COLUMN_HEADERS.NAME;
+    }
     debugLog('getPublishedSheetData: Configured Headers - mainHeaderName=%s, reasonHeaderName=%s, classHeaderName=%s, nameHeaderName=%s', mainHeaderName, reasonHeaderName, classHeaderName, nameHeaderName);
 
     // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
@@ -408,10 +434,20 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
     }
 
     var configJson = JSON.parse(userInfo.configJson || '{}');
+    var setupStatus = configJson.setupStatus || 'pending';
     var publishedSpreadsheetId = configJson.publishedSpreadsheetId;
     var publishedSheetName = configJson.publishedSheetName;
 
     if (!publishedSpreadsheetId || !publishedSheetName) {
+      if (setupStatus === 'pending') {
+        // セットアップ未完了の場合は適切なメッセージを返す
+        return {
+          status: 'setup_required',
+          message: 'セットアップを完了してください。',
+          incrementalData: [],
+          setupStatus: setupStatus
+        };
+      }
       throw new Error('公開対象のスプレッドシートまたはシートが設定されていません。');
     }
 
