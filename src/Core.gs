@@ -597,6 +597,37 @@ function getAvailableSheets(requestUserId) {
 }
 
 /**
+ * 指定されたユーザーのスプレッドシートからシートのリストを取得します。
+ * @param {string} userId - ユーザーID
+ * @returns {Array<Object>} シートのリスト（例: [{name: 'Sheet1', id: 'sheetId1'}, ...]）
+ */
+function getSheetsList(userId) {
+  try {
+    var userInfo = findUserById(userId);
+    if (!userInfo || !userInfo.spreadsheetId) {
+      console.warn('getSheetsList: User info or spreadsheetId not found for userId:', userId);
+      return [];
+    }
+
+    var spreadsheet = SpreadsheetApp.openById(userInfo.spreadsheetId);
+    var sheets = spreadsheet.getSheets();
+    
+    var sheetList = sheets.map(function(sheet) {
+      return {
+        name: sheet.getName(),
+        id: sheet.getSheetId() // シートIDも必要に応じて取得
+      };
+    });
+    
+    debugLog('✅ getSheetsList: Found sheets for userId %s: %s', userId, JSON.stringify(sheetList));
+    return sheetList;
+  } catch (e) {
+    console.error('getSheetsList エラー: ' + e.message);
+    return [];
+  }
+}
+
+/**
  * ボードデータを再読み込み (マルチテナント対応版)
  * AdminPanel.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
