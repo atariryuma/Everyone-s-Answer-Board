@@ -506,7 +506,7 @@
     btn.innerHTML = '<div class="spinner mr-2"></div>削除中...';
     
     if (typeof runGasWithUserId === 'function') {
-      runGasWithUserId('deleteAccount')
+      runGasWithUserId('deleteCurrentUserAccount')
         .then(result => {
           if (result.success) {
             showMessage('アカウントが削除されました', 'success');
