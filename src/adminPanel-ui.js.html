@@ -165,6 +165,16 @@ function updateUIWithNewStatus(status) {
 
   // Update unpublish button state
   updateUnpublishButton(status);
+
+  // --- NEW ADDITION FOR INITIAL COLUMN LOADING ---
+  // If an active sheet is set on initial load, load its configuration
+  if (status.activeSheetName && status.userInfo && status.userInfo.spreadsheetId) {
+    console.log('📋 Initial load: Loading config for active sheet:', status.activeSheetName);
+    // Ensure selectedSheet is correctly set before calling loadConfigForSelected
+    selectedSheet = status.activeSheetName; // This might be redundant if populateSheetSelect already did it, but ensures it.
+    loadConfigForSelected();
+  }
+  // --- END NEW ADDITION ---
   
   console.groupEnd();
 }
