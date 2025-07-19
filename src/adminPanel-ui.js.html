@@ -404,21 +404,57 @@ function clearConfigFields() {
 
 // Build configuration object from form
 function buildConfigObject() {
-  return {
+  console.group('📋 buildConfigObject');
+  
+  // Get values from primary elements (with fallback to secondary elements)
+  const opinionValue = document.getElementById('opinionHeader')?.value || 
+                      document.getElementById('opinion-column')?.value || '';
+  const nameValue = document.getElementById('name-column')?.value || '';
+  const classValue = document.getElementById('class-column')?.value || '';
+  const timestampValue = document.getElementById('timestamp-column')?.value || '';
+  const showNames = document.getElementById('show-names')?.checked || false;
+  const showCounts = document.getElementById('show-counts')?.checked !== false; // デフォルトtrue
+  
+  const config = {
     sheetName: selectedSheet,
-    opinionColumn: document.getElementById('opinion-column')?.value || '',
-    nameColumn: document.getElementById('name-column')?.value || '',
-    classColumn: document.getElementById('class-column')?.value || '',
-    timestampColumn: document.getElementById('timestamp-column')?.value || '',
-    showNames: document.getElementById('show-names')?.checked || false,
-    showCounts: document.getElementById('show-counts')?.checked !== false // デフォルトtrue
+    // Use property names that match backend expectations (opinionHeader format)
+    opinionHeader: opinionValue,
+    nameHeader: nameValue,
+    classHeader: classValue,
+    timestampHeader: timestampValue,
+    // Also provide legacy format for backward compatibility
+    opinionColumn: opinionValue,
+    nameColumn: nameValue,
+    classColumn: classValue,
+    timestampColumn: timestampValue,
+    showNames: showNames,
+    showCounts: showCounts
   };
+  
+  console.log('📊 Built config object:', config);
+  console.log('🎯 Primary opinion value from opinionHeader:', document.getElementById('opinionHeader')?.value);
+  console.log('🔄 Fallback opinion value from opinion-column:', document.getElementById('opinion-column')?.value);
+  console.groupEnd();
+  
+  return config;
 }
 
 // Validate configuration
 function validateConfig() {
-  const opinionColumn = document.getElementById('opinion-column')?.value;
-  return opinionColumn && opinionColumn.trim() !== '';
+  // Check primary element first, then fallback to secondary element
+  const opinionValue = document.getElementById('opinionHeader')?.value || 
+                      document.getElementById('opinion-column')?.value || '';
+  
+  const isValid = opinionValue && opinionValue.trim() !== '';
+  
+  console.log('🔍 validateConfig:', {
+    opinionHeader: document.getElementById('opinionHeader')?.value,
+    opinionColumn: document.getElementById('opinion-column')?.value,
+    finalValue: opinionValue,
+    isValid: isValid
+  });
+  
+  return isValid;
 }
 
 // Update configuration buttons state
@@ -488,12 +524,34 @@ function updateStepIndicators(currentStep) {
 
 // Update footer and guidance text
 function updateFooterAndGuidance(status) {
+  console.group('🦶 updateFooterAndGuidance');
+  
   const footer = document.getElementById('admin-footer');
   const guidanceText = document.getElementById('guidance-text');
   
-  if (!footer || !guidanceText) return;
+  if (!footer || !guidanceText) {
+    console.warn('❌ Footer or guidance elements not found');
+    console.groupEnd();
+    return;
+  }
 
-  const isPublished = status.isPublished;
+  // Check multiple possible publication status indicators
+  const isPublished = status.isPublished || 
+                     status.appPublished || 
+                     (status.userInfo && status.userInfo.configJson && 
+                      JSON.parse(status.userInfo.configJson || '{}').appPublished) ||
+                     status.activeSheetName; // If there's an active sheet, it's likely published
+  
+  console.log('🔍 Publication status check:', {
+    'status.isPublished': status.isPublished,
+    'status.appPublished': status.appPublished,
+    'configJson.appPublished': status.userInfo?.configJson ? 
+      JSON.parse(status.userInfo.configJson || '{}').appPublished : undefined,
+    'status.activeSheetName': status.activeSheetName,
+    'final isPublished': isPublished,
+    'has appUrls': !!status.appUrls,
+    'has viewUrl': !!status.appUrls?.viewUrl
+  });
 
   if (isPublished && status.appUrls && status.appUrls.viewUrl) {
     footer.classList.remove('hidden');
@@ -509,13 +567,16 @@ function updateFooterAndGuidance(status) {
     updateTopicText(status);
     
     guidanceText.textContent = '回答ボードは現在公開中です。';
+    console.log('✅ Footer shown - board is published');
   } else {
     footer.classList.add('hidden');
+    console.log('❌ Footer hidden - board not published or missing viewUrl');
     
     // Update guidance based on setup step
     updateGuidanceForStep(status.setupStep || 1, guidanceText);
   }
   
+  console.groupEnd();
   adjustLayout();
 }
 

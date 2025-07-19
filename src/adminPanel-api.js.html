@@ -250,26 +250,48 @@ function runHeaderGuessing() {
 
 // Save configuration and publish board
 function saveAndPublish() {
+  console.group('💾 saveAndPublish');
+  
   if (!validateConfig()) {
+    console.error('❌ Validation failed');
     showMessage('必須項目（回答データ列）が選択されていません。', 'error');
+    console.groupEnd();
     return;
   }
   
   setLoading(true, '設定を保存し、ボードを公開しています...');
   
   const config = buildConfigObject();
+  console.log('📦 Config to save:', config);
   
   runGasWithUserId('saveAndPublish', selectedSheet, config)
     .then(function(result) {
+      console.log('📥 saveAndPublish result:', result);
       setLoading(false);
+      
       if (result && result.status === 'success') {
         showMessage('✅ 設定が保存され、ボードが公開されました！', 'success');
-        loadStatus(true); // 強制リフレッシュでUIを更新
+        
+        // Clear all relevant caches before status reload
+        if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+          console.log('🧹 Clearing unifiedCache');
+          window.unifiedCache.clear();
+        }
+        
+        // Force refresh to get updated status from database
+        console.log('🔄 Reloading status with force refresh');
+        loadStatus(true);
+        
+        console.log('✅ Save and publish completed successfully');
       } else {
+        console.error('❌ Save failed:', result);
         showMessage(result.message || '設定の保存に失敗しました。', 'error');
       }
+      console.groupEnd();
     })
     .catch(function(error) {
+      console.error('❌ saveAndPublish error:', error);
+      console.groupEnd();
       handleError(error, 'saveAndPublish', '設定の保存に失敗しました。');
     });
 }
