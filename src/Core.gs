@@ -90,37 +90,29 @@ function registerNewUser(adminEmail) {
   var userId, appUrls;
   
   if (existingUser) {
-    // 既存ユーザーの場合は情報を更新
+    // 既存ユーザーの場合は最小限の更新のみ（設定は保護）
     userId = existingUser.userId;
     var existingConfig = JSON.parse(existingUser.configJson || '{}');
     
-    // 設定をリセット（新規登録状態に戻す）
-    var updatedConfig = {
-      ...existingConfig,
-      setupStatus: 'pending',
-      lastRegistration: new Date().toISOString(),
-      formCreated: false,
-      appPublished: false
-    };
-    
-    // 既存ユーザー情報を更新
+    // 最終アクセス時刻とアクティブ状態のみ更新（設定は保護）
     updateUser(userId, {
       lastAccessedAt: new Date().toISOString(),
-      isActive: 'true',
-      configJson: JSON.stringify(updatedConfig)
+      isActive: 'true'
+      // 注意: configJsonは更新しない（既存の設定を保護）
     });
+    
     // キャッシュを無効化して最新状態を反映
     invalidateUserCache(userId, adminEmail, existingUser.spreadsheetId, false);
     
-    debugLog('✅ 既存ユーザー情報を更新しました: ' + adminEmail);
+    debugLog('✅ 既存ユーザーの最終アクセス時刻を更新しました（設定は保護）: ' + adminEmail);
     appUrls = generateAppUrls(userId);
     
     return {
       userId: userId,
       adminUrl: appUrls.adminUrl,
       viewUrl: appUrls.viewUrl,
-      setupRequired: true,
-      message: '既存ユーザーの情報を更新しました。クイックスタートで新しいフォームを作成してください。',
+      setupRequired: false, // 既存ユーザーはセットアップ完了済みと仮定
+      message: 'おかえりなさい！管理パネルへリダイレクトします。',
       isExistingUser: true
     };
   }
@@ -3840,30 +3832,50 @@ function processLoginFlow() {
 
     var result;
 
-    if (userInfo && (userInfo.isActive === true || String(userInfo.isActive).toLowerCase() === 'true')) {
-      // 既存アクティブユーザー - 直接管理パネルへリダイレクト
-      var appUrls = generateAppUrls(userInfo.userId);
-      result = {
-        status: 'existing_user',
-        userId: userInfo.userId,
-        adminUrl: appUrls.adminUrl,
-        viewUrl: appUrls.viewUrl,
-        message: 'ログインが完了しました'
-      };
-      console.log('processLoginFlow: 既存アクティブユーザー -', userInfo.userId);
-
-    } else if (userInfo && (userInfo.isActive === false || String(userInfo.isActive).toLowerCase() === 'false')) {
-      // 既存だが非アクティブユーザー - セットアップ必要
-      var appUrls = generateAppUrls(userInfo.userId);
-      result = {
-        status: 'setup_required',
-        userId: userInfo.userId,
-        adminUrl: appUrls.adminUrl,
-        viewUrl: appUrls.viewUrl,
-        message: 'セットアップを完了してください'
-      };
-      console.log('processLoginFlow: 既存非アクティブユーザー -', userInfo.userId);
-
+    if (userInfo) {
+      // ユーザーが存在する場合（アクティブ状態に関係なく既存ユーザーとして処理）
+      console.log('processLoginFlow: 既存ユーザー検出 -', userInfo.userId, 'isActive:', userInfo.isActive, 'type:', typeof userInfo.isActive);
+      
+      // アクティブ状態の安全なチェック（undefinedの場合はtrueと仮定）
+      var isUserActive = (userInfo.isActive === undefined || 
+                         userInfo.isActive === true || 
+                         userInfo.isActive === 'true' ||
+                         String(userInfo.isActive).toLowerCase() === 'true');
+      
+      if (isUserActive) {
+        // アクティブユーザー - 最終アクセス時刻のみ更新（設定は保護）
+        try {
+          updateUser(userInfo.userId, {
+            lastAccessedAt: new Date().toISOString(),
+            isActive: 'true'
+          });
+          console.log('processLoginFlow: 既存ユーザーの最終アクセス時刻を更新しました（設定保護）');
+        } catch (updateError) {
+          console.warn('processLoginFlow: 最終アクセス時刻更新エラー:', updateError.message);
+          // 更新エラーは無視して続行
+        }
+        
+        var appUrls = generateAppUrls(userInfo.userId);
+        result = {
+          status: 'existing_user',
+          userId: userInfo.userId,
+          adminUrl: appUrls.adminUrl,
+          viewUrl: appUrls.viewUrl,
+          message: 'おかえりなさい！'
+        };
+        console.log('processLoginFlow: 既存アクティブユーザー（設定保護）-', userInfo.userId);
+      } else {
+        // 明示的に非アクティブなユーザー
+        var appUrls = generateAppUrls(userInfo.userId);
+        result = {
+          status: 'inactive_user',
+          userId: userInfo.userId,
+          adminUrl: appUrls.adminUrl,
+          viewUrl: appUrls.viewUrl,
+          message: 'アカウントが無効化されています。管理者にお問い合わせください。'
+        };
+        console.log('processLoginFlow: 既存非アクティブユーザー -', userInfo.userId);
+      }
     } else {
       // 新規ユーザー - 自動登録処理
       console.log('processLoginFlow: 新規ユーザー登録開始 -', activeUserEmail);
@@ -3917,6 +3929,62 @@ function processLoginFlow() {
       message: errorMessage,
       errorType: error.name,
       timestamp: new Date().toISOString()
+    };
+  }
+}
+
+/**
+ * データベース修正の検証用関数
+ */
+function verifyDatabaseFieldFix() {
+  try {
+    const activeUserEmail = Session.getActiveUser().getEmail();
+    console.log('=== データベースフィールド取得検証開始 ===');
+    console.log('検証対象ユーザー:', activeUserEmail);
+    
+    // キャッシュをクリアして最新データを取得
+    cacheManager.remove('email_' + activeUserEmail);
+    
+    const userInfo = findUserByEmail(activeUserEmail);
+    if (userInfo) {
+      console.log('=== 検証結果 ===');
+      console.log('ユーザーID:', userInfo.userId);
+      console.log('メールアドレス:', userInfo.adminEmail);
+      console.log('isActive:', userInfo.isActive, '(型:', typeof userInfo.isActive, ')');
+      console.log('configJson:', userInfo.configJson ? 'あり（長さ:' + userInfo.configJson.length + ')' : 'なし');
+      console.log('lastAccessedAt:', userInfo.lastAccessedAt);
+      console.log('createdAt:', userInfo.createdAt);
+      console.log('全フィールド:', Object.keys(userInfo));
+      
+      // isActive値の詳細チェック
+      const isActiveCheck = (userInfo.isActive === undefined || 
+                           userInfo.isActive === true || 
+                           userInfo.isActive === 'true' ||
+                           String(userInfo.isActive).toLowerCase() === 'true');
+      console.log('アクティブユーザー判定:', isActiveCheck);
+      
+      return {
+        success: true,
+        userId: userInfo.userId,
+        hasIsActive: userInfo.isActive !== undefined,
+        isActiveValue: userInfo.isActive,
+        isActiveType: typeof userInfo.isActive,
+        allFieldsCount: Object.keys(userInfo).length,
+        message: 'データベースフィールド取得が正常に動作しています'
+      };
+    } else {
+      console.log('=== 検証結果: ユーザーが見つかりません ===');
+      return {
+        success: false,
+        message: 'ユーザーが見つかりませんでした: ' + activeUserEmail
+      };
+    }
+  } catch (error) {
+    console.error('=== 検証エラー ===', error.message);
+    return {
+      success: false,
+      error: error.message,
+      message: '検証中にエラーが発生しました'
     };
   }
 }
