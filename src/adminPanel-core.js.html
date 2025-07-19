@@ -224,19 +224,29 @@ function adjustLayout() {
   }
 }
 
-// Loading state management
+// Loading state management with QuickStart support
 function setLoading(flag, text = '') {
   const overlay = document.getElementById('loading-overlay');
   const loadingText = document.getElementById('loading-text');
+  const quickstartProgress = document.getElementById('quickstart-progress');
   
   if (overlay) {
     if (flag) {
       overlay.classList.remove('hidden');
+      
+      // If QuickStart is active, use lighter overlay
+      if (quickstartProgress && !quickstartProgress.classList.contains('hidden')) {
+        overlay.classList.add('quickstart-active');
+      } else {
+        overlay.classList.remove('quickstart-active');
+      }
+      
       if (loadingText && text) {
         loadingText.textContent = text;
       }
     } else {
       overlay.classList.add('hidden');
+      overlay.classList.remove('quickstart-active');
     }
   }
 }

@@ -43,8 +43,31 @@ function updateUIWithNewStatus(status) {
   // Update footer and guidance
   updateFooterAndGuidance(status);
   
-  // Update step indicators
-  updateStepIndicators(status.setupStep || 1);
+  // Update step indicators and manage sections
+  const currentStep = status.setupStep || 1;
+  updateStepIndicators(currentStep);
+  manageSectionStates(currentStep);
+  
+  // Update spreadsheet button state
+  updateSpreadsheetButton();
+}
+
+// Update spreadsheet access button state
+function updateSpreadsheetButton() {
+  const btn = document.getElementById('open-spreadsheet-btn-step2');
+  if (!btn) return;
+  
+  if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetUrl) {
+    btn.disabled = false;
+    btn.onclick = function() {
+      window.open(currentStatus.userInfo.spreadsheetUrl, '_blank');
+    };
+    console.log('✅ Spreadsheet button enabled with URL:', currentStatus.userInfo.spreadsheetUrl);
+  } else {
+    btn.disabled = true;
+    btn.onclick = null;
+    console.log('⚠️ Spreadsheet button disabled - no URL available');
+  }
 }
 
 // Update static UI elements
@@ -190,8 +213,9 @@ function populateSheetSelect(sheetNames, activeSheetName) {
   select.removeEventListener('change', handleSheetSelectionChange);
   select.addEventListener('change', handleSheetSelectionChange);
   
-  // Update UI for selected sheet
+  // Update UI for selected sheet and enable spreadsheet button
   updateUIForSelectedSheet();
+  updateSpreadsheetButton();
 }
 
 // Populate header options for configuration
@@ -462,6 +486,85 @@ function toggleSection(sectionId) {
     if (arrow) {
       arrow.classList.remove('fa-chevron-down');
       arrow.classList.add('fa-chevron-up');
+    }
+  }
+}
+
+// Automatically collapse completed sections
+function collapseCompletedSection(stepNumber) {
+  const sectionId = `step${stepNumber}-content`;
+  const section = document.getElementById(sectionId);
+  if (!section) return;
+  
+  console.log(`📁 Auto-collapsing completed step ${stepNumber}`);
+  
+  // Collapse the section
+  section.classList.add('hidden');
+  
+  // Update toggle button state
+  const toggleBtn = document.querySelector(`[onclick*="${sectionId}"]`);
+  if (toggleBtn) {
+    toggleBtn.setAttribute('aria-expanded', 'false');
+    const arrow = toggleBtn.querySelector('.fa-chevron-down, .fa-chevron-up');
+    if (arrow) {
+      arrow.classList.remove('fa-chevron-down');
+      arrow.classList.add('fa-chevron-up');
+    }
+  }
+  
+  // Add visual indicator for completed section
+  const sectionContainer = section.closest('.glass-panel');
+  if (sectionContainer) {
+    sectionContainer.classList.add('section-completed');
+  }
+}
+
+// Automatically expand active section
+function expandActiveSection(stepNumber) {
+  const sectionId = `step${stepNumber}-content`;
+  const section = document.getElementById(sectionId);
+  if (!section) return;
+  
+  console.log(`📂 Auto-expanding active step ${stepNumber}`);
+  
+  // Expand the section
+  section.classList.remove('hidden');
+  
+  // Update toggle button state
+  const toggleBtn = document.querySelector(`[onclick*="${sectionId}"]`);
+  if (toggleBtn) {
+    toggleBtn.setAttribute('aria-expanded', 'true');
+    const arrow = toggleBtn.querySelector('.fa-chevron-down, .fa-chevron-up');
+    if (arrow) {
+      arrow.classList.remove('fa-chevron-up');
+      arrow.classList.add('fa-chevron-down');
+    }
+  }
+  
+  // Remove completed indicator
+  const sectionContainer = section.closest('.glass-panel');
+  if (sectionContainer) {
+    sectionContainer.classList.remove('section-completed');
+  }
+}
+
+// Manage section states based on current step
+function manageSectionStates(currentStep) {
+  console.log(`🔄 Managing section states for step ${currentStep}`);
+  
+  // Collapse all completed sections (previous steps)
+  for (let i = 1; i < currentStep; i++) {
+    collapseCompletedSection(i);
+  }
+  
+  // Expand current section
+  expandActiveSection(currentStep);
+  
+  // Keep future sections expanded but remove completed styling
+  for (let i = currentStep + 1; i <= 3; i++) {
+    const sectionContainer = document.getElementById(`step${i}-content`)?.closest('.glass-panel');
+    if (sectionContainer) {
+      sectionContainer.classList.remove('section-completed');
     }
   }
 }

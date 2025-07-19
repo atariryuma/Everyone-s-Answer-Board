@@ -427,7 +427,34 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
+  z-index: 8000;
+}
+
+/* QuickStart progress bar should be above loading overlay */
+#quickstart-progress {
+  position: relative;
+  z-index: 8500 !important;
+}
+
+/* Make sure QuickStart progress is visible during loading */
+.loading-overlay.quickstart-active {
+  background: rgba(0,0,0,0.3);
+  z-index: 7000;
+}
+
+/* Completed section styling */
+.section-completed {
+  opacity: 0.7;
+  border-color: rgba(34, 197, 94, 0.3) !important;
+}
+
+.section-completed::before {
+  content: "✅";
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  font-size: 1.2rem;
+  z-index: 10;
 }
 
 /* Spinner Variants */

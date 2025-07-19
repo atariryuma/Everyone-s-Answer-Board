@@ -2724,9 +2724,11 @@ function getSheetsList(userId) {
 
     var service = getSheetsService();
     if (!service) {
-      console.error('getSheetsList: Sheets service not initialized');
-      return { error: true, message: 'Sheets service initialization failed' };
+      console.error('❌ getSheetsList: Sheets service not initialized');
+      return [];
     }
+    
+    debugLog('✅ getSheetsList: Service validated successfully');
 
     debugLog('getSheetsList: SheetsService obtained, attempting to fetch spreadsheet data...');
     
@@ -2759,11 +2761,7 @@ function getSheetsList(userId) {
           console.error('getSheetsList: 最終修復も失敗:', finalRepairError.message);
         }
         
-        return {
-          error: true,
-          message: 'スプレッドシートへのアクセス権限がありません。管理者にお問い合わせください。',
-          details: accessError.message
-        };
+        return [];
       }
     }
     

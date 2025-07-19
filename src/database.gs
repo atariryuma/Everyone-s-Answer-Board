@@ -357,14 +357,28 @@ function getDeletionLogs() {
  */
 function getSheetsService() {
   try {
+    console.log('🔧 getSheetsService: サービス取得開始');
+    
     var accessToken = getServiceAccountTokenCached();
     if (!accessToken) {
-      console.error('Failed to get service account token');
+      console.error('❌ Failed to get service account token');
       return null;
     }
-    return createSheetsService(accessToken);
+    
+    console.log('✅ Access token obtained successfully');
+    
+    var service = createSheetsService(accessToken);
+    if (!service) {
+      console.error('❌ Failed to create sheets service');
+      return null;
+    }
+    
+    console.log('✅ Sheets service created successfully');
+    return service;
+    
   } catch (error) {
-    console.error('getSheetsService error:', error.message);
+    console.error('❌ getSheetsService error:', error.message);
+    console.error('❌ Error stack:', error.stack);
     return null;
   }
 }

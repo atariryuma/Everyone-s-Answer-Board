@@ -84,7 +84,12 @@ function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
 // Load current status from backend
 function loadStatus(forceRefresh = false) {
   updateUserActivity();
-  setLoading(true, '最新のステータス情報を読み込んでいます...');
+  
+  const statusMessage = forceRefresh ? 
+    '📊 システム情報を最新化しています...' : 
+    '📋 ダッシュボードを読み込んでいます...';
+  
+  setLoading(true, statusMessage);
   
   const cacheKey = 'status_' + (userId || 'guest');
   const cacheTime = 60000; // 1分キャッシュ
@@ -663,9 +668,9 @@ function handleQuickStart() {
   simulateQuickStartProgress();
   console.log('🔍 Step 5: Progress bar shown and simulation started');
   
-  // Show loading message
+  // Show loading message optimized for QuickStart
   if (typeof setLoading === 'function') {
-    setLoading(true, 'クイックスタートを実行中...');
+    setLoading(true, '🚀 クイックスタートを実行中... 進捗は上記で確認できます');
     console.log('🔍 Step 6: Loading state set');
   } else {
     console.warn('⚠️ setLoading function not available');
