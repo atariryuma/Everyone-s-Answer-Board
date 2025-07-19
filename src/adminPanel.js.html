@@ -204,6 +204,7 @@
         <div>
           <select class="form-control form-select column-mapping-select" data-column="${column.id}">
             <option value="">選択してください</option>
+            ${columns.map(col => `<option value="${col.id}">${col.name}</option>`).join('')}
             <option value="content">回答内容</option>
             <option value="author">回答者名</option>
             <option value="timestamp">回答時刻</option>
