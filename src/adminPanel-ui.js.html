@@ -4,18 +4,128 @@
 // =============================================================================
 
 // =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+// Unified publication state detection
+function getPublicationState(status) {
+  console.group('📊 getPublicationState');
+  
+  if (!status) {
+    console.warn('❌ No status provided');
+    console.groupEnd();
+    return { isPublished: false, reason: 'No status data' };
+  }
+  
+  // Check multiple possible publication indicators in priority order
+  let isPublished = false;
+  let reason = '';
+  
+  // 1. Direct isPublished property
+  if (status.isPublished === true) {
+    isPublished = true;
+    reason = 'status.isPublished=true';
+  }
+  // 2. Direct appPublished property  
+  else if (status.appPublished === true) {
+    isPublished = true;
+    reason = 'status.appPublished=true';
+  }
+  // 3. Check configJson for appPublished
+  else if (status.userInfo?.configJson) {
+    try {
+      const config = JSON.parse(status.userInfo.configJson);
+      if (config.appPublished === true) {
+        isPublished = true;
+        reason = 'configJson.appPublished=true';
+      }
+    } catch (e) {
+      console.warn('⚠️ Failed to parse configJson:', e);
+    }
+  }
+  
+  // 4. Fallback: if there's an active sheet, likely published
+  if (!isPublished && status.activeSheetName) {
+    isPublished = true;
+    reason = 'activeSheetName exists (fallback)';
+  }
+  
+  const result = { isPublished, reason };
+  console.log('📊 Publication state result:', result);
+  console.groupEnd();
+  
+  return result;
+}
+
+// Generate viewUrl with comprehensive fallback logic
+function generateViewUrl(status, userId) {
+  console.group('🔗 generateViewUrl');
+  
+  // 1. Use existing viewUrl if available
+  let viewUrl = status.appUrls?.viewUrl;
+  if (viewUrl) {
+    console.log('✅ Using existing viewUrl:', viewUrl);
+    console.groupEnd();
+    return viewUrl;
+  }
+  
+  // 2. Generate from appUrls.webApp with userId
+  if (status.appUrls?.webApp && userId) {
+    viewUrl = status.appUrls.webApp + '?userId=' + encodeURIComponent(userId) + '&mode=view';
+    console.log('🔧 Generated from appUrls.webApp:', viewUrl);
+    console.groupEnd();
+    return viewUrl;
+  }
+  
+  // 3. Generate from status.webAppUrl with userId
+  if (status.webAppUrl && userId) {
+    viewUrl = status.webAppUrl + '?userId=' + encodeURIComponent(userId) + '&mode=view';
+    console.log('🔧 Generated from webAppUrl:', viewUrl);
+    console.groupEnd();
+    return viewUrl;
+  }
+  
+  // 4. Simple fallback without userId
+  if (status.appUrls?.webApp) {
+    viewUrl = status.appUrls.webApp + '?mode=view';
+    console.log('🔧 Simple fallback from webApp:', viewUrl);
+    console.groupEnd();
+    return viewUrl;
+  }
+  
+  console.warn('❌ Could not generate viewUrl');
+  console.groupEnd();
+  return null;
+}
+
+// =============================================================================
 // MAIN UI UPDATE FUNCTIONS
 // =============================================================================
 
 // Update UI with new status data
 function updateUIWithNewStatus(status) {
+  console.group('🔄 updateUIWithNewStatus');
+  
   if (!validateStatus(status)) {
     console.warn('Invalid status received, skipping UI update');
+    console.groupEnd();
     return;
   }
   
+  // Standardize status object with publication state and viewUrl
+  const publicationState = getPublicationState(status);
+  const viewUrl = generateViewUrl(status, userId);
+  
+  // Add normalized properties to status object
+  status._normalized = {
+    isPublished: publicationState.isPublished,
+    publishReason: publicationState.reason,
+    viewUrl: viewUrl,
+    hasValidViewUrl: !!viewUrl
+  };
+  
   currentStatus = status;
-  console.log('✅ AdminPanel: Status updated');
+  console.log('✅ AdminPanel: Status updated with normalized data:', status._normalized);
   
   // セットアップ状況を確認
   const setupStatus = getSetupStatusFromUserInfo(status.userInfo);
@@ -50,6 +160,8 @@ function updateUIWithNewStatus(status) {
   
   // Update spreadsheet button state
   updateSpreadsheetButton();
+  
+  console.groupEnd();
 }
 
 // Update spreadsheet access button state
@@ -154,32 +266,63 @@ function updatePublicationStatusUI(isPublished) {
 
 // チェックボックスの状態を同期する関数
 function syncCheckboxStates(status) {
-  // 設定データの優先順位: 公開シート設定 > グローバル設定 > デフォルト値
-  const activeSheetName = status.activeSheetName || status.publishedSheetName;
-  const sheetConfig = activeSheetName && status.systemStatus ? 
-    status.systemStatus[`sheet_${activeSheetName}`] : null;
+  console.group('☑️ syncCheckboxStates');
   
-  // showNames の値を決定
-  const showNames = sheetConfig?.showNames !== undefined ? 
-    sheetConfig.showNames : 
-    (status.showNames !== undefined ? status.showNames : false);
+  // Priority: Database config (configJson) > status properties > defaults
+  let showNames = false;
+  let showCounts = true;
   
-  // showCounts の値を決定
-  const showCounts = sheetConfig?.showCounts !== undefined ? 
-    sheetConfig.showCounts : 
-    (status.showCounts !== undefined ? status.showCounts : true);
+  // Try to get values from database configJson first
+  if (status.userInfo?.configJson) {
+    try {
+      const config = JSON.parse(status.userInfo.configJson);
+      const activeSheetName = status.activeSheetName;
+      
+      // Check sheet-specific config first
+      if (activeSheetName && config[`sheet_${activeSheetName}`]) {
+        const sheetConfig = config[`sheet_${activeSheetName}`];
+        if (sheetConfig.showNames !== undefined) showNames = sheetConfig.showNames;
+        if (sheetConfig.showCounts !== undefined) showCounts = sheetConfig.showCounts;
+        console.log('📊 Using sheet-specific config:', {
+          sheetName: activeSheetName,
+          showNames,
+          showCounts
+        });
+      }
+      // Fall back to global config
+      else {
+        if (config.showNames !== undefined) showNames = config.showNames;
+        if (config.showCounts !== undefined) showCounts = config.showCounts;
+        console.log('📊 Using global config:', { showNames, showCounts });
+      }
+    } catch (e) {
+      console.warn('⚠️ Failed to parse configJson, using status properties');
+      // Fall back to status properties
+      if (status.showNames !== undefined) showNames = status.showNames;
+      if (status.showCounts !== undefined) showCounts = status.showCounts;
+    }
+  } else {
+    // Use status properties as fallback
+    if (status.showNames !== undefined) showNames = status.showNames;
+    if (status.showCounts !== undefined) showCounts = status.showCounts;
+    console.log('📊 Using status properties:', { showNames, showCounts });
+  }
 
-  // チェックボックスを更新
+  // Update checkbox elements
   const showNamesCheckbox = safeGetElement('show-names');
   const showCountsCheckbox = safeGetElement('show-counts');
   
   if (showNamesCheckbox) {
     showNamesCheckbox.checked = showNames;
+    console.log('☑️ showNames checkbox set to:', showNames);
   }
   
   if (showCountsCheckbox) {
     showCountsCheckbox.checked = showCounts;
+    console.log('☑️ showCounts checkbox set to:', showCounts);
   }
+  
+  console.groupEnd();
 }
 
 // =============================================================================
@@ -535,61 +678,36 @@ function updateFooterAndGuidance(status) {
     return;
   }
 
-  // Check multiple possible publication status indicators
-  const isPublished = status.isPublished || 
-                     status.appPublished || 
-                     (status.userInfo && status.userInfo.configJson && 
-                      JSON.parse(status.userInfo.configJson || '{}').appPublished) ||
-                     status.activeSheetName; // If there's an active sheet, it's likely published
+  // Use normalized publication state from status object
+  const isPublished = status._normalized?.isPublished || false;
+  const viewUrl = status._normalized?.viewUrl;
   
-  // Generate viewUrl fallback if missing but we have webApp URL
-  let viewUrl = status.appUrls?.viewUrl;
-  if (!viewUrl && status.appUrls?.webApp && userId) {
-    // Generate fallback viewUrl from webApp URL using backend pattern
-    viewUrl = status.appUrls.webApp + '?userId=' + encodeURIComponent(userId) + '&mode=view';
-    console.log('🔧 Generated fallback viewUrl from appUrls.webApp:', viewUrl);
-  }
-  
-  // Also try webAppUrl as fallback
-  if (!viewUrl && status.webAppUrl && userId) {
-    viewUrl = status.webAppUrl + '?userId=' + encodeURIComponent(userId) + '&mode=view';
-    console.log('🔧 Generated viewUrl from webAppUrl:', viewUrl);
-  }
-  
-  // Simple fallback without userId if still missing
-  if (!viewUrl && status.appUrls?.webApp) {
-    viewUrl = status.appUrls.webApp + '?mode=view';
-    console.log('🔧 Generated simple fallback viewUrl:', viewUrl);
-  }
-  
-  console.log('🔍 Publication status check:', {
-    'status.isPublished': status.isPublished,
-    'status.appPublished': status.appPublished,
-    'configJson.appPublished': status.userInfo?.configJson ? 
-      JSON.parse(status.userInfo.configJson || '{}').appPublished : undefined,
-    'status.activeSheetName': status.activeSheetName,
-    'final isPublished': isPublished,
-    'has appUrls': !!status.appUrls,
-    'original viewUrl': status.appUrls?.viewUrl,
-    'fallback viewUrl': viewUrl,
-    'will show footer': isPublished && !!viewUrl
+  console.log('🔍 Simplified publication check:', {
+    'normalized isPublished': isPublished,
+    'publish reason': status._normalized?.publishReason,
+    'normalized viewUrl': viewUrl,
+    'has valid viewUrl': status._normalized?.hasValidViewUrl,
+    'will show footer': isPublished
   });
 
-  // Show footer if published and we have any viewUrl (original or generated)
-  if (isPublished && viewUrl) {
+  // Show footer if published (regardless of viewUrl availability for now)
+  if (isPublished) {
     footer.classList.remove('hidden');
     
-    // Update board URL using our generated viewUrl
+    // Update board URL using our generated viewUrl (if available)
     const boardUrlInput = document.getElementById('board-url');
     const viewBoardLink = document.getElementById('view-board-link');
     
     if (boardUrlInput) {
-      boardUrlInput.value = viewUrl;
-      console.log('📝 Board URL input updated:', viewUrl);
+      boardUrlInput.value = viewUrl || 'URL生成中...';
+      console.log('📝 Board URL input updated:', viewUrl || 'URL generation pending');
     }
-    if (viewBoardLink) {
+    if (viewBoardLink && viewUrl) {
       viewBoardLink.href = viewUrl;
       console.log('🔗 View board link updated:', viewUrl);
+    } else if (viewBoardLink) {
+      viewBoardLink.removeAttribute('href');
+      console.log('🔗 View board link cleared - no URL available');
     }
     
     // Update topic text
@@ -599,7 +717,7 @@ function updateFooterAndGuidance(status) {
     console.log('✅ Footer shown - board is published');
   } else {
     footer.classList.add('hidden');
-    console.log('❌ Footer hidden - board not published or missing viewUrl');
+    console.log('❌ Footer hidden - board not published');
     
     // Update guidance based on setup step
     updateGuidanceForStep(status.setupStep || 1, guidanceText);
@@ -746,8 +864,8 @@ function manageSectionStates(currentStep) {
       // Step 2 is completed if we have active sheet
       return currentStatus && currentStatus.activeSheetName;
     } else if (stepNumber === 3) {
-      // Step 3 is completed if app is published
-      return currentStatus && currentStatus.appPublished;
+      // Step 3 is completed if app is published (use normalized state)
+      return currentStatus && currentStatus._normalized && currentStatus._normalized.isPublished;
     }
     return false;
   };
