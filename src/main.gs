@@ -422,8 +422,10 @@ function doGet(e) {
       return showLoginPage();
     }
 
-    // 4. パラメータなしの直接アクセス時はログインページを表示
-    if (!params.mode) {
+    // 4. パラメータ検証とデフォルト処理
+    if (!params || !params.mode) {
+      // パラメータなしまたは不正な場合はログインページを表示
+      console.log('No mode parameter, showing login page');
       return showLoginPage();
     }
 
@@ -602,9 +604,19 @@ function getUserInfo(email, userId) {
  */
 function showLoginPage() {
   const template = HtmlService.createTemplateFromFile('LoginPage');
-  return template.evaluate()
-    .setTitle('StudyQuest - ログイン')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  const htmlOutput = template.evaluate()
+    .setTitle('StudyQuest - ログイン');
+  
+  // XFrameOptionsMode を安全に設定
+  try {
+    if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
+      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+  } catch (e) {
+    console.warn('XFrameOptionsMode設定エラー:', e.message);
+  }
+  
+  return htmlOutput;
 }
 
 /**
@@ -613,9 +625,19 @@ function showLoginPage() {
  */
 function showSetupPage() {
   const template = HtmlService.createTemplateFromFile('SetupPage');
-  return template.evaluate()
-    .setTitle('StudyQuest - 初回セットアップ')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+  const htmlOutput = template.evaluate()
+    .setTitle('StudyQuest - 初回セットアップ');
+  
+  // XFrameOptionsMode を安全に設定
+  try {
+    if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
+      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    }
+  } catch (e) {
+    console.warn('XFrameOptionsMode設定エラー:', e.message);
+  }
+  
+  return htmlOutput;
 }
 
 /**
@@ -624,9 +646,19 @@ function showSetupPage() {
  */
 function showAppSetupPage() {
     const appSetupTemplate = HtmlService.createTemplateFromFile('AppSetupPage');
-    return appSetupTemplate.evaluate()
-      .setTitle('アプリ設定 - StudyQuest')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    const htmlOutput = appSetupTemplate.evaluate()
+      .setTitle('アプリ設定 - StudyQuest');
+    
+    // XFrameOptionsMode を安全に設定
+    try {
+      if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
+        htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+      }
+    } catch (e) {
+      console.warn('XFrameOptionsMode設定エラー:', e.message);
+    }
+    
+    return htmlOutput;
 }
 
 
@@ -647,9 +679,19 @@ function showErrorPage(title, message, error) {
   } else {
     template.debugInfo = '';
   }
-  return template.evaluate()
-    .setTitle(`エラー - ${title}`)
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+  const htmlOutput = template.evaluate()
+    .setTitle(`エラー - ${title}`);
+  
+  // XFrameOptionsMode を安全に設定
+  try {
+    if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
+      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    }
+  } catch (e) {
+    console.warn('XFrameOptionsMode設定エラー:', e.message);
+  }
+  
+  return htmlOutput;
 }
 
 /**
@@ -779,8 +821,18 @@ function createSecureRedirect(targetUrl, message) {
     </html>
   `;
   
-  return HtmlService.createHtmlOutput(userActionRedirectHtml)
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  const htmlOutput = HtmlService.createHtmlOutput(userActionRedirectHtml);
+  
+  // XFrameOptionsMode を安全に設定
+  try {
+    if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
+      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+  } catch (e) {
+    console.warn('XFrameOptionsMode設定エラー:', e.message);
+  }
+  
+  return htmlOutput;
 }
 
 /**
@@ -866,10 +918,16 @@ function getWebAppUrl() {
  * @return {{mode:string,userId:string|null,setupParam:string|null,spreadsheetId:string|null,sheetName:string|null,isDirectPageAccess:boolean}}
  */
 function parseRequestParams(e) {
-  const p = (e && e.parameter) || {};
-  const mode = p.mode || null; // デフォルトを'admin'からnullに変更し、パラメータの有無を明確化
+  // 引数の安全性チェック
+  if (!e || typeof e !== 'object') {
+    console.log('parseRequestParams: 無効なeventオブジェクト');
+    return { mode: null, userId: null, setupParam: null, spreadsheetId: null, sheetName: null, isDirectPageAccess: false };
+  }
+
+  const p = e.parameter || {};
+  const mode = p.mode || null;
   const userId = p.userId || null;
-  const setupParam = p.setup || null; // setup パラメータを正しく取得
+  const setupParam = p.setup || null;
   const spreadsheetId = p.spreadsheetId || null;
   const sheetName = p.sheetName || null;
   const isDirectPageAccess = !!(userId && mode === 'view');
@@ -912,10 +970,20 @@ function renderAdminPanel(userInfo, mode) {
   adminTemplate.DEBUG_MODE = shouldEnableDebugMode();
   
   
-  return adminTemplate.evaluate()
+  const htmlOutput = adminTemplate.evaluate()
     .setTitle('みんなの回答ボード 管理パネル')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .setSandboxMode(HtmlService.SandboxMode.NATIVE);
+  
+  // XFrameOptionsMode を安全に設定
+  try {
+    if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
+      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+  } catch (e) {
+    console.warn('XFrameOptionsMode設定エラー:', e.message);
+  }
+  
+  return htmlOutput;
 }
 
 /**
