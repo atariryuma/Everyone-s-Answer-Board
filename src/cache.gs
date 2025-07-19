@@ -369,9 +369,9 @@ function getHeadersCached(spreadsheetId, sheetName) {
       
       var indices = {};
       
-      // すべてのヘッダーのインデックスを生成（動的ヘッダーに対応）
+      // タイムスタンプ列を除外してヘッダーのインデックスを生成
       headers.forEach(function(headerName, index) {
-        if (headerName && headerName.trim() !== '') {
+        if (headerName && headerName.trim() !== '' && headerName !== 'タイムスタンプ') {
           indices[headerName] = index;
           console.log(`[getHeadersCached] Mapped ${headerName} -> ${index}`);
         }

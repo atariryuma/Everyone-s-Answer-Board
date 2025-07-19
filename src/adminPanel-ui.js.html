@@ -420,8 +420,7 @@ function populateHeaderOptions(headers) {
     'opinionHeader',      // Main required field
     'opinion-column',     // Optional details field (backup)
     'name-column', 
-    'class-column',
-    'timestamp-column'
+    'class-column'
   ];
   
   console.log('🎯 Target dropdown elements:', selects);
@@ -490,7 +489,6 @@ function populateConfig(cfg) {
     'opinion-column': cfg.opinionColumn || cfg.opinionHeader,
     'name-column': cfg.nameColumn || cfg.nameHeader,
     'class-column': cfg.classColumn || cfg.classHeader,
-    'timestamp-column': cfg.timestampColumn,
     'show-names': cfg.showNames,
     'show-counts': cfg.showCounts
   };
@@ -544,8 +542,7 @@ function clearConfigFields() {
     'opinionHeader',      // Main required field
     'opinion-column',
     'name-column',
-    'class-column', 
-    'timestamp-column'
+    'class-column'
   ];
   
   fieldIds.forEach(id => {
@@ -567,7 +564,6 @@ function buildConfigObject() {
                       document.getElementById('opinion-column')?.value || '';
   const nameValue = document.getElementById('name-column')?.value || '';
   const classValue = document.getElementById('class-column')?.value || '';
-  const timestampValue = document.getElementById('timestamp-column')?.value || '';
   const showNames = document.getElementById('show-names')?.checked || false;
   const showCounts = document.getElementById('show-counts')?.checked || false; // デフォルトfalseに変更
   
@@ -577,12 +573,10 @@ function buildConfigObject() {
     opinionHeader: opinionValue,
     nameHeader: nameValue,
     classHeader: classValue,
-    timestampHeader: timestampValue,
     // Also provide legacy format for backward compatibility
     opinionColumn: opinionValue,
     nameColumn: nameValue,
     classColumn: classValue,
-    timestampColumn: timestampValue,
     showNames: showNames,
     showCounts: showCounts
   };
@@ -1782,9 +1776,7 @@ function displayColumnMapping(columns) {
           <option value="">選択してください</option>
           <option value="content">回答内容</option>
           <option value="author">回答者名</option>
-          <option value="timestamp">回答時刻</option>
           <option value="reaction">リアクション</option>
-          <option value="ignore">無視</option>
         </select>
       </div>
     `;
