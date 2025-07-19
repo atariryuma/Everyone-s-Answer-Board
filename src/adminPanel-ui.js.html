@@ -451,7 +451,18 @@ function populateHeaderOptions(headers) {
       console.log(`🧹 Cleared dropdown: ${selectId}`);
       
       let optionsAdded = 0;
-      headers.forEach(header => {
+      const excludedHeaders = [
+        'なるほど！',
+        'いいね！',
+        'もっと知りたい！',
+        'ハイライト',
+        'メールアドレス', // フォームで自動収集されるため、マッピング対象から除外
+        'タイムスタンプ' // ユーザーの要望により除外
+      ];
+
+      const filteredHeaders = headers.filter(header => !excludedHeaders.includes(header));
+
+      filteredHeaders.forEach(header => {
         const option = document.createElement('option');
         option.value = header;
         option.textContent = header;
