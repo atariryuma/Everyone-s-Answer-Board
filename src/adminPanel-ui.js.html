@@ -542,6 +542,26 @@ function updateFooterAndGuidance(status) {
                       JSON.parse(status.userInfo.configJson || '{}').appPublished) ||
                      status.activeSheetName; // If there's an active sheet, it's likely published
   
+  // Generate viewUrl fallback if missing but we have webApp URL
+  let viewUrl = status.appUrls?.viewUrl;
+  if (!viewUrl && status.appUrls?.webApp && userId) {
+    // Generate fallback viewUrl from webApp URL using backend pattern
+    viewUrl = status.appUrls.webApp + '?userId=' + encodeURIComponent(userId) + '&mode=view';
+    console.log('🔧 Generated fallback viewUrl from appUrls.webApp:', viewUrl);
+  }
+  
+  // Also try webAppUrl as fallback
+  if (!viewUrl && status.webAppUrl && userId) {
+    viewUrl = status.webAppUrl + '?userId=' + encodeURIComponent(userId) + '&mode=view';
+    console.log('🔧 Generated viewUrl from webAppUrl:', viewUrl);
+  }
+  
+  // Simple fallback without userId if still missing
+  if (!viewUrl && status.appUrls?.webApp) {
+    viewUrl = status.appUrls.webApp + '?mode=view';
+    console.log('🔧 Generated simple fallback viewUrl:', viewUrl);
+  }
+  
   console.log('🔍 Publication status check:', {
     'status.isPublished': status.isPublished,
     'status.appPublished': status.appPublished,
@@ -550,18 +570,27 @@ function updateFooterAndGuidance(status) {
     'status.activeSheetName': status.activeSheetName,
     'final isPublished': isPublished,
     'has appUrls': !!status.appUrls,
-    'has viewUrl': !!status.appUrls?.viewUrl
+    'original viewUrl': status.appUrls?.viewUrl,
+    'fallback viewUrl': viewUrl,
+    'will show footer': isPublished && !!viewUrl
   });
 
-  if (isPublished && status.appUrls && status.appUrls.viewUrl) {
+  // Show footer if published and we have any viewUrl (original or generated)
+  if (isPublished && viewUrl) {
     footer.classList.remove('hidden');
     
-    // Update board URL
+    // Update board URL using our generated viewUrl
     const boardUrlInput = document.getElementById('board-url');
     const viewBoardLink = document.getElementById('view-board-link');
     
-    if (boardUrlInput) boardUrlInput.value = status.appUrls.viewUrl;
-    if (viewBoardLink) viewBoardLink.href = status.appUrls.viewUrl;
+    if (boardUrlInput) {
+      boardUrlInput.value = viewUrl;
+      console.log('📝 Board URL input updated:', viewUrl);
+    }
+    if (viewBoardLink) {
+      viewBoardLink.href = viewUrl;
+      console.log('🔗 View board link updated:', viewUrl);
+    }
     
     // Update topic text
     updateTopicText(status);
