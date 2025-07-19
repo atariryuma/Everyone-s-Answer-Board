@@ -107,25 +107,6 @@
   <?!= include('adminPanel-layout.css'); ?>
   <?!= include('adminPanel.css'); ?>
   
-  <!-- レイアウト調整スタイル -->
-  <style>
-    /* ヘッダー固定対応 */
-    .responsive-grid {
-      max-height: calc(100vh - 8.5rem); /* フッター対応: 全高 - ヘッダー・フッター領域 */
-      overflow-y: auto; /* 必要に応じてスクロール */
-    }
-    @media (min-width: 640px) {
-      .responsive-grid {
-        max-height: calc(100vh - 9.75rem); /* 大画面でのフッター対応 */
-      }
-    }
-    
-    /* 左右パネルの高さ最適化 */
-    .left-panel, .right-panel {
-      max-height: calc(100vh - 12rem); /* パネル個別の高さ制限 */
-      overflow-y: auto;
-    }
-  </style>
   
   <!-- Core JavaScript Libraries (must be loaded first) -->
   <?!= include('ClientOptimizer'); ?>
@@ -245,9 +226,8 @@
       <p id="loading-message" class="mt-4 text-gray-300">処理中...</p>
     </div>
   </div>
-  <header class="glass-panel border-b border-gray-700 fixed top-0 left-2 right-2 sm:left-4 sm:right-4 z-50 rounded-lg sm:rounded-xl shadow-lg h-16 sm:h-20">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
-      <div class="flex items-center justify-between gap-4">
+  <header class="glass-panel border-b border-gray-700 fixed top-4 sm:top-6 left-2 right-2 sm:left-4 sm:right-4 z-50 rounded-lg sm:rounded-xl shadow-lg h-16 sm:h-20">
+  <div class="relative -top-4 sm:-top-6 max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between gap-4">
         <!-- ロゴとタイトル -->
         <div class="flex items-center gap-3 flex-shrink-0">
           <div class="w-8 h-8 bg-gradient-to-r from-cyan-400 to-purple-400 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -314,12 +294,12 @@
   <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6
               pt-16 sm:pt-20
               pb-16 sm:pb-20
-            ">
+              h-screen overflow-y-auto">
     <!-- メインコンテンツ：ステータスバー＋左右パネル -->
-    <div class="responsive-grid">
+    <div class="responsive-grid space-y-4">
 
     <!-- シンプル統合ステータスバー -->
-    <section class="mb-4">
+    <section class="mb-0">
       <div class="glass-panel p-4 rounded-lg">
         <div class="flex items-center justify-between">
           <!-- 左側: ステータス表示 -->
@@ -358,7 +338,7 @@
 
     <!-- 左右パネル -->
     <div class="grid grid-cols-1 lg:grid-cols-3 lg:gap-x-6">
-      <div class="left-panel col-span-2 space-y-1 lg:space-y-2">
+      <div class="left-panel col-span-2 space-y-2">
         
         <!-- ステップ1: データソース設定 -->
         <div class="glass-panel p-4 lg:p-6" id="data-setup-section">
@@ -778,7 +758,7 @@
       </div>
       
       <!-- 右側：情報・ヘルプパネル -->
-      <div class="right-panel">
+      <div class="right-panel space-y-4">
         
         <!-- システム状況 -->
         <div id="system-info-panel" class="glass-panel p-4 lg:p-6">
