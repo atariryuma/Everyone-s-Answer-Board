@@ -111,13 +111,11 @@
   <style>
     /* ヘッダー固定対応 */
     .responsive-grid {
-      padding-top: 5.5rem !important; /* 88px - ヘッダー高さ + 余白（マージン調整済み） */
       max-height: calc(100vh - 8.5rem); /* フッター対応: 全高 - ヘッダー・フッター領域 */
       overflow-y: auto; /* 必要に応じてスクロール */
     }
     @media (min-width: 640px) {
       .responsive-grid {
-        padding-top: 6.25rem !important; /* 100px - ヘッダー高さ + 余白（マージン調整済み） */
         max-height: calc(100vh - 9.75rem); /* 大画面でのフッター対応 */
       }
     }
@@ -239,12 +237,6 @@
   console.log('- window.isSystemAdmin final:', window.isSystemAdmin);
   
   </script>
-  <!-- 統合CSS -->
-  <?!= include('UnifiedStyles'); ?>
-  
-  <!-- レイアウト修正用の追加CSS -->
-  <!-- Admin Panel Layout Styles -->
-  <?!= include('adminPanel-layout.css'); ?>
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans">
   <div id="loading-overlay" class="loading-overlay hidden">
@@ -253,7 +245,7 @@
       <p id="loading-message" class="mt-4 text-gray-300">処理中...</p>
     </div>
   </div>
-  <header class="glass-panel border-b border-gray-700 fixed top-4 sm:top-6 left-2 right-2 sm:left-4 sm:right-4 z-50 rounded-lg sm:rounded-xl shadow-lg">
+  <header class="glass-panel border-b border-gray-700 fixed top-0 left-2 right-2 sm:left-4 sm:right-4 z-50 rounded-lg sm:rounded-xl shadow-lg h-16 sm:h-20">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
       <div class="flex items-center justify-between gap-4">
         <!-- ロゴとタイトル -->
@@ -319,9 +311,15 @@
         </div>
     </div>
   </header>
-  <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6 pt-16 sm:pt-20 py-4 sm:py-8 pb-24">
+  <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6
+              pt-16 sm:pt-20
+              pb-16 sm:pb-20
+            ">
+    <!-- メインコンテンツ：ステータスバー＋左右パネル -->
+    <div class="responsive-grid">
+
     <!-- シンプル統合ステータスバー -->
-    <section>
+    <section class="mb-4">
       <div class="glass-panel p-4 rounded-lg">
         <div class="flex items-center justify-between">
           <!-- 左側: ステータス表示 -->
@@ -358,10 +356,9 @@
       </div>
     </section>
 
-    <!-- メインコンテンツエリア -->
-    <div class="responsive-grid mt-2 lg:mt-3">
-      <!-- 左側：セットアップフロー（メインパネル） -->
-      <div class="left-panel space-y-2 lg:space-y-3">
+    <!-- 左右パネル -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 lg:gap-x-6">
+      <div class="left-panel col-span-2 space-y-1 lg:space-y-2">
         
         <!-- ステップ1: データソース設定 -->
         <div class="glass-panel p-4 lg:p-6" id="data-setup-section">
@@ -781,7 +778,7 @@
       </div>
       
       <!-- 右側：情報・ヘルプパネル -->
-      <div class="space-y-3 lg:space-y-4">
+      <div class="right-panel">
         
         <!-- システム状況 -->
         <div id="system-info-panel" class="glass-panel p-4 lg:p-6">
@@ -955,10 +952,12 @@
         </div>
       </details>
       </div>
+    </div>
+  </div>
   </main>
   
   <!-- 統合フッター -->
-  <footer id="admin-footer" class="fixed bottom-0 left-0 right-0 glass-panel border-t border-gray-700 hidden">
+  <footer id="admin-footer" class="fixed bottom-0 left-0 right-0 glass-panel border-t border-gray-700 h-16 sm:h-20 hidden">
     <div class="max-w-6xl mx-auto px-6 py-4">
       <div class="flex items-center justify-between">
         <!-- 左側: 公開中の問題文 -->
