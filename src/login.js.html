@@ -59,27 +59,48 @@
     };
 
     // 統合されたログインフロー処理 - 1回のAPI呼び出しで完了
+    const registerAndRedirect = () => {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(res => {
+            if (res && res.adminUrl) {
+              showAdminPanelRedirect(res.adminUrl, '新規ユーザー登録が完了しました');
+              resolve();
+            } else {
+              reject(new Error(res.message || 'ユーザー登録に失敗しました'));
+            }
+          })
+          .withFailureHandler(reject)
+          .confirmUserRegistration();
+      });
+    };
+
     const processUnifiedLogin = () => {
       return new Promise((resolve, reject) => {
         google.script.run
           .withSuccessHandler(response => {
-            if (response && response.status && response.adminUrl) {
-              // 成功時のメッセージを状態に応じて決定
-              let message = 'ログインが完了しました';
-              if (response.status === 'new_user') {
-                message = '新規ユーザー登録が完了しました';
-              } else if (response.status === 'setup_required') {
-                message = 'セットアップを完了してください';
-              }
-              
-              showAdminPanelRedirect(response.adminUrl, message);
+            if (!response || !response.status) {
+              reject(new Error(response && response.message ? response.message : 'ログイン処理に失敗しました'));
+              return;
+            }
+
+            if (response.status === 'existing_user' || response.status === 'setup_required') {
+              const msg = response.status === 'setup_required' ? 'セットアップを完了してください' : 'ログインが完了しました';
+              showAdminPanelRedirect(response.adminUrl, msg);
               resolve();
+            } else if (response.status === 'unregistered') {
+              if (confirm('このアカウントを登録しますか？')) {
+                registerAndRedirect().then(resolve).catch(reject);
+              } else {
+                setLoading(false);
+                resolve();
+              }
             } else {
               reject(new Error(response.message || 'ログイン処理に失敗しました'));
             }
           })
           .withFailureHandler(reject)
-          .processLoginFlow();
+          .getLoginStatus();
       });
     };
 

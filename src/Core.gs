@@ -3920,3 +3920,81 @@ function processLoginFlow() {
     };
   }
 }
+
+/**
+ * Returns the current login status without auto-registering new users.
+ * @returns {Object} Login status result
+ */
+function getLoginStatus() {
+  try {
+    var activeUserEmail = Session.getActiveUser().getEmail();
+    if (!activeUserEmail) {
+      return { status: 'error', message: 'ログインユーザーの情報を取得できませんでした。' };
+    }
+
+    var cacheKey = 'login_status_' + activeUserEmail;
+    try {
+      var cached = CacheService.getScriptCache().get(cacheKey);
+      if (cached) return JSON.parse(cached);
+    } catch (e) {
+      console.warn('getLoginStatus: キャッシュ読み込みエラー -', e.message);
+    }
+
+    var userInfo = cacheManager.get(
+      'email_' + activeUserEmail,
+      function() { return findUserByEmail(activeUserEmail); },
+      { ttl: 300, enableMemoization: true }
+    );
+
+    var result;
+    if (userInfo && (userInfo.isActive === true || String(userInfo.isActive).toLowerCase() === 'true')) {
+      var urls = generateAppUrls(userInfo.userId);
+      result = {
+        status: 'existing_user',
+        userId: userInfo.userId,
+        adminUrl: urls.adminUrl,
+        viewUrl: urls.viewUrl,
+        message: 'ログインが完了しました'
+      };
+    } else if (userInfo) {
+      var urls = generateAppUrls(userInfo.userId);
+      result = {
+        status: 'setup_required',
+        userId: userInfo.userId,
+        adminUrl: urls.adminUrl,
+        viewUrl: urls.viewUrl,
+        message: 'セットアップを完了してください'
+      };
+    } else {
+      result = { status: 'unregistered', userEmail: activeUserEmail };
+    }
+
+    try {
+      CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 30);
+    } catch (e) {
+      console.warn('getLoginStatus: キャッシュ保存エラー -', e.message);
+    }
+
+    return result;
+  } catch (error) {
+    console.error('getLoginStatus error:', error);
+    return { status: 'error', message: error.message };
+  }
+}
+
+/**
+ * Confirms registration for the active user on demand.
+ * @returns {Object} Registration result
+ */
+function confirmUserRegistration() {
+  try {
+    var activeUserEmail = Session.getActiveUser().getEmail();
+    if (!activeUserEmail) {
+      return { status: 'error', message: 'ユーザー情報を取得できませんでした。' };
+    }
+    return registerNewUser(activeUserEmail);
+  } catch (error) {
+    console.error('confirmUserRegistration error:', error);
+    return { status: 'error', message: error.message };
+  }
+}
