@@ -25,29 +25,19 @@ function setupCharacterCounters() {
 
 // セキュリティ情報表示関数
 function showSecurityInfo() {
-  showModal('security-details-modal');
+  if (window.sharedModals) {
+    window.sharedModals.showSecurityDetails();
+  } else {
+    showModal('security-details-modal');
+  }
 }
 
 // Google連携の利点表示関数
 function showGoogleIntegrationInfo() {
-  showModal('google-integration-modal');
-}
-
-// モーダル表示関数
-function showModal(modalId) {
-  const modal = document.getElementById(modalId);
-  if (modal) {
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-  }
-}
-
-// モーダル非表示関数
-function hideModal(modalId) {
-  const modal = document.getElementById(modalId);
-  if (modal) {
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
+  if (window.sharedModals) {
+    window.sharedModals.showGoogleIntegration();
+  } else {
+    showModal('google-integration-modal');
   }
 }
 
@@ -57,13 +47,24 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // フォーム設定モーダルが開かれたときにカウンターをリセット
-// Note: showFormConfigModal is now defined in adminPanel-ui.js.html
-// We enhance it here to include character counter setup
-if (typeof window.showFormConfigModal === 'function') {
-  const originalShowFormConfigModal = window.showFormConfigModal;
-  window.showFormConfigModal = function() {
-    originalShowFormConfigModal();
-    setTimeout(setupCharacterCounters, 100); // モーダル表示後にセットアップ
-  };
-}
+// この機能は既にshowFormConfigModal内で適切に処理されています
+document.addEventListener('DOMContentLoaded', function() {
+  // モーダルが表示されるたびにカウンターをセットアップ
+  const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+        const modal = document.getElementById('form-config-modal');
+        if (modal && !modal.classList.contains('hidden')) {
+          setTimeout(setupCharacterCounters, 100);
+        }
+      }
+    });
+  });
+  
+  // モーダルの監視を開始
+  const modal = document.getElementById('form-config-modal');
+  if (modal) {
+    observer.observe(modal, { attributes: true });
+  }
+});
 </script>

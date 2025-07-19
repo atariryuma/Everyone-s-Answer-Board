@@ -923,22 +923,35 @@ function manageSectionStates(currentStep) {
 
 // Show form configuration modal
 function showFormConfigModal() {
-  const modal = document.getElementById('form-config-modal');
-  if (modal) {
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
+  if (window.sharedModals) {
+    window.sharedModals.showFormConfig();
     loadSavedClassChoices();
     manageFocusForModal('form-config-modal', true);
+  } else {
+    // Fallback for legacy support
+    const modal = document.getElementById('form-config-modal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      loadSavedClassChoices();
+      manageFocusForModal('form-config-modal', true);
+    }
   }
 }
 
 // Hide form configuration modal
 function hideFormConfigModal() {
-  const modal = document.getElementById('form-config-modal');
-  if (modal) {
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
+  if (window.sharedModals) {
+    window.sharedModals.hideModal('form-config-modal');
     manageFocusForModal('form-config-modal', false);
+  } else {
+    // Fallback for legacy support
+    const modal = document.getElementById('form-config-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      manageFocusForModal('form-config-modal', false);
+    }
   }
 }
 
