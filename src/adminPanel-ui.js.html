@@ -850,6 +850,15 @@ function expandActiveSection(stepNumber) {
   // Expand the section
   section.classList.remove('hidden');
   
+  // Special handling for Step 3: ensure config-area is visible
+  if (stepNumber === 3) {
+    const configArea = document.getElementById('config-area');
+    if (configArea && currentStatus && currentStatus.activeSheetName) {
+      configArea.classList.remove('hidden');
+      console.log(`📋 expandActiveSection: Config area shown for Step 3`);
+    }
+  }
+  
   // Update toggle button state
   const toggleBtn = document.querySelector(`[onclick*="${sectionId}"]`);
   if (toggleBtn) {
@@ -904,6 +913,16 @@ function manageSectionStates(currentStep) {
       // Current active section
       sectionContainer.classList.add('section-active');
       expandActiveSection(i);
+      
+      // Special handling for Step 3: ensure config-area is visible
+      if (i === 3) {
+        const configArea = document.getElementById('config-area');
+        if (configArea && currentStatus && currentStatus.activeSheetName) {
+          configArea.classList.remove('hidden');
+          console.log(`📋 Step 3: Config area shown for sheet: ${currentStatus.activeSheetName}`);
+        }
+      }
+      
       console.log(`🔄 Step ${i}: Active`);
     } else if (isFuture) {
       // Future sections

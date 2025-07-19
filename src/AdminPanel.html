@@ -112,11 +112,20 @@
     /* ヘッダー固定対応 */
     .responsive-grid {
       padding-top: 5rem !important; /* 80px - ヘッダー高さ + 余白（マージン調整済み） */
+      max-height: calc(100vh - 8rem); /* フッター対応: 全高 - ヘッダー・フッター領域 */
+      overflow-y: auto; /* 必要に応じてスクロール */
     }
     @media (min-width: 640px) {
       .responsive-grid {
         padding-top: 5.5rem !important; /* 88px - ヘッダー高さ + 余白（マージン調整済み） */
+        max-height: calc(100vh - 9rem); /* 大画面でのフッター対応 */
       }
+    }
+    
+    /* 左右パネルの高さ最適化 */
+    .left-panel, .right-panel {
+      max-height: calc(100vh - 12rem); /* パネル個別の高さ制限 */
+      overflow-y: auto;
     }
   </style>
   
@@ -310,7 +319,7 @@
         </div>
     </div>
   </header>
-  <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6 pt-20 sm:pt-24 py-4 sm:py-8 pb-24">
+  <main class="flex-1 max-w-6xl mx-auto px-4 sm:px-6 pt-16 sm:pt-20 py-4 sm:py-8 pb-24">
     <!-- シンプル統合ステータスバー -->
     <section>
       <div class="glass-panel p-4 rounded-lg">
@@ -350,9 +359,9 @@
     </section>
 
     <!-- メインコンテンツエリア -->
-    <div class="responsive-grid mt-3 lg:mt-4">
+    <div class="responsive-grid mt-2 lg:mt-3">
       <!-- 左側：セットアップフロー（メインパネル） -->
-      <div class="left-panel space-y-3 lg:space-y-4">
+      <div class="left-panel space-y-2 lg:space-y-3">
         
         <!-- ステップ1: データソース設定 -->
         <div class="glass-panel p-4 lg:p-6" id="data-setup-section">
