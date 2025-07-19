@@ -344,7 +344,7 @@ function handleDeleteRequest() {
     '本当にこのアカウントを削除しますか？この操作は元に戻せず、すべてのデータが失われます。',
     function() {
       setLoading(true, 'アカウントを完全に削除しています...');
-      runGasWithUserId('deleteCurrentUserAccount')
+      runGasWithUserId(google.script.run.deleteCurrentUserAccount)
         .then(function(response) {
           setLoading(false);
           showMessage(response, 'success');
@@ -368,7 +368,7 @@ function switchToAnotherAccount() {
     '別のアカウントでログインしますか？現在のセッションがクリアされます。',
     function() {
       setLoading(true, 'セッションをクリアしています...');
-      runGasWithUserId('resetUserAuthentication')
+      runGasWithUserId(google.script.run.resetUserAuthentication)
         .then(function(result) {
           console.log('Session cleanup result:', result);
           window.location.href = 'https://accounts.google.com/logout';

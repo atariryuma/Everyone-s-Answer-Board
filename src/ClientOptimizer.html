@@ -15,32 +15,34 @@ class GASOptimizer {
 
   /**
    * Promise化されたgoogle.script.run呼び出し
-   * @param {string} functionName - 呼び出す関数名
+   * @param {Function} serverFunction - 呼び出すサーバーサイド関数 (google.script.run.functionName)
    * @param {...any} args - 関数の引数
    * @returns {Promise} 結果のPromise
    */
-  async call(functionName, ...args) {
+  async call(serverFunction, ...args) {
+    // 関数名を取得 (デバッグ・ローディング表示用)
+    const functionName = serverFunction.name || 'anonymousFunction'; 
     return new Promise((resolve, reject) => {
       // 同時実行制限の確認
       if (this.activeCalls >= this.concurrentLimit) {
-        this.callQueue.push(() => this.executeCall(functionName, args, resolve, reject));
+        this.callQueue.push(() => this.executeCall(serverFunction, functionName, args, resolve, reject));
         return;
       }
 
-      this.executeCall(functionName, args, resolve, reject);
+      this.executeCall(serverFunction, functionName, args, resolve, reject);
     });
   }
 
   /**
    * 実際の関数呼び出し実行
    */
-  executeCall(functionName, args, resolve, reject) {
+  executeCall(serverFunction, functionName, args, resolve, reject) {
     this.activeCalls++;
     
     // ローディング状態の管理
     this.setLoadingState(functionName, true);
 
-    google.script.run
+    serverFunction(...args)
       .withSuccessHandler((result) => {
         this.activeCalls--;
         this.setLoadingState(functionName, false);
@@ -53,7 +55,7 @@ class GASOptimizer {
         console.error(`GAS Function Error [${functionName}]:`, error);
         reject(this.enhanceError(error, functionName));
         this.processQueue();
-      })[functionName](...args);
+      });
   }
 
   /**

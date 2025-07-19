@@ -193,48 +193,48 @@
     : { getOrSet: function(_, fn) { return fn(); } };
   
   // runGas ラッパー関数 - キャッシュ対応
-  function runGas(functionName, ...args) {
-    return gasOptimizer.call(functionName, ...args);
+  function runGas(serverFunction, ...args) {
+    return gasOptimizer.call(serverFunction, ...args);
   }
   
   // マルチテナント対応: 新しいrunGasWithUserId関数
-  function runGasWithUserId(functionName, ...args) {
+  function runGasWithUserId(serverFunction, ...args) {
     // userIdが設定されていない場合は初期化を待つ
     if (!userId) {
       return userIdPromise.then(() => {
         if (!userId) {
-          console.error('❌  - No userId available for:', functionName);
+          console.error('❌  - No userId available for:', serverFunction.name || 'anonymousFunction');
           throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
         }
         
-        console.log('✅  - runGasWithUserId (after init):', functionName, 'userId:', userId);
+        console.log('✅  - runGasWithUserId (after init):', serverFunction.name || 'anonymousFunction', 'userId:', userId);
         // userIdを第一引数として追加
-        return gasOptimizer.call(functionName, userId, ...args);
+        return gasOptimizer.call(serverFunction, userId, ...args);
       });
     }
     
-    console.log('✅  - runGasWithUserId:', functionName, 'userId:', userId);
+    console.log('✅  - runGasWithUserId:', serverFunction.name || 'anonymousFunction', 'userId:', userId);
     // userIdを第一引数として追加
-    return gasOptimizer.call(functionName, userId, ...args);
+    return gasOptimizer.call(serverFunction, userId, ...args);
   }
   
   // callWithCache 関数 - 読み取り専用操作用
-  function callWithCache(functionName, cacheKey, ttl, ...args) {
+  function callWithCache(serverFunction, cacheKey, ttl, ...args) {
     return unifiedCache.getOrSet(cacheKey, function() {
-      return gasOptimizer.call(functionName, ...args);
+      return gasOptimizer.call(serverFunction, ...args);
     }, ttl);
   }
   
   // マルチテナント対応: callWithCacheWithUserId関数
-  function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
+  function callWithCacheWithUserId(serverFunction, cacheKey, ttl, ...args) {
     if (!userId) {
-      console.error('❌  - No userId available for cached call:', functionName);
+      console.error('❌  - No userId available for cached call:', serverFunction.name || 'anonymousFunction');
       throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
     }
     
     return unifiedCache.getOrSet(cacheKey, function() {
-      console.log('✅  - callWithCacheWithUserId:', functionName, 'userId:', userId);
-      return gasOptimizer.call(functionName, userId, ...args);
+      console.log('✅  - callWithCacheWithUserId:', serverFunction.name || 'anonymousFunction', 'userId:', userId);
+      return gasOptimizer.call(serverFunction, userId, ...args);
     }, ttl);
   }
   </script>
