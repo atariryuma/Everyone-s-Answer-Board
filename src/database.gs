@@ -551,27 +551,35 @@ function updateUser(userId, updateData) {
  * @returns {object} 作成されたユーザーデータ
  */
 function createUser(userData) {
-  // メールアドレスの重複チェック
-  var existingUser = findUserByEmail(userData.adminEmail);
-  if (existingUser) {
-    throw new Error('このメールアドレスは既に登録されています。');
+  // 同時登録による重複を防ぐためロックを取得
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+
+  try {
+    // メールアドレスの重複チェック
+    var existingUser = findUserByEmail(userData.adminEmail);
+    if (existingUser) {
+      throw new Error('このメールアドレスは既に登録されています。');
+    }
+
+    var props = PropertiesService.getScriptProperties();
+    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    var service = getSheetsService();
+    var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+
+    var newRow = DB_SHEET_CONFIG.HEADERS.map(function(header) {
+      return userData[header] || '';
+    });
+  
+    appendSheetsData(service, dbId, "'" + sheetName + "'!A1", [newRow]);
+
+    // 最適化: 新規ユーザー作成時は対象キャッシュのみ無効化
+    invalidateUserCache(userData.userId, userData.adminEmail, userData.spreadsheetId, false);
+
+    return userData;
+  } finally {
+    lock.releaseLock();
   }
-
-  var props = PropertiesService.getScriptProperties();
-  var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-  var service = getSheetsService();
-  var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
-
-  var newRow = DB_SHEET_CONFIG.HEADERS.map(function(header) { 
-    return userData[header] || ''; 
-  });
-  
-  appendSheetsData(service, dbId, "'" + sheetName + "'!A1", [newRow]);
-  
-  // 最適化: 新規ユーザー作成時は対象キャッシュのみ無効化
-  invalidateUserCache(userData.userId, userData.adminEmail, userData.spreadsheetId, false);
-  
-  return userData;
 }
 
 /**
