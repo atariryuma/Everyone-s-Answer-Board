@@ -3304,7 +3304,7 @@ function getStatus(requestUserId) {
     let sheetNames = [];
     try {
       if (userInfo.spreadsheetId) {
-        const sheets = getSheetsList(currentUserId);
+        const sheets = getSheetsList(requestUserId);
         sheetNames = sheets || [];
       }
     } catch (sheetError) {
