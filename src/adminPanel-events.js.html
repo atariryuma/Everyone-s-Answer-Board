@@ -347,11 +347,23 @@ function handleDeleteRequest() {
       runGasWithUserId('deleteCurrentUserAccount')
         .then(function(response) {
           setLoading(false);
-          showMessage(response, 'success');
-          // Redirect to login or show confirmation
+          showMessage(response.message || 'アカウントが削除されました', 'success');
+          if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+            window.unifiedCache.clear();
+          }
+          if (window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
+            window.gasOptimizer.clearCache();
+          }
+          if (window.localStorage) {
+            window.localStorage.clear();
+          }
           setTimeout(function() {
-            window.location.reload();
-          }, 3000);
+            runGasWithUserId('getWebAppUrl').then(function(webAppUrl) {
+              window.location.href = '/login';
+            }).catch(function() {
+              window.location.href = '/login';
+            });
+          }, 2000);
         })
         .catch(function(error) {
           setLoading(false);
