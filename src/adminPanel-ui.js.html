@@ -239,6 +239,11 @@ function populateSheetSelect(sheetNames, activeSheetName) {
     select.value = activeSheetName;
     selectedSheet = activeSheetName;
     console.log('✅ Active sheet set:', activeSheetName);
+    
+    // Trigger change event to load column configuration
+    const changeEvent = new Event('change', { bubbles: true });
+    select.dispatchEvent(changeEvent);
+    console.log('🔄 Change event triggered for active sheet');
   }
   
   // Add change event listener for data preview

@@ -170,9 +170,23 @@ function loadConfigForSelected() {
 function handleSheetDetailsSuccess(details) {
   console.log('✅ Sheet details loaded:', details);
   
-  if (details && details.headers) {
-    console.log('📋 Populating header options with:', details.headers);
-    populateHeaderOptions(details.headers);
+  if (details && details.allHeaders) {
+    console.log('📋 Populating header options with:', details.allHeaders);
+    populateHeaderOptions(details.allHeaders);
+    
+    // Show config area and hide placeholder
+    const configArea = document.getElementById('config-area');
+    const configPlaceholder = document.getElementById('config-placeholder');
+    
+    if (configArea) {
+      configArea.classList.remove('hidden');
+      console.log('✅ Config area shown');
+    }
+    
+    if (configPlaceholder) {
+      configPlaceholder.classList.add('hidden');
+      console.log('✅ Config placeholder hidden');
+    }
     
     if (details.guessedConfig) {
       console.log('🤖 AI config available:', details.guessedConfig);
