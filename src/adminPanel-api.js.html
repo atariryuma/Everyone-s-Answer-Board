@@ -545,7 +545,11 @@ function initializeAPI() {
 }
 
 // Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
+if (document.readyState !== 'loading') {
   setTimeout(initializeAPI, 200);
-});
+} else {
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(initializeAPI, 200);
+  });
+}
 </script>
