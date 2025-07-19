@@ -508,12 +508,20 @@
     if (typeof runGasWithUserId === 'function') {
       runGasWithUserId('deleteCurrentUserAccount')
         .then(result => {
-          if (result.success) {
+          if (result.status === 'success' || result.success) {
             showMessage('アカウントが削除されました', 'success');
+            if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+              window.unifiedCache.clear();
+            }
+            if (window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
+              window.gasOptimizer.clearCache();
+            }
+            if (window.localStorage) {
+              window.localStorage.clear();
+            }
             setTimeout(() => {
-              // Use the unified URL function from backend for redirect
               runGasWithUserId('getWebAppUrl').then(webAppUrl => {
-                window.location.href = webAppUrl;
+                window.location.href = '/login';
               }).catch(error => {
                 console.error('Failed to get web app URL:', error);
                 window.location.href = '/login';
