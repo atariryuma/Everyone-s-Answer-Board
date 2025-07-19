@@ -2684,13 +2684,7 @@ function getSheetsList(userId) {
       spreadsheetUrl: userInfo.spreadsheetUrl
     });
     
-    if (!userInfo.spreadsheetId) {
-      console.warn('getSheetsList: No spreadsheet ID for user:', userId);
-      return [];
-    }
-    
-    var service = getSheetsService();
-    debugLog('getSheetsList: SheetsService obtained, attempting to fetch spreadsheet data...');
+    if (!userInfo.spreadsheetId) {      console.warn('getSheetsList: No spreadsheet ID for user:', userId);      return [];    }    debugLog('getSheetsList: User\'s spreadsheetId:', userInfo.spreadsheetId); // Added debug log    var service = getSheetsService();    debugLog('getSheetsList: SheetsService obtained, attempting to fetch spreadsheet data...');
     
     var spreadsheet;
     try {
