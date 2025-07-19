@@ -23,13 +23,30 @@ main {
 
 /* ヘッダー固定に対応したレイアウト調整 */
 header {
-  height: 72px; /* モバイル: py-3 (12px * 2) + アイコン高さ (32px) + 余白 ≈ 72px */
+  height: 72px !important; /* モバイル: py-3 (12px * 2) + アイコン高さ (32px) + 余白 ≈ 72px */
 }
 
 @media (min-width: 640px) {
   header {
-    height: 80px; /* デスクトップ: py-4 (16px * 2) + アイコン高さ (32px) + 余白 ≈ 80px */
+    height: 80px !important; /* デスクトップ: py-4 (16px * 2) + アイコン高さ (32px) + 余白 ≈ 80px */
   }
+}
+
+/* 強制的なコンテンツ調整 */
+.responsive-grid {
+  margin-top: 0 !important;
+  padding-top: calc(72px + 1rem) !important; /* ヘッダー高さ + 余白 */
+}
+
+@media (min-width: 640px) {
+  .responsive-grid {
+    padding-top: calc(80px + 1.5rem) !important; /* ヘッダー高さ + 余白 */
+  }
+}
+
+/* デバッグ用識別クラス */
+.layout-updated-v1-1 {
+  border-top: 3px solid #22c55e !important; /* 一時的な視覚確認用 */
 }
 
 /* Admin Panel Layout Fixes */

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Layout Update v1.1 - 2025-07-19 - Header Fixed + CSS Layout Optimization -->
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
@@ -103,7 +104,22 @@
   <?!= include('SharedUtilities'); ?>
   
   <!-- Admin Panel Specific Styles -->
+  <?!= include('adminPanel-layout.css'); ?>
   <?!= include('adminPanel.css'); ?>
+  
+  <!-- レイアウト修正確認用スタイル -->
+  <style>
+    /* 確実なレイアウト適用 */
+    .responsive-grid.layout-updated-v1-1 {
+      padding-top: calc(72px + 1rem) !important;
+      background: linear-gradient(to right, rgba(34, 197, 94, 0.1), transparent) !important;
+    }
+    @media (min-width: 640px) {
+      .responsive-grid.layout-updated-v1-1 {
+        padding-top: calc(80px + 1.5rem) !important;
+      }
+    }
+  </style>
   
   <!-- Core JavaScript Libraries (must be loaded first) -->
   <?!= include('ClientOptimizer'); ?>
@@ -352,7 +368,7 @@
     </section>
 
     <!-- メインコンテンツエリア -->
-    <div class="responsive-grid pt-18 sm:pt-20">
+    <div class="responsive-grid layout-updated-v1-1">
       <!-- 左側：セットアップフロー（メインパネル） -->
       <div class="left-panel space-y-4 lg:space-y-6">
         
