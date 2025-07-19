@@ -282,6 +282,9 @@
         .then(result => {
           if (result.success) {
             showMessage('設定が保存され、ボードが公開されました', 'success');
+            if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+              window.unifiedCache.clear();
+            }
             loadSystemStatus();
             navigateToStep(3);
           } else {
@@ -312,6 +315,9 @@
         .then(result => {
           if (result.success) {
             showMessage('ボードの公開を停止しました', 'success');
+            if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+              window.unifiedCache.clear();
+            }
             loadSystemStatus();
           } else {
             showMessage(result.message || '停止に失敗しました', 'error');
