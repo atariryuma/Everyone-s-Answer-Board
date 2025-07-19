@@ -886,7 +886,7 @@ function loadUserInfo() {
 // Load system status
 function loadSystemStatus() {
   if (typeof runGasWithUserId === 'function') {
-    runGasWithUserId('getSystemStatus')
+    runGasWithUserId('getStatus')
       .then(status => {
         updateSystemStatusDisplay(status);
       })
