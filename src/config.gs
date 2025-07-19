@@ -649,7 +649,7 @@ function saveAndActivateSheet(requestUserId, spreadsheetId, sheetName, config) {
     console.log('saveAndActivateSheet: バッチ処理完了');
 
     // 5. 最新のステータスをキャッシュを無視して取得
-    const finalStatus = getStatus(requestUserId, true);
+    const finalStatus = getAppConfig(requestUserId);
     console.log('saveAndActivateSheet: 統合処理完了');
 
     // 6. 新しいスプレッドシートまたは設定変更時に自動で公開準備まで進める
@@ -711,7 +711,7 @@ function saveAndPublish(requestUserId, sheetName, config) {
     console.log('saveAndPublish: 表示オプション設定完了');
 
     // 5. 最新のステータスを強制再取得して返す
-    const finalStatus = getStatus(requestUserId, true); // forceRefresh = true
+    const finalStatus = getAppConfig(requestUserId); // forceRefresh = true
     console.log('saveAndPublish: 統合処理完了、最新ステータスを返します。');
 
     return finalStatus;
@@ -961,7 +961,7 @@ function activateSheet(requestUserId, spreadsheetId, sheetName) {
     console.log('activateSheet: シート切り替え完了');
 
     // 最新のステータスを取得（キャッシュ活用）
-    const finalStatus = getStatus(requestUserId, false);
+    const finalStatus = getAppConfig(requestUserId);
     console.log('activateSheet: 公開処理完了');
 
     const executionTime = Date.now() - startTime;
@@ -1137,7 +1137,7 @@ function clearActiveSheet(requestUserId) {
     console.log('回答ボードの公開を正常に停止しました - ユーザーID:', currentUserId);
 
     // 最新のステータスを取得して返す（UI更新のため）
-    const updatedStatus = getStatus(requestUserId, true);
+    const updatedStatus = getAppConfig(requestUserId);
     return {
       success: true,
       message: '✅ 回答ボードの公開を停止しました。',

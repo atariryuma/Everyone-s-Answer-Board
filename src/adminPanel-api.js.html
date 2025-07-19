@@ -100,14 +100,14 @@ function loadStatus(forceRefresh = false) {
       unifiedCache.delete(cacheKey);
     }
     // マルチテナント対応: 新しい関数を使用
-    runGasWithUserId('getStatus')
+    runGasWithUserId('getAppConfig')
       .then(function(status) {
         console.log('✅ Status loaded ( forced refresh)', status);
         updateUIWithNewStatus(status);
         setLoading(false);
       })
       .catch(function(error) {
-        console.error('❌  getStatus failed, falling back to legacy:', error);
+        console.error('❌  getAppConfig failed, falling back to legacy:', error);
         // フォールバック: 従来の方法
         runGasWithUserId('getStatus', forceRefresh)
           .then(function(status) {
@@ -121,7 +121,7 @@ function loadStatus(forceRefresh = false) {
       });
   } else {
     // キャッシュ利用
-    callWithCacheWithUserId('getStatus', cacheKey, cacheTime)
+    callWithCacheWithUserId('getAppConfig', cacheKey, cacheTime)
       .then(function(status) {
         console.log('✅ Status loaded (cached)', status);
         updateUIWithNewStatus(status);
@@ -886,7 +886,7 @@ function loadUserInfo() {
 // Load system status
 function loadSystemStatus() {
   if (typeof runGasWithUserId === 'function') {
-    runGasWithUserId('getStatus')
+    runGasWithUserId('getAppConfig')
       .then(status => {
         updateSystemStatusDisplay(status);
       })
