@@ -860,6 +860,461 @@ function updateBasicStaticUI(status) {
   }
 }
 
+// Update system status display
+function updateSystemStatusDisplay(status) {
+  if (!status) return;
+  
+  // Update publish status
+  const publishIndicator = document.getElementById('info-publish-indicator');
+  const publishText = document.getElementById('info-publish-text');
+  
+  if (status.isPublished) {
+    publishIndicator.className = 'w-2 h-2 rounded-full bg-green-400';
+    publishText.textContent = '公開中';
+  } else {
+    publishIndicator.className = 'w-2 h-2 rounded-full bg-gray-400';
+    publishText.textContent = '非公開';
+  }
+  
+  // Update other status fields
+  document.getElementById('info-published-sheet').textContent = status.sheetName || '-';
+  document.getElementById('info-display-mode').textContent = status.displayMode || '-';
+  document.getElementById('info-show-counts').textContent = status.showCounts ? '表示' : '非表示';
+  document.getElementById('info-answer-count').textContent = status.answerCount || '0';
+  document.getElementById('info-reaction-count').textContent = status.reactionCount || '0';
+  
+  // Enable resource buttons if URLs are available
+  const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
+  const formBtn = document.getElementById('open-form-btn');
+  
+  if (status.spreadsheetUrl) {
+    spreadsheetBtn.disabled = false;
+    spreadsheetBtn.onclick = () => window.open(status.spreadsheetUrl, '_blank');
+  }
+  
+  if (status.formUrl) {
+    formBtn.disabled = false;
+    formBtn.onclick = () => window.open(status.formUrl, '_blank');
+  }
+}
+
+// Navigate to specific step
+function navigateToStep(step) {
+  currentStep = step;
+  
+  // Update step indicators
+  document.querySelectorAll('.step-indicator').forEach((indicator, index) => {
+    const stepNumber = index + 1;
+    indicator.classList.toggle('completed', stepNumber < step);
+    indicator.classList.toggle('active', stepNumber === step);
+  });
+  
+  // Show/hide step content
+  document.querySelectorAll('.step-content').forEach((content, index) => {
+    const stepNumber = index + 1;
+    content.classList.toggle('hidden', stepNumber !== step);
+  });
+  
+  // Update progress bar
+  const progressBar = document.querySelector('.progress-bar');
+  if (progressBar) {
+    progressBar.style.width = `${(step / 3) * 100}%`;
+  }
+  
+  validateCurrentStep();
+}
+
+// Validate current step with setup status consideration
+function validateCurrentStep() {
+  const savePublishBtn = document.getElementById('save-publish-btn');
+  if (!savePublishBtn) return;
+  
+  // セットアップ状況を確認
+  const setupStatus = getSetupStatusFromGlobalStatus();
+  
+  // セットアップ未完了時の段階的制御
+  if (setupStatus === 'pending') {
+    enforceStepProgression();
+  }
+  
+  let isValid = false;
+  
+  switch (currentStep) {
+    case 1:
+      isValid = selectedSheetId || selectedFormId;
+      break;
+    case 2:
+      isValid = currentConfig && validateConfiguration();
+      break;
+    case 3:
+      isValid = true;
+      break;
+  }
+  
+  savePublishBtn.disabled = !isValid;
+}
+
+// セットアップ状況をグローバルステータスから取得
+function getSetupStatusFromGlobalStatus() {
+  try {
+    if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
+      const config = typeof currentStatus.userInfo.configJson === 'string' 
+        ? JSON.parse(currentStatus.userInfo.configJson) 
+        : currentStatus.userInfo.configJson;
+      return config.setupStatus || 'pending';
+    }
+    return 'pending';
+  } catch (error) {
+    console.warn('getSetupStatusFromGlobalStatus エラー:', error);
+    return 'pending';
+  }
+}
+
+// セットアップ未完了時の段階的制御を強制
+function enforceStepProgression() {
+  const step1Completed = checkStep1Completion();
+  const step2Completed = checkStep2Completion();
+  
+  // Step 2の制御
+  const step2Section = document.getElementById('sheet-selection-section');
+  if (!step1Completed) {
+    disableSection(step2Section, '⚠️ 先にデータ準備を完了してください');
+  } else {
+    enableSection(step2Section);
+  }
+  
+  // Step 3の制御
+  const step3Section = document.getElementById('config-section');
+  if (!step1Completed || !step2Completed) {
+    disableSection(step3Section, '⚠️ 前のステップを完了してください');
+  } else {
+    enableSection(step3Section);
+  }
+}
+
+// Step 1完了チェック
+function checkStep1Completion() {
+  return !!(selectedSheetId || selectedFormId || 
+            (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId));
+}
+
+// Step 2完了チェック
+function checkStep2Completion() {
+  return !!(currentStatus && currentStatus.activeSheetName);
+}
+
+// セクションを無効化
+function disableSection(section, message) {
+  if (!section) return;
+  
+  section.style.opacity = '0.5';
+  section.style.pointerEvents = 'none';
+  
+  // 警告メッセージを追加
+  const existingWarning = section.querySelector('.step-warning');
+  if (!existingWarning) {
+    const warning = document.createElement('div');
+    warning.className = 'step-warning bg-yellow-100 border border-yellow-300 rounded-lg p-3 mb-4 text-sm text-yellow-800';
+    warning.innerHTML = `<span class="font-semibold">${message}</span>`;
+    section.insertBefore(warning, section.firstChild);
+  }
+}
+
+// セクションを有効化
+function enableSection(section) {
+  if (!section) return;
+  
+  section.style.opacity = '1';
+  section.style.pointerEvents = 'auto';
+  
+  // 警告メッセージを削除
+  const warning = section.querySelector('.step-warning');
+  if (warning) {
+    warning.remove();
+  }
+}
+
+// Validate current step with setup status consideration
+function validateCurrentStep() {
+  const savePublishBtn = document.getElementById('save-publish-btn');
+  if (!savePublishBtn) return;
+  
+  // セットアップ状況を確認
+  const setupStatus = getSetupStatusFromGlobalStatus();
+  
+  // セットアップ未完了時の段階的制御
+  if (setupStatus === 'pending') {
+    enforceStepProgression();
+  }
+  
+  let isValid = false;
+  
+  switch (currentStep) {
+    case 1:
+      isValid = selectedSheetId || selectedFormId;
+      break;
+    case 2:
+      isValid = currentConfig && validateConfiguration();
+      break;
+    case 3:
+      isValid = true;
+      break;
+  }
+  
+  savePublishBtn.disabled = !isValid;
+}
+
+// セットアップ状況をグローバルステータスから取得
+function getSetupStatusFromGlobalStatus() {
+  try {
+    if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
+      const config = typeof currentStatus.userInfo.configJson === 'string' 
+        ? JSON.parse(currentStatus.userInfo.configJson) 
+        : currentStatus.userInfo.configJson;
+      return config.setupStatus || 'pending';
+    }
+    return 'pending';
+  } catch (error) {
+    console.warn('getSetupStatusFromGlobalStatus エラー:', error);
+    return 'pending';
+  }
+}
+
+// セットアップ未完了時の段階的制御を強制
+function enforceStepProgression() {
+  const step1Completed = checkStep1Completion();
+  const step2Completed = checkStep2Completion();
+  
+  // Step 2の制御
+  const step2Section = document.getElementById('sheet-selection-section');
+  if (!step1Completed) {
+    disableSection(step2Section, '⚠️ 先にデータ準備を完了してください');
+  } else {
+    enableSection(step2Section);
+  }
+  
+  // Step 3の制御
+  const step3Section = document.getElementById('config-section');
+  if (!step1Completed || !step2Completed) {
+    disableSection(step3Section, '⚠️ 前のステップを完了してください');
+  } else {
+    enableSection(step3Section);
+  }
+}
+
+// Step 1完了チェック
+function checkStep1Completion() {
+  return !!(selectedSheetId || selectedFormId || 
+            (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId));
+}
+
+// Step 2完了チェック
+function checkStep2Completion() {
+  return !!(currentStatus && currentStatus.activeSheetName);
+}
+
+// セクションを無効化
+function disableSection(section, message) {
+  if (!section) return;
+  
+  section.style.opacity = '0.5';
+  section.style.pointerEvents = 'none';
+  
+  // 警告メッセージを追加
+  const existingWarning = section.querySelector('.step-warning');
+  if (!existingWarning) {
+    const warning = document.createElement('div');
+    warning.className = 'step-warning bg-yellow-100 border border-yellow-300 rounded-lg p-3 mb-4 text-sm text-yellow-800';
+    warning.innerHTML = `<span class="font-semibold">${message}</span>`;
+    section.insertBefore(warning, section.firstChild);
+  }
+}
+
+// セクションを有効化
+function enableSection(section) {
+  if (!section) return;
+  
+  section.style.opacity = '1';
+  section.style.pointerEvents = 'auto';
+  
+  // 警告メッセージを削除
+  const warning = section.querySelector('.step-warning');
+  if (warning) {
+    warning.remove();
+  }
+}
+
+// Validate configuration
+function validateConfiguration() {
+  if (!currentConfig || !currentConfig.columnMappings) return false;
+  
+  const mappings = currentConfig.columnMappings;
+  const hasContent = Object.values(mappings).includes('content');
+  const hasAuthor = Object.values(mappings).includes('author');
+  
+  return hasContent && hasAuthor;
+}
+
+// Handle sheet selection
+function handleSheetSelection(event) {
+  selectedSheetId = event.target.value;
+  selectedFormId = null; // Clear form selection
+  
+  if (selectedSheetId) {
+    loadSheetColumns(selectedSheetId);
+  }
+  
+  validateCurrentStep();
+}
+
+// Handle form selection
+function handleFormSelection(event) {
+  selectedFormId = event.target.value;
+  selectedSheetId = null; // Clear sheet selection
+  
+  if (selectedFormId) {
+    loadFormColumns(selectedFormId);
+  }
+  
+  validateCurrentStep();
+}
+
+// Load sheet columns
+function loadSheetColumns(sheetId) {
+  if (typeof runGasWithUserId === 'function') {
+    runGasWithUserId('getSheetColumns', sheetId)
+      .then(columns => {
+        displayColumnMapping(columns);
+      })
+      .catch(error => {
+        console.error('Failed to load sheet columns:', error);
+        showMessage('列の読み込みに失敗しました', 'error');
+      });
+  }
+}
+
+// Load form columns
+function loadFormColumns(formId) {
+  if (typeof runGasWithUserId === 'function') {
+    runGasWithUserId('getFormColumns', formId)
+      .then(columns => {
+        displayColumnMapping(columns);
+      })
+      .catch(error => {
+        console.error('Failed to load form columns:', error);
+        showMessage('フォーム項目の読み込みに失敗しました', 'error');
+      });
+  }
+}
+
+// Display column mapping interface
+function displayColumnMapping(columns) {
+  const configPlaceholder = document.getElementById('config-placeholder');
+  const configContent = document.getElementById('config-content');
+  
+  if (configPlaceholder) configPlaceholder.classList.add('hidden');
+  if (configContent) configContent.classList.remove('hidden');
+  
+  const mappingContainer = document.getElementById('column-mappings');
+  if (!mappingContainer) return;
+  
+  mappingContainer.innerHTML = '';
+  
+  columns.forEach((column, index) => {
+    const mappingDiv = document.createElement('div');
+    mappingDiv.className = 'column-mapping';
+    mappingDiv.innerHTML = `
+      <div>
+        <label class="block text-sm font-medium text-gray-200 mb-2">
+          ${column.name}
+          ${column.required ? '<span class="text-red-400">*</span>' : ''}
+        </label>
+        <p class="text-xs text-gray-400">${column.description || ''}</p>
+      </div>
+      <div>
+        <select class="form-control form-select column-mapping-select" data-column="${column.id}">
+          <option value="">選択してください</option>
+          <option value="content">回答内容</option>
+          <option value="author">回答者名</option>
+          <option value="timestamp">回答時刻</option>
+          <option value="reaction">リアクション</option>
+          <option value="ignore">無視</option>
+        </select>
+      </div>
+    `;
+    mappingContainer.appendChild(mappingDiv);
+  });
+}
+
+// Handle column mapping
+function handleColumnMapping(select) {
+  const columnId = select.dataset.column;
+  const mappingType = select.value;
+  const mappingDiv = select.closest('.column-mapping');
+  
+  // Update visual feedback
+  mappingDiv.classList.remove('required', 'mapped');
+  if (mappingType && mappingType !== 'ignore') {
+    mappingDiv.classList.add('mapped');
+  }
+  
+  // Update configuration
+  if (!currentConfig) currentConfig = {};
+  if (!currentConfig.columnMappings) currentConfig.columnMappings = {};
+  currentConfig.columnMappings[columnId] = mappingType;
+  
+  validateCurrentStep();
+}
+
+// Handle toggle changes
+function handleToggleChange(event) {
+  const toggleName = event.target.name;
+  const isChecked = event.target.checked;
+  
+  if (!currentConfig) currentConfig = {};
+  currentConfig[toggleName] = isChecked;
+  
+  validateCurrentStep();
+}
+
+// Update system status display
+function updateSystemStatusDisplay(status) {
+  if (!status) return;
+  
+  // Update publish status
+  const publishIndicator = document.getElementById('info-publish-indicator');
+  const publishText = document.getElementById('info-publish-text');
+  
+  if (status.isPublished) {
+    publishIndicator.className = 'w-2 h-2 rounded-full bg-green-400';
+    publishText.textContent = '公開中';
+  } else {
+    publishIndicator.className = 'w-2 h-2 rounded-full bg-gray-400';
+    publishText.textContent = '非公開';
+  }
+  
+  // Update other status fields
+  document.getElementById('info-published-sheet').textContent = status.sheetName || '-';
+  document.getElementById('info-display-mode').textContent = status.displayMode || '-';
+  document.getElementById('info-show-counts').textContent = status.showCounts ? '表示' : '非表示';
+  document.getElementById('info-answer-count').textContent = status.answerCount || '0';
+  document.getElementById('info-reaction-count').textContent = status.reactionCount || '0';
+  
+  // Enable resource buttons if URLs are available
+  const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
+  const formBtn = document.getElementById('open-form-btn');
+  
+  if (status.spreadsheetUrl) {
+    spreadsheetBtn.disabled = false;
+    spreadsheetBtn.onclick = () => window.open(status.spreadsheetUrl, '_blank');
+  }
+  
+  if (status.formUrl) {
+    formBtn.disabled = false;
+    formBtn.onclick = () => window.open(status.formUrl, '_blank');
+  }
+}
+
 // Initialize when DOM is ready
 if (document.readyState !== 'loading') {
   setTimeout(initializeUI, 300);

@@ -142,6 +142,24 @@ var webAppUrl = '';
 var currentSpreadsheetUrl = '';
 var currentStatus = null;
 
+// Global variables from adminPanel.js.html
+let currentStep = 1;
+let selectedSheetId = null;
+let selectedFormId = null;
+let availableSheets = [];
+let availableForms = [];
+let currentConfig = null;
+
+// Initialize admin panel
+function initializeAdminPanel(incomingUserId) {
+  // userId is now managed globally by adminPanel-core.js
+  loadUserInfo();
+  loadSystemStatus();
+  setupEventListeners();
+  setupRealtimeUpdates();
+  validateCurrentStep();
+}
+
 // =============================================================================
 // LEGACY UTILITIES (for backward compatibility)
 // =============================================================================

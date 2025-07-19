@@ -1,182 +1,19 @@
 <script>
   // Admin Panel JavaScript
   
-  // Global variables
-  // Note: userId is now managed by adminPanel-core.js to avoid conflicts
-  let currentStep = 1;
-  let selectedSheetId = null;
-  let selectedFormId = null;
-  let availableSheets = [];
-  let availableForms = [];
-  let currentConfig = null;
   
-  // Initialize admin panel
-  function initializeAdminPanel(incomingUserId) {
-    // userId is now managed globally by adminPanel-core.js
-    loadUserInfo();
-    loadSystemStatus();
-    setupEventListeners();
-    setupRealtimeUpdates();
-    validateCurrentStep();
-  }
   
-  // Load user information
-  function loadUserInfo() {
-    if (typeof runGasWithUserId === 'function') {
-      runGasWithUserId('getUserInfo')
-        .then(userInfo => {
-          if (userInfo) {
-            document.getElementById('info-admin-email').textContent = userInfo.email || '-';
-            document.getElementById('info-user-id').textContent = userInfo.userId || '-';
-          }
-        })
-        .catch(error => {
-          console.error('Failed to load user info:', error);
-        });
-    }
-  }
   
-  // Load system status
-  function loadSystemStatus() {
-    if (typeof runGasWithUserId === 'function') {
-      runGasWithUserId('getSystemStatus')
-        .then(status => {
-          updateSystemStatusDisplay(status);
-        })
-        .catch(error => {
-          console.error('Failed to load system status:', error);
-        });
-    }
-  }
   
-  // Update system status display
-  function updateSystemStatusDisplay(status) {
-    if (!status) return;
-    
-    // Update publish status
-    const publishIndicator = document.getElementById('info-publish-indicator');
-    const publishText = document.getElementById('info-publish-text');
-    
-    if (status.isPublished) {
-      publishIndicator.className = 'w-2 h-2 rounded-full bg-green-400';
-      publishText.textContent = '公開中';
-    } else {
-      publishIndicator.className = 'w-2 h-2 rounded-full bg-gray-400';
-      publishText.textContent = '非公開';
-    }
-    
-    // Update other status fields
-    document.getElementById('info-published-sheet').textContent = status.sheetName || '-';
-    document.getElementById('info-display-mode').textContent = status.displayMode || '-';
-    document.getElementById('info-show-counts').textContent = status.showCounts ? '表示' : '非表示';
-    document.getElementById('info-answer-count').textContent = status.answerCount || '0';
-    document.getElementById('info-reaction-count').textContent = status.reactionCount || '0';
-    
-    // Enable resource buttons if URLs are available
-    const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
-    const formBtn = document.getElementById('open-form-btn');
-    
-    if (status.spreadsheetUrl) {
-      spreadsheetBtn.disabled = false;
-      spreadsheetBtn.onclick = () => window.open(status.spreadsheetUrl, '_blank');
-    }
-    
-    if (status.formUrl) {
-      formBtn.disabled = false;
-      formBtn.onclick = () => window.open(status.formUrl, '_blank');
-    }
-  }
   
-  // Setup event listeners
-  function setupEventListeners() {
-    // Step navigation
-    document.querySelectorAll('.step-btn').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const targetStep = parseInt(this.dataset.step);
-        navigateToStep(targetStep);
-      });
-    });
-    
-    // Form submissions
-    const savePublishBtn = document.getElementById('save-publish-btn');
-    if (savePublishBtn) {
-      savePublishBtn.addEventListener('click', handleSaveAndPublish);
-    }
-    
-    const unpublishBtn = document.getElementById('unpublish-board-btn');
-    if (unpublishBtn) {
-      unpublishBtn.addEventListener('click', handleUnpublish);
-    }
-    
-    // Sheet and form selection
-    const sheetSelect = document.getElementById('sheet-select');
-    if (sheetSelect) {
-      sheetSelect.addEventListener('change', handleSheetSelection);
-    }
-    
-    const formSelect = document.getElementById('form-select');
-    if (formSelect) {
-      formSelect.addEventListener('change', handleFormSelection);
-    }
-    
-    // Column mapping
-    document.addEventListener('change', function(e) {
-      if (e.target.classList.contains('column-mapping-select')) {
-        handleColumnMapping(e.target);
-      }
-    });
-    
-    // Toggle switches
-    document.querySelectorAll('.toggle-switch input').forEach(toggle => {
-      toggle.addEventListener('change', handleToggleChange);
-    });
-    
-    // Account management
-    const deleteAccountBtn = document.getElementById('delete-account-btn');
-    if (deleteAccountBtn) {
-      deleteAccountBtn.addEventListener('click', handleAccountDeletion);
-    }
-  }
   
-  // Setup real-time updates
-  function setupRealtimeUpdates() {
-    // Update system status every 30 seconds
-    setInterval(loadSystemStatus, 30000);
-    
-    // Update answer count every 10 seconds when published
-    setInterval(() => {
-      const publishText = document.getElementById('info-publish-text');
-      if (publishText && publishText.textContent === '公開中') {
-        updateAnswerCount();
-      }
-    }, 10000);
-  }
   
-  // Navigate to specific step
-  function navigateToStep(step) {
-    currentStep = step;
-    
-    // Update step indicators
-    document.querySelectorAll('.step-indicator').forEach((indicator, index) => {
-      const stepNumber = index + 1;
-      indicator.classList.toggle('completed', stepNumber < step);
-      indicator.classList.toggle('active', stepNumber === step);
-    });
-    
-    // Show/hide step content
-    document.querySelectorAll('.step-content').forEach((content, index) => {
-      const stepNumber = index + 1;
-      content.classList.toggle('hidden', stepNumber !== step);
-    });
-    
-    // Update progress bar
-    const progressBar = document.querySelector('.progress-bar');
-    if (progressBar) {
-      progressBar.style.width = `${(step / 3) * 100}%`;
-    }
-    
-    validateCurrentStep();
-  }
+  
+  
+  
+  
+  
+  
   
   // Validate current step with setup status consideration
   function validateCurrentStep() {
@@ -542,83 +379,11 @@
     }
   }
   
-  // Update answer count
-  function updateAnswerCount() {
-    if (typeof runGasWithUserId === 'function') {
-      runGasWithUserId('getAnswerCount')
-        .then(count => {
-          document.getElementById('info-answer-count').textContent = count || '0';
-        })
-        .catch(error => {
-          console.error('Failed to update answer count:', error);
-        });
-    }
-  }
   
-  // Show message
-  function showMessage(message, type = 'info') {
-    // Create message element
-    const messageEl = document.createElement('div');
-    messageEl.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transition-all duration-300 ${getMessageClasses(type)}`;
-    messageEl.textContent = message;
-    
-    // Add to page
-    document.body.appendChild(messageEl);
-    
-    // Animate in
-    setTimeout(() => {
-      messageEl.classList.add('translate-y-0', 'opacity-100');
-    }, 100);
-    
-    // Remove after delay
-    setTimeout(() => {
-      messageEl.classList.add('translate-y-2', 'opacity-0');
-      setTimeout(() => {
-        document.body.removeChild(messageEl);
-      }, 300);
-    }, 3000);
-  }
   
-  // Get message classes based on type
-  function getMessageClasses(type) {
-    const baseClasses = 'transform translate-y-2 opacity-0';
-    switch (type) {
-      case 'success':
-        return `${baseClasses} bg-green-600 text-white`;
-      case 'error':
-        return `${baseClasses} bg-red-600 text-white`;
-      case 'warning':
-        return `${baseClasses} bg-yellow-600 text-white`;
-      default:
-        return `${baseClasses} bg-blue-600 text-white`;
-    }
-  }
   
-  // Switch to another account
-  function switchToAnotherAccount() {
-    if (confirm('別のアカウントに切り替えますか？')) {
-      // Use the unified URL function from backend
-      runGasWithUserId('getWebAppUrl').then(webAppUrl => {
-        window.location.href = webAppUrl + '?switch_account=true';
-      }).catch(error => {
-        console.error('Failed to get web app URL:', error);
-        window.location.href = '/login?switch_account=true';
-      });
-    }
-  }
   
-  // Open app setup page
-  function openAppSetupPage() {
-    // Use the unified URL function from backend
-    runGasWithUserId('getWebAppUrl').then(webAppUrl => {
-      window.open(webAppUrl + '?mode=appsetup&setup=true', '_blank');
-    }).catch(error => {
-      console.error('Failed to get web app URL:', error);
-      // Fallback to current location
-      var base = window.location.origin + window.location.pathname;
-      window.open(base + '?mode=appsetup&setup=true', '_blank');
-    });
-  }
+  
   
   // Initialization is triggered from AdminPanel.html after userId is ready.
   
