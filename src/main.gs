@@ -461,69 +461,6 @@ function doGet(e) {
   }
 }
 
-/**
- * リクエストを適切なハンドラに振り分ける
- * @param {Object} params - 解析されたリクエストパラメータ
- * @param {string} userEmail - 現在のユーザーのメールアドレス
- * @returns {HtmlOutput}
- */
-function routeRequest(params, userEmail) {
-  // デバッグログを追加
-  console.log('routeRequest - params:', JSON.stringify(params), 'userEmail:', userEmail);
-  
-  // 1. システムセットアップが最優先
-  if (!isSystemSetup()) {
-    console.log('routeRequest - System not setup, showing setup page');
-    return showSetupPage();
-  }
-
-  // 2. パラメータなしのルートアクセスは常にログインページを表示
-  if (!params.mode) {
-    console.log('routeRequest - No mode parameter, showing login page');
-    return showLoginPage();
-  }
-
-  // 3. ログインしていないユーザーはログインページへ（パラメータがあっても）
-  if (!userEmail) {
-    console.log('routeRequest - No user email, showing login page');
-    return showLoginPage();
-  }
-
-  // 4. ユーザー情報を取得（キャッシュ活用）
-  const userInfo = getUserInfo(userEmail, params.userId);
-  console.log('routeRequest - userInfo found:', !!userInfo, 'for email:', userEmail);
-
-  // 5. ユーザー情報がない場合は、どのモードであってもログインページを表示
-  if (!userInfo) {
-    console.warn('No user info found for email:', userEmail, 'or userId:', params.userId, '. Showing login page.');
-    return showLoginPage();
-  }
-
-  // 6. ルーティング決定
-  console.log('routeRequest - Routing to mode:', params.mode);
-  switch (params.mode) {
-    case 'admin':
-      console.log('routeRequest - Admin mode accessed');
-      return handleAdminRoute(userInfo, params, userEmail);
-    case 'view':
-      console.log('routeRequest - View mode accessed');
-      return renderAnswerBoard(userInfo, params);
-    case 'appsetup':
-      console.log('appsetup mode - setupParam:', params.setupParam, 'hasSetupPageAccess:', hasSetupPageAccess());
-      if (params.setupParam === 'true' && hasSetupPageAccess()) {
-        return showAppSetupPage();
-      }
-      // setup パラメータがない場合やアクセス権限がない場合のエラー
-      const errorMsg = params.setupParam !== 'true' 
-        ? 'setup=true パラメータが必要です。'
-        : 'このページにアクセスする権限がありません。';
-      return showErrorPage('アクセス拒否', errorMsg);
-    default:
-      // 不明なモードの場合はログインページへ
-      console.log('routeRequest - Unknown mode, showing login page');
-      return showLoginPage();
-  }
-}
 
 /**
  * 管理者ページのルートを処理
@@ -558,36 +495,105 @@ function handleAdminRoute(userInfo, params, userEmail) {
 
 
 /**
- * ユーザー情報を取得（キャッシュ対応）
- * @param {string} email - ユーザーのメールアドレス
- * @param {string} userId - URLパラメータから取得したユーザーID
+ * 統合されたユーザー情報取得関数 (Phase 2: 統合完了)
+ * キャッシュ戦略とセキュリティチェックを統合
+ * @param {string|Object} identifier - メールアドレス、ユーザーID、または設定オブジェクト
+ * @param {string} [type] - 'email' | 'userId' | null (auto-detect)
+ * @param {Object} [options] - キャッシュオプション
  * @returns {Object|null} ユーザー情報オブジェクト、見つからない場合はnull
  */
-function getUserInfo(email, userId) {
-  const cache = CacheService.getUserCache();
-  const cacheKey = `user_info_${userId || email}`;
+function getOrFetchUserInfo(identifier, type = null, options = {}) {
+  // オプションのデフォルト値
+  const opts = {
+    ttl: options.ttl || 300, // 5分キャッシュ
+    enableSecurityCheck: options.enableSecurityCheck !== false, // デフォルトで有効
+    currentUserEmail: options.currentUserEmail || null,
+    useExecutionCache: options.useExecutionCache || false,
+    ...options
+  };
+
+  // 引数の正規化
+  let email = null;
+  let userId = null;
   
-  const cachedInfo = cache.get(cacheKey);
-  if (cachedInfo) {
-    return JSON.parse(cachedInfo);
+  if (typeof identifier === 'object' && identifier !== null) {
+    // オブジェクト形式の場合（後方互換性）
+    email = identifier.email;
+    userId = identifier.userId;
+  } else if (typeof identifier === 'string') {
+    // 文字列の場合、typeに基づいて判定
+    if (type === 'email' || (!type && identifier.includes('@'))) {
+      email = identifier;
+    } else {
+      userId = identifier;
+    }
   }
 
+  // キャッシュキーの生成
+  const cacheKey = `unified_user_info_${userId || email}`;
+  
+  // 実行レベルキャッシュの確認（オプション）
+  if (opts.useExecutionCache && _executionUserInfoCache && 
+      _executionUserInfoCache.userId === userId) {
+    return _executionUserInfoCache.userInfo;
+  }
+
+  // 永続キャッシュの確認
+  const cache = CacheService.getUserCache();
+  const cachedInfo = cache.get(cacheKey);
+  if (cachedInfo) {
+    try {
+      const userInfo = JSON.parse(cachedInfo);
+      // 実行レベルキャッシュにも保存（オプション）
+      if (opts.useExecutionCache && userId) {
+        _executionUserInfoCache = { userId, userInfo };
+      }
+      return userInfo;
+    } catch (e) {
+      console.warn('キャッシュデータのパースに失敗:', e.message);
+    }
+  }
+
+  // データベースから取得
   let userInfo = null;
+  
   if (userId) {
     userInfo = findUserById(userId);
     // セキュリティチェック: 取得した情報のemailが現在のユーザーと一致するか確認
-    if (userInfo && userInfo.adminEmail !== email) {
-      return null; // 他人の情報へのアクセスは許可しない
+    if (opts.enableSecurityCheck && userInfo && opts.currentUserEmail && 
+        userInfo.adminEmail !== opts.currentUserEmail) {
+      console.warn('セキュリティチェック失敗: 他人の情報へのアクセス試行');
+      return null;
     }
-  } else {
+  } else if (email) {
     userInfo = findUserByEmail(email);
   }
 
+  // キャッシュに保存
   if (userInfo) {
-    cache.put(cacheKey, JSON.stringify(userInfo), 300); // 5分キャッシュ
+    try {
+      cache.put(cacheKey, JSON.stringify(userInfo), opts.ttl);
+      // 実行レベルキャッシュにも保存（オプション）
+      if (opts.useExecutionCache && (userId || userInfo.userId)) {
+        _executionUserInfoCache = { userId: userId || userInfo.userId, userInfo };
+      }
+    } catch (e) {
+      console.warn('キャッシュ保存に失敗:', e.message);
+    }
   }
 
   return userInfo;
+}
+
+/**
+ * レガシー getUserInfo 関数（後方互換性のため保持）
+ * @deprecated getOrFetchUserInfo を使用してください
+ */
+function getUserInfo(email, userId) {
+  return getOrFetchUserInfo(userId || email, userId ? 'userId' : 'email', {
+    currentUserEmail: email,
+    enableSecurityCheck: true
+  });
 }
 
 /**
@@ -877,102 +883,7 @@ function parseRequestParams(e) {
 
 
 
-/**
- * マルチテナント対応: ステートレスなユーザーセッション検証
- * 全ての処理をuserIdベースで実行し、emailは認証確認のみに使用
- * @param {string} currentUserEmail - 現在の認証済みユーザーメール（認証確認のみ）
- * @param {Object} params - リクエストパラメータ（userIdを含む）
- * @returns {Object} userEmailとuserInfoを含むオブジェクト
- */
-function validateUserSession(currentUserEmail, params) {
-  console.log('validateUserSession - email:', currentUserEmail, 'params:', params);
-  
-  // 基本的な認証チェック（Googleアカウントにログインしているか）
-  if (!currentUserEmail) {
-    console.warn('validateUserSession - no authenticated user');
-    return { userEmail: null, userInfo: null };
-  }
-  
-  let userInfo = null;
-  
-  // マルチテナント対応: 常にuserIdベースでユーザー情報を取得
-  if (params.userId) {
-    console.log('validateUserSession - looking up userId:', params.userId);
-    userInfo = findUserById(params.userId);
-    
-    if (userInfo) {
-      // セキュリティチェック: リクエストされたuserIdが認証済みユーザーのものか確認
-      if (userInfo.adminEmail !== currentUserEmail) {
-        console.warn('validateUserSession - security violation:', 
-                    'authenticated:', currentUserEmail, 
-                    'requested:', userInfo.adminEmail);
-        // 本人以外のデータへのアクセス試行は拒否
-        return { userEmail: currentUserEmail, userInfo: null };
-      }
-      
-      console.log('validateUserSession - valid user found:', userInfo.userId);
-    } else {
-      console.warn('validateUserSession - userId not found:', params.userId);
-    }
-  } else if (params.isDirectPageAccess) {
-    // 直接ページアクセスの場合は、emailベースでフォールバック
-    console.log('validateUserSession - direct page access, looking up by email');
-    userInfo = findUserByEmail(currentUserEmail);
-  } else {
-    // userIdパラメータがない場合は、emailベースでフォールバック
-    console.log('validateUserSession - no userId param, looking up by email');
-    userInfo = findUserByEmail(currentUserEmail);
-  }
-  
-  return { userEmail: currentUserEmail, userInfo: userInfo };
-}
 
-/**
- * セットアップページ関連の処理
- * @param {Object} params リクエストパラメータ
- * @param {string} userEmail 現在のユーザーのメール
- * @return {HtmlOutput|null} 表示するHTMLがあれば返す
- */
-function handleSetupPages(params, userEmail) {
-  // セットアップが未完了の場合は、userEmailの有無に関係なくセットアップページを優先
-  if (!isSystemSetup() && !params.isDirectPageAccess) {
-    const t = HtmlService.createTemplateFromFile('SetupPage');
-    t.include = include;
-    return safeSetXFrameOptionsDeny(t.evaluate().setTitle('初回セットアップ - StudyQuest'));
-  }
-
-  if (params.setupParam === 'true' && params.mode === 'appsetup') {
-    const domainInfo = getDeployUserDomainInfo();
-    if (domainInfo.deployDomain && domainInfo.deployDomain !== '' && !domainInfo.isDomainMatch) {
-      debugLog('Domain access warning. Current:', domainInfo.currentDomain, 'Deploy:', domainInfo.deployDomain);
-    }
-    if (!hasSetupPageAccess()) {
-      const errorHtml = HtmlService.createHtmlOutput(
-        '<h1>アクセス拒否</h1>' +
-        '<p>アプリ設定ページにアクセスする権限がありません。</p>' +
-        '<p>編集者として登録され、かつアクティブ状態である必要があります。</p>' +
-        '<p>現在のドメイン: ' + (domainInfo.currentDomain || '不明') + '</p>'
-      );
-      return safeSetXFrameOptionsDeny(errorHtml);
-    }
-    const appSetupTemplate = HtmlService.createTemplateFromFile('AppSetupPage');
-    appSetupTemplate.include = include;
-    return safeSetXFrameOptionsDeny(appSetupTemplate.evaluate().setTitle('アプリ設定 - StudyQuest'));
-  }
-
-  if (params.setupParam === 'true') {
-    const explicit = HtmlService.createTemplateFromFile('SetupPage');
-    explicit.include = include;
-    return safeSetXFrameOptionsDeny(explicit.evaluate().setTitle('StudyQuest - サービスアカウント セットアップ'));
-  }
-
-  // システムセットアップが完了している場合のみ、userEmailをチェック
-  if (!userEmail && !params.isDirectPageAccess) {
-    return showRegistrationPage();
-  }
-
-  return null;
-}
 
 /**
  * 管理パネルを表示

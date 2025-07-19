@@ -18,17 +18,16 @@ function clearExecutionUserInfoCache() {
 
 /**
  * ユーザー情報を取得（実行中はキャッシュを使用）
+ * @deprecated getOrFetchUserInfo を使用してください
  * @param {string} userId ユーザーID
  * @returns {Object} ユーザー情報
  */
 function getCachedUserInfo(userId) {
-  if (_executionUserInfoCache && _executionUserInfoCache.userId === userId) {
-    return _executionUserInfoCache.userInfo;
-  }
-  
-  const userInfo = findUserById(userId);
-  _executionUserInfoCache = { userId, userInfo };
-  return userInfo;
+  // 新しい統合関数を使用（実行レベルキャッシュを有効化）
+  return getOrFetchUserInfo(userId, 'userId', {
+    useExecutionCache: true,
+    ttl: 300
+  });
 }
 
 // =================================================================
@@ -1949,52 +1948,90 @@ function getSavedClassChoices(userId) {
 }
 
 /**
- * クイックスタート用フォーム作成（デフォルト設定）
- * @param {string} userEmail - ユーザーメールアドレス
- * @param {string} userId - ユーザーID
- * @returns {Object} フォーム作成結果
+ * 統合フォーム作成関数（Phase 2: 最適化版）
+ * プリセット設定を使用して重複コードを排除
  */
-function createQuickStartForm(userEmail, userId) {
-  try {
-    const now = new Date();
-    const dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm:ss');
-    const formTitle = `みんなの回答ボード - ${dateTimeString}`;
-    
-    const defaultConfig = {
+const FORM_PRESETS = {
+  quickstart: {
+    titlePrefix: 'みんなの回答ボード',
+    questions: 'custom',
+    description: 'このフォームに回答すると、みんなの回答ボードに反映されます。',
+    config: {
       mainQuestion: '今日の学習について、あなたの考えや感想を聞かせてください',
       questionType: 'text',
       enableClass: false,
       includeOthers: false
-    };
+    }
+  },
+  custom: {
+    titlePrefix: 'カスタムフォーム',
+    questions: 'custom',
+    description: 'このフォームに回答すると、みんなの回答ボードに反映されます。',
+    config: {} // Will be overridden by user input
+  },
+  study: {
+    titlePrefix: 'StudyQuest',
+    questions: 'simple', // Default, can be overridden
+    description: 'このフォームに回答すると、みんなの回答ボードに反映されます。',
+    config: {}
+  }
+};
+
+/**
+ * 統合フォーム作成関数
+ * @param {string} presetType - 'quickstart' | 'custom' | 'study'
+ * @param {string} userEmail - ユーザーメールアドレス
+ * @param {string} userId - ユーザーID
+ * @param {Object} overrides - プリセットを上書きする設定
+ * @returns {Object} フォーム作成結果
+ */
+function createUnifiedForm(presetType, userEmail, userId, overrides = {}) {
+  try {
+    const preset = FORM_PRESETS[presetType];
+    if (!preset) {
+      throw new Error(`未知のプリセットタイプ: ${presetType}`);
+    }
+
+    const now = new Date();
+    const dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm:ss');
     
-    return createFormFactory({
+    // タイトル生成（上書き可能）
+    const titlePrefix = overrides.titlePrefix || preset.titlePrefix;
+    const formTitle = overrides.formTitle || `${titlePrefix} - ${dateTimeString}`;
+    
+    // 設定をマージ（プリセット + ユーザー設定）
+    const mergedConfig = { ...preset.config, ...overrides.customConfig };
+    
+    const factoryOptions = {
       userEmail: userEmail,
       userId: userId,
       formTitle: formTitle,
-      questions: 'custom',
-      formDescription: 'このフォームに回答すると、みんなの回答ボードに反映されます。',
-      customConfig: defaultConfig
-    });
+      questions: overrides.questions || preset.questions,
+      formDescription: overrides.formDescription || preset.description,
+      customConfig: mergedConfig
+    };
+
+    return createFormFactory(factoryOptions);
   } catch (error) {
-    console.error('createQuickStartForm Error:', error.message);
-    throw new Error('クイックスタートフォームの作成に失敗しました: ' + error.message);
+    console.error(`createUnifiedForm Error (${presetType}):`, error.message);
+    throw new Error(`フォーム作成に失敗しました (${presetType}): ` + error.message);
   }
 }
 
 /**
+ * クイックスタート用フォーム作成（後方互換性）
+ * @deprecated createUnifiedForm('quickstart', ...) を使用してください
+ */
+function createQuickStartForm(userEmail, userId) {
+  return createUnifiedForm('quickstart', userEmail, userId);
+}
+
+/**
  * カスタムフォーム作成（管理パネル用）
- * @param {string} userEmail - ユーザーメールアドレス
- * @param {string} userId - ユーザーID
- * @param {Object} config - カスタム設定
- * @returns {Object} フォーム作成結果
+ * @deprecated createUnifiedForm('custom', ...) を使用してください
  */
 function createCustomForm(userEmail, userId, config) {
   try {
-    const now = new Date();
-    const dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm:ss');
-    const baseTitle = config.formTitle || 'カスタムフォーム';
-    const formTitle = `${baseTitle} - ${dateTimeString}`;
-    
     // AdminPanelのconfig構造を内部形式に変換
     const convertedConfig = {
       mainQuestion: {
@@ -2011,52 +2048,18 @@ function createCustomForm(userEmail, userId, config) {
     
     console.log('createCustomForm - converted config:', JSON.stringify(convertedConfig));
     
-    return createFormFactory({
-      userEmail: userEmail,
-      userId: userId,
-      formTitle: formTitle,
-      questions: 'custom',
-      formDescription: 'このフォームに回答すると、みんなの回答ボードに反映されます。',
+    const overrides = {
+      titlePrefix: config.formTitle || 'カスタムフォーム',
       customConfig: convertedConfig
-    });
+    };
+    
+    return createUnifiedForm('custom', userEmail, userId, overrides);
   } catch (error) {
     console.error('createCustomForm Error:', error.message);
     throw new Error('カスタムフォームの作成に失敗しました: ' + error.message);
   }
 }
 
-/**
- * カスタム設定でStudyQuestフォームを作成（廃止予定）
- * @deprecated createCustomFormを使用してください
- */
-function createStudyQuestFormWithConfig(userEmail, userId, formTitle, config) {
-  try {
-    var formResult = createFormFactory({
-      userEmail: userEmail,
-      userId: userId,
-      formTitle: formTitle,
-      questions: 'custom',
-      formDescription: 'このフォームに回答すると、みんなの回答ボードに反映されます。',
-      customConfig: config
-    });
-    
-    var form = FormApp.openById(formResult.formId);
-    
-    // Email収集タイプの設定
-    try {
-      if (typeof form.setEmailCollectionType === 'function') {
-        form.setEmailCollectionType(FormApp.EmailCollectionType.VERIFIED);
-      }
-    } catch (undocumentedError) {
-      console.warn('Email collection type setting failed:', undocumentedError.message);
-    }
-    
-    return formResult;
-  } catch (error) {
-    console.error('createStudyQuestFormWithConfig Error:', error.message);
-    throw new Error('カスタムフォームの作成に失敗しました: ' + error.message);
-  }
-}
 
 /**
  * リンクされたスプレッドシートを作成
@@ -2216,7 +2219,10 @@ function shareAllSpreadsheetsWithServiceAccount() {
 /**
  * フォーム作成
  */
-// questionType defaults to 'simple'
+/**
+ * StudyQuestフォーム作成（追加機能付き）
+ * @deprecated createUnifiedForm('study', ...) を使用してください
+ */
 function createStudyQuestForm(userEmail, userId, formTitle, questionType) {
   try {
     // パフォーマンス測定開始
@@ -2226,16 +2232,15 @@ function createStudyQuestForm(userEmail, userId, formTitle, questionType) {
     };
     profiler.start('createForm');
     
-    // 共通ファクトリを使用してフォーム作成
-    var formResult = createFormFactory({
-      userEmail: userEmail,
-      userId: userId,
+    // 統合ファクトリを使用してフォーム作成
+    const overrides = {
       formTitle: formTitle,
-      questions: questionType || 'simple',
-      formDescription: 'このフォームに回答すると、みんなの回答ボードに反映されます。'
-    });
+      questions: questionType || 'simple'
+    };
     
-    // カスタマイズされた設定を追加
+    var formResult = createUnifiedForm('study', userEmail, userId, overrides);
+    
+    // StudyQuest固有のカスタマイズ
     var form = FormApp.openById(formResult.formId);
     
     // Email収集タイプの設定（可能な場合）
@@ -2244,7 +2249,6 @@ function createStudyQuestForm(userEmail, userId, formTitle, questionType) {
         form.setEmailCollectionType(FormApp.EmailCollectionType.VERIFIED);
       }
     } catch (undocumentedError) {
-      // 失敗しても続行
       console.warn('Email collection type setting failed:', undocumentedError.message);
     }
     

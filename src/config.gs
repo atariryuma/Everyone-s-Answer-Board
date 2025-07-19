@@ -124,8 +124,13 @@ function clearOldUserCache(currentEmail) {
 }
 
 // 他の関数も同様に、存在することを確認
-function getUserInfo(requestUserId) {
+function getConfigUserInfo(requestUserId) {
   return getUserInfoCached(requestUserId);
+}
+
+// レガシー互換性のため保持
+function getUserInfo(requestUserId) {
+  return getConfigUserInfo(requestUserId);
 }
 
 /**
@@ -714,6 +719,62 @@ function saveAndPublish(requestUserId, sheetName, config) {
   } catch (error) {
     console.error('saveAndPublishで致命的なエラー:', error.message, error.stack);
     throw new Error('設定の保存と公開中にサーバーエラーが発生しました: ' + error.message);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * 既存の設定で回答ボードを再公開 (Unpublished.htmlから呼び出される)
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ * @returns {object} 公開結果
+ */
+function republishBoard(requestUserId) {
+  if (!requestUserId) {
+    requestUserId = getUserId();
+  }
+  
+  verifyUserAccess(requestUserId);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+
+  try {
+    console.log('republishBoard開始: userId=%s', requestUserId);
+
+    const userInfo = getConfigUserInfo(requestUserId);
+    if (!userInfo || !userInfo.spreadsheetId) {
+      throw new Error('ユーザーのスプレッドシート情報が見つかりません。');
+    }
+
+    const configJson = JSON.parse(userInfo.configJson || '{}');
+    
+    // 既存の公開設定をチェック
+    if (!configJson.publishedSpreadsheetId || !configJson.publishedSheetName) {
+      throw new Error('公開するシートが設定されていません。管理パネルから設定を行ってください。');
+    }
+
+    // アプリを公開状態に設定
+    configJson.appPublished = true;
+    configJson.lastModified = new Date().toISOString();
+
+    // 設定を保存
+    updateUser(requestUserId, {
+      configJson: JSON.stringify(configJson),
+      lastUpdated: new Date().toISOString()
+    });
+
+    console.log('republishBoard完了: シート=%s', configJson.publishedSheetName);
+    
+    return {
+      success: true,
+      message: '回答ボードが再公開されました',
+      publishedSheetName: configJson.publishedSheetName,
+      publishedSpreadsheetId: configJson.publishedSpreadsheetId
+    };
+
+  } catch (error) {
+    console.error('republishBoardでエラー:', error.message, error.stack);
+    throw new Error('再公開処理中にエラーが発生しました: ' + error.message);
   } finally {
     lock.releaseLock();
   }
