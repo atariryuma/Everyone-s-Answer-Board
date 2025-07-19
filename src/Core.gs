@@ -1557,6 +1557,53 @@ function clearAllCaches() {
 }
 
 /**
+ * 指定されたシートの列ヘッダーを取得します。
+ * AdminPanel.htmlから呼び出される
+ * @param {string} userId - リクエスト元のユーザーID
+ * @param {number} sheetId - 対象シートのID
+ * @returns {Array<Object>} 列ヘッダーのリスト（例: [{id: 'Timestamp', name: 'Timestamp'}, ...]）
+ */
+function getSheetColumns(userId, sheetId) {
+  verifyUserAccess(userId);
+  try {
+    var userInfo = findUserById(userId);
+    if (!userInfo || !userInfo.spreadsheetId) {
+      throw new Error('ユーザー情報またはスプレッドシートIDが見つかりません');
+    }
+
+    var spreadsheet = SpreadsheetApp.openById(userInfo.spreadsheetId);
+    var sheet = spreadsheet.getSheetById(sheetId);
+
+    if (!sheet) {
+      throw new Error('指定されたシートが見つかりません: ' + sheetId);
+    }
+
+    var lastColumn = sheet.getLastColumn();
+    if (lastColumn === 0) {
+      return []; // 列がない場合
+    }
+
+    var headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+
+    // クライアントサイドが期待する形式に変換
+    var columns = headers.map(function(headerName) {
+      return {
+        id: headerName,
+        name: headerName
+      };
+    });
+
+    debugLog('✅ getSheetColumns: Found %s columns for sheetId %s', columns.length, sheetId);
+    return columns;
+
+  } catch (e) {
+    console.error('getSheetColumns エラー: ' + e.message);
+    console.error('Error details:', e.stack);
+    throw new Error('列の取得に失敗しました: ' + e.message);
+  }
+}
+
+/**
  * GoogleフォームURLからフォームIDを抽出
  */
 function extractFormIdFromUrl(url) {
