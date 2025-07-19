@@ -2178,7 +2178,7 @@ setupEventDelegation() {
             this.hideLoadingOverlay();
           }
         })
-        .getPublishedSheetData(classFilter, sortOrder, this.state.showAdminFeatures, false);
+        .getPublishedSheetData(this.state.userId, classFilter, sortOrder, this.state.showAdminFeatures, false);
       
       
       // Post-processing after successful data load
