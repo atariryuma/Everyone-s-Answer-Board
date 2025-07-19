@@ -1,4 +1,6 @@
 <script>
+let lastSelectedSheetName = null; // To prevent redundant sheet selection change events
+
 // =============================================================================
 // ADMIN PANEL UI UPDATES & DISPLAY CONTROL
 // =============================================================================
@@ -160,8 +162,23 @@ function updateUIWithNewStatus(status) {
   
   // Update spreadsheet button state
   updateSpreadsheetButton();
+
+  // Update unpublish button state
+  updateUnpublishButton(status);
   
   console.groupEnd();
+}
+
+// Update unpublish button state
+function updateUnpublishButton(status) {
+  const unpublishBtn = document.getElementById('unpublish-board-btn');
+  if (!unpublishBtn) return;
+
+  if (status._normalized?.isPublished) {
+    unpublishBtn.classList.remove('hidden');
+  } else {
+    unpublishBtn.classList.add('hidden');
+  }
 }
 
 // Update spreadsheet access button state
@@ -381,12 +398,8 @@ function populateSheetSelect(sheetNames, activeSheetName) {
   if (activeSheetName) {
     select.value = activeSheetName;
     selectedSheet = activeSheetName;
+    lastSelectedSheetName = activeSheetName; // Update last selected sheet
     console.log('✅ Active sheet set:', activeSheetName);
-    
-    // Trigger change event to load column configuration
-    const changeEvent = new Event('change', { bubbles: true });
-    select.dispatchEvent(changeEvent);
-    console.log('🔄 Change event triggered for active sheet');
   }
   
   // Add change event listener for data preview
@@ -556,7 +569,7 @@ function buildConfigObject() {
   const classValue = document.getElementById('class-column')?.value || '';
   const timestampValue = document.getElementById('timestamp-column')?.value || '';
   const showNames = document.getElementById('show-names')?.checked || false;
-  const showCounts = document.getElementById('show-counts')?.checked !== false; // デフォルトtrue
+  const showCounts = document.getElementById('show-counts')?.checked || false; // デフォルトfalseに変更
   
   const config = {
     sheetName: selectedSheet,
@@ -1097,6 +1110,12 @@ function initializeUI() {
 function handleSheetSelectionChange(event) {
   const newSelectedSheet = event.target.value;
   const previewSection = document.getElementById('data-preview-section');
+
+  // Prevent redundant calls if the selected sheet hasn't actually changed
+  if (newSelectedSheet === lastSelectedSheetName) {
+    console.log('📊 Sheet selection changed, but value is the same. Skipping redundant processing.');
+    return;
+  }
   
   console.log('📊 Sheet selection changed:', {
     previousSheet: selectedSheet,
@@ -1104,8 +1123,9 @@ function handleSheetSelectionChange(event) {
     hasPreviewSection: !!previewSection
   });
   
-  // Update global selected sheet variable
+  // Update global selected sheet variable and last selected sheet
   selectedSheet = newSelectedSheet;
+  lastSelectedSheetName = newSelectedSheet;
   
   if (newSelectedSheet && previewSection) {
     console.log('📋 Loading preview and config for sheet:', newSelectedSheet);

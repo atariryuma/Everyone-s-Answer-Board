@@ -1641,7 +1641,7 @@ setupEventDelegation() {
       }
 
       // サーバーキャッシュをクリアして他のソート順でも新着が反映されるようにする
-      this.gas.clearCache().catch(err => console.warn('Cache clear failed', err));
+      this.gas.unpublishBoard().catch(err => console.warn('Unpublish failed', err));
       this.state.lastSeenCount = incrementalData.totalCount;
       
       console.log('✅ 増分リフレッシュ完了:', {
