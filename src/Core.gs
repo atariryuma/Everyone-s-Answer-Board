@@ -623,6 +623,8 @@ function getSheetsList(userId) {
     return sheetList;
   } catch (e) {
     console.error('getSheetsList エラー: ' + e.message);
+    // サービスアカウント権限修復ロジックを削除または修正
+    // 例: if (e.message.includes('service is not defined')) { /* 権限修復ロジック */ }
     return [];
   }
 }
