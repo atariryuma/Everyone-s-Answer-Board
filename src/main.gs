@@ -422,18 +422,9 @@ function doGet(e) {
       return showLoginPage();
     }
 
-    // 4. ルーティング
-    // パラメータなしの直接アクセスの場合、認証フローを開始
+    // 4. パラメータなしの直接アクセス時はログインページを表示
     if (!params.mode) {
-      const result = processLoginFlow(userEmail);
-      // processLoginFlowがHtmlOutputを返すことを保証
-      if (result && typeof result.getMimeType === 'function') {
-        return result;
-      } else {
-        // 予期せぬエラーや戻り値の場合は、安全にログインページを表示
-        console.error('processLoginFlowから予期せぬ戻り値。安全のためログインページを表示します。', result);
-        return showLoginPage();
-      }
+      return showLoginPage();
     }
 
     // mode=admin の場合
