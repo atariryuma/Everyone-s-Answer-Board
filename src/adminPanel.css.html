@@ -35,7 +35,7 @@
 }
 
 .header-title .logo-icon {
-  font-size: var(--font-size-2xl);
+  font-size: var(--font-size-xl); /* Adjusted size */
 }
 
 .header-title h1 {
@@ -136,6 +136,55 @@
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
+}
+
+/* Icon Sizing */
+.icon-sm {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-md {
+  width: 20px;
+  height: 20px;
+}
+
+.icon-lg {
+  width: 24px;
+  height: 24px;
+}
+
+.icon-xl {
+  width: 32px;
+  height: 32px;
+}
+
+/* Specific adjustments for SVG icons within buttons/elements */
+.btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.header-title .logo-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.domain-indicator svg {
+  width: 20px;
+  height: 20px;
+}
+
+.content-card h2 svg,
+.content-card h3 svg,
+.content-card h4 svg {
+  width: 20px;
+  height: 20px;
+}
+
+.step-circle svg {
+  width: 16px;
+  height: 16px;
 }
 
 </style>
