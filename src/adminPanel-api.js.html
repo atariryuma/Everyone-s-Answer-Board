@@ -270,6 +270,19 @@ function saveAndPublish() {
   const config = buildConfigObject();
   console.log('📦 Config to save:', config);
   
+  // PRE-SAVE: Aggressive cache clearing to prevent stale data issues
+  console.log('🧹 Pre-save: Clearing all caches to prevent stale data');
+  if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+    window.unifiedCache.clear();
+    console.log('✅ Pre-save: UnifiedCache cleared');
+  }
+  
+  // Clear GAS optimizer cache if available
+  if (window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
+    window.gasOptimizer.clearCache();
+    console.log('✅ Pre-save: GAS optimizer cache cleared');
+  }
+  
   runGasWithUserId('saveAndPublish', selectedSheet, config)
     .then(function(result) {
       console.log('📥 saveAndPublish result:', result);
@@ -279,9 +292,9 @@ function saveAndPublish() {
       if (result && (result.userInfo || result.status === 'success')) {
         showMessage('✅ 設定が保存され、ボードが公開されました！', 'success');
         
-        // Clear all relevant caches before status reload
+        // POST-SAVE: Maintain existing cache clearing
         if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-          console.log('🧹 Clearing unifiedCache');
+          console.log('🧹 Post-save: Clearing unifiedCache');
           window.unifiedCache.clear();
         }
         
@@ -290,6 +303,14 @@ function saveAndPublish() {
           console.log('🚀 Using integrated API response for immediate UI update');
           updateUIWithNewStatus(result);
         }
+        
+        // SAFETY MEASURE: Delayed secondary cache clear
+        setTimeout(() => {
+          if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+            window.unifiedCache.clear();
+            console.log('🧹 Safety: Secondary cache clear completed');
+          }
+        }, 500);
         
         // Additional forced refresh with delay to ensure sync
         console.log('🔄 Scheduling delayed status refresh for synchronization');
@@ -311,7 +332,7 @@ function saveAndPublish() {
       
       // PHASE3: Enhanced error handling with rollback support
       if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-        console.log('🧹 Clearing cache after error');
+        console.log('🧹 Error: Clearing cache after error');
         window.unifiedCache.clear();
       }
       
