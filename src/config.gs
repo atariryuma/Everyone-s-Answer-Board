@@ -1907,6 +1907,17 @@ function saveAndPublish(requestUserId, sheetName, config) {
     commitAllChanges(context);
     console.log('✅ Phase 3完了: DB書き込み完了');
 
+    // DB書き込み後にキャッシュを無効化し、最新ユーザー情報を再取得
+    invalidateUserCache(context.requestUserId, context.userInfo.adminEmail,
+      context.userInfo.spreadsheetId, false);
+    const updatedUserInfo = fetchUserFromDatabase('userId', context.requestUserId);
+    if (updatedUserInfo) {
+      context.userInfo = updatedUserInfo;
+      console.log('✅ コンテキストをDBの最新情報で更新しました。');
+    } else {
+      console.warn('DBからのユーザー再取得に失敗しましたが、処理を続行します。');
+    }
+
     // Phase 4: 統合レスポンス生成（DB検索なし）
     console.log('🏗️ Phase 4: レスポンス構築開始');
     const finalResponse = buildResponseFromContext(context);
