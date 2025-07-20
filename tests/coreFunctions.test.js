@@ -2,12 +2,39 @@ const fs = require('fs');
 const vm = require('vm');
 
 describe('Core.gs utilities', () => {
-  const code = fs.readFileSync('src/Core.gs', 'utf8');
+  const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
+  const mainCode = fs.readFileSync('src/main.gs', 'utf8');
   let context;
   beforeEach(() => {
-    context = { debugLog: () => {}, console };
+    context = { 
+      debugLog: () => {}, 
+      console, 
+      PropertiesService: {
+        getScriptProperties: () => ({
+          getProperty: (key) => {
+            if (key === 'DEBUG_MODE') return 'false';
+            return null;
+          }
+        })
+      },
+      CacheService: {
+        getUserCache: () => ({
+          get: () => null,
+          put: () => {}
+        })
+      },
+      Session: {
+        getActiveUser: () => ({ getEmail: () => 'test@example.com' })
+      },
+      Utilities: {
+        getUuid: () => 'mock-uuid',
+        computeDigest: () => [],
+        Charset: { UTF_8: 'UTF-8' }
+      }
+    };
     vm.createContext(context);
-    vm.runInContext(code, context);
+    vm.runInContext(mainCode, context);
+    vm.runInContext(coreCode, context);
   });
 
   describe('getOpinionHeaderSafely', () => {

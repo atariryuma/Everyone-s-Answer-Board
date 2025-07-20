@@ -222,8 +222,7 @@ function getConfig(requestUserId, sheetName, forceRefresh = false) {
       finalConfig.reasonHeader = savedSheetConfig.reasonHeader || '';
       finalConfig.nameHeader = savedSheetConfig.nameHeader || '';
       finalConfig.classHeader = savedSheetConfig.classHeader || '';
-      finalConfig.showNames = savedSheetConfig.showNames || false;
-      finalConfig.showCounts = savedSheetConfig.showCounts !== undefined ? savedSheetConfig.showCounts : false;
+      // showNames, showCounts, displayMode はグローバル設定に統一するため、シート固有設定からは削除
 
     } else if (headers && headers.length > 0) {
       // 4.【保存設定がない場合のみ】新しい自動マッピングを実行
@@ -1202,7 +1201,10 @@ function createBoardFromAdmin(requestUserId) {
       editFormUrl: formAndSsInfo.editFormUrl,
       createdAt: new Date().toISOString(),
       publishedSheet: formAndSsInfo.sheetName, // 作成時に公開シートを設定
-      appPublished: true // 作成時に公開状態にする
+      appPublished: true, // 作成時に公開状態にする
+      showNames: false, // グローバル設定の初期値
+      showCounts: false, // グローバル設定の初期値
+      displayMode: 'anonymous' // グローバル設定の初期値
     };
 
     var userData = {
@@ -1686,7 +1688,14 @@ function getConfigFromContext(context, sheetName) {
   try {
     const configJson = JSON.parse(context.userInfo.configJson || '{}');
     const sheetKey = 'sheet_' + sheetName;
-    return configJson[sheetKey] || {};
+    const sheetConfig = configJson[sheetKey] || {};
+
+    // グローバル設定と重複するキーを削除して返す
+    delete sheetConfig.showNames;
+    delete sheetConfig.showCounts;
+    delete sheetConfig.displayMode;
+
+    return sheetConfig;
   } catch (e) {
     console.warn('getConfigFromContext エラー:', e.message);
     return {};
@@ -1707,9 +1716,15 @@ function saveSheetConfigInContext(context, spreadsheetId, sheetName, config) {
     const configJson = JSON.parse(context.userInfo.configJson || '{}');
     const sheetKey = 'sheet_' + sheetName;
     
+    // シート固有の設定を準備し、グローバル設定と重複するキーを削除
+    const sheetConfig = { ...config };
+    delete sheetConfig.showNames;
+    delete sheetConfig.showCounts;
+    delete sheetConfig.displayMode;
+
     // シート設定を更新
     configJson[sheetKey] = {
-      ...config,
+      ...sheetConfig,
       lastModified: new Date().toISOString()
     };
     

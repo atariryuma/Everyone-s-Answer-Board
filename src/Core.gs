@@ -400,7 +400,7 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       }
     }
 
-    var finalDisplayMode = (adminMode === true) ? DISPLAY_MODES.NAMED : (sheetData.displayMode || DISPLAY_MODES.ANONYMOUS);
+    var finalDisplayMode = (adminMode === true) ? DISPLAY_MODES.NAMED : (configJson.displayMode || DISPLAY_MODES.ANONYMOUS);
 
     var result = {
       header: headerTitle,
@@ -492,8 +492,8 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
       return {
         header: '', // 必要に応じて設定
         sheetName: publishedSheetName,
-        showCounts: false, // 必要に応じて設定
-        displayMode: '', // 必要に応じて設定
+        showCounts: configJson.showCounts === true,
+        displayMode: configJson.displayMode || DISPLAY_MODES.ANONYMOUS,
         data: [],
         rows: [],
         totalCount: lastRow - headerRow, // ヘッダーを除いたデータ総数
@@ -1422,8 +1422,6 @@ function quickStartSetup(requestUserId) {
       reasonHeader: 'そう考える理由や体験があれば教えてください（任意）',
       nameHeader: '名前',
       classHeader: 'クラス',
-      showNames: false,
-      showCounts: false,
       lastModified: new Date().toISOString()
     };
     

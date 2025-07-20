@@ -2,7 +2,7 @@ const fs = require('fs');
 const vm = require('vm');
 
 describe('getWebAppUrlCached upgrade', () => {
-  const code = fs.readFileSync('src/url.gs', 'utf8');
+  const mainCode = fs.readFileSync('src/main.gs', 'utf8');
   let context;
 
   beforeEach(() => {
@@ -21,10 +21,32 @@ describe('getWebAppUrlCached upgrade', () => {
         getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/dev' }),
         getScriptId: () => 'ID'
       },
-      console: { warn: () => {}, log: () => {}, error: () => {} }
+      console: { warn: () => {}, log: () => {}, error: () => {} },
+      PropertiesService: {
+        getScriptProperties: () => ({
+          getProperty: (key) => {
+            if (key === 'DEBUG_MODE') return 'false';
+            return null;
+          }
+        })
+      },
+      CacheService: {
+        getUserCache: () => ({
+          get: () => null,
+          put: () => {}
+        })
+      },
+      Session: {
+        getActiveUser: () => ({ getEmail: () => 'test@example.com' })
+      },
+      Utilities: {
+        getUuid: () => 'mock-uuid',
+        computeDigest: () => [],
+        Charset: { UTF_8: 'UTF-8' }
+      }
     };
     vm.createContext(context);
-    vm.runInContext(code, context);
+    vm.runInContext(mainCode, context);
   });
 
   test('updates cached dev url when production url available', () => {
