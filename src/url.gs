@@ -64,7 +64,16 @@ function getWebAppUrlCached() {
     // 直接キャッシュサービスを使用
     var cache = CacheService.getScriptCache();
     var cachedUrl = cache.get(URL_CACHE_KEY);
-    
+
+    // cacheManager 互換: CacheServiceから取得できない場合はcacheManagerを参照
+    if (!cachedUrl && typeof cacheManager !== 'undefined' && cacheManager.get) {
+      try {
+        cachedUrl = cacheManager.get(URL_CACHE_KEY, () => null, { enableMemoization: false });
+      } catch (cacheError) {
+        console.warn('cacheManager access failed:', cacheError.message);
+      }
+    }
+
     if (cachedUrl) {
       // キャッシュされたURLが開発URLでないか検証
       if (!cachedUrl.includes('googleusercontent.com') &&
@@ -75,15 +84,35 @@ function getWebAppUrlCached() {
       } else {
         console.warn('Cached URL is invalid (dev URL detected), clearing cache: ' + cachedUrl);
         cache.remove(URL_CACHE_KEY);
+        cachedUrl = null;
       }
     }
-    
+
+    if (!cachedUrl && typeof cacheManager !== 'undefined' && cacheManager.get) {
+      try {
+        cachedUrl = cacheManager.get(URL_CACHE_KEY, () => null, { enableMemoization: false });
+        if (cachedUrl) {
+          console.log('Valid cacheManager URL found: ' + cachedUrl);
+          return cachedUrl;
+        }
+      } catch (cacheError) {
+        console.warn('cacheManager access failed:', cacheError.message);
+      }
+    }
+
     // 新しいURLを計算
     var currentUrl = computeWebAppUrl();
     
     // 有効なURLの場合のみキャッシュに保存
     if (currentUrl && !currentUrl.includes('googleusercontent.com') && !currentUrl.includes('userCodeAppPanel')) {
       cache.put(URL_CACHE_KEY, currentUrl, URL_CACHE_TTL);
+      if (typeof cacheManager !== 'undefined' && cacheManager.get) {
+        try {
+          cacheManager.store[URL_CACHE_KEY] = currentUrl;
+        } catch (e) {
+          console.warn('cacheManager update failed:', e.message);
+        }
+      }
       console.log('New URL cached: ' + currentUrl);
     } else {
       console.warn('Invalid URL not cached: ' + currentUrl);
