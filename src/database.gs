@@ -381,6 +381,7 @@ function getSheetsService() {
     }
     
     console.log('✅ Sheets service created successfully');
+    console.log('DEBUG: getSheetsService returning:', JSON.stringify(service, null, 2));
     return service;
     
   } catch (error) {
@@ -818,11 +819,13 @@ function createSheetsService(accessToken) {
  * @returns {object} レスポンス
  */
 function batchGetSheetsData(service, spreadsheetId, ranges) {
+  console.log('DEBUG: batchGetSheetsData received service:', JSON.stringify(service, null, 2));
   // API呼び出しをキャッシュ化（短期間）
   var cacheKey = `batchGet_${spreadsheetId}_${JSON.stringify(ranges)}`;
   
   return cacheManager.get(cacheKey, () => {
     try {
+      console.log('DEBUG: Accessing service.baseUrl. Service object:', JSON.stringify(service, null, 2));
       var url = service.baseUrl + '/' + spreadsheetId + '/values:batchGet?' + 
         ranges.map(function(range) { return 'ranges=' + encodeURIComponent(range); }).join('&');
       

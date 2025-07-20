@@ -1436,6 +1436,7 @@ function createExecutionContext(requestUserId) {
         operationsCount: 0
       }
     };
+    console.log('DEBUG: context.sheetsService set to:', JSON.stringify(context.sheetsService, null, 2));
     
     const endTime = new Date().getTime();
     console.log('✅ ExecutionContext作成完了: %dms', endTime - startTime);
@@ -1610,6 +1611,7 @@ function buildResponseFromContext(context) {
     // スプレッドシートの詳細情報が必要な場合は追加取得
     if (spreadsheetId && publishedSheetName) {
       try {
+        console.log('DEBUG: Calling getSheetDetails with context.sheetsService:', JSON.stringify(context.sheetsService, null, 2));
         // シート情報を取得（最低限の情報のみ、既存SheetsServiceを使用）
         const sheetDetails = getSheetDetails(context, spreadsheetId, publishedSheetName);
         response.sheetDetails = sheetDetails;
@@ -1642,8 +1644,10 @@ function buildResponseFromContext(context) {
  * @returns {object} シート詳細情報
  */
 function getSheetDetails(context, spreadsheetId, sheetName) {
+  console.log('DEBUG: getSheetDetails received context.sheetsService:', JSON.stringify(context.sheetsService, null, 2));
   try {
     // コンテキスト内のSheetsServiceを使用してシート情報を取得
+    console.log('DEBUG: Calling getSpreadsheetsData with service:', JSON.stringify(context.sheetsService, null, 2));
     const data = getSpreadsheetsData(context.sheetsService, spreadsheetId);
     
     if (!data || !data.sheets) {
