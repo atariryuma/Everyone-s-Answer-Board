@@ -1149,25 +1149,42 @@ function initializeUI() {
   loadStatus(true); // 強制的にキャッシュをバイパスして最新のステータス情報を取得
 }
 
-// Load system status
+// Load system status - OPTIMIZED with integrated API
 function loadStatus(bypassCache = false) {
-  console.group('🔄 loadStatus');
-  console.log('🔄 Loading system status, bypassCache:', bypassCache);
+  console.group('🔄 loadStatus - Integrated API');
+  console.log('🚀 Loading system status with integrated API, bypassCache:', bypassCache);
 
-  const userIdPromise = runGasWithUserId('getUserId'); // getUserIdをサーバーサイド関数として呼び出す
-  userIdPromise
-    .then(id => {
-      userId = id;
-      console.log('✅ userIdPromise resolved, userId:', userId);
-      // Use gasOptimizer.call for API calls
-      return gasOptimizer.call('getAppConfig', userId);
-    })
-    .then(status => {
-      console.log('✅ Status loaded ( forced refresh)', status);
-      updateUIWithNewStatus(status);
+  // Single API call to get all initial data
+  runGasWithUserId('getInitialData')
+    .then(response => {
+      console.log('✅ Integrated data loaded:', response);
+      
+      // Extract userId for compatibility
+      if (response.userInfo && response.userInfo.userId) {
+        userId = response.userInfo.userId;
+        console.log('✅ userId extracted from integrated response:', userId);
+      }
+      
+      // Update UI with integrated response
+      updateUIWithNewStatus(response);
+      
+      // If sheet details are included, apply them immediately
+      if (response.sheetDetails && response.activeSheetName) {
+        console.log('✅ Sheet details included in integrated response, applying configuration');
+        try {
+          populateHeaderOptions(response.sheetDetails.allHeaders);
+          console.log('✅ Header options populated from integrated data');
+          populateConfig(response.sheetDetails.guessedConfig);
+          console.log('✅ AI configuration applied from integrated data');
+        } catch (configError) {
+          console.error('Error applying sheet configuration from integrated data:', configError);
+        }
+      }
+      
+      console.log('⚡ Performance: Single API call replaced 3-4 separate calls');
     })
     .catch(error => {
-      console.error('❌ getAppConfig failed:', error);
+      console.error('❌ Integrated API failed:', error);
       showMessage('システムステータスの読み込みに失敗しました', 'error');
     })
     .finally(() => {
@@ -1233,7 +1250,7 @@ function handleSheetSelectionChange(event) {
   }
 }
 
-// Load configuration for selected sheet
+// Load configuration for selected sheet - OPTIMIZED
 function loadConfigForSelected(sheetName, spreadsheetId) {
   console.log('📋 Loading config for:', { selectedSheet: sheetName, spreadsheetId: spreadsheetId });
 
@@ -1242,14 +1259,39 @@ function loadConfigForSelected(sheetName, spreadsheetId) {
     return;
   }
 
+  // Check if we already have sheet details from integrated API
+  if (currentStatus && currentStatus.sheetDetails && 
+      currentStatus.activeSheetName === sheetName) {
+    console.log('⚡ Using cached sheet details from integrated API');
+    try {
+      populateHeaderOptions(currentStatus.sheetDetails.allHeaders);
+      console.log('✅ Header options populated from cache');
+      populateConfig(currentStatus.sheetDetails.guessedConfig);
+      console.log('✅ AI configuration applied from cache');
+      return; // Early return - no API call needed
+    } catch (error) {
+      console.error('Error in cached config population:', error);
+      // Fall through to API call if cache fails
+    }
+  }
+
+  // Fallback: Call API if cache is not available or failed
+  console.log('📞 Making API call for sheet details:', sheetName);
   runGasWithUserId('getSheetDetails', spreadsheetId, sheetName)
     .then(function(details) {
-      console.log('✅ Sheet details loaded for config:', details);
-      populateConfig(details.guessedConfig);
-      populateHeaderOptions(details.allHeaders);
+      console.log('✅ Sheet details loaded via API:', details);
+      try {
+        populateHeaderOptions(details.allHeaders);
+        console.log('✅ Header options populated from API');
+        populateConfig(details.guessedConfig);
+        console.log('✅ AI configuration applied from API');
+      } catch (error) {
+        console.error('Error in API config population sequence:', error);
+        showMessage('設定の適用中にエラーが発生しました', 'error');
+      }
     })
     .catch(function(error) {
-      console.error('Failed to load sheet config:', error);
+      console.error('Failed to load sheet config via API:', error);
       showMessage('シート設定の読み込みに失敗しました', 'error');
     });
 }

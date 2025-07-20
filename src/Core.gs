@@ -4121,3 +4121,205 @@ function confirmUserRegistration() {
     return { status: 'error', message: error.message };
   }
 }
+
+// =================================================================
+// 統合API（フェーズ2最適化）
+// =================================================================
+
+/**
+ * 統合初期データ取得API - OPTIMIZED
+ * 従来の5つのAPI呼び出し（getCurrentUserStatus, getUserId, getAppConfig, getSheetDetails）を統合
+ * @param {string} requestUserId - リクエスト元のユーザーID（省略可能）
+ * @param {string} targetSheetName - 詳細を取得するシート名（省略可能）
+ * @returns {Object} 統合された初期データ
+ */
+function getInitialData(requestUserId, targetSheetName) {
+  debugLog('🚀 getInitialData: 統合初期化開始', { requestUserId, targetSheetName });
+  
+  try {
+    var startTime = new Date().getTime();
+    
+    // === ステップ1: ユーザー認証とユーザー情報取得（キャッシュ活用） ===
+    var activeUserEmail = Session.getActiveUser().getEmail();
+    var currentUserId = requestUserId;
+    
+    // UserID の解決
+    if (!currentUserId) {
+      currentUserId = getUserId();
+    }
+    
+    // Phase3 Optimization: Use execution-level cache to avoid duplicate database queries
+    clearExecutionUserInfoCache(); // Clear any stale cache
+    
+    // ユーザー認証
+    verifyUserAccess(currentUserId);
+    var userInfo = getCachedUserInfo(currentUserId); // Use cached version
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    // === ステップ2: 設定データの取得と自動修復 ===
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    
+    // Auto-healing for inconsistent setup states
+    var needsUpdate = false;
+    if (configJson.formUrl && !configJson.formCreated) {
+      configJson.formCreated = true;
+      needsUpdate = true;
+    }
+    if (configJson.formCreated && configJson.setupStatus !== 'completed') {
+      configJson.setupStatus = 'completed';
+      needsUpdate = true;
+    }
+    if (configJson.publishedSheetName && !configJson.appPublished) {
+      configJson.appPublished = true;
+      needsUpdate = true;
+    }
+    if (needsUpdate) {
+      try {
+        updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
+        userInfo.configJson = JSON.stringify(configJson);
+      } catch (updateErr) {
+        console.warn('Config auto-heal failed: ' + updateErr.message);
+      }
+    }
+    
+    // === ステップ3: シート一覧とアプリURL生成 ===
+    var sheets = getSheetsList(currentUserId);
+    var appUrls = generateAppUrls(currentUserId);
+    
+    // === ステップ4: 回答数とリアクション数の取得 ===
+    var answerCount = 0;
+    var totalReactions = 0;
+    try {
+      if (configJson.publishedSpreadsheetId && configJson.publishedSheetName) {
+        var responseData = getResponsesData(currentUserId, configJson.publishedSheetName);
+        if (responseData.status === 'success') {
+          answerCount = responseData.data.length;
+          totalReactions = answerCount * 2; // 暫定値
+        }
+      }
+    } catch (err) {
+      console.warn('Answer count retrieval failed:', err.message);
+    }
+    
+    // === ステップ5: セットアップステップの決定 ===
+    var setupStep = determineSetupStep(userInfo, configJson);
+    
+    // === ベース応答の構築 ===
+    var response = {
+      // ユーザー情報
+      userInfo: {
+        userId: userInfo.userId,
+        adminEmail: userInfo.adminEmail,
+        isActive: userInfo.isActive,
+        lastAccessedAt: userInfo.lastAccessedAt,
+        spreadsheetId: userInfo.spreadsheetId,
+        spreadsheetUrl: userInfo.spreadsheetUrl,
+        configJson: userInfo.configJson
+      },
+      // アプリ設定
+      appUrls: appUrls,
+      setupStep: setupStep,
+      activeSheetName: configJson.publishedSheetName || null,
+      webAppUrl: appUrls.webApp,
+      isPublished: !!configJson.appPublished,
+      answerCount: answerCount,
+      totalReactions: totalReactions,
+      // シート情報
+      allSheets: sheets,
+      sheetNames: sheets,
+      // カスタムフォーム情報
+      customFormInfo: configJson.formUrl ? {
+        title: configJson.formTitle || 'カスタムフォーム',
+        mainQuestion: configJson.publishedSheetName || '質問',
+        formUrl: configJson.formUrl
+      } : null,
+      // メタ情報
+      _meta: {
+        apiVersion: 'integrated_v1',
+        executionTime: null,
+        includedApis: ['getCurrentUserStatus', 'getUserId', 'getAppConfig']
+      }
+    };
+    
+    // === ステップ6: シート詳細の取得（オプション） ===
+    var includeSheetDetails = targetSheetName || configJson.publishedSheetName;
+    if (includeSheetDetails && userInfo.spreadsheetId) {
+      try {
+        var sheetDetails = getSheetDetailsInternal(currentUserId, userInfo.spreadsheetId, includeSheetDetails);
+        response.sheetDetails = sheetDetails;
+        response._meta.includedApis.push('getSheetDetails');
+        debugLog('✅ シート詳細を統合応答に追加:', includeSheetDetails);
+      } catch (sheetErr) {
+        console.warn('Sheet details retrieval failed:', sheetErr.message);
+        response.sheetDetailsError = sheetErr.message;
+      }
+    }
+    
+    // === 実行時間の記録 ===
+    var endTime = new Date().getTime();
+    response._meta.executionTime = endTime - startTime;
+    
+    debugLog('🎯 getInitialData: 統合初期化完了', {
+      executionTime: response._meta.executionTime + 'ms',
+      userId: currentUserId,
+      setupStep: setupStep,
+      hasSheetDetails: !!response.sheetDetails
+    });
+    
+    return response;
+    
+  } catch (error) {
+    console.error('❌ getInitialData error:', error);
+    return { 
+      status: 'error', 
+      message: error.message,
+      _meta: {
+        apiVersion: 'integrated_v1',
+        error: error.message
+      }
+    };
+  }
+}
+
+/**
+ * getSheetDetailsの内部実装（統合API用）
+ * @param {string} requestUserId - ユーザーID
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {Object} シート詳細
+ */
+function getSheetDetailsInternal(requestUserId, spreadsheetId, sheetName) {
+  var targetId = spreadsheetId || getEffectiveSpreadsheetId(requestUserId);
+  if (!targetId) {
+    throw new Error('spreadsheetIdが取得できません');
+  }
+  
+  const ss = SpreadsheetApp.openById(targetId);
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    throw new Error('シートが見つかりません: ' + sheetName);
+  }
+
+  const lastColumn = sheet.getLastColumn();
+  if (lastColumn < 1) {
+    throw new Error(`シート '${sheetName}' に列が存在しません`);
+  }
+  
+  const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0] || [];
+  const guessed = autoMapHeaders(headers);
+
+  let existing = {};
+  try {
+    existing = getConfig(requestUserId, sheetName, true) || {};
+  } catch (e) {
+    console.warn('getConfig failed in getSheetDetailsInternal:', e.message);
+  }
+
+  return {
+    allHeaders: headers,
+    guessedConfig: guessed,
+    existingConfig: existing
+  };
+}
