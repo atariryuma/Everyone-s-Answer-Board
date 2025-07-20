@@ -824,9 +824,10 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
   var cacheKey = `batchGet_${spreadsheetId}_${JSON.stringify(ranges)}`;
   
   return cacheManager.get(cacheKey, () => {
+    const currentService = service; // Capture service in local variable
     try {
-      console.log('DEBUG: Accessing service.baseUrl. Service object:', JSON.stringify(service, null, 2));
-      var url = service.baseUrl + '/' + spreadsheetId + '/values:batchGet?' + 
+      console.log('DEBUG: Accessing service.baseUrl. Service object:', JSON.stringify(currentService, null, 2));
+      var url = currentService.baseUrl + '/' + spreadsheetId + '/values:batchGet?' + 
         ranges.map(function(range) { return 'ranges=' + encodeURIComponent(range); }).join('&');
       
       var response = UrlFetchApp.fetch(url, {
