@@ -3,6 +3,7 @@ const vm = require('vm');
 
 describe('generateAppUrls admin url', () => {
   const mainCode = fs.readFileSync('src/main.gs', 'utf8');
+  const urlCode = fs.readFileSync('src/url.gs', 'utf8');
   let context;
 
   beforeEach(() => {
@@ -13,7 +14,8 @@ describe('generateAppUrls admin url', () => {
         remove() {}
       },
       ScriptApp: {
-        getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/dev' })
+        getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/dev' }),
+        getScriptId: () => 'ID'
       },
       console: { error: () => {}, log: () => {}, warn: () => {} },
       PropertiesService: {
@@ -24,12 +26,20 @@ describe('generateAppUrls admin url', () => {
           }
         })
       },
-      CacheService: {
-        getUserCache: () => ({
-          get: () => null,
-          put: () => {}
-        })
-      },
+      CacheService: (() => {
+        const store = {};
+        return {
+          getUserCache: () => ({
+            get: () => null,
+            put: () => {}
+          }),
+          getScriptCache: () => ({
+            get: (k) => store[k] || null,
+            put: (k, v) => { store[k] = v; },
+            remove: (k) => { delete store[k]; }
+          })
+        };
+      })(),
       Session: {
         getActiveUser: () => ({ getEmail: () => 'test@example.com' })
       },
@@ -40,6 +50,7 @@ describe('generateAppUrls admin url', () => {
       }
     };
     vm.createContext(context);
+    vm.runInContext(urlCode, context);
     vm.runInContext(mainCode, context);
   });
 

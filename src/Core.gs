@@ -4231,6 +4231,17 @@ function getInitialData(requestUserId, targetSheetName) {
     
     // === ステップ5: セットアップステップの決定 ===
     var setupStep = determineSetupStep(userInfo, configJson);
+
+    // 公開シート設定とヘッダー情報を取得
+    var publishedSheetName = configJson.publishedSheetName || '';
+    var sheetConfigKey = publishedSheetName ? 'sheet_' + publishedSheetName : '';
+    var activeSheetConfig = sheetConfigKey && configJson[sheetConfigKey]
+      ? configJson[sheetConfigKey]
+      : {};
+
+    var opinionHeader = activeSheetConfig.opinionHeader || '';
+    var nameHeader = activeSheetConfig.nameHeader || '';
+    var classHeader = activeSheetConfig.classHeader || '';
     
     // === ベース応答の構築 ===
     var response = {
@@ -4252,6 +4263,17 @@ function getInitialData(requestUserId, targetSheetName) {
       isPublished: !!configJson.appPublished,
       answerCount: answerCount,
       totalReactions: totalReactions,
+      config: {
+        publishedSheetName: publishedSheetName,
+        opinionHeader: opinionHeader,
+        nameHeader: nameHeader,
+        classHeader: classHeader,
+        showNames: configJson.showNames || false,
+        showCounts: configJson.showCounts !== undefined ? configJson.showCounts : true,
+        displayMode: configJson.displayMode || 'anonymous',
+        setupStatus: configJson.setupStatus || 'initial',
+        isPublished: !!configJson.appPublished,
+      },
       // シート情報
       allSheets: sheets,
       sheetNames: sheets,

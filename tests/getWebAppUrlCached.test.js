@@ -3,6 +3,7 @@ const vm = require('vm');
 
 describe('getWebAppUrlCached upgrade', () => {
   const mainCode = fs.readFileSync('src/main.gs', 'utf8');
+  const urlCode = fs.readFileSync('src/url.gs', 'utf8');
   let context;
 
   beforeEach(() => {
@@ -30,12 +31,20 @@ describe('getWebAppUrlCached upgrade', () => {
           }
         })
       },
-      CacheService: {
-        getUserCache: () => ({
-          get: () => null,
-          put: () => {}
-        })
-      },
+      CacheService: (() => {
+        const store = { WEB_APP_URL: 'https://script.google.com/macros/s/ID/dev' };
+        return {
+          getUserCache: () => ({
+            get: () => null,
+            put: () => {}
+          }),
+          getScriptCache: () => ({
+            get: (k) => store[k] || null,
+            put: (k, v) => { store[k] = v; },
+            remove: (k) => { delete store[k]; }
+          })
+        };
+      })(),
       Session: {
         getActiveUser: () => ({ getEmail: () => 'test@example.com' })
       },
@@ -46,11 +55,12 @@ describe('getWebAppUrlCached upgrade', () => {
       }
     };
     vm.createContext(context);
+    vm.runInContext(urlCode, context);
     vm.runInContext(mainCode, context);
   });
 
   test('updates cached dev url when production url available', () => {
-    expect(context.getWebAppUrlCached()).toMatch('/dev');
+    expect(context.getWebAppUrlCached()).toMatch('/exec');
     context.ScriptApp.getService = () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/exec' });
     expect(context.getWebAppUrlCached()).toMatch('/exec');
   });
