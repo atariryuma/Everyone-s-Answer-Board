@@ -1,6 +1,10 @@
 <script>
 let lastSelectedSheetName = null; // To prevent redundant sheet selection change events
 
+// UI Update Mutex to prevent race conditions
+let isUIUpdateInProgress = false;
+let pendingUIUpdate = null;
+
 // =============================================================================
 // ADMIN PANEL UI UPDATES & DISPLAY CONTROL
 // =============================================================================
@@ -88,20 +92,30 @@ function updateUIWithNewStatus(status) {
     logWarn('Invalid status received, skipping UI update');
     return;
   }
+
+  // UI Update Mutex: Prevent concurrent UI updates
+  if (isUIUpdateInProgress) {
+    logDebug('UI update in progress, queuing this update');
+    pendingUIUpdate = status;
+    return;
+  }
+
+  isUIUpdateInProgress = true;
   
-  // Standardize status object with publication state and viewUrl
-  const publicationState = getPublicationState(status);
-  const viewUrl = generateViewUrl(status, userId);
-  
-  // Add normalized properties to status object
-  status._normalized = {
-    isPublished: publicationState.isPublished,
-    publishReason: publicationState.reason,
-    viewUrl: viewUrl,
-    hasValidViewUrl: !!viewUrl
-  };
-  
-  currentStatus = status;
+  try {
+    // Standardize status object with publication state and viewUrl
+    const publicationState = getPublicationState(status);
+    const viewUrl = generateViewUrl(status, userId);
+    
+    // Add normalized properties to status object
+    status._normalized = {
+      isPublished: publicationState.isPublished,
+      publishReason: publicationState.reason,
+      viewUrl: viewUrl,
+      hasValidViewUrl: !!viewUrl
+    };
+    
+    currentStatus = status;
   
   // セットアップ状況を確認
   const setupStatus = getSetupStatusFromUserInfo(status.userInfo);
@@ -138,10 +152,23 @@ function updateUIWithNewStatus(status) {
   // Update unpublish button state
   updateUnpublishButton(status);
 
-  // If an active sheet is set on initial load, load its configuration
-  if (status.activeSheetName && status.userInfo && status.userInfo.spreadsheetId) {
-    selectedSheet = status.activeSheetName;
-    loadConfigForSelected(status.activeSheetName, status.userInfo.spreadsheetId);
+    // If an active sheet is set on initial load, load its configuration
+    if (status.activeSheetName && status.userInfo && status.userInfo.spreadsheetId) {
+      selectedSheet = status.activeSheetName;
+      loadConfigForSelected(status.activeSheetName, status.userInfo.spreadsheetId);
+    }
+    
+  } finally {
+    // Release the UI update mutex
+    isUIUpdateInProgress = false;
+    
+    // Process any pending UI update
+    if (pendingUIUpdate) {
+      const nextUpdate = pendingUIUpdate;
+      pendingUIUpdate = null;
+      logDebug('Processing queued UI update');
+      setTimeout(() => updateUIWithNewStatus(nextUpdate), 0);
+    }
   }
 }
 
@@ -1221,8 +1248,12 @@ function loadConfigForSelected(sheetName, spreadsheetId) {
     return;
   }
 
+  // Check if fresh save protection is active - skip cache if so
+  const timeSinceFreshSave = Date.now() - (window.freshSaveTimestamp || 0);
+  const isFreshSaveActive = timeSinceFreshSave < 30000; // 30 seconds
+  
   // Check if we already have sheet details from integrated API
-  if (currentStatus && currentStatus.sheetDetails && 
+  if (!isFreshSaveActive && currentStatus && currentStatus.sheetDetails && 
       currentStatus.activeSheetName === sheetName) {
     console.log('⚡ Using cached sheet details from integrated API');
     try {
@@ -1237,8 +1268,13 @@ function loadConfigForSelected(sheetName, spreadsheetId) {
     }
   }
 
-  // Fallback: Call API if cache is not available or failed
-  console.log('📞 Making API call for sheet details:', sheetName);
+  // Force fresh API call if fresh save protection is active or cache unavailable
+  if (isFreshSaveActive) {
+    console.log('🔄 Fresh save protection active - forcing API call for latest data');
+  } else {
+    console.log('📞 Making API call for sheet details:', sheetName);
+  }
+  
   runGasWithUserId('getSheetDetails', spreadsheetId, sheetName)
     .then(function(details) {
       console.log('✅ Sheet details loaded via API:', details);

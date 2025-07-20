@@ -212,16 +212,20 @@ function saveAndPublish() {
     return;
   }
   
+  // Set save protection flags to prevent interference
+  isSaveInProgress = true;
+  freshSaveTimestamp = Date.now();
+  window.freshSaveTimestamp = freshSaveTimestamp;
+  
   setLoading(true, '設定を保存し、ボードを公開しています...');
   
   const config = buildConfigObject();
   
-  // PRE-SAVE: Aggressive cache clearing to prevent stale data issues
+  // Clear all caches once before save
   if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
     window.unifiedCache.clear();
   }
   
-  // Clear GAS optimizer cache if available
   if (window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
     window.gasOptimizer.clearCache();
   }
@@ -229,49 +233,38 @@ function saveAndPublish() {
   runGasWithUserId('saveAndPublish', selectedSheet, config)
     .then(function(result) {
       setLoading(false);
+      isSaveInProgress = false;
       
       // Check if result has data (from integrated API) or legacy success status
       if (result && (result.userInfo || result.status === 'success')) {
         showMessage('✅ 設定が保存され、ボードが公開されました！', 'success');
         
-        // POST-SAVE: Maintain existing cache clearing
-        if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-          window.unifiedCache.clear();
-        }
-        
-        // If integrated API returned data, use it immediately
+        // Use fresh data from save response if available
         if (result.userInfo && result._meta) {
+          logInfo('Using fresh data from save response');
           updateUIWithNewStatus(result);
-        }
-        
-        // SAFETY MEASURE: Delayed secondary cache clear
-        setTimeout(() => {
-          if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-            window.unifiedCache.clear();
-          }
-        }, 500);
-        
-        // Additional forced refresh with delay to ensure sync
-        setTimeout(() => {
+        } else {
+          // Only force refresh if no fresh data available
+          logInfo('No fresh data in response, forcing refresh');
           loadStatus(true);
-        }, 1000);
+        }
       } else {
         logError('Save failed:', result);
         showMessage(result.message || '設定の保存に失敗しました。', 'error');
+        isSaveInProgress = false;
       }
     })
     .catch(function(error) {
       logError('saveAndPublish error:', error);
       setLoading(false);
+      isSaveInProgress = false;
       
-      // Enhanced error handling with rollback support
+      // Clear caches after error and reload
       if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
         window.unifiedCache.clear();
       }
       
-      // Try to reload current state to ensure UI consistency
       loadStatus(true);
-      
       handleError(error, 'saveAndPublish', '設定の保存に失敗しました。システム状態を再読み込みしました。');
     });
 }
@@ -522,6 +515,14 @@ let lastUserActivity = Date.now();
 let currentPollInterval = 5 * 60 * 1000; // 開始は5分間隔
 let statusPollTimer = null;
 
+// Fresh save management to prevent interference
+let freshSaveTimestamp = 0;
+let isSaveInProgress = false;
+const FRESH_SAVE_PROTECTION_DURATION = 30000; // 30 seconds
+
+// Make freshSaveTimestamp globally accessible
+window.freshSaveTimestamp = freshSaveTimestamp;
+
 // Get optimal polling interval based on user activity
 function getOptimalPollInterval() {
   const timeSinceActivity = Date.now() - lastUserActivity;
@@ -550,6 +551,18 @@ function startSystemStatusUpdate() {
     // UIが非表示の時は更新しない
     if (document.hidden) return;
     
+    // Skip background updates if save operation is in progress or recently completed
+    if (isSaveInProgress) {
+      logDebug('Skipping background update: save in progress');
+      return;
+    }
+    
+    const timeSinceFreshSave = Date.now() - freshSaveTimestamp;
+    if (timeSinceFreshSave < FRESH_SAVE_PROTECTION_DURATION) {
+      logDebug('Skipping background update: fresh save protection active');
+      return;
+    }
+    
     // 現在のポーリング間隔を確認し、必要に応じて調整
     const optimalInterval = getOptimalPollInterval();
     if (Math.abs(currentPollInterval - optimalInterval) > 30000) { // 30秒以上の差
@@ -566,7 +579,7 @@ function startSystemStatusUpdate() {
         }
       })
       .catch(function(error) {
-        console.warn('Background status update failed:', error);
+        logWarn('Background status update failed:', error);
       });
   }, currentPollInterval);
 }
