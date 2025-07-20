@@ -1,0 +1,321 @@
+<script>
+// =============================================================================
+// GAS API METHODS & DATA MANAGEMENT
+// Google Apps Script API呼び出しとデータ管理
+// =============================================================================
+
+// Extend StudyQuestApp with API methods
+Object.assign(StudyQuestApp.prototype, {
+  
+  runGas(funcName, ...args) {
+    const cacheKey = funcName + JSON.stringify(args);
+    const isStateChanging = ['toggleHighlight', 'addReaction', 'endPublication'].includes(funcName);
+    
+    if (!isStateChanging) {
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return Promise.resolve(cached);
+      }
+    }
+    
+    return new Promise((resolve, reject) => {
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        const userId = USER_ID || '';
+        google.script.run
+          .withSuccessHandler((result) => {
+            if (!isStateChanging) {
+              this.cache.set(cacheKey, result, 1000);
+            }
+            resolve(result);
+          })
+          .withFailureHandler((error) => {
+            pageLog('error', 'GAS API error:', { funcName, args, error });
+            reject(error);
+          })
+          .withUserObject({ userId: userId })
+          [funcName](...args);
+      } else {
+        pageLog('warn', 'Google Apps Script environment not detected');
+        this.getMockData(funcName, ...args).then((result) => {
+          if (!isStateChanging) {
+            this.cache.set(cacheKey, result, 1000);
+          }
+          resolve(result);
+        }).catch(reject);
+      }
+    });
+  },
+
+  async verifyAdminAsync() {
+    if (window.isAdminUser) {
+      this.state.isAdminUser = true;
+      this.state.showHighlightToggle = true;
+      this.updateAdminButtonUI();
+      this.updateEndPublicationButtonUI();
+      return;
+    }
+    
+    try {
+      const isAdmin = await this.gas.checkAdmin();
+      if (isAdmin) {
+        window.isAdminUser = true;
+        this.state.isAdminUser = true;
+        this.state.showHighlightToggle = true;
+        this.updateAdminButtonUI();
+        this.updateEndPublicationButtonUI();
+      }
+    } catch (error) {
+      pageLog('error', 'Admin check failed:', error);
+    }
+  },
+
+  getMockData(funcName, ...args) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        if (funcName === 'getPublishedSheetData') {
+          const currentDisplayMode = window.displayMode || this.state.displayMode;
+          const studentName1 = currentDisplayMode === 'named' ? '田中太郎' : '';
+          const studentName2 = currentDisplayMode === 'named' ? '佐藤花子' : '';
+          resolve({
+            header: 'テスト問題',
+            sheetName: 'テストシート',
+            data: [
+              {
+                rowIndex: 1,
+                name: studentName1,
+                class: '3年A組',
+                opinion: 'これは素晴らしいアイデアだと思います。',
+                reason: '理由は簡潔で分かりやすく、実現可能性が高いからです。',
+                reactions: {
+                  UNDERSTAND: { count: 5, reacted: false },
+                  LIKE: { count: 2, reacted: false },
+                  CURIOUS: { count: 1, reacted: false }
+                },
+                highlight: false
+              },
+              {
+                rowIndex: 2,
+                name: studentName2,
+                class: '3年B組',
+                opinion: '少し改善の余地があると考えます。',
+                reason: 'より多くの人の意見を聞く必要があると思います。',
+                reactions: {
+                  UNDERSTAND: { count: 3, reacted: true },
+                  LIKE: { count: 0, reacted: false },
+                  CURIOUS: { count: 0, reacted: false }
+                },
+                highlight: true
+              }
+            ]
+          });
+        } else if (funcName === 'addReaction') {
+          resolve({
+            status: 'ok',
+            reactions: {
+              UNDERSTAND: { count: Math.floor(Math.random() * 5), reacted: Math.random() < 0.5 },
+              LIKE: { count: Math.floor(Math.random() * 5), reacted: Math.random() < 0.5 },
+              CURIOUS: { count: Math.floor(Math.random() * 5), reacted: Math.random() < 0.5 }
+            }
+          });
+        } else if (funcName === 'toggleHighlight') {
+          const currentHighlight = args[2] === undefined ? false : !args[2];
+          resolve({
+            status: 'ok',
+            highlight: currentHighlight
+          });
+        } else if (funcName === 'checkAdmin') {
+          resolve(true);
+        }
+      }, 300);
+    });
+  },
+
+  async loadDataImmediate() {
+    try {
+      this.state.isLoading = true;
+      const data = await this.loadSheetData(false);
+      
+      if (data && data.data) {
+        this.state.currentAnswers = data.data;
+        this.renderBoard();
+        this.initialDataLoaded = true;
+        this.hideLoadingOverlay();
+        
+        // Start polling after initial data load
+        this.startPolling();
+      }
+    } catch (error) {
+      pageLog('error', 'Initial data load failed:', error);
+      this.hideLoadingOverlay();
+      this.displayEmptyState();
+    } finally {
+      this.state.isLoading = false;
+    }
+  },
+
+  async loadSheetData(bypassCache = false, classFilter = '', sortOrder = '') {
+    try {
+      pageLog('info', 'Loading sheet data', { bypassCache, classFilter, sortOrder });
+      
+      const actualFilter = classFilter || (this.elements.classFilter ? this.elements.classFilter.value : '');
+      const actualSort = sortOrder || (this.elements.sortOrder ? this.elements.sortOrder.value : '');
+      
+      const data = await this.gas.getPublishedSheetData(actualFilter, actualSort, this.state.showAdminFeatures, bypassCache);
+      
+      if (data && data.data) {
+        const oldRows = this.state.currentAnswers || [];
+        this.state.currentAnswers = data.data;
+        
+        if (data.header) {
+          const headerToShow = data.header.startsWith('<') || data.header.includes('読み込み') 
+            ? 'お題' 
+            : this.escapeHtml(data.header);
+          if (this.elements.headingLabel) {
+            this.elements.headingLabel.textContent = headerToShow;
+          }
+        }
+        
+        if (data.sheetName && this.elements.sheetNameText) {
+          this.elements.sheetNameText.textContent = data.sheetName;
+        }
+        
+        this.renderBoard(false, oldRows);
+        return data;
+      }
+      
+      return null;
+    } catch (error) {
+      pageLog('error', 'Failed to load sheet data:', error);
+      throw error;
+    }
+  },
+
+  startPolling() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+    }
+    
+    this.pollSuccessCount = 0;
+    this.pollFailureCount = 0;
+    this.currentPollInterval = this.isLowPerformanceMode ? 30000 : 15000;
+    
+    const adaptivePoll = async () => {
+      pageLog('info', 'Polling execution:', {
+        currentInterval: this.currentPollInterval,
+        successCount: this.pollSuccessCount,
+        failureCount: this.pollFailureCount
+      });
+      
+      try {
+        await this.checkForNewContentLight();
+        this.pollSuccessCount++;
+        this.pollFailureCount = 0;
+        
+        if (this.pollSuccessCount > 3 && this.currentPollInterval > 10000) {
+          this.currentPollInterval = Math.max(10000, this.currentPollInterval * 0.9);
+        }
+        
+        pageLog('info', 'Polling success:', {
+          successCount: this.pollSuccessCount,
+          nextInterval: this.currentPollInterval
+        });
+      } catch (error) {
+        this.pollFailureCount++;
+        this.pollSuccessCount = 0;
+        
+        if (this.pollFailureCount > 2) {
+          this.currentPollInterval = Math.min(60000, this.currentPollInterval * 1.5);
+        }
+        
+        pageLog('warn', 'Polling failed:', {
+          failureCount: this.pollFailureCount,
+          nextInterval: this.currentPollInterval,
+          error: error.message
+        });
+      }
+      
+      this.pollingInterval = setTimeout(adaptivePoll, this.currentPollInterval);
+    };
+    
+    this.pollingInterval = setTimeout(adaptivePoll, this.currentPollInterval);
+    pageLog('info', 'Polling started');
+  },
+
+  stopPolling() {
+    if (this.pollingInterval) {
+      clearTimeout(this.pollingInterval);
+      this.pollingInterval = null;
+      pageLog('info', 'Polling stopped');
+    }
+  },
+
+  async checkForNewContentLight() {
+    try {
+      const classFilter = this.elements.classFilter ? this.elements.classFilter.value : '';
+      const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : '';
+      
+      const count = await this.gas.getDataCount(classFilter, sortOrder, this.state.showAdminFeatures);
+      
+      if (typeof count === 'number') {
+        if (this.initialDataLoaded && count > (this.state.currentAnswers ? this.state.currentAnswers.length : 0)) {
+          const newItemCount = count - (this.state.currentAnswers ? this.state.currentAnswers.length : 0);
+          this.state.hasNewContent = true;
+          this.state.newContentCount = newItemCount;
+          this.showNewContentBanner([{ count: newItemCount }]);
+        }
+      }
+    } catch (error) {
+      pageLog('warn', 'New content check failed:', error);
+      throw error;
+    }
+  },
+
+  async refreshContentFromBanner() {
+    try {
+      this.state.hasNewContent = false;
+      this.state.newContentCount = 0;
+      
+      if (this.elements.refreshContentBtn) {
+        const originalText = this.elements.refreshContentBtn.textContent;
+        const originalBackground = this.elements.refreshContentBtn.style.background;
+        
+        this.elements.refreshContentBtn.textContent = '更新中...';
+        this.elements.refreshContentBtn.style.background = 'linear-gradient(45deg, #10b981, #3b82f6)';
+      }
+      
+      await this.loadSheetData(true);
+      this.dismissNewContentBanner();
+      
+      setTimeout(() => {
+        if (this.elements.refreshContentBtn) {
+          this.elements.refreshContentBtn.textContent = originalText;
+          this.elements.refreshContentBtn.style.background = originalBackground;
+        }
+      }, 2000);
+    } catch (error) {
+      pageLog('error', 'Content refresh failed:', error);
+      this.provideFeedback('更新に失敗しました', 'error');
+    }
+  },
+
+  destroy() {
+    this.stopPolling();
+    this.cache.clear();
+    
+    if (this.visibilityObserver) {
+      this.visibilityObserver.disconnect();
+    }
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+    }
+    if (this.idleCallbackId) {
+      cancelIdleCallback(this.idleCallbackId);
+    }
+    
+    pageLog('info', 'StudyQuestApp destroyed');
+  }
+});
+</script>

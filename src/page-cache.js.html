@@ -1,0 +1,163 @@
+<script>
+// =============================================================================
+// UNIFIED CACHE SYSTEM
+// キャッシュシステム - TTL対応、自動クリーンアップ
+// =============================================================================
+
+class UnifiedCache {
+  constructor() {
+    this.data = new Map();
+    this.timestamps = new Map();
+    this.hitCount = 0;
+    this.missCount = 0;
+  }
+  
+  set(key, value, ttl = 300000) { // 5分のデフォルトTTL
+    this.data.set(key, value);
+    this.timestamps.set(key, Date.now() + ttl);
+    pageLog('info', `Cache set: ${key}`);
+  }
+  
+  get(key) {
+    if (!this.data.has(key)) {
+      this.missCount++;
+      return undefined;
+    }
+    
+    const expiry = this.timestamps.get(key);
+    if (expiry && Date.now() > expiry) {
+      this.delete(key);
+      this.missCount++;
+      return undefined;
+    }
+    
+    this.hitCount++;
+    pageLog('info', `Cache hit: ${key}`);
+    return this.data.get(key);
+  }
+  
+  has(key) {
+    return this.get(key) !== undefined;
+  }
+  
+  delete(key) {
+    this.data.delete(key);
+    this.timestamps.delete(key);
+    pageLog('info', `Cache deleted: ${key}`);
+  }
+  
+  clear() {
+    this.data.clear();
+    this.timestamps.clear();
+    this.hitCount = 0;
+    this.missCount = 0;
+    pageLog('info', 'Cache cleared');
+  }
+  
+  cleanup() {
+    const now = Date.now();
+    let cleanedCount = 0;
+    
+    for (const [key, expiry] of this.timestamps.entries()) {
+      if (now > expiry) {
+        this.delete(key);
+        cleanedCount++;
+      }
+    }
+    
+    if (cleanedCount > 0) {
+      pageLog('info', `Cache cleanup: ${cleanedCount} items removed`);
+    }
+  }
+  
+  getStats() {
+    return {
+      size: this.data.size,
+      hitCount: this.hitCount,
+      missCount: this.missCount,
+      hitRate: this.hitCount + this.missCount > 0 
+        ? (this.hitCount / (this.hitCount + this.missCount) * 100).toFixed(2) + '%' 
+        : '0%'
+    };
+  }
+  
+  get size() {
+    return this.data.size;
+  }
+  
+  // バッチ操作
+  setMultiple(items, ttl = 300000) {
+    for (const [key, value] of Object.entries(items)) {
+      this.set(key, value, ttl);
+    }
+  }
+  
+  getMultiple(keys) {
+    const result = {};
+    for (const key of keys) {
+      const value = this.get(key);
+      if (value !== undefined) {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+  
+  deleteMultiple(keys) {
+    for (const key of keys) {
+      this.delete(key);
+    }
+  }
+  
+  // パターンマッチング削除
+  deletePattern(pattern) {
+    const regex = new RegExp(pattern);
+    const keysToDelete = [];
+    
+    for (const key of this.data.keys()) {
+      if (regex.test(key)) {
+        keysToDelete.push(key);
+      }
+    }
+    
+    this.deleteMultiple(keysToDelete);
+    return keysToDelete.length;
+  }
+  
+  // 自動クリーンアップの開始/停止
+  startAutoCleanup(intervalMs = 60000) { // 1分間隔
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+    
+    this.cleanupInterval = setInterval(() => {
+      this.cleanup();
+    }, intervalMs);
+    
+    pageLog('info', `Auto cleanup started (${intervalMs}ms interval)`);
+  }
+  
+  stopAutoCleanup() {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+      pageLog('info', 'Auto cleanup stopped');
+    }
+  }
+}
+
+// Global cache instance
+if (typeof window.unifiedCache === 'undefined') {
+  window.unifiedCache = new UnifiedCache();
+  
+  // 自動クリーンアップ開始
+  window.unifiedCache.startAutoCleanup();
+  
+  // ページアンロード時のクリーンアップ
+  window.addEventListener('beforeunload', () => {
+    window.unifiedCache.stopAutoCleanup();
+  });
+  
+  pageLog('info', 'UnifiedCache initialized');
+}
+</script>

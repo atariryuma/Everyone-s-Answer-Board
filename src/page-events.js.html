@@ -1,0 +1,362 @@
+<script>
+// =============================================================================
+// EVENT HANDLING & INTERACTIONS
+// イベントハンドラー、ユーザーインタラクション管理
+// =============================================================================
+
+// Extend StudyQuestApp with event handling methods
+Object.assign(StudyQuestApp.prototype, {
+
+  setupEventDelegation() {
+    // 重複登録防止
+    if (this.eventDelegationSetup) {
+      return;
+    }
+    
+    this.handlers.onAnswersContainerClick = (e) => {
+      const answerCard = e.target.closest('.answer-card');
+
+      if (!answerCard || answerCard.classList.contains('hidden-card')) {
+        return;
+      }
+
+      const rowIndex = answerCard.dataset.rowIndex;
+      if (!rowIndex) {
+        return;
+      }
+
+      // リアクションボタンのクリックを処理
+      const reactionBtn = e.target.closest('.reaction-btn');
+      if (reactionBtn) {
+        e.stopPropagation();
+        if (!reactionBtn.disabled) {
+          this.handleReaction(rowIndex, reactionBtn.dataset.reaction);
+        }
+        return;
+      }
+
+      // ハイライトボタンのクリックを処理
+      const highlightBtn = e.target.closest('.highlight-btn');
+      if (highlightBtn) {
+        e.stopPropagation();
+        if (!highlightBtn.disabled) {
+          this.handleHighlight(rowIndex);
+        }
+        return;
+      }
+
+      // カード本体のクリックとしてモーダルを表示
+      this.showAnswerModal(rowIndex);
+    };
+
+    if (this.elements.answersContainer) {
+      this.elements.answersContainer.removeEventListener('click', this.handlers.onAnswersContainerClick);
+      this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
+      this.eventDelegationSetup = true;
+    }
+  },
+
+  setupNonCriticalEventListeners() {
+    // 重複登録防止
+    if (this.nonCriticalListenersSetup) {
+      return;
+    }
+    
+    // Modal handlers
+    this.handlers.onAnswerModalContainerClick = (e) => {
+      if (e.target === e.currentTarget) {
+        this.hideAnswerModal();
+      }
+    };
+    if (this.elements.answerModalContainer) {
+      this.elements.answerModalContainer.addEventListener('click', this.handlers.onAnswerModalContainerClick);
+    }
+
+    if (this.elements.infoModalConfirmBtn) {
+      this.handlers.onInfoModalConfirmClick = () => this.hideInfoModal();
+      this.elements.infoModalConfirmBtn.addEventListener('click', this.handlers.onInfoModalConfirmClick);
+    }
+
+    this.handlers.onModalReactionClick = (e) => {
+      const btn = e.target.closest('.reaction-btn');
+      const highlightBtn = e.target.closest('.highlight-btn');
+      
+      if (highlightBtn) {
+        const id = highlightBtn.dataset.rowIndex;
+        if (id) {
+          this.handleHighlight(id);
+        }
+      } else if (btn) {
+        const id = btn.dataset.rowIndex;
+        const reaction = btn.dataset.reaction;
+        if (id && reaction) {
+          this.handleReaction(id, reaction);
+        }
+      }
+    };
+    if (this.elements.modalReactionContainer) {
+      this.elements.modalReactionContainer.addEventListener('click', this.handlers.onModalReactionClick);
+    }
+
+    // Filter and sort handlers
+    this.handlers.onClassFilterChange = () => {
+      this.dismissNewContentBanner();
+      this.loadSheetData(true).then(() => {
+        this.state.lastSeenCount = this.state.currentAnswers.length;
+      });
+    };
+    this.handlers.onSortOrderChange = () => {
+      this.dismissNewContentBanner();
+      this.loadSheetData(true).then(() => {
+        this.state.lastSeenCount = this.state.currentAnswers.length;
+      });
+    };
+    if (this.elements.classFilter) {
+      this.elements.classFilter.addEventListener('change', this.handlers.onClassFilterChange);
+    }
+    if (this.elements.sortOrder) {
+      this.elements.sortOrder.addEventListener('change', this.handlers.onSortOrderChange);
+    }
+
+    // Admin controls
+    if (this.elements.endPublicationBtn) {
+      this.handlers.onEndPublicationClick = () => this.endPublication();
+      this.elements.endPublicationBtn.addEventListener('click', this.handlers.onEndPublicationClick);
+    }
+    if (this.elements.adminToggleBtn) {
+      this.handlers.onAdminToggleClick = () => this.toggleAdminMode();
+      this.elements.adminToggleBtn.addEventListener('click', this.handlers.onAdminToggleClick);
+    }
+    
+    // 新着通知バナーのイベントハンドラー
+    if (this.elements.refreshContentBtn) {
+      this.handlers.onRefreshContentClick = () => this.refreshContentFromBanner();
+      this.elements.refreshContentBtn.addEventListener('click', this.handlers.onRefreshContentClick);
+    }
+    if (this.elements.dismissBannerBtn) {
+      this.handlers.onDismissBannerClick = () => this.dismissNewContentBanner();
+      this.elements.dismissBannerBtn.addEventListener('click', this.handlers.onDismissBannerClick);
+    }
+
+    // Global event handlers
+    this.handlers.onDocumentKeydown = (e) => {
+      if (e.key === 'Escape') {
+        this.hideAnswerModal();
+      }
+    };
+    document.addEventListener('keydown', this.handlers.onDocumentKeydown);
+
+    this.handlers.onWindowResize = debounce(() => this.adjustLayout(), 100);
+    window.addEventListener('resize', this.handlers.onWindowResize, { passive: true });
+
+    this.handlers.onVisibilityChange = () => {
+      if (document.hidden) {
+        this.stopPolling();
+        this.throttledUpdate('hidden-cleanup', () => this.cleanup(), 1000);
+      } else {
+        this.startPolling();
+      }
+    };
+    document.addEventListener('visibilitychange', this.handlers.onVisibilityChange, { passive: true });
+    
+    this.nonCriticalListenersSetup = true;
+  },
+
+  // Reaction handling with debouncing
+  handleReaction(rowIndex, reaction) {
+    const key = `${rowIndex}-${reaction}`;
+    
+    if (this.pendingReactions.has(key)) {
+      return;
+    }
+    
+    this.pendingReactions.add(key);
+    
+    if (this.reactionDebounce.has(key)) {
+      clearTimeout(this.reactionDebounce.get(key));
+    }
+    
+    const debounceId = setTimeout(async () => {
+      try {
+        const currentAnswer = this.state.currentAnswers.find(a => a.rowIndex.toString() === rowIndex.toString());
+        if (!currentAnswer) {
+          pageLog('warn', 'Answer not found for reaction:', rowIndex);
+          return;
+        }
+        
+        this.updateReactionUI(rowIndex, reaction, true);
+        
+        const result = await this.gas.addReaction(rowIndex, reaction, this.state.sheetName);
+        
+        if (result && result.reactions) {
+          this.updateReactionData(rowIndex, result.reactions);
+          this.updateReactionUI(rowIndex, reaction, false, result.reactions);
+        }
+      } catch (error) {
+        pageLog('error', 'Reaction failed:', error);
+        this.updateReactionUI(rowIndex, reaction, false);
+      } finally {
+        this.reactionDebounce.delete(key);
+        this.pendingReactions.delete(key);
+      }
+    }, 300);
+    
+    this.reactionDebounce.set(key, debounceId);
+  },
+
+  // Highlight handling with debouncing
+  handleHighlight(rowIndex) {
+    if (!this.state.showHighlightToggle) {
+      return;
+    }
+    
+    const key = `highlight-${rowIndex}`;
+    
+    if (this.highlightDebounce.has(key)) {
+      clearTimeout(this.highlightDebounce.get(key));
+    }
+    
+    const debounceId = setTimeout(async () => {
+      try {
+        const result = await this.gas.toggleHighlight(rowIndex, this.state.sheetName);
+        
+        if (result && result.hasOwnProperty('highlight')) {
+          this.updateHighlightData(rowIndex, result.highlight);
+          this.updateHighlightUI(rowIndex, result.highlight);
+        }
+      } catch (error) {
+        pageLog('error', 'Highlight toggle failed:', error);
+      } finally {
+        this.highlightDebounce.delete(key);
+      }
+    }, 300);
+    
+    this.highlightDebounce.set(key, debounceId);
+  },
+
+  // UI state update methods
+  updateReactionUI(rowIndex, reaction, isPending, newReactions = null) {
+    const cards = document.querySelectorAll(`[data-row-index="${rowIndex}"]`);
+    
+    cards.forEach(card => {
+      const reactionBtn = card.querySelector(`[data-reaction="${reaction}"]`);
+      if (reactionBtn) {
+        const countSpan = reactionBtn.querySelector('.reaction-count');
+        
+        if (isPending) {
+          reactionBtn.disabled = true;
+          reactionBtn.style.opacity = '0.5';
+        } else {
+          reactionBtn.disabled = false;
+          reactionBtn.style.opacity = '';
+          
+          if (newReactions && newReactions[reaction]) {
+            const reactionData = newReactions[reaction];
+            if (countSpan) {
+              countSpan.textContent = reactionData.count || 0;
+            }
+            
+            if (reactionData.reacted) {
+              reactionBtn.classList.add('reacted');
+            } else {
+              reactionBtn.classList.remove('reacted');
+            }
+          }
+        }
+      }
+    });
+  },
+
+  updateHighlightUI(rowIndex, isHighlighted) {
+    const cards = document.querySelectorAll(`[data-row-index="${rowIndex}"]`);
+    
+    cards.forEach(card => {
+      const highlightBtn = card.querySelector('.highlight-btn');
+      if (highlightBtn) {
+        if (isHighlighted) {
+          highlightBtn.classList.add('highlighted');
+          card.classList.add('highlighted');
+        } else {
+          highlightBtn.classList.remove('highlighted');
+          card.classList.remove('highlighted');
+        }
+      }
+    });
+  },
+
+  updateReactionData(rowIndex, newReactions) {
+    const answer = this.state.currentAnswers.find(a => a.rowIndex.toString() === rowIndex.toString());
+    if (answer) {
+      answer.reactions = newReactions;
+    }
+  },
+
+  updateHighlightData(rowIndex, isHighlighted) {
+    const answer = this.state.currentAnswers.find(a => a.rowIndex.toString() === rowIndex.toString());
+    if (answer) {
+      answer.highlight = isHighlighted;
+    }
+  },
+
+  // Admin functionality
+  toggleAdminMode() {
+    this.state.showAdminFeatures = !this.state.showAdminFeatures;
+    this.updateAdminButtonUI();
+    this.updateEndPublicationButtonUI();
+    this.renderBoard();
+  },
+
+  updateAdminButtonUI() {
+    if (!this.elements.adminToggleBtn) return;
+    
+    if (this.state.showAdminFeatures) {
+      this.elements.adminToggleBtn.textContent = '通常表示';
+      this.elements.adminToggleBtn.classList.add('active');
+    } else {
+      this.elements.adminToggleBtn.textContent = '管理モード';
+      this.elements.adminToggleBtn.classList.remove('active');
+    }
+  },
+
+  updateEndPublicationButtonUI() {
+    if (!this.elements.endPublicationBtn) return;
+    
+    if (this.state.showAdminFeatures) {
+      this.elements.endPublicationBtn.classList.remove('hidden');
+      this.elements.endPublicationBtn.removeAttribute('hidden');
+      this.elements.endPublicationBtn.style.display = '';
+    } else {
+      this.elements.endPublicationBtn.classList.add('hidden');
+      this.elements.endPublicationBtn.setAttribute('hidden', '');
+      this.elements.endPublicationBtn.style.display = 'none';
+    }
+  },
+
+  endPublication() {
+    // Publication end functionality would go here
+    pageLog('info', 'Publication end requested');
+  },
+
+  // Performance helpers
+  throttledUpdate(key, fn, delay) {
+    if (this.deferredUpdates.has(key)) {
+      return;
+    }
+    
+    this.deferredUpdates.add(key);
+    
+    setTimeout(() => {
+      fn();
+      this.deferredUpdates.delete(key);
+    }, delay);
+  },
+
+  cleanup() {
+    // Cleanup idle resources
+    if (this.domFragmentPool.length > 10) {
+      this.domFragmentPool.splice(5);
+    }
+  }
+
+});
+</script>

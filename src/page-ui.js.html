@@ -1,0 +1,646 @@
+<script>
+// =============================================================================
+// UI RENDERING & MODAL MANAGEMENT
+// UIレンダリング、モーダル管理、レイアウト調整
+// =============================================================================
+
+// Extend StudyQuestApp with UI methods
+Object.assign(StudyQuestApp.prototype, {
+
+  renderBoard(isLayoutChange = false, oldRows = []) {
+    // 管理者の場合はハイライトトグルを確実に有効化
+    if (this.state.isAdminUser && !this.state.showHighlightToggle) {
+      this.state.showHighlightToggle = true;
+      this.cache.clear();
+    }
+    
+    const container = this.elements.answersContainer;
+    container.querySelectorAll('.skeleton').forEach(el => el.remove());
+    const newRows = this.state.currentAnswers;
+    
+    // Batch DOM updates
+    const updates = [];
+    if (this.elements.sliderValue && this.elements.sizeSlider && 
+        this.elements.sliderValue.textContent !== this.elements.sizeSlider.value) {
+      updates.push(() => this.elements.sliderValue.textContent = this.elements.sizeSlider.value);
+    }
+    if (this.elements.sizeSlider) {
+      const newClassName = 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-' + this.elements.sizeSlider.value;
+      if (container.className !== newClassName) {
+        updates.push(() => container.className = newClassName);
+      }
+    }
+    if (this.elements.answerCount) {
+      const userIcon = this.getIcon('users', 'w-4 h-4 inline-block -mt-1');
+      const countHtml = userIcon + '<span>' + newRows.length + '件</span>';
+      if (this.elements.answerCount.innerHTML !== countHtml) {
+        updates.push(() => this.elements.answerCount.innerHTML = countHtml);
+      }
+    }
+    
+    this.batchDOMUpdates(updates);
+    
+    if (newRows.length === 0) {
+      this.displayEmptyState();
+    } else {
+      this.renderAnswerCards(newRows, oldRows, container);
+    }
+  },
+
+  displayEmptyState() {
+    const container = this.elements.answersContainer;
+    if (!container.querySelector('.no-answers')) {
+      container.innerHTML = '';
+      const p = document.createElement('p');
+      p.className = 'text-center text-gray-500 col-span-full mt-8 no-answers';
+      p.textContent = 'このクラスの回答はありません。';
+      container.appendChild(p);
+    }
+  },
+
+  renderAnswerCards(newRows, oldRows, container) {
+    const existingMap = new Map();
+    container.querySelectorAll('.answer-card').forEach(card => {
+      existingMap.set(card.dataset.rowIndex, card);
+    });
+    
+    // Remove cards for deleted rows
+    existingMap.forEach((card, id) => {
+      if (!newRows.some(r => String(r.rowIndex) === id)) {
+        card.remove();
+        existingMap.delete(id);
+      }
+    });
+    
+    const changedItems = [];
+    
+    // Enhanced batch processing with virtual scrolling for large datasets
+    if (newRows.length > RENDER_BATCH_SIZE) {
+      this.renderWithVirtualScrolling(newRows, oldRows, container, existingMap, changedItems);
+    } else {
+      this.renderNormalBatch(newRows, oldRows, container, existingMap, changedItems);
+    }
+    
+    // Defer updates for better performance
+    if (changedItems.length) {
+      this.deferredRender(() => this.applyUpdates(changedItems));
+    }
+  },
+
+  renderNormalBatch(newRows, oldRows, container, existingMap, changedItems) {
+    const fragment = this.getReusableFragment();
+    
+    newRows.forEach((row) => {
+      const rowId = String(row.rowIndex);
+      let card = existingMap.get(rowId);
+      const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
+      
+      if (!card) {
+        card = this.createAnswerCard(row);
+        card.classList.add('new-card');
+        
+        if (this.visibilityObserver) {
+          this.visibilityObserver.observe(card);
+        }
+        
+        changedItems.push(row);
+        fragment.appendChild(card);
+      } else {
+        this.updateExistingCard(card, row, oldData, changedItems);
+      }
+    });
+    
+    if (fragment.children.length > 0) {
+      container.appendChild(fragment);
+    }
+    
+    this.recycleFragment(fragment);
+  },
+
+  renderWithVirtualScrolling(newRows, oldRows, container, existingMap, changedItems) {
+    const batchSize = this.isLowPerformanceMode ? CHUNK_SIZE : RENDER_BATCH_SIZE;
+    let currentIndex = 0;
+    
+    const processBatch = () => {
+      const startTime = performance.now();
+      const endIndex = Math.min(currentIndex + batchSize, newRows.length);
+      const batch = newRows.slice(currentIndex, endIndex);
+      
+      const fragment = this.getReusableFragment();
+      
+      batch.forEach((row) => {
+        const rowId = String(row.rowIndex);
+        let card = existingMap.get(rowId);
+        const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
+        
+        if (!card) {
+          card = this.createAnswerCard(row);
+          card.classList.add('new-card');
+          
+          if (this.visibilityObserver) {
+            this.visibilityObserver.observe(card);
+          }
+          
+          changedItems.push(row);
+          fragment.appendChild(card);
+        } else {
+          this.updateExistingCard(card, row, oldData, changedItems);
+        }
+      });
+      
+      if (fragment.children.length > 0) {
+        container.appendChild(fragment);
+      }
+      
+      this.recycleFragment(fragment);
+      currentIndex = endIndex;
+      
+      if (currentIndex < newRows.length) {
+        const elapsed = performance.now() - startTime;
+        
+        if (elapsed < PERFORMANCE_BUDGET && !this.isLowPerformanceMode) {
+          processBatch();
+        } else {
+          this.deferredRender(processBatch);
+        }
+      }
+    };
+    
+    processBatch();
+  },
+
+  updateExistingCard(card, row, oldData, changedItems) {
+    if (oldData) {
+      let hasChanges = false;
+      
+      if (oldData.opinion !== row.opinion) {
+        const t = card.querySelector('.opinion-text');
+        if (t) {
+          t.textContent = row.opinion;
+          hasChanges = true;
+        }
+      }
+      
+      if (oldData.reason !== row.reason) {
+        const p = card.querySelector('.answer-preview p');
+        if (p) {
+          p.textContent = row.reason;
+          hasChanges = true;
+        }
+      }
+      
+      if (oldData.name !== row.name) {
+        const n = card.querySelector('.font-bold');
+        if (n) {
+          n.textContent = row.name;
+          hasChanges = true;
+        }
+      }
+      
+      if (JSON.stringify(oldData.reactions) !== JSON.stringify(row.reactions) || 
+          oldData.highlight !== row.highlight) {
+        hasChanges = true;
+      }
+      
+      if (hasChanges) {
+        changedItems.push(row);
+      }
+    }
+  },
+
+  createAnswerCard(data) {
+    const cacheKey = `${data.rowIndex}-${data.opinion?.slice(0,50)}-${data.reason?.slice(0,30)}-${data.name}-${JSON.stringify(data.reactions)}-${data.highlight}-${this.state.showCounts}-${this.state.displayMode}-${this.state.showHighlightToggle}`;
+    
+    const cachedCard = this.cache.get(`render-${cacheKey}`);
+    if (cachedCard) {
+      const clonedCard = cachedCard.cloneNode(true);
+      clonedCard.dataset.rowIndex = data.rowIndex;
+      
+      const reactionButtons = clonedCard.querySelectorAll('.reaction-btn');
+      reactionButtons.forEach(btn => {
+        btn.dataset.rowIndex = data.rowIndex;
+      });
+      
+      return clonedCard;
+    }
+    
+    const card = document.createElement('div');
+    const highlightClass = data.highlight ? ' highlighted' : '';
+    card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer' + highlightClass;
+    card.dataset.rowIndex = data.rowIndex;
+    card.setAttribute('role', 'article');
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('aria-label', '回答カード: ' + (data.opinion || '').substring(0, 50) + (data.opinion && data.opinion.length > 50 ? '...' : ''));
+    
+    let highlightBtnHtml = '';
+    if (this.state.showHighlightToggle) {
+      const cls = data.highlight ? 'liked' : '';
+      const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
+      highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
+    }
+    
+    const showName = this.state.displayMode === 'named';
+    let displayName = '';
+    
+    if (showName) {
+      if (data.name) {
+        displayName = data.name;
+      } else if (data.email) {
+        displayName = data.email.split('@')[0];
+      }
+    }
+    
+    const nameHtml = showName && displayName ? '<div class="name-display flex-shrink-0 mr-2"><span class="font-bold text-sm text-cyan-300 bg-gray-800/50 px-2 py-1 rounded border border-cyan-400">' + this.escapeHtml(displayName) + '</span></div>' : '';
+    const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex flex-col sm:flex-row justify-between items-start sm:items-center gap-y-1 min-h-[2rem]' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
+    
+    const reactionButtonsHtml = this.reactionTypes.map(rt => {
+      const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
+      const cls = info.reacted ? 'liked' : '';
+      const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+      const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-lg text-gray-200" aria-hidden="true">' + (info.count || 0) + '</span>' : '';
+      const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
+      const reactionName = reactionNames[rt.key] || rt.key;
+      const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
+      return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + ariaLabel + '" aria-pressed="' + info.reacted + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
+    }).join('');
+    
+    // Create main content div
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'relative flex-grow mb-3 answer-preview';
+    
+    const opinionTitle = document.createElement('h3');
+    opinionTitle.className = 'opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
+    opinionTitle.textContent = data.opinion || '';
+    
+    const reasonText = document.createElement('p');
+    reasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
+    reasonText.textContent = data.reason || '';
+    
+    contentDiv.appendChild(opinionTitle);
+    contentDiv.appendChild(reasonText);
+    
+    // Create footer div
+    const footerDiv = document.createElement('div');
+    footerDiv.className = containerClass;
+    
+    if (nameHtml) {
+      const nameContainer = document.createElement('div');
+      nameContainer.className = 'name-container flex-shrink-0';
+      nameContainer.innerHTML = nameHtml;
+      footerDiv.appendChild(nameContainer);
+    }
+    
+    // Create reaction container
+    const reactionContainer = document.createElement('div');
+    reactionContainer.className = 'reaction-container flex items-center gap-2';
+    reactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
+    footerDiv.appendChild(reactionContainer);
+    
+    card.appendChild(contentDiv);
+    card.appendChild(footerDiv);
+    
+    // Cache the created card
+    this.cache.set(`render-${cacheKey}`, card.cloneNode(true), 30000);
+    
+    return card;
+  },
+
+  showAnswerModal(rowIndex) {
+    let data = this.state.currentAnswers.find(r => r.rowIndex == rowIndex);
+    
+    if (!data && this.state.filteredData) {
+      data = this.state.filteredData.find(r => r.rowIndex == rowIndex);
+    }
+    
+    if (!data) {
+      pageLog('error', 'No data found for rowIndex:', rowIndex);
+      return;
+    }
+    
+    this.state.lastFocusedElement = document.activeElement;
+    this.elements.modalAnswer.innerHTML = '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + this.escapeHtml(data.opinion || '') + '</p>' + '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + this.escapeHtml(data.reason || '') + '</p>';
+    
+    const showName = this.state.displayMode === 'named';
+    let modalDisplayName = '';
+    
+    if (showName) {
+      if (data.name) {
+        modalDisplayName = data.name;
+      } else if (data.email) {
+        modalDisplayName = data.email.split('@')[0];
+      }
+    }
+    
+    this.elements.modalStudentName.textContent = modalDisplayName;
+    const footerBase = 'text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex';
+    this.elements.modalFooter.className = footerBase + (showName ? ' justify-between items-center' : ' justify-end items-center');
+    
+    const reactionButtonsHtml = this.reactionTypes.map(rt => {
+      const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
+      const cls = info.reacted ? 'liked' : '';
+      const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+      const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-gray-200">' + info.count + '</span>' : '';
+      return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
+    }).join('');
+    
+    let highlightBtnHtml = '';
+    if (this.state.showHighlightToggle) {
+      const cls = data.highlight ? 'liked' : '';
+      const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
+      highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
+    }
+    
+    this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
+    
+    this.applyReactionStyles(this.elements.answerModalCard, data);
+    
+    this.elements.answerModalContainer.classList.remove('hidden');
+    this.elements.answerModalContainer.classList.add('modal-fade');
+    this.elements.answerModalCard.classList.add('modal-scale');
+    
+    this.elements.answerModalCloseBtn.focus();
+  },
+
+  hideAnswerModal() {
+    this.elements.answerModalContainer.classList.add('hidden');
+    this.elements.answerModalContainer.classList.remove('modal-fade');
+    this.elements.answerModalCard.classList.remove('modal-scale');
+    if (this.state.lastFocusedElement) {
+      this.state.lastFocusedElement.focus();
+    }
+  },
+
+  showInfoModal() {
+    this.state.lastFocusedElement = document.activeElement;
+    this.elements.infoModalContainer.classList.remove('hidden');
+    this.elements.infoModalContainer.classList.add('modal-fade');
+    this.elements.infoModalCard.classList.add('modal-scale');
+    
+    this.elements.infoModalCard.scrollTop = 0;
+    
+    setTimeout(() => {
+      this.elements.infoModalConfirmBtn.focus();
+    }, 100);
+  },
+
+  hideInfoModal() {
+    this.elements.infoModalContainer.classList.add('hidden');
+    this.elements.infoModalContainer.classList.remove('modal-fade');
+    this.elements.infoModalCard.classList.remove('modal-scale');
+    
+    localStorage.setItem('introSeen', '1');
+    if (this.state.lastFocusedElement) {
+      this.state.lastFocusedElement.focus();
+    }
+  },
+
+  getIcon(name, classes = '', solid = false) {
+    const cacheKey = `icon-${name}-${classes}-${solid}`;
+    const cachedIcon = this.cache.get(cacheKey);
+    if (cachedIcon) {
+      return cachedIcon;
+    }
+    
+    let key = name;
+    if (ICONS[name + '-outline'] || ICONS[name + '-solid']) {
+      key = solid ? name + '-solid' : name + '-outline';
+    }
+    const icon = ICONS[key];
+    if (!icon) {
+      pageLog('warn', 'Icon not found:', key);
+      const fallback = '<span aria-hidden="true" class="' + classes + '">⭐</span>';
+      this.cache.set(cacheKey, fallback);
+      return fallback;
+    }
+    const result = '<span aria-hidden="true" class="' + classes + '">' + icon + '</span>';
+    this.cache.set(cacheKey, result);
+    return result;
+  },
+
+  renderIcons() {
+    if (this.elements.infoIconLike) {
+      this.elements.infoIconLike.innerHTML = this.getIcon('hand-thumb-up');
+    }
+    if (this.elements.infoIconUnderstand) {
+      this.elements.infoIconUnderstand.innerHTML = this.getIcon('lightbulb');
+    }
+    if (this.elements.infoIconCurious) {
+      this.elements.infoIconCurious.innerHTML = this.getIcon('magnifying-glass-plus');
+    }
+    if (this.elements.infoIconHighlight) {
+      this.elements.infoIconHighlight.innerHTML = this.getIcon('star');
+    }
+    if (this.elements.iconClose) {
+      this.elements.iconClose.innerHTML = this.getIcon('x');
+    }
+    if (this.elements.iconGrid) {
+      this.elements.iconGrid.innerHTML = this.getIcon('grid-2x2');
+    }
+  },
+
+  adjustLayout() {
+    if (this.baseBodyPadding === undefined) {
+      this.baseBodyPadding = parseFloat(getComputedStyle(this.elements.body).paddingBottom) || 0;
+    }
+    const footerHeight = this.elements.footer.offsetHeight;
+    this.elements.body.style.paddingBottom = footerHeight + this.baseBodyPadding + 'px';
+  },
+
+  updateSortOptions() {
+    if (this.elements.scoreOption) {
+      if (this.state.showScoreSort) {
+        this.elements.scoreOption.style.display = '';
+      } else {
+        this.elements.scoreOption.style.display = 'none';
+      }
+    }
+  },
+
+  optimizeForLowPerformance() {
+    pageLog('info', 'Enabling low performance optimizations');
+    
+    document.documentElement.style.setProperty('--transition-duration', '0.1s');
+    document.documentElement.style.setProperty('--animation-duration', '0.1s');
+    document.documentElement.style.setProperty('--backdrop-blur', '4px');
+    
+    const style = document.createElement('style');
+    style.id = 'low-performance-optimizations';
+    style.textContent = `
+      .glass-panel {
+        -webkit-backdrop-filter: blur(4px) !important;
+        backdrop-filter: blur(4px) !important;
+        background: var(--color-surface) !important;
+      }
+      
+      .answer-card:hover {
+        transform: none !important;
+        box-shadow: var(--shadow-sm) !important;
+      }
+      
+      .reaction-btn:hover {
+        transform: scale(1.02) !important;
+      }
+      
+      .game-btn:hover {
+        transform: translateY(-1px) !important;
+      }
+      
+      .answer-card.highlighted {
+        transform: none !important;
+        border: 3px solid #9333ea !important;
+        border-image: none !important;
+        box-shadow: 0 0 12px rgba(147, 51, 234, 0.5) !important;
+      }
+      
+      * {
+        will-change: auto !important;
+      }
+      
+      .answer-card {
+        box-shadow: var(--shadow-sm) !important;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    document.body.classList.add('low-performance');
+    
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = setInterval(() => this.loadSheetData(false), 30000);
+    }
+  },
+
+  setupObservers() {
+    if ('IntersectionObserver' in window) {
+      this.visibilityObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          const card = entry.target;
+          const rect = card.getBoundingClientRect();
+          const isPartiallyVisible = rect.top < window.innerHeight && rect.bottom > 0;
+          
+          if (entry.isIntersecting) {
+            card.classList.add('visible');
+            card.classList.remove('hidden-card');
+          } else if (!isPartiallyVisible) {
+            card.classList.remove('visible');
+            card.classList.add('hidden-card');
+          }
+        });
+      }, {
+        rootMargin: `${VIEWPORT_BUFFER}px`,
+        threshold: [0, 0.1, 0.5, 1.0]
+      });
+    }
+
+    if ('ResizeObserver' in window) {
+      this.resizeObserver = new ResizeObserver(debounce(() => {
+        this.adjustLayout();
+      }, 100));
+      this.resizeObserver.observe(this.elements.answersContainer);
+    }
+  },
+
+  deferredRender(callback, priority = 'normal') {
+    if (this.isLowPerformanceMode) {
+      this.idleCallbackId = requestIdleCallback(callback, { timeout: IDLE_TIMEOUT });
+    } else {
+      this.animationFrameId = requestAnimationFrame(callback);
+    }
+  },
+
+  batchDOMUpdates(updates) {
+    const startTime = performance.now();
+    let processedCount = 0;
+    
+    const processBatch = () => {
+      while (processedCount < updates.length && (performance.now() - startTime) < PERFORMANCE_BUDGET) {
+        updates[processedCount]();
+        processedCount++;
+      }
+      
+      if (processedCount < updates.length) {
+        requestAnimationFrame(processBatch);
+      }
+    };
+    
+    processBatch();
+  },
+
+  getReusableFragment() {
+    if (this.domFragmentPool.length > 0) {
+      return this.domFragmentPool.pop();
+    }
+    return document.createDocumentFragment();
+  },
+
+  recycleFragment(fragment) {
+    while (fragment.firstChild) {
+      fragment.removeChild(fragment.firstChild);
+    }
+    if (this.domFragmentPool.length < 10) {
+      this.domFragmentPool.push(fragment);
+    }
+  },
+
+  // New content banner management
+  showNewContentBanner(newItems) {
+    if (!this.elements.newContentBanner || !newItems || newItems.length === 0) return;
+    
+    const count = newItems.reduce((sum, item) => sum + (item.count || 1), 0);
+    if (this.elements.newContentText) {
+      this.elements.newContentText.textContent = `新しい回答が${count}件追加されました`;
+    }
+    
+    this.elements.newContentBanner.classList.remove('hidden');
+    this.elements.newContentBanner.classList.add('banner-fade-in');
+  },
+
+  dismissNewContentBanner() {
+    if (!this.elements.newContentBanner) return;
+    
+    this.elements.newContentBanner.classList.add('hidden');
+    this.elements.newContentBanner.classList.remove('banner-fade-in');
+    this.state.hasNewContent = false;
+    this.state.newContentCount = 0;
+  },
+
+  // Style application methods
+  applyReactionStyles(element, data) {
+    if (!element || !data) return;
+    
+    // Apply highlight styles
+    if (data.highlight) {
+      element.classList.add('highlighted');
+    } else {
+      element.classList.remove('highlighted');
+    }
+    
+    // Apply reaction-based styles if needed
+    if (data.reactions) {
+      const hasLikes = data.reactions.LIKE && data.reactions.LIKE.count > 0;
+      const hasUnderstands = data.reactions.UNDERSTAND && data.reactions.UNDERSTAND.count > 0;
+      const hasCurious = data.reactions.CURIOUS && data.reactions.CURIOUS.count > 0;
+      
+      if (hasLikes) element.classList.add('has-likes');
+      else element.classList.remove('has-likes');
+      
+      if (hasUnderstands) element.classList.add('has-understands');
+      else element.classList.remove('has-understands');
+      
+      if (hasCurious) element.classList.add('has-curious');
+      else element.classList.remove('has-curious');
+    }
+  },
+
+  applyUpdates(changedItems) {
+    // Apply any deferred updates to changed items
+    changedItems.forEach(item => {
+      const cards = document.querySelectorAll(`[data-row-index="${item.rowIndex}"]`);
+      cards.forEach(card => {
+        this.applyReactionStyles(card, item);
+      });
+    });
+  }
+
+});
+</script>
