@@ -1587,7 +1587,7 @@ function buildResponseFromContext(context) {
       // URL情報（キャッシュされた値を使用）
       appUrls: {
         webAppUrl: ScriptApp.getService().getUrl(),
-        viewUrl: userInfo.viewUrl || generateViewUrl(context.requestUserId),
+        viewUrl: userInfo.viewUrl || (ScriptApp.getService().getUrl() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view'),
         setupUrl: ScriptApp.getService().getUrl() + '?setup=true',
         adminUrl: ScriptApp.getService().getUrl() + '?mode=admin&userId=' + context.requestUserId,
         status: 'success'
