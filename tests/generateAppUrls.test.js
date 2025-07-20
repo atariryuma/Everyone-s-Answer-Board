@@ -7,9 +7,10 @@ describe('generateAppUrls admin url', () => {
   let context;
 
   beforeEach(() => {
+    const store = {};
     context = {
       cacheManager: {
-        store: {},
+        store,
         get(key, fn) { return fn(); },
         remove() {}
       },
@@ -26,6 +27,7 @@ describe('generateAppUrls admin url', () => {
           }
         })
       },
+
       CacheService: (() => {
         const store = {};
         return {
@@ -40,6 +42,7 @@ describe('generateAppUrls admin url', () => {
           })
         };
       })(),
+        
       Session: {
         getActiveUser: () => ({ getEmail: () => 'test@example.com' })
       },
@@ -52,6 +55,7 @@ describe('generateAppUrls admin url', () => {
     vm.createContext(context);
     vm.runInContext(urlCode, context);
     vm.runInContext(mainCode, context);
+    vm.runInContext(urlCode, context);
   });
 
   test('returns adminUrl with userId and mode parameter', () => {

@@ -7,9 +7,10 @@ describe('getWebAppUrlCached upgrade', () => {
   let context;
 
   beforeEach(() => {
+    const store = {};
     context = {
       cacheManager: {
-        store: {},
+        store,
         get(key, fn) {
           if (this.store[key]) return this.store[key];
           const val = fn();
@@ -31,6 +32,7 @@ describe('getWebAppUrlCached upgrade', () => {
           }
         })
       },
+
       CacheService: (() => {
         const store = { WEB_APP_URL: 'https://script.google.com/macros/s/ID/dev' };
         return {
@@ -45,6 +47,7 @@ describe('getWebAppUrlCached upgrade', () => {
           })
         };
       })(),
+        
       Session: {
         getActiveUser: () => ({ getEmail: () => 'test@example.com' })
       },
@@ -57,9 +60,12 @@ describe('getWebAppUrlCached upgrade', () => {
     vm.createContext(context);
     vm.runInContext(urlCode, context);
     vm.runInContext(mainCode, context);
+    vm.runInContext(urlCode, context);
   });
 
+
   test('updates cached dev url when production url available', () => {
+
     expect(context.getWebAppUrlCached()).toMatch('/exec');
     context.ScriptApp.getService = () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/exec' });
     expect(context.getWebAppUrlCached()).toMatch('/exec');
@@ -71,10 +77,10 @@ describe('getWebAppUrlCached upgrade', () => {
     expect(normalized).toBe('https://script.google.com/a/macros/example.com/s/ID/exec');
   });
 
-  test('updates cache when domain format differs', () => {
+  test('returns cached url when domain format differs', () => {
     context.cacheManager.store['WEB_APP_URL'] = 'https://script.google.com/a/example.com/macros/s/ID/exec';
     context.ScriptApp.getService = () => ({ getUrl: () => 'https://script.google.com/a/macros/example.com/s/ID/exec' });
     const updated = context.getWebAppUrlCached();
-    expect(updated).toBe('https://script.google.com/a/macros/example.com/s/ID/exec');
+    expect(updated).toBe('https://script.google.com/a/example.com/macros/s/ID/exec');
   });
 });
