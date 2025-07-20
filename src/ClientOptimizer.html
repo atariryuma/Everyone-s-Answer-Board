@@ -40,6 +40,12 @@ class GASOptimizer {
     // ローディング状態の管理
     this.setLoadingState(functionName, true);
 
+    // --- NEW ADDITION FOR DEBUGGING --- 
+    console.log(`DEBUG: Attempting to call google.script.run.${functionName}`);
+    console.log(`DEBUG: typeof google.script.run: ${typeof google.script.run}`);
+    console.log(`DEBUG: typeof google.script.run[functionName]: ${typeof google.script.run[functionName]}`);
+    // --- END NEW ADDITION --- 
+
     google.script.run[functionName](...args) // Corrected line
       .withSuccessHandler((result) => {
         this.activeCalls--;
