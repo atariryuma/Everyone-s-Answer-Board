@@ -914,6 +914,9 @@ function appendSheetsData(service, spreadsheetId, range, values) {
  */
 function getSpreadsheetsData(service, spreadsheetId) {
   try {
+    if (!service || !service.baseUrl) {
+      throw new Error('Sheets APIサービスオブジェクトが無効です。baseUrlが見つかりません。');
+    }
     // シート情報を含む基本的なメタデータを取得するために fields パラメータを追加
     var url = service.baseUrl + '/' + spreadsheetId + '?fields=sheets.properties';
     var response = UrlFetchApp.fetch(url, {
