@@ -3,6 +3,40 @@
 // ADMIN PANEL CORE UTILITIES & DOM OPERATIONS
 // =============================================================================
 
+// =============================================================================
+// LOGGING UTILITIES - Standardized logging with levels
+// =============================================================================
+
+// Simple logging utility with conditional output based on DEBUG mode
+const DEBUG_MODE = window.DEBUG_MODE || false;
+
+function adminLog(level, ...args) {
+  if (!DEBUG_MODE) return;
+  
+  switch (level) {
+    case 'error':
+      console.error('[AdminPanel]', ...args);
+      break;
+    case 'warn':
+      console.warn('[AdminPanel]', ...args);
+      break;
+    case 'info':
+      console.log('[AdminPanel]', ...args);
+      break;
+    case 'debug':
+      if (DEBUG_MODE) console.log('[AdminPanel:DEBUG]', ...args);
+      break;
+    default:
+      console.log('[AdminPanel]', ...args);
+  }
+}
+
+// Convenience functions for different log levels
+function logError(...args) { adminLog('error', ...args); }
+function logWarn(...args) { adminLog('warn', ...args); }
+function logInfo(...args) { adminLog('info', ...args); }
+function logDebug(...args) { adminLog('debug', ...args); }
+
 // Use SharedUtilities instead of local debounce
 var debounce = window.debounce || function(func, delay, key) {
   window.sharedUtilities.debounce.debounce(func, key || 'default', delay);

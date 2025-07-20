@@ -9,47 +9,24 @@
 
 // マルチテナント対応: 新しいrunGasWithUserId関数
 function runGasWithUserId(functionName, ...args) {
-  console.group(`🔄 runGasWithUserId: ${functionName}`);
-  console.log('📝 Input args:', args);
-  console.log('🆔 Current userId:', userId);
-  console.log('⏳ userIdPromise status:', typeof userIdPromise);
-  
   // userIdが設定されていない場合は初期化を待つ
   if (!userId) {
-    console.log('⏳ userId not set, waiting for userIdPromise...');
-    
     return userIdPromise.then(() => {
-      console.log('✅ userIdPromise resolved, userId:', userId);
-      
       if (!userId) {
-        console.error('❌ No userId available after promise resolution for:', functionName);
-        console.groupEnd();
+        logError('No userId available for:', functionName);
         throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
       }
       
-      console.log('✅ runGasWithUserId (after init):', functionName, 'userId:', userId);
-      console.log('🔧 Calling gasOptimizer.call with:', functionName, userId, ...args);
-      
       // userIdを第一引数として追加
-      const result = gasOptimizer.call(functionName, userId, ...args);
-      console.log('📤 gasOptimizer.call result:', result);
-      console.groupEnd();
-      return result;
+      return gasOptimizer.call(functionName, userId, ...args);
     }).catch((error) => {
-      console.error('❌ userIdPromise rejected:', error);
-      console.groupEnd();
+      logError('userIdPromise rejected:', error);
       throw error;
     });
   }
   
-  console.log('✅ runGasWithUserId (immediate):', functionName, 'userId:', userId);
-  console.log('🔧 Calling gasOptimizer.call with:', functionName, userId, ...args);
-  
   // userIdを第一引数として追加
-  const result = gasOptimizer.call(functionName, userId, ...args);
-  console.log('📤 gasOptimizer.call result:', result);
-  console.groupEnd();
-  return result;
+  return gasOptimizer.call(functionName, userId, ...args);
 }
 
 // callWithCache 関数 - 読み取り専用操作用
@@ -86,8 +63,8 @@ function loadStatus(forceRefresh = false) {
   updateUserActivity();
   
   const statusMessage = forceRefresh ? 
-    '📊 システム情報を最新化しています...' : 
-    '📋 ダッシュボードを読み込んでいます...';
+    'システム情報を最新化しています...' : 
+    'ダッシュボードを読み込んでいます...';
   
   setLoading(true, statusMessage);
   
@@ -102,16 +79,14 @@ function loadStatus(forceRefresh = false) {
     // マルチテナント対応: 新しい関数を使用
     runGasWithUserId('getAppConfig')
       .then(function(status) {
-        console.log('✅ Status loaded ( forced refresh)', status);
         updateUIWithNewStatus(status);
         setLoading(false);
       })
       .catch(function(error) {
-        console.error('❌  getAppConfig failed, falling back to legacy:', error);
+        logError('getAppConfig failed, falling back to legacy:', error);
         // フォールバック: 従来の方法
         runGasWithUserId('getStatus', forceRefresh)
           .then(function(status) {
-            console.log('✅ Status loaded (legacy fallback)', status);
             updateUIWithNewStatus(status);
             setLoading(false);
           })
@@ -123,7 +98,6 @@ function loadStatus(forceRefresh = false) {
     // キャッシュ利用
     callWithCacheWithUserId('getAppConfig', cacheKey, cacheTime)
       .then(function(status) {
-        console.log('✅ Status loaded (cached)', status);
         updateUIWithNewStatus(status);
         setLoading(false);
       })
@@ -135,31 +109,18 @@ function loadStatus(forceRefresh = false) {
 
 // Load sheet configuration for selected sheet
 function loadConfigForSelected() {
-  console.group('🔧 loadConfigForSelected');
-  
   if (!selectedSheet) {
-    console.warn('❌ No sheet selected for config loading');
-    console.groupEnd();
+    logWarn('No sheet selected for config loading');
     return;
   }
   
   if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
-    console.error('❌ Missing required data:', {
-      hasCurrentStatus: !!currentStatus,
-      hasUserInfo: !!(currentStatus && currentStatus.userInfo),
-      hasSpreadsheetId: !!(currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId)
-    });
+    logError('Missing required data for loadConfigForSelected');
     showMessage('スプレッドシートの情報が見つかりません。', 'error');
-    console.groupEnd();
     return;
   }
   
-  console.log('📊 Loading config for:', {
-    selectedSheet: selectedSheet,
-    spreadsheetId: currentStatus.userInfo.spreadsheetId
-  });
-  
-  setLoading(true, '📋 列情報を読み込んでいます...');
+  setLoading(true, '列情報を読み込んでいます...');
   
   runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
     .then(handleSheetDetailsSuccess)
@@ -168,10 +129,7 @@ function loadConfigForSelected() {
 
 // Handle successful sheet details loading
 function handleSheetDetailsSuccess(details) {
-  console.log('✅ Sheet details loaded:', details);
-  
   if (details && details.allHeaders) {
-    console.log('📋 Populating header options with:', details.allHeaders);
     populateHeaderOptions(details.allHeaders);
     
     // Show config area and hide placeholder
@@ -180,37 +138,30 @@ function handleSheetDetailsSuccess(details) {
     
     if (configArea) {
       configArea.classList.remove('hidden');
-      console.log('✅ Config area shown');
     }
     
     if (configPlaceholder) {
       configPlaceholder.classList.add('hidden');
-      console.log('✅ Config placeholder hidden');
     }
     
     if (details.guessedConfig) {
-      console.log('🤖 AI config available:', details.guessedConfig);
-      // populateConfig(details.guessedConfig); // ここを修正
       // DOMの更新が完了するのを待ってからpopulateConfigを呼び出す
       setTimeout(() => {
         populateConfig(details.guessedConfig);
         showMessage('AI列判定が完了しました。設定を確認してください。', 'success');
-      }, 0); // 0msのsetTimeoutでイベントループの最後に実行
-    } else {
-      console.log('⚠️ No AI config available');
+      }, 0);
     }
   } else {
-    console.warn('⚠️ No headers in sheet details:', details);
+    logWarn('No headers in sheet details:', details);
     showMessage('シートの詳細情報を取得できませんでした。', 'warning');
   }
   
   setLoading(false);
-  console.groupEnd();
 }
 
 // Handle sheet details loading error
 function handleSheetDetailsError(error) {
-  console.error('❌ Sheet details failed:', error);
+  logError('Sheet details failed:', error);
   handleError(error, 'loadConfigForSelected', 'シート情報の読み込みに失敗しました。');
 }
 
@@ -256,36 +207,27 @@ function runHeaderGuessing() {
 
 // Save configuration and publish board
 function saveAndPublish() {
-  console.group('💾 saveAndPublish');
-  
   if (!validateConfig()) {
-    console.error('❌ Validation failed');
     showMessage('必須項目（回答データ列）が選択されていません。', 'error');
-    console.groupEnd();
     return;
   }
   
   setLoading(true, '設定を保存し、ボードを公開しています...');
   
   const config = buildConfigObject();
-  console.log('📦 Config to save:', config);
   
   // PRE-SAVE: Aggressive cache clearing to prevent stale data issues
-  console.log('🧹 Pre-save: Clearing all caches to prevent stale data');
   if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
     window.unifiedCache.clear();
-    console.log('✅ Pre-save: UnifiedCache cleared');
   }
   
   // Clear GAS optimizer cache if available
   if (window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
     window.gasOptimizer.clearCache();
-    console.log('✅ Pre-save: GAS optimizer cache cleared');
   }
   
   runGasWithUserId('saveAndPublish', selectedSheet, config)
     .then(function(result) {
-      console.log('📥 saveAndPublish result:', result);
       setLoading(false);
       
       // Check if result has data (from integrated API) or legacy success status
@@ -294,13 +236,11 @@ function saveAndPublish() {
         
         // POST-SAVE: Maintain existing cache clearing
         if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-          console.log('🧹 Post-save: Clearing unifiedCache');
           window.unifiedCache.clear();
         }
         
         // If integrated API returned data, use it immediately
         if (result.userInfo && result._meta) {
-          console.log('🚀 Using integrated API response for immediate UI update');
           updateUIWithNewStatus(result);
         }
         
@@ -308,39 +248,30 @@ function saveAndPublish() {
         setTimeout(() => {
           if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
             window.unifiedCache.clear();
-            console.log('🧹 Safety: Secondary cache clear completed');
           }
         }, 500);
         
         // Additional forced refresh with delay to ensure sync
-        console.log('🔄 Scheduling delayed status refresh for synchronization');
         setTimeout(() => {
           loadStatus(true);
-          console.log('✅ Delayed status refresh completed');
         }, 1000);
-        
-        console.log('✅ Save and publish completed successfully');
       } else {
-        console.error('❌ Save failed:', result);
+        logError('Save failed:', result);
         showMessage(result.message || '設定の保存に失敗しました。', 'error');
       }
-      console.groupEnd();
     })
     .catch(function(error) {
-      console.error('❌ saveAndPublish error:', error);
+      logError('saveAndPublish error:', error);
       setLoading(false);
       
-      // PHASE3: Enhanced error handling with rollback support
+      // Enhanced error handling with rollback support
       if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-        console.log('🧹 Error: Clearing cache after error');
         window.unifiedCache.clear();
       }
       
       // Try to reload current state to ensure UI consistency
-      console.log('🔄 Reloading current state after error');
       loadStatus(true);
       
-      console.groupEnd();
       handleError(error, 'saveAndPublish', '設定の保存に失敗しました。システム状態を再読み込みしました。');
     });
 }
@@ -736,8 +667,6 @@ function updateOverallProgress(percentage, statusMessage) {
 
 // Simulate QuickStart progress (for demonstration)
 function simulateQuickStartProgress() {
-  console.log('🎬 Simulating QuickStart progress');
-  
   // Step 1: Folder creation
   updateProgressStep(1, 'active', 'ユーザー専用フォルダの作成', 'フォルダ構造を準備中...');
   updateOverallProgress(10, 'フォルダを作成しています...');
@@ -767,73 +696,41 @@ function simulateQuickStartProgress() {
 
 // Handle quick start setup
 function handleQuickStart() {
-  console.group('🚀 QuickStart Function Called');
-  console.log('🔍 Step 1: Function entry');
-  
   const quickstartBtn = document.getElementById('quickstart-btn');
   const quickstartText = document.getElementById('quickstart-text');
   
-  console.log('🔍 Step 2: DOM elements check', {
-    quickstartBtn: !!quickstartBtn,
-    quickstartText: !!quickstartText
-  });
-  
   if (!quickstartBtn || !quickstartText) {
-    console.error('❌ QuickStart elements not found');
-    console.groupEnd();
+    console.error('QuickStart elements not found');
     return;
   }
-  
-  console.log('🔍 Step 3: Function availability check', {
-    runGasWithUserId: typeof runGasWithUserId,
-    setLoading: typeof setLoading,
-    showMessage: typeof showMessage,
-    userId: typeof userId !== 'undefined' ? userId : 'undefined',
-    userIdPromise: typeof userIdPromise
-  });
   
   // Update button state
   quickstartBtn.disabled = true;
   quickstartText.textContent = 'セットアップ中...';
-  console.log('🔍 Step 4: Button state updated');
   
   // Show progress bar and start simulation
   showQuickStartProgress();
   simulateQuickStartProgress();
-  console.log('🔍 Step 5: Progress bar shown and simulation started');
   
   // Show loading message optimized for QuickStart
   if (typeof setLoading === 'function') {
-    setLoading(true, '🚀 クイックスタートを実行中... 進捗は上記で確認できます');
-    console.log('🔍 Step 6: Loading state set');
-  } else {
-    console.warn('⚠️ setLoading function not available');
+    setLoading(true, 'クイックスタートを実行中... 進捗は上記で確認できます');
   }
-  
-  console.log('🔍 Step 7: About to call runGasWithUserId');
   
   runGasWithUserId('quickStartSetup')
     .then(function(result) {
-      console.log('✅ QuickStart backend call succeeded:', result);
-      
       if (result && result.status === 'success') {
-        console.log('✅ QuickStart completed successfully');
-        
         // Final progress update
         updateOverallProgress(100, 'セットアップが完了しました！');
         updateProgressStep(4, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
         
-        if (typeof showMessage === 'function') {
-          showMessage('✅ クイックスタートが完了しました！フォームとボードが自動作成されました。', 'success');
-        }
+        showMessage('✅ クイックスタートが完了しました！フォームとボードが自動作成されました。', 'success');
         
         // Update status after quick start
-        if (typeof loadStatus === 'function') {
-          if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-            window.unifiedCache.clear();
-          }
-          loadStatus(true);
+        if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+          window.unifiedCache.clear();
         }
+        loadStatus(true);
         
         // Reset button state
         quickstartBtn.disabled = false;
@@ -846,15 +743,13 @@ function handleQuickStart() {
           quickstartBtn.disabled = false;
         }, 5000);
       } else {
-        console.warn('⚠️ QuickStart returned error result:', result);
+        logWarn('QuickStart returned error result:', result);
         
         // Show error in progress
         updateProgressStep(4, 'error', 'セットアップエラー', result?.message || 'エラーが発生しました');
         updateOverallProgress(0, 'セットアップに失敗しました');
         
-        if (typeof showMessage === 'function') {
-          showMessage(result?.message || 'クイックスタートに失敗しました。', 'error');
-        }
+        showMessage(result?.message || 'クイックスタートに失敗しました。', 'error');
         
         quickstartBtn.disabled = false;
         quickstartText.textContent = 'クイックスタートを開始';
@@ -865,19 +760,10 @@ function handleQuickStart() {
         }, 3000);
       }
       
-      if (typeof setLoading === 'function') {
-        setLoading(false);
-      }
-      
-      console.groupEnd();
+      setLoading(false);
     })
     .catch(function(error) {
-      console.error('❌ QuickStart error:', error);
-      console.error('❌ Error details:', {
-        message: error.message,
-        stack: error.stack,
-        type: error.constructor.name
-      });
+      logError('QuickStart error:', error);
       
       // Show error in progress
       updateProgressStep(4, 'error', 'セットアップエラー', '通信エラーが発生しました');
@@ -885,23 +771,18 @@ function handleQuickStart() {
       
       if (typeof handleError === 'function') {
         handleError(error, 'handleQuickStart', 'クイックスタートに失敗しました。');
-      } else if (typeof showMessage === 'function') {
+      } else {
         showMessage('クイックスタートに失敗しました: ' + error.message, 'error');
       }
       
       quickstartBtn.disabled = false;
       quickstartText.textContent = 'クイックスタートを開始';
-      
-      if (typeof setLoading === 'function') {
-        setLoading(false);
-      }
+      setLoading(false);
       
       // Hide progress bar after delay
       setTimeout(() => {
         hideQuickStartProgress();
       }, 3000);
-      
-      console.groupEnd();
     });
 }
 
@@ -911,8 +792,6 @@ function handleQuickStart() {
 
 // Initialize API communications
 function initializeAPI() {
-  console.log('✅ AdminPanel: API communications ready');
-  
   // Start background status updates
   startSystemStatusUpdate();
   

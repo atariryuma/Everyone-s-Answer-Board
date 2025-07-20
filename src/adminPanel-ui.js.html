@@ -11,11 +11,7 @@ let lastSelectedSheetName = null; // To prevent redundant sheet selection change
 
 // Unified publication state detection
 function getPublicationState(status) {
-  console.group('📊 getPublicationState');
-  
   if (!status) {
-    console.warn('❌ No status provided');
-    console.groupEnd();
     return { isPublished: false, reason: 'No status data' };
   }
   
@@ -42,7 +38,7 @@ function getPublicationState(status) {
         reason = 'configJson.appPublished=true';
       }
     } catch (e) {
-      console.warn('⚠️ Failed to parse configJson:', e);
+      console.warn('Failed to parse configJson:', e);
     }
   }
   
@@ -52,51 +48,33 @@ function getPublicationState(status) {
     reason = 'activeSheetName exists (fallback)';
   }
   
-  const result = { isPublished, reason };
-  console.log('📊 Publication state result:', result);
-  console.groupEnd();
-  
-  return result;
+  return { isPublished, reason };
 }
 
 // Generate viewUrl with comprehensive fallback logic
 function generateViewUrl(status, userId) {
-  console.group('🔗 generateViewUrl');
-  
   // 1. Use existing viewUrl if available
   let viewUrl = status.appUrls?.viewUrl;
   if (viewUrl) {
-    console.log('✅ Using existing viewUrl:', viewUrl);
-    console.groupEnd();
     return viewUrl;
   }
   
   // 2. Generate from appUrls.webApp with userId
   if (status.appUrls?.webApp && userId) {
-    viewUrl = status.appUrls.webApp + '?userId=' + encodeURIComponent(userId) + '&mode=view';
-    console.log('🔧 Generated from appUrls.webApp:', viewUrl);
-    console.groupEnd();
-    return viewUrl;
+    return status.appUrls.webApp + '?userId=' + encodeURIComponent(userId) + '&mode=view';
   }
   
   // 3. Generate from status.webAppUrl with userId
   if (status.webAppUrl && userId) {
-    viewUrl = status.webAppUrl + '?userId=' + encodeURIComponent(userId) + '&mode=view';
-    console.log('🔧 Generated from webAppUrl:', viewUrl);
-    console.groupEnd();
-    return viewUrl;
+    return status.webAppUrl + '?userId=' + encodeURIComponent(userId) + '&mode=view';
   }
   
   // 4. Simple fallback without userId
   if (status.appUrls?.webApp) {
-    viewUrl = status.appUrls.webApp + '?mode=view';
-    console.log('🔧 Simple fallback from webApp:', viewUrl);
-    console.groupEnd();
-    return viewUrl;
+    return status.appUrls.webApp + '?mode=view';
   }
   
-  console.warn('❌ Could not generate viewUrl');
-  console.groupEnd();
+  logWarn('Could not generate viewUrl');
   return null;
 }
 
@@ -106,11 +84,8 @@ function generateViewUrl(status, userId) {
 
 // Update UI with new status data
 function updateUIWithNewStatus(status) {
-  console.group('🔄 updateUIWithNewStatus');
-  
   if (!validateStatus(status)) {
-    console.warn('Invalid status received, skipping UI update');
-    console.groupEnd();
+    logWarn('Invalid status received, skipping UI update');
     return;
   }
   
@@ -127,11 +102,9 @@ function updateUIWithNewStatus(status) {
   };
   
   currentStatus = status;
-  console.log('✅ AdminPanel: Status updated with normalized data:', status._normalized);
   
   // セットアップ状況を確認
   const setupStatus = getSetupStatusFromUserInfo(status.userInfo);
-  console.log('🔧 Setup Status:', setupStatus);
   
   // 固定表示要素をクリア（setupStatus関係なく実行）
   clearInitialDisplayElements();
@@ -142,7 +115,6 @@ function updateUIWithNewStatus(status) {
   // セットアップ未完了時の追加処理
   if (setupStatus === 'pending') {
     updateButtonStatesForSetup(status);
-    console.log('🔧 セットアップ未完了: ボタン状態を調整しました');
   }
   
   // Update dynamic content based on state
@@ -166,17 +138,11 @@ function updateUIWithNewStatus(status) {
   // Update unpublish button state
   updateUnpublishButton(status);
 
-  // --- NEW ADDITION FOR INITIAL COLUMN LOADING ---
   // If an active sheet is set on initial load, load its configuration
   if (status.activeSheetName && status.userInfo && status.userInfo.spreadsheetId) {
-    console.log('📋 Initial load: Loading config for active sheet:', status.activeSheetName);
-    // Ensure selectedSheet is correctly set before calling loadConfigForSelected
-    selectedSheet = status.activeSheetName; // This might be redundant if populateSheetSelect already did it, but ensures it.
+    selectedSheet = status.activeSheetName;
     loadConfigForSelected(status.activeSheetName, status.userInfo.spreadsheetId);
   }
-  // --- END NEW ADDITION ---
-  
-  console.groupEnd();
 }
 
 // Update unpublish button state
@@ -301,8 +267,6 @@ function updatePublicationStatusUI(isPublished) {
 
 // チェックボックスの状態を同期する関数
 function syncCheckboxStates(status) {
-  console.group('☑️ syncCheckboxStates');
-  
   // Priority: Database config (configJson) > status properties > defaults
   let showNames = false;
   let showCounts = true;
@@ -311,16 +275,14 @@ function syncCheckboxStates(status) {
   if (status.config) {
     if (status.config.showNames !== undefined) showNames = status.config.showNames;
     if (status.config.showCounts !== undefined) showCounts = status.config.showCounts;
-    console.log('📊 Using status.config:', { showNames, showCounts });
   } else if (status.userInfo?.configJson) {
     // 2. Fallback to raw configJson
     try {
       const config = JSON.parse(status.userInfo.configJson);
       if (config.showNames !== undefined) showNames = config.showNames;
       if (config.showCounts !== undefined) showCounts = config.showCounts;
-      console.log('📊 Using global configJson:', { showNames, showCounts });
     } catch (e) {
-      console.warn('⚠️ Failed to parse configJson, using status properties');
+      logWarn('Failed to parse configJson, using status properties');
       if (status.showNames !== undefined) showNames = status.showNames;
       if (status.showCounts !== undefined) showCounts = status.showCounts;
     }
@@ -328,7 +290,6 @@ function syncCheckboxStates(status) {
     // 3. Use status properties as last resort
     if (status.showNames !== undefined) showNames = status.showNames;
     if (status.showCounts !== undefined) showCounts = status.showCounts;
-    console.log('📊 Using status properties:', { showNames, showCounts });
   }
 
   // Update checkbox elements
@@ -337,15 +298,11 @@ function syncCheckboxStates(status) {
   
   if (showNamesCheckbox) {
     showNamesCheckbox.checked = showNames;
-    console.log('☑️ showNames checkbox set to:', showNames);
   }
   
   if (showCountsCheckbox) {
     showCountsCheckbox.checked = showCounts;
-    console.log('☑️ showCounts checkbox set to:', showCounts);
   }
-  
-  console.groupEnd();
 }
 
 // =============================================================================
@@ -356,7 +313,7 @@ function syncCheckboxStates(status) {
 function populateSheetSelect(sheetNames, activeSheetName) {
   const select = document.getElementById('sheet-select');
   if (!select) {
-    console.warn('Sheet select element not found');
+    logWarn('Sheet select element not found');
     return;
   }
 
