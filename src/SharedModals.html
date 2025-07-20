@@ -1,196 +1,838 @@
-<!-- SharedModals.html - Unified Modal Components -->
+<!-- SharedModals.html - 共通モーダルコンポーネント -->
+<!-- GAS include用のモーダルコンポーネント集 -->
 
-<!-- Confirmation Modal -->
-<div id="confirmation-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-  <div class="modal-card">
-    <div class="modal-header">
-      <h3 id="modal-title" class="modal-title">確認</h3>
-    </div>
-    <div class="modal-content">
-      <p id="modal-message">実行しますか？</p>
-    </div>
-    <div class="modal-footer">
+<!-- 確認モーダル -->
+<div id="confirmation-modal" class="fixed inset-0 bg-black/80 z-[60] hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4">
+    <h3 id="modal-title" class="text-xl font-bold text-cyan-400 mb-4"></h3>
+    <p id="modal-message" class="text-gray-300 mb-6"></p>
+    <div class="flex justify-end gap-3">
       <button type="button" id="modal-cancel-btn" class="btn btn-secondary">キャンセル</button>
       <button type="button" id="modal-confirm-btn" class="btn btn-primary">はい、実行します</button>
     </div>
   </div>
 </div>
 
-<!-- Publish Modal -->
-<div id="publish-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-  <div class="modal-card">
-    <div class="modal-header">
-      <h3 class="modal-title">✅ 公開準備完了</h3>
-    </div>
-    <div class="modal-content">
-      <p>シートの設定が完了しました。<br>学習者がアクセスできるよう公開しますか？</p>
-    </div>
-    <div class="modal-footer">
-      <button type="button" id="publish-modal-private-btn" class="btn btn-secondary">非公開のまま</button>
-      <button type="button" id="publish-modal-publish-btn" class="btn btn-primary">🚀 公開する</button>
+<!-- 公開モーダル -->
+<div id="publish-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-md w-full">
+      <h3 class="text-xl font-bold text-cyan-400 mb-4">
+        <svg class="w-6 h-6 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        公開準備完了
+      </h3>
+      <p class="text-gray-300 mb-6">
+        シートの設定が完了しました。<br>
+        学習者がアクセスできるよう公開しますか？
+      </p>
+      <div class="flex justify-end gap-3">
+        <button type="button" id="publish-modal-private-btn" class="btn btn-secondary">非公開のまま</button>
+        <button type="button" id="publish-modal-publish-btn" class="btn btn-primary">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+          </svg>
+          公開する
+        </button>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Privacy Modal -->
-<div id="privacy-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-  <div class="modal-card">
-    <div class="modal-header">
-        <h3 class="modal-title">プライバシーとデータ保護</h3>
-    </div>
-    <div class="modal-content">
+<!-- プライバシーモーダル -->
+<div id="privacy-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-lg w-full">
+      <div class="flex items-center gap-3 mb-4">
+        <svg class="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+        </svg>
+        <h3 class="text-xl font-bold text-yellow-400">プライバシーとデータ保護</h3>
+      </div>
+      <div class="space-y-4 text-gray-300">
         <p>このシステムは教育目的でのみ使用されます。</p>
-        <div class="notice-panel notice-warning">
-          <h4>重要な注意事項</h4>
-          <ul>
-            <li>個人情報は適切に保護されます</li>
-            <li>回答データは教育目的でのみ使用されます</li>
-            <li>管理者は適切なアクセス権限を持っています</li>
-            <li>データは法的要件に従って管理されます</li>
+        <div class="glass-panel bg-yellow-500/10 rounded-lg p-4 border border-yellow-400/30">
+          <h4 class="font-semibold text-yellow-400 mb-2">重要な注意事項</h4>
+          <ul class="text-sm space-y-1">
+            <li>• 個人情報は適切に保護されます</li>
+            <li>• 回答データは教育目的でのみ使用されます</li>
+            <li>• 管理者は適切なアクセス権限を持っています</li>
+            <li>• データは法的要件に従って管理されます</li>
           </ul>
         </div>
-    </div>
-    <div class="modal-footer">
+      </div>
+      <div class="flex justify-end gap-3 mt-6">
         <button type="button" id="privacy-modal-cancel" class="btn btn-secondary">キャンセル</button>
         <button type="button" id="privacy-modal-continue" class="btn btn-primary">理解しました、継続</button>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Digital Citizenship Modal -->
-<div id="digital-citizenship-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-  <div class="modal-card modal-lg">
-    <div class="modal-header">
-      <h3 class="modal-title">デジタル・シティズンシップに基づく回答ボード指導</h3>
-      <button type="button" id="digital-citizenship-modal-close" class="modal-close-btn" aria-label="閉じる">✕</button>
-    </div>
-    <div class="modal-content">
-        <!-- content cards -->
-    </div>
-    <div class="modal-footer">
-      <button type="button" id="digital-citizenship-modal-close-btn" class="btn btn-primary">理解しました</button>
+<!-- デジタルシティズンシップモーダル -->
+<div id="digital-citizenship-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-2xl font-bold text-cyan-400">デジタル・シティズンシップに基づく回答ボード指導</h3>
+        <button type="button" id="digital-citizenship-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="space-y-6 text-gray-300">
+        <div class="glass-panel bg-cyan-500/10 rounded-lg p-4 border border-cyan-400/30 mb-4">
+          <h4 class="font-semibold text-cyan-400 mb-2">🌐 デジタル・シティズンシップとは</h4>
+          <p class="text-sm">デジタル社会における責任ある市民として、技術を適切かつ効果的に使用する能力です。回答ボードを通じて、この重要な概念を実践的に指導しましょう。</p>
+        </div>
+        
+        <div class="glass-panel bg-blue-500/10 rounded-lg p-4 border border-blue-400/30">
+          <h4 class="font-semibold text-blue-400 mb-2">📝 デジタル・リテラシーの育成</h4>
+          <p class="text-sm">適切な質問設計を通じて、学習者がデジタル環境で建設的な議論ができるよう導きましょう。情報を批判的に評価し、根拠に基づいた意見を表現する力を育成します。</p>
+        </div>
+        
+        <div class="glass-panel bg-green-500/10 rounded-lg p-4 border border-green-400/30">
+          <h4 class="font-semibold text-green-400 mb-2">🤝 デジタル・コミュニケーション</h4>
+          <p class="text-sm">多様な意見を尊重し、相手の立場を理解する姿勢を重視しましょう。リアクション機能の適切な使い方を指導し、建設的なフィードバック文化を形成します。</p>
+        </div>
+        
+        <div class="glass-panel bg-purple-500/10 rounded-lg p-4 border border-purple-400/30">
+          <h4 class="font-semibold text-purple-400 mb-2">🛡️ デジタル・セキュリティと倫理</h4>
+          <p class="text-sm">個人情報保護の重要性を学習者に伝え、デジタル環境でのプライバシー意識を高めましょう。名前表示設定を通じて、適切な情報開示について考える機会を提供します。</p>
+        </div>
+        
+        <div class="glass-panel bg-red-500/10 rounded-lg p-4 border border-red-400/30">
+          <h4 class="font-semibold text-red-400 mb-2">⚖️ デジタル・責任と法的理解</h4>
+          <p class="text-sm">デジタル空間での行動にも実世界と同様の責任が伴うことを指導しましょう。不適切な投稿への対応を通じて、デジタル環境でのルールとマナーを学ばせます。</p>
+        </div>
+        
+        <div class="glass-panel bg-yellow-500/10 rounded-lg p-4 border border-yellow-400/30">
+          <h4 class="font-semibold text-yellow-400 mb-2">📊 デジタル・フットプリントと振り返り</h4>
+          <p class="text-sm">デジタル活動の記録が残ることを意識させ、学習データを活用した振り返りの価値を伝えましょう。自らの学習過程を客観視する力を育成します。</p>
+        </div>
+      </div>
+      
+      <div class="flex justify-end mt-6">
+        <button type="button" id="digital-citizenship-modal-close-btn" class="btn btn-primary">理解しました</button>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Teacher Guide Modal -->
-<div id="teacherGuideModal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-  <div class="modal-card modal-lg">
-      <div class="modal-header">
-        <h2 class="modal-title">教師向けガイド</h2>
-        <button type="button" id="teacherGuideModal-close" class="modal-close-btn" aria-label="閉じる">✕</button>
+<!-- 教師ガイドモーダル -->
+<div id="teacherGuideModal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-bold text-cyan-400">教師向けガイド</h2>
+        <button type="button" id="teacherGuideModal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
       </div>
-      <div class="modal-content">
-          <!-- content -->
+      
+      <div class="space-y-6 text-gray-300">
+        <div class="glass-panel bg-blue-500/10 rounded-lg p-4 border border-blue-400/30">
+          <h3 class="font-semibold text-blue-400 mb-2">📚 学習目標の設定</h3>
+          <p class="text-sm">明確な学習目標を設定し、学習者がアクティブに参加できる環境を作りましょう。</p>
+        </div>
+        
+        <div class="glass-panel bg-green-500/10 rounded-lg p-4 border border-green-400/30">
+          <h3 class="font-semibold text-green-400 mb-2">🎯 効果的な質問設計</h3>
+          <p class="text-sm">学習者の思考を促進する質問を設計し、多様な回答を引き出しましょう。</p>
+        </div>
+        
+        <div class="glass-panel bg-purple-500/10 rounded-lg p-4 border border-purple-400/30">
+          <h3 class="font-semibold text-purple-400 mb-2">📊 データ活用</h3>
+          <p class="text-sm">収集したデータを分析し、学習指導の改善に活用しましょう。</p>
+        </div>
       </div>
-      <div class="modal-footer">
+      
+      <div class="flex justify-end mt-6">
         <button type="button" id="teacherGuideModal-close-btn" class="btn btn-primary">理解しました</button>
       </div>
+    </div>
   </div>
 </div>
 
-<!-- Generic Alert Modal -->
-<div id="alert-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-  <div class="modal-card">
-      <div class="modal-header">
-        <h3 id="alert-modal-title" class="modal-title"></h3>
+<!-- 汎用アラートモーダル -->
+<div id="alert-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-md w-full">
+      <div class="flex items-center gap-3 mb-4">
+        <svg id="alert-modal-icon" class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <h3 id="alert-modal-title" class="text-xl font-bold"></h3>
       </div>
-      <div class="modal-content">
-        <p id="alert-modal-message"></p>
-      </div>
-      <div class="modal-footer">
+      <p id="alert-modal-message" class="text-gray-300 mb-6"></p>
+      <div class="flex justify-end">
         <button type="button" id="alert-modal-close-btn" class="btn btn-primary">OK</button>
       </div>
+    </div>
   </div>
 </div>
 
-<!-- Loading Modal -->
-<div id="loading-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-    <div class="modal-card text-center">
-        <div class="modal-content">
-            <div class="spinner"></div>
-            <h3 id="loading-modal-title" class="modal-title">処理中...</h3>
-            <p id="loading-modal-message">しばらくお待ちください</p>
-        </div>
+<!-- ローディングモーダル -->
+<div id="loading-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-md w-full text-center">
+      <div class="spinner mx-auto mb-4"></div>
+      <h3 id="loading-modal-title" class="text-xl font-bold text-cyan-400 mb-2">処理中...</h3>
+      <p id="loading-modal-message" class="text-gray-300">しばらくお待ちください</p>
     </div>
+  </div>
+</div>
+        
+      </div>
 </div>
 
-<!-- Security Modal -->
-<div id="security-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-  <div class="modal-card modal-lg">
-      <div class="modal-header">
-        <h3 class="modal-title">セキュリティとデータ保護</h3>
-        <button type="button" id="security-modal-close" class="modal-close-btn" aria-label="閉じる">✕</button>
+<!-- セキュリティモーダル -->
+<div id="security-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-2xl font-bold text-cyan-400">セキュリティとデータ保護</h3>
+        <button type="button" id="security-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
       </div>
-      <div class="modal-content">
-          <!-- content -->
+      
+      <div class="space-y-6 text-gray-300">
+        <div class="glass-panel bg-blue-500/10 rounded-lg p-4 border border-blue-400/30">
+          <h4 class="font-semibold text-blue-400 mb-2">🔒 データの暗号化と保護</h4>
+          <p class="text-sm">すべてのデータ通信はHTTPS暗号化により保護されており、Google Workspace のセキュリティ基準に準拠しています。学習者の個人情報は適切に保護されます。</p>
+        </div>
+        
+        <div class="glass-panel bg-green-500/10 rounded-lg p-4 border border-green-400/30">
+          <h4 class="font-semibold text-green-400 mb-2">👥 アクセス制御</h4>
+          <p class="text-sm">管理者権限により、教師のみがシート設定や公開・非公開の切り替えを行えます。学習者は閲覧と回答のみ可能で、他の学習者のデータを変更することはできません。</p>
+        </div>
+        
+        <div class="glass-panel bg-purple-500/10 rounded-lg p-4 border border-purple-400/30">
+          <h4 class="font-semibold text-purple-400 mb-2">📊 データの管理と保存</h4>
+          <p class="text-sm">回答データはGoogle スプレッドシートに保存され、学校のGoogle Workspace 管理ポリシーに従って管理されます。データは教育目的でのみ使用されます。</p>
+        </div>
+        
+        <div class="glass-panel bg-yellow-500/10 rounded-lg p-4 border border-yellow-400/30">
+          <h4 class="font-semibold text-yellow-400 mb-2">🛡️ プライバシー設定</h4>
+          <p class="text-sm">名前の表示・非表示、リアクション数の表示設定により、学習環境に応じて適切なプライバシーレベルを設定できます。匿名での議論も可能です。</p>
+        </div>
+        
+        <div class="glass-panel bg-red-500/10 rounded-lg p-4 border border-red-400/30">
+          <h4 class="font-semibold text-red-400 mb-2">⚠️ 注意事項</h4>
+          <p class="text-sm">機密性の高い個人情報や学外秘の内容は投稿しないよう、学習者に事前に指導してください。適切な利用ガイドラインを設定することが重要です。</p>
+        </div>
       </div>
-      <div class="modal-footer">
+      
+      <div class="flex justify-end mt-6">
         <button type="button" id="security-modal-confirm" class="btn btn-primary">理解しました</button>
       </div>
+    </div>
   </div>
 </div>
 
-<!-- Form Config Modal (AdminPanel) -->
-<div id="form-config-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-  <div class="modal-card modal-lg">
-      <div class="modal-header">
-        <h3 class="modal-title">新しいフォームを作成</h3>
-        <button type="button" id="form-config-close" class="modal-close-btn" aria-label="閉じる">✕</button>
+<!-- 管理者用モーダル (AdminPanel専用) -->
+
+<!-- フォーム設定モーダル -->
+<div id="form-config-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="p-8">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-2xl font-bold text-cyan-400">新しいフォームを作成</h3>
+          <button type="button" id="form-config-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="space-y-6">
+          <!-- ステップ0: フォームタイトルの設定 -->
+          <div class="glass-panel bg-cyan-500/5 border border-cyan-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-cyan-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm0 2h12v8H4V6z"/>
+                  <path d="M6 8h8v2H6V8zm0 4h6v2H6v-2z"/>
+                </svg>
+              </div>
+              <h4 class="text-lg font-semibold text-cyan-400">フォームタイトル</h4>
+              <span class="text-xs text-gray-400 bg-gray-700/50 px-2 py-1 rounded">必須</span>
+            </div>
+            <input 
+              type="text" 
+              id="custom-form-title" 
+              class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-colors" 
+              placeholder="例：国語の授業振り返り、理科実験レポート、今日の学習まとめ"
+              maxlength="100"
+            >
+            <div class="flex justify-between items-center mt-2">
+              <p class="text-xs text-gray-400">📝 作成されるフォームのタイトルに使用されます（自動で日時が追加されます）</p>
+              <span class="text-xs text-gray-500" id="title-counter">0/100</span>
+            </div>
+          </div>
+
+          <!-- ステップ1: 問題文の入力 -->
+          <div class="glass-panel bg-blue-500/5 border border-blue-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
+              <h4 class="text-lg font-semibold text-blue-400">質問内容を入力</h4>
+              <span class="text-xs text-gray-400 bg-gray-700/50 px-2 py-1 rounded">必須</span>
+            </div>
+            <textarea 
+              id="custom-main-question" 
+              rows="3" 
+              class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors" 
+              placeholder="例：今日の授業で学んだことの中で、最も印象に残ったことは何ですか？"
+              maxlength="500"
+            ></textarea>
+            <div class="flex justify-between items-center mt-2">
+              <p class="text-xs text-gray-400">💡 学習者に表示される質問文を入力してください</p>
+              <span class="text-xs text-gray-500" id="question-counter">0/500</span>
+            </div>
+          </div>
+
+          <!-- ステップ2: 回答方法の選択 -->
+          <div class="glass-panel bg-green-500/5 border border-green-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">2</div>
+              <h4 class="text-lg font-semibold text-green-400">回答方法を選択</h4>
+            </div>
+            <select id="main-question-type" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm focus:border-green-400 focus:ring-1 focus:ring-green-400 transition-colors" title="回答方法を選択してください">
+              <option value="choice" selected>選択肢（単一選択）</option>
+              <option value="multiple">選択肢（複数選択可）</option>
+              <option value="text">短文テキスト（1行回答）</option>
+            </select>
+            <p class="text-xs text-gray-400 mt-2">💡 すべての回答方法で、回答の理由を入力する欄が自動的に追加されます</p>
+          </div>
+
+          <!-- 選択肢設定（選択肢タイプの場合） -->
+          <div id="main-question-choices-div" class="glass-panel bg-yellow-500/5 border border-yellow-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-yellow-500 text-white rounded-full flex items-center justify-center text-sm font-bold">3</div>
+              <h4 class="text-lg font-semibold text-yellow-400">選択肢を設定</h4>
+            </div>
+            <textarea id="main-question-choices" rows="4" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-colors" placeholder="例：&#10;気づいたことがある。&#10;疑問に思うことがある。&#10;もっと知りたいことがある。"></textarea>
+            <p class="text-xs text-gray-400 mt-2">💡 学習者が選択できる選択肢を1行に1つずつ入力してください。例のような評価軸や、具体的な選択肢を設定できます。</p>
+            
+            <div class="mt-4">
+              <label class="flex items-center">
+                <input type="checkbox" id="include-others-option" class="mr-2 rounded bg-gray-700 border-gray-600 text-yellow-500 focus:ring-yellow-400" checked>
+                <span class="text-sm text-gray-300">「その他...」選択肢を追加する</span>
+              </label>
+              <p class="text-xs text-gray-400 mt-1 ml-6">チェックすると、学習者が自由に回答を入力できる「その他...」オプションが自動的に追加されます</p>
+            </div>
+          </div>
+
+          <!-- ステップ4: クラス設定（オプション） -->
+          <div class="glass-panel bg-purple-500/5 border border-purple-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-bold">4</div>
+              <h4 class="text-lg font-semibold text-purple-400">クラス設定</h4>
+              <span class="text-xs text-gray-400 bg-gray-700/50 px-2 py-1 rounded">オプション</span>
+            </div>
+            <div class="mb-3">
+              <label class="flex items-center">
+                <input type="checkbox" id="enable-class-selection" class="mr-2 rounded bg-gray-700 border-gray-600 text-purple-500 focus:ring-purple-400" checked>
+                <span class="text-sm text-gray-300">クラス選択を有効にする</span>
+              </label>
+            </div>
+            <div id="class-choices-container">
+              <textarea id="class-choices" rows="3" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition-colors" placeholder="例：&#10;クラス1&#10;クラス2&#10;クラス3&#10;クラス4"></textarea>
+              <p class="text-xs text-gray-400 mt-2">1行に1つずつクラス名を入力してください</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex gap-3 mt-8">
+          <button type="button" id="form-config-cancel" class="flex-1 px-6 py-3 bg-gray-600/80 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors font-medium">
+            キャンセル
+          </button>
+          <button type="button" id="form-config-create" class="flex-1 px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-600 hover:to-blue-600 transition-colors font-medium shadow-lg">
+            フォーム作成
+          </button>
+        </div>
       </div>
-      <div class="modal-content">
-          <!-- form content -->
-      </div>
-      <div class="modal-footer">
-          <button type="button" id="form-config-cancel" class="btn btn-secondary">キャンセル</button>
-          <button type="button" id="form-config-create" class="btn btn-primary">フォーム作成</button>
-      </div>
+    </div>
   </div>
 </div>
 
-<!-- Security Details Modal (AdminPanel) -->
-<div id="security-details-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-    <div class="modal-card modal-lg">
-        <div class="modal-header">
-            <h2 class="modal-title">🔒 セキュリティについて</h2>
-            <button type="button" id="security-details-modal-close" class="modal-close-btn" aria-label="閉じる">✕</button>
+<!-- セキュリティ詳細モーダル -->
+<div id="security-details-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center p-6 border-b border-gray-600/30">
+        <h2 class="text-xl font-semibold text-white">🔒 セキュリティについて</h2>
+        <button type="button" id="security-details-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="p-6 space-y-6">
+        <!-- データベースアクセス制御 -->
+        <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+          <h3 class="text-lg font-medium text-cyan-400 mb-4 flex items-center gap-2">
+            🔒 データベースアクセス制御
+          </h3>
+          <ul class="space-y-2 text-sm text-gray-300">
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>限定アクセス：</strong>データベースにアクセスできるのはウェブアプリをデプロイしたユーザーとサービスアカウントのみ
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>完全非公開設定：</strong>システム上、データベースは非公開設定が必須となっており、外部からのアクセスは一切不可能
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>個別データ分離：</strong>各ユーザーのデータは専用スプレッドシートで完全分離
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>自動権限管理：</strong>サービスアカウントへの編集権限付与を自動実行
+              </div>
+            </li>
+          </ul>
         </div>
-        <div class="modal-content">
-            <!-- content -->
+
+        <!-- 多層セキュリティ対策 -->
+        <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+          <h3 class="text-lg font-medium text-cyan-400 mb-4 flex items-center gap-2">
+            🛡️ 多層セキュリティ対策
+          </h3>
+          <ul class="space-y-2 text-sm text-gray-300">
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>暗号化認証：</strong>JWT ベースのサービスアカウント認証とトークン自動更新
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>ドメイン制限：</strong>組織展開時のドメインベースアクセス制御
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>入力検証：</strong>全入力データの包括的検証とサニタイゼーション
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>監査ログ：</strong>システム活動の完全追跡とログ記録
+              </div>
+            </li>
+          </ul>
         </div>
-        <div class="modal-footer">
-            <button type="button" id="security-details-modal-confirm" class="btn btn-primary">閉じる</button>
+
+        <!-- ユーザー保護 -->
+        <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+          <h3 class="text-lg font-medium text-cyan-400 mb-4 flex items-center gap-2">
+            👥 ユーザー保護
+          </h3>
+          <ul class="space-y-2 text-sm text-gray-300">
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>学習者データ保護：</strong>一般ユーザーは他の回答者データや基盤データベースにアクセス不可
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>管理者権限分離：</strong>階層的アクセスレベルによる適切な権限管理
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>セッションセキュリティ：</strong>自動クリーンアップ機能付きセキュアセッション管理
+              </div>
+            </li>
+          </ul>
         </div>
+
+        <!-- 重要事項 -->
+        <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+          <h3 class="text-lg font-medium text-blue-300 mb-3 flex items-center gap-2">
+            📋 重要
+          </h3>
+          <p class="text-sm text-blue-200">
+            回答ボード使用者の個人情報や回答データは厳重に保護され、教育目的以外での使用や第三者による不正アクセスを防ぐ設計となっています。
+          </p>
+        </div>
+      </div>
+      
+      <div class="p-6 border-t border-gray-600/30 text-center">
+        <button type="button" id="security-details-modal-confirm" class="btn btn-primary">閉じる</button>
+      </div>
     </div>
+  </div>
 </div>
 
-<!-- Google Integration Modal (AdminPanel) -->
-<div id="google-integration-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-    <div class="modal-card modal-lg">
-        <div class="modal-header">
-            <h2 class="modal-title">📊 Google連携の利点</h2>
-            <button type="button" id="google-integration-modal-close" class="modal-close-btn" aria-label="閉じる">✕</button>
+<!-- Google連携の利点モーダル -->
+<div id="google-integration-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center p-6 border-b border-gray-600/30">
+        <h2 class="text-xl font-semibold text-white">📊 Google連携の利点</h2>
+        <button type="button" id="google-integration-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="p-6 space-y-4">
+        <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+          <ul class="space-y-3 text-sm text-gray-300">
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>自動フォーム作成：</strong>回答収集フォームの即座生成
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>リアルタイム同期：</strong>フォーム回答の即座反映
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>セキュアな共有：</strong>学校ドメイン内でのデータ管理
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>バックアップ機能：</strong>Google Drive による自動バックアップ
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>分析活用：</strong>Google Sheets での詳細データ分析
+              </div>
+            </li>
+          </ul>
         </div>
-        <div class="modal-content">
-            <!-- content -->
-        </div>
-        <div class="modal-footer">
-            <button type="button" id="google-integration-modal-confirm" class="btn btn-primary">閉じる</button>
-        </div>
+      </div>
+      
+      <div class="p-6 border-t border-gray-600/30 text-center">
+        <button type="button" id="google-integration-modal-confirm" class="btn btn-primary">閉じる</button>
+      </div>
     </div>
+  </div>
 </div>
 
 <script>
-// The existing SharedModals class and its logic are maintained.
-// It will now operate on the newly styled modal structures.
+// 共通モーダル管理クラス
 class SharedModals {
   constructor() {
     this.loadedModals = new Set();
     this.setupEventListeners();
   }
 
-  // ... (rest of the original script)
+  // 選択的モーダル読み込み
+  loadModals(modalIds) {
+    modalIds.forEach(modalId => {
+      if (!this.loadedModals.has(modalId)) {
+        this.loadedModals.add(modalId);
+        console.log(`Modal ${modalId} loaded`);
+      }
+    });
+  }
+
+  // 管理者専用モーダルの読み込み
+  loadAdminModals() {
+    this.loadModals(['form-config-modal', 'security-details-modal', 'google-integration-modal']);
+  }
+
+  // 確認モーダルの表示
+  showConfirmation(title, message, onConfirm, onCancel) {
+    const modal = document.getElementById('confirmation-modal');
+    const titleEl = document.getElementById('modal-title');
+    const messageEl = document.getElementById('modal-message');
+    const confirmBtn = document.getElementById('modal-confirm-btn');
+    const cancelBtn = document.getElementById('modal-cancel-btn');
+
+    // null checks for modal elements
+    if (!modal || !titleEl || !messageEl || !confirmBtn || !cancelBtn) {
+      console.error('モーダル要素が見つかりません');
+      return;
+    }
+
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    // イベントリスナーを一度削除してから追加
+    confirmBtn.onclick = () => {
+      this.hideModal('confirmation-modal');
+      if (onConfirm) onConfirm();
+    };
+    
+    cancelBtn.onclick = () => {
+      this.hideModal('confirmation-modal');
+      if (onCancel) onCancel();
+    };
+  }
+
+  // アラートモーダルの表示
+  showAlert(title, message, type = 'info') {
+    const modal = document.getElementById('alert-modal');
+    const titleEl = document.getElementById('alert-modal-title');
+    const messageEl = document.getElementById('alert-modal-message');
+    const iconEl = document.getElementById('alert-modal-icon');
+    const closeBtn = document.getElementById('alert-modal-close-btn');
+
+    // null checks for modal elements
+    if (!modal || !titleEl || !messageEl || !iconEl || !closeBtn) {
+      console.error('アラートモーダル要素が見つかりません');
+      return;
+    }
+
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    
+    // アイコンとカラーを設定
+    const typeConfig = {
+      info: { color: 'text-blue-400', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+      success: { color: 'text-green-400', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
+      warning: { color: 'text-yellow-400', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z' },
+      error: { color: 'text-red-400', icon: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' }
+    };
+    
+    const config = typeConfig[type] || typeConfig.info;
+    titleEl.className = `text-xl font-bold ${config.color}`;
+    iconEl.className = `w-8 h-8 ${config.color}`;
+    iconEl.querySelector('path').setAttribute('d', config.icon);
+    
+    modal.classList.remove('hidden');
+    
+    closeBtn.onclick = () => this.hideModal('alert-modal');
+  }
+
+  // ローディングモーダルの表示
+  showLoading(title = '処理中...', message = 'しばらくお待ちください') {
+    const modal = document.getElementById('loading-modal');
+    const titleEl = document.getElementById('loading-modal-title');
+    const messageEl = document.getElementById('loading-modal-message');
+    
+    if (titleEl) titleEl.textContent = title;
+    if (messageEl) messageEl.textContent = message;
+    
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  // モーダルの非表示
+  hideModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+  }
+
+  // イベントリスナーの設定
+  setupEventListeners() {
+    // ESCキーでモーダルを閉じる
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const modals = [
+          'confirmation-modal',
+          'publish-modal',
+          'privacy-modal',
+          'digital-citizenship-modal',
+          'teacherGuideModal',
+          'alert-modal',
+          'loading-modal',
+          'security-modal',
+          'form-config-modal',
+          'security-details-modal',
+          'google-integration-modal'
+        ];
+        
+        modals.forEach(modalId => {
+          const modal = document.getElementById(modalId);
+          if (modal && !modal.classList.contains('hidden')) {
+            this.hideModal(modalId);
+          }
+        });
+      }
+    });
+
+    // クローズボタンの設定
+    const closeButtons = [
+      'digital-citizenship-modal-close',
+      'digital-citizenship-modal-close-btn',
+      'teacherGuideModal-close',
+      'teacherGuideModal-close-btn',
+      'security-modal-close',
+      'security-modal-confirm',
+      'form-config-close',
+      'form-config-cancel',
+      'security-details-modal-close',
+      'security-details-modal-confirm',
+      'google-integration-modal-close',
+      'google-integration-modal-confirm'
+    ];
+    
+    closeButtons.forEach(buttonId => {
+      const button = document.getElementById(buttonId);
+      if (button) {
+        button.onclick = () => {
+          if (buttonId.includes('digital-citizenship')) {
+            this.hideModal('digital-citizenship-modal');
+          } else if (buttonId.includes('teacherGuide')) {
+            this.hideModal('teacherGuideModal');
+          } else if (buttonId.includes('security-modal')) {
+            this.hideModal('security-modal');
+          } else if (buttonId.includes('form-config')) {
+            this.hideModal('form-config-modal');
+          } else if (buttonId.includes('security-details')) {
+            this.hideModal('security-details-modal');
+          } else if (buttonId.includes('google-integration')) {
+            this.hideModal('google-integration-modal');
+          }
+        };
+      }
+    });
+  }
+
+  // プライバシーモーダルの表示
+  showPrivacy(onContinue) {
+    const modal = document.getElementById('privacy-modal');
+    if (!modal) {
+      console.error('プライバシーモーダルが見つかりません');
+      return;
+    }
+    
+    modal.classList.remove('hidden');
+    
+    const continueBtn = document.getElementById('privacy-modal-continue');
+    const cancelBtn = document.getElementById('privacy-modal-cancel');
+    
+    if (continueBtn) {
+      continueBtn.onclick = () => {
+        this.hideModal('privacy-modal');
+        if (onContinue) onContinue();
+      };
+    }
+    
+    if (cancelBtn) {
+      cancelBtn.onclick = () => {
+        this.hideModal('privacy-modal');
+      };
+    }
+  }
+
+  // デジタル・シティズンシップモーダルの表示
+  showDigitalCitizenship() {
+    const modal = document.getElementById('digital-citizenship-modal');
+    if (!modal) {
+      console.error('デジタル・シティズンシップモーダルが見つかりません');
+      return;
+    }
+    
+    modal.classList.remove('hidden');
+  }
+
+  // フォーム設定モーダルの表示
+  showFormConfig() {
+    this.loadAdminModals();
+    const modal = document.getElementById('form-config-modal');
+    if (!modal) {
+      console.error('フォーム設定モーダルが見つかりません');
+      return;
+    }
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  // セキュリティ詳細モーダルの表示
+  showSecurityDetails() {
+    this.loadAdminModals();
+    const modal = document.getElementById('security-details-modal');
+    if (!modal) {
+      console.error('セキュリティ詳細モーダルが見つかりません');
+      return;
+    }
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  // Google連携モーダルの表示
+  showGoogleIntegration() {
+    this.loadAdminModals();
+    const modal = document.getElementById('google-integration-modal');
+    if (!modal) {
+      console.error('Google連携モーダルが見つかりません');
+      return;
+    }
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
 }
+
+// グローバルインスタンスの作成
 window.sharedModals = new SharedModals();
-// ... (rest of the original script)
+
+// グローバル関数（後方互換性のため）
+window.showPrivacyModal = function(onContinue) {
+  window.sharedModals.showPrivacy(onContinue);
+};
+
+window.showDigitalCitizenshipModal = function() {
+  window.sharedModals.showDigitalCitizenship();
+};
+
+// 管理者専用モーダル用グローバル関数（後方互換性のため）
+window.showModal = function(modalId) {
+  if (modalId === 'form-config-modal') {
+    window.sharedModals.showFormConfig();
+  } else if (modalId === 'security-details-modal') {
+    window.sharedModals.showSecurityDetails();
+  } else if (modalId === 'google-integration-modal') {
+    window.sharedModals.showGoogleIntegration();
+  } else {
+    // 従来のshowModal実装
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+  }
+};
+
+window.hideModal = function(modalId) {
+  window.sharedModals.hideModal(modalId);
+};
 </script>
