@@ -249,25 +249,33 @@ function updateDatabaseInfo(status) {
     currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
   }
 
+  const cfg = status.config || {};
+
   // 基本情報の更新
   safeSetText('info-admin-email', status.userInfo.adminEmail);
   safeSetText('info-user-id', status.userInfo.userId);
-  safeSetText('info-published-sheet', status.publishedSheetName || 'なし');
+  safeSetText('info-published-sheet', cfg.publishedSheetName || status.publishedSheetName || 'なし');
   safeSetText('info-answer-count', status.answerCount || '0');
   safeSetText('info-reaction-count', status.totalReactions || '0');
 
   // 公開状態の表示を更新
-  const isPublished = status && (status.appPublished || (status.activeSheetName && status.publishedSheetName));
+  const isPublished = cfg.isPublished !== undefined
+    ? cfg.isPublished
+    : status.appPublished || status.isPublished || (status.activeSheetName && (cfg.publishedSheetName || status.publishedSheetName));
   updatePublicationStatusUI(isPublished);
-  
+
   // 表示モードの更新
-  const displayMode = status.showNames ? '名前表示' : '匿名表示';
+  const displayModeFlag = cfg.showNames !== undefined ? cfg.showNames : status.showNames;
+  const displayMode = displayModeFlag ? '名前表示' : '匿名表示';
   safeSetText('info-display-mode', displayMode);
-  
+
   // カウント表示の更新
-  const showCounts = status.showCounts !== undefined ? (status.showCounts ? '表示' : '非表示') : '表示';
+  const showCountsFlag = cfg.showCounts !== undefined
+    ? cfg.showCounts
+    : (status.showCounts !== undefined ? status.showCounts : true);
+  const showCounts = showCountsFlag ? '表示' : '非表示';
   safeSetText('info-show-counts', showCounts);
-  
+
   // チェックボックスの状態同期
   syncCheckboxStates(status);
 }
@@ -299,24 +307,25 @@ function syncCheckboxStates(status) {
   let showNames = false;
   let showCounts = true;
   
-  // Try to get values from global configJson first
-  if (status.userInfo?.configJson) {
+  // 1. Prefer status.config if available
+  if (status.config) {
+    if (status.config.showNames !== undefined) showNames = status.config.showNames;
+    if (status.config.showCounts !== undefined) showCounts = status.config.showCounts;
+    console.log('📊 Using status.config:', { showNames, showCounts });
+  } else if (status.userInfo?.configJson) {
+    // 2. Fallback to raw configJson
     try {
       const config = JSON.parse(status.userInfo.configJson);
-      
-      // Use global config
       if (config.showNames !== undefined) showNames = config.showNames;
       if (config.showCounts !== undefined) showCounts = config.showCounts;
-      console.log('📊 Using global config:', { showNames, showCounts });
-
+      console.log('📊 Using global configJson:', { showNames, showCounts });
     } catch (e) {
       console.warn('⚠️ Failed to parse configJson, using status properties');
-      // Fall back to status properties
       if (status.showNames !== undefined) showNames = status.showNames;
       if (status.showCounts !== undefined) showCounts = status.showCounts;
     }
   } else {
-    // Use status properties as fallback
+    // 3. Use status properties as last resort
     if (status.showNames !== undefined) showNames = status.showNames;
     if (status.showCounts !== undefined) showCounts = status.showCounts;
     console.log('📊 Using status properties:', { showNames, showCounts });
@@ -746,22 +755,31 @@ function updateFooterAndGuidance(status) {
 function updateTopicText(status) {
   const topicTextElement = document.getElementById('current-topic-text');
   if (!topicTextElement) return;
-  
+
   let topic = '（問題文未設定）';
-  
+  const cfg = status.config || {};
+
   if (status.customFormInfo && status.customFormInfo.mainQuestion) {
     topic = status.customFormInfo.mainQuestion;
-  } else if (status.publishedSheetName && status.userInfo && status.userInfo.configJson) {
-    try {
-      const config = JSON.parse(status.userInfo.configJson);
-      const sheetKey = 'sheet_' + status.publishedSheetName;
-      const sheetConfig = config[sheetKey] || {};
-      topic = sheetConfig.opinionHeader || status.publishedSheetName || '（問題文未設定）';
-    } catch (e) {
-      topic = status.publishedSheetName || '（問題文未設定）';
+  } else if (cfg.opinionHeader) {
+    topic = cfg.opinionHeader;
+  } else {
+    const sheetName = cfg.publishedSheetName || status.publishedSheetName;
+    if (sheetName) {
+      if (status.userInfo?.configJson) {
+        try {
+          const fullCfg = JSON.parse(status.userInfo.configJson);
+          const sheetCfg = fullCfg['sheet_' + sheetName] || {};
+          topic = sheetCfg.opinionHeader || sheetName || '（問題文未設定）';
+        } catch (e) {
+          topic = sheetName || '（問題文未設定）';
+        }
+      } else {
+        topic = sheetName;
+      }
     }
   }
-  
+
   topicTextElement.textContent = topic;
 }
 
