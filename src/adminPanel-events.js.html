@@ -433,6 +433,16 @@ function updateUIForSelectedSheet() {
       guidanceText.textContent = 'ステップ2: 表示したいシートを選択してください。';
     }
   }
+
+  // Toggle placeholder visibility
+  var configPlaceholder = document.getElementById('config-placeholder');
+  if (configPlaceholder) {
+    if (hasSelection) {
+      configPlaceholder.classList.add('hidden');
+    } else {
+      configPlaceholder.classList.remove('hidden');
+    }
+  }
 }
 
 // =============================================================================
