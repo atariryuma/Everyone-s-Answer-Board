@@ -1652,7 +1652,7 @@ function getSheetDetailsOptimized(context, spreadsheetId, sheetName) {
     
     // 既存のgetSheetDetailsロジックを適用
     const headers = data.allHeaders || [];
-    const guessed = guessConfigFromHeaders(headers);
+    const guessed = autoMapHeaders(headers);
     const existing = getConfigFromContext(context, sheetName);
     
     return {
