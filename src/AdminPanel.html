@@ -10,62 +10,102 @@
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
   <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), screen-wake-lock=(), accelerometer=(), gyroscope=(), magnetometer=(), ambient-light-sensor=(), speaker=(), vibrate=(), vr=()" />
   <!-- User ID will be retrieved dynamically from backend -->
+
+
+  <!-- TailwindCSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Comprehensive console warnings suppression
+    (function() {
+      // Store original console methods
+      const originalWarn = console.warn;
+      const originalInfo = console.info;
+      const originalLog = console.log;
+      const originalError = console.error;
+      
+      // Patterns to suppress
+      const suppressPatterns = [
+        'cdn.tailwindcss.com should not be used in production',
+        'tailwindcss.com should not be used in production',
+        'TailwindCSS',
+        'Tailwind CSS',
+        'tailwind',
+        '-ms-high-contrast is in the process of being deprecated',
+        'Feature Policy',
+        'Permissions Policy', 
+        'Unrecognized feature',
+        'deprecated',
+        'iframe.*sandbox.*allow-scripts.*allow-same-origin',
+        'sandbox attribute can escape its sandboxing',
+        'has both allow-scripts and allow-same-origin',
+        'can escape its sandboxing',
+        'Net state changed from',
+        'warden_bin',
+        'mae_html_user',
+        'unrecognized feature',
+        'ambient-light-sensor',
+        'speaker',
+        'vibrate',
+        'vr',
+        'cdn.tailwindcss.com should not be used in production',
+        'tailwindcss.com/docs/installation',
+        'should not be used in production',
+        'PostCSS plugin',
+        'Tailwind CLI',
+        'Explain Console errors by using Copilot',
+        'Learn more',
+        'Don\'t show again'
+      ];
+      
+      // Helper function to check if message should be suppressed
+      function shouldSuppress(args) {
+        const message = args[0] ? String(args[0]).toLowerCase() : '';
+        return suppressPatterns.some(pattern => {
+          const regex = new RegExp(pattern.toLowerCase(), 'i');
+          return regex.test(message);
+        });
+      }
+      
+      // Override console.warn
+      console.warn = function(...args) {
+        if (!shouldSuppress(args)) {
+          originalWarn.apply(console, args);
+        }
+      };
+      
+      // Override console.info
+      console.info = function(...args) {
+        if (!shouldSuppress(args)) {
+          originalInfo.apply(console, args);
+        }
+      };
+      
+      // Override console.log for specific patterns
+      console.log = function(...args) {
+        if (!shouldSuppress(args)) {
+          originalLog.apply(console, args);
+        }
+      };
+      
+      // Enhanced error filtering but keep important errors
+      console.error = function(...args) {
+        const message = args[0] ? String(args[0]) : '';
+        if (!message.includes('cdn.tailwindcss.com') && 
+            !message.includes('TailwindCSS') &&
+            !message.includes('Tailwind CSS')) {
+          originalError.apply(console, args);
+        }
+      };
+    })();
+  </script>
 
-
-  <!-- Critical CSS - AdminPanel最適化 -->
-  <style>
-  :root {
-    --bg-primary: #0f0f0f;
-    --bg-glass: rgba(255, 255, 255, 0.03);
-    --bg-glass-hover: rgba(255, 255, 255, 0.05);
-    --text-primary: #c0caf5;
-    --text-secondary: #9ca3af;
-    --accent-primary: #3b82f6;
-    --accent-secondary: #10b981;
-    --accent-warning: #f59e0b;
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --transition-base: 250ms ease-out;
-  }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    color: var(--text-primary);
-    background-color: var(--bg-primary);
-    margin: 0;
-  }
-  .glass-panel {
-    background: var(--bg-glass);
-    border: 1px solid var(--glass-border);
-    border-radius: 12px;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-  }
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border: 1px solid var(--glass-border);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: var(--transition-base);
-    background: var(--bg-glass);
-    color: var(--text-primary);
-    text-decoration: none;
-  }
-  .btn--primary { background: var(--accent-primary); color: #000; }
-  .btn--secondary { background: var(--accent-secondary); color: #000; }
-  .flex { display: flex; }
-  .items-center { align-items: center; }
-  .gap-4 { gap: 1rem; }
-  .w-full { width: 100%; }
-  </style>
-  
-  <!-- 統一CSSシステム -->
-  <?!= include('unified-styles.css'); ?>
-  <!-- 統一システム読み込み -->
+  <!-- Unified Styles and Shared Components -->
+  <?!= include('UnifiedStyles'); ?>
   <?!= include('SharedUtilities'); ?>
+  
+  <!-- Admin Panel Specific Styles -->
+  <?!= include('adminPanel-layout.css'); ?>
+  <?!= include('adminPanel.css'); ?>
   
   
   <!-- Core JavaScript Libraries (must be loaded first) -->
@@ -179,25 +219,30 @@
   
   </script>
 </head>
-<body>
+<body class="bg-[#1a1b26] text-gray-200 font-sans">
   <div id="loading-overlay" class="loading-overlay hidden">
     <div class="text-center">
       <div class="spinner"></div>
-      <p id="loading-message" class="mt-4">処理中...</p>
+      <p id="loading-message" class="mt-4 text-gray-300">処理中...</p>
     </div>
   </div>
-  <header id="admin-header" class="glass-panel fixed top-0 left-0 right-0 z-50 rounded-lg shadow-lg">
-  <div class="relative max-w-6xl mx-auto p-4 flex items-center justify-between gap-4">
+  <header id="admin-header" class="glass-panel border-b border-gray-700 fixed top-1 sm:top-2 left-2 right-2 sm:left-4 sm:right-4 z-50 rounded-lg sm:rounded-xl shadow-lg">
+  <div class="relative -top-1 sm:-top-2 max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between gap-4">
         <!-- ロゴとタイトル -->
-        <div class="flex items-center gap-4">
-          <div class="w-8 h-8 glass-panel rounded-lg flex items-center justify-center" style="background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="flex items-center gap-3 flex-shrink-0">
+          <div class="w-8 h-8 bg-gradient-to-r from-cyan-400 to-purple-400 rounded-lg flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
             </svg>
           </div>
-          <div>
-            <h1 class="text-lg font-semibold">みんなの回答ボード　管理パネル</h1>
-            <p class="text-sm opacity-75">StudyQuest</p>
+          <div class="min-w-0">
+            <div class="hidden sm:block">
+              <h1 class="text-lg sm:text-xl font-bold text-white leading-tight truncate">みんなの回答ボード	管理パネル</h1>
+              <p class="text-xs text-gray-400">StudyQuest</p>
+            </div>
+            <div class="sm:hidden">
+              <h1 class="text-base font-bold text-white truncate">みんなの回答ボード</h1>
+            </div>
           </div>
         </div>
         
@@ -246,9 +291,12 @@
         </div>
     </div>
   </header>
-  <main id="admin-main" class="flex-1 max-w-6xl mx-auto p-4 pt-20 pb-20">
+  <main id="admin-main" class="flex-1 max-w-6xl mx-auto px-4 sm:px-6
+              pt-16 sm:pt-20
+              pb-16 sm:pb-20
+              h-screen overflow-y-auto">
     <!-- メインコンテンツ：ステータスバー＋左右パネル -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="responsive-grid grid grid-cols-1 lg:grid-cols-3 gap-4">
 
     <!-- シンプル統合ステータスバー -->
     <section class="col-span-1 lg:col-span-3">
@@ -331,13 +379,13 @@
               
               <!-- 水平配置のボタン -->
               <div class="flex gap-3">
-                <button type="button" id="quickstart-btn" class="btn btn--primary flex-1">
+                <button type="button" id="quickstart-btn" class="btn btn-google flex-1">
                   <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                   </svg>
                   <span id="quickstart-text">クイックスタート</span>
                 </button>
-                <button type="button" id="create-board-btn" class="btn btn--secondary flex-1">
+                <button type="button" id="create-board-btn" class="btn btn-google flex-1">
                   <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                   </svg>
@@ -417,7 +465,7 @@
             <!-- 既存ユーザー向けの追加オプション -->
             <div id="existing-user-section" class="hidden bg-gray-800/30 border border-gray-600/30 rounded-xl p-4 mb-4">
               <h4 class="text-sm font-semibold text-gray-300 mb-3">追加オプション</h4>
-              <button type="button" id="create-additional-form-btn" class="btn btn--secondary w-full text-sm">
+              <button type="button" id="create-additional-form-btn" class="btn btn-secondary w-full text-sm">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
@@ -449,10 +497,10 @@
                       既存のGoogleフォームまたはスプレッドシートのURLを貼り付けてください
                     </p>
                     <div class="flex gap-2">
-                      <button type="button" id="add-resource-btn" class="btn btn--primary flex-1">
+                      <button type="button" id="add-resource-btn" class="btn btn-primary flex-1">
                         <span id="add-resource-text">リソースを追加</span>
                       </button>
-                      <button type="button" id="open-resource-btn" class="btn btn--secondary px-3" disabled title="フォームまたはスプレッドシートを開く">
+                      <button type="button" id="open-resource-btn" class="btn btn-secondary px-3" disabled title="フォームまたはスプレッドシートを開く">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                         </svg>
@@ -475,7 +523,7 @@
                 </div>
                 <div class="flex gap-2">
                   <input type="url" id="form-url-input" class="form-control flex-1 text-sm" readonly placeholder="フォームURLが生成されます">
-                  <button type="button" id="copy-form-url-btn" class="btn btn--secondary" title="URLをコピー">
+                  <button type="button" id="copy-form-url-btn" class="btn btn-secondary" title="URLをコピー">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                     </svg>
@@ -542,7 +590,7 @@
                   <select id="sheet-select" class="form-control flex-1" aria-describedby="sheet-help">
                     <option>読み込み中...</option>
                   </select>
-                  <button type="button" id="open-spreadsheet-btn-step2" class="btn btn--secondary px-3" title="スプレッドシートを開く">
+                  <button type="button" id="open-spreadsheet-btn-step2" class="btn btn-secondary px-3" title="スプレッドシートを開く">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                     </svg>
@@ -669,21 +717,21 @@
               
               <!-- 統合アクションボタン -->
               <div class="space-y-3 pt-4">
-                <button type="button" id="save-publish-btn" disabled class="btn btn--primary w-full">
+                <button type="button" id="save-publish-btn" disabled class="btn btn-primary w-full btn-lg">
                   <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                   </svg>
                   <span id="save-publish-text">設定を保存して公開</span>
                 </button>
 
-                <button type="button" id="unpublish-board-btn" class="btn w-full hidden" style="background: var(--accent-warning); color: #000;">
+                <button type="button" id="unpublish-board-btn" class="btn btn-warning w-full hidden">
                   <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636"></path>
                   </svg>
                   <span id="unpublish-board-text">公開を停止</span>
                 </button>
 
-                <button type="button" id="unpublish-board-btn" class="btn w-full hidden" style="background: var(--accent-warning); color: #000;">
+                <button type="button" id="unpublish-board-btn" class="btn btn-warning w-full hidden">
                   <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636"></path>
                   </svg>

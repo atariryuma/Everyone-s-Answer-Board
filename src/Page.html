@@ -3,19 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <title>StudyQuest -みんなの回答ボード- - みんなのかいとうボード</title>
-<script src="https://cdn.tailwindcss.com"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <!-- Content Security Policy for enhanced security -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com https://script.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https:; img-src 'self' data: https:;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://fonts.googleapis.com https://script.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https:; img-src 'self' data: https:;">
 <!-- Permissions Policy to silence console warnings -->
 <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), screen-wake-lock=(), accelerometer=(), gyroscope=(), magnetometer=(), ambient-light-sensor=(), speaker=(), vibrate=(), vr=()">
 <!-- Preload Google Fonts for better performance -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&amp;display=swap" rel="stylesheet">
-
-<!-- Global error handling and configuration -->
+<!-- Global error handling and TailwindCSS setup -->
 <script>
 // Global error handling for document.write and other issues
 window.addEventListener('error', function(event) {
@@ -42,14 +40,14 @@ window.tailwind = {
     corePlugins: { preflight: false }
   }
 };
-
-// Server configuration processing
+</script>
+<script src="https://cdn.tailwindcss.com" defer onerror="console.warn('TailwindCSS failed to load')"></script>
+<script>
 const DEBUG_MODE = '<?= typeof DEBUG_MODE !== "undefined" ? DEBUG_MODE : "false" ?>' === 'true';
-
-// Essential debug utilities for maintenance
 function debugLog() {
   if (DEBUG_MODE && console && console.log) {
     try {
+      // 引数を安全に処理
       const args = Array.from(arguments).map(arg => {
         if (typeof arg === 'object' && arg !== null) {
           return safeDebugStringify(arg);
@@ -70,10 +68,12 @@ function safeDebugStringify(obj, maxDepth = 2, currentDepth = 0) {
     if (obj === null || obj === undefined) return obj;
     if (typeof obj !== 'object') return obj;
     
+    // DOM要素の安全な表示
     if (obj instanceof HTMLElement) {
       return `[${obj.tagName}${obj.id ? '#' + obj.id : ''}${obj.className ? '.' + obj.className.split(' ').slice(0, 2).join('.') : ''}]`;
     }
     
+    // 配列の安全な表示
     if (Array.isArray(obj)) {
       if (obj.length > 5) {
         return `[Array(${obj.length}): first 3 items + ${obj.length - 3} more]`;
@@ -81,6 +81,7 @@ function safeDebugStringify(obj, maxDepth = 2, currentDepth = 0) {
       return obj.map(item => safeDebugStringify(item, maxDepth, currentDepth + 1));
     }
     
+    // オブジェクトの安全な表示
     const result = {};
     let count = 0;
     for (const key in obj) {
@@ -97,7 +98,11 @@ function safeDebugStringify(obj, maxDepth = 2, currentDepth = 0) {
   }
 }
 
-// Server configuration constants
+// システム全体フロー表示機能
+function showSystemFlow() {
+  // Development flow display removed for production
+}
+
 const __SHOW_COUNTS__ = '<?= typeof showCounts !== "undefined" ? showCounts : "false" ?>';
 const __DISPLAY_MODE__ = '<?= typeof displayMode !== "undefined" ? displayMode : "anonymous" ?>';
 const __SHEET_NAME__ = '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>';
@@ -111,10 +116,9 @@ const __SHOW_HIGHLIGHT_TOGGLE__ = '<?= typeof showHighlightToggle !== "undefined
 const __SHOW_SCORE_SORT__ = '<?= typeof showScoreSort !== "undefined" ? showScoreSort : "false" ?>';
 const __IS_STUDENT_MODE__ = '<?= typeof isStudentMode !== "undefined" ? isStudentMode : "true" ?>';
 const __IS_ADMIN_USER__ = '<?= typeof isAdminUser !== "undefined" ? isAdminUser : "false" ?>';
-
-// Process server configuration
 window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : __SHOW_COUNTS__ === 'true';
 window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
+// Store server-provided admin capability but always start in view mode
 window.hasAdminCapability = __SHOW_ADMIN_FEATURES__.startsWith('<') ? false : __SHOW_ADMIN_FEATURES__ === 'true';
 window.showAdminFeatures = false; // Always start in view mode
 window.showHighlightToggle = __SHOW_HIGHLIGHT_TOGGLE__.startsWith('<') ? false : __SHOW_HIGHLIGHT_TOGGLE__ === 'true';
@@ -122,11 +126,10 @@ window.showScoreSort = __SHOW_SCORE_SORT__.startsWith('<') ? false : __SHOW_SCOR
 window.isStudentMode = __IS_STUDENT_MODE__.startsWith('<') ? true : __IS_STUDENT_MODE__ === 'true';
 window.isAdminUser = __IS_ADMIN_USER__.startsWith('<') ? false : __IS_ADMIN_USER__ === 'true';
 
-// Global constants
+// Server configuration processing completed
 const SHEET_NAME = __SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHEET_NAME__;
 const USER_ID = __USER_ID__.startsWith('<') ? '' : __USER_ID__;
 const OWNER_NAME = __OWNER_NAME__.startsWith('<') ? '' : __OWNER_NAME__;
-
 let MAPPING;
 try {
   if (typeof __MAPPING__ === 'string' && !__MAPPING__.startsWith('<')) {
@@ -139,15 +142,512 @@ try {
   MAPPING = {};
 }
 </script>
-
-<!-- Include SharedUtilities -->
 <?!= include('SharedUtilities'); ?>
+<style>
+:root {
+  --color-primary: #8be9fd;
+  --color-background: #1a1b26;
+  --color-surface: rgba(26, 27, 38, 0.95);
+  --color-text: #c0caf5;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-accent: #facc15;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
+  --color-success: #10b981;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+  /* Performance variables */
+  --transition-duration: 0.2s;
+  --transition-easing: ease-out;
+  --animation-duration: 0.3s;
+  --backdrop-blur: 12px;
+}
+body {
+  color: var(--color-text);
+  background-color: var(--color-background);
+  margin: 0;
+  overflow-x: hidden;
+}
+.glass-panel { 
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  backdrop-filter: blur(var(--backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--backdrop-blur));
+  transition: border-color var(--transition-duration) var(--transition-easing);
+}
+.glass-panel:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.game-font {
+  font-family: 'Press Start 2P', cursive;
+}
+.game-btn {
+  transition: transform var(--transition-duration) var(--transition-easing),
+              box-shadow var(--transition-duration) var(--transition-easing),
+              border-bottom-width var(--transition-duration) var(--transition-easing);
+  border-radius: 0.75rem;
+  border-bottom-width: 4px;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+  position: relative;
+  overflow: hidden;
+}
+.game-btn:not(:disabled):hover { 
+  transform: translate3d(0, -2px, 0); 
+  box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+}
+.game-btn:active:not(:disabled) { 
+  transform: translate3d(0, 2px, 0); 
+  border-bottom-width: 2px; 
+}
+.game-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+#classFilter, #sortOrder { 
+  background-color: #6272a4; 
+  border: 1px solid var(--color-border); 
+  color: var(--color-text); 
+  border-radius: 0.75rem; 
+  padding: 0.5rem 0.75rem; 
+  transition: border-color var(--transition-duration) var(--transition-easing),
+              box-shadow var(--transition-duration) var(--transition-easing);
+}
+#classFilter:focus, #sortOrder:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(139, 233, 253, 0.1);
+}
+:focus-visible { 
+  outline: 3px solid var(--color-primary); 
+  outline-offset: 2px; 
+  border-radius: 0.75rem; 
+}
+header { 
+  position: sticky; 
+  top: 0; 
+  z-index: 50; 
+  contain: layout;
+  backdrop-filter: blur(var(--backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--backdrop-blur));
+}
+.answer-card { 
+  transition: transform var(--animation-duration) var(--transition-easing),
+              box-shadow var(--animation-duration) var(--transition-easing);
+  border-radius: 1rem;
+  contain: layout style;
+  position: relative;
+  overflow: hidden;
+}
+.answer-card.highlighted {
+  border-image: linear-gradient(45deg, #9333ea, #c084fc, #9333ea) 1 !important;
+  border-width: 4px !important;
+  box-shadow: 
+    0 0 25px rgba(147, 51, 234, 0.6),
+    inset 0 0 20px rgba(192, 132, 252, 0.1),
+    0 8px 32px rgba(147, 51, 234, 0.2);
+  transform: scale(1.02);
+  position: relative;
+}
+.answer-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.2);
+}
+.answer-card.loading {
+  opacity: 0.7;
+}
 
-<!-- Page-specific CSS -->
-<?!= include('page.css'); ?>
+.answer-card.loading .reaction-btn,
+.answer-card.loading .highlight-btn {
+  opacity: 0.5;
+}
+.reaction-btn {
+  transition: transform var(--transition-duration) var(--transition-easing),
+              background-color var(--transition-duration) var(--transition-easing),
+              box-shadow var(--transition-duration) var(--transition-easing);
+  position: relative;
+  overflow: hidden;
+}
+.reaction-btn:hover {
+  transform: scale(1.1);
+}
+.reaction-btn:active {
+  transform: scale(0.95);
+}
+.reaction-btn.reacted {
+  background-color: var(--color-primary) !important;
+  color: #000 !important;
+  box-shadow: 0 0 10px rgba(139, 233, 253, 0.5);
+}
+.reaction-btn.loading {
+  opacity: 0.6;
+}
+.fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+.slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+.pulse {
+  animation: pulse 0.6s ease-out;
+}
+.shake {
+  animation: shake 0.5s ease-out;
+}
+.admin-toggle {
+  transition: background-color var(--animation-duration) var(--transition-easing);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.admin-toggle:hover {
+  background-color: rgba(139, 233, 253, 0.1);
+}
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(26, 27, 38, 0.8);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(139, 233, 253, 0.3);
+  border-top: 4px solid var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
 
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); will-change: opacity, transform; }
+  to { opacity: 1; transform: translateY(0); will-change: auto; }
+}
+@keyframes pulse {
+  0% { transform: scale3d(1, 1, 1); will-change: transform; }
+  50% { transform: scale3d(1.05, 1.05, 1); }
+  100% { transform: scale3d(1, 1, 1); will-change: auto; }
+}
+@keyframes shake {
+  0%, 100% { transform: translate3d(0, 0, 0); will-change: transform; }
+  25% { transform: translate3d(-5px, 0, 0); }
+  75% { transform: translate3d(5px, 0, 0); }
+}
+@keyframes spin {
+  100% { transform: rotate(360deg); will-change: transform; }
+}
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% { transform: translate(-50%, 0); will-change: auto; }
+  40% { transform: translate(-50%, -10px); will-change: transform; }
+  60% { transform: translate(-50%, -5px); }
+}
+
+
+/* Performance optimizations */
+@media (max-width: 768px) and (max-resolution: 150dpi) {
+  :root {
+    --backdrop-blur: 0px;
+    --transition-duration: 0.1s;
+    --animation-duration: 0.15s;
+  }
+  
+  .glass-panel {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--color-surface);
+  }
+  
+  .answer-card:hover {
+    transform: none;
+  }
+  
+  .reaction-btn:hover {
+    transform: scale(1.05);
+  }
+}
+
+/* Low-end device optimizations */
+@media (max-width: 768px), (max-resolution: 120dpi) {
+  :root {
+    --backdrop-blur: 0px;
+    --transition-duration: 0.1s;
+    --animation-duration: 0.1s;
+  }
+}
+
+/* High refresh rate display optimizations */
+@media (min-resolution: 120dpi) and (min-width: 1200px) {
+  :root {
+    --transition-duration: 0.15s;
+    --animation-duration: 0.2s;
+  }
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+  .answer-card {
+    margin-bottom: 1rem;
+  }
+  .game-btn {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
+  header {
+    padding: 1rem;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --color-border: rgba(255, 255, 255, 0.3);
+    --color-surface: rgba(26, 27, 38, 0.98);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-duration: 0.01ms;
+    --animation-duration: 0.01ms;
+    --backdrop-blur: 0px;
+  }
+  
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transform: none !important;
+  }
+  
+  .answer-card:hover,
+  .reaction-btn:hover,
+  .game-btn:hover {
+    transform: none !important;
+  }
+}
+
+/* Low performance mode styles */
+.low-performance .answer-card {
+  contain: layout style paint;
+}
+
+.low-performance .answer-card:hover {
+  transform: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.low-performance .glass-panel {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Hidden card styles for virtual scrolling */
+.hidden-card {
+  visibility: hidden;
+  position: absolute;
+  left: -9999px;
+}
+
+.visible {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* Optimize grid layout for performance */
+@supports (container-type: inline-size) {
+  #answers {
+    container-type: inline-size;
+  }
+}
+
+/* Optimize for high DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .answer-card {
+    backface-visibility: hidden;
+    perspective: 1000px;
+  }
+}
+.answer-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+.answer-card.new-card {
+  animation: fadeIn 0.3s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.highlight-badge {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #facc15;
+}
+.answer-card.reaction-bg-like { border-color:#ef4444 !important; }
+.answer-card.reaction-bg-understand { border-color:#fbbf24 !important; }
+.answer-card.reaction-bg-curious { border-color:#10b981 !important; }
+.answer-card.reaction-bg-like-understand { border-image: linear-gradient(45deg, #ef4444, #fbbf24) 1 !important; }
+.answer-card.reaction-bg-like-curious { border-image: linear-gradient(45deg, #ef4444, #10b981) 1 !important; }
+.answer-card.reaction-bg-understand-curious { border-image: linear-gradient(45deg, #fbbf24, #10b981) 1 !important; }
+.answer-card.reaction-bg-like-understand-curious { border-image: linear-gradient(45deg, #ef4444, #fbbf24, #10b981) 1 !important; }
+.reaction-border-1 { border-width: 2px; }
+.reaction-border-2 { border-width: 4px; }
+.reaction-border-3 { border-width: 6px; }
+.answer-preview { 
+  display: -webkit-box; 
+  -webkit-line-clamp: 5; 
+  line-clamp: 5; 
+  -webkit-box-orient: vertical; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  min-height: 120px; 
+}
+.like-btn svg { 
+  transition: fill var(--transition-duration) var(--transition-easing),
+              transform var(--transition-duration) var(--transition-easing);
+  fill: none;
+}
+.like-btn.liked svg { stroke: transparent; fill: currentColor; transform: scale(1.1); }
+.like-btn.loading {   opacity: 0.7; position: relative; }
+.like-btn.loading::after { 
+  content: ""; 
+  position: absolute; 
+  inset: 0; 
+  border: 2px solid transparent; 
+  border-top: 2px solid currentColor; 
+  border-radius: 50%; 
+  animation: spin 0.8s linear infinite; 
+  width: 16px; 
+  height: 16px; 
+  margin: auto; 
+}
+.highlight-btn { 
+  transition: background var(--transition-duration) var(--transition-easing),
+              transform var(--transition-duration) var(--transition-easing);
+  border-radius: 4px;
+  padding: 2px;
+}
+.highlight-btn:hover { 
+  background: rgba(147, 51, 234, 0.15);
+  transform: scale(1.1);
+}
+.highlight-btn.liked { 
+  color: #9333ea; 
+  text-shadow: 0 0 8px rgba(147, 51, 234, 0.6);
+}
+#controlsFooter { pointer-events: none; }
+#controlsFooter > .glass-panel { pointer-events: auto; }
+.skeleton { position: relative; overflow: hidden; background-color: rgba(255,255,255,0.05); }
+.skeleton::after { content: ""; position: absolute; inset: 0; background-image: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.2), rgba(255,255,255,0)); animation: skeleton-loading 1.5s infinite; }
+@keyframes skeleton-loading { 0% { transform: translate3d(-100%, 0, 0); will-change: transform; } 100% { transform: translate3d(100%, 0, 0); } }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* Fallback styles when TailwindCSS fails to load */
+.tailwind-fallback .bg-gradient-to-br { background: linear-gradient(135deg, var(--color-background), #2a2b3c); }
+.tailwind-fallback .text-white { color: white; }
+.tailwind-fallback .text-center { text-align: center; }
+.tailwind-fallback .p-4 { padding: 1rem; }
+.tailwind-fallback .p-6 { padding: 1.5rem; }
+.tailwind-fallback .m-4 { margin: 1rem; }
+.tailwind-fallback .mb-4 { margin-bottom: 1rem; }
+.tailwind-fallback .mt-4 { margin-top: 1rem; }
+.tailwind-fallback .flex { display: flex; }
+.tailwind-fallback .flex-col { flex-direction: column; }
+.tailwind-fallback .flex-wrap { flex-wrap: wrap; }
+.tailwind-fallback .items-center { align-items: center; }
+.tailwind-fallback .justify-center { justify-content: center; }
+.tailwind-fallback .justify-between { justify-content: space-between; }
+.tailwind-fallback .gap-4 { gap: 1rem; }
+.tailwind-fallback .grid { display: grid; }
+.tailwind-fallback .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.tailwind-fallback .rounded-lg { border-radius: 0.5rem; }
+.tailwind-fallback .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+.tailwind-fallback .w-full { width: 100%; }
+.tailwind-fallback .h-full { height: 100%; }
+.tailwind-fallback .min-h-screen { min-height: 100vh; }
+.tailwind-fallback .relative { position: relative; }
+.tailwind-fallback .absolute { position: absolute; }
+.tailwind-fallback .fixed { position: fixed; }
+.tailwind-fallback .top-0 { top: 0; }
+.tailwind-fallback .bottom-0 { bottom: 0; }
+.tailwind-fallback .left-0 { left: 0; }
+.tailwind-fallback .right-0 { right: 0; }
+.tailwind-fallback .z-10 { z-index: 10; }
+.tailwind-fallback .z-50 { z-index: 50; }
+.tailwind-fallback .hidden { display: none; }
+.tailwind-fallback .block { display: block; }
+.tailwind-fallback .inline { display: inline; }
+.tailwind-fallback .inline-block { display: inline-block; }
+.modal-close-btn { 
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  transform: none;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+/* モーダルでのリアクション装飾 */
+#answerModalCard.reaction-border-1 { border-width: 3px !important; }
+#answerModalCard.reaction-border-2 { border-width: 4px !important; }
+#answerModalCard.reaction-border-3 { border-width: 5px !important; }
+/* モーダルでのリアクション背景色 */
+#answerModalCard.reaction-bg-like { 
+  border-color: #ef4444 !important; 
+  border-image: none !important;
+}
+#answerModalCard.reaction-bg-understand { 
+  border-color: #fbbf24 !important; 
+  border-image: none !important;
+}
+#answerModalCard.reaction-bg-curious { 
+  border-color: #10b981 !important; 
+  border-image: none !important;
+}
+#answerModalCard.reaction-bg-like-understand { 
+  border-image: linear-gradient(45deg, #ef4444, #fbbf24) 1 !important; 
+  border-color: transparent !important;
+}
+#answerModalCard.reaction-bg-like-curious { 
+  border-image: linear-gradient(45deg, #ef4444, #10b981) 1 !important; 
+  border-color: transparent !important;
+}
+#answerModalCard.reaction-bg-understand-curious { 
+  border-image: linear-gradient(45deg, #fbbf24, #10b981) 1 !important; 
+  border-color: transparent !important;
+}
+#answerModalCard.reaction-bg-like-understand-curious { 
+  border-image: linear-gradient(45deg, #ef4444, #fbbf24, #10b981) 1 !important; 
+  border-color: transparent !important;
+}
+/* モーダルでのハイライト装飾（リアクション装飾より後に配置で優先） */
+#answerModalCard.highlighted {
+  border-image: linear-gradient(45deg, #9333ea, #c084fc, #9333ea) 1 !important;
+  border-width: 4px !important;
+  box-shadow: 
+    0 0 25px rgba(147, 51, 234, 0.6),
+    inset 0 0 20px rgba(192, 132, 252, 0.1) !important;
+  position: relative;
+}
+.render-optimized { transform: translateZ(0); }
+.modal-fade { animation: modalFade 0.2s ease-out; }
+@keyframes modalFade { from { opacity: 0; will-change: opacity; } to { opacity: 1; } }
+.modal-scale { animation: modalScale 0.2s ease-out; }
+@keyframes modalScale { from { transform: scale3d(0.8, 0.8, 1); will-change: transform; } to { transform: scale3d(1, 1, 1); } }
+</style>
 </head>
-<body>
+<body class="bg-[#1a1b26] text-gray-200 font-sans">
 <!-- Loading Overlay -->
 <div id="loading-overlay" class="loading-overlay hidden">
   <div class="text-center">
@@ -260,7 +760,6 @@ try {
     </div>
   </div>
 </header>
-
 <!-- 新着通知バナー -->
 <div id="newContentBanner" class="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-full shadow-lg hidden transition-all duration-300" role="alert" aria-live="polite">
   <div class="flex items-center gap-3">
@@ -277,8 +776,6 @@ try {
 
 <main id="answers" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" role="main" aria-live="polite" aria-label="回答一覧"></main>
 </div>
-
-<!-- Answer Modal -->
 <div id="answerModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
 <div id="answerModalCard" class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full max-w-5xl h-auto max-h-[85vh] relative" role="document" aria-labelledby="modalAnswer">
 <button type="button" id="answerModalCloseBtn" class="modal-close-btn bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform z-10" aria-label="閉じる">
@@ -291,8 +788,6 @@ try {
 </div>
 </div>
 </div>
-
-<!-- Info Modal -->
 <div id="infoModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
 <div id="infoModalCard" class="glass-panel rounded-xl p-8 shadow-2xl border-2 border-cyan-400/80 w-full max-w-2xl relative" role="document">
 <div class="space-y-5 text-gray-200 text-lg leading-relaxed">
@@ -326,14 +821,13 @@ try {
 <p class="flex items-center gap-2"><span id="infoIconHighlight" class="w-5 h-5 text-purple-400"></span>先生が注目してほしい意見につけています</p>
 <p>責任あるリアクションで、みんなで学びを深めよう！</p>
 
+
 <div class="text-center mt-6">
 <button type="button" id="infoModalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">わかった</button>
 </div>
 </div>
 </div>
 </div>
-
-<!-- Footer Controls -->
 <footer id="controlsFooter" class="fixed bottom-0 left-0 right-0 z-40 p-4">
 <div class="glass-panel max-w-md mx-auto rounded-xl p-3 flex items-center justify-center gap-3">
 <input type="range" id="sizeSlider" min="2" max="6" value="4" class="w-1/2" aria-label="表示列数の変更">
@@ -343,55 +837,3226 @@ try {
 </div>
 </div>
 </footer>
-
-<!-- Modular JavaScript Components -->
-<?!= include('page-utils.js'); ?>
-<?!= include('page-cache.js'); ?>
-<?!= include('page-core.js'); ?>
-<?!= include('page-api.js'); ?>
-<?!= include('page-events.js'); ?>
-<?!= include('page-ui.js'); ?>
-
 <script>
-// Additional utility functions and domain/form link loading
-function loadDomainInfo() {
-  // Domain information loading logic here
-  // This would be extracted from the original Page.html
-}
+// Optimize initial render
+const RENDER_BATCH_SIZE = 10;
+const VIEWPORT_BUFFER = 200; // Viewport buffer for virtual scrolling
+const PERFORMANCE_BUDGET = 16; // Maximum ms per frame
+const CHUNK_SIZE = 5; // DOM operations per chunk
+const IDLE_TIMEOUT = 5000; // Idle timeout for cleanup
+const ICONS = {
+  'lightbulb-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
+  'lightbulb-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6z M10.5 11.25 L11 13 L13 13 L13.5 11.25 H 10.5 Z"/><path d="M9 16.5h6v1H9z M9 18h6v1H9z M9 19.5h6v1H9z"/></svg>',
+  'hand-thumb-up-outline': '<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.338 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
+  'hand-thumb-up-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z M6.5 10v12h1V10h-1z"/></svg>',
+  'magnifying-glass-plus-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6"/></svg>',
+  'magnifying-glass-plus-solid': '<svg viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z M9.75 7.5v2.25H7.5v1.5h2.25V13.5h1.5v-2.25H13.5v-1.5h-2.25V7.5h-1.5z" fill="currentColor"/><path d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15zM16.5 16.5l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  'x': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+  'star-outline': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
+  'star-solid': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
+  'star': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
+  'grid-2x2': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
+  'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
+};
 
-function loadFormLink() {
-  // Form link loading logic here
-  // This would be extracted from the original Page.html
-}
-
-// Initialize the application
-try {
-  // Create the StudyQuestApp instance
-  if (typeof window.app === 'undefined') {
-    window.studyQuestApp = window.app;
-    debugLog('StudyQuestApp instance ready:', window.app);
+class UnifiedCache {
+  constructor() {
+    this.data = new Map();
+    this.timestamps = new Map();
   }
   
-  // Load domain info and form link
+  set(key, value, ttl = 300000) { // 5分のデフォルトTTL
+    this.data.set(key, value);
+    this.timestamps.set(key, Date.now() + ttl);
+  }
+  
+  get(key) {
+    if (!this.data.has(key)) return undefined;
+    
+    const expiry = this.timestamps.get(key);
+    if (expiry && Date.now() > expiry) {
+      this.delete(key);
+      return undefined;
+    }
+    
+    return this.data.get(key);
+  }
+  
+  has(key) {
+    return this.get(key) !== undefined;
+  }
+  
+  delete(key) {
+    this.data.delete(key);
+    this.timestamps.delete(key);
+  }
+  
+  clear() {
+    this.data.clear();
+    this.timestamps.clear();
+  }
+  
+  cleanup() {
+    const now = Date.now();
+    for (const [key, expiry] of this.timestamps.entries()) {
+      if (now > expiry) {
+        this.delete(key);
+      }
+    }
+  }
+  
+  get size() {
+    return this.data.size;
+  }
+}
+
+class StudyQuestApp {
+  constructor() {
+    this.cache = new UnifiedCache();
+    this.weakCache = new WeakMap(); // For DOM element caching
+    this.performanceMetrics = { frameTime: 0, domOperations: 0 };
+    this.visibilityObserver = null;
+    this.resizeObserver = null;
+    this.deferredUpdates = new Set();
+    this.animationFrameId = null;
+    this.idleCallbackId = null;
+    this.domFragmentPool = [];
+    this.isLowPerformanceMode = true;
+    this.elements = {
+      body: document.body,
+      mainContainer: document.getElementById('main-container'),
+      answersContainer: document.getElementById('answers'),
+      sizeSlider: document.getElementById('sizeSlider'),
+      sliderValue: document.getElementById('sliderValue'),
+      headingLabel: document.getElementById('headingLabel'),
+      sheetNameText: document.getElementById('sheetNameText'),
+      endPublicationBtn: document.getElementById('endPublicationBtn'),
+      adminToggleBtn: document.getElementById('adminToggleBtn'),
+      answerCount: document.getElementById('answerCount'),
+      answerModalContainer: document.getElementById('answerModalContainer'),
+      answerModalCloseBtn: document.getElementById('answerModalCloseBtn'),
+      answerModalCard: document.getElementById('answerModalCard'),
+      modalAnswer: document.getElementById('modalAnswer'),
+      modalStudentName: document.getElementById('modalStudentName'),
+      modalReactionContainer: document.getElementById('modalReactions'),
+      modalFooter: document.getElementById('modalFooter'),
+      infoModalContainer: document.getElementById('infoModalContainer'),
+      infoModalCard: document.getElementById('infoModalCard'),
+      infoModalConfirmBtn: document.getElementById('infoModalConfirmBtn'),
+      infoIconLike: document.getElementById('infoIconLike'),
+      infoIconUnderstand: document.getElementById('infoIconUnderstand'),
+      infoIconCurious: document.getElementById('infoIconCurious'),
+      infoIconHighlight: document.getElementById('infoIconHighlight'),
+      newContentBanner: document.getElementById('newContentBanner'),
+      newContentText: document.getElementById('newContentText'),
+      refreshContentBtn: document.getElementById('refreshContentBtn'),
+      dismissBannerBtn: document.getElementById('dismissBannerBtn'),
+      iconClose: document.getElementById('iconClose'),
+      iconGrid: document.getElementById('iconGrid'),
+      classFilter: document.getElementById('classFilter'),
+      sortOrder: document.getElementById('sortOrder'),
+      scoreOption: document.getElementById('scoreOption'),
+      footer: document.getElementById('controlsFooter'),
+      loadingOverlay: document.getElementById('loading-overlay')
+    };
+    this.state = {
+      currentAnswers: [],
+      isLoading: false,
+      lastFocusedElement: null,
+      isStudentMode: window.isStudentMode,
+      isAdminUser: window.isAdminUser,
+      showCounts: window.showCounts,
+      showAdminFeatures: false, // 初期状態は常に閲覧モード
+      showHighlightToggle: window.isAdminUser, // 管理者なら常に表示
+      showScoreSort: window.showScoreSort,
+      displayMode: window.displayMode,
+      sheetName: SHEET_NAME,
+      userId: USER_ID, // Add userId to state
+      hasNewContent: false,
+      newContentCount: 0,
+      lastSeenCount: 0,
+      pollingFailureCount: 0
+    };
+    
+    // 新着チェック用の初期化
+    this.lastViewKey = null;
+    this.initialDataLoaded = false;
+    
+    // Initial state setup complete
+    this.serverShowCounts = window.showCounts;
+    this.serverDisplayMode = window.displayMode;
+    this.pollingInterval = null;
+    this.handlers = {};
+    this.adminModeVerified = false; // 管理モード切り替え時の権限確認フラグ
+    this.reactionDebounce = new Map(); // リアクションのデバウンス処理用
+    this.highlightDebounce = new Map(); // ハイライトのデバウンス処理用
+    this.pendingReactions = new Set(); // 処理中のリアクション
+    
+    // イベントリスナー重複登録防止フラグ
+    this.eventDelegationSetup = false;
+    this.nonCriticalListenersSetup = false;
+    this.modalOperationPending = false;
+    this.reactionTypes = [
+      { key: 'LIKE', icon: 'hand-thumb-up' },
+      { key: 'UNDERSTAND', icon: 'lightbulb' },
+      { key: 'CURIOUS', icon: 'magnifying-glass-plus' }
+    ];
+    
+    // リアクション状態保存用のキー
+    this.reactionStorageKey = `reactions_${USER_ID}_${SHEET_NAME}`;
+    this.gas = {
+      getPublishedSheetData: (classFilter, sort, adminMode, bypassCache) => this.runGas('getPublishedSheetData', this.state.userId, classFilter, sort, adminMode, bypassCache),
+      getIncrementalSheetData: (classFilter, sort, adminMode, sinceRowCount) => this.runGas('getIncrementalSheetData', this.state.userId, classFilter, sort, adminMode, sinceRowCount),
+      getAvailableSheets: () => this.runGas('getAvailableSheets', this.state.userId),
+      addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', this.state.userId, rowIndex, reaction, sheetName),
+      toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', this.state.userId, rowIndex, sheetName),
+      checkAdmin: () => this.runGas('checkAdmin', this.state.userId),
+      clearCache: () => this.runGas('refreshBoardData', this.state.userId),
+      getDataCount: (classFilter, sortOrder, adminMode) => this.runGas('getDataCount', this.state.userId, classFilter, sortOrder, adminMode)
+    };
+    const savedCols = localStorage.getItem('boardColumns');
+    if (savedCols && this.elements.sizeSlider && this.elements.sliderValue) {
+      this.elements.sizeSlider.value = savedCols;
+      this.elements.sliderValue.textContent = savedCols;
+    }
+    this.init();
+  }
+  init() {
+      // 初期ロード状態を表示
+      this.showLoadingOverlay();
+      
+      // タイムアウト設定（15秒）
+      this.initTimeoutId = setTimeout(() => {
+        this.hideLoadingOverlay();
+        console.warn('ページの初期化に時間がかかっています。ページを再読み込みしてください。');
+      }, 15000);
+      
+      // Critical path only - non-blocking
+      this.setupCriticalElements();
+      this.showMinimalSkeleton();
+      
+      // Apply default low performance tweaks
+      this.optimizeForLowPerformance();
+      
+      // Immediate async loading for data
+      this.loadDataImmediate();
+      
+      // Defer all non-critical operations
+      requestIdleCallback(() => {
+        this.setupNonCriticalEventListeners();
+        this.renderIcons();
+        this.adjustLayout();
+        this.updateSortOptions();
+        this.setupObservers();
+        // Initial admin state setup - 管理者権限があっても最初は閲覧モードで起動
+        if (window.hasAdminCapability && window.isAdminUser) {
+          this.state.isAdminUser = true;
+          this.state.showAdminFeatures = false; // 初期は閲覧モード
+          if (this.elements.adminToggleBtn) {
+            this.elements.adminToggleBtn.classList.remove('hidden');
+            this.elements.adminToggleBtn.removeAttribute('hidden');
+            this.elements.adminToggleBtn.style.display = ''; // 表示を確実に
+            this.elements.adminToggleBtn.textContent = '管理モード';
+          }
+        } else {
+          // 非管理者の場合は管理機能を完全に無効化
+          this.state.isAdminUser = false;
+          this.state.showAdminFeatures = false;
+          if (this.elements.adminToggleBtn) {
+            this.elements.adminToggleBtn.classList.add('hidden');
+            this.elements.adminToggleBtn.setAttribute('hidden', '');
+            this.elements.adminToggleBtn.style.display = 'none'; // 確実に非表示
+          }
+        }
+        // Check if modal should be shown
+        const introSeen = localStorage.getItem('introSeen');
+        
+        // Show modal if never seen before
+        if (!introSeen) {
+          setTimeout(() => this.showInfoModal(), 500);
+        }
+      }, { timeout: 50 });
+
+      // AdminPanelからのメッセージをリッスン
+      window.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'REFRESH_BOARD_DATA') {
+          // Refresh board data message received
+          this.loadSheetData(true);
+        }
+      });
+    }
+  setupCriticalElements() {
+    if (this.elements.headingLabel) {
+      // 問題文を常に表示（読み込み中は表示しない）
+      const opinionHeader = __OPINION_HEADER__.startsWith('<') || __OPINION_HEADER__.includes('読み込み')
+        ? 'お題'  // デフォルトテキスト
+        : this.escapeHtml(__OPINION_HEADER__);
+      this.elements.headingLabel.textContent = opinionHeader;
+    }
+
+    // Only setup absolutely critical event listeners
+    this.setupEventDelegation();
+    this.handlers.onAnswerModalCloseClick = () => this.hideAnswerModal();
+    if (this.elements.answerModalCloseBtn) {
+      this.elements.answerModalCloseBtn.addEventListener('click', this.handlers.onAnswerModalCloseClick);
+    }
+    // Size slider for immediate response with throttling
+    const debouncedRender = this.debounce(() => this.renderBoard(true), 200);
+    this.handlers.onSizeSliderInput = this.throttle((e) => {
+      localStorage.setItem('boardColumns', e.target.value);
+      debouncedRender();
+    }, 100); // Throttle to 100ms
+    
+    if (this.elements.sizeSlider) {
+      this.elements.sizeSlider.addEventListener('input', this.handlers.onSizeSliderInput, { passive: true });
+    }
+  }
+  
+  setupNonCriticalEventListeners() {
+    // 重複登録防止
+    if (this.nonCriticalListenersSetup) {
+      // Non-critical event listeners already set up
+      return;
+    }
+    
+    // Optimized: Event delegation for answer cards container
+    this.handlers.onAnswersContainerClick = (e) => {
+      const card = e.target.closest('.answer-card');
+      const reactionBtn = e.target.closest('.reaction-btn');
+      const highlightBtn = e.target.closest('.highlight-btn');
+      
+      if (reactionBtn && card) {
+        const rowIndex = card.dataset.rowIndex;
+        const reaction = reactionBtn.dataset.reaction;
+        if (rowIndex && reaction) {
+          this.handleReaction(rowIndex, reaction);
+        }
+      } else if (highlightBtn && card) {
+        const rowIndex = card.dataset.rowIndex;
+        if (rowIndex) {
+          this.handleHighlight(rowIndex);
+        }
+      } else if (card) {
+        // Card click to show modal
+        const rowIndex = card.dataset.rowIndex;
+        if (rowIndex) {
+          this.showAnswerModal(parseInt(rowIndex));
+        }
+      }
+    };
+    
+    if (this.elements.answersContainer) {
+      this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
+    }
+    
+    // Modal handlers
+    this.handlers.onAnswerModalContainerClick = (e) => {
+      if (e.target === e.currentTarget) {
+        this.hideAnswerModal();
+      }
+    };
+    if (this.elements.answerModalContainer) {
+      this.elements.answerModalContainer.addEventListener('click', this.handlers.onAnswerModalContainerClick);
+    }
+    if (this.elements.infoModalConfirmBtn) {
+      this.handlers.onInfoModalConfirmClick = () => this.hideInfoModal();
+      this.elements.infoModalConfirmBtn.addEventListener('click', this.handlers.onInfoModalConfirmClick);
+    }
+    this.handlers.onModalReactionClick = (e) => {
+      const btn = e.target.closest('.reaction-btn');
+      const highlightBtn = e.target.closest('.highlight-btn');
+      
+      if (highlightBtn) {
+        const id = highlightBtn.dataset.rowIndex;
+        if (id) {
+          this.handleHighlight(id);
+        }
+      } else if (btn) {
+        const id = btn.dataset.rowIndex;
+        const reaction = btn.dataset.reaction;
+        if (id && reaction) {
+          this.handleReaction(id, reaction);
+        }
+      }
+    };
+    if (this.elements.modalReactionContainer) {
+      this.elements.modalReactionContainer.addEventListener('click', this.handlers.onModalReactionClick);
+    }
+    this.handlers.onClassFilterChange = () => {
+      this.dismissNewContentBanner(); // フィルター変更時は既存の通知を消去
+      this.loadSheetData(true).then(() => {
+        this.state.lastSeenCount = this.state.currentAnswers.length; // 新しいベースラインを設定
+      });
+    };
+    this.handlers.onSortOrderChange = () => {
+      this.dismissNewContentBanner(); // ソート変更時は既存の通知を消去
+      this.loadSheetData(true).then(() => {
+        this.state.lastSeenCount = this.state.currentAnswers.length; // 新しいベースラインを設定
+      });
+    };
+    if (this.elements.classFilter) {
+      this.elements.classFilter.addEventListener('change', this.handlers.onClassFilterChange);
+    }
+    if (this.elements.sortOrder) {
+      this.elements.sortOrder.addEventListener('change', this.handlers.onSortOrderChange);
+    }
+    if (this.elements.endPublicationBtn) {
+      this.handlers.onEndPublicationClick = () => this.endPublication();
+      this.elements.endPublicationBtn.addEventListener('click', this.handlers.onEndPublicationClick);
+    }
+    if (this.elements.adminToggleBtn) {
+      this.handlers.onAdminToggleClick = () => this.toggleAdminMode();
+      this.elements.adminToggleBtn.addEventListener('click', this.handlers.onAdminToggleClick);
+    }
+    
+    // 新着通知バナーのイベントハンドラー
+    if (this.elements.refreshContentBtn) {
+      this.handlers.onRefreshContentClick = () => this.refreshContent();
+      this.elements.refreshContentBtn.addEventListener('click', this.handlers.onRefreshContentClick);
+    }
+    if (this.elements.dismissBannerBtn) {
+      this.handlers.onDismissBannerClick = () => this.dismissNewContentBanner();
+      this.elements.dismissBannerBtn.addEventListener('click', this.handlers.onDismissBannerClick);
+    }
+    this.handlers.onDocumentKeydown = (e) => {
+      if (e.key === 'Escape') {
+        this.hideAnswerModal();
+      }
+    };
+    document.addEventListener('keydown', this.handlers.onDocumentKeydown);
+    this.handlers.onWindowResize = this.debounce(() => this.adjustLayout(), 100);
+    window.addEventListener('resize', this.handlers.onWindowResize, { passive: true });
+    this.handlers.onVisibilityChange = () => {
+      if (document.hidden) {
+        this.stopPolling();
+        // Cleanup when page is hidden
+        this.throttledUpdate('hidden-cleanup', () => this.cleanup(), 1000);
+      } else {
+        this.startPolling();
+      }
+    };
+    document.addEventListener('visibilitychange', this.handlers.onVisibilityChange, { passive: true });
+    
+    this.nonCriticalListenersSetup = true;
+    // Non-critical event listener setup complete
+  }
+  /**
+ * イベント委譲の設定（安定版の堅牢なロジックを採用）
+ * これにより、クリックイベントが他のイベントと競合しなくなります。
+ */
+setupEventDelegation() {
+    // 重複登録防止
+    if (this.eventDelegationSetup) {
+        // Event delegation already set up
+        return;
+    }
+    
+    this.handlers.onAnswersContainerClick = (e) => {
+        const answerCard = e.target.closest('.answer-card');
+
+        if (!answerCard || answerCard.classList.contains('hidden-card')) {
+            return;
+        }
+
+        const rowIndex = answerCard.dataset.rowIndex;
+        if (!rowIndex) {
+            return;
+        }
+
+        // リアクションボタンのクリックを処理
+        const reactionBtn = e.target.closest('.reaction-btn');
+        if (reactionBtn) {
+            e.stopPropagation(); // ★重要: イベントの伝播を止め、カード本体のクリックと分離
+            if (!reactionBtn.disabled) {
+                this.handleReaction(rowIndex, reactionBtn.dataset.reaction);
+            }
+            return;
+        }
+
+        // ハイライトボタンのクリックを処理
+        const highlightBtn = e.target.closest('.highlight-btn');
+        if (highlightBtn) {
+            e.stopPropagation(); // ★重要: 同様にイベントの伝播を停止
+            if (!highlightBtn.disabled) {
+                this.handleHighlight(rowIndex);
+            }
+            return;
+        }
+
+        // 上記以外の場合は、カード本体のクリックとしてモーダルを表示
+        this.showAnswerModal(rowIndex);
+    };
+
+    if (this.elements.answersContainer) {
+        // 既存のリスナーをクリアしてから追加
+        this.elements.answersContainer.removeEventListener('click', this.handlers.onAnswersContainerClick);
+        this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
+        this.eventDelegationSetup = true;
+    } else {
+        console.error('No answers container found for event delegation');
+    }
+}
+  
+  // Debug helper functions removed for production
+  adjustLayout() {
+    if (this.baseBodyPadding === undefined) {
+      this.baseBodyPadding = parseFloat(getComputedStyle(this.elements.body).paddingBottom) || 0;
+    }
+    const footerHeight = this.elements.footer.offsetHeight;
+    this.elements.body.style.paddingBottom = footerHeight + this.baseBodyPadding + 'px';
+  }
+  runGas(funcName, ...args) {
+    // Simple request deduplication for identical calls (except for state-changing operations)
+    const cacheKey = funcName + JSON.stringify(args);
+    const isStateChanging = ['toggleHighlight', 'addReaction', 'endPublication'].includes(funcName);
+    
+    if (!isStateChanging) {
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        return Promise.resolve(cached);
+      }
+    }
+    
+    // GAS API call processing
+    
+    return new Promise((resolve, reject) => {
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        const userId = USER_ID || '';
+        google.script.run
+          .withSuccessHandler((result) => {
+            if (!isStateChanging) {
+              this.cache.set(cacheKey, result, 1000); // 1秒キャッシュ
+            }
+            resolve(result);
+          })
+          .withFailureHandler((error) => {
+            console.error('GAS APIエラー受信:', { funcName, args, error, success: false });
+            reject(error);
+          })
+          .withUserObject({ userId: userId })
+          [funcName](...args);
+      } else {
+        console.warn('Google Apps Script environment not detected.');
+        this.getMockData(funcName, ...args).then((result) => {
+          if (!isStateChanging) {
+            this.cache.set(cacheKey, result, 1000); // 1秒キャッシュ
+          }
+          resolve(result);
+        }).catch(reject);
+      }
+    });
+  }
+  async verifyAdminAsync() {
+    // Use server-provided flag first (fast)
+    if (window.isAdminUser) {
+      this.state.isAdminUser = true;
+      this.state.showHighlightToggle = true; // 管理者なら常に表示
+      // Admin permissions verified
+      this.updateAdminButtonUI();
+      this.updateEndPublicationButtonUI();
+      return;
+    }
+    
+    // Fallback API call (slower)
+    try {
+      const isAdmin = await this.gas.checkAdmin();
+      if (isAdmin) {
+        window.isAdminUser = true;
+        this.state.isAdminUser = true;
+        this.state.showHighlightToggle = true; // 管理者なら常に表示
+        // API admin permissions verified
+        this.updateAdminButtonUI();
+        this.updateEndPublicationButtonUI();
+      }
+    } catch (e) {
+      console.error('Admin check failed', e);
+    }
+  }
+  
+  // 管理者UI更新の共通メソッド
+  updateAdminButtonUI() {
+    // Only show admin toggle button for administrators, never for viewers
+    if (this.elements.adminToggleBtn && this.state.isAdminUser) {
+      // Show button for admin users only
+      this.elements.adminToggleBtn.classList.remove('hidden');
+      this.elements.adminToggleBtn.removeAttribute('hidden');
+      
+      // Always show "管理モード" text, never show "閲覧モード" to avoid confusion
+      this.elements.adminToggleBtn.textContent = '管理モード';
+      
+      // Apply styling based on current admin mode state
+      if (this.state.showAdminFeatures) {
+        // Active admin mode: highlighted styling
+        this.elements.adminToggleBtn.classList.remove('text-gray-500', 'opacity-60');
+        this.elements.adminToggleBtn.classList.add('bg-cyan-600', 'hover:bg-cyan-700', 'text-white', 'shadow-lg', 'ring-2', 'ring-cyan-400/50');
+      } else {
+        // Inactive admin mode: subtle gray styling
+        this.elements.adminToggleBtn.classList.remove('bg-cyan-600', 'hover:bg-cyan-700', 'text-white', 'shadow-lg', 'ring-2', 'ring-cyan-400/50');
+        this.elements.adminToggleBtn.classList.add('text-gray-500', 'opacity-60');
+      }
+    } else {
+      // Hide button for non-admin users
+      if (this.elements.adminToggleBtn) {
+        this.elements.adminToggleBtn.classList.add('hidden');
+        this.elements.adminToggleBtn.setAttribute('hidden', '');
+      }
+    }
+  }
+  
+  updateEndPublicationButtonUI() {
+    if (this.elements.endPublicationBtn) {
+      if (this.state.showAdminFeatures) {
+        this.elements.endPublicationBtn.classList.remove('hidden');
+        this.elements.endPublicationBtn.removeAttribute('hidden');
+      } else {
+        this.elements.endPublicationBtn.classList.add('hidden');
+        this.elements.endPublicationBtn.setAttribute('hidden', '');
+      }
+    }
+  }
+  
+  // サーバー管理者権限確認の共通メソッド
+  async checkServerAdminPermission() {
+    try {
+      const isAdmin = await this.gas.checkAdmin();
+      if (!isAdmin) {
+        throw new Error('サーバー側で管理者権限が確認できませんでした');
+      }
+      return true;
+    } catch (error) {
+      console.error('管理者権限確認エラー:', error);
+      throw error;
+    }
+  }
+  
+  // 軽量な新着コンテンツチェック
+  async checkForNewContentLight() {
+    try {
+      const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+      const sortOrder = this.elements.sortOrder.value;
+      
+      // 軽量な件数チェックのみ実行（フルデータ取得なし）
+      const countData = await this.gas.getDataCount(selectedClass, sortOrder, this.state.showAdminFeatures);
+      
+      console.log('📊 軽量新着チェック:', {
+        countResponse: countData,
+        newCount: countData.count || 0,
+        currentCount: this.state.currentAnswers ? this.state.currentAnswers.length : 0,
+        lastSeenCount: this.state.lastSeenCount,
+        selectedClass,
+        sortOrder,
+        status: countData.status,
+        error: countData.message
+      });
+      
+      const newCount = countData.count || 0;
+      
+      // 成功した場合は失敗カウントをリセット
+      this.state.pollingFailureCount = 0;
+      
+      // 現在のフィルター/ソート設定をキーとして保存
+      const currentViewKey = `${selectedClass}-${sortOrder}`;
+      
+      // 初回データロード完了の確認
+      if (!this.initialDataLoaded) {
+        // Initial data load completed
+        this.lastViewKey = currentViewKey;
+        this.state.lastSeenCount = newCount;
+        this.initialDataLoaded = true;
+        return;
+      }
+      
+      // フィルター/ソート設定が変わった場合は比較をリセット
+      if (this.lastViewKey !== null && this.lastViewKey !== currentViewKey) {
+        console.log('🔄 表示設定変更検出、新着チェックをリセット:', {
+          oldKey: this.lastViewKey,
+          newKey: currentViewKey,
+          newCount,
+          settingLastSeenToNewCount: true
+        });
+        this.lastViewKey = currentViewKey;
+        this.state.lastSeenCount = newCount;
+        return;
+      }
+      
+      // 同じフィルター/ソート設定での新着チェック
+      const hasNewItems = newCount > this.state.lastSeenCount && this.state.lastSeenCount > 0;
+      console.log('📊 新着判定:', {
+        newCount,
+        lastSeenCount: this.state.lastSeenCount,
+        hasNewItems,
+        difference: newCount - this.state.lastSeenCount,
+        currentViewKey
+      });
+      
+      if (hasNewItems) {
+        const newItems = newCount - this.state.lastSeenCount;
+        
+        // 異常に大きな差は誤検知の可能性が高い
+        if (newItems <= 10 && newItems > 0) { // 妥当な範囲の新着のみ通知
+          this.showNewContentBanner(newItems);
+          console.log('🎉 軽量新着検出・通知表示:', { 
+            newItems, 
+            newCount, 
+            lastSeenCount: this.state.lastSeenCount,
+            viewKey: currentViewKey,
+            lightweightCheck: true
+          });
+        } else {
+          console.log('⚠️ 異常な新着数検出、誤検知として無視:', {
+            newItems,
+            newCount,
+            lastSeenCount: this.state.lastSeenCount
+          });
+        }
+      }
+      
+      // 現在のビューキーを確実に設定
+      this.lastViewKey = currentViewKey;
+    } catch (error) {
+      this.state.pollingFailureCount++;
+      console.warn('軽量新着チェックに失敗:', error, 'failureCount:', this.state.pollingFailureCount);
+      
+      // 連続で失敗が続く場合はポーリング間隔を延ばす
+      if (this.state.pollingFailureCount >= 3) {
+        // Polling interval extended due to consecutive failures
+        this.stopPolling();
+        setTimeout(() => {
+          this.startPolling();
+        }, 5000); // 5秒後に再開
+        this.state.pollingFailureCount = 0;
+      }
+    }
+  }
+  
+  // 新着通知バナーを表示
+  showNewContentBanner(newItems) {
+    if (!this.elements.newContentBanner) return;
+    
+    // デバウンス：短時間内の連続通知を防ぐ
+    const now = Date.now();
+    if (this.lastNotificationTime && (now - this.lastNotificationTime) < 2000) {
+      console.log('🚫 通知デバウンス: 短時間内の連続通知をスキップ');
+      return;
+    }
+    this.lastNotificationTime = now;
+    
+    // 既に表示されている場合は、新しい数で上書き（累積しない）
+    if (!this.elements.newContentBanner.classList.contains('hidden')) {
+      console.log('📱 通知更新: 既存バナーを新しい数で更新', {
+        oldCount: this.state.newContentCount,
+        newCount: newItems
+      });
+      this.state.newContentCount = newItems; // 累積せず上書き
+    } else {
+      this.state.newContentCount = newItems;
+    }
+    
+    this.state.hasNewContent = true;
+    
+    const message = this.state.newContentCount === 1 ? 
+      '新しい意見が投稿されました' : 
+      `${this.state.newContentCount}件の新しい意見が投稿されました`;
+    this.elements.newContentText.textContent = message;
+    
+    this.elements.newContentBanner.classList.remove('hidden');
+    
+    // アニメーションをリセットしてから適用
+    this.elements.newContentBanner.style.animation = '';
+    
+    // 3秒後にバウンスアニメーション
+    setTimeout(() => {
+      if (!this.elements.newContentBanner.classList.contains('hidden')) {
+        this.elements.newContentBanner.style.animation = 'bounce 1s ease-in-out';
+      }
+    }, 3000);
+    
+    console.log('📢 新着通知表示:', {
+      count: this.state.newContentCount,
+      message: message
+    });
+  }
+  
+  // 新着バナーを閉じる
+  dismissNewContentBanner() {
+    if (!this.elements.newContentBanner) return;
+    
+    this.elements.newContentBanner.classList.add('hidden');
+    this.elements.newContentBanner.style.animation = '';
+    this.state.hasNewContent = false;
+    this.state.newContentCount = 0;
+  }
+  
+  // 増分コンテンツ更新（新しいカードのみ取得・追加）
+  async refreshContentIncremental() {
+    this.dismissNewContentBanner();
+    
+    try {
+      const originalText = this.elements.refreshContentBtn ? this.elements.refreshContentBtn.textContent : '';
+      if (this.elements.refreshContentBtn) {
+        this.elements.refreshContentBtn.textContent = '更新中...';
+        this.elements.refreshContentBtn.disabled = true;
+      }
+      
+      console.log('🔄 増分リフレッシュ開始 - 基準行数:', this.state.lastSeenCount || 0);
+      
+      // 現在のフィルタ設定を取得
+      const classFilter = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+      const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
+      const adminMode = this.state.showAdminFeatures;
+      
+      // 増分データを取得
+      const incrementalData = await this.gas.getIncrementalSheetData(
+        classFilter, 
+        sortOrder, 
+        adminMode, 
+        this.state.lastSeenCount || 0
+      );
+      
+      if (incrementalData.status === 'error') {
+        throw new Error(incrementalData.message);
+      }
+      
+      console.log('📥 増分データ取得結果:', {
+        newCount: incrementalData.newCount,
+        totalCount: incrementalData.totalCount,
+        hasNewData: incrementalData.newCount > 0
+      });
+      
+      // 新しいデータがない場合
+      if (incrementalData.newCount === 0) {
+        this.provideFeedback('最新の状態です', 'info');
+        this.state.lastSeenCount = incrementalData.totalCount;
+        return;
+      }
+      
+      // 新しいカードを既存のカードに追加
+      await this.appendNewCards(incrementalData.data, sortOrder);
+
+      // 状態を更新
+      if (sortOrder === 'newest') {
+        this.state.currentAnswers = incrementalData.data.concat(this.state.currentAnswers);
+      } else {
+        this.state.currentAnswers = this.state.currentAnswers.concat(incrementalData.data);
+      }
+
+      // サーバーキャッシュをクリアして他のソート順でも新着が反映されるようにする
+      this.gas.clearCache().catch(err => console.warn('Cache clear failed', err));
+      this.state.lastSeenCount = incrementalData.totalCount;
+      
+      console.log('✅ 増分リフレッシュ完了:', {
+        addedCards: incrementalData.newCount,
+        totalCards: this.state.currentAnswers.length,
+        newBaseline: this.state.lastSeenCount
+      });
+      
+      this.provideFeedback(`${incrementalData.newCount}件の新しい投稿を追加しました`, 'success');
+      
+    } catch (error) {
+      console.error('増分コンテンツ更新に失敗:', error);
+      
+      // エラー時は従来の全体更新にフォールバック
+      console.log('🔄 フォールバック: 全体更新を実行');
+      await this.refreshContentFull();
+      
+    } finally {
+      // ボタンを元に戻す
+      if (this.elements.refreshContentBtn) {
+        this.elements.refreshContentBtn.textContent = this.elements.refreshContentBtn.textContent.includes('更新中') ? 
+          (originalText || '更新して表示') : this.elements.refreshContentBtn.textContent;
+        this.elements.refreshContentBtn.disabled = false;
+      }
+    }
+  }
+  
+  // 全体コンテンツ更新（従来の方法）
+  async refreshContentFull() {
+    try {
+      // 従来の手動リフレッシュ時はキャッシュをクリアして最新データを取得
+      this.cache.clear();
+      console.log('🔄 全体リフレッシュ開始 - キャッシュクリア完了');
+      
+      await this.loadSheetData(true, false);
+      
+      // 手動リフレッシュ後は新着チェック基準を更新（初期化フラグは維持）
+      this.state.lastSeenCount = this.state.currentAnswers.length;
+      console.log('🔄 全体リフレッシュ完了、新着基準更新:', {
+        newLastSeenCount: this.state.lastSeenCount,
+        maintainInitialFlag: this.initialDataLoaded,
+        currentAnswersLength: this.state.currentAnswers.length,
+        visibleCards: document.querySelectorAll('.answer-card').length
+      });
+      
+      this.provideFeedback('更新完了！', 'success');
+      
+    } catch (error) {
+      console.error('全体コンテンツ更新に失敗:', error);
+      this.provideFeedback('更新失敗', 'error');
+      throw error;
+    }
+  }
+  
+  // コンテンツを更新（手動） - 増分更新を優先
+  async refreshContent() {
+    // 増分更新を試行、失敗時は全体更新にフォールバック
+    await this.refreshContentIncremental();
+  }
+  
+  // 新しいカードを既存のカードコンテナに追加
+  async appendNewCards(newData, sortOrder = 'newest') {
+    if (!newData || newData.length === 0) return;
+    
+    console.log('📌 新しいカードを追加:', newData.length + '件');
+    
+    const container = this.elements.answersContainer;
+    if (!container) return;
+    
+    // 新しいカードを作成してコンテナに追加
+    const fragment = document.createDocumentFragment();
+    
+    for (const data of newData) {
+      const cardElement = this.createAnswerCard(data);
+      if (cardElement) {
+        // 新しいカードであることを示すアニメーション
+        cardElement.style.opacity = '0';
+        cardElement.style.transform = 'translateY(20px)';
+        fragment.appendChild(cardElement);
+      }
+    }
+    
+    if (sortOrder === 'newest') {
+      container.prepend(fragment);
+    } else {
+      container.appendChild(fragment);
+    }
+    
+    // アニメーションで新しいカードを表示
+    await new Promise(resolve => {
+      requestAnimationFrame(() => {
+        const newCards = container.querySelectorAll('.answer-card[style*="opacity: 0"]');
+        newCards.forEach((card, index) => {
+          setTimeout(() => {
+            card.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+          }, index * 100); // 100msずつ遅延して順次表示
+        });
+        
+        // 全てのアニメーションが完了するまで待機
+        setTimeout(resolve, newCards.length * 100 + 300);
+      });
+    });
+  }
+  
+  // ユーザーフィードバック表示
+  provideFeedback(message, type = 'info') {
+    if (!this.elements.refreshContentBtn) return;
+    
+    const originalText = this.elements.refreshContentBtn.textContent;
+    const originalBackground = this.elements.refreshContentBtn.style.background;
+    
+    this.elements.refreshContentBtn.textContent = message;
+    
+    switch (type) {
+      case 'success':
+        this.elements.refreshContentBtn.style.background = 'rgba(16, 185, 129, 0.3)';
+        break;
+      case 'error':
+        this.elements.refreshContentBtn.style.background = 'rgba(239, 68, 68, 0.3)';
+        break;
+      case 'info':
+        this.elements.refreshContentBtn.style.background = 'rgba(59, 130, 246, 0.3)';
+        break;
+    }
+    
+    setTimeout(() => {
+      this.elements.refreshContentBtn.textContent = originalText;
+      this.elements.refreshContentBtn.style.background = originalBackground;
+    }, 2000);
+  }
+  
+  getMockData(funcName, ...args) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        if (funcName === 'getPublishedSheetData') {
+          const currentDisplayMode = window.displayMode || this.state.displayMode;
+          const studentName1 = currentDisplayMode === 'named' ? '田中太郎' : '';
+          const studentName2 = currentDisplayMode === 'named' ? '佐藤花子' : '';
+          resolve({
+            header: 'テスト問題',
+            sheetName: 'テストシート',
+            data: [
+              {
+                rowIndex: 1,
+                name: studentName1,
+                class: '3年A組',
+                opinion: 'これは素晴らしいアイデアだと思います。',
+                reason: '理由は簡潔で分かりやすく、実現可能性が高いからです。',
+                reactions: {
+                  UNDERSTAND: { count: 5, reacted: false },
+                  LIKE: { count: 2, reacted: false },
+                  CURIOUS: { count: 1, reacted: false }
+                },
+                highlight: false
+              },
+              {
+                rowIndex: 2,
+                name: studentName2,
+                class: '3年B組',
+                opinion: '少し改善の余地があると考えます。',
+                reason: 'より多くの人の意見を聞く必要があると思います。',
+                reactions: {
+                  UNDERSTAND: { count: 3, reacted: true },
+                  LIKE: { count: 0, reacted: false },
+                  CURIOUS: { count: 0, reacted: false }
+                },
+                highlight: true
+              }
+            ]
+          });
+        } else if (funcName === 'addReaction') {
+          resolve({
+            status: 'ok',
+            reactions: {
+              UNDERSTAND: { count: Math.floor(Math.random() * 5), reacted: Math.random() < 0.5 },
+              LIKE: { count: Math.floor(Math.random() * 5), reacted: Math.random() < 0.5 },
+              CURIOUS: { count: Math.floor(Math.random() * 5), reacted: Math.random() < 0.5 }
+            }
+          });
+        } else if (funcName === 'toggleHighlight') {
+          const currentHighlight = args[2] === undefined ? false : !args[2];
+          resolve({
+            status: 'ok',
+            highlight: currentHighlight
+          });
+        } else if (funcName === 'checkAdmin') {
+          resolve(true);
+        }
+      }, 300);
+    });
+  }
+  startPolling() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+    }
+    
+    // Adaptive polling: start with normal interval, adjust based on success/failure
+    this.pollSuccessCount = 0;
+    this.pollFailureCount = 0;
+    this.currentPollInterval = this.isLowPerformanceMode ? 30000 : 15000;
+    
+    const adaptivePoll = async () => {
+      console.log('⏰ ポーリング実行:', {
+        currentInterval: this.currentPollInterval,
+        successCount: this.pollSuccessCount,
+        failureCount: this.pollFailureCount,
+        timestamp: new Date().toLocaleTimeString()
+      });
+      
+      try {
+        await this.checkForNewContentLight();
+        this.pollSuccessCount++;
+        this.pollFailureCount = 0;
+        
+        // Reduce interval on consistent success (but not below minimum)
+        if (this.pollSuccessCount > 3 && this.currentPollInterval > 10000) {
+          this.currentPollInterval = Math.max(10000, this.currentPollInterval * 0.9);
+        }
+        
+        console.log('✅ ポーリング成功:', {
+          successCount: this.pollSuccessCount,
+          nextInterval: this.currentPollInterval
+        });
+      } catch (error) {
+        this.pollFailureCount++;
+        this.pollSuccessCount = 0;
+        
+        // Increase interval on failures (exponential backoff)
+        if (this.pollFailureCount > 2) {
+          this.currentPollInterval = Math.min(60000, this.currentPollInterval * 1.5);
+        }
+        console.warn('❌ ポーリング失敗:', error, {
+          failureCount: this.pollFailureCount,
+          newInterval: this.currentPollInterval
+        });
+      }
+      
+      // Schedule next poll with current interval
+      this.pollingTimeout = setTimeout(adaptivePoll, this.currentPollInterval);
+    };
+    
+    // Start first poll
+    this.pollingTimeout = setTimeout(adaptivePoll, this.currentPollInterval);
+    
+    // Start automatic cleanup for memory management
+    this.cleanupInterval = setInterval(() => {
+      this.cache.cleanup();
+    }, 5 * 60 * 1000); // Cleanup every 5 minutes
+  }
+  stopPolling() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+    }
+    
+    if (this.pollingTimeout) {
+      clearTimeout(this.pollingTimeout);
+      this.pollingTimeout = null;
+    }
+    
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+  }
+  destroy() {
+    this.stopPolling();
+    this.cleanup();
+    if (this.elements.sizeSlider && this.handlers.onSizeSliderInput) {
+      this.elements.sizeSlider.removeEventListener('input', this.handlers.onSizeSliderInput);
+    }
+    if (this.elements.answerModalCloseBtn && this.handlers.onAnswerModalCloseClick) {
+      this.elements.answerModalCloseBtn.removeEventListener('click', this.handlers.onAnswerModalCloseClick);
+    }
+    if (this.elements.answerModalContainer && this.handlers.onAnswerModalContainerClick) {
+      this.elements.answerModalContainer.removeEventListener('click', this.handlers.onAnswerModalContainerClick);
+    }
+    if (this.elements.infoModalConfirmBtn && this.handlers.onInfoModalConfirmClick) {
+      this.elements.infoModalConfirmBtn.removeEventListener('click', this.handlers.onInfoModalConfirmClick);
+    }
+    if (this.elements.modalReactionContainer && this.handlers.onModalReactionClick) {
+      this.elements.modalReactionContainer.removeEventListener('click', this.handlers.onModalReactionClick);
+    }
+    if (this.elements.classFilter && this.handlers.onClassFilterChange) {
+      this.elements.classFilter.removeEventListener('change', this.handlers.onClassFilterChange);
+    }
+    if (this.elements.sortOrder && this.handlers.onSortOrderChange) {
+      this.elements.sortOrder.removeEventListener('change', this.handlers.onSortOrderChange);
+    }
+    if (this.elements.adminToggleBtn && this.handlers.onAdminToggleClick) {
+      this.elements.adminToggleBtn.removeEventListener('click', this.handlers.onAdminToggleClick);
+    }
+    if (this.handlers.onDocumentKeydown) {
+      document.removeEventListener('keydown', this.handlers.onDocumentKeydown);
+    }
+    if (this.handlers.onWindowResize) {
+      window.removeEventListener('resize', this.handlers.onWindowResize);
+    }
+    if (this.handlers.onVisibilityChange) {
+      document.removeEventListener('visibilitychange', this.handlers.onVisibilityChange);
+    }
+    if (this.elements.answersContainer && this.handlers.onAnswersContainerClick) {
+      this.elements.answersContainer.removeEventListener('click', this.handlers.onAnswersContainerClick);
+    }
+    if (this.handlers.onDocumentClick) {
+      document.removeEventListener('click', this.handlers.onDocumentClick);
+    }
+    // Cleanup observers
+    if (this.visibilityObserver) {
+      this.visibilityObserver.disconnect();
+    }
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
+    // Cancel any pending callbacks
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+    }
+    if (this.idleCallbackId) {
+      cancelIdleCallback(this.idleCallbackId);
+    }
+    // 漏れていたイベントリスナーの削除
+    if (this.elements.refreshContentBtn && this.handlers.onRefreshContentClick) {
+      this.elements.refreshContentBtn.removeEventListener('click', this.handlers.onRefreshContentClick);
+    }
+    if (this.elements.dismissBannerBtn && this.handlers.onDismissBannerClick) {
+      this.elements.dismissBannerBtn.removeEventListener('click', this.handlers.onDismissBannerClick);
+    }
+    if (this.elements.endPublicationBtn && this.handlers.onEndPublicationClick) {
+      this.elements.endPublicationBtn.removeEventListener('click', this.handlers.onEndPublicationClick);
+    }
+    if (this.elements.sheetSelector && this.handlers.onSheetSelectorChange) {
+      this.elements.sheetSelector.removeEventListener('change', this.handlers.onSheetSelectorChange);
+    }
+    
+    // イベントリスナー設定フラグのリセット
+    this.eventDelegationSetup = false;
+    this.nonCriticalListenersSetup = false;
+    this.modalOperationPending = false;
+    
+    // Clear caches
+    this.cache.clear();
+    this.deferredUpdates.clear();
+    this.domFragmentPool.length = 0;
+    
+    debugLog('アプリケーションのクリーンアップ完了');
+  }
+  async loadDataImmediate() {
+    // Verify admin first to ensure proper initialization
+    await this.verifyAdminAsync();
+    
+    // Start loading immediately without waiting
+    this.loadSheetData(false, true).then(() => {
+      this.startPolling();
+    });
+    
+    // Load sheets in background only for administrators
+    if (this.state.isAdminUser) {
+      this.loadAvailableSheets();
+    }
+  }
+  
+  showMinimalSkeleton() {
+    // Show only 3 skeletons for immediate visual feedback
+    const count = 3;
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < count; i++) {
+      frag.appendChild(this.createSkeletonCard());
+    }
+    this.elements.answersContainer.appendChild(frag);
+  }
+
+  displayEmptyState() {
+    const container = this.elements.answersContainer;
+    if (!container) return;
+    
+    container.innerHTML = `
+      <div class="text-center py-16 px-6 col-span-full">
+        <svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+        <h3 class="mt-2 text-lg font-medium text-white">まだ回答がありません</h3>
+        <p class="mt-1 text-sm text-gray-400">最初の回答者になりましょう！</p>
+      </div>
+    `;
+  }
+
+  // Add these two methods
+  showLoadingOverlay() {
+    if (this.elements.loadingOverlay) {
+      this.elements.loadingOverlay.classList.remove('hidden');
+    }
+    
+    // すべてのユーザーインタラクションを無効化
+    var allInteractiveElements = document.querySelectorAll('button, input, select, textarea, a, .cursor-pointer, .answer-card');
+    allInteractiveElements.forEach(function(element) {
+      if (element) {
+        element.style.pointerEvents = 'none';
+        element.style.opacity = '0.6';
+      }
+    });
+    
+    // メインコンテナを無効化
+    var mainContent = document.querySelector('#main-container') || document.body;
+    mainContent.style.pointerEvents = 'none';
+    mainContent.style.userSelect = 'none';
+  }
+
+  hideLoadingOverlay() {
+    if (this.elements.loadingOverlay) {
+      this.elements.loadingOverlay.classList.add('hidden');
+    }
+    
+    // すべてのユーザーインタラクションを有効化
+    var allInteractiveElements = document.querySelectorAll('button, input, select, textarea, a, .cursor-pointer, .answer-card');
+    allInteractiveElements.forEach(function(element) {
+      if (element) {
+        element.style.pointerEvents = 'auto';
+        element.style.opacity = '1';
+      }
+    });
+    
+    // メインコンテナを有効化
+    var mainContent = document.querySelector('#main-container') || document.body;
+    mainContent.style.pointerEvents = 'auto';
+    mainContent.style.userSelect = 'auto';
+  }
+
+  async loadSheetData(showLoading = true, isInitialLoad = false, requestedSheetName = null) {
+    if (this.state.isLoading && showLoading) return;
+    this.state.isLoading = true;
+    this.showLoadingOverlay(); // Add this line
+
+    const selectedClass = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
+    const oldAnswers = [...this.state.currentAnswers];
+    
+    // Show immediate visual feedback - but keep the question text visible
+    // (Removed loading spinner from heading to keep question text always visible)
+    
+    // Optimized loading state - don't clear if initial load
+    if (showLoading && !isInitialLoad) {
+      const count = Math.min(parseInt(this.elements.sizeSlider.value, 10) * 2, 8); // Cap at 8
+      const frag = document.createDocumentFragment();
+      for (let i = 0; i < count; i++) {
+        frag.appendChild(this.createSkeletonCard());
+      }
+      const container = this.elements.answersContainer;
+      container.className = 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-' + this.elements.sizeSlider.value;
+      container.innerHTML = '';
+      container.appendChild(frag);
+    }
+    try {
+      const sortOrder = this.elements.sortOrder.value;
+      const classFilter = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
+      
+      google.script.run
+        .withSuccessHandler(result => {
+          try {
+            // 初期ロードタイムアウトをクリア
+            if (isInitialLoad && this.initTimeoutId) {
+              clearTimeout(this.initTimeoutId);
+              this.initTimeoutId = null;
+            }
+            
+            if (!result || !result.data || result.data.length === 0) {
+              this.displayEmptyState();
+              if (isInitialLoad) {
+                this.state.lastSeenCount = 0;
+              }
+              return;
+            }
+
+            this.state.currentAnswers = result.data;
+            
+            // Apply saved reaction states to restore user's previous reactions
+            this.applyReactionState(result.data);
+            
+            // Populate class filter with available classes and make it visible
+            this.populateClassFilter(result.data);
+            
+            if (isInitialLoad) {
+              this.state.lastSeenCount = result.data.length;
+              // 初期データロード完了フラグを設定
+              this.initialDataLoaded = true;
+              const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+              const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
+              this.lastViewKey = `${selectedClass}-${sortOrder}`;
+              // Initial data load completed
+            }
+
+            // Update heading with the actual question text from server (only if valid)
+            if (result.header && this.elements.headingLabel && 
+                result.header !== '読み込み中...' && 
+                !result.header.includes('読み込み') &&
+                result.header.trim() !== '') {
+              this.elements.headingLabel.textContent = result.header;
+            }
+
+            this.renderBoard(false);
+          } finally {
+            // 成功時にローディング状態を解除
+            this.state.isLoading = false;
+            this.hideLoadingOverlay();
+          }
+        })
+        .withFailureHandler(error => {
+          try {
+            // 初期ロードタイムアウトをクリア
+            if (isInitialLoad && this.initTimeoutId) {
+              clearTimeout(this.initTimeoutId);
+              this.initTimeoutId = null;
+            }
+            
+            console.error('Error loading sheet data:', error);
+            
+            // Check if the error indicates the board has been unpublished
+            const errorStr = error.message || error.toString();
+            if (errorStr.includes('アクティブなシートが見つかりません') || 
+                errorStr.includes('公開されていません') ||
+                errorStr.includes('unpublished') ||
+                errorStr.includes('not found')) {
+              // Board has been unpublished, redirect to Unpublished.html
+              console.log('Board appears to be unpublished, redirecting...');
+              this.redirectToUnpublishedPage();
+              return;
+            }
+            
+            this.displayEmptyState();
+          } finally {
+            // エラー時にもローディング状態を解除
+            this.state.isLoading = false;
+            this.hideLoadingOverlay();
+          }
+        })
+        .getPublishedSheetData(this.state.userId, classFilter, sortOrder, this.state.showAdminFeatures, false);
+      
+      
+      // Post-processing after successful data load
+      this.adjustLayout();
+      
+      if (!this.state.isAdminUser || !window.hasAdminCapability) {
+        this.state.showAdminFeatures = false;
+        this.state.showHighlightToggle = false;
+        // 管理モードボタンを確実に非表示
+        if (this.elements.adminToggleBtn) {
+          this.elements.adminToggleBtn.classList.add('hidden');
+          this.elements.adminToggleBtn.setAttribute('hidden', '');
+          this.elements.adminToggleBtn.style.display = 'none';
+        }
+      } else {
+        this.state.showHighlightToggle = true;
+        // 管理モードボタンを表示
+        if (this.elements.adminToggleBtn) {
+          this.elements.adminToggleBtn.classList.remove('hidden');
+          this.elements.adminToggleBtn.removeAttribute('hidden');
+          this.elements.adminToggleBtn.style.display = '';
+        }
+        // Admin settings updated
+        this.cache.clear();
+        // Cache cleared due to admin highlight settings
+      }
+      
+      if (isInitialLoad) {
+        this.elements.answersContainer.classList.add('render-optimized');
+      }
+    } catch (error) {
+      console.error('Error loading sheet data:', error);
+      const errorMessage = this.escapeHtml(error.message || 'Unknown error');
+      this.elements.answersContainer.querySelectorAll('.skeleton').forEach(el => el.remove());
+      this.elements.answersContainer.innerHTML = '<div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg">' + '<p class="font-bold">データの読み込みに失敗しました。</p>' + '<p class="text-sm mt-2">' + errorMessage + '</p>' + '<button id="retryLoadBtn" class="mt-4 game-btn bg-cyan-600 text-white px-4 py-2 rounded-lg font-bold border-cyan-800 hover:bg-cyan-500 text-sm">再試行</button>' + '</div>';
+      // 同期エラーの場合にもローディング状態を解除
+      this.state.isLoading = false;
+      this.hideLoadingOverlay();
+    }
+  }
+  async loadAvailableSheets() {
+    try {
+      const sheetsData = await this.gas.getAvailableSheets();
+      this.populateSheetSelector(sheetsData);
+    } catch (error) {
+      console.error('Failed to load available sheets:', error);
+      if (this.elements.sheetSelector) {
+        this.elements.sheetSelector.innerHTML = '<option value="">エラー: シート読み込み失敗</option>';
+      }
+    }
+  }
+  populateSheetSelector(sheets) {
+    const selector = this.elements.sheetSelector;
+    
+    if (!selector) return;
+
+    if (!sheets || sheets.length === 0) {
+      selector.innerHTML = '<option value="">利用可能なシートがありません</option>';
+      selector.disabled = true;
+      return;
+    }
+    
+    // シート選択肢を構築
+    if (!Array.isArray(sheets)) {
+      console.error('Invalid sheets data:', sheets);
+      selector.innerHTML = '<option>シートデータが無効です</option>';
+      selector.disabled = true;
+      return;
+    }
+    
+    const options = sheets.map(sheet => {
+      const selected = sheet.name === this.state.sheetName ? 'selected' : ''; // Use sheet.name for comparison
+      const activeLabel = sheet.name === this.state.sheetName ? ' (現在のアクティブシート)' : '';
+      return `<option value="${this.escapeHtml(sheet.name)}" ${selected}>${this.escapeHtml(sheet.name)}${activeLabel}</option>`;
+    }).join('');
+    
+    selector.innerHTML = options;
+    selector.disabled = false;
+    
+    // 現在のアクティブシートを記録
+    // this.state.currentActiveSheet is already set by loadSheetData
+  }
+  async switchSheet() {
+    const selectedSheet = this.elements.sheetSelector.value;
+    if (!selectedSheet || selectedSheet === this.state.currentActiveSheet) {
+      return;
+    }
+    
+    try {
+      // 新しいシートのデータを読み込み
+      await this.loadSheetData(true, false, selectedSheet);
+      this.state.currentActiveSheet = selectedSheet;
+      
+      // UIを更新
+      this.updateSheetSelectorLabels();
+    } catch (error) {
+      console.error('Failed to switch sheet:', error);
+      // エラー時は元のシートに戻す
+      this.elements.sheetSelector.value = this.state.currentActiveSheet || '';
+    }
+  }
+  updateSheetSelectorLabels() {
+    const selector = this.elements.sheetSelector;
+    const options = Array.from(selector.options);
+    
+    options.forEach(option => {
+      const sheetName = option.value;
+      const isActive = sheetName === this.state.currentActiveSheet;
+      const cleanName = sheetName.replace(/ \(現在のアクティブシート\)$/, '');
+      
+      if (isActive) {
+        option.textContent = `${cleanName} (現在のアクティブシート)`;
+      } else {
+        option.textContent = cleanName;
+      }
+    });
+  }
+  populateClassFilter(rows) {
+    const classFilter = this.elements.classFilter;
+    // Ensure rows is an array before mapping
+    const uniqueClasses = ['すべて', ...new Set(Array.isArray(rows) ? rows.map(r => r.class).filter(Boolean) : [])];
+    classFilter.innerHTML = uniqueClasses.map(c => '<option value="' + this.escapeHtml(c) + '">' + this.escapeHtml(c) + '</option>').join('');
+    classFilter.value = 'すべて';
+    classFilter.classList.remove('hidden');
+  }
+  applyReactionStyles(element, data) {
+    if (!element || !data) return;
+    
+    // 既存のリアクション関連クラスをクリア
+    const reactionClasses = [
+      'reaction-bg-like', 'reaction-bg-understand', 'reaction-bg-curious',
+      'reaction-bg-like-understand', 'reaction-bg-like-curious', 'reaction-bg-understand-curious',
+      'reaction-bg-like-understand-curious', 'reaction-border-1', 'reaction-border-2', 'reaction-border-3',
+      'highlighted'
+    ];
+    reactionClasses.forEach(cls => element.classList.remove(cls));
+    
+    // ハイライト状態を適用（リアクション装飾より優先）
+    if (data.highlight) {
+      element.classList.add('highlighted');
+      // Highlight decoration applied
+      // ハイライト時はリアクション装飾をスキップ
+      return;
+    } else {
+      // No highlight decoration
+    }
+    
+    // アクティブなリアクションを特定
+    const active = this.reactionTypes.filter(rt => 
+      data.reactions && data.reactions[rt.key] && data.reactions[rt.key].count > 0
+    ).map(rt => rt.key);
+    
+    // 背景色クラスを適用
+    if (active.length === 1) {
+      if (active[0] === 'LIKE') element.classList.add('reaction-bg-like');
+      else if (active[0] === 'UNDERSTAND') element.classList.add('reaction-bg-understand');
+      else if (active[0] === 'CURIOUS') element.classList.add('reaction-bg-curious');
+    } else if (active.length === 2) {
+      const sorted = active.sort();
+      if (sorted[0] === 'CURIOUS' && sorted[1] === 'LIKE') element.classList.add('reaction-bg-like-curious');
+      else if (sorted[0] === 'LIKE' && sorted[1] === 'UNDERSTAND') element.classList.add('reaction-bg-like-understand');
+      else if (sorted[0] === 'CURIOUS' && sorted[1] === 'UNDERSTAND') element.classList.add('reaction-bg-understand-curious');
+    } else if (active.length === 3) {
+      element.classList.add('reaction-bg-like-understand-curious');
+    }
+    
+    // ボーダー幅を適用
+    const totalReactions = this.reactionTypes.reduce((sum, rt) => sum + (data.reactions?.[rt.key]?.count || 0), 0);
+    if (totalReactions >= 10) {
+      element.classList.add('reaction-border-3');
+    } else if (totalReactions >= 5) {
+      element.classList.add('reaction-border-2');
+    } else if (totalReactions > 0) {
+      element.classList.add('reaction-border-1');
+    }
+  }
+  renderBoard(isLayoutChange = false, oldRows = []) {
+    // 管理者の場合はハイライトトグルを確実に有効化
+    if (this.state.isAdminUser && !this.state.showHighlightToggle) {
+      this.state.showHighlightToggle = true;
+      // Highlight toggle force enabled in renderBoard
+      // ハイライトトグル設定が変更されたのでキャッシュをクリア
+      this.cache.clear();
+      // Cache cleared due to highlight setting change
+    }
+    
+    const container = this.elements.answersContainer;
+    container.querySelectorAll('.skeleton').forEach(el => el.remove());
+    const newRows = this.state.currentAnswers;
+    
+    // Batch DOM updates using performance-aware batching
+    const updates = [];
+    if (this.elements.sliderValue && this.elements.sizeSlider && 
+        this.elements.sliderValue.textContent !== this.elements.sizeSlider.value) {
+      updates.push(() => this.elements.sliderValue.textContent = this.elements.sizeSlider.value);
+    }
+    if (this.elements.sizeSlider) {
+      const newClassName = 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-' + this.elements.sizeSlider.value;
+      if (container.className !== newClassName) {
+        updates.push(() => container.className = newClassName);
+      }
+    }
+    if (this.elements.answerCount) {
+      const userIcon = this.getIcon('users', 'w-4 h-4 inline-block -mt-1');
+      const countHtml = userIcon + '<span>' + newRows.length + '件</span>';
+      if (this.elements.answerCount.innerHTML !== countHtml) {
+        updates.push(() => this.elements.answerCount.innerHTML = countHtml);
+      }
+    }
+    
+    // Apply updates using performance-aware batching
+    this.batchDOMUpdates(updates);
+    
+    if (newRows.length === 0) {
+      if (!container.querySelector('.no-answers')) {
+        container.innerHTML = '';
+        const p = document.createElement('p');
+        p.className = 'text-center text-gray-500 col-span-full mt-8 no-answers';
+        p.textContent = 'このクラスの回答はありません。';
+        container.appendChild(p);
+      }
+    } else {
+      const existingMap = new Map();
+      container.querySelectorAll('.answer-card').forEach(card => {
+        existingMap.set(card.dataset.rowIndex, card);
+      });
+      existingMap.forEach((card, id) => {
+        if (!newRows.some(r => String(r.rowIndex) === id)) {
+          card.remove();
+          existingMap.delete(id);
+        }
+      });
+      const changedItems = [];
+      let prevNode = null;
+      // Enhanced batch processing with virtual scrolling for large datasets
+      if (newRows.length > RENDER_BATCH_SIZE) {
+        this.renderWithVirtualScrolling(newRows, oldRows, container, existingMap, changedItems);
+      } else {
+        // Process small datasets normally
+        const fragment = this.getReusableFragment();
+        
+        newRows.forEach((row) => {
+          const rowId = String(row.rowIndex);
+          let card = existingMap.get(rowId);
+          const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
+          
+          if (!card) {
+            card = this.createAnswerCard(row);
+            card.classList.add('new-card');
+            
+            // Add to visibility observer
+            if (this.visibilityObserver) {
+              this.visibilityObserver.observe(card);
+            }
+            
+            changedItems.push(row);
+            fragment.appendChild(card);
+          } else {
+            this.updateExistingCard(card, row, oldData, changedItems);
+            // 既存のカードは既にDOMにあるので、フラグメントに追加しない
+            // 必要に応じて位置を調整するが、ここでは元の位置を保持
+          }
+        });
+        
+        // Append fragment to container
+        if (fragment.children.length > 0) {
+          container.appendChild(fragment);
+        }
+        
+        // Recycle fragment
+        this.recycleFragment(fragment);
+      }
+      // Defer updates for better performance
+      if (changedItems.length) {
+        this.deferredRender(() => this.applyUpdates(changedItems));
+      }
+    }
+  }
+  
+  renderWithVirtualScrolling(newRows, oldRows, container, existingMap, changedItems) {
+    const batchSize = this.isLowPerformanceMode ? CHUNK_SIZE : RENDER_BATCH_SIZE;
+    let currentIndex = 0;
+    let prevNode = null;
+    
+    const processBatch = () => {
+      const startTime = performance.now();
+      const endIndex = Math.min(currentIndex + batchSize, newRows.length);
+      const batch = newRows.slice(currentIndex, endIndex);
+      
+      // Use document fragment for efficient DOM manipulation
+      const fragment = this.getReusableFragment();
+      
+      batch.forEach((row) => {
+        const rowId = String(row.rowIndex);
+        let card = existingMap.get(rowId);
+        const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
+        
+        if (!card) {
+          card = this.createAnswerCard(row);
+          card.classList.add('new-card');
+          
+          // Add to visibility observer for virtual scrolling
+          if (this.visibilityObserver) {
+            this.visibilityObserver.observe(card);
+          }
+          
+          changedItems.push(row);
+          fragment.appendChild(card);
+        } else {
+          this.updateExistingCard(card, row, oldData, changedItems);
+          // 既存のカードは既にDOMにあるので、フラグメントに追加しない
+        }
+      });
+      
+      // Append fragment to container
+      if (fragment.children.length > 0) {
+        container.appendChild(fragment);
+      }
+      
+      // Recycle fragment
+      this.recycleFragment(fragment);
+      
+      currentIndex = endIndex;
+      
+      // Continue processing if there are more items
+      if (currentIndex < newRows.length) {
+        const elapsed = performance.now() - startTime;
+        
+        if (elapsed < PERFORMANCE_BUDGET && !this.isLowPerformanceMode) {
+          // Continue synchronously if we have time budget
+          processBatch();
+        } else {
+          // Defer to next frame/idle callback
+          this.deferredRender(processBatch);
+        }
+      }
+    };
+    
+    processBatch();
+  }
+  
+  updateExistingCard(card, row, oldData, changedItems) {
+    if (oldData) {
+      let hasChanges = false;
+      
+      if (oldData.opinion !== row.opinion) {
+        const t = card.querySelector('.opinion-text');
+        if (t) {
+          t.textContent = row.opinion;
+          hasChanges = true;
+        }
+      }
+      
+      if (oldData.reason !== row.reason) {
+        const p = card.querySelector('.answer-preview p');
+        if (p) {
+          p.textContent = row.reason;
+          hasChanges = true;
+        }
+      }
+      
+      if (oldData.name !== row.name) {
+        const n = card.querySelector('.font-bold');
+        if (n) {
+          n.textContent = row.name;
+          hasChanges = true;
+        }
+      }
+      
+      if (JSON.stringify(oldData.reactions) !== JSON.stringify(row.reactions) || 
+          oldData.highlight !== row.highlight) {
+        hasChanges = true;
+      }
+      
+      if (hasChanges) {
+        changedItems.push(row);
+      }
+    }
+  }
+  createAnswerCard(data) {
+    // Optimized cache key generation (faster than JSON.stringify)
+    const cacheKey = `${data.rowIndex}-${data.opinion?.slice(0,50)}-${data.reason?.slice(0,30)}-${data.name}-${JSON.stringify(data.reactions)}-${data.highlight}-${this.state.showCounts}-${this.state.displayMode}-${this.state.showHighlightToggle}`;
+    
+    // Answer card cache check
+    
+    const cachedCard = this.cache.get(`render-${cacheKey}`);
+    if (cachedCard) {
+      const clonedCard = cachedCard.cloneNode(true);
+      // Ensure cloned card has proper data-row-index
+      clonedCard.dataset.rowIndex = data.rowIndex;
+      
+      // Optimized: Only update elements that need row index (avoid querySelectorAll)
+      const reactionButtons = clonedCard.querySelectorAll('.reaction-btn');
+      reactionButtons.forEach(btn => {
+        btn.dataset.rowIndex = data.rowIndex;
+      });
+      
+      // Using cached card
+      return clonedCard;
+    }
+    
+    const card = document.createElement('div');
+    const highlightClass = data.highlight ? ' highlighted' : '';
+    card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer' + highlightClass;
+    card.dataset.rowIndex = data.rowIndex;
+    card.setAttribute('role', 'article');
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('aria-label', '回答カード: ' + (data.opinion || '').substring(0, 50) + (data.opinion && data.opinion.length > 50 ? '...' : ''));
+    
+    // Answer card created
+    let highlightBtnHtml = '';
+    // Highlight button condition check
+    if (this.state.showHighlightToggle) {
+      const cls = data.highlight ? 'liked' : '';
+      const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
+      highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
+      // Highlight button created
+    } else {
+      // Highlight button skipped
+    }
+    const showName = this.state.displayMode === 'named';
+    let displayName = '';
+    
+    // Debug: Log display mode and admin features state
+    // Card display state configured
+    
+    if (showName) {
+      // 名前が利用可能な場合はそれを使用、なければemailから生成
+      if (data.name) {
+        displayName = data.name;
+      } else if (data.email) {
+        displayName = data.email.split('@')[0];
+      }
+      
+    }
+    
+    const nameHtml = showName && displayName ? '<div class="name-display flex-shrink-0 mr-2"><span class="font-bold text-sm text-cyan-300 bg-gray-800/50 px-2 py-1 rounded border border-cyan-400">' + this.escapeHtml(displayName) + '</span></div>' : '';
+    const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex flex-col sm:flex-row justify-between items-start sm:items-center gap-y-1 min-h-[2rem]' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
+    
+    // Name display configuration complete
+    const reactionButtonsHtml = this.reactionTypes.map(rt => {
+      const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
+      const cls = info.reacted ? 'liked' : '';
+      const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+      const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-lg text-gray-200" aria-hidden="true">' + (info.count || 0) + '</span>' : '';
+      const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
+      const reactionName = reactionNames[rt.key] || rt.key;
+      const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
+      return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + ariaLabel + '" aria-pressed="' + info.reacted + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
+    }).join('');
+    // Optimized: Use DocumentFragment instead of innerHTML for better performance
+    const fragment = document.createDocumentFragment();
+    
+    // Create main content div
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'relative flex-grow mb-3 answer-preview';
+    
+    const opinionTitle = document.createElement('h3');
+    opinionTitle.className = 'opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
+    opinionTitle.textContent = data.opinion || '';
+    
+    const reasonText = document.createElement('p');
+    reasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
+    reasonText.textContent = data.reason || '';
+    
+    contentDiv.appendChild(opinionTitle);
+    contentDiv.appendChild(reasonText);
+    
+    // Create footer div
+    const footerDiv = document.createElement('div');
+    footerDiv.className = containerClass;
+    
+    // 名前表示部分を追加
+    if (nameHtml) {
+      const nameContainer = document.createElement('div');
+      nameContainer.className = 'name-container flex-shrink-0';
+      nameContainer.innerHTML = nameHtml;
+      footerDiv.appendChild(nameContainer);
+      console.log('✅ 名前コンテナを追加:', {
+        rowIndex: data.rowIndex,
+        nameHtml,
+        containerHTML: nameContainer.outerHTML
+      });
+    } else {
+      console.log('❌ 名前HTML生成されず:', {
+        rowIndex: data.rowIndex,
+        showName,
+        displayName
+      });
+    }
+    
+    // リアクション部分を追加
+    const reactionsDiv = document.createElement('div');
+    reactionsDiv.className = 'flex items-center gap-1 flex-shrink-0';
+    reactionsDiv.setAttribute('role', 'group');
+    reactionsDiv.setAttribute('aria-label', '回答への反応');
+    reactionsDiv.innerHTML = reactionButtonsHtml + highlightBtnHtml;
+    
+    footerDiv.appendChild(reactionsDiv);
+    
+    // 最終的なfooterDivの内容を確認
+    console.log('📦 フッター構成確認:', {
+      rowIndex: data.rowIndex,
+      footerChildren: footerDiv.children.length,
+      footerHTML: footerDiv.outerHTML.substring(0, 200)
+    });
+    
+    fragment.appendChild(contentDiv);
+    fragment.appendChild(footerDiv);
+    card.appendChild(fragment);
+    if (data.highlight) {
+      const badge = document.createElement('span');
+      badge.className = 'highlight-badge';
+      badge.innerHTML = this.getIcon('star', '', true);
+      card.appendChild(badge);
+    }
+    
+    // 統一されたリアクションスタイルを適用
+    this.applyReactionStyles(card, data);
+    
+    // Cache the card for reuse (limit cache size)
+    if (this.cache.size > 100) {
+      this.cache.cleanup();
+    }
+    this.cache.set(`render-${cacheKey}`, card.cloneNode(true));
+    
+    return card;
+  }
+  createSkeletonCard() {
+    const card = document.createElement('div');
+    card.className = 'answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 skeleton';
+    // Simplified skeleton for faster rendering
+    card.innerHTML = '<div class="h-20 w-full rounded bg-gray-500/30 mb-4"></div><div class="h-6 w-full rounded bg-gray-500/20"></div>';
+    return card;
+  }
+  /**
+ * リアクション処理（連続クリック防止機能＋安定化されたUI更新）
+ */
+/**
+ * リアクション処理（連続クリック防止機能＋安定化されたUI更新）
+ */
+async handleReaction(rowIndex, reaction) {
+    const numericRowIndex = parseInt(rowIndex, 10);
+    const reactionKey = `${numericRowIndex}-${reaction}`;
+
+    // ★連続クリック防止機能（問題版から継承）
+    if (this.pendingReactions.has(reactionKey)) {
+        return; // すでに処理中なら何もしない
+    }
+    this.pendingReactions.add(reactionKey);
+
+    const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
+    
+    // ボタンを即座に無効化して視覚的フィードバックを提供
+    btns.forEach(btn => {
+        btn.disabled = true;
+        btn.classList.add('loading');
+    });
+    const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
+
+    if (!item) {
+        // エラー時はボタンを再有効化
+        btns.forEach(btn => {
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        });
+        this.pendingReactions.delete(reactionKey);
+        return;
+    }
+
+    // 1人1つのリアクション制限をチェック
+    const currentReactions = item.reactions || {};
+    const hasAnyReaction = Object.keys(currentReactions).some(key => 
+      currentReactions[key] && currentReactions[key].reacted
+    );
+    
+    const isCurrentReactionActive = currentReactions[reaction] && currentReactions[reaction].reacted;
+    
+    // 既に他のリアクションをしている場合でも、別のリアクションに直接切り替えを許可
+    // （サーバー側で自動的に既存のリアクションを削除して新しいリアクションを追加）
+    if (hasAnyReaction && !isCurrentReactionActive) {
+      debugLog('既存のリアクションを切り替えます:', { 
+        existingReactions: Object.keys(currentReactions).filter(key => currentReactions[key]?.reacted),
+        newReaction: reaction
+      });
+    }
+
+    try {
+        // ★修正ポイント②：先にサーバーと通信する
+        const res = await this.gas.addReaction(numericRowIndex, reaction, this.state.sheetName);
+
+        // レスポンスの安全な処理
+        debugLog('addReactionレスポンス:', { res, type: typeof res });
+        
+        if (res && res.status === 'ok') {
+            // ★修正ポイント③：サーバーからの応答成功後に、UIを完全に更新する
+            if (res.reactions && typeof res.reactions === 'object') {
+                item.reactions = res.reactions;
+            } else {
+                debugLog('警告: reactionsプロパティが期待された形式ではありません');
+                // フォールバック: 既存のreactionsを保持し、カウントのみ更新
+                if (!item.reactions) {
+                    item.reactions = {};
+                }
+                if (!item.reactions[reaction]) {
+                    item.reactions[reaction] = { count: 0, reacted: false };
+                }
+                item.reactions[reaction].count = (item.reactions[reaction].count || 0) + 1;
+                item.reactions[reaction].reacted = true;
+            }
+            
+            // リアクション状態をlocalStorageに保存
+            this.saveReactionState(numericRowIndex, item.reactions);
+            
+            // UI状態を即座に更新
+            requestAnimationFrame(() => {
+                this.applyUpdates([item]); // 次の描画フレームで安全にUIを更新
+                
+                // リアクションボタンの状態を強制更新
+                const reactionBtns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
+                reactionBtns.forEach(btn => {
+                    const reactionInfo = item.reactions?.[reaction];
+                    if (reactionInfo?.reacted) {
+                        btn.classList.add('liked');
+                        btn.setAttribute('aria-pressed', 'true');
+                    } else {
+                        btn.classList.remove('liked');
+                        btn.setAttribute('aria-pressed', 'false');
+                    }
+                });
+            });
+
+            // モーダルが開いていればそちらも更新
+            if (!this.elements.answerModalContainer.classList.contains('hidden')) {
+                const modalRowIndex = this.elements.modalReactionContainer.querySelector('[data-row-index]')?.dataset.rowIndex;
+                if (modalRowIndex == rowIndex) {
+                    this.updateModalContent(item);
+                }
+            }
+        } else {
+            const errorMsg = res?.message || 'リアクションの処理に失敗しました';
+            debugLog('リアクションAPIエラー:', { 
+                res, 
+                errorMsg,
+                responseType: typeof res,
+                hasValues: res?.values !== undefined,
+                responseKeys: res ? Object.keys(res) : []
+            });
+            
+            // ユーザーフレンドリーなエラーメッセージ
+            if (errorMsg.includes('Cannot read properties of undefined')) {
+                throw new Error('データの読み込みに失敗しました。ページを更新してもう一度お試しください。');
+            } else {
+                throw new Error(errorMsg);
+            }
+        }
+    } catch (error) {
+        console.error('Failed to add reaction:', error);
+        debugLog('リアクションエラー詳細:', {
+            error: error.message,
+            stack: error.stack,
+            reaction,
+            rowIndex,
+            item: item ? { rowIndex: item.rowIndex, hasReactions: !!item.reactions } : null
+        });
+        this.showErrorFeedback(btns[0], 'リアクションに失敗しました');
+        // エラー時は何もしない（UIは元の状態のまま）
+    } finally {
+        // ★修正ポイント④：最後にボタンのローディング状態を解除
+        btns.forEach(btn => {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        });
+        this.pendingReactions.delete(reactionKey);
+    }
+}
+  
+  showErrorFeedback(btn, message) {
+    if (!btn) return;
+    
+    // 元のクラスを保存
+    const originalClasses = btn.className;
+    
+    // エラー表示
+    btn.classList.add('bg-red-500');
+    btn.title = message;
+    
+    // 2秒後に元に戻す
+    setTimeout(() => {
+      btn.className = originalClasses;
+      btn.title = '';
+    }, 2000);
+  }
+  async handleHighlight(rowIndex) {
+    // Highlight processing started
+    
+    // バックエンド側で管理者権限をチェックするので、フロントエンド側のチェックは不要
+    
+    const numericRowIndex = parseInt(rowIndex, 10);
+    const highlightKey = `${numericRowIndex}-highlight`;
+    
+    // Enhanced debounce for highlight operations
+    if (this.highlightDebounce.has(highlightKey)) {
+      clearTimeout(this.highlightDebounce.get(highlightKey));
+      return; // Ignore rapid highlight clicks
+    }
+    
+    // Rate limiting for highlights
+    const now = Date.now();
+    const lastHighlightTime = this.lastReactionTimes?.get(highlightKey) || 0;
+    if (now - lastHighlightTime < 500) { // Minimum 500ms between highlights
+      return;
+    }
+    
+    // 既に処理中の場合は無視
+    if (this.pendingReactions.has(highlightKey)) {
+      return;
+    }
+    
+    this.pendingReactions.add(highlightKey);
+    if (!this.lastReactionTimes) this.lastReactionTimes = new Map();
+    this.lastReactionTimes.set(highlightKey, now);
+    
+    const btns = document.querySelectorAll('.highlight-btn[data-row-index="' + numericRowIndex + '"]');
+    const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
+    
+    if (!item) {
+      this.pendingReactions.delete(highlightKey);
+      return;
+    }
+    
+    // ★修正ポイント①：UI更新をボタンのローディング表示のみに限定
+    btns.forEach(btn => {
+        btn.classList.add('loading');
+        btn.disabled = true;
+    });
+    
+    try {
+        // ★修正ポイント②：先にサーバーと通信する
+        const res = await this.gas.toggleHighlight(numericRowIndex, this.state.sheetName);
+
+        if (res && res.status === 'ok') {
+            // ★修正ポイント③：サーバーからの応答成功後に、UIを完全に更新する
+            item.highlight = res.highlight;
+            requestAnimationFrame(() => this.applyUpdates([item])); // 次の描画フレームで安全にUIを更新
+
+            // モーダルが開いていればそちらも更新
+            if (!this.elements.answerModalContainer.classList.contains('hidden')) {
+                const modalRowIndex = this.elements.modalReactionContainer.querySelector('[data-row-index]')?.dataset.rowIndex;
+                if (modalRowIndex == rowIndex) {
+                    this.updateModalContent(item);
+                }
+            }
+        } else {
+            throw new Error(res?.message || 'ハイライトの処理に失敗しました');
+        }
+    } catch (error) {
+        console.error('Failed to toggle highlight:', error);
+        this.showErrorFeedback(btns[0], 'ハイライトに失敗しました');
+    } finally {
+        // ★修正ポイント④：最後にボタンのローディング状態を解除
+        btns.forEach(btn => {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        });
+        this.pendingReactions.delete(highlightKey);
+    }
+  }
+  
+  async toggleAdminMode() {
+    // Temporarily disable button to prevent duplicate clicks
+    if (this.elements.adminToggleBtn) {
+      this.elements.adminToggleBtn.disabled = true;
+    }
+    
+    try {
+      const enable = !this.state.showAdminFeatures;
+      
+      // 管理者権限チェック
+      if (enable) {
+        if (!this.state.isAdminUser || !window.hasAdminCapability) {
+          console.warn('管理者権限がありません。');
+          return;
+        }
+        
+        // 管理モード移行時の確認モーダル
+        const confirmed = await this.showAdminModeConfirmation();
+        if (!confirmed) {
+          return; // ユーザーがキャンセルした場合
+        }
+        
+        // 最初の管理モード切り替え時のみサーバー側で再確認（オプション）
+        if (!this.adminModeVerified) {
+          try {
+            const ok = await this.gas.checkAdmin();
+            if (!ok) {
+              console.warn('サーバー側の権限確認に失敗しました。');
+              // ローカルの権限情報を信頼して継続
+            }
+            this.adminModeVerified = true;
+          } catch (e) {
+            console.warn('権限確認API呼び出しに失敗しました', e);
+            // エラーが発生してもローカルの権限情報を信頼して継続
+          }
+        }
+      }
+      
+      // グローバル設定を更新
+      window.showAdminFeatures = enable;
+      window.showHighlightToggle = this.state.isAdminUser; // 管理者なら常に表示
+      
+      debugLog('toggleAdminMode状態更新:', {
+        enable,
+        isAdminUser: this.state.isAdminUser,
+        showAdminFeatures: window.showAdminFeatures,
+        showHighlightToggle: window.showHighlightToggle
+      });
+      if (enable) {
+        // 管理モード時は強制的に名前とリアクション数を表示
+        window.showCounts = true;
+        window.displayMode = 'named';
+        window.isStudentMode = false;
+        window.showScoreSort = window.showCounts;
+        debugLog('管理モード有効化: 名前とリアクション数を強制表示', {
+          showCounts: window.showCounts,
+          displayMode: window.displayMode
+        });
+      } else {
+        // 閲覧モード時はサーバー設定に戻す
+        window.showCounts = this.serverShowCounts;
+        window.displayMode = this.serverDisplayMode;
+        window.isStudentMode = true;
+        window.showScoreSort = window.showCounts;
+        debugLog('閲覧モード有効化: サーバー設定を復元', {
+          showCounts: window.showCounts,
+          displayMode: window.displayMode,
+          serverShowCounts: this.serverShowCounts,
+          serverDisplayMode: this.serverDisplayMode
+        });
+      }
+      
+      // 管理モード有効時は強制的にローカル状態も更新
+      if (enable) {
+        this.state.displayMode = 'named';
+        this.state.showCounts = true;
+        this.state.isStudentMode = false;
+      } else {
+        this.state.displayMode = this.serverDisplayMode;
+        this.state.showCounts = this.serverShowCounts;
+        this.state.isStudentMode = true;
+      }
+      
+      // Update local state from global variables (but preserve displayMode if in admin mode)
+      this.updateConfigFromGlobals();
+      
+      // Re-enforce admin mode settings after updateConfigFromGlobals
+      if (enable) {
+        this.state.displayMode = 'named';
+        this.state.showCounts = true;
+      }
+      
+      // 管理モード切り替え後の状態を確認
+      debugLog('管理モード切り替え後の状態確認:', {
+        enable,
+        stateDisplayMode: this.state.displayMode,
+        stateShowCounts: this.state.showCounts,
+        windowDisplayMode: window.displayMode,
+        windowShowCounts: window.showCounts
+      });
+      
+      // キャッシュをクリアして新しい設定で再描画
+      this.cache.clear();
+      
+      // 管理モード切り替え時は既存のカードを全て削除して強制再生成
+      this.elements.answersContainer.innerHTML = '';
+      
+      // UI状態を更新
+      this.updateSortOptions();
+      this.updateAdminButtonUI();
+      this.updateEndPublicationButtonUI();
+      // 管理モード切り替え時は設定変更のため再描画が必要
+      this.loadSheetData(true, false).then(() => {
+        // 管理モード切り替え後に新着チェックの基準を更新
+        this.state.lastSeenCount = this.state.currentAnswers.length;
+        console.log('🔄 管理モード切り替え完了、新着チェック基準更新:', {
+          newBaselineCount: this.state.lastSeenCount,
+          adminMode: this.state.showAdminFeatures
+        });
+      });
+    } finally {
+      // Re-enable button
+      if (this.elements.adminToggleBtn) {
+        this.elements.adminToggleBtn.disabled = false;
+      }
+    }
+  }
+  
+  /**
+   * 管理モード移行確認モーダル
+   */
+  async showAdminModeConfirmation() {
+    return new Promise((resolve) => {
+      // モーダル要素を作成
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      modal.innerHTML = `
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+          <div class="flex items-center mb-4">
+            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+              <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+              </svg>
+            </div>
+            <div class="ml-4">
+              <h3 class="text-lg font-medium text-gray-900">管理モードに切り替えますか？</h3>
+            </div>
+          </div>
+          <div class="mb-6">
+            <p class="text-sm text-gray-600">
+              管理モードでは、<strong>生徒の名前とリアクション数が表示</strong>されます。<br>
+              画面共有時などは十分注意してください。
+            </p>
+          </div>
+          <div class="flex justify-end space-x-3">
+            <button type="button" class="cancel-btn px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+              キャンセル
+            </button>
+            <button type="button" class="confirm-btn px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">
+              管理モードに切り替え
+            </button>
+          </div>
+        </div>
+      `;
+      
+      // イベントリスナーを追加
+      const cancelBtn = modal.querySelector('.cancel-btn');
+      const confirmBtn = modal.querySelector('.confirm-btn');
+      
+      const cleanup = () => {
+        document.body.removeChild(modal);
+      };
+      
+      cancelBtn.addEventListener('click', () => {
+        cleanup();
+        resolve(false);
+      });
+      
+      confirmBtn.addEventListener('click', () => {
+        cleanup();
+        resolve(true);
+      });
+      
+      // Escapeキーでキャンセル
+      const handleKeydown = (e) => {
+        if (e.key === 'Escape') {
+          cleanup();
+          document.removeEventListener('keydown', handleKeydown);
+          resolve(false);
+        }
+      };
+      document.addEventListener('keydown', handleKeydown);
+      
+      // モーダルを表示
+      document.body.appendChild(modal);
+      
+      // フォーカスを確認ボタンに移動
+      setTimeout(() => confirmBtn.focus(), 100);
+    });
+  }
+  
+  async endPublication() {
+    if (!confirm('公開を終了しますか？生徒は回答ボードにアクセスできなくなります。')) {
+      return;
+    }
+    
+    try {
+      await this.runGas('clearActiveSheet');
+      if (window.sharedModals) {
+        window.sharedModals.showAlert('公開終了', '公開を終了しました。管理画面に移動します。', 'success');
+      } else {
+        alert('公開を終了しました。管理画面に移動します。');
+      }
+      // 少し遅延してからUnpublished.htmlに移動（ユーザーがメッセージを確認できるように）
+      setTimeout(() => {
+        this.redirectToUnpublishedPage();
+      }, 1500);
+    } catch (error) {
+      console.error('公開終了に失敗しました:', error);
+      const errorMsg = '公開終了に失敗しました: ' + (error.message || error);
+      if (window.sharedModals) {
+        window.sharedModals.showAlert('エラー', errorMsg, 'error');
+      } else {
+        alert(errorMsg);
+      }
+    }
+  }
+  redirectToUnpublishedPage() {
+    // Force redirect to Unpublished.html for both admin and viewers
+    google.script.run
+      .withSuccessHandler(function(webAppUrl) {
+        const url = new URL(webAppUrl);
+        // Redirect to Unpublished.html
+        url.pathname = url.pathname.replace(/\/[^\/]*$/, '/Unpublished.html');
+        window.location.href = url.toString();
+      })
+      .withFailureHandler(function(error) {
+        console.error('Failed to get web app URL:', error);
+        // Fallback: try relative path
+        window.location.href = './Unpublished.html';
+      })
+      .getWebAppUrl();
+  }
+  
+  endAdminMode() {
+    google.script.run
+      .withSuccessHandler(function(adminUrl) {
+        const url = new URL(adminUrl);
+        url.searchParams.set('mode', 'admin');
+        window.location.href = url.toString();
+      })
+      .getWebAppUrl();
+  }
+  
+  /**
+   * リアクション状態をlocalStorageに保存
+   * @param {number} rowIndex - 行インデックス
+   * @param {object} reactions - リアクション状態オブジェクト
+   */
+  saveReactionState(rowIndex, reactions) {
+    try {
+      // 既存の保存データを取得
+      const existingData = JSON.parse(localStorage.getItem(this.reactionStorageKey) || '{}');
+      
+      // 現在のリアクション状態を保存
+      existingData[rowIndex] = {};
+      Object.keys(reactions).forEach(reactionType => {
+        const reaction = reactions[reactionType];
+        if (reaction && reaction.reacted) {
+          existingData[rowIndex][reactionType] = {
+            reacted: true,
+            timestamp: new Date().toISOString()
+          };
+        }
+      });
+      
+      // 空のオブジェクトの場合は削除
+      if (Object.keys(existingData[rowIndex]).length === 0) {
+        delete existingData[rowIndex];
+      }
+      
+      localStorage.setItem(this.reactionStorageKey, JSON.stringify(existingData));
+      debugLog('リアクション状態を保存:', { rowIndex, reactions: existingData[rowIndex] });
+    } catch (error) {
+      console.warn('リアクション状態の保存に失敗:', error);
+    }
+  }
+  
+  /**
+   * localStorageからリアクション状態を読み込み
+   * @returns {object} 保存されたリアクション状態
+   */
+  loadReactionState() {
+    try {
+      const savedData = JSON.parse(localStorage.getItem(this.reactionStorageKey) || '{}');
+      debugLog('リアクション状態を読み込み:', savedData);
+      return savedData;
+    } catch (error) {
+      console.warn('リアクション状態の読み込みに失敗:', error);
+      return {};
+    }
+  }
+  
+  /**
+   * 保存されたリアクション状態を現在のデータに適用
+   * @param {array} answers - 回答データ配列
+   */
+  applyReactionState(answers) {
+    const savedReactions = this.loadReactionState();
+    
+    answers.forEach(answer => {
+      const savedReaction = savedReactions[answer.rowIndex];
+      if (savedReaction && answer.reactions) {
+        Object.keys(savedReaction).forEach(reactionType => {
+          if (answer.reactions[reactionType]) {
+            answer.reactions[reactionType].reacted = true;
+          }
+        });
+      }
+    });
+    
+    debugLog('保存されたリアクション状態を適用完了');
+  }
+  updateReactionButtonUI(rowIndex, reaction, count, reacted) {
+    document.querySelectorAll('[data-row-index="' + rowIndex + '"][data-reaction="' + reaction + '"]').forEach(btn => {
+      const countEl = btn.querySelector('.reaction-count');
+      if (countEl && this.state.showCounts) {
+        countEl.textContent = count;
+      }
+      const rt = this.reactionTypes.find(r => r.key === reaction);
+      const svgEl = btn.querySelector('svg');
+      if (svgEl && rt) {
+        svgEl.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', reacted);
+      }
+      const colorClass = reaction === 'LIKE' ? 'text-red-500' : reaction === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+      btn.classList.remove('text-red-500', 'text-yellow-500', 'text-green-500');
+      btn.classList.add(colorClass);
+      btn.classList.toggle('liked', reacted);
+      btn.setAttribute('aria-pressed', reacted.toString());
+      const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
+      const reactionName = reactionNames[reaction] || reaction;
+      const ariaLabel = `${reactionName}${reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${count}件)` : ''}`;
+      btn.setAttribute('aria-label', ariaLabel);
+    });
+  }
+  applyUpdates(items) {
+    items.forEach(item => {
+      this.reactionTypes.forEach(rt => {
+        if (item.reactions && item.reactions[rt.key]) {
+          this.updateReactionButtonUI(item.rowIndex, rt.key, item.reactions[rt.key].count, item.reactions[rt.key].reacted);
+        }
+      });
+      const card = document.querySelector('.answer-card[data-row-index="' + item.rowIndex + '"]');
+      if (card) {
+        card.classList.toggle('highlighted', item.highlight);
+        this.applyReactionStyles(card, item);
+        const highlightBtn = card.querySelector('.highlight-btn');
+        if (highlightBtn) {
+          highlightBtn.classList.toggle('liked', item.highlight);
+          highlightBtn.setAttribute('aria-pressed', String(item.highlight));
+          const label = item.highlight ? 'ハイライトを解除する' : 'ハイライトする';
+          highlightBtn.setAttribute('aria-label', label);
+          const svgEl = highlightBtn.querySelector('svg');
+          if (svgEl) {
+            svgEl.outerHTML = this.getIcon('star', 'w-5 h-5', item.highlight);
+          }
+        }
+        let badge = card.querySelector('.highlight-badge');
+        if (item.highlight && !badge) {
+          badge = document.createElement('span');
+          badge.className = 'highlight-badge';
+          badge.innerHTML = this.getIcon('star', '', true);
+          card.appendChild(badge);
+        } else if (!item.highlight && badge) {
+          badge.remove();
+        }
+      }
+    });
+  }
+  showAnswerModal(rowIndex) {
+    if (DEBUG_MODE) console.log('📱 [MODAL DEBUG] showAnswerModal called:', {
+        rowIndex: rowIndex,
+        rowIndexType: typeof rowIndex,
+        timestamp: new Date().toISOString()
+    });
+
+    // Show answer modal called
+
+    // Data search context
+    
+    // 最新データを取得（filteredDataとcurrentAnswersの両方から）
+    let data = this.state.currentAnswers.find(r => r.rowIndex == rowIndex);
+    // Data search in currentAnswers
+    
+    if (!data && this.state.filteredData) {
+      data = this.state.filteredData.find(r => r.rowIndex == rowIndex);
+      debugLog('Data search in filteredData:', {
+        found: !!data,
+        searchRowIndex: rowIndex,
+        availableRowIndexes: this.state.filteredData?.map(r => r.rowIndex) || []
+      });
+    }
+    
+    if (!data) {
+      debugLog('ERROR: No data found for rowIndex:', {
+        rowIndex: rowIndex,
+        currentAnswers: this.state.currentAnswers,
+        filteredData: this.state.filteredData
+      });
+      return;
+    }
+    
+    debugLog('Data found for modal:', {
+      rowIndex: rowIndex,
+      data: data,
+      opinion: data.opinion?.substring(0, 50) + '...',
+      reason: data.reason?.substring(0, 50) + '...'
+    });
+    this.state.lastFocusedElement = document.activeElement;
+    this.elements.modalAnswer.innerHTML = '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + this.escapeHtml(data.opinion || '') + '</p>' + '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + this.escapeHtml(data.reason || '') + '</p>';
+    const showName = this.state.displayMode === 'named';
+    let modalDisplayName = '';
+    
+    // Debug: Log modal display mode state
+    debugLog('Modal display state:', {
+      displayMode: this.state.displayMode,
+      showName,
+      showAdminFeatures: this.state.showAdminFeatures,
+      isAdminUser: this.state.isAdminUser,
+      dataName: data.name,
+      dataEmail: data.email
+    });
+    
+    if (showName) {
+      // 名前が利用可能な場合はそれを使用、なければemailから生成
+      if (data.name) {
+        modalDisplayName = data.name;
+      } else if (data.email) {
+        modalDisplayName = data.email.split('@')[0];
+      }
+    }
+    
+    this.elements.modalStudentName.textContent = modalDisplayName;
+    const footerBase = 'text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex';
+    this.elements.modalFooter.className = footerBase + (showName ? ' justify-between items-center' : ' justify-end items-center');
+    const reactionButtonsHtml = this.reactionTypes.map(rt => {
+      const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
+      const cls = info.reacted ? 'liked' : '';
+      const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+      const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-gray-200">' + info.count + '</span>' : '';
+      return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
+    }).join('');
+    
+    // ハイライトボタンを追加
+    let highlightBtnHtml = '';
+    if (this.state.showHighlightToggle) {
+      const cls = data.highlight ? 'liked' : '';
+      const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
+      highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
+    }
+    
+    this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
+    
+    // リアクションに基づくカード色の適用
+    debugLog('モーダルにリアクション装飾適用:', {
+      rowIndex: data.rowIndex,
+      highlight: data.highlight,
+      reactions: data.reactions,
+      element: this.elements.answerModalCard.className
+    });
+    this.applyReactionStyles(this.elements.answerModalCard, data);
+    debugLog('モーダル装飾適用後:', {
+      className: this.elements.answerModalCard.className
+    });
+    
+    this.elements.answerModalContainer.classList.remove('hidden');
+    this.elements.answerModalContainer.classList.add('modal-fade');
+    this.elements.answerModalCard.classList.add('modal-scale');
+    
+    this.elements.answerModalCloseBtn.focus();
+  }
+  updateModalContent(data) {
+    if (!data) return;
+    
+    // リアクションボタンを更新
+    const reactionButtonsHtml = this.reactionTypes.map(rt => {
+      const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
+      const cls = info.reacted ? 'liked' : '';
+      const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+      const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-gray-200">' + info.count + '</span>' : '';
+      return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
+    }).join('');
+    
+    // ハイライトボタンを更新
+    let highlightBtnHtml = '';
+    if (this.state.showHighlightToggle) {
+      const cls = data.highlight ? 'liked' : '';
+      const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
+      highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
+    }
+    
+    this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
+    
+    // モーダルカードのスタイルを更新
+    debugLog('updateModalContent装飾適用:', {
+      rowIndex: data.rowIndex,
+      highlight: data.highlight,
+      reactions: data.reactions
+    });
+    this.applyReactionStyles(this.elements.answerModalCard, data);
+  }
+  hideAnswerModal() {
+    this.elements.answerModalContainer.classList.add('hidden');
+    this.elements.answerModalContainer.classList.remove('modal-fade');
+    this.elements.answerModalCard.classList.remove('modal-scale');
+    if (this.state.lastFocusedElement) {
+      this.state.lastFocusedElement.focus();
+    }
+  }
+  showInfoModal() {
+    this.state.lastFocusedElement = document.activeElement;
+    this.elements.infoModalContainer.classList.remove('hidden');
+    this.elements.infoModalContainer.classList.add('modal-fade');
+    this.elements.infoModalCard.classList.add('modal-scale');
+    
+    // Ensure modal starts from the top
+    this.elements.infoModalCard.scrollTop = 0;
+    
+    // Focus on the modal container first, then the button
+    setTimeout(() => {
+      this.elements.infoModalConfirmBtn.focus();
+    }, 100);
+  }
+  hideInfoModal() {
+    this.elements.infoModalContainer.classList.add('hidden');
+    this.elements.infoModalContainer.classList.remove('modal-fade');
+    this.elements.infoModalCard.classList.remove('modal-scale');
+    
+    localStorage.setItem('introSeen', '1');
+    if (this.state.lastFocusedElement) {
+      this.state.lastFocusedElement.focus();
+    }
+  }
+  getIcon(name, classes = '', solid = false) {
+    // Cache icons to avoid repeated string concatenation
+    const cacheKey = `icon-${name}-${classes}-${solid}`;
+    const cachedIcon = this.cache.get(cacheKey);
+    if (cachedIcon) {
+      return cachedIcon;
+    }
+    
+    let key = name;
+    if (ICONS[name + '-outline'] || ICONS[name + '-solid']) {
+      key = solid ? name + '-solid' : name + '-outline';
+    }
+    const icon = ICONS[key];
+    if (!icon) {
+      console.warn('Icon not found:', key);
+      const fallback = '<span aria-hidden="true" class="' + classes + '">⭐</span>';
+      this.cache.set(cacheKey, fallback);
+      return fallback;
+    }
+    const result = '<span aria-hidden="true" class="' + classes + '">' + icon + '</span>';
+    this.cache.set(cacheKey, result);
+    return result;
+  }
+  renderIcons() {
+    if (this.elements.infoIconLike) {
+      this.elements.infoIconLike.innerHTML = this.getIcon('hand-thumb-up');
+    }
+    if (this.elements.infoIconUnderstand) {
+      this.elements.infoIconUnderstand.innerHTML = this.getIcon('lightbulb');
+    }
+    if (this.elements.infoIconCurious) {
+      this.elements.infoIconCurious.innerHTML = this.getIcon('magnifying-glass-plus');
+    }
+    if (this.elements.infoIconHighlight) {
+      this.elements.infoIconHighlight.innerHTML = this.getIcon('star');
+    }
+    if (this.elements.iconClose) {
+      this.elements.iconClose.innerHTML = this.getIcon('x');
+    }
+    if (this.elements.iconGrid) {
+      this.elements.iconGrid.innerHTML = this.getIcon('grid-2x2');
+    }
+  }
+  debounce(func, delay) {
+    // Use SharedUtilities with instance-specific keys
+    const key = `studyquest-${this.instanceId || 'default'}-${Math.random().toString(36).substr(2, 9)}`;
+    return (...args) => {
+      window.sharedUtilities.debounce.debounce(() => func.apply(this, args), key, delay);
+    };
+  }
+  
+  throttle(func, delay) {
+    // Use SharedUtilities with instance-specific keys
+    const key = `studyquest-throttle-${this.instanceId || 'default'}-${Math.random().toString(36).substr(2, 9)}`;
+    return (...args) => {
+      window.sharedUtilities.throttle.throttle(() => func.apply(this, args), key, delay);
+    };
+  }
+  updateSortOptions() {
+    if (this.elements.scoreOption) {
+      if (this.state.showScoreSort) {
+        this.elements.scoreOption.style.display = 'block';
+      } else {
+        this.elements.scoreOption.style.display = 'none';
+        if (this.elements.sortOrder.value === 'score') {
+          this.elements.sortOrder.value = 'newest';
+        }
+      }
+    }
+  }
+  updateConfigFromGlobals() {
+    debugLog('updateConfigFromGlobals前の状態:', {
+      isAdminUser: this.state.isAdminUser,
+      showHighlightToggle: this.state.showHighlightToggle,
+      windowShowHighlightToggle: window.showHighlightToggle,
+      showAdminFeatures: this.state.showAdminFeatures,
+      windowShowAdminFeatures: window.showAdminFeatures,
+      currentDisplayMode: this.state.displayMode
+    });
+    
+    this.state.isStudentMode = window.isStudentMode;
+    this.state.showCounts = window.showCounts;
+    window.showScoreSort = window.showCounts;
+    this.state.showAdminFeatures = window.showAdminFeatures;
+    this.state.showHighlightToggle = this.state.isAdminUser; // 管理者なら常に表示
+    this.state.showScoreSort = window.showScoreSort;
+    this.state.showPublishControls = window.showPublishControls;
+    
+    // Only update displayMode if not in admin mode
+    if (!this.state.showAdminFeatures) {
+      this.state.displayMode = window.displayMode;
+    }
+    
+    debugLog('updateConfigFromGlobals後の状態:', {
+      isAdminUser: this.state.isAdminUser,
+      showHighlightToggle: this.state.showHighlightToggle,
+      windowShowHighlightToggle: window.showHighlightToggle,
+      showAdminFeatures: this.state.showAdminFeatures,
+      windowShowAdminFeatures: window.showAdminFeatures,
+      finalDisplayMode: this.state.displayMode,
+      windowDisplayMode: window.displayMode
+    });
+  }
+  escapeHtml(str) {
+    if (!str) return '';
+    return str.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+
+  // Performance optimization methods
+  detectLowPerformanceDevice() {
+    const userAgent = navigator.userAgent;
+    const platform = navigator.platform;
+    const memory = navigator.deviceMemory || 4; // Default to 4GB if not available
+    const cores = navigator.hardwareConcurrency || 4;
+    
+    // Detect low-end devices
+    if (memory <= 2 || cores <= 2) return true;
+    if (userAgent.includes('Mobile') && !userAgent.includes('iPad')) return true;
+    if (platform.includes('Win32') && cores <= 4) return true;
+    
+    return false;
+  }
+
+  setupPerformanceMonitoring() {
+    let frameCount = 0;
+    let lastTime = performance.now();
+    
+    const measurePerformance = () => {
+      const now = performance.now();
+      const delta = now - lastTime;
+      
+      if (frameCount > 0) {
+        this.performanceMetrics.frameTime = delta;
+        
+        // If frame time is consistently over 16ms, enable low performance mode
+        if (delta > PERFORMANCE_BUDGET && !this.isLowPerformanceMode) {
+          console.warn('Low performance detected, enabling optimizations');
+          this.isLowPerformanceMode = true;
+          this.optimizeForLowPerformance();
+        }
+      }
+      
+      lastTime = now;
+      frameCount++;
+      
+      if (frameCount < 60) { // Monitor first 60 frames
+        requestAnimationFrame(measurePerformance);
+      }
+    };
+    
+    requestAnimationFrame(measurePerformance);
+  }
+
+  optimizeForLowPerformance() {
+    debugLog('Enabling low performance optimizations');
+    
+    // Reduce animation and transition durations
+    document.documentElement.style.setProperty('--transition-duration', '0.1s');
+    document.documentElement.style.setProperty('--animation-duration', '0.1s');
+    document.documentElement.style.setProperty('--backdrop-blur', '4px');
+    
+    // Create comprehensive low-performance stylesheet
+    const style = document.createElement('style');
+    style.id = 'low-performance-optimizations';
+    style.textContent = `
+      /* Disable expensive visual effects */
+      .glass-panel {
+        -webkit-backdrop-filter: blur(4px) !important;
+        backdrop-filter: blur(4px) !important;
+        background: var(--color-surface) !important;
+      }
+      
+      /* Simplify hover effects */
+      .answer-card:hover {
+        transform: none !important;
+        box-shadow: var(--shadow-sm) !important;
+      }
+      
+      .reaction-btn:hover {
+        transform: scale(1.02) !important;
+      }
+      
+      .game-btn:hover {
+        transform: translateY(-1px) !important;
+      }
+      
+      /* Disable complex animations */
+      .answer-card.highlighted {
+        transform: none !important;
+        border: 3px solid #9333ea !important;
+        border-image: none !important;
+        box-shadow: 0 0 12px rgba(147, 51, 234, 0.5) !important;
+      }
+      
+      /* Remove will-change to reduce GPU usage */
+      * {
+        will-change: auto !important;
+      }
+      
+      /* Simplify shadows */
+      .answer-card {
+        box-shadow: var(--shadow-sm) !important;
+      }
+      
+    `;
+    document.head.appendChild(style);
+    
+    // Add low-performance class to body for CSS targeting
+    document.body.classList.add('low-performance');
+    
+    // Reduce polling frequency
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = setInterval(() => this.loadSheetData(false), 30000); // 30s instead of 15s
+    }
+  }
+
+  setupObservers() {
+    // Intersection Observer for virtual scrolling
+    if ('IntersectionObserver' in window) {
+      this.visibilityObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          const card = entry.target;
+          const rect = card.getBoundingClientRect();
+          const isPartiallyVisible = rect.top < window.innerHeight && rect.bottom > 0;
+          
+          if (entry.isIntersecting) {
+            card.classList.add('visible');
+            card.classList.remove('hidden-card');
+          } else if (!isPartiallyVisible) {
+            // Only mark as hidden if the card is completely outside the viewport
+            card.classList.remove('visible');
+            card.classList.add('hidden-card');
+          }
+          // If partially visible but not intersecting, keep it accessible
+        });
+      }, {
+        rootMargin: `${VIEWPORT_BUFFER}px`,
+        threshold: [0, 0.1, 0.5, 1.0] // Multiple thresholds for better visibility detection
+      });
+    }
+
+    // ResizeObserver for responsive adjustments
+    if ('ResizeObserver' in window) {
+      this.resizeObserver = new ResizeObserver(this.debounce(() => {
+        this.adjustLayout();
+      }, 100));
+      this.resizeObserver.observe(this.elements.answersContainer);
+    }
+  }
+
+  deferredRender(callback, priority = 'normal') {
+    if (this.isLowPerformanceMode) {
+      // Use requestIdleCallback for low priority updates
+      this.idleCallbackId = requestIdleCallback(callback, { timeout: IDLE_TIMEOUT });
+    } else {
+      // Use requestAnimationFrame for normal updates
+      this.animationFrameId = requestAnimationFrame(callback);
+    }
+  }
+
+  batchDOMUpdates(updates) {
+    const startTime = performance.now();
+    let processedCount = 0;
+    
+    const processBatch = () => {
+      while (processedCount < updates.length && (performance.now() - startTime) < PERFORMANCE_BUDGET) {
+        updates[processedCount]();
+        processedCount++;
+      }
+      
+      if (processedCount < updates.length) {
+        // Continue in next frame
+        requestAnimationFrame(processBatch);
+      }
+    };
+    
+    processBatch();
+  }
+
+  getReusableFragment() {
+    if (this.domFragmentPool.length > 0) {
+      return this.domFragmentPool.pop();
+    }
+    return document.createDocumentFragment();
+  }
+
+  recycleFragment(fragment) {
+    // Clear fragment content and reuse
+    while (fragment.firstChild) {
+      fragment.removeChild(fragment.firstChild);
+    }
+    if (this.domFragmentPool.length < 10) { // Limit pool size
+      this.domFragmentPool.push(fragment);
+    }
+  }
+
+  throttledUpdate(key, callback, delay = 100) {
+    if (this.deferredUpdates.has(key)) {
+      return;
+    }
+    
+    this.deferredUpdates.add(key);
+    setTimeout(() => {
+      callback();
+      this.deferredUpdates.delete(key);
+    }, delay);
+  }
+
+  cleanup() {
+    // Consolidated cache cleanup
+    this.cache.cleanup();
+
+    // Clear DOM fragment pool
+    this.domFragmentPool.length = 0;
+
+    debugLog('Cache cleanup completed', {
+      cacheSize: this.cache.size
+    });
+  }
+  
+  // Enhanced cache methods with timestamp tracking
+}
+// ===== 共通ドメイン情報処理関数 =====
+// AdminPanel.html と Login.html で共通使用
+
+/**
+ * ドメイン情報を取得して表示する共通関数
+ * @param {Function} onSuccess - 成功時のコールバック（オプション）
+ * @param {Function} onError - エラー時のコールバック（オプション）
+ */
+function loadDomainInfo(onSuccess, onError) {
+  google.script.run
+    .withSuccessHandler(info => {
+      displayDomainInfo(info);
+      if (onSuccess) onSuccess(info);
+    })
+    .withFailureHandler(error => {
+      console.error('ドメイン情報の取得に失敗しました:', error);
+      displayDomainInfo({ error: error.message || error });
+      if (onError) onError(error);
+    })
+    .getDeployUserDomainInfo();
+}
+
+/**
+ * ドメイン情報を表示する共通関数
+ * @param {Object} info - ドメイン情報オブジェクト
+ */
+function displayDomainInfo(info) {
+  const headerDomainMatch = document.getElementById('header-domain-match');
+  const headerDomainMismatch = document.getElementById('header-domain-mismatch');
+  const headerDomainInitial = document.getElementById('header-domain-initial');
+  const headerDomainMatchText = document.getElementById('header-domain-match-text');
+  const headerDomainMismatchText = document.getElementById('header-domain-mismatch-text');
+
+  // 全ての表示を一旦非表示にする
+  if (headerDomainMatch) headerDomainMatch.classList.add('hidden');
+  if (headerDomainMismatch) headerDomainMismatch.classList.add('hidden');
+  if (headerDomainInitial) headerDomainInitial.classList.add('hidden');
+  
+  if (!info || info.error) {
+    console.warn('ドメイン情報エラー:', info?.error);
+    if (headerDomainInitial) headerDomainInitial.classList.remove('hidden');
+    return;
+  }
+
+  if (info.isDomainMatch) {
+    // ドメインが一致している場合
+    if (headerDomainMatch && headerDomainMatchText) {
+      headerDomainMatch.classList.remove('hidden');
+      if (info.deployDomain) {
+        headerDomainMatchText.textContent = `${info.deployDomain} ドメイン`;
+      } else {
+        headerDomainMatchText.textContent = 'グローバルアクセス';
+      }
+    }
+  } else {
+    // ドメイン不一致の場合
+    if (headerDomainMismatch && headerDomainMismatchText) {
+      headerDomainMismatch.classList.remove('hidden');
+      headerDomainMismatchText.textContent = info.currentDomain;
+    }
+  }
+}
+
+/**
+ * フォームリンクを取得して表示する関数
+ */
+function loadFormLink() {
+  google.script.run
+    .withSuccessHandler(formInfo => {
+      if (formInfo && formInfo.formUrl) {
+        const formLinkBtn = document.getElementById('form-link-btn');
+        if (formLinkBtn) {
+          formLinkBtn.href = formInfo.formUrl;
+          formLinkBtn.classList.remove('hidden');
+        }
+      }
+    })
+    .withFailureHandler(error => {
+      console.warn('フォーム情報の取得に失敗しました:', error);
+    })
+    .getActiveFormInfo(USER_ID);
+}
+
+try {
+  if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
+    window.studyQuestApp.destroy();
+  }
+  // システムフロー表示
+  showSystemFlow();
+  
+  window.studyQuestApp = new StudyQuestApp();
+  
+  // Expose debug functions globally for console access
+  window.debugAnswerCards = () => {
+    if (window.studyQuestApp && window.studyQuestApp.debugAnswerCards) {
+      window.studyQuestApp.debugAnswerCards();
+    } else {
+      console.log('StudyQuestApp not available or debug function not found');
+    }
+  };
+  
+  // Enhanced global debug function with additional utility methods
+  window.debugClickAnswerCard = (cardIndex = 0, options = {}) => {
+    if (window.studyQuestApp && window.studyQuestApp.debugClickAnswerCard) {
+      return window.studyQuestApp.debugClickAnswerCard(cardIndex, options);
+    } else {
+      console.log('StudyQuestApp not available or debug function not found');
+      return { success: false, error: 'StudyQuestApp not available' };
+    }
+  };
+
+  // システムフロー表示をグローバルで利用可能にする
+  window.showSystemFlow = showSystemFlow;
+  
+  // デバッグ用：データ構造確認機能
+  window.debugCurrentData = () => {
+    if (window.studyQuestApp && window.studyQuestApp.state) {
+      console.log('現在のデータ構造:', {
+        currentAnswers: window.studyQuestApp.state.currentAnswers,
+        currentAnswersLength: window.studyQuestApp.state.currentAnswers?.length,
+        firstItem: window.studyQuestApp.state.currentAnswers?.[0],
+        header: window.studyQuestApp.elements?.headingLabel?.textContent
+      });
+    } else {
+      console.log('StudyQuestApp not available');
+    }
+  };
+
+  // Additional global debug utilities
+  window.debugClickAllAnswerCards = async (options = {}) => {
+    if (!window.studyQuestApp) {
+      console.log('StudyQuestApp not available');
+      return { success: false, error: 'StudyQuestApp not available' };
+    }
+    
+    const container = window.studyQuestApp.elements?.answersContainer;
+    if (!container) {
+      console.log('No answers container found');
+      return { success: false, error: 'No answers container found' };
+    }
+    
+    const answerCards = container.querySelectorAll('.answer-card');
+    const results = [];
+    
+    console.log(`Found ${answerCards.length} answer cards, clicking all...`);
+    
+    for (let i = 0; i < answerCards.length; i++) {
+      try {
+        const result = await window.studyQuestApp.debugClickAnswerCard(i, { 
+          ...options, 
+          logDetails: false // Reduce noise when clicking all cards
+        });
+        results.push(result);
+        
+        if (options.delay && i < answerCards.length - 1) {
+          // Add proper delay between clicks if specified
+          await new Promise(resolve => setTimeout(resolve, options.delay));
+        }
+      } catch (error) {
+        console.error(`Error clicking card ${i}:`, error);
+        results.push({ success: false, error: error.message, cardIndex: i });
+      }
+    }
+    
+    return {
+      success: true,
+      totalCards: answerCards.length,
+      results
+    };
+  };
+
+  window.debugGetAnswerCardInfo = (cardIndex = 0) => {
+    if (!window.studyQuestApp) {
+      console.log('StudyQuestApp not available');
+      return { success: false, error: 'StudyQuestApp not available' };
+    }
+    
+    // Validate cardIndex
+    if (typeof cardIndex !== 'number' || cardIndex < 0 || !Number.isInteger(cardIndex)) {
+      console.log('Invalid card index:', cardIndex);
+      return { success: false, error: 'Invalid card index. Must be a non-negative integer.' };
+    }
+    
+    const container = window.studyQuestApp.elements?.answersContainer;
+    if (!container) {
+      console.log('No answers container found');
+      return { success: false, error: 'No answers container found' };
+    }
+    
+    const answerCards = container.querySelectorAll('.answer-card');
+    if (answerCards.length === 0) {
+      console.log('No answer cards found');
+      return { success: false, error: 'No answer cards found' };
+    }
+    
+    if (cardIndex >= answerCards.length) {
+      console.log('Card index out of bounds');
+      return { success: false, error: 'Card index out of bounds', totalCards: answerCards.length };
+    }
+    
+    const card = answerCards[cardIndex];
+    
+    try {
+      const cardInfo = {
+        index: cardIndex,
+        className: card.className,
+        dataset: { ...card.dataset },
+        rowIndex: card.dataset.rowIndex,
+        boundingRect: card.getBoundingClientRect(),
+        computedStyle: {
+          display: getComputedStyle(card).display,
+          visibility: getComputedStyle(card).visibility,
+          opacity: getComputedStyle(card).opacity
+        },
+        textContent: card.textContent?.trim() || '',
+        innerHTML: card.innerHTML
+      };
+      
+      console.log('Answer card info:', cardInfo);
+      return { success: true, cardInfo };
+    } catch (error) {
+      console.error('Error getting card info:', error);
+      return { success: false, error: `Error getting card info: ${error.message}` };
+    }
+  };
+  
+  // ドメイン情報とフォームリンクを取得
   loadDomainInfo();
   loadFormLink();
   
-  // Cleanup on page unload
   window.addEventListener('beforeunload', () => {
     if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
       window.studyQuestApp.destroy();
     }
   });
-  
 } catch (error) {
   console.error('Error creating StudyQuestApp instance:', error);
   const container = document.getElementById('answers');
   if (container) {
-    const msg = escapeHtml(error.message || '');
+    const msg = StudyQuestApp.prototype.escapeHtml(error.message || '');
     container.innerHTML = '<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました: ' + msg + '</div>';
   }
 }
 </script>
-
 </body>
 </html>
