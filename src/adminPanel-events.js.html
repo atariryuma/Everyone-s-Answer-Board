@@ -345,10 +345,44 @@ function setupRealtimeValidation() {
 
 // Handle delete account request
 function handleDeleteRequest() {
-  showConfirmationModal(
-    'アカウント削除の確認',
-    '本当にこのアカウントを削除しますか？この操作は元に戻せず、すべてのデータが失われます。',
-    function() {
+  if (window.sharedModals && typeof window.sharedModals.showConfirmation === 'function') {
+    window.sharedModals.showConfirmation(
+      'アカウント削除の確認',
+      '本当にこのアカウントを削除しますか？この操作は元に戻せず、すべてのデータが失われます。',
+      function() {
+        setLoading(true, 'アカウントを完全に削除しています...');
+        runGasWithUserId('deleteCurrentUserAccount')
+          .then(function(response) {
+            setLoading(false);
+            showMessage(response.message || 'アカウントが削除されました', 'success');
+            if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+              window.unifiedCache.clear();
+            }
+            if (window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
+              window.gasOptimizer.clearCache();
+            }
+            if (window.localStorage) {
+              window.localStorage.clear();
+            }
+            setTimeout(function() {
+              runGasWithUserId('getWebAppUrl')
+                .then(function(webAppUrl) {
+                  window.location.href = webAppUrl;
+                })
+                .catch(function() {
+                  window.location.reload();
+                });
+            }, 2000);
+          })
+          .catch(function(error) {
+            setLoading(false);
+            handleError(error, 'deleteAccount', 'アカウントの削除に失敗しました。');
+          });
+      }
+    );
+  } else {
+    console.error('SharedModals not available, falling back to alert');
+    if (confirm('本当にこのアカウントを削除しますか？この操作は元に戻せず、すべてのデータが失われます。')) {
       setLoading(true, 'アカウントを完全に削除しています...');
       runGasWithUserId('deleteCurrentUserAccount')
         .then(function(response) {
@@ -378,7 +412,7 @@ function handleDeleteRequest() {
           handleError(error, 'deleteAccount', 'アカウントの削除に失敗しました。');
         });
     }
-  );
+  }
 }
 
 // Switch to another account
