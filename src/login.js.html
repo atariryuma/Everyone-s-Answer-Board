@@ -244,13 +244,23 @@
       google.script.run
         .withSuccessHandler(result => {
           console.log('Session cleanup result:', result);
-          // Google認証のログアウトURLにリダイレクト
-          window.location.href = 'https://accounts.google.com/logout';
+          google.script.run
+            .withSuccessHandler(res => {
+              if (res && res.url) {
+                window.location.href = res.url;
+              } else {
+                window.location.href = 'https://accounts.google.com/logout';
+              }
+            })
+            .withFailureHandler(err => {
+              console.error('Get sign-in URL failed:', err);
+              window.location.href = 'https://accounts.google.com/logout';
+            })
+            .getGoogleSignInUrl();
         })
         .withFailureHandler(error => {
           console.error('Session cleanup failed:', error);
           alert('セッションクリアに失敗しました。手動でGoogleアカウントからログアウトしてください。');
-          // 失敗時もGoogleログアウトページへ
           window.location.href = 'https://accounts.google.com/logout';
         })
         .resetUserAuthentication();

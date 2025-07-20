@@ -289,3 +289,36 @@ function generateAppUrls(userId) {
   }
 }
 
+/**
+ * Generate Google account chooser URL dynamically.
+ * @returns {{url: string}}
+ */
+function getGoogleSignInUrl() {
+  try {
+    var continueUrl = getWebAppUrlCached();
+    var domainInfo = getSystemDomainInfo();
+
+    var params = {
+      continue: continueUrl,
+      followup: continueUrl,
+      flowName: 'GlifWebSignIn',
+      flowEntry: 'AccountChooser'
+    };
+
+    if (domainInfo && domainInfo.adminDomain) {
+      params.hd = domainInfo.adminDomain;
+    }
+
+    var query = Object.keys(params)
+      .map(function(key) {
+        return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
+      })
+      .join('&');
+
+    return { url: 'https://accounts.google.com/v3/signin/accountchooser?' + query };
+  } catch (e) {
+    console.error('getGoogleSignInUrl error: ' + e.message);
+    return { url: 'https://accounts.google.com/' };
+  }
+}
+
