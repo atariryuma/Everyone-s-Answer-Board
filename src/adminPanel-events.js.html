@@ -539,18 +539,15 @@ function manageFocusForModal(modalId, show) {
 // Initialize event listeners when DOM is ready
 // Add additional delay to ensure all JavaScript modules are loaded
 function initializeEventListeners() {
-  // Check if essential functions are loaded before setting up events
+  // Check if essential functions are available, but continue even if some are missing
   const requiredFunctions = ['handleQuickStart', 'showFormConfigModal', 'toggleSection'];
   const missingFunctions = requiredFunctions.filter(func => typeof window[func] !== 'function');
-  
+
   if (missingFunctions.length > 0) {
-    console.warn('⚠️ AdminPanel: Waiting for functions to load:', missingFunctions);
-    // Retry after a short delay
-    setTimeout(initializeEventListeners, 200);
-    return;
+    console.warn('⚠️ AdminPanel: Missing functions during event initialization:', missingFunctions);
   }
-  
-  console.log('✅ AdminPanel: All required functions loaded, setting up event listeners');
+
+  console.log('✅ AdminPanel: Setting up event listeners');
   setupEventListeners();
 }
 
