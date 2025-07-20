@@ -406,9 +406,11 @@ function invalidateUserCache(userId, email, spreadsheetId, clearPattern) {
   
   if (userId) {
     keysToRemove.push('user_' + userId);
+    keysToRemove.push('unified_user_info_' + userId);
   }
   if (email) {
     keysToRemove.push('email_' + email);
+    keysToRemove.push('unified_user_info_' + email);
   }
   if (spreadsheetId) {
     // スプレッドシートIDを含むキーを削除
