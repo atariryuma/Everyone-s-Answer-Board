@@ -5,180 +5,166 @@
   <base target="_top">
   <title>StudyQuest - ログイン</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#1a1b26">
+  <meta name="theme-color" content="#6366f1">
   <meta name="description" content="StudyQuest 回答ボードシステム - ログイン">
   <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), screen-wake-lock=(), accelerometer=(), gyroscope=(), magnetometer=(), ambient-light-sensor=(), speaker=(), vibrate=(), vr=()" />
 
-  <!-- Critical CSS - LoginPage最適化 -->
-  <style>
-  :root {
-    --bg-primary: #0f0f0f;
-    --bg-secondary: #1a1b26;
-    --bg-glass: rgba(255, 255, 255, 0.03);
-    --bg-glass-hover: rgba(255, 255, 255, 0.05);
-    --text-primary: #c0caf5;
-    --text-secondary: #9ca3af;
-    --accent-primary: #3b82f6;
-    --accent-secondary: #10b981;
-    --accent-warning: #f59e0b;
-    --accent-error: #ef4444;
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --transition-base: 250ms ease-out;
-  }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    color: var(--text-primary);
-    background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 50%, #0f172a 100%);
-    margin: 0;
-    min-height: 100vh;
-  }
-  .glass-panel {
-    background: var(--bg-glass);
-    border: 1px solid var(--glass-border);
-    border-radius: 12px;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  }
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
-    border: 1px solid var(--glass-border);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: var(--transition-base);
-    background: var(--bg-glass);
-    color: var(--text-primary);
-    text-decoration: none;
-    font-weight: 500;
-  }
-  .btn--primary { background: var(--accent-primary); color: #000; border-color: var(--accent-primary); }
-  .btn--secondary { background: var(--accent-secondary); color: #000; border-color: var(--accent-secondary); }
-  .btn:hover { background: var(--bg-glass-hover); transform: translateY(-1px); }
-  .flex { display: flex; }
-  .items-center { align-items: center; }
-  .justify-center { justify-content: center; }
-  .text-center { text-align: center; }
-  .w-full { width: 100%; }
-  .min-h-screen { min-height: 100vh; }
-  </style>
+  <!-- Modern Flat Dark Theme CSS -->
+  <?!= include('login.css'); ?>
 
-  <!-- 統一CSSシステム -->
+  <!-- Unified CSS System -->
   <?!= include('unified-styles.css'); ?>
-  <!-- 統一システム読み込み -->
-  <?!= include('SharedUtilities'); ?>
   
-  <!-- 統一システムによる軽量化スタイル -->
+  <!-- Shared Utilities -->
+  <?!= include('SharedUtilities'); ?>
 </head>
 <body>
-  <div class="min-h-screen flex items-center justify-center p-4">
-    <div class="glass-panel p-8" style="max-width: 400px; width: 90%;">
-    <!-- ヘッダー -->
-    <div class="text-center mb-8">
-      <h1 class="text-2xl font-bold mb-2" style="color: var(--accent-primary);">🎓 StudyQuest</h1>
-      <p class="text-lg">ログイン</p>
-      <p class="text-sm opacity-75 mt-2">初回利用時は自動的にアカウントが作成されます</p>
-    </div>
+  <!-- Main Login Container -->
+  <div class="login-container">
+    <div class="login-card">
+      <!-- Header Section -->
+      <header class="login-header">
+        <div class="logo-section">
+          <div class="logo-icon">🎓</div>
+          <h1 class="app-title">StudyQuest</h1>
+        </div>
+        <div class="login-subtitle">
+          <h2>ログイン</h2>
+          <p class="subtitle-text">初回利用時は自動的にアカウントが作成されます</p>
+        </div>
+      </header>
 
-    <!-- 組織情報 -->
-    <div class="glass-panel p-4 mb-6" id="organization-panel" style="display: none;">
-      <div class="text-center">
-        <div class="organization-info" id="organization-info">
-          <div class="flex items-center justify-center mb-2">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--accent-primary);">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H3m2 0h4m6 0a7 7 0 11-14 0m2 0a7 7 0 012 0h4a7 7 0 012 0z"/>
-            </svg>
-            <span id="organization-name" class="font-medium text-sm" style="color: var(--accent-primary);">組織名</span>
+      <!-- Organization Info Panel -->
+      <div class="organization-panel" id="organization-panel">
+        <div class="organization-content">
+          <div class="organization-icon">🏢</div>
+          <div class="organization-text">
+            <div class="organization-name" id="organization-name">組織名</div>
+            <div class="organization-desc">この組織で展開されています</div>
           </div>
-          <p class="text-xs opacity-75">この組織で展開されています</p>
         </div>
       </div>
-    </div>
 
-    <!-- アカウント情報 -->
-    <div class="glass-panel p-6 mb-6">
-      <h2 class="text-lg font-semibold mb-4">📧 使用するアカウント</h2>
-      <div class="glass-panel p-3">
-        <div class="font-medium" id="user-email-display" style="color: var(--accent-primary);">ユーザー情報を取得中...</div>
+      <!-- Account Information -->
+      <div class="account-section">
+        <h3 class="section-title">
+          <span class="section-icon">👤</span>
+          使用するアカウント
+        </h3>
+        <div class="account-display">
+          <div class="user-email" id="user-email-display">ユーザー情報を取得中...</div>
+        </div>
       </div>
-    </div>
 
-    <!-- ログインアクション -->
-    <div class="space-y-4">
-      <button type="button" id="login-btn" class="w-full btn btn--primary" style="padding: 0.75rem 1.5rem;" disabled>
-        はじめる
-      </button>
-
-      <div class="text-center space-y-3">
-        <button id="switch-account-btn" onclick="switchAccount()" class="text-sm underline opacity-75 hover:opacity-100" style="color: var(--accent-primary);">
-          別のアカウントでログイン
+      <!-- Login Actions -->
+      <div class="login-actions">
+        <button type="button" id="login-btn" class="login-button" disabled>
+          <span class="button-text">はじめる</span>
         </button>
-        <br>
-        <button onclick="showSecurityModal()" class="text-xs opacity-50 hover:opacity-75 underline">
-          セキュリティ仕様について
-        </button>
-      </div>
-    </div>
-    </div>
-  </div>
 
-  <!-- セキュリティ仕様モーダル -->
-  <div id="security-modal" class="fixed inset-0 flex items-center justify-center hidden z-50" style="background: rgba(0, 0, 0, 0.5);">
-    <div class="glass-panel p-6 w-full mx-4" style="max-width: 500px; max-height: 80vh; overflow-y: auto;">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="text-xl font-semibold">🔒 セキュリティ仕様</h3>
-        <button onclick="closeSecurityModal()" class="opacity-75 hover:opacity-100 text-2xl">✕</button>
-      </div>
-      
-      <div class="space-y-4 text-sm">
-        <div class="glass-panel p-4">
-          <h4 class="font-medium mb-2" style="color: var(--accent-primary);">🏢 ドメイン制限</h4>
-          <p>このシステムは<strong>naha-okinawa.ed.jp</strong>ドメインのユーザーのみアクセス可能です。組織外からのアクセスは制限されています。</p>
+        <div class="secondary-actions">
+          <button id="switch-account-btn" onclick="switchAccount()" class="link-button">
+            別のアカウントでログイン
+          </button>
+          <button onclick="showSecurityModal()" class="link-button secondary">
+            セキュリティ仕様について
+          </button>
         </div>
-        
-        <div class="glass-panel p-4">
-          <h4 class="font-medium mb-2" style="color: var(--accent-primary);">🔐 認証システム</h4>
-          <p>Google Workspace内部OAuth認証を使用しており、外部認証は受け付けません。組織のセキュリティポリシーに準拠しています。</p>
-        </div>
-        
-        <div class="glass-panel p-4">
-          <h4 class="font-medium mb-2" style="color: var(--accent-primary);">🛡️ データ保護</h4>
-          <ul class="space-y-1" style="list-style: disc; margin-left: 1.5rem;">
-            <li>Content Security Policy (CSP) による外部リソース制限</li>
-            <li>X-Content-Type-Options: nosniff による MIME タイプ保護</li>
-            <li>Referrer-Policy による情報漏洩防止</li>
-            <li>ユーザーデータの暗号化と安全な保存</li>
-          </ul>
-        </div>
-        
-        <div class="glass-panel p-4">
-          <h4 class="font-medium mb-2" style="color: var(--accent-primary);">👥 アクセス制御</h4>
-          <p>マルチテナント環境での権限分離により、ユーザーは自分のデータのみアクセス可能です。管理者権限は適切に分離されています。</p>
-        </div>
-        
-        <div class="glass-panel p-4">
-          <h4 class="font-medium mb-2" style="color: var(--accent-primary);">📝 監査ログ</h4>
-          <p>システムの全操作は監査ログに記録され、セキュリティインシデントの追跡と分析が可能です。</p>
-        </div>
-        
-        <div class="glass-panel p-4">
-          <h4 class="font-medium mb-2" style="color: var(--accent-primary);">⚙️ システム設計</h4>
-          <p>Google Apps Script環境での実行により、Googleのインフラストラクチャのセキュリティ基準を活用しています。</p>
-        </div>
-      </div>
-      
-      <div class="mt-6 text-center">
-        <button onclick="closeSecurityModal()" class="btn btn--secondary">
-          閉じる
-        </button>
       </div>
     </div>
   </div>
 
+  <!-- Security Modal -->
+  <div id="security-modal" class="modal-overlay">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 class="modal-title">
+          <span class="modal-icon">🔒</span>
+          セキュリティ仕様
+        </h3>
+        <button onclick="closeSecurityModal()" class="modal-close">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="modal-content">
+        <div class="security-section">
+          <div class="security-item">
+            <h4 class="security-title">
+              <span class="security-icon">🏢</span>
+              ドメイン制限
+            </h4>
+            <p class="security-desc">
+              このシステムは<strong>naha-okinawa.ed.jp</strong>ドメインのユーザーのみアクセス可能です。組織外からのアクセスは制限されています。
+            </p>
+          </div>
+          
+          <div class="security-item">
+            <h4 class="security-title">
+              <span class="security-icon">🔐</span>
+              認証システム
+            </h4>
+            <p class="security-desc">
+              Google Workspace内部OAuth認証を使用しており、外部認証は受け付けません。組織のセキュリティポリシーに準拠しています。
+            </p>
+          </div>
+          
+          <div class="security-item">
+            <h4 class="security-title">
+              <span class="security-icon">🛡️</span>
+              データ保護
+            </h4>
+            <ul class="security-list">
+              <li>Content Security Policy (CSP) による外部リソース制限</li>
+              <li>X-Content-Type-Options: nosniff による MIME タイプ保護</li>
+              <li>Referrer-Policy による情報漏洩防止</li>
+              <li>ユーザーデータの暗号化と安全な保存</li>
+            </ul>
+          </div>
+          
+          <div class="security-item">
+            <h4 class="security-title">
+              <span class="security-icon">👥</span>
+              アクセス制御
+            </h4>
+            <p class="security-desc">
+              マルチテナント環境での権限分離により、ユーザーは自分のデータのみアクセス可能です。管理者権限は適切に分離されています。
+            </p>
+          </div>
+          
+          <div class="security-item">
+            <h4 class="security-title">
+              <span class="security-icon">📝</span>
+              監査ログ
+            </h4>
+            <p class="security-desc">
+              システムの全操作は監査ログに記録され、セキュリティインシデントの追跡と分析が可能です。
+            </p>
+          </div>
+          
+          <div class="security-item">
+            <h4 class="security-title">
+              <span class="security-icon">⚙️</span>
+              システム設計
+            </h4>
+            <p class="security-desc">
+              Google Apps Script環境での実行により、Googleのインフラストラクチャのセキュリティ基準を活用しています。
+            </p>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button onclick="closeSecurityModal()" class="modal-button">
+            理解しました
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript -->
   <?!= include('login.js'); ?>
-
 </body>
 </html>
