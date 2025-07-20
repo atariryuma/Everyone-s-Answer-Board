@@ -1149,6 +1149,32 @@ function initializeUI() {
   loadStatus(true); // 強制的にキャッシュをバイパスして最新のステータス情報を取得
 }
 
+// Load system status
+function loadStatus(bypassCache = false) {
+  console.group('🔄 loadStatus');
+  console.log('🔄 Loading system status, bypassCache:', bypassCache);
+
+  const userIdPromise = getUserId(); // Assuming getUserId returns a Promise
+  userIdPromise
+    .then(id => {
+      userId = id;
+      console.log('✅ userIdPromise resolved, userId:', userId);
+      // Use gasOptimizer.call for API calls
+      return gasOptimizer.call('getAppConfig', userId);
+    })
+    .then(status => {
+      console.log('✅ Status loaded ( forced refresh)', status);
+      updateUIWithNewStatus(status);
+    })
+    .catch(error => {
+      console.error('❌ getAppConfig failed:', error);
+      showMessage('システムステータスの読み込みに失敗しました', 'error');
+    })
+    .finally(() => {
+      console.groupEnd();
+    });
+}
+
 // =============================================================================
 // DATA PREVIEW FUNCTIONALITY
 // =============================================================================
