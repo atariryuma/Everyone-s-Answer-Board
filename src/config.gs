@@ -1688,16 +1688,21 @@ function getSheetDetails(context, spreadsheetId, sheetName) {
     // コンテキスト内のSheetsServiceを使用してシート情報を取得
     console.log('DEBUG: Calling getSpreadsheetsData with service:', JSON.stringify(context.sheetsService, null, 2));
     const data = getSpreadsheetsData(context.sheetsService, spreadsheetId);
-    
+
     if (!data || !data.sheets) {
       throw new Error('スプレッドシートデータの取得に失敗しました');
     }
-    
-    // 既存のgetSheetDetailsロジックを適用
-    const headers = data.allHeaders || [];
+
+    // ヘッダー行をAPIで取得
+    const range = `'${sheetName}'!1:1`;
+    const batch = batchGetSheetsData(context.sheetsService, spreadsheetId, [range]);
+    const headers = (batch.valueRanges && batch.valueRanges[0] && batch.valueRanges[0].values)
+      ? batch.valueRanges[0].values[0] || []
+      : [];
+
     const guessed = autoMapHeaders(headers);
     const existing = getConfigFromContext(context, sheetName);
-    
+
     return {
       allHeaders: headers,
       guessedConfig: guessed,
@@ -1708,7 +1713,7 @@ function getSheetDetails(context, spreadsheetId, sheetName) {
         id: sheet.properties.sheetId
       }))
     };
-    
+
   } catch (error) {
     console.warn('getSheetDetailsOptimized エラー:', error.message);
     return {
