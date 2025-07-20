@@ -549,42 +549,6 @@ header {
 @keyframes skeleton-loading { 0% { transform: translate3d(-100%, 0, 0); will-change: transform; } 100% { transform: translate3d(100%, 0, 0); } }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
-/* Fallback styles when TailwindCSS fails to load */
-.tailwind-fallback .bg-gradient-to-br { background: linear-gradient(135deg, var(--color-background), #2a2b3c); }
-.tailwind-fallback .text-white { color: white; }
-.tailwind-fallback .text-center { text-align: center; }
-.tailwind-fallback .p-4 { padding: 1rem; }
-.tailwind-fallback .p-6 { padding: 1.5rem; }
-.tailwind-fallback .m-4 { margin: 1rem; }
-.tailwind-fallback .mb-4 { margin-bottom: 1rem; }
-.tailwind-fallback .mt-4 { margin-top: 1rem; }
-.tailwind-fallback .flex { display: flex; }
-.tailwind-fallback .flex-col { flex-direction: column; }
-.tailwind-fallback .flex-wrap { flex-wrap: wrap; }
-.tailwind-fallback .items-center { align-items: center; }
-.tailwind-fallback .justify-center { justify-content: center; }
-.tailwind-fallback .justify-between { justify-content: space-between; }
-.tailwind-fallback .gap-4 { gap: 1rem; }
-.tailwind-fallback .grid { display: grid; }
-.tailwind-fallback .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
-.tailwind-fallback .rounded-lg { border-radius: 0.5rem; }
-.tailwind-fallback .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
-.tailwind-fallback .w-full { width: 100%; }
-.tailwind-fallback .h-full { height: 100%; }
-.tailwind-fallback .min-h-screen { min-height: 100vh; }
-.tailwind-fallback .relative { position: relative; }
-.tailwind-fallback .absolute { position: absolute; }
-.tailwind-fallback .fixed { position: fixed; }
-.tailwind-fallback .top-0 { top: 0; }
-.tailwind-fallback .bottom-0 { bottom: 0; }
-.tailwind-fallback .left-0 { left: 0; }
-.tailwind-fallback .right-0 { right: 0; }
-.tailwind-fallback .z-10 { z-index: 10; }
-.tailwind-fallback .z-50 { z-index: 50; }
-.tailwind-fallback .hidden { display: none; }
-.tailwind-fallback .block { display: block; }
-.tailwind-fallback .inline { display: inline; }
-.tailwind-fallback .inline-block { display: inline-block; }
 .modal-close-btn { 
   position: absolute;
   top: -12px;
@@ -1433,16 +1397,6 @@ setupEventDelegation() {
       // 軽量な件数チェックのみ実行（フルデータ取得なし）
       const countData = await this.gas.getDataCount(selectedClass, sortOrder, this.state.showAdminFeatures);
       
-      console.log('📊 軽量新着チェック:', {
-        countResponse: countData,
-        newCount: countData.count || 0,
-        currentCount: this.state.currentAnswers ? this.state.currentAnswers.length : 0,
-        lastSeenCount: this.state.lastSeenCount,
-        selectedClass,
-        sortOrder,
-        status: countData.status,
-        error: countData.message
-      });
       
       const newCount = countData.count || 0;
       
@@ -1463,12 +1417,6 @@ setupEventDelegation() {
       
       // フィルター/ソート設定が変わった場合は比較をリセット
       if (this.lastViewKey !== null && this.lastViewKey !== currentViewKey) {
-        console.log('🔄 表示設定変更検出、新着チェックをリセット:', {
-          oldKey: this.lastViewKey,
-          newKey: currentViewKey,
-          newCount,
-          settingLastSeenToNewCount: true
-        });
         this.lastViewKey = currentViewKey;
         this.state.lastSeenCount = newCount;
         return;
@@ -1476,13 +1424,6 @@ setupEventDelegation() {
       
       // 同じフィルター/ソート設定での新着チェック
       const hasNewItems = newCount > this.state.lastSeenCount && this.state.lastSeenCount > 0;
-      console.log('📊 新着判定:', {
-        newCount,
-        lastSeenCount: this.state.lastSeenCount,
-        hasNewItems,
-        difference: newCount - this.state.lastSeenCount,
-        currentViewKey
-      });
       
       if (hasNewItems) {
         const newItems = newCount - this.state.lastSeenCount;
@@ -1490,19 +1431,7 @@ setupEventDelegation() {
         // 異常に大きな差は誤検知の可能性が高い
         if (newItems <= 10 && newItems > 0) { // 妥当な範囲の新着のみ通知
           this.showNewContentBanner(newItems);
-          console.log('🎉 軽量新着検出・通知表示:', { 
-            newItems, 
-            newCount, 
-            lastSeenCount: this.state.lastSeenCount,
-            viewKey: currentViewKey,
-            lightweightCheck: true
-          });
         } else {
-          console.log('⚠️ 異常な新着数検出、誤検知として無視:', {
-            newItems,
-            newCount,
-            lastSeenCount: this.state.lastSeenCount
-          });
         }
       }
       
@@ -1531,17 +1460,12 @@ setupEventDelegation() {
     // デバウンス：短時間内の連続通知を防ぐ
     const now = Date.now();
     if (this.lastNotificationTime && (now - this.lastNotificationTime) < 2000) {
-      console.log('🚫 通知デバウンス: 短時間内の連続通知をスキップ');
       return;
     }
     this.lastNotificationTime = now;
     
     // 既に表示されている場合は、新しい数で上書き（累積しない）
     if (!this.elements.newContentBanner.classList.contains('hidden')) {
-      console.log('📱 通知更新: 既存バナーを新しい数で更新', {
-        oldCount: this.state.newContentCount,
-        newCount: newItems
-      });
       this.state.newContentCount = newItems; // 累積せず上書き
     } else {
       this.state.newContentCount = newItems;
@@ -1566,10 +1490,6 @@ setupEventDelegation() {
       }
     }, 3000);
     
-    console.log('📢 新着通知表示:', {
-      count: this.state.newContentCount,
-      message: message
-    });
   }
   
   // 新着バナーを閉じる
@@ -1593,7 +1513,6 @@ setupEventDelegation() {
         this.elements.refreshContentBtn.disabled = true;
       }
       
-      console.log('🔄 増分リフレッシュ開始 - 基準行数:', this.state.lastSeenCount || 0);
       
       // 現在のフィルタ設定を取得
       const classFilter = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
@@ -1612,11 +1531,6 @@ setupEventDelegation() {
         throw new Error(incrementalData.message);
       }
       
-      console.log('📥 増分データ取得結果:', {
-        newCount: incrementalData.newCount,
-        totalCount: incrementalData.totalCount,
-        hasNewData: incrementalData.newCount > 0
-      });
       
       // 新しいデータがない場合
       if (incrementalData.newCount === 0) {
@@ -1639,11 +1553,6 @@ setupEventDelegation() {
       this.gas.clearCache().catch(err => console.warn('Cache clear failed', err));
       this.state.lastSeenCount = incrementalData.totalCount;
       
-      console.log('✅ 増分リフレッシュ完了:', {
-        addedCards: incrementalData.newCount,
-        totalCards: this.state.currentAnswers.length,
-        newBaseline: this.state.lastSeenCount
-      });
       
       this.provideFeedback(`${incrementalData.newCount}件の新しい投稿を追加しました`, 'success');
       
@@ -1651,7 +1560,6 @@ setupEventDelegation() {
       console.error('増分コンテンツ更新に失敗:', error);
       
       // エラー時は従来の全体更新にフォールバック
-      console.log('🔄 フォールバック: 全体更新を実行');
       await this.refreshContentFull();
       
     } finally {
@@ -1669,18 +1577,11 @@ setupEventDelegation() {
     try {
       // 従来の手動リフレッシュ時はキャッシュをクリアして最新データを取得
       this.cache.clear();
-      console.log('🔄 全体リフレッシュ開始 - キャッシュクリア完了');
       
       await this.loadSheetData(true, false);
       
       // 手動リフレッシュ後は新着チェック基準を更新（初期化フラグは維持）
       this.state.lastSeenCount = this.state.currentAnswers.length;
-      console.log('🔄 全体リフレッシュ完了、新着基準更新:', {
-        newLastSeenCount: this.state.lastSeenCount,
-        maintainInitialFlag: this.initialDataLoaded,
-        currentAnswersLength: this.state.currentAnswers.length,
-        visibleCards: document.querySelectorAll('.answer-card').length
-      });
       
       this.provideFeedback('更新完了！', 'success');
       
@@ -1701,7 +1602,6 @@ setupEventDelegation() {
   async appendNewCards(newData, sortOrder = 'newest') {
     if (!newData || newData.length === 0) return;
     
-    console.log('📌 新しいカードを追加:', newData.length + '件');
     
     const container = this.elements.answersContainer;
     if (!container) return;
@@ -3896,144 +3796,10 @@ try {
   if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
     window.studyQuestApp.destroy();
   }
-  // システムフロー表示
-  showSystemFlow();
   
   window.studyQuestApp = new StudyQuestApp();
   
-  // Expose debug functions globally for console access
-  window.debugAnswerCards = () => {
-    if (window.studyQuestApp && window.studyQuestApp.debugAnswerCards) {
-      window.studyQuestApp.debugAnswerCards();
-    } else {
-      console.log('StudyQuestApp not available or debug function not found');
-    }
-  };
-  
-  // Enhanced global debug function with additional utility methods
-  window.debugClickAnswerCard = (cardIndex = 0, options = {}) => {
-    if (window.studyQuestApp && window.studyQuestApp.debugClickAnswerCard) {
-      return window.studyQuestApp.debugClickAnswerCard(cardIndex, options);
-    } else {
-      console.log('StudyQuestApp not available or debug function not found');
-      return { success: false, error: 'StudyQuestApp not available' };
-    }
-  };
 
-  // システムフロー表示をグローバルで利用可能にする
-  window.showSystemFlow = showSystemFlow;
-  
-  // デバッグ用：データ構造確認機能
-  window.debugCurrentData = () => {
-    if (window.studyQuestApp && window.studyQuestApp.state) {
-      console.log('現在のデータ構造:', {
-        currentAnswers: window.studyQuestApp.state.currentAnswers,
-        currentAnswersLength: window.studyQuestApp.state.currentAnswers?.length,
-        firstItem: window.studyQuestApp.state.currentAnswers?.[0],
-        header: window.studyQuestApp.elements?.headingLabel?.textContent
-      });
-    } else {
-      console.log('StudyQuestApp not available');
-    }
-  };
-
-  // Additional global debug utilities
-  window.debugClickAllAnswerCards = async (options = {}) => {
-    if (!window.studyQuestApp) {
-      console.log('StudyQuestApp not available');
-      return { success: false, error: 'StudyQuestApp not available' };
-    }
-    
-    const container = window.studyQuestApp.elements?.answersContainer;
-    if (!container) {
-      console.log('No answers container found');
-      return { success: false, error: 'No answers container found' };
-    }
-    
-    const answerCards = container.querySelectorAll('.answer-card');
-    const results = [];
-    
-    console.log(`Found ${answerCards.length} answer cards, clicking all...`);
-    
-    for (let i = 0; i < answerCards.length; i++) {
-      try {
-        const result = await window.studyQuestApp.debugClickAnswerCard(i, { 
-          ...options, 
-          logDetails: false // Reduce noise when clicking all cards
-        });
-        results.push(result);
-        
-        if (options.delay && i < answerCards.length - 1) {
-          // Add proper delay between clicks if specified
-          await new Promise(resolve => setTimeout(resolve, options.delay));
-        }
-      } catch (error) {
-        console.error(`Error clicking card ${i}:`, error);
-        results.push({ success: false, error: error.message, cardIndex: i });
-      }
-    }
-    
-    return {
-      success: true,
-      totalCards: answerCards.length,
-      results
-    };
-  };
-
-  window.debugGetAnswerCardInfo = (cardIndex = 0) => {
-    if (!window.studyQuestApp) {
-      console.log('StudyQuestApp not available');
-      return { success: false, error: 'StudyQuestApp not available' };
-    }
-    
-    // Validate cardIndex
-    if (typeof cardIndex !== 'number' || cardIndex < 0 || !Number.isInteger(cardIndex)) {
-      console.log('Invalid card index:', cardIndex);
-      return { success: false, error: 'Invalid card index. Must be a non-negative integer.' };
-    }
-    
-    const container = window.studyQuestApp.elements?.answersContainer;
-    if (!container) {
-      console.log('No answers container found');
-      return { success: false, error: 'No answers container found' };
-    }
-    
-    const answerCards = container.querySelectorAll('.answer-card');
-    if (answerCards.length === 0) {
-      console.log('No answer cards found');
-      return { success: false, error: 'No answer cards found' };
-    }
-    
-    if (cardIndex >= answerCards.length) {
-      console.log('Card index out of bounds');
-      return { success: false, error: 'Card index out of bounds', totalCards: answerCards.length };
-    }
-    
-    const card = answerCards[cardIndex];
-    
-    try {
-      const cardInfo = {
-        index: cardIndex,
-        className: card.className,
-        dataset: { ...card.dataset },
-        rowIndex: card.dataset.rowIndex,
-        boundingRect: card.getBoundingClientRect(),
-        computedStyle: {
-          display: getComputedStyle(card).display,
-          visibility: getComputedStyle(card).visibility,
-          opacity: getComputedStyle(card).opacity
-        },
-        textContent: card.textContent?.trim() || '',
-        innerHTML: card.innerHTML
-      };
-      
-      console.log('Answer card info:', cardInfo);
-      return { success: true, cardInfo };
-    } catch (error) {
-      console.error('Error getting card info:', error);
-      return { success: false, error: `Error getting card info: ${error.message}` };
-    }
-  };
   
   // ドメイン情報とフォームリンクを取得
   loadDomainInfo();
