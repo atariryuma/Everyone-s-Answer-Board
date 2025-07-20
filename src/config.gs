@@ -1579,7 +1579,17 @@ function buildResponseFromContext(context) {
     const userInfo = context.userInfo;
     const configJson = JSON.parse(userInfo.configJson || '{}');
     const spreadsheetId = userInfo.spreadsheetId;
-    const publishedSheetName = configJson.publishedSheetName;
+    const publishedSheetName = configJson.publishedSheetName || '';
+
+    // 公開シートに紐づく設定を取得
+    const sheetConfigKey = publishedSheetName ? 'sheet_' + publishedSheetName : '';
+    const activeSheetConfig = sheetConfigKey && configJson[sheetConfigKey]
+      ? configJson[sheetConfigKey]
+      : {};
+
+    const opinionHeader = activeSheetConfig.opinionHeader || '';
+    const nameHeader = activeSheetConfig.nameHeader || '';
+    const classHeader = activeSheetConfig.classHeader || '';
     
     // 基本的なレスポンス構造を構築
     const response = {
@@ -1598,6 +1608,19 @@ function buildResponseFromContext(context) {
       
       // スプレッドシート情報（既存データから構築）
       activeSheetName: publishedSheetName,
+
+      // 表示・列設定
+      config: {
+        publishedSheetName: publishedSheetName,
+        opinionHeader: opinionHeader,
+        nameHeader: nameHeader,
+        classHeader: classHeader,
+        showNames: configJson.showNames || false,
+        showCounts: configJson.showCounts !== undefined ? configJson.showCounts : true,
+        displayMode: configJson.displayMode || 'anonymous',
+        setupStatus: configJson.setupStatus || 'initial',
+        isPublished: configJson.appPublished || false,
+      },
       
       // パフォーマンス統計
       _meta: {
@@ -1617,11 +1640,27 @@ function buildResponseFromContext(context) {
         response.sheetDetails = sheetDetails;
         response.allSheets = sheetDetails.allSheets || [];
         response.sheetNames = sheetDetails.sheetNames || [];
+
+        // ヘッダー情報と自動マッピング結果を追加
+        response.headers = sheetDetails.allHeaders || [];
+        response.autoMappedHeaders = sheetDetails.guessedConfig || {
+          opinionHeader: '',
+          reasonHeader: '',
+          nameHeader: '',
+          classHeader: '',
+        };
         
       } catch (e) {
         console.warn('buildResponseFromContext: シート詳細取得エラー（基本情報のみで継続）:', e.message);
         response.allSheets = [];
         response.sheetNames = [];
+        response.headers = [];
+        response.autoMappedHeaders = {
+          opinionHeader: '',
+          reasonHeader: '',
+          nameHeader: '',
+          classHeader: '',
+        };
       }
     }
     
