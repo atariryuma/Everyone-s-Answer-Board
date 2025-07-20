@@ -1475,23 +1475,39 @@ function updateUserOptimized(context, updateData) {
 function commitAllChanges(context) {
   const startTime = new Date().getTime();
   console.log('💽 commitAllChanges: 一括DB書き込み開始');
-  
+
   if (!context.hasChanges || Object.keys(context.pendingUpdates).length === 0) {
     console.log('📝 変更なし: DB書き込みをスキップ');
     return;
   }
-  
+
   try {
-    // 既存のupdateUserの内部実装を使用（ただしSheetsServiceは再利用）
-    updateUserDirect(context.sheetsService, context.requestUserId, context.pendingUpdates);
-    
+    const currentConfig = JSON.parse(context.userInfo.configJson || '{}');
+    let pendingConfig = {};
+
+    if (context.pendingUpdates.configJson) {
+      try {
+        pendingConfig = JSON.parse(context.pendingUpdates.configJson);
+      } catch (e) {
+        console.warn('commitAllChanges: pending configJson parse error:', e.message);
+      }
+      delete context.pendingUpdates.configJson;
+    }
+
+    const newConfig = Object.assign({}, currentConfig, context.pendingUpdates, pendingConfig);
+    const newConfigJson = JSON.stringify(newConfig);
+
+    updateUserDirect(context.sheetsService, context.requestUserId, { configJson: newConfigJson });
+
+    context.pendingUpdates = {};
+    context.userInfo.configJson = newConfigJson;
+
     const endTime = new Date().getTime();
-    console.log('✅ 一括DB書き込み完了: %dms, 変更項目数: %d', 
-      endTime - startTime, Object.keys(context.pendingUpdates).length);
-    
-    // 統計更新
+    console.log('✅ 一括DB書き込み完了: %dms, 変更項目数: %d',
+      endTime - startTime, 1);
+
     context.stats.dbQueries++; // コミット時の1回をカウント
-    
+
   } catch (error) {
     console.error('❌ 一括DB書き込みエラー:', error.message);
     throw new Error('設定の保存に失敗しました: ' + error.message);
