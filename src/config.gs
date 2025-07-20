@@ -1611,7 +1611,7 @@ function buildResponseFromContext(context) {
     if (spreadsheetId && publishedSheetName) {
       try {
         // シート情報を取得（最低限の情報のみ、既存SheetsServiceを使用）
-        const sheetDetails = getSheetDetailsOptimized(context, spreadsheetId, publishedSheetName);
+        const sheetDetails = getSheetDetails(context, spreadsheetId, publishedSheetName);
         response.sheetDetails = sheetDetails;
         response.allSheets = sheetDetails.allSheets || [];
         response.sheetNames = sheetDetails.sheetNames || [];
@@ -1641,7 +1641,7 @@ function buildResponseFromContext(context) {
  * @param {string} sheetName - シート名
  * @returns {object} シート詳細情報
  */
-function getSheetDetailsOptimized(context, spreadsheetId, sheetName) {
+function getSheetDetails(context, spreadsheetId, sheetName) {
   try {
     // コンテキスト内のSheetsServiceを使用してシート情報を取得
     const data = getSpreadsheetsData(context.sheetsService, spreadsheetId);

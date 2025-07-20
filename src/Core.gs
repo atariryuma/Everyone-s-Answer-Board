@@ -4316,36 +4316,4 @@ function getInitialData(requestUserId, targetSheetName) {
  * @param {string} sheetName - シート名
  * @returns {Object} シート詳細
  */
-function getSheetDetailsInternal(requestUserId, spreadsheetId, sheetName) {
-  var targetId = spreadsheetId || getEffectiveSpreadsheetId(requestUserId);
-  if (!targetId) {
-    throw new Error('spreadsheetIdが取得できません');
-  }
-  
-  const ss = SpreadsheetApp.openById(targetId);
-  const sheet = ss.getSheetByName(sheetName);
-  if (!sheet) {
-    throw new Error('シートが見つかりません: ' + sheetName);
-  }
 
-  const lastColumn = sheet.getLastColumn();
-  if (lastColumn < 1) {
-    throw new Error(`シート '${sheetName}' に列が存在しません`);
-  }
-  
-  const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0] || [];
-  const guessed = autoMapHeaders(headers);
-
-  let existing = {};
-  try {
-    existing = getConfig(requestUserId, sheetName, true) || {};
-  } catch (e) {
-    console.warn('getConfig failed in getSheetDetailsInternal:', e.message);
-  }
-
-  return {
-    allHeaders: headers,
-    guessedConfig: guessed,
-    existingConfig: existing
-  };
-}
