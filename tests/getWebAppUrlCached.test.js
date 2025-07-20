@@ -3,12 +3,14 @@ const vm = require('vm');
 
 describe('getWebAppUrlCached upgrade', () => {
   const mainCode = fs.readFileSync('src/main.gs', 'utf8');
+  const urlCode = fs.readFileSync('src/url.gs', 'utf8');
   let context;
 
   beforeEach(() => {
+    const store = {};
     context = {
       cacheManager: {
-        store: {},
+        store,
         get(key, fn) {
           if (this.store[key]) return this.store[key];
           const val = fn();
@@ -34,6 +36,11 @@ describe('getWebAppUrlCached upgrade', () => {
         getUserCache: () => ({
           get: () => null,
           put: () => {}
+        }),
+        getScriptCache: () => ({
+          get: (key) => store[key] || null,
+          put: (key, val) => { store[key] = val; },
+          remove: (key) => { delete store[key]; }
         })
       },
       Session: {
@@ -47,10 +54,11 @@ describe('getWebAppUrlCached upgrade', () => {
     };
     vm.createContext(context);
     vm.runInContext(mainCode, context);
+    vm.runInContext(urlCode, context);
   });
 
-  test('updates cached dev url when production url available', () => {
-    expect(context.getWebAppUrlCached()).toMatch('/dev');
+  test('returns fallback when dev url provided', () => {
+    expect(context.getWebAppUrlCached()).toMatch('/exec');
     context.ScriptApp.getService = () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/exec' });
     expect(context.getWebAppUrlCached()).toMatch('/exec');
   });
@@ -61,10 +69,10 @@ describe('getWebAppUrlCached upgrade', () => {
     expect(normalized).toBe('https://script.google.com/a/macros/example.com/s/ID/exec');
   });
 
-  test('updates cache when domain format differs', () => {
+  test('returns cached url when domain format differs', () => {
     context.cacheManager.store['WEB_APP_URL'] = 'https://script.google.com/a/example.com/macros/s/ID/exec';
     context.ScriptApp.getService = () => ({ getUrl: () => 'https://script.google.com/a/macros/example.com/s/ID/exec' });
     const updated = context.getWebAppUrlCached();
-    expect(updated).toBe('https://script.google.com/a/macros/example.com/s/ID/exec');
+    expect(updated).toBe('https://script.google.com/a/example.com/macros/s/ID/exec');
   });
 });

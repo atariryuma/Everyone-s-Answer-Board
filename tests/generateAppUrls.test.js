@@ -3,17 +3,20 @@ const vm = require('vm');
 
 describe('generateAppUrls admin url', () => {
   const mainCode = fs.readFileSync('src/main.gs', 'utf8');
+  const urlCode = fs.readFileSync('src/url.gs', 'utf8');
   let context;
 
   beforeEach(() => {
+    const store = {};
     context = {
       cacheManager: {
-        store: {},
+        store,
         get(key, fn) { return fn(); },
         remove() {}
       },
       ScriptApp: {
-        getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/dev' })
+        getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/dev' }),
+        getScriptId: () => 'ID'
       },
       console: { error: () => {}, log: () => {}, warn: () => {} },
       PropertiesService: {
@@ -28,6 +31,11 @@ describe('generateAppUrls admin url', () => {
         getUserCache: () => ({
           get: () => null,
           put: () => {}
+        }),
+        getScriptCache: () => ({
+          get: (key) => store[key] || null,
+          put: (key, val) => { store[key] = val; },
+          remove: (key) => { delete store[key]; }
         })
       },
       Session: {
@@ -41,6 +49,7 @@ describe('generateAppUrls admin url', () => {
     };
     vm.createContext(context);
     vm.runInContext(mainCode, context);
+    vm.runInContext(urlCode, context);
   });
 
   test('returns adminUrl with userId and mode parameter', () => {
