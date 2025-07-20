@@ -674,13 +674,13 @@ function saveAndActivateSheet(requestUserId, spreadsheetId, sheetName, config) {
 }
 
 /**
- *【新しい推奨関数】設定を保存し、ボードを公開する統合関数 (マルチテナント対応版)
+ *【レガシー版】設定を保存し、ボードを公開する統合関数 (マルチテナント対応版)
  * @param {string} requestUserId - リクエスト元のユーザーID
  * @param {string} sheetName - 対象のシート名
  * @param {object} config - 保存・適用する設定オブジェクト
  * @returns {object} 最新のステータスオブジェクト
  */
-function saveAndPublish(requestUserId, sheetName, config) {
+function saveAndPublishLegacy(requestUserId, sheetName, config) {
   verifyUserAccess(requestUserId);
   const lock = LockService.getScriptLock();
   lock.waitLock(30000); // 30秒待機
@@ -1388,6 +1388,493 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
 // =================================================================
 // 関数統合完了: Optimized/Batch機能は基底関数に統合済み
 // =================================================================
+
+// =================================================================
+// PHASE3 OPTIMIZATION: トランザクション型実行アーキテクチャ
+// =================================================================
+
+/**
+ * 実行コンテキストを作成（リソース一括作成・管理）
+ * @param {string} requestUserId - ユーザーID
+ * @returns {object} 実行コンテキスト
+ */
+function createExecutionContext(requestUserId) {
+  const startTime = new Date().getTime();
+  console.log('🚀 ExecutionContext作成開始: userId=%s', requestUserId);
+  
+  try {
+    // 1. 共有リソースを一括作成（1回のみ）
+    const sheetsService = getSheetsService();
+    const userInfo = getCachedUserInfo(requestUserId);
+    
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    // 2. 実行コンテキスト構築
+    const context = {
+      // 基本情報
+      requestUserId: requestUserId,
+      startTime: startTime,
+      
+      // 共有リソース
+      sheetsService: sheetsService,
+      userInfo: JSON.parse(JSON.stringify(userInfo)), // Deep copy
+      
+      // 変更トラッキング
+      pendingUpdates: {},
+      configChanges: {},
+      hasChanges: false,
+      
+      // パフォーマンス情報
+      stats: {
+        sheetsServiceCreations: 1,
+        dbQueries: 1,
+        cacheHits: 0,
+        operationsCount: 0
+      }
+    };
+    
+    const endTime = new Date().getTime();
+    console.log('✅ ExecutionContext作成完了: %dms', endTime - startTime);
+    
+    return context;
+    
+  } catch (error) {
+    console.error('❌ ExecutionContext作成エラー:', error.message);
+    throw new Error('実行コンテキストの初期化に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * 最適化版updateUser（インメモリ更新）
+ * @param {object} context - 実行コンテキスト
+ * @param {object} updateData - 更新データ
+ */
+function updateUserOptimized(context, updateData) {
+  console.log('💾 updateUserOptimized: 変更をコンテキストに蓄積');
+  
+  // 変更をpendingUpdatesに蓄積（DB書き込みはしない）
+  context.pendingUpdates = {...context.pendingUpdates, ...updateData};
+  
+  // メモリ内のuserInfoも即座に更新（後続処理で使用可能）
+  context.userInfo = {...context.userInfo, ...updateData};
+  context.hasChanges = true;
+  context.stats.operationsCount++;
+  
+  console.log('📊 蓄積された変更数: %d', Object.keys(context.pendingUpdates).length);
+}
+
+/**
+ * 蓄積された全変更を一括でDBにコミット
+ * @param {object} context - 実行コンテキスト
+ */
+function commitAllChanges(context) {
+  const startTime = new Date().getTime();
+  console.log('💽 commitAllChanges: 一括DB書き込み開始');
+  
+  if (!context.hasChanges || Object.keys(context.pendingUpdates).length === 0) {
+    console.log('📝 変更なし: DB書き込みをスキップ');
+    return;
+  }
+  
+  try {
+    // 既存のupdateUserの内部実装を使用（ただしSheetsServiceは再利用）
+    updateUserDirect(context.sheetsService, context.requestUserId, context.pendingUpdates);
+    
+    const endTime = new Date().getTime();
+    console.log('✅ 一括DB書き込み完了: %dms, 変更項目数: %d', 
+      endTime - startTime, Object.keys(context.pendingUpdates).length);
+    
+    // 統計更新
+    context.stats.dbQueries++; // コミット時の1回をカウント
+    
+  } catch (error) {
+    console.error('❌ 一括DB書き込みエラー:', error.message);
+    throw new Error('設定の保存に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * 既存のupdateUser内部実装を直接実行（SheetsService再利用版）
+ * @param {object} sheetsService - 再利用するSheetsService
+ * @param {string} userId - ユーザーID
+ * @param {object} updateData - 更新データ
+ */
+function updateUserDirect(sheetsService, userId, updateData) {
+  var props = PropertiesService.getScriptProperties();
+  var dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
+  var sheetName = 'Users';
+  
+  // 現在のデータを取得（提供されたSheetsServiceを使用）
+  var data = batchGetSheetsData(sheetsService, dbId, ["'" + sheetName + "'!A:H"]);
+  var values = data.valueRanges[0].values || [];
+  
+  if (values.length === 0) {
+    throw new Error('データベースが空です');
+  }
+  
+  var headers = values[0];
+  var userIdIndex = headers.indexOf('userId');
+  var rowIndex = -1;
+  
+  // ユーザーの行を特定
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][userIdIndex] === userId) {
+      rowIndex = i + 1; // 1-based index
+      break;
+    }
+  }
+  
+  if (rowIndex === -1) {
+    throw new Error('更新対象のユーザーが見つかりません');
+  }
+  
+  // 更新データを適用
+  var updateRequests = [];
+  Object.keys(updateData).forEach(function(field) {
+    var columnIndex = headers.indexOf(field);
+    if (columnIndex !== -1) {
+      updateRequests.push({
+        range: sheetName + '!' + getColumnLetter(columnIndex + 1) + rowIndex,
+        values: [[updateData[field]]]
+      });
+    }
+  });
+  
+  if (updateRequests.length > 0) {
+    batchUpdateSheetsData(sheetsService, dbId, updateRequests);
+  }
+}
+
+/**
+ * 列番号をアルファベットに変換
+ * @param {number} num - 列番号（1-based）
+ * @returns {string} 列のアルファベット表記
+ */
+function getColumnLetter(num) {
+  var letter = '';
+  while (num > 0) {
+    num--;
+    letter = String.fromCharCode(65 + (num % 26)) + letter;
+    num = Math.floor(num / 26);
+  }
+  return letter;
+}
+
+/**
+ * コンテキストから統合レスポンスを構築（DB検索なし）
+ * @param {object} context - 実行コンテキスト
+ * @returns {object} getInitialData形式の統合レスポンス
+ */
+function buildResponseFromContext(context) {
+  const startTime = new Date().getTime();
+  console.log('🏗️ buildResponseFromContext: DB検索なしでレスポンス構築');
+  
+  try {
+    // 最新のuserInfoから必要な情報を取得
+    const userInfo = context.userInfo;
+    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const spreadsheetId = userInfo.spreadsheetId;
+    const publishedSheetName = configJson.publishedSheetName;
+    
+    // 基本的なレスポンス構造を構築
+    const response = {
+      userInfo: userInfo,
+      isPublished: configJson.appPublished || false,
+      setupStep: 3, // saveAndPublish完了時は常にStep 3
+      
+      // URL情報（キャッシュされた値を使用）
+      appUrls: {
+        webAppUrl: ScriptApp.getService().getUrl(),
+        viewUrl: userInfo.viewUrl || generateViewUrl(context.requestUserId),
+        setupUrl: ScriptApp.getService().getUrl() + '?setup=true',
+        adminUrl: ScriptApp.getService().getUrl() + '?mode=admin&userId=' + context.requestUserId,
+        status: 'success'
+      },
+      
+      // スプレッドシート情報（既存データから構築）
+      activeSheetName: publishedSheetName,
+      
+      // パフォーマンス統計
+      _meta: {
+        executionTime: new Date().getTime() - context.startTime,
+        includedApis: ['buildResponseFromContext'],
+        apiVersion: 'optimized_v1',
+        stats: context.stats
+      }
+    };
+    
+    // スプレッドシートの詳細情報が必要な場合は追加取得
+    if (spreadsheetId && publishedSheetName) {
+      try {
+        // シート情報を取得（最低限の情報のみ、既存SheetsServiceを使用）
+        const sheetDetails = getSheetDetailsOptimized(context, spreadsheetId, publishedSheetName);
+        response.sheetDetails = sheetDetails;
+        response.allSheets = sheetDetails.allSheets || [];
+        response.sheetNames = sheetDetails.sheetNames || [];
+        
+      } catch (e) {
+        console.warn('buildResponseFromContext: シート詳細取得エラー（基本情報のみで継続）:', e.message);
+        response.allSheets = [];
+        response.sheetNames = [];
+      }
+    }
+    
+    const endTime = new Date().getTime();
+    console.log('✅ レスポンス構築完了: %dms', endTime - startTime);
+    
+    return response;
+    
+  } catch (error) {
+    console.error('❌ buildResponseFromContext エラー:', error.message);
+    throw new Error('レスポンス構築に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * 最適化版シート詳細取得（コンテキスト内SheetsService使用）
+ * @param {object} context - 実行コンテキスト
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {object} シート詳細情報
+ */
+function getSheetDetailsOptimized(context, spreadsheetId, sheetName) {
+  try {
+    // コンテキスト内のSheetsServiceを使用してシート情報を取得
+    const data = getSpreadsheetsData(context.sheetsService, spreadsheetId);
+    
+    if (!data || !data.sheets) {
+      throw new Error('スプレッドシートデータの取得に失敗しました');
+    }
+    
+    // 既存のgetSheetDetailsロジックを適用
+    const headers = data.allHeaders || [];
+    const guessed = guessConfigFromHeaders(headers);
+    const existing = getConfigFromContext(context, sheetName);
+    
+    return {
+      allHeaders: headers,
+      guessedConfig: guessed,
+      existingConfig: existing,
+      allSheets: data.sheets,
+      sheetNames: data.sheets.map(sheet => ({
+        name: sheet.properties.title,
+        id: sheet.properties.sheetId
+      }))
+    };
+    
+  } catch (error) {
+    console.warn('getSheetDetailsOptimized エラー:', error.message);
+    return {
+      allHeaders: [],
+      guessedConfig: {},
+      existingConfig: {},
+      allSheets: [],
+      sheetNames: []
+    };
+  }
+}
+
+/**
+ * コンテキストから設定を取得（DB検索なし）
+ * @param {object} context - 実行コンテキスト  
+ * @param {string} sheetName - シート名
+ * @returns {object} 設定オブジェクト
+ */
+function getConfigFromContext(context, sheetName) {
+  try {
+    const configJson = JSON.parse(context.userInfo.configJson || '{}');
+    const sheetKey = 'sheet_' + sheetName;
+    return configJson[sheetKey] || {};
+  } catch (e) {
+    console.warn('getConfigFromContext エラー:', e.message);
+    return {};
+  }
+}
+
+/**
+ * コンテキスト版: シート設定保存（インメモリ更新のみ）
+ * @param {object} context - 実行コンテキスト
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @param {object} config - 設定オブジェクト
+ */
+function saveSheetConfigInContext(context, spreadsheetId, sheetName, config) {
+  console.log('💾 saveSheetConfigInContext: インメモリ更新');
+  
+  try {
+    const configJson = JSON.parse(context.userInfo.configJson || '{}');
+    const sheetKey = 'sheet_' + sheetName;
+    
+    // シート設定を更新
+    configJson[sheetKey] = {
+      ...config,
+      lastModified: new Date().toISOString()
+    };
+    
+    // updateUserOptimizedを使用してコンテキストに変更を蓄積
+    updateUserOptimized(context, { 
+      configJson: JSON.stringify(configJson) 
+    });
+    
+    console.log('✅ シート設定をコンテキストに保存: %s', sheetKey);
+    
+  } catch (error) {
+    console.error('❌ saveSheetConfigInContext エラー:', error.message);
+    throw new Error('シート設定の保存に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * コンテキスト版: シート切り替え（インメモリ更新のみ）
+ * @param {object} context - 実行コンテキスト
+ * @param {string} spreadsheetId - スプレッドシートID  
+ * @param {string} sheetName - シート名
+ */
+function switchToSheetInContext(context, spreadsheetId, sheetName) {
+  console.log('🔄 switchToSheetInContext: インメモリ更新');
+  
+  try {
+    const configJson = JSON.parse(context.userInfo.configJson || '{}');
+    
+    // アクティブシート情報を更新
+    configJson.publishedSpreadsheetId = spreadsheetId;
+    configJson.publishedSheetName = sheetName;
+    configJson.appPublished = true;
+    configJson.lastModified = new Date().toISOString();
+    
+    // updateUserOptimizedを使用してコンテキストに変更を蓄積
+    updateUserOptimized(context, { 
+      configJson: JSON.stringify(configJson) 
+    });
+    
+    console.log('✅ シート切り替えをコンテキストに保存: %s', sheetName);
+    
+  } catch (error) {
+    console.error('❌ switchToSheetInContext エラー:', error.message);
+    throw new Error('シート切り替えに失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * コンテキスト版: 表示オプション設定（インメモリ更新のみ）
+ * @param {object} context - 実行コンテキスト
+ * @param {object} displayOptions - 表示オプション
+ */
+function setDisplayOptionsInContext(context, displayOptions) {
+  console.log('🎛️ setDisplayOptionsInContext: インメモリ更新');
+  
+  try {
+    const configJson = JSON.parse(context.userInfo.configJson || '{}');
+    
+    // 表示オプションを更新
+    if (displayOptions.showNames !== undefined) {
+      configJson.showNames = displayOptions.showNames;
+    }
+    if (displayOptions.showCounts !== undefined) {
+      configJson.showCounts = displayOptions.showCounts;
+    }
+    if (displayOptions.displayMode !== undefined) {
+      configJson.displayMode = displayOptions.displayMode;
+    } else if (displayOptions.showNames !== undefined) {
+      // 後方互換性
+      configJson.displayMode = displayOptions.showNames ? 'named' : 'anonymous';
+    }
+    
+    configJson.lastModified = new Date().toISOString();
+    
+    // updateUserOptimizedを使用してコンテキストに変更を蓄積
+    updateUserOptimized(context, { 
+      configJson: JSON.stringify(configJson) 
+    });
+    
+    console.log('✅ 表示オプションをコンテキストに保存:', displayOptions);
+    
+  } catch (error) {
+    console.error('❌ setDisplayOptionsInContext エラー:', error.message);
+    throw new Error('表示オプションの設定に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * 【最適化版】設定を保存し、ボードを公開する統合関数（トランザクション型）
+ * @param {string} requestUserId - ユーザーID
+ * @param {string} sheetName - シート名
+ * @param {object} config - 設定オブジェクト
+ * @returns {object} 最新のステータスオブジェクト
+ */
+function saveAndPublish(requestUserId, sheetName, config) {
+  verifyUserAccess(requestUserId);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+
+  try {
+    console.log('🚀 saveAndPublishOptimized開始: sheetName=%s', sheetName);
+    const overallStartTime = new Date().getTime();
+
+    // Phase 1: 実行コンテキスト作成（リソース一括作成）
+    const context = createExecutionContext(requestUserId);
+    const spreadsheetId = context.userInfo.spreadsheetId;
+
+    if (!spreadsheetId) {
+      throw new Error('ユーザーのスプレッドシート情報が見つかりません。');
+    }
+
+    // Phase 2: インメモリ更新（DB書き込みなし）
+    console.log('💾 Phase 2: インメモリ更新開始');
+    
+    // 2-1. シート設定保存
+    saveSheetConfigInContext(context, spreadsheetId, sheetName, config);
+    
+    // 2-2. シート切り替え
+    switchToSheetInContext(context, spreadsheetId, sheetName);
+    
+    // 2-3. 表示オプション設定
+    const displayOptions = {
+      showNames: !!config.showNames,
+      showCounts: config.showCounts !== undefined ? !!config.showCounts : false
+    };
+    setDisplayOptionsInContext(context, displayOptions);
+    
+    console.log('✅ Phase 2完了: 全設定をコンテキストに蓄積');
+
+    // Phase 3: 一括DB書き込み（1回のみ）
+    console.log('💽 Phase 3: 一括DB書き込み開始');
+    commitAllChanges(context);
+    console.log('✅ Phase 3完了: DB書き込み完了');
+
+    // Phase 4: 統合レスポンス生成（DB検索なし）
+    console.log('🏗️ Phase 4: レスポンス構築開始');
+    const finalResponse = buildResponseFromContext(context);
+    console.log('✅ Phase 4完了: レスポンス構築完了');
+
+    // パフォーマンス統計
+    const totalTime = new Date().getTime() - overallStartTime;
+    console.log('📊 saveAndPublishOptimized パフォーマンス統計:');
+    console.log('  ⏱️ 総実行時間: %dms', totalTime);
+    console.log('  🔧 SheetsService作成: %d回', context.stats.sheetsServiceCreations);
+    console.log('  🗄️ DB検索: %d回', context.stats.dbQueries);
+    console.log('  ⚡ 操作回数: %d回', context.stats.operationsCount);
+
+    // レスポンスに統計情報を追加
+    finalResponse._meta.totalExecutionTime = totalTime;
+    finalResponse._meta.optimizationStats = {
+      sheetsServiceCreations: context.stats.sheetsServiceCreations,
+      dbQueries: context.stats.dbQueries,
+      operationsCount: context.stats.operationsCount,
+      improvementMessage: 'トランザクション型最適化により高速化'
+    };
+
+    return finalResponse;
+
+  } catch (error) {
+    console.error('❌ saveAndPublishOptimized致命的エラー:', error.message, error.stack);
+    throw new Error('設定の保存と公開中にサーバーエラーが発生しました: ' + error.message);
+  } finally {
+    lock.releaseLock();
+  }
+}
 
 
 
