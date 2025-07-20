@@ -67,7 +67,9 @@ function getWebAppUrlCached() {
     
     if (cachedUrl) {
       // キャッシュされたURLが開発URLでないか検証
-      if (!cachedUrl.includes('googleusercontent.com') && !cachedUrl.includes('userCodeAppPanel')) {
+      if (!cachedUrl.includes('googleusercontent.com') &&
+          !cachedUrl.includes('userCodeAppPanel') &&
+          !cachedUrl.endsWith('/dev')) {
         console.log('Valid cached URL found: ' + cachedUrl);
         return cachedUrl;
       } else {

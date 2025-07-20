@@ -27,17 +27,22 @@ describe('generateAppUrls admin url', () => {
           }
         })
       },
-      CacheService: {
-        getUserCache: () => ({
-          get: () => null,
-          put: () => {}
-        }),
-        getScriptCache: () => ({
-          get: (key) => store[key] || null,
-          put: (key, val) => { store[key] = val; },
-          remove: (key) => { delete store[key]; }
-        })
-      },
+
+      CacheService: (() => {
+        const store = {};
+        return {
+          getUserCache: () => ({
+            get: () => null,
+            put: () => {}
+          }),
+          getScriptCache: () => ({
+            get: (k) => store[k] || null,
+            put: (k, v) => { store[k] = v; },
+            remove: (k) => { delete store[k]; }
+          })
+        };
+      })(),
+        
       Session: {
         getActiveUser: () => ({ getEmail: () => 'test@example.com' })
       },
@@ -48,6 +53,7 @@ describe('generateAppUrls admin url', () => {
       }
     };
     vm.createContext(context);
+    vm.runInContext(urlCode, context);
     vm.runInContext(mainCode, context);
     vm.runInContext(urlCode, context);
   });
