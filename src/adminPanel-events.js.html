@@ -350,7 +350,7 @@ function handleDeleteRequest() {
     '本当にこのアカウントを削除しますか？この操作は元に戻せず、すべてのデータが失われます。',
     function() {
       setLoading(true, 'アカウントを完全に削除しています...');
-      runGasWithUserId('deleteCurrentUserAccount')
+      runGasWithUserId('deleteUserAccount')
         .then(function(response) {
           setLoading(false);
           showMessage(response.message || 'アカウントが削除されました', 'success');
