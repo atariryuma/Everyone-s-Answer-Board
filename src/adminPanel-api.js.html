@@ -497,7 +497,8 @@ function openForm() {
 function openAppSetupPage() {
   runGasWithUserId('getWebAppUrl')
     .then(function(webAppUrl) {
-      const setupUrl = webAppUrl + '?setup=true&mode=appsetup';
+      const setupUrl =
+        webAppUrl + '?setup=true&mode=appsetup&userId=' + encodeURIComponent(userId);
       window.location.href = setupUrl;
     })
     .catch(function(error) {

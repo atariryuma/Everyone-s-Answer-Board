@@ -364,12 +364,14 @@
               window.localStorage.clear();
             }
             setTimeout(() => {
-              runGasWithUserId('getWebAppUrl').then(webAppUrl => {
-                window.location.href = '/login';
-              }).catch(error => {
-                console.error('Failed to get web app URL:', error);
-                window.location.href = '/login';
-              });
+              runGasWithUserId('getWebAppUrl')
+                .then(webAppUrl => {
+                  window.location.href = webAppUrl;
+                })
+                .catch(error => {
+                  console.error('Failed to get web app URL:', error);
+                  window.location.reload();
+                });
             }, 2000);
           } else {
             showMessage(result.message || '削除に失敗しました', 'error');

@@ -364,11 +364,13 @@ function handleDeleteRequest() {
             window.localStorage.clear();
           }
           setTimeout(function() {
-            runGasWithUserId('getWebAppUrl').then(function(webAppUrl) {
-              window.location.href = '/login';
-            }).catch(function() {
-              window.location.href = '/login';
-            });
+            runGasWithUserId('getWebAppUrl')
+              .then(function(webAppUrl) {
+                window.location.href = webAppUrl;
+              })
+              .catch(function() {
+                window.location.reload();
+              });
           }, 2000);
         })
         .catch(function(error) {

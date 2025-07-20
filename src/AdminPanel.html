@@ -872,6 +872,7 @@
       </div>
       
       <!-- アプリ設定リンク -->
+<? if (isDeployUser) { ?>
       <div id="app-setup-link" class="bg-blue-900/10 border border-blue-500/30 rounded-lg p-3 transition-all hover:border-blue-500/50">
         <button type="button" onclick="openAppSetupPage()" class="w-full flex items-center justify-between text-sm font-medium text-blue-300 hover:text-blue-200 transition-colors">
           <div class="flex items-center">
@@ -889,6 +890,7 @@
           アプリの有効/無効状態を管理できます
         </p>
       </div>
+<? } ?>
       
       <!-- セキュリティと統合情報 -->
       <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
