@@ -1058,7 +1058,8 @@ function getDbSheet() {
 }
 
 /**
- * 現在のユーザーのアカウント情報をデータベースから完全に削除する
+ * 現在のユーザーのアカウント情報をデータベースから完全に削除する。
+ * Google Drive 上の関連ファイルやフォルダは保持したままにする。
  * @returns {string} 成功メッセージ
  */
 function deleteUserAccount(userId) {
@@ -1156,6 +1157,8 @@ function deleteUserAccount(userId) {
       
       // 関連するすべてのキャッシュを削除
       invalidateUserCache(userId, userInfo.adminEmail, userInfo.spreadsheetId, false);
+
+      // Google Drive のデータは保持するため何も操作しない
       
       // UserPropertiesからも関連情報を削除
       const userProps = PropertiesService.getUserProperties();
