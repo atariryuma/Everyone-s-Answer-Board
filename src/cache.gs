@@ -246,7 +246,7 @@ class CacheManager {
     
     try {
       // スクリプトキャッシュを完全にクリア
-      this.scriptCache.removeAll([]);
+      this.scriptCache.removeAll();
       scriptCacheCleared = true;
       debugLog('[Cache] Cleared script cache.');
     } catch (e) {

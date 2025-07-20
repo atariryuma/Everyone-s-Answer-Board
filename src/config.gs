@@ -729,7 +729,13 @@ function saveAndPublish(requestUserId, sheetName, config) {
 
     // 5. 全キャッシュをクリアして確実に最新データを取得
     clearExecutionUserInfoCache();
-    CacheService.getScriptCache().removeAll();
+    try {
+      CacheService.getScriptCache().removeAll();
+      console.log('saveAndPublish: スクリプトキャッシュクリア成功');
+    } catch (e) {
+      console.warn('saveAndPublish: スクリプトキャッシュクリアエラー（処理継続）:', e.message);
+      // キャッシュクリアに失敗してもアプリケーション動作には影響しないため継続
+    }
     console.log('saveAndPublish: 全キャッシュクリア完了');
     
     // 6. 統合APIで最新ステータスを取得
