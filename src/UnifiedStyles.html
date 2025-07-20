@@ -1,8 +1,13 @@
 <style>
 /* =============================================================================
-   StudyQuest - Unified CSS Styles
-   Based on AdminPanel.html with additional styles from all HTML files
+   StudyQuest - Unified CSS Styles (Bootstrap 5 Compatible)
+   Migrated from Tailwind CSS to Bootstrap with preserved custom styling
    ============================================================================= */
+   
+/* Bootstrap 5 Custom Properties Override */
+:root {
+  --bs-font-sans-serif: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Google Sans', sans-serif;
+}
 
 /* CSS Variables - Comprehensive Color and Design System */
 :root {
@@ -43,7 +48,7 @@ body {
   margin: 0; 
   color: var(--color-text);
   background: var(--color-background);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Google Sans', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Google Sans', sans-serif;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -744,7 +749,7 @@ body {
 
 /* Font Styles */
 .game-font {
-  font-family: 'Press Start 2P', cursive;
+  font-family: 'Inter', sans-serif;  font-weight: 700;
   font-size: 0.75rem;
   letter-spacing: 0.05em;
 }
@@ -897,5 +902,181 @@ body {
   .responsive-grid {
     grid-template-columns: repeat(3, 1fr);
   }
+}
+
+/* =============================================================================
+   BOOTSTRAP 5 COMPATIBILITY & EXTENSIONS
+   ============================================================================= */
+
+/* Bootstrap Button Extensions - Preserve Custom Styling */
+.btn.btn-glass {
+  background: rgba(139,233,253,0.1);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(139,233,253,0.3);
+  color: var(--color-primary);
+}
+
+.btn.btn-game {
+  background: linear-gradient(135deg, var(--color-primary), #50fa7b);
+  color: #000;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+  border: 2px solid transparent;
+}
+
+/* Bootstrap Card Extensions */
+.card.glass-card {
+  background: var(--color-surface);
+  backdrop-filter: blur(var(--backdrop-blur));
+  border: 1px solid var(--color-border);
+}
+
+.card.glass-card:hover {
+  border-color: rgba(255,255,255,0.2);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  transition: all var(--transition-duration) var(--transition-easing);
+}
+
+/* Bootstrap Form Extensions */
+.form-control.glass-input {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  backdrop-filter: blur(8px);
+}
+
+.form-control.glass-input:focus {
+  background: rgba(255,255,255,0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 0.25rem rgba(139, 233, 253, 0.25);
+}
+
+.form-control.glass-input::placeholder {
+  color: rgba(192, 202, 245, 0.6);
+}
+
+/* Bootstrap Modal Extensions */
+.modal.glass-modal .modal-content {
+  background: var(--color-surface);
+  backdrop-filter: blur(var(--backdrop-blur));
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.modal-backdrop.glass-backdrop {
+  background-color: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+}
+
+/* Bootstrap Badge Extensions */
+.badge.glass-badge {
+  background: rgba(139,233,253,0.2);
+  color: var(--color-primary);
+  border: 1px solid rgba(139,233,253,0.3);
+}
+
+/* Bootstrap Utility Extensions */
+.bg-glass {
+  background: var(--color-surface) !important;
+  backdrop-filter: blur(var(--backdrop-blur));
+}
+
+.border-glass {
+  border-color: var(--color-border) !important;
+}
+
+.text-glass {
+  color: var(--color-text) !important;
+}
+
+/* Custom Gradient Utilities (Bootstrap Extension) */
+.bg-gradient-primary {
+  background: linear-gradient(135deg, var(--color-primary), #50fa7b) !important;
+}
+
+.bg-gradient-google {
+  background: linear-gradient(135deg, var(--color-google-blue), var(--color-google-green)) !important;
+}
+
+.bg-gradient-danger {
+  background: linear-gradient(135deg, var(--color-error), #dc2626) !important;
+}
+
+/* Bootstrap Spinner Extensions */
+.spinner-border.glass-spinner {
+  color: var(--color-primary);
+}
+
+/* Bootstrap Alert Extensions */
+.alert.glass-alert {
+  background: var(--color-surface);
+  backdrop-filter: blur(var(--backdrop-blur));
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+/* Responsive Design Utilities */
+.min-h-screen {
+  min-height: 100vh;
+}
+
+.min-h-100 {
+  min-height: 100%;
+}
+
+/* Game-style animations */
+@keyframes game-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.game-pulse {
+  animation: game-pulse 2s infinite;
+}
+
+/* Bootstrap Navigation Extensions */
+.navbar.glass-navbar {
+  background: var(--color-surface) !important;
+  backdrop-filter: blur(var(--backdrop-blur));
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Ensure Bootstrap doesn't override our custom properties */
+.btn:not([class*="btn-outline"]):not([class*="btn-link"]) {
+  border-color: transparent;
+}
+
+/* Preserve glass effects in Bootstrap components */
+.dropdown-menu.glass-dropdown {
+  background: var(--color-surface);
+  backdrop-filter: blur(var(--backdrop-blur));
+  border: 1px solid var(--color-border);
+}
+
+.dropdown-item {
+  color: var(--color-text);
+}
+
+.dropdown-item:hover {
+  background: rgba(255,255,255,0.1);
+  color: var(--color-text);
+}
+
+/* Fix Bootstrap focus states with our design */
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 0.25rem rgba(139, 233, 253, 0.25);
+}
+
+/* Bootstrap Toast Extensions */
+.toast.glass-toast {
+  background: var(--color-surface);
+  backdrop-filter: blur(var(--backdrop-blur));
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
 }
 </style>

@@ -1,43 +1,51 @@
 <!-- SharedModals.html - 共通モーダルコンポーネント -->
 <!-- GAS include用のモーダルコンポーネント集 -->
 
-<!-- 確認モーダル -->
-<div id="confirmation-modal" class="fixed inset-0 bg-black/80 z-[60] hidden flex items-center justify-center" role="dialog" aria-modal="true">
-  <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4">
-    <h3 id="modal-title" class="text-xl font-bold text-cyan-400 mb-4"></h3>
-    <p id="modal-message" class="text-gray-300 mb-6"></p>
-    <div class="flex justify-end gap-3">
-      <button type="button" id="modal-cancel-btn" class="btn btn-secondary">キャンセル</button>
-      <button type="button" id="modal-confirm-btn" class="btn btn-primary">はい、実行します</button>
+<!-- 確認モーダル (Bootstrap) -->
+<div id="confirmation-modal" class="modal fade glass-modal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content glass-card border-0">
+      <div class="modal-header border-0 pb-0">
+        <h3 id="modal-title" class="modal-title fs-5 fw-bold text-primary"></h3>
+      </div>
+      <div class="modal-body">
+        <p id="modal-message" class="text-glass mb-0"></p>
+      </div>
+      <div class="modal-footer border-0 justify-content-end gap-3">
+        <button type="button" id="modal-cancel-btn" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+        <button type="button" id="modal-confirm-btn" class="btn btn-primary">はい、実行します</button>
+      </div>
     </div>
   </div>
+  <div class="modal-backdrop glass-backdrop"></div>
 </div>
 
-<!-- 公開モーダル -->
-<div id="publish-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
-  <div class="flex items-center justify-center min-h-full p-4">
-    <div class="glass-panel rounded-xl p-6 max-w-md w-full">
-      <h3 class="text-xl font-bold text-cyan-400 mb-4">
-        <svg class="w-6 h-6 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
-        公開準備完了
-      </h3>
-      <p class="text-gray-300 mb-6">
-        シートの設定が完了しました。<br>
-        学習者がアクセスできるよう公開しますか？
-      </p>
-      <div class="flex justify-end gap-3">
-        <button type="button" id="publish-modal-private-btn" class="btn btn-secondary">非公開のまま</button>
+<!-- 公開モーダル (Bootstrap) -->
+<div id="publish-modal" class="modal fade glass-modal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content glass-card border-0">
+      <div class="modal-header border-0 pb-0">
+        <h3 class="modal-title fs-5 fw-bold text-primary">
+          <i class="bi bi-check-circle me-2"></i>
+          公開準備完了
+        </h3>
+      </div>
+      <div class="modal-body">
+        <p class="text-glass mb-0">
+          シートの設定が完了しました。<br>
+          学習者がアクセスできるよう公開しますか？
+        </p>
+      </div>
+      <div class="modal-footer border-0 justify-content-end gap-3">
+        <button type="button" id="publish-modal-private-btn" class="btn btn-secondary" data-bs-dismiss="modal">非公開のまま</button>
         <button type="button" id="publish-modal-publish-btn" class="btn btn-primary">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-          </svg>
+          <i class="bi bi-broadcast me-2"></i>
           公開する
         </button>
       </div>
     </div>
   </div>
+  <div class="modal-backdrop glass-backdrop"></div>
 </div>
 
 <!-- プライバシーモーダル -->

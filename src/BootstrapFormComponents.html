@@ -1,0 +1,463 @@
+<!-- BootstrapFormComponents.html - Bootstrap 5 Form Components with Glass Styling -->
+<!-- GAS include用のBootstrapフォームコンポーネント集 -->
+
+<style>
+/* =============================================================================
+   BOOTSTRAP FORM COMPONENTS WITH GLASS STYLING
+   ============================================================================= */
+
+/* Glass Form Controls */
+.form-control.glass {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  backdrop-filter: blur(8px);
+  border-radius: 0.75rem;
+}
+
+.form-control.glass:focus {
+  background: rgba(255,255,255,0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 0.25rem rgba(139, 233, 253, 0.25);
+  color: var(--color-text);
+}
+
+.form-control.glass::placeholder {
+  color: rgba(192, 202, 245, 0.6);
+}
+
+/* Glass Select Controls */
+.form-select.glass {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  backdrop-filter: blur(8px);
+  border-radius: 0.75rem;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23c0caf5' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m1 6 7 7 7-7'/%3e%3c/svg%3e");
+}
+
+.form-select.glass:focus {
+  background: rgba(255,255,255,0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 0.25rem rgba(139, 233, 253, 0.25);
+}
+
+/* Glass Floating Labels */
+.form-floating.glass > .form-control,
+.form-floating.glass > .form-select {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  backdrop-filter: blur(8px);
+}
+
+.form-floating.glass > label {
+  color: rgba(192, 202, 245, 0.8);
+}
+
+.form-floating.glass > .form-control:focus ~ label,
+.form-floating.glass > .form-control:not(:placeholder-shown) ~ label,
+.form-floating.glass > .form-select ~ label {
+  color: var(--color-primary);
+  transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
+}
+
+/* Glass Check/Radio Controls */
+.form-check-input.glass {
+  background-color: rgba(255,255,255,0.1);
+  border: 1px solid var(--color-border);
+  backdrop-filter: blur(8px);
+}
+
+.form-check-input.glass:checked {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.form-check-input.glass:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 0.25rem rgba(139, 233, 253, 0.25);
+}
+
+.form-check-label {
+  color: var(--color-text);
+}
+
+/* Glass Form Switch */
+.form-switch .form-check-input.glass {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23c0caf5'/%3e%3c/svg%3e");
+}
+
+.form-switch .form-check-input.glass:checked {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23000'/%3e%3c/svg%3e");
+}
+
+/* Glass Range Controls */
+.form-range.glass {
+  background: transparent;
+}
+
+.form-range.glass::-webkit-slider-track {
+  background: rgba(255,255,255,0.2);
+  border-radius: 0.5rem;
+}
+
+.form-range.glass::-webkit-slider-thumb {
+  background: var(--color-primary);
+  border: 2px solid var(--color-background);
+  backdrop-filter: blur(8px);
+}
+
+.form-range.glass::-moz-range-track {
+  background: rgba(255,255,255,0.2);
+  border-radius: 0.5rem;
+}
+
+.form-range.glass::-moz-range-thumb {
+  background: var(--color-primary);
+  border: 2px solid var(--color-background);
+}
+
+/* Glass Input Groups */
+.input-group.glass .form-control {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  backdrop-filter: blur(8px);
+}
+
+.input-group.glass .input-group-text {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  backdrop-filter: blur(8px);
+}
+
+/* Form Validation States with Glass Styling */
+.form-control.glass.is-valid {
+  border-color: var(--color-success);
+}
+
+.form-control.glass.is-valid:focus {
+  border-color: var(--color-success);
+  box-shadow: 0 0 0 0.25rem rgba(16, 185, 129, 0.25);
+}
+
+.form-control.glass.is-invalid {
+  border-color: var(--color-error);
+}
+
+.form-control.glass.is-invalid:focus {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 0.25rem rgba(239, 68, 68, 0.25);
+}
+
+.valid-feedback {
+  color: var(--color-success);
+}
+
+.invalid-feedback {
+  color: var(--color-error);
+}
+
+/* Glass Form Text/Help */
+.form-text.glass {
+  color: rgba(192, 202, 245, 0.7);
+}
+
+/* Custom Glass File Input */
+.form-control.glass[type="file"] {
+  background: rgba(255,255,255,0.1);
+  border: 2px dashed var(--color-border);
+  color: var(--color-text);
+  backdrop-filter: blur(8px);
+  padding: 2rem;
+  text-align: center;
+  transition: all var(--transition-duration) var(--transition-easing);
+}
+
+.form-control.glass[type="file"]:hover {
+  border-color: var(--color-primary);
+  background: rgba(255,255,255,0.15);
+}
+
+.form-control.glass[type="file"]:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 0.25rem rgba(139, 233, 253, 0.25);
+}
+
+/* Glass Button Groups */
+.btn-group.glass .btn {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  backdrop-filter: blur(8px);
+}
+
+.btn-group.glass .btn:hover {
+  background: rgba(255,255,255,0.2);
+  border-color: var(--color-primary);
+}
+
+.btn-group.glass .btn.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #000;
+}
+
+/* Responsive Form Adjustments */
+@media (max-width: 768px) {
+  .form-floating.glass > label {
+    font-size: 0.875rem;
+  }
+  
+  .form-control.glass,
+  .form-select.glass {
+    font-size: 0.875rem;
+  }
+}
+
+/* Form Grid with Glass Styling */
+.form-grid.glass {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+@media (min-width: 768px) {
+  .form-grid.glass {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 992px) {
+  .form-grid.glass {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Special Game-Style Form Elements */
+.form-control.game {
+  background: linear-gradient(135deg, rgba(139,233,253,0.1), rgba(80,250,123,0.1));
+  border: 2px solid var(--color-primary);
+  color: var(--color-text);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.form-control.game:focus {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(139, 233, 253, 0.3);
+  border-color: var(--color-primary);
+}
+
+.btn.game {
+  background: linear-gradient(135deg, var(--color-primary), #50fa7b);
+  color: #000;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: none;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+  transition: all 0.1s ease;
+}
+
+.btn.game:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 0 rgba(0,0,0,0.2);
+}
+
+.btn.game:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 rgba(0,0,0,0.2);
+}
+</style>
+
+<!-- Bootstrap Form Templates -->
+<script type="text/template" id="glass-form-template">
+  <!-- Basic Glass Form -->
+  <form class="glass-form">
+    <div class="form-floating glass mb-3">
+      <input type="text" class="form-control glass" id="floatingInput" placeholder="入力してください">
+      <label for="floatingInput">ラベル</label>
+    </div>
+    
+    <div class="form-floating glass mb-3">
+      <select class="form-select glass" id="floatingSelect">
+        <option selected>選択してください</option>
+        <option value="1">オプション 1</option>
+        <option value="2">オプション 2</option>
+        <option value="3">オプション 3</option>
+      </select>
+      <label for="floatingSelect">選択</label>
+    </div>
+    
+    <div class="form-check mb-3">
+      <input class="form-check-input glass" type="checkbox" id="flexCheckDefault">
+      <label class="form-check-label" for="flexCheckDefault">
+        チェックボックス
+      </label>
+    </div>
+    
+    <button type="submit" class="btn btn-primary glass">送信</button>
+  </form>
+</script>
+
+<script type="text/template" id="game-form-template">
+  <!-- Game-Style Form -->
+  <form class="game-form">
+    <div class="mb-3">
+      <label class="form-label text-primary fw-bold">プレイヤー名</label>
+      <input type="text" class="form-control game" placeholder="プレイヤー名を入力">
+    </div>
+    
+    <div class="mb-3">
+      <label class="form-label text-primary fw-bold">レベル選択</label>
+      <select class="form-select glass">
+        <option>初心者</option>
+        <option>中級者</option>
+        <option>上級者</option>
+      </select>
+    </div>
+    
+    <button type="submit" class="btn game w-100">ゲーム開始</button>
+  </form>
+</script>
+
+<script>
+// Form Component Helper Functions
+window.BootstrapFormComponents = {
+  // Initialize glass form styling
+  initGlassForm: function(selector) {
+    const forms = document.querySelectorAll(selector || '.glass-form');
+    forms.forEach(form => {
+      // Add glass classes to form controls
+      const controls = form.querySelectorAll('.form-control, .form-select');
+      controls.forEach(control => {
+        if (!control.classList.contains('glass')) {
+          control.classList.add('glass');
+        }
+      });
+      
+      // Add glass classes to form floating containers
+      const floatingContainers = form.querySelectorAll('.form-floating');
+      floatingContainers.forEach(container => {
+        if (!container.classList.contains('glass')) {
+          container.classList.add('glass');
+        }
+      });
+      
+      // Add glass classes to form check inputs
+      const checkInputs = form.querySelectorAll('.form-check-input');
+      checkInputs.forEach(input => {
+        if (!input.classList.contains('glass')) {
+          input.classList.add('glass');
+        }
+      });
+    });
+  },
+  
+  // Create a glass input with floating label
+  createGlassInput: function(id, label, type = 'text', placeholder = '') {
+    return `
+      <div class="form-floating glass mb-3">
+        <input type="${type}" class="form-control glass" id="${id}" placeholder="${placeholder || label}">
+        <label for="${id}">${label}</label>
+      </div>
+    `;
+  },
+  
+  // Create a glass select with floating label
+  createGlassSelect: function(id, label, options = []) {
+    const optionsHtml = options.map(option => 
+      `<option value="${option.value || option}">${option.text || option}</option>`
+    ).join('');
+    
+    return `
+      <div class="form-floating glass mb-3">
+        <select class="form-select glass" id="${id}">
+          <option selected disabled>選択してください</option>
+          ${optionsHtml}
+        </select>
+        <label for="${id}">${label}</label>
+      </div>
+    `;
+  },
+  
+  // Create a glass checkbox
+  createGlassCheckbox: function(id, label, checked = false) {
+    return `
+      <div class="form-check mb-3">
+        <input class="form-check-input glass" type="checkbox" id="${id}" ${checked ? 'checked' : ''}>
+        <label class="form-check-label" for="${id}">
+          ${label}
+        </label>
+      </div>
+    `;
+  },
+  
+  // Create a glass switch
+  createGlassSwitch: function(id, label, checked = false) {
+    return `
+      <div class="form-check form-switch mb-3">
+        <input class="form-check-input glass" type="checkbox" id="${id}" ${checked ? 'checked' : ''}>
+        <label class="form-check-label" for="${id}">
+          ${label}
+        </label>
+      </div>
+    `;
+  },
+  
+  // Initialize game-style forms
+  initGameForm: function(selector) {
+    const forms = document.querySelectorAll(selector || '.game-form');
+    forms.forEach(form => {
+      // Add game classes to appropriate elements
+      const inputs = form.querySelectorAll('input[type="text"], input[type="email"], input[type="password"]');
+      inputs.forEach(input => {
+        if (!input.classList.contains('game')) {
+          input.classList.add('game');
+        }
+      });
+      
+      const buttons = form.querySelectorAll('button[type="submit"]');
+      buttons.forEach(button => {
+        if (!button.classList.contains('game')) {
+          button.classList.add('game');
+        }
+      });
+    });
+  },
+  
+  // Auto-initialize all forms on page load
+  autoInit: function() {
+    this.initGlassForm();
+    this.initGameForm();
+    
+    // Add focus enhancement
+    document.addEventListener('focusin', function(e) {
+      if (e.target.classList.contains('form-control') && e.target.classList.contains('glass')) {
+        e.target.parentElement?.classList.add('focused');
+      }
+    });
+    
+    document.addEventListener('focusout', function(e) {
+      if (e.target.classList.contains('form-control') && e.target.classList.contains('glass')) {
+        e.target.parentElement?.classList.remove('focused');
+      }
+    });
+  }
+};
+
+// Auto-initialize when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() {
+    window.BootstrapFormComponents.autoInit();
+  });
+} else {
+  window.BootstrapFormComponents.autoInit();
+}
+</script>
