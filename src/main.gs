@@ -417,12 +417,17 @@ function doGet(e) {
     const params = parseRequestParams(e);
 
     // 3. ログイン状態の確認
-    const userEmail = Session.getActiveUser().getEmail();
-    if (!userEmail) {
-      return showLoginPage();
-    }
+  const userEmail = Session.getActiveUser().getEmail();
+  if (!userEmail) {
+    return showLoginPage();
+  }
 
-    // 4. パラメータ検証とデフォルト処理
+  // 4. アプリ設定ページリクエストの処理
+  if (params.setupParam === 'true') {
+    return showAppSetupPage();
+  }
+
+  // 5. パラメータ検証とデフォルト処理
     if (!params || !params.mode) {
       // パラメータなしまたは不正な場合はログインページを表示
       console.log('No mode parameter, showing login page');
