@@ -46,7 +46,7 @@ class GASOptimizer {
     console.log(`DEBUG: typeof google.script.run[functionName]: ${typeof google.script.run[functionName]}`);
     // --- END NEW ADDITION --- 
 
-    google.script.run[functionName](...args) // Corrected line
+    google.script.run
       .withSuccessHandler((result) => {
         this.activeCalls--;
         this.setLoadingState(functionName, false);
@@ -59,7 +59,7 @@ class GASOptimizer {
         console.error(`GAS Function Error [${functionName}]:`, error);
         reject(this.enhanceError(error, functionName));
         this.processQueue();
-      });
+      })[functionName](...args);
   }
 
   /**
