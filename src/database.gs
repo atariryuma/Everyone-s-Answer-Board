@@ -359,18 +359,25 @@ function getSheetsService() {
   try {
     console.log('🔧 getSheetsService: サービス取得開始');
     
-    var accessToken = getServiceAccountTokenCached();
+    var accessToken;
+    try {
+      accessToken = getServiceAccountTokenCached();
+    } catch (tokenError) {
+      console.error('❌ Failed to get service account token:', tokenError.message);
+      throw new Error('サービスアカウントトークンの取得に失敗しました: ' + tokenError.message);
+    }
+
     if (!accessToken) {
-      console.error('❌ Failed to get service account token');
-      return null;
+      console.error('❌ Access token is null or undefined after generation.');
+      throw new Error('サービスアカウントトークンが取得できませんでした。');
     }
     
     console.log('✅ Access token obtained successfully');
     
     var service = createSheetsService(accessToken);
-    if (!service) {
-      console.error('❌ Failed to create sheets service');
-      return null;
+    if (!service || !service.baseUrl) {
+      console.error('❌ Failed to create sheets service or service object is invalid');
+      throw new Error('Sheets APIサービスの初期化に失敗しました。');
     }
     
     console.log('✅ Sheets service created successfully');
@@ -379,7 +386,7 @@ function getSheetsService() {
   } catch (error) {
     console.error('❌ getSheetsService error:', error.message);
     console.error('❌ Error stack:', error.stack);
-    return null;
+    throw error; // エラーを再スロー
   }
 }
 

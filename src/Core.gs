@@ -4273,10 +4273,14 @@ function getInitialData(requestUserId, targetSheetName) {
     var includeSheetDetails = targetSheetName || configJson.publishedSheetName;
     if (includeSheetDetails && userInfo.spreadsheetId) {
       try {
-        var sheetDetails = getSheetDetailsInternal(currentUserId, userInfo.spreadsheetId, includeSheetDetails);
+        // getInitialData内でcontextを生成
+        const context = createExecutionContext(currentUserId);
+        var sheetDetails = getSheetDetails(context, userInfo.spreadsheetId, includeSheetDetails);
         response.sheetDetails = sheetDetails;
         response._meta.includedApis.push('getSheetDetails');
         debugLog('✅ シート詳細を統合応答に追加:', includeSheetDetails);
+        // getInitialData内で生成したcontextの変更をコミット
+        commitAllChanges(context);
       } catch (sheetErr) {
         console.warn('Sheet details retrieval failed:', sheetErr.message);
         response.sheetDetailsError = sheetErr.message;

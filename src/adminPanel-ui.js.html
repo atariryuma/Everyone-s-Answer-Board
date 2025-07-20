@@ -299,29 +299,16 @@ function syncCheckboxStates(status) {
   let showNames = false;
   let showCounts = true;
   
-  // Try to get values from database configJson first
+  // Try to get values from global configJson first
   if (status.userInfo?.configJson) {
     try {
       const config = JSON.parse(status.userInfo.configJson);
-      const activeSheetName = status.activeSheetName;
       
-      // Check sheet-specific config first
-      if (activeSheetName && config[`sheet_${activeSheetName}`]) {
-        const sheetConfig = config[`sheet_${activeSheetName}`];
-        if (sheetConfig.showNames !== undefined) showNames = sheetConfig.showNames;
-        if (sheetConfig.showCounts !== undefined) showCounts = sheetConfig.showCounts;
-        console.log('📊 Using sheet-specific config:', {
-          sheetName: activeSheetName,
-          showNames,
-          showCounts
-        });
-      }
-      // Fall back to global config
-      else {
-        if (config.showNames !== undefined) showNames = config.showNames;
-        if (config.showCounts !== undefined) showCounts = config.showCounts;
-        console.log('📊 Using global config:', { showNames, showCounts });
-      }
+      // Use global config
+      if (config.showNames !== undefined) showNames = config.showNames;
+      if (config.showCounts !== undefined) showCounts = config.showCounts;
+      console.log('📊 Using global config:', { showNames, showCounts });
+
     } catch (e) {
       console.warn('⚠️ Failed to parse configJson, using status properties');
       // Fall back to status properties
