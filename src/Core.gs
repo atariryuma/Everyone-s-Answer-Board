@@ -1162,6 +1162,35 @@ function checkAdmin(requestUserId) {
 }
 
 /**
+ * 指定シートのデータ行数を取得します。
+ * @param {string} spreadsheetId スプレッドシートID
+ * @param {string} sheetName シート名
+ * @param {string} classFilter クラスフィルタ
+ * @returns {number} データ行数
+ */
+function countSheetRows(spreadsheetId, sheetName, classFilter) {
+  const key = `rowCount_${spreadsheetId}_${sheetName}_${classFilter}`;
+  return cacheManager.get(key, () => {
+    const sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName);
+    if (!sheet) return 0;
+
+    const lastRow = sheet.getLastRow();
+    if (!classFilter || classFilter === 'すべて') {
+      return Math.max(0, lastRow - 1);
+    }
+
+    const headerIndices = getHeaderIndices(spreadsheetId, sheetName);
+    const classIndex = headerIndices[COLUMN_HEADERS.CLASS];
+    if (classIndex === undefined) {
+      return Math.max(0, lastRow - 1);
+    }
+
+    const values = sheet.getRange(2, classIndex + 1, lastRow - 1, 1).getValues();
+    return values.reduce((cnt, row) => row[0] === classFilter ? cnt + 1 : cnt, 0);
+  }, { ttl: 30, enableMemoization: true });
+}
+
+/**
  * データ数を取得する (マルチテナント対応版)
  * @param {string} requestUserId - リクエスト元のユーザーID
  * @returns {number} データ数
@@ -1184,22 +1213,16 @@ function getDataCount(requestUserId, classFilter, sortOrder, adminMode) {
       };
     }
 
-    // シートデータを取得して件数を返す
-    const sheetData = getSheetData(requestUserId, configJson.publishedSheetName, classFilter, sortOrder, adminMode);
-    if (sheetData.status === 'success') {
-      return {
-        count: sheetData.totalCount || 0,
-        lastUpdate: new Date().toISOString(),
-        status: 'success'
-      };
-    } else {
-      return {
-        count: 0,
-        lastUpdate: new Date().toISOString(),
-        status: 'error',
-        message: sheetData.message
-      };
-    }
+    const count = countSheetRows(
+      configJson.publishedSpreadsheetId,
+      configJson.publishedSheetName,
+      classFilter
+    );
+    return {
+      count,
+      lastUpdate: new Date().toISOString(),
+      status: 'success'
+    };
   } catch (e) {
     console.error('getDataCount エラー: ' + e.message);
     return {
