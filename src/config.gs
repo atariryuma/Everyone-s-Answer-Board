@@ -685,34 +685,44 @@ function saveAndPublish(requestUserId, sheetName, config) {
   try {
     console.log('saveAndPublish開始: sheetName=%s', sheetName);
 
-    const userInfo = getUserInfo(requestUserId);
+    // PHASE2 OPTIMIZATION: Use execution-level cache to avoid duplicate DB queries
+    clearExecutionUserInfoCache();
+    const userInfo = getCachedUserInfo(requestUserId);
     if (!userInfo || !userInfo.spreadsheetId) {
       throw new Error('ユーザーのスプレッドシート情報が見つかりません。');
     }
     const spreadsheetId = userInfo.spreadsheetId;
 
-    // 1. 最小限のキャッシュクリア（公開時のみ）
-    console.log('saveAndPublish: 公開処理開始');
+    console.log('saveAndPublish: 公開処理開始（最適化版）');
 
-    // 2. 設定を保存
-    saveSheetConfig(requestUserId, spreadsheetId, sheetName, config);
+    // PHASE2 OPTIMIZATION: Integrated processing with shared resources
+    const sheetsService = getSheetsService();
+    console.log('saveAndPublish: 共有Sheetsサービス作成完了');
+
+    // 2. 設定を保存（共有サービス使用）
+    saveSheetConfigOptimized(requestUserId, spreadsheetId, sheetName, config, sheetsService, userInfo);
     console.log('saveAndPublish: 設定保存完了');
 
-    // 3. シートをアクティブ化
-    switchToSheet(requestUserId, spreadsheetId, sheetName);
+    // 3. シートをアクティブ化（共有サービス使用）
+    switchToSheetOptimized(requestUserId, spreadsheetId, sheetName, sheetsService, userInfo);
     console.log('saveAndPublish: シート切り替え完了');
 
-    // 4. 表示オプションを更新
+    // 4. 表示オプションを更新（共有サービス使用）
     const displayOptions = {
       showNames: !!config.showNames,
       showCounts: config.showCounts !== undefined ? !!config.showCounts : false
     };
-    setDisplayOptions(requestUserId, displayOptions);
+    setDisplayOptionsOptimized(requestUserId, displayOptions, sheetsService, userInfo);
     console.log('saveAndPublish: 表示オプション設定完了');
 
-    // 5. 最新のステータスを強制再取得して返す
-    const finalStatus = getAppConfig(requestUserId); // forceRefresh = true
-    console.log('saveAndPublish: 統合処理完了、最新ステータスを返します。');
+    // 5. 全キャッシュをクリアして確実に最新データを取得
+    clearExecutionUserInfoCache();
+    CacheService.getScriptCache().removeAll();
+    console.log('saveAndPublish: 全キャッシュクリア完了');
+    
+    // 6. 統合APIで最新ステータスを取得
+    const finalStatus = getInitialData(requestUserId);
+    console.log('saveAndPublish: 統合API経由で最新ステータス取得完了');
 
     return finalStatus;
 
@@ -1391,6 +1401,56 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
     console.error('getSheetDetails error:', error.message);
     throw new Error('シート情報の取得に失敗しました: ' + error.message);
   }
+}
+
+// =================================================================
+// PHASE2 OPTIMIZED FUNCTIONS (重複処理排除)
+// =================================================================
+
+/**
+ * 最適化版: 設定保存（共有リソース使用）
+ */
+function saveSheetConfigOptimized(requestUserId, spreadsheetId, sheetName, config, sheetsService, userInfo) {
+  // Use pre-cached userInfo instead of fetching again
+  saveConfig(requestUserId, sheetName, config, true, sheetsService);
+}
+
+/**
+ * 最適化版: シート切り替え（共有リソース使用）
+ */
+function switchToSheetOptimized(requestUserId, spreadsheetId, sheetName, sheetsService, userInfo) {
+  // Use provided sheetsService and userInfo instead of fetching
+  const configJsonObj = JSON.parse(userInfo.configJson || '{}');
+  configJsonObj.publishedSpreadsheetId = spreadsheetId;
+  configJsonObj.publishedSheetName = sheetName;
+  configJsonObj.appPublished = true;
+  configJsonObj.lastModified = new Date().toISOString();
+  
+  // Update user with optimized call
+  updateUser(requestUserId, { configJson: JSON.stringify(configJsonObj) });
+}
+
+/**
+ * 最適化版: 表示オプション設定（共有リソース使用）
+ */
+function setDisplayOptionsOptimized(requestUserId, displayOptions, sheetsService, userInfo) {
+  // Use pre-cached userInfo instead of fetching again
+  const configJsonObj = JSON.parse(userInfo.configJson || '{}');
+  
+  if (displayOptions.showNames !== undefined) {
+    configJsonObj.showNames = displayOptions.showNames;
+  }
+  if (displayOptions.showCounts !== undefined) {
+    configJsonObj.showCounts = displayOptions.showCounts;
+  }
+  if (displayOptions.displayMode !== undefined) {
+    configJsonObj.displayMode = displayOptions.displayMode;
+  }
+  
+  configJsonObj.lastModified = new Date().toISOString();
+  
+  console.log('setDisplayOptions: 設定更新', displayOptions);
+  updateUser(requestUserId, { configJson: JSON.stringify(configJsonObj) });
 }
 
 /**

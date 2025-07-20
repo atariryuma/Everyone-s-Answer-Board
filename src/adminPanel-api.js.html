@@ -275,7 +275,8 @@ function saveAndPublish() {
       console.log('📥 saveAndPublish result:', result);
       setLoading(false);
       
-      if (result && result.status === 'success') {
+      // Check if result has data (from integrated API) or legacy success status
+      if (result && (result.userInfo || result.status === 'success')) {
         showMessage('✅ 設定が保存され、ボードが公開されました！', 'success');
         
         // Clear all relevant caches before status reload
@@ -284,9 +285,18 @@ function saveAndPublish() {
           window.unifiedCache.clear();
         }
         
-        // Force refresh to get updated status from database
-        console.log('🔄 Reloading status with force refresh');
-        loadStatus(true);
+        // If integrated API returned data, use it immediately
+        if (result.userInfo && result._meta) {
+          console.log('🚀 Using integrated API response for immediate UI update');
+          updateUIWithNewStatus(result);
+        }
+        
+        // Additional forced refresh with delay to ensure sync
+        console.log('🔄 Scheduling delayed status refresh for synchronization');
+        setTimeout(() => {
+          loadStatus(true);
+          console.log('✅ Delayed status refresh completed');
+        }, 1000);
         
         console.log('✅ Save and publish completed successfully');
       } else {
@@ -297,8 +307,20 @@ function saveAndPublish() {
     })
     .catch(function(error) {
       console.error('❌ saveAndPublish error:', error);
+      setLoading(false);
+      
+      // PHASE3: Enhanced error handling with rollback support
+      if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+        console.log('🧹 Clearing cache after error');
+        window.unifiedCache.clear();
+      }
+      
+      // Try to reload current state to ensure UI consistency
+      console.log('🔄 Reloading current state after error');
+      loadStatus(true);
+      
       console.groupEnd();
-      handleError(error, 'saveAndPublish', '設定の保存に失敗しました。');
+      handleError(error, 'saveAndPublish', '設定の保存に失敗しました。システム状態を再読み込みしました。');
     });
 }
 
