@@ -276,6 +276,9 @@ function processLoginFlow(userEmail) {
       
       // 3b. データベースに作成
       createUser(newUser);
+      if (!waitForUserRecord(newUser.userId, 3000, 500)) {
+        console.warn('processLoginFlow: user not found after create:', newUser.userId);
+      }
       console.log('processLoginFlow: 新規ユーザー作成完了:', newUser.userId);
       
       // 3c. 新規ユーザーの管理パネルへリダイレクト

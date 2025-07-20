@@ -680,6 +680,22 @@ function createUser(userData) {
 }
 
 /**
+ * Polls the database until a user record becomes available.
+ * @param {string} userId - The ID of the user to fetch.
+ * @param {number} maxWaitMs - Maximum wait time in milliseconds.
+ * @param {number} intervalMs - Poll interval in milliseconds.
+ * @returns {boolean} true if found within the wait window.
+ */
+function waitForUserRecord(userId, maxWaitMs, intervalMs) {
+  var start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    if (fetchUserFromDatabase('userId', userId)) return true;
+    Utilities.sleep(intervalMs);
+  }
+  return false;
+}
+
+/**
  * データベースシートを初期化
  * @param {string} spreadsheetId - データベースのスプレッドシートID
  */
