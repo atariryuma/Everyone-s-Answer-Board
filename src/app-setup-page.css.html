@@ -1,0 +1,116 @@
+<style>
+/* =============================================================================
+   APP & SYSTEM SETUP PAGES - MODERN FLAT DARK THEME
+============================================================================= */
+
+.app-setup-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-3);
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: var(--space-5);
+}
+
+.page-header h1 {
+  font-size: var(--font-size-3xl);
+  font-weight: 700;
+  color: var(--accent-primary);
+  margin-bottom: var(--space-1);
+}
+
+.page-header p {
+  font-size: var(--font-size-lg);
+  color: var(--text-secondary);
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+.content-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+
+.content-card h2 {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: var(--space-2);
+}
+
+.page-footer {
+  text-align: center;
+  margin-top: var(--space-5);
+}
+
+/* Form Styles */
+.form-grid {
+    display: grid;
+    gap: var(--space-4);
+}
+
+.form-group label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: var(--space-2);
+    color: var(--text-primary);
+}
+
+.form-group .input-field,
+.form-group .textarea-field {
+    width: 100%;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--space-2);
+    color: var(--text-primary);
+    font-size: var(--font-size-base);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.form-group .input-field:focus,
+.form-group .textarea-field:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px var(--accent-primary-light);
+}
+
+.form-group .help-text {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    margin-top: var(--space-1);
+}
+
+/* Help/Details Section */
+.help-section details {
+    background-color: var(--bg-surface-hover);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--space-2);
+}
+
+.help-section summary {
+    padding: var(--space-2);
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--accent-primary);
+    outline: none;
+}
+
+.help-section .details-content {
+    padding: 0 var(--space-2) var(--space-2) var(--space-5);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+</style>

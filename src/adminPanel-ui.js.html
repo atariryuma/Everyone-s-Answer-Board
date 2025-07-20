@@ -281,12 +281,12 @@ function updatePublicationStatusUI(isPublished) {
   
   if (statusElement) {
     if (isPublished) {
-      statusElement.className = 'px-2 py-1 rounded text-xs font-medium bg-green-600 text-white';
-      if (indicatorElement) indicatorElement.className = 'w-2 h-2 rounded-full bg-green-400';
+      statusElement.className = 'status-badge success';;
+      if (indicatorElement) indicatorElement.className = 'status-dot success';
       if (textElement) textElement.textContent = '公開中';
     } else {
-      statusElement.className = 'px-2 py-1 rounded text-xs font-medium bg-gray-600 text-gray-300';
-      if (indicatorElement) indicatorElement.className = 'w-2 h-2 rounded-full bg-gray-400';
+      statusElement.className = 'status-badge muted';;
+      if (indicatorElement) indicatorElement.className = 'status-dot muted';
       if (textElement) textElement.textContent = '非公開';
     }
   }
@@ -616,9 +616,9 @@ function updateConfigButtons() {
   if (saveBtn) {
     saveBtn.disabled = !isValid;
     if (isValid) {
-      saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      saveBtn.classList.remove('btn-disabled');
     } else {
-      saveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      saveBtn.classList.add('btn-disabled');
     }
   }
 }
@@ -645,29 +645,29 @@ function updateStepIndicators(currentStep) {
     if (stepNumber < currentStep) {
       // 完了したステップ
       if (circle) {
-        circle.className = 'w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all';
+        circle.className = 'step-circle completed';;
       }
       if (text) {
         text.classList.remove('text-gray-500');
-        text.classList.add('text-gray-300');
+        text.classList.add('text-secondary');
       }
     } else if (stepNumber === currentStep) {
       // 現在のステップ
       if (circle) {
-        circle.className = 'w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all ring-2 ring-blue-400 ring-offset-2 ring-offset-gray-800';
+        circle.className = 'step-circle active';;
       }
       if (text) {
         text.classList.remove('text-gray-500');
-        text.classList.add('text-white', 'font-semibold');
+        text.classList.add('text-primary', 'font-semibold');
       }
     } else {
       // 未完了のステップ
       if (circle) {
-        circle.className = 'w-6 h-6 bg-gray-600 text-gray-400 rounded-full flex items-center justify-center font-bold text-xs transition-all';
+        circle.className = 'step-circle uncompleted';;
       }
       if (text) {
         text.classList.remove('text-white', 'font-semibold');
-        text.classList.add('text-gray-500');
+        text.classList.add('text-tertiary');
       }
     }
   });
@@ -898,7 +898,7 @@ function manageSectionStates(currentStep) {
   
   // Update all sections based on their true state
   for (let i = 1; i <= 3; i++) {
-    const sectionContainer = document.getElementById(`step${i}-content`)?.closest('.glass-panel');
+    const sectionContainer = document.getElementById(`step${i}-content`)?.closest('.content-card');
     if (!sectionContainer) continue;
     
     // Clear all state classes
@@ -1072,7 +1072,7 @@ function updateDynamicContent(status) {
     const button = document.getElementById(buttonId);
     if (button) {
       button.disabled = false;
-      button.classList.remove('opacity-50', 'cursor-not-allowed');
+      btn.classList.remove('btn-disabled');
     }
   });
 }
@@ -1088,7 +1088,7 @@ function updateUIForNoActiveSheet(status) {
     const button = document.getElementById(buttonId);
     if (button) {
       button.disabled = true;
-      button.classList.add('opacity-50', 'cursor-not-allowed');
+      btn.classList.add('btn-disabled');
     }
   });
 }
@@ -1214,10 +1214,8 @@ function handleSheetSelectionChange(event) {
     const previewContent = document.getElementById('data-preview-content');
     if (previewContent) {
       previewContent.innerHTML = `
-        <div class="animate-pulse">
-          <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-          <div class="h-4 bg-gray-700 rounded w-1/2"></div>
-        </div>
+        <div class="skeleton-line long"></div>
+        <div class="skeleton-line short"></div>
       `;
     }
 
@@ -1318,19 +1316,19 @@ function loadDataPreview(sheetName, details) {
       previewContent.innerHTML = `
         <div class="text-sm">
           <div class="mb-2">
-            <span class="text-gray-400">列数:</span>
-            <span class="text-white font-medium">${details.headers.length}列</span>
+            <span class="text-secondary">列数:</span>
+            <span class="text-primary font-medium">${details.headers.length}列</span>
           </div>
           <div class="mb-2">
-            <span class="text-gray-400">主要な列:</span>
+            <span class="text-secondary">主要な列:</span>
             <div class="flex flex-wrap gap-1 mt-1">
               ${headersList.map(header => `
-                <span class="px-2 py-1 bg-blue-500/20 text-blue-200 rounded text-xs">${header}</span>
+                <span class="badge badge-info">${header}</span>
               `).join('')}
-              ${moreHeaders ? `<span class="text-gray-400 text-xs">${moreHeaders}</span>` : ''}
+              ${moreHeaders ? `<span class="text-secondary text-xs">${moreHeaders}</span>` : ''}
             </div>
           </div>
-          <div class="text-xs text-gray-400 mt-2">
+          <div class="text-xs text-secondary mt-2">
             データの内容を確認して、次のステップで列設定を行ってください
           </div>
         </div>
@@ -1432,7 +1430,7 @@ function clearInitialDisplayElements() {
   }
   
   // 適切なドメイン情報を表示
-  showAppropriateHeaderStatus();
+  showAppropriateHeaderStatus(currentStatus);
   
   // 既存のセットアップガイドのみ削除
   const existingGuides = [
@@ -1458,13 +1456,14 @@ function showAppropriateHeaderStatus() {
   
   if (domainMatch && domainMismatch) {
     // 現在はドメイン一致として表示（実際のドメインチェックは別途実装）
-    domainMatch.style.display = 'block';
-    domainMismatch.style.display = 'none';
+    domainMatch.classList.remove('hidden');
+    domainMatch.classList.add('domain-indicator', 'success');
+    domainMismatch.classList.add('hidden');
     
     // ドメイン名を適切に設定
     const domainText = document.getElementById('header-domain-match-text');
-    if (domainText) {
-      domainText.textContent = 'naha-okinawa.ed.jp';
+    if (domainText && status && status.userInfo && status.userInfo.domain) {
+      domainText.textContent = status.userInfo.domain;
     }
     
     console.log('✅ ドメイン一致表示を有効化');
@@ -1493,11 +1492,11 @@ function updateButtonStatesForSetup(status) {
       
       if (!hasSpreadsheet || !hasActiveSheet) {
         button.disabled = true;
-        button.classList.add('opacity-75');
+        button.classList.add('btn-disabled');
         button.title = '先にデータソースとシートを設定してください';
       } else {
         button.disabled = false;
-        button.classList.remove('opacity-75');
+        button.classList.remove('btn-disabled');
         button.title = '';
       }
     }
@@ -1528,10 +1527,10 @@ function updateSystemStatusDisplay(status) {
   const publishText = document.getElementById('info-publish-text');
   
   if (status.isPublished) {
-    publishIndicator.className = 'w-2 h-2 rounded-full bg-green-400';
+    publishIndicator.className = 'status-dot success';
     publishText.textContent = '公開中';
   } else {
-    publishIndicator.className = 'w-2 h-2 rounded-full bg-gray-400';
+    publishIndicator.className = 'status-dot muted';
     publishText.textContent = '非公開';
   }
   
@@ -1712,7 +1711,7 @@ function disableSection(section, message) {
   const existingWarning = section.querySelector('.step-warning');
   if (!existingWarning) {
     const warning = document.createElement('div');
-    warning.className = 'step-warning bg-yellow-100 border border-yellow-300 rounded-lg p-3 mb-4 text-sm text-yellow-800';
+    warning.className = 'step-warning notice-warning';
     warning.innerHTML = `<span class="font-semibold">${message}</span>`;
     section.insertBefore(warning, section.firstChild);
   }
@@ -1822,7 +1821,7 @@ function disableSection(section, message) {
   const existingWarning = section.querySelector('.step-warning');
   if (!existingWarning) {
     const warning = document.createElement('div');
-    warning.className = 'step-warning bg-yellow-100 border border-yellow-300 rounded-lg p-3 mb-4 text-sm text-yellow-800';
+    warning.className = 'step-warning notice-warning';
     warning.innerHTML = `<span class="font-semibold">${message}</span>`;
     section.insertBefore(warning, section.firstChild);
   }
@@ -1923,14 +1922,14 @@ function displayColumnMapping(columns) {
     mappingDiv.className = 'column-mapping';
     mappingDiv.innerHTML = `
       <div>
-        <label class="block text-sm font-medium text-gray-200 mb-2">
+        <label class="form-label">
           ${column.name}
-          ${column.required ? '<span class="text-red-400">*</span>' : ''}
+          ${column.required ? '<span class="required">*</span>' : ''}
         </label>
-        <p class="text-xs text-gray-400">${column.description || ''}</p>
+        <p class="help-text">${column.description || ''}</p>
       </div>
       <div>
-        <select class="form-control form-select column-mapping-select" data-column="${column.id}">
+        <select class="form-control" data-column="${column.id}">
           <option value="">選択してください</option>
           <option value="content">回答内容</option>
           <option value="author">回答者名</option>
@@ -1982,10 +1981,10 @@ function updateSystemStatusDisplay(status) {
   const publishText = document.getElementById('info-publish-text');
   
   if (status.isPublished) {
-    publishIndicator.className = 'w-2 h-2 rounded-full bg-green-400';
+    publishIndicator.className = 'status-dot success';
     publishText.textContent = '公開中';
   } else {
-    publishIndicator.className = 'w-2 h-2 rounded-full bg-gray-400';
+    publishIndicator.className = 'status-dot muted';
     publishText.textContent = '非公開';
   }
   
