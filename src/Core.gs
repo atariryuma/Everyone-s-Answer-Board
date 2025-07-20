@@ -837,13 +837,19 @@ function getAppConfig(requestUserId) {
 }
 
 /**
- * シート設定を保存する
+ * シート設定を保存する（統合版：Batch/Optimized機能統合）
  * AdminPanel.htmlから呼び出される
+ * @param {string} userId - ユーザーID
  * @param {string} spreadsheetId - 設定対象のスプレッドシートID
  * @param {string} sheetName - 設定対象のシート名
  * @param {object} config - 保存するシート固有の設定
+ * @param {object} options - オプション設定
+ * @param {object} options.sheetsService - 共有SheetsService（最適化用）
+ * @param {object} options.userInfo - 事前取得済みユーザー情報（最適化用）
+ * @param {boolean} options.batchMode - バッチモード（表示オプション同時更新）
+ * @param {object} options.displayOptions - バッチモード時の表示オプション
  */
-function saveSheetConfig(userId, spreadsheetId, sheetName, config) {
+function saveSheetConfig(userId, spreadsheetId, sheetName, config, options = {}) {
   try {
     if (!spreadsheetId || typeof spreadsheetId !== 'string') {
       throw new Error('無効なspreadsheetIdです: ' + spreadsheetId);
@@ -856,16 +862,31 @@ function saveSheetConfig(userId, spreadsheetId, sheetName, config) {
     }
     
     var currentUserId = userId;
-    var userInfo = findUserById(currentUserId);
+    
+    // 最適化モード: 事前取得済みuserInfoを使用、なければ取得
+    var userInfo = options.userInfo || findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
     var configJson = JSON.parse(userInfo.configJson || '{}');
 
-    // save using sheet-specific key expected by getConfig
+    // シート設定を更新
     var sheetKey = 'sheet_' + sheetName;
-    configJson[sheetKey] = config;
+    configJson[sheetKey] = {
+      ...config,
+      lastModified: new Date().toISOString()
+    };
+
+    // バッチモード: 表示オプションも同時更新
+    if (options.batchMode && options.displayOptions) {
+      configJson.publishedSheetName = sheetName;
+      configJson.publishedSpreadsheetId = spreadsheetId;
+      configJson.displayMode = options.displayOptions.showNames ? 'named' : 'anonymous';
+      configJson.showCounts = options.displayOptions.showCounts;
+      configJson.appPublished = true;
+      configJson.lastModified = new Date().toISOString();
+    }
 
     updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
     debugLog('✅ シート設定を保存しました: %s', sheetKey);
@@ -877,12 +898,16 @@ function saveSheetConfig(userId, spreadsheetId, sheetName, config) {
 }
 
 /**
- * 表示するシートを切り替える
+ * 表示するシートを切り替える（統合版：Optimized機能統合）
  * AdminPanel.htmlから呼び出される
+ * @param {string} userId - ユーザーID
  * @param {string} spreadsheetId - 公開対象のスプレッドシートID
  * @param {string} sheetName - 公開対象のシート名
+ * @param {object} options - オプション設定
+ * @param {object} options.sheetsService - 共有SheetsService（最適化用）
+ * @param {object} options.userInfo - 事前取得済みユーザー情報（最適化用）
  */
-function switchToSheet(userId, spreadsheetId, sheetName) {
+function switchToSheet(userId, spreadsheetId, sheetName, options = {}) {
   try {
     if (!spreadsheetId || typeof spreadsheetId !== 'string') {
       throw new Error('無効なspreadsheetIdです: ' + spreadsheetId);
@@ -892,7 +917,9 @@ function switchToSheet(userId, spreadsheetId, sheetName) {
     }
     
     var currentUserId = userId;
-    var userInfo = findUserById(currentUserId);
+    
+    // 最適化モード: 事前取得済みuserInfoを使用、なければ取得
+    var userInfo = options.userInfo || findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -902,6 +929,7 @@ function switchToSheet(userId, spreadsheetId, sheetName) {
     configJson.publishedSpreadsheetId = spreadsheetId;
     configJson.publishedSheetName = sheetName;
     configJson.appPublished = true; // シートを切り替えたら公開状態にする
+    configJson.lastModified = new Date().toISOString();
 
     updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
     debugLog('✅ 表示シートを切り替えました: %s - %s', spreadsheetId, sheetName);

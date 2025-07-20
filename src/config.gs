@@ -644,8 +644,11 @@ function saveAndActivateSheet(requestUserId, spreadsheetId, sheetName, config) {
       showCounts: config.showCounts !== undefined ? !!config.showCounts : false
     };
 
-    // 統合処理
-    saveSheetConfigBatch(requestUserId, spreadsheetId, sheetName, config, displayOptions);
+    // 統合処理（バッチモード使用）
+    saveSheetConfig(requestUserId, spreadsheetId, sheetName, config, { 
+      batchMode: true, 
+      displayOptions: displayOptions 
+    });
     console.log('saveAndActivateSheet: バッチ処理完了');
 
     // 5. 最新のステータスをキャッシュを無視して取得
@@ -699,20 +702,29 @@ function saveAndPublish(requestUserId, sheetName, config) {
     const sheetsService = getSheetsService();
     console.log('saveAndPublish: 共有Sheetsサービス作成完了');
 
-    // 2. 設定を保存（共有サービス使用）
-    saveSheetConfigOptimized(requestUserId, spreadsheetId, sheetName, config, sheetsService, userInfo);
+    // 2. 設定を保存（最適化モード使用）
+    saveSheetConfig(requestUserId, spreadsheetId, sheetName, config, { 
+      sheetsService: sheetsService, 
+      userInfo: userInfo 
+    });
     console.log('saveAndPublish: 設定保存完了');
 
-    // 3. シートをアクティブ化（共有サービス使用）
-    switchToSheetOptimized(requestUserId, spreadsheetId, sheetName, sheetsService, userInfo);
+    // 3. シートをアクティブ化（最適化モード使用）
+    switchToSheet(requestUserId, spreadsheetId, sheetName, { 
+      sheetsService: sheetsService, 
+      userInfo: userInfo 
+    });
     console.log('saveAndPublish: シート切り替え完了');
 
-    // 4. 表示オプションを更新（共有サービス使用）
+    // 4. 表示オプションを更新（最適化モード使用）
     const displayOptions = {
       showNames: !!config.showNames,
       showCounts: config.showCounts !== undefined ? !!config.showCounts : false
     };
-    setDisplayOptionsOptimized(requestUserId, displayOptions, sheetsService, userInfo);
+    setDisplayOptions(requestUserId, displayOptions, { 
+      sheetsService: sheetsService, 
+      userInfo: userInfo 
+    });
     console.log('saveAndPublish: 表示オプション設定完了');
 
     // 5. 全キャッシュをクリアして確実に最新データを取得
@@ -838,53 +850,6 @@ function checkIfNewOrUpdatedForm(requestUserId, spreadsheetId, sheetName) {
   }
 }
 
-/**
- * バッチ処理で設定保存・シート切り替え・表示オプション設定を統合実行 (マルチテナント対応版)
- * @param {string} requestUserId - リクエスト元のユーザーID
- * @param {string} spreadsheetId - スプレッドシートID
- * @param {string} sheetName - シート名
- * @param {object} config - 設定オブジェクト
- * @param {object} displayOptions - 表示オプション
- */
-function saveSheetConfigBatch(requestUserId, spreadsheetId, sheetName, config, displayOptions) {
-  verifyUserAccess(requestUserId);
-  try {
-    // 一度のユーザー情報取得で全処理を実行
-    const userInfo = getUserInfo(requestUserId);
-    const configJson = JSON.parse(userInfo.configJson || '{}');
-
-    // シート設定を更新
-    const sheetConfigKey = 'sheet_' + sheetName;
-    configJson[sheetConfigKey] = {
-      ...config,
-      lastModified: new Date().toISOString()
-    };
-
-    // アクティブシートと表示設定を同時更新
-    configJson.publishedSheetName = sheetName;
-    configJson.publishedSpreadsheetId = spreadsheetId;
-    configJson.displayMode = displayOptions.showNames ? 'named' : 'anonymous';
-    configJson.showCounts = displayOptions.showCounts;
-    configJson.appPublished = true;
-    configJson.lastModified = new Date().toISOString();
-
-    // 一回のAPI呼び出しで全ての設定を更新
-    updateUser(userInfo.userId, {
-      configJson: JSON.stringify(configJson),
-      lastAccessedAt: new Date().toISOString(),
-      spreadsheetId: spreadsheetId // スプレッドシートIDも更新
-    });
-
-    // 関連キャッシュを無効化してUI即座反映
-    invalidateUserCache(userInfo.userId, userInfo.adminEmail, spreadsheetId, false);
-
-    console.log('saveSheetConfigBatch: 統合更新完了');
-    console.log('saveSheetConfigBatch: 更新内容 - spreadsheetId:', spreadsheetId, 'sheetName:', sheetName);
-  } catch (error) {
-    console.error('saveSheetConfigBatch error:', error.message);
-    throw new Error('バッチ処理中にエラーが発生しました: ' + error.message);
-  }
-}
 
 /**
  *【新しい推奨関数】設定を下書きとして保存する（公開はしない） (マルチテナント対応版)
@@ -1161,33 +1126,44 @@ function clearActiveSheet(requestUserId) {
 }
 
 /**
- * 表示オプションを設定 (マルチテナント対応版)
+ * 表示オプション設定（統合版：Optimized機能統合）
  * AdminPanel.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
- * @param {object} options - 表示オプション
+ * @param {object} displayOptions - 表示オプション
+ * @param {object} options - オプション設定
+ * @param {object} options.sheetsService - 共有SheetsService（最適化用）
+ * @param {object} options.userInfo - 事前取得済みユーザー情報（最適化用）
  */
-function setDisplayOptions(requestUserId, options) {
+function setDisplayOptions(requestUserId, displayOptions, options = {}) {
   verifyUserAccess(requestUserId);
   try {
-    var currentUserId = requestUserId; // requestUserId を使用
+    var currentUserId = requestUserId;
 
-    var userInfo = findUserById(currentUserId);
+    // 最適化モード: 事前取得済みuserInfoを使用、なければ取得
+    var userInfo = options.userInfo || findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません。');
     }
 
     var configJson = JSON.parse(userInfo.configJson || '{}');
-    configJson.showNames = options.showNames;
-    configJson.showCounts = options.showCounts;
+    
+    // 各オプションを個別にチェックして設定（undefinedの場合は既存値を保持）
+    if (displayOptions.showNames !== undefined) {
+      configJson.showNames = displayOptions.showNames;
+    }
+    if (displayOptions.showCounts !== undefined) {
+      configJson.showCounts = displayOptions.showCounts;
+    }
+    if (displayOptions.displayMode !== undefined) {
+      configJson.displayMode = displayOptions.displayMode;
+    } else if (displayOptions.showNames !== undefined) {
+      // showNamesからdisplayModeを設定（後方互換性）
+      configJson.displayMode = displayOptions.showNames ? 'named' : 'anonymous';
+    }
+    
+    configJson.lastModified = new Date().toISOString();
 
-    // showNamesからdisplayModeを設定
-    configJson.displayMode = options.showNames ? 'named' : 'anonymous';
-
-    console.log('setDisplayOptions: 設定更新', {
-      showNames: options.showNames,
-      showCounts: options.showCounts,
-      displayMode: configJson.displayMode
-    });
+    console.log('setDisplayOptions: 設定更新', displayOptions);
 
     updateUser(currentUserId, {
       configJson: JSON.stringify(configJson)
@@ -1404,64 +1380,10 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
 }
 
 // =================================================================
-// PHASE2 OPTIMIZED FUNCTIONS (重複処理排除)
+// 関数統合完了: Optimized/Batch機能は基底関数に統合済み
 // =================================================================
 
-/**
- * 最適化版: 設定保存（共有リソース使用）
- */
-function saveSheetConfigOptimized(requestUserId, spreadsheetId, sheetName, config, sheetsService, userInfo) {
-  // Use pre-cached userInfo instead of fetching again
-  saveConfig(requestUserId, sheetName, config, true, sheetsService);
-}
 
-/**
- * 最適化版: シート切り替え（共有リソース使用）
- */
-function switchToSheetOptimized(requestUserId, spreadsheetId, sheetName, sheetsService, userInfo) {
-  // Use provided sheetsService and userInfo instead of fetching
-  const configJsonObj = JSON.parse(userInfo.configJson || '{}');
-  configJsonObj.publishedSpreadsheetId = spreadsheetId;
-  configJsonObj.publishedSheetName = sheetName;
-  configJsonObj.appPublished = true;
-  configJsonObj.lastModified = new Date().toISOString();
-  
-  // Update user with optimized call
-  updateUser(requestUserId, { configJson: JSON.stringify(configJsonObj) });
-}
-
-/**
- * 最適化版: 表示オプション設定（共有リソース使用）
- */
-function setDisplayOptionsOptimized(requestUserId, displayOptions, sheetsService, userInfo) {
-  // Use pre-cached userInfo instead of fetching again
-  const configJsonObj = JSON.parse(userInfo.configJson || '{}');
-  
-  if (displayOptions.showNames !== undefined) {
-    configJsonObj.showNames = displayOptions.showNames;
-  }
-  if (displayOptions.showCounts !== undefined) {
-    configJsonObj.showCounts = displayOptions.showCounts;
-  }
-  if (displayOptions.displayMode !== undefined) {
-    configJsonObj.displayMode = displayOptions.displayMode;
-  }
-  
-  configJsonObj.lastModified = new Date().toISOString();
-  
-  console.log('setDisplayOptions: 設定更新', displayOptions);
-  updateUser(requestUserId, { configJson: JSON.stringify(configJsonObj) });
-}
-
-/**
- * アクティブシートをクリア（公開停止）
- * AdminPanel.htmlから呼び出される
- */
-
-/**
- * 表示オプションを設定
- * AdminPanel.htmlから呼び出される
- */
 
 
 
