@@ -1154,7 +1154,7 @@ function loadStatus(bypassCache = false) {
   console.group('🔄 loadStatus');
   console.log('🔄 Loading system status, bypassCache:', bypassCache);
 
-  const userIdPromise = getUserId(); // Assuming getUserId returns a Promise
+  const userIdPromise = runGasWithUserId('getUserId'); // getUserIdをサーバーサイド関数として呼び出す
   userIdPromise
     .then(id => {
       userId = id;
