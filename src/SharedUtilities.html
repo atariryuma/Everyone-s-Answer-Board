@@ -669,29 +669,28 @@ class UnifiedLoadingManager {
     this.currentState = null;
     this.overlay = null;
     this.initialized = false;
+    this.variantClasses = ['transparent', 'modal', 'progress', 'quickstart', 'page-specific'];
   }
 
-  // Initialize the loading manager
+  // Initialize the loading manager.
   init() {
-    if (this.initialized) return;
+    if (this.initialized) return true;
     
     this.overlay = document.getElementById('loading-overlay');
     if (!this.overlay) {
-      console.warn('UnifiedLoadingManager: loading-overlay element not found, will retry');
-      // Retry after DOM is ready
-      setTimeout(() => this.init(), 100);
+      console.warn('UnifiedLoadingManager: loading-overlay element not found. Will not initialize.');
       return false;
     }
     
-    console.log('UnifiedLoadingManager: Initialized successfully');
+    console.log('UnifiedLoadingManager: Initialized successfully.');
     this.initialized = true;
     return true;
   }
 
-  // Main loading function with unified API
+  // Main loading function with a unified API.
   setLoading(isLoading, options = {}) {
-    if (!this.init()) {
-      console.warn('UnifiedLoadingManager: Failed to initialize, cannot show loading');
+    if (!this.initialized) {
+      console.warn('UnifiedLoadingManager: Not initialized, cannot manage loading state.');
       return;
     }
 
@@ -702,11 +701,11 @@ class UnifiedLoadingManager {
     }
   }
 
-  // Show loading overlay with options
+  // Show loading overlay with options.
   show(options = {}) {
     const config = {
       message: options.message || '処理中...',
-      type: options.type || 'overlay', // 'overlay', 'transparent', 'modal', 'progress', 'quickstart'
+      type: options.type || 'overlay',
       progress: options.progress || null,
       steps: options.steps || null,
       disableInteraction: options.disableInteraction !== false,
@@ -715,34 +714,34 @@ class UnifiedLoadingManager {
 
     this.currentState = config;
     
-    // Reset all variant classes
-    this.overlay.className = 'loading-overlay';
+    // Clean up previous variant classes
+    this.variantClasses.forEach(vc => this.overlay.classList.remove(vc));
     
-    // Add variant class based on type
+    // Add the new variant class if it's not the default overlay
     if (config.type !== 'overlay') {
       this.overlay.classList.add(config.type);
     }
     
-    // Show the overlay
+    // Update content and show the overlay
+    this.updateContent(config);
     this.overlay.classList.remove('hidden');
     
-    // Update content
-    this.updateContent(config);
-    
-    // Handle interaction disabling
-    if (config.disableInteraction) {
+    // Manage user interaction
+    if (config.disableInteraction && config.type !== 'transparent') {
       document.body.style.overflow = 'hidden';
       document.body.style.pointerEvents = 'none';
-      this.overlay.style.pointerEvents = 'auto'; // Allow overlay interactions
+      this.overlay.style.pointerEvents = 'auto';
+    } else {
+      // Allow interaction for transparent overlays or when not disabled
+      this.overlay.style.pointerEvents = 'none';
     }
   }
 
-  // Hide loading overlay
+  // Hide loading overlay.
   hide() {
     if (!this.overlay) return;
     
     this.overlay.classList.add('hidden');
-    this.overlay.className = 'loading-overlay hidden';
     
     // Restore interaction
     document.body.style.overflow = '';
@@ -751,46 +750,34 @@ class UnifiedLoadingManager {
     this.currentState = null;
   }
 
-  // Update loading content based on configuration
+  // Update loading content based on configuration.
   updateContent(config) {
     let content = `<div class="loading-content">`;
     
-    // Add loading message
-    content += `<div class="loading-message">${this.escapeHtml(config.message)}</div>`;
+    if (config.message) {
+      content += `<div class="loading-message">${this.escapeHtml(config.message)}</div>`;
+    }
     
-    // Add spinner for basic overlay
     if (config.type === 'overlay' || config.type === 'modal') {
       content += `<div class="loading-spinner"></div>`;
     }
     
-    // Add progress bar if specified
     if (config.progress !== null) {
       const progressValue = typeof config.progress === 'object' 
         ? Math.round((config.progress.current / config.progress.total) * 100)
         : config.progress;
-        
       content += `
         <div class="loading-progress">
-          <div class="loading-progress-bar">
-            <div class="loading-progress-fill" style="width: ${progressValue}%"></div>
-          </div>
+          <div class="loading-progress-bar"><div class="loading-progress-fill" style="width: ${progressValue}%"></div></div>
           <div class="loading-percentage">${progressValue}%</div>
-        </div>
-      `;
+        </div>`;
     }
     
-    // Add steps if specified
     if (config.steps && Array.isArray(config.steps)) {
       content += `<div class="loading-steps">`;
-      config.steps.forEach((step, index) => {
-        const stepClass = step.status === 'completed' ? 'completed' : 
-                         step.status === 'active' ? 'active' : '';
-        content += `
-          <div class="loading-step ${stepClass}">
-            <div class="loading-step-dot"></div>
-            <div class="loading-step-text">${this.escapeHtml(step.text)}</div>
-          </div>
-        `;
+      config.steps.forEach(step => {
+        const stepClass = step.status === 'completed' ? 'completed' : (step.status === 'active' ? 'active' : '');
+        content += `<div class="loading-step ${stepClass}"><div class="loading-step-dot"></div><div class="loading-step-text">${this.escapeHtml(step.text)}</div></div>`;
       });
       content += `</div>`;
     }
@@ -799,98 +786,51 @@ class UnifiedLoadingManager {
     this.overlay.innerHTML = content;
   }
 
-  // Simple HTML escaping
+  // Simple HTML escaping.
   escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
   }
 
-  // Update progress (for ongoing operations)
-  updateProgress(progress, message = null) {
-    if (!this.currentState) return;
-    
-    this.currentState.progress = progress;
-    if (message) {
-      this.currentState.message = message;
-    }
-    
-    this.updateContent(this.currentState);
-  }
-
-  // Update steps (for multi-step operations)
-  updateSteps(steps) {
-    if (!this.currentState) return;
-    
-    this.currentState.steps = steps;
-    this.updateContent(this.currentState);
-  }
-
-  // Convenience methods for common use cases
-  showSimple(message = '処理中...') {
-    this.setLoading(true, { message, type: 'overlay' });
-  }
-
-  showProgress(message = '処理中...', progress = 0) {
-    this.setLoading(true, { message, type: 'progress', progress });
-  }
-
-  showTransparent(message = '処理中...') {
-    this.setLoading(true, { message, type: 'transparent' });
-  }
-
-  showQuickStart(message = 'セットアップ中...') {
-    this.setLoading(true, { message, type: 'quickstart' });
-  }
-
-  // AdminPanel-specific convenience method
+  // Convenience methods for common use cases.
+  showSimple(message = '処理中...') { this.setLoading(true, { message, type: 'overlay' }); }
+  showProgress(message = '処理中...', progress = 0) { this.setLoading(true, { message, type: 'progress', progress }); }
+  showTransparent(message = '処理中...') { this.setLoading(true, { message, type: 'transparent' }); }
+  showQuickStart(message = 'セットアップ中...') { this.setLoading(true, { message, type: 'quickstart' }); }
   showAdminProgress(message, step = 0, percentage = 0) {
-    const options = {
-      message: message,
-      type: 'progress',
-      progress: percentage,
-      disableInteraction: true
-    };
-    
-    // Add step information if provided
+    const options = { message, type: 'progress', progress: percentage, disableInteraction: true };
     if (step > 0) {
-      const steps = [
+      options.steps = [
         { text: 'システム情報を読み込み中...', status: step > 1 ? 'completed' : step === 1 ? 'active' : 'pending' },
         { text: 'ユーザー情報を取得中...', status: step > 2 ? 'completed' : step === 2 ? 'active' : 'pending' },
         { text: 'シート情報と設定を適用中...', status: step > 3 ? 'completed' : step === 3 ? 'active' : 'pending' },
         { text: 'UIを最終調整中...', status: step > 4 ? 'completed' : step === 4 ? 'active' : 'pending' }
       ];
-      options.steps = steps;
     }
-    
     this.setLoading(true, options);
   }
 }
 
-// Create global instance
+// Create and initialize the global instance once the DOM is ready.
 window.unifiedLoading = new UnifiedLoadingManager();
+document.addEventListener('DOMContentLoaded', () => {
+  window.unifiedLoading.init();
+});
 
-// Backward compatibility - enhanced setLoading function
-window.setLoading = function(isLoading, message = '処理中...', step = 0, percentage = 0) {
-  // Handle different parameter patterns
-  if (typeof message === 'object') {
-    // If second parameter is options object: setLoading(true, { message: '...', ... })
-    const options = message;
-    window.unifiedLoading.setLoading(isLoading, options);
-    return;
-  }
-  
-  // Handle AdminPanel pattern: setLoading(true, 'message', step, percentage)
-  if (typeof step === 'number' && step > 0) {
-    window.unifiedLoading.showAdminProgress(message, step, percentage);
-    return;
-  }
-  
-  // Handle simple pattern: setLoading(true, 'message')
-  if (isLoading) {
-    window.unifiedLoading.showSimple(message);
-  } else {
+// Backward compatibility wrapper for the global setLoading function.
+window.setLoading = function(isLoading, message, step, percentage) {
+  if (!isLoading) {
     window.unifiedLoading.setLoading(false);
+    return;
+  }
+
+  if (typeof message === 'object') {
+    window.unifiedLoading.setLoading(true, message);
+  } else if (typeof step === 'number' && step > 0) {
+    window.unifiedLoading.showAdminProgress(message, step, percentage);
+  } else {
+    window.unifiedLoading.showSimple(message || '処理中...');
   }
 };
 

@@ -1194,61 +1194,19 @@ setupEventDelegation() {
 
   // Add these two methods
   showLoadingOverlay(message = '読み込み中...') {
-    // Use unified loading manager if available
     if (window.unifiedLoading) {
       window.unifiedLoading.setLoading(true, { 
         message: message, 
         type: 'page-specific',
         disableInteraction: true 
       });
-      return;
     }
-    
-    // Fallback to legacy implementation
-    if (this.elements.loadingOverlay) {
-      this.elements.loadingOverlay.classList.remove('hidden');
-    }
-    
-    // すべてのユーザーインタラクションを無効化
-    var allInteractiveElements = document.querySelectorAll('button, input, select, textarea, a, .cursor-pointer, .answer-card');
-    allInteractiveElements.forEach(function(element) {
-      if (element) {
-        element.style.pointerEvents = 'none';
-        element.style.opacity = '0.6';
-      }
-    });
-    
-    // メインコンテナを無効化
-    var mainContent = document.querySelector('#main-container') || document.body;
-    mainContent.style.pointerEvents = 'none';
-    mainContent.style.userSelect = 'none';
   }
 
   hideLoadingOverlay() {
-    // Use unified loading manager if available
     if (window.unifiedLoading) {
       window.unifiedLoading.setLoading(false);
-      return;
     }
-    
-    // Fallback to legacy implementation
-    if (this.elements.loadingOverlay) {
-      this.elements.loadingOverlay.classList.add('hidden');
-    }
-    
-    // すべてのユーザーインタラクションを有効化
-    var allInteractiveElements = document.querySelectorAll('button, input, select, textarea, a, .cursor-pointer, .answer-card');
-    allInteractiveElements.forEach(function(element) {
-      if (element) {
-        element.style.pointerEvents = 'auto';
-        element.style.opacity = '1';
-      }
-    });
-    
-    // メインコンテナを有効化
-    var mainContent = document.querySelector('#main-container') || document.body;
-    mainContent.style.pointerEvents = 'auto';
-    mainContent.style.userSelect = 'auto';
   }
 
   async loadSheetData(showLoading = true, isInitialLoad = false, requestedSheetName = null) {

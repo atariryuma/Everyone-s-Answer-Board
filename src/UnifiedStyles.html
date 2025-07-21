@@ -421,48 +421,47 @@ body {
    UNIFIED LOADING OVERLAY SYSTEM
    ============================================================================= */
 
-/* Base loading overlay - default dark semi-transparent */
+/* Base loading overlay */
 .loading-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.8);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  transition: opacity 0.3s ease, background-color 0.3s ease;
   z-index: 8000;
-  transition: all 0.3s ease;
+  background-color: rgba(0,0,0,0.8);
 }
 
-/* Loading overlay variants */
+/* Variant: Transparent background, allows interaction with elements behind it */
 .loading-overlay.transparent {
-  background: rgba(0,0,0,0.1);
-  pointer-events: none;
+  background-color: rgba(0,0,0,0.1);
 }
 
+/* Variant: Modal, for critical blocking actions */
 .loading-overlay.modal {
-  background: rgba(0,0,0,0.9);
+  background-color: rgba(0,0,0,0.9);
   z-index: 9000;
 }
 
+/* Variant: Page-specific styling with backdrop blur */
 .loading-overlay.page-specific {
-  background: rgba(26, 27, 38, 0.8);
+  background-color: rgba(26, 27, 38, 0.8);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  z-index: 1000;
 }
 
-/* QuickStart specific styling */
+/* Variant: QuickStart, lightweight and non-blocking */
 .loading-overlay.quickstart {
-  background: rgba(0,0,0,0.1);
+  background-color: rgba(0,0,0,0.1);
   z-index: 7000;
-  pointer-events: none;
 }
 
-/* Progress display containers */
+/* Content container for all loading elements */
 .loading-content {
   color: var(--color-text);
   text-align: center;
@@ -473,9 +472,9 @@ body {
 .loading-message {
   font-size: 1rem;
   margin-bottom: 1rem;
-  color: var(--color-text);
 }
 
+/* Progress bar styles */
 .loading-progress {
   width: 100%;
   margin-top: 1rem;
@@ -502,7 +501,7 @@ body {
   color: rgba(255,255,255,0.7);
 }
 
-/* Loading steps display */
+/* Step-based loading indicator */
 .loading-steps {
   margin-top: 1.5rem;
   text-align: left;
@@ -546,7 +545,7 @@ body {
   color: var(--color-success);
 }
 
-/* QuickStart progress bar should be above loading overlay */
+/* Ensure QuickStart progress bar is visible */
 #quickstart-progress {
   position: relative;
   z-index: 8500 !important;
