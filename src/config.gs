@@ -1568,29 +1568,6 @@ function createExecutionContext(requestUserId) {
   const startTime = new Date().getTime();
   console.log('🚀 ExecutionContext作成開始: userId=%s', requestUserId);
   
-  // === Phase1最適化: 無効ユーザーID検証強化 ===
-  if (!requestUserId || 
-      typeof requestUserId !== 'string' || 
-      requestUserId.trim() === '' ||
-      requestUserId === 'undefined' ||
-      requestUserId === 'null') {
-    const error = new Error(`無効なrequestUserIdが渡されました: "${requestUserId}"`);
-    error.name = 'InvalidUserIdError';
-    console.error('❌ createExecutionContext: ' + error.message);
-    throw error;
-  }
-
-  // 実在するユーザーID形式かチェック（UUIDまたはメールアドレス）
-  const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestUserId);
-  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(requestUserId);
-  
-  if (!isValidUUID && !isValidEmail) {
-    const error = new Error(`不正な形式のrequestUserId: "${requestUserId}" (UUIDまたはメールアドレスが必要)`);
-    error.name = 'InvalidUserIdFormatError';
-    console.error('❌ createExecutionContext: ' + error.message);
-    throw error;
-  }
-  
   try {
     // 1. 共有リソースを一括作成（1回のみ）
     // ExecutionContextManagerを使用してコンテキストを取得
@@ -1602,10 +1579,7 @@ function createExecutionContext(requestUserId) {
     const userInfo = getCachedUserInfo(requestUserId);
     
     if (!userInfo) {
-      const error = new Error(`ユーザー情報が見つかりません: userId="${requestUserId}"`);
-      error.name = 'UserNotFoundError';
-      console.error('❌ createExecutionContext: ' + error.message);
-      throw error;
+      throw new Error('ユーザー情報が見つかりません');
     }
     
     // 2. 実行コンテキスト構築
@@ -1678,48 +1652,21 @@ function commitAllChanges(context) {
   const startTime = new Date().getTime();
   console.log('💽 commitAllChanges: 一括DB書き込み開始');
   
-  // Phase4最適化: より厳密な変更検証で不要な書き込みを防止
-  if (!context || !context.hasChanges) {
-    debugLog('Phase4: コンテキストに変更なし - 書き込みスキップ');
-    return { skipped: true, reason: 'no_context_changes' };
+  if (!context.hasChanges || Object.keys(context.pendingUpdates).length === 0) {
+    console.log('📝 変更なし: DB書き込みをスキップ');
+    return;
   }
-  
-  const pendingKeys = Object.keys(context.pendingUpdates || {});
-  if (pendingKeys.length === 0) {
-    debugLog('Phase4: 保留更新なし - 書き込みスキップ');
-    return { skipped: true, reason: 'no_pending_updates' };
-  }
-  
-  // Phase4最適化: 実際の変更内容をチェック（値の比較）
-  const hasRealChanges = pendingKeys.some(key => {
-    const newValue = context.pendingUpdates[key];
-    const oldValue = context.userInfo[key];
-    const hasChanged = JSON.stringify(newValue) !== JSON.stringify(oldValue);
-    if (!hasChanged) {
-      debugLog('Phase4: フィールド[' + key + ']は実際には変更されていません');
-    }
-    return hasChanged;
-  });
-  
-  if (!hasRealChanges) {
-    console.log('📝 Phase4最適化: 実際の変更なし - DB書き込みをスキップ');
-    return { skipped: true, reason: 'no_real_changes', checkedFields: pendingKeys };
-  }
-  
-  debugLog('Phase4: 実際の変更を検出 - 書き込み実行:', pendingKeys);
   
   try {
     // 既存のupdateUserの内部実装を使用（ただしSheetsServiceは再利用）
     updateUserDirect(context.sheetsService, context.requestUserId, context.pendingUpdates);
     
     const endTime = new Date().getTime();
-    console.log('✅ Phase4最適化: DB書き込み完了 (%dms, 変更項目数: %d)', 
-      endTime - startTime, pendingKeys.length);
+    console.log('✅ 一括DB書き込み完了: %dms, 変更項目数: %d', 
+      endTime - startTime, Object.keys(context.pendingUpdates).length);
     
     // 統計更新
     context.stats.dbQueries++; // コミット時の1回をカウント
-    
-    return { success: true, changedFields: pendingKeys, executionTime: endTime - startTime };
     
   } catch (error) {
     console.error('❌ 一括DB書き込みエラー:', error.message);

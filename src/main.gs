@@ -539,14 +539,10 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
   // キャッシュキーの生成
   const cacheKey = `unified_user_info_${userId || email}`;
   
-  // Phase2最適化: 実行レベルキャッシュの確認を強化（メールアドレスでも対応）
-  if (opts.useExecutionCache && _executionUserInfoCache) {
-    const cacheMatch = (_executionUserInfoCache.userId === userId) || 
-                      (_executionUserInfoCache.email === email);
-    if (cacheMatch) {
-      debugLog('Phase2: 実行レベルキャッシュヒット:', cacheKey);
-      return _executionUserInfoCache.userInfo;
-    }
+  // 実行レベルキャッシュの確認（オプション）
+  if (opts.useExecutionCache && _executionUserInfoCache && 
+      _executionUserInfoCache.userId === userId) {
+    return _executionUserInfoCache.userInfo;
   }
 
   // 永続キャッシュの確認
@@ -555,14 +551,9 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
   if (cachedInfo) {
     try {
       const userInfo = JSON.parse(cachedInfo);
-      // Phase2最適化: 実行レベルキャッシュにメールアドレスも保存
-      if (opts.useExecutionCache) {
-        _executionUserInfoCache = { 
-          userId: userId || userInfo.userId, 
-          email: email || userInfo.adminEmail, 
-          userInfo 
-        };
-        debugLog('Phase2: 永続キャッシュヒット→実行キャッシュに保存:', cacheKey);
+      // 実行レベルキャッシュにも保存（オプション）
+      if (opts.useExecutionCache && userId) {
+        _executionUserInfoCache = { userId, userInfo };
       }
       return userInfo;
     } catch (e) {
@@ -589,14 +580,9 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
   if (userInfo) {
     try {
       cache.put(cacheKey, JSON.stringify(userInfo), opts.ttl);
-      // Phase2最適化: 実行レベルキャッシュに詳細情報保存
-      if (opts.useExecutionCache) {
-        _executionUserInfoCache = { 
-          userId: userId || userInfo.userId, 
-          email: email || userInfo.adminEmail, 
-          userInfo 
-        };
-        debugLog('Phase2: データベース検索→実行キャッシュに保存:', cacheKey);
+      // 実行レベルキャッシュにも保存（オプション）
+      if (opts.useExecutionCache && (userId || userInfo.userId)) {
+        _executionUserInfoCache = { userId: userId || userInfo.userId, userInfo };
       }
     } catch (e) {
       console.warn('キャッシュ保存に失敗:', e.message);
