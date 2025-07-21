@@ -187,6 +187,14 @@
     </div>
   </div>
 </div>
+
+<!-- ページ全体ローディングオーバーレイ -->
+<div id="page-loading-overlay" class="loading-overlay hidden">
+  <div class="text-center">
+    <div class="spinner"></div>
+    <p id="page-loading-message" class="mt-4 text-gray-300">処理中...</p>
+  </div>
+</div>
         
       </div>
 </div>
@@ -626,6 +634,32 @@ class SharedModals {
     if (modal) modal.classList.remove('hidden');
   }
 
+  // ページ全体ローディングオーバーレイの表示
+  showPageLoading(message = '処理中...', percentage = 0) {
+    const overlay = document.getElementById('page-loading-overlay');
+    const loadingMessage = document.getElementById('page-loading-message');
+    // プログレスバーはAdminPanel.htmlにしかないので、ここではメッセージのみ更新
+    
+    if (overlay) {
+      overlay.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+      document.body.style.pointerEvents = 'none';
+    }
+    if (loadingMessage) {
+      loadingMessage.textContent = message;
+    }
+  }
+
+  // ページ全体ローディングオーバーレイの非表示
+  hidePageLoading() {
+    const overlay = document.getElementById('page-loading-overlay');
+    if (overlay) {
+      overlay.classList.add('hidden');
+      document.body.style.overflow = '';
+      document.body.style.pointerEvents = '';
+    }
+  }
+
   // モーダルの非表示
   hideModal(modalId) {
     const modal = document.getElementById(modalId);
@@ -648,6 +682,7 @@ class SharedModals {
           'teacherGuideModal',
           'alert-modal',
           'loading-modal',
+          'page-loading-overlay', // 追加
           'security-modal',
           'form-config-modal',
           'security-details-modal',
@@ -657,7 +692,12 @@ class SharedModals {
         modals.forEach(modalId => {
           const modal = document.getElementById(modalId);
           if (modal && !modal.classList.contains('hidden')) {
-            this.hideModal(modalId);
+            // page-loading-overlayはhidePageLoadingで制御
+            if (modalId === 'page-loading-overlay') {
+              this.hidePageLoading();
+            } else {
+              this.hideModal(modalId);
+            }
           }
         });
       }
