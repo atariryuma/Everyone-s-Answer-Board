@@ -57,4 +57,28 @@ document.addEventListener('DOMContentLoaded', function() {
     observer.observe(modal, { attributes: true });
   }
 });
+
+// クラス選択の有効/無効に応じてプルダウンの表示を切り替える
+document.addEventListener('DOMContentLoaded', function() {
+  const enableClassSelectionCheckbox = document.getElementById('enable-class-selection');
+  const classChoicesContainer = document.getElementById('class-choices-container');
+
+  const toggleClassChoicesVisibility = () => {
+    if (enableClassSelectionCheckbox && classChoicesContainer) {
+      if (enableClassSelectionCheckbox.checked) {
+        classChoicesContainer.classList.remove('hidden');
+      } else {
+        classChoicesContainer.classList.add('hidden');
+      }
+    }
+  };
+
+  // 初期表示時の設定
+  toggleClassChoicesVisibility();
+
+  // チェックボックスが変更されたときのイベントリスナー
+  if (enableClassSelectionCheckbox) {
+    enableClassSelectionCheckbox.addEventListener('change', toggleClassChoicesVisibility);
+  }
+});
 </script>
