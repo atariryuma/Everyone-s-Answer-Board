@@ -23,7 +23,7 @@ const DELETE_LOG_SHEET_CONFIG = {
  * @param {string} reason - 削除理由
  * @param {string} deleteType - 削除タイプ ("self" | "admin")
  */
-function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, deleteType) {
+function logAccountDeletion(context, executorEmail, targetUserId, targetEmail, reason, deleteType) {
   try {
     const props = PropertiesService.getScriptProperties();
     const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
@@ -33,7 +33,7 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
       return;
     }
     
-    const service = getSheetsService();
+    const service = context.getSheetsService();
     const logSheetName = DELETE_LOG_SHEET_CONFIG.SHEET_NAME;
     
     // ログシートの存在確認・作成
@@ -86,7 +86,7 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
 /**
  * 全ユーザー一覧を取得（管理者用）
  */
-function getAllUsersForAdmin() {
+function getAllUsersForAdmin(context) {
   try {
     // 管理者権限チェック
     if (!isDeployUser()) {
@@ -100,7 +100,7 @@ function getAllUsersForAdmin() {
       throw new Error('データベースIDが設定されていません');
     }
     
-    const service = getSheetsService();
+    const service = context.getSheetsService();
     const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
     const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
@@ -145,7 +145,7 @@ function getAllUsersForAdmin() {
  * @param {string} targetUserId - 削除対象のユーザーID
  * @param {string} reason - 削除理由
  */
-function deleteUserAccountByAdmin(targetUserId, reason) {
+function deleteUserAccountByAdmin(context, targetUserId, reason) {
   try {
     // 管理者権限チェック
     if (!isDeployUser()) {
@@ -160,7 +160,7 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
     const executorEmail = Session.getActiveUser().getEmail();
     
     // 削除対象ユーザー情報を取得
-    const targetUserInfo = findUserById(targetUserId);
+    const targetUserInfo = findUserById(context, targetUserId);
     if (!targetUserInfo) {
       throw new Error('削除対象のユーザーが見つかりません。');
     }
@@ -182,7 +182,7 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
         throw new Error('データベースIDが設定されていません');
       }
       
-      const service = getSheetsService();
+      const service = context.getSheetsService();
       const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
       
       // データベーススプレッドシートの情報を取得
@@ -265,10 +265,10 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
  * 削除権限チェック
  * @param {string} targetUserId - 対象ユーザーID
  */
-function canDeleteUser(targetUserId) {
+function canDeleteUser(context, targetUserId) {
   try {
     const currentUserEmail = Session.getActiveUser().getEmail();
-    const targetUser = findUserById(targetUserId);
+    const targetUser = findUserById(context, targetUserId);
     
     if (!targetUser) {
       return false;
@@ -285,7 +285,7 @@ function canDeleteUser(targetUserId) {
 /**
  * 削除ログ一覧を取得（管理者用）
  */
-function getDeletionLogs() {
+function getDeletionLogs(context) {
   try {
     // 管理者権限チェック
     if (!isDeployUser()) {
@@ -299,7 +299,7 @@ function getDeletionLogs() {
       throw new Error('データベースIDが設定されていません');
     }
     
-    const service = getSheetsService();
+    const service = context.getSheetsService();
     const logSheetName = DELETE_LOG_SHEET_CONFIG.SHEET_NAME;
     
     try {
@@ -352,12 +352,13 @@ function getDeletionLogs() {
 }
 
 /**
- * 最適化されたSheetsサービスを取得
+ * 最適化されたSheetsサービスを取得（内部関数）
+ * ExecutionContextからのみ呼び出されるべきです。
  * @returns {object} Sheets APIサービス
  */
-function getSheetsService() {
+function getSheetsServiceInternal() {
   try {
-    console.log('🔧 getSheetsService: サービス取得開始');
+    console.log('🔧 getSheetsServiceInternal: サービス取得開始');
     
     var accessToken;
     try {
@@ -381,11 +382,11 @@ function getSheetsService() {
     }
     
     console.log('✅ Sheets service created successfully');
-    console.log('DEBUG: getSheetsService returning:', JSON.stringify(service, null, 2));
+    console.log('DEBUG: getSheetsServiceInternal returning:', JSON.stringify(service, null, 2));
     return service;
     
   } catch (error) {
-    console.error('❌ getSheetsService error:', error.message);
+    console.error('❌ getSheetsServiceInternal error:', error.message);
     console.error('❌ Error stack:', error.stack);
     throw error; // エラーを再スロー
   }
@@ -396,11 +397,11 @@ function getSheetsService() {
  * @param {string} userId - ユーザーID
  * @returns {object|null} ユーザー情報
  */
-function findUserById(userId) {
+function findUserById(context, userId) {
   var cacheKey = 'user_' + userId;
   return cacheManager.get(
     cacheKey,
-    function() { return fetchUserFromDatabase('userId', userId); },
+    function() { return fetchUserFromDatabase(context, 'userId', userId); },
     { ttl: 300, enableMemoization: true }
   );
 }
@@ -410,11 +411,11 @@ function findUserById(userId) {
  * @param {string} email - メールアドレス
  * @returns {object|null} ユーザー情報
  */
-function findUserByEmail(email) {
+function findUserByEmail(context, email) {
   var cacheKey = 'email_' + email;
   return cacheManager.get(
     cacheKey,
-    function() { return fetchUserFromDatabase('adminEmail', email); },
+    function() { return fetchUserFromDatabase(context, 'adminEmail', email); },
     { ttl: 300, enableMemoization: true }
   );
 }
@@ -425,7 +426,7 @@ function findUserByEmail(email) {
  * @param {string} value - 検索値
  * @returns {object|null} ユーザー情報
  */
-function fetchUserFromDatabase(field, value) {
+function fetchUserFromDatabase(context, field, value) {
   try {
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
@@ -435,7 +436,7 @@ function fetchUserFromDatabase(field, value) {
       return null;
     }
     
-    var service = getSheetsService();
+    var service = context.getSheetsService();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
     console.log('fetchUserFromDatabase - 検索開始:', {
@@ -549,7 +550,7 @@ function fetchUserFromDatabase(field, value) {
  * @param {string} userId - ユーザーID
  * @returns {object|null} ユーザー情報
  */
-function getUserWithFallback(userId) {
+function getUserWithFallback(context, userId) {
   // 入力検証
   if (!userId || typeof userId !== 'string') {
     console.warn('getUserWithFallback: Invalid userId:', userId);
@@ -557,9 +558,9 @@ function getUserWithFallback(userId) {
   }
 
   // 可能な限りキャッシュを利用
-  var user = findUserById(userId);
+  var user = findUserById(context, userId);
   if (!user) {
-    handleMissingUser(userId);
+    handleMissingUser(context, userId);
   }
   return user;
 }
@@ -570,11 +571,11 @@ function getUserWithFallback(userId) {
  * @param {object} updateData - 更新データ
  * @returns {object} 更新結果
  */
-function updateUser(userId, updateData) {
+function updateUser(context, userId, updateData) {
   try {
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    var service = getSheetsService();
+    var service = context.getSheetsService();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
     // 現在のデータを取得
@@ -647,21 +648,21 @@ function updateUser(userId, updateData) {
  * @param {object} userData - 作成するユーザーデータ
  * @returns {object} 作成されたユーザーデータ
  */
-function createUser(userData) {
+function createUser(context, userData) {
   // 同時登録による重複を防ぐためロックを取得
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
 
   try {
     // メールアドレスの重複チェック
-    var existingUser = findUserByEmail(userData.adminEmail);
+    var existingUser = findUserByEmail(context, userData.adminEmail);
     if (existingUser) {
       throw new Error('このメールアドレスは既に登録されています。');
     }
 
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    var service = getSheetsService();
+    var service = context.getSheetsService();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
     var newRow = DB_SHEET_CONFIG.HEADERS.map(function(header) {
@@ -686,10 +687,10 @@ function createUser(userData) {
  * @param {number} intervalMs - Poll interval in milliseconds.
  * @returns {boolean} true if found within the wait window.
  */
-function waitForUserRecord(userId, maxWaitMs, intervalMs) {
+function waitForUserRecord(context, userId, maxWaitMs, intervalMs) {
   var start = Date.now();
   while (Date.now() - start < maxWaitMs) {
-    if (fetchUserFromDatabase('userId', userId)) return true;
+    if (fetchUserFromDatabase(context, userId)) return true;
     Utilities.sleep(intervalMs);
   }
   return false;
@@ -699,8 +700,8 @@ function waitForUserRecord(userId, maxWaitMs, intervalMs) {
  * データベースシートを初期化
  * @param {string} spreadsheetId - データベースのスプレッドシートID
  */
-function initializeDatabaseSheet(spreadsheetId) {
-  var service = getSheetsService();
+function initializeDatabaseSheet(context, spreadsheetId) {
+  var service = context.getSheetsService();
   var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
   try {
@@ -732,7 +733,7 @@ function initializeDatabaseSheet(spreadsheetId) {
  * ユーザーが見つからない場合のキャッシュ処理
  * @param {string} userId - キャッシュ削除対象のユーザーID
  */
-function handleMissingUser(userId) {
+function handleMissingUser(context, userId) {
   try {
     // 最適化: 特定のユーザーキャッシュのみ削除（全体のキャッシュクリアは避ける）
     if (userId) {
@@ -834,7 +835,8 @@ function createSheetsService(accessToken) {
  * @param {string[]} ranges - 取得範囲の配列
  * @returns {object} レスポンス
  */
-function batchGetSheetsData(service, spreadsheetId, ranges) {
+function batchGetSheetsData(context, spreadsheetId, ranges) {
+  const service = context.getSheetsService();
   console.log('DEBUG: batchGetSheetsData received service:', JSON.stringify(service, null, 2));
   // API呼び出しをキャッシュ化（短期間）
   var cacheKey = `batchGet_${spreadsheetId}_${JSON.stringify(ranges)}`;
@@ -872,7 +874,8 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
  * @param {object[]} requests - 更新リクエストの配列
  * @returns {object} レスポンス
  */
-function batchUpdateSheetsData(service, spreadsheetId, requests) {
+function batchUpdateSheetsData(context, spreadsheetId, requests) {
+  const service = context.getSheetsService();
   try {
     var url = service.baseUrl + '/' + spreadsheetId + '/values:batchUpdate';
     
@@ -908,7 +911,8 @@ function batchUpdateSheetsData(service, spreadsheetId, requests) {
  * @param {array} values - 値の配列
  * @returns {object} レスポンス
  */
-function appendSheetsData(service, spreadsheetId, range, values) {
+function appendSheetsData(context, spreadsheetId, range, values) {
+  const service = context.getSheetsService();
   var url = service.baseUrl + '/' + spreadsheetId + '/values/' + encodeURIComponent(range) + 
     ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
   
@@ -928,7 +932,8 @@ function appendSheetsData(service, spreadsheetId, range, values) {
  * @param {string} spreadsheetId - スプレッドシートID
  * @returns {object} スプレッドシート情報
  */
-function getSpreadsheetsData(service, spreadsheetId) {
+function getSpreadsheetsData(context, spreadsheetId) {
+  const service = context.getSheetsService();
   try {
     if (!service || !service.baseUrl) {
       throw new Error('Sheets APIサービスオブジェクトが無効です。baseUrlが見つかりません。');
@@ -972,11 +977,11 @@ function getSpreadsheetsData(service, spreadsheetId) {
  * すべてのユーザー情報を取得
  * @returns {Array} ユーザー情報配列
  */
-function getAllUsers() {
+function getAllUsers(context) {
   try {
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    var service = getSheetsService();
+    var service = context.getSheetsService();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
     var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
@@ -1016,7 +1021,8 @@ function getAllUsers() {
  * @param {array} values - 値の配列
  * @returns {object} レスポンス
  */
-function updateSheetsData(service, spreadsheetId, range, values) {
+function updateSheetsData(context, spreadsheetId, range, values) {
+  const service = context.getSheetsService();
   var url = service.baseUrl + '/' + spreadsheetId + '/values/' + encodeURIComponent(range) + 
     '?valueInputOption=RAW';
   
@@ -1037,7 +1043,8 @@ function updateSheetsData(service, spreadsheetId, range, values) {
  * @param {object} requestBody - リクエストボディ
  * @returns {object} レスポンス
  */
-function batchUpdateSpreadsheet(service, spreadsheetId, requestBody) {
+function batchUpdateSpreadsheet(context, spreadsheetId, requestBody) {
+  const service = context.getSheetsService();
   var url = service.baseUrl + '/' + spreadsheetId + ':batchUpdate';
   var response = UrlFetchApp.fetch(url, {
     method: 'post',
@@ -1052,7 +1059,7 @@ function batchUpdateSpreadsheet(service, spreadsheetId, requestBody) {
  * データベースシートを取得
  * @returns {object} データベースシート
  */
-function getDbSheet() {
+function getDbSheet(context) {
   try {
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
@@ -1078,14 +1085,14 @@ function getDbSheet() {
  * Google Drive 上の関連ファイルやフォルダは保持したままにする。
  * @returns {string} 成功メッセージ
  */
-function deleteUserAccount(userId) {
+function deleteUserAccount(context, userId) {
   try {
     if (!userId) {
       throw new Error('ユーザーが特定できません。');
     }
     
     // ユーザー情報を取得して、関連情報を得る
-    const userInfo = findUserById(userId);
+    const userInfo = findUserById(context, userId);
     if (!userInfo) {
       throw new Error('データベースにユーザー情報が見つかりません。');
     }
@@ -1101,7 +1108,7 @@ function deleteUserAccount(userId) {
         throw new Error('データベースIDが設定されていません');
       }
       
-      var service = getSheetsService();
+      var service = context.getSheetsService();
       if (!service) {
         throw new Error('Sheets APIサービスの初期化に失敗しました');
       }
@@ -1109,7 +1116,7 @@ function deleteUserAccount(userId) {
       var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
       
       // データベーススプレッドシートの情報を取得してsheetIdを確認
-      var spreadsheetInfo = getSpreadsheetsData(service, dbId);
+      var spreadsheetInfo = getSpreadsheetsData(context, dbId);
       
       var targetSheetId = null;
       for (var i = 0; i < spreadsheetInfo.sheets.length; i++) {
@@ -1126,7 +1133,7 @@ function deleteUserAccount(userId) {
       console.log('Found database sheet with sheetId:', targetSheetId);
       
       // データを取得
-      var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
+      var data = batchGetSheetsData(context, dbId, ["'" + sheetName + "'!A:H"]);
       var values = data.valueRanges[0].values || [];
       
       // ユーザーIDに基づいて行を探す（A列がIDと仮定）
