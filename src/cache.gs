@@ -333,7 +333,7 @@ function getHeadersCached(spreadsheetId, sheetName) {
     try {
       console.log(`[getHeadersCached] Starting for spreadsheetId: ${spreadsheetId}, sheetName: ${sheetName}`);
       
-      var service = getSheetsServiceInternal();
+      var service = getSheetsService();
       if (!service) {
         throw new Error('Sheets service is not available');
       }
