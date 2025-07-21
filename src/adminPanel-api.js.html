@@ -828,7 +828,14 @@ function handleQuickStart() {
         updateProgressStep(4, 'error', 'セットアップエラー', result?.message || 'エラーが発生しました');
         updateOverallProgress(0, 'セットアップに失敗しました');
         
-        showMessage(result?.message || 'クイックスタートに失敗しました。', 'error');
+        // 権限エラーの可能性を考慮したメッセージ
+        let errorMessage = result?.message || 'クイックスタートに失敗しました。';
+        if (errorMessage.includes('permission') || errorMessage.includes('権限') || 
+            errorMessage.includes('Drive') || errorMessage.includes('Sheets')) {
+          errorMessage = 'クイックスタートに失敗しました。Google Drive やスプレッドシートへのアクセス権限を確認してください。システム管理者でない場合、権限が制限されている可能性があります。';
+        }
+        
+        showMessage(errorMessage, 'error');
         
         quickstartBtn.disabled = false;
         quickstartText.textContent = 'クイックスタートを開始';
@@ -848,10 +855,17 @@ function handleQuickStart() {
       updateProgressStep(4, 'error', 'セットアップエラー', '通信エラーが発生しました');
       updateOverallProgress(0, 'セットアップに失敗しました');
       
+      // 権限エラーの可能性を考慮したメッセージ
+      let errorMessage = 'クイックスタートに失敗しました。';
+      if (error.toString().includes('permission') || error.toString().includes('権限') || 
+          error.toString().includes('Drive') || error.toString().includes('Sheets')) {
+        errorMessage = 'クイックスタートに失敗しました。Google Drive やスプレッドシートへのアクセス権限を確認してください。システム管理者でない場合、権限が制限されている可能性があります。';
+      }
+      
       if (typeof handleError === 'function') {
-        handleError(error, 'handleQuickStart', 'クイックスタートに失敗しました。');
+        handleError(error, 'handleQuickStart', errorMessage);
       } else {
-        showMessage('クイックスタートに失敗しました: ' + error.message, 'error');
+        showMessage(errorMessage, 'error');
       }
       
       quickstartBtn.disabled = false;
