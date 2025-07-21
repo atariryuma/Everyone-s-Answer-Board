@@ -289,3 +289,11 @@ function generateAppUrls(userId) {
   }
 }
 
+/**
+ * 指定されたURLへサーバーサイドでリダイレクトします。
+ * @param {string} url リダイレクト先のURL
+ */
+function redirectToUrl(url) {
+  return HtmlService.createHtmlOutput('<script>window.top.location.href="' + url + '";</script>');
+}
+
