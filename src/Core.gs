@@ -1024,18 +1024,24 @@ function testSetup() {
 // include 関数は main.gs で定義されています
 
 
-function getResponsesData(userId, sheetName) {
+function getResponsesData(userId, sheetName, executionContext) {
+  // ExecutionContextManagerを使用してコンテキストを取得または作成
+  var contextToUse = executionContext;
+  if (!contextToUse && typeof ExecutionContextManager !== 'undefined') {
+    contextToUse = ExecutionContextManager.getOrCreate(userId);
+  }
+  
   var userInfo = getCachedUserInfo(userId);
   if (!userInfo) {
     return { status: 'error', message: 'ユーザー情報が見つかりません' };
   }
 
   try {
-    var service = getSheetsService();
+    var service = getSheetsService(contextToUse);
     var spreadsheetId = userInfo.spreadsheetId;
     var range = "'" + (sheetName || 'フォームの回答 1') + "'!A:Z";
     
-    var response = batchGetSheetsData(service, spreadsheetId, [range]);
+    var response = batchGetSheetsData(service, spreadsheetId, [range], contextToUse);
     var values = response.valueRanges[0].values || [];
     
     if (values.length === 0) {
@@ -1575,7 +1581,12 @@ function createUserFolder(userEmail) {
  */
 function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
   try {
-    var service = getSheetsService();
+    // ExecutionContextManagerを使用してコンテキストを取得
+    var contextToUse = null;
+    if (typeof ExecutionContextManager !== 'undefined') {
+      contextToUse = ExecutionContextManager.getOrCreate();
+    }
+    var service = getSheetsService(contextToUse);
     var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
     var highlightColumnIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT];
     
@@ -1585,7 +1596,7 @@ function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
     
     // 現在の値を取得
     var range = "'" + sheetName + "'!" + String.fromCharCode(65 + highlightColumnIndex) + rowIndex;
-    var response = batchGetSheetsData(service, spreadsheetId, [range]);
+    var response = batchGetSheetsData(service, spreadsheetId, [range], contextToUse);
     var isHighlighted = false;
     if (response && response.valueRanges && response.valueRanges[0] && 
         response.valueRanges[0].values && response.valueRanges[0].values[0] &&
@@ -1712,7 +1723,12 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
     try {
       lock.waitLock(10000);
       
-      var service = getSheetsService();
+      // ExecutionContextManagerを使用してコンテキストを取得
+    var contextToUse = null;
+    if (typeof ExecutionContextManager !== 'undefined') {
+      contextToUse = ExecutionContextManager.getOrCreate();
+    }
+    var service = getSheetsService(contextToUse);
       var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
       
       // すべてのリアクション列を取得してユーザーの重複リアクションをチェック
@@ -1742,7 +1758,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
       }
       
       // 全リアクション列の現在の値を一括取得
-      var response = batchGetSheetsData(service, spreadsheetId, allReactionRanges);
+      var response = batchGetSheetsData(service, spreadsheetId, allReactionRanges, contextToUse);
       var updateData = [];
       var userAction = null;
       var targetCount = 0;
@@ -2624,7 +2640,12 @@ function emergencyAdminPanelRepair(userEmail, spreadsheetId) {
     
     // 4. サービスアカウントアクセステスト
     try {
-      const service = getSheetsService();
+      // ExecutionContextManagerを使用してコンテキストを取得
+      var contextToUse = null;
+      if (typeof ExecutionContextManager !== 'undefined') {
+        contextToUse = ExecutionContextManager.getOrCreate();
+      }
+      const service = getSheetsService(contextToUse);
       const testData = getSpreadsheetsData(service, spreadsheetId);
       debugLog('ステップ4: サービスアカウントアクセステスト成功');
     } catch (serviceTestError) {
@@ -2765,12 +2786,17 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
       }
       
       var spreadsheetId = userInfo.spreadsheetId;
-      var service = getSheetsService();
+      // ExecutionContextManagerを使用してコンテキストを取得
+    var contextToUse = null;
+    if (typeof ExecutionContextManager !== 'undefined') {
+      contextToUse = ExecutionContextManager.getOrCreate();
+    }
+    var service = getSheetsService(contextToUse);
       
       // フォーム回答データのみを取得（名簿機能は使用しない）
       var ranges = [sheetName + '!A:Z'];
       
-      var responses = batchGetSheetsData(service, spreadsheetId, ranges);
+      var responses = batchGetSheetsData(service, spreadsheetId, ranges, contextToUse);
       var sheetData = responses.valueRanges[0].values || [];
     
     // 名簿機能は使用せず、空の配列を設定
@@ -2867,7 +2893,12 @@ function getSheetsList(userId) {
 
     debugLog('getSheetsList: User\'s spreadsheetId:', userInfo.spreadsheetId);
 
-    var service = getSheetsService();
+    // ExecutionContextManagerを使用してコンテキストを取得
+    var contextToUse = null;
+    if (typeof ExecutionContextManager !== 'undefined') {
+      contextToUse = ExecutionContextManager.getOrCreate();
+    }
+    var service = getSheetsService(contextToUse);
     if (!service) {
       console.error('❌ getSheetsList: Sheets service not initialized');
       return [];
@@ -3201,7 +3232,12 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
  */
 function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
   try {
-    var service = getSheetsService();
+    // ExecutionContextManagerを使用してコンテキストを取得
+    var contextToUse = null;
+    if (typeof ExecutionContextManager !== 'undefined') {
+      contextToUse = ExecutionContextManager.getOrCreate();
+    }
+    var service = getSheetsService(contextToUse);
     var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
     
     var reactionData = {
@@ -3218,7 +3254,7 @@ function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
       if (columnIndex !== undefined) {
         var range = sheetName + '!' + String.fromCharCode(65 + columnIndex) + rowIndex;
         try {
-          var response = batchGetSheetsData(service, spreadsheetId, [range]);
+          var response = batchGetSheetsData(service, spreadsheetId, [range], contextToUse);
           var cellValue = '';
           if (response && response.valueRanges && response.valueRanges[0] && 
               response.valueRanges[0].values && response.valueRanges[0].values[0] &&
@@ -4344,12 +4380,29 @@ function getInitialData(requestUserId, targetSheetName) {
     var includeSheetDetails = targetSheetName || configJson.publishedSheetName;
     if (includeSheetDetails && userInfo.spreadsheetId) {
       try {
-        // getInitialData内でcontextを生成
+        // getInitialData内でcontextを生成（ExecutionContextManagerと連携）
         const context = createExecutionContext(currentUserId);
+        
+        // グローバルコンテキストとしても設定
+        if (typeof ExecutionContextManager !== 'undefined') {
+          globalExecutionContext = context;
+        }
+        
         var sheetDetails = getSheetDetails(context, userInfo.spreadsheetId, includeSheetDetails);
         response.sheetDetails = sheetDetails;
         response._meta.includedApis.push('getSheetDetails');
         debugLog('✅ シート詳細を統合応答に追加:', includeSheetDetails);
+        
+        // パフォーマンス統計をレスポンスに追加
+        if (context.stats) {
+          response._meta.performanceStats = {
+            cacheHits: context.stats.cacheHits,
+            dataRetrievals: context.stats.dataRetrievals,
+            sheetsServiceCreations: context.stats.sheetsServiceCreations,
+            executionTime: new Date().getTime() - context.startTime
+          };
+        }
+        
         // getInitialData内で生成したcontextの変更をコミット
         commitAllChanges(context);
       } catch (sheetErr) {
