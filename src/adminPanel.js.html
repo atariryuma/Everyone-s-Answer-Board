@@ -1,35 +1,35 @@
 <script>
   // Admin Panel JavaScript
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   // Validate current step with setup status consideration
   function validateCurrentStep() {
     const savePublishBtn = document.getElementById('save-publish-btn');
     if (!savePublishBtn) return;
-    
+
     // セットアップ状況を確認
     const setupStatus = getSetupStatusFromGlobalStatus();
-    
+
     // セットアップ未完了時の段階的制御
     if (setupStatus === 'pending') {
       enforceStepProgression();
     }
-    
+
     let isValid = false;
-    
+
     switch (currentStep) {
       case 1:
         isValid = selectedSheetId || selectedFormId;
@@ -41,16 +41,16 @@
         isValid = true;
         break;
     }
-    
+
     savePublishBtn.disabled = !isValid;
   }
-  
+
   // セットアップ状況をグローバルステータスから取得
   function getSetupStatusFromGlobalStatus() {
     try {
       if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
-        const config = typeof currentStatus.userInfo.configJson === 'string' 
-          ? JSON.parse(currentStatus.userInfo.configJson) 
+        const config = typeof currentStatus.userInfo.configJson === 'string'
+          ? JSON.parse(currentStatus.userInfo.configJson)
           : currentStatus.userInfo.configJson;
         return config.setupStatus || 'pending';
       }
@@ -60,12 +60,12 @@
       return 'pending';
     }
   }
-  
+
   // セットアップ未完了時の段階的制御を強制
   function enforceStepProgression() {
     const step1Completed = checkStep1Completion();
     const step2Completed = checkStep2Completion();
-    
+
     // Step 2の制御
     const step2Section = document.getElementById('sheet-selection-section');
     if (!step1Completed) {
@@ -73,7 +73,7 @@
     } else {
       enableSection(step2Section);
     }
-    
+
     // Step 3の制御
     const step3Section = document.getElementById('config-section');
     if (!step1Completed || !step2Completed) {
@@ -82,25 +82,25 @@
       enableSection(step3Section);
     }
   }
-  
+
   // Step 1完了チェック
   function checkStep1Completion() {
-    return !!(selectedSheetId || selectedFormId || 
+    return !!(selectedSheetId || selectedFormId ||
               (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId));
   }
-  
+
   // Step 2完了チェック
   function checkStep2Completion() {
     return !!(currentStatus && currentStatus.activeSheetName);
   }
-  
+
   // セクションを無効化
   function disableSection(section, message) {
     if (!section) return;
-    
+
     section.style.opacity = '0.5';
     section.style.pointerEvents = 'none';
-    
+
     // 警告メッセージを追加
     const existingWarning = section.querySelector('.step-warning');
     if (!existingWarning) {
@@ -110,45 +110,45 @@
       section.insertBefore(warning, section.firstChild);
     }
   }
-  
+
   // セクションを有効化
   function enableSection(section) {
     if (!section) return;
-    
+
     section.style.opacity = '1';
     section.style.pointerEvents = 'auto';
-    
+
     // 警告メッセージを削除
     const warning = section.querySelector('.step-warning');
     if (warning) {
       warning.remove();
     }
   }
-  
+
   // Handle sheet selection
   function handleSheetSelection(event) {
     selectedSheetId = event.target.value;
     selectedFormId = null; // Clear form selection
-    
+
     if (selectedSheetId) {
       loadSheetColumns(selectedSheetId);
     }
-    
+
     validateCurrentStep();
   }
-  
+
   // Handle form selection
   function handleFormSelection(event) {
     selectedFormId = event.target.value;
     selectedSheetId = null; // Clear sheet selection
-    
+
     if (selectedFormId) {
       loadFormColumns(selectedFormId);
     }
-    
+
     validateCurrentStep();
   }
-  
+
   // Load sheet columns
   function loadSheetColumns(sheetId) {
     if (typeof runGasWithUserId === 'function') {
@@ -162,7 +162,7 @@
         });
     }
   }
-  
+
   // Load form columns
   function loadFormColumns(formId) {
     if (typeof runGasWithUserId === 'function') {
@@ -176,20 +176,20 @@
         });
     }
   }
-  
+
   // Display column mapping interface
   function displayColumnMapping(columns) {
     const configPlaceholder = document.getElementById('config-placeholder');
     const configContent = document.getElementById('config-content');
-    
+
     if (configPlaceholder) configPlaceholder.classList.add('hidden');
     if (configContent) configContent.classList.remove('hidden');
-    
+
     const mappingContainer = document.getElementById('column-mappings');
     if (!mappingContainer) return;
-    
+
     mappingContainer.innerHTML = '';
-    
+
     columns.forEach((column, index) => {
       const mappingDiv = document.createElement('div');
       mappingDiv.className = 'column-mapping';
@@ -216,57 +216,57 @@
       mappingContainer.appendChild(mappingDiv);
     });
   }
-  
+
   // Handle column mapping
   function handleColumnMapping(select) {
     const columnId = select.dataset.column;
     const mappingType = select.value;
     const mappingDiv = select.closest('.column-mapping');
-    
+
     // Update visual feedback
     mappingDiv.classList.remove('required', 'mapped');
     if (mappingType && mappingType !== 'ignore') {
       mappingDiv.classList.add('mapped');
     }
-    
+
     // Update configuration
     if (!currentConfig) currentConfig = {};
     if (!currentConfig.columnMappings) currentConfig.columnMappings = {};
     currentConfig.columnMappings[columnId] = mappingType;
-    
+
     validateCurrentStep();
   }
-  
+
   // Handle toggle changes
   function handleToggleChange(event) {
     const toggleName = event.target.name;
     const isChecked = event.target.checked;
-    
+
     if (!currentConfig) currentConfig = {};
     currentConfig[toggleName] = isChecked;
-    
+
     validateCurrentStep();
   }
-  
+
   // Validate configuration
   function validateConfiguration() {
     if (!currentConfig || !currentConfig.columnMappings) return false;
-    
+
     const mappings = currentConfig.columnMappings;
     const hasContent = Object.values(mappings).includes('content');
     const hasAuthor = Object.values(mappings).includes('author');
-    
+
     return hasContent && hasAuthor;
   }
-  
+
   // Handle save and publish
   function handleSaveAndPublish() {
     const btn = document.getElementById('save-publish-btn');
     if (!btn || btn.disabled) return;
-    
+
     btn.disabled = true;
     btn.innerHTML = '<div class="spinner mr-2"></div>保存中...';
-    
+
     const config = {
       sheetId: selectedSheetId,
       formId: selectedFormId,
@@ -277,7 +277,7 @@
         anonymousMode: currentConfig.anonymousMode || false
       }
     };
-    
+
     if (typeof runGasWithUserId === 'function') {
       runGasWithUserId('saveAndPublishBoard', config)
         .then(result => {
@@ -302,15 +302,15 @@
         });
     }
   }
-  
+
   // Handle unpublish
   function handleUnpublish() {
     if (!confirm('ボードの公開を停止しますか？')) return;
-    
+
     const btn = document.getElementById('unpublish-board-btn');
     btn.disabled = true;
     btn.innerHTML = '<div class="spinner mr-2"></div>停止中...';
-    
+
     if (typeof runGasWithUserId === 'function') {
       runGasWithUserId('unpublishBoard')
         .then(result => {
@@ -334,21 +334,21 @@
         });
     }
   }
-  
+
   // Handle account deletion
   function handleAccountDeletion() {
     const confirmText = 'DELETE';
     const userInput = prompt(`アカウントを完全に削除します。この操作は取り消せません。\n\n続行するには「${confirmText}」と入力してください:`);
-    
+
     if (userInput !== confirmText) {
       showMessage('削除がキャンセルされました', 'info');
       return;
     }
-    
+
     const btn = document.getElementById('delete-account-btn');
     btn.disabled = true;
     btn.innerHTML = '<div class="spinner mr-2"></div>削除中...';
-    
+
     if (typeof runGasWithUserId === 'function') {
       runGasWithUserId('deleteCurrentUserAccount')
         .then(result => {
@@ -387,15 +387,15 @@
         });
     }
   }
-  
-  
-  
-  
-  
-  
-  
+
+
+
+
+
+
+
   // Initialization is triggered from AdminPanel.html after userId is ready.
-  
+
   // Export functions for global access
   window.adminPanel = {
     initializeAdminPanel,

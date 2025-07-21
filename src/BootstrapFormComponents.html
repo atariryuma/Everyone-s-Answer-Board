@@ -210,7 +210,7 @@
   .form-floating.glass > label {
     font-size: 0.875rem;
   }
-  
+
   .form-control.glass,
   .form-select.glass {
     font-size: 0.875rem;
@@ -284,7 +284,7 @@
       <input type="text" class="form-control glass" id="floatingInput" placeholder="入力してください">
       <label for="floatingInput">ラベル</label>
     </div>
-    
+
     <div class="form-floating glass mb-3">
       <select class="form-select glass" id="floatingSelect">
         <option selected>選択してください</option>
@@ -294,14 +294,14 @@
       </select>
       <label for="floatingSelect">選択</label>
     </div>
-    
+
     <div class="form-check mb-3">
       <input class="form-check-input glass" type="checkbox" id="flexCheckDefault">
       <label class="form-check-label" for="flexCheckDefault">
         チェックボックス
       </label>
     </div>
-    
+
     <button type="submit" class="btn btn-primary glass">送信</button>
   </form>
 </script>
@@ -313,7 +313,7 @@
       <label class="form-label text-primary fw-bold">プレイヤー名</label>
       <input type="text" class="form-control game" placeholder="プレイヤー名を入力">
     </div>
-    
+
     <div class="mb-3">
       <label class="form-label text-primary fw-bold">レベル選択</label>
       <select class="form-select glass">
@@ -322,7 +322,7 @@
         <option>上級者</option>
       </select>
     </div>
-    
+
     <button type="submit" class="btn game w-100">ゲーム開始</button>
   </form>
 </script>
@@ -341,7 +341,7 @@ window.BootstrapFormComponents = {
           control.classList.add('glass');
         }
       });
-      
+
       // Add glass classes to form floating containers
       const floatingContainers = form.querySelectorAll('.form-floating');
       floatingContainers.forEach(container => {
@@ -349,7 +349,7 @@ window.BootstrapFormComponents = {
           container.classList.add('glass');
         }
       });
-      
+
       // Add glass classes to form check inputs
       const checkInputs = form.querySelectorAll('.form-check-input');
       checkInputs.forEach(input => {
@@ -359,7 +359,7 @@ window.BootstrapFormComponents = {
       });
     });
   },
-  
+
   // Create a glass input with floating label
   createGlassInput: function(id, label, type = 'text', placeholder = '') {
     return `
@@ -369,13 +369,13 @@ window.BootstrapFormComponents = {
       </div>
     `;
   },
-  
+
   // Create a glass select with floating label
   createGlassSelect: function(id, label, options = []) {
-    const optionsHtml = options.map(option => 
+    const optionsHtml = options.map(option =>
       `<option value="${option.value || option}">${option.text || option}</option>`
     ).join('');
-    
+
     return `
       <div class="form-floating glass mb-3">
         <select class="form-select glass" id="${id}">
@@ -386,7 +386,7 @@ window.BootstrapFormComponents = {
       </div>
     `;
   },
-  
+
   // Create a glass checkbox
   createGlassCheckbox: function(id, label, checked = false) {
     return `
@@ -398,7 +398,7 @@ window.BootstrapFormComponents = {
       </div>
     `;
   },
-  
+
   // Create a glass switch
   createGlassSwitch: function(id, label, checked = false) {
     return `
@@ -410,7 +410,7 @@ window.BootstrapFormComponents = {
       </div>
     `;
   },
-  
+
   // Initialize game-style forms
   initGameForm: function(selector) {
     const forms = document.querySelectorAll(selector || '.game-form');
@@ -422,7 +422,7 @@ window.BootstrapFormComponents = {
           input.classList.add('game');
         }
       });
-      
+
       const buttons = form.querySelectorAll('button[type="submit"]');
       buttons.forEach(button => {
         if (!button.classList.contains('game')) {
@@ -431,19 +431,19 @@ window.BootstrapFormComponents = {
       });
     });
   },
-  
+
   // Auto-initialize all forms on page load
   autoInit: function() {
     this.initGlassForm();
     this.initGameForm();
-    
+
     // Add focus enhancement
     document.addEventListener('focusin', function(e) {
       if (e.target.classList.contains('form-control') && e.target.classList.contains('glass')) {
         e.target.parentElement?.classList.add('focused');
       }
     });
-    
+
     document.addEventListener('focusout', function(e) {
       if (e.target.classList.contains('form-control') && e.target.classList.contains('glass')) {
         e.target.parentElement?.classList.remove('focused');

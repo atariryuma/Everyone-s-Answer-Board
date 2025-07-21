@@ -3,7 +3,7 @@
    StudyQuest - Unified CSS Styles (Bootstrap 5 Compatible)
    Migrated from Tailwind CSS to Bootstrap with preserved custom styling
    ============================================================================= */
-   
+
 /* Bootstrap 5 Custom Properties Override */
 :root {
   --bs-font-sans-serif: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Google Sans', sans-serif;
@@ -19,12 +19,12 @@
   --bs-warning: #f59e0b;
   --bs-info: #06b6d4;
   --bs-light: #f1f5f9;
-  
+
   /* Dark Theme Background System */
   --bs-dark: #0f172a;
   --bs-body-bg: #1e293b;
   --bs-body-color: #e2e8f0;
-  
+
   /* Legacy Support */
   --color-primary: var(--bs-primary);
   --color-background: var(--bs-body-bg);
@@ -32,38 +32,38 @@
   --color-text: var(--bs-body-color);
   --color-border: rgba(148, 163, 184, 0.2);
   --color-accent: #fbbf24;
-  
+
   /* Surface Color System */
   --color-surface-1: #334155;
   --color-surface-2: #475569;
   --color-surface-3: #64748b;
-  
+
   /* Text Color Hierarchy */
   --color-text-primary: #f1f5f9;
   --color-text-secondary: #e2e8f0;
   --color-text-muted: #94a3b8;
   --color-text-faded: #64748b;
-  
+
   /* Glass Morphism Enhanced */
   --glass-bg: rgba(30, 41, 59, 0.8);
   --glass-border: rgba(148, 163, 184, 0.2);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   --backdrop-blur: 20px;
-  
+
   /* Enhanced Shadow System */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
   --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.3);
-  
+
   /* Animation System Enhanced */
   --transition-duration: 0.2s;
   --transition-easing: ease-out;
   --transition-bounce: cubic-bezier(0.4, 0, 0.2, 1);
   --animation-duration: 0.3s;
   --animation-duration-slow: 0.6s;
-  
+
   /* Google Workspace Colors */
   --color-google-blue: #4285f4;
   --color-google-green: #34a853;
@@ -72,8 +72,8 @@
 }
 
 /* Base Styles */
-body { 
-  margin: 0; 
+body {
+  margin: 0;
   color: var(--color-text);
   background: var(--color-background);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Google Sans', sans-serif;
@@ -84,23 +84,23 @@ body {
 }
 
 /* Enhanced Glass Panel Effects */
-.glass-panel { 
-  background: var(--color-surface); 
-  -webkit-backdrop-filter: blur(var(--backdrop-blur)); 
-  backdrop-filter: blur(var(--backdrop-blur)); 
-  border: 1px solid var(--color-border); 
+.glass-panel {
+  background: var(--color-surface);
+  -webkit-backdrop-filter: blur(var(--backdrop-blur));
+  backdrop-filter: blur(var(--backdrop-blur));
+  border: 1px solid var(--color-border);
   transition: all var(--transition-duration) var(--transition-easing);
   border-radius: 1rem;
-  box-shadow: 
+  box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
     0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-.glass-panel:hover { 
-  border-color: rgba(255,255,255,0.25); 
-  will-change: border-color, box-shadow; 
-  box-shadow: 
+.glass-panel:hover {
+  border-color: rgba(255,255,255,0.25);
+  will-change: border-color, box-shadow;
+  box-shadow:
     0 12px 40px rgba(0, 0, 0, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.15),
     0 1px 0 rgba(255, 255, 255, 0.08);
@@ -114,7 +114,7 @@ body {
   backdrop-filter: blur(24px) saturate(200%);
   border: 1px solid rgba(255, 255, 255, 0.125);
   border-radius: 1.5rem;
-  box-shadow: 
+  box-shadow:
     0 16px 64px rgba(0, 0, 0, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.15),
     0 2px 0 rgba(255, 255, 255, 0.08);
@@ -124,7 +124,7 @@ body {
 .glass-panel-enhanced:hover {
   border-color: rgba(255, 255, 255, 0.2);
   transform: translateY(-4px) scale(1.02);
-  box-shadow: 
+  box-shadow:
     0 24px 80px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.2),
     0 2px 0 rgba(255, 255, 255, 0.1);
@@ -184,36 +184,36 @@ body {
   z-index: 1;
 }
 
-.btn:disabled { 
-  opacity: 0.5; 
-  cursor: not-allowed; 
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
   transform: none !important;
 }
 
-.btn:not(:disabled):hover { 
-  transform: translate3d(0, -2px, 0); 
-  will-change: transform; 
+.btn:not(:disabled):hover {
+  transform: translate3d(0, -2px, 0);
+  will-change: transform;
   box-shadow: var(--shadow-lg);
 }
 
-.btn:not(:disabled):active { 
-  transform: translate3d(0, 0, 0); 
+.btn:not(:disabled):active {
+  transform: translate3d(0, 0, 0);
 }
 
 /* Button Variants */
-.btn-primary { 
+.btn-primary {
   background: linear-gradient(135deg, var(--color-primary), #50fa7b);
   color: #000;
   font-weight: 700;
 }
 
-.btn-secondary { 
+.btn-secondary {
   background: rgba(255,255,255,0.1);
   color: var(--color-text);
   border: 1px solid rgba(255,255,255,0.2);
 }
 
-.btn-danger { 
+.btn-danger {
   background: var(--color-error);
   color: white;
 }
@@ -309,25 +309,25 @@ body {
 }
 
 /* Status Indicators */
-.status-indicator { 
-  width: 8px; 
-  height: 8px; 
-  border-radius: 50%; 
-  display: inline-block; 
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
   margin-right: 8px;
 }
 
-.status-active { 
-  background-color: var(--color-success); 
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); 
+.status-active {
+  background-color: var(--color-success);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
 }
 
-.status-inactive { 
-  background-color: var(--color-warning); 
+.status-inactive {
+  background-color: var(--color-warning);
 }
 
-.status-error { 
-  background-color: var(--color-error); 
+.status-error {
+  background-color: var(--color-error);
 }
 
 /* Enhanced Card System with Micro-interactions */
@@ -477,9 +477,9 @@ body {
 
 /* Loading States */
 .loading-skeleton {
-  background: linear-gradient(90deg, 
-    rgba(255,255,255,0.1) 25%, 
-    rgba(255,255,255,0.2) 50%, 
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.1) 25%,
+    rgba(255,255,255,0.2) 50%,
     rgba(255,255,255,0.1) 75%);
   background-size: 200% 100%;
   animation: loading-skeleton 1.5s infinite;
@@ -488,9 +488,9 @@ body {
 }
 
 .skeleton {
-  background: linear-gradient(90deg, 
-    rgba(255,255,255,0.1) 25%, 
-    rgba(255,255,255,0.2) 50%, 
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.1) 25%,
+    rgba(255,255,255,0.2) 50%,
     rgba(255,255,255,0.1) 75%);
   background-size: 200% 100%;
   animation: skeleton-loading 1.5s infinite;
@@ -587,8 +587,8 @@ body {
 }
 
 /* Tooltip System */
-.tooltip { 
-  position: relative; 
+.tooltip {
+  position: relative;
 }
 
 .tooltip::after {
@@ -610,8 +610,8 @@ body {
   margin-bottom: 5px;
 }
 
-.tooltip:hover::after { 
-  opacity: 1; 
+.tooltip:hover::after {
+  opacity: 1;
 }
 
 /* Card Hover Effects */
@@ -722,10 +722,10 @@ body {
 }
 
 /* Accessibility */
-:focus-visible { 
-  outline: 3px solid var(--color-primary); 
-  outline-offset: 2px; 
-  border-radius: 4px; 
+:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .sr-only {
@@ -878,27 +878,27 @@ body {
 }
 
 @keyframes customModalFadeIn {
-  0% { 
-    opacity: 0; 
-    transform: scale(0.95) translateY(-10px); 
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
     backdrop-filter: blur(0px);
   }
-  100% { 
-    opacity: 1; 
-    transform: scale(1) translateY(0); 
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
     backdrop-filter: blur(10px);
   }
 }
 
 @keyframes customModalFadeOut {
-  0% { 
-    opacity: 1; 
-    transform: scale(1) translateY(0); 
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
     backdrop-filter: blur(10px);
   }
-  100% { 
-    opacity: 0; 
-    transform: scale(0.95) translateY(-10px); 
+  100% {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
     backdrop-filter: blur(0px);
   }
 }
@@ -1034,26 +1034,26 @@ body {
     padding: 1rem 1.5rem;
     font-size: 16px;
   }
-  
+
   .form-control {
     padding: 1rem;
     font-size: 16px;
   }
-  
+
   .glass-panel {
     margin: 0.5rem;
     padding: 1rem;
   }
-  
+
   .responsive-grid {
     grid-template-columns: 1fr;
     gap: 1rem;
   }
-  
+
   .answer-card {
     padding: 1rem;
   }
-  
+
   .reaction-btn {
     padding: 0.5rem 0.75rem;
     font-size: 0.8rem;
