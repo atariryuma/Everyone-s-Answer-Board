@@ -660,5 +660,197 @@ window.switchToAnotherAccount = function() {
   window.sharedUtilities.auth.switchToAnotherAccount();
 };
 
-console.log('✅ SharedUtilities loaded successfully - Version 1.0.0');
+// =============================================================================
+// UNIFIED LOADING MANAGER - Centralized loading overlay management
+// =============================================================================
+
+class UnifiedLoadingManager {
+  constructor() {
+    this.currentState = null;
+    this.overlay = null;
+    this.initialized = false;
+  }
+
+  // Initialize the loading manager
+  init() {
+    if (this.initialized) return;
+    
+    this.overlay = document.getElementById('loading-overlay');
+    if (!this.overlay) {
+      console.warn('Loading overlay element not found');
+      return;
+    }
+    
+    this.initialized = true;
+  }
+
+  // Main loading function with unified API
+  setLoading(isLoading, options = {}) {
+    this.init();
+    if (!this.overlay) return;
+
+    if (isLoading) {
+      this.show(options);
+    } else {
+      this.hide();
+    }
+  }
+
+  // Show loading overlay with options
+  show(options = {}) {
+    const config = {
+      message: options.message || '処理中...',
+      type: options.type || 'overlay', // 'overlay', 'transparent', 'modal', 'progress', 'quickstart'
+      progress: options.progress || null,
+      steps: options.steps || null,
+      disableInteraction: options.disableInteraction !== false,
+      ...options
+    };
+
+    this.currentState = config;
+    
+    // Reset all variant classes
+    this.overlay.className = 'loading-overlay';
+    
+    // Add variant class based on type
+    if (config.type !== 'overlay') {
+      this.overlay.classList.add(config.type);
+    }
+    
+    // Show the overlay
+    this.overlay.classList.remove('hidden');
+    
+    // Update content
+    this.updateContent(config);
+    
+    // Handle interaction disabling
+    if (config.disableInteraction) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.pointerEvents = 'none';
+      this.overlay.style.pointerEvents = 'auto'; // Allow overlay interactions
+    }
+  }
+
+  // Hide loading overlay
+  hide() {
+    if (!this.overlay) return;
+    
+    this.overlay.classList.add('hidden');
+    this.overlay.className = 'loading-overlay hidden';
+    
+    // Restore interaction
+    document.body.style.overflow = '';
+    document.body.style.pointerEvents = '';
+    
+    this.currentState = null;
+  }
+
+  // Update loading content based on configuration
+  updateContent(config) {
+    let content = `<div class="loading-content">`;
+    
+    // Add loading message
+    content += `<div class="loading-message">${this.escapeHtml(config.message)}</div>`;
+    
+    // Add spinner for basic overlay
+    if (config.type === 'overlay' || config.type === 'modal') {
+      content += `<div class="loading-spinner"></div>`;
+    }
+    
+    // Add progress bar if specified
+    if (config.progress !== null) {
+      const progressValue = typeof config.progress === 'object' 
+        ? Math.round((config.progress.current / config.progress.total) * 100)
+        : config.progress;
+        
+      content += `
+        <div class="loading-progress">
+          <div class="loading-progress-bar">
+            <div class="loading-progress-fill" style="width: ${progressValue}%"></div>
+          </div>
+          <div class="loading-percentage">${progressValue}%</div>
+        </div>
+      `;
+    }
+    
+    // Add steps if specified
+    if (config.steps && Array.isArray(config.steps)) {
+      content += `<div class="loading-steps">`;
+      config.steps.forEach((step, index) => {
+        const stepClass = step.status === 'completed' ? 'completed' : 
+                         step.status === 'active' ? 'active' : '';
+        content += `
+          <div class="loading-step ${stepClass}">
+            <div class="loading-step-dot"></div>
+            <div class="loading-step-text">${this.escapeHtml(step.text)}</div>
+          </div>
+        `;
+      });
+      content += `</div>`;
+    }
+    
+    content += `</div>`;
+    this.overlay.innerHTML = content;
+  }
+
+  // Simple HTML escaping
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Update progress (for ongoing operations)
+  updateProgress(progress, message = null) {
+    if (!this.currentState) return;
+    
+    this.currentState.progress = progress;
+    if (message) {
+      this.currentState.message = message;
+    }
+    
+    this.updateContent(this.currentState);
+  }
+
+  // Update steps (for multi-step operations)
+  updateSteps(steps) {
+    if (!this.currentState) return;
+    
+    this.currentState.steps = steps;
+    this.updateContent(this.currentState);
+  }
+
+  // Convenience methods for common use cases
+  showSimple(message = '処理中...') {
+    this.setLoading(true, { message, type: 'overlay' });
+  }
+
+  showProgress(message = '処理中...', progress = 0) {
+    this.setLoading(true, { message, type: 'progress', progress });
+  }
+
+  showTransparent(message = '処理中...') {
+    this.setLoading(true, { message, type: 'transparent' });
+  }
+
+  showQuickStart(message = 'セットアップ中...') {
+    this.setLoading(true, { message, type: 'quickstart' });
+  }
+}
+
+// Create global instance
+window.unifiedLoading = new UnifiedLoadingManager();
+
+// Backward compatibility - simple setLoading function
+window.setLoading = function(isLoading, message = '処理中...', options = {}) {
+  if (typeof message === 'object') {
+    // If second parameter is options object
+    options = message;
+    message = options.message || '処理中...';
+  }
+  
+  window.unifiedLoading.setLoading(isLoading, { message, ...options });
+};
+
+console.log('✅ SharedUtilities loaded successfully - Version 1.1.0 (with UnifiedLoadingManager)');
 </script>

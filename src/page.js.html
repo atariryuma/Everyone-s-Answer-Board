@@ -1193,7 +1193,18 @@ setupEventDelegation() {
   }
 
   // Add these two methods
-  showLoadingOverlay() {
+  showLoadingOverlay(message = '読み込み中...') {
+    // Use unified loading manager if available
+    if (window.unifiedLoading) {
+      window.unifiedLoading.setLoading(true, { 
+        message: message, 
+        type: 'page-specific',
+        disableInteraction: true 
+      });
+      return;
+    }
+    
+    // Fallback to legacy implementation
     if (this.elements.loadingOverlay) {
       this.elements.loadingOverlay.classList.remove('hidden');
     }
@@ -1214,6 +1225,13 @@ setupEventDelegation() {
   }
 
   hideLoadingOverlay() {
+    // Use unified loading manager if available
+    if (window.unifiedLoading) {
+      window.unifiedLoading.setLoading(false);
+      return;
+    }
+    
+    // Fallback to legacy implementation
     if (this.elements.loadingOverlay) {
       this.elements.loadingOverlay.classList.add('hidden');
     }
@@ -1236,7 +1254,7 @@ setupEventDelegation() {
   async loadSheetData(showLoading = true, isInitialLoad = false, requestedSheetName = null) {
     if (this.state.isLoading && showLoading) return;
     this.state.isLoading = true;
-    this.showLoadingOverlay(); // Add this line
+    this.showLoadingOverlay('データを読み込んでいます...'); // Add this line
 
     const selectedClass = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
     const oldAnswers = [...this.state.currentAnswers];

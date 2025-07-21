@@ -417,6 +417,11 @@ body {
   border-radius: 0.5rem;
 }
 
+/* =============================================================================
+   UNIFIED LOADING OVERLAY SYSTEM
+   ============================================================================= */
+
+/* Base loading overlay - default dark semi-transparent */
 .loading-overlay {
   position: fixed;
   top: 0;
@@ -425,22 +430,126 @@ body {
   height: 100%;
   background: rgba(0,0,0,0.8);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   z-index: 8000;
+  transition: all 0.3s ease;
+}
+
+/* Loading overlay variants */
+.loading-overlay.transparent {
+  background: rgba(0,0,0,0.1);
+  pointer-events: none;
+}
+
+.loading-overlay.modal {
+  background: rgba(0,0,0,0.9);
+  z-index: 9000;
+}
+
+.loading-overlay.page-specific {
+  background: rgba(26, 27, 38, 0.8);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1000;
+}
+
+/* QuickStart specific styling */
+.loading-overlay.quickstart {
+  background: rgba(0,0,0,0.1);
+  z-index: 7000;
+  pointer-events: none;
+}
+
+/* Progress display containers */
+.loading-content {
+  color: var(--color-text);
+  text-align: center;
+  padding: 2rem;
+  max-width: 400px;
+}
+
+.loading-message {
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  color: var(--color-text);
+}
+
+.loading-progress {
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.loading-progress-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.loading-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary), #50fa7b);
+  transition: width 0.5s ease;
+  border-radius: 2px;
+}
+
+.loading-percentage {
+  font-size: 0.875rem;
+  color: rgba(255,255,255,0.7);
+}
+
+/* Loading steps display */
+.loading-steps {
+  margin-top: 1.5rem;
+  text-align: left;
+}
+
+.loading-step {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.loading-step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-border);
+  margin-right: 0.75rem;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.loading-step.active .loading-step-dot {
+  background: var(--color-primary);
+  animation: pulse 2s infinite;
+}
+
+.loading-step.completed .loading-step-dot {
+  background: var(--color-success);
+}
+
+.loading-step-text {
+  color: var(--color-text);
+}
+
+.loading-step.active .loading-step-text {
+  color: var(--color-primary);
+}
+
+.loading-step.completed .loading-step-text {
+  color: var(--color-success);
 }
 
 /* QuickStart progress bar should be above loading overlay */
 #quickstart-progress {
   position: relative;
   z-index: 8500 !important;
-}
-
-/* Make sure QuickStart progress is visible during loading */
-.loading-overlay.quickstart-active {
-  background: rgba(0,0,0,0.1);
-  z-index: 7000;
-  pointer-events: none; /* Allow interaction with progress bar */
 }
 
 /* Completed section styling - only show checkmark when truly completed */

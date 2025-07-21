@@ -258,62 +258,48 @@ function adjustLayout() {
   }
 }
 
-// Set loading state and message with progress
+// Set loading state using unified loading manager
 function setLoading(flag, text = '処理中...', step = 0, percentage = 0) {
   logDebug(`setLoading called: flag=${flag}, text=${text}, step=${step}, percentage=${percentage}`);
+  
+  // Use unified loading manager if available
+  if (window.unifiedLoading) {
+    if (flag) {
+      const options = {
+        message: text,
+        type: 'progress', // Always use progress type for admin panel
+        progress: percentage,
+        disableInteraction: true
+      };
+      
+      // Add step information if provided
+      if (step > 0) {
+        const steps = [
+          { text: 'システム情報を読み込み中...', status: step > 1 ? 'completed' : step === 1 ? 'active' : 'pending' },
+          { text: 'ユーザー情報を取得中...', status: step > 2 ? 'completed' : step === 2 ? 'active' : 'pending' },
+          { text: 'シート情報と設定を適用中...', status: step > 3 ? 'completed' : step === 3 ? 'active' : 'pending' },
+          { text: 'UIを最終調整中...', status: step > 4 ? 'completed' : step === 4 ? 'active' : 'pending' }
+        ];
+        options.steps = steps;
+      }
+      
+      window.unifiedLoading.setLoading(true, options);
+    } else {
+      window.unifiedLoading.setLoading(false);
+    }
+    return;
+  }
+  
+  // Fallback to legacy implementation if unified loading not available
+  console.warn('Unified loading manager not available, using fallback');
   const overlay = document.getElementById('loading-overlay');
-  const loadingMessage = document.getElementById('loading-message');
-  const progressBar = document.getElementById('loading-progress-bar');
-  const progressPercentage = document.getElementById('loading-progress-percentage');
-
   if (overlay) {
     if (flag) {
       overlay.classList.remove('hidden');
-      // 画面全体を操作不能にする
       document.body.style.overflow = 'hidden';
       document.body.style.pointerEvents = 'none';
-
-      if (loadingMessage) {
-        loadingMessage.textContent = text;
-      }
-      if (progressBar) {
-        progressBar.style.width = `${percentage}%`;
-      }
-      if (progressPercentage) {
-        progressPercentage.textContent = `${percentage}%`;
-      }
-
-      // Update individual steps
-      for (let i = 1; i <= 4; i++) {
-        const stepDot = document.getElementById(`loading-step-${i}-dot`);
-        const stepText = document.getElementById(`loading-step-${i}-text`);
-        const stepDetail = document.getElementById(`loading-step-${i}-detail`);
-
-        if (stepDot && stepText && stepDetail) {
-          if (i < step) {
-            stepDot.className = 'w-2 h-2 rounded-full bg-green-400';
-            stepText.classList.remove('text-gray-300', 'text-emerald-300');
-            stepText.classList.add('text-green-300');
-            stepDetail.classList.remove('text-gray-500', 'text-emerald-400');
-            stepDetail.classList.add('text-green-400');
-          } else if (i === step) {
-            stepDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
-            stepText.classList.remove('text-gray-300', 'text-green-300');
-            stepText.classList.add('text-emerald-300');
-            stepDetail.classList.remove('text-gray-500', 'text-green-400');
-            stepDetail.classList.add('text-emerald-400');
-          } else {
-            stepDot.className = 'w-2 h-2 rounded-full bg-gray-400';
-            stepText.classList.remove('text-emerald-300', 'text-green-300');
-            stepText.classList.add('text-gray-300');
-            stepDetail.classList.remove('text-emerald-400', 'text-green-400');
-            stepDetail.classList.add('text-gray-500');
-          }
-        }
-      }
     } else {
       overlay.classList.add('hidden');
-      // 画面操作を可能にする
       document.body.style.overflow = '';
       document.body.style.pointerEvents = '';
     }
