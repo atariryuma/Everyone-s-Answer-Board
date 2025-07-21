@@ -8,104 +8,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#1a1b26" />
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
-  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), screen-wake-lock=(), accelerometer=(), gyroscope=(), magnetometer=(), ambient-light-sensor=(), speaker=(), vibrate=(), vr=()" />
+  <!-- Shared Security Headers -->
+  <?!= include('SharedSecurityHeaders'); ?>
+  
   <!-- User ID will be retrieved dynamically from backend -->
 
 
-  <!-- TailwindCSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    // Comprehensive console warnings suppression
-    (function() {
-      // Store original console methods
-      const originalWarn = console.warn;
-      const originalInfo = console.info;
-      const originalLog = console.log;
-      const originalError = console.error;
-      
-      // Patterns to suppress
-      const suppressPatterns = [
-        'cdn.tailwindcss.com should not be used in production',
-        'tailwindcss.com should not be used in production',
-        'TailwindCSS',
-        'Tailwind CSS',
-        'tailwind',
-        '-ms-high-contrast is in the process of being deprecated',
-        'Feature Policy',
-        'Permissions Policy', 
-        'Unrecognized feature',
-        'deprecated',
-        'iframe.*sandbox.*allow-scripts.*allow-same-origin',
-        'sandbox attribute can escape its sandboxing',
-        'has both allow-scripts and allow-same-origin',
-        'can escape its sandboxing',
-        'Net state changed from',
-        'warden_bin',
-        'mae_html_user',
-        'unrecognized feature',
-        'ambient-light-sensor',
-        'speaker',
-        'vibrate',
-        'vr',
-        'cdn.tailwindcss.com should not be used in production',
-        'tailwindcss.com/docs/installation',
-        'should not be used in production',
-        'PostCSS plugin',
-        'Tailwind CLI',
-        'Explain Console errors by using Copilot',
-        'Learn more',
-        'Don\'t show again'
-      ];
-      
-      // Helper function to check if message should be suppressed
-      function shouldSuppress(args) {
-        const message = args[0] ? String(args[0]).toLowerCase() : '';
-        return suppressPatterns.some(pattern => {
-          const regex = new RegExp(pattern.toLowerCase(), 'i');
-          return regex.test(message);
-        });
-      }
-      
-      // Override console.warn
-      console.warn = function(...args) {
-        if (!shouldSuppress(args)) {
-          originalWarn.apply(console, args);
-        }
-      };
-      
-      // Override console.info
-      console.info = function(...args) {
-        if (!shouldSuppress(args)) {
-          originalInfo.apply(console, args);
-        }
-      };
-      
-      // Override console.log for specific patterns
-      console.log = function(...args) {
-        if (!shouldSuppress(args)) {
-          originalLog.apply(console, args);
-        }
-      };
-      
-      // Enhanced error filtering but keep important errors
-      console.error = function(...args) {
-        const message = args[0] ? String(args[0]) : '';
-        if (!message.includes('cdn.tailwindcss.com') && 
-            !message.includes('TailwindCSS') &&
-            !message.includes('Tailwind CSS')) {
-          originalError.apply(console, args);
-        }
-      };
-    })();
-  </script>
+  <!-- Shared TailwindCSS Configuration -->
+  <?!= include('SharedTailwindConfig'); ?>
+  
+  <!-- Admin Panel Specific Styles - Tailwind CDNの後に読み込んで適切なカスケードを確保 -->
+  <?!= include('adminPanel-layout.css'); ?>
+  <?!= include('adminPanel.css'); ?>
 
   <!-- Unified Styles and Shared Components -->
   <?!= include('UnifiedStyles'); ?>
   <?!= include('SharedUtilities'); ?>
-  
-  <!-- Admin Panel Specific Styles -->
-  <?!= include('adminPanel-layout.css'); ?>
-  <?!= include('adminPanel.css'); ?>
   
   
   <!-- Core JavaScript Libraries (must be loaded first) -->

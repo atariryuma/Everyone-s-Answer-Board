@@ -5,8 +5,12 @@
     <base target="_top">
     <title>StudyQuest -みんなの回答ボード- - 準備中</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- TailwindCSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Shared Security Headers -->
+    <?!= include('SharedSecurityHeaders'); ?>
+    
+    <!-- Shared TailwindCSS Configuration -->
+    <?!= include('SharedTailwindConfig'); ?>
     <?= include('UnifiedStyles'); ?>
     <?= include('SharedUtilities'); ?>
     <style>
