@@ -58,53 +58,54 @@ function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
 // STATUS AND DATA LOADING
 // =============================================================================
 
-// Load current status from backend
-function loadStatus(forceRefresh = false) {
-  updateUserActivity();
-  
-  const statusMessage = forceRefresh ? 
-    'システム情報を最新化しています...' : 
-    'ダッシュボードを読み込んでいます...';
-  
-  setLoading(true, statusMessage);
-  
-  const cacheKey = 'status_' + (userId || 'guest');
-  const cacheTime = 60000; // 1分キャッシュ
-  
-  if (forceRefresh) {
-    // キャッシュを削除してから取得
-    if (unifiedCache && unifiedCache.delete) {
-      unifiedCache.delete(cacheKey);
-    }
-    // マルチテナント対応: 新しい関数を使用
-    runGasWithUserId('getAppConfig')
-      .then(function(status) {
-        updateUIWithNewStatus(status);
-        setLoading(false);
-      })
-      .catch(function(error) {
-        logError('getAppConfig failed, falling back to legacy:', error);
-        // フォールバック: 従来の方法
-        runGasWithUserId('getStatus', forceRefresh)
-          .then(function(status) {
-            updateUIWithNewStatus(status);
-            setLoading(false);
-          })
-          .catch(function(error) {
-            handleError(error, 'loadStatus', 'ステータスの読み込みに失敗しました。');
-          });
-      });
-  } else {
-    // キャッシュ利用
-    callWithCacheWithUserId('getAppConfig', cacheKey, cacheTime)
-      .then(function(status) {
-        updateUIWithNewStatus(status);
-        setLoading(false);
-      })
-      .catch(function(error) {
-        handleError(error, 'loadStatus', 'ステータスの読み込みに失敗しました。');
-      });
-  }
+// Load system status - OPTIMIZED with integrated API
+function loadStatus(bypassCache = false) {
+  console.group('🔄 loadStatus - Integrated API');
+  console.log('🚀 Loading system status with integrated API, bypassCache:', bypassCache);
+
+  // Single API call to get all initial data
+  setLoading(true, 'システム情報を読み込み中...', 1, 10); // Step 1: Initializing
+
+  runGasWithUserId('getInitialData')
+    .then(response => {
+      console.log('✅ Integrated data loaded:', response);
+      setLoading(true, 'ユーザー情報を取得中...', 2, 40); // Step 2: User Info
+
+      // Extract userId for compatibility
+      if (response.userInfo && response.userInfo.userId) {
+        userId = response.userInfo.userId;
+        console.log('✅ userId extracted from integrated response:', userId);
+      }
+
+      // Update UI with integrated response
+      updateUIWithNewStatus(response);
+      setLoading(true, 'シート情報と設定を適用中...', 3, 70); // Step 3: Sheet Info & Config
+
+      // If sheet details are included, apply them immediately
+      if (response.sheetDetails && response.activeSheetName) {
+        console.log('✅ Sheet details included in integrated response, applying configuration');
+        try {
+          populateHeaderOptions(response.sheetDetails.allHeaders);
+          console.log('✅ Header options populated from integrated data');
+          populateConfig(response.sheetDetails.guessedConfig);
+          console.log('✅ AI configuration applied from integrated data');
+        } catch (configError) {
+          console.error('Error applying sheet configuration from integrated data:', configError);
+        }
+      }
+      setLoading(true, 'UIを最終調整中...', 4, 90); // Step 4: UI Rendering
+
+      console.log('⚡ Performance: Single API call replaced 3-4 separate calls');
+    })
+    .catch(error => {
+      console.error('❌ Integrated API failed:', error);
+      showMessage('システムステータスの読み込みに失敗しました', 'error');
+      setLoading(false); // Hide loading on error
+    })
+    .finally(() => {
+      setLoading(false); // Hide loading when done
+      console.groupEnd();
+    });
 }
 
 // Load sheet configuration for selected sheet
