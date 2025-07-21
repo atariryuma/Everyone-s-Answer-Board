@@ -1212,7 +1212,7 @@ setupEventDelegation() {
   async loadSheetData(showLoading = true, isInitialLoad = false, requestedSheetName = null) {
     if (this.state.isLoading && showLoading) return;
     this.state.isLoading = true;
-    this.showLoadingOverlay('データを読み込んでいます...'); // Add this line
+    this.showLoadingOverlay(''); // Add this line
 
     const selectedClass = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
     const oldAnswers = [...this.state.currentAnswers];
