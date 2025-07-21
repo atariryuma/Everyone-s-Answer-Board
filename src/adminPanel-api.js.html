@@ -67,10 +67,9 @@ function loadStatus(bypassCache = false) {
   logDebug('Calling setLoading(true) from loadStatus');
   setLoading(true, 'システム情報を読み込み中...', 1, 10); // Step 1: Initializing
 
-  runGasWithUserId('getInitialData')
+  sharedUtilities.gas.callWithLoading('getInitialData', 'システム情報を読み込み中...')
     .then(response => {
       console.log('✅ Integrated data loaded:', response);
-      setLoading(true, 'ユーザー情報を取得中...', 2, 40); // Step 2: User Info
 
       // Extract userId for compatibility
       if (response.userInfo && response.userInfo.userId) {
@@ -80,7 +79,6 @@ function loadStatus(bypassCache = false) {
 
       // Update UI with integrated response
       updateUIWithNewStatus(response);
-      setLoading(true, 'シート情報と設定を適用中...', 3, 70); // Step 3: Sheet Info & Config
 
       // If sheet details are included, apply them immediately
       if (response.sheetDetails && response.activeSheetName) {
@@ -94,17 +92,13 @@ function loadStatus(bypassCache = false) {
           console.error('Error applying sheet configuration from integrated data:', configError);
         }
       }
-      setLoading(true, 'UIを最終調整中...', 4, 90); // Step 4: UI Rendering
-
       console.log('⚡ Performance: Single API call replaced 3-4 separate calls');
     })
     .catch(error => {
       console.error('❌ Integrated API failed:', error);
       showMessage('システムステータスの読み込みに失敗しました', 'error');
-      setLoading(false); // Hide loading on error
     })
     .finally(() => {
-      setLoading(false); // Hide loading when done
       console.groupEnd();
     });
 }
@@ -122,9 +116,7 @@ function loadConfigForSelected() {
     return;
   }
   
-  setLoading(true, '列情報を読み込んでいます...');
-  
-  runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
+  sharedUtilities.gas.callWithLoading('getSheetDetails', 'シート情報を読み込み中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
     .then(handleSheetDetailsSuccess)
     .catch(handleSheetDetailsError);
 }
@@ -157,8 +149,6 @@ function handleSheetDetailsSuccess(details) {
     logWarn('No headers in sheet details:', details);
     showMessage('シートの詳細情報を取得できませんでした。', 'warning');
   }
-  
-  setLoading(false);
 }
 
 // Handle sheet details loading error
@@ -183,9 +173,7 @@ function runHeaderGuessing() {
     return;
   }
   
-  setLoading(true, 'AI搭載高精度列判定システムが分析中...');
-  
-  runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
+  sharedUtilities.gas.callWithLoading('getSheetDetails', 'AI搭載高精度列判定システムが分析中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
     .then(function(details) {
       const configToUse = {
         ...details.guessedConfig,
@@ -195,7 +183,6 @@ function runHeaderGuessing() {
       setTimeout(() => {
         populateConfig(configToUse);
         showMessage('AI列判定が完了しました！設定を確認して「保存・公開」を押してください。', 'success');
-        setLoading(false);
       }, 0);
     })
     .catch(function(error) {
@@ -219,22 +206,8 @@ function saveAndPublish() {
   freshSaveTimestamp = Date.now();
   window.freshSaveTimestamp = freshSaveTimestamp;
   
-  setLoading(true, '設定を保存し、ボードを公開しています...');
-  
-  const config = buildConfigObject();
-  
-  // Clear all caches once before save
-  if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-    window.unifiedCache.clear();
-  }
-  
-  if (window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
-    window.gasOptimizer.clearCache();
-  }
-  
-  runGasWithUserId('saveAndPublish', selectedSheet, config)
+  sharedUtilities.gas.callWithLoading('saveAndPublish', '設定を保存し、ボードを公開しています...', selectedSheet, config)
     .then(function(result) {
-      setLoading(false);
       isSaveInProgress = false;
       
       // Check if result has data (from integrated API) or legacy success status
@@ -258,7 +231,6 @@ function saveAndPublish() {
     })
     .catch(function(error) {
       logError('saveAndPublish error:', error);
-      setLoading(false);
       isSaveInProgress = false;
       
       // Clear caches after error and reload
@@ -273,12 +245,10 @@ function saveAndPublish() {
 
 // Unpublish board
 function unpublishBoard() {
-  setLoading(true, 'ボードの公開を停止中...');
-  runGasWithUserId('unpublishBoard')
+  sharedUtilities.gas.callWithLoading('unpublishBoard', 'ボードの公開を停止中...')
     .then(function(response) {
       console.log('公開停止レスポンス:', response);
       showMessage(response.message || '✅ 回答ボードの公開を停止しました。', 'success');
-      setLoading(false);
       if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
         window.unifiedCache.clear();
       }
@@ -295,7 +265,7 @@ function unpublishBoard() {
 
 // Load saved class choices
 function loadSavedClassChoices() {
-    runGasWithUserId('getSavedClassChoices')
+    sharedUtilities.gas.callWithLoading('getSavedClassChoices', 'クラス選択肢を読み込み中...')
         .then(function(result) {
             if (result.status === 'success' && result.classChoices) {
                 const classChoicesTextarea = document.getElementById('class-choices');
@@ -306,6 +276,7 @@ function loadSavedClassChoices() {
         })
         .catch(function(error) {
             console.warn('保存されたクラス選択肢の読み込みに失敗:', error.message);
+            showMessage('クラス選択肢の読み込みに失敗しました。', 'error');
         });
 }
 
@@ -365,9 +336,7 @@ function createFormWithConfig() {
     return;
   }
   
-  // runGasWithUserIdを使用して統一されたAPIコールに変更（UI用ラッパー関数を呼び出し）
-  console.log('📤 Sending config to createCustomFormUI:', config);
-  runGasWithUserId('createCustomFormUI', config)
+  sharedUtilities.gas.callWithLoading('createCustomFormUI', 'カスタムフォームを作成中...', config)
     .then(function(result) {
       console.log('📥 Received response from createCustomFormUI:', result);
       if (result && result.status === 'success') {
@@ -394,7 +363,6 @@ function createFormWithConfig() {
           hideQuickStartProgress();
         }, 2000);
       }
-      setLoading(false);
     })
     .catch(function(error) {
       console.error('フォーム作成エラー:', error);
@@ -406,7 +374,6 @@ function createFormWithConfig() {
       }
       
       showMessage(errorMessage, 'error');
-      setLoading(false);
       
       // エラー時も進捗バーを非表示
       setTimeout(() => {
@@ -441,8 +408,7 @@ function addResource() {
     return;
   }
 
-  setLoading(true, 'リソースを追加しています...');
-  runGasWithUserId('addSpreadsheetUrl', url)
+  sharedUtilities.gas.callWithLoading('addSpreadsheetUrl', 'リソースを追加しています...', url)
     .then(function(result) {
       if (result.status === 'success') {
         showMessage(result.message, 'success');
@@ -451,7 +417,6 @@ function addResource() {
       } else {
         showMessage(result.message || 'リソースの追加に失敗しました。', 'error');
       }
-      setLoading(false);
     })
     .catch(function(error) {
       handleError(error, 'addResource', 'リソースの追加に失敗しました。');
@@ -527,7 +492,7 @@ function openForm() {
 
 // Open app setup page
 function openAppSetupPage() {
-  runGasWithUserId('getWebAppUrl')
+  sharedUtilities.gas.callWithLoading('getWebAppUrl', 'アプリ設定ページを準備中...')
     .then(function(webAppUrl) {
       const setupUrl =
         webAppUrl + '?setup=true&mode=appsetup&userId=' + encodeURIComponent(userId);
@@ -797,7 +762,7 @@ function handleQuickStart() {
   // Show loading message optimized for QuickStart
   // クイックスタート中は専用のプログレスバーを使用するため、汎用ローディングは表示しない
   
-  runGasWithUserId('quickStartSetup')
+  sharedUtilities.gas.callWithLoading('quickStartSetup', 'クイックスタートセットアップ中...')
     .then(function(result) {
       if (result && result.status === 'success') {
         // Final progress update
@@ -846,8 +811,6 @@ function handleQuickStart() {
           hideQuickStartProgress();
         }, 3000);
       }
-      
-      setLoading(false);
     })
     .catch(function(error) {
       logError('QuickStart error:', error);
@@ -871,7 +834,6 @@ function handleQuickStart() {
       
       quickstartBtn.disabled = false;
       quickstartText.textContent = 'クイックスタートを開始';
-      setLoading(false);
       
       // Hide progress bar after delay
       setTimeout(() => {
@@ -934,8 +896,8 @@ function initializeAPI() {
 
 // Load user information
 function loadUserInfo() {
-  if (typeof runGasWithUserId === 'function') {
-    runGasWithUserId('getUserInfo')
+  if (typeof sharedUtilities.gas.callWithLoading === 'function') {
+    sharedUtilities.gas.callWithLoading('getUserInfo', 'ユーザー情報を読み込み中...')
       .then(userInfo => {
         if (userInfo) {
           document.getElementById('info-admin-email').textContent = userInfo.email || '-';
@@ -944,19 +906,21 @@ function loadUserInfo() {
       })
       .catch(error => {
         console.error('Failed to load user info:', error);
+        showMessage('ユーザー情報の読み込みに失敗しました。', 'error');
       });
   }
 }
 
 // Load system status
 function loadSystemStatus() {
-  if (typeof runGasWithUserId === 'function') {
-    runGasWithUserId('getAppConfig')
+  if (typeof sharedUtilities.gas.callWithLoading === 'function') {
+    sharedUtilities.gas.callWithLoading('getAppConfig', 'システム設定を読み込み中...')
       .then(status => {
         updateSystemStatusDisplay(status);
       })
       .catch(error => {
         console.error('Failed to load system status:', error);
+        showMessage('システム設定の読み込みに失敗しました。', 'error');
       });
   }
 }

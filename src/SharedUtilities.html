@@ -409,6 +409,26 @@ class GASUtilities {
     });
   }
 
+  // GAS function call with loading overlay
+  callWithLoading(functionName, message = '処理中...', ...args) {
+    return new Promise((resolve, reject) => {
+      window.unifiedLoading.showSimple(message); // Show loading overlay
+
+      google.script.run
+        .withSuccessHandler(result => {
+          window.unifiedLoading.hide(); // Hide loading overlay on success
+          resolve(result);
+        })
+        .withFailureHandler(error => {
+          window.unifiedLoading.hide(); // Hide loading overlay on failure
+          // Log the error using the shared error handler
+          window.sharedUtilities.errors.logError(error, `GAS call failed: ${functionName}`);
+          reject(error);
+        })
+        [functionName](...args);
+    });
+  }
+
   // Check if running in GAS environment
   isGASEnvironment() {
     return typeof google !== 'undefined' &&
