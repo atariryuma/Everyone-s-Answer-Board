@@ -677,17 +677,23 @@ class UnifiedLoadingManager {
     
     this.overlay = document.getElementById('loading-overlay');
     if (!this.overlay) {
-      console.warn('Loading overlay element not found');
-      return;
+      console.warn('UnifiedLoadingManager: loading-overlay element not found, will retry');
+      // Retry after DOM is ready
+      setTimeout(() => this.init(), 100);
+      return false;
     }
     
+    console.log('UnifiedLoadingManager: Initialized successfully');
     this.initialized = true;
+    return true;
   }
 
   // Main loading function with unified API
   setLoading(isLoading, options = {}) {
-    this.init();
-    if (!this.overlay) return;
+    if (!this.init()) {
+      console.warn('UnifiedLoadingManager: Failed to initialize, cannot show loading');
+      return;
+    }
 
     if (isLoading) {
       this.show(options);
@@ -836,20 +842,56 @@ class UnifiedLoadingManager {
   showQuickStart(message = 'セットアップ中...') {
     this.setLoading(true, { message, type: 'quickstart' });
   }
+
+  // AdminPanel-specific convenience method
+  showAdminProgress(message, step = 0, percentage = 0) {
+    const options = {
+      message: message,
+      type: 'progress',
+      progress: percentage,
+      disableInteraction: true
+    };
+    
+    // Add step information if provided
+    if (step > 0) {
+      const steps = [
+        { text: 'システム情報を読み込み中...', status: step > 1 ? 'completed' : step === 1 ? 'active' : 'pending' },
+        { text: 'ユーザー情報を取得中...', status: step > 2 ? 'completed' : step === 2 ? 'active' : 'pending' },
+        { text: 'シート情報と設定を適用中...', status: step > 3 ? 'completed' : step === 3 ? 'active' : 'pending' },
+        { text: 'UIを最終調整中...', status: step > 4 ? 'completed' : step === 4 ? 'active' : 'pending' }
+      ];
+      options.steps = steps;
+    }
+    
+    this.setLoading(true, options);
+  }
 }
 
 // Create global instance
 window.unifiedLoading = new UnifiedLoadingManager();
 
-// Backward compatibility - simple setLoading function
-window.setLoading = function(isLoading, message = '処理中...', options = {}) {
+// Backward compatibility - enhanced setLoading function
+window.setLoading = function(isLoading, message = '処理中...', step = 0, percentage = 0) {
+  // Handle different parameter patterns
   if (typeof message === 'object') {
-    // If second parameter is options object
-    options = message;
-    message = options.message || '処理中...';
+    // If second parameter is options object: setLoading(true, { message: '...', ... })
+    const options = message;
+    window.unifiedLoading.setLoading(isLoading, options);
+    return;
   }
   
-  window.unifiedLoading.setLoading(isLoading, { message, ...options });
+  // Handle AdminPanel pattern: setLoading(true, 'message', step, percentage)
+  if (typeof step === 'number' && step > 0) {
+    window.unifiedLoading.showAdminProgress(message, step, percentage);
+    return;
+  }
+  
+  // Handle simple pattern: setLoading(true, 'message')
+  if (isLoading) {
+    window.unifiedLoading.showSimple(message);
+  } else {
+    window.unifiedLoading.setLoading(false);
+  }
 };
 
 console.log('✅ SharedUtilities loaded successfully - Version 1.1.0 (with UnifiedLoadingManager)');

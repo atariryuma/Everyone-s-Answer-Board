@@ -258,53 +258,8 @@ function adjustLayout() {
   }
 }
 
-// Set loading state using unified loading manager
-function setLoading(flag, text = '処理中...', step = 0, percentage = 0) {
-  logDebug(`setLoading called: flag=${flag}, text=${text}, step=${step}, percentage=${percentage}`);
-  
-  // Use unified loading manager if available
-  if (window.unifiedLoading) {
-    if (flag) {
-      const options = {
-        message: text,
-        type: 'progress', // Always use progress type for admin panel
-        progress: percentage,
-        disableInteraction: true
-      };
-      
-      // Add step information if provided
-      if (step > 0) {
-        const steps = [
-          { text: 'システム情報を読み込み中...', status: step > 1 ? 'completed' : step === 1 ? 'active' : 'pending' },
-          { text: 'ユーザー情報を取得中...', status: step > 2 ? 'completed' : step === 2 ? 'active' : 'pending' },
-          { text: 'シート情報と設定を適用中...', status: step > 3 ? 'completed' : step === 3 ? 'active' : 'pending' },
-          { text: 'UIを最終調整中...', status: step > 4 ? 'completed' : step === 4 ? 'active' : 'pending' }
-        ];
-        options.steps = steps;
-      }
-      
-      window.unifiedLoading.setLoading(true, options);
-    } else {
-      window.unifiedLoading.setLoading(false);
-    }
-    return;
-  }
-  
-  // Fallback to legacy implementation if unified loading not available
-  console.warn('Unified loading manager not available, using fallback');
-  const overlay = document.getElementById('loading-overlay');
-  if (overlay) {
-    if (flag) {
-      overlay.classList.remove('hidden');
-      document.body.style.overflow = 'hidden';
-      document.body.style.pointerEvents = 'none';
-    } else {
-      overlay.classList.add('hidden');
-      document.body.style.overflow = '';
-      document.body.style.pointerEvents = '';
-    }
-  }
-}
+// AdminPanel no longer overrides global setLoading
+// Uses unified loading system with admin-specific configurations
 
 
 // =============================================================================
