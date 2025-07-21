@@ -6,17 +6,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <!-- Content Security Policy for enhanced security -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://fonts.googleapis.com https://script.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' https:; img-src 'self' data: https:;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://fonts.googleapis.com https://script.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https:; img-src 'self' data: https:;">
 <!-- Permissions Policy to silence console warnings -->
 <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), screen-wake-lock=(), accelerometer=(), gyroscope=(), magnetometer=(), ambient-light-sensor=(), speaker=(), vibrate=(), vr=()">
 <!-- Preload Google Fonts for better performance -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
-<!-- Bootstrap CSS & Icons -->
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<!-- Global error handling -->
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&amp;display=swap" rel="stylesheet">
+<!-- Global error handling and TailwindCSS setup -->
 <script>
 // Global error handling for document.write and other issues
 window.addEventListener('error', function(event) {
@@ -35,7 +32,16 @@ window.addEventListener('unhandledrejection', function(event) {
   console.warn('Unhandled promise rejection:', event.reason);
   event.preventDefault();
 });
+
+// TailwindCSS configuration to suppress production warnings
+window.tailwind = {
+  config: {
+    mode: 'jit',
+    corePlugins: { preflight: false }
+  }
+};
 </script>
+<script src="https://cdn.tailwindcss.com" defer onerror="console.warn('TailwindCSS failed to load')"></script>
 <script>
 const DEBUG_MODE = '<?= typeof DEBUG_MODE !== "undefined" ? DEBUG_MODE : "false" ?>' === 'true';
 function debugLog() {
@@ -57,16 +63,16 @@ function debugLog() {
 
 function safeDebugStringify(obj, maxDepth = 2, currentDepth = 0) {
   if (currentDepth > maxDepth) return '[Max Depth Reached]';
-
+  
   try {
     if (obj === null || obj === undefined) return obj;
     if (typeof obj !== 'object') return obj;
-
+    
     // DOM要素の安全な表示
     if (obj instanceof HTMLElement) {
       return `[${obj.tagName}${obj.id ? '#' + obj.id : ''}${obj.className ? '.' + obj.className.split(' ').slice(0, 2).join('.') : ''}]`;
     }
-
+    
     // 配列の安全な表示
     if (Array.isArray(obj)) {
       if (obj.length > 5) {
@@ -74,7 +80,7 @@ function safeDebugStringify(obj, maxDepth = 2, currentDepth = 0) {
       }
       return obj.map(item => safeDebugStringify(item, maxDepth, currentDepth + 1));
     }
-
+    
     // オブジェクトの安全な表示
     const result = {};
     let count = 0;
@@ -137,7 +143,6 @@ try {
 }
 </script>
 <?!= include('SharedUtilities'); ?>
-<?!= include('BootstrapFormComponents'); ?>
 <style>
 :root {
   --color-primary: #8be9fd;
@@ -163,7 +168,7 @@ body {
   margin: 0;
   overflow-x: hidden;
 }
-.glass-panel {
+.glass-panel { 
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   backdrop-filter: blur(var(--backdrop-blur));
@@ -186,25 +191,25 @@ body {
   position: relative;
   overflow: hidden;
 }
-.game-btn:not(:disabled):hover {
-  transform: translate3d(0, -2px, 0);
+.game-btn:not(:disabled):hover { 
+  transform: translate3d(0, -2px, 0); 
   box-shadow: 0 8px 16px rgba(0,0,0,0.3);
 }
-.game-btn:active:not(:disabled) {
-  transform: translate3d(0, 2px, 0);
-  border-bottom-width: 2px;
+.game-btn:active:not(:disabled) { 
+  transform: translate3d(0, 2px, 0); 
+  border-bottom-width: 2px; 
 }
 .game-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none !important;
 }
-#classFilter, #sortOrder {
-  background-color: #6272a4;
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-  border-radius: 0.75rem;
-  padding: 0.5rem 0.75rem;
+#classFilter, #sortOrder { 
+  background-color: #6272a4; 
+  border: 1px solid var(--color-border); 
+  color: var(--color-text); 
+  border-radius: 0.75rem; 
+  padding: 0.5rem 0.75rem; 
   transition: border-color var(--transition-duration) var(--transition-easing),
               box-shadow var(--transition-duration) var(--transition-easing);
 }
@@ -212,20 +217,20 @@ body {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(139, 233, 253, 0.1);
 }
-:focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 2px;
-  border-radius: 0.75rem;
+:focus-visible { 
+  outline: 3px solid var(--color-primary); 
+  outline-offset: 2px; 
+  border-radius: 0.75rem; 
 }
-header {
-  position: sticky;
-  top: 0;
-  z-index: 50;
+header { 
+  position: sticky; 
+  top: 0; 
+  z-index: 50; 
   contain: layout;
   backdrop-filter: blur(var(--backdrop-blur));
   -webkit-backdrop-filter: blur(var(--backdrop-blur));
 }
-.answer-card {
+.answer-card { 
   transition: transform var(--animation-duration) var(--transition-easing),
               box-shadow var(--animation-duration) var(--transition-easing);
   border-radius: 1rem;
@@ -236,7 +241,7 @@ header {
 .answer-card.highlighted {
   border-image: linear-gradient(45deg, #9333ea, #c084fc, #9333ea) 1 !important;
   border-width: 4px !important;
-  box-shadow:
+  box-shadow: 
     0 0 25px rgba(147, 51, 234, 0.6),
     inset 0 0 20px rgba(192, 132, 252, 0.1),
     0 8px 32px rgba(147, 51, 234, 0.2);
@@ -350,17 +355,17 @@ header {
     --transition-duration: 0.1s;
     --animation-duration: 0.15s;
   }
-
+  
   .glass-panel {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
     background: var(--color-surface);
   }
-
+  
   .answer-card:hover {
     transform: none;
   }
-
+  
   .reaction-btn:hover {
     transform: scale(1.05);
   }
@@ -412,14 +417,14 @@ header {
     --animation-duration: 0.01ms;
     --backdrop-blur: 0px;
   }
-
+  
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     transform: none !important;
   }
-
+  
   .answer-card:hover,
   .reaction-btn:hover,
   .game-btn:hover {
@@ -500,46 +505,46 @@ header {
 .reaction-border-1 { border-width: 2px; }
 .reaction-border-2 { border-width: 4px; }
 .reaction-border-3 { border-width: 6px; }
-.answer-preview {
-  display: -webkit-box;
-  -webkit-line-clamp: 5;
-  line-clamp: 5;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-height: 120px;
+.answer-preview { 
+  display: -webkit-box; 
+  -webkit-line-clamp: 5; 
+  line-clamp: 5; 
+  -webkit-box-orient: vertical; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  min-height: 120px; 
 }
-.like-btn svg {
+.like-btn svg { 
   transition: fill var(--transition-duration) var(--transition-easing),
               transform var(--transition-duration) var(--transition-easing);
   fill: none;
 }
 .like-btn.liked svg { stroke: transparent; fill: currentColor; transform: scale(1.1); }
 .like-btn.loading {   opacity: 0.7; position: relative; }
-.like-btn.loading::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border: 2px solid transparent;
-  border-top: 2px solid currentColor;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  width: 16px;
-  height: 16px;
-  margin: auto;
+.like-btn.loading::after { 
+  content: ""; 
+  position: absolute; 
+  inset: 0; 
+  border: 2px solid transparent; 
+  border-top: 2px solid currentColor; 
+  border-radius: 50%; 
+  animation: spin 0.8s linear infinite; 
+  width: 16px; 
+  height: 16px; 
+  margin: auto; 
 }
-.highlight-btn {
+.highlight-btn { 
   transition: background var(--transition-duration) var(--transition-easing),
               transform var(--transition-duration) var(--transition-easing);
   border-radius: 4px;
   padding: 2px;
 }
-.highlight-btn:hover {
+.highlight-btn:hover { 
   background: rgba(147, 51, 234, 0.15);
   transform: scale(1.1);
 }
-.highlight-btn.liked {
-  color: #9333ea;
+.highlight-btn.liked { 
+  color: #9333ea; 
   text-shadow: 0 0 8px rgba(147, 51, 234, 0.6);
 }
 #controlsFooter { pointer-events: none; }
@@ -549,7 +554,43 @@ header {
 @keyframes skeleton-loading { 0% { transform: translate3d(-100%, 0, 0); will-change: transform; } 100% { transform: translate3d(100%, 0, 0); } }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
-.modal-close-btn {
+/* Fallback styles when TailwindCSS fails to load */
+.tailwind-fallback .bg-gradient-to-br { background: linear-gradient(135deg, var(--color-background), #2a2b3c); }
+.tailwind-fallback .text-white { color: white; }
+.tailwind-fallback .text-center { text-align: center; }
+.tailwind-fallback .p-4 { padding: 1rem; }
+.tailwind-fallback .p-6 { padding: 1.5rem; }
+.tailwind-fallback .m-4 { margin: 1rem; }
+.tailwind-fallback .mb-4 { margin-bottom: 1rem; }
+.tailwind-fallback .mt-4 { margin-top: 1rem; }
+.tailwind-fallback .flex { display: flex; }
+.tailwind-fallback .flex-col { flex-direction: column; }
+.tailwind-fallback .flex-wrap { flex-wrap: wrap; }
+.tailwind-fallback .items-center { align-items: center; }
+.tailwind-fallback .justify-center { justify-content: center; }
+.tailwind-fallback .justify-between { justify-content: space-between; }
+.tailwind-fallback .gap-4 { gap: 1rem; }
+.tailwind-fallback .grid { display: grid; }
+.tailwind-fallback .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.tailwind-fallback .rounded-lg { border-radius: 0.5rem; }
+.tailwind-fallback .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+.tailwind-fallback .w-full { width: 100%; }
+.tailwind-fallback .h-full { height: 100%; }
+.tailwind-fallback .min-h-screen { min-height: 100vh; }
+.tailwind-fallback .relative { position: relative; }
+.tailwind-fallback .absolute { position: absolute; }
+.tailwind-fallback .fixed { position: fixed; }
+.tailwind-fallback .top-0 { top: 0; }
+.tailwind-fallback .bottom-0 { bottom: 0; }
+.tailwind-fallback .left-0 { left: 0; }
+.tailwind-fallback .right-0 { right: 0; }
+.tailwind-fallback .z-10 { z-index: 10; }
+.tailwind-fallback .z-50 { z-index: 50; }
+.tailwind-fallback .hidden { display: none; }
+.tailwind-fallback .block { display: block; }
+.tailwind-fallback .inline { display: inline; }
+.tailwind-fallback .inline-block { display: inline-block; }
+.modal-close-btn { 
   position: absolute;
   top: -12px;
   right: -12px;
@@ -562,39 +603,39 @@ header {
 #answerModalCard.reaction-border-2 { border-width: 4px !important; }
 #answerModalCard.reaction-border-3 { border-width: 5px !important; }
 /* モーダルでのリアクション背景色 */
-#answerModalCard.reaction-bg-like {
-  border-color: #ef4444 !important;
+#answerModalCard.reaction-bg-like { 
+  border-color: #ef4444 !important; 
   border-image: none !important;
 }
-#answerModalCard.reaction-bg-understand {
-  border-color: #fbbf24 !important;
+#answerModalCard.reaction-bg-understand { 
+  border-color: #fbbf24 !important; 
   border-image: none !important;
 }
-#answerModalCard.reaction-bg-curious {
-  border-color: #10b981 !important;
+#answerModalCard.reaction-bg-curious { 
+  border-color: #10b981 !important; 
   border-image: none !important;
 }
-#answerModalCard.reaction-bg-like-understand {
-  border-image: linear-gradient(45deg, #ef4444, #fbbf24) 1 !important;
+#answerModalCard.reaction-bg-like-understand { 
+  border-image: linear-gradient(45deg, #ef4444, #fbbf24) 1 !important; 
   border-color: transparent !important;
 }
-#answerModalCard.reaction-bg-like-curious {
-  border-image: linear-gradient(45deg, #ef4444, #10b981) 1 !important;
+#answerModalCard.reaction-bg-like-curious { 
+  border-image: linear-gradient(45deg, #ef4444, #10b981) 1 !important; 
   border-color: transparent !important;
 }
-#answerModalCard.reaction-bg-understand-curious {
-  border-image: linear-gradient(45deg, #fbbf24, #10b981) 1 !important;
+#answerModalCard.reaction-bg-understand-curious { 
+  border-image: linear-gradient(45deg, #fbbf24, #10b981) 1 !important; 
   border-color: transparent !important;
 }
-#answerModalCard.reaction-bg-like-understand-curious {
-  border-image: linear-gradient(45deg, #ef4444, #fbbf24, #10b981) 1 !important;
+#answerModalCard.reaction-bg-like-understand-curious { 
+  border-image: linear-gradient(45deg, #ef4444, #fbbf24, #10b981) 1 !important; 
   border-color: transparent !important;
 }
 /* モーダルでのハイライト装飾（リアクション装飾より後に配置で優先） */
 #answerModalCard.highlighted {
   border-image: linear-gradient(45deg, #9333ea, #c084fc, #9333ea) 1 !important;
   border-width: 4px !important;
-  box-shadow:
+  box-shadow: 
     0 0 25px rgba(147, 51, 234, 0.6),
     inset 0 0 20px rgba(192, 132, 252, 0.1) !important;
   position: relative;
@@ -606,97 +647,112 @@ header {
 @keyframes modalScale { from { transform: scale3d(0.8, 0.8, 1); will-change: transform; } to { transform: scale3d(1, 1, 1); } }
 </style>
 </head>
-<body class="bg-dark text-light">
+<body class="bg-[#1a1b26] text-gray-200 font-sans">
 <!-- Loading Overlay -->
 <div id="loading-overlay" class="loading-overlay hidden">
   <div class="text-center">
-    <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
-    <p class="mt-3 text-muted">読み込み中...</p>
+    <div class="spinner"></div>
+    <p class="mt-4 text-gray-300">読み込み中...</p>
   </div>
 </div>
 
-<div id="main-container" class="container-fluid px-3 py-3 px-md-4 py-md-4">
+<div id="main-container" class="w-full mx-auto px-4 pt-4 pb-4 md:px-6 md:pt-6 md:pb-6">
 <!-- コンパクトヘッダー -->
-<header id="main-header" class="glass-panel rounded-4 p-3 mb-4 shadow fade-in">
+<header id="main-header" class="glass-panel rounded-xl p-3 mb-4 shadow-lg fade-in">
   <!-- 上部: フォームリンク + ドメイン情報（横並び） -->
-  <div class="d-flex align-items-center justify-content-between mb-3 small">
+  <div class="flex items-center justify-between mb-3 text-xs">
     <!-- フォームリンク（左側） -->
-    <a id="form-link-btn" href="#" target="_blank" class="btn btn-outline-primary btn-sm d-none d-flex align-items-center gap-2">
-      <i class="bi bi-clipboard"></i>
-      <span class="fw-medium">📝 回答フォーム</span>
+    <a id="form-link-btn" href="#" target="_blank" class="bg-cyan-500/10 border border-cyan-400/30 rounded px-3 py-1 flex items-center gap-2 hover:bg-cyan-500/20 transition-all text-cyan-400 hover:text-cyan-300 hidden">
+      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+      </svg>
+      <span class="font-medium">📝 回答フォーム</span>
     </a>
-
+    
     <!-- 管理モードボタンとドメイン情報（右側） -->
-    <div class="flex-shrink-0 d-flex align-items-center gap-2">
+    <div class="flex-shrink-0 flex items-center gap-2">
       <!-- 管理モードボタン -->
-      <button type="button" id="adminToggleBtn" class="btn btn-sm btn-outline-secondary admin-toggle d-none d-flex align-items-center gap-1 text-nowrap" hidden aria-label="管理者モード切り替え">
-        <i class="bi bi-gear"></i>
+      <button type="button" id="adminToggleBtn" class="admin-toggle text-xs text-gray-500 hover:text-cyan-400 transition-all opacity-60 hover:opacity-100 hidden whitespace-nowrap flex items-center gap-1 px-2 py-1 rounded" hidden aria-label="管理者モード切り替え">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
       </button>
-
+      
       <div>
         <!-- ドメイン一致表示 -->
-        <div id="header-domain-match" class="badge bg-success bg-opacity-25 border border-success d-none">
-          <div class="d-flex align-items-center gap-1">
-            <i class="bi bi-check-circle text-success"></i>
-            <span class="text-success fw-medium" id="header-domain-match-text">学校ドメイン</span>
+        <div id="header-domain-match" class="bg-green-500/10 border border-green-400/30 rounded px-2 py-1 hidden">
+          <div class="flex items-center gap-1">
+            <svg class="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span class="text-green-400 font-medium" id="header-domain-match-text">学校ドメイン</span>
           </div>
         </div>
-
+        
         <!-- ドメイン不一致表示 -->
-        <div id="header-domain-mismatch" class="badge bg-warning bg-opacity-25 border border-warning d-none">
-          <div class="d-flex align-items-center gap-1">
-            <i class="bi bi-exclamation-triangle text-warning"></i>
-            <span class="text-warning fw-medium" id="header-domain-mismatch-text">外部アクセス</span>
+        <div id="header-domain-mismatch" class="bg-yellow-500/10 border border-yellow-400/30 rounded px-2 py-1 hidden">
+          <div class="flex items-center gap-1">
+            <svg class="w-3 h-3 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+            <span class="text-yellow-400 font-medium" id="header-domain-mismatch-text">外部アクセス</span>
           </div>
         </div>
-
+        
         <!-- 初期状態表示 -->
-        <div id="header-domain-initial" class="badge bg-info bg-opacity-25 border border-info">
-          <div class="d-flex align-items-center gap-1">
-            <div class="status-dot status-dot-pulse bg-primary"></div>
-            <span class="text-info fw-medium">確認中</span>
+        <div id="header-domain-initial" class="bg-blue-500/10 border border-blue-400/30 rounded px-2 py-1">
+          <div class="flex items-center gap-1">
+            <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+            <span class="text-blue-400 font-medium">確認中</span>
           </div>
         </div>
       </div>
     </div>
   </div>
-
+  
   <!-- メイン部分: 問題タイトル + コントロール -->
-  <div class="d-flex flex-column flex-lg-row align-items-center gap-3">
+  <div class="flex flex-col lg:flex-row items-center gap-3">
     <!-- 左: コントロール -->
-    <div class="d-flex align-items-center gap-3 small">
-      <div id="answerCount" class="text-muted d-flex align-items-center gap-1">
-        <svg class="icon-size-sm text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="flex items-center gap-3 text-xs">
+      <div id="answerCount" class="text-gray-400 flex items-center gap-1">
+        <svg class="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
         </svg>
         <span id="answerCountText">0件</span>
       </div>
-
-      <select id="classFilter" class="form-select form-select-sm bg-dark border-secondary text-light d-none" title="クラスフィルター" aria-label="クラスフィルター"></select>
-
-      <div class="position-relative">
-        <select id="sortOrder" class="form-select form-select-sm bg-dark border-secondary text-light pe-4" title="並び順" aria-label="並び順">
+      
+      <select id="classFilter" class="hidden text-xs bg-gray-700 border border-gray-600 rounded px-2 py-1" title="クラスフィルター" aria-label="クラスフィルター"></select>
+      
+      <div class="relative">
+        <select id="sortOrder" class="text-xs bg-gray-700 border border-gray-600 rounded px-2 py-1 pr-6 appearance-none" title="並び順" aria-label="並び順">
           <option value="newest" selected>新着順</option>
           <option value="random">ランダム順</option>
-          <option value="score" id="scoreOption" class="d-none">スコア順</option>
+          <option value="score" id="scoreOption" class="hidden">スコア順</option>
         </select>
+        <svg class="absolute right-1 top-1/2 transform -translate-y-1/2 w-2 h-2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
       </div>
     </div>
 
     <!-- 中央: 問題タイトル（最大） -->
-    <div class="flex-grow-1 text-center">
-      <div id="headingLabel" class="fs-4 fs-md-3 fs-lg-2 fs-xl-1 fw-bold text-danger lh-sm">
-        <div class="spinner-border text-danger" role="status" aria-hidden="true"></div>
+    <div class="flex-grow text-center min-w-0">
+      <div id="headingLabel" class="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-pink-400 leading-tight">
+        <svg class="w-5 h-5 md:w-6 md:h-6 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
+        </svg>
       </div>
     </div>
 
   <!-- Right Section: Info & Admin Controls -->
-  <div class="w-100 w-lg-auto text-end space-y-1 px-2 min-w-150">
-    <p id="sheetNameText" class="small text-muted d-flex align-items-center justify-content-end gap-1" style="height: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+  <div class="w-full lg:w-auto lg:min-w-[150px] text-right space-y-1 px-2">
+    <p id="sheetNameText" class="text-xs text-gray-400 h-4 truncate flex items-center justify-end gap-1">
     </p>
-    <div class="d-flex justify-content-end gap-1 flex-wrap">
-      <button type="button" id="endPublicationBtn" class="admin-toggle btn btn-warning btn-sm d-none text-nowrap d-flex align-items-center gap-1 btn-hover-lift" hidden aria-label="公開終了">
-        <svg class="icon-size-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="flex justify-end gap-1 flex-wrap">
+      <button type="button" id="endPublicationBtn" class="admin-toggle text-xs bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded hidden whitespace-nowrap transition-all flex items-center gap-1" hidden aria-label="公開終了">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"></path>
         </svg>
         公開終了
@@ -705,54 +761,46 @@ header {
   </div>
 </header>
 <!-- 新着通知バナー -->
-<div id="newContentBanner" class="position-fixed translate-middle-x bg-primary text-white px-4 py-2 rounded-pill shadow d-none" style="top: 80px; left: 50%; z-index: 1050;" role="alert" aria-live="polite">
-  <div class="d-flex align-items-center gap-3">
-    <span id="newContentIcon" aria-hidden="true">📋</span>
+<div id="newContentBanner" class="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-full shadow-lg hidden transition-all duration-300" role="alert" aria-live="polite">
+  <div class="flex items-center gap-3">
+    <span id="newContentIcon" class="w-5 h-5 animate-pulse" aria-hidden="true">📋</span>
     <span id="newContentText">新しい意見が投稿されました</span>
-    <button type="button" id="refreshContentBtn" class="btn btn-light btn-sm rounded-pill" aria-label="新しいコンテンツを更新して表示">
+    <button type="button" id="refreshContentBtn" class="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-sm font-medium transition-colors" aria-label="新しいコンテンツを更新して表示">
       更新して表示
     </button>
-    <button type="button" id="dismissBannerBtn" class="btn btn-sm btn-close btn-close-white" aria-label="通知を閉じる">
+    <button type="button" id="dismissBannerBtn" class="text-white/70 hover:text-white w-5 h-5 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors" aria-label="通知を閉じる">
       ×
     </button>
   </div>
 </div>
 
-<main id="answers" class="row g-3" role="main" aria-live="polite" aria-label="回答一覧"></main>
+<main id="answers" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" role="main" aria-live="polite" aria-label="回答一覧"></main>
 </div>
-<div id="answerModalContainer" class="modal fade modal-custom-fade" tabindex="-1" role="dialog" aria-modal="true" style="backdrop-filter: blur(10px);">
-<div class="modal-dialog modal-xl modal-dialog-scrollable">
-<div id="answerModalCard" class="modal-content glass-panel border border-cyan-400" role="document" aria-labelledby="modalAnswer">
-<div class="modal-header border-bottom border-cyan-400">
-<button type="button" id="answerModalCloseBtn" class="btn-close btn-close-white hover-scale-110" data-bs-dismiss="modal" aria-label="閉じる">
-  <span id="iconClose" class="icon-size-md"></span>
+<div id="answerModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
+<div id="answerModalCard" class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full max-w-5xl h-auto max-h-[85vh] relative" role="document" aria-labelledby="modalAnswer">
+<button type="button" id="answerModalCloseBtn" class="modal-close-btn bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform z-10" aria-label="閉じる">
+  <span id="iconClose" class="w-6 h-6"></span>
 </button>
-</div>
-<div class="modal-body">
-<div id="modalAnswer" class="mb-3"></div>
-</div>
-<div class="modal-footer border-top border-cyan-400 d-flex justify-content-between align-items-center">
-<div><span id="modalStudentName" class="fw-bold fs-4 text-light"></span></div>
-<div id="modalReactions" class="d-flex align-items-center gap-2"></div>
+<div id="modalAnswer" class="flex-grow min-h-[200px] mb-4 overflow-y-auto pr-4"></div>
+<div id="modalFooter" class="text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex justify-between items-center">
+<div><span id="modalStudentName" class="font-bold text-2xl text-gray-200"></span></div>
+<div id="modalReactions" class="flex items-center gap-2"></div>
 </div>
 </div>
 </div>
-</div>
-<div id="infoModalContainer" class="modal fade modal-custom-fade" tabindex="-1" role="dialog" aria-modal="true" style="backdrop-filter: blur(10px);">
-<div class="modal-dialog modal-lg modal-dialog-centered">
-<div id="infoModalCard" class="modal-content glass-panel border border-cyan-400" role="document">
-<div class="modal-body">
-<div class="text-light fs-5 lh-base">
+<div id="infoModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
+<div id="infoModalCard" class="glass-panel rounded-xl p-8 shadow-2xl border-2 border-cyan-400/80 w-full max-w-2xl relative" role="document">
+<div class="space-y-5 text-gray-200 text-lg leading-relaxed">
 <!-- Digital Citizenship Education Section -->
-<div class="p-3 mb-3 rounded-3" style="background: linear-gradient(to right, rgba(34, 197, 94, 0.2), rgba(16, 185, 129, 0.2)); border: 1px solid rgba(34, 197, 94, 0.3);">
-<div class="d-flex align-items-start gap-3">
-<div class="d-flex align-items-center justify-content-center flex-shrink-0 rounded-circle text-white" style="width: 2rem; height: 2rem; background: linear-gradient(to right, #22c55e, #10b981);">
-<span class="fs-5">📚</span>
+<div class="bg-gradient-to-r from-green-800/40 to-emerald-800/40 border border-green-400/50 rounded-lg p-4 mb-4">
+<div class="flex items-start gap-3">
+<div class="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+<span class="text-lg">📚</span>
 </div>
 <div>
-<p class="fw-bold mb-3" style="color: #bbf7d0;">デジタル・シティズンシップって何だろう？</p>
-<p class="small mb-2" style="color: #dcfce7;">
-<span class="fw-semibold" style="color: #bbf7d0;">デジタル・シティズンシップ</span>とは、コンピューターやタブレットを使うときに、<span class="fw-semibold" style="color: #bbf7d0;">やさしい心で相手のことを考える</span>ことです。
+<p class="text-base font-bold text-green-200 mb-3">デジタル・シティズンシップって何だろう？</p>
+<p class="text-sm text-green-100 leading-relaxed mb-2">
+<span class="text-green-200 font-semibold">デジタル・シティズンシップ</span>とは、コンピューターやタブレットを使うときに、<span class="text-green-200 font-semibold">やさしい心で相手のことを考える</span>ことです。
 </p>
 <p class="text-sm text-green-200 leading-relaxed mb-2">
 みんなの回答ボードでも、<span class="text-green-200 font-semibold">思いやりのある言葉</span>を選んで、みんなが気持ちよく参加できるようにしましょう。
@@ -765,30 +813,27 @@ header {
 </div>
 
 <p>みんなの意見を気持ちよく共有するために、リアクションのしかたをおぼえよう！</p>
-<ul class="list-unstyled">
-<li class="d-flex align-items-center gap-2 mb-2"><span id="infoIconLike" class="icon-size-md text-danger"></span>いいね！：すてきだと思ったときに押そう</li>
-<li class="d-flex align-items-center gap-2 mb-2"><span id="infoIconUnderstand" class="icon-size-md text-warning"></span>なるほど！：参考になったときに押そう</li>
-<li class="d-flex align-items-center gap-2 mb-2"><span id="infoIconCurious" class="icon-size-md text-success"></span>もっと知りたい！：もっと知りたいときに押そう</li>
+<ul class="space-y-2">
+<li class="flex items-center gap-2"><span id="infoIconLike" class="w-5 h-5 text-red-400"></span>いいね！：すてきだと思ったときに押そう</li>
+<li class="flex items-center gap-2"><span id="infoIconUnderstand" class="w-5 h-5 text-yellow-400"></span>なるほど！：参考になったときに押そう</li>
+<li class="flex items-center gap-2"><span id="infoIconCurious" class="w-5 h-5 text-green-400"></span>もっと知りたい！：もっと知りたいときに押そう</li>
 </ul>
-<p class="d-flex align-items-center gap-2"><span id="infoIconHighlight" class="icon-size-md text-info"></span>先生が注目してほしい意見につけています</p>
+<p class="flex items-center gap-2"><span id="infoIconHighlight" class="w-5 h-5 text-purple-400"></span>先生が注目してほしい意見につけています</p>
 <p>責任あるリアクションで、みんなで学びを深めよう！</p>
 
 
-</div>
-<div class="modal-footer justify-content-center">
-<button type="button" id="infoModalConfirmBtn" class="btn btn-primary btn-hover-lift" data-bs-dismiss="modal">わかった</button>
-</div>
+<div class="text-center mt-6">
+<button type="button" id="infoModalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">わかった</button>
 </div>
 </div>
 </div>
-<footer id="controlsFooter" class="fixed-bottom p-3">
-<div class="container">
-<div class="glass-panel rounded-3 p-3 d-flex align-items-center justify-content-center gap-3 mx-auto" style="max-width: 28rem;">
-<input type="range" id="sizeSlider" min="2" max="6" value="4" class="form-range" style="width: 50%;" aria-label="表示列数の変更">
-<div class="d-flex align-items-center gap-1">
-<span id="sliderValue" class="fw-bold fs-5">4</span>
-<span id="iconGrid" class="icon-size-md"></span>
 </div>
+<footer id="controlsFooter" class="fixed bottom-0 left-0 right-0 z-40 p-4">
+<div class="glass-panel max-w-md mx-auto rounded-xl p-3 flex items-center justify-center gap-3">
+<input type="range" id="sizeSlider" min="2" max="6" value="4" class="w-1/2" aria-label="表示列数の変更">
+<div class="flex items-center gap-1">
+<span id="sliderValue" class="font-bold text-lg">4</span>
+<span id="iconGrid" class="w-4 h-4"></span>
 </div>
 </div>
 </footer>
@@ -819,38 +864,38 @@ class UnifiedCache {
     this.data = new Map();
     this.timestamps = new Map();
   }
-
+  
   set(key, value, ttl = 300000) { // 5分のデフォルトTTL
     this.data.set(key, value);
     this.timestamps.set(key, Date.now() + ttl);
   }
-
+  
   get(key) {
     if (!this.data.has(key)) return undefined;
-
+    
     const expiry = this.timestamps.get(key);
     if (expiry && Date.now() > expiry) {
       this.delete(key);
       return undefined;
     }
-
+    
     return this.data.get(key);
   }
-
+  
   has(key) {
     return this.get(key) !== undefined;
   }
-
+  
   delete(key) {
     this.data.delete(key);
     this.timestamps.delete(key);
   }
-
+  
   clear() {
     this.data.clear();
     this.timestamps.clear();
   }
-
+  
   cleanup() {
     const now = Date.now();
     for (const [key, expiry] of this.timestamps.entries()) {
@@ -859,7 +904,7 @@ class UnifiedCache {
       }
     }
   }
-
+  
   get size() {
     return this.data.size;
   }
@@ -932,11 +977,11 @@ class StudyQuestApp {
       lastSeenCount: 0,
       pollingFailureCount: 0
     };
-
+    
     // 新着チェック用の初期化
     this.lastViewKey = null;
     this.initialDataLoaded = false;
-
+    
     // Initial state setup complete
     this.serverShowCounts = window.showCounts;
     this.serverDisplayMode = window.displayMode;
@@ -946,7 +991,7 @@ class StudyQuestApp {
     this.reactionDebounce = new Map(); // リアクションのデバウンス処理用
     this.highlightDebounce = new Map(); // ハイライトのデバウンス処理用
     this.pendingReactions = new Set(); // 処理中のリアクション
-
+    
     // イベントリスナー重複登録防止フラグ
     this.eventDelegationSetup = false;
     this.nonCriticalListenersSetup = false;
@@ -956,7 +1001,7 @@ class StudyQuestApp {
       { key: 'UNDERSTAND', icon: 'lightbulb' },
       { key: 'CURIOUS', icon: 'magnifying-glass-plus' }
     ];
-
+    
     // リアクション状態保存用のキー
     this.reactionStorageKey = `reactions_${USER_ID}_${SHEET_NAME}`;
     this.gas = {
@@ -979,23 +1024,23 @@ class StudyQuestApp {
   init() {
       // 初期ロード状態を表示
       this.showLoadingOverlay();
-
+      
       // タイムアウト設定（15秒）
       this.initTimeoutId = setTimeout(() => {
         this.hideLoadingOverlay();
         console.warn('ページの初期化に時間がかかっています。ページを再読み込みしてください。');
       }, 15000);
-
+      
       // Critical path only - non-blocking
       this.setupCriticalElements();
       this.showMinimalSkeleton();
-
+      
       // Apply default low performance tweaks
       this.optimizeForLowPerformance();
-
+      
       // Immediate async loading for data
       this.loadDataImmediate();
-
+      
       // Defer all non-critical operations
       requestIdleCallback(() => {
         this.setupNonCriticalEventListeners();
@@ -1025,7 +1070,7 @@ class StudyQuestApp {
         }
         // Check if modal should be shown
         const introSeen = localStorage.getItem('introSeen');
-
+        
         // Show modal if never seen before
         if (!introSeen) {
           setTimeout(() => this.showInfoModal(), 500);
@@ -1061,25 +1106,25 @@ class StudyQuestApp {
       localStorage.setItem('boardColumns', e.target.value);
       debouncedRender();
     }, 100); // Throttle to 100ms
-
+    
     if (this.elements.sizeSlider) {
       this.elements.sizeSlider.addEventListener('input', this.handlers.onSizeSliderInput, { passive: true });
     }
   }
-
+  
   setupNonCriticalEventListeners() {
     // 重複登録防止
     if (this.nonCriticalListenersSetup) {
       // Non-critical event listeners already set up
       return;
     }
-
+    
     // Optimized: Event delegation for answer cards container
     this.handlers.onAnswersContainerClick = (e) => {
       const card = e.target.closest('.answer-card');
       const reactionBtn = e.target.closest('.reaction-btn');
       const highlightBtn = e.target.closest('.highlight-btn');
-
+      
       if (reactionBtn && card) {
         const rowIndex = card.dataset.rowIndex;
         const reaction = reactionBtn.dataset.reaction;
@@ -1099,11 +1144,11 @@ class StudyQuestApp {
         }
       }
     };
-
+    
     if (this.elements.answersContainer) {
       this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
     }
-
+    
     // Modal handlers
     this.handlers.onAnswerModalContainerClick = (e) => {
       if (e.target === e.currentTarget) {
@@ -1120,7 +1165,7 @@ class StudyQuestApp {
     this.handlers.onModalReactionClick = (e) => {
       const btn = e.target.closest('.reaction-btn');
       const highlightBtn = e.target.closest('.highlight-btn');
-
+      
       if (highlightBtn) {
         const id = highlightBtn.dataset.rowIndex;
         if (id) {
@@ -1163,7 +1208,7 @@ class StudyQuestApp {
       this.handlers.onAdminToggleClick = () => this.toggleAdminMode();
       this.elements.adminToggleBtn.addEventListener('click', this.handlers.onAdminToggleClick);
     }
-
+    
     // 新着通知バナーのイベントハンドラー
     if (this.elements.refreshContentBtn) {
       this.handlers.onRefreshContentClick = () => this.refreshContent();
@@ -1191,7 +1236,7 @@ class StudyQuestApp {
       }
     };
     document.addEventListener('visibilitychange', this.handlers.onVisibilityChange, { passive: true });
-
+    
     this.nonCriticalListenersSetup = true;
     // Non-critical event listener setup complete
   }
@@ -1205,7 +1250,7 @@ setupEventDelegation() {
         // Event delegation already set up
         return;
     }
-
+    
     this.handlers.onAnswersContainerClick = (e) => {
         const answerCard = e.target.closest('.answer-card');
 
@@ -1251,7 +1296,7 @@ setupEventDelegation() {
         console.error('No answers container found for event delegation');
     }
 }
-
+  
   // Debug helper functions removed for production
   adjustLayout() {
     if (this.baseBodyPadding === undefined) {
@@ -1264,16 +1309,16 @@ setupEventDelegation() {
     // Simple request deduplication for identical calls (except for state-changing operations)
     const cacheKey = funcName + JSON.stringify(args);
     const isStateChanging = ['toggleHighlight', 'addReaction', 'endPublication'].includes(funcName);
-
+    
     if (!isStateChanging) {
       const cached = this.cache.get(cacheKey);
       if (cached) {
         return Promise.resolve(cached);
       }
     }
-
+    
     // GAS API call processing
-
+    
     return new Promise((resolve, reject) => {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         const userId = USER_ID || '';
@@ -1311,7 +1356,7 @@ setupEventDelegation() {
       this.updateEndPublicationButtonUI();
       return;
     }
-
+    
     // Fallback API call (slower)
     try {
       const isAdmin = await this.gas.checkAdmin();
@@ -1327,7 +1372,7 @@ setupEventDelegation() {
       console.error('Admin check failed', e);
     }
   }
-
+  
   // 管理者UI更新の共通メソッド
   updateAdminButtonUI() {
     // Only show admin toggle button for administrators, never for viewers
@@ -1335,18 +1380,18 @@ setupEventDelegation() {
       // Show button for admin users only
       this.elements.adminToggleBtn.classList.remove('hidden');
       this.elements.adminToggleBtn.removeAttribute('hidden');
-
+      
       // Always show "管理モード" text, never show "閲覧モード" to avoid confusion
       this.elements.adminToggleBtn.textContent = '管理モード';
-
+      
       // Apply styling based on current admin mode state
       if (this.state.showAdminFeatures) {
         // Active admin mode: highlighted styling
         this.elements.adminToggleBtn.classList.remove('text-gray-500', 'opacity-60');
-        this.elements.adminToggleBtn.classList.add('btn-info', 'shadow-lg', 'btn-hover-lift');
+        this.elements.adminToggleBtn.classList.add('bg-cyan-600', 'hover:bg-cyan-700', 'text-white', 'shadow-lg', 'ring-2', 'ring-cyan-400/50');
       } else {
         // Inactive admin mode: subtle gray styling
-        this.elements.adminToggleBtn.classList.remove('btn-info', 'shadow-lg', 'btn-hover-lift');
+        this.elements.adminToggleBtn.classList.remove('bg-cyan-600', 'hover:bg-cyan-700', 'text-white', 'shadow-lg', 'ring-2', 'ring-cyan-400/50');
         this.elements.adminToggleBtn.classList.add('text-gray-500', 'opacity-60');
       }
     } else {
@@ -1357,7 +1402,7 @@ setupEventDelegation() {
       }
     }
   }
-
+  
   updateEndPublicationButtonUI() {
     if (this.elements.endPublicationBtn) {
       if (this.state.showAdminFeatures) {
@@ -1369,7 +1414,7 @@ setupEventDelegation() {
       }
     }
   }
-
+  
   // サーバー管理者権限確認の共通メソッド
   async checkServerAdminPermission() {
     try {
@@ -1383,25 +1428,35 @@ setupEventDelegation() {
       throw error;
     }
   }
-
+  
   // 軽量な新着コンテンツチェック
   async checkForNewContentLight() {
     try {
       const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
       const sortOrder = this.elements.sortOrder.value;
-
+      
       // 軽量な件数チェックのみ実行（フルデータ取得なし）
       const countData = await this.gas.getDataCount(selectedClass, sortOrder, this.state.showAdminFeatures);
-
-
+      
+      console.log('📊 軽量新着チェック:', {
+        countResponse: countData,
+        newCount: countData.count || 0,
+        currentCount: this.state.currentAnswers ? this.state.currentAnswers.length : 0,
+        lastSeenCount: this.state.lastSeenCount,
+        selectedClass,
+        sortOrder,
+        status: countData.status,
+        error: countData.message
+      });
+      
       const newCount = countData.count || 0;
-
+      
       // 成功した場合は失敗カウントをリセット
       this.state.pollingFailureCount = 0;
-
+      
       // 現在のフィルター/ソート設定をキーとして保存
       const currentViewKey = `${selectedClass}-${sortOrder}`;
-
+      
       // 初回データロード完了の確認
       if (!this.initialDataLoaded) {
         // Initial data load completed
@@ -1410,33 +1465,58 @@ setupEventDelegation() {
         this.initialDataLoaded = true;
         return;
       }
-
+      
       // フィルター/ソート設定が変わった場合は比較をリセット
       if (this.lastViewKey !== null && this.lastViewKey !== currentViewKey) {
+        console.log('🔄 表示設定変更検出、新着チェックをリセット:', {
+          oldKey: this.lastViewKey,
+          newKey: currentViewKey,
+          newCount,
+          settingLastSeenToNewCount: true
+        });
         this.lastViewKey = currentViewKey;
         this.state.lastSeenCount = newCount;
         return;
       }
-
+      
       // 同じフィルター/ソート設定での新着チェック
       const hasNewItems = newCount > this.state.lastSeenCount && this.state.lastSeenCount > 0;
-
+      console.log('📊 新着判定:', {
+        newCount,
+        lastSeenCount: this.state.lastSeenCount,
+        hasNewItems,
+        difference: newCount - this.state.lastSeenCount,
+        currentViewKey
+      });
+      
       if (hasNewItems) {
         const newItems = newCount - this.state.lastSeenCount;
-
+        
         // 異常に大きな差は誤検知の可能性が高い
         if (newItems <= 10 && newItems > 0) { // 妥当な範囲の新着のみ通知
           this.showNewContentBanner(newItems);
+          console.log('🎉 軽量新着検出・通知表示:', { 
+            newItems, 
+            newCount, 
+            lastSeenCount: this.state.lastSeenCount,
+            viewKey: currentViewKey,
+            lightweightCheck: true
+          });
         } else {
+          console.log('⚠️ 異常な新着数検出、誤検知として無視:', {
+            newItems,
+            newCount,
+            lastSeenCount: this.state.lastSeenCount
+          });
         }
       }
-
+      
       // 現在のビューキーを確実に設定
       this.lastViewKey = currentViewKey;
     } catch (error) {
       this.state.pollingFailureCount++;
       console.warn('軽量新着チェックに失敗:', error, 'failureCount:', this.state.pollingFailureCount);
-
+      
       // 連続で失敗が続く場合はポーリング間隔を延ばす
       if (this.state.pollingFailureCount >= 3) {
         // Polling interval extended due to consecutive failures
@@ -1448,93 +1528,108 @@ setupEventDelegation() {
       }
     }
   }
-
+  
   // 新着通知バナーを表示
   showNewContentBanner(newItems) {
     if (!this.elements.newContentBanner) return;
-
+    
     // デバウンス：短時間内の連続通知を防ぐ
     const now = Date.now();
     if (this.lastNotificationTime && (now - this.lastNotificationTime) < 2000) {
+      console.log('🚫 通知デバウンス: 短時間内の連続通知をスキップ');
       return;
     }
     this.lastNotificationTime = now;
-
+    
     // 既に表示されている場合は、新しい数で上書き（累積しない）
     if (!this.elements.newContentBanner.classList.contains('hidden')) {
+      console.log('📱 通知更新: 既存バナーを新しい数で更新', {
+        oldCount: this.state.newContentCount,
+        newCount: newItems
+      });
       this.state.newContentCount = newItems; // 累積せず上書き
     } else {
       this.state.newContentCount = newItems;
     }
-
+    
     this.state.hasNewContent = true;
-
-    const message = this.state.newContentCount === 1 ?
-      '新しい意見が投稿されました' :
+    
+    const message = this.state.newContentCount === 1 ? 
+      '新しい意見が投稿されました' : 
       `${this.state.newContentCount}件の新しい意見が投稿されました`;
     this.elements.newContentText.textContent = message;
-
+    
     this.elements.newContentBanner.classList.remove('hidden');
-
+    
     // アニメーションをリセットしてから適用
     this.elements.newContentBanner.style.animation = '';
-
+    
     // 3秒後にバウンスアニメーション
     setTimeout(() => {
       if (!this.elements.newContentBanner.classList.contains('hidden')) {
         this.elements.newContentBanner.style.animation = 'bounce 1s ease-in-out';
       }
     }, 3000);
-
+    
+    console.log('📢 新着通知表示:', {
+      count: this.state.newContentCount,
+      message: message
+    });
   }
-
+  
   // 新着バナーを閉じる
   dismissNewContentBanner() {
     if (!this.elements.newContentBanner) return;
-
+    
     this.elements.newContentBanner.classList.add('hidden');
     this.elements.newContentBanner.style.animation = '';
     this.state.hasNewContent = false;
     this.state.newContentCount = 0;
   }
-
+  
   // 増分コンテンツ更新（新しいカードのみ取得・追加）
   async refreshContentIncremental() {
     this.dismissNewContentBanner();
-
+    
     try {
       const originalText = this.elements.refreshContentBtn ? this.elements.refreshContentBtn.textContent : '';
       if (this.elements.refreshContentBtn) {
         this.elements.refreshContentBtn.textContent = '更新中...';
         this.elements.refreshContentBtn.disabled = true;
       }
-
-
+      
+      console.log('🔄 増分リフレッシュ開始 - 基準行数:', this.state.lastSeenCount || 0);
+      
       // 現在のフィルタ設定を取得
       const classFilter = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
       const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
       const adminMode = this.state.showAdminFeatures;
-
+      
       // 増分データを取得
       const incrementalData = await this.gas.getIncrementalSheetData(
-        classFilter,
-        sortOrder,
-        adminMode,
+        classFilter, 
+        sortOrder, 
+        adminMode, 
         this.state.lastSeenCount || 0
       );
-
+      
       if (incrementalData.status === 'error') {
         throw new Error(incrementalData.message);
       }
-
-
+      
+      console.log('📥 増分データ取得結果:', {
+        newCount: incrementalData.newCount,
+        totalCount: incrementalData.totalCount,
+        hasNewData: incrementalData.newCount > 0
+      });
+      
       // 新しいデータがない場合
       if (incrementalData.newCount === 0) {
         this.provideFeedback('最新の状態です', 'info');
         this.state.lastSeenCount = incrementalData.totalCount;
         return;
       }
-
+      
       // 新しいカードを既存のカードに追加
       await this.appendNewCards(incrementalData.data, sortOrder);
 
@@ -1548,63 +1643,77 @@ setupEventDelegation() {
       // サーバーキャッシュをクリアして他のソート順でも新着が反映されるようにする
       this.gas.clearCache().catch(err => console.warn('Cache clear failed', err));
       this.state.lastSeenCount = incrementalData.totalCount;
-
-
+      
+      console.log('✅ 増分リフレッシュ完了:', {
+        addedCards: incrementalData.newCount,
+        totalCards: this.state.currentAnswers.length,
+        newBaseline: this.state.lastSeenCount
+      });
+      
       this.provideFeedback(`${incrementalData.newCount}件の新しい投稿を追加しました`, 'success');
-
+      
     } catch (error) {
       console.error('増分コンテンツ更新に失敗:', error);
-
+      
       // エラー時は従来の全体更新にフォールバック
+      console.log('🔄 フォールバック: 全体更新を実行');
       await this.refreshContentFull();
-
+      
     } finally {
       // ボタンを元に戻す
       if (this.elements.refreshContentBtn) {
-        this.elements.refreshContentBtn.textContent = this.elements.refreshContentBtn.textContent.includes('更新中') ?
+        this.elements.refreshContentBtn.textContent = this.elements.refreshContentBtn.textContent.includes('更新中') ? 
           (originalText || '更新して表示') : this.elements.refreshContentBtn.textContent;
         this.elements.refreshContentBtn.disabled = false;
       }
     }
   }
-
+  
   // 全体コンテンツ更新（従来の方法）
   async refreshContentFull() {
     try {
       // 従来の手動リフレッシュ時はキャッシュをクリアして最新データを取得
       this.cache.clear();
-
+      console.log('🔄 全体リフレッシュ開始 - キャッシュクリア完了');
+      
       await this.loadSheetData(true, false);
-
+      
       // 手動リフレッシュ後は新着チェック基準を更新（初期化フラグは維持）
       this.state.lastSeenCount = this.state.currentAnswers.length;
-
+      console.log('🔄 全体リフレッシュ完了、新着基準更新:', {
+        newLastSeenCount: this.state.lastSeenCount,
+        maintainInitialFlag: this.initialDataLoaded,
+        currentAnswersLength: this.state.currentAnswers.length,
+        visibleCards: document.querySelectorAll('.answer-card').length
+      });
+      
       this.provideFeedback('更新完了！', 'success');
-
+      
     } catch (error) {
       console.error('全体コンテンツ更新に失敗:', error);
       this.provideFeedback('更新失敗', 'error');
       throw error;
     }
   }
-
+  
   // コンテンツを更新（手動） - 増分更新を優先
   async refreshContent() {
     // 増分更新を試行、失敗時は全体更新にフォールバック
     await this.refreshContentIncremental();
   }
-
+  
   // 新しいカードを既存のカードコンテナに追加
   async appendNewCards(newData, sortOrder = 'newest') {
     if (!newData || newData.length === 0) return;
-
-
+    
+    console.log('📌 新しいカードを追加:', newData.length + '件');
+    
     const container = this.elements.answersContainer;
     if (!container) return;
-
+    
     // 新しいカードを作成してコンテナに追加
     const fragment = document.createDocumentFragment();
-
+    
     for (const data of newData) {
       const cardElement = this.createAnswerCard(data);
       if (cardElement) {
@@ -1614,13 +1723,13 @@ setupEventDelegation() {
         fragment.appendChild(cardElement);
       }
     }
-
+    
     if (sortOrder === 'newest') {
       container.prepend(fragment);
     } else {
       container.appendChild(fragment);
     }
-
+    
     // アニメーションで新しいカードを表示
     await new Promise(resolve => {
       requestAnimationFrame(() => {
@@ -1632,22 +1741,22 @@ setupEventDelegation() {
             card.style.transform = 'translateY(0)';
           }, index * 100); // 100msずつ遅延して順次表示
         });
-
+        
         // 全てのアニメーションが完了するまで待機
         setTimeout(resolve, newCards.length * 100 + 300);
       });
     });
   }
-
+  
   // ユーザーフィードバック表示
   provideFeedback(message, type = 'info') {
     if (!this.elements.refreshContentBtn) return;
-
+    
     const originalText = this.elements.refreshContentBtn.textContent;
     const originalBackground = this.elements.refreshContentBtn.style.background;
-
+    
     this.elements.refreshContentBtn.textContent = message;
-
+    
     switch (type) {
       case 'success':
         this.elements.refreshContentBtn.style.background = 'rgba(16, 185, 129, 0.3)';
@@ -1659,13 +1768,13 @@ setupEventDelegation() {
         this.elements.refreshContentBtn.style.background = 'rgba(59, 130, 246, 0.3)';
         break;
     }
-
+    
     setTimeout(() => {
       this.elements.refreshContentBtn.textContent = originalText;
       this.elements.refreshContentBtn.style.background = originalBackground;
     }, 2000);
   }
-
+  
   getMockData(funcName, ...args) {
     return new Promise((resolve) => {
       setTimeout(() => {
@@ -1730,12 +1839,12 @@ setupEventDelegation() {
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
     }
-
+    
     // Adaptive polling: start with normal interval, adjust based on success/failure
     this.pollSuccessCount = 0;
     this.pollFailureCount = 0;
     this.currentPollInterval = this.isLowPerformanceMode ? 30000 : 15000;
-
+    
     const adaptivePoll = async () => {
       console.log('⏰ ポーリング実行:', {
         currentInterval: this.currentPollInterval,
@@ -1743,17 +1852,17 @@ setupEventDelegation() {
         failureCount: this.pollFailureCount,
         timestamp: new Date().toLocaleTimeString()
       });
-
+      
       try {
         await this.checkForNewContentLight();
         this.pollSuccessCount++;
         this.pollFailureCount = 0;
-
+        
         // Reduce interval on consistent success (but not below minimum)
         if (this.pollSuccessCount > 3 && this.currentPollInterval > 10000) {
           this.currentPollInterval = Math.max(10000, this.currentPollInterval * 0.9);
         }
-
+        
         console.log('✅ ポーリング成功:', {
           successCount: this.pollSuccessCount,
           nextInterval: this.currentPollInterval
@@ -1761,7 +1870,7 @@ setupEventDelegation() {
       } catch (error) {
         this.pollFailureCount++;
         this.pollSuccessCount = 0;
-
+        
         // Increase interval on failures (exponential backoff)
         if (this.pollFailureCount > 2) {
           this.currentPollInterval = Math.min(60000, this.currentPollInterval * 1.5);
@@ -1771,14 +1880,14 @@ setupEventDelegation() {
           newInterval: this.currentPollInterval
         });
       }
-
+      
       // Schedule next poll with current interval
       this.pollingTimeout = setTimeout(adaptivePoll, this.currentPollInterval);
     };
-
+    
     // Start first poll
     this.pollingTimeout = setTimeout(adaptivePoll, this.currentPollInterval);
-
+    
     // Start automatic cleanup for memory management
     this.cleanupInterval = setInterval(() => {
       this.cache.cleanup();
@@ -1789,12 +1898,12 @@ setupEventDelegation() {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
     }
-
+    
     if (this.pollingTimeout) {
       clearTimeout(this.pollingTimeout);
       this.pollingTimeout = null;
     }
-
+    
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
@@ -1869,34 +1978,34 @@ setupEventDelegation() {
     if (this.elements.sheetSelector && this.handlers.onSheetSelectorChange) {
       this.elements.sheetSelector.removeEventListener('change', this.handlers.onSheetSelectorChange);
     }
-
+    
     // イベントリスナー設定フラグのリセット
     this.eventDelegationSetup = false;
     this.nonCriticalListenersSetup = false;
     this.modalOperationPending = false;
-
+    
     // Clear caches
     this.cache.clear();
     this.deferredUpdates.clear();
     this.domFragmentPool.length = 0;
-
+    
     debugLog('アプリケーションのクリーンアップ完了');
   }
   async loadDataImmediate() {
     // Verify admin first to ensure proper initialization
     await this.verifyAdminAsync();
-
+    
     // Start loading immediately without waiting
     this.loadSheetData(false, true).then(() => {
       this.startPolling();
     });
-
+    
     // Load sheets in background only for administrators
     if (this.state.isAdminUser) {
       this.loadAvailableSheets();
     }
   }
-
+  
   showMinimalSkeleton() {
     // Show only 3 skeletons for immediate visual feedback
     const count = 3;
@@ -1910,14 +2019,14 @@ setupEventDelegation() {
   displayEmptyState() {
     const container = this.elements.answersContainer;
     if (!container) return;
-
+    
     container.innerHTML = `
       <div class="text-center py-16 px-6 col-span-full">
         <svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
-        <h3 class="mt-2 h5 fw-medium text-white">まだ回答がありません</h3>
-        <p class="mt-1 small text-muted">最初の回答者になりましょう！</p>
+        <h3 class="mt-2 text-lg font-medium text-white">まだ回答がありません</h3>
+        <p class="mt-1 text-sm text-gray-400">最初の回答者になりましょう！</p>
       </div>
     `;
   }
@@ -1927,7 +2036,7 @@ setupEventDelegation() {
     if (this.elements.loadingOverlay) {
       this.elements.loadingOverlay.classList.remove('hidden');
     }
-
+    
     // すべてのユーザーインタラクションを無効化
     var allInteractiveElements = document.querySelectorAll('button, input, select, textarea, a, .cursor-pointer, .answer-card');
     allInteractiveElements.forEach(function(element) {
@@ -1936,7 +2045,7 @@ setupEventDelegation() {
         element.style.opacity = '0.6';
       }
     });
-
+    
     // メインコンテナを無効化
     var mainContent = document.querySelector('#main-container') || document.body;
     mainContent.style.pointerEvents = 'none';
@@ -1947,7 +2056,7 @@ setupEventDelegation() {
     if (this.elements.loadingOverlay) {
       this.elements.loadingOverlay.classList.add('hidden');
     }
-
+    
     // すべてのユーザーインタラクションを有効化
     var allInteractiveElements = document.querySelectorAll('button, input, select, textarea, a, .cursor-pointer, .answer-card');
     allInteractiveElements.forEach(function(element) {
@@ -1956,7 +2065,7 @@ setupEventDelegation() {
         element.style.opacity = '1';
       }
     });
-
+    
     // メインコンテナを有効化
     var mainContent = document.querySelector('#main-container') || document.body;
     mainContent.style.pointerEvents = 'auto';
@@ -1970,10 +2079,10 @@ setupEventDelegation() {
 
     const selectedClass = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
     const oldAnswers = [...this.state.currentAnswers];
-
+    
     // Show immediate visual feedback - but keep the question text visible
     // (Removed loading spinner from heading to keep question text always visible)
-
+    
     // Optimized loading state - don't clear if initial load
     if (showLoading && !isInitialLoad) {
       const count = Math.min(parseInt(this.elements.sizeSlider.value, 10) * 2, 8); // Cap at 8
@@ -1989,7 +2098,7 @@ setupEventDelegation() {
     try {
       const sortOrder = this.elements.sortOrder.value;
       const classFilter = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
-
+      
       google.script.run
         .withSuccessHandler(result => {
           try {
@@ -1998,7 +2107,7 @@ setupEventDelegation() {
               clearTimeout(this.initTimeoutId);
               this.initTimeoutId = null;
             }
-
+            
             if (!result || !result.data || result.data.length === 0) {
               this.displayEmptyState();
               if (isInitialLoad) {
@@ -2008,13 +2117,13 @@ setupEventDelegation() {
             }
 
             this.state.currentAnswers = result.data;
-
+            
             // Apply saved reaction states to restore user's previous reactions
             this.applyReactionState(result.data);
-
+            
             // Populate class filter with available classes and make it visible
             this.populateClassFilter(result.data);
-
+            
             if (isInitialLoad) {
               this.state.lastSeenCount = result.data.length;
               // 初期データロード完了フラグを設定
@@ -2026,8 +2135,8 @@ setupEventDelegation() {
             }
 
             // Update heading with the actual question text from server (only if valid)
-            if (result.header && this.elements.headingLabel &&
-                result.header !== '読み込み中...' &&
+            if (result.header && this.elements.headingLabel && 
+                result.header !== '読み込み中...' && 
                 !result.header.includes('読み込み') &&
                 result.header.trim() !== '') {
               this.elements.headingLabel.textContent = result.header;
@@ -2047,12 +2156,12 @@ setupEventDelegation() {
               clearTimeout(this.initTimeoutId);
               this.initTimeoutId = null;
             }
-
+            
             console.error('Error loading sheet data:', error);
-
+            
             // Check if the error indicates the board has been unpublished
             const errorStr = error.message || error.toString();
-            if (errorStr.includes('アクティブなシートが見つかりません') ||
+            if (errorStr.includes('アクティブなシートが見つかりません') || 
                 errorStr.includes('公開されていません') ||
                 errorStr.includes('unpublished') ||
                 errorStr.includes('not found')) {
@@ -2061,7 +2170,7 @@ setupEventDelegation() {
               this.redirectToUnpublishedPage();
               return;
             }
-
+            
             this.displayEmptyState();
           } finally {
             // エラー時にもローディング状態を解除
@@ -2070,11 +2179,11 @@ setupEventDelegation() {
           }
         })
         .getPublishedSheetData(this.state.userId, classFilter, sortOrder, this.state.showAdminFeatures, false);
-
-
+      
+      
       // Post-processing after successful data load
       this.adjustLayout();
-
+      
       if (!this.state.isAdminUser || !window.hasAdminCapability) {
         this.state.showAdminFeatures = false;
         this.state.showHighlightToggle = false;
@@ -2096,7 +2205,7 @@ setupEventDelegation() {
         this.cache.clear();
         // Cache cleared due to admin highlight settings
       }
-
+      
       if (isInitialLoad) {
         this.elements.answersContainer.classList.add('render-optimized');
       }
@@ -2104,7 +2213,7 @@ setupEventDelegation() {
       console.error('Error loading sheet data:', error);
       const errorMessage = this.escapeHtml(error.message || 'Unknown error');
       this.elements.answersContainer.querySelectorAll('.skeleton').forEach(el => el.remove());
-      this.elements.answersContainer.innerHTML = '<div class="text-center text-danger w-100 mt-4 p-4 bg-danger bg-opacity-10 rounded-3">' + '<p class="fw-bold">データの読み込みに失敗しました。</p>' + '<p class="small mt-2">' + errorMessage + '</p>' + '<button id="retryLoadBtn" class="btn btn-primary mt-3 fw-bold">再試行</button>' + '</div>';
+      this.elements.answersContainer.innerHTML = '<div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg">' + '<p class="font-bold">データの読み込みに失敗しました。</p>' + '<p class="text-sm mt-2">' + errorMessage + '</p>' + '<button id="retryLoadBtn" class="mt-4 game-btn bg-cyan-600 text-white px-4 py-2 rounded-lg font-bold border-cyan-800 hover:bg-cyan-500 text-sm">再試行</button>' + '</div>';
       // 同期エラーの場合にもローディング状態を解除
       this.state.isLoading = false;
       this.hideLoadingOverlay();
@@ -2123,7 +2232,7 @@ setupEventDelegation() {
   }
   populateSheetSelector(sheets) {
     const selector = this.elements.sheetSelector;
-
+    
     if (!selector) return;
 
     if (!sheets || sheets.length === 0) {
@@ -2131,7 +2240,7 @@ setupEventDelegation() {
       selector.disabled = true;
       return;
     }
-
+    
     // シート選択肢を構築
     if (!Array.isArray(sheets)) {
       console.error('Invalid sheets data:', sheets);
@@ -2139,16 +2248,16 @@ setupEventDelegation() {
       selector.disabled = true;
       return;
     }
-
+    
     const options = sheets.map(sheet => {
       const selected = sheet.name === this.state.sheetName ? 'selected' : ''; // Use sheet.name for comparison
       const activeLabel = sheet.name === this.state.sheetName ? ' (現在のアクティブシート)' : '';
       return `<option value="${this.escapeHtml(sheet.name)}" ${selected}>${this.escapeHtml(sheet.name)}${activeLabel}</option>`;
     }).join('');
-
+    
     selector.innerHTML = options;
     selector.disabled = false;
-
+    
     // 現在のアクティブシートを記録
     // this.state.currentActiveSheet is already set by loadSheetData
   }
@@ -2157,12 +2266,12 @@ setupEventDelegation() {
     if (!selectedSheet || selectedSheet === this.state.currentActiveSheet) {
       return;
     }
-
+    
     try {
       // 新しいシートのデータを読み込み
       await this.loadSheetData(true, false, selectedSheet);
       this.state.currentActiveSheet = selectedSheet;
-
+      
       // UIを更新
       this.updateSheetSelectorLabels();
     } catch (error) {
@@ -2174,12 +2283,12 @@ setupEventDelegation() {
   updateSheetSelectorLabels() {
     const selector = this.elements.sheetSelector;
     const options = Array.from(selector.options);
-
+    
     options.forEach(option => {
       const sheetName = option.value;
       const isActive = sheetName === this.state.currentActiveSheet;
       const cleanName = sheetName.replace(/ \(現在のアクティブシート\)$/, '');
-
+      
       if (isActive) {
         option.textContent = `${cleanName} (現在のアクティブシート)`;
       } else {
@@ -2197,7 +2306,7 @@ setupEventDelegation() {
   }
   applyReactionStyles(element, data) {
     if (!element || !data) return;
-
+    
     // 既存のリアクション関連クラスをクリア
     const reactionClasses = [
       'reaction-bg-like', 'reaction-bg-understand', 'reaction-bg-curious',
@@ -2206,7 +2315,7 @@ setupEventDelegation() {
       'highlighted'
     ];
     reactionClasses.forEach(cls => element.classList.remove(cls));
-
+    
     // ハイライト状態を適用（リアクション装飾より優先）
     if (data.highlight) {
       element.classList.add('highlighted');
@@ -2216,12 +2325,12 @@ setupEventDelegation() {
     } else {
       // No highlight decoration
     }
-
+    
     // アクティブなリアクションを特定
-    const active = this.reactionTypes.filter(rt =>
+    const active = this.reactionTypes.filter(rt => 
       data.reactions && data.reactions[rt.key] && data.reactions[rt.key].count > 0
     ).map(rt => rt.key);
-
+    
     // 背景色クラスを適用
     if (active.length === 1) {
       if (active[0] === 'LIKE') element.classList.add('reaction-bg-like');
@@ -2235,7 +2344,7 @@ setupEventDelegation() {
     } else if (active.length === 3) {
       element.classList.add('reaction-bg-like-understand-curious');
     }
-
+    
     // ボーダー幅を適用
     const totalReactions = this.reactionTypes.reduce((sum, rt) => sum + (data.reactions?.[rt.key]?.count || 0), 0);
     if (totalReactions >= 10) {
@@ -2255,14 +2364,14 @@ setupEventDelegation() {
       this.cache.clear();
       // Cache cleared due to highlight setting change
     }
-
+    
     const container = this.elements.answersContainer;
     container.querySelectorAll('.skeleton').forEach(el => el.remove());
     const newRows = this.state.currentAnswers;
-
+    
     // Batch DOM updates using performance-aware batching
     const updates = [];
-    if (this.elements.sliderValue && this.elements.sizeSlider &&
+    if (this.elements.sliderValue && this.elements.sizeSlider && 
         this.elements.sliderValue.textContent !== this.elements.sizeSlider.value) {
       updates.push(() => this.elements.sliderValue.textContent = this.elements.sizeSlider.value);
     }
@@ -2279,10 +2388,10 @@ setupEventDelegation() {
         updates.push(() => this.elements.answerCount.innerHTML = countHtml);
       }
     }
-
+    
     // Apply updates using performance-aware batching
     this.batchDOMUpdates(updates);
-
+    
     if (newRows.length === 0) {
       if (!container.querySelector('.no-answers')) {
         container.innerHTML = '';
@@ -2310,21 +2419,21 @@ setupEventDelegation() {
       } else {
         // Process small datasets normally
         const fragment = this.getReusableFragment();
-
+        
         newRows.forEach((row) => {
           const rowId = String(row.rowIndex);
           let card = existingMap.get(rowId);
           const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
-
+          
           if (!card) {
             card = this.createAnswerCard(row);
             card.classList.add('new-card');
-
+            
             // Add to visibility observer
             if (this.visibilityObserver) {
               this.visibilityObserver.observe(card);
             }
-
+            
             changedItems.push(row);
             fragment.appendChild(card);
           } else {
@@ -2333,12 +2442,12 @@ setupEventDelegation() {
             // 必要に応じて位置を調整するが、ここでは元の位置を保持
           }
         });
-
+        
         // Append fragment to container
         if (fragment.children.length > 0) {
           container.appendChild(fragment);
         }
-
+        
         // Recycle fragment
         this.recycleFragment(fragment);
       }
@@ -2348,34 +2457,34 @@ setupEventDelegation() {
       }
     }
   }
-
+  
   renderWithVirtualScrolling(newRows, oldRows, container, existingMap, changedItems) {
     const batchSize = this.isLowPerformanceMode ? CHUNK_SIZE : RENDER_BATCH_SIZE;
     let currentIndex = 0;
     let prevNode = null;
-
+    
     const processBatch = () => {
       const startTime = performance.now();
       const endIndex = Math.min(currentIndex + batchSize, newRows.length);
       const batch = newRows.slice(currentIndex, endIndex);
-
+      
       // Use document fragment for efficient DOM manipulation
       const fragment = this.getReusableFragment();
-
+      
       batch.forEach((row) => {
         const rowId = String(row.rowIndex);
         let card = existingMap.get(rowId);
         const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
-
+        
         if (!card) {
           card = this.createAnswerCard(row);
           card.classList.add('new-card');
-
+          
           // Add to visibility observer for virtual scrolling
           if (this.visibilityObserver) {
             this.visibilityObserver.observe(card);
           }
-
+          
           changedItems.push(row);
           fragment.appendChild(card);
         } else {
@@ -2383,21 +2492,21 @@ setupEventDelegation() {
           // 既存のカードは既にDOMにあるので、フラグメントに追加しない
         }
       });
-
+      
       // Append fragment to container
       if (fragment.children.length > 0) {
         container.appendChild(fragment);
       }
-
+      
       // Recycle fragment
       this.recycleFragment(fragment);
-
+      
       currentIndex = endIndex;
-
+      
       // Continue processing if there are more items
       if (currentIndex < newRows.length) {
         const elapsed = performance.now() - startTime;
-
+        
         if (elapsed < PERFORMANCE_BUDGET && !this.isLowPerformanceMode) {
           // Continue synchronously if we have time budget
           processBatch();
@@ -2407,14 +2516,14 @@ setupEventDelegation() {
         }
       }
     };
-
+    
     processBatch();
   }
-
+  
   updateExistingCard(card, row, oldData, changedItems) {
     if (oldData) {
       let hasChanges = false;
-
+      
       if (oldData.opinion !== row.opinion) {
         const t = card.querySelector('.opinion-text');
         if (t) {
@@ -2422,7 +2531,7 @@ setupEventDelegation() {
           hasChanges = true;
         }
       }
-
+      
       if (oldData.reason !== row.reason) {
         const p = card.querySelector('.answer-preview p');
         if (p) {
@@ -2430,7 +2539,7 @@ setupEventDelegation() {
           hasChanges = true;
         }
       }
-
+      
       if (oldData.name !== row.name) {
         const n = card.querySelector('.font-bold');
         if (n) {
@@ -2438,12 +2547,12 @@ setupEventDelegation() {
           hasChanges = true;
         }
       }
-
-      if (JSON.stringify(oldData.reactions) !== JSON.stringify(row.reactions) ||
+      
+      if (JSON.stringify(oldData.reactions) !== JSON.stringify(row.reactions) || 
           oldData.highlight !== row.highlight) {
         hasChanges = true;
       }
-
+      
       if (hasChanges) {
         changedItems.push(row);
       }
@@ -2452,25 +2561,25 @@ setupEventDelegation() {
   createAnswerCard(data) {
     // Optimized cache key generation (faster than JSON.stringify)
     const cacheKey = `${data.rowIndex}-${data.opinion?.slice(0,50)}-${data.reason?.slice(0,30)}-${data.name}-${JSON.stringify(data.reactions)}-${data.highlight}-${this.state.showCounts}-${this.state.displayMode}-${this.state.showHighlightToggle}`;
-
+    
     // Answer card cache check
-
+    
     const cachedCard = this.cache.get(`render-${cacheKey}`);
     if (cachedCard) {
       const clonedCard = cachedCard.cloneNode(true);
       // Ensure cloned card has proper data-row-index
       clonedCard.dataset.rowIndex = data.rowIndex;
-
+      
       // Optimized: Only update elements that need row index (avoid querySelectorAll)
       const reactionButtons = clonedCard.querySelectorAll('.reaction-btn');
       reactionButtons.forEach(btn => {
         btn.dataset.rowIndex = data.rowIndex;
       });
-
+      
       // Using cached card
       return clonedCard;
     }
-
+    
     const card = document.createElement('div');
     const highlightClass = data.highlight ? ' highlighted' : '';
     card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer' + highlightClass;
@@ -2478,24 +2587,24 @@ setupEventDelegation() {
     card.setAttribute('role', 'article');
     card.setAttribute('tabindex', '0');
     card.setAttribute('aria-label', '回答カード: ' + (data.opinion || '').substring(0, 50) + (data.opinion && data.opinion.length > 50 ? '...' : ''));
-
+    
     // Answer card created
     let highlightBtnHtml = '';
     // Highlight button condition check
     if (this.state.showHighlightToggle) {
       const cls = data.highlight ? 'liked' : '';
       const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
-      highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'icon-size-md', data.highlight) + '</button>';
+      highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
       // Highlight button created
     } else {
       // Highlight button skipped
     }
     const showName = this.state.displayMode === 'named';
     let displayName = '';
-
+    
     // Debug: Log display mode and admin features state
     // Card display state configured
-
+    
     if (showName) {
       // 名前が利用可能な場合はそれを使用、なければemailから生成
       if (data.name) {
@@ -2503,45 +2612,45 @@ setupEventDelegation() {
       } else if (data.email) {
         displayName = data.email.split('@')[0];
       }
-
+      
     }
-
-    const nameHtml = showName && displayName ? '<div class="name-display flex-shrink-0 me-2"><span class="fw-bold small text-info bg-dark bg-opacity-50 px-2 py-1 rounded border border-info">' + this.escapeHtml(displayName) + '</span></div>' : '';
+    
+    const nameHtml = showName && displayName ? '<div class="name-display flex-shrink-0 mr-2"><span class="font-bold text-sm text-cyan-300 bg-gray-800/50 px-2 py-1 rounded border border-cyan-400">' + this.escapeHtml(displayName) + '</span></div>' : '';
     const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex flex-col sm:flex-row justify-between items-start sm:items-center gap-y-1 min-h-[2rem]' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
-
+    
     // Name display configuration complete
     const reactionButtonsHtml = this.reactionTypes.map(rt => {
       const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
       const cls = info.reacted ? 'liked' : '';
-      const colorClass = rt.key === 'LIKE' ? 'text-danger' : rt.key === 'UNDERSTAND' ? 'text-warning' : 'text-success';
-      const countSpan = this.state.showCounts ? '<span class="reaction-count fw-bold fs-5 text-light" aria-hidden="true">' + (info.count || 0) + '</span>' : '';
+      const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+      const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-lg text-gray-200" aria-hidden="true">' + (info.count || 0) + '</span>' : '';
       const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
       const reactionName = reactionNames[rt.key] || rt.key;
       const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
-      return '<button type="button" class="reaction-btn like-btn d-flex align-items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + ariaLabel + '" aria-pressed="' + info.reacted + '">' + this.getIcon(rt.icon, 'icon-size-md', info.reacted) + countSpan + '</button>';
+      return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + ariaLabel + '" aria-pressed="' + info.reacted + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
     }).join('');
     // Optimized: Use DocumentFragment instead of innerHTML for better performance
     const fragment = document.createDocumentFragment();
-
+    
     // Create main content div
     const contentDiv = document.createElement('div');
     contentDiv.className = 'relative flex-grow mb-3 answer-preview';
-
+    
     const opinionTitle = document.createElement('h3');
-    opinionTitle.className = 'opinion-text text-info text-break fs-4 fw-semibold lh-sm';
+    opinionTitle.className = 'opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
     opinionTitle.textContent = data.opinion || '';
-
+    
     const reasonText = document.createElement('p');
-    reasonText.className = 'text-light white-space-pre-wrap text-break-words mt-4';
+    reasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
     reasonText.textContent = data.reason || '';
-
+    
     contentDiv.appendChild(opinionTitle);
     contentDiv.appendChild(reasonText);
-
+    
     // Create footer div
     const footerDiv = document.createElement('div');
     footerDiv.className = containerClass;
-
+    
     // 名前表示部分を追加
     if (nameHtml) {
       const nameContainer = document.createElement('div');
@@ -2560,23 +2669,23 @@ setupEventDelegation() {
         displayName
       });
     }
-
+    
     // リアクション部分を追加
     const reactionsDiv = document.createElement('div');
-    reactionsDiv.className = 'd-flex align-items-center gap-1 flex-shrink-0';
+    reactionsDiv.className = 'flex items-center gap-1 flex-shrink-0';
     reactionsDiv.setAttribute('role', 'group');
     reactionsDiv.setAttribute('aria-label', '回答への反応');
     reactionsDiv.innerHTML = reactionButtonsHtml + highlightBtnHtml;
-
+    
     footerDiv.appendChild(reactionsDiv);
-
+    
     // 最終的なfooterDivの内容を確認
     console.log('📦 フッター構成確認:', {
       rowIndex: data.rowIndex,
       footerChildren: footerDiv.children.length,
       footerHTML: footerDiv.outerHTML.substring(0, 200)
     });
-
+    
     fragment.appendChild(contentDiv);
     fragment.appendChild(footerDiv);
     card.appendChild(fragment);
@@ -2586,23 +2695,23 @@ setupEventDelegation() {
       badge.innerHTML = this.getIcon('star', '', true);
       card.appendChild(badge);
     }
-
+    
     // 統一されたリアクションスタイルを適用
     this.applyReactionStyles(card, data);
-
+    
     // Cache the card for reuse (limit cache size)
     if (this.cache.size > 100) {
       this.cache.cleanup();
     }
     this.cache.set(`render-${cacheKey}`, card.cloneNode(true));
-
+    
     return card;
   }
   createSkeletonCard() {
     const card = document.createElement('div');
     card.className = 'answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 skeleton';
     // Simplified skeleton for faster rendering
-    card.innerHTML = '<div class="placeholder-glow mb-3"><div class="placeholder w-100 rounded-3" style="height: 5rem;"></div></div><div class="placeholder-glow"><div class="placeholder w-100 rounded-3" style="height: 1.5rem;"></div></div>';
+    card.innerHTML = '<div class="h-20 w-full rounded bg-gray-500/30 mb-4"></div><div class="h-6 w-full rounded bg-gray-500/20"></div>';
     return card;
   }
   /**
@@ -2622,7 +2731,7 @@ async handleReaction(rowIndex, reaction) {
     this.pendingReactions.add(reactionKey);
 
     const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
-
+    
     // ボタンを即座に無効化して視覚的フィードバックを提供
     btns.forEach(btn => {
         btn.disabled = true;
@@ -2642,16 +2751,16 @@ async handleReaction(rowIndex, reaction) {
 
     // 1人1つのリアクション制限をチェック
     const currentReactions = item.reactions || {};
-    const hasAnyReaction = Object.keys(currentReactions).some(key =>
+    const hasAnyReaction = Object.keys(currentReactions).some(key => 
       currentReactions[key] && currentReactions[key].reacted
     );
-
+    
     const isCurrentReactionActive = currentReactions[reaction] && currentReactions[reaction].reacted;
-
+    
     // 既に他のリアクションをしている場合でも、別のリアクションに直接切り替えを許可
     // （サーバー側で自動的に既存のリアクションを削除して新しいリアクションを追加）
     if (hasAnyReaction && !isCurrentReactionActive) {
-      debugLog('既存のリアクションを切り替えます:', {
+      debugLog('既存のリアクションを切り替えます:', { 
         existingReactions: Object.keys(currentReactions).filter(key => currentReactions[key]?.reacted),
         newReaction: reaction
       });
@@ -2663,7 +2772,7 @@ async handleReaction(rowIndex, reaction) {
 
         // レスポンスの安全な処理
         debugLog('addReactionレスポンス:', { res, type: typeof res });
-
+        
         if (res && res.status === 'ok') {
             // ★修正ポイント③：サーバーからの応答成功後に、UIを完全に更新する
             if (res.reactions && typeof res.reactions === 'object') {
@@ -2680,14 +2789,14 @@ async handleReaction(rowIndex, reaction) {
                 item.reactions[reaction].count = (item.reactions[reaction].count || 0) + 1;
                 item.reactions[reaction].reacted = true;
             }
-
+            
             // リアクション状態をlocalStorageに保存
             this.saveReactionState(numericRowIndex, item.reactions);
-
+            
             // UI状態を即座に更新
             requestAnimationFrame(() => {
                 this.applyUpdates([item]); // 次の描画フレームで安全にUIを更新
-
+                
                 // リアクションボタンの状態を強制更新
                 const reactionBtns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
                 reactionBtns.forEach(btn => {
@@ -2711,14 +2820,14 @@ async handleReaction(rowIndex, reaction) {
             }
         } else {
             const errorMsg = res?.message || 'リアクションの処理に失敗しました';
-            debugLog('リアクションAPIエラー:', {
-                res,
+            debugLog('リアクションAPIエラー:', { 
+                res, 
                 errorMsg,
                 responseType: typeof res,
                 hasValues: res?.values !== undefined,
                 responseKeys: res ? Object.keys(res) : []
             });
-
+            
             // ユーザーフレンドリーなエラーメッセージ
             if (errorMsg.includes('Cannot read properties of undefined')) {
                 throw new Error('データの読み込みに失敗しました。ページを更新してもう一度お試しください。');
@@ -2746,17 +2855,17 @@ async handleReaction(rowIndex, reaction) {
         this.pendingReactions.delete(reactionKey);
     }
 }
-
+  
   showErrorFeedback(btn, message) {
     if (!btn) return;
-
+    
     // 元のクラスを保存
     const originalClasses = btn.className;
-
+    
     // エラー表示
     btn.classList.add('bg-red-500');
     btn.title = message;
-
+    
     // 2秒後に元に戻す
     setTimeout(() => {
       btn.className = originalClasses;
@@ -2765,48 +2874,48 @@ async handleReaction(rowIndex, reaction) {
   }
   async handleHighlight(rowIndex) {
     // Highlight processing started
-
+    
     // バックエンド側で管理者権限をチェックするので、フロントエンド側のチェックは不要
-
+    
     const numericRowIndex = parseInt(rowIndex, 10);
     const highlightKey = `${numericRowIndex}-highlight`;
-
+    
     // Enhanced debounce for highlight operations
     if (this.highlightDebounce.has(highlightKey)) {
       clearTimeout(this.highlightDebounce.get(highlightKey));
       return; // Ignore rapid highlight clicks
     }
-
+    
     // Rate limiting for highlights
     const now = Date.now();
     const lastHighlightTime = this.lastReactionTimes?.get(highlightKey) || 0;
     if (now - lastHighlightTime < 500) { // Minimum 500ms between highlights
       return;
     }
-
+    
     // 既に処理中の場合は無視
     if (this.pendingReactions.has(highlightKey)) {
       return;
     }
-
+    
     this.pendingReactions.add(highlightKey);
     if (!this.lastReactionTimes) this.lastReactionTimes = new Map();
     this.lastReactionTimes.set(highlightKey, now);
-
+    
     const btns = document.querySelectorAll('.highlight-btn[data-row-index="' + numericRowIndex + '"]');
     const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
-
+    
     if (!item) {
       this.pendingReactions.delete(highlightKey);
       return;
     }
-
+    
     // ★修正ポイント①：UI更新をボタンのローディング表示のみに限定
     btns.forEach(btn => {
         btn.classList.add('loading');
         btn.disabled = true;
     });
-
+    
     try {
         // ★修正ポイント②：先にサーバーと通信する
         const res = await this.gas.toggleHighlight(numericRowIndex, this.state.sheetName);
@@ -2838,29 +2947,29 @@ async handleReaction(rowIndex, reaction) {
         this.pendingReactions.delete(highlightKey);
     }
   }
-
+  
   async toggleAdminMode() {
     // Temporarily disable button to prevent duplicate clicks
     if (this.elements.adminToggleBtn) {
       this.elements.adminToggleBtn.disabled = true;
     }
-
+    
     try {
       const enable = !this.state.showAdminFeatures;
-
+      
       // 管理者権限チェック
       if (enable) {
         if (!this.state.isAdminUser || !window.hasAdminCapability) {
           console.warn('管理者権限がありません。');
           return;
         }
-
+        
         // 管理モード移行時の確認モーダル
         const confirmed = await this.showAdminModeConfirmation();
         if (!confirmed) {
           return; // ユーザーがキャンセルした場合
         }
-
+        
         // 最初の管理モード切り替え時のみサーバー側で再確認（オプション）
         if (!this.adminModeVerified) {
           try {
@@ -2876,11 +2985,11 @@ async handleReaction(rowIndex, reaction) {
           }
         }
       }
-
+      
       // グローバル設定を更新
       window.showAdminFeatures = enable;
       window.showHighlightToggle = this.state.isAdminUser; // 管理者なら常に表示
-
+      
       debugLog('toggleAdminMode状態更新:', {
         enable,
         isAdminUser: this.state.isAdminUser,
@@ -2910,7 +3019,7 @@ async handleReaction(rowIndex, reaction) {
           serverDisplayMode: this.serverDisplayMode
         });
       }
-
+      
       // 管理モード有効時は強制的にローカル状態も更新
       if (enable) {
         this.state.displayMode = 'named';
@@ -2921,16 +3030,16 @@ async handleReaction(rowIndex, reaction) {
         this.state.showCounts = this.serverShowCounts;
         this.state.isStudentMode = true;
       }
-
+      
       // Update local state from global variables (but preserve displayMode if in admin mode)
       this.updateConfigFromGlobals();
-
+      
       // Re-enforce admin mode settings after updateConfigFromGlobals
       if (enable) {
         this.state.displayMode = 'named';
         this.state.showCounts = true;
       }
-
+      
       // 管理モード切り替え後の状態を確認
       debugLog('管理モード切り替え後の状態確認:', {
         enable,
@@ -2939,13 +3048,13 @@ async handleReaction(rowIndex, reaction) {
         windowDisplayMode: window.displayMode,
         windowShowCounts: window.showCounts
       });
-
+      
       // キャッシュをクリアして新しい設定で再描画
       this.cache.clear();
-
+      
       // 管理モード切り替え時は既存のカードを全て削除して強制再生成
       this.elements.answersContainer.innerHTML = '';
-
+      
       // UI状態を更新
       this.updateSortOptions();
       this.updateAdminButtonUI();
@@ -2966,7 +3075,7 @@ async handleReaction(rowIndex, reaction) {
       }
     }
   }
-
+  
   /**
    * 管理モード移行確認モーダル
    */
@@ -3003,25 +3112,25 @@ async handleReaction(rowIndex, reaction) {
           </div>
         </div>
       `;
-
+      
       // イベントリスナーを追加
       const cancelBtn = modal.querySelector('.cancel-btn');
       const confirmBtn = modal.querySelector('.confirm-btn');
-
+      
       const cleanup = () => {
         document.body.removeChild(modal);
       };
-
+      
       cancelBtn.addEventListener('click', () => {
         cleanup();
         resolve(false);
       });
-
+      
       confirmBtn.addEventListener('click', () => {
         cleanup();
         resolve(true);
       });
-
+      
       // Escapeキーでキャンセル
       const handleKeydown = (e) => {
         if (e.key === 'Escape') {
@@ -3031,20 +3140,20 @@ async handleReaction(rowIndex, reaction) {
         }
       };
       document.addEventListener('keydown', handleKeydown);
-
+      
       // モーダルを表示
       document.body.appendChild(modal);
-
+      
       // フォーカスを確認ボタンに移動
       setTimeout(() => confirmBtn.focus(), 100);
     });
   }
-
+  
   async endPublication() {
     if (!confirm('公開を終了しますか？生徒は回答ボードにアクセスできなくなります。')) {
       return;
     }
-
+    
     try {
       await this.runGas('clearActiveSheet');
       if (window.sharedModals) {
@@ -3082,7 +3191,7 @@ async handleReaction(rowIndex, reaction) {
       })
       .getWebAppUrl();
   }
-
+  
   endAdminMode() {
     google.script.run
       .withSuccessHandler(function(adminUrl) {
@@ -3092,7 +3201,7 @@ async handleReaction(rowIndex, reaction) {
       })
       .getWebAppUrl();
   }
-
+  
   /**
    * リアクション状態をlocalStorageに保存
    * @param {number} rowIndex - 行インデックス
@@ -3102,7 +3211,7 @@ async handleReaction(rowIndex, reaction) {
     try {
       // 既存の保存データを取得
       const existingData = JSON.parse(localStorage.getItem(this.reactionStorageKey) || '{}');
-
+      
       // 現在のリアクション状態を保存
       existingData[rowIndex] = {};
       Object.keys(reactions).forEach(reactionType => {
@@ -3114,19 +3223,19 @@ async handleReaction(rowIndex, reaction) {
           };
         }
       });
-
+      
       // 空のオブジェクトの場合は削除
       if (Object.keys(existingData[rowIndex]).length === 0) {
         delete existingData[rowIndex];
       }
-
+      
       localStorage.setItem(this.reactionStorageKey, JSON.stringify(existingData));
       debugLog('リアクション状態を保存:', { rowIndex, reactions: existingData[rowIndex] });
     } catch (error) {
       console.warn('リアクション状態の保存に失敗:', error);
     }
   }
-
+  
   /**
    * localStorageからリアクション状態を読み込み
    * @returns {object} 保存されたリアクション状態
@@ -3141,14 +3250,14 @@ async handleReaction(rowIndex, reaction) {
       return {};
     }
   }
-
+  
   /**
    * 保存されたリアクション状態を現在のデータに適用
    * @param {array} answers - 回答データ配列
    */
   applyReactionState(answers) {
     const savedReactions = this.loadReactionState();
-
+    
     answers.forEach(answer => {
       const savedReaction = savedReactions[answer.rowIndex];
       if (savedReaction && answer.reactions) {
@@ -3159,7 +3268,7 @@ async handleReaction(rowIndex, reaction) {
         });
       }
     });
-
+    
     debugLog('保存されたリアクション状態を適用完了');
   }
   updateReactionButtonUI(rowIndex, reaction, count, reacted) {
@@ -3171,10 +3280,10 @@ async handleReaction(rowIndex, reaction) {
       const rt = this.reactionTypes.find(r => r.key === reaction);
       const svgEl = btn.querySelector('svg');
       if (svgEl && rt) {
-        svgEl.outerHTML = this.getIcon(rt.icon, 'icon-size-md', reacted);
+        svgEl.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', reacted);
       }
-      const colorClass = reaction === 'LIKE' ? 'text-danger' : reaction === 'UNDERSTAND' ? 'text-warning' : 'text-success';
-      btn.classList.remove('text-danger', 'text-warning', 'text-success');
+      const colorClass = reaction === 'LIKE' ? 'text-red-500' : reaction === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+      btn.classList.remove('text-red-500', 'text-yellow-500', 'text-green-500');
       btn.classList.add(colorClass);
       btn.classList.toggle('liked', reacted);
       btn.setAttribute('aria-pressed', reacted.toString());
@@ -3203,7 +3312,7 @@ async handleReaction(rowIndex, reaction) {
           highlightBtn.setAttribute('aria-label', label);
           const svgEl = highlightBtn.querySelector('svg');
           if (svgEl) {
-            svgEl.outerHTML = this.getIcon('star', 'icon-size-md', item.highlight);
+            svgEl.outerHTML = this.getIcon('star', 'w-5 h-5', item.highlight);
           }
         }
         let badge = card.querySelector('.highlight-badge');
@@ -3228,11 +3337,11 @@ async handleReaction(rowIndex, reaction) {
     // Show answer modal called
 
     // Data search context
-
+    
     // 最新データを取得（filteredDataとcurrentAnswersの両方から）
     let data = this.state.currentAnswers.find(r => r.rowIndex == rowIndex);
     // Data search in currentAnswers
-
+    
     if (!data && this.state.filteredData) {
       data = this.state.filteredData.find(r => r.rowIndex == rowIndex);
       debugLog('Data search in filteredData:', {
@@ -3241,7 +3350,7 @@ async handleReaction(rowIndex, reaction) {
         availableRowIndexes: this.state.filteredData?.map(r => r.rowIndex) || []
       });
     }
-
+    
     if (!data) {
       debugLog('ERROR: No data found for rowIndex:', {
         rowIndex: rowIndex,
@@ -3250,7 +3359,7 @@ async handleReaction(rowIndex, reaction) {
       });
       return;
     }
-
+    
     debugLog('Data found for modal:', {
       rowIndex: rowIndex,
       data: data,
@@ -3258,10 +3367,10 @@ async handleReaction(rowIndex, reaction) {
       reason: data.reason?.substring(0, 50) + '...'
     });
     this.state.lastFocusedElement = document.activeElement;
-    this.elements.modalAnswer.innerHTML = '<p class="text-info white-space-pre-wrap text-break-words display-5 fw-bold lh-sm">' + this.escapeHtml(data.opinion || '') + '</p>' + '<p class="text-light white-space-pre-wrap text-break-words fs-3 mt-4">' + this.escapeHtml(data.reason || '') + '</p>';
+    this.elements.modalAnswer.innerHTML = '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + this.escapeHtml(data.opinion || '') + '</p>' + '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + this.escapeHtml(data.reason || '') + '</p>';
     const showName = this.state.displayMode === 'named';
     let modalDisplayName = '';
-
+    
     // Debug: Log modal display mode state
     debugLog('Modal display state:', {
       displayMode: this.state.displayMode,
@@ -3271,7 +3380,7 @@ async handleReaction(rowIndex, reaction) {
       dataName: data.name,
       dataEmail: data.email
     });
-
+    
     if (showName) {
       // 名前が利用可能な場合はそれを使用、なければemailから生成
       if (data.name) {
@@ -3280,28 +3389,28 @@ async handleReaction(rowIndex, reaction) {
         modalDisplayName = data.email.split('@')[0];
       }
     }
-
+    
     this.elements.modalStudentName.textContent = modalDisplayName;
     const footerBase = 'text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex';
     this.elements.modalFooter.className = footerBase + (showName ? ' justify-between items-center' : ' justify-end items-center');
     const reactionButtonsHtml = this.reactionTypes.map(rt => {
       const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
       const cls = info.reacted ? 'liked' : '';
-      const colorClass = rt.key === 'LIKE' ? 'text-danger' : rt.key === 'UNDERSTAND' ? 'text-warning' : 'text-success';
+      const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
       const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-gray-200">' + info.count + '</span>' : '';
-      return '<button type="button" class="reaction-btn like-btn d-flex align-items-center gap-2 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'icon-size-md', info.reacted) + countSpan + '</button>';
+      return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
     }).join('');
-
+    
     // ハイライトボタンを追加
     let highlightBtnHtml = '';
     if (this.state.showHighlightToggle) {
       const cls = data.highlight ? 'liked' : '';
       const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
-      highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'icon-size-md', data.highlight) + '</button>';
+      highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
     }
-
+    
     this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
-
+    
     // リアクションに基づくカード色の適用
     debugLog('モーダルにリアクション装飾適用:', {
       rowIndex: data.rowIndex,
@@ -3313,35 +3422,35 @@ async handleReaction(rowIndex, reaction) {
     debugLog('モーダル装飾適用後:', {
       className: this.elements.answerModalCard.className
     });
-
+    
     this.elements.answerModalContainer.classList.remove('hidden');
     this.elements.answerModalContainer.classList.add('modal-fade');
     this.elements.answerModalCard.classList.add('modal-scale');
-
+    
     this.elements.answerModalCloseBtn.focus();
   }
   updateModalContent(data) {
     if (!data) return;
-
+    
     // リアクションボタンを更新
     const reactionButtonsHtml = this.reactionTypes.map(rt => {
       const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
       const cls = info.reacted ? 'liked' : '';
-      const colorClass = rt.key === 'LIKE' ? 'text-danger' : rt.key === 'UNDERSTAND' ? 'text-warning' : 'text-success';
+      const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
       const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-gray-200">' + info.count + '</span>' : '';
-      return '<button type="button" class="reaction-btn like-btn d-flex align-items-center gap-2 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'icon-size-md', info.reacted) + countSpan + '</button>';
+      return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
     }).join('');
-
+    
     // ハイライトボタンを更新
     let highlightBtnHtml = '';
     if (this.state.showHighlightToggle) {
       const cls = data.highlight ? 'liked' : '';
       const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
-      highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'icon-size-md', data.highlight) + '</button>';
+      highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
     }
-
+    
     this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
-
+    
     // モーダルカードのスタイルを更新
     debugLog('updateModalContent装飾適用:', {
       rowIndex: data.rowIndex,
@@ -3363,10 +3472,10 @@ async handleReaction(rowIndex, reaction) {
     this.elements.infoModalContainer.classList.remove('hidden');
     this.elements.infoModalContainer.classList.add('modal-fade');
     this.elements.infoModalCard.classList.add('modal-scale');
-
+    
     // Ensure modal starts from the top
     this.elements.infoModalCard.scrollTop = 0;
-
+    
     // Focus on the modal container first, then the button
     setTimeout(() => {
       this.elements.infoModalConfirmBtn.focus();
@@ -3376,7 +3485,7 @@ async handleReaction(rowIndex, reaction) {
     this.elements.infoModalContainer.classList.add('hidden');
     this.elements.infoModalContainer.classList.remove('modal-fade');
     this.elements.infoModalCard.classList.remove('modal-scale');
-
+    
     localStorage.setItem('introSeen', '1');
     if (this.state.lastFocusedElement) {
       this.state.lastFocusedElement.focus();
@@ -3389,7 +3498,7 @@ async handleReaction(rowIndex, reaction) {
     if (cachedIcon) {
       return cachedIcon;
     }
-
+    
     let key = name;
     if (ICONS[name + '-outline'] || ICONS[name + '-solid']) {
       key = solid ? name + '-solid' : name + '-outline';
@@ -3432,7 +3541,7 @@ async handleReaction(rowIndex, reaction) {
       window.sharedUtilities.debounce.debounce(() => func.apply(this, args), key, delay);
     };
   }
-
+  
   throttle(func, delay) {
     // Use SharedUtilities with instance-specific keys
     const key = `studyquest-throttle-${this.instanceId || 'default'}-${Math.random().toString(36).substr(2, 9)}`;
@@ -3461,7 +3570,7 @@ async handleReaction(rowIndex, reaction) {
       windowShowAdminFeatures: window.showAdminFeatures,
       currentDisplayMode: this.state.displayMode
     });
-
+    
     this.state.isStudentMode = window.isStudentMode;
     this.state.showCounts = window.showCounts;
     window.showScoreSort = window.showCounts;
@@ -3469,12 +3578,12 @@ async handleReaction(rowIndex, reaction) {
     this.state.showHighlightToggle = this.state.isAdminUser; // 管理者なら常に表示
     this.state.showScoreSort = window.showScoreSort;
     this.state.showPublishControls = window.showPublishControls;
-
+    
     // Only update displayMode if not in admin mode
     if (!this.state.showAdminFeatures) {
       this.state.displayMode = window.displayMode;
     }
-
+    
     debugLog('updateConfigFromGlobals後の状態:', {
       isAdminUser: this.state.isAdminUser,
       showHighlightToggle: this.state.showHighlightToggle,
@@ -3496,26 +3605,26 @@ async handleReaction(rowIndex, reaction) {
     const platform = navigator.platform;
     const memory = navigator.deviceMemory || 4; // Default to 4GB if not available
     const cores = navigator.hardwareConcurrency || 4;
-
+    
     // Detect low-end devices
     if (memory <= 2 || cores <= 2) return true;
     if (userAgent.includes('Mobile') && !userAgent.includes('iPad')) return true;
     if (platform.includes('Win32') && cores <= 4) return true;
-
+    
     return false;
   }
 
   setupPerformanceMonitoring() {
     let frameCount = 0;
     let lastTime = performance.now();
-
+    
     const measurePerformance = () => {
       const now = performance.now();
       const delta = now - lastTime;
-
+      
       if (frameCount > 0) {
         this.performanceMetrics.frameTime = delta;
-
+        
         // If frame time is consistently over 16ms, enable low performance mode
         if (delta > PERFORMANCE_BUDGET && !this.isLowPerformanceMode) {
           console.warn('Low performance detected, enabling optimizations');
@@ -3523,26 +3632,26 @@ async handleReaction(rowIndex, reaction) {
           this.optimizeForLowPerformance();
         }
       }
-
+      
       lastTime = now;
       frameCount++;
-
+      
       if (frameCount < 60) { // Monitor first 60 frames
         requestAnimationFrame(measurePerformance);
       }
     };
-
+    
     requestAnimationFrame(measurePerformance);
   }
 
   optimizeForLowPerformance() {
     debugLog('Enabling low performance optimizations');
-
+    
     // Reduce animation and transition durations
     document.documentElement.style.setProperty('--transition-duration', '0.1s');
     document.documentElement.style.setProperty('--animation-duration', '0.1s');
     document.documentElement.style.setProperty('--backdrop-blur', '4px');
-
+    
     // Create comprehensive low-performance stylesheet
     const style = document.createElement('style');
     style.id = 'low-performance-optimizations';
@@ -3553,21 +3662,21 @@ async handleReaction(rowIndex, reaction) {
         backdrop-filter: blur(4px) !important;
         background: var(--color-surface) !important;
       }
-
+      
       /* Simplify hover effects */
       .answer-card:hover {
         transform: none !important;
         box-shadow: var(--shadow-sm) !important;
       }
-
+      
       .reaction-btn:hover {
         transform: scale(1.02) !important;
       }
-
+      
       .game-btn:hover {
         transform: translateY(-1px) !important;
       }
-
+      
       /* Disable complex animations */
       .answer-card.highlighted {
         transform: none !important;
@@ -3575,23 +3684,23 @@ async handleReaction(rowIndex, reaction) {
         border-image: none !important;
         box-shadow: 0 0 12px rgba(147, 51, 234, 0.5) !important;
       }
-
+      
       /* Remove will-change to reduce GPU usage */
       * {
         will-change: auto !important;
       }
-
+      
       /* Simplify shadows */
       .answer-card {
         box-shadow: var(--shadow-sm) !important;
       }
-
+      
     `;
     document.head.appendChild(style);
-
+    
     // Add low-performance class to body for CSS targeting
     document.body.classList.add('low-performance');
-
+    
     // Reduce polling frequency
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
@@ -3607,7 +3716,7 @@ async handleReaction(rowIndex, reaction) {
           const card = entry.target;
           const rect = card.getBoundingClientRect();
           const isPartiallyVisible = rect.top < window.innerHeight && rect.bottom > 0;
-
+          
           if (entry.isIntersecting) {
             card.classList.add('visible');
             card.classList.remove('hidden-card');
@@ -3646,19 +3755,19 @@ async handleReaction(rowIndex, reaction) {
   batchDOMUpdates(updates) {
     const startTime = performance.now();
     let processedCount = 0;
-
+    
     const processBatch = () => {
       while (processedCount < updates.length && (performance.now() - startTime) < PERFORMANCE_BUDGET) {
         updates[processedCount]();
         processedCount++;
       }
-
+      
       if (processedCount < updates.length) {
         // Continue in next frame
         requestAnimationFrame(processBatch);
       }
     };
-
+    
     processBatch();
   }
 
@@ -3683,7 +3792,7 @@ async handleReaction(rowIndex, reaction) {
     if (this.deferredUpdates.has(key)) {
       return;
     }
-
+    
     this.deferredUpdates.add(key);
     setTimeout(() => {
       callback();
@@ -3702,7 +3811,7 @@ async handleReaction(rowIndex, reaction) {
       cacheSize: this.cache.size
     });
   }
-
+  
   // Enhanced cache methods with timestamp tracking
 }
 // ===== 共通ドメイン情報処理関数 =====
@@ -3742,7 +3851,7 @@ function displayDomainInfo(info) {
   if (headerDomainMatch) headerDomainMatch.classList.add('hidden');
   if (headerDomainMismatch) headerDomainMismatch.classList.add('hidden');
   if (headerDomainInitial) headerDomainInitial.classList.add('hidden');
-
+  
   if (!info || info.error) {
     console.warn('ドメイン情報エラー:', info?.error);
     if (headerDomainInitial) headerDomainInitial.classList.remove('hidden');
@@ -3792,15 +3901,149 @@ try {
   if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
     window.studyQuestApp.destroy();
   }
-
+  // システムフロー表示
+  showSystemFlow();
+  
   window.studyQuestApp = new StudyQuestApp();
+  
+  // Expose debug functions globally for console access
+  window.debugAnswerCards = () => {
+    if (window.studyQuestApp && window.studyQuestApp.debugAnswerCards) {
+      window.studyQuestApp.debugAnswerCards();
+    } else {
+      console.log('StudyQuestApp not available or debug function not found');
+    }
+  };
+  
+  // Enhanced global debug function with additional utility methods
+  window.debugClickAnswerCard = (cardIndex = 0, options = {}) => {
+    if (window.studyQuestApp && window.studyQuestApp.debugClickAnswerCard) {
+      return window.studyQuestApp.debugClickAnswerCard(cardIndex, options);
+    } else {
+      console.log('StudyQuestApp not available or debug function not found');
+      return { success: false, error: 'StudyQuestApp not available' };
+    }
+  };
 
+  // システムフロー表示をグローバルで利用可能にする
+  window.showSystemFlow = showSystemFlow;
+  
+  // デバッグ用：データ構造確認機能
+  window.debugCurrentData = () => {
+    if (window.studyQuestApp && window.studyQuestApp.state) {
+      console.log('現在のデータ構造:', {
+        currentAnswers: window.studyQuestApp.state.currentAnswers,
+        currentAnswersLength: window.studyQuestApp.state.currentAnswers?.length,
+        firstItem: window.studyQuestApp.state.currentAnswers?.[0],
+        header: window.studyQuestApp.elements?.headingLabel?.textContent
+      });
+    } else {
+      console.log('StudyQuestApp not available');
+    }
+  };
 
+  // Additional global debug utilities
+  window.debugClickAllAnswerCards = async (options = {}) => {
+    if (!window.studyQuestApp) {
+      console.log('StudyQuestApp not available');
+      return { success: false, error: 'StudyQuestApp not available' };
+    }
+    
+    const container = window.studyQuestApp.elements?.answersContainer;
+    if (!container) {
+      console.log('No answers container found');
+      return { success: false, error: 'No answers container found' };
+    }
+    
+    const answerCards = container.querySelectorAll('.answer-card');
+    const results = [];
+    
+    console.log(`Found ${answerCards.length} answer cards, clicking all...`);
+    
+    for (let i = 0; i < answerCards.length; i++) {
+      try {
+        const result = await window.studyQuestApp.debugClickAnswerCard(i, { 
+          ...options, 
+          logDetails: false // Reduce noise when clicking all cards
+        });
+        results.push(result);
+        
+        if (options.delay && i < answerCards.length - 1) {
+          // Add proper delay between clicks if specified
+          await new Promise(resolve => setTimeout(resolve, options.delay));
+        }
+      } catch (error) {
+        console.error(`Error clicking card ${i}:`, error);
+        results.push({ success: false, error: error.message, cardIndex: i });
+      }
+    }
+    
+    return {
+      success: true,
+      totalCards: answerCards.length,
+      results
+    };
+  };
 
+  window.debugGetAnswerCardInfo = (cardIndex = 0) => {
+    if (!window.studyQuestApp) {
+      console.log('StudyQuestApp not available');
+      return { success: false, error: 'StudyQuestApp not available' };
+    }
+    
+    // Validate cardIndex
+    if (typeof cardIndex !== 'number' || cardIndex < 0 || !Number.isInteger(cardIndex)) {
+      console.log('Invalid card index:', cardIndex);
+      return { success: false, error: 'Invalid card index. Must be a non-negative integer.' };
+    }
+    
+    const container = window.studyQuestApp.elements?.answersContainer;
+    if (!container) {
+      console.log('No answers container found');
+      return { success: false, error: 'No answers container found' };
+    }
+    
+    const answerCards = container.querySelectorAll('.answer-card');
+    if (answerCards.length === 0) {
+      console.log('No answer cards found');
+      return { success: false, error: 'No answer cards found' };
+    }
+    
+    if (cardIndex >= answerCards.length) {
+      console.log('Card index out of bounds');
+      return { success: false, error: 'Card index out of bounds', totalCards: answerCards.length };
+    }
+    
+    const card = answerCards[cardIndex];
+    
+    try {
+      const cardInfo = {
+        index: cardIndex,
+        className: card.className,
+        dataset: { ...card.dataset },
+        rowIndex: card.dataset.rowIndex,
+        boundingRect: card.getBoundingClientRect(),
+        computedStyle: {
+          display: getComputedStyle(card).display,
+          visibility: getComputedStyle(card).visibility,
+          opacity: getComputedStyle(card).opacity
+        },
+        textContent: card.textContent?.trim() || '',
+        innerHTML: card.innerHTML
+      };
+      
+      console.log('Answer card info:', cardInfo);
+      return { success: true, cardInfo };
+    } catch (error) {
+      console.error('Error getting card info:', error);
+      return { success: false, error: `Error getting card info: ${error.message}` };
+    }
+  };
+  
   // ドメイン情報とフォームリンクを取得
   loadDomainInfo();
   loadFormLink();
-
+  
   window.addEventListener('beforeunload', () => {
     if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
       window.studyQuestApp.destroy();
@@ -3815,7 +4058,5 @@ try {
   }
 }
 </script>
-<!-- Bootstrap JavaScript Bundle -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 </body>
 </html>

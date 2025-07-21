@@ -6,6 +6,7 @@
     <title>StudyQuest -みんなの回答ボード- - 準備中</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <?= include('UnifiedStyles'); ?>
     <?= include('SharedUtilities'); ?>
     <style>
@@ -34,54 +35,54 @@
                 <!-- メインステータス -->
                 <div class="glass-panel rounded-2xl p-8 shadow-2xl mb-8">
                     <div class="mb-6">
-                        <div class="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-to-r from-yellow-500/20 to-orange-500/20 flex items-center justify-center border-2 border-yellow-400 pulse-slow">
+                        <div class="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-to-r from-yellow-500/20 to-orange-500/20 flex items-center justify-center border-2 border-yellow-400/30 pulse-slow">
                             <svg class="w-12 h-12 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
                             </svg>
                         </div>
                         <h1 class="text-3xl font-bold mb-2 text-yellow-300">回答ボード準備中</h1>
-                        <p class="text-secondary text-lg">現在、回答ボードは非公開になっています</p>
+                        <p class="text-gray-400 text-lg">現在、回答ボードは非公開になっています</p>
                     </div>
-
+                    
                     <? if (typeof ownerName !== 'undefined' && ownerName) { ?>
-                    <div class="mb-6 p-3 bg-secondary bg-opacity-50 rounded-lg">
-                        <p class="text-sm text-light">管理者: <span class="text-info font-medium"><?= ownerName ?></span></p>
+                    <div class="mb-6 p-3 bg-gray-700/50 rounded-lg">
+                        <p class="text-sm text-gray-300">管理者: <span class="text-cyan-400 font-medium"><?= ownerName ?></span></p>
                     </div>
                     <? } ?>
-
+                    
                     <!-- ステータス情報 -->
                     <div class="grid md:grid-cols-2 gap-4 mb-8">
-                        <div class="bg-secondary bg-opacity-25 rounded-lg p-4">
+                        <div class="bg-gray-700/30 rounded-lg p-4">
                             <div class="flex items-center gap-2 mb-2">
                                 <div class="w-3 h-3 rounded-full bg-red-500"></div>
                                 <span class="text-sm font-medium">公開状態</span>
                             </div>
-                            <p class="text-secondary text-sm">非公開（学習者はアクセスできません）</p>
+                            <p class="text-gray-400 text-sm">非公開（学習者はアクセスできません）</p>
                         </div>
-                        <div class="bg-secondary bg-opacity-25 rounded-lg p-4">
+                        <div class="bg-gray-700/30 rounded-lg p-4">
                             <div class="flex items-center gap-2 mb-2">
                                 <div class="w-3 h-3 rounded-full bg-blue-500"></div>
                                 <span class="text-sm font-medium">システム状態</span>
                             </div>
-                            <p class="text-secondary text-sm">待機中（いつでも再公開可能）</p>
+                            <p class="text-gray-400 text-sm">待機中（いつでも再公開可能）</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- 管理者向けコントロール -->
                 <div class="admin-controls rounded-2xl p-6 mb-6">
-                    <h2 class="text-xl font-bold mb-4 text-info flex items-center justify-center gap-2">
+                    <h2 class="text-xl font-bold mb-4 text-cyan-300 flex items-center justify-center gap-2">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                         </svg>
                         管理者コントロール
                     </h2>
-
+                    
                     <div class="grid md:grid-cols-2 gap-4">
                         <!-- 再公開ボタン -->
-                        <button type="button" id="republish-btn"
-                                class="group btn btn-success px-4 py-3 rounded-3 fw-semibold hover-scale-105 btn-gradient-hover shadow-lg" style="background: linear-gradient(135deg, #10b981, #059669);">
+                        <button type="button" id="republish-btn" 
+                                class="group bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-4 rounded-xl font-semibold transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2 focus:ring-offset-gray-800">
                             <div class="flex items-center justify-center gap-2">
                                 <svg class="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
@@ -90,10 +91,10 @@
                             </div>
                             <p class="text-xs mt-1 opacity-80">既存の設定で即座に公開</p>
                         </button>
-
+                        
                         <!-- 管理パネルボタン -->
-                        <button type="button" id="admin-panel-btn"
-                                class="group btn btn-info px-4 py-3 rounded-3 fw-semibold hover-scale-105 btn-gradient-hover shadow-lg" style="background: linear-gradient(135deg, #0891b2, #0e7490);">
+                        <button type="button" id="admin-panel-btn" 
+                                class="group bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-6 py-4 rounded-xl font-semibold transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-gray-800">
                             <div class="flex items-center justify-center gap-2">
                                 <svg class="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
@@ -113,19 +114,19 @@
                         </svg>
                         学習者用URL
                     </h3>
-                    <div class="bg-secondary bg-opacity-50 rounded-lg p-4">
+                    <div class="bg-gray-700/50 rounded-lg p-4">
                         <div class="flex gap-2 mb-2">
                             <input type="text" id="board-url" readonly value="<?= typeof boardUrl !== 'undefined' ? boardUrl : '' ?>"
-                                   class="flex-1 p-3 bg-secondary border border-secondary rounded-lg text-sm cursor-pointer hover:bg-secondary transition-colors"
+                                   class="flex-1 p-3 bg-gray-600 border border-gray-500 rounded-lg text-sm cursor-pointer hover:bg-gray-500 transition-colors"
                                    onclick="this.select()">
-                            <button type="button" onclick="copyBoardUrl()"
-                                    class="px-4 py-3 bg-info hover:bg-info rounded-lg text-sm font-medium transition-colors">
+                            <button type="button" onclick="copyBoardUrl()" 
+                                    class="px-4 py-3 bg-cyan-600 hover:bg-cyan-700 rounded-lg text-sm font-medium transition-colors">
                               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                               </svg>
                             </button>
                         </div>
-                        <p class="text-xs text-secondary">このURLは固定です。再公開後、学習者は同じURLでアクセスできます。</p>
+                        <p class="text-xs text-gray-400">このURLは固定です。再公開後、学習者は同じURLでアクセスできます。</p>
                     </div>
                 </div>
             </div>
@@ -133,29 +134,29 @@
             <!-- 一般ユーザー用画面 -->
             <div class="text-center fade-in">
                 <div class="glass-panel rounded-2xl p-8 shadow-2xl">
-                    <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-r from-yellow-500/20 to-orange-500/20 flex items-center justify-center border-2 border-yellow-400 pulse-slow">
+                    <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-r from-yellow-500/20 to-orange-500/20 flex items-center justify-center border-2 border-yellow-400/30 pulse-slow">
                         <svg class="w-10 h-10 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                     </div>
                     <h1 class="text-4xl font-bold mb-4 text-yellow-300">準備中です</h1>
-                    <p class="text-secondary mb-6 text-lg">先生が回答ボードを準備中です。<br>しばらくお待ちください。</p>
-
+                    <p class="text-gray-400 mb-6 text-lg">先生が回答ボードを準備中です。<br>しばらくお待ちください。</p>
+                    
                     <? if (typeof ownerName !== 'undefined' && ownerName) { ?>
-                    <div class="mb-6 p-3 bg-secondary bg-opacity-50 rounded-lg">
-                        <p class="text-sm text-light">担当: <span class="text-info"><?= ownerName ?></span></p>
+                    <div class="mb-6 p-3 bg-gray-700/50 rounded-lg">
+                        <p class="text-sm text-gray-300">担当: <span class="text-cyan-400"><?= ownerName ?></span></p>
                     </div>
                     <? } ?>
-
+                    
                     <div class="space-y-4">
-                        <button type="button" onclick="location.reload()"
-                                class="px-6 py-3 bg-info hover:bg-info rounded-lg font-semibold transition-colors flex items-center gap-2 mx-auto">
+                        <button type="button" onclick="location.reload()" 
+                                class="px-6 py-3 bg-cyan-600 hover:bg-cyan-700 rounded-lg font-semibold transition-colors flex items-center gap-2 mx-auto">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                             </svg>
                             更新して確認
                         </button>
-                        <p class="text-xs text-muted">準備ができたらこのページに回答ボードが表示されます</p>
+                        <p class="text-xs text-gray-500">準備ができたらこのページに回答ボードが表示されます</p>
                     </div>
                 </div>
             </div>
@@ -191,27 +192,27 @@
             const messageArea = document.getElementById('message-area');
             if (messageArea) {
                 const colors = {
-                    success: 'bg-success border-success',
-                    error: 'bg-danger border-danger',
-                    info: 'bg-primary border-primary',
-                    warning: 'bg-yellow-600 border-warning'
+                    success: 'bg-green-600 border-green-500',
+                    error: 'bg-red-600 border-red-500', 
+                    info: 'bg-blue-600 border-blue-500',
+                    warning: 'bg-yellow-600 border-yellow-500'
                 };
-
+                
                 const messageDiv = document.createElement('div');
                 messageDiv.className = `${colors[type] || colors.info} text-white px-4 py-3 rounded-lg shadow-lg border-l-4 mb-2 transform transition-all duration-300 translate-x-0`;
                 messageDiv.innerHTML = `
                     <div class="flex items-center gap-2">
                         <span class="font-medium">${message}</span>
-                        <button onclick="this.parentElement.parentElement.remove()" class="ml-auto hover:bg-white bg-opacity-25 rounded p-1">
+                        <button onclick="this.parentElement.parentElement.remove()" class="ml-auto hover:bg-white/20 rounded p-1">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
                         </button>
                     </div>
                 `;
-
+                
                 messageArea.appendChild(messageDiv);
-
+                
                 // Auto remove after 4 seconds
                 setTimeout(() => {
                     if (messageDiv.parentElement) {
@@ -229,10 +230,10 @@
         document.getElementById('republish-btn')?.addEventListener('click', function() {
             const button = this;
             const originalHTML = button.innerHTML;
-
+            
             // ローディング状態に変更
             button.disabled = true;
-            button.classList.remove('hover-scale-105');
+            button.className = button.className.replace('hover:scale-105', '');
             button.innerHTML = `
                 <div class="flex items-center justify-center gap-2">
                     <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -241,9 +242,9 @@
                     <span>再公開中...</span>
                 </div>
             `;
-
+            
             showMessage('回答ボードを再公開しています...', 'info');
-
+            
             // サーバーに再公開リクエスト
             google.script.run
                 .withSuccessHandler((result) => {
@@ -260,11 +261,11 @@
                 })
                 .republishBoard();
         });
-
+        
         // 管理パネルボタン
         document.getElementById('admin-panel-btn')?.addEventListener('click', function() {
             showMessage('管理パネルに移動しています...', 'info');
-
+            
             // 管理パネルURLに移動
             <? if (typeof adminPanelUrl !== 'undefined' && adminPanelUrl) { ?>
             window.location.href = '<?= adminPanelUrl ?>';

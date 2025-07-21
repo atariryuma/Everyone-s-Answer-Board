@@ -11,18 +11,18 @@
 function cleanupSessionOnAccountSwitch(currentEmail) {
   try {
     console.log('セッションクリーンアップを開始: ' + currentEmail);
-
+    
     const props = PropertiesService.getUserProperties();
     const userCache = CacheService.getUserCache();
-
+    
     // 現在のユーザーのハッシュキーを生成
     const currentUserKey = 'CURRENT_USER_ID_' + Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, currentEmail, Utilities.Charset.UTF_8)
       .map(function(byte) { return (byte + 256).toString(16).slice(-2); })
       .join('');
-
+    
     // 古い形式のキャッシュを完全削除
     props.deleteProperty('CURRENT_USER_ID');
-
+    
     // 他のユーザーIDキャッシュをクリア（現在のユーザー以外）
     const allProperties = props.getProperties();
     Object.keys(allProperties).forEach(function(key) {
@@ -31,7 +31,7 @@ function cleanupSessionOnAccountSwitch(currentEmail) {
         console.log('削除された古いユーザーキャッシュ: ' + key);
       }
     });
-
+    
     // ユーザーキャッシュを全面クリア
     if (userCache) {
       try {
@@ -40,7 +40,7 @@ function cleanupSessionOnAccountSwitch(currentEmail) {
         console.warn('ユーザーキャッシュクリア中のエラー: ' + cacheError.message);
       }
     }
-
+    
     // スクリプトキャッシュの関連項目もクリア
     const scriptCache = CacheService.getScriptCache();
     if (scriptCache) {
@@ -53,9 +53,9 @@ function cleanupSessionOnAccountSwitch(currentEmail) {
         console.warn('スクリプトキャッシュクリア中のエラー: ' + scriptCacheError.message);
       }
     }
-
+    
     console.log('セッションクリーンアップ完了: ' + currentEmail);
-
+    
   } catch (error) {
     console.error('セッションクリーンアップでエラー: ' + error.message);
     // エラーが発生してもアプリケーションを停止させない

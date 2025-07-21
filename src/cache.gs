@@ -12,7 +12,7 @@ class CacheManager {
     this.scriptCache = CacheService.getScriptCache();
     this.memoCache = new Map(); // メモ化用の高速キャッシュ
     this.defaultTTL = 21600; // デフォルトTTL（6時間）
-
+    
     // パフォーマンス監視用の統計情報
     this.stats = {
       hits: 0,
@@ -32,7 +32,7 @@ class CacheManager {
    */
   get(key, valueFn, options = {}) {
     const { ttl = this.defaultTTL, enableMemoization = false } = options;
-
+    
     // パフォーマンス監視
     this.stats.totalOps++;
     const startTime = Date.now();
@@ -87,9 +87,9 @@ class CacheManager {
     // 3. 値の生成とキャッシュ保存
     debugLog(`[Cache] Miss for key: ${key}. Generating new value.`);
     this.stats.misses++;
-
+    
     let newValue;
-
+    
     try {
       newValue = valueFn();
     } catch (e) {
@@ -97,7 +97,7 @@ class CacheManager {
       this.stats.errors++;
       throw e;
     }
-
+    
     // キャッシュ保存（エラーが発生しても値は返す）
     try {
       const stringValue = JSON.stringify(newValue);
@@ -165,19 +165,19 @@ class CacheManager {
       console.warn(`[Cache] Invalid key for removal: ${key}`);
       return;
     }
-
+    
     try {
       this.scriptCache.remove(key);
     } catch (e) {
       console.warn(`[Cache] Failed to remove scriptCache for key: ${key}`, e.message);
     }
-
+    
     try {
       this.memoCache.delete(key);
     } catch (e) {
       console.warn(`[Cache] Failed to remove memoCache for key: ${key}`, e.message);
     }
-
+    
     debugLog(`[Cache] Removed cache for key: ${key}`);
   }
 
@@ -190,11 +190,11 @@ class CacheManager {
       console.warn(`[Cache] Invalid pattern for clearByPattern: ${pattern}`);
       return;
     }
-
+    
     // メモ化キャッシュから一致するキーを削除
     const keysToRemove = [];
     let failedRemovals = 0;
-
+    
     try {
       for (const key of this.memoCache.keys()) {
         if (key.includes(pattern)) {
@@ -204,7 +204,7 @@ class CacheManager {
     } catch (e) {
       console.warn(`[Cache] Failed to iterate memoCache keys for pattern: ${pattern}`, e.message);
     }
-
+    
     keysToRemove.forEach(key => {
       try {
         this.memoCache.delete(key);
@@ -214,7 +214,7 @@ class CacheManager {
         failedRemovals++;
       }
     });
-
+    
     debugLog(`[Cache] Cleared ${keysToRemove.length - failedRemovals} cache entries matching pattern: ${pattern} (${failedRemovals} failed)`);
   }
 
@@ -234,7 +234,7 @@ class CacheManager {
   clearAll() {
     let memoCacheCleared = false;
     let scriptCacheCleared = false;
-
+    
     try {
       // メモ化キャッシュをクリア
       this.memoCache.clear();
@@ -243,7 +243,7 @@ class CacheManager {
     } catch (e) {
       console.warn('[Cache] Failed to clear memoization cache:', e.message);
     }
-
+    
     try {
       // スクリプトキャッシュを完全にクリア
       this.scriptCache.removeAll();
@@ -252,16 +252,16 @@ class CacheManager {
     } catch (e) {
       console.warn('[Cache] Failed to clear script cache:', e.message);
     }
-
+    
     // 統計をリセット
     try {
       this.resetStats();
     } catch (e) {
       console.warn('[Cache] Failed to reset stats:', e.message);
     }
-
+    
     console.log(`[Cache] clearAll() completed - MemoCache: ${memoCacheCleared ? 'OK' : 'FAILED'}, ScriptCache: ${scriptCacheCleared ? 'OK' : 'FAILED'}`);
-
+    
     return {
       memoCacheCleared,
       scriptCacheCleared,
@@ -277,7 +277,7 @@ class CacheManager {
     const uptime = Date.now() - this.stats.lastReset;
     const hitRate = this.stats.totalOps > 0 ? (this.stats.hits / this.stats.totalOps * 100).toFixed(1) : 0;
     const errorRate = this.stats.totalOps > 0 ? (this.stats.errors / this.stats.totalOps * 100).toFixed(1) : 0;
-
+    
     return {
       memoCacheSize: this.memoCache.size,
       status: this.stats.errors / this.stats.totalOps < 0.1 ? 'ok' : 'degraded',
@@ -332,43 +332,43 @@ function getHeadersCached(spreadsheetId, sheetName) {
   const indices = cacheManager.get(key, () => {
     try {
       console.log(`[getHeadersCached] Starting for spreadsheetId: ${spreadsheetId}, sheetName: ${sheetName}`);
-
+      
       var service = getSheetsService();
       if (!service) {
         throw new Error('Sheets service is not available');
       }
-
+      
       var range = sheetName + '!1:1';
       console.log(`[getHeadersCached] Fetching range: ${range}`);
-
+      
       // Use the updated API pattern consistent with other functions
       var url = service.baseUrl + '/' + spreadsheetId + '/values/' + encodeURIComponent(range);
       var response = UrlFetchApp.fetch(url, {
         headers: { 'Authorization': 'Bearer ' + service.accessToken }
       });
-
+      
       var responseData = JSON.parse(response.getContentText());
       console.log(`[getHeadersCached] API response:`, JSON.stringify(responseData, null, 2));
-
+      
       if (!responseData) {
         throw new Error('API response is null or undefined');
       }
-
+      
       if (!responseData.values) {
         console.warn(`[getHeadersCached] No values in response for ${range}`);
         return {};
       }
-
+      
       if (!responseData.values[0] || responseData.values[0].length === 0) {
         console.warn(`[getHeadersCached] Empty header row for ${range}`);
         return {};
       }
-
+      
       var headers = responseData.values[0];
       console.log(`[getHeadersCached] Headers found:`, headers);
-
+      
       var indices = {};
-
+      
       // タイムスタンプ列を除外してヘッダーのインデックスを生成
       headers.forEach(function(headerName, index) {
         if (headerName && headerName.trim() !== '' && headerName !== 'タイムスタンプ') {
@@ -376,7 +376,7 @@ function getHeadersCached(spreadsheetId, sheetName) {
           console.log(`[getHeadersCached] Mapped ${headerName} -> ${index}`);
         }
       });
-
+      
       console.log(`[getHeadersCached] Final indices:`, indices);
       return indices;
     } catch (error) {
@@ -403,7 +403,7 @@ function getHeadersCached(spreadsheetId, sheetName) {
  */
 function invalidateUserCache(userId, email, spreadsheetId, clearPattern) {
   const keysToRemove = [];
-
+  
   if (userId) {
     keysToRemove.push('user_' + userId);
     keysToRemove.push('unified_user_info_' + userId);
@@ -418,16 +418,16 @@ function invalidateUserCache(userId, email, spreadsheetId, clearPattern) {
     keysToRemove.push('data_' + spreadsheetId);
     keysToRemove.push('sheets_' + spreadsheetId);
   }
-
+  
   keysToRemove.forEach(key => {
     cacheManager.remove(key);
   });
-
+  
   // さらに包括的なパターンマッチングが必要な場合
   if (clearPattern && spreadsheetId) {
     cacheManager.clearByPattern(spreadsheetId);
   }
-
+  
   debugLog(`[Cache] Invalidated user cache for userId: ${userId}, email: ${email}, spreadsheetId: ${spreadsheetId}`);
 }
 
@@ -443,9 +443,9 @@ function clearDatabaseCache() {
     cacheManager.clearByPattern('hdr_');
     cacheManager.clearByPattern('data_');
     cacheManager.clearByPattern('sheets_');
-
+    
     // サービスアカウントトークンは保持（パフォーマンス向上のため）
-
+    
     debugLog('[Cache] Database cache cleared successfully');
   } catch (error) {
     console.error('clearDatabaseCache error:', error.message);
@@ -486,13 +486,13 @@ function preWarmCache(activeUserEmail) {
         const userInfo = findUserByEmail(activeUserEmail);
         if (userInfo) {
           results.preWarmedItems.push('user_by_email');
-
+          
           // ユーザーIDベースのキャッシュも事前取得
           if (userInfo.userId) {
             findUserById(userInfo.userId);
             results.preWarmedItems.push('user_by_id');
           }
-
+          
           // スプレッドシート情報の事前取得
           if (userInfo.spreadsheetId) {
             try {
@@ -534,7 +534,7 @@ function preWarmCache(activeUserEmail) {
     results.success = results.errors.length === 0;
 
     console.log('✅ キャッシュプリウォーミング完了:', results.preWarmedItems.length, 'items,', results.duration + 'ms');
-
+    
     if (results.errors.length > 0) {
       console.warn('⚠️ プリウォーミング中のエラー:', results.errors);
     }

@@ -10,7 +10,7 @@ function setupCharacterCounters() {
     titleInput.addEventListener('input', function() {
       const count = this.value.length;
       titleCounter.textContent = `${count}/100`;
-      titleCounter.className = count > 90 ? 'small text-danger' : 'small text-secondary';
+      titleCounter.className = count > 90 ? 'text-xs text-red-400' : 'text-xs text-gray-500';
     });
   }
 
@@ -18,7 +18,7 @@ function setupCharacterCounters() {
     questionTextarea.addEventListener('input', function() {
       const count = this.value.length;
       questionCounter.textContent = `${count}/500`;
-      questionCounter.className = count > 450 ? 'small text-danger' : 'small text-secondary';
+      questionCounter.className = count > 450 ? 'text-xs text-red-400' : 'text-xs text-gray-500';
     });
   }
 }
@@ -54,13 +54,13 @@ document.addEventListener('DOMContentLoaded', function() {
     mutations.forEach(function(mutation) {
       if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
         const modal = document.getElementById('form-config-modal');
-        if (modal && !modal.classList.contains('d-none')) {
+        if (modal && !modal.classList.contains('hidden')) {
           setTimeout(setupCharacterCounters, 100);
         }
       }
     });
   });
-
+  
   // モーダルの監視を開始
   const modal = document.getElementById('form-config-modal');
   if (modal) {
