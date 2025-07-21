@@ -750,6 +750,29 @@ class SharedModals {
     
     modal.classList.remove('hidden');
     modal.classList.add('flex');
+
+    // 回答方法の選択肢に応じて選択肢設定の表示を切り替えるロジック
+    const mainQuestionTypeSelect = document.getElementById('main-question-type');
+    const mainQuestionChoicesDiv = document.getElementById('main-question-choices-div');
+
+    const toggleChoicesVisibility = () => {
+      if (mainQuestionTypeSelect && mainQuestionChoicesDiv) {
+        if (mainQuestionTypeSelect.value === 'choice' || mainQuestionTypeSelect.value === 'multiple') {
+          mainQuestionChoicesDiv.classList.remove('hidden');
+        } else {
+          mainQuestionChoicesDiv.classList.add('hidden');
+        }
+      }
+    };
+
+    // 初期表示時の設定
+    toggleChoicesVisibility();
+
+    // 選択肢が変更されたときのイベントリスナー
+    if (mainQuestionTypeSelect) {
+      mainQuestionTypeSelect.removeEventListener('change', toggleChoicesVisibility); // 重複登録防止
+      mainQuestionTypeSelect.addEventListener('change', toggleChoicesVisibility);
+    }
   }
 
   // セキュリティ詳細モーダルの表示
