@@ -110,13 +110,123 @@ function getServiceAccountEmail() {
     var serviceAccountCredsString = props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
     
     if (!serviceAccountCredsString) {
+      console.warn('getServiceAccountEmail: サービスアカウント認証情報が設定されていません');
       return 'サービスアカウント未設定';
     }
     
-    var serviceAccountCreds = JSON.parse(serviceAccountCredsString);
-    return serviceAccountCreds.client_email || 'メールアドレス不明';
+    var serviceAccountCreds;
+    try {
+      serviceAccountCreds = JSON.parse(serviceAccountCredsString);
+    } catch (parseError) {
+      console.error('getServiceAccountEmail: JSON解析エラー:', parseError.message);
+      return 'サービスアカウント設定エラー';
+    }
+    
+    if (!serviceAccountCreds.client_email) {
+      console.error('getServiceAccountEmail: client_emailが見つかりません');
+      return 'メールアドレス不明';
+    }
+    
+    // Basic email format validation
+    var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(serviceAccountCreds.client_email)) {
+      console.error('getServiceAccountEmail: 無効なメール形式:', serviceAccountCreds.client_email);
+      return 'メールアドレス形式エラー';
+    }
+    
+    return serviceAccountCreds.client_email;
   } catch (e) {
+    console.error('getServiceAccountEmail: 予期しないエラー:', e.message);
     return 'サービスアカウント設定エラー';
+  }
+}
+
+/**
+ * サービスアカウントの設定を検証し、問題がある場合は修復を試みる
+ * @returns {object} {isValid: boolean, email: string, issues: array, repaired: boolean}
+ */
+function validateAndRepairServiceAccount() {
+  var result = {
+    isValid: false,
+    email: '',
+    issues: [],
+    repaired: false
+  };
+  
+  try {
+    console.log('validateAndRepairServiceAccount: 検証開始');
+    var props = PropertiesService.getScriptProperties();
+    var serviceAccountCredsString = props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
+    
+    // Check if credentials exist
+    if (!serviceAccountCredsString) {
+      result.issues.push('サービスアカウント認証情報が設定されていません');
+      return result;
+    }
+    
+    var serviceAccountCreds;
+    try {
+      serviceAccountCreds = JSON.parse(serviceAccountCredsString);
+    } catch (parseError) {
+      result.issues.push('JSON解析エラー: ' + parseError.message);
+      return result;
+    }
+    
+    // Validate required fields
+    var requiredFields = ['client_email', 'private_key', 'project_id', 'type'];
+    for (var i = 0; i < requiredFields.length; i++) {
+      var field = requiredFields[i];
+      if (!serviceAccountCreds[field]) {
+        result.issues.push('必須フィールドが不足: ' + field);
+      }
+    }
+    
+    if (result.issues.length > 0) {
+      return result;
+    }
+    
+    // Validate email format
+    var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(serviceAccountCreds.client_email)) {
+      result.issues.push('無効なメール形式: ' + serviceAccountCreds.client_email);
+      return result;
+    }
+    
+    // Validate service account type
+    if (serviceAccountCreds.type !== 'service_account') {
+      result.issues.push('無効なアカウントタイプ: ' + serviceAccountCreds.type);
+      return result;
+    }
+    
+    // Test basic access (this will throw if the service account is invalid)
+    try {
+      var testOAuth2 = getOAuth2Service();
+      if (!testOAuth2.hasAccess()) {
+        console.warn('validateAndRepairServiceAccount: OAuth2アクセストークンの取得を試行中...');
+        testOAuth2.getAccessToken(); // Force token refresh
+        if (!testOAuth2.hasAccess()) {
+          result.issues.push('サービスアカウント認証に失敗しました');
+          return result;
+        } else {
+          result.repaired = true;
+          console.log('validateAndRepairServiceAccount: OAuth2アクセストークンを修復しました');
+        }
+      }
+    } catch (authError) {
+      result.issues.push('OAuth2認証エラー: ' + authError.message);
+      return result;
+    }
+    
+    result.isValid = true;
+    result.email = serviceAccountCreds.client_email;
+    console.log('validateAndRepairServiceAccount: 検証成功 -', result.email);
+    
+    return result;
+    
+  } catch (error) {
+    result.issues.push('予期しないエラー: ' + error.message);
+    console.error('validateAndRepairServiceAccount: エラー', error.message);
+    return result;
   }
 }
 

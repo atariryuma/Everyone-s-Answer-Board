@@ -571,74 +571,234 @@ function getUserWithFallback(userId) {
  * @returns {object} 更新結果
  */
 function updateUser(userId, updateData) {
+  var transactionLog = [];
+  var rollbackData = null;
+  
   try {
+    console.log('updateUser: トランザクション開始 - userId:', userId);
+    transactionLog.push('Transaction started for userId: ' + userId);
+    
+    // Pre-flight checks with database health validation
+    var dbHealthCheck = testAndRepairDatabaseConnection();
+    if (!dbHealthCheck.isHealthy) {
+      throw new Error('データベース接続エラー: ' + dbHealthCheck.issues.join(', '));
+    }
+    
+    if (dbHealthCheck.repaired) {
+      console.log('updateUser: データベース接続を修復しました');
+      transactionLog.push('Database connection repaired');
+    }
+    
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
     var service = getSheetsService();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
-    // 現在のデータを取得
-    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
-    var values = data.valueRanges[0].values || [];
+    // Validate input data
+    if (!userId || typeof userId !== 'string') {
+      throw new Error('無効なuserID: ' + userId);
+    }
+    
+    if (!updateData || typeof updateData !== 'object') {
+      throw new Error('無効な更新データ: ' + typeof updateData);
+    }
+    
+    transactionLog.push('Input validation passed');
+    
+    // Get current data with retry logic
+    var data, values;
+    var maxRetries = 3;
+    var retryDelay = 1000;
+    
+    for (var retry = 0; retry < maxRetries; retry++) {
+      try {
+        data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
+        values = data.valueRanges[0].values || [];
+        break;
+      } catch (dataError) {
+        console.warn('updateUser: データ取得試行 ' + (retry + 1) + ' 失敗:', dataError.message);
+        if (retry === maxRetries - 1) {
+          throw new Error('データベースからの情報取得に失敗しました: ' + dataError.message);
+        }
+        Utilities.sleep(retryDelay);
+        retryDelay *= 2;
+      }
+    }
     
     if (values.length === 0) {
       throw new Error('データベースが空です');
     }
     
+    transactionLog.push('Current data retrieved successfully');
+    
     var headers = values[0];
     var userIdIndex = headers.indexOf('userId');
     var rowIndex = -1;
+    var currentRowData = null;
     
-    // ユーザーの行を特定
+    // Find user row and store current data for rollback
     for (var i = 1; i < values.length; i++) {
       if (values[i][userIdIndex] === userId) {
         rowIndex = i + 1; // 1-based index
+        currentRowData = values[i].slice(); // Create copy for rollback
         break;
       }
     }
     
     if (rowIndex === -1) {
-      throw new Error('更新対象のユーザーが見つかりません');
+      throw new Error('更新対象のユーザーが見つかりません: ' + userId);
     }
     
-    // バッチ更新リクエストを作成
-    var requests = Object.keys(updateData).map(function(key) {
+    // Store rollback data
+    rollbackData = {
+      rowIndex: rowIndex,
+      headers: headers,
+      originalData: currentRowData
+    };
+    
+    transactionLog.push('User row found at index: ' + rowIndex);
+    
+    // Create batch update requests with validation
+    var requests = [];
+    var validUpdateFields = [];
+    
+    Object.keys(updateData).forEach(function(key) {
       var colIndex = headers.indexOf(key);
-      if (colIndex === -1) return null;
+      if (colIndex === -1) {
+        console.warn('updateUser: 不明な列をスキップ:', key);
+        return;
+      }
       
-      return {
+      // Validate data types and constraints
+      var value = updateData[key];
+      if (key === 'configJson' && value) {
+        try {
+          JSON.parse(value); // Validate JSON format
+        } catch (jsonError) {
+          throw new Error('無効なJSON形式のconfigJson: ' + jsonError.message);
+        }
+      }
+      
+      requests.push({
         range: "'" + sheetName + "'!" + String.fromCharCode(65 + colIndex) + rowIndex,
-        values: [[updateData[key]]]
-      };
-    }).filter(function(item) { return item !== null; });
+        values: [[value]]
+      });
+      
+      validUpdateFields.push(key);
+    });
     
-    if (requests.length > 0) {
-      batchUpdateSheetsData(service, dbId, requests);
+    if (requests.length === 0) {
+      console.warn('updateUser: 更新可能なフィールドがありません');
+      return { success: true, message: '更新するフィールドがありませんでした', fieldsUpdated: [] };
     }
     
-    // スプレッドシートIDが更新された場合、サービスアカウントと共有
-    if (updateData.spreadsheetId) {
+    transactionLog.push('Prepared ' + requests.length + ' update requests for fields: ' + validUpdateFields.join(', '));
+    
+    // Execute batch update with retry and verification
+    for (var updateRetry = 0; updateRetry < maxRetries; updateRetry++) {
       try {
-        shareSpreadsheetWithServiceAccount(updateData.spreadsheetId);
-        console.log('ユーザー更新時のサービスアカウント共有完了:', updateData.spreadsheetId);
-      } catch (shareError) {
-        console.error('ユーザー更新時のサービスアカウント共有エラー:', shareError.message);
-        console.error('スプレッドシートの更新は完了しましたが、サービスアカウントとの共有に失敗しました。手動で共有してください。');
+        batchUpdateSheetsData(service, dbId, requests);
+        console.log('updateUser: バッチ更新完了 (試行 ' + (updateRetry + 1) + ')');
+        transactionLog.push('Batch update completed on attempt ' + (updateRetry + 1));
+        break;
+      } catch (updateError) {
+        console.warn('updateUser: バッチ更新試行 ' + (updateRetry + 1) + ' 失敗:', updateError.message);
+        
+        if (updateRetry === maxRetries - 1) {
+          throw new Error('データベース更新に失敗しました: ' + updateError.message);
+        }
+        
+        Utilities.sleep(retryDelay);
       }
     }
     
-    // 最適化: 変更された内容に基づいてキャッシュを選択的に無効化
+    // Handle spreadsheet sharing if needed
+    if (updateData.spreadsheetId) {
+      try {
+        shareSpreadsheetWithServiceAccount(updateData.spreadsheetId);
+        console.log('updateUser: サービスアカウント共有完了:', updateData.spreadsheetId);
+        transactionLog.push('Service account sharing completed for: ' + updateData.spreadsheetId);
+      } catch (shareError) {
+        console.error('updateUser: サービスアカウント共有エラー:', shareError.message);
+        transactionLog.push('Service account sharing failed: ' + shareError.message);
+        // Note: This is not a critical failure for the user update transaction
+        console.warn('スプレッドシートの更新は完了しましたが、サービスアカウントとの共有に失敗しました。手動で共有してください。');
+      }
+    }
+    
+    // Verify update success by reading back the data
+    try {
+      Utilities.sleep(200); // Brief pause for consistency
+      var verificationData = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!" + String.fromCharCode(65 + userIdIndex) + rowIndex]);
+      var verifiedUserId = verificationData.valueRanges[0].values[0][0];
+      
+      if (verifiedUserId !== userId) {
+        throw new Error('データ整合性エラー: 更新確認に失敗しました');
+      }
+      
+      transactionLog.push('Update verification successful');
+    } catch (verificationError) {
+      console.warn('updateUser: 更新確認で警告:', verificationError.message);
+      // Continue as update likely succeeded
+    }
+    
+    // Cache invalidation (optimized based on changed fields)
     var userInfo = findUserById(userId);
     var email = updateData.adminEmail || (userInfo ? userInfo.adminEmail : null);
     var spreadsheetId = updateData.spreadsheetId || (userInfo ? userInfo.spreadsheetId : null);
     
-    // キャッシュを無効化（必要最小限）
     invalidateUserCache(userId, email, spreadsheetId, false);
+    transactionLog.push('Cache invalidation completed');
     
-    return { success: true };
+    console.log('updateUser: トランザクション完了 - フィールド:', validUpdateFields.join(', '));
+    
+    return { 
+      success: true, 
+      message: 'ユーザー情報を正常に更新しました',
+      fieldsUpdated: validUpdateFields,
+      transactionLog: transactionLog
+    };
+    
   } catch (error) {
-    console.error('ユーザー更新エラー:', error);
-    throw error;
+    console.error('updateUser: トランザクションエラー:', error.message);
+    transactionLog.push('Transaction failed: ' + error.message);
+    
+    // Attempt rollback if we have the necessary data
+    if (rollbackData && rollbackData.originalData) {
+      try {
+        console.log('updateUser: ロールバック試行中...');
+        
+        var rollbackRequests = [];
+        for (var i = 0; i < rollbackData.headers.length && i < rollbackData.originalData.length; i++) {
+          if (rollbackData.originalData[i] !== undefined) {
+            rollbackRequests.push({
+              range: "'" + sheetName + "'!" + String.fromCharCode(65 + i) + rollbackData.rowIndex,
+              values: [[rollbackData.originalData[i]]]
+            });
+          }
+        }
+        
+        if (rollbackRequests.length > 0) {
+          batchUpdateSheetsData(service, dbId, rollbackRequests);
+          console.log('updateUser: ロールバック完了');
+          transactionLog.push('Rollback completed successfully');
+        }
+        
+      } catch (rollbackError) {
+        console.error('updateUser: ロールバック失敗:', rollbackError.message);
+        transactionLog.push('Rollback failed: ' + rollbackError.message);
+        // Add rollback failure to the original error message
+        error.message += ' (ロールバックも失敗: ' + rollbackError.message + ')';
+      }
+    }
+    
+    // Enhanced error reporting
+    var enhancedError = new Error('ユーザー更新に失敗しました: ' + error.message);
+    enhancedError.transactionLog = transactionLog;
+    enhancedError.originalError = error;
+    enhancedError.rollbackData = rollbackData;
+    
+    throw enhancedError;
   }
 }
 
@@ -965,6 +1125,166 @@ function getSpreadsheetsData(service, spreadsheetId) {
     console.error('getSpreadsheetsData error:', error.message);
     console.error('getSpreadsheetsData error stack:', error.stack);
     throw new Error('スプレッドシート情報取得に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * データベース接続の健全性をテストし、必要に応じて修復を試みる
+ * @returns {object} {isHealthy: boolean, issues: array, repaired: boolean, dbInfo: object}
+ */
+function testAndRepairDatabaseConnection() {
+  var result = {
+    isHealthy: false,
+    issues: [],
+    repaired: false,
+    dbInfo: null
+  };
+  
+  try {
+    console.log('testAndRepairDatabaseConnection: データベース健全性チェック開始');
+    
+    // Step 1: Check if database spreadsheet ID is configured
+    var props = PropertiesService.getScriptProperties();
+    var dbSpreadsheetId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    
+    if (!dbSpreadsheetId) {
+      result.issues.push('データベースのスプレッドシートIDが設定されていません');
+      return result;
+    }
+    
+    result.dbInfo = {
+      spreadsheetId: dbSpreadsheetId
+    };
+    
+    // Step 2: Validate and repair service account
+    var serviceAccountValidation = validateAndRepairServiceAccount();
+    if (!serviceAccountValidation.isValid) {
+      result.issues.push('サービスアカウント設定エラー: ' + serviceAccountValidation.issues.join(', '));
+      return result;
+    }
+    
+    if (serviceAccountValidation.repaired) {
+      result.repaired = true;
+      console.log('testAndRepairDatabaseConnection: サービスアカウントを修復しました');
+    }
+    
+    // Step 3: Test basic spreadsheet access
+    var maxRetries = 3;
+    var retryDelay = 1000;
+    var accessTest = false;
+    
+    for (var retry = 0; retry < maxRetries; retry++) {
+      try {
+        var file = DriveApp.getFileById(dbSpreadsheetId);
+        if (!file) {
+          result.issues.push('データベーススプレッドシートが見つかりません: ' + dbSpreadsheetId);
+          return result;
+        }
+        
+        // Try to access basic file properties
+        result.dbInfo.name = file.getName();
+        result.dbInfo.url = file.getUrl();
+        accessTest = true;
+        
+        console.log('testAndRepairDatabaseConnection: スプレッドシートアクセス成功 (試行 ' + (retry + 1) + ')');
+        break;
+        
+      } catch (accessError) {
+        console.warn('testAndRepairDatabaseConnection: アクセス試行 ' + (retry + 1) + ' 失敗:', accessError.message);
+        
+        if (retry === maxRetries - 1) {
+          result.issues.push('データベーススプレッドシートへのアクセスに失敗: ' + accessError.message);
+          return result;
+        }
+        
+        Utilities.sleep(retryDelay);
+        retryDelay *= 2;
+      }
+    }
+    
+    if (!accessTest) {
+      result.issues.push('データベーススプレッドシートアクセステストに失敗しました');
+      return result;
+    }
+    
+    // Step 4: Test Sheets API connection
+    try {
+      var service = getSheetsService();
+      if (!service) {
+        result.issues.push('Sheets APIサービスの初期化に失敗しました');
+        return result;
+      }
+      
+      // Simple API test - try to get spreadsheet metadata
+      var request = {
+        'url': 'https://sheets.googleapis.com/v4/spreadsheets/' + dbSpreadsheetId + '?fields=sheets.properties.title',
+        'method': 'GET',
+        'headers': {
+          'Authorization': 'Bearer ' + service.getAccessToken()
+        }
+      };
+      
+      var response = UrlFetchApp.fetch(request.url, {
+        method: request.method,
+        headers: request.headers
+      });
+      
+      if (response.getResponseCode() !== 200) {
+        if (response.getResponseCode() === 403) {
+          // Try to repair permissions
+          console.log('testAndRepairDatabaseConnection: 権限エラー検出、修復を試行中...');
+          try {
+            shareSpreadsheetWithServiceAccount(dbSpreadsheetId);
+            result.repaired = true;
+            console.log('testAndRepairDatabaseConnection: データベース権限を修復しました');
+            
+            // Retry the API call
+            var retryResponse = UrlFetchApp.fetch(request.url, {
+              method: request.method,
+              headers: request.headers
+            });
+            
+            if (retryResponse.getResponseCode() !== 200) {
+              result.issues.push('権限修復後もAPI アクセスに失敗: ' + retryResponse.getResponseCode());
+              return result;
+            }
+          } catch (repairError) {
+            result.issues.push('データベース権限修復に失敗: ' + repairError.message);
+            return result;
+          }
+        } else {
+          result.issues.push('Sheets API エラー: ' + response.getResponseCode() + ' - ' + response.getContentText());
+          return result;
+        }
+      }
+      
+      var apiResult = JSON.parse(response.getContentText());
+      result.dbInfo.sheets = apiResult.sheets || [];
+      
+    } catch (apiError) {
+      result.issues.push('Sheets API テストに失敗: ' + apiError.message);
+      return result;
+    }
+    
+    // Step 5: Test basic read operation
+    try {
+      var testData = getAllUsers();
+      result.dbInfo.userCount = testData ? testData.length : 0;
+      console.log('testAndRepairDatabaseConnection: データベース読み込みテスト成功 - ユーザー数:', result.dbInfo.userCount);
+    } catch (readError) {
+      console.warn('testAndRepairDatabaseConnection: データ読み込みテストで警告:', readError.message);
+      // This is not a critical failure, continue
+    }
+    
+    result.isHealthy = true;
+    console.log('testAndRepairDatabaseConnection: データベース健全性チェック完了');
+    
+    return result;
+    
+  } catch (error) {
+    result.issues.push('予期しないエラー: ' + error.message);
+    console.error('testAndRepairDatabaseConnection: 致命的エラー:', error.message);
+    return result;
   }
 }
 

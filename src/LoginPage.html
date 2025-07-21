@@ -18,12 +18,13 @@
   <?!= include('SharedUtilities'); ?>
   
   <style>
-    /* 背景とモーダル風スタイル */
+    /* Login Page Specific Styles - Unified with Admin Panel */
     .login-background {
-      background: linear-gradient(135deg, #1a1b26 0%, #16213e 50%, #0f172a 100%);
+      background: var(--color-background);
       min-height: 100vh;
       position: relative;
       overflow: auto;
+      animation: fadeIn 0.5s ease-out;
     }
     
     .login-background::before {
@@ -39,53 +40,119 @@
       pointer-events: none;
     }
     
-    .login-modal {
-      position: relative;
-      z-index: 10;
-      background: rgba(30, 41, 59, 0.95);
-      backdrop-filter: blur(20px);
-      border: 1px solid rgba(148, 163, 184, 0.1);
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-      max-width: 400px;
+    .login-container {
+      max-width: 420px;
       width: 90%;
-      aspect-ratio: 9/16; /* スマホ比率 */
+      min-height: 580px;
       max-height: 90vh;
       overflow-y: auto;
+      animation: slideUp 0.6s ease-out;
     }
     
+    /* Responsive design matching admin panel breakpoints */
     @media (max-width: 640px) {
-      .login-modal {
+      .login-container {
         width: 95%;
-        max-width: 360px;
-        aspect-ratio: auto;
-        min-height: 600px;
+        max-width: 380px;
+        min-height: 520px;
         padding: 1.5rem;
+      }
+      
+      .login-btn {
+        min-height: 48px;
+        padding: 1rem 1.5rem;
+        font-size: 16px;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .login-container {
+        padding: 1rem;
       }
     }
     
     @media (max-height: 700px) {
-      .login-modal {
-        aspect-ratio: auto;
+      .login-container {
+        min-height: auto;
         max-height: 85vh;
-        padding: 1.5rem;
       }
     }
     
-    /* ローディングスピナーアニメーション */
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
+    @media (min-width: 768px) {
+      .login-container {
+        padding: 2rem;
       }
     }
     
-    .loading-spinner {
-      animation: spin 1s linear infinite;
+    @media (min-width: 1024px) {
+      .login-container {
+        max-width: 450px;
+        padding: 2.5rem;
+      }
+    }
+    
+    /* Button animation enhancements */
+    .login-btn {
+      position: relative;
+      overflow: hidden;
+      transition: all var(--transition-duration) var(--transition-easing);
+    }
+    
+    .login-btn::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      transition: all var(--animation-duration) var(--transition-easing);
+      transform: translate(-50%, -50%);
+      z-index: 0;
+    }
+    
+    .login-btn:not(:disabled):active::before {
+      width: 200%;
+      height: 200%;
+    }
+    
+    .login-btn > * {
+      position: relative;
+      z-index: 1;
+    }
+    
+    /* Form field focus animations */
+    .form-control {
+      transition: all var(--transition-duration) var(--transition-easing), 
+                  box-shadow var(--animation-duration) var(--transition-easing);
+    }
+    
+    .form-control:focus {
+      transform: translateY(-1px);
+      animation: subtle-bounce 0.4s ease-out;
+    }
+    
+    .form-control:hover:not(:focus) {
+      transform: translateY(-0.5px);
+    }
+    
+    /* Form field subtle bounce animation */
+    @keyframes subtle-bounce {
+      0% { transform: translateY(0); }
+      30% { transform: translateY(-2px); }
+      100% { transform: translateY(-1px); }
+    }
+    
+    /* Enhanced transition for interactive elements */
+    .text-cyan-400:hover, .underline:hover {
+      transition: all var(--transition-duration) var(--transition-easing);
     }
   </style>
 </head>
 <body class="login-background">
   <div class="min-h-screen flex items-center justify-center p-4">
-    <div class="login-modal rounded-2xl p-8">
+    <div class="login-container glass-panel rounded-2xl p-8">
     <!-- ヘッダー -->
     <div class="text-center mb-8">
       <h1 class="text-4xl font-bold text-cyan-400 mb-2">🎓 StudyQuest</h1>
@@ -111,14 +178,14 @@
     <!-- アカウント情報 -->
     <div class="glass-panel rounded-xl p-6 mb-6">
       <h2 class="text-lg font-semibold text-white mb-4">📧 使用するアカウント</h2>
-      <div class="bg-gray-800 p-3 rounded-lg">
+      <div class="form-control">
         <div class="text-cyan-400 font-medium" id="user-email-display">ユーザー情報を取得中...</div>
       </div>
     </div>
 
     <!-- ログインアクション -->
     <div class="space-y-4">
-      <button type="button" id="login-btn" class="w-full btn bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+      <button type="button" id="login-btn" class="w-full btn btn-primary login-btn font-bold py-3 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
         はじめる
       </button>
 
@@ -127,7 +194,7 @@
           別のアカウントでログイン
         </button>
         <br>
-        <button onclick="showSecurityModal()" class="text-xs text-gray-500 hover:text-gray-400 underline">
+        <button onclick="showSecurityModal()" class="text-xs text-gray-500 hover:text-gray-400 underline transition-colors duration-200">
           セキュリティ仕様について
         </button>
       </div>
@@ -136,8 +203,8 @@
   </div>
 
   <!-- セキュリティ仕様モーダル -->
-  <div id="security-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
-    <div class="glass-panel rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+  <div id="security-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50" style="animation: modalFade 0.3s ease-out;">
+    <div class="glass-panel rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto" style="animation: modalScale 0.3s ease-out;">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-xl font-semibold text-white">🔒 セキュリティ仕様</h3>
         <button onclick="closeSecurityModal()" class="text-gray-400 hover:text-white text-2xl">✕</button>
@@ -181,7 +248,7 @@
       </div>
       
       <div class="mt-6 text-center">
-        <button onclick="closeSecurityModal()" class="btn bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white py-2 px-6 rounded-lg">
+        <button onclick="closeSecurityModal()" class="btn btn-secondary text-white py-2 px-6 rounded-lg">
           閉じる
         </button>
       </div>

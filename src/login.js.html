@@ -257,18 +257,36 @@
     }
   }
 
-  // セキュリティモーダル制御関数
+  // セキュリティモーダル制御関数 - アニメーション対応
   function showSecurityModal() {
     const modal = document.getElementById('security-modal');
     if (modal) {
+      modal.style.animation = 'modalFade 0.3s ease-out';
       modal.classList.remove('hidden');
+      
+      // モーダル内コンテンツのアニメーション
+      const modalContent = modal.querySelector('.glass-panel');
+      if (modalContent) {
+        modalContent.style.animation = 'modalScale 0.3s ease-out';
+      }
     }
   }
 
   function closeSecurityModal() {
     const modal = document.getElementById('security-modal');
     if (modal) {
-      modal.classList.add('hidden');
+      // フェードアウトアニメーション
+      modal.style.animation = 'fadeOut 0.2s ease-out';
+      
+      setTimeout(() => {
+        modal.classList.add('hidden');
+        // アニメーションをリセット
+        modal.style.animation = '';
+        const modalContent = modal.querySelector('.glass-panel');
+        if (modalContent) {
+          modalContent.style.animation = '';
+        }
+      }, 200);
     }
   }
 

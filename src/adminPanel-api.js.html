@@ -368,7 +368,18 @@ function createFormWithConfig() {
     .then(function(result) {
       console.log('📥 Received response from createCustomFormUI:', result);
       if (result && result.status === 'success') {
-        showMessage('✅ 新しいフォームが作成され、連携されました！', 'success');
+        // Use the new structured message format
+        var successMessage = result.message || '✅ 新しいフォームが作成されました！';
+        if (result.detailedMessage) {
+          showMessage(successMessage, 'success', result.detailedMessage);
+        } else {
+          showMessage(successMessage, 'success');
+        }
+        
+        // Show next steps if available
+        if (result.nextSteps && result.nextSteps.length > 0) {
+          showNextStepsModal(result.nextSteps, result);
+        }
         
         // クラス選択肢をデータベースに保存
         saveClassChoicesToDatabase(classChoices);
@@ -385,7 +396,26 @@ function createFormWithConfig() {
         }, 3000);
       } else {
         console.error('❌ カスタムフォーム作成が失敗:', result);
-        showMessage(result?.message || 'フォームの作成に失敗しました。', 'error');
+        
+        // Use the new structured error message format
+        var errorMessage = result?.message || 'フォームの作成に失敗しました';
+        if (result?.detailedMessage) {
+          showMessage(errorMessage, 'error', result.detailedMessage);
+        } else {
+          showMessage(errorMessage, 'error');
+        }
+        
+        // Show retry option if available
+        if (result?.canRetry) {
+          showRetryOption('カスタムフォーム作成', function() {
+            createCustomFormWithConfig();
+          });
+        }
+        
+        // Show suggestions if available
+        if (result?.suggestions && result.suggestions.length > 0) {
+          showSuggestions(result.suggestions);
+        }
         // 失敗時も進捗バーを非表示
         setTimeout(() => {
           hideQuickStartProgress();
@@ -797,7 +827,18 @@ function handleQuickStart() {
         updateOverallProgress(100, 'セットアップが完了しました！');
         updateProgressStep(4, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
         
-        showMessage('✅ クイックスタートが完了しました！フォームとボードが自動作成されました。', 'success');
+        // Use the new structured message format
+        var successMessage = result.message || '✅ クイックスタートが完了しました！';
+        if (result.detailedMessage) {
+          showMessage(successMessage, 'success', result.detailedMessage);
+        } else {
+          showMessage(successMessage, 'success');
+        }
+        
+        // Show next steps if available
+        if (result.nextSteps && result.nextSteps.length > 0) {
+          showNextStepsModal(result.nextSteps, result);
+        }
         
         // Update status after quick start
         if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
@@ -818,18 +859,30 @@ function handleQuickStart() {
       } else {
         logWarn('QuickStart returned error result:', result);
         
-        // Show error in progress
-        updateProgressStep(4, 'error', 'セットアップエラー', result?.message || 'エラーが発生しました');
+        // Show error in progress using improved error messages
+        var errorMessage = result?.message || 'エラーが発生しました';
+        updateProgressStep(4, 'error', 'セットアップエラー', errorMessage);
         updateOverallProgress(0, 'セットアップに失敗しました');
         
-        // 権限エラーの可能性を考慮したメッセージ
-        let errorMessage = result?.message || 'クイックスタートに失敗しました。';
-        if (errorMessage.includes('permission') || errorMessage.includes('権限') || 
-            errorMessage.includes('Drive') || errorMessage.includes('Sheets')) {
-          errorMessage = 'クイックスタートに失敗しました。Google Drive やスプレッドシートへのアクセス権限を確認してください。システム管理者でない場合、権限が制限されている可能性があります。';
+        // Use the new structured error message format
+        var displayMessage = errorMessage;
+        var detailedMessage = result?.detailedMessage || '';
+        
+        if (result?.detailedMessage) {
+          showMessage(displayMessage, 'error', detailedMessage);
+        } else {
+          showMessage(displayMessage, 'error');
         }
         
-        showMessage(errorMessage, 'error');
+        // Show retry option if available
+        if (result?.canRetry) {
+          showRetryOption('クイックスタート', startQuickStart);
+        }
+        
+        // Show suggestions if available
+        if (result?.suggestions && result.suggestions.length > 0) {
+          showSuggestions(result.suggestions);
+        }
         
         quickstartBtn.disabled = false;
         quickstartText.textContent = 'クイックスタートを開始';

@@ -864,38 +864,156 @@ function checkIfNewOrUpdatedForm(requestUserId, spreadsheetId, sheetName) {
  * @returns {object} 保存完了メッセージ
  */
 function saveDraftConfig(requestUserId, sheetName, config) {
-  verifyUserAccess(requestUserId);
+  var validationLog = [];
+  var preCommitState = {};
+  
   try {
+    console.log('saveDraftConfig開始: sheetName=%s', sheetName);
+    validationLog.push('Draft config save started');
+    
+    // Pre-commit Validation 1: Access verification
+    verifyUserAccess(requestUserId);
+    validationLog.push('User access verified');
+    
+    // Pre-commit Validation 2: Parameter validation
     if (typeof sheetName !== 'string' || !sheetName) {
       throw new Error('無効なsheetNameです。シート名は必須です。');
     }
+    
     if (typeof config !== 'object' || config === null) {
       throw new Error('無効なconfigオブジェクトです。設定オブジェクトは必須です。');
     }
-
-    console.log('saveDraftConfig開始: sheetName=%s', sheetName);
-
+    
+    // Enhanced sheet name validation with user-friendly messages
+    if (sheetName.length > 100) {
+      throw new Error('シート名は100文字以内で入力してください');
+    }
+    
+    // Validate sheet name characters (basic safety check)
+    var invalidSheetChars = /[[\]\\\/\?\*:]/;
+    if (invalidSheetChars.test(sheetName)) {
+      throw new Error('シート名に使用できない文字が含まれています。英数字とひらがな・カタカナ・漢字をご使用ください');
+    }
+    
+    validationLog.push('Parameter validation passed');
+    
+    // Pre-commit Validation 3: Configuration structure validation
+    var requiredConfigFields = ['opinionHeader', 'reasonHeader', 'nameHeader', 'classHeader'];
+    for (var i = 0; i < requiredConfigFields.length; i++) {
+      var field = requiredConfigFields[i];
+      if (config[field] === undefined || config[field] === null) {
+        throw new Error('必須設定フィールドが不足しています: ' + field);
+      }
+      
+      if (typeof config[field] !== 'string') {
+        throw new Error('設定フィールドは文字列である必要があります: ' + field + ' (現在: ' + typeof config[field] + ')');
+      }
+      
+      // Validate header field lengths with user-friendly message
+      if (config[field].length > 200) {
+        throw new Error('「' + field + '」は200文字以内で入力してください');
+      }
+    }
+    
+    validationLog.push('Configuration structure validated');
+    
+    // Pre-commit Validation 4: User and spreadsheet verification
     const userInfo = getUserInfo(requestUserId);
     if (!userInfo || !userInfo.spreadsheetId) {
       throw new Error('ユーザーのスプレッドシート情報が見つかりません。');
     }
-
-    // 設定を保存
+    
+    // Store pre-commit state for potential rollback
+    preCommitState = {
+      userId: userInfo.userId,
+      spreadsheetId: userInfo.spreadsheetId,
+      sheetName: sheetName,
+      timestamp: new Date().toISOString()
+    };
+    
+    validationLog.push('User information verified');
+    
+    // Pre-commit Validation 5: Database health check
+    var dbHealth = testAndRepairDatabaseConnection();
+    if (!dbHealth.isHealthy) {
+      throw new Error('データベース接続エラー: ' + dbHealth.issues.join(', '));
+    }
+    
+    if (dbHealth.repaired) {
+      validationLog.push('Database connection repaired before commit');
+    }
+    
+    validationLog.push('Database health verified');
+    
+    // Pre-commit Validation 6: Spreadsheet accessibility check
+    try {
+      var spreadsheetTest = SpreadsheetApp.openById(userInfo.spreadsheetId);
+      if (!spreadsheetTest) {
+        throw new Error('スプレッドシートにアクセスできません');
+      }
+      
+      // Check if the specific sheet exists or can be created
+      var targetSheet = spreadsheetTest.getSheetByName(sheetName);
+      if (!targetSheet) {
+        console.log('saveDraftConfig: シート「' + sheetName + '」が存在しないため、設定のみ保存します');
+      }
+      
+      validationLog.push('Spreadsheet accessibility verified');
+    } catch (spreadsheetError) {
+      throw new Error('スプレッドシートアクセス検証に失敗: ' + spreadsheetError.message);
+    }
+    
+    // Pre-commit Validation 7: Configuration integrity check
+    try {
+      var configString = JSON.stringify(config);
+      var parsedConfig = JSON.parse(configString);
+      
+      // Verify the config can be safely serialized and deserialized
+      if (JSON.stringify(parsedConfig) !== configString) {
+        throw new Error('設定データの整合性チェックに失敗しました');
+      }
+      
+      validationLog.push('Configuration integrity verified');
+    } catch (integrityError) {
+      throw new Error('設定データの整合性エラー: ' + integrityError.message);
+    }
+    
+    // All pre-commit validations passed - proceed with saving
+    validationLog.push('All pre-commit validations passed - proceeding with save');
+    console.log('saveDraftConfig: 事前検証完了 - 設定保存を実行中...');
+    
+    // Save configuration
     saveSheetConfig(requestUserId, userInfo.spreadsheetId, sheetName, config);
-
-    // 関連キャッシュをクリア
+    validationLog.push('Configuration saved successfully');
+    
+    // Clear related caches
     invalidateUserCache(userInfo.userId, userInfo.adminEmail, userInfo.spreadsheetId, false);
+    validationLog.push('Cache invalidation completed');
 
     console.log('saveDraftConfig: 設定保存完了');
 
     return {
       success: true,
-      message: '設定が下書きとして保存されました。'
+      message: '💾 設定を保存しました',
+      detailedMessage: '列の設定が正常に保存されました。いつでも変更できます。',
+      validationLog: validationLog,
+      preCommitState: preCommitState,
+      nextSteps: [
+        '「保存・公開」で回答ボードを開始できます',
+        '設定はいつでも変更可能です'
+      ]
     };
 
   } catch (error) {
-    console.error('saveDraftConfigで致命的なエラー:', error.message, error.stack);
-    throw new Error('設定の保存中にサーバーエラーが発生しました: ' + error.message);
+    console.error('saveDraftConfig: 検証またはコミットエラー:', error.message, error.stack);
+    validationLog.push('Error occurred: ' + error.message);
+    
+    var enhancedError = new Error('設定の保存中にサーバーエラーが発生しました: ' + error.message);
+    enhancedError.validationLog = validationLog;
+    enhancedError.preCommitState = preCommitState;
+    enhancedError.originalError = error;
+    
+    throw enhancedError;
   }
 }
 
