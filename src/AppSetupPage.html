@@ -11,6 +11,7 @@
     <?!= include('SharedUtilities'); ?>
     <script>
       const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
+      const __RETURN_URL__ = new URLSearchParams(window.location.search).get('return') || '';
     </script>
 </head>
 <body>
@@ -405,24 +406,35 @@
 
         // 管理パネルに戻る
         function goBackToAdminPanel() {
+            if (__RETURN_URL__) {
+                try {
+                    if (window.parent !== window) {
+                        window.parent.location.href = __RETURN_URL__;
+                    } else {
+                        window.location.href = __RETURN_URL__;
+                    }
+                    return;
+                } catch (e) {
+                    window.open(__RETURN_URL__, '_blank');
+                    return;
+                }
+            }
+
             google.script.run
                 .withSuccessHandler((webAppUrl) => {
                     const targetUrl = webAppUrl + '?mode=admin&userId=' + __USER_ID__;
                     try {
-                        // iframeの場合は親ウィンドウに移動
                         if (window.parent !== window) {
                             window.parent.location.href = targetUrl;
                         } else {
                             window.location.href = targetUrl;
                         }
                     } catch (e) {
-                        // フォールバック: 新しいタブで開く
                         window.open(targetUrl, '_blank');
                     }
                 })
                 .withFailureHandler((error) => {
                     console.error('WebApp URL取得エラー:', error);
-                    // フォールバック: 現在のURLを使用
                     const currentUrl = window.location.href.split('?')[0];
                     const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__;
                     try {

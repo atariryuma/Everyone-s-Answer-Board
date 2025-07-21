@@ -495,10 +495,16 @@ function openForm() {
 
 // Open app setup page
 function openAppSetupPage() {
-  runGasWithUserId('getWebAppUrl')
+  runGasWithUserId('getWebAppUrlCached')
     .then(function(webAppUrl) {
+      const adminUrl =
+        webAppUrl + '?mode=admin&userId=' + encodeURIComponent(userId);
       const setupUrl =
-        webAppUrl + '?setup=true&mode=appsetup&userId=' + encodeURIComponent(userId);
+        webAppUrl +
+        '?setup=true&mode=appsetup&userId=' +
+        encodeURIComponent(userId) +
+        '&return=' +
+        encodeURIComponent(adminUrl);
       window.location.href = setupUrl;
     })
     .catch(function(error) {
