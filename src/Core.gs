@@ -222,7 +222,7 @@ function registerNewUser(adminEmail) {
     // 生成されたユーザー情報のキャッシュをクリア
     invalidateUserCache(userId, adminEmail, null, false);
   } catch (e) {
-    console.error('データベースへのユーザー登録に失敗:', e);
+    console.error('データベースへのユーザー登録に失敗: ' + e.message);
     throw new Error('ユーザー登録に失敗しました。システム管理者に連絡してください。');
   }
 
