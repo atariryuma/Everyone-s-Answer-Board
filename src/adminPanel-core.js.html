@@ -260,6 +260,7 @@ function adjustLayout() {
 
 // Set loading state and message with progress
 function setLoading(flag, text = '処理中...', step = 0, percentage = 0) {
+  logDebug(`setLoading called: flag=${flag}, text=${text}, step=${step}, percentage=${percentage}`);
   const overlay = document.getElementById('loading-overlay');
   const loadingMessage = document.getElementById('loading-message');
   const progressBar = document.getElementById('loading-progress-bar');
