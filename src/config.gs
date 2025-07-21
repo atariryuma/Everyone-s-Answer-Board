@@ -679,7 +679,7 @@ function saveAndActivateSheet(requestUserId, spreadsheetId, sheetName, config) {
  * @param {object} config - 保存・適用する設定オブジェクト
  * @returns {object} 最新のステータスオブジェクト
  */
-function saveAndPublishLegacy(requestUserId, sheetName, config) {
+function saveAndPublishLegacy(context, requestUserId, sheetName, config) {
   verifyUserAccess(requestUserId);
   const lock = LockService.getScriptLock();
   lock.waitLock(30000); // 30秒待機
@@ -689,7 +689,7 @@ function saveAndPublishLegacy(requestUserId, sheetName, config) {
 
     // PHASE2 OPTIMIZATION: Use execution-level cache to avoid duplicate DB queries
     clearExecutionUserInfoCache();
-    const userInfo = getCachedUserInfo(requestUserId);
+    const userInfo = getCachedUserInfo(context, requestUserId);
     if (!userInfo || !userInfo.spreadsheetId) {
       throw new Error('ユーザーのスプレッドシート情報が見つかりません。');
     }
@@ -698,7 +698,7 @@ function saveAndPublishLegacy(requestUserId, sheetName, config) {
     console.log('saveAndPublish: 公開処理開始（最適化版）');
 
     // PHASE2 OPTIMIZATION: Integrated processing with shared resources
-    const sheetsService = getSheetsService();
+    
     console.log('saveAndPublish: 共有Sheetsサービス作成完了');
 
     // 2. 設定を保存（最適化モード使用）
@@ -756,7 +756,7 @@ function saveAndPublishLegacy(requestUserId, sheetName, config) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  * @returns {object} 公開結果
  */
-function republishBoard(requestUserId) {
+function republishBoard(context, requestUserId) {
   if (!requestUserId) {
     requestUserId = getUserId();
   }
@@ -766,9 +766,10 @@ function republishBoard(requestUserId) {
   lock.waitLock(30000);
 
   try {
+    const context = new ExecutionContext();
     console.log('republishBoard開始: userId=%s', requestUserId);
 
-    const userInfo = getConfigUserInfo(requestUserId);
+    const userInfo = getConfigUserInfo(context, requestUserId);
     if (!userInfo || !userInfo.spreadsheetId) {
       throw new Error('ユーザーのスプレッドシート情報が見つかりません。');
     }
@@ -1016,9 +1017,10 @@ function autoMapSheetHeaders(requestUserId, sheetName, overrides) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  * @param {string} url - スプレッドシートURL
  */
-function addSpreadsheetUrl(requestUserId, url) {
+function addSpreadsheetUrl(context, requestUserId, url) {
   verifyUserAccess(requestUserId);
   try {
+    const context = new ExecutionContext();
     var spreadsheetId = url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1];
     if (!spreadsheetId) {
       throw new Error('無効なスプレッドシートURLです。');
@@ -1026,7 +1028,7 @@ function addSpreadsheetUrl(requestUserId, url) {
 
     var currentUserId = requestUserId; // requestUserId を使用
 
-    var userInfo = findUserById(currentUserId);
+    var userInfo = findUserById(context, currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません。');
     }
@@ -1049,7 +1051,7 @@ function addSpreadsheetUrl(requestUserId, url) {
     // シートリストを即座に取得
     var sheets = [];
     try {
-      sheets = getSheetsList(currentUserId);
+      sheets = getSheetsList(context, currentUserId);
       console.log('シート検出完了:', {
         spreadsheetId: spreadsheetId,
         sheetCount: sheets.length,
@@ -1345,13 +1347,14 @@ function resetUserAuthentication(requestUserId) {
  * @param {string} sheetName - シート名
  * @returns {object} { allHeaders: Array<string>, guessedConfig: object, existingConfig: object }
  */
-function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
+function getSheetDetails(context, requestUserId, spreadsheetId, sheetName) {
   verifyUserAccess(requestUserId);
   try {
+    const context = new ExecutionContext();
     if (!sheetName) {
       throw new Error('sheetNameは必須です');
     }
-    var targetId = spreadsheetId || getEffectiveSpreadsheetId(requestUserId);
+    var targetId = spreadsheetId || getEffectiveSpreadsheetId(context, requestUserId);
     if (!targetId) {
       throw new Error('spreadsheetIdが取得できません');
     }
@@ -1366,11 +1369,11 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
       throw new Error(`シート '${sheetName}' に列が存在しません`);
     }
     const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0] || [];
-    const guessed = autoMapHeaders(headers);
+    const guessed = autoMapHeaders(context, headers);
 
     let existing = {};
     try {
-      existing = getConfig(requestUserId, sheetName, true) || {};
+      existing = getConfig(context, requestUserId, sheetName, true) || {};
     } catch (e) {
       console.warn('getConfig failed in getSheetDetails:', e.message);
     }
@@ -1406,7 +1409,7 @@ function createExecutionContext(requestUserId) {
   
   try {
     // 1. 共有リソースを一括作成（1回のみ）
-    const sheetsService = getSheetsService();
+    const sheetsService = getSheetsServiceInternal();
     const userInfo = getCachedUserInfo(requestUserId);
     
     if (!userInfo) {
@@ -1700,7 +1703,7 @@ function getSheetDetails(context, spreadsheetId, sheetName) {
       ? batch.valueRanges[0].values[0] || []
       : [];
 
-    const guessed = autoMapHeaders(headers);
+    const guessed = autoMapHeaders(context, headers);
     const existing = getConfigFromContext(context, sheetName);
 
     return {

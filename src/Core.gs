@@ -4,6 +4,61 @@
  */
 
 /**
+ * リクエストごとの実行コンテキストを管理するクラス。
+ * Sheets APIサービスやユーザー情報など、リクエスト中に共有されるべきリソースを保持します。
+ */
+class ExecutionContext {
+  constructor() {
+    this._sheetsService = null;
+    this._userInfo = null;
+    this._adminEmail = null;
+  }
+
+  /**
+   * Sheets APIサービスを取得または初期化します。
+   * @returns {object} Sheets APIサービスオブジェクト
+   */
+  getSheetsService() {
+    if (!this._sheetsService) {
+      this._sheetsService = getSheetsServiceInternal(); // 内部関数として定義
+    }
+    return this._sheetsService;
+  }
+
+  /**
+   * 現在のリクエストのユーザー情報を設定します。
+   * @param {object} userInfo - ユーザー情報
+   */
+  setUserInfo(userInfo) {
+    this._userInfo = userInfo;
+  }
+
+  /**
+   * 現在のリクエストのユーザー情報を取得します。
+   * @returns {object|null} ユーザー情報
+   */
+  getUserInfo() {
+    return this._userInfo;
+  }
+
+  /**
+   * 現在のリクエストの管理者メールアドレスを設定します。
+   * @param {string} email - 管理者メールアドレス
+   */
+  setAdminEmail(email) {
+    this._adminEmail = email;
+  }
+
+  /**
+   * 現在のリクエストの管理者メールアドレスを取得します。
+   * @returns {string|null} 管理者メールアドレス
+   */
+  getAdminEmail() {
+    return this._adminEmail;
+  }
+}
+
+/**
  * セットアップステップを統一的に判定する関数
  * @param {Object} userInfo - ユーザー情報
  * @param {Object} configJson - 設定JSON
@@ -188,21 +243,23 @@ function registerNewUser(adminEmail) {
  * Page.htmlから呼び出される - フロントエンド期待形式に対応
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
+function addReaction(context, requestUserId, rowIndex, reactionKey, sheetName) {
   verifyUserAccess(requestUserId);
   clearExecutionUserInfoCache();
 
   try {
+    const context = new ExecutionContext();
     var reactingUserEmail = Session.getActiveUser().getEmail();
     var ownerUserId = requestUserId; // requestUserId を使用
 
     // ボードオーナーの情報をDBから取得（キャッシュ利用）
-    var boardOwnerInfo = findUserById(ownerUserId);
+    var boardOwnerInfo = findUserById(context, ownerUserId);
     if (!boardOwnerInfo) {
       throw new Error('無効なボードです。');
     }
 
     var result = processReaction(
+      context,
       boardOwnerInfo.spreadsheetId,
       sheetName,
       rowIndex,
@@ -213,7 +270,7 @@ function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
     // Page.html期待形式に変換
     if (result && result.status === 'success') {
       // 更新後のリアクション情報を取得
-      var updatedReactions = getRowReactions(boardOwnerInfo.spreadsheetId, sheetName, rowIndex, reactingUserEmail);
+      var updatedReactions = getRowReactions(context, boardOwnerInfo.spreadsheetId, sheetName, rowIndex, reactingUserEmail);
 
       return {
         status: "ok",
@@ -283,11 +340,11 @@ function getPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode,
     // キャッシュバイパス時は直接実行
     if (bypassCache === true) {
       debugLog('🔄 キャッシュバイパス：最新データを直接取得');
-      return executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode);
+      return executeGetPublishedSheetData(context, requestUserId, classFilter, sortOrder, adminMode);
     }
 
     return cacheManager.get(requestKey, () => {
-      return executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode);
+      return executeGetPublishedSheetData(context, requestUserId, classFilter, sortOrder, adminMode);
     }, { ttl: 600 }); // 10分間キャッシュ
   } finally {
     // 実行終了時にユーザー情報キャッシュをクリア
@@ -298,12 +355,13 @@ function getPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode,
 /**
  * 実際のデータ取得処理（キャッシュ制御から分離） (マルチテナント対応版)
  */
-function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode) {
+function executeGetPublishedSheetData(context, requestUserId, classFilter, sortOrder, adminMode) {
     try {
+      const context = new ExecutionContext();
       var currentUserId = requestUserId; // requestUserId を使用
       debugLog('getPublishedSheetData: userId=%s, classFilter=%s, sortOrder=%s, adminMode=%s', currentUserId, classFilter, sortOrder, adminMode);
 
-      var userInfo = getCachedUserInfo(currentUserId);
+      var userInfo = getCachedUserInfo(context, currentUserId);
       if (!userInfo) {
         throw new Error('ユーザー情報が見つかりません');
       }
@@ -342,7 +400,7 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     debugLog('getPublishedSheetData: isOwner=%s, ownerId=%s, currentUserId=%s', isOwner, configJson.ownerId, currentUserId);
 
     // データ取得
-    var sheetData = getSheetData(currentUserId, publishedSheetName, classFilter, sortOrder, adminMode);
+    var sheetData = getSheetData(context, currentUserId, publishedSheetName, classFilter, sortOrder, adminMode);
     debugLog('getPublishedSheetData: sheetData status=%s, totalCount=%s', sheetData.status, sheetData.totalCount);
 
     if (sheetData.status === 'error') {
@@ -570,9 +628,10 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
  * Page.htmlから呼び出される - フロントエンド期待形式に対応
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function getAvailableSheets(requestUserId) {
+function getAvailableSheets(context, requestUserId) {
   verifyUserAccess(requestUserId);
   try {
+    const context = new ExecutionContext();
     var currentUserId = requestUserId; // requestUserId を使用
 
     if (!currentUserId) {
@@ -580,7 +639,7 @@ function getAvailableSheets(requestUserId) {
       return [];
     }
 
-    var sheets = getSheetsList(currentUserId);
+    var sheets = getSheetsList(context, currentUserId);
 
     if (!sheets || sheets.length === 0) {
       console.warn('getAvailableSheets: No sheets found for user:', currentUserId);
@@ -606,7 +665,7 @@ function getAvailableSheets(requestUserId) {
  * @param {string} userId - ユーザーID
  * @returns {Array<Object>} シートのリスト（例: [{name: 'Sheet1', id: 'sheetId1'}, ...]）
  */
-function getSheetsList(userId) {
+function getSheetsList(context, userId) {
   try {
     var userInfo = findUserById(userId);
     if (!userInfo || !userInfo.spreadsheetId) {
@@ -651,7 +710,7 @@ function refreshBoardData(requestUserId) {
     invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId, false);
 
     // 最新のステータスを取得
-    return getAppConfig(requestUserId);
+    return getAppConfig(context, requestUserId);
   } catch (e) {
     console.error('refreshBoardData の再読み込みに失敗: ' + e.message);
     return { status: 'error', message: 'ボードデータの再読み込みに失敗しました: ' + e.message };
@@ -729,11 +788,12 @@ function formatSheetDataForFrontend(rawData, mappedIndices, headerIndices, admin
  * アプリ設定を取得（最適化版） (マルチテナント対応版)
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function getAppConfig(requestUserId) {
+function getAppConfig(context, requestUserId) {
   verifyUserAccess(requestUserId);
   try {
+    const context = new ExecutionContext();
     var currentUserId = requestUserId;
-    var userInfo = findUserById(currentUserId);
+    var userInfo = findUserById(context, currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -762,7 +822,7 @@ function getAppConfig(requestUserId) {
       }
     }
 
-    var sheets = getSheetsList(currentUserId);
+    var sheets = getSheetsList(context, currentUserId);
     var appUrls = generateAppUrls(currentUserId);
     
     // 回答数を取得
@@ -770,7 +830,7 @@ function getAppConfig(requestUserId) {
     var totalReactions = 0;
     try {
       if (configJson.publishedSpreadsheetId && configJson.publishedSheetName) {
-        var responseData = getResponsesData(currentUserId, configJson.publishedSheetName);
+        var responseData = getResponsesData(context, currentUserId, configJson.publishedSheetName);
         if (responseData.status === 'success') {
           answerCount = responseData.data.length;
           // リアクション数の概算計算（詳細実装は後回し）
@@ -1024,14 +1084,14 @@ function testSetup() {
 // include 関数は main.gs で定義されています
 
 
-function getResponsesData(userId, sheetName) {
+function getResponsesData(context, userId, sheetName) {
   var userInfo = getCachedUserInfo(userId);
   if (!userInfo) {
     return { status: 'error', message: 'ユーザー情報が見つかりません' };
   }
 
   try {
-    var service = getSheetsService();
+    var service = context.getSheetsService();
     var spreadsheetId = userInfo.spreadsheetId;
     var range = "'" + (sheetName || 'フォームの回答 1') + "'!A:Z";
     
@@ -1099,12 +1159,13 @@ function getCurrentUserStatus(requestUserId) {
  * Page.htmlから呼び出される（パラメータなし）
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function getActiveFormInfo(requestUserId) {
+function getActiveFormInfo(context, requestUserId) {
   verifyUserAccess(requestUserId);
   try {
+    const context = new ExecutionContext();
     var currentUserId = requestUserId; // requestUserId を使用
 
-    var userInfo = findUserById(currentUserId);
+    var userInfo = findUserById(context, currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -1115,7 +1176,8 @@ function getActiveFormInfo(requestUserId) {
     var answerCount = 0;
     try {
       if (configJson.publishedSpreadsheetId && configJson.publishedSheet) {
-        var responseData = getResponsesData(currentUserId, configJson.publishedSheet);
+        if (configJson.publishedSpreadsheetId && configJson.publishedSheet) {
+        var responseData = getResponsesData(context, currentUserId, configJson.publishedSheet);
         if (responseData.status === 'success') {
           answerCount = responseData.data.length;
         }
@@ -1325,12 +1387,13 @@ function saveSystemConfig(requestUserId, config) {
  * Page.htmlから呼び出される - フロントエンド期待形式に対応
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function toggleHighlight(requestUserId, rowIndex, sheetName) {
+function toggleHighlight(context, requestUserId, rowIndex, sheetName) {
   verifyUserAccess(requestUserId);
   try {
+    const context = new ExecutionContext();
     var currentUserId = requestUserId; // requestUserId を使用
 
-    var userInfo = findUserById(currentUserId);
+    var userInfo = findUserById(context, currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -1342,6 +1405,7 @@ function toggleHighlight(requestUserId, rowIndex, sheetName) {
     }
 
     var result = processHighlightToggle(
+      context,
       userInfo.spreadsheetId,
       sheetName || 'フォームの回答 1',
       rowIndex
@@ -1377,16 +1441,17 @@ function toggleHighlight(requestUserId, rowIndex, sheetName) {
  * フォルダ作成、フォーム作成、スプレッドシート作成、ボード公開まで一括実行
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function quickStartSetup(requestUserId) {
+function quickStartSetup(context, requestUserId) {
   // 新規ユーザー（requestUserIdがundefinedまたはnull）の場合はverifyUserAccessをスキップ
   if (requestUserId) {
     verifyUserAccess(requestUserId);
   }
   try {
+    const context = new ExecutionContext();
     debugLog('🚀 クイックスタートセットアップ開始: ' + requestUserId);
     
     // ユーザー情報の取得
-    var userInfo = findUserById(requestUserId);
+    var userInfo = findUserById(context, requestUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -1573,9 +1638,9 @@ function createUserFolder(userEmail) {
 /**
  * ハイライト切り替え処理
  */
-function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
+function processHighlightToggle(context, spreadsheetId, sheetName, rowIndex) {
   try {
-    var service = getSheetsService();
+    var service = context.getSheetsService();
     var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
     var highlightColumnIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT];
     
@@ -1705,14 +1770,14 @@ function extractFormIdFromUrl(url) {
 /**
  * リアクション処理
  */
-function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reactingUserEmail) {
+function processReaction(context, spreadsheetId, sheetName, rowIndex, reactionKey, reactingUserEmail) {
   try {
     // LockServiceを使って競合を防ぐ
     var lock = LockService.getScriptLock();
     try {
       lock.waitLock(10000);
       
-      var service = getSheetsService();
+      var service = context.getSheetsService();
       var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
       
       // すべてのリアクション列を取得してユーザーの重複リアクションをチェック
@@ -2526,7 +2591,7 @@ function addServiceAccountToSpreadsheet(spreadsheetId) {
  * @param {string} userEmail - ユーザーのメールアドレス
  * @param {string} spreadsheetId - スプレッドシートID
  */
-function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
+function repairUserSpreadsheetAccess(context, userEmail, spreadsheetId) {
   try {
     debugLog('スプレッドシートアクセス権限の修復を開始: ' + userEmail + ' -> ' + spreadsheetId);
     
@@ -2610,7 +2675,7 @@ function emergencyAdminPanelRepair(userEmail, spreadsheetId) {
     debugLog('ステップ1: サービスアカウント権限追加完了');
     
     // 2. ユーザー権限の強制追加
-    const repairResult = repairUserSpreadsheetAccess(userEmail, spreadsheetId);
+    const repairResult = repairUserSpreadsheetAccess(context, userEmail, spreadsheetId);
     debugLog('ステップ2: ユーザー権限修復結果:', repairResult);
     
     // 3. 権限確認テスト
@@ -2624,7 +2689,7 @@ function emergencyAdminPanelRepair(userEmail, spreadsheetId) {
     
     // 4. サービスアカウントアクセステスト
     try {
-      const service = getSheetsService();
+      const service = context.getSheetsService();
       const testData = getSpreadsheetsData(service, spreadsheetId);
       debugLog('ステップ4: サービスアカウントアクセステスト成功');
     } catch (serviceTestError) {
@@ -2739,7 +2804,7 @@ function checkSpreadsheetSharingPermission(spreadsheetId) {
 /**
  * シートデータ取得
  */
-function getSheetData(userId, sheetName, classFilter, sortMode, adminMode) {
+function getSheetData(context, userId, sheetName, classFilter, sortOrder, adminMode) {
   // キャッシュキー生成（ユーザー、シート、フィルタ条件ごとに個別キャッシュ）
   var cacheKey = `sheetData_${userId}_${sheetName}_${classFilter}_${sortMode}`;
   
@@ -2765,7 +2830,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
       }
       
       var spreadsheetId = userInfo.spreadsheetId;
-      var service = getSheetsService();
+      var service = context.getSheetsService();
       
       // フォーム回答データのみを取得（名簿機能は使用しない）
       var ranges = [sheetName + '!A:Z'];
@@ -2867,7 +2932,7 @@ function getSheetsList(userId) {
 
     debugLog('getSheetsList: User\'s spreadsheetId:', userInfo.spreadsheetId);
 
-    var service = getSheetsService();
+    var service = context.getSheetsService();
     if (!service) {
       console.error('❌ getSheetsList: Sheets service not initialized');
       return [];
@@ -2899,7 +2964,7 @@ function getSheetsList(userId) {
         try {
           var currentUserEmail = Session.getActiveUser().getEmail();
           if (currentUserEmail === userInfo.adminEmail) {
-            repairUserSpreadsheetAccess(currentUserEmail, userInfo.spreadsheetId);
+            repairUserSpreadsheetAccess(context, currentUserEmail, userInfo.spreadsheetId);
             debugLog('getSheetsList: ユーザー権限での修復を実行しました。');
           }
         } catch (finalRepairError) {
@@ -3199,9 +3264,9 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
 /**
  * 特定の行のリアクション情報を取得
  */
-function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
+function getRowReactions(context, spreadsheetId, sheetName, rowIndex, reactingUserEmail) {
   try {
-    var service = getSheetsService();
+    var service = context.getSheetsService();
     var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
     
     var reactionData = {
@@ -4260,7 +4325,7 @@ function getInitialData(requestUserId, targetSheetName) {
     }
     
     // === ステップ3: シート一覧とアプリURL生成 ===
-    var sheets = getSheetsList(currentUserId);
+    var sheets = getSheetsList(context, currentUserId);
     var appUrls = generateAppUrls(currentUserId);
     
     // === ステップ4: 回答数とリアクション数の取得 ===
@@ -4268,7 +4333,7 @@ function getInitialData(requestUserId, targetSheetName) {
     var totalReactions = 0;
     try {
       if (configJson.publishedSpreadsheetId && configJson.publishedSheetName) {
-        var responseData = getResponsesData(currentUserId, configJson.publishedSheetName);
+        var responseData = getResponsesData(context, currentUserId, configJson.publishedSheetName);
         if (responseData.status === 'success') {
           answerCount = responseData.data.length;
           totalReactions = answerCount * 2; // 暫定値
