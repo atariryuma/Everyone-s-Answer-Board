@@ -335,59 +335,6 @@
     }
   }
   
-  // Handle account deletion
-  function handleAccountDeletion() {
-    const confirmText = 'DELETE';
-    const userInput = prompt(`アカウントを完全に削除します。この操作は取り消せません。\n\n続行するには「${confirmText}」と入力してください:`);
-    
-    if (userInput !== confirmText) {
-      showMessage('削除がキャンセルされました', 'info');
-      return;
-    }
-    
-    const btn = document.getElementById('delete-account-btn');
-    btn.disabled = true;
-    btn.innerHTML = '<div class="spinner mr-2"></div>削除中...';
-    
-    if (typeof runGasWithUserId === 'function') {
-      runGasWithUserId('deleteCurrentUserAccount')
-        .then(result => {
-          if (result.status === 'success' || result.success) {
-            showMessage('アカウントが削除されました', 'success');
-            if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-              window.unifiedCache.clear();
-            }
-            if (window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
-              window.gasOptimizer.clearCache();
-            }
-            if (window.localStorage) {
-              window.localStorage.clear();
-            }
-            setTimeout(() => {
-              runGasWithUserId('getWebAppUrl')
-                .then(webAppUrl => {
-                  window.location.href = webAppUrl;
-                })
-                .catch(error => {
-                  console.error('Failed to get web app URL:', error);
-                  window.location.reload();
-                });
-            }, 2000);
-          } else {
-            showMessage(result.message || '削除に失敗しました', 'error');
-          }
-        })
-        .catch(error => {
-          console.error('Account deletion failed:', error);
-          showMessage('削除に失敗しました', 'error');
-        })
-        .finally(() => {
-          btn.disabled = false;
-          btn.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>自分のアカウントを完全に削除する';
-        });
-    }
-  }
-  
   
   
   

@@ -650,6 +650,17 @@ function showSetupPage() {
  * @returns {HtmlOutput}
  */
 function showAppSetupPage() {
+    // システム管理者権限チェック
+    try {
+      if (!isDeployUser()) {
+        console.warn('Unauthorized access attempt to app setup page:', Session.getActiveUser().getEmail());
+        return showErrorPage('アクセス権限がありません', 'この機能にアクセスする権限がありません。システム管理者にお問い合わせください。');
+      }
+    } catch (error) {
+      console.error('Error checking deploy user permissions:', error);
+      return showErrorPage('認証エラー', '権限確認中にエラーが発生しました。');
+    }
+    
     const appSetupTemplate = HtmlService.createTemplateFromFile('AppSetupPage');
     const htmlOutput = appSetupTemplate.evaluate()
       .setTitle('アプリ設定 - StudyQuest');
@@ -698,6 +709,7 @@ function showErrorPage(title, message, error) {
   
   return htmlOutput;
 }
+
 
 /**
  * ユーザー専用の一意の管理パネルURLを構築

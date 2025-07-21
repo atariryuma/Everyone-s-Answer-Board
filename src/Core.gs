@@ -1394,17 +1394,10 @@ function quickStartSetup(requestUserId) {
     var configJson = JSON.parse(userInfo.configJson || '{}');
     var userEmail = userInfo.adminEmail;
     
-    // 既にセットアップ済みかチェック
+    // クイックスタート繰り返し実行を許可
+    // 既存のセットアップがある場合は警告メッセージを出すが、処理は継続する
     if (configJson.formCreated && userInfo.spreadsheetId) {
-      var appUrls = generateAppUrls(requestUserId);
-      return {
-        status: 'already_completed',
-        message: 'クイックスタートは既に完了しています。',
-        webAppUrl: appUrls.webAppUrl,
-        adminUrl: appUrls.adminUrl,
-        viewUrl: appUrls.viewUrl,
-        setupUrl: appUrls.setupUrl
-      };
+      console.log('⚠️ 既存のセットアップが検出されました。新しいセットアップで上書きします。');
     }
     
     // ステップ1: ユーザー専用フォルダを作成
@@ -2280,13 +2273,14 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
     var sheets = spreadsheetObj.getSheets();
     var sheetName = sheets[0].getName();
     
-    // サービスアカウントとスプレッドシートを共有
+    // サービスアカウントとスプレッドシートを共有（失敗しても処理継続）
     try {
       shareSpreadsheetWithServiceAccount(spreadsheetId);
       debugLog('サービスアカウントとの共有完了: ' + spreadsheetId);
     } catch (shareError) {
-      console.error('サービスアカウント共有エラー:', shareError.message);
-      console.error('スプレッドシート作成は完了しましたが、サービスアカウントとの共有に失敗しました。手動で共有してください。');
+      console.warn('サービスアカウント共有エラー（処理継続）:', shareError.message);
+      // 権限エラーの場合でも、スプレッドシート作成自体は成功とみなす
+      debugLog('スプレッドシート作成は完了しました。サービスアカウント共有は後で設定してください。');
     }
     
     return {
@@ -2439,8 +2433,13 @@ function createStudyQuestForm(userEmail, userId, formTitle, questionType) {
     
     form.setConfirmationMessage(confirmationMessage);
     
-    // サービスアカウントをスプレッドシートに追加
-    addServiceAccountToSpreadsheet(formResult.spreadsheetId);
+    // サービスアカウントをスプレッドシートに追加（失敗しても処理継続）
+    try {
+      addServiceAccountToSpreadsheet(formResult.spreadsheetId);
+    } catch (serviceAccountError) {
+      console.warn('サービスアカウント追加に失敗しましたが、処理を継続します:', serviceAccountError.message);
+      // 権限エラーの場合でも、フォーム作成自体は成功とみなす
+    }
     
     // リアクション列をスプレッドシートに追加
     addReactionColumnsToSpreadsheet(formResult.spreadsheetId, formResult.sheetName);

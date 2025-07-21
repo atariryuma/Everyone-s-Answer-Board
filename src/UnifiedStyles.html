@@ -438,8 +438,9 @@ body {
 
 /* Make sure QuickStart progress is visible during loading */
 .loading-overlay.quickstart-active {
-  background: rgba(0,0,0,0.3);
+  background: rgba(0,0,0,0.1);
   z-index: 7000;
+  pointer-events: none; /* Allow interaction with progress bar */
 }
 
 /* Completed section styling - only show checkmark when truly completed */

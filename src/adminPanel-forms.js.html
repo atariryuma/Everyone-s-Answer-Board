@@ -1,18 +1,8 @@
 <script>
 // 文字数カウンター機能
 function setupCharacterCounters() {
-  const titleInput = document.getElementById('custom-form-title');
   const questionTextarea = document.getElementById('custom-main-question');
-  const titleCounter = document.getElementById('title-counter');
   const questionCounter = document.getElementById('question-counter');
-
-  if (titleInput && titleCounter) {
-    titleInput.addEventListener('input', function() {
-      const count = this.value.length;
-      titleCounter.textContent = `${count}/100`;
-      titleCounter.className = count > 90 ? 'text-xs text-red-400' : 'text-xs text-gray-500';
-    });
-  }
 
   if (questionTextarea && questionCounter) {
     questionTextarea.addEventListener('input', function() {

@@ -174,9 +174,16 @@ function setupResourceHandlers() {
 // =============================================================================
 
 function setupAccountManagementHandlers() {
-  // Delete account handler
-  if (elements['delete-account-btn']) {
-    elements['delete-account-btn'].addEventListener('click', handleDeleteRequest);
+  // Delete account handler - 防御的実装
+  const deleteBtn = elements['delete-account-btn'] || getCachedElement('delete-account-btn');
+  if (deleteBtn) {
+    // 既存のイベントリスナーを削除（重複を防ぐため）
+    deleteBtn.removeEventListener('click', handleDeleteRequest);
+    // 新しいイベントリスナーを追加
+    deleteBtn.addEventListener('click', handleDeleteRequest);
+    console.log('Delete account button event listener attached successfully');
+  } else {
+    console.warn('Delete account button not found');
   }
   
   // Switch account handlers

@@ -513,10 +513,10 @@
         
         <div class="error-actions">
             <button class="btn btn-primary" onclick="location.reload()">
-                🔄 ページを再読み込み
+                🔄 再読み込み
             </button>
-            <button class="btn btn-secondary" onclick="history.back()">
-                ← 前のページに戻る
+            <button class="btn btn-secondary" onclick="window.location.href = window.location.origin + window.location.pathname">
+                🏠 ログイン画面に戻る
             </button>
         </div>
         

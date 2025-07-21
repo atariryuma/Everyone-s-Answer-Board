@@ -268,11 +268,14 @@ function setLoading(flag, text = '') {
     if (flag) {
       overlay.classList.remove('hidden');
       
-      // If QuickStart is active, use lighter overlay
+      // If QuickStart is active, hide overlay completely to show progress
       if (quickstartProgress && !quickstartProgress.classList.contains('hidden')) {
         overlay.classList.add('quickstart-active');
+        // Completely hide overlay during progress display
+        overlay.style.display = 'none';
       } else {
         overlay.classList.remove('quickstart-active');
+        overlay.style.display = 'flex';
       }
       
       if (loadingText && text) {
@@ -281,6 +284,7 @@ function setLoading(flag, text = '') {
     } else {
       overlay.classList.add('hidden');
       overlay.classList.remove('quickstart-active');
+      overlay.style.display = 'none';
     }
   }
 }
