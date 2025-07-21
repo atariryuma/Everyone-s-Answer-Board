@@ -352,7 +352,7 @@ function setupRealtimeValidation() {
 
 // Handle delete account request
 function handleDeleteRequest() {
-  showConfirmationModal(
+  window.sharedModals.showConfirmation(
     'アカウント削除の確認',
     '本当にこのアカウントを削除しますか？この操作は元に戻せず、すべてのデータが失われます。',
     function() {
