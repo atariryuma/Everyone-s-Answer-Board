@@ -237,25 +237,15 @@
       }
       
       if (userEmailDisplay) {
-        userEmailDisplay.textContent = 'アカウント切り替え中...';
-      }
-      
-      // バックエンドのセッションクリーンアップ関数を呼び出し
-      google.script.run
-        .withSuccessHandler(result => {
-          console.log('Session cleanup result:', result);
-          // Google認証のログアウトURLにリダイレクト
-          window.location.href = 'https://accounts.google.com/logout';
-        })
-        .withFailureHandler(error => {
-          console.error('Session cleanup failed:', error);
-          alert('セッションクリアに失敗しました。手動でGoogleアカウントからログアウトしてください。');
-          // 失敗時もGoogleログアウトページへ
-          window.location.href = 'https://accounts.google.com/logout';
-        })
-        .resetUserAuthentication();
+      userEmailDisplay.textContent = 'Googleアカウント選択画面へリダイレクト中...';
     }
+
+    // 直接GoogleのログアウトURLにリダイレクト
+    // これにより、現在のGoogleセッションがクリアされ、
+    // 次のログイン時にアカウント選択が促される可能性が高まります。
+    window.location.href = 'https://accounts.google.com/logout'; 
   }
+}
 
   // セキュリティモーダル制御関数
   function showSecurityModal() {
