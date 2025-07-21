@@ -138,70 +138,10 @@
     </div>
   </div>
 
-  <!-- セキュリティ仕様モーダル -->
-  <div class="modal fade" id="security-modal" tabindex="-1" aria-labelledby="securityModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-      <div class="modal-content glass-panel border-0">
-        <div class="modal-header border-bottom border-secondary">
-          <h3 class="modal-title fs-5 fw-semibold text-light" id="securityModalLabel">🔒 セキュリティ仕様</h3>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <div class="row g-3">
-            <div class="col-12">
-              <div class="bg-dark p-3 rounded-2">
-                <h4 class="fw-medium text-primary mb-2 h6">🏢 ドメイン制限</h4>
-                <p class="small text-light mb-0">このシステムは<strong>naha-okinawa.ed.jp</strong>ドメインのユーザーのみアクセス可能です。組織外からのアクセスは制限されています。</p>
-              </div>
-            </div>
+  
 
-            <div class="col-12">
-              <div class="bg-dark p-3 rounded-2">
-                <h4 class="fw-medium text-primary mb-2 h6">🔐 認証システム</h4>
-                <p class="small text-light mb-0">Google Workspace内部OAuth認証を使用しており、外部認証は受け付けません。組織のセキュリティポリシーに準拠しています。</p>
-              </div>
-            </div>
-
-            <div class="col-12">
-              <div class="bg-dark p-3 rounded-2">
-                <h4 class="fw-medium text-primary mb-2 h6">🛡️ データ保護</h4>
-                <ul class="small text-light mb-0 ps-3">
-                  <li>Content Security Policy (CSP) による外部リソース制限</li>
-                  <li>X-Content-Type-Options: nosniff による MIME タイプ保護</li>
-                  <li>Referrer-Policy による情報漏洩防止</li>
-                  <li>ユーザーデータの暗号化と安全な保存</li>
-                </ul>
-              </div>
-            </div>
-
-            <div class="col-12">
-              <div class="bg-dark p-3 rounded-2">
-                <h4 class="fw-medium text-primary mb-2 h6">👥 アクセス制御</h4>
-                <p class="small text-light mb-0">マルチテナント環境での権限分離により、ユーザーは自分のデータのみアクセス可能です。管理者権限は適切に分離されています。</p>
-              </div>
-            </div>
-
-            <div class="col-12">
-              <div class="bg-dark p-3 rounded-2">
-                <h4 class="fw-medium text-primary mb-2 h6">📝 監査ログ</h4>
-                <p class="small text-light mb-0">システムの全操作は監査ログに記録され、セキュリティインシデントの追跡と分析が可能です。</p>
-              </div>
-            </div>
-
-            <div class="col-12">
-              <div class="bg-dark p-3 rounded-2">
-                <h4 class="fw-medium text-primary mb-2 h6">⚙️ システム設計</h4>
-                <p class="small text-light mb-0">Google Apps Script環境での実行により、Googleのインフラストラクチャのセキュリティ基準を活用しています。</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer border-top border-secondary">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- 共通モーダルコンポーネントを読み込み -->
+  <?!= include('SharedModals'); ?>
 
   <!-- Bootstrap JavaScript -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
@@ -211,16 +151,14 @@
   <script>
     // セキュリティモーダル表示用の関数を更新
     function showSecurityModal() {
-      const modal = new bootstrap.Modal(document.getElementById('security-modal'));
-      modal.show();
-    }
-
-    function closeSecurityModal() {
-      const modal = bootstrap.Modal.getInstance(document.getElementById('security-modal'));
-      if (modal) {
-        modal.hide();
+      if (window.sharedModals) {
+        window.sharedModals.showSecurityDetails(); // SharedModalsのshowSecurityDetailsを呼び出す
+      } else {
+        console.error('SharedModalsがロードされていません。');
       }
     }
+
+    // closeSecurityModalはSharedModalsで管理されるため不要
   </script>
 
 </body>

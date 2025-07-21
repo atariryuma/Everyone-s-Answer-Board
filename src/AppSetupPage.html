@@ -185,86 +185,95 @@
     </div>
 
     <!-- 削除確認モーダル -->
-    <div id="delete-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
-        <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4">
-            <h3 class="text-xl font-semibold text-white mb-4">⚠️ ユーザーアカウント削除</h3>
+    <div id="delete-modal" class="modal fade glass-modal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content glass-card border-0">
+                <div class="modal-header border-0 pb-0">
+                    <h3 class="modal-title fs-5 fw-bold text-warning">⚠️ ユーザーアカウント削除</h3>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <p class="text-glass mb-2">以下のユーザーを削除しますか？</p>
+                        <div class="bg-secondary bg-opacity-25 border border-secondary rounded-3 p-3">
+                            <p class="text-info fw-medium mb-0" id="delete-user-email"></p>
+                            <p class="small text-secondary mb-0" id="delete-user-id"></p>
+                        </div>
+                    </div>
 
-            <div class="mb-4">
-                <p class="text-light mb-2">以下のユーザーを削除しますか？</p>
-                <div class="bg-secondary p-3 rounded-lg">
-                    <p class="text-info font-medium" id="delete-user-email"></p>
-                    <p class="text-sm text-secondary" id="delete-user-id"></p>
+                    <div class="mb-3">
+                        <label for="deletion-reason" class="form-label small fw-medium text-glass mb-2">削除理由 <span class="text-danger">*</span></label>
+                        <textarea
+                            id="deletion-reason"
+                            class="form-control glass-input"
+                            rows="3"
+                            placeholder="削除理由を入力してください（必須）"
+                            required></textarea>
+                        <p class="small text-secondary mt-1 mb-0">この情報は監査ログに記録されます</p>
+                    </div>
+
+                    <div class="alert alert-danger glass-alert" role="alert">
+                        <p class="small text-danger mb-0">
+                            ⚠️ この操作は取り消せません。ユーザーのデータが完全に削除されます。
+                        </p>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 justify-content-end gap-2">
+                    <button type="button" onclick="cancelDeletion()" class="btn btn-secondary" data-bs-dismiss="modal">
+                        キャンセル
+                    </button>
+                    <button type="button" id="confirm-delete-btn" onclick="confirmDeletion()" class="btn btn-danger">
+                        削除実行
+                    </button>
                 </div>
             </div>
-
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-light mb-2">削除理由 <span class="text-danger">*</span></label>
-                <textarea
-                    id="deletion-reason"
-                    class="w-full p-3 bg-secondary border border-secondary rounded-lg text-white resize-none"
-                    rows="3"
-                    placeholder="削除理由を入力してください（必須）"
-                    required></textarea>
-                <p class="text-xs text-secondary mt-1">この情報は監査ログに記録されます</p>
-            </div>
-
-            <div class="bg-danger bg-opacity-25 border border-danger p-3 rounded-lg mb-4">
-                <p class="text-danger text-sm">
-                    ⚠️ この操作は取り消せません。ユーザーのデータが完全に削除されます。
-                </p>
-            </div>
-
-            <div class="flex gap-3">
-                <button
-                    onclick="cancelDeletion()"
-                    class="btn btn-secondary flex-grow-1 py-2 px-3">
-                    キャンセル
-                </button>
-                <button
-                    id="confirm-delete-btn"
-                    onclick="confirmDeletion()"
-                    class="btn btn-danger flex-grow-1 py-2 px-3">
-                    削除実行
-                </button>
-            </div>
         </div>
+        <div class="modal-backdrop glass-backdrop"></div>
     </div>
 
     <!-- 削除ログモーダル -->
-    <div id="logs-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
-        <div class="glass-panel rounded-xl p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-semibold text-white">📋 削除ログ</h3>
-                <button
-                    onclick="closeDeletionLogs()"
-                    class="text-secondary hover:text-white text-2xl">✕</button>
-            </div>
-
-            <div id="logs-content">
-                <div id="logs-loading" class="p-8 text-center text-secondary">
-                    <div class="loading-spinner w-8 h-8 border-2 border-secondary border-t-transparent rounded-full mx-auto mb-2"></div>
-                    削除ログを読み込み中...
+    <div id="logs-modal" class="modal fade glass-modal" tabindex="-1" role="dialog" aria-modal="true" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl" role="document">
+            <div class="modal-content glass-card border-0">
+                <div class="modal-header border-0 pb-0">
+                    <h3 class="modal-title fs-5 fw-bold text-white">📋 削除ログ</h3>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" onclick="closeDeletionLogs()"></button>
                 </div>
-                <div id="logs-table-content" class="hidden">
-                    <div class="bg-secondary rounded-lg overflow-hidden">
-                        <table class="w-full">
-                            <thead class="bg-dark">
-                                <tr>
-                                    <th class="px-4 py-3 text-left text-sm font-medium text-light">削除日時</th>
-                                    <th class="px-4 py-3 text-left text-sm font-medium text-light">実行者</th>
-                                    <th class="px-4 py-3 text-left text-sm font-medium text-light">対象ユーザー</th>
-                                    <th class="px-4 py-3 text-left text-sm font-medium text-light">削除理由</th>
-                                    <th class="px-4 py-3 text-left text-sm font-medium text-light">タイプ</th>
-                                </tr>
-                            </thead>
-                            <tbody id="logs-table-body" class="divide-y divide-gray-700">
-                            </tbody>
-                        </table>
+
+                <div class="modal-body">
+                    <div id="logs-content">
+                        <div id="logs-loading" class="p-5 text-center text-secondary">
+                            <div class="spinner-border text-secondary mx-auto mb-2" role="status"></div>
+                            削除ログを読み込み中...
+                        </div>
+                        <div id="logs-table-content" class="d-none">
+                            <div class="bg-secondary rounded-3 overflow-hidden">
+                                <table class="table table-dark table-striped mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th class="px-3 py-2 text-start small fw-medium text-light">削除日時</th>
+                                            <th class="px-3 py-2 text-start small fw-medium text-light">実行者</th>
+                                            <th class="px-3 py-2 text-start small fw-medium text-light">対象ユーザー</th>
+                                            <th class="px-3 py-2 text-start small fw-medium text-light">削除理由</th>
+                                            <th class="px-3 py-2 text-start small fw-medium text-light">タイプ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="logs-table-body">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
+        <div class="modal-backdrop glass-backdrop"></div>
     </div>
+
+    <!-- Bootstrap JavaScript Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+    <?!= include('SharedModals'); ?>
 
     <script>
         let currentUserInfo = null;
@@ -273,22 +282,18 @@
         // メッセージ表示関数
         function showMessage(message, type = 'info') {
             const messageArea = document.getElementById('message-area');
-            const colors = {
-                success: 'bg-success bg-opacity-25 border-success text-green-100',
-                error: 'bg-danger bg-opacity-25 border-danger text-danger',
-                warning: 'bg-warning bg-opacity-25 border-warning text-warning',
-                info: 'bg-primary bg-opacity-25 border-primary text-primary'
+            // Bootstrapのalertクラスを使用
+            const alertClass = {
+                success: 'alert-success',
+                error: 'alert-danger',
+                warning: 'alert-warning',
+                info: 'alert-info'
             };
 
             messageArea.innerHTML = `
-                <div class="message show glass-panel rounded-lg p-4 border ${colors[type]}">
-                    <div class="flex items-center">
-                        <div class="mr-3">
-                            ${type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'}
-                        </div>
-                        <div class="flex-grow-1">${message}</div>
-                        <button onclick="this.closest('.message').style.display='none'" class="ml-4 text-secondary hover:text-white">✕</button>
-                    </div>
+                <div class="alert ${alertClass[type]} alert-dismissible fade show glass-alert" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             `;
         }
@@ -321,8 +326,8 @@
 
             // 現在の状態を表示
             statusElement.innerHTML = isActive
-                ? '<span class="bg-success text-green-100 px-3 py-1 rounded-full">🟢 アクティブ</span>'
-                : '<span class="bg-danger text-danger px-3 py-1 rounded-full">🔴 非アクティブ</span>';
+                ? '<span class="badge bg-success">🟢 アクティブ</span>'
+                : '<span class="badge bg-danger">🔴 非アクティブ</span>';
 
             adminElement.textContent = userInfo.adminEmail || '不明';
             lastUpdatedElement.textContent = userInfo.lastAccessedAt
@@ -344,16 +349,13 @@
             // トグル変更時のイベント
             toggleElement.addEventListener('change', function() {
                 const newStatus = this.checked;
-                const confirmMessage = newStatus
-                    ? 'アプリを有効化しますか？ユーザーがアクセスできるようになります。'
-                    : 'アプリを無効化しますか？ユーザーのアクセスが制限されます。';
-
-                if (confirm(confirmMessage)) {
-                    updateIsActiveStatus(newStatus);
-                } else {
-                    // キャンセル時は元に戻す
-                    this.checked = !newStatus;
-                }
+                // SharedModalsの確認モーダルを使用
+                window.sharedModals.showConfirmation(
+                    newStatus ? 'アプリ有効化の確認' : 'アプリ無効化の確認',
+                    newStatus ? 'アプリを有効化しますか？ユーザーがアクセスできるようになります。' : 'アプリを無効化しますか？ユーザーのアクセスが制限されます。',
+                    () => { updateIsActiveStatus(newStatus); },
+                    () => { this.checked = !newStatus; } // キャンセル時は元に戻す
+                );
             });
         }
 
@@ -370,35 +372,36 @@
                 // ボタン状態を変更
                 updateBtn.disabled = true;
                 updateText.style.display = 'none';
-                updateSpinner.classList.remove('hidden');
+                updateSpinner.classList.remove('d-none'); // hiddenからd-noneに変更
 
-                showMessage(isActive ? 'アプリを有効化中...' : 'アプリを無効化中...', 'info');
+                window.sharedModals.showLoading(isActive ? 'アプリを有効化中...' : 'アプリを無効化中...');
 
                 google.script.run
                     .withSuccessHandler((result) => {
                         if (result.status === 'success') {
-                            showMessage(`✅ ${result.message}`, 'success');
+                            window.sharedModals.showAlert(`✅ ${result.message}`, 'success');
                             // ステータスを再読み込み
                             loadCurrentStatus();
                         } else {
-                            showMessage(`❌ ${result.message}`, 'error');
+                            window.sharedModals.showAlert(`❌ ${result.message}`, 'error');
                         }
                     })
                     .withFailureHandler((error) => {
                         console.error('Update error:', error);
-                        showMessage(`❌ 更新に失敗しました: ${error.message || error}`, 'error');
+                        window.sharedModals.showAlert(`❌ 更新に失敗しました: ${error.message || error}`, 'error');
                     })
                     .updateIsActiveStatus(__USER_ID__, isActive);
 
             } catch (error) {
-                showMessage(`❌ ${error.message}`, 'error');
+                window.sharedModals.showAlert(`❌ ${error.message}`, 'error');
             } finally {
                 // ボタン状態をリセット
                 setTimeout(() => {
                     updateBtn.disabled = false;
                     updateText.style.display = 'inline';
-                    updateSpinner.classList.add('hidden');
+                    updateSpinner.classList.add('d-none');
                     setupInProgress = false;
+                    window.sharedModals.hideModal('loading-modal');
                 }, 1000);
             }
         }
@@ -465,11 +468,11 @@
             const btn = document.getElementById('manage-users-btn');
 
             if (userManagementVisible) {
-                container.classList.add('hidden');
+                container.classList.add('d-none'); // hiddenからd-noneに変更
                 btn.textContent = '👥 ユーザー管理を開く';
                 userManagementVisible = false;
             } else {
-                container.classList.remove('hidden');
+                container.classList.remove('d-none'); // hiddenからd-noneに変更
                 btn.textContent = '👥 ユーザー管理を閉じる';
                 userManagementVisible = true;
                 loadUserList();
@@ -481,8 +484,8 @@
             const loadingDiv = document.getElementById('user-loading');
             const contentDiv = document.getElementById('user-table-content');
 
-            loadingDiv.classList.remove('hidden');
-            contentDiv.classList.add('hidden');
+            loadingDiv.classList.remove('d-none'); // hiddenからd-noneに変更
+            contentDiv.classList.add('d-none'); // hiddenからd-noneに変更
 
             google.script.run
                 .withSuccessHandler((result) => {
@@ -490,12 +493,12 @@
                         currentUserList = result.users;
                         displayUserList(result.users);
                     } else {
-                        showMessage(`ユーザー一覧の取得に失敗しました: ${result.message}`, 'error');
+                        window.sharedModals.showAlert(`ユーザー一覧の取得に失敗しました: ${result.message}`, 'error');
                     }
                     loadingDiv.classList.add('d-none');
                 })
                 .withFailureHandler((error) => {
-                    showMessage(`エラー: ${error.message || error}`, 'error');
+                    window.sharedModals.showAlert(`エラー: ${error.message || error}`, 'error');
                     loadingDiv.classList.add('d-none');
                 })
                 .getAllUsersForAdminForUI(__USER_ID__);
@@ -518,8 +521,8 @@
                 tableBody.innerHTML = users.map(user => {
                     const isActive = user.isActive === true || String(user.isActive).toLowerCase() === 'true';
                     const statusBadge = isActive
-                        ? '<span class="px-2 py-1 bg-success text-green-100 rounded-full text-xs">アクティブ</span>'
-                        : '<span class="px-2 py-1 bg-danger text-danger rounded-full text-xs">非アクティブ</span>';
+                        ? '<span class="badge bg-success">アクティブ</span>'
+                        : '<span class="badge bg-danger">非アクティブ</span>';
 
                     const lastAccess = user.lastAccessedAt
                         ? new Date(user.lastAccessedAt).toLocaleDateString('ja-JP')
@@ -530,17 +533,17 @@
                         : '不明';
 
                     return `
-                        <tr class="hover:bg-secondary bg-opacity-50">
-                            <td class="px-4 py-3 text-sm text-white">${user.adminEmail}</td>
-                            <td class="px-4 py-3 text-sm text-light">${registrationDate}</td>
-                            <td class="px-4 py-3">${statusBadge}</td>
-                            <td class="px-4 py-3 text-sm text-light">${lastAccess}</td>
-                            <td class="px-4 py-3 text-center">
+                        <tr class="glass-panel-hover">
+                            <td class="px-3 py-2 small text-white">${user.adminEmail}</td>
+                            <td class="px-3 py-2 small text-light">${registrationDate}</td>
+                            <td class="px-3 py-2">${statusBadge}</td>
+                            <td class="px-3 py-2 small text-light">${lastAccess}</td>
+                            <td class="px-3 py-2 text-center">
                                 <button
                                     data-user-id="${user.userId}"
                                     data-user-email="${user.adminEmail}"
                                     onclick="showDeleteConfirmation(this.dataset.userId, this.dataset.userEmail)"
-                                    class="btn bg-danger hover:bg-danger text-white px-3 py-1 rounded text-xs">
+                                    class="btn btn-danger btn-sm">
                                     削除
                                 </button>
                             </td>
@@ -549,7 +552,7 @@
                 }).join('');
             }
 
-            contentDiv.classList.remove('hidden');
+            contentDiv.classList.remove('d-none'); // hiddenからd-noneに変更
         }
 
         // 削除確認モーダルを表示
@@ -559,13 +562,17 @@
             document.getElementById('delete-user-email').textContent = userEmail;
             document.getElementById('delete-user-id').textContent = `ID: ${userId}`;
             document.getElementById('deletion-reason').value = '';
-            document.getElementById('delete-modal').classList.remove('hidden');
+            const deleteModal = new bootstrap.Modal(document.getElementById('delete-modal'));
+            deleteModal.show();
         }
 
         // 削除をキャンセル
         function cancelDeletion() {
             userToDelete = null;
-            document.getElementById('delete-modal').classList.add('hidden');
+            const deleteModal = bootstrap.Modal.getInstance(document.getElementById('delete-modal'));
+            if (deleteModal) {
+                deleteModal.hide();
+            }
         }
 
         // 削除を実行
@@ -574,7 +581,7 @@
 
             const reason = document.getElementById('deletion-reason').value.trim();
             if (!reason) {
-                showMessage('削除理由を入力してください', 'warning');
+                window.sharedModals.showAlert('削除理由を入力してください', 'warning');
                 return;
             }
 
@@ -585,17 +592,17 @@
             google.script.run
                 .withSuccessHandler((result) => {
                     if (result.status === 'success') {
-                        showMessage(`✅ ${result.message}`, 'success');
+                        window.sharedModals.showAlert(`✅ ${result.message}`, 'success');
                         cancelDeletion();
                         loadUserList(); // ユーザー一覧を再読み込み
                     } else {
-                        showMessage(`❌ ${result.message}`, 'error');
+                        window.sharedModals.showAlert(`❌ ${result.message}`, 'error');
                     }
                     confirmBtn.disabled = false;
                     confirmBtn.textContent = '削除実行';
                 })
                 .withFailureHandler((error) => {
-                    showMessage(`❌ 削除に失敗しました: ${error.message || error}`, 'error');
+                    window.sharedModals.showAlert(`❌ 削除に失敗しました: ${error.message || error}`, 'error');
                     confirmBtn.disabled = false;
                     confirmBtn.textContent = '削除実行';
                 })
@@ -604,25 +611,25 @@
 
         // 削除ログを表示
         function viewDeletionLogs() {
-            const modal = document.getElementById('logs-modal');
+            const logsModal = new bootstrap.Modal(document.getElementById('logs-modal'));
             const loadingDiv = document.getElementById('logs-loading');
             const contentDiv = document.getElementById('logs-table-content');
 
-            modal.classList.remove('hidden');
-            loadingDiv.classList.remove('hidden');
-            contentDiv.classList.add('hidden');
+            logsModal.show();
+            loadingDiv.classList.remove('d-none');
+            contentDiv.classList.add('d-none');
 
             google.script.run
                 .withSuccessHandler((result) => {
                     if (result.status === 'success') {
                         displayDeletionLogs(result.logs);
                     } else {
-                        showMessage(`ログの取得に失敗しました: ${result.message}`, 'error');
+                        window.sharedModals.showAlert(`ログの取得に失敗しました: ${result.message}`, 'error');
                     }
                     loadingDiv.classList.add('d-none');
                 })
                 .withFailureHandler((error) => {
-                    showMessage(`エラー: ${error.message || error}`, 'error');
+                    window.sharedModals.showAlert(`エラー: ${error.message || error}`, 'error');
                     loadingDiv.classList.add('d-none');
                 })
                 .getDeletionLogsForUI(__USER_ID__);
@@ -636,7 +643,7 @@
             if (logs.length === 0) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="5" class="px-4 py-8 text-center text-secondary">
+                        <td colspan="5" class="px-3 py-4 text-center text-secondary">
                             削除ログが見つかりません
                         </td>
                     </tr>
@@ -648,23 +655,26 @@
                     const typeText = log.deleteType === 'admin' ? '管理者削除' : '自己削除';
 
                     return `
-                        <tr class="hover:bg-secondary bg-opacity-50">
-                            <td class="px-4 py-3 text-sm text-light">${deleteDate}</td>
-                            <td class="px-4 py-3 text-sm text-white">${log.executorEmail}</td>
-                            <td class="px-4 py-3 text-sm text-info">${log.targetEmail}</td>
-                            <td class="px-4 py-3 text-sm text-light">${log.reason || '理由なし'}</td>
-                            <td class="px-4 py-3 text-sm ${typeColor}">${typeText}</td>
+                        <tr class="glass-panel-hover">
+                            <td class="px-3 py-2 small text-light">${deleteDate}</td>
+                            <td class="px-3 py-2 small text-white">${log.executorEmail}</td>
+                            <td class="px-3 py-2 small text-info">${log.targetEmail}</td>
+                            <td class="px-3 py-2 small text-light">${log.reason || '理由なし'}</td>
+                            <td class="px-3 py-2 small ${typeColor}">${typeText}</td>
                         </tr>
                     `;
                 }).join('');
             }
 
-            contentDiv.classList.remove('hidden');
+            contentDiv.classList.remove('d-none');
         }
 
         // 削除ログモーダルを閉じる
         function closeDeletionLogs() {
-            document.getElementById('logs-modal').classList.add('hidden');
+            const logsModal = bootstrap.Modal.getInstance(document.getElementById('logs-modal'));
+            if (logsModal) {
+                logsModal.hide();
+            }
         }
     </script>
 </body>

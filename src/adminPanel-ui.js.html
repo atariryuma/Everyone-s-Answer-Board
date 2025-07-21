@@ -1813,22 +1813,6 @@ function checkStep2Completion() {
   return !!(currentStatus && currentStatus.activeSheetName);
 }
 
-// セクションを無効化
-function disableSection(section, message) {
-  if (!section) return;
-
-  section.style.opacity = '0.5';
-  section.style.pointerEvents = 'none';
-
-  // 警告メッセージを追加
-  const existingWarning = section.querySelector('.step-warning');
-  if (!existingWarning) {
-    const warning = document.createElement('div');
-    warning.className = 'step-warning bg-yellow-100 border border-yellow-300 rounded-lg p-3 mb-4 text-sm text-yellow-800';
-    warning.innerHTML = `<span class="font-semibold">${message}</span>`;
-    section.insertBefore(warning, section.firstChild);
-  }
-}
 
 // セクションを有効化
 function enableSection(section) {
