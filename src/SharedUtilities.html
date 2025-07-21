@@ -725,6 +725,8 @@ class UnifiedLoadingManager {
     // Update content and show the overlay
     this.updateContent(config);
     this.overlay.classList.remove('hidden');
+    this.overlay.style.display = 'flex'; // 明示的にdisplayをflexに設定
+    this.overlay.style.visibility = 'visible'; // 明示的にvisibilityをvisibleに設定
     
     // Manage user interaction
     if (config.disableInteraction && config.type !== 'transparent') {
@@ -742,6 +744,8 @@ class UnifiedLoadingManager {
     if (!this.overlay) return;
     
     this.overlay.classList.add('hidden');
+    this.overlay.style.display = 'none'; // 明示的にdisplayをnoneに設定
+    this.overlay.style.visibility = 'hidden'; // 明示的にvisibilityをhiddenに設定
     
     // Restore interaction
     document.body.style.overflow = '';
