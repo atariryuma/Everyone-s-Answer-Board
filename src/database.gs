@@ -472,28 +472,41 @@ function findUserByEmail(email) {
   return cacheManager.get(
     cacheKey,
     function() { 
-      // ExecutionContextManager経由でコンテキストを取得
-      var context = null;
-      if (typeof ExecutionContextManager !== 'undefined') {
-        context = ExecutionContextManager.getCurrent();
-      }
-      return fetchUserFromDatabase('adminEmail', email, context); 
+      // ログイン関連: 循環依存を避けるため最適化を使用しない
+      return fetchUserFromDatabase('adminEmail', email, null); 
     },
     { ttl: 300, enableMemoization: true }
   );
 }
 
 /**
+ * ログイン関数専用：メールアドレスでユーザーを直接検索（最適化除外）
+ * @param {string} email - メールアドレス
+ * @returns {object|null} ユーザー情報
+ */
+function findUserByEmailDirect(email) {
+  if (!email) {
+    debugLog('findUserByEmailDirect: 空のメールアドレスが渡されました');
+    return null;
+  }
+  
+  // ExecutionContextManager最適化を完全に除外してデータベースから直接取得
+  return fetchUserFromDatabase('adminEmail', email, null);
+}
+
+/**
  * データベースからユーザーを取得
  * @param {string} field - 検索フィールド
  * @param {string} value - 検索値
+ * @param {object|null} executionContext - 実行コンテキスト（nullの場合は最適化除外）
  * @returns {object|null} ユーザー情報
  */
 function fetchUserFromDatabase(field, value, executionContext) {
   try {
     // ExecutionContextManagerを使用してコンテキストを取得または作成
+    // executionContextがnullの場合は最適化を除外（循環依存防止）
     var contextToUse = executionContext;
-    if (!contextToUse && typeof ExecutionContextManager !== 'undefined') {
+    if (!contextToUse && executionContext !== null && typeof ExecutionContextManager !== 'undefined') {
       contextToUse = ExecutionContextManager.getOrCreate();
     }
     
@@ -635,6 +648,24 @@ function getUserWithFallback(userId) {
 }
 
 /**
+ * ユーザーの特定フィールドを更新（ログイン関数専用）
+ * @param {string} userId - ユーザーID
+ * @param {string} fieldName - フィールド名
+ * @param {*} fieldValue - 新しい値
+ * @returns {boolean} 更新成功の可否
+ */
+function updateUserField(userId, fieldName, fieldValue) {
+  try {
+    var updateData = {};
+    updateData[fieldName] = fieldValue;
+    return updateUser(userId, updateData);
+  } catch (error) {
+    console.error('updateUserField エラー:', error.message);
+    return false;
+  }
+}
+
+/**
  * ユーザー情報を一括更新
  * @param {string} userId - ユーザーID
  * @param {object} updateData - 更新データ
@@ -644,7 +675,8 @@ function updateUser(userId, updateData) {
   try {
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    var service = getSheetsService();
+    // ログイン関連の更新のため、ExecutionContextManager最適化を除外
+    var service = getSheetsService(null);
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
     // 現在のデータを取得
@@ -723,15 +755,16 @@ function createUser(userData) {
   lock.waitLock(10000);
 
   try {
-    // メールアドレスの重複チェック
-    var existingUser = findUserByEmail(userData.adminEmail);
+    // メールアドレスの重複チェック（ログイン関数のため最適化除外）
+    var existingUser = findUserByEmailDirect(userData.adminEmail);
     if (existingUser) {
       throw new Error('このメールアドレスは既に登録されています。');
     }
 
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    var service = getSheetsService();
+    // ユーザー作成はログイン関連のため、ExecutionContextManager最適化を除外
+    var service = getSheetsService(null);
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
     var newRow = DB_SHEET_CONFIG.HEADERS.map(function(header) {

@@ -483,7 +483,7 @@ function preWarmCache(activeUserEmail) {
     // 2. ユーザー情報の事前取得（メール/ID両方）
     if (activeUserEmail) {
       try {
-        const userInfo = findUserByEmail(activeUserEmail);
+        const userInfo = findUserByEmailDirect(activeUserEmail);
         if (userInfo) {
           results.preWarmedItems.push('user_by_email');
           

@@ -17,7 +17,12 @@ var runtimeUserInfo = null;
 var globalExecutionContext = null;
 
 /**
- * ExecutionContextManager - システム全体の最適化を管理
+ * 循環依存防止フラグ
+ */
+var contextCreationInProgress = false;
+
+/**
+ * ExecutionContextManager - システム全体の最適化を管理（循環依存対応版）
  */
 const ExecutionContextManager = {
   /**
@@ -26,6 +31,12 @@ const ExecutionContextManager = {
    * @returns {object} ExecutionContext
    */
   getOrCreate(userId) {
+    // 循環依存検出: コンテキスト作成中は BasicContext を返す
+    if (contextCreationInProgress) {
+      console.warn('🔄 ExecutionContextManager: 循環依存検出 - BasicContextで処理継続');
+      return this.createBasicContext();
+    }
+    
     // 既存のコンテキストがあり、同一ユーザーの場合は再利用
     if (globalExecutionContext && 
         (!userId || globalExecutionContext.requestUserId === userId)) {
@@ -33,6 +44,7 @@ const ExecutionContextManager = {
     }
     
     // 新しいコンテキストを作成
+    contextCreationInProgress = true;
     try {
       const actualUserId = userId || getUserId();
       globalExecutionContext = createExecutionContext(actualUserId);
@@ -40,6 +52,53 @@ const ExecutionContextManager = {
       return globalExecutionContext;
     } catch (error) {
       console.warn('⚠️ ExecutionContextManager: コンテキスト作成失敗:', error.message);
+      // フォールバック: BasicContextを返す
+      return this.createBasicContext();
+    } finally {
+      contextCreationInProgress = false;
+    }
+  },
+
+  /**
+   * ユーザー情報なしで動作するBasicContextを作成
+   * @returns {object} BasicExecutionContext
+   */
+  createBasicContext() {
+    try {
+      console.log('🔧 ExecutionContextManager: BasicContext作成');
+      return {
+        // 基本情報
+        requestUserId: null,
+        startTime: new Date().getTime(),
+        basicMode: true,
+        
+        // 共有リソース（ユーザー情報なしで取得可能）
+        sheetsService: getSheetsService(), // 循環依存を避けるため直接呼び出し
+        userInfo: null,
+        
+        // 実行レベルキャッシュ
+        sheetsDataCache: {},
+        userDataCache: {},
+        spreadsheetMetadataCache: {},
+        
+        // 変更トラッキング
+        pendingUpdates: {},
+        configChanges: {},
+        hasChanges: false,
+        
+        // パフォーマンス情報
+        stats: {
+          basicMode: true,
+          sheetsServiceCreations: 1,
+          dbQueries: 0,
+          cacheHits: 0,
+          operationsCount: 0,
+          dataRetrievals: 0,
+          cacheSkips: 0
+        }
+      };
+    } catch (error) {
+      console.error('❌ BasicContext作成エラー:', error.message);
       return null;
     }
   },
