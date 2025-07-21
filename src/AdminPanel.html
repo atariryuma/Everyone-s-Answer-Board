@@ -16,14 +16,14 @@
 
   <!-- Shared TailwindCSS Configuration -->
   <?!= include('SharedTailwindConfig'); ?>
-  
-  <!-- Admin Panel Specific Styles - Tailwind CDNの後に読み込んで適切なカスケードを確保 -->
-  <?!= include('adminPanel-layout.css'); ?>
-  <?!= include('adminPanel.css'); ?>
 
   <!-- Unified Styles and Shared Components -->
   <?!= include('UnifiedStyles'); ?>
   <?!= include('SharedUtilities'); ?>
+  
+  <!-- Admin Panel Specific Styles -->
+  <?!= include('adminPanel-layout.css'); ?>
+  <?!= include('adminPanel.css'); ?>
   
   
   <!-- Core JavaScript Libraries (must be loaded first) -->

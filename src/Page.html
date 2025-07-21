@@ -35,10 +35,6 @@
   
   <!-- Shared TailwindCSS Configuration -->
   <?!= include('SharedTailwindConfig'); ?>
-  
-  <!-- Custom CSS - Tailwind CDNの後に読み込んで適切なカスケードを確保 -->
-  <?!= include('page.css'); ?>
-  
   <script>
     const DEBUG_MODE = '<?= typeof DEBUG_MODE !== "undefined" ? DEBUG_MODE : "false" ?>' === 'true';
     function debugLog() {
@@ -140,6 +136,7 @@
     }
   </script>
   <?!= include('SharedUtilities'); ?>
+  <?!= include('page.css'); ?>
 
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans">
