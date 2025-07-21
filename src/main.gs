@@ -721,6 +721,17 @@ function buildUserAdminUrl(userId) {
   return `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
 }
 
+/**
+ * 指定されたURLへリダイレクトするサーバーサイド関数
+ * @param {string} url - リダイレクト先のURL
+ * @returns {HtmlOutput} リダイレクトを実行するHTML出力
+ */
+function redirectToUrl(url) {
+  // XSS攻撃を防ぐため、URLをサニタイズ
+  const sanitizedUrl = sanitizeRedirectUrl(url);
+  return HtmlService.createHtmlOutput().setContent(`<script>window.top.location.href = '${sanitizedUrl}';</script>`);
+}
+
 
 /**
  * セキュアなリダイレクトHTMLを作成 (シンプル版)

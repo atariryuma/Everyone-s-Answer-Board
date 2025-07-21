@@ -528,10 +528,17 @@ function openAppSetupPage() {
     .then(function(webAppUrl) {
       const setupUrl =
         webAppUrl + '?setup=true&mode=appsetup&userId=' + encodeURIComponent(userId);
-      window.location.href = setupUrl;
+      // サーバーサイドのリダイレクト関数を呼び出す
+      google.script.run
+        .withSuccessHandler(function() { /* リダイレクトはサーバーサイドで行われるため、ここでは何もしない */ })
+        .withFailureHandler(function(error) {
+          console.error('Failed to redirect to app setup page:', error);
+          showMessage('アプリ設定ページへのリダイレクトに失敗しました。', 'error');
+        })
+        .redirectToUrl(setupUrl);
     })
     .catch(function(error) {
-      console.error('Failed to get web app URL:', error);
+      console.error('Failed to get web app URL for app setup page:', error);
       showMessage('アプリ設定ページのURLを取得できませんでした。', 'error');
     });
 }
