@@ -1176,13 +1176,11 @@ function getActiveFormInfo(context, requestUserId) {
     var answerCount = 0;
     try {
       if (configJson.publishedSpreadsheetId && configJson.publishedSheet) {
-        if (configJson.publishedSpreadsheetId && configJson.publishedSheet) {
         var responseData = getResponsesData(context, currentUserId, configJson.publishedSheet);
         if (responseData.status === 'success') {
           answerCount = responseData.data.length;
         }
-      }
-    } catch (countError) {
+      } catch (countError) {
       console.warn('回答数の取得に失敗: ' + countError.message);
     }
 
