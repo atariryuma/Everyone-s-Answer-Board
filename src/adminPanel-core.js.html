@@ -12,7 +12,7 @@ const DEBUG_MODE = window.DEBUG_MODE || false;
 
 function adminLog(level, ...args) {
   if (!DEBUG_MODE) return;
-  
+
   switch (level) {
     case 'error':
       console.error('[AdminPanel]', ...args);
@@ -66,10 +66,10 @@ var cacheElements = dom.cacheElements.bind(dom);
 // Utility for setting up multiple event listeners efficiently
 function setupMultipleListeners(elementHandlerMap) {
   Object.keys(elementHandlerMap).forEach(function(elementId) {
-    var element = elementId.startsWith('#') ? 
-      document.querySelector(elementId) : 
+    var element = elementId.startsWith('#') ?
+      document.querySelector(elementId) :
       (elements[elementId] || getCachedElement(elementId));
-    
+
     if (element) {
       var handlers = elementHandlerMap[elementId];
       if (Array.isArray(handlers)) {
@@ -117,7 +117,7 @@ function setupDelegatedHandler(parentElement, selector, event, callback) {
   if (typeof parentElement === 'string') {
     parentElement = getCachedElement(parentElement);
   }
-  
+
   if (parentElement) {
     addSafeEventListener(parentElement, event, function(e) {
       var target = e.target.closest(selector);
@@ -139,12 +139,12 @@ var userId = '';
 function initializeUserId() {
   console.group('🔐 Initializing UserId');
   console.log('📞 About to call getCurrentUserStatus');
-  
+
   return new Promise((resolve, reject) => {
     google.script.run
       .withSuccessHandler(response => {
         console.log('📥 getCurrentUserStatus response:', response);
-        
+
         if (response && response.status === 'success' && response.userInfo && response.userInfo.userId) {
           userId = response.userInfo.userId;
           console.log('✅ AdminPanel: User authenticated, userId:', userId);
@@ -248,7 +248,7 @@ function safeSetHTML(elementId, html) {
 function adjustLayout() {
   var isMobile = window.innerWidth < 768;
   var body = document.body;
-  
+
   if (isMobile) {
     body.classList.add('mobile-layout');
     body.classList.remove('desktop-layout');
@@ -263,18 +263,18 @@ function setLoading(flag, text = '') {
   const overlay = document.getElementById('loading-overlay');
   const loadingText = document.getElementById('loading-text');
   const quickstartProgress = document.getElementById('quickstart-progress');
-  
+
   if (overlay) {
     if (flag) {
       overlay.classList.remove('hidden');
-      
+
       // If QuickStart is active, use lighter overlay
       if (quickstartProgress && !quickstartProgress.classList.contains('hidden')) {
         overlay.classList.add('quickstart-active');
       } else {
         overlay.classList.remove('quickstart-active');
       }
-      
+
       if (loadingText && text) {
         loadingText.textContent = text;
       }

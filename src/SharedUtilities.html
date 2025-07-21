@@ -436,11 +436,11 @@ class SecurityUtilities {
     if (!html) return '';
     const div = document.createElement('div');
     div.innerHTML = html;
-    
+
     // Remove script tags and other dangerous elements
     const scripts = div.querySelectorAll('script, object, embed, iframe, form');
     scripts.forEach(script => script.remove());
-    
+
     return div.innerHTML;
   }
 
@@ -627,8 +627,8 @@ window.sharedUtilities.auth = {
     if (!container) return;
 
     // Safely escape email with fallback
-    const safeEmail = window.sharedUtilities && window.sharedUtilities.security 
-      ? window.sharedUtilities.security.escapeHtml(email) 
+    const safeEmail = window.sharedUtilities && window.sharedUtilities.security
+      ? window.sharedUtilities.security.escapeHtml(email)
       : (email || '').replace(/[<>&"']/g, function(match) {
           switch (match) {
             case '<': return '&lt;';

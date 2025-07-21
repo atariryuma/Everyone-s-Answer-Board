@@ -12,7 +12,7 @@ var elements = {};
 
 function setupEventListeners() {
   console.log('✅ AdminPanel: Initializing event handlers');
-  
+
   // Cache frequently used elements
   elements = {
     'sheet-select': getCachedElement('sheet-select'),
@@ -22,13 +22,13 @@ function setupEventListeners() {
     'open-spreadsheet-btn': getCachedElement('open-spreadsheet-btn'),
     'open-form-btn': getCachedElement('open-form-btn')
   };
-  
+
   // Sheet selection handler
   if (elements['sheet-select']) {
     elements['sheet-select'].addEventListener('change', function(e) {
       selectedSheet = e.target.value;
       updateUIForSelectedSheet();
-      
+
       if (selectedSheet) {
         console.log('Sheet selected:', selectedSheet);
         loadConfigForSelected();
@@ -37,13 +37,13 @@ function setupEventListeners() {
       }
     });
   }
-  
+
   // AI column detection button
   var reguessBtn = document.getElementById('reguess-headers-btn');
   if (reguessBtn) {
     reguessBtn.addEventListener('click', runHeaderGuessing);
   }
-  
+
   // Save and publish button
   if (elements['save-publish-btn']) {
     elements['save-publish-btn'].addEventListener('click', function() {
@@ -54,7 +54,7 @@ function setupEventListeners() {
       saveAndPublish();
     });
   }
-  
+
   // Unpublish button
   if (elements['unpublish-board-btn']) {
     elements['unpublish-board-btn'].addEventListener('click', function() {
@@ -65,7 +65,7 @@ function setupEventListeners() {
       );
     });
   }
-  
+
   // クイックスタートボタンのイベントリスナー
   var quickstartBtn = document.getElementById('quickstart-btn');
   if (quickstartBtn) {
@@ -103,25 +103,25 @@ function setupEventListeners() {
       showFormConfigModal();
     });
   }
-  
+
   // Form configuration modal handlers
   setupFormConfigModalHandlers();
-  
+
   // Resource management
   setupResourceHandlers();
-  
+
   // Account management
   setupAccountManagementHandlers();
-  
+
   // External links
   setupExternalLinkHandlers();
-  
+
   // Modal handlers
   setupModalHandlers();
-  
+
   // Real-time validation
   setupRealtimeValidation();
-  
+
   console.log('✅ AdminPanel: Event handlers ready');
 }
 
@@ -133,15 +133,15 @@ function setupFormConfigModalHandlers() {
   var formConfigClose = document.getElementById('form-config-close');
   var formConfigCancel = document.getElementById('form-config-cancel');
   var formConfigCreate = document.getElementById('form-config-create');
-  
+
   if (formConfigClose) {
     formConfigClose.addEventListener('click', hideFormConfigModal);
   }
-  
+
   if (formConfigCancel) {
     formConfigCancel.addEventListener('click', hideFormConfigModal);
   }
-  
+
   if (formConfigCreate) {
     formConfigCreate.addEventListener('click', createFormWithConfig);
   }
@@ -154,11 +154,11 @@ function setupFormConfigModalHandlers() {
 function setupResourceHandlers() {
   var addResourceBtn = document.getElementById('add-resource-btn');
   var resourceUrlInput = document.getElementById('resource-url-input');
-  
+
   if (addResourceBtn) {
     addResourceBtn.addEventListener('click', addResource);
   }
-  
+
   if (resourceUrlInput) {
     resourceUrlInput.addEventListener('keypress', function(e) {
       if (e.key === 'Enter') {
@@ -178,7 +178,7 @@ function setupAccountManagementHandlers() {
   if (elements['delete-account-btn']) {
     elements['delete-account-btn'].addEventListener('click', handleDeleteRequest);
   }
-  
+
   // Switch account handlers
   var switchAccountBtns = document.querySelectorAll('[onclick*="switchToAnotherAccount"]');
   switchAccountBtns.forEach(function(btn) {
@@ -198,24 +198,24 @@ function setupExternalLinkHandlers() {
   if (elements['open-spreadsheet-btn']) {
     elements['open-spreadsheet-btn'].addEventListener('click', openDatabaseSpreadsheet);
   }
-  
+
   // Open form
   if (elements['open-form-btn']) {
     elements['open-form-btn'].addEventListener('click', openForm);
   }
-  
+
   // Digital citizenship
   var digitalCitizenshipBtn = document.getElementById('digital-citizenship-btn');
   if (digitalCitizenshipBtn) {
     digitalCitizenshipBtn.addEventListener('click', showDigitalCitizenshipModal);
   }
-  
+
   // Copy board URL
   var copyUrlBtn = document.getElementById('copy-url-btn');
   if (copyUrlBtn) {
     copyUrlBtn.addEventListener('click', copyBoardUrl);
   }
-  
+
   // Copy form URL
   var copyFormUrlBtn = document.getElementById('copy-form-url-btn');
   if (copyFormUrlBtn) {
@@ -231,33 +231,33 @@ function setupModalHandlers() {
   // Privacy modal
   var privacyClose = document.getElementById('privacy-modal-close');
   var privacyCancel = document.getElementById('privacy-modal-cancel');
-  
+
   if (privacyClose) {
     privacyClose.addEventListener('click', hidePrivacyModal);
   }
-  
+
   if (privacyCancel) {
     privacyCancel.addEventListener('click', hidePrivacyModal);
   }
-  
+
   // Digital citizenship modal
   var dcClose = document.getElementById('digital-citizenship-close');
   if (dcClose) {
     dcClose.addEventListener('click', hideDigitalCitizenshipModal);
   }
-  
+
   // Confirmation modal
   var confirmClose = document.getElementById('confirmation-modal-close');
   var confirmCancel = document.getElementById('confirmation-modal-cancel');
-  
+
   if (confirmClose) {
     confirmClose.addEventListener('click', hideConfirmationModal);
   }
-  
+
   if (confirmCancel) {
     confirmCancel.addEventListener('click', hideConfirmationModal);
   }
-  
+
   // Close modals on backdrop click
   setupBackdropClickHandlers();
 }
@@ -273,7 +273,7 @@ function setupBackdropClickHandlers() {
     'digital-citizenship-modal',
     'confirmation-modal'
   ];
-  
+
   modals.forEach(function(modalId) {
     var modal = document.getElementById(modalId);
     if (modal) {
@@ -310,19 +310,19 @@ function setupRealtimeValidation() {
   if (opinionSelect) {
     opinionSelect.addEventListener('change', updateConfigButtons);
   }
-  
+
   // Show names checkbox
   var showNamesCheckbox = document.getElementById('show-names');
   if (showNamesCheckbox) {
     showNamesCheckbox.addEventListener('change', updateConfigButtons);
   }
-  
+
   // Show counts checkbox
   var showCountsCheckbox = document.getElementById('show-counts');
   if (showCountsCheckbox) {
     showCountsCheckbox.addEventListener('change', updateConfigButtons);
   }
-  
+
   // Name column validation
   var nameSelect = document.getElementById('name-column');
   if (nameSelect) {
@@ -439,16 +439,16 @@ function switchToAnotherAccount() {
 // Update UI for selected sheet
 function updateUIForSelectedSheet() {
   var hasSelection = selectedSheet && selectedSheet.trim() !== '';
-  
+
   // Update step indicators
   updateStepIndicators(hasSelection ? 3 : 2);
-  
+
   // Enable/disable configuration section
   var configSection = document.getElementById('config-section');
   if (configSection) {
     if (hasSelection) {
       configSection.classList.remove('opacity-50', 'pointer-events-none');
-      
+
       // 防御的ロジック: config-areaが確実に表示されるようにする
       var configArea = document.getElementById('config-area');
       if (configArea) {
@@ -459,7 +459,7 @@ function updateUIForSelectedSheet() {
       configSection.classList.add('opacity-50', 'pointer-events-none');
     }
   }
-  
+
   // Update guidance text
   var guidanceText = document.getElementById('guidance-text');
   if (guidanceText) {
@@ -494,14 +494,14 @@ document.addEventListener('keydown', function(e) {
       saveAndPublish();
     }
   }
-  
+
   // Escape to close modals
   if (e.key === 'Escape') {
     var openModals = document.querySelectorAll('.modal:not(.hidden)');
     if (openModals.length > 0) {
       var lastModal = openModals[openModals.length - 1];
       var modalId = lastModal.id;
-      
+
       switch(modalId) {
         case 'form-config-modal':
           hideFormConfigModal();
@@ -528,7 +528,7 @@ document.addEventListener('keydown', function(e) {
 if ('ontouchstart' in window) {
   // Add touch-friendly classes
   document.body.classList.add('touch-device');
-  
+
   // Improve button tap targets
   var buttons = document.querySelectorAll('button, .btn');
   buttons.forEach(function(button) {
@@ -544,11 +544,11 @@ if ('ontouchstart' in window) {
 function manageFocusForModal(modalId, show) {
   var modal = document.getElementById(modalId);
   if (!modal) return;
-  
+
   if (show) {
     // Store currently focused element
     modal.setAttribute('data-previous-focus', document.activeElement?.id || '');
-    
+
     // Focus first interactive element in modal
     var firstFocusable = modal.querySelector('button, input, textarea, select, [tabindex]:not([tabindex="-1"])');
     if (firstFocusable) {

@@ -26,9 +26,9 @@ function include(path) {
  */
 function escapeJavaScript(str) {
   if (!str) return '';
-  
+
   const strValue = str.toString();
-  
+
   // URL判定: HTTP/HTTPSで始まり、すでに適切にエスケープされている場合は最小限の処理
   if (strValue.match(/^https?:\/\/[^\s<>"']+$/)) {
     // URLの場合はバックスラッシュと改行文字のみエスケープ
@@ -38,7 +38,7 @@ function escapeJavaScript(str) {
       .replace(/\r/g, '\\r')
       .replace(/\t/g, '\\t');
   }
-  
+
   // 通常のテキストの場合は従来通りの完全エスケープ
   return strValue
     .replace(/\\/g, '\\\\')
@@ -155,10 +155,10 @@ var ULTRA_CONFIG = {
     BATCH_SIZE: 100,
     API_RATE_LIMIT: 90 // 100秒間隔での制限
   },
-  
+
   CACHE_STRATEGY: {
     L1_TTL: 300,     // Level 1: 5分
-    L2_TTL: 3600,    // Level 2: 1時間  
+    L2_TTL: 3600,    // Level 2: 1時間
     L3_TTL: 21600    // Level 3: 6時間（最大）
   }
 };
@@ -188,7 +188,7 @@ function log(level, message, details) {
       default:
         console.log(message, details || '');
     }
-    
+
     if (typeof globalProfiler !== 'undefined') {
       globalProfiler.end('logging');
     }
@@ -214,7 +214,7 @@ function getDeployUserDomainInfo() {
   try {
     var activeUserEmail = Session.getActiveUser().getEmail();
     var currentDomain = getEmailDomain(activeUserEmail);
-    
+
     // 統一されたURL取得システムを使用（開発URL除去機能付き）
     var webAppUrl = getWebAppUrlCached();
     var deployDomain = ''; // 個人アカウント/グローバルアクセスの場合、デフォルトで空
@@ -288,10 +288,10 @@ function showRegistrationPage() {
   try {
     var template = HtmlService.createTemplateFromFile('LoginPage');
     template.include = include;
-    
-  
+
+
     // No template variable processing - client will get GOOGLE_CLIENT_ID via server function
-    
+
     var output = template.evaluate()
       .setTitle('ログイン - StudyQuest');
     return safeSetXFrameOptionsDeny(output);
@@ -310,23 +310,23 @@ function getGoogleClientId() {
     console.log('Getting GOOGLE_CLIENT_ID from script properties...');
     var properties = PropertiesService.getScriptProperties();
     var clientId = properties.getProperty('GOOGLE_CLIENT_ID');
-    
+
     console.log('GOOGLE_CLIENT_ID retrieved:', clientId ? 'Found' : 'Not found');
-    
+
     if (!clientId) {
       console.warn('GOOGLE_CLIENT_ID not found in script properties');
-      
+
       // Try to get all properties to see what's available
       var allProperties = properties.getProperties();
       console.log('Available properties:', Object.keys(allProperties));
-      
-      return { 
-        clientId: '', 
+
+      return {
+        clientId: '',
         error: 'GOOGLE_CLIENT_ID not found in script properties',
         setupInstructions: 'Please set GOOGLE_CLIENT_ID in Google Apps Script project settings under Properties > Script Properties'
       };
     }
-    
+
     return { clientId: clientId, success: true };
   } catch (error) {
     console.error('Error getting GOOGLE_CLIENT_ID:', error);
@@ -342,17 +342,17 @@ function checkSystemConfiguration() {
   try {
     var properties = PropertiesService.getScriptProperties();
     var allProperties = properties.getProperties();
-    
+
     var requiredProperties = [
       'GOOGLE_CLIENT_ID',
-      'DATABASE_SPREADSHEET_ID', 
+      'DATABASE_SPREADSHEET_ID',
       'ADMIN_EMAIL',
       'SERVICE_ACCOUNT_CREDS'
     ];
-    
+
     var configStatus = {};
     var missingProperties = [];
-    
+
     requiredProperties.forEach(function(prop) {
       var value = allProperties[prop];
       configStatus[prop] = {
@@ -360,12 +360,12 @@ function checkSystemConfiguration() {
         hasValue: !!(value && value.trim()),
         length: value ? value.length : 0
       };
-      
+
       if (!value || !value.trim()) {
         missingProperties.push(prop);
       }
     });
-    
+
     return {
       isFullyConfigured: missingProperties.length === 0,
       configStatus: configStatus,
@@ -458,7 +458,7 @@ function doGet(e) {
       }
       return renderAnswerBoard(userInfo, params);
     }
-    
+
     // 不明なモードの場合はログインページへ
     return showLoginPage();
 
@@ -522,7 +522,7 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
   // 引数の正規化
   let email = null;
   let userId = null;
-  
+
   if (typeof identifier === 'object' && identifier !== null) {
     // オブジェクト形式の場合（後方互換性）
     email = identifier.email;
@@ -538,9 +538,9 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
 
   // キャッシュキーの生成
   const cacheKey = `unified_user_info_${userId || email}`;
-  
+
   // 実行レベルキャッシュの確認（オプション）
-  if (opts.useExecutionCache && _executionUserInfoCache && 
+  if (opts.useExecutionCache && _executionUserInfoCache &&
       _executionUserInfoCache.userId === userId) {
     return _executionUserInfoCache.userInfo;
   }
@@ -563,11 +563,11 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
 
   // データベースから取得
   let userInfo = null;
-  
+
   if (userId) {
     userInfo = findUserById(userId);
     // セキュリティチェック: 取得した情報のemailが現在のユーザーと一致するか確認
-    if (opts.enableSecurityCheck && userInfo && opts.currentUserEmail && 
+    if (opts.enableSecurityCheck && userInfo && opts.currentUserEmail &&
         userInfo.adminEmail !== opts.currentUserEmail) {
       console.warn('セキュリティチェック失敗: 他人の情報へのアクセス試行');
       return null;
@@ -611,7 +611,7 @@ function showLoginPage() {
   const template = HtmlService.createTemplateFromFile('LoginPage');
   const htmlOutput = template.evaluate()
     .setTitle('StudyQuest - ログイン');
-  
+
   // XFrameOptionsMode を安全に設定
   try {
     if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
@@ -620,7 +620,7 @@ function showLoginPage() {
   } catch (e) {
     console.warn('XFrameOptionsMode設定エラー:', e.message);
   }
-  
+
   return htmlOutput;
 }
 
@@ -632,7 +632,7 @@ function showSetupPage() {
   const template = HtmlService.createTemplateFromFile('SetupPage');
   const htmlOutput = template.evaluate()
     .setTitle('StudyQuest - 初回セットアップ');
-  
+
   // XFrameOptionsMode を安全に設定
   try {
     if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
@@ -641,7 +641,7 @@ function showSetupPage() {
   } catch (e) {
     console.warn('XFrameOptionsMode設定エラー:', e.message);
   }
-  
+
   return htmlOutput;
 }
 
@@ -653,7 +653,7 @@ function showAppSetupPage() {
     const appSetupTemplate = HtmlService.createTemplateFromFile('AppSetupPage');
     const htmlOutput = appSetupTemplate.evaluate()
       .setTitle('アプリ設定 - StudyQuest');
-    
+
     // XFrameOptionsMode を安全に設定
     try {
       if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
@@ -662,7 +662,7 @@ function showAppSetupPage() {
     } catch (e) {
       console.warn('XFrameOptionsMode設定エラー:', e.message);
     }
-    
+
     return htmlOutput;
 }
 
@@ -686,7 +686,7 @@ function showErrorPage(title, message, error) {
   }
   const htmlOutput = template.evaluate()
     .setTitle(`エラー - ${title}`);
-  
+
   // XFrameOptionsMode を安全に設定
   try {
     if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
@@ -695,7 +695,7 @@ function showErrorPage(title, message, error) {
   } catch (e) {
     console.warn('XFrameOptionsMode設定エラー:', e.message);
   }
-  
+
   return htmlOutput;
 }
 
@@ -719,10 +719,10 @@ function buildUserAdminUrl(userId) {
 function createSecureRedirect(targetUrl, message) {
   // URL検証とサニタイゼーション
   const sanitizedUrl = sanitizeRedirectUrl(targetUrl);
-  
+
   console.log('createSecureRedirect - Original URL:', targetUrl);
   console.log('createSecureRedirect - Sanitized URL:', sanitizedUrl);
-  
+
   // ユーザーアクティベーション必須のHTMLアンカー方式（サンドボックス制限準拠）
   const userActionRedirectHtml = `
     <!DOCTYPE html>
@@ -732,7 +732,7 @@ function createSecureRedirect(targetUrl, message) {
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <style>
-        body { 
+        body {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
           min-height: 100vh;
@@ -753,15 +753,15 @@ function createSecureRedirect(targetUrl, message) {
           border: 1px solid rgba(75, 85, 99, 0.3);
         }
         .icon { font-size: 64px; margin-bottom: 20px; }
-        .title { 
-          color: #10b981; 
-          font-size: 24px; 
-          font-weight: bold; 
-          margin-bottom: 16px; 
+        .title {
+          color: #10b981;
+          font-size: 24px;
+          font-weight: bold;
+          margin-bottom: 16px;
         }
-        .subtitle { 
-          color: #d1d5db; 
-          margin-bottom: 32px; 
+        .subtitle {
+          color: #d1d5db;
+          margin-bottom: 32px;
           line-height: 1.5;
         }
         .main-button {
@@ -808,15 +808,15 @@ function createSecureRedirect(targetUrl, message) {
         <div class="icon">🔐</div>
         <h1 class="title">${message || 'アクセス確認'}</h1>
         <p class="subtitle">セキュリティのため、下のボタンをクリックして続行してください</p>
-        
+
         <a href="${sanitizedUrl}" target="_top" class="main-button">
           🚀 続行する
         </a>
-        
+
         <div class="url-info">
           <div class="url-text">${sanitizedUrl}</div>
         </div>
-        
+
         <div class="note">
           ✓ このリンクは安全です<br>
           ✓ Google Apps Script公式のセキュリティガイドラインに準拠
@@ -825,9 +825,9 @@ function createSecureRedirect(targetUrl, message) {
     </body>
     </html>
   `;
-  
+
   const htmlOutput = HtmlService.createHtmlOutput(userActionRedirectHtml);
-  
+
   // XFrameOptionsMode を安全に設定
   try {
     if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
@@ -836,7 +836,7 @@ function createSecureRedirect(targetUrl, message) {
   } catch (e) {
     console.warn('XFrameOptionsMode設定エラー:', e.message);
   }
-  
+
   return htmlOutput;
 }
 
@@ -849,24 +849,24 @@ function sanitizeRedirectUrl(url) {
   if (!url) {
     return getWebAppUrlCached();
   }
-  
+
   try {
     let cleanUrl = String(url).trim();
-    
+
     // 複数レベルのクォート除去（JSON文字列化による多重クォートに対応）
     let previousUrl = '';
     while (cleanUrl !== previousUrl) {
       previousUrl = cleanUrl;
-      
+
       // 先頭と末尾のクォートを除去
       if ((cleanUrl.startsWith('"') && cleanUrl.endsWith('"')) ||
           (cleanUrl.startsWith("'") && cleanUrl.endsWith("'"))) {
         cleanUrl = cleanUrl.slice(1, -1);
       }
-      
+
       // エスケープされたクォートを除去
       cleanUrl = cleanUrl.replace(/\\"/g, '"').replace(/\\'/g, "'");
-      
+
       // URL内に埋め込まれた別のURLを検出
       const embeddedUrlMatch = cleanUrl.match(/https?:\/\/[^\s<>"']+/);
       if (embeddedUrlMatch && embeddedUrlMatch[0] !== cleanUrl) {
@@ -874,25 +874,25 @@ function sanitizeRedirectUrl(url) {
         cleanUrl = embeddedUrlMatch[0];
       }
     }
-    
+
     // 基本的なURL形式チェック
     if (!cleanUrl.match(/^https?:\/\/[^\s<>"']+$/)) {
       console.warn('Invalid URL format after sanitization:', cleanUrl);
       return getWebAppUrlCached();
     }
-    
+
     // 開発モードURLのチェック
     if (cleanUrl.includes('googleusercontent.com') || cleanUrl.includes('userCodeAppPanel')) {
       console.warn('Development URL detected in redirect, using fallback:', cleanUrl);
       return getWebAppUrlCached();
     }
-    
+
     // 最終的な URL 妥当性チェック
     if (!cleanUrl.includes('script.google.com') && !cleanUrl.includes('localhost')) {
       console.warn('Suspicious URL detected:', cleanUrl);
       return getWebAppUrlCached();
     }
-    
+
     return cleanUrl;
   } catch (e) {
     console.error('URL sanitization error:', e.message);
@@ -936,11 +936,11 @@ function parseRequestParams(e) {
   const spreadsheetId = p.spreadsheetId || null;
   const sheetName = p.sheetName || null;
   const isDirectPageAccess = !!(userId && mode === 'view');
-  
+
   // デバッグログを追加
   console.log('parseRequestParams - Received parameters:', JSON.stringify(p));
   console.log('parseRequestParams - Parsed mode:', mode, 'setupParam:', setupParam);
-  
+
   return { mode, userId, setupParam, spreadsheetId, sheetName, isDirectPageAccess };
 }
 
@@ -973,12 +973,12 @@ function renderAdminPanel(userInfo, mode) {
   console.log('renderAdminPanel - current user email:', Session.getActiveUser().getEmail());
   adminTemplate.isDeployUser = deployUserResult;
   adminTemplate.DEBUG_MODE = shouldEnableDebugMode();
-  
-  
+
+
   const htmlOutput = adminTemplate.evaluate()
     .setTitle('みんなの回答ボード 管理パネル')
     .setSandboxMode(HtmlService.SandboxMode.NATIVE);
-  
+
   // XFrameOptionsMode を安全に設定
   try {
     if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
@@ -987,7 +987,7 @@ function renderAdminPanel(userInfo, mode) {
   } catch (e) {
     console.warn('XFrameOptionsMode設定エラー:', e.message);
   }
-  
+
   return htmlOutput;
 }
 
@@ -1025,7 +1025,7 @@ function renderAnswerBoard(userInfo, params) {
       // setupStatus未完了時の安全なopinionHeader取得
       const setupStatus = config.setupStatus || 'pending';
       let rawOpinionHeader;
-      
+
       if (setupStatus === 'pending') {
         rawOpinionHeader = 'セットアップ中...';
       } else {

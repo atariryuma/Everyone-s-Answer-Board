@@ -18,17 +18,17 @@ function getPublicationState(status) {
   if (!status) {
     return { isPublished: false, reason: 'No status data' };
   }
-  
+
   // Check multiple possible publication indicators in priority order
   let isPublished = false;
   let reason = '';
-  
+
   // 1. Direct isPublished property
   if (status.isPublished === true) {
     isPublished = true;
     reason = 'status.isPublished=true';
   }
-  // 2. Direct appPublished property  
+  // 2. Direct appPublished property
   else if (status.appPublished === true) {
     isPublished = true;
     reason = 'status.appPublished=true';
@@ -45,13 +45,13 @@ function getPublicationState(status) {
       console.warn('Failed to parse configJson:', e);
     }
   }
-  
+
   // 4. Fallback: if there's an active sheet, likely published
   if (!isPublished && status.activeSheetName) {
     isPublished = true;
     reason = 'activeSheetName exists (fallback)';
   }
-  
+
   return { isPublished, reason };
 }
 
@@ -62,22 +62,22 @@ function generateViewUrl(status, userId) {
   if (viewUrl) {
     return viewUrl;
   }
-  
+
   // 2. Generate from appUrls.webApp with userId
   if (status.appUrls?.webApp && userId) {
     return status.appUrls.webApp + '?userId=' + encodeURIComponent(userId) + '&mode=view';
   }
-  
+
   // 3. Generate from status.webAppUrl with userId
   if (status.webAppUrl && userId) {
     return status.webAppUrl + '?userId=' + encodeURIComponent(userId) + '&mode=view';
   }
-  
+
   // 4. Simple fallback without userId
   if (status.appUrls?.webApp) {
     return status.appUrls.webApp + '?mode=view';
   }
-  
+
   logWarn('Could not generate viewUrl');
   return null;
 }
@@ -101,12 +101,12 @@ function updateUIWithNewStatus(status) {
   }
 
   isUIUpdateInProgress = true;
-  
+
   try {
     // Standardize status object with publication state and viewUrl
     const publicationState = getPublicationState(status);
     const viewUrl = generateViewUrl(status, userId);
-    
+
     // Add normalized properties to status object
     status._normalized = {
       isPublished: publicationState.isPublished,
@@ -114,38 +114,38 @@ function updateUIWithNewStatus(status) {
       viewUrl: viewUrl,
       hasValidViewUrl: !!viewUrl
     };
-    
+
     currentStatus = status;
-  
+
   // セットアップ状況を確認
   const setupStatus = getSetupStatusFromUserInfo(status.userInfo);
-  
+
   // 固定表示要素をクリア（setupStatus関係なく実行）
   clearInitialDisplayElements();
-  
+
   // Update static UI elements first（常に実行）
   updateStaticUI(status);
-  
+
   // セットアップ未完了時の追加処理
   if (setupStatus === 'pending') {
     updateButtonStatesForSetup(status);
   }
-  
+
   // Update dynamic content based on state
   if (status.activeSheetName) {
     updateDynamicContent(status);
   } else {
     updateUIForNoActiveSheet(status);
   }
-  
+
   // Update footer and guidance
   updateFooterAndGuidance(status);
-  
+
   // Update step indicators and manage sections
   const currentStep = status.setupStep || 1;
   updateStepIndicators(currentStep);
   manageSectionStates(currentStep);
-  
+
   // Update spreadsheet button state
   updateSpreadsheetButton();
 
@@ -157,11 +157,11 @@ function updateUIWithNewStatus(status) {
       selectedSheet = status.activeSheetName;
       loadConfigForSelected(status.activeSheetName, status.userInfo.spreadsheetId);
     }
-    
+
   } finally {
     // Release the UI update mutex
     isUIUpdateInProgress = false;
-    
+
     // Process any pending UI update
     if (pendingUIUpdate) {
       const nextUpdate = pendingUIUpdate;
@@ -188,7 +188,7 @@ function updateUnpublishButton(status) {
 function updateSpreadsheetButton() {
   const btn = document.getElementById('open-spreadsheet-btn-step2');
   if (!btn) return;
-  
+
   if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetUrl) {
     btn.disabled = false;
     btn.onclick = function() {
@@ -206,23 +206,23 @@ function updateSpreadsheetButton() {
 function updateStaticUI(status) {
   // Update database info panel
   updateDatabaseInfo(status);
-  
+
   // Update existing user section
   updateExistingUserSection(status);
-  
+
   // Populate sheet selection - fix property name mismatch
   console.log('🔍 Debug: Checking sheet data properties', {
     allSheets: status.allSheets,
     sheetNames: status.sheetNames,
     activeSheetName: status.activeSheetName
   });
-  
+
   const sheetsData = status.sheetNames || status.allSheets || [];
   populateSheetSelect(sheetsData, status.activeSheetName);
-  
+
   // Update custom form info
   updateCustomFormInfo(status);
-  
+
   // Check for auto-publish dialog
   checkAutoPublishDialog(status);
 }
@@ -278,7 +278,7 @@ function updatePublicationStatusUI(isPublished) {
   const statusElement = safeGetElement('info-publish-status');
   const indicatorElement = safeGetElement('info-publish-indicator');
   const textElement = safeGetElement('info-publish-text');
-  
+
   if (statusElement) {
     if (isPublished) {
       statusElement.className = 'px-2 py-1 rounded text-xs font-medium bg-green-600 text-white';
@@ -297,7 +297,7 @@ function syncCheckboxStates(status) {
   // Priority: Database config (configJson) > status properties > defaults
   let showNames = false;
   let showCounts = true;
-  
+
   // 1. Prefer status.config if available
   if (status.config) {
     if (status.config.showNames !== undefined) showNames = status.config.showNames;
@@ -322,11 +322,11 @@ function syncCheckboxStates(status) {
   // Update checkbox elements
   const showNamesCheckbox = safeGetElement('show-names');
   const showCountsCheckbox = safeGetElement('show-counts');
-  
+
   if (showNamesCheckbox) {
     showNamesCheckbox.checked = showNames;
   }
-  
+
   if (showCountsCheckbox) {
     showCountsCheckbox.checked = showCounts;
   }
@@ -353,13 +353,13 @@ function populateSheetSelect(sheetNames, activeSheetName) {
 
   // Clear existing options
   select.innerHTML = '<option value="">-- シートを選択 --</option>';
-  
+
   if (sheetNames && sheetNames.length > 0) {
     console.log('✅ Adding sheets to dropdown:', sheetNames.length);
-    
+
     sheetNames.forEach((sheet, index) => {
       const option = document.createElement('option');
-      
+
       // Handle both object and string formats
       if (typeof sheet === 'object' && sheet.name) {
         option.value = sheet.name;
@@ -373,7 +373,7 @@ function populateSheetSelect(sheetNames, activeSheetName) {
         console.warn('⚠️ Unknown sheet format:', sheet);
         return;
       }
-      
+
       select.appendChild(option);
     });
     select.disabled = false;
@@ -383,7 +383,7 @@ function populateSheetSelect(sheetNames, activeSheetName) {
     select.innerHTML = '<option value="">利用可能なシートがありません</option>';
     select.disabled = true;
   }
-  
+
   // Set active sheet if available
   if (activeSheetName) {
     select.value = activeSheetName;
@@ -391,11 +391,11 @@ function populateSheetSelect(sheetNames, activeSheetName) {
     lastSelectedSheetName = activeSheetName; // Update last selected sheet
     console.log('✅ Active sheet set:', activeSheetName);
   }
-  
+
   // Add change event listener for data preview
   select.removeEventListener('change', handleSheetSelectionChange);
   select.addEventListener('change', handleSheetSelectionChange);
-  
+
   // Update UI for selected sheet and enable spreadsheet button
   updateUIForSelectedSheet();
   updateSpreadsheetButton();
@@ -405,31 +405,31 @@ function populateSheetSelect(sheetNames, activeSheetName) {
 function populateHeaderOptions(headers) {
   console.group('🎯 populateHeaderOptions');
   console.log('📝 Headers to populate:', headers.length, headers);
-  
+
   const selects = [
     'opinionHeader',      // Main required field
     'opinion-column',     // Optional details field (backup)
-    'name-column', 
+    'name-column',
     'class-column'
   ];
-  
+
   console.log('🎯 Target dropdown elements:', selects);
-  
+
   selects.forEach(selectId => {
     console.log(`🔍 Looking for element: ${selectId}`);
     const select = document.getElementById(selectId);
-    
+
     if (select) {
       console.log(`✅ Found element: ${selectId}`);
-      
+
       // Store current value
       const currentValue = select.value;
       console.log(`📄 Current value: "${currentValue}"`);
-      
+
       // Clear and repopulate
       select.innerHTML = '<option value="">-- 列を選択 --</option>';
       console.log(`🧹 Cleared dropdown: ${selectId}`);
-      
+
       let optionsAdded = 0;
       const excludedHeaders = [
         'なるほど！',
@@ -449,16 +449,16 @@ function populateHeaderOptions(headers) {
         select.appendChild(option);
         optionsAdded++;
       });
-      
+
       console.log(`📋 Added ${optionsAdded} options to ${selectId}`);
       console.log(`📊 Total options in ${selectId}:`, select.options.length);
-      
+
       // Restore previous value if still valid
       if (currentValue && headers.includes(currentValue)) {
         select.value = currentValue;
         console.log(`♻️ Restored value: "${currentValue}" for ${selectId}`);
       }
-      
+
       // Debug final state
       console.log(`🎯 Final state of ${selectId}:`, {
         value: select.value,
@@ -466,26 +466,26 @@ function populateHeaderOptions(headers) {
         visible: !select.hidden,
         disabled: select.disabled
       });
-      
+
     } else {
       console.error(`❌ Element not found: ${selectId}`);
     }
   });
-  
+
   console.groupEnd();
 }
 
 // Populate configuration with guessed values
 function populateConfig(cfg) {
   if (!cfg) return;
-  
+
   console.group('🤖 populateConfig');
   console.log('📝 AI Config received:', cfg);
-  
+
   const mappings = {
     // Main opinion dropdown (primary target)
     'opinionHeader': cfg.opinionHeader || cfg.opinionColumn,
-    
+
     // Detail configuration dropdowns (secondary targets with property name fixes)
     'opinion-column': cfg.opinionColumn || cfg.opinionHeader,
     'name-column': cfg.nameColumn || cfg.nameHeader,
@@ -493,19 +493,19 @@ function populateConfig(cfg) {
     'show-names': cfg.showNames,
     'show-counts': cfg.showCounts
   };
-  
+
   console.log('🎯 Mappings to apply:', mappings);
-  
+
   Object.keys(mappings).forEach(elementId => {
     const element = document.getElementById(elementId);
     const value = mappings[elementId];
-    
-    console.log(`🔍 Setting ${elementId}:`, { 
-      element: !!element, 
+
+    console.log(`🔍 Setting ${elementId}:`, {
+      element: !!element,
       value: value,
-      valueType: typeof value 
+      valueType: typeof value
     });
-    
+
     if (element && value !== undefined) {
       if (element.type === 'checkbox') {
         element.checked = Boolean(value);
@@ -513,7 +513,7 @@ function populateConfig(cfg) {
       } else {
         element.value = value;
         console.log(`📋 Dropdown ${elementId} set to:`, element.value);
-        
+
         // Verify the option exists in the dropdown
         const hasOption = Array.from(element.options).some(option => option.value === value);
         if (!hasOption) {
@@ -532,7 +532,7 @@ function populateConfig(cfg) {
       }
     }
   });
-  
+
   console.groupEnd();
   updateConfigButtons();
 }
@@ -545,29 +545,29 @@ function clearConfigFields() {
     'name-column',
     'class-column'
   ];
-  
+
   fieldIds.forEach(id => {
     const element = document.getElementById(id);
     if (element) {
       element.value = '';
     }
   });
-  
+
   updateConfigButtons();
 }
 
 // Build configuration object from form
 function buildConfigObject() {
   console.group('📋 buildConfigObject');
-  
+
   // Get values from primary elements (with fallback to secondary elements)
-  const opinionValue = document.getElementById('opinionHeader')?.value || 
+  const opinionValue = document.getElementById('opinionHeader')?.value ||
                       document.getElementById('opinion-column')?.value || '';
   const nameValue = document.getElementById('name-column')?.value || '';
   const classValue = document.getElementById('class-column')?.value || '';
   const showNames = document.getElementById('show-names')?.checked || false;
   const showCounts = document.getElementById('show-counts')?.checked || false; // デフォルトfalseに変更
-  
+
   const config = {
     sheetName: selectedSheet,
     // Use property names that match backend expectations (opinionHeader format)
@@ -581,30 +581,30 @@ function buildConfigObject() {
     showNames: showNames,
     showCounts: showCounts
   };
-  
+
   console.log('📊 Built config object:', config);
   console.log('🎯 Primary opinion value from opinionHeader:', document.getElementById('opinionHeader')?.value);
   console.log('🔄 Fallback opinion value from opinion-column:', document.getElementById('opinion-column')?.value);
   console.groupEnd();
-  
+
   return config;
 }
 
 // Validate configuration
 function validateConfig() {
   // Check primary element first, then fallback to secondary element
-  const opinionValue = document.getElementById('opinionHeader')?.value || 
+  const opinionValue = document.getElementById('opinionHeader')?.value ||
                       document.getElementById('opinion-column')?.value || '';
-  
+
   const isValid = opinionValue && opinionValue.trim() !== '';
-  
+
   console.log('🔍 validateConfig:', {
     opinionHeader: document.getElementById('opinionHeader')?.value,
     opinionColumn: document.getElementById('opinion-column')?.value,
     finalValue: opinionValue,
     isValid: isValid
   });
-  
+
   return isValid;
 }
 
@@ -612,7 +612,7 @@ function validateConfig() {
 function updateConfigButtons() {
   const isValid = validateConfig();
   const saveBtn = document.getElementById('save-publish-btn');
-  
+
   if (saveBtn) {
     saveBtn.disabled = !isValid;
     if (isValid) {
@@ -637,7 +637,7 @@ function updateStepIndicators(currentStep) {
 
   steps.forEach((step, index) => {
     if (!step) return;
-    
+
     const stepNumber = index + 1;
     const circle = step.querySelector('div');
     const text = step.querySelector('span');
@@ -676,10 +676,10 @@ function updateStepIndicators(currentStep) {
 // Update footer and guidance text
 function updateFooterAndGuidance(status) {
   console.group('🦶 updateFooterAndGuidance');
-  
+
   const footer = document.getElementById('admin-footer');
   const guidanceText = document.getElementById('guidance-text');
-  
+
   if (!footer || !guidanceText) {
     console.warn('❌ Footer or guidance elements not found');
     console.groupEnd();
@@ -689,7 +689,7 @@ function updateFooterAndGuidance(status) {
   // Use normalized publication state from status object
   const isPublished = status._normalized?.isPublished || false;
   const viewUrl = status._normalized?.viewUrl;
-  
+
   console.log('🔍 Simplified publication check:', {
     'normalized isPublished': isPublished,
     'publish reason': status._normalized?.publishReason,
@@ -701,11 +701,11 @@ function updateFooterAndGuidance(status) {
   // Show footer if published (regardless of viewUrl availability for now)
   if (isPublished) {
     footer.classList.remove('hidden');
-    
+
     // Update board URL using our generated viewUrl (if available)
     const boardUrlInput = document.getElementById('board-url');
     const viewBoardLink = document.getElementById('view-board-link');
-    
+
     if (boardUrlInput) {
       boardUrlInput.value = viewUrl || 'URL生成中...';
       console.log('📝 Board URL input updated:', viewUrl || 'URL generation pending');
@@ -717,20 +717,20 @@ function updateFooterAndGuidance(status) {
       viewBoardLink.removeAttribute('href');
       console.log('🔗 View board link cleared - no URL available');
     }
-    
+
     // Update topic text
     updateTopicText(status);
-    
+
     guidanceText.textContent = '回答ボードは現在公開中です。';
     console.log('✅ Footer shown - board is published');
   } else {
     footer.classList.add('hidden');
     console.log('❌ Footer hidden - board not published');
-    
+
     // Update guidance based on setup step
     updateGuidanceForStep(status.setupStep || 1, guidanceText);
   }
-  
+
   console.groupEnd();
   adjustLayout();
 }
@@ -774,7 +774,7 @@ function updateGuidanceForStep(step, guidanceElement) {
     2: 'ステップ2: 表示したいシートを選択してください。',
     3: 'ステップ3: 列を設定してボードを公開しましょう。'
   };
-  
+
   guidanceElement.textContent = messages[step] || 'セットアップを開始してください。';
 }
 
@@ -789,11 +789,11 @@ function toggleSection(sectionId) {
     console.warn('Section not found:', sectionId);
     return;
   }
-  
+
   // Find the toggle button for this section
   const toggleBtn = document.querySelector(`[onclick*="${sectionId}"]`);
   const arrow = toggleBtn ? toggleBtn.querySelector('.fa-chevron-down, .fa-chevron-up') : null;
-  
+
   // Toggle the section visibility
   if (section.classList.contains('hidden')) {
     // Show section
@@ -823,12 +823,12 @@ function collapseCompletedSection(stepNumber) {
   const sectionId = `step${stepNumber}-content`;
   const section = document.getElementById(sectionId);
   if (!section) return;
-  
+
   console.log(`📁 Auto-collapsing completed step ${stepNumber}`);
-  
+
   // Collapse the section
   section.classList.add('hidden');
-  
+
   // Update toggle button state
   const toggleBtn = document.querySelector(`[onclick*="${sectionId}"]`);
   if (toggleBtn) {
@@ -839,7 +839,7 @@ function collapseCompletedSection(stepNumber) {
       arrow.classList.add('fa-chevron-up');
     }
   }
-  
+
   // Note: Visual indicators are now managed by manageSectionStates()
 }
 
@@ -848,12 +848,12 @@ function expandActiveSection(stepNumber) {
   const sectionId = `step${stepNumber}-content`;
   const section = document.getElementById(sectionId);
   if (!section) return;
-  
+
   console.log(`📂 Auto-expanding active step ${stepNumber}`);
-  
+
   // Expand the section
   section.classList.remove('hidden');
-  
+
   // Special handling for Step 3: ensure config-area is visible
   if (stepNumber === 3) {
     const configArea = document.getElementById('config-area');
@@ -862,7 +862,7 @@ function expandActiveSection(stepNumber) {
       console.log(`📋 expandActiveSection: Config area shown for Step 3`);
     }
   }
-  
+
   // Update toggle button state
   const toggleBtn = document.querySelector(`[onclick*="${sectionId}"]`);
   if (toggleBtn) {
@@ -873,14 +873,14 @@ function expandActiveSection(stepNumber) {
       arrow.classList.add('fa-chevron-down');
     }
   }
-  
+
   // Note: Visual indicators are now managed by manageSectionStates()
 }
 
 // Manage section states based on current step
 function manageSectionStates(currentStep) {
   console.log(`🔄 Managing section states for step ${currentStep}`);
-  
+
   // Determine if sections are truly completed based on setup status
   const isStepCompleted = (stepNumber) => {
     if (stepNumber === 1) {
@@ -895,19 +895,19 @@ function manageSectionStates(currentStep) {
     }
     return false;
   };
-  
+
   // Update all sections based on their true state
   for (let i = 1; i <= 3; i++) {
     const sectionContainer = document.getElementById(`step${i}-content`)?.closest('.glass-panel');
     if (!sectionContainer) continue;
-    
+
     // Clear all state classes
     sectionContainer.classList.remove('section-completed', 'section-active', 'section-future', 'show-checkmark');
-    
+
     const isCompleted = isStepCompleted(i);
     const isActive = i === currentStep;
     const isFuture = i > currentStep;
-    
+
     if (isCompleted && i < currentStep) {
       // Truly completed sections get checkmark
       sectionContainer.classList.add('section-completed', 'show-checkmark');
@@ -917,7 +917,7 @@ function manageSectionStates(currentStep) {
       // Current active section
       sectionContainer.classList.add('section-active');
       expandActiveSection(i);
-      
+
       // Special handling for Step 3: ensure config-area is visible
       if (i === 3) {
         const configArea = document.getElementById('config-area');
@@ -926,7 +926,7 @@ function manageSectionStates(currentStep) {
           console.log(`📋 Step 3: Config area shown for sheet: ${currentStatus.activeSheetName}`);
         }
       }
-      
+
       console.log(`🔄 Step ${i}: Active`);
     } else if (isFuture) {
       // Future sections
@@ -985,7 +985,7 @@ function showPrivacyModal(onContinue) {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     manageFocusForModal('privacy-modal', true);
-    
+
     // Set up continue handler
     const continueBtn = document.getElementById('privacy-modal-continue');
     if (continueBtn && onContinue) {
@@ -1030,16 +1030,16 @@ function showConfirmationModal(title, message, onConfirm) {
   const titleElement = document.getElementById('confirmation-title');
   const messageElement = document.getElementById('confirmation-message');
   const confirmBtn = document.getElementById('confirmation-confirm');
-  
+
   if (modal && titleElement && messageElement && confirmBtn) {
     titleElement.textContent = title;
     messageElement.textContent = message;
-    
+
     confirmBtn.onclick = function() {
       hideConfirmationModal();
       if (onConfirm) onConfirm();
     };
-    
+
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     manageFocusForModal('confirmation-modal', true);
@@ -1067,7 +1067,7 @@ function updateDynamicContent(status) {
     'open-spreadsheet-btn',
     'open-form-btn'
   ];
-  
+
   buttons.forEach(buttonId => {
     const button = document.getElementById(buttonId);
     if (button) {
@@ -1083,7 +1083,7 @@ function updateUIForNoActiveSheet(status) {
   const buttons = [
     'open-form-btn'
   ];
-  
+
   buttons.forEach(buttonId => {
     const button = document.getElementById(buttonId);
     if (button) {
@@ -1107,11 +1107,11 @@ function updateCustomFormInfo(status) {
     // Update form-related UI elements
     const formTitle = document.getElementById('form-title-display');
     const formQuestion = document.getElementById('form-question-display');
-    
+
     if (formTitle) {
       formTitle.textContent = status.customFormInfo.title || 'フォーム未作成';
     }
-    
+
     if (formQuestion) {
       formQuestion.textContent = status.customFormInfo.mainQuestion || '';
     }
@@ -1133,7 +1133,7 @@ function checkAutoPublishDialog(status) {
 // Initialize UI components
 function initializeUI() {
   console.log('✅ AdminPanel: UI components ready');
-  
+
   // Load initial status
   loadStatus(true); // 強制的にキャッシュをバイパスして最新のステータス情報を取得
 }
@@ -1147,16 +1147,16 @@ function loadStatus(bypassCache = false) {
   runGasWithUserId('getInitialData')
     .then(response => {
       console.log('✅ Integrated data loaded:', response);
-      
+
       // Extract userId for compatibility
       if (response.userInfo && response.userInfo.userId) {
         userId = response.userInfo.userId;
         console.log('✅ userId extracted from integrated response:', userId);
       }
-      
+
       // Update UI with integrated response
       updateUIWithNewStatus(response);
-      
+
       // If sheet details are included, apply them immediately
       if (response.sheetDetails && response.activeSheetName) {
         console.log('✅ Sheet details included in integrated response, applying configuration');
@@ -1169,7 +1169,7 @@ function loadStatus(bypassCache = false) {
           console.error('Error applying sheet configuration from integrated data:', configError);
         }
       }
-      
+
       console.log('⚡ Performance: Single API call replaced 3-4 separate calls');
     })
     .catch(error => {
@@ -1195,21 +1195,21 @@ function handleSheetSelectionChange(event) {
     console.log('📊 Sheet selection changed, but value is the same. Skipping redundant processing.');
     return;
   }
-  
+
   console.log('📊 Sheet selection changed:', {
     previousSheet: selectedSheet,
     newSelectedSheet: newSelectedSheet,
     hasPreviewSection: !!previewSection
   });
-  
+
   // Update global selected sheet variable and last selected sheet
   selectedSheet = newSelectedSheet;
   lastSelectedSheetName = newSelectedSheet;
-  
+
   if (newSelectedSheet && previewSection) {
     console.log('📋 Loading preview and config for sheet:', newSelectedSheet);
     previewSection.classList.remove('hidden');
-    
+
     // Show loading state for preview
     const previewContent = document.getElementById('data-preview-content');
     if (previewContent) {
@@ -1251,9 +1251,9 @@ function loadConfigForSelected(sheetName, spreadsheetId) {
   // Check if fresh save protection is active - skip cache if so
   const timeSinceFreshSave = Date.now() - (window.freshSaveTimestamp || 0);
   const isFreshSaveActive = timeSinceFreshSave < 30000; // 30 seconds
-  
+
   // Check if we already have sheet details from integrated API
-  if (!isFreshSaveActive && currentStatus && currentStatus.sheetDetails && 
+  if (!isFreshSaveActive && currentStatus && currentStatus.sheetDetails &&
       currentStatus.activeSheetName === sheetName) {
     console.log('⚡ Using cached sheet details from integrated API');
     try {
@@ -1274,7 +1274,7 @@ function loadConfigForSelected(sheetName, spreadsheetId) {
   } else {
     console.log('📞 Making API call for sheet details:', sheetName);
   }
-  
+
   runGasWithUserId('getSheetDetails', spreadsheetId, sheetName)
     .then(function(details) {
       console.log('✅ Sheet details loaded via API:', details);
@@ -1298,7 +1298,7 @@ function loadConfigForSelected(sheetName, spreadsheetId) {
 function loadDataPreview(sheetName, details) {
   const previewContent = document.getElementById('data-preview-content');
   if (!previewContent) return;
-  
+
   // Show loading state (if details are not yet available)
   if (!details) {
     previewContent.innerHTML = `
@@ -1314,7 +1314,7 @@ function loadDataPreview(sheetName, details) {
     if (details && details.headers) {
       const headersList = details.headers.slice(0, 5); // First 5 headers
       const moreHeaders = details.headers.length > 5 ? `...他${details.headers.length - 5}列` : '';
-      
+
       previewContent.innerHTML = `
         <div class="text-sm">
           <div class="mb-2">
@@ -1343,13 +1343,13 @@ function loadDataPreview(sheetName, details) {
       previewContent.innerHTML = '<p class="text-red-400">スプレッドシート情報が見つかりません</p>';
       return;
     }
-    
+
     runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, sheetName)
       .then(function(details) {
         if (details && details.headers) {
           const headersList = details.headers.slice(0, 5); // First 5 headers
           const moreHeaders = details.headers.length > 5 ? `...他${details.headers.length - 5}列` : '';
-          
+
           previewContent.innerHTML = `
             <div class="text-sm">
               <div class="mb-2">
@@ -1405,14 +1405,14 @@ function getSetupStatusFromUserInfo(userInfo) {
       console.log('🔧 configJson setupStatus:', config.setupStatus);
       return config.setupStatus;
     }
-    
+
     // setupStatusがない場合、他のフィールドから推測
     if (config.appPublished === true && config.formCreated === true) {
       return 'completed';
     }
-    
+
     return 'pending';
-    
+
   } catch (error) {
     console.warn('getSetupStatusFromUserInfo JSON解析エラー:', error.message);
     return 'pending'; // エラー時はセットアップ未完了とみなす
@@ -1430,16 +1430,16 @@ function clearInitialDisplayElements() {
     initialContainer.style.display = 'none';
     console.log('✅ 初期ドメイン表示を非表示');
   }
-  
+
   // 適切なドメイン情報を表示
   showAppropriateHeaderStatus();
-  
+
   // 既存のセットアップガイドのみ削除
   const existingGuides = [
     document.getElementById('setup-pending-guide'),
     document.querySelector('.setup-guide')
   ];
-  
+
   existingGuides.forEach(guide => {
     if (guide) {
       guide.remove();
@@ -1455,18 +1455,18 @@ function showAppropriateHeaderStatus() {
   // ドメイン一致表示（仮）を表示
   const domainMatch = document.getElementById('header-domain-match');
   const domainMismatch = document.getElementById('header-domain-mismatch');
-  
+
   if (domainMatch && domainMismatch) {
     // 現在はドメイン一致として表示（実際のドメインチェックは別途実装）
     domainMatch.style.display = 'block';
     domainMismatch.style.display = 'none';
-    
+
     // ドメイン名を適切に設定
     const domainText = document.getElementById('header-domain-match-text');
     if (domainText) {
       domainText.textContent = 'naha-okinawa.ed.jp';
     }
-    
+
     console.log('✅ ドメイン一致表示を有効化');
   }
 }
@@ -1477,20 +1477,20 @@ function showAppropriateHeaderStatus() {
  */
 function updateButtonStatesForSetup(status) {
   // より穏やかなUI制御（完全無効化ではなく、適切なガイダンス）
-  
+
   // 最低限無効化すべき公開関連ボタンのみ
   const criticalPublishButtons = [
     'save-publish-btn',
     'unpublish-board-btn'
   ];
-  
+
   criticalPublishButtons.forEach(buttonId => {
     const button = document.getElementById(buttonId);
     if (button) {
       // データが不足している場合のみ無効化
       const hasSpreadsheet = status.userInfo && status.userInfo.spreadsheetId;
       const hasActiveSheet = status.activeSheetName;
-      
+
       if (!hasSpreadsheet || !hasActiveSheet) {
         button.disabled = true;
         button.classList.add('opacity-75');
@@ -1502,7 +1502,7 @@ function updateButtonStatesForSetup(status) {
       }
     }
   });
-  
+
   console.log('✅ ボタン状態を適切に更新しました');
 }
 
@@ -1522,11 +1522,11 @@ function updateBasicStaticUI(status) {
 // Update system status display
 function updateSystemStatusDisplay(status) {
   if (!status) return;
-  
+
   // Update publish status
   const publishIndicator = document.getElementById('info-publish-indicator');
   const publishText = document.getElementById('info-publish-text');
-  
+
   if (status.isPublished) {
     publishIndicator.className = 'w-2 h-2 rounded-full bg-green-400';
     publishText.textContent = '公開中';
@@ -1534,45 +1534,45 @@ function updateSystemStatusDisplay(status) {
     publishIndicator.className = 'w-2 h-2 rounded-full bg-gray-400';
     publishText.textContent = '非公開';
   }
-  
+
   // Update other status fields
   document.getElementById('info-published-sheet').textContent = status.sheetName || '-';
   document.getElementById('info-display-mode').textContent = status.displayMode || '-';
   document.getElementById('info-show-counts').textContent = status.showCounts ? '表示' : '非表示';
   document.getElementById('info-answer-count').textContent = status.answerCount || '0';
   document.getElementById('info-reaction-count').textContent = status.reactionCount || '0';
-  
+
   // Enable resource buttons if URLs are available
   const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
   const formBtn = document.getElementById('open-form-btn');
   const resourceBtn = document.getElementById('open-resource-btn');
-  
+
   if (status.spreadsheetUrl) {
     if (spreadsheetBtn) {
       spreadsheetBtn.disabled = false;
       spreadsheetBtn.onclick = () => window.open(status.spreadsheetUrl, '_blank');
     }
   }
-  
+
   if (status.formUrl) {
     if (formBtn) {
       formBtn.disabled = false;
       formBtn.onclick = () => window.open(status.formUrl, '_blank');
     }
-    
+
     // Update form URL input field
     const formUrlInput = document.getElementById('form-url-input');
     if (formUrlInput) {
       formUrlInput.value = status.formUrl;
     }
-    
+
     // Update form URL link
     const formUrlLink = document.getElementById('open-form-url-link');
     if (formUrlLink) {
       formUrlLink.href = status.formUrl;
     }
   }
-  
+
   // Handle generic resource button in Step 1
   if (resourceBtn && (status.formUrl || status.spreadsheetUrl)) {
     resourceBtn.disabled = false;
@@ -1584,7 +1584,7 @@ function updateSystemStatusDisplay(status) {
         window.open(status.spreadsheetUrl, '_blank');
       }
     };
-    
+
     // Update button title based on available resources
     if (status.formUrl && status.spreadsheetUrl) {
       resourceBtn.title = 'フォームを開く (スプレッドシートも利用可能)';
@@ -1599,26 +1599,26 @@ function updateSystemStatusDisplay(status) {
 // Navigate to specific step
 function navigateToStep(step) {
   currentStep = step;
-  
+
   // Update step indicators
   document.querySelectorAll('.step-indicator').forEach((indicator, index) => {
     const stepNumber = index + 1;
     indicator.classList.toggle('completed', stepNumber < step);
     indicator.classList.toggle('active', stepNumber === step);
   });
-  
+
   // Show/hide step content
   document.querySelectorAll('.step-content').forEach((content, index) => {
     const stepNumber = index + 1;
     content.classList.toggle('hidden', stepNumber !== step);
   });
-  
+
   // Update progress bar
   const progressBar = document.querySelector('.progress-bar');
   if (progressBar) {
     progressBar.style.width = `${(step / 3) * 100}%`;
   }
-  
+
   validateCurrentStep();
 }
 
@@ -1626,17 +1626,17 @@ function navigateToStep(step) {
 function validateCurrentStep() {
   const savePublishBtn = document.getElementById('save-publish-btn');
   if (!savePublishBtn) return;
-  
+
   // セットアップ状況を確認
   const setupStatus = getSetupStatusFromGlobalStatus();
-  
+
   // セットアップ未完了時の段階的制御
   if (setupStatus === 'pending') {
     enforceStepProgression();
   }
-  
+
   let isValid = false;
-  
+
   switch (currentStep) {
     case 1:
       isValid = selectedSheetId || selectedFormId;
@@ -1648,7 +1648,7 @@ function validateCurrentStep() {
       isValid = true;
       break;
   }
-  
+
   savePublishBtn.disabled = !isValid;
 }
 
@@ -1656,8 +1656,8 @@ function validateCurrentStep() {
 function getSetupStatusFromGlobalStatus() {
   try {
     if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
-      const config = typeof currentStatus.userInfo.configJson === 'string' 
-        ? JSON.parse(currentStatus.userInfo.configJson) 
+      const config = typeof currentStatus.userInfo.configJson === 'string'
+        ? JSON.parse(currentStatus.userInfo.configJson)
         : currentStatus.userInfo.configJson;
       return config.setupStatus || 'pending';
     }
@@ -1672,7 +1672,7 @@ function getSetupStatusFromGlobalStatus() {
 function enforceStepProgression() {
   const step1Completed = checkStep1Completion();
   const step2Completed = checkStep2Completion();
-  
+
   // Step 2の制御
   const step2Section = document.getElementById('sheet-selection-section');
   if (!step1Completed) {
@@ -1680,7 +1680,7 @@ function enforceStepProgression() {
   } else {
     enableSection(step2Section);
   }
-  
+
   // Step 3の制御
   const step3Section = document.getElementById('config-section');
   if (!step1Completed || !step2Completed) {
@@ -1692,7 +1692,7 @@ function enforceStepProgression() {
 
 // Step 1完了チェック
 function checkStep1Completion() {
-  return !!(selectedSheetId || selectedFormId || 
+  return !!(selectedSheetId || selectedFormId ||
             (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId));
 }
 
@@ -1704,10 +1704,10 @@ function checkStep2Completion() {
 // セクションを無効化
 function disableSection(section, message) {
   if (!section) return;
-  
+
   section.style.opacity = '0.5';
   section.style.pointerEvents = 'none';
-  
+
   // 警告メッセージを追加
   const existingWarning = section.querySelector('.step-warning');
   if (!existingWarning) {
@@ -1721,10 +1721,10 @@ function disableSection(section, message) {
 // セクションを有効化
 function enableSection(section) {
   if (!section) return;
-  
+
   section.style.opacity = '1';
   section.style.pointerEvents = 'auto';
-  
+
   // 警告メッセージを削除
   const warning = section.querySelector('.step-warning');
   if (warning) {
@@ -1736,17 +1736,17 @@ function enableSection(section) {
 function validateCurrentStep() {
   const savePublishBtn = document.getElementById('save-publish-btn');
   if (!savePublishBtn) return;
-  
+
   // セットアップ状況を確認
   const setupStatus = getSetupStatusFromGlobalStatus();
-  
+
   // セットアップ未完了時の段階的制御
   if (setupStatus === 'pending') {
     enforceStepProgression();
   }
-  
+
   let isValid = false;
-  
+
   switch (currentStep) {
     case 1:
       isValid = selectedSheetId || selectedFormId;
@@ -1758,7 +1758,7 @@ function validateCurrentStep() {
       isValid = true;
       break;
   }
-  
+
   savePublishBtn.disabled = !isValid;
 }
 
@@ -1766,8 +1766,8 @@ function validateCurrentStep() {
 function getSetupStatusFromGlobalStatus() {
   try {
     if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
-      const config = typeof currentStatus.userInfo.configJson === 'string' 
-        ? JSON.parse(currentStatus.userInfo.configJson) 
+      const config = typeof currentStatus.userInfo.configJson === 'string'
+        ? JSON.parse(currentStatus.userInfo.configJson)
         : currentStatus.userInfo.configJson;
       return config.setupStatus || 'pending';
     }
@@ -1782,7 +1782,7 @@ function getSetupStatusFromGlobalStatus() {
 function enforceStepProgression() {
   const step1Completed = checkStep1Completion();
   const step2Completed = checkStep2Completion();
-  
+
   // Step 2の制御
   const step2Section = document.getElementById('sheet-selection-section');
   if (!step1Completed) {
@@ -1790,7 +1790,7 @@ function enforceStepProgression() {
   } else {
     enableSection(step2Section);
   }
-  
+
   // Step 3の制御
   const step3Section = document.getElementById('config-section');
   if (!step1Completed || !step2Completed) {
@@ -1802,7 +1802,7 @@ function enforceStepProgression() {
 
 // Step 1完了チェック
 function checkStep1Completion() {
-  return !!(selectedSheetId || selectedFormId || 
+  return !!(selectedSheetId || selectedFormId ||
             (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId));
 }
 
@@ -1814,10 +1814,10 @@ function checkStep2Completion() {
 // セクションを無効化
 function disableSection(section, message) {
   if (!section) return;
-  
+
   section.style.opacity = '0.5';
   section.style.pointerEvents = 'none';
-  
+
   // 警告メッセージを追加
   const existingWarning = section.querySelector('.step-warning');
   if (!existingWarning) {
@@ -1831,10 +1831,10 @@ function disableSection(section, message) {
 // セクションを有効化
 function enableSection(section) {
   if (!section) return;
-  
+
   section.style.opacity = '1';
   section.style.pointerEvents = 'auto';
-  
+
   // 警告メッセージを削除
   const warning = section.querySelector('.step-warning');
   if (warning) {
@@ -1845,11 +1845,11 @@ function enableSection(section) {
 // Validate configuration
 function validateConfiguration() {
   if (!currentConfig || !currentConfig.columnMappings) return false;
-  
+
   const mappings = currentConfig.columnMappings;
   const hasContent = Object.values(mappings).includes('content');
   const hasAuthor = Object.values(mappings).includes('author');
-  
+
   return hasContent && hasAuthor;
 }
 
@@ -1857,11 +1857,11 @@ function validateConfiguration() {
 function handleSheetSelection(event) {
   selectedSheetId = event.target.value;
   selectedFormId = null; // Clear form selection
-  
+
   if (selectedSheetId) {
     loadSheetColumns(selectedSheetId);
   }
-  
+
   validateCurrentStep();
 }
 
@@ -1869,11 +1869,11 @@ function handleSheetSelection(event) {
 function handleFormSelection(event) {
   selectedFormId = event.target.value;
   selectedSheetId = null; // Clear sheet selection
-  
+
   if (selectedFormId) {
     loadFormColumns(selectedFormId);
   }
-  
+
   validateCurrentStep();
 }
 
@@ -1909,15 +1909,15 @@ function loadFormColumns(formId) {
 function displayColumnMapping(columns) {
   const configPlaceholder = document.getElementById('config-placeholder');
   const configContent = document.getElementById('config-content');
-  
+
   if (configPlaceholder) configPlaceholder.classList.add('hidden');
   if (configContent) configContent.classList.remove('hidden');
-  
+
   const mappingContainer = document.getElementById('column-mappings');
   if (!mappingContainer) return;
-  
+
   mappingContainer.innerHTML = '';
-  
+
   columns.forEach((column, index) => {
     const mappingDiv = document.createElement('div');
     mappingDiv.className = 'column-mapping';
@@ -1947,18 +1947,18 @@ function handleColumnMapping(select) {
   const columnId = select.dataset.column;
   const mappingType = select.value;
   const mappingDiv = select.closest('.column-mapping');
-  
+
   // Update visual feedback
   mappingDiv.classList.remove('required', 'mapped');
   if (mappingType && mappingType !== 'ignore') {
     mappingDiv.classList.add('mapped');
   }
-  
+
   // Update configuration
   if (!currentConfig) currentConfig = {};
   if (!currentConfig.columnMappings) currentConfig.columnMappings = {};
   currentConfig.columnMappings[columnId] = mappingType;
-  
+
   validateCurrentStep();
 }
 
@@ -1966,21 +1966,21 @@ function handleColumnMapping(select) {
 function handleToggleChange(event) {
   const toggleName = event.target.name;
   const isChecked = event.target.checked;
-  
+
   if (!currentConfig) currentConfig = {};
   currentConfig[toggleName] = isChecked;
-  
+
   validateCurrentStep();
 }
 
 // Update system status display
 function updateSystemStatusDisplay(status) {
   if (!status) return;
-  
+
   // Update publish status
   const publishIndicator = document.getElementById('info-publish-indicator');
   const publishText = document.getElementById('info-publish-text');
-  
+
   if (status.isPublished) {
     publishIndicator.className = 'w-2 h-2 rounded-full bg-green-400';
     publishText.textContent = '公開中';
@@ -1988,45 +1988,45 @@ function updateSystemStatusDisplay(status) {
     publishIndicator.className = 'w-2 h-2 rounded-full bg-gray-400';
     publishText.textContent = '非公開';
   }
-  
+
   // Update other status fields
   document.getElementById('info-published-sheet').textContent = status.sheetName || '-';
   document.getElementById('info-display-mode').textContent = status.displayMode || '-';
   document.getElementById('info-show-counts').textContent = status.showCounts ? '表示' : '非表示';
   document.getElementById('info-answer-count').textContent = status.answerCount || '0';
   document.getElementById('info-reaction-count').textContent = status.reactionCount || '0';
-  
+
   // Enable resource buttons if URLs are available
   const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
   const formBtn = document.getElementById('open-form-btn');
   const resourceBtn = document.getElementById('open-resource-btn');
-  
+
   if (status.spreadsheetUrl) {
     if (spreadsheetBtn) {
       spreadsheetBtn.disabled = false;
       spreadsheetBtn.onclick = () => window.open(status.spreadsheetUrl, '_blank');
     }
   }
-  
+
   if (status.formUrl) {
     if (formBtn) {
       formBtn.disabled = false;
       formBtn.onclick = () => window.open(status.formUrl, '_blank');
     }
-    
+
     // Update form URL input field
     const formUrlInput = document.getElementById('form-url-input');
     if (formUrlInput) {
       formUrlInput.value = status.formUrl;
     }
-    
+
     // Update form URL link
     const formUrlLink = document.getElementById('open-form-url-link');
     if (formUrlLink) {
       formUrlLink.href = status.formUrl;
     }
   }
-  
+
   // Handle generic resource button in Step 1
   if (resourceBtn && (status.formUrl || status.spreadsheetUrl)) {
     resourceBtn.disabled = false;
@@ -2038,7 +2038,7 @@ function updateSystemStatusDisplay(status) {
         window.open(status.spreadsheetUrl, '_blank');
       }
     };
-    
+
     // Update button title based on available resources
     if (status.formUrl && status.spreadsheetUrl) {
       resourceBtn.title = 'フォームを開く (スプレッドシートも利用可能)';
