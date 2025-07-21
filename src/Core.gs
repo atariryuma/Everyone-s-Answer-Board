@@ -1395,9 +1395,20 @@ function quickStartSetup(requestUserId) {
     var userEmail = userInfo.adminEmail;
     
     // クイックスタート繰り返し実行を許可
-    // 既存のセットアップがある場合は警告メッセージを出すが、処理は継続する
+    // 既存のセットアップがある場合は完全にリセットして新しいセットアップで上書きする
     if (configJson.formCreated && userInfo.spreadsheetId) {
-      console.log('⚠️ 既存のセットアップが検出されました。新しいセットアップで上書きします。');
+      console.log('⚠️ 既存のセットアップが検出されました。新しいセットアップで完全に上書きします。');
+      
+      // 既存のキャッシュを完全にクリアして、新しいセットアップが確実に反映されるようにする
+      invalidateUserCache(requestUserId, userEmail, userInfo.spreadsheetId, true);
+      
+      // 既存の設定を初期化（重要な情報以外をリセット）
+      configJson = {
+        setupStatus: 'in_progress',
+        createdAt: configJson.createdAt || new Date().toISOString(),
+        formCreated: false,
+        appPublished: false
+      };
     }
     
     // ステップ1: ユーザー専用フォルダを作成
@@ -1456,13 +1467,28 @@ function quickStartSetup(requestUserId) {
       [sheetConfigKey]: quickStartSheetConfig
     };
     
+    // ユーザーデータベースを新しいセットアップ情報で完全に更新
+    console.log('💾 ユーザーデータベースを新しいセットアップで更新中...');
     updateUser(requestUserId, {
       spreadsheetId: formAndSsInfo.spreadsheetId,
       spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
-      configJson: JSON.stringify(updatedConfig)
+      configJson: JSON.stringify(updatedConfig),
+      lastAccessedAt: new Date().toISOString()
     });
-    // セットアップ完了後に関連キャッシュをクリア
+    
+    // 重要: 新しいセットアップ完了後に全関連キャッシュを強制的にクリア
+    console.log('🗑️ 古いキャッシュをクリアして新しいセットアップを反映中...');
     invalidateUserCache(requestUserId, userEmail, formAndSsInfo.spreadsheetId, true);
+    
+    // 管理パネルでの表示を確実に更新するために、実行キャッシュもクリア
+    clearExecutionUserInfoCache();
+    
+    // さらに、少し遅延してもう一度全キャッシュをクリアして確実に反映
+    setTimeout(() => {
+      invalidateUserCache(requestUserId, userEmail, formAndSsInfo.spreadsheetId, true);
+      clearExecutionUserInfoCache();
+      console.log('🔄 管理パネル表示更新のための追加キャッシュクリア完了');
+    }, 1000);
     
     // ステップ4: 回答ボードを公開状態に設定
     debugLog('🌐 ステップ4: 回答ボード公開中...');
@@ -1497,6 +1523,7 @@ function quickStartSetup(requestUserId) {
         configJson: JSON.stringify(currentConfig)
       });
       invalidateUserCache(requestUserId, userEmail, null, false);
+      clearExecutionUserInfoCache();
     } catch (updateError) {
       console.error('エラー状態の更新に失敗: ' + updateError.message);
     }
