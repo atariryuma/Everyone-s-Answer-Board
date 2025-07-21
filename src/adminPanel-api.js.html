@@ -64,13 +64,13 @@ function loadStatus(bypassCache = false) {
   console.log('🚀 Loading system status with integrated API, bypassCache:', bypassCache);
 
   // Single API call to get all initial data
-  logDebug('Calling setLoading(true) from loadStatus');
-  setLoading(true, 'システム情報を読み込み中...', 1, 10); // Step 1: Initializing
+  logDebug('Calling window.setLoading(true) from loadStatus');
+  window.setLoading(true, 'システム情報を読み込み中...', 1, 10); // Step 1: Initializing
 
   runGasWithUserId('getInitialData')
     .then(response => {
       console.log('✅ Integrated data loaded:', response);
-      setLoading(true, 'ユーザー情報を取得中...', 2, 40); // Step 2: User Info
+      window.setLoading(true, 'ユーザー情報を取得中...', 2, 40); // Step 2: User Info
 
       // Extract userId for compatibility
       if (response.userInfo && response.userInfo.userId) {
@@ -80,7 +80,7 @@ function loadStatus(bypassCache = false) {
 
       // Update UI with integrated response
       updateUIWithNewStatus(response);
-      setLoading(true, 'シート情報と設定を適用中...', 3, 70); // Step 3: Sheet Info & Config
+      window.setLoading(true, 'シート情報と設定を適用中...', 3, 70); // Step 3: Sheet Info & Config
 
       // If sheet details are included, apply them immediately
       if (response.sheetDetails && response.activeSheetName) {
@@ -94,17 +94,17 @@ function loadStatus(bypassCache = false) {
           console.error('Error applying sheet configuration from integrated data:', configError);
         }
       }
-      setLoading(true, 'UIを最終調整中...', 4, 90); // Step 4: UI Rendering
+      window.setLoading(true, 'UIを最終調整中...', 4, 90); // Step 4: UI Rendering
 
       console.log('⚡ Performance: Single API call replaced 3-4 separate calls');
     })
     .catch(error => {
       console.error('❌ Integrated API failed:', error);
       showMessage('システムステータスの読み込みに失敗しました', 'error');
-      setLoading(false); // Hide loading on error
+      window.setLoading(false); // Hide loading on error
     })
     .finally(() => {
-      setLoading(false); // Hide loading when done
+      window.setLoading(false); // Hide loading when done
       console.groupEnd();
     });
 }
@@ -122,7 +122,7 @@ function loadConfigForSelected() {
     return;
   }
   
-  setLoading(true, '列情報を読み込んでいます...');
+  window.setLoading(true, '列情報を読み込んでいます...');
   
   runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
     .then(handleSheetDetailsSuccess)
@@ -158,8 +158,7 @@ function handleSheetDetailsSuccess(details) {
     showMessage('シートの詳細情報を取得できませんでした。', 'warning');
   }
   
-  setLoading(false);
-}
+  window.setLoading(false);
 
 // Handle sheet details loading error
 function handleSheetDetailsError(error) {
@@ -183,7 +182,7 @@ function runHeaderGuessing() {
     return;
   }
   
-  setLoading(true, 'AI搭載高精度列判定システムが分析中...');
+  window.setLoading(true, 'AI搭載高精度列判定システムが分析中...');
   
   runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
     .then(function(details) {
@@ -195,7 +194,7 @@ function runHeaderGuessing() {
       setTimeout(() => {
         populateConfig(configToUse);
         showMessage('AI列判定が完了しました！設定を確認して「保存・公開」を押してください。', 'success');
-        setLoading(false);
+        window.setLoading(false);
       }, 0);
     })
     .catch(function(error) {
@@ -219,7 +218,7 @@ function saveAndPublish() {
   freshSaveTimestamp = Date.now();
   window.freshSaveTimestamp = freshSaveTimestamp;
   
-  setLoading(true, '設定を保存し、ボードを公開しています...');
+  window.setLoading(true, '設定を保存し、ボードを公開しています...');
   
   const config = buildConfigObject();
   
@@ -234,7 +233,7 @@ function saveAndPublish() {
   
   runGasWithUserId('saveAndPublish', selectedSheet, config)
     .then(function(result) {
-      setLoading(false);
+      window.setLoading(false);
       isSaveInProgress = false;
       
       // Check if result has data (from integrated API) or legacy success status
@@ -258,7 +257,7 @@ function saveAndPublish() {
     })
     .catch(function(error) {
       logError('saveAndPublish error:', error);
-      setLoading(false);
+      window.setLoading(false);
       isSaveInProgress = false;
       
       // Clear caches after error and reload
@@ -273,12 +272,12 @@ function saveAndPublish() {
 
 // Unpublish board
 function unpublishBoard() {
-  setLoading(true, 'ボードの公開を停止中...');
+  window.setLoading(true, 'ボードの公開を停止中...');
   runGasWithUserId('unpublishBoard')
     .then(function(response) {
       console.log('公開停止レスポンス:', response);
       showMessage(response.message || '✅ 回答ボードの公開を停止しました。', 'success');
-      setLoading(false);
+      window.setLoading(false);
       if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
         window.unifiedCache.clear();
       }
@@ -363,7 +362,7 @@ function createFormWithConfig() {
   // userEmailは現在のユーザー情報から取得
   if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.adminEmail) {
     showMessage('ユーザー情報が取得できません。ページを再読み込みしてください。', 'error');
-    setLoading(false);
+    window.setLoading(false);
     return;
   }
   
@@ -393,7 +392,7 @@ function createFormWithConfig() {
           hideQuickStartProgress();
         }, 2000);
       }
-      setLoading(false);
+      window.setLoading(false);
     })
     .catch(function(error) {
       console.error('フォーム作成エラー:', error);
@@ -405,7 +404,7 @@ function createFormWithConfig() {
       }
       
       showMessage(errorMessage, 'error');
-      setLoading(false);
+      window.setLoading(false);
       
       // エラー時も進捗バーを非表示
       setTimeout(() => {
@@ -440,7 +439,7 @@ function addResource() {
     return;
   }
 
-  setLoading(true, 'リソースを追加しています...');
+  window.setLoading(true, 'リソースを追加しています...');
   runGasWithUserId('addSpreadsheetUrl', url)
     .then(function(result) {
       if (result.status === 'success') {
@@ -450,7 +449,7 @@ function addResource() {
       } else {
         showMessage(result.message || 'リソースの追加に失敗しました。', 'error');
       }
-      setLoading(false);
+      window.setLoading(false);
     })
     .catch(function(error) {
       handleError(error, 'addResource', 'リソースの追加に失敗しました。');
@@ -839,7 +838,7 @@ function handleQuickStart() {
         }, 3000);
       }
       
-      setLoading(false);
+      window.setLoading(false);
     })
     .catch(function(error) {
       logError('QuickStart error:', error);
@@ -856,7 +855,7 @@ function handleQuickStart() {
       
       quickstartBtn.disabled = false;
       quickstartText.textContent = 'クイックスタートを開始';
-      setLoading(false);
+      window.setLoading(false);
       
       // Hide progress bar after delay
       setTimeout(() => {
