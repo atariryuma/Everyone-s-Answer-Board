@@ -154,9 +154,8 @@ function verifyAdminAccess(userId) {
     cacheManager.remove(emailCacheKey);
     
     // 直接データベースから取得（キャッシュを経由しない）
-    // 認証関数のため、ExecutionContextManager最適化を除外
     console.log('verifyAdminAccess: データベースから直接ユーザー検索');
-    var userFromDb = fetchUserFromDatabase('userId', userId, null);
+    var userFromDb = fetchUserFromDatabase('userId', userId);
     
     console.log('verifyAdminAccess: データベース検索結果:', {
       found: !!userFromDb,
@@ -219,8 +218,7 @@ function processLoginFlow(userEmail) {
     }
 
     // 1. ユーザー情報をデータベースから取得
-    // ログイン処理のため、ExecutionContextManager最適化を除外
-    var userInfo = findUserByEmailDirect(userEmail);
+    var userInfo = findUserByEmail(userEmail);
 
     // 2. 既存ユーザーの処理
     if (userInfo) {
