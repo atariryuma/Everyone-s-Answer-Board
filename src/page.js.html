@@ -3041,7 +3041,9 @@ try {
   // システムフロー表示
   showSystemFlow();
   
-  window.studyQuestApp = new StudyQuestApp();
+  document.addEventListener('DOMContentLoaded', () => {
+  const app = new StudyQuestApp();
+});
   
   // Expose debug functions globally for console access
   window.debugAnswerCards = () => {
