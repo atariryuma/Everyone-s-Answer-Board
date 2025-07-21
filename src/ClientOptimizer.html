@@ -36,15 +36,15 @@ class GASOptimizer {
    */
   executeCall(functionName, args, resolve, reject) {
     this.activeCalls++;
-
+    
     // ローディング状態の管理
     this.setLoadingState(functionName, true);
 
-    // --- NEW ADDITION FOR DEBUGGING ---
+    // --- NEW ADDITION FOR DEBUGGING --- 
     console.log(`DEBUG: Attempting to call google.script.run.${functionName}`);
     console.log(`DEBUG: typeof google.script.run: ${typeof google.script.run}`);
     console.log(`DEBUG: typeof google.script.run[functionName]: ${typeof google.script.run[functionName]}`);
-    // --- END NEW ADDITION ---
+    // --- END NEW ADDITION --- 
 
     google.script.run
       .withSuccessHandler((result) => {
@@ -100,7 +100,7 @@ class GASOptimizer {
         return message;
       }
     }
-
+    
     return '予期しないエラーが発生しました。しばらく待ってから再度お試しください。';
   }
 
@@ -126,7 +126,7 @@ class GASOptimizer {
   async callWithCache(functionName, args, ttl = 5 * 60 * 1000) {
     const cacheKey = `${functionName}_${JSON.stringify(args)}`;
     const cached = this.cache.get(cacheKey);
-
+    
     if (cached && (Date.now() - cached.timestamp) < ttl) {
       return cached.data;
     }
@@ -144,7 +144,7 @@ class GASOptimizer {
    * バッチ処理対応の関数呼び出し
    */
   async batchCall(calls) {
-    const promises = calls.map(({ functionName, args }) =>
+    const promises = calls.map(({ functionName, args }) => 
       this.call(functionName, ...args).catch(error => ({ error, functionName }))
     );
 

@@ -27,11 +27,11 @@ function computeWebAppUrl() {
       /\/dev$/, // 開発エンドポイント
       /\/test$/ // テストエンドポイント
     ];
-
+    
     var isDevUrl = devPatterns.some(function(pattern) {
       return pattern.test(url);
     });
-
+    
     if (isDevUrl) {
       console.warn('開発モードのURLを検出しました: ' + url + ' フォールバックURLを使用します');
       return getFallbackUrl();
@@ -102,7 +102,7 @@ function getWebAppUrlCached() {
 
     // 新しいURLを計算
     var currentUrl = computeWebAppUrl();
-
+    
     // 有効なURLの場合のみキャッシュに保存
     if (currentUrl && !currentUrl.includes('googleusercontent.com') && !currentUrl.includes('userCodeAppPanel')) {
       cache.put(URL_CACHE_KEY, currentUrl, URL_CACHE_TTL);
@@ -117,7 +117,7 @@ function getWebAppUrlCached() {
     } else {
       console.warn('Invalid URL not cached: ' + currentUrl);
     }
-
+    
     return currentUrl;
   } catch (e) {
     console.error('getWebAppUrlCached error: ' + e.message);
@@ -149,14 +149,14 @@ function clearUrlCache() {
     var cache = CacheService.getScriptCache();
     cache.remove(URL_CACHE_KEY);
     console.log('URL cache cleared successfully');
-
+    
     // 新しいURLを即座に生成してキャッシュ
     var newUrl = computeWebAppUrl();
     if (newUrl && !newUrl.includes('googleusercontent.com') && !newUrl.includes('userCodeAppPanel')) {
       cache.put(URL_CACHE_KEY, newUrl, URL_CACHE_TTL);
       console.log('New URL cached:', newUrl);
     }
-
+    
     return newUrl;
   } catch (e) {
     console.error('clearUrlCache error:', e.message);
@@ -171,26 +171,26 @@ function clearUrlCache() {
 function forceUrlSystemReset() {
   try {
     console.log('Forcing URL system reset...');
-
+    
     // 全てのURLキャッシュをクリア
     var cache = CacheService.getScriptCache();
     cache.remove(URL_CACHE_KEY);
-
+    
     // 新しいURLを生成
     var newUrl = computeWebAppUrl();
     console.log('New URL generated:', newUrl);
-
+    
     // 開発URLチェック
     if (newUrl && (newUrl.includes('googleusercontent.com') || newUrl.includes('userCodeAppPanel'))) {
       console.warn('Development URL detected, using fallback');
       newUrl = getFallbackUrl();
     }
-
+    
     // 新しいURLをキャッシュ
     if (newUrl) {
       cache.put(URL_CACHE_KEY, newUrl, URL_CACHE_TTL);
     }
-
+    
     return {
       status: 'success',
       message: 'URLシステムがリセットされました',
@@ -224,18 +224,18 @@ function generateAppUrls(userId) {
         message: '無効なユーザーIDです。有効なIDを指定してください。'
       };
     }
-
+    
     var webAppUrl = getWebAppUrlCached();
-
+    
     // 最終的なURL検証を複数回実行
     var maxRetries = 3;
     for (var i = 0; i < maxRetries; i++) {
       if (!webAppUrl || webAppUrl.includes('googleusercontent.com') || webAppUrl.includes('userCodeAppPanel')) {
         console.warn('無効なURLが返されました（試行 ' + (i + 1) + '/' + maxRetries + '）: ' + webAppUrl);
-
+        
         // キャッシュをクリアして再取得
         webAppUrl = clearUrlCache();
-
+        
         if (i < maxRetries - 1) {
           // 再試行
           webAppUrl = computeWebAppUrl();
@@ -247,13 +247,13 @@ function generateAppUrls(userId) {
         break;
       }
     }
-
+    
     // 最終チェック: まだ開発URLが含まれている場合は強制的にフォールバック
     if (webAppUrl && (webAppUrl.includes('googleusercontent.com') || webAppUrl.includes('userCodeAppPanel'))) {
       console.error('開発URLが最終チェックで検出されました。フォールバックURLを使用します: ' + webAppUrl);
       webAppUrl = getFallbackUrl();
     }
-
+    
     if (!webAppUrl) {
       return {
         webAppUrl: '',
@@ -264,10 +264,10 @@ function generateAppUrls(userId) {
         message: 'WebアプリURLが取得できませんでした'
       };
     }
-
+    
     // URLエンコードして安全にユーザーIDを追加
     var encodedUserId = encodeURIComponent(userId.trim());
-
+    
     return {
       webAppUrl: webAppUrl,
       adminUrl: webAppUrl.replace(/\/dev$/, '/exec') +
@@ -286,39 +286,6 @@ function generateAppUrls(userId) {
       status: 'error',
       message: 'URLの生成に失敗しました: ' + e.message
     };
-  }
-}
-
-/**
- * Generate Google account chooser URL dynamically.
- * @returns {{url: string}}
- */
-function getGoogleSignInUrl() {
-  try {
-    var continueUrl = getWebAppUrlCached();
-    var domainInfo = getSystemDomainInfo();
-
-    var params = {
-      continue: continueUrl,
-      followup: continueUrl,
-      flowName: 'GlifWebSignIn',
-      flowEntry: 'AccountChooser'
-    };
-
-    if (domainInfo && domainInfo.adminDomain) {
-      params.hd = domainInfo.adminDomain;
-    }
-
-    var query = Object.keys(params)
-      .map(function(key) {
-        return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
-      })
-      .join('&');
-
-    return { url: 'https://accounts.google.com/v3/signin/accountchooser?' + query };
-  } catch (e) {
-    console.error('getGoogleSignInUrl error: ' + e.message);
-    return { url: 'https://accounts.google.com/' };
   }
 }
 

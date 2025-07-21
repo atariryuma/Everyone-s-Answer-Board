@@ -16,7 +16,7 @@ function runGasWithUserId(functionName, ...args) {
         logError('No userId available for:', functionName);
         throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
       }
-
+      
       // userIdを第一引数として追加
       return gasOptimizer.call(functionName, userId, ...args);
     }).catch((error) => {
@@ -24,7 +24,7 @@ function runGasWithUserId(functionName, ...args) {
       throw error;
     });
   }
-
+  
   // userIdを第一引数として追加
   return gasOptimizer.call(functionName, userId, ...args);
 }
@@ -48,7 +48,7 @@ function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
       }, ttl);
     });
   }
-
+  
   return unifiedCache.getOrSet(cacheKey, function() {
     return gasOptimizer.call(functionName, userId, ...args);
   }, ttl);
@@ -61,16 +61,16 @@ function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
 // Load current status from backend
 function loadStatus(forceRefresh = false) {
   updateUserActivity();
-
-  const statusMessage = forceRefresh ?
-    'システム情報を最新化しています...' :
+  
+  const statusMessage = forceRefresh ? 
+    'システム情報を最新化しています...' : 
     'ダッシュボードを読み込んでいます...';
-
+  
   setLoading(true, statusMessage);
-
+  
   const cacheKey = 'status_' + (userId || 'guest');
   const cacheTime = 60000; // 1分キャッシュ
-
+  
   if (forceRefresh) {
     // キャッシュを削除してから取得
     if (unifiedCache && unifiedCache.delete) {
@@ -113,15 +113,15 @@ function loadConfigForSelected() {
     logWarn('No sheet selected for config loading');
     return;
   }
-
+  
   if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
     logError('Missing required data for loadConfigForSelected');
     showMessage('スプレッドシートの情報が見つかりません。', 'error');
     return;
   }
-
+  
   setLoading(true, '列情報を読み込んでいます...');
-
+  
   runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
     .then(handleSheetDetailsSuccess)
     .catch(handleSheetDetailsError);
@@ -131,19 +131,19 @@ function loadConfigForSelected() {
 function handleSheetDetailsSuccess(details) {
   if (details && details.allHeaders) {
     populateHeaderOptions(details.allHeaders);
-
+    
     // Show config area and hide placeholder
     const configArea = document.getElementById('config-area');
     const configPlaceholder = document.getElementById('config-placeholder');
-
+    
     if (configArea) {
       configArea.classList.remove('hidden');
     }
-
+    
     if (configPlaceholder) {
       configPlaceholder.classList.add('hidden');
     }
-
+    
     if (details.guessedConfig) {
       // DOMの更新が完了するのを待ってからpopulateConfigを呼び出す
       setTimeout(() => {
@@ -155,7 +155,7 @@ function handleSheetDetailsSuccess(details) {
     logWarn('No headers in sheet details:', details);
     showMessage('シートの詳細情報を取得できませんでした。', 'warning');
   }
-
+  
   setLoading(false);
 }
 
@@ -175,21 +175,21 @@ function runHeaderGuessing() {
     showMessage('シートを選択してください。', 'warning');
     return;
   }
-
+  
   if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
     showMessage('スプレッドシートの情報が見つかりません。', 'error');
     return;
   }
-
+  
   setLoading(true, 'AI搭載高精度列判定システムが分析中...');
-
+  
   runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, selectedSheet)
     .then(function(details) {
       const configToUse = {
         ...details.guessedConfig,
         sheetName: selectedSheet
       };
-
+      
       setTimeout(() => {
         populateConfig(configToUse);
         showMessage('AI列判定が完了しました！設定を確認して「保存・公開」を押してください。', 'success');
@@ -211,34 +211,34 @@ function saveAndPublish() {
     showMessage('必須項目（回答データ列）が選択されていません。', 'error');
     return;
   }
-
+  
   // Set save protection flags to prevent interference
   isSaveInProgress = true;
   freshSaveTimestamp = Date.now();
   window.freshSaveTimestamp = freshSaveTimestamp;
-
+  
   setLoading(true, '設定を保存し、ボードを公開しています...');
-
+  
   const config = buildConfigObject();
-
+  
   // Clear all caches once before save
   if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
     window.unifiedCache.clear();
   }
-
+  
   if (window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
     window.gasOptimizer.clearCache();
   }
-
+  
   runGasWithUserId('saveAndPublish', selectedSheet, config)
     .then(function(result) {
       setLoading(false);
       isSaveInProgress = false;
-
+      
       // Check if result has data (from integrated API) or legacy success status
       if (result && (result.userInfo || result.status === 'success')) {
         showMessage('✅ 設定が保存され、ボードが公開されました！', 'success');
-
+        
         // Use fresh data from save response if available
         if (result.userInfo && result._meta) {
           logInfo('Using fresh data from save response');
@@ -258,12 +258,12 @@ function saveAndPublish() {
       logError('saveAndPublish error:', error);
       setLoading(false);
       isSaveInProgress = false;
-
+      
       // Clear caches after error and reload
       if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
         window.unifiedCache.clear();
       }
-
+      
       loadStatus(true);
       handleError(error, 'saveAndPublish', '設定の保存に失敗しました。システム状態を再読み込みしました。');
     });
@@ -313,42 +313,42 @@ function createFormWithConfig() {
   const questionTextarea = document.getElementById('custom-main-question');
   const classChoicesTextarea = document.getElementById('class-choices');
   const includeOthersOption = document.getElementById('include-others-option').checked;
-
+  
   if (!titleInput || !questionTextarea || !classChoicesTextarea) {
     showMessage('フォーム作成に必要な要素が見つかりません。', 'error');
     return;
   }
-
+  
   const title = titleInput.value.trim();
   const question = questionTextarea.value.trim();
   const classChoicesText = classChoicesTextarea.value.trim();
-
+  
   if (!title || !question) {
     showMessage('タイトルと問題文は必須です。', 'warning');
     return;
   }
-
+  
   if (!classChoicesText) {
     showMessage('クラス選択肢を入力してください。', 'warning');
     return;
   }
-
+  
   const classChoices = classChoicesText.split('\n')
     .map(choice => choice.trim())
     .filter(choice => choice.length > 0);
-
+  
   if (classChoices.length === 0) {
     showMessage('有効なクラス選択肢を入力してください。', 'warning');
     return;
   }
-
+  
   const config = {
     title: title,
     mainQuestion: question,
     classChoices: classChoices,
     includeOthers: includeOthersOption,
   };
-
+  
   hideFormConfigModal();
   setLoading(true, '新しいフォームを作成しています...');
 
@@ -359,17 +359,17 @@ function createFormWithConfig() {
     setLoading(false);
     return;
   }
-
+  
   const userEmail = currentStatus.userInfo.adminEmail;
-
+  
   google.script.run
     .withSuccessHandler(function(result) {
       if (result && result.status === 'success') {
         showMessage('✅ 新しいフォームが作成され、連携されました！', 'success');
-
+        
         // クラス選択肢をデータベースに保存
         saveClassChoicesToDatabase(classChoices);
-
+        
         // ステータスを更新
         loadStatus(true);
       } else {
@@ -402,7 +402,7 @@ function addResource() {
     showMessage('URL入力フィールドが見つかりません。', 'error');
     return;
   }
-
+  
   const url = urlInput.value.trim();
   if (!url) {
     showMessage('URLを入力してください。', 'warning');
@@ -436,7 +436,7 @@ function copyBoardUrl() {
   if (urlInput) {
     urlInput.select();
     urlInput.setSelectionRange(0, 99999); // For mobile devices
-
+    
     try {
       document.execCommand('copy');
       showMessage('URLがクリップボードにコピーされました！', 'success');
@@ -452,7 +452,7 @@ function copyFormUrl() {
   if (urlInput && urlInput.value) {
     urlInput.select();
     urlInput.setSelectionRange(0, 99999); // For mobile devices
-
+    
     try {
       // Try modern clipboard API first
       if (navigator.clipboard && window.isSecureContext) {
@@ -495,16 +495,10 @@ function openForm() {
 
 // Open app setup page
 function openAppSetupPage() {
-  runGasWithUserId('getWebAppUrlCached')
+  runGasWithUserId('getWebAppUrl')
     .then(function(webAppUrl) {
-      const adminUrl =
-        webAppUrl + '?mode=admin&userId=' + encodeURIComponent(userId);
       const setupUrl =
-        webAppUrl +
-        '?setup=true&mode=appsetup&userId=' +
-        encodeURIComponent(userId) +
-        '&return=' +
-        encodeURIComponent(adminUrl);
+        webAppUrl + '?setup=true&mode=appsetup&userId=' + encodeURIComponent(userId);
       window.location.href = setupUrl;
     })
     .catch(function(error) {
@@ -533,7 +527,7 @@ window.freshSaveTimestamp = freshSaveTimestamp;
 // Get optimal polling interval based on user activity
 function getOptimalPollInterval() {
   const timeSinceActivity = Date.now() - lastUserActivity;
-
+  
   if (timeSinceActivity < 2 * 60 * 1000) { // 2分以内
     return 30 * 1000; // 30秒間隔
   } else if (timeSinceActivity < 10 * 60 * 1000) { // 10分以内
@@ -557,26 +551,26 @@ function startSystemStatusUpdate() {
   statusPollTimer = setInterval(function() {
     // UIが非表示の時は更新しない
     if (document.hidden) return;
-
+    
     // Skip background updates if save operation is in progress or recently completed
     if (isSaveInProgress) {
       logDebug('Skipping background update: save in progress');
       return;
     }
-
+    
     const timeSinceFreshSave = Date.now() - freshSaveTimestamp;
     if (timeSinceFreshSave < FRESH_SAVE_PROTECTION_DURATION) {
       logDebug('Skipping background update: fresh save protection active');
       return;
     }
-
+    
     // 現在のポーリング間隔を確認し、必要に応じて調整
     const optimalInterval = getOptimalPollInterval();
     if (Math.abs(currentPollInterval - optimalInterval) > 30000) { // 30秒以上の差
       restartStatusPolling();
       return;
     }
-
+    
     // キャッシュを利用して静かに更新
     runGasWithUserId('getStatus', false)
       .then(function(status) {
@@ -634,13 +628,13 @@ function updateProgressStep(stepId, status, text, detail) {
   const dotElement = document.getElementById(`progress-step-${stepId}-dot`);
   const textElement = document.getElementById(`progress-step-${stepId}-text`);
   const detailElement = document.getElementById(`progress-step-${stepId}-detail`);
-
+  
   if (!stepElement || !dotElement || !textElement || !detailElement) return;
-
+  
   // Update text and detail
   textElement.textContent = text;
   detailElement.textContent = detail;
-
+  
   // Update visual state based on status
   switch (status) {
     case 'waiting':
@@ -671,15 +665,15 @@ function updateOverallProgress(percentage, statusMessage) {
   const progressBar = document.getElementById('progress-bar');
   const progressPercentage = document.getElementById('progress-percentage');
   const progressStatus = document.getElementById('progress-status');
-
+  
   if (progressBar) {
     progressBar.style.width = `${percentage}%`;
   }
-
+  
   if (progressPercentage) {
     progressPercentage.textContent = `${percentage}%`;
   }
-
+  
   if (progressStatus) {
     progressStatus.textContent = statusMessage;
   }
@@ -690,25 +684,25 @@ function simulateQuickStartProgress() {
   // Step 1: Folder creation
   updateProgressStep(1, 'active', 'ユーザー専用フォルダの作成', 'フォルダ構造を準備中...');
   updateOverallProgress(10, 'フォルダを作成しています...');
-
+  
   setTimeout(() => {
     updateProgressStep(1, 'completed', 'ユーザー専用フォルダの作成', '✅ フォルダが作成されました');
     updateProgressStep(2, 'active', 'Googleフォームとスプレッドシートの作成', 'データ収集の仕組みを構築中...');
     updateOverallProgress(35, 'フォームとスプレッドシートを作成しています...');
   }, 1500);
-
+  
   setTimeout(() => {
     updateProgressStep(2, 'completed', 'Googleフォームとスプレッドシートの作成', '✅ フォームとスプレッドシートが作成されました');
     updateProgressStep(3, 'active', '回答ボードの設定と公開', 'Webアプリケーションを設定中...');
     updateOverallProgress(70, '回答ボードを設定しています...');
   }, 3000);
-
+  
   setTimeout(() => {
     updateProgressStep(3, 'completed', '回答ボードの設定と公開', '✅ 回答ボードが公開されました');
     updateProgressStep(4, 'active', 'セットアップ完了', '利用準備が整いました！');
     updateOverallProgress(100, 'セットアップが完了しました！');
   }, 4500);
-
+  
   setTimeout(() => {
     updateProgressStep(4, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
   }, 5000);
@@ -718,44 +712,44 @@ function simulateQuickStartProgress() {
 function handleQuickStart() {
   const quickstartBtn = document.getElementById('quickstart-btn');
   const quickstartText = document.getElementById('quickstart-text');
-
+  
   if (!quickstartBtn || !quickstartText) {
     console.error('QuickStart elements not found');
     return;
   }
-
+  
   // Update button state
   quickstartBtn.disabled = true;
   quickstartText.textContent = 'セットアップ中...';
-
+  
   // Show progress bar and start simulation
   showQuickStartProgress();
   simulateQuickStartProgress();
-
+  
   // Show loading message optimized for QuickStart
   if (typeof setLoading === 'function') {
     setLoading(true, 'クイックスタートを実行中... 進捗は上記で確認できます');
   }
-
+  
   runGasWithUserId('quickStartSetup')
     .then(function(result) {
       if (result && result.status === 'success') {
         // Final progress update
         updateOverallProgress(100, 'セットアップが完了しました！');
         updateProgressStep(4, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
-
+        
         showMessage('✅ クイックスタートが完了しました！フォームとボードが自動作成されました。', 'success');
-
+        
         // Update status after quick start
         if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
           window.unifiedCache.clear();
         }
         loadStatus(true);
-
+        
         // Reset button state
         quickstartBtn.disabled = false;
         quickstartText.textContent = 'クイックスタート完了';
-
+        
         // Hide progress bar after delay and reset button
         setTimeout(() => {
           hideQuickStartProgress();
@@ -764,41 +758,41 @@ function handleQuickStart() {
         }, 5000);
       } else {
         logWarn('QuickStart returned error result:', result);
-
+        
         // Show error in progress
         updateProgressStep(4, 'error', 'セットアップエラー', result?.message || 'エラーが発生しました');
         updateOverallProgress(0, 'セットアップに失敗しました');
-
+        
         showMessage(result?.message || 'クイックスタートに失敗しました。', 'error');
-
+        
         quickstartBtn.disabled = false;
         quickstartText.textContent = 'クイックスタートを開始';
-
+        
         // Hide progress bar after delay
         setTimeout(() => {
           hideQuickStartProgress();
         }, 3000);
       }
-
+      
       setLoading(false);
     })
     .catch(function(error) {
       logError('QuickStart error:', error);
-
+      
       // Show error in progress
       updateProgressStep(4, 'error', 'セットアップエラー', '通信エラーが発生しました');
       updateOverallProgress(0, 'セットアップに失敗しました');
-
+      
       if (typeof handleError === 'function') {
         handleError(error, 'handleQuickStart', 'クイックスタートに失敗しました。');
       } else {
         showMessage('クイックスタートに失敗しました: ' + error.message, 'error');
       }
-
+      
       quickstartBtn.disabled = false;
       quickstartText.textContent = 'クイックスタートを開始';
       setLoading(false);
-
+      
       // Hide progress bar after delay
       setTimeout(() => {
         hideQuickStartProgress();
@@ -814,7 +808,7 @@ function handleQuickStart() {
 function initializeAPI() {
   // Start background status updates
   startSystemStatusUpdate();
-
+  
   // Setup user activity tracking
   document.addEventListener('click', updateUserActivity);
   document.addEventListener('keypress', updateUserActivity);
@@ -825,7 +819,7 @@ function initializeAPI() {
 function setupRealtimeUpdates() {
   // Update system status every 30 seconds
   setInterval(loadSystemStatus, 30000);
-
+  
   // Update answer count every 10 seconds when published
   setInterval(() => {
     const publishText = document.getElementById('info-publish-text');

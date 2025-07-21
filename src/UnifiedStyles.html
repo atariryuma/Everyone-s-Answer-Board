@@ -1,133 +1,68 @@
 <style>
 /* =============================================================================
-   StudyQuest - Unified CSS Styles (Bootstrap 5 Compatible)
-   Migrated from Tailwind CSS to Bootstrap with preserved custom styling
+   StudyQuest - Unified CSS Styles
+   Based on AdminPanel.html with additional styles from all HTML files
    ============================================================================= */
 
-/* Bootstrap 5 Custom Properties Override */
+/* CSS Variables - Comprehensive Color and Design System */
 :root {
-  --bs-font-sans-serif: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Google Sans', sans-serif;
-}
-
-/* CSS Variables - Modern Dark Theme Design System */
-:root {
-  /* Bootstrap Color System Override */
-  --bs-primary: #3b82f6;
-  --bs-secondary: #6366f1;
-  --bs-success: #10b981;
-  --bs-danger: #ef4444;
-  --bs-warning: #f59e0b;
-  --bs-info: #06b6d4;
-  --bs-light: #f1f5f9;
-
-  /* Dark Theme Background System */
-  --bs-dark: #0f172a;
-  --bs-body-bg: #1e293b;
-  --bs-body-color: #e2e8f0;
-
-  /* Legacy Support */
-  --color-primary: var(--bs-primary);
-  --color-background: var(--bs-body-bg);
-  --color-surface: rgba(30, 41, 59, 0.8);
-  --color-text: var(--bs-body-color);
-  --color-border: rgba(148, 163, 184, 0.2);
-  --color-accent: #fbbf24;
-
-  /* Surface Color System */
-  --color-surface-1: #334155;
-  --color-surface-2: #475569;
-  --color-surface-3: #64748b;
-
-  /* Text Color Hierarchy */
-  --color-text-primary: #f1f5f9;
-  --color-text-secondary: #e2e8f0;
-  --color-text-muted: #94a3b8;
-  --color-text-faded: #64748b;
-
-  /* Glass Morphism Enhanced */
-  --glass-bg: rgba(30, 41, 59, 0.8);
-  --glass-border: rgba(148, 163, 184, 0.2);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  --backdrop-blur: 20px;
-
-  /* Enhanced Shadow System */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
-  --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.3);
-
-  /* Animation System Enhanced */
-  --transition-duration: 0.2s;
-  --transition-easing: ease-out;
-  --transition-bounce: cubic-bezier(0.4, 0, 0.2, 1);
-  --animation-duration: 0.3s;
-  --animation-duration-slow: 0.6s;
-
+  /* Primary Color Palette */
+  --color-primary: #8be9fd;
+  --color-background: #1a1b26;
+  --color-surface: rgba(26,27,38,0.7);
+  --color-text: #c0caf5;
+  --color-border: rgba(255,255,255,0.1);
+  --color-accent: #facc15;
+  
+  /* Status Colors */
+  --color-success: #10b981;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+  --color-info: #3b82f6;
+  
   /* Google Workspace Colors */
   --color-google-blue: #4285f4;
   --color-google-green: #34a853;
   --color-google-yellow: #fbbc05;
   --color-google-red: #ea4335;
+  
+  /* Shadow System */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 8px 25px rgba(0, 0, 0, 0.15);
+  
+  /* Animation and Transition System */
+  --transition-duration: 0.2s;
+  --transition-easing: ease-out;
+  --animation-duration: 0.3s;
+  --backdrop-blur: 12px;
 }
 
 /* Base Styles */
-body {
-  margin: 0;
+body { 
+  margin: 0; 
   color: var(--color-text);
   background: var(--color-background);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Google Sans', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Google Sans', sans-serif;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   line-height: 1.6;
 }
 
-/* Enhanced Glass Panel Effects */
-.glass-panel {
-  background: var(--color-surface);
-  -webkit-backdrop-filter: blur(var(--backdrop-blur));
-  backdrop-filter: blur(var(--backdrop-blur));
-  border: 1px solid var(--color-border);
+/* Glass Panel Effects */
+.glass-panel { 
+  background: var(--color-surface); 
+  -webkit-backdrop-filter: blur(var(--backdrop-blur)); 
+  backdrop-filter: blur(var(--backdrop-blur)); 
+  border: 1px solid var(--color-border); 
   transition: all var(--transition-duration) var(--transition-easing);
   border-radius: 1rem;
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-.glass-panel:hover {
-  border-color: rgba(255,255,255,0.25);
-  will-change: border-color, box-shadow;
-  box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    0 1px 0 rgba(255, 255, 255, 0.08);
-  transform: translateY(-2px);
-}
-
-/* Enhanced Glass Panel Variant */
-.glass-panel-enhanced {
-  background: var(--glass-bg-enhanced);
-  -webkit-backdrop-filter: blur(24px) saturate(200%);
-  backdrop-filter: blur(24px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.125);
-  border-radius: 1.5rem;
-  box-shadow:
-    0 16px 64px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    0 2px 0 rgba(255, 255, 255, 0.08);
-  transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
-}
-
-.glass-panel-enhanced:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-4px) scale(1.02);
-  box-shadow:
-    0 24px 80px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    0 2px 0 rgba(255, 255, 255, 0.1);
+.glass-panel:hover { 
+  border-color: rgba(255,255,255,0.2); 
+  will-change: border-color; 
 }
 
 /* Google Workspace Integration Styles */
@@ -184,36 +119,36 @@ body {
   z-index: 1;
 }
 
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.btn:disabled { 
+  opacity: 0.5; 
+  cursor: not-allowed; 
   transform: none !important;
 }
 
-.btn:not(:disabled):hover {
-  transform: translate3d(0, -2px, 0);
-  will-change: transform;
+.btn:not(:disabled):hover { 
+  transform: translate3d(0, -2px, 0); 
+  will-change: transform; 
   box-shadow: var(--shadow-lg);
 }
 
-.btn:not(:disabled):active {
-  transform: translate3d(0, 0, 0);
+.btn:not(:disabled):active { 
+  transform: translate3d(0, 0, 0); 
 }
 
 /* Button Variants */
-.btn-primary {
+.btn-primary { 
   background: linear-gradient(135deg, var(--color-primary), #50fa7b);
   color: #000;
   font-weight: 700;
 }
 
-.btn-secondary {
+.btn-secondary { 
   background: rgba(255,255,255,0.1);
   color: var(--color-text);
   border: 1px solid rgba(255,255,255,0.2);
 }
 
-.btn-danger {
+.btn-danger { 
   background: var(--color-error);
   color: white;
 }
@@ -309,28 +244,28 @@ body {
 }
 
 /* Status Indicators */
-.status-indicator {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
+.status-indicator { 
+  width: 8px; 
+  height: 8px; 
+  border-radius: 50%; 
+  display: inline-block; 
   margin-right: 8px;
 }
 
-.status-active {
-  background-color: var(--color-success);
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+.status-active { 
+  background-color: var(--color-success); 
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); 
 }
 
-.status-inactive {
-  background-color: var(--color-warning);
+.status-inactive { 
+  background-color: var(--color-warning); 
 }
 
-.status-error {
-  background-color: var(--color-error);
+.status-error { 
+  background-color: var(--color-error); 
 }
 
-/* Enhanced Card System with Micro-interactions */
+/* Answer Card System (from Page.html) */
 .answer-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -339,21 +274,6 @@ body {
   transition: all var(--transition-duration) var(--transition-easing);
   position: relative;
   overflow: hidden;
-}
-
-.answer-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
-  transition: left 0.6s ease-in-out;
-}
-
-.answer-card:hover::before {
-  left: 100%;
 }
 
 .answer-card:hover {
@@ -477,9 +397,9 @@ body {
 
 /* Loading States */
 .loading-skeleton {
-  background: linear-gradient(90deg,
-    rgba(255,255,255,0.1) 25%,
-    rgba(255,255,255,0.2) 50%,
+  background: linear-gradient(90deg, 
+    rgba(255,255,255,0.1) 25%, 
+    rgba(255,255,255,0.2) 50%, 
     rgba(255,255,255,0.1) 75%);
   background-size: 200% 100%;
   animation: loading-skeleton 1.5s infinite;
@@ -488,9 +408,9 @@ body {
 }
 
 .skeleton {
-  background: linear-gradient(90deg,
-    rgba(255,255,255,0.1) 25%,
-    rgba(255,255,255,0.2) 50%,
+  background: linear-gradient(90deg, 
+    rgba(255,255,255,0.1) 25%, 
+    rgba(255,255,255,0.2) 50%, 
     rgba(255,255,255,0.1) 75%);
   background-size: 200% 100%;
   animation: skeleton-loading 1.5s infinite;
@@ -587,8 +507,8 @@ body {
 }
 
 /* Tooltip System */
-.tooltip {
-  position: relative;
+.tooltip { 
+  position: relative; 
 }
 
 .tooltip::after {
@@ -610,8 +530,8 @@ body {
   margin-bottom: 5px;
 }
 
-.tooltip:hover::after {
-  opacity: 1;
+.tooltip:hover::after { 
+  opacity: 1; 
 }
 
 /* Card Hover Effects */
@@ -722,10 +642,10 @@ body {
 }
 
 /* Accessibility */
-:focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 2px;
-  border-radius: 4px;
+:focus-visible { 
+  outline: 3px solid var(--color-primary); 
+  outline-offset: 2px; 
+  border-radius: 4px; 
 }
 
 .sr-only {
@@ -824,7 +744,7 @@ body {
 
 /* Font Styles */
 .game-font {
-  font-family: 'Inter', sans-serif;  font-weight: 700;
+  font-family: 'Press Start 2P', cursive;
   font-size: 0.75rem;
   letter-spacing: 0.05em;
 }
@@ -837,162 +757,6 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.5;
-}
-
-/* Bootstrap-compatible Custom Animations */
-.hover-scale-110 {
-  transition: transform var(--transition-duration) var(--transition-easing);
-  will-change: transform;
-}
-
-.hover-scale-110:hover {
-  transform: scale(1.1);
-}
-
-.hover-scale-105 {
-  transition: transform var(--transition-duration) var(--transition-easing);
-  will-change: transform;
-}
-
-.hover-scale-105:hover {
-  transform: scale(1.05);
-}
-
-.btn-hover-lift {
-  transition: all var(--transition-duration) var(--transition-easing);
-  will-change: transform, box-shadow;
-}
-
-.btn-hover-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-/* Custom Modal Animations */
-.modal-custom-fade {
-  animation: customModalFadeIn 0.3s ease-out;
-}
-
-.modal-custom-fade.fade-out {
-  animation: customModalFadeOut 0.3s ease-in;
-}
-
-@keyframes customModalFadeIn {
-  0% {
-    opacity: 0;
-    transform: scale(0.95) translateY(-10px);
-    backdrop-filter: blur(0px);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-    backdrop-filter: blur(10px);
-  }
-}
-
-@keyframes customModalFadeOut {
-  0% {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-    backdrop-filter: blur(10px);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(0.95) translateY(-10px);
-    backdrop-filter: blur(0px);
-  }
-}
-
-/* Enhanced Button Transitions */
-.btn-gradient-hover {
-  background-size: 200% 100%;
-  transition: background-position var(--transition-duration) var(--transition-easing),
-              transform var(--transition-duration) var(--transition-easing);
-}
-
-.btn-gradient-hover:hover {
-  background-position: 100% 0;
-  transform: translateY(-1px);
-}
-
-/* Missing Bootstrap Utilities */
-.white-space-pre-wrap {
-  white-space: pre-wrap;
-}
-
-.text-break-words {
-  word-break: break-word;
-  overflow-wrap: break-word;
-}
-
-/* Gap utilities for older Bootstrap versions */
-.gap-1 {
-  gap: 0.25rem !important;
-}
-
-.gap-2 {
-  gap: 0.5rem !important;
-}
-
-.gap-3 {
-  gap: 1rem !important;
-}
-
-/* Flex utilities enhancement */
-.flex-shrink-0 {
-  flex-shrink: 0 !important;
-}
-
-.flex-grow-1 {
-  flex-grow: 1 !important;
-}
-
-/* Min-width utilities */
-.min-w-150 {
-  min-width: 150px !important;
-}
-
-/* Height utilities */
-.h-1rem {
-  height: 1rem !important;
-}
-
-/* Custom spacing for specific needs */
-.space-y-1 > * + * {
-  margin-top: 0.25rem !important;
-}
-
-/* Icon Size System */
-.icon-size-xs {
-  width: 0.75rem !important;
-  height: 0.75rem !important;
-}
-
-.icon-size-sm {
-  width: 1rem !important;
-  height: 1rem !important;
-}
-
-.icon-size-md {
-  width: 1.25rem !important;
-  height: 1.25rem !important;
-}
-
-.icon-size-lg {
-  width: 1.5rem !important;
-  height: 1.5rem !important;
-}
-
-/* Status Dot System */
-.status-dot {
-  width: 0.5rem !important;
-  height: 0.5rem !important;
-  border-radius: 50% !important;
-  display: inline-block;
-}
-
-.status-dot-pulse {
-  animation: pulse 2s infinite;
 }
 
 /* Tailwind CSS Fallback */
@@ -1034,26 +798,26 @@ body {
     padding: 1rem 1.5rem;
     font-size: 16px;
   }
-
+  
   .form-control {
     padding: 1rem;
     font-size: 16px;
   }
-
+  
   .glass-panel {
     margin: 0.5rem;
     padding: 1rem;
   }
-
+  
   .responsive-grid {
     grid-template-columns: 1fr;
     gap: 1rem;
   }
-
+  
   .answer-card {
     padding: 1rem;
   }
-
+  
   .reaction-btn {
     padding: 0.5rem 0.75rem;
     font-size: 0.8rem;
@@ -1133,397 +897,5 @@ body {
   .responsive-grid {
     grid-template-columns: repeat(3, 1fr);
   }
-}
-
-/* =============================================================================
-   BOOTSTRAP 5 COMPATIBILITY & EXTENSIONS
-   ============================================================================= */
-
-/* Bootstrap Button Extensions - Preserve Custom Styling */
-.btn.btn-glass {
-  background: rgba(139,233,253,0.1);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(139,233,253,0.3);
-  color: var(--color-primary);
-}
-
-.btn.btn-game {
-  background: linear-gradient(135deg, var(--color-primary), #50fa7b);
-  color: #000;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  box-shadow: 0 4px 0 rgba(0,0,0,0.2);
-  border: 2px solid transparent;
-}
-
-/* Bootstrap Card Extensions */
-.card.glass-card {
-  background: var(--color-surface);
-  backdrop-filter: blur(var(--backdrop-blur));
-  border: 1px solid var(--color-border);
-}
-
-.card.glass-card:hover {
-  border-color: rgba(255,255,255,0.2);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-  transition: all var(--transition-duration) var(--transition-easing);
-}
-
-/* Bootstrap Form Extensions */
-.form-control.glass-input {
-  background: rgba(255,255,255,0.1);
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-  backdrop-filter: blur(8px);
-}
-
-.form-control.glass-input:focus {
-  background: rgba(255,255,255,0.15);
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 0.25rem rgba(139, 233, 253, 0.25);
-}
-
-.form-control.glass-input::placeholder {
-  color: rgba(192, 202, 245, 0.6);
-}
-
-/* Bootstrap Modal Extensions */
-.modal.glass-modal .modal-content {
-  background: var(--color-surface);
-  backdrop-filter: blur(var(--backdrop-blur));
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-}
-
-.modal-backdrop.glass-backdrop {
-  background-color: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(4px);
-}
-
-/* Bootstrap Badge Extensions */
-.badge.glass-badge {
-  background: rgba(139,233,253,0.2);
-  color: var(--color-primary);
-  border: 1px solid rgba(139,233,253,0.3);
-}
-
-/* Bootstrap Utility Extensions */
-.bg-glass {
-  background: var(--color-surface) !important;
-  backdrop-filter: blur(var(--backdrop-blur));
-}
-
-.border-glass {
-  border-color: var(--color-border) !important;
-}
-
-.text-glass {
-  color: var(--color-text) !important;
-}
-
-/* Custom Gradient Utilities (Bootstrap Extension) */
-.bg-gradient-primary {
-  background: linear-gradient(135deg, var(--color-primary), #50fa7b) !important;
-}
-
-.bg-gradient-google {
-  background: linear-gradient(135deg, var(--color-google-blue), var(--color-google-green)) !important;
-}
-
-.bg-gradient-danger {
-  background: linear-gradient(135deg, var(--color-error), #dc2626) !important;
-}
-
-/* Bootstrap Spinner Extensions */
-.spinner-border.glass-spinner {
-  color: var(--color-primary);
-}
-
-/* Bootstrap Alert Extensions */
-.alert.glass-alert {
-  background: var(--color-surface);
-  backdrop-filter: blur(var(--backdrop-blur));
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-}
-
-/* Responsive Design Utilities */
-.min-h-screen {
-  min-height: 100vh;
-}
-
-.min-h-100 {
-  min-height: 100%;
-}
-
-/* Game-style animations */
-@keyframes game-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-}
-
-.game-pulse {
-  animation: game-pulse 2s infinite;
-}
-
-/* Bootstrap Navigation Extensions */
-.navbar.glass-navbar {
-  background: var(--color-surface) !important;
-  backdrop-filter: blur(var(--backdrop-blur));
-  border-bottom: 1px solid var(--color-border);
-}
-
-/* Ensure Bootstrap doesn't override our custom properties */
-.btn:not([class*="btn-outline"]):not([class*="btn-link"]) {
-  border-color: transparent;
-}
-
-/* Preserve glass effects in Bootstrap components */
-.dropdown-menu.glass-dropdown {
-  background: var(--color-surface);
-  backdrop-filter: blur(var(--backdrop-blur));
-  border: 1px solid var(--color-border);
-}
-
-.dropdown-item {
-  color: var(--color-text);
-}
-
-.dropdown-item:hover {
-  background: rgba(255,255,255,0.1);
-  color: var(--color-text);
-}
-
-/* Fix Bootstrap focus states with our design */
-.form-control:focus,
-.form-select:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 0.25rem rgba(139, 233, 253, 0.25);
-}
-
-/* Bootstrap Toast Extensions */
-.toast.glass-toast {
-  background: var(--color-surface);
-  backdrop-filter: blur(var(--backdrop-blur));
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-}
-
-/* ========================================
-   Modern UX Micro-interactions & Animations
-   ======================================== */
-
-/* Smooth Page Transitions */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideInFromLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-100px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* Modern Card Entrance Animations */
-.card-entrance {
-  animation: fadeInUp 0.6s ease-out forwards;
-}
-
-.card-entrance-delayed {
-  opacity: 0;
-  animation: fadeInUp 0.6s ease-out 0.3s forwards;
-}
-
-.card-entrance-stagger {
-  opacity: 0;
-  animation: fadeInUp 0.6s ease-out 0.6s forwards;
-}
-
-/* Interactive Button Enhancements */
-.btn-enhanced {
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
-}
-
-.btn-enhanced::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  transition: width 0.4s ease, height 0.4s ease;
-}
-
-.btn-enhanced:active::before {
-  width: 300px;
-  height: 300px;
-}
-
-/* Pulse Animation for Important Elements */
-@keyframes pulse-subtle {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 0.8;
-  }
-}
-
-.pulse-animation {
-  animation: pulse-subtle 2s ease-in-out infinite;
-}
-
-/* Floating Action Animations */
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-.floating-element {
-  animation: float 3s ease-in-out infinite;
-}
-
-/* Loading State Enhancements */
-@keyframes shimmer {
-  0% {
-    background-position: -200px 0;
-  }
-  100% {
-    background-position: calc(200px + 100%) 0;
-  }
-}
-
-.loading-shimmer {
-  background: linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 100%);
-  background-size: 200px 100%;
-  animation: shimmer 1.5s infinite linear;
-}
-
-/* Success State Animations */
-@keyframes checkmarkDraw {
-  from {
-    stroke-dashoffset: 100;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-.success-checkmark {
-  stroke-dasharray: 100;
-  animation: checkmarkDraw 0.8s ease-out forwards;
-}
-
-/* Scroll-based Animations */
-.fade-in-on-scroll {
-  opacity: 0;
-  transform: translateY(50px);
-  transition: all 0.8s cubic-bezier(0.4, 0.0, 0.2, 1);
-}
-
-.fade-in-on-scroll.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* Modal Entrance/Exit Animations */
-.modal-fade-in {
-  animation: scaleIn 0.3s ease-out forwards;
-}
-
-.modal-fade-out {
-  animation: scaleIn 0.2s ease-in reverse forwards;
-}
-
-/* Notification Toast Animations */
-@keyframes slideInFromRight {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-.toast-slide-in {
-  animation: slideInFromRight 0.4s ease-out forwards;
-}
-
-/* Typing Indicator Animation */
-@keyframes typing {
-  0%, 60%, 100% {
-    transform: translateY(0);
-  }
-  30% {
-    transform: translateY(-10px);
-  }
-}
-
-.typing-indicator span {
-  display: inline-block;
-  animation: typing 1.4s ease-in-out infinite;
-}
-
-.typing-indicator span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.typing-indicator span:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-/* Smooth Hover Transitions for Interactive Elements */
-.interactive-element {
-  transition: all 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
-  cursor: pointer;
-}
-
-.interactive-element:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.1);
-}
-
-.interactive-element:active {
-  transform: translateY(0);
-  filter: brightness(0.95);
-  transition: all 0.1s ease;
 }
 </style>

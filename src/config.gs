@@ -227,7 +227,7 @@ function getConfig(requestUserId, sheetName, forceRefresh = false) {
     } else if (headers && headers.length > 0) {
       // 4.【保存設定がない場合のみ】新しい自動マッピングを実行
       console.log('保存済み設定がないため、自動マッピングを実行します。');
-      const guessedConfig = autoMapHeaders(headers);
+      const guessedConfig = autoMapHeaders(headers); 
       finalConfig.opinionHeader = guessedConfig.opinionHeader || '';
       finalConfig.reasonHeader = guessedConfig.reasonHeader || '';
       finalConfig.nameHeader = guessedConfig.nameHeader || '';
@@ -289,7 +289,7 @@ function autoMapHeaders(headers, sheetName = null) {
   const processedHeaders = headers.map((header, index) => {
     const cleaned = String(header || '').trim();
     const lower = cleaned.toLowerCase();
-
+    
     return {
       original: header,
       cleaned: cleaned,
@@ -315,7 +315,7 @@ function autoMapHeaders(headers, sheetName = null) {
       }
 
       const score = calculateHeaderScore(headerInfo, mappingRules[mappingKey], mappingKey);
-
+      
       if (score > bestScore) {
         bestScore = score;
         bestHeader = headerInfo;
@@ -333,8 +333,8 @@ function autoMapHeaders(headers, sheetName = null) {
 
   // 3. 主要な回答列が見つからない場合のフォールバック処理
   if (!result.opinionHeader) {
-    const candidateHeaders = processedHeaders.filter(h =>
-      !usedHeaders.has(h.index) &&
+    const candidateHeaders = processedHeaders.filter(h => 
+      !usedHeaders.has(h.index) && 
       !h.isMetadata &&
       h.cleaned.length > 0
     );
@@ -346,7 +346,7 @@ function autoMapHeaders(headers, sheetName = null) {
         const bestPriority = calculateFallbackPriority(best);
         return currentPriority > bestPriority ? current : best;
       });
-
+      
       result.opinionHeader = fallbackHeader.original;
       usedHeaders.add(fallbackHeader.index);
     }
@@ -463,12 +463,12 @@ function adjustScoreByContext(score, headerInfo, mappingType) {
  */
 function isMetadataColumn(header) {
   const metadataPatterns = [
-    'タイムスタンプ', 'timestamp', 'メールアドレス', 'email',
+    'タイムスタンプ', 'timestamp', 'メールアドレス', 'email', 
     'id', 'uuid', '更新日時', '作成日時', 'created_at', 'updated_at'
   ];
-
+  
   const headerLower = header.toLowerCase();
-  return metadataPatterns.some(pattern =>
+  return metadataPatterns.some(pattern => 
     headerLower.includes(pattern.toLowerCase())
   );
 }
@@ -478,21 +478,21 @@ function isMetadataColumn(header) {
  */
 function calculateFallbackPriority(headerInfo) {
   let priority = 0;
-
+  
   // 長い説明的なヘッダーを優先
   priority += headerInfo.length * 0.1;
-
+  
   // 日本語が含まれる場合は優先
   if (headerInfo.hasJapanese) {
     priority += 10;
   }
-
+  
   // 質問らしいパターン
-  if (headerInfo.lower.includes('ください') || headerInfo.lower.includes('何') ||
+  if (headerInfo.lower.includes('ください') || headerInfo.lower.includes('何') || 
       headerInfo.lower.includes('どう') || headerInfo.lower.includes('?')) {
     priority += 15;
   }
-
+  
   return priority;
 }
 
@@ -507,7 +507,7 @@ function analyzeColumnContent(sheetName, processedHeaders) {
 
     const analysis = {};
     const lastRow = Math.min(sheet.getLastRow(), 21); // 最大20行まで分析
-
+    
     processedHeaders.forEach((headerInfo, index) => {
       if (lastRow <= 1) return; // データがない場合
 
@@ -523,10 +523,10 @@ function analyzeColumnContent(sheetName, processedHeaders) {
           maxLength: Math.max(...columnData.map(val => val.length)),
           hasLongText: columnData.some(val => val.length > 50),
           hasShortText: columnData.every(val => val.length < 20),
-          containsReasonWords: columnData.some(val =>
+          containsReasonWords: columnData.some(val => 
             val.includes('なぜなら') || val.includes('理由') || val.includes('から') || val.includes('ので')
           ),
-          containsClassPattern: columnData.some(val =>
+          containsClassPattern: columnData.some(val => 
             /^\d+[年組]/.test(val) || /^[A-Z]\d*$/.test(val)
           ),
           dataCount: columnData.length
@@ -553,7 +553,7 @@ function refineResultsWithContentAnalysis(result, contentAnalysis, processedHead
   if (refinedResult.opinionHeader) {
     const opinionIndex = processedHeaders.findIndex(h => h.original === refinedResult.opinionHeader);
     const analysis = contentAnalysis[opinionIndex];
-
+    
     if (analysis && analysis.avgLength < 10 && !analysis.hasLongText) {
       // 短いテキストばかりの場合、本当に回答列か確認
       const betterCandidate = findBetterOpinionColumn(contentAnalysis, processedHeaders, refinedResult);
@@ -567,7 +567,7 @@ function refineResultsWithContentAnalysis(result, contentAnalysis, processedHead
   if (refinedResult.reasonHeader) {
     const reasonIndex = processedHeaders.findIndex(h => h.original === refinedResult.reasonHeader);
     const analysis = contentAnalysis[reasonIndex];
-
+    
     if (analysis && analysis.containsReasonWords) {
       // 理由を示すキーワードが含まれている場合、信頼度を上げる
       console.log('理由列の信頼度が高いことを確認しました');
@@ -578,7 +578,7 @@ function refineResultsWithContentAnalysis(result, contentAnalysis, processedHead
   if (refinedResult.classHeader) {
     const classIndex = processedHeaders.findIndex(h => h.original === refinedResult.classHeader);
     const analysis = contentAnalysis[classIndex];
-
+    
     if (analysis && analysis.containsClassPattern) {
       console.log('クラス列でクラス番号パターンを確認しました');
     }
@@ -592,20 +592,20 @@ function refineResultsWithContentAnalysis(result, contentAnalysis, processedHead
  */
 function findBetterOpinionColumn(contentAnalysis, processedHeaders, currentResult) {
   const usedHeaders = Object.values(currentResult).filter(v => v);
-
+  
   for (let i = 0; i < processedHeaders.length; i++) {
     const header = processedHeaders[i];
     const analysis = contentAnalysis[i];
-
+    
     if (usedHeaders.includes(header.original) || header.isMetadata) {
       continue;
     }
-
+    
     if (analysis && (analysis.hasLongText || analysis.avgLength > 30)) {
       return header.original;
     }
   }
-
+  
   return null;
 }
 
@@ -644,9 +644,9 @@ function saveAndActivateSheet(requestUserId, spreadsheetId, sheetName, config) {
     };
 
     // 統合処理（バッチモード使用）
-    saveSheetConfig(requestUserId, spreadsheetId, sheetName, config, {
-      batchMode: true,
-      displayOptions: displayOptions
+    saveSheetConfig(requestUserId, spreadsheetId, sheetName, config, { 
+      batchMode: true, 
+      displayOptions: displayOptions 
     });
     console.log('saveAndActivateSheet: バッチ処理完了');
 
@@ -702,16 +702,16 @@ function saveAndPublishLegacy(requestUserId, sheetName, config) {
     console.log('saveAndPublish: 共有Sheetsサービス作成完了');
 
     // 2. 設定を保存（最適化モード使用）
-    saveSheetConfig(requestUserId, spreadsheetId, sheetName, config, {
-      sheetsService: sheetsService,
-      userInfo: userInfo
+    saveSheetConfig(requestUserId, spreadsheetId, sheetName, config, { 
+      sheetsService: sheetsService, 
+      userInfo: userInfo 
     });
     console.log('saveAndPublish: 設定保存完了');
 
     // 3. シートをアクティブ化（最適化モード使用）
-    switchToSheet(requestUserId, spreadsheetId, sheetName, {
-      sheetsService: sheetsService,
-      userInfo: userInfo
+    switchToSheet(requestUserId, spreadsheetId, sheetName, { 
+      sheetsService: sheetsService, 
+      userInfo: userInfo 
     });
     console.log('saveAndPublish: シート切り替え完了');
 
@@ -720,9 +720,9 @@ function saveAndPublishLegacy(requestUserId, sheetName, config) {
       showNames: !!config.showNames,
       showCounts: config.showCounts !== undefined ? !!config.showCounts : false
     };
-    setDisplayOptions(requestUserId, displayOptions, {
-      sheetsService: sheetsService,
-      userInfo: userInfo
+    setDisplayOptions(requestUserId, displayOptions, { 
+      sheetsService: sheetsService, 
+      userInfo: userInfo 
     });
     console.log('saveAndPublish: 表示オプション設定完了');
 
@@ -736,7 +736,7 @@ function saveAndPublishLegacy(requestUserId, sheetName, config) {
       // キャッシュクリアに失敗してもアプリケーション動作には影響しないため継続
     }
     console.log('saveAndPublish: 全キャッシュクリア完了');
-
+    
     // 6. 統合APIで最新ステータスを取得
     const finalStatus = getInitialData(requestUserId);
     console.log('saveAndPublish: 統合API経由で最新ステータス取得完了');
@@ -760,7 +760,7 @@ function republishBoard(requestUserId) {
   if (!requestUserId) {
     requestUserId = getUserId();
   }
-
+  
   verifyUserAccess(requestUserId);
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -774,7 +774,7 @@ function republishBoard(requestUserId) {
     }
 
     const configJson = JSON.parse(userInfo.configJson || '{}');
-
+    
     // 既存の公開設定をチェック
     if (!configJson.publishedSpreadsheetId || !configJson.publishedSheetName) {
       throw new Error('公開するシートが設定されていません。管理パネルから設定を行ってください。');
@@ -791,7 +791,7 @@ function republishBoard(requestUserId) {
     });
 
     console.log('republishBoard完了: シート=%s', configJson.publishedSheetName);
-
+    
     return {
       success: true,
       message: '回答ボードが再公開されました',
@@ -969,7 +969,7 @@ function autoMapSheetHeaders(requestUserId, sheetName, overrides) {
     if (!headers || headers.length === 0) {
       return null;
     }
-
+    
     // 新しい高精度自動判定機能を使用
     const mappingResult = autoMapHeaders(headers, sheetName);
 
@@ -1000,10 +1000,10 @@ function autoMapSheetHeaders(requestUserId, sheetName, overrides) {
       nameHeader: mappingResult.nameHeader || '',
       classHeader: mappingResult.classHeader || ''
     };
-
+    
     debugLog('高精度自動マッピング結果 for ' + sheetName + ': ' + JSON.stringify(mapping));
     return mapping;
-
+    
   } catch (e) {
     console.error('autoMapSheetHeaders エラー: ' + e.message);
     return null;
@@ -1063,9 +1063,9 @@ function addSpreadsheetUrl(requestUserId, url) {
     // 必要最小限のキャッシュ無効化
     invalidateUserCache(currentUserId, userInfo.adminEmail, spreadsheetId, true);
 
-    return {
-      status: 'success',
-      message: 'スプレッドシートが正常に追加されました。',
+    return { 
+      status: 'success', 
+      message: 'スプレッドシートが正常に追加されました。', 
       sheets: sheets,
       spreadsheetId: spreadsheetId,
       autoSelectFirst: sheets.length > 0 ? sheets[0].name : null,
@@ -1151,7 +1151,7 @@ function setDisplayOptions(requestUserId, displayOptions, options = {}) {
     }
 
     var configJson = JSON.parse(userInfo.configJson || '{}');
-
+    
     // 各オプションを個別にチェックして設定（undefinedの場合は既存値を保持）
     if (displayOptions.showNames !== undefined) {
       configJson.showNames = displayOptions.showNames;
@@ -1165,7 +1165,7 @@ function setDisplayOptions(requestUserId, displayOptions, options = {}) {
       // showNamesからdisplayModeを設定（後方互換性）
       configJson.displayMode = displayOptions.showNames ? 'named' : 'anonymous';
     }
-
+    
     configJson.lastModified = new Date().toISOString();
 
     console.log('setDisplayOptions: 設定更新', displayOptions);
@@ -1292,13 +1292,13 @@ function verifyUserAuthentication(requestUserId) {
       var domainInfo = getDeployUserDomainInfo();
       if (domainInfo.deployDomain && domainInfo.deployDomain !== '' && !domainInfo.isDomainMatch) {
         console.warn('Domain access denied:', domainInfo.currentDomain, 'vs', domainInfo.deployDomain);
-        return {
-          authenticated: false,
-          email: null,
-          error: `ドメインアクセスが制限されています。許可されたドメイン: ${domainInfo.deployDomain}, 現在のドメイン: ${domainInfo.currentDomain}`
+        return { 
+          authenticated: false, 
+          email: null, 
+          error: `ドメインアクセスが制限されています。許可されたドメイン: ${domainInfo.deployDomain}, 現在のドメイン: ${domainInfo.currentDomain}` 
         };
       }
-
+      
       return { authenticated: true, email: email };
     } else {
       return { authenticated: false, email: null };
@@ -1403,31 +1403,31 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
 function createExecutionContext(requestUserId) {
   const startTime = new Date().getTime();
   console.log('🚀 ExecutionContext作成開始: userId=%s', requestUserId);
-
+  
   try {
     // 1. 共有リソースを一括作成（1回のみ）
     const sheetsService = getSheetsService();
     const userInfo = getCachedUserInfo(requestUserId);
-
+    
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
-
+    
     // 2. 実行コンテキスト構築
     const context = {
       // 基本情報
       requestUserId: requestUserId,
       startTime: startTime,
-
+      
       // 共有リソース
       sheetsService: sheetsService,
       userInfo: JSON.parse(JSON.stringify(userInfo)), // Deep copy
-
+      
       // 変更トラッキング
       pendingUpdates: {},
       configChanges: {},
       hasChanges: false,
-
+      
       // パフォーマンス情報
       stats: {
         sheetsServiceCreations: 1,
@@ -1437,12 +1437,12 @@ function createExecutionContext(requestUserId) {
       }
     };
     console.log('DEBUG: context.sheetsService set to:', JSON.stringify(context.sheetsService, null, 2));
-
+    
     const endTime = new Date().getTime();
     console.log('✅ ExecutionContext作成完了: %dms', endTime - startTime);
-
+    
     return context;
-
+    
   } catch (error) {
     console.error('❌ ExecutionContext作成エラー:', error.message);
     throw new Error('実行コンテキストの初期化に失敗しました: ' + error.message);
@@ -1456,15 +1456,15 @@ function createExecutionContext(requestUserId) {
  */
 function updateUserOptimized(context, updateData) {
   console.log('💾 updateUserOptimized: 変更をコンテキストに蓄積');
-
+  
   // 変更をpendingUpdatesに蓄積（DB書き込みはしない）
   context.pendingUpdates = {...context.pendingUpdates, ...updateData};
-
+  
   // メモリ内のuserInfoも即座に更新（後続処理で使用可能）
   context.userInfo = {...context.userInfo, ...updateData};
   context.hasChanges = true;
   context.stats.operationsCount++;
-
+  
   console.log('📊 蓄積された変更数: %d', Object.keys(context.pendingUpdates).length);
 }
 
@@ -1475,23 +1475,23 @@ function updateUserOptimized(context, updateData) {
 function commitAllChanges(context) {
   const startTime = new Date().getTime();
   console.log('💽 commitAllChanges: 一括DB書き込み開始');
-
+  
   if (!context.hasChanges || Object.keys(context.pendingUpdates).length === 0) {
     console.log('📝 変更なし: DB書き込みをスキップ');
     return;
   }
-
+  
   try {
     // 既存のupdateUserの内部実装を使用（ただしSheetsServiceは再利用）
     updateUserDirect(context.sheetsService, context.requestUserId, context.pendingUpdates);
-
+    
     const endTime = new Date().getTime();
-    console.log('✅ 一括DB書き込み完了: %dms, 変更項目数: %d',
+    console.log('✅ 一括DB書き込み完了: %dms, 変更項目数: %d', 
       endTime - startTime, Object.keys(context.pendingUpdates).length);
-
+    
     // 統計更新
     context.stats.dbQueries++; // コミット時の1回をカウント
-
+    
   } catch (error) {
     console.error('❌ 一括DB書き込みエラー:', error.message);
     throw new Error('設定の保存に失敗しました: ' + error.message);
@@ -1508,19 +1508,19 @@ function updateUserDirect(sheetsService, userId, updateData) {
   var props = PropertiesService.getScriptProperties();
   var dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
   var sheetName = 'Users';
-
+  
   // 現在のデータを取得（提供されたSheetsServiceを使用）
   var data = batchGetSheetsData(sheetsService, dbId, ["'" + sheetName + "'!A:H"]);
   var values = data.valueRanges[0].values || [];
-
+  
   if (values.length === 0) {
     throw new Error('データベースが空です');
   }
-
+  
   var headers = values[0];
   var userIdIndex = headers.indexOf('userId');
   var rowIndex = -1;
-
+  
   // ユーザーの行を特定
   for (var i = 1; i < values.length; i++) {
     if (values[i][userIdIndex] === userId) {
@@ -1528,11 +1528,11 @@ function updateUserDirect(sheetsService, userId, updateData) {
       break;
     }
   }
-
+  
   if (rowIndex === -1) {
     throw new Error('更新対象のユーザーが見つかりません');
   }
-
+  
   // 更新データを適用
   var updateRequests = [];
   Object.keys(updateData).forEach(function(field) {
@@ -1544,7 +1544,7 @@ function updateUserDirect(sheetsService, userId, updateData) {
       });
     }
   });
-
+  
   if (updateRequests.length > 0) {
     batchUpdateSheetsData(sheetsService, dbId, updateRequests);
   }
@@ -1573,7 +1573,7 @@ function getColumnLetter(num) {
 function buildResponseFromContext(context) {
   const startTime = new Date().getTime();
   console.log('🏗️ buildResponseFromContext: DB検索なしでレスポンス構築');
-
+  
   try {
     // 最新のuserInfoから必要な情報を取得
     const userInfo = context.userInfo;
@@ -1590,13 +1590,13 @@ function buildResponseFromContext(context) {
     const opinionHeader = activeSheetConfig.opinionHeader || '';
     const nameHeader = activeSheetConfig.nameHeader || '';
     const classHeader = activeSheetConfig.classHeader || '';
-
+    
     // 基本的なレスポンス構造を構築
     const response = {
       userInfo: userInfo,
       isPublished: configJson.appPublished || false,
       setupStep: 3, // saveAndPublish完了時は常にStep 3
-
+      
       // URL情報（キャッシュされた値を使用）
       appUrls: {
         webAppUrl: ScriptApp.getService().getUrl(),
@@ -1605,7 +1605,7 @@ function buildResponseFromContext(context) {
         adminUrl: ScriptApp.getService().getUrl() + '?mode=admin&userId=' + context.requestUserId,
         status: 'success'
       },
-
+      
       // スプレッドシート情報（既存データから構築）
       activeSheetName: publishedSheetName,
 
@@ -1621,7 +1621,7 @@ function buildResponseFromContext(context) {
         setupStatus: configJson.setupStatus || 'initial',
         isPublished: configJson.appPublished || false,
       },
-
+      
       // パフォーマンス統計
       _meta: {
         executionTime: new Date().getTime() - context.startTime,
@@ -1630,7 +1630,7 @@ function buildResponseFromContext(context) {
         stats: context.stats
       }
     };
-
+    
     // スプレッドシートの詳細情報が必要な場合は追加取得
     if (spreadsheetId && publishedSheetName) {
       try {
@@ -1649,7 +1649,7 @@ function buildResponseFromContext(context) {
           nameHeader: '',
           classHeader: '',
         };
-
+        
       } catch (e) {
         console.warn('buildResponseFromContext: シート詳細取得エラー（基本情報のみで継続）:', e.message);
         response.allSheets = [];
@@ -1663,12 +1663,12 @@ function buildResponseFromContext(context) {
         };
       }
     }
-
+    
     const endTime = new Date().getTime();
     console.log('✅ レスポンス構築完了: %dms', endTime - startTime);
-
+    
     return response;
-
+    
   } catch (error) {
     console.error('❌ buildResponseFromContext エラー:', error.message);
     throw new Error('レスポンス構築に失敗しました: ' + error.message);
@@ -1728,7 +1728,7 @@ function getSheetDetails(context, spreadsheetId, sheetName) {
 
 /**
  * コンテキストから設定を取得（DB検索なし）
- * @param {object} context - 実行コンテキスト
+ * @param {object} context - 実行コンテキスト  
  * @param {string} sheetName - シート名
  * @returns {object} 設定オブジェクト
  */
@@ -1759,11 +1759,11 @@ function getConfigFromContext(context, sheetName) {
  */
 function saveSheetConfigInContext(context, spreadsheetId, sheetName, config) {
   console.log('💾 saveSheetConfigInContext: インメモリ更新');
-
+  
   try {
     const configJson = JSON.parse(context.userInfo.configJson || '{}');
     const sheetKey = 'sheet_' + sheetName;
-
+    
     // シート固有の設定を準備し、グローバル設定と重複するキーを削除
     const sheetConfig = { ...config };
     delete sheetConfig.showNames;
@@ -1775,14 +1775,14 @@ function saveSheetConfigInContext(context, spreadsheetId, sheetName, config) {
       ...sheetConfig,
       lastModified: new Date().toISOString()
     };
-
+    
     // updateUserOptimizedを使用してコンテキストに変更を蓄積
-    updateUserOptimized(context, {
-      configJson: JSON.stringify(configJson)
+    updateUserOptimized(context, { 
+      configJson: JSON.stringify(configJson) 
     });
-
+    
     console.log('✅ シート設定をコンテキストに保存: %s', sheetKey);
-
+    
   } catch (error) {
     console.error('❌ saveSheetConfigInContext エラー:', error.message);
     throw new Error('シート設定の保存に失敗しました: ' + error.message);
@@ -1792,28 +1792,28 @@ function saveSheetConfigInContext(context, spreadsheetId, sheetName, config) {
 /**
  * コンテキスト版: シート切り替え（インメモリ更新のみ）
  * @param {object} context - 実行コンテキスト
- * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} spreadsheetId - スプレッドシートID  
  * @param {string} sheetName - シート名
  */
 function switchToSheetInContext(context, spreadsheetId, sheetName) {
   console.log('🔄 switchToSheetInContext: インメモリ更新');
-
+  
   try {
     const configJson = JSON.parse(context.userInfo.configJson || '{}');
-
+    
     // アクティブシート情報を更新
     configJson.publishedSpreadsheetId = spreadsheetId;
     configJson.publishedSheetName = sheetName;
     configJson.appPublished = true;
     configJson.lastModified = new Date().toISOString();
-
+    
     // updateUserOptimizedを使用してコンテキストに変更を蓄積
-    updateUserOptimized(context, {
-      configJson: JSON.stringify(configJson)
+    updateUserOptimized(context, { 
+      configJson: JSON.stringify(configJson) 
     });
-
+    
     console.log('✅ シート切り替えをコンテキストに保存: %s', sheetName);
-
+    
   } catch (error) {
     console.error('❌ switchToSheetInContext エラー:', error.message);
     throw new Error('シート切り替えに失敗しました: ' + error.message);
@@ -1827,10 +1827,10 @@ function switchToSheetInContext(context, spreadsheetId, sheetName) {
  */
 function setDisplayOptionsInContext(context, displayOptions) {
   console.log('🎛️ setDisplayOptionsInContext: インメモリ更新');
-
+  
   try {
     const configJson = JSON.parse(context.userInfo.configJson || '{}');
-
+    
     // 表示オプションを更新
     if (displayOptions.showNames !== undefined) {
       configJson.showNames = displayOptions.showNames;
@@ -1844,16 +1844,16 @@ function setDisplayOptionsInContext(context, displayOptions) {
       // 後方互換性
       configJson.displayMode = displayOptions.showNames ? 'named' : 'anonymous';
     }
-
+    
     configJson.lastModified = new Date().toISOString();
-
+    
     // updateUserOptimizedを使用してコンテキストに変更を蓄積
-    updateUserOptimized(context, {
-      configJson: JSON.stringify(configJson)
+    updateUserOptimized(context, { 
+      configJson: JSON.stringify(configJson) 
     });
-
+    
     console.log('✅ 表示オプションをコンテキストに保存:', displayOptions);
-
+    
   } catch (error) {
     console.error('❌ setDisplayOptionsInContext エラー:', error.message);
     throw new Error('表示オプションの設定に失敗しました: ' + error.message);
@@ -1886,20 +1886,20 @@ function saveAndPublish(requestUserId, sheetName, config) {
 
     // Phase 2: インメモリ更新（DB書き込みなし）
     console.log('💾 Phase 2: インメモリ更新開始');
-
+    
     // 2-1. シート設定保存
     saveSheetConfigInContext(context, spreadsheetId, sheetName, config);
-
+    
     // 2-2. シート切り替え
     switchToSheetInContext(context, spreadsheetId, sheetName);
-
+    
     // 2-3. 表示オプション設定
     const displayOptions = {
       showNames: !!config.showNames,
       showCounts: config.showCounts !== undefined ? !!config.showCounts : false
     };
     setDisplayOptionsInContext(context, displayOptions);
-
+    
     console.log('✅ Phase 2完了: 全設定をコンテキストに蓄積');
 
     // Phase 3: 一括DB書き込み（1回のみ）
