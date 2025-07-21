@@ -897,11 +897,25 @@ function setupRealtimeUpdates() {
 
 // Initialize when DOM is ready
 if (document.readyState !== 'loading') {
-  setTimeout(initializeAPI, 200);
+  initializeAPI();
 } else {
   document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(initializeAPI, 200);
+    initializeAPI();
   });
+}
+
+// Initialize API communications
+function initializeAPI() {
+  // Start background status updates
+  startSystemStatusUpdate();
+  
+  // Setup user activity tracking
+  document.addEventListener('click', updateUserActivity);
+  document.addEventListener('keypress', updateUserActivity);
+  document.addEventListener('scroll', updateUserActivity);
+
+  // 初回ロード時にシステムステータスをロード
+  loadStatus();
 }
 
 // Load user information
