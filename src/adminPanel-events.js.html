@@ -85,9 +85,6 @@ function setupEventListeners() {
     createBoardBtn.addEventListener('click', function() {
       if (typeof showFormConfigModal === 'function') {
         showFormConfigModal();
-      } else {
-        console.error('showFormConfigModal function not found');
-        showMessage('フォーム作成機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
       }
     });
   }

@@ -1,6 +1,11 @@
 <style>
   /* Admin Panel Specific Styles */
 
+  body {
+    background-color: #1a1b26; /* Tailwindのbg-[#1a1b26]に対応 */
+    color: #e2e8f0; /* Tailwindのtext-gray-200に対応 (近似色) */
+  }
+
 
   /* Glass panel effects */
   .glass-panel {
@@ -270,13 +275,8 @@
     border-left: 4px solid #22c55e;
   }
 
-  /* Responsive improvements */
+  /* Responsive Layout Improvements */
   @media (max-width: 768px) {
-    .responsive-grid {
-      grid-template-columns: 1fr;
-      gap: 1rem;
-    }
-
     .glass-panel {
       margin: 0.5rem;
     }
@@ -368,45 +368,8 @@
   }
 
   /* Layout Helper Classes */
-  .admin-grid {
-    display: grid;
-    gap: 1.5rem;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  }
-
-  .admin-flex {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .admin-flex-between {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-  }
 
   /* Typography Improvements */
-  .admin-title {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #ffffff;
-    margin: 0;
-  }
-
-  .admin-subtitle {
-    font-size: 1rem;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.8);
-    margin: 0;
-  }
-
-  .admin-text {
-    font-size: 0.875rem;
-    color: rgba(255, 255, 255, 0.7);
-    line-height: 1.5;
-  }
 
   /* Status Badge Improvements */
   .status-badge {
@@ -443,6 +406,22 @@
     background: rgba(59, 130, 246, 0.2);
     color: #3b82f6;
     border: 1px solid rgba(59, 130, 246, 0.3);
+  }
+
+  .bg-gradient-green {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(16, 185, 129, 0.1));
+  }
+
+  .bg-gradient-blue-purple {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(168, 85, 247, 0.1));
+  }
+
+  .bg-gradient-success-info {
+    background: linear-gradient(135deg, #28a745, #17a2b8); /* Bootstrapのsuccessとinfoカラー */
+  }
+
+  .bg-gradient-cyan-purple {
+    background: linear-gradient(90deg, rgba(6, 182, 212, 0.2), rgba(139, 92, 246, 0.2));
   }
 
   /* Responsive Layout Improvements */

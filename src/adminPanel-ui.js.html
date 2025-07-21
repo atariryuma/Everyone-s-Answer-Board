@@ -178,9 +178,9 @@ function updateUnpublishButton(status) {
   if (!unpublishBtn) return;
 
   if (status._normalized?.isPublished) {
-    unpublishBtn.classList.remove('hidden');
+    unpublishBtn.classList.remove('d-none');
   } else {
-    unpublishBtn.classList.add('hidden');
+    unpublishBtn.classList.add('d-none');
   }
 }
 
@@ -281,12 +281,12 @@ function updatePublicationStatusUI(isPublished) {
 
   if (statusElement) {
     if (isPublished) {
-      statusElement.className = 'px-2 py-1 rounded text-xs font-medium bg-green-600 text-white';
-      if (indicatorElement) indicatorElement.className = 'w-2 h-2 rounded-full bg-green-400';
+      statusElement.className = 'px-2 py-1 rounded small fw-medium bg-success text-white';
+      if (indicatorElement) indicatorElement.className = 'rounded-circle bg-success';
       if (textElement) textElement.textContent = '公開中';
     } else {
-      statusElement.className = 'px-2 py-1 rounded text-xs font-medium bg-gray-600 text-gray-300';
-      if (indicatorElement) indicatorElement.className = 'w-2 h-2 rounded-full bg-gray-400';
+      statusElement.className = 'px-2 py-1 rounded small fw-medium bg-secondary text-light';
+      if (indicatorElement) indicatorElement.className = 'rounded-circle bg-secondary';
       if (textElement) textElement.textContent = '非公開';
     }
   }
@@ -325,10 +325,14 @@ function syncCheckboxStates(status) {
 
   if (showNamesCheckbox) {
     showNamesCheckbox.checked = showNames;
+    // Bootstrapのカスタムチェックボックスのスタイルを適用
+    showNamesCheckbox.classList.add('form-check-input');
   }
 
   if (showCountsCheckbox) {
     showCountsCheckbox.checked = showCounts;
+    // Bootstrapのカスタムチェックボックスのスタイルを適用
+    showCountsCheckbox.classList.add('form-check-input');
   }
 }
 
@@ -1214,9 +1218,9 @@ function handleSheetSelectionChange(event) {
     const previewContent = document.getElementById('data-preview-content');
     if (previewContent) {
       previewContent.innerHTML = `
-        <div class="animate-pulse">
-          <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-          <div class="h-4 bg-gray-700 rounded w-1/2"></div>
+        <div class="placeholder-glow">
+          <div class="placeholder col-7 mb-2"></div>
+          <div class="placeholder col-4"></div>
         </div>
       `;
     }
@@ -1302,9 +1306,9 @@ function loadDataPreview(sheetName, details) {
   // Show loading state (if details are not yet available)
   if (!details) {
     previewContent.innerHTML = `
-      <div class="animate-pulse">
-        <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-        <div class="h-4 bg-gray-700 rounded w-1/2"></div>
+      <div class="placeholder-glow">
+        <div class="placeholder col-7 mb-2"></div>
+        <div class="placeholder col-4"></div>
       </div>
     `;
   }
@@ -1316,21 +1320,21 @@ function loadDataPreview(sheetName, details) {
       const moreHeaders = details.headers.length > 5 ? `...他${details.headers.length - 5}列` : '';
 
       previewContent.innerHTML = `
-        <div class="text-sm">
+        <div class="small">
           <div class="mb-2">
-            <span class="text-gray-400">列数:</span>
-            <span class="text-white font-medium">${details.headers.length}列</span>
+            <span class="text-secondary">列数:</span>
+            <span class="text-white fw-medium">${details.headers.length}列</span>
           </div>
           <div class="mb-2">
-            <span class="text-gray-400">主要な列:</span>
-            <div class="flex flex-wrap gap-1 mt-1">
+            <span class="text-secondary">主要な列:</span>
+            <div class="d-flex flex-wrap gap-1 mt-1">
               ${headersList.map(header => `
-                <span class="px-2 py-1 bg-blue-500/20 text-blue-200 rounded text-xs">${header}</span>
+                <span class="badge bg-primary-subtle text-primary rounded-pill small">${header}</span>
               `).join('')}
-              ${moreHeaders ? `<span class="text-gray-400 text-xs">${moreHeaders}</span>` : ''}
+              ${moreHeaders ? `<span class="text-secondary small">${moreHeaders}</span>` : ''}
             </div>
           </div>
-          <div class="text-xs text-gray-400 mt-2">
+          <div class="small text-secondary mt-2">
             データの内容を確認して、次のステップで列設定を行ってください
           </div>
         </div>
@@ -1427,7 +1431,7 @@ function clearInitialDisplayElements() {
   // 初期表示を非表示にして、適切なドメイン表示に切り替え
   const initialContainer = document.getElementById('header-domain-initial');
   if (initialContainer) {
-    initialContainer.style.display = 'none';
+    initialContainer.classList.add('d-none');
     console.log('✅ 初期ドメイン表示を非表示');
   }
 
@@ -1458,8 +1462,8 @@ function showAppropriateHeaderStatus() {
 
   if (domainMatch && domainMismatch) {
     // 現在はドメイン一致として表示（実際のドメインチェックは別途実装）
-    domainMatch.style.display = 'block';
-    domainMismatch.style.display = 'none';
+    domainMatch.classList.remove('d-none');
+    domainMismatch.classList.add('d-none');
 
     // ドメイン名を適切に設定
     const domainText = document.getElementById('header-domain-match-text');
@@ -1493,11 +1497,9 @@ function updateButtonStatesForSetup(status) {
 
       if (!hasSpreadsheet || !hasActiveSheet) {
         button.disabled = true;
-        button.classList.add('opacity-75');
         button.title = '先にデータソースとシートを設定してください';
       } else {
         button.disabled = false;
-        button.classList.remove('opacity-75');
         button.title = '';
       }
     }
@@ -1610,7 +1612,7 @@ function navigateToStep(step) {
   // Show/hide step content
   document.querySelectorAll('.step-content').forEach((content, index) => {
     const stepNumber = index + 1;
-    content.classList.toggle('hidden', stepNumber !== step);
+    content.classList.toggle('d-none', stepNumber !== step);
   });
 
   // Update progress bar
