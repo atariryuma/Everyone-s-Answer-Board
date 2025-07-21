@@ -28,8 +28,8 @@
     
     if (flag) {
       loginBtn.innerHTML = `
-        <div class="flex items-center justify-center">
-          <div class="loading-spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+        <div class="d-flex align-items-center justify-content-center">
+          <div class="spinner-border spinner-border-sm text-light me-2" role="status"></div>
           ${text || '処理中…'}
         </div>
       `;
@@ -169,7 +169,7 @@
           if (userEmailDisplay && userEmailDisplay.textContent.includes('システム関数の呼び出しエラー')) {
             const retryButton = document.createElement('button');
             retryButton.textContent = '🔄 再試行';
-            retryButton.className = 'mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600';
+            retryButton.className = 'btn btn-primary mt-2';
             retryButton.onclick = () => {
               retryButton.remove();
               handleSimpleLogin();
@@ -309,26 +309,26 @@
       
       // サンドボックス制限準拠: ユーザークリック必須のHTMLアンカー方式
       const successHtml = `
-        <div class="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 flex items-center justify-center p-4">
-          <div class="bg-gray-800 rounded-2xl p-8 max-w-md w-full shadow-2xl border border-gray-700">
+        <div class="vh-100 d-flex align-items-center justify-content-center p-3" style="background: linear-gradient(135deg, #1f2937, #581c87, #1e3a8a);">
+          <div class="bg-dark rounded-4 p-4 shadow-lg border border-secondary" style="max-width: 28rem; width: 100%;">
             <!-- 成功アイコン -->
             <div class="text-center mb-6">
               <div class="text-6xl mb-4">✅</div>
-              <h1 class="text-2xl font-bold text-green-400 mb-2">${message || 'ログインが完了しました'}</h1>
+              <h1 class="h3 fw-bold text-success mb-2">${message || 'ログインが完了しました'}</h1>
               <p class="text-gray-300">管理パネルにアクセスしてください</p>
             </div>
             
             <!-- メインアクションボタン -->
-            <div class="space-y-4">
+            <div class="d-grid gap-3">
               <a href="${adminUrl}" target="_top" 
-                 class="block w-full bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white font-bold py-4 px-6 rounded-lg text-center transition-all duration-200 transform hover:scale-105 shadow-lg">
+                 class="btn btn-primary w-100 fw-bold py-3 px-4 rounded-3 text-center hover-scale-105 btn-gradient-hover shadow-lg d-block text-decoration-none" style="background: linear-gradient(135deg, #10b981, #3b82f6);">
                 🚀 管理パネルを開く
               </a>
               
               <!-- URL情報 -->
-              <div class="bg-gray-700 rounded-lg p-4">
-                <h3 class="text-sm font-semibold text-gray-200 mb-2">📱 管理パネルURL:</h3>
-                <div class="bg-gray-900 p-2 rounded text-xs text-cyan-400 font-mono break-all">
+              <div class="bg-secondary bg-opacity-50 rounded-3 p-3">
+                <h3 class="small fw-semibold text-light mb-2">📱 管理パネルURL:</h3>
+                <div class="bg-dark p-2 rounded small text-info font-monospace text-break">
                   ${adminUrl}
                 </div>
                 <button onclick="copyUrlToClipboard('${adminUrl}')" 
@@ -338,7 +338,7 @@
               </div>
               
               <!-- 使用上の注意 -->
-              <div class="text-xs text-gray-400 space-y-1">
+              <div class="small text-muted">
                 <p>💡 このURLをブックマークすると、次回から直接アクセスできます</p>
                 <p>🔒 セキュリティのため、URLは他人と共有しないでください</p>
               </div>

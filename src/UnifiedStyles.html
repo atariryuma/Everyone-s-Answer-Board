@@ -9,38 +9,66 @@
   --bs-font-sans-serif: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Google Sans', sans-serif;
 }
 
-/* CSS Variables - Comprehensive Color and Design System */
+/* CSS Variables - Modern Dark Theme Design System */
 :root {
-  /* Primary Color Palette */
-  --color-primary: #8be9fd;
-  --color-background: #1a1b26;
-  --color-surface: rgba(26,27,38,0.7);
-  --color-text: #c0caf5;
-  --color-border: rgba(255,255,255,0.1);
-  --color-accent: #facc15;
+  /* Bootstrap Color System Override */
+  --bs-primary: #3b82f6;
+  --bs-secondary: #6366f1;
+  --bs-success: #10b981;
+  --bs-danger: #ef4444;
+  --bs-warning: #f59e0b;
+  --bs-info: #06b6d4;
+  --bs-light: #f1f5f9;
   
-  /* Status Colors */
-  --color-success: #10b981;
-  --color-error: #ef4444;
-  --color-warning: #f59e0b;
-  --color-info: #3b82f6;
+  /* Dark Theme Background System */
+  --bs-dark: #0f172a;
+  --bs-body-bg: #1e293b;
+  --bs-body-color: #e2e8f0;
+  
+  /* Legacy Support */
+  --color-primary: var(--bs-primary);
+  --color-background: var(--bs-body-bg);
+  --color-surface: rgba(30, 41, 59, 0.8);
+  --color-text: var(--bs-body-color);
+  --color-border: rgba(148, 163, 184, 0.2);
+  --color-accent: #fbbf24;
+  
+  /* Surface Color System */
+  --color-surface-1: #334155;
+  --color-surface-2: #475569;
+  --color-surface-3: #64748b;
+  
+  /* Text Color Hierarchy */
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #e2e8f0;
+  --color-text-muted: #94a3b8;
+  --color-text-faded: #64748b;
+  
+  /* Glass Morphism Enhanced */
+  --glass-bg: rgba(30, 41, 59, 0.8);
+  --glass-border: rgba(148, 163, 184, 0.2);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --backdrop-blur: 20px;
+  
+  /* Enhanced Shadow System */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.3);
+  
+  /* Animation System Enhanced */
+  --transition-duration: 0.2s;
+  --transition-easing: ease-out;
+  --transition-bounce: cubic-bezier(0.4, 0, 0.2, 1);
+  --animation-duration: 0.3s;
+  --animation-duration-slow: 0.6s;
   
   /* Google Workspace Colors */
   --color-google-blue: #4285f4;
   --color-google-green: #34a853;
   --color-google-yellow: #fbbc05;
   --color-google-red: #ea4335;
-  
-  /* Shadow System */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
-  --shadow-lg: 0 8px 25px rgba(0, 0, 0, 0.15);
-  
-  /* Animation and Transition System */
-  --transition-duration: 0.2s;
-  --transition-easing: ease-out;
-  --animation-duration: 0.3s;
-  --backdrop-blur: 12px;
 }
 
 /* Base Styles */
@@ -55,7 +83,7 @@ body {
   line-height: 1.6;
 }
 
-/* Glass Panel Effects */
+/* Enhanced Glass Panel Effects */
 .glass-panel { 
   background: var(--color-surface); 
   -webkit-backdrop-filter: blur(var(--backdrop-blur)); 
@@ -63,11 +91,43 @@ body {
   border: 1px solid var(--color-border); 
   transition: all var(--transition-duration) var(--transition-easing);
   border-radius: 1rem;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .glass-panel:hover { 
-  border-color: rgba(255,255,255,0.2); 
-  will-change: border-color; 
+  border-color: rgba(255,255,255,0.25); 
+  will-change: border-color, box-shadow; 
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 1px 0 rgba(255, 255, 255, 0.08);
+  transform: translateY(-2px);
+}
+
+/* Enhanced Glass Panel Variant */
+.glass-panel-enhanced {
+  background: var(--glass-bg-enhanced);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  backdrop-filter: blur(24px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.125);
+  border-radius: 1.5rem;
+  box-shadow: 
+    0 16px 64px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 2px 0 rgba(255, 255, 255, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.glass-panel-enhanced:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 
+    0 24px 80px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 2px 0 rgba(255, 255, 255, 0.1);
 }
 
 /* Google Workspace Integration Styles */
@@ -270,7 +330,7 @@ body {
   background-color: var(--color-error); 
 }
 
-/* Answer Card System (from Page.html) */
+/* Enhanced Card System with Micro-interactions */
 .answer-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -279,6 +339,21 @@ body {
   transition: all var(--transition-duration) var(--transition-easing);
   position: relative;
   overflow: hidden;
+}
+
+.answer-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+  transition: left 0.6s ease-in-out;
+}
+
+.answer-card:hover::before {
+  left: 100%;
 }
 
 .answer-card:hover {
@@ -764,6 +839,162 @@ body {
   line-height: 1.5;
 }
 
+/* Bootstrap-compatible Custom Animations */
+.hover-scale-110 {
+  transition: transform var(--transition-duration) var(--transition-easing);
+  will-change: transform;
+}
+
+.hover-scale-110:hover {
+  transform: scale(1.1);
+}
+
+.hover-scale-105 {
+  transition: transform var(--transition-duration) var(--transition-easing);
+  will-change: transform;
+}
+
+.hover-scale-105:hover {
+  transform: scale(1.05);
+}
+
+.btn-hover-lift {
+  transition: all var(--transition-duration) var(--transition-easing);
+  will-change: transform, box-shadow;
+}
+
+.btn-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Custom Modal Animations */
+.modal-custom-fade {
+  animation: customModalFadeIn 0.3s ease-out;
+}
+
+.modal-custom-fade.fade-out {
+  animation: customModalFadeOut 0.3s ease-in;
+}
+
+@keyframes customModalFadeIn {
+  0% { 
+    opacity: 0; 
+    transform: scale(0.95) translateY(-10px); 
+    backdrop-filter: blur(0px);
+  }
+  100% { 
+    opacity: 1; 
+    transform: scale(1) translateY(0); 
+    backdrop-filter: blur(10px);
+  }
+}
+
+@keyframes customModalFadeOut {
+  0% { 
+    opacity: 1; 
+    transform: scale(1) translateY(0); 
+    backdrop-filter: blur(10px);
+  }
+  100% { 
+    opacity: 0; 
+    transform: scale(0.95) translateY(-10px); 
+    backdrop-filter: blur(0px);
+  }
+}
+
+/* Enhanced Button Transitions */
+.btn-gradient-hover {
+  background-size: 200% 100%;
+  transition: background-position var(--transition-duration) var(--transition-easing),
+              transform var(--transition-duration) var(--transition-easing);
+}
+
+.btn-gradient-hover:hover {
+  background-position: 100% 0;
+  transform: translateY(-1px);
+}
+
+/* Missing Bootstrap Utilities */
+.white-space-pre-wrap {
+  white-space: pre-wrap;
+}
+
+.text-break-words {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Gap utilities for older Bootstrap versions */
+.gap-1 {
+  gap: 0.25rem !important;
+}
+
+.gap-2 {
+  gap: 0.5rem !important;
+}
+
+.gap-3 {
+  gap: 1rem !important;
+}
+
+/* Flex utilities enhancement */
+.flex-shrink-0 {
+  flex-shrink: 0 !important;
+}
+
+.flex-grow-1 {
+  flex-grow: 1 !important;
+}
+
+/* Min-width utilities */
+.min-w-150 {
+  min-width: 150px !important;
+}
+
+/* Height utilities */
+.h-1rem {
+  height: 1rem !important;
+}
+
+/* Custom spacing for specific needs */
+.space-y-1 > * + * {
+  margin-top: 0.25rem !important;
+}
+
+/* Icon Size System */
+.icon-size-xs {
+  width: 0.75rem !important;
+  height: 0.75rem !important;
+}
+
+.icon-size-sm {
+  width: 1rem !important;
+  height: 1rem !important;
+}
+
+.icon-size-md {
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+}
+
+.icon-size-lg {
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+}
+
+/* Status Dot System */
+.status-dot {
+  width: 0.5rem !important;
+  height: 0.5rem !important;
+  border-radius: 50% !important;
+  display: inline-block;
+}
+
+.status-dot-pulse {
+  animation: pulse 2s infinite;
+}
+
 /* Tailwind CSS Fallback */
 .tailwind-fallback {
   /* Fallback styles when TailwindCSS fails to load */
@@ -1078,5 +1309,221 @@ body {
   backdrop-filter: blur(var(--backdrop-blur));
   border: 1px solid var(--color-border);
   color: var(--color-text);
+}
+
+/* ========================================
+   Modern UX Micro-interactions & Animations
+   ======================================== */
+
+/* Smooth Page Transitions */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Modern Card Entrance Animations */
+.card-entrance {
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.card-entrance-delayed {
+  opacity: 0;
+  animation: fadeInUp 0.6s ease-out 0.3s forwards;
+}
+
+.card-entrance-stagger {
+  opacity: 0;
+  animation: fadeInUp 0.6s ease-out 0.6s forwards;
+}
+
+/* Interactive Button Enhancements */
+.btn-enhanced {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.btn-enhanced::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.4s ease, height 0.4s ease;
+}
+
+.btn-enhanced:active::before {
+  width: 300px;
+  height: 300px;
+}
+
+/* Pulse Animation for Important Elements */
+@keyframes pulse-subtle {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+.pulse-animation {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+/* Floating Action Animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.floating-element {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Loading State Enhancements */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.loading-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 100%);
+  background-size: 200px 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+/* Success State Animations */
+@keyframes checkmarkDraw {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.success-checkmark {
+  stroke-dasharray: 100;
+  animation: checkmarkDraw 0.8s ease-out forwards;
+}
+
+/* Scroll-based Animations */
+.fade-in-on-scroll {
+  opacity: 0;
+  transform: translateY(50px);
+  transition: all 0.8s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.fade-in-on-scroll.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Modal Entrance/Exit Animations */
+.modal-fade-in {
+  animation: scaleIn 0.3s ease-out forwards;
+}
+
+.modal-fade-out {
+  animation: scaleIn 0.2s ease-in reverse forwards;
+}
+
+/* Notification Toast Animations */
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast-slide-in {
+  animation: slideInFromRight 0.4s ease-out forwards;
+}
+
+/* Typing Indicator Animation */
+@keyframes typing {
+  0%, 60%, 100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-10px);
+  }
+}
+
+.typing-indicator span {
+  display: inline-block;
+  animation: typing 1.4s ease-in-out infinite;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* Smooth Hover Transitions for Interactive Elements */
+.interactive-element {
+  transition: all 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+  cursor: pointer;
+}
+
+.interactive-element:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+
+.interactive-element:active {
+  transform: translateY(0);
+  filter: brightness(0.95);
+  transition: all 0.1s ease;
 }
 </style>

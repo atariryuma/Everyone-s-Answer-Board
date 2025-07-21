@@ -14,19 +14,19 @@
     </script>
 </head>
 <body>
-    <div class="max-w-4xl mx-auto p-6">
+    <div class="container-fluid" style="max-width: 56rem;">
         <!-- ヘッダー -->
-        <div class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-cyan-400 mb-2">⚙️ StudyQuest アプリ設定</h1>
-            <p class="text-xl text-gray-300">アプリケーションの運用設定を管理します</p>
-            <p class="text-sm text-gray-400 mt-2">このページでアプリの有効/無効を切り替えることができます</p>
+        <div class="text-center mb-5">
+            <h1 class="display-4 fw-bold text-info mb-2">⚙️ StudyQuest アプリ設定</h1>
+            <p class="fs-4 text-light">アプリケーションの運用設定を管理します</p>
+            <p class="small text-muted mt-2">このページでアプリの有効/無効を切り替えることができます</p>
         </div>
 
         <!-- メッセージエリア -->
-        <div id="message-area" class="mb-6"></div>
+        <div id="message-area" class="mb-4"></div>
 
         <!-- 現在のステータス表示 -->
-        <div class="glass-panel rounded-xl p-6 mb-6">
+        <div class="glass-panel rounded-4 p-4 mb-4">
             <h2 class="text-xl font-semibold text-white mb-4">📊 現在のステータス</h2>
             <div id="status-display" class="space-y-3">
                 <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
@@ -54,10 +54,10 @@
         </div>
 
         <!-- アプリ状態切り替えパネル -->
-        <div class="glass-panel rounded-xl p-6 mb-6">
-            <h2 class="text-xl font-semibold text-white mb-4">🔧 アプリ状態の管理</h2>
+        <div class="glass-panel rounded-4 p-4 mb-4">
+            <h2 class="h4 fw-semibold text-white mb-3">🔧 アプリ状態の管理</h2>
             
-            <div class="space-y-6">
+            <div class="d-flex flex-column gap-4">
                 <!-- isActive トグル -->
                 <div class="p-4 bg-gray-800 rounded-lg">
                     <div class="flex items-center justify-between mb-3">
@@ -82,10 +82,10 @@
                     <!-- 変更ボタン -->
                     <button 
                         id="updateStatusBtn"
-                        class="w-full btn bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="btn btn-primary w-100 fw-bold"
                         disabled>
                         <span id="update-text">変更を保存</span>
-                        <div id="update-spinner" class="loading-spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full mx-auto hidden"></div>
+                        <div id="update-spinner" class="spinner-border spinner-border-sm mx-auto d-none" role="status"></div>
                     </button>
                 </div>
 
@@ -115,7 +115,7 @@
         </div>
 
         <!-- ユーザー管理セクション -->
-        <div class="glass-panel rounded-xl p-6 mb-6">
+        <div class="glass-panel rounded-4 p-4 mb-4">
             <h2 class="text-xl font-semibold text-white mb-4">👥 ユーザー管理</h2>
             
             <div class="space-y-4">
@@ -145,7 +145,7 @@
                             ユーザー一覧を読み込み中...
                         </div>
                         <div id="user-table-content" class="hidden">
-                            <table class="w-full">
+                            <table class="table table-dark table-striped w-100">
                                 <thead class="bg-gray-900">
                                     <tr>
                                         <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">メールアドレス</th>
@@ -217,13 +217,13 @@
             <div class="flex gap-3">
                 <button 
                     onclick="cancelDeletion()"
-                    class="flex-1 btn bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg">
+                    class="btn btn-secondary flex-grow-1 py-2 px-3">
                     キャンセル
                 </button>
                 <button 
                     id="confirm-delete-btn"
                     onclick="confirmDeletion()"
-                    class="flex-1 btn bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg">
+                    class="btn btn-danger flex-grow-1 py-2 px-3">
                     削除実行
                 </button>
             </div>
@@ -286,7 +286,7 @@
                         <div class="mr-3">
                             ${type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'}
                         </div>
-                        <div class="flex-1">${message}</div>
+                        <div class="flex-grow-1">${message}</div>
                         <button onclick="this.closest('.message').style.display='none'" class="ml-4 text-gray-400 hover:text-white">✕</button>
                     </div>
                 </div>
@@ -481,11 +481,11 @@
                     } else {
                         showMessage(`ユーザー一覧の取得に失敗しました: ${result.message}`, 'error');
                     }
-                    loadingDiv.classList.add('hidden');
+                    loadingDiv.classList.add('d-none');
                 })
                 .withFailureHandler((error) => {
                     showMessage(`エラー: ${error.message || error}`, 'error');
-                    loadingDiv.classList.add('hidden');
+                    loadingDiv.classList.add('d-none');
                 })
                 .getAllUsersForAdminForUI(__USER_ID__);
         }
@@ -608,11 +608,11 @@
                     } else {
                         showMessage(`ログの取得に失敗しました: ${result.message}`, 'error');
                     }
-                    loadingDiv.classList.add('hidden');
+                    loadingDiv.classList.add('d-none');
                 })
                 .withFailureHandler((error) => {
                     showMessage(`エラー: ${error.message || error}`, 'error');
-                    loadingDiv.classList.add('hidden');
+                    loadingDiv.classList.add('d-none');
                 })
                 .getDeletionLogsForUI(__USER_ID__);
         }

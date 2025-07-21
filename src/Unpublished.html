@@ -82,7 +82,7 @@
                     <div class="grid md:grid-cols-2 gap-4">
                         <!-- 再公開ボタン -->
                         <button type="button" id="republish-btn" 
-                                class="group bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-4 rounded-xl font-semibold transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2 focus:ring-offset-gray-800">
+                                class="group btn btn-success px-4 py-3 rounded-3 fw-semibold hover-scale-105 btn-gradient-hover shadow-lg" style="background: linear-gradient(135deg, #10b981, #059669);">
                             <div class="flex items-center justify-center gap-2">
                                 <svg class="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
@@ -94,7 +94,7 @@
                         
                         <!-- 管理パネルボタン -->
                         <button type="button" id="admin-panel-btn" 
-                                class="group bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-6 py-4 rounded-xl font-semibold transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-gray-800">
+                                class="group btn btn-info px-4 py-3 rounded-3 fw-semibold hover-scale-105 btn-gradient-hover shadow-lg" style="background: linear-gradient(135deg, #0891b2, #0e7490);">
                             <div class="flex items-center justify-center gap-2">
                                 <svg class="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
@@ -233,7 +233,7 @@
             
             // ローディング状態に変更
             button.disabled = true;
-            button.className = button.className.replace('hover:scale-105', '');
+            button.classList.remove('hover-scale-105');
             button.innerHTML = `
                 <div class="flex items-center justify-center gap-2">
                     <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -216,21 +216,21 @@
     </div>
   </div>
   <header id="admin-header" class="glass-panel border-b border-gray-700 fixed top-1 sm:top-2 left-2 right-2 sm:left-4 sm:right-4 z-50 rounded-lg sm:rounded-xl shadow-lg">
-  <div class="relative -top-1 sm:-top-2 max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between gap-4">
+  <div class="container-fluid position-relative px-3 px-sm-4 py-3 py-sm-4 d-flex align-items-center justify-content-between gap-3" style="top: -0.25rem; max-width: 72rem;">
         <!-- ロゴとタイトル -->
-        <div class="flex items-center gap-3 flex-shrink-0">
-          <div class="w-8 h-8 bg-gradient-to-r from-cyan-400 to-purple-400 rounded-lg flex items-center justify-center flex-shrink-0">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="d-flex align-items-center gap-3 flex-shrink-0">
+          <div class="d-flex align-items-center justify-content-center flex-shrink-0 rounded-2" style="width: 2rem; height: 2rem; background: linear-gradient(135deg, #22d3ee, #a855f7);">
+            <svg class="icon-size-md text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
             </svg>
           </div>
           <div class="min-w-0">
             <div class="hidden sm:block">
-              <h1 class="text-lg sm:text-xl font-bold text-white leading-tight truncate">みんなの回答ボード	管理パネル</h1>
+              <h1 class="h5 h4-sm fw-bold text-white lh-sm text-truncate">みんなの回答ボード	管理パネル</h1>
               <p class="text-xs text-gray-400">StudyQuest</p>
             </div>
             <div class="sm:hidden">
-              <h1 class="text-base font-bold text-white truncate">みんなの回答ボード</h1>
+              <h1 class="h6 fw-bold text-white text-truncate">みんなの回答ボード</h1>
             </div>
           </div>
         </div>
@@ -243,7 +243,7 @@
             <!-- ドメイン一致表示（Login.htmlスタイル） -->
             <div id="header-domain-match" class="glass-panel bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-3 border border-green-400/30 hidden">
               <div class="flex items-center gap-2">
-                <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="icon-size-md text-success flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
                 <div>
@@ -254,14 +254,14 @@
             </div>
             
             <!-- ドメイン不一致表示（Login.htmlスタイル） -->
-            <div id="header-domain-mismatch" class="glass-panel bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg p-3 border border-yellow-400/30 hidden">
+            <div id="header-domain-mismatch" class="glass-panel bg-warning bg-opacity-10 rounded-3 p-3 border border-warning d-none">
               <div class="flex items-center gap-2">
-                <svg class="w-5 h-5 text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="icon-size-md text-warning flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
                 </svg>
                 <div>
-                  <div class="text-yellow-400 font-semibold text-sm" id="header-domain-mismatch-text">ドメイン不一致</div>
-                  <div class="text-yellow-200 text-xs">アクセス制限あり</div>
+                  <div class="text-warning fw-semibold small" id="header-domain-mismatch-text">ドメイン不一致</div>
+                  <div class="text-warning text-opacity-75" style="font-size: 0.75rem;">アクセス制限あり</div>
                 </div>
               </div>
             </div>
@@ -269,7 +269,7 @@
             <!-- 初期状態表示 -->
             <div id="header-domain-initial" class="glass-panel bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-3 border border-blue-400/30">
               <div class="flex items-center gap-2">
-                <div id="header-status-dot" class="w-3 h-3 bg-blue-400 rounded-full animate-pulse flex-shrink-0"></div>
+                <div id="header-status-dot" class="status-dot status-dot-pulse bg-primary flex-shrink-0"></div>
                 <div>
                   <div class="text-blue-400 font-semibold text-sm" id="header-domain-name-initial">ドメイン確認中</div>
                   <div class="text-blue-200 text-xs" id="header-status-text-initial">セットアップ中</div>
@@ -280,7 +280,7 @@
         </div>
     </div>
   </header>
-  <main id="admin-main" class="flex-1 max-w-6xl mx-auto px-4 sm:px-6
+  <main id="admin-main" class="flex-grow-1 container-fluid px-3 px-sm-4"
               pt-16 sm:pt-20
               pb-16 sm:pb-20
               h-screen overflow-y-auto">
@@ -293,8 +293,8 @@
         <div class="flex items-center justify-between">
           <!-- 左側: ステータス表示 -->
           <div class="flex items-center gap-3">
-            <div class="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
-              <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="d-flex align-items-center justify-content-center flex-shrink-0 rounded-2" style="width: 1.5rem; height: 1.5rem; background: linear-gradient(135deg, #3b82f6, #8b5cf6);">
+              <svg class="icon-size-sm text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
               </svg>
             </div>
@@ -306,19 +306,19 @@
           
           <!-- 右側: コンパクトステップナビゲーション -->
           <div class="flex items-center gap-2">
-            <div class="flex items-center gap-1" id="step-1-indicator">
-              <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">1</div>
-              <span class="text-xs text-gray-300 hidden sm:inline">データ準備</span>
+            <div class="d-flex align-items-center gap-1" id="step-1-indicator">
+              <div class="d-flex align-items-center justify-content-center fw-bold rounded-circle text-white transition-all" style="width: 1.5rem; height: 1.5rem; font-size: 0.75rem; background-color: var(--bs-primary); ">1</div>
+              <span class="small text-light d-none d-sm-inline">データ準備</span>
             </div>
             <div class="w-4 h-px bg-gray-600"></div>
-            <div class="flex items-center gap-1" id="step-2-indicator">
-              <div class="w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">2</div>
-              <span class="text-xs text-gray-300 hidden sm:inline">シート設定</span>
+            <div class="d-flex align-items-center gap-1" id="step-2-indicator">
+              <div class="d-flex align-items-center justify-content-center fw-bold rounded-circle text-white transition-all" style="width: 1.5rem; height: 1.5rem; font-size: 0.75rem; background-color: var(--bs-secondary); ">2</div>
+              <span class="small text-light d-none d-sm-inline">シート設定</span>
             </div>
             <div class="w-4 h-px bg-gray-600"></div>
-            <div class="flex items-center gap-1" id="step-3-indicator">
-              <div class="w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all">3</div>
-              <span class="text-xs text-gray-300 hidden sm:inline">表示設定</span>
+            <div class="d-flex align-items-center gap-1" id="step-3-indicator">
+              <div class="d-flex align-items-center justify-content-center fw-bold rounded-circle text-white transition-all" style="width: 1.5rem; height: 1.5rem; font-size: 0.75rem; background-color: var(--bs-secondary); ">3</div>
+              <span class="small text-light d-none d-sm-inline">表示設定</span>
             </div>
           </div>
         </div>
@@ -648,14 +648,14 @@
               <div class="space-y-4">
                 <div class="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
                   <label class="block">
-                    <div class="flex items-center gap-2 mb-2">
+                    <div class="d-flex align-items-center gap-2 mb-2">
                       <span class="text-sm font-medium text-white">回答データ列</span>
                       <span class="px-2 py-1 bg-red-500 text-white text-xs rounded-full">必須</span>
                     </div>
-                    <div class="flex gap-2">
-                      <select id="opinionHeader" class="form-control flex-1" aria-describedby="main-help"></select>
-                      <button type="button" id="reguess-headers-btn" class="btn bg-gradient-to-r from-cyan-600/80 to-purple-600/80 hover:from-cyan-600 hover:to-purple-600 text-white px-3 py-2 relative overflow-hidden group" title="AI搭載 高精度列判定システム">
-                        <span class="relative z-10 flex items-center gap-1">
+                    <div class="d-flex gap-2">
+                      <select id="opinionHeader" class="form-control flex-grow-1" aria-describedby="main-help"></select>
+                      <button type="button" id="reguess-headers-btn" class="btn btn-info px-3 py-2 position-relative" title="AI搭載 高精度列判定システム">
+                        <span class="position-relative d-flex align-items-center gap-1" style="z-index: 10;">
                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
                           </svg>
@@ -793,7 +793,7 @@
           <div class="flex justify-between items-center">
             <span class="text-gray-400">公開状態:</span>
             <span class="px-2 py-1 rounded text-xs font-medium" id="info-publish-status">
-              <span class="inline-flex items-center gap-1">
+              <span class="inline-d-flex align-items-center gap-1">
                 <div class="w-2 h-2 rounded-full" id="info-publish-indicator"></div>
                 <span id="info-publish-text">確認中</span>
               </span>
