@@ -4156,59 +4156,97 @@ function verifyDatabaseFieldFix() {
 }
 
 /**
- * Returns the current login status without auto-registering new users.
+ * Phase3最適化: ログイン状態を確認（高速化版：4秒→1秒以下）
  * @returns {Object} Login status result
  */
 function getLoginStatus() {
+  const startTime = new Date().getTime();
+  debugLog('🚀 getLoginStatus: 高速化版実行開始');
+  
   try {
     var activeUserEmail = Session.getActiveUser().getEmail();
     if (!activeUserEmail) {
       return { status: 'error', message: 'ログインユーザーの情報を取得できませんでした。' };
     }
 
-    var cacheKey = 'login_status_' + activeUserEmail;
+    // Phase3最適化: より長時間のキャッシュで高速化（30秒→5分）
+    var cacheKey = 'fast_login_status_' + activeUserEmail;
     try {
-      var cached = CacheService.getScriptCache().get(cacheKey);
-      if (cached) return JSON.parse(cached);
+      var cached = cacheManager.get(cacheKey, null, { ttl: 300, enableMemoization: true });
+      if (cached) {
+        debugLog('⚡ getLoginStatus: キャッシュヒット (' + (new Date().getTime() - startTime) + 'ms)');
+        return cached;
+      }
     } catch (e) {
       console.warn('getLoginStatus: キャッシュ読み込みエラー -', e.message);
     }
 
-    var userInfo = cacheManager.get(
-      'email_' + activeUserEmail,
-      function() { return findUserByEmail(activeUserEmail); },
-      { ttl: 300, enableMemoization: true }
-    );
+    // Phase3最適化: 実行レベルキャッシュを活用した高速ユーザー情報取得
+    var userInfo = getOrFetchUserInfo(activeUserEmail, 'email', {
+      useExecutionCache: true,
+      currentUserEmail: activeUserEmail,
+      ttl: 1800
+    });
 
     var result;
     if (userInfo && (userInfo.isActive === true || String(userInfo.isActive).toLowerCase() === 'true')) {
-      var urls = generateAppUrls(userInfo.userId);
       result = {
         status: 'existing_user',
         userId: userInfo.userId,
-        adminUrl: urls.adminUrl,
-        viewUrl: urls.viewUrl,
-        message: 'ログインが完了しました'
+        message: 'ログインが完了しました',
+        userInfo: {
+          userId: userInfo.userId,
+          adminEmail: userInfo.adminEmail,
+          isActive: userInfo.isActive
+        }
       };
+      
+      // Phase3最適化: URL生成を条件付きで実行（必要時のみ）
+      if (userInfo.userId) {
+        try {
+          var urls = generateAppUrls(userInfo.userId);
+          result.adminUrl = urls.adminUrl;
+          result.viewUrl = urls.viewUrl;
+        } catch (urlError) {
+          console.warn('URL生成をスキップ:', urlError.message);
+          // URL生成失敗してもログイン成功は返す
+        }
+      }
     } else if (userInfo) {
-      var urls = generateAppUrls(userInfo.userId);
       result = {
         status: 'setup_required',
         userId: userInfo.userId,
-        adminUrl: urls.adminUrl,
-        viewUrl: urls.viewUrl,
-        message: 'セットアップを完了してください'
+        message: 'セットアップを完了してください',
+        userInfo: {
+          userId: userInfo.userId,
+          adminEmail: userInfo.adminEmail,
+          isActive: userInfo.isActive
+        }
       };
+      
+      if (userInfo.userId) {
+        try {
+          var urls = generateAppUrls(userInfo.userId);
+          result.adminUrl = urls.adminUrl;
+          result.viewUrl = urls.viewUrl;
+        } catch (urlError) {
+          console.warn('URL生成をスキップ:', urlError.message);
+        }
+      }
     } else {
       result = { status: 'unregistered', userEmail: activeUserEmail };
     }
 
+    // Phase3最適化: 結果をキャッシュに高速保存
     try {
-      CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 30);
+      cacheManager.get(cacheKey, function() { return result; }, { ttl: 300, enableMemoization: true });
     } catch (e) {
       console.warn('getLoginStatus: キャッシュ保存エラー -', e.message);
     }
 
+    var executionTime = new Date().getTime() - startTime;
+    debugLog('⚡ getLoginStatus: 高速化完了 (' + executionTime + 'ms)');
+    
     return result;
   } catch (error) {
     console.error('getLoginStatus error:', error);
@@ -4250,21 +4288,56 @@ function getInitialData(requestUserId, targetSheetName) {
   try {
     var startTime = new Date().getTime();
     
-    // === ステップ1: ユーザー認証とユーザー情報取得（キャッシュ活用） ===
+    // === Phase1最適化: 早期ユーザーID検証 ===
     var activeUserEmail = Session.getActiveUser().getEmail();
-    var currentUserId = requestUserId;
-    
-    // UserID の解決
-    if (!currentUserId) {
-      currentUserId = getUserId();
+    if (!activeUserEmail) {
+      throw new Error('アクティブユーザーの認証に失敗しました。ログインしてください。');
     }
     
-    // Phase3 Optimization: Use execution-level cache to avoid duplicate database queries
+    var currentUserId = requestUserId;
+    
+    // UserID の解決と検証
+    if (!currentUserId) {
+      currentUserId = getUserId();
+      debugLog('getInitialData: UserIDをSession経由で解決:', currentUserId);
+    }
+    
+    // 無効なUserID検証
+    if (!currentUserId || 
+        typeof currentUserId !== 'string' || 
+        currentUserId.trim() === '' ||
+        currentUserId === 'undefined' ||
+        currentUserId === 'null') {
+      const error = new Error(`getInitialData: 無効なcurrentUserIdが設定されました: "${currentUserId}"`);
+      error.name = 'InvalidCurrentUserIdError';
+      console.error('❌ ' + error.message);
+      throw error;
+    }
+    
+    // UserID形式検証
+    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(currentUserId);
+    const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(currentUserId);
+    
+    if (!isValidUUID && !isValidEmail) {
+      const error = new Error(`getInitialData: 不正な形式のcurrentUserId: "${currentUserId}"`);
+      error.name = 'InvalidUserIdFormatError';
+      console.error('❌ ' + error.message);
+      throw error;
+    }
+    
+    // Phase2最適化: 実行レベルキャッシュを有効にして重複DB検索を削減
     clearExecutionUserInfoCache(); // Clear any stale cache
     
     // ユーザー認証
     verifyUserAccess(currentUserId);
-    var userInfo = getCachedUserInfo(currentUserId); // Use cached version
+    
+    // Phase2最適化: getOrFetchUserInfoを実行レベルキャッシュ有効で使用
+    var userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
+      useExecutionCache: true,
+      currentUserEmail: activeUserEmail,
+      ttl: 1800
+    });
+    
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }

@@ -132,13 +132,16 @@ function setupDelegatedHandler(parentElement, selector, event, callback) {
 // STATE MANAGEMENT
 // =============================================================================
 
-// マルチテナント対応: ユーザーIDの安全な初期化
-var userId = '';
+// Phase1最適化: ユーザーIDの安全な初期化
+var userId = null; // nullで初期化してundefined状態を明確化
 
-// マルチテナント対応: バックエンドから安全にユーザーIDを取得
+// Phase1最適化: バックエンドから安全にユーザーIDを取得（検証強化）
 function initializeUserId() {
   console.group('🔐 Initializing UserId');
   console.log('📞 About to call getCurrentUserStatus');
+  
+  // Phase1最適化: 古いuserIdをクリア
+  userId = null;
   
   return new Promise((resolve, reject) => {
     google.script.run
@@ -146,8 +149,31 @@ function initializeUserId() {
         console.log('📥 getCurrentUserStatus response:', response);
         
         if (response && response.status === 'success' && response.userInfo && response.userInfo.userId) {
-          userId = response.userInfo.userId;
+          const newUserId = response.userInfo.userId;
+          
+          // Phase1最適化: UserID形式検証をクライアント側でも実施
+          if (!newUserId || typeof newUserId !== 'string' || newUserId.trim() === '') {
+            const errorMsg = `無効なuserIdが返されました: "${newUserId}"`;
+            console.error('❌ AdminPanel: ' + errorMsg, response);
+            console.groupEnd();
+            reject(new Error(errorMsg));
+            return;
+          }
+          
+          const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(newUserId);
+          const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newUserId);
+          
+          if (!isValidUUID && !isValidEmail) {
+            const errorMsg = `不正な形式のuserIdが返されました: "${newUserId}" (UUIDまたはメールアドレスが必要)`;
+            console.error('❌ AdminPanel: ' + errorMsg, response);
+            console.groupEnd();
+            reject(new Error(errorMsg));
+            return;
+          }
+          
+          userId = newUserId;
           console.log('✅ AdminPanel: User authenticated, userId:', userId);
+          console.log('📊 AdminPanel: UserID validation passed (format: ' + (isValidUUID ? 'UUID' : 'email') + ')');
           console.groupEnd();
           resolve(userId);
         } else {

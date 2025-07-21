@@ -7,15 +7,32 @@
 // BACKEND FUNCTION WRAPPERS
 // =============================================================================
 
-// マルチテナント対応: 新しいrunGasWithUserId関数
+// Phase1最適化: マルチテナント対応 runGasWithUserId関数（検証強化）
 function runGasWithUserId(functionName, ...args) {
+  // Phase1最適化: 関数呼び出し時点でのuserID検証
+  function validateUserId(currentUserId, callingFunction) {
+    if (!currentUserId || typeof currentUserId !== 'string' || currentUserId.trim() === '') {
+      const errorMsg = `${callingFunction}: 無効なuserIdが設定されています: "${currentUserId}"`;
+      logError(errorMsg);
+      throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
+    }
+    
+    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(currentUserId);
+    const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(currentUserId);
+    
+    if (!isValidUUID && !isValidEmail) {
+      const errorMsg = `${callingFunction}: 不正な形式のuserId: "${currentUserId}"`;
+      logError(errorMsg);
+      throw new Error('ユーザーIDの形式が正しくありません。ページを再読み込みしてください。');
+    }
+    
+    return true;
+  }
+  
   // userIdが設定されていない場合は初期化を待つ
   if (!userId) {
     return userIdPromise.then(() => {
-      if (!userId) {
-        logError('No userId available for:', functionName);
-        throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
-      }
+      validateUserId(userId, functionName);
       
       // userIdを第一引数として追加
       return gasOptimizer.call(functionName, userId, ...args);
@@ -24,6 +41,9 @@ function runGasWithUserId(functionName, ...args) {
       throw error;
     });
   }
+  
+  // Phase1最適化: 現在のuserIdを検証
+  validateUserId(userId, functionName);
   
   // userIdを第一引数として追加
   return gasOptimizer.call(functionName, userId, ...args);
