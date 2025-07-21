@@ -17,7 +17,7 @@
             <div class="col-md-8 col-lg-6">
                 <!-- ヘッダー -->
                 <div class="text-center mb-5">
-                    <h1 class="display-4 fw-bold text-cyan-400 mb-2">📚 StudyQuest</h1>
+                    <h1 class="display-4 fw-bold text-info mb-2">📚 StudyQuest</h1>
                     <p class="fs-4 text-light">初回セットアップ</p>
                     <p class="text-muted">システムを使用開始するための設定を行います</p>
                 </div>
@@ -28,17 +28,17 @@
                 <!-- セットアップフォーム -->
                 <div class="glass-panel rounded-3 p-4 mb-4">
                     <h2 class="h4 fw-semibold text-white mb-4">🔧 システム設定</h2>
-                    
+
                     <form id="setup-form">
                         <!-- サービスアカウントJSON -->
                         <div class="mb-3">
                             <label for="service-account-json" class="form-label text-light">
                                 🔑 サービスアカウントJSONキー
                             </label>
-                            <textarea 
-                                id="service-account-json" 
+                            <textarea
+                                id="service-account-json"
                                 name="serviceAccountJson"
-                                rows="8" 
+                                rows="8"
                                 class="form-control bg-dark text-light font-monospace"
                                 style="font-size: 0.75rem; resize: vertical;"
                                 placeholder='{"type": "service_account", "project_id": "...", "private_key_id": "...", ...}'
@@ -51,9 +51,9 @@
                             <label for="database-id" class="form-label text-light">
                                 📊 データベーススプレッドシートID
                             </label>
-                            <input 
-                                type="text" 
-                                id="database-id" 
+                            <input
+                                type="text"
+                                id="database-id"
                                 name="databaseId"
                                 class="form-control bg-dark text-light font-monospace"
                                 placeholder="1BcD3fGhIjKlMnOpQrStUvWxYz0123456789ABCDEFGH"
@@ -65,8 +65,8 @@
 
                         <!-- セットアップボタン -->
                         <div class="d-grid">
-                            <button 
-                                type="submit" 
+                            <button
+                                type="submit"
                                 id="setup-btn"
                                 class="btn btn-primary btn-lg fw-bold"
                                 style="background: linear-gradient(to right, #0891b2, #2563eb); border: none;">
@@ -81,7 +81,7 @@
                 <div id="test-section" class="glass-panel rounded-3 p-4 d-none">
                     <h3 class="h5 fw-semibold text-white mb-3">✅ セットアップ完了</h3>
                     <p class="text-light mb-3">セットアップが正常に完了しました。システムの動作確認を行えます。</p>
-                    <button 
+                    <button
                         id="test-btn"
                         class="btn btn-success fw-bold me-2 mb-2"
                         style="background: linear-gradient(to right, #059669, #10b981); border: none;">
@@ -132,12 +132,12 @@
         function showMessage(message, type = 'info') {
             const messageArea = document.getElementById('message-area');
             const colors = {
-                success: 'bg-green-600/20 border-green-500/50 text-green-100',
-                error: 'bg-red-600/20 border-red-500/50 text-red-100',
-                warning: 'bg-yellow-600/20 border-yellow-500/50 text-yellow-100',
-                info: 'bg-blue-600/20 border-blue-500/50 text-blue-100'
+                success: 'bg-success bg-opacity-25 border-success text-green-100',
+                error: 'bg-danger bg-opacity-25 border-danger text-danger',
+                warning: 'bg-warning bg-opacity-25 border-warning text-warning',
+                info: 'bg-primary bg-opacity-25 border-primary text-primary'
             };
-            
+
             messageArea.innerHTML = `
                 <div class="message show glass-panel rounded-lg p-4 border ${colors[type]}">
                     <div class="flex items-center">
@@ -183,30 +183,30 @@
         // セットアップフォーム送信処理
         document.getElementById('setup-form').addEventListener('submit', async function(e) {
             e.preventDefault();
-            
+
             if (setupInProgress) return;
             setupInProgress = true;
 
             const setupBtn = document.getElementById('setup-btn');
             const setupText = document.getElementById('setup-text');
             const setupSpinner = document.getElementById('setup-spinner');
-            
+
             try {
                 // ボタン状態を変更
                 setupBtn.disabled = true;
                 setupText.style.display = 'none';
                 setupSpinner.classList.remove('hidden');
-                
+
                 // 入力値取得
                 const serviceAccountJson = document.getElementById('service-account-json').value.trim();
                 const databaseId = document.getElementById('database-id').value.trim();
-                
+
                 // バリデーション
                 validateJSON(serviceAccountJson);
                 validateSpreadsheetId(databaseId);
-                
+
                 showMessage('セットアップを実行中...', 'info');
-                
+
                 // セットアップ実行
                 await new Promise((resolve, reject) => {
                     google.script.run
@@ -230,7 +230,7 @@
                         })
                         .setupApplication(serviceAccountJson, databaseId);
                 });
-                
+
             } catch (error) {
                 showMessage(`❌ ${error.message}`, 'error');
             } finally {
@@ -246,7 +246,7 @@
         document.getElementById('test-btn').addEventListener('click', function() {
             this.disabled = true;
             this.innerHTML = '<div class="loading-spinner w-4 h-4 border-2 border-white border-t-transparent rounded-full mx-auto"></div>';
-            
+
             google.script.run
                 .withSuccessHandler((result) => {
                     showMessage(`${result.message}`, result.status === 'success' ? 'success' : 'warning');
