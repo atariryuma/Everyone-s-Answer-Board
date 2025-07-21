@@ -33,12 +33,7 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
       return;
     }
     
-    // ExecutionContextManagerを使用してコンテキストを取得
-    var contextToUse = null;
-    if (typeof ExecutionContextManager !== 'undefined') {
-      contextToUse = ExecutionContextManager.getOrCreate();
-    }
-    const service = getSheetsService(contextToUse);
+    const service = getSheetsService();
     const logSheetName = DELETE_LOG_SHEET_CONFIG.SHEET_NAME;
     
     // ログシートの存在確認・作成
@@ -91,17 +86,11 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
 /**
  * 全ユーザー一覧を取得（管理者用）
  */
-function getAllUsersForAdmin(executionContext) {
+function getAllUsersForAdmin() {
   try {
     // 管理者権限チェック
     if (!isDeployUser()) {
       throw new Error('この機能にアクセスする権限がありません。');
-    }
-    
-    // ExecutionContextManagerを使用してコンテキストを取得または作成
-    var contextToUse = executionContext;
-    if (!contextToUse && typeof ExecutionContextManager !== 'undefined') {
-      contextToUse = ExecutionContextManager.getOrCreate();
     }
     
     const props = PropertiesService.getScriptProperties();
@@ -111,10 +100,10 @@ function getAllUsersForAdmin(executionContext) {
       throw new Error('データベースIDが設定されていません');
     }
     
-    const service = getSheetsService(contextToUse);
+    const service = getSheetsService();
     const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
-    const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`], contextToUse);
+    const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
     const values = data.valueRanges[0].values || [];
     
     if (values.length <= 1) {
@@ -193,12 +182,7 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
         throw new Error('データベースIDが設定されていません');
       }
       
-      // ExecutionContextManagerを使用してコンテキストを取得
-    var contextToUse = null;
-    if (typeof ExecutionContextManager !== 'undefined') {
-      contextToUse = ExecutionContextManager.getOrCreate();
-    }
-    const service = getSheetsService(contextToUse);
+      const service = getSheetsService();
       const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
       
       // データベーススプレッドシートの情報を取得
@@ -315,12 +299,7 @@ function getDeletionLogs() {
       throw new Error('データベースIDが設定されていません');
     }
     
-    // ExecutionContextManagerを使用してコンテキストを取得
-    var contextToUse = null;
-    if (typeof ExecutionContextManager !== 'undefined') {
-      contextToUse = ExecutionContextManager.getOrCreate();
-    }
-    const service = getSheetsService(contextToUse);
+    const service = getSheetsService();
     const logSheetName = DELETE_LOG_SHEET_CONFIG.SHEET_NAME;
     
     try {
@@ -376,31 +355,8 @@ function getDeletionLogs() {
  * 最適化されたSheetsサービスを取得
  * @returns {object} Sheets APIサービス
  */
-function getSheetsService(executionContext) {
+function getSheetsService() {
   try {
-    // Smart Function Wrapper: 引数がなくてもグローバルコンテキストをチェック
-    var contextToUse = executionContext;
-    if (!contextToUse && typeof ExecutionContextManager !== 'undefined') {
-      contextToUse = ExecutionContextManager.getCurrent();
-    }
-    
-    // ExecutionContextが存在し、そこにsheetsServiceがある場合は再利用
-    if (contextToUse && contextToUse.sheetsService) {
-      try {
-        // サービスの有効性を検証
-        if (contextToUse.sheetsService.baseUrl && contextToUse.sheetsService.accessToken) {
-          console.log('🔄 getSheetsService: ExecutionContextからサービス再利用');
-          if (contextToUse.stats) {
-            contextToUse.stats.cacheHits++;
-          }
-          return contextToUse.sheetsService;
-        }
-      } catch (validateError) {
-        console.warn('⚠️ ExecutionContextのsheetsServiceが無効:', validateError.message);
-        // フォールバック処理続行
-      }
-    }
-    
     console.log('🔧 getSheetsService: サービス取得開始');
     
     var accessToken;
@@ -426,12 +382,6 @@ function getSheetsService(executionContext) {
     
     console.log('✅ Sheets service created successfully');
     console.log('DEBUG: getSheetsService returning:', JSON.stringify(service, null, 2));
-    
-    // ExecutionContextがある場合は統計情報を更新
-    if (contextToUse && contextToUse.stats) {
-      contextToUse.stats.sheetsServiceCreations++;
-    }
-    
     return service;
     
   } catch (error) {
@@ -450,14 +400,7 @@ function findUserById(userId) {
   var cacheKey = 'user_' + userId;
   return cacheManager.get(
     cacheKey,
-    function() { 
-      // ExecutionContextManager経由でコンテキストを取得
-      var context = null;
-      if (typeof ExecutionContextManager !== 'undefined') {
-        context = ExecutionContextManager.getCurrent();
-      }
-      return fetchUserFromDatabase('userId', userId, context); 
-    },
+    function() { return fetchUserFromDatabase('userId', userId); },
     { ttl: 300, enableMemoization: true }
   );
 }
@@ -471,14 +414,7 @@ function findUserByEmail(email) {
   var cacheKey = 'email_' + email;
   return cacheManager.get(
     cacheKey,
-    function() { 
-      // ExecutionContextManager経由でコンテキストを取得
-      var context = null;
-      if (typeof ExecutionContextManager !== 'undefined') {
-        context = ExecutionContextManager.getCurrent();
-      }
-      return fetchUserFromDatabase('adminEmail', email, context); 
-    },
+    function() { return fetchUserFromDatabase('adminEmail', email); },
     { ttl: 300, enableMemoization: true }
   );
 }
@@ -489,14 +425,8 @@ function findUserByEmail(email) {
  * @param {string} value - 検索値
  * @returns {object|null} ユーザー情報
  */
-function fetchUserFromDatabase(field, value, executionContext) {
+function fetchUserFromDatabase(field, value) {
   try {
-    // ExecutionContextManagerを使用してコンテキストを取得または作成
-    var contextToUse = executionContext;
-    if (!contextToUse && typeof ExecutionContextManager !== 'undefined') {
-      contextToUse = ExecutionContextManager.getOrCreate();
-    }
-    
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
     
@@ -505,7 +435,7 @@ function fetchUserFromDatabase(field, value, executionContext) {
       return null;
     }
     
-    var service = getSheetsService(contextToUse);
+    var service = getSheetsService();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
     console.log('fetchUserFromDatabase - 検索開始:', {
@@ -515,7 +445,7 @@ function fetchUserFromDatabase(field, value, executionContext) {
       sheetName: sheetName
     });
     
-    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"], contextToUse);
+    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
     var values = data.valueRanges[0].values || [];
     
     console.log('fetchUserFromDatabase - スプレッドシートデータ取得完了:', {
@@ -904,37 +834,12 @@ function createSheetsService(accessToken) {
  * @param {string[]} ranges - 取得範囲の配列
  * @returns {object} レスポンス
  */
-function batchGetSheetsData(service, spreadsheetId, ranges, executionContext) {
+function batchGetSheetsData(service, spreadsheetId, ranges) {
   console.log('DEBUG: batchGetSheetsData received service:', JSON.stringify(service, null, 2));
+  // API呼び出しをキャッシュ化（短期間）
+  var cacheKey = `batchGet_${spreadsheetId}_${JSON.stringify(ranges)}`;
   
-  // Smart Function Wrapper: グローバルコンテキストも自動チェック
-  var contextToUse = executionContext;
-  if (!contextToUse && typeof ExecutionContextManager !== 'undefined') {
-    contextToUse = ExecutionContextManager.getCurrent();
-  }
-  
-  // ExecutionContextのキャッシュをチェック
-  if (contextToUse && contextToUse.sheetsDataCache) {
-    var cacheKey = `batchGet_${spreadsheetId}_${JSON.stringify(ranges)}`;
-    if (contextToUse.sheetsDataCache[cacheKey]) {
-      try {
-        console.log('🔄 batchGetSheetsData: ExecutionContextキャッシュヒット');
-        if (contextToUse.stats) {
-          contextToUse.stats.cacheHits++;
-        }
-        return contextToUse.sheetsDataCache[cacheKey];
-      } catch (cacheError) {
-        console.warn('⚠️ ExecutionContextキャッシュが破損:', cacheError.message);
-        // キャッシュをクリアして処理続行
-        delete contextToUse.sheetsDataCache[cacheKey];
-      }
-    }
-  }
-  
-  // 従来のキャッシュも確認（後方互換性）
-  var legacyCacheKey = `batchGet_${spreadsheetId}_${JSON.stringify(ranges)}`;
-  
-  var result = cacheManager.get(legacyCacheKey, () => {
+  return cacheManager.get(cacheKey, () => {
     const currentService = service; // Capture service in local variable
     try {
       console.log('DEBUG: Accessing service.baseUrl. Service object:', JSON.stringify(currentService, null, 2));
@@ -952,23 +857,12 @@ function batchGetSheetsData(service, spreadsheetId, ranges, executionContext) {
         throw new Error('Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText());
       }
       
-      if (contextToUse && contextToUse.stats) {
-        contextToUse.stats.dataRetrievals++;
-      }
-      
       return JSON.parse(response.getContentText());
     } catch (error) {
       console.error('batchGetSheetsData error:', error.message);
       throw new Error('データ取得に失敗しました: ' + error.message);
     }
   }, { ttl: 120 }); // 2分間キャッシュ（API制限対策）
-  
-  // ExecutionContextのキャッシュに保存
-  if (contextToUse && contextToUse.sheetsDataCache && cacheKey) {
-    contextToUse.sheetsDataCache[cacheKey] = result;
-  }
-  
-  return result;
 }
 
 /**
@@ -1075,24 +969,17 @@ function getSpreadsheetsData(service, spreadsheetId) {
 }
 
 /**
- * すべてのユーザー情報を取得（最適化版）
- * @param {object} executionContext - 実行コンテキスト（オプション）
+ * すべてのユーザー情報を取得
  * @returns {Array} ユーザー情報配列
  */
-function getAllUsers(executionContext) {
+function getAllUsers() {
   try {
-    // ExecutionContextManagerを使用してコンテキストを取得または作成
-    var contextToUse = executionContext;
-    if (!contextToUse && typeof ExecutionContextManager !== 'undefined') {
-      contextToUse = ExecutionContextManager.getOrCreate();
-    }
-    
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    var service = getSheetsService(contextToUse);
+    var service = getSheetsService();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
-    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"], contextToUse);
+    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
     var values = data.valueRanges[0].values || [];
     
     if (values.length <= 1) {

@@ -7,106 +7,6 @@ const CONFIG_SHEET_NAME = 'Config';
 
 var runtimeUserInfo = null;
 
-// =================================================================
-// ExecutionContextManager - グローバル最適化システム
-// =================================================================
-
-/**
- * グローバルExecutionContext（システム全体で共有）
- */
-var globalExecutionContext = null;
-
-/**
- * ExecutionContextManager - システム全体の最適化を管理
- */
-const ExecutionContextManager = {
-  /**
-   * 現在のグローバルExecutionContextを取得または作成
-   * @param {string} userId - ユーザーID（オプション）
-   * @returns {object} ExecutionContext
-   */
-  getOrCreate(userId) {
-    // 既存のコンテキストがあり、同一ユーザーの場合は再利用
-    if (globalExecutionContext && 
-        (!userId || globalExecutionContext.requestUserId === userId)) {
-      return globalExecutionContext;
-    }
-    
-    // 新しいコンテキストを作成
-    try {
-      const actualUserId = userId || getUserId();
-      globalExecutionContext = createExecutionContext(actualUserId);
-      console.log('🌟 ExecutionContextManager: 新しいグローバルコンテキスト作成');
-      return globalExecutionContext;
-    } catch (error) {
-      console.warn('⚠️ ExecutionContextManager: コンテキスト作成失敗:', error.message);
-      return null;
-    }
-  },
-
-  /**
-   * 現在のグローバルExecutionContextを取得（作成しない）
-   * @returns {object|null} ExecutionContext
-   */
-  getCurrent() {
-    return globalExecutionContext;
-  },
-
-  /**
-   * グローバルExecutionContextをクリア
-   */
-  clear() {
-    if (globalExecutionContext) {
-      console.log('🧹 ExecutionContextManager: グローバルコンテキストクリア');
-      globalExecutionContext = null;
-    }
-  },
-
-  /**
-   * 統計情報を取得
-   * @returns {object} 統計情報
-   */
-  getStats() {
-    if (!globalExecutionContext || !globalExecutionContext.stats) {
-      return { status: 'no_context' };
-    }
-    return {
-      ...globalExecutionContext.stats,
-      status: 'active',
-      userId: globalExecutionContext.requestUserId,
-      uptime: new Date().getTime() - globalExecutionContext.startTime
-    };
-  }
-};
-
-/**
- * システム全体のパフォーマンス統計を取得（管理者向け）
- * @returns {object} システム統計情報
- */
-function getSystemPerformanceStats() {
-  if (!isDeployUser()) {
-    return { error: 'この機能にアクセスする権限がありません。' };
-  }
-  
-  const stats = ExecutionContextManager.getStats();
-  
-  return {
-    timestamp: new Date().toISOString(),
-    globalContext: stats,
-    cacheManager: (typeof cacheManager !== 'undefined') ? cacheManager.getStats() : null,
-    optimization: {
-      status: 'active',
-      version: '2.0',
-      features: [
-        'ExecutionContextManager',
-        'Smart Function Wrappers',
-        'Multi-level Caching',
-        'Performance Monitoring'
-      ]
-    }
-  };
-}
-
 /**
  * 実行中に一度だけユーザー情報を取得して再利用する。
  * @param {string} [requestUserId] - リクエスト元のユーザーID (オプション)
@@ -798,12 +698,7 @@ function saveAndPublishLegacy(requestUserId, sheetName, config) {
     console.log('saveAndPublish: 公開処理開始（最適化版）');
 
     // PHASE2 OPTIMIZATION: Integrated processing with shared resources
-    // ExecutionContextManagerを使用してコンテキストを取得
-    var contextToUse = null;
-    if (typeof ExecutionContextManager !== 'undefined') {
-      contextToUse = ExecutionContextManager.getOrCreate();
-    }
-    const sheetsService = getSheetsService(contextToUse);
+    const sheetsService = getSheetsService();
     console.log('saveAndPublish: 共有Sheetsサービス作成完了');
 
     // 2. 設定を保存（最適化モード使用）
@@ -1511,12 +1406,7 @@ function createExecutionContext(requestUserId) {
   
   try {
     // 1. 共有リソースを一括作成（1回のみ）
-    // ExecutionContextManagerを使用してコンテキストを取得
-    var contextToUse = null;
-    if (typeof ExecutionContextManager !== 'undefined') {
-      contextToUse = ExecutionContextManager.getOrCreate();
-    }
-    const sheetsService = getSheetsService(contextToUse); // ExecutionContext作成時は従来通り
+    const sheetsService = getSheetsService();
     const userInfo = getCachedUserInfo(requestUserId);
     
     if (!userInfo) {
@@ -1533,11 +1423,6 @@ function createExecutionContext(requestUserId) {
       sheetsService: sheetsService,
       userInfo: JSON.parse(JSON.stringify(userInfo)), // Deep copy
       
-      // 実行レベルキャッシュ（重複処理防止）
-      sheetsDataCache: {},
-      userDataCache: {},
-      spreadsheetMetadataCache: {},
-      
       // 変更トラッキング
       pendingUpdates: {},
       configChanges: {},
@@ -1548,9 +1433,7 @@ function createExecutionContext(requestUserId) {
         sheetsServiceCreations: 1,
         dbQueries: 1,
         cacheHits: 0,
-        operationsCount: 0,
-        dataRetrievals: 0,
-        cacheSkips: 0
+        operationsCount: 0
       }
     };
     console.log('DEBUG: context.sheetsService set to:', JSON.stringify(context.sheetsService, null, 2));
@@ -1802,29 +1685,6 @@ function buildResponseFromContext(context) {
 function getSheetDetails(context, spreadsheetId, sheetName) {
   console.log('DEBUG: getSheetDetails received context.sheetsService:', JSON.stringify(context.sheetsService, null, 2));
   try {
-    // 入力パラメーターの検証
-    if (!context || !spreadsheetId || !sheetName) {
-      throw new Error('必須パラメーターが不足しています');
-    }
-    
-    // キャッシュキーの生成
-    const cacheKey = `sheet_${spreadsheetId}_${sheetName}`;
-    
-    // ExecutionContextのキャッシュをチェック
-    if (context.sheetsDataCache && context.sheetsDataCache[cacheKey]) {
-      try {
-        console.log('🔄 getSheetDetails: ExecutionContextキャッシュヒット');
-        if (context.stats) {
-          context.stats.cacheHits++;
-        }
-        return context.sheetsDataCache[cacheKey];
-      } catch (cacheError) {
-        console.warn('⚠️ キャッシュデータが破損:', cacheError.message);
-        // キャッシュをクリアして処理続行
-        delete context.sheetsDataCache[cacheKey];
-      }
-    }
-    
     // コンテキスト内のSheetsServiceを使用してシート情報を取得
     console.log('DEBUG: Calling getSpreadsheetsData with service:', JSON.stringify(context.sheetsService, null, 2));
     const data = getSpreadsheetsData(context.sheetsService, spreadsheetId);
@@ -1835,17 +1695,15 @@ function getSheetDetails(context, spreadsheetId, sheetName) {
 
     // ヘッダー行をAPIで取得
     const range = `'${sheetName}'!1:1`;
-    const batch = batchGetSheetsData(context.sheetsService, spreadsheetId, [range], context);
+    const batch = batchGetSheetsData(context.sheetsService, spreadsheetId, [range]);
     const headers = (batch.valueRanges && batch.valueRanges[0] && batch.valueRanges[0].values)
       ? batch.valueRanges[0].values[0] || []
       : [];
-    
-    context.stats.dataRetrievals++;
 
     const guessed = autoMapHeaders(headers);
     const existing = getConfigFromContext(context, sheetName);
 
-    const result = {
+    return {
       allHeaders: headers,
       guessedConfig: guessed,
       existingConfig: existing,
@@ -1855,22 +1713,9 @@ function getSheetDetails(context, spreadsheetId, sheetName) {
         id: sheet.properties.sheetId
       }))
     };
-    
-    // 結果をキャッシュに保存
-    if (context.sheetsDataCache) {
-      context.sheetsDataCache[cacheKey] = result;
-    }
-    
-    return result;
 
   } catch (error) {
-    console.warn('getSheetDetails エラー:', error.message);
-    
-    // セーフティネット: 基本的な応答を返す
-    if (context && context.stats) {
-      context.stats.errors = (context.stats.errors || 0) + 1;
-    }
-    
+    console.warn('getSheetDetailsOptimized エラー:', error.message);
     return {
       allHeaders: [],
       guessedConfig: {},
