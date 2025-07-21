@@ -343,12 +343,10 @@ function createFormWithConfig() {
   }
   
   const config = {
-    mainQuestion: { // mainQuestion をオブジェクトとして定義
-      title: question,
-      type: 'text' // デフォルトで 'text' タイプを設定
-    },
+    mainQuestion: question, // mainQuestionは文字列として送信（バックエンドが期待する形式）
     classChoices: classChoices,
     includeOthers: includeOthersOption,
+    enableClass: classChoices && classChoices.length > 0, // クラス選択肢があるかを判定
   };
   
   hideFormConfigModal();
@@ -367,9 +365,11 @@ function createFormWithConfig() {
     return;
   }
   
-  // runGasWithUserIdを使用して統一されたAPIコールに変更
-  runGasWithUserId('createCustomForm', config)
+  // runGasWithUserIdを使用して統一されたAPIコールに変更（UI用ラッパー関数を呼び出し）
+  console.log('📤 Sending config to createCustomFormUI:', config);
+  runGasWithUserId('createCustomFormUI', config)
     .then(function(result) {
+      console.log('📥 Received response from createCustomFormUI:', result);
       if (result && result.status === 'success') {
         showMessage('✅ 新しいフォームが作成され、連携されました！', 'success');
         
@@ -387,6 +387,7 @@ function createFormWithConfig() {
           hideQuickStartProgress();
         }, 3000);
       } else {
+        console.error('❌ カスタムフォーム作成が失敗:', result);
         showMessage(result?.message || 'フォームの作成に失敗しました。', 'error');
         // 失敗時も進捗バーを非表示
         setTimeout(() => {
