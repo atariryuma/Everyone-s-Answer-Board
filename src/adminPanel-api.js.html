@@ -341,7 +341,10 @@ function createFormWithConfig() {
   }
   
   const config = {
-    mainQuestion: question,
+    mainQuestion: { // mainQuestion をオブジェクトとして定義
+      title: question,
+      type: 'text' // デフォルトで 'text' タイプを設定
+    },
     classChoices: classChoices,
     includeOthers: includeOthersOption,
   };
