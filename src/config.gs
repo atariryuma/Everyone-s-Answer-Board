@@ -1986,28 +1986,6 @@ function setDisplayOptionsInContext(context, displayOptions) {
  * @returns {object} 最新のステータスオブジェクト
  */
 function saveAndPublish(requestUserId, sheetName, config) {
-  // Parameter validation to catch frontend/backend mismatches
-  debugLog('🔧 saveAndPublish: Parameter validation', {
-    requestUserId: requestUserId,
-    requestUserIdType: typeof requestUserId,
-    requestUserIdLength: requestUserId ? requestUserId.length : null,
-    sheetName: sheetName,
-    sheetNameType: typeof sheetName,
-    configType: typeof config,
-    caller: 'saveAndPublish'
-  });
-  
-  // Validate requestUserId format
-  if (!requestUserId || typeof requestUserId !== 'string') {
-    throw new Error('saveAndPublish: Invalid requestUserId parameter - must be a string');
-  }
-  
-  // Basic UUID validation for requestUserId
-  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!uuidPattern.test(requestUserId)) {
-    throw new Error('saveAndPublish: Invalid requestUserId format - must be UUID: ' + requestUserId);
-  }
-  
   verifyUserAccess(requestUserId);
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
