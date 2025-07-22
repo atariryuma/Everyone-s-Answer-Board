@@ -7,24 +7,34 @@
 // BACKEND FUNCTION WRAPPERS
 // =============================================================================
 
-// マルチテナント対応: Simplified runGasWithUserId (no userIdPromise)
+// マルチテナント対応: 新しいrunGasWithUserId関数
 function runGasWithUserId(functionName, ...args) {
-  let userIdToSend = userId; // Use current userId
+  let userIdToSend = userId; // Use a local variable for clarity
 
-  // If userId is not set, throw error immediately (no promise waiting)
+  // If userId is not set (null/undefined), wait for initialization
   if (!userIdToSend) {
-    throw new Error('ユーザーIDが初期化されていません。システムの初期化を待ってください。');
+    return userIdPromise.then(resolvedUserId => {
+      userIdToSend = resolvedUserId; // Update local variable with resolved ID
+      // Perform validation after resolution
+      validateUserId(userIdToSend, functionName);
+      return gasOptimizer.call(functionName, userIdToSend, ...args);
+    }).catch(error => {
+      console.error('❌ runGasWithUserId: userIdの初期化に失敗しました:', error);
+      throw new Error('ユーザーIDの取得に失敗しました。ページを再読み込みしてください。');
+    });
   }
 
-  // Validate userId format
-  try {
-    validateUserId(userIdToSend, functionName);
-  } catch (validationError) {
-    console.error('❌ runGasWithUserId: userId検証エラー:', validationError);
+  // If userId is already set, validate its type
+  if (typeof userIdToSend !== 'string' || userIdToSend.trim() === '') {
+    // This is the problematic case: userId is set but not a valid string
+    const errorMsg = `runGasWithUserId: 無効なuserIdが設定されています: "${userIdToSend}" (type: ${typeof userIdToSend})`;
+    console.error('❌ ' + errorMsg);
+    // Throw an error immediately to prevent sending invalid data to backend
     throw new Error('ユーザーIDの形式が正しくありません。ページを再読み込みしてください。');
   }
 
-  // If userId is valid, proceed with the API call
+  // If userId is a valid string, proceed
+  validateUserId(userIdToSend, functionName); // This validation should now catch it if it's not a string
   return gasOptimizer.call(functionName, userIdToSend, ...args);
 }
 
@@ -35,10 +45,17 @@ function callWithCache(functionName, cacheKey, ttl, ...args) {
   }, ttl);
 }
 
-// runGasWithUserId with cache support (simplified)
+// runGasWithUserId with cache support
 function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
   if (!userId) {
-    throw new Error('ユーザーIDが設定されていません。システムの初期化を待ってください。');
+    return userIdPromise.then(() => {
+      if (!userId) {
+        throw new Error('ユーザーIDが設定されていません。');
+      }
+      return unifiedCache.getOrSet(cacheKey, function() {
+        return gasOptimizer.call(functionName, userId, ...args);
+      }, ttl);
+    });
   }
   
   return unifiedCache.getOrSet(cacheKey, function() {
@@ -47,38 +64,11 @@ function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
 }
 
 // =============================================================================
-// VALIDATION FUNCTIONS
-// =============================================================================
-
-// Validate userId format and content
-function validateUserId(userId, functionName = 'unknown') {
-  if (!userId) {
-    throw new Error(`${functionName}: userIdが設定されていません`);
-  }
-  
-  if (typeof userId !== 'string') {
-    throw new Error(`${functionName}: userIdは文字列である必要があります (現在の型: ${typeof userId})`);
-  }
-  
-  if (userId.trim() === '') {
-    throw new Error(`${functionName}: userIdが空文字列です`);
-  }
-  
-  // UUID形式の基本的な検証 (36文字、ハイフン付き)
-  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!uuidPattern.test(userId)) {
-    throw new Error(`${functionName}: userIdの形式が正しくありません (UUID形式が必要): ${userId}`);
-  }
-  
-  return true;
-}
-
-// =============================================================================
 // STATUS AND DATA LOADING
 // =============================================================================
 
-// Load system status - MAIN API entry point
-window.loadStatusFromAPI = function loadStatus(bypassCache = false) {
+// Load system status - OPTIMIZED with integrated API
+function loadStatus(bypassCache = false) {
   console.group('🔄 loadStatus - Integrated API');
   console.log('🚀 Loading system status with integrated API, bypassCache:', bypassCache);
 
@@ -90,13 +80,10 @@ window.loadStatusFromAPI = function loadStatus(bypassCache = false) {
     .then(response => {
       console.log('✅ Integrated data loaded:', response);
 
-      // Extract and set userId from response (critical step)
+      // Extract userId for compatibility
       if (response.userInfo && response.userInfo.userId) {
-        setUserId(response.userInfo.userId);
-        console.log('✅ userId extracted and set from integrated response:', userId);
-      } else {
-        console.error('❌ No userId in getInitialData response:', response);
-        throw new Error('ユーザーIDが取得できませんでした');
+        userId = response.userInfo.userId;
+        console.log('✅ userId extracted from integrated response:', userId);
       }
 
       // Update UI with integrated response
@@ -949,9 +936,6 @@ function initializeAPI() {
   document.addEventListener('click', updateUserActivity);
   document.addEventListener('keypress', updateUserActivity);
   document.addEventListener('scroll', updateUserActivity);
-  
-  // 初回ロード時にシステムステータスをロード
-  window.loadStatusFromAPI();
 }
 
 // Setup real-time updates
@@ -968,20 +952,28 @@ function setupRealtimeUpdates() {
   }, 10000);
 }
 
-// Initialize when DOM is ready - Global initialization guard
-if (!window.adminPanelInitialized) {
-  window.adminPanelInitialized = true;
-  
-  if (document.readyState !== 'loading') {
+// Initialize when DOM is ready
+if (document.readyState !== 'loading') {
+  initializeAPI();
+} else {
+  document.addEventListener('DOMContentLoaded', function() {
     initializeAPI();
-  } else {
-    document.addEventListener('DOMContentLoaded', function() {
-      initializeAPI();
-    });
-  }
+  });
 }
 
-// Initialize API communications (removed duplicate)
+// Initialize API communications
+function initializeAPI() {
+  // Start background status updates
+  startSystemStatusUpdate();
+  
+  // Setup user activity tracking
+  document.addEventListener('click', updateUserActivity);
+  document.addEventListener('keypress', updateUserActivity);
+  document.addEventListener('scroll', updateUserActivity);
+
+  // 初回ロード時にシステムステータスをロード
+  loadStatus();
+}
 
 // Load user information
 function loadUserInfo() {
