@@ -237,6 +237,9 @@ function saveAndPublish() {
     return;
   }
   
+  // UIからconfigオブジェクトを構築
+  const config = buildConfigObject(); // ここでconfigを取得
+
   // Set save protection flags to prevent interference
   isSaveInProgress = true;
   freshSaveTimestamp = Date.now();
@@ -371,7 +374,7 @@ function createFormWithConfig() {
     return;
   }
   
-  runGasWithUserId('createCustomFormUI', 'カスタムフォームを作成中...', config)
+  runGasWithUserId('createCustomFormUI', false, config)
     .then(function(result) {
       console.log('📥 Received response from createCustomFormUI:', result);
       if (result && result.status === 'success') {
@@ -828,7 +831,7 @@ function handleQuickStart() {
   // Show loading message optimized for QuickStart
   // クイックスタート中は専用のプログレスバーを使用するため、汎用ローディングは表示しない
   
-  runGasWithUserId('quickStartSetup', 'クイックスタートセットアップ中...')
+  runGasWithUserId('quickStartSetup', false)
     .then(function(result) {
       if (result && result.status === 'success') {
         // Final progress update
