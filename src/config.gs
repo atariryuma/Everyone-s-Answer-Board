@@ -1005,7 +1005,7 @@ function addSpreadsheetUrl(requestUserId, url) {
  * AdminPanel.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function clearActiveSheet(requestUserId) {
+function unpublishBoard(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
     var currentUserId = requestUserId; // requestUserId を使用
@@ -1048,7 +1048,7 @@ function clearActiveSheet(requestUserId) {
       ...updatedStatus
     };
   } catch (e) {
-    console.error('clearActiveSheet エラー: ' + e.message);
+    console.error('unpublishBoard エラー: ' + e.message);
     throw new Error('回答ボードの公開停止に失敗しました: ' + e.message);
   }
 }

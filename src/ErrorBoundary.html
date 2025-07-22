@@ -401,6 +401,7 @@
 
 <!-- サーバーサイドエラー表示部分 -->
 <? if (typeof title !== 'undefined' && title) { ?>
+<? var loginUrl = getWebAppUrl(); ?>
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -515,9 +516,9 @@
             <button class="btn btn-primary" onclick="location.reload()">
                 🔄 再読み込み
             </button>
-            <button class="btn btn-secondary" onclick="window.location.href = window.location.origin + window.location.pathname">
+            <a class="btn btn-secondary" href="<?= loginUrl ?>">
                 🏠 ログイン画面に戻る
-            </button>
+            </a>
         </div>
         
         <? if (typeof debugInfo !== 'undefined' && debugInfo) { ?>
