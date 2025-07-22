@@ -417,6 +417,7 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     var formattedData = formatSheetDataForFrontend(sheetData.data, mappedIndices, headerIndices, adminMode, isOwner, sheetData.displayMode);
 
     debugLog('getPublishedSheetData: formattedData length=%s', formattedData.length);
+    debugLog('getPublishedSheetData: formattedData content=%s', JSON.stringify(formattedData));
 
     // ボードのタイトルを実際のスプレッドシートのヘッダーから取得
     let headerTitle = publishedSheetName || '今日のお題';
