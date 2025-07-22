@@ -219,6 +219,111 @@ class CacheManager {
   }
 
   /**
+   * インテリジェント無効化：関連するキャッシュエントリを連鎖的に無効化
+   * @param {string} entityType - エンティティタイプ (user, spreadsheet, form等)
+   * @param {string} entityId - エンティティID
+   * @param {Array<string>} relatedIds - 関連するエンティティID群
+   */
+  invalidateRelated(entityType, entityId, relatedIds = []) {
+    try {
+      console.log(`🔗 関連キャッシュ無効化開始: ${entityType}/${entityId}`);
+      
+      // 1. メインエンティティのキャッシュ無効化
+      const patterns = this._getInvalidationPatterns(entityType, entityId);
+      patterns.forEach(pattern => {
+        this.clearByPattern(pattern);
+      });
+      
+      // 2. 関連エンティティのキャッシュ無効化
+      relatedIds.forEach(relatedId => {
+        if (relatedId && relatedId !== entityId) {
+          const relatedPatterns = this._getInvalidationPatterns(entityType, relatedId);
+          relatedPatterns.forEach(pattern => {
+            this.clearByPattern(pattern);
+          });
+        }
+      });
+      
+      // 3. クロスエンティティ関連キャッシュの無効化
+      this._invalidateCrossEntityCache(entityType, entityId, relatedIds);
+      
+      console.log(`✅ 関連キャッシュ無効化完了: ${entityType}/${entityId}`);
+      
+    } catch (error) {
+      console.warn(`⚠️ 関連キャッシュ無効化エラー: ${entityType}/${entityId}`, error.message);
+    }
+  }
+  
+  /**
+   * エンティティタイプに基づく無効化パターンを取得
+   * @private
+   */
+  _getInvalidationPatterns(entityType, entityId) {
+    const patterns = [];
+    
+    switch (entityType) {
+      case 'user':
+        patterns.push(
+          `user_${entityId}*`,
+          `userInfo_${entityId}*`,
+          `config_${entityId}*`,
+          `appUrls_${entityId}*`,
+          `status_${entityId}*`
+        );
+        break;
+        
+      case 'spreadsheet':
+        patterns.push(
+          `sheets_${entityId}*`,
+          `batchGet_${entityId}*`,
+          `headers_${entityId}*`,
+          `spreadsheet_${entityId}*`
+        );
+        break;
+        
+      case 'form':
+        patterns.push(
+          `form_${entityId}*`,
+          `formUrl_${entityId}*`,
+          `formResponse_${entityId}*`
+        );
+        break;
+        
+      default:
+        patterns.push(`${entityType}_${entityId}*`);
+    }
+    
+    return patterns;
+  }
+  
+  /**
+   * クロスエンティティキャッシュの無効化
+   * @private
+   */
+  _invalidateCrossEntityCache(entityType, entityId, relatedIds) {
+    try {
+      // ユーザー変更時は関連するスプレッドシート・フォームキャッシュも無効化
+      if (entityType === 'user' && relatedIds.length > 0) {
+        relatedIds.forEach(relatedId => {
+          this.clearByPattern(`user_${entityId}_spreadsheet_${relatedId}*`);
+          this.clearByPattern(`user_${entityId}_form_${relatedId}*`);
+        });
+      }
+      
+      // スプレッドシート変更時は関連するユーザーキャッシュも無効化
+      if (entityType === 'spreadsheet' && relatedIds.length > 0) {
+        relatedIds.forEach(userId => {
+          this.clearByPattern(`user_${userId}_spreadsheet_${entityId}*`);
+          this.clearByPattern(`config_${userId}*`); // ユーザー設定も無効化
+        });
+      }
+      
+    } catch (error) {
+      console.warn('クロスエンティティキャッシュ無効化エラー:', error.message);
+    }
+  }
+
+  /**
    * 期限切れのキャッシュをクリアします（この機能はGASでは自動です）。
    * メモ化キャッシュをクリアする目的で実装します。
    */

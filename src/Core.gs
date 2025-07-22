@@ -1561,6 +1561,17 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
     lastModified: new Date().toISOString()
   };
   
+  // 型安全性確保: publishedSheetNameの明示的文字列変換
+  var safeSheetName = formAndSsInfo.sheetName;
+  if (typeof safeSheetName !== 'string') {
+    console.error('❌ quickStartSetup: formAndSsInfo.sheetNameが文字列ではありません:', typeof safeSheetName, safeSheetName);
+    safeSheetName = String(safeSheetName); // 強制的に文字列化
+  }
+  if (safeSheetName === 'true' || safeSheetName === 'false') {
+    console.error('❌ quickStartSetup: 無効なシート名が検出されました:', safeSheetName);
+    throw new Error('無効なシート名: ' + safeSheetName);
+  }
+  
   var updatedConfig = {
     ...configJson,
     setupStatus: 'completed',
@@ -1568,7 +1579,7 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
     formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl,
     editFormUrl: formAndSsInfo.editFormUrl,
     publishedSpreadsheetId: formAndSsInfo.spreadsheetId,
-    publishedSheetName: formAndSsInfo.sheetName,
+    publishedSheetName: safeSheetName, // 型安全性が確保されたシート名
     appPublished: true,
     folderId: folder ? folder.getId() : '',
     folderUrl: folder ? folder.getUrl() : '',

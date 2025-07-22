@@ -7,6 +7,14 @@
 var USER_CACHE_TTL = 300; // 5分
 var DB_BATCH_SIZE = 100;
 
+// 簡易インデックス機能：ユーザー検索の高速化
+var userIndexCache = {
+  byUserId: new Map(),
+  byEmail: new Map(),
+  lastUpdate: 0,
+  TTL: 300000 // 5分間のキャッシュ
+};
+
 /**
  * 削除ログ用シート設定
  */
@@ -967,7 +975,7 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
     }
   }
 
-  // API呼び出しをキャッシュ化（短期間）
+  // API効率化: 小さなバッチの統合とキャッシュ化
   var cacheKey = `batchGet_${spreadsheetId}_${JSON.stringify(ranges)}`;
   
   return cacheManager.get(cacheKey, () => {

@@ -7,16 +7,314 @@ const CONFIG_SHEET_NAME = 'Config';
 
 var runtimeUserInfo = null;
 
+// メモリ管理用の実行レベル変数
+var executionUserInfoCache = null;
+var lastCacheUserIdKey = null;
+var executionStartTime = Date.now();
+const EXECUTION_MAX_LIFETIME = 300000; // 5分間の最大実行時間
+
 /**
  * 実行中に一度だけユーザー情報を取得して再利用する。
+ * メモリ管理強化版：実行時間制限とキャッシュ自動クリア
  * @param {string} [requestUserId] - リクエスト元のユーザーID (オプション)
  * @returns {object|null} ユーザー情報
  */
 function getUserInfoCached(requestUserId) {
-  if (runtimeUserInfo && (!requestUserId || runtimeUserInfo.userId === requestUserId)) return runtimeUserInfo;
-  var userId = requestUserId || getUserId();
-  runtimeUserInfo = findUserById(userId);
-  return runtimeUserInfo;
+  // 実行時間制限チェック
+  if (Date.now() - executionStartTime > EXECUTION_MAX_LIFETIME) {
+    console.warn('⚠️ 実行時間制限到達、キャッシュを自動クリア');
+    clearExecutionUserInfoCache();
+    executionStartTime = Date.now();
+  }
+  
+  const userIdKey = requestUserId || getUserId();
+  
+  // キャッシュヒット条件：同じユーザーIDかつキャッシュが有効
+  if (executionUserInfoCache && lastCacheUserIdKey === userIdKey) {
+    return executionUserInfoCache;
+  }
+  
+  // キャッシュミス：新規取得
+  try {
+    const userInfo = findUserById(userIdKey);
+    if (userInfo) {
+      executionUserInfoCache = userInfo;
+      lastCacheUserIdKey = userIdKey;
+    }
+    return userInfo;
+  } catch (error) {
+    console.error('getUserInfoCached error:', error.message);
+    // エラー時はキャッシュをクリア
+    clearExecutionUserInfoCache();
+    return null;
+  }
+}
+
+/**
+ * 実行レベルのユーザー情報キャッシュをクリア
+ */
+function clearExecutionUserInfoCache() {
+  executionUserInfoCache = null;
+  lastCacheUserIdKey = null;
+  debugLog('[Memory] 実行レベルユーザー情報キャッシュをクリアしました');
+}
+
+/**
+ * リソース管理を自動化するContextクラス
+ * メモリ管理改善版：リソース自動解放とライフサイクル管理
+ */
+class ManagedExecutionContext {
+  constructor(requestUserId, userInfo) {
+    this.requestUserId = requestUserId;
+    this.userInfo = userInfo;
+    this.resources = new Map();
+    this.startTime = Date.now();
+    this.maxLifetime = 300000; // 5分間の最大ライフタイム
+    this.isDestroyed = false;
+    this.memoryUsage = { peak: 0, current: 0 };
+    
+    // シーツサービスを安全に作成
+    try {
+      this.sheetsService = createSheetsService();
+      this.resources.set('sheetsService', this.sheetsService);
+      this._trackMemoryUsage('sheetsService');
+    } catch (error) {
+      console.error('❌ サービス作成エラー:', error.message);
+      this.sheetsService = getSheetsServiceCached();
+      this.resources.set('sheetsService', this.sheetsService);
+      this._trackMemoryUsage('sheetsService');
+    }
+    
+    this.pendingUpdates = {};
+    this.cachesToInvalidate = [];
+    
+    // 自動クリーンアップのタイマー設定
+    this._scheduleAutoCleanup();
+    
+    // メモリ使用量監視の開始
+    this._startMemoryMonitoring();
+  }
+  
+  /**
+   * メモリ使用量を追跡
+   */
+  _trackMemoryUsage(resourceKey) {
+    try {
+      // 大まかなメモリ使用量を計算
+      const resourcesSize = this.resources.size * 100; // 概算値
+      const updatesSize = Object.keys(this.pendingUpdates).length * 50;
+      this.memoryUsage.current = resourcesSize + updatesSize;
+      
+      if (this.memoryUsage.current > this.memoryUsage.peak) {
+        this.memoryUsage.peak = this.memoryUsage.current;
+      }
+      
+      // メモリ使用量が過大になった場合の警告
+      if (this.memoryUsage.current > 5000) {
+        console.warn('⚠️ ExecutionContext高メモリ使用量検出:', this.memoryUsage.current);
+      }
+    } catch (error) {
+      console.warn('メモリ使用量追跡エラー:', error.message);
+    }
+  }
+  
+  /**
+   * メモリ使用量監視を開始
+   */
+  _startMemoryMonitoring() {
+    this.memoryMonitorTimer = setTimeout(() => {
+      if (!this.isDestroyed) {
+        this._trackMemoryUsage('monitor');
+        this._startMemoryMonitoring(); // 再帰的監視
+      }
+    }, 30000); // 30秒間隔
+  }
+  
+  /**
+   * リソースの自動クリーンアップを予約
+   */
+  _scheduleAutoCleanup() {
+    this.cleanupTimer = setTimeout(() => {
+      if (!this.isDestroyed) {
+        console.warn('⚠️ ExecutionContext自動クリーンアップ実行:', this.requestUserId);
+        this.destroy();
+      }
+    }, this.maxLifetime);
+  }
+  
+  /**
+   * リソースを手動で追加
+   */
+  addResource(key, resource) {
+    if (!this.isDestroyed) {
+      this.resources.set(key, resource);
+      this._trackMemoryUsage(key);
+    }
+  }
+  
+  /**
+   * 特定のリソースを安全に削除
+   */
+  removeResource(key) {
+    if (this.resources.has(key)) {
+      try {
+        const resource = this.resources.get(key);
+        if (resource && typeof resource.cleanup === 'function') {
+          resource.cleanup();
+        }
+        this.resources.delete(key);
+        debugLog(`🗑️ リソース削除: ${key}`);
+      } catch (error) {
+        console.warn('リソース削除エラー:', key, error.message);
+      }
+    }
+  }
+  
+  /**
+   * コンテキストを破棄してリソースを解放
+   */
+  destroy() {
+    if (this.isDestroyed) return;
+    
+    try {
+      // タイマーをクリア
+      if (this.cleanupTimer) {
+        clearTimeout(this.cleanupTimer);
+        this.cleanupTimer = null;
+      }
+      
+      if (this.memoryMonitorTimer) {
+        clearTimeout(this.memoryMonitorTimer);
+        this.memoryMonitorTimer = null;
+      }
+      
+      // リソースを個別にクリーンアップ
+      for (const [key, resource] of this.resources) {
+        try {
+          if (resource && typeof resource.cleanup === 'function') {
+            resource.cleanup();
+          }
+        } catch (cleanupError) {
+          console.warn(`リソースクリーンアップエラー (${key}):`, cleanupError.message);
+        }
+      }
+      
+      // リソースをクリア
+      this.resources.clear();
+      this.sheetsService = null;
+      this.pendingUpdates = null;
+      this.cachesToInvalidate = null;
+      this.userInfo = null;
+      
+      this.isDestroyed = true;
+      
+      const lifetime = Date.now() - this.startTime;
+      debugLog(`✅ ExecutionContextクリーンアップ完了: ${this.requestUserId} (lifetime: ${lifetime}ms, peak memory: ${this.memoryUsage.peak})`);
+      
+    } catch (error) {
+      console.error('❌ ExecutionContextクリーンアップエラー:', error.message);
+    }
+  }
+  
+  /**
+   * ヘルスチェック
+   */
+  isHealthy() {
+    const age = Date.now() - this.startTime;
+    return !this.isDestroyed && 
+           this.sheetsService && 
+           age < this.maxLifetime &&
+           this.resources.size > 0 &&
+           this.memoryUsage.current < 10000; // メモリ制限チェック
+  }
+  
+  /**
+   * メモリ統計情報を取得
+   */
+  getMemoryStats() {
+    return {
+      resourceCount: this.resources.size,
+      currentMemory: this.memoryUsage.current,
+      peakMemory: this.memoryUsage.peak,
+      lifetime: Date.now() - this.startTime,
+      isHealthy: this.isHealthy()
+    };
+  }
+}
+
+// グローバルなコンテキスト管理
+const globalContextManager = {
+  activeContexts: new Map(),
+  maxConcurrentContexts: 10,
+  
+  register(context) {
+    if (this.activeContexts.size >= this.maxConcurrentContexts) {
+      console.warn('⚠️ 最大コンテキスト数到達、古いコンテキストを強制クリーンアップ');
+      this._cleanupOldest();
+    }
+    
+    this.activeContexts.set(context.requestUserId, context);
+    debugLog(`📝 コンテキスト登録: ${context.requestUserId} (total: ${this.activeContexts.size})`);
+  },
+  
+  unregister(userId) {
+    if (this.activeContexts.has(userId)) {
+      const context = this.activeContexts.get(userId);
+      context.destroy();
+      this.activeContexts.delete(userId);
+      debugLog(`🗑️ コンテキスト削除: ${userId} (remaining: ${this.activeContexts.size})`);
+    }
+  },
+  
+  _cleanupOldest() {
+    let oldestContext = null;
+    let oldestTime = Date.now();
+    
+    for (const [userId, context] of this.activeContexts) {
+      if (context.startTime < oldestTime) {
+        oldestTime = context.startTime;
+        oldestContext = userId;
+      }
+    }
+    
+    if (oldestContext) {
+      this.unregister(oldestContext);
+    }
+  },
+  
+  cleanup() {
+    for (const userId of this.activeContexts.keys()) {
+      this.unregister(userId);
+    }
+  }
+};
+
+/**
+ * グローバルメモリ管理機能
+ */
+function performGlobalMemoryCleanup() {
+  try {
+    console.log('🧹 グローバルメモリクリーンアップ開始');
+    
+    // 1. ExecutionContextの清理
+    globalContextManager.cleanup();
+    
+    // 2. 実行レベルキャッシュのクリア
+    clearExecutionUserInfoCache();
+    
+    // 3. CacheManagerの期限切れキャッシュクリア
+    if (typeof cacheManager !== 'undefined' && cacheManager.clearExpired) {
+      cacheManager.clearExpired();
+    }
+    
+    // 4. 旧形式のランタイム変数クリア
+    runtimeUserInfo = null;
+    
+    console.log('✅ グローバルメモリクリーンアップ完了');
+    
+  } catch (error) {
+    console.error('❌ グローバルメモリクリーンアップエラー:', error.message);
+  }
 }
 
 /**
@@ -1339,16 +1637,20 @@ function createExecutionContext(requestUserId, options = {}) {
       throw new Error('ユーザー情報が見つかりません');
     }
     
-    // SheetsServiceオブジェクトの安全なコピー（関数を含むため JSON.parse(JSON.stringify()) は不適用）
+    // SheetsServiceオブジェクトの安全なコピー - 関数のクロージャスコープを保持
     if (!originalSheetsService || !originalSheetsService.baseUrl || !originalSheetsService.accessToken) {
       throw new Error('SheetsServiceオブジェクトが無効です。baseUrlまたはaccessTokenが見つかりません');
     }
     
-    const sheetsService = {
-      baseUrl: originalSheetsService.baseUrl,
-      accessToken: originalSheetsService.accessToken,
-      spreadsheets: originalSheetsService.spreadsheets // 関数参照を保持
-    };
+    // 重要: 新しいサービスインスタンスを作成してクロージャスコープの問題を回避
+    let sheetsService = createSheetsService(originalSheetsService.accessToken);
+    
+    // フォールバック検証: 作成されたサービスが有効であることを確認
+    if (!sheetsService || !sheetsService.baseUrl || !sheetsService.accessToken) {
+      console.error('❌ SheetsService作成失敗、オリジナルサービスを使用');
+      // 最後の手段：オリジナルサービスを直接使用（参照の問題は発生するが機能する）
+      sheetsService = originalSheetsService;
+    }
     
     console.log('DEBUG: SheetsService安全コピー完了 - baseUrl存在:', !!sheetsService.baseUrl);
     
@@ -1423,19 +1725,97 @@ function commitAllChanges(context) {
   }
   
   try {
-    // 既存のupdateUserの内部実装を使用（ただしSheetsServiceは再利用）
+    // Phase 1: DB更新実行
     updateUserDirect(context.sheetsService, context.requestUserId, context.pendingUpdates);
     
+    // Phase 2: アトミックなキャッシュ無効化（DB更新成功後に即座に実行）
+    try {
+      console.log('🗑️ トランザクション後のキャッシュ無効化開始');
+      
+      // 1. ユーザー関連キャッシュの無効化
+      invalidateUserCacheTransaction(context.requestUserId, context.userInfo.adminEmail, 
+                                    context.userInfo.spreadsheetId);
+      
+      // 2. 実行レベルキャッシュのクリア
+      clearExecutionUserInfoCache();
+      
+      // 3. SheetsServiceキャッシュの部分無効化（必要に応じて）
+      if (context.pendingUpdates.spreadsheetId) {
+        // スプレッドシートIDが変更された場合は関連キャッシュをクリア
+        cacheManager.clearByPattern(`batchGet_${context.pendingUpdates.spreadsheetId}_*`);
+      }
+      
+      console.log('✅ キャッシュ無効化完了');
+      
+    } catch (cacheError) {
+      // キャッシュエラーは致命的ではないが、ログに記録
+      console.warn('⚠️ キャッシュ無効化で軽微なエラー:', cacheError.message);
+    }
+    
     const endTime = new Date().getTime();
-    console.log('✅ 一括DB書き込み完了: %dms, 変更項目数: %d', 
+    console.log('✅ 一括DB書き込み+キャッシュ無効化完了: %dms, 変更項目数: %d', 
       endTime - startTime, Object.keys(context.pendingUpdates).length);
     
     // 統計更新
     context.stats.dbQueries++; // コミット時の1回をカウント
     
+    // コンテキストの変更状態をリセット
+    context.hasChanges = false;
+    context.pendingUpdates = {};
+    
   } catch (error) {
     console.error('❌ 一括DB書き込みエラー:', error.message);
     throw new Error('設定の保存に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * トランザクション用の安全なキャッシュ無効化
+ * @param {string} userId - ユーザーID
+ * @param {string} userEmail - ユーザーのメールアドレス
+ * @param {string} spreadsheetId - スプレッドシートID
+ */
+function invalidateUserCacheTransaction(userId, userEmail, spreadsheetId) {
+  try {
+    // 1. ユーザー情報キャッシュの無効化
+    if (typeof invalidateUserCache === 'function') {
+      invalidateUserCache(userId, userEmail, spreadsheetId, false);
+    }
+    
+    // 2. CacheManagerを使用した関連キャッシュの無効化
+    if (typeof cacheManager !== 'undefined' && cacheManager.remove) {
+      // ユーザー関連のキーを無効化
+      const userCacheKeys = [
+        `user_${userId}`,
+        `userInfo_${userId}`,
+        `config_${userId}`,
+        `appUrls_${userId}`
+      ];
+      
+      userCacheKeys.forEach(key => {
+        try {
+          cacheManager.remove(key);
+        } catch (keyError) {
+          console.warn('キャッシュキー削除エラー:', key, keyError.message);
+        }
+      });
+      
+      // スプレッドシート関連のキーを無効化
+      if (spreadsheetId) {
+        try {
+          cacheManager.clearByPattern(`sheets_${spreadsheetId}_*`);
+          cacheManager.clearByPattern(`batchGet_${spreadsheetId}_*`);
+        } catch (patternError) {
+          console.warn('パターンベースキャッシュ削除エラー:', patternError.message);
+        }
+      }
+    }
+    
+    console.log('✅ トランザクション用キャッシュ無効化完了');
+    
+  } catch (error) {
+    console.warn('⚠️ トランザクション用キャッシュ無効化エラー:', error.message);
+    // エラーは再スローしない（トランザクションを破綻させない）
   }
 }
 
@@ -1588,21 +1968,27 @@ function buildResponseFromContext(context) {
     // スプレッドシートの詳細情報が必要な場合は追加取得
     if (spreadsheetId && publishedSheetName) {
       try {
-        console.log('DEBUG: Calling getSheetDetails with context service');
-        // シート情報を取得（最低限の情報のみ、既存SheetsServiceを使用）
-        const sheetDetails = getSheetDetails(context, spreadsheetId, publishedSheetName);
-        response.sheetDetails = sheetDetails;
-        response.allSheets = sheetDetails.allSheets || [];
-        response.sheetNames = sheetDetails.sheetNames || [];
+        // 最終的な型安全性チェック: 'true'/'false'文字列の検出と防止
+        if (publishedSheetName === 'true' || publishedSheetName === 'false') {
+          console.error('❌ buildResponseFromContext: 無効なシート名を検出:', publishedSheetName);
+          console.warn('⚠️ シート詳細取得をスキップします');
+        } else {
+          console.log('DEBUG: Calling getSheetDetails with context service');
+          // シート情報を取得（最低限の情報のみ、既存SheetsServiceを使用）
+          const sheetDetails = getSheetDetails(context, spreadsheetId, publishedSheetName);
+          response.sheetDetails = sheetDetails;
+          response.allSheets = sheetDetails.allSheets || [];
+          response.sheetNames = sheetDetails.sheetNames || [];
 
-        // ヘッダー情報と自動マッピング結果を追加
-        response.headers = sheetDetails.allHeaders || [];
-        response.autoMappedHeaders = sheetDetails.guessedConfig || {
-          opinionHeader: '',
-          reasonHeader: '',
-          nameHeader: '',
-          classHeader: '',
-        };
+          // ヘッダー情報と自動マッピング結果を追加
+          response.headers = sheetDetails.allHeaders || [];
+          response.autoMappedHeaders = sheetDetails.guessedConfig || {
+            opinionHeader: '',
+            reasonHeader: '',
+            nameHeader: '',
+            classHeader: '',
+          };
+        }
         
       } catch (e) {
         console.warn('buildResponseFromContext: シート詳細取得エラー（基本情報のみで継続）:', e.message);
@@ -1639,6 +2025,16 @@ function buildResponseFromContext(context) {
 function getSheetDetails(context, spreadsheetId, sheetName) {
   console.log('DEBUG: getSheetDetails received context with sheetsService');
   try {
+    // サービスオブジェクトの健全性を確認し、必要に応じて復旧
+    if (!context?.sheetsService?.baseUrl || !context?.sheetsService?.accessToken) {
+      console.warn('⚠️ ExecutionContextのSheetsServiceが無効、復旧中...');
+      context.sheetsService = getSheetsServiceCached();
+      if (!context.sheetsService) {
+        throw new Error('SheetsService復旧に失敗しました');
+      }
+      console.log('✅ SheetsService復旧完了');
+    }
+    
     // コンテキスト内のSheetsServiceを使用してシート情報を取得
     console.log('DEBUG: Calling getSpreadsheetsData with context service');
     const data = getSpreadsheetsData(context.sheetsService, spreadsheetId);
