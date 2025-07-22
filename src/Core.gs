@@ -4340,16 +4340,22 @@ function getInitialData(requestUserId, targetSheetName) {
       }
     };
     
-    // === ステップ6: シート詳細の取得（オプション） ===
+    // === ステップ6: シート詳細の取得（オプション）- 最適化版 ===
     var includeSheetDetails = targetSheetName || configJson.publishedSheetName;
     if (includeSheetDetails && userInfo.spreadsheetId) {
       try {
-        // getInitialData内でcontextを生成
-        const context = createExecutionContext(currentUserId);
+        // 最適化: getSheetsServiceの重複呼び出しを避けるため、一度だけ作成して再利用
+        var sharedSheetsService = getSheetsService();
+        
+        // ExecutionContext を最適化版で作成（sheetsService と userInfo を渡して重複作成を回避）
+        const context = createExecutionContext(currentUserId, {
+          reuseService: sharedSheetsService,
+          reuseUserInfo: userInfo
+        });
         var sheetDetails = getSheetDetails(context, userInfo.spreadsheetId, includeSheetDetails);
         response.sheetDetails = sheetDetails;
         response._meta.includedApis.push('getSheetDetails');
-        debugLog('✅ シート詳細を統合応答に追加:', includeSheetDetails);
+        debugLog('✅ シート詳細を統合応答に追加 (最適化版):', includeSheetDetails);
         // getInitialData内で生成したcontextの変更をコミット
         commitAllChanges(context);
       } catch (sheetErr) {

@@ -1396,24 +1396,27 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
 // =================================================================
 
 /**
- * 実行コンテキストを作成（リソース一括作成・管理）
+ * 実行コンテキストを作成（リソース一括作成・管理）- 最適化対応版
  * @param {string} requestUserId - ユーザーID
+ * @param {object} options - オプション設定（後方互換性のため）
+ * @param {object} options.reuseService - 既存のSheetsServiceを再利用
+ * @param {object} options.reuseUserInfo - 既存のユーザー情報を再利用
  * @returns {object} 実行コンテキスト
  */
-function createExecutionContext(requestUserId) {
+function createExecutionContext(requestUserId, options = {}) {
   const startTime = new Date().getTime();
   console.log('🚀 ExecutionContext作成開始: userId=%s', requestUserId);
   
   try {
-    // 1. 共有リソースを一括作成（1回のみ）
-    const sheetsService = getSheetsService();
-    const userInfo = getCachedUserInfo(requestUserId);
+    // 1. 共有リソースの取得（最適化：既存リソース再利用対応）
+    const sheetsService = options.reuseService || getSheetsService();
+    const userInfo = options.reuseUserInfo || getCachedUserInfo(requestUserId);
     
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
     
-    // 2. 実行コンテキスト構築
+    // 2. 実行コンテキスト構築（既存プロパティ名を完全保持）
     const context = {
       // 基本情報
       requestUserId: requestUserId,
@@ -1430,16 +1433,18 @@ function createExecutionContext(requestUserId) {
       
       // パフォーマンス情報
       stats: {
-        sheetsServiceCreations: 1,
-        dbQueries: 1,
+        sheetsServiceCreations: options.reuseService ? 0 : 1, // 再利用時は0
+        dbQueries: options.reuseUserInfo ? 0 : 1, // 再利用時は0
         cacheHits: 0,
         operationsCount: 0
       }
     };
-    console.log('DEBUG: context.sheetsService set to:', JSON.stringify(context.sheetsService, null, 2));
+    // デバッグ: SheetsService設定完了（セキュリティのため詳細は非表示）
+    console.log('DEBUG: context.sheetsService initialized successfully');
     
     const endTime = new Date().getTime();
-    console.log('✅ ExecutionContext作成完了: %dms', endTime - startTime);
+    console.log('✅ ExecutionContext作成完了: %dms (リソース再利用: Service=%s, UserInfo=%s)', 
+      endTime - startTime, !!options.reuseService, !!options.reuseUserInfo);
     
     return context;
     
@@ -1634,7 +1639,7 @@ function buildResponseFromContext(context) {
     // スプレッドシートの詳細情報が必要な場合は追加取得
     if (spreadsheetId && publishedSheetName) {
       try {
-        console.log('DEBUG: Calling getSheetDetails with context.sheetsService:', JSON.stringify(context.sheetsService, null, 2));
+        console.log('DEBUG: Calling getSheetDetails with context service');
         // シート情報を取得（最低限の情報のみ、既存SheetsServiceを使用）
         const sheetDetails = getSheetDetails(context, spreadsheetId, publishedSheetName);
         response.sheetDetails = sheetDetails;
@@ -1683,10 +1688,10 @@ function buildResponseFromContext(context) {
  * @returns {object} シート詳細情報
  */
 function getSheetDetails(context, spreadsheetId, sheetName) {
-  console.log('DEBUG: getSheetDetails received context.sheetsService:', JSON.stringify(context.sheetsService, null, 2));
+  console.log('DEBUG: getSheetDetails received context with sheetsService');
   try {
     // コンテキスト内のSheetsServiceを使用してシート情報を取得
-    console.log('DEBUG: Calling getSpreadsheetsData with service:', JSON.stringify(context.sheetsService, null, 2));
+    console.log('DEBUG: Calling getSpreadsheetsData with context service');
     const data = getSpreadsheetsData(context.sheetsService, spreadsheetId);
 
     if (!data || !data.sheets) {
