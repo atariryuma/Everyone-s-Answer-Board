@@ -339,7 +339,7 @@
                 <div class="bg-gray-900 p-2 rounded text-xs text-cyan-400 font-mono break-all">
                   ${adminUrl}
                 </div>
-                <button onclick="copyUrlToClipboard('${adminUrl}')" 
+                <button onclick="copyUrlToClipboard('${adminUrl}', this)" 
                         class="mt-2 text-xs text-blue-400 hover:text-blue-300 underline">
                   📋 URLをコピー
                 </button>
@@ -380,38 +380,46 @@
   /**
    * URLをクリップボードにコピー (成功画面用)
    * @param {string} url - コピーするURL
+   * @param {HTMLElement} buttonElement - クリックされたボタン要素
    */
-  window.copyUrlToClipboard = function(url) {
+  window.copyUrlToClipboard = function(url, buttonElement) {
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url).then(() => {
           // 一時的な成功表示
-          const button = event.target;
-          const originalText = button.textContent;
-          button.textContent = '✅ コピー完了!';
-          button.disabled = true;
+          const originalText = buttonElement.textContent;
+          buttonElement.textContent = '✅ コピー完了!';
+          buttonElement.disabled = true;
           setTimeout(() => {
-            button.textContent = originalText;
-            button.disabled = false;
+            buttonElement.textContent = originalText;
+            buttonElement.disabled = false;
           }, 2000);
         }).catch((error) => {
-          console.warn('Clipboard API failed:', error);
-          fallbackCopy(url);
+          console.error('Clipboard API failed:', error);
+          // ユーザーに手動コピーを促すメッセージをボタンの近くに表示
+          const messageElement = document.createElement('span');
+          messageElement.textContent = ' (手動でコピーしてください)';
+          messageElement.style.color = 'orange';
+          buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
+          setTimeout(() => messageElement.remove(), 5000);
         });
       } else {
-        fallbackCopy(url);
+        // Clipboard APIがサポートされていない場合のフォールバック
+        console.warn('Clipboard API not supported. Manual copy required.');
+        const messageElement = document.createElement('span');
+        messageElement.textContent = ' (ブラウザがコピーをサポートしていません。手動でコピーしてください)';
+        messageElement.style.color = 'orange';
+        buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
+        setTimeout(() => messageElement.remove(), 5000);
       }
     } catch (error) {
       console.error('copyUrlToClipboard error:', error);
-      fallbackCopy(url);
-    }
-    
-    function fallbackCopy(url) {
-      // フォールバック: prompt で表示
-      const copied = prompt('下記URLをコピーしてください:', url);
-      if (copied === url) {
-        alert('URLがクリップボードにコピーされました');
-      }
+      // 予期せぬエラーの場合
+      const messageElement = document.createElement('span');
+      messageElement.textContent = ' (コピー中にエラーが発生しました)';
+      messageElement.style.color = 'red';
+      buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
+      setTimeout(() => messageElement.remove(), 5000);
     }
   };
 
