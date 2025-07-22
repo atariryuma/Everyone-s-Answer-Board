@@ -5332,11 +5332,11 @@ function confirmUserRegistration() {
  * @param {string} targetSheetName - 詳細を取得するシート名（省略可能）
  * @returns {Object} 統合された初期データ
  */
-function getInitialData(targetSheetName) {
+function getInitialData(requestUserId, targetSheetName) {
   debugLog('🚀 getInitialData: 統合初期化開始', { 
-    currentUserId: currentUserId, 
-    currentUserIdType: typeof currentUserId,
-    currentUserIdLength: currentUserId ? currentUserId.length : null,
+    requestUserId: requestUserId, 
+    requestUserIdType: typeof requestUserId,
+    requestUserIdLength: requestUserId ? requestUserId.length : null,
     targetSheetName: targetSheetName,
     caller: 'getInitialData'
   });
@@ -5356,7 +5356,7 @@ function getInitialData(targetSheetName) {
       debugLog('✅ getInitialData: UserID derived from authenticated email', { 
         activeUserEmail, 
         derivedUserId: currentUserId,
-        derivedUserId: currentUserId 
+        requestUserId: requestUserId 
       });
       
       // Log any mismatch for debugging but ALWAYS use the derived userID
