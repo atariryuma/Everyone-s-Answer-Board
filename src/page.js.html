@@ -1212,7 +1212,7 @@ setupEventDelegation() {
   async loadSheetData(showLoading = true, isInitialLoad = false, requestedSheetName = null) {
     if (this.state.isLoading && showLoading) return;
     this.state.isLoading = true;
-    this.showLoadingOverlay(''); // Add this line
+    this.showLoadingOverlay('読み込み中...'); // Add this line
 
     const selectedClass = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
     const oldAnswers = [...this.state.currentAnswers];
@@ -1250,10 +1250,11 @@ setupEventDelegation() {
               if (isInitialLoad) {
                 this.state.lastSeenCount = 0;
               }
+              console.log('Received empty or invalid data:', result);
               return;
             }
 
-            this.state.currentAnswers = result.data;
+            console.log('Received data:', result.data);
             
             // Apply saved reaction states to restore user's previous reactions
             this.applyReactionState(result.data);
