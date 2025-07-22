@@ -4525,7 +4525,7 @@ function getInitialData(requestUserId, targetSheetName) {
       // カスタムフォーム情報
       customFormInfo: configJson.formUrl ? {
         title: configJson.formTitle || 'カスタムフォーム',
-        mainQuestion: opinionHeader || configJson.publishedSheetName || '質問',
+        mainQuestion: configJson.mainQuestion || opinionHeader || configJson.publishedSheetName || '質問',
         formUrl: configJson.formUrl
       } : null,
       // メタ情報
