@@ -267,14 +267,61 @@ function adjustLayout() {
 // =============================================================================
 
 // Initialize layout on load
+// 統合初期化管理システム
 function initCore() {
   adjustLayout();
 }
 
-if (document.readyState !== 'loading') {
+// 統合初期化システム - 単一エントリーポイント
+function initializeAdminPanelMaster() {
+  console.log('🚀 AdminPanel Master Initialization Started');
+  
+  // Phase 1: Core初期化
   initCore();
+  
+  // Phase 2: 各モジュールを順次初期化 (race conditionを防ぐ)
+  setTimeout(() => {
+    // Status管理初期化
+    if (typeof initializeMessageArea === 'function') {
+      initializeMessageArea();
+      console.log('✅ Status module initialized');
+    }
+    
+    // API通信初期化
+    if (typeof initializeAPI === 'function') {
+      initializeAPI();
+      console.log('✅ API module initialized');
+    }
+    
+    // UI初期化
+    if (typeof initializeUI === 'function') {
+      initializeUI();
+      console.log('✅ UI module initialized');
+    }
+    
+    // フォーム管理初期化
+    if (typeof setupCharacterCounters === 'function') {
+      setupCharacterCounters();
+      console.log('✅ Forms module initialized');
+    }
+    
+    // イベント管理初期化（最後に実行）
+    setTimeout(() => {
+      if (typeof initializeEventListeners === 'function') {
+        initializeEventListeners();
+        console.log('✅ Events module initialized');
+      }
+      console.log('🎉 AdminPanel Master Initialization Complete');
+    }, 100);
+    
+  }, 50);
+}
+
+// 単一DOMContentLoadedハンドラー
+if (document.readyState !== 'loading') {
+  initializeAdminPanelMaster();
 } else {
-  document.addEventListener('DOMContentLoaded', initCore);
+  document.addEventListener('DOMContentLoaded', initializeAdminPanelMaster);
 }
 
 // Update layout on resize

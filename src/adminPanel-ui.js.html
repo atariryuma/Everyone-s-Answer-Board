@@ -1133,52 +1133,7 @@ function checkAutoPublishDialog(status) {
 // Initialize UI components
 function initializeUI() {
   console.log('✅ AdminPanel: UI components ready');
-  
-  // Load initial status
-  loadStatus(true); // 強制的にキャッシュをバイパスして最新のステータス情報を取得
-}
-
-// Load system status - OPTIMIZED with integrated API
-function loadStatus(bypassCache = false) {
-  console.group('🔄 loadStatus - Integrated API');
-  console.log('🚀 Loading system status with integrated API, bypassCache:', bypassCache);
-
-  // Single API call to get all initial data
-  runGasWithUserId('getInitialData')
-    .then(response => {
-      console.log('✅ Integrated data loaded:', response);
-      
-      // Extract userId for compatibility
-      if (response.userInfo && response.userInfo.userId) {
-        userId = response.userInfo.userId;
-        console.log('✅ userId extracted from integrated response:', userId);
-      }
-      
-      // Update UI with integrated response
-      updateUIWithNewStatus(response);
-      
-      // If sheet details are included, apply them immediately
-      if (response.sheetDetails && response.activeSheetName) {
-        console.log('✅ Sheet details included in integrated response, applying configuration');
-        try {
-          populateHeaderOptions(response.sheetDetails.allHeaders);
-          console.log('✅ Header options populated from integrated data');
-          populateConfig(response.sheetDetails.guessedConfig);
-          console.log('✅ AI configuration applied from integrated data');
-        } catch (configError) {
-          console.error('Error applying sheet configuration from integrated data:', configError);
-        }
-      }
-      
-      console.log('⚡ Performance: Single API call replaced 3-4 separate calls');
-    })
-    .catch(error => {
-      console.error('❌ Integrated API failed:', error);
-      showMessage('システムステータスの読み込みに失敗しました', 'error');
-    })
-    .finally(() => {
-      console.groupEnd();
-    });
+  // UI初期化のみ実行、loadStatusは adminPanel-api.js で処理される
 }
 
 // =============================================================================
@@ -1622,51 +1577,8 @@ function navigateToStep(step) {
   validateCurrentStep();
 }
 
-// Validate current step with setup status consideration
-function validateCurrentStep() {
-  const savePublishBtn = document.getElementById('save-publish-btn');
-  if (!savePublishBtn) return;
-  
-  // セットアップ状況を確認
-  const setupStatus = getSetupStatusFromGlobalStatus();
-  
-  // セットアップ未完了時の段階的制御
-  if (setupStatus === 'pending') {
-    enforceStepProgression();
-  }
-  
-  let isValid = false;
-  
-  switch (currentStep) {
-    case 1:
-      isValid = selectedSheetId || selectedFormId;
-      break;
-    case 2:
-      isValid = currentConfig && validateConfiguration();
-      break;
-    case 3:
-      isValid = true;
-      break;
-  }
-  
-  savePublishBtn.disabled = !isValid;
-}
 
 // セットアップ状況をグローバルステータスから取得
-function getSetupStatusFromGlobalStatus() {
-  try {
-    if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
-      const config = typeof currentStatus.userInfo.configJson === 'string' 
-        ? JSON.parse(currentStatus.userInfo.configJson) 
-        : currentStatus.userInfo.configJson;
-      return config.setupStatus || 'pending';
-    }
-    return 'pending';
-  } catch (error) {
-    console.warn('getSetupStatusFromGlobalStatus エラー:', error);
-    return 'pending';
-  }
-}
 
 // セットアップ未完了時の段階的制御を強制
 function enforceStepProgression() {
@@ -1732,51 +1644,8 @@ function enableSection(section) {
   }
 }
 
-// Validate current step with setup status consideration
-function validateCurrentStep() {
-  const savePublishBtn = document.getElementById('save-publish-btn');
-  if (!savePublishBtn) return;
-  
-  // セットアップ状況を確認
-  const setupStatus = getSetupStatusFromGlobalStatus();
-  
-  // セットアップ未完了時の段階的制御
-  if (setupStatus === 'pending') {
-    enforceStepProgression();
-  }
-  
-  let isValid = false;
-  
-  switch (currentStep) {
-    case 1:
-      isValid = selectedSheetId || selectedFormId;
-      break;
-    case 2:
-      isValid = currentConfig && validateConfiguration();
-      break;
-    case 3:
-      isValid = true;
-      break;
-  }
-  
-  savePublishBtn.disabled = !isValid;
-}
 
 // セットアップ状況をグローバルステータスから取得
-function getSetupStatusFromGlobalStatus() {
-  try {
-    if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
-      const config = typeof currentStatus.userInfo.configJson === 'string' 
-        ? JSON.parse(currentStatus.userInfo.configJson) 
-        : currentStatus.userInfo.configJson;
-      return config.setupStatus || 'pending';
-    }
-    return 'pending';
-  } catch (error) {
-    console.warn('getSetupStatusFromGlobalStatus エラー:', error);
-    return 'pending';
-  }
-}
 
 // セットアップ未完了時の段階的制御を強制
 function enforceStepProgression() {
@@ -1956,89 +1825,5 @@ function handleToggleChange(event) {
   validateCurrentStep();
 }
 
-// Update system status display
-function updateSystemStatusDisplay(status) {
-  if (!status) return;
-  
-  // Update publish status
-  const publishIndicator = document.getElementById('info-publish-indicator');
-  const publishText = document.getElementById('info-publish-text');
-  
-  if (status.isPublished) {
-    publishIndicator.className = 'w-2 h-2 rounded-full bg-green-400';
-    publishText.textContent = '公開中';
-  } else {
-    publishIndicator.className = 'w-2 h-2 rounded-full bg-gray-400';
-    publishText.textContent = '非公開';
-  }
-  
-  // Update other status fields
-  document.getElementById('info-published-sheet').textContent = status.sheetName || '-';
-  document.getElementById('info-display-mode').textContent = status.displayMode || '-';
-  document.getElementById('info-show-counts').textContent = status.showCounts ? '表示' : '非表示';
-  document.getElementById('info-answer-count').textContent = status.answerCount || '0';
-  document.getElementById('info-reaction-count').textContent = status.reactionCount || '0';
-  
-  // Enable resource buttons if URLs are available
-  const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
-  const formBtn = document.getElementById('open-form-btn');
-  const resourceBtn = document.getElementById('open-resource-btn');
-  
-  if (status.spreadsheetUrl) {
-    if (spreadsheetBtn) {
-      spreadsheetBtn.disabled = false;
-      spreadsheetBtn.onclick = () => window.open(status.spreadsheetUrl, '_blank');
-    }
-  }
-  
-  if (status.formUrl) {
-    if (formBtn) {
-      formBtn.disabled = false;
-      formBtn.onclick = () => window.open(status.formUrl, '_blank');
-    }
-    
-    // Update form URL input field
-    const formUrlInput = document.getElementById('form-url-input');
-    if (formUrlInput) {
-      formUrlInput.value = status.formUrl;
-    }
-    
-    // Update form URL link
-    const formUrlLink = document.getElementById('open-form-url-link');
-    if (formUrlLink) {
-      formUrlLink.href = status.formUrl;
-    }
-  }
-  
-  // Handle generic resource button in Step 1
-  if (resourceBtn && (status.formUrl || status.spreadsheetUrl)) {
-    resourceBtn.disabled = false;
-    resourceBtn.onclick = () => {
-      // Priority: Form first, then spreadsheet
-      if (status.formUrl) {
-        window.open(status.formUrl, '_blank');
-      } else if (status.spreadsheetUrl) {
-        window.open(status.spreadsheetUrl, '_blank');
-      }
-    };
-    
-    // Update button title based on available resources
-    if (status.formUrl && status.spreadsheetUrl) {
-      resourceBtn.title = 'フォームを開く (スプレッドシートも利用可能)';
-    } else if (status.formUrl) {
-      resourceBtn.title = 'フォームを開く';
-    } else if (status.spreadsheetUrl) {
-      resourceBtn.title = 'スプレッドシートを開く';
-    }
-  }
-}
-
-// Initialize when DOM is ready
-if (document.readyState !== 'loading') {
-  setTimeout(initializeUI, 300);
-} else {
-  document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(initializeUI, 300);
-  });
-}
+// 初期化は adminPanel-core.js の統合初期化システムで管理されます
 </script>

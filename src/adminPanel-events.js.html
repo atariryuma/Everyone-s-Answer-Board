@@ -23,20 +23,6 @@ function setupEventListeners() {
     'open-form-btn': getCachedElement('open-form-btn')
   };
   
-  // Sheet selection handler
-  if (elements['sheet-select']) {
-    elements['sheet-select'].addEventListener('change', function(e) {
-      selectedSheet = e.target.value;
-      updateUIForSelectedSheet();
-      
-      if (selectedSheet) {
-        console.log('Sheet selected:', selectedSheet);
-        loadConfigForSelected();
-      } else {
-        clearConfigFields();
-      }
-    });
-  }
   
   // AI column detection button
   var reguessBtn = document.getElementById('reguess-headers-btn');
@@ -356,10 +342,8 @@ function handleDeleteRequest() {
     'アカウント削除の確認',
     '本当にこのアカウントを削除しますか？この操作は元に戻せず、すべてのデータが失われます。',
     function() {
-      setLoading(true, 'アカウントを完全に削除しています...');
-      runGasWithUserId('deleteCurrentUserAccount')
+      sharedUtilities.gas.callWithLoading('deleteCurrentUserAccount', 'アカウントを完全に削除しています...')
         .then(function(response) {
-          setLoading(false);
           showMessage(response.message || 'アカウントが削除されました', 'success');
           if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
             window.unifiedCache.clear();
@@ -381,7 +365,6 @@ function handleDeleteRequest() {
           }, 2000);
         })
         .catch(function(error) {
-          setLoading(false);
           handleError(error, 'deleteAccount', 'アカウントの削除に失敗しました。');
         });
     }
@@ -394,8 +377,7 @@ function switchToAnotherAccount() {
     'アカウント切り替え',
     '別のアカウントでログインしますか？現在のセッションがクリアされます。',
     function() {
-      setLoading(true, 'セッションをクリアしています...');
-      runGasWithUserId('resetUserAuthentication')
+      sharedUtilities.gas.callWithLoading('resetUserAuthentication', 'セッションをクリアしています...')
         .then(function(result) {
           console.log('Session cleanup result:', result);
           window.location.href = 'https://accounts.google.com/logout';
@@ -558,13 +540,6 @@ function initializeEventListeners() {
   setupEventListeners();
 }
 
-if (document.readyState !== 'loading') {
-  setTimeout(initializeEventListeners, 200);
-} else {
-  document.addEventListener('DOMContentLoaded', function() {
-    // Increased delay to ensure all modules are loaded
-    setTimeout(initializeEventListeners, 200);
-  });
-}
+// 初期化は adminPanel-core.js の統合初期化システムで管理されます
 
 </script>

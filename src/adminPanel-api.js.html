@@ -7,9 +7,34 @@
 // BACKEND FUNCTION WRAPPERS
 // =============================================================================
 
-// マルチテナント対応: 新しいrunGasWithUserId関数
-function runGasWithUserId(functionName, ...args) {
-  // userIdが設定されていない場合は初期化を待つ
+// マルチテナント対応: 新しいrunGasWithUserId関数 - ローディング機能付き
+function runGasWithUserId(functionName, loadingMessage = '処理中...', ...args) {
+  // ローディング表示が必要な場合は callWithLoading を使用
+  if (loadingMessage && loadingMessage !== false) {
+    // userIdが設定されていない場合は初期化を待つ
+    if (!userId) {
+      return userIdPromise.then(() => {
+        if (!userId) {
+          logError('No userId available for:', functionName);
+          throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
+        }
+        
+        // ローディング機能付きでuserIdを第一引数として追加
+        return sharedUtilities.gas.callWithLoading(functionName, loadingMessage, userId, ...args);
+      }).catch((error) => {
+        logError('Error in runGasWithUserId (after userIdPromise):', error);
+        throw error;
+      });
+    }
+    
+    // userIdが既に設定されている場合 - ローディング機能付き
+    return sharedUtilities.gas.callWithLoading(functionName, loadingMessage, userId, ...args).catch((error) => {
+      logError('Error in runGasWithUserId (direct call with loading):', error);
+      throw error;
+    });
+  }
+  
+  // ローディング不要の場合（loadingMessage = false）は従来通り
   if (!userId) {
     return userIdPromise.then(() => {
       if (!userId) {
@@ -64,9 +89,6 @@ function loadStatus(bypassCache = false) {
   console.log('🚀 Loading system status with integrated API, bypassCache:', bypassCache);
 
   // Single API call to get all initial data
-  logDebug('Calling setLoading(true) from loadStatus');
-  setLoading(true, 'システム情報を読み込み中...', 1, 10); // Step 1: Initializing
-
   sharedUtilities.gas.callWithLoading('getInitialData', 'システム情報を読み込み中...')
     .then(response => {
       console.log('✅ Integrated data loaded:', response);
@@ -116,7 +138,7 @@ function loadConfigForSelected() {
     return;
   }
   
-  sharedUtilities.gas.callWithLoading('getSheetDetails', 'シート情報を読み込み中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
+  runGasWithUserId('getSheetDetails', 'シート情報を読み込み中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
     .then(handleSheetDetailsSuccess)
     .catch(handleSheetDetailsError);
 }
@@ -173,7 +195,7 @@ function runHeaderGuessing() {
     return;
   }
   
-  sharedUtilities.gas.callWithLoading('getSheetDetails', 'AI搭載高精度列判定システムが分析中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
+  runGasWithUserId('getSheetDetails', 'AI搭載高精度列判定システムが分析中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
     .then(function(details) {
       const configToUse = {
         ...details.guessedConfig,
@@ -206,7 +228,7 @@ function saveAndPublish() {
   freshSaveTimestamp = Date.now();
   window.freshSaveTimestamp = freshSaveTimestamp;
   
-  sharedUtilities.gas.callWithLoading('saveAndPublish', '設定を保存し、ボードを公開しています...', selectedSheet, config)
+  runGasWithUserId('saveAndPublish', '設定を保存し、ボードを公開しています...', selectedSheet, config)
     .then(function(result) {
       isSaveInProgress = false;
       
@@ -245,7 +267,7 @@ function saveAndPublish() {
 
 // Unpublish board
 function unpublishBoard() {
-  sharedUtilities.gas.callWithLoading('unpublishBoard', 'ボードの公開を停止中...')
+  runGasWithUserId('unpublishBoard', 'ボードの公開を停止中...')
     .then(function(response) {
       console.log('公開停止レスポンス:', response);
       showMessage(response.message || '✅ 回答ボードの公開を停止しました。', 'success');
@@ -265,7 +287,7 @@ function unpublishBoard() {
 
 // Load saved class choices
 function loadSavedClassChoices() {
-    sharedUtilities.gas.callWithLoading('getSavedClassChoices', 'クラス選択肢を読み込み中...')
+    runGasWithUserId('getSavedClassChoices', 'クラス選択肢を読み込み中...')
         .then(function(result) {
             if (result.status === 'success' && result.classChoices) {
                 const classChoicesTextarea = document.getElementById('class-choices');
@@ -332,11 +354,10 @@ function createFormWithConfig() {
   // userEmailは現在のユーザー情報から取得
   if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.adminEmail) {
     showMessage('ユーザー情報が取得できません。ページを再読み込みしてください。', 'error');
-    setLoading(false);
     return;
   }
   
-  sharedUtilities.gas.callWithLoading('createCustomFormUI', 'カスタムフォームを作成中...', config)
+  runGasWithUserId('createCustomFormUI', 'カスタムフォームを作成中...', config)
     .then(function(result) {
       console.log('📥 Received response from createCustomFormUI:', result);
       if (result && result.status === 'success') {
@@ -408,7 +429,7 @@ function addResource() {
     return;
   }
 
-  sharedUtilities.gas.callWithLoading('addSpreadsheetUrl', 'リソースを追加しています...', url)
+  runGasWithUserId('addSpreadsheetUrl', 'リソースを追加しています...', url)
     .then(function(result) {
       if (result.status === 'success') {
         showMessage(result.message, 'success');
@@ -492,7 +513,7 @@ function openForm() {
 
 // Open app setup page
 function openAppSetupPage() {
-  sharedUtilities.gas.callWithLoading('getWebAppUrl', 'アプリ設定ページを準備中...')
+  runGasWithUserId('getWebAppUrl', 'アプリ設定ページを準備中...')
     .then(function(webAppUrl) {
       const setupUrl =
         webAppUrl + '?setup=true&mode=appsetup&userId=' + encodeURIComponent(userId);
@@ -762,7 +783,7 @@ function handleQuickStart() {
   // Show loading message optimized for QuickStart
   // クイックスタート中は専用のプログレスバーを使用するため、汎用ローディングは表示しない
   
-  sharedUtilities.gas.callWithLoading('quickStartSetup', 'クイックスタートセットアップ中...')
+  runGasWithUserId('quickStartSetup', 'クイックスタートセットアップ中...')
     .then(function(result) {
       if (result && result.status === 'success') {
         // Final progress update
@@ -872,27 +893,8 @@ function setupRealtimeUpdates() {
 }
 
 // Initialize when DOM is ready
-if (document.readyState !== 'loading') {
-  initializeAPI();
-} else {
-  document.addEventListener('DOMContentLoaded', function() {
-    initializeAPI();
-  });
-}
+// 初期化は adminPanel-core.js の統合初期化システムで管理されます
 
-// Initialize API communications
-function initializeAPI() {
-  // Start background status updates
-  startSystemStatusUpdate();
-  
-  // Setup user activity tracking
-  document.addEventListener('click', updateUserActivity);
-  document.addEventListener('keypress', updateUserActivity);
-  document.addEventListener('scroll', updateUserActivity);
-
-  // 初回ロード時にシステムステータスをロード
-  loadStatus();
-}
 
 // Load user information
 function loadUserInfo() {
