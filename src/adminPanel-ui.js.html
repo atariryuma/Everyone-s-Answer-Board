@@ -417,7 +417,7 @@ function populateHeaderOptions(headers) {
   
   const selects = [
     'opinionHeader',      // Main required field
-    'opinion-column',     // Optional details field (backup)
+    'reason-column',     // Optional details field (reason column)
     'name-column', 
     'class-column'
   ];
@@ -530,7 +530,8 @@ function populateConfig(cfg) {
     'opinionHeader': cfg.opinionHeader || cfg.opinionColumn,
     
     // Detail configuration dropdowns (secondary targets with property name fixes)
-    'opinion-column': cfg.opinionColumn || cfg.opinionHeader,
+    'reason-column': cfg.reasonColumn || cfg.reasonHeader,
+    'reason-column': cfg.reasonColumn || cfg.reasonHeader,
     'name-column': cfg.nameColumn || cfg.nameHeader,
     'class-column': cfg.classColumn || cfg.classHeader,
     'show-names': cfg.showNames,
@@ -600,7 +601,7 @@ function populateConfig(cfg) {
 function clearConfigFields() {
   const fieldIds = [
     'opinionHeader',      // Main required field
-    'opinion-column',
+    'reason-column',
     'name-column',
     'class-column'
   ];
@@ -623,7 +624,7 @@ function buildConfigObject() {
   
   // Get values from primary elements (with fallback to secondary elements)
   const opinionValue = document.getElementById('opinionHeader')?.value || 
-                      document.getElementById('opinion-column')?.value || '';
+                      document.getElementById('reason-column')?.value || '';
   const nameValue = document.getElementById('name-column')?.value || '';
   const classValue = document.getElementById('class-column')?.value || '';
   const showNames = document.getElementById('show-names')?.checked || false;
@@ -635,6 +636,7 @@ function buildConfigObject() {
     opinionHeader: opinionValue,
     nameHeader: nameValue,
     classHeader: classValue,
+    reasonHeader: document.getElementById('reason-column')?.value || '', // Add reasonHeader
     // Also provide legacy format for backward compatibility
     opinionColumn: opinionValue,
     nameColumn: nameValue,
@@ -646,7 +648,7 @@ function buildConfigObject() {
   if (window.DEBUG) {
     console.log('📊 Built config object:', config);
     console.log('🎯 Primary opinion value from opinionHeader:', document.getElementById('opinionHeader')?.value);
-    console.log('🔄 Fallback opinion value from opinion-column:', document.getElementById('opinion-column')?.value);
+    console.log('🔄 Fallback opinion value from reason-column:', document.getElementById('reason-column')?.value);
     console.groupEnd();
   }
   
@@ -657,14 +659,14 @@ function buildConfigObject() {
 function validateConfig() {
   // Check primary element first, then fallback to secondary element
   const opinionValue = document.getElementById('opinionHeader')?.value || 
-                      document.getElementById('opinion-column')?.value || '';
+                      document.getElementById('reason-column')?.value || '';
   
   const isValid = opinionValue && opinionValue.trim() !== '';
   
   if (window.DEBUG) {
     console.log('🔍 validateConfig:', {
       opinionHeader: document.getElementById('opinionHeader')?.value,
-      opinionColumn: document.getElementById('opinion-column')?.value,
+      reasonColumn: document.getElementById('reason-column')?.value,
       finalValue: opinionValue,
       isValid: isValid
     });

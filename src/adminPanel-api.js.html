@@ -581,26 +581,13 @@ function openAppSetupPage() {
         window.open(setupUrl, '_blank'); // Fallback: open in new tab
       }, 10000); // 10秒でタイムアウト
 
+      // 直接リダイレクトを試みる
       try {
-        google.script.run
-          .withSuccessHandler(function() {
-            clearTimeout(redirectTimeout);
-            // サーバーサイドのリダイレクトが成功した場合、ここでは何もしない
-            // ユーザーは新しいページに移動するため、ローディングは自動的に消える
-          })
-          .withFailureHandler(function(error) {
-            clearTimeout(redirectTimeout);
-            console.error('Failed to redirect to app setup page:', error);
-            window.unifiedLoading.hide();
-            showMessage(errorMessage + ' ' + (error.message || ''), 'error');
-            // フォールバック: 新しいタブで開く
-            showMessage(fallbackMessage, 'info');
-            window.open(setupUrl, '_blank');
-          })
-          .redirectToUrl(setupUrl);
-      } catch (e) {
         clearTimeout(redirectTimeout);
-        console.error('Error calling redirectToUrl:', e);
+        window.unifiedLoading.hide();
+        window.open(setupUrl, '_top'); // _top を使用して現在のウィンドウで開く
+      } catch (e) {
+        console.error('Error opening app setup page:', e);
         window.unifiedLoading.hide();
         showMessage(errorMessage + ' ' + (e.message || ''), 'error');
         // フォールバック: 新しいタブで開く

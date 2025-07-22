@@ -154,9 +154,10 @@ body {
 }
 
 .btn-google {
-  background: linear-gradient(135deg, var(--color-google-blue), var(--color-google-green));
+  background: linear-gradient(135deg, #3b7ad9, #2d944a); /* Slightly darker shades */
   color: white;
   font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.2); /* Add a subtle border */
 }
 
 .btn-success {
@@ -452,7 +453,10 @@ body {
 
 /* Variant: Page-specific styling with backdrop blur */
 .loading-overlay.page-specific {
-  background-color: var(--color-background);
+  /* background-color: var(--color-background); */ /* Remove this to use the default dark background */
+  background-color: rgba(0,0,0,0.8) !important; /* Ensure it's dark */
+  backdrop-filter: blur(var(--backdrop-blur)); /* Keep the blur effect */
+  -webkit-backdrop-filter: blur(var(--backdrop-blur));
 }
 
 /* Variant: QuickStart, lightweight and non-blocking */
@@ -467,24 +471,44 @@ body {
   text-align: center;
   padding: 2rem;
   max-width: 400px;
+  background: rgba(26,27,38,0.7); /* Darker background for the content box */
+  border-radius: 1rem;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .loading-message {
-  font-size: 1rem;
-  margin-bottom: 1rem;
+  font-size: 1.1rem;
+  margin-bottom: 1.5rem;
+  font-weight: 600;
 }
 
-/* Progress bar styles */
+/* Spinner for global loading */
+.global-spinner {
+  width: 60px;
+  height: 60px;
+  border: 6px solid rgba(255,255,255,0.3);
+  border-top: 6px solid var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1.5rem;
+}
+
+/* Progress bar styles (if needed, can be hidden by default) */
 .loading-progress {
-  width: 100%;
+  width: 80%;
   margin-top: 1rem;
 }
 
 .loading-progress-bar {
   width: 100%;
-  height: 4px;
+  height: 6px;
   background: rgba(255,255,255,0.2);
-  border-radius: 2px;
+  border-radius: 3px;
   overflow: hidden;
   margin-bottom: 0.5rem;
 }
@@ -493,11 +517,11 @@ body {
   height: 100%;
   background: linear-gradient(90deg, var(--color-primary), #50fa7b);
   transition: width 0.5s ease;
-  border-radius: 2px;
+  border-radius: 3px;
 }
 
 .loading-percentage {
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   color: rgba(255,255,255,0.7);
 }
 
