@@ -95,9 +95,6 @@ function callWithCache(functionName, cacheKey, ttl, ...args) {
 
 // runGasWithUserId with cache support (simplified)
 function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
-  if (!userId) {
-    throw new Error('ユーザーIDが設定されていません。システムの初期化を待ってください。');
-  }
   
   // Enhanced userId validation for cached calls
   try {
@@ -163,7 +160,40 @@ window.loadStatusFromAPI = function loadStatus(bypassCache = false) {
       console.log('✅ Integrated data loaded:', response);
 
       // Extract and set userId from response (critical step)
+            // Extract and set userId from response (critical step)
       if (response.userInfo && response.userInfo.userId) {
+        // Validate the userID format before setting it
+        try {
+          validateUserId(response.userInfo.userId, 'getInitialData response');
+          
+          // Log the previous userID if it exists and differs
+          if (userId && userId !== response.userInfo.userId) {
+            console.warn('🔄 UserID changed during session:', {
+              previousUserId: userId,
+              newUserId: response.userInfo.userId,
+              source: 'getInitialData response'
+            });
+          }
+          
+          setUserId(response.userInfo.userId);
+          console.log('✅ userId extracted and set from integrated response:', userId);
+          
+          // Double-check that the userID was actually set correctly
+          if (userId !== response.userInfo.userId) {
+            throw new Error('ユーザーIDの設定に失敗しました');
+          }
+          
+        } catch (validationError) {
+          console.error('❌ Invalid userId received from getInitialData:', {
+            receivedUserId: response.userInfo.userId,
+            validationError: validationError.message
+          });
+          throw new Error('サーバーから無効なユーザーIDを受信しました。ページを再読み込みしてください。');
+        }
+      } else {
+        console.error('❌ No userId in getInitialData response:', response);
+        throw new Error('ユーザーIDが取得できませんでした。認証に失敗している可能性があります。');
+      }
         // Validate the userID format before setting it
         try {
           validateUserId(response.userInfo.userId, 'getInitialData response');

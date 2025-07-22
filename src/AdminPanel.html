@@ -12,6 +12,11 @@
   <?!= include('SharedSecurityHeaders'); ?>
   
   <!-- User ID will be retrieved dynamically from backend -->
+  <script>
+    // サーバーサイドから渡されたuserIdをグローバル変数として設定
+    var userId = '<?= escapeJavaScript(userInfo.userId) ?>';
+    console.log('AdminPanel.html: Initialized userId:', userId);
+  </script>
 
 
   <!-- Shared TailwindCSS Configuration -->
