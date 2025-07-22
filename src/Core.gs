@@ -5322,46 +5322,11 @@ function getInitialData(requestUserId, targetSheetName) {
     
     // === ステップ1: ユーザー認証とユーザー情報取得（キャッシュ活用） ===
     var activeUserEmail = Session.getActiveUser().getEmail();
+    var currentUserId = requestUserId;
     
-    // Enhanced user authentication with email-based fallback
-    var currentUserId = null;
-    
-    try {
-      // Always derive userID from authenticated email to prevent mismatch
-      currentUserId = getUserId();
-      debugLog('✅ getInitialData: UserID derived from authenticated email', { 
-        activeUserEmail, 
-        derivedUserId: currentUserId,
-        requestUserId: requestUserId 
-      });
-      
-      // Validate that the derived userID matches any provided requestUserId
-      if (requestUserId && requestUserId !== currentUserId) {
-        console.warn('⚠️ getInitialData: UserID mismatch detected', {
-          requestUserId: requestUserId,
-          derivedUserId: currentUserId,
-          activeUserEmail: activeUserEmail
-        });
-        // Use the derived userID instead of the provided one
-      }
-      
-    } catch (userIdError) {
-      debugLog('❌ getInitialData: Failed to derive userID from email', { 
-        activeUserEmail, 
-        error: userIdError.message 
-      });
-      
-      // Fallback: Try to use requestUserId if derivation fails
-      if (requestUserId) {
-        currentUserId = requestUserId;
-        console.warn('🔄 getInitialData: Using requestUserId as fallback', { requestUserId });
-      } else {
-        throw new Error('認証エラー: ユーザーIDを取得できませんでした。再度ログインしてください。');
-      }
-    }
-    
+    // UserID の解決
     if (!currentUserId) {
-      throw new Error('認証エラー: ユーザーIDが設定されていません。再度ログインしてください。');
+      currentUserId = getUserId();
     }
     
     // Phase3 Optimization: Use execution-level cache to avoid duplicate database queries

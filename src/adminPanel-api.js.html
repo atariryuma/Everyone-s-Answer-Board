@@ -16,36 +16,12 @@ function runGasWithUserId(functionName, ...args) {
     throw new Error('ユーザーIDが初期化されていません。システムの初期化を待ってください。');
   }
 
-  // Enhanced userId validation with user-friendly error messages
+  // Validate userId format
   try {
     validateUserId(userIdToSend, functionName);
   } catch (validationError) {
     console.error('❌ runGasWithUserId: userId検証エラー:', validationError);
-    
-    // Determine error type and provide appropriate user guidance
-    let userFriendlyMessage = '';
-    if (validationError.message.includes('設定されていません')) {
-      userFriendlyMessage = 'ユーザー認証が完了していません。ページを再読み込みしてログインし直してください。';
-    } else if (validationError.message.includes('文字列である必要があります')) {
-      userFriendlyMessage = 'ユーザー認証データが破損しています。ページを再読み込みしてください。';
-    } else if (validationError.message.includes('空文字列です')) {
-      userFriendlyMessage = 'ユーザー認証が無効です。再度ログインしてください。';
-    } else if (validationError.message.includes('形式が正しくありません')) {
-      userFriendlyMessage = 'ユーザー認証の形式エラーが発生しました。ブラウザキャッシュをクリアして再度ログインしてください。';
-    } else {
-      userFriendlyMessage = 'ユーザー認証エラーが発生しました。ページを再読み込みしてください。';
-    }
-    
-    // Log recovery suggestion for debugging
-    console.warn('🔧 Recovery suggestion:', {
-      originalError: validationError.message,
-      userFriendlyMessage: userFriendlyMessage,
-      functionName: functionName,
-      userIdLength: userIdToSend ? userIdToSend.length : 'null',
-      userIdType: typeof userIdToSend
-    });
-    
-    throw new Error(userFriendlyMessage);
+    throw new Error('ユーザーIDの形式が正しくありません。ページを再読み込みしてください。');
   }
 
   // If userId is valid, proceed with the API call
@@ -63,20 +39,6 @@ function callWithCache(functionName, cacheKey, ttl, ...args) {
 function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
   if (!userId) {
     throw new Error('ユーザーIDが設定されていません。システムの初期化を待ってください。');
-  }
-  
-  // Enhanced userId validation for cached calls
-  try {
-    validateUserId(userId, functionName);
-  } catch (validationError) {
-    console.error('❌ callWithCacheWithUserId: userId検証エラー:', validationError);
-    console.warn('🔧 Cache invalidated due to invalid userId');
-    
-    // Clear potentially corrupted cache entry
-    unifiedCache.delete(cacheKey);
-    
-    // Provide user-friendly error message
-    throw new Error('ユーザー認証エラーです。ページを再読み込みしてください。');
   }
   
   return unifiedCache.getOrSet(cacheKey, function() {
