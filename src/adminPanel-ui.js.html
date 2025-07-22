@@ -1232,16 +1232,7 @@ function handleSheetSelectionChange(event) {
     console.log('📋 Loading preview and config for sheet:', newSelectedSheet);
     previewSection.classList.remove('hidden');
     
-    // Show loading state for preview
-    const previewContent = document.getElementById('data-preview-content');
-    if (previewContent) {
-      previewContent.innerHTML = `
-        <div class="animate-pulse">
-          <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-          <div class="h-4 bg-gray-700 rounded w-1/2"></div>
-        </div>
-      `;
-    }
+    
 
     // Call getSheetDetails once and use its result for both preview and config
     if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
@@ -1335,15 +1326,7 @@ function loadDataPreview(sheetName, details) {
   const previewContent = document.getElementById('data-preview-content');
   if (!previewContent) return;
   
-  // Show loading state (if details are not yet available)
-  if (!details) {
-    previewContent.innerHTML = `
-      <div class="animate-pulse">
-        <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-        <div class="h-4 bg-gray-700 rounded w-1/2"></div>
-      </div>
-    `;
-  }
+  
 
   // If details are provided, use them directly
   if (details) {

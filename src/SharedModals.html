@@ -178,15 +178,7 @@
 </div>
 
 <!-- ローディングモーダル -->
-<div id="loading-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
-  <div class="flex items-center justify-center min-h-full p-4">
-    <div class="glass-panel rounded-xl p-6 max-w-md w-full text-center">
-      <div class="spinner mx-auto mb-4"></div>
-      <h3 id="loading-modal-title" class="text-xl font-bold text-cyan-400 mb-2">処理中...</h3>
-      <p id="loading-modal-message" class="text-gray-300">しばらくお待ちください</p>
-    </div>
-  </div>
-</div>
+
         
       </div>
 </div>
@@ -614,26 +606,7 @@ class SharedModals {
     closeBtn.onclick = () => this.hideModal('alert-modal');
   }
 
-  // ローディングモーダルの表示
-  showLoading(title = '処理中...', message = 'しばらくお待ちください') {
-    const modal = document.getElementById('loading-modal');
-    const titleEl = document.getElementById('loading-modal-title');
-    const messageEl = document.getElementById('loading-modal-message');
-    
-    if (titleEl) titleEl.textContent = title;
-    if (messageEl) messageEl.textContent = message;
-    
-    if (modal) modal.classList.remove('hidden');
-  }
-
-  // モーダルの非表示
-  hideModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    }
-  }
+  
 
   // イベントリスナーの設定
   setupEventListeners() {

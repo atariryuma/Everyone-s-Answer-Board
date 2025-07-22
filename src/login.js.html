@@ -18,25 +18,7 @@
   });
 
   // UI状態管理 - グローバルスコープに移動して他の関数からアクセス可能にする
-  window.setLoading = function(flag, text = '') {
-    const loginBtn = document.getElementById('login-btn');
-    if (!loginBtn) {
-      console.warn('login-btn element not found, skipping loading state change');
-      return;
-    }
-    loginBtn.disabled = flag;
-    
-    if (flag) {
-      loginBtn.innerHTML = `
-        <div class="flex items-center justify-center">
-          <div class="loading-spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-          ${text || '処理中…'}
-        </div>
-      `;
-    } else {
-      loginBtn.textContent = 'はじめる';
-    }
-  };
+  
 
   document.addEventListener('DOMContentLoaded', () => {
     const loginBtn = document.getElementById('login-btn');
@@ -92,7 +74,7 @@
               if (confirm('このアカウントを登録しますか？')) {
                 registerAndRedirect().then(resolve).catch(reject);
               } else {
-                setLoading(false);
+          
                 resolve();
               }
             } else {
@@ -126,7 +108,7 @@
     // GAS内蔵認証を使用した簡易ログイン処理
     const handleSimpleLogin = () => {
       try {
-        setLoading(true, 'ユーザー情報確認中…');
+        
         
         // URL システムのリセットを事前に実行
         google.script.run
@@ -146,7 +128,7 @@
       } catch (err) {
         console.error('Login function error:', err);
         userEmailDisplay.textContent = 'ログイン処理エラー';
-        setLoading(false);
+  
       }
     };
 
@@ -180,7 +162,7 @@
       }
       
       userEmailDisplay.textContent = displayMessage;
-      setLoading(false);
+
     };
 
     // 初期化処理 - 組織ポリシー制限を回避するため簡易認証を使用
@@ -191,7 +173,7 @@
 
       displayCurrentUserEmail();
 
-      setLoading(false);
+
 
       // 初期状態のドメイン表示を設定
       updateDomainDisplay('initial', 'ドメイン確認中', 'セットアップ中');
@@ -251,7 +233,7 @@
       }
     }
 
-    setLoading(true, '読み込み中…');
+    
     init();
   });
 
@@ -341,10 +323,7 @@
       
       console.log('管理パネルアクセス成功画面を表示:', adminUrl);
       
-      // ローディング状態を停止
-      if (typeof setLoading === 'function') {
-        setLoading(false);
-      }
+      
       
       // サンドボックス制限準拠: ユーザークリック必須のHTMLアンカー方式
       const successHtml = `
@@ -667,10 +646,8 @@
     event.preventDefault(); // デフォルトのリンク遷移をキャンセル
 
     const buttonText = buttonElement.querySelector('#admin-panel-btn-text');
-    const buttonSpinner = buttonElement.querySelector('#admin-panel-btn-spinner');
 
     if (buttonText) buttonText.classList.add('hidden');
-    if (buttonSpinner) buttonSpinner.classList.remove('hidden');
     buttonElement.classList.add('cursor-not-allowed'); // カーソルを変更
     buttonElement.style.pointerEvents = 'none'; // クリックイベントを無効化
     buttonElement.setAttribute('aria-disabled', 'true'); // アクセシビリティ対応
