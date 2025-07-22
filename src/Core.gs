@@ -4602,8 +4602,8 @@ function createCustomFormUI(requestUserId, config) {
       throw new Error('アクティブユーザーのメールアドレスが取得できません');
     }
     
-    var userForValidation = findUserById(requestUserId);
-    if (!userForValidation) {
+    var existingUser = findUserById(requestUserId);
+    if (!existingUser) {
       throw new Error('ユーザー情報が見つかりません: ' + requestUserId);
     }
     
@@ -4639,11 +4639,11 @@ function createCustomFormUI(requestUserId, config) {
     progressCheckpoints.formCreated = true;
     
     // 既存ユーザーの情報を更新（スプレッドシート情報を追加）
-    const existingUserForUpdate = findUserById(requestUserId);
-    if (existingUserForUpdate) {
+    const existingUser = findUserById(requestUserId);
+    if (existingUser) {
       console.log('createCustomFormUI - updating user data for:', requestUserId);
       
-      const updatedConfigJson = JSON.parse(existingUserForUpdate.configJson || '{}');
+      const updatedConfigJson = JSON.parse(existingUser.configJson || '{}');
       updatedConfigJson.formUrl = result.formUrl;
       updatedConfigJson.editFormUrl = result.editFormUrl || result.formUrl;
       updatedConfigJson.formCreated = true;
@@ -4723,9 +4723,9 @@ function createQuickStartFormUI(requestUserId) {
     const result = createQuickStartForm(activeUserEmail, requestUserId);
     
     // 既存ユーザーの情報を更新
-    const userDataForQuickStart = findUserById(requestUserId);
-    if (userDataForQuickStart) {
-      const updatedConfigJson = JSON.parse(userDataForQuickStart.configJson || '{}');
+    const existingUser = findUserById(requestUserId);
+    if (existingUser) {
+      const updatedConfigJson = JSON.parse(existingUser.configJson || '{}');
       updatedConfigJson.formUrl = result.viewFormUrl || result.formUrl;
       updatedConfigJson.editFormUrl = result.editFormUrl;
       updatedConfigJson.formCreated = true;
