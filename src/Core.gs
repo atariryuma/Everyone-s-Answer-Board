@@ -277,8 +277,27 @@ function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
  * @throws {Error} 認証エラーまたは権限エラー
  */
 function verifyUserAccess(requestUserId) {
+  // 型安全性強化: パラメータ検証
+  if (!requestUserId) {
+    throw new Error('認証エラー: ユーザーIDが指定されていません');
+  }
+  if (typeof requestUserId !== 'string') {
+    throw new Error('認証エラー: ユーザーIDは文字列である必要があります');
+  }
+  if (requestUserId.trim().length === 0) {
+    throw new Error('認証エラー: ユーザーIDが空文字列です');
+  }
+  if (requestUserId.length > 255) {
+    throw new Error('認証エラー: ユーザーIDが長すぎます（最大255文字）');
+  }
+  
   clearExecutionUserInfoCache(); // キャッシュをクリアして最新のユーザー情報を取得
+  
   const activeUserEmail = Session.getActiveUser().getEmail();
+  if (!activeUserEmail) {
+    throw new Error('認証エラー: アクティブユーザーの情報を取得できませんでした');
+  }
+  
   const requestedUserInfo = findUserById(requestUserId);
 
   if (!requestedUserInfo) {
@@ -1062,7 +1081,7 @@ function getResponsesData(userId, sheetName) {
   }
 
   try {
-    var service = getSheetsService();
+    var service = getSheetsServiceCached();
     var spreadsheetId = userInfo.spreadsheetId;
     var range = "'" + (sheetName || 'フォームの回答 1') + "'!A:Z";
     
@@ -1408,136 +1427,274 @@ function toggleHighlight(requestUserId, rowIndex, sheetName) {
  * フォルダ作成、フォーム作成、スプレッドシート作成、ボード公開まで一括実行
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
+/**
+ * クイックスタート用のファイル作成とフォルダ管理
+ * @param {object} setupContext - セットアップコンテキスト
+ * @returns {object} 作成されたファイル情報
+ */
+function createQuickStartFiles(setupContext) {
+  var userEmail = setupContext.userEmail;
+  var requestUserId = setupContext.requestUserId;
+  
+  // ステップ1: ユーザー専用フォルダを作成
+  debugLog('📁 ステップ1: フォルダ作成中...');
+  var folder = createUserFolder(userEmail);
+  
+  // ステップ2: Googleフォームとスプレッドシートを作成
+  debugLog('📝 ステップ2: フォーム作成中...');
+  var formAndSsInfo = createStudyQuestForm(userEmail, requestUserId);
+  
+  // 作成したファイルをフォルダに移動（改善版：冗長処理除去と安全な移動処理）
+  if (folder) {
+    var moveResults = { form: false, spreadsheet: false };
+    var moveErrors = [];
+    
+    try {
+      var formFile = DriveApp.getFileById(formAndSsInfo.formId);
+      var ssFile = DriveApp.getFileById(formAndSsInfo.spreadsheetId);
+      
+      // フォームファイルの移動処理
+      try {
+        // 既にフォルダに存在するかチェック（重複移動を防止）
+        var formParents = formFile.getParents();
+        var isFormAlreadyInFolder = false;
+        
+        while (formParents.hasNext()) {
+          if (formParents.next().getId() === folder.getId()) {
+            isFormAlreadyInFolder = true;
+            break;
+          }
+        }
+        
+        if (!isFormAlreadyInFolder) {
+          debugLog('📝 フォームファイルを移動中: %s → %s', formFile.getId(), folder.getName());
+          folder.addFile(formFile);
+          // ルートフォルダから削除（適切なタイミングで実行）
+          DriveApp.getRootFolder().removeFile(formFile);
+          moveResults.form = true;
+          debugLog('✅ フォームファイル移動完了');
+        } else {
+          debugLog('ℹ️ フォームファイルは既にフォルダに存在します');
+          moveResults.form = true;
+        }
+      } catch (formMoveError) {
+        moveErrors.push('フォームファイル移動エラー: ' + formMoveError.message);
+        console.error('❌ フォームファイルの移動に失敗:', formMoveError.message);
+      }
+      
+      // スプレッドシートファイルの移動処理
+      try {
+        // 既にフォルダに存在するかチェック（重複移動を防止）
+        var ssParents = ssFile.getParents();
+        var isSsAlreadyInFolder = false;
+        
+        while (ssParents.hasNext()) {
+          if (ssParents.next().getId() === folder.getId()) {
+            isSsAlreadyInFolder = true;
+            break;
+          }
+        }
+        
+        if (!isSsAlreadyInFolder) {
+          debugLog('📊 スプレッドシートファイルを移動中: %s → %s', ssFile.getId(), folder.getName());
+          folder.addFile(ssFile);
+          // ルートフォルダから削除（適切なタイミングで実行）
+          DriveApp.getRootFolder().removeFile(ssFile);
+          moveResults.spreadsheet = true;
+          debugLog('✅ スプレッドシートファイル移動完了');
+        } else {
+          debugLog('ℹ️ スプレッドシートファイルは既にフォルダに存在します');
+          moveResults.spreadsheet = true;
+        }
+      } catch (ssMoveError) {
+        moveErrors.push('スプレッドシートファイル移動エラー: ' + ssMoveError.message);
+        console.error('❌ スプレッドシートファイルの移動に失敗:', ssMoveError.message);
+      }
+      
+      // 移動結果のログ出力
+      if (moveResults.form && moveResults.spreadsheet) {
+        debugLog('✅ 全ファイルのフォルダ移動が完了: ' + folder.getName());
+      } else {
+        console.warn('⚠️ 一部のファイル移動に失敗しましたが、処理を継続します');
+        debugLog('移動結果: フォーム=%s, スプレッドシート=%s', moveResults.form, moveResults.spreadsheet);
+        if (moveErrors.length > 0) {
+          debugLog('移動エラー詳細: %s', moveErrors.join('; '));
+        }
+      }
+      
+    } catch (generalError) {
+      console.error('❌ ファイル移動処理で予期しないエラー:', generalError.message);
+      // ファイル移動失敗は致命的ではないため、処理は継続
+      debugLog('ファイルはマイドライブに残りますが、システムは正常に動作します');
+    }
+  }
+  
+  return {
+    folder: folder,
+    formAndSsInfo: formAndSsInfo,
+    moveResults: moveResults || { form: false, spreadsheet: false }
+  };
+}
+
+/**
+ * クイックスタートのデータベース更新とキャッシュ管理
+ * @param {object} setupContext - セットアップコンテキスト
+ * @param {object} createdFiles - 作成されたファイル情報
+ * @returns {object} 更新された設定オブジェクト
+ */
+function updateQuickStartDatabase(setupContext, createdFiles) {
+  var requestUserId = setupContext.requestUserId;
+  var configJson = setupContext.configJson;
+  var userEmail = setupContext.userEmail;
+  var formAndSsInfo = createdFiles.formAndSsInfo;
+  var folder = createdFiles.folder;
+  
+  debugLog('💾 ステップ3: データベース更新中...');
+  
+  // クイックスタート用の適切な初期設定を作成
+  var sheetConfigKey = 'sheet_' + formAndSsInfo.sheetName;
+  var quickStartSheetConfig = {
+    opinionHeader: '今日のテーマについて、あなたの考えや意見を聞かせてください',
+    reasonHeader: 'そう考える理由や体験があれば教えてください（任意）',
+    nameHeader: '名前',
+    classHeader: 'クラス',
+    lastModified: new Date().toISOString()
+  };
+  
+  var updatedConfig = {
+    ...configJson,
+    setupStatus: 'completed',
+    formCreated: true,
+    formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl,
+    editFormUrl: formAndSsInfo.editFormUrl,
+    publishedSpreadsheetId: formAndSsInfo.spreadsheetId,
+    publishedSheetName: formAndSsInfo.sheetName,
+    appPublished: true,
+    folderId: folder ? folder.getId() : '',
+    folderUrl: folder ? folder.getUrl() : '',
+    completedAt: new Date().toISOString(),
+    [sheetConfigKey]: quickStartSheetConfig
+  };
+  
+  // ユーザーデータベースを新しいセットアップ情報で完全に更新
+  console.log('💾 ユーザーデータベースを新しいセットアップで更新中...');
+  updateUser(requestUserId, {
+    spreadsheetId: formAndSsInfo.spreadsheetId,
+    spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+    configJson: JSON.stringify(updatedConfig),
+    lastAccessedAt: new Date().toISOString()
+  });
+  
+  // 重要: 新しいセットアップ完了後に全関連キャッシュを強制的にクリア
+  console.log('🗑️ 古いキャッシュをクリアして新しいセットアップを反映中...');
+  invalidateUserCache(requestUserId, userEmail, formAndSsInfo.spreadsheetId, true);
+  
+  return updatedConfig;
+}
+
+/**
+ * クイックスタート完了時のレスポンス生成
+ * @param {object} setupContext - セットアップコンテキスト
+ * @param {object} createdFiles - 作成されたファイル情報
+ * @param {object} updatedConfig - 更新された設定
+ * @returns {object} 成功レスポンス
+ */
+function generateQuickStartResponse(setupContext, createdFiles, updatedConfig) {
+  var requestUserId = setupContext.requestUserId;
+  var formAndSsInfo = createdFiles.formAndSsInfo;
+  
+  // ステップ4: 回答ボードを公開状態に設定
+  debugLog('🌐 ステップ4: 回答ボード公開中...');
+  
+  debugLog('✅ クイックスタートセットアップ完了: ' + requestUserId);
+  
+  var appUrls = generateAppUrls(requestUserId);
+  return {
+    status: 'success',
+    message: 'クイックスタートが完了しました！回答ボードをお楽しみください。',
+    webAppUrl: appUrls.webAppUrl,
+    adminUrl: appUrls.adminUrl,
+    viewUrl: appUrls.viewUrl,
+    setupUrl: appUrls.setupUrl,
+    formUrl: updatedConfig.formUrl,
+    editFormUrl: updatedConfig.editFormUrl,
+    spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+    folderUrl: updatedConfig.folderUrl
+  };
+}
+
+/**
+ * クイックスタートセットアップのコンテキストを初期化
+ * @param {string} requestUserId - ユーザーID
+ * @returns {object} セットアップコンテキスト
+ */
+function initializeQuickStartContext(requestUserId) {
+  debugLog('🚀 クイックスタートセットアップ開始: ' + requestUserId);
+  
+  // ユーザー情報の取得
+  var userInfo = findUserById(requestUserId);
+  if (!userInfo) {
+    throw new Error('ユーザー情報が見つかりません');
+  }
+  
+  var configJson = JSON.parse(userInfo.configJson || '{}');
+  var userEmail = userInfo.adminEmail;
+  
+  // クイックスタート繰り返し実行を許可
+  // 既存のセットアップがある場合は完全にリセットして新しいセットアップで上書きする
+  if (configJson.formCreated && userInfo.spreadsheetId) {
+    console.log('⚠️ 既存のセットアップが検出されました。新しいセットアップで完全に上書きします。');
+    
+    // 既存のキャッシュを完全にクリアして、新しいセットアップが確実に反映されるようにする
+    invalidateUserCache(requestUserId, userEmail, userInfo.spreadsheetId, true);
+    
+    // 既存の設定を初期化（重要な情報以外をリセット）
+    configJson = {
+      setupStatus: 'in_progress',
+      createdAt: configJson.createdAt || new Date().toISOString(),
+      formCreated: false,
+      appPublished: false
+    };
+  }
+  
+  return {
+    requestUserId: requestUserId,
+    userInfo: userInfo,
+    configJson: configJson,
+    userEmail: userEmail
+  };
+}
+
 function quickStartSetup(requestUserId) {
   // 新規ユーザー（requestUserIdがundefinedまたはnull）の場合はverifyUserAccessをスキップ
   if (requestUserId) {
     verifyUserAccess(requestUserId);
   }
   try {
-    debugLog('🚀 クイックスタートセットアップ開始: ' + requestUserId);
+    // ステップ0: セットアップコンテキストを初期化
+    var setupContext = initializeQuickStartContext(requestUserId);
+    var configJson = setupContext.configJson;
+    var userEmail = setupContext.userEmail;
+    var userInfo = setupContext.userInfo;
     
-    // ユーザー情報の取得
-    var userInfo = findUserById(requestUserId);
-    if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません');
-    }
+    // ステップ1-2: ファイル作成とフォルダ管理を実行
+    var createdFiles = createQuickStartFiles(setupContext);
+    var formAndSsInfo = createdFiles.formAndSsInfo;
+    var folder = createdFiles.folder;
     
-    var configJson = JSON.parse(userInfo.configJson || '{}');
-    var userEmail = userInfo.adminEmail;
-    
-    // クイックスタート繰り返し実行を許可
-    // 既存のセットアップがある場合は完全にリセットして新しいセットアップで上書きする
-    if (configJson.formCreated && userInfo.spreadsheetId) {
-      console.log('⚠️ 既存のセットアップが検出されました。新しいセットアップで完全に上書きします。');
-      
-      // 既存のキャッシュを完全にクリアして、新しいセットアップが確実に反映されるようにする
-      invalidateUserCache(requestUserId, userEmail, userInfo.spreadsheetId, true);
-      
-      // 既存の設定を初期化（重要な情報以外をリセット）
-      configJson = {
-        setupStatus: 'in_progress',
-        createdAt: configJson.createdAt || new Date().toISOString(),
-        formCreated: false,
-        appPublished: false
-      };
-    }
-    
-    // ステップ1: ユーザー専用フォルダを作成
-    debugLog('📁 ステップ1: フォルダ作成中...');
-    var folder = createUserFolder(userEmail);
-    
-    // ステップ2: Googleフォームとスプレッドシートを作成
-    debugLog('📝 ステップ2: フォーム作成中...');
-    var formAndSsInfo = createStudyQuestForm(userEmail, requestUserId);
-    
-    // 作成したファイルをフォルダに移動
-    if (folder) {
-      try {
-        var formFile = DriveApp.getFileById(formAndSsInfo.formId);
-        var ssFile = DriveApp.getFileById(formAndSsInfo.spreadsheetId);
-        
-        debugLog('Attempting to move form file %s to folder %s', formFile.getId(), folder.getId());
-        folder.addFile(formFile);
-        debugLog('Form file moved successfully.');
-
-        debugLog('Attempting to move spreadsheet file %s to folder %s', ssFile.getId(), folder.getId());
-        folder.addFile(ssFile);
-        debugLog('Spreadsheet file moved successfully.');
-        
-        debugLog('📁 ファイルをフォルダに移動しました: ' + folder.getName());
-      } catch (moveError) {
-        // フォルダ移動に失敗しても処理は継続
-        console.warn('ファイル移動に失敗しましたが、処理を継続します: ' + moveError.message);
-      }
-    }
-    
-    // ステップ3: データベースを更新
-    debugLog('💾 ステップ3: データベース更新中...');
-    
-    // クイックスタート用の適切な初期設定を作成
-    var sheetConfigKey = 'sheet_' + formAndSsInfo.sheetName;
-    var quickStartSheetConfig = {
-      opinionHeader: '今日のテーマについて、あなたの考えや意見を聞かせてください',
-      reasonHeader: 'そう考える理由や体験があれば教えてください（任意）',
-      nameHeader: '名前',
-      classHeader: 'クラス',
-      lastModified: new Date().toISOString()
-    };
-    
-    var updatedConfig = {
-      ...configJson,
-      setupStatus: 'completed',
-      formCreated: true,
-      formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl,
-      editFormUrl: formAndSsInfo.editFormUrl,
-      publishedSpreadsheetId: formAndSsInfo.spreadsheetId,
-      publishedSheetName: formAndSsInfo.sheetName,
-      appPublished: true,
-      folderId: folder ? folder.getId() : '',
-      folderUrl: folder ? folder.getUrl() : '',
-      completedAt: new Date().toISOString(),
-      [sheetConfigKey]: quickStartSheetConfig
-    };
-    
-    // ユーザーデータベースを新しいセットアップ情報で完全に更新
-    console.log('💾 ユーザーデータベースを新しいセットアップで更新中...');
-    updateUser(requestUserId, {
-      spreadsheetId: formAndSsInfo.spreadsheetId,
-      spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
-      configJson: JSON.stringify(updatedConfig),
-      lastAccessedAt: new Date().toISOString()
-    });
-    
-    // 重要: 新しいセットアップ完了後に全関連キャッシュを強制的にクリア
-    console.log('🗑️ 古いキャッシュをクリアして新しいセットアップを反映中...');
-    invalidateUserCache(requestUserId, userEmail, formAndSsInfo.spreadsheetId, true);
+    // ステップ3: データベース更新とキャッシュ管理を実行
+    var updatedConfig = updateQuickStartDatabase(setupContext, createdFiles);
     
     // 管理パネルでの表示を確実に更新するために、実行キャッシュもクリア
     clearExecutionUserInfoCache();
     
     // さらに、少し遅延してもう一度全キャッシュをクリアして確実に反映
-    invalidateUserCache(requestUserId, userEmail, formAndSsInfo.spreadsheetId, true);
+    invalidateUserCache(requestUserId, userEmail, createdFiles.formAndSsInfo.spreadsheetId, true);
     clearExecutionUserInfoCache();
     console.log('🔄 管理パネル表示更新のための追加キャッシュクリア完了');
     
-    // ステップ4: 回答ボードを公開状態に設定
-    debugLog('🌐 ステップ4: 回答ボード公開中...');
-    
-    debugLog('✅ クイックスタートセットアップ完了: ' + requestUserId);
-    
-    var appUrls = generateAppUrls(requestUserId);
-    return {
-      status: 'success',
-      message: 'クイックスタートが完了しました！回答ボードをお楽しみください。',
-      webAppUrl: appUrls.webAppUrl,
-      adminUrl: appUrls.adminUrl,
-      viewUrl: appUrls.viewUrl,
-      setupUrl: appUrls.setupUrl,
-      formUrl: updatedConfig.formUrl,
-      editFormUrl: updatedConfig.editFormUrl,
-      spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
-      folderUrl: updatedConfig.folderUrl
-    };
+    // ステップ4: 最終レスポンス生成
+    return generateQuickStartResponse(setupContext, createdFiles, updatedConfig);
     
   } catch (e) {
     console.error('❌ quickStartSetup エラー: ' + e.message);
@@ -1605,7 +1762,7 @@ function createUserFolder(userEmail) {
  */
 function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
   try {
-    var service = getSheetsService();
+    var service = getSheetsServiceCached();
     var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
     var highlightColumnIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT];
     
@@ -1742,7 +1899,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
     try {
       lock.waitLock(10000);
       
-      var service = getSheetsService();
+      var service = getSheetsServiceCached();
       var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
       
       // すべてのリアクション列を取得してユーザーの重複リアクションをチェック
@@ -2659,7 +2816,7 @@ function emergencyAdminPanelRepair(userEmail, spreadsheetId) {
     
     // 4. サービスアカウントアクセステスト
     try {
-      const service = getSheetsService();
+      const service = getSheetsServiceCached();
       const testData = getSpreadsheetsData(service, spreadsheetId);
       debugLog('ステップ4: サービスアカウントアクセステスト成功');
     } catch (serviceTestError) {
@@ -2800,7 +2957,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
       }
       
       var spreadsheetId = userInfo.spreadsheetId;
-      var service = getSheetsService();
+      var service = getSheetsServiceCached();
       
       // フォーム回答データのみを取得（名簿機能は使用しない）
       var ranges = [sheetName + '!A:Z'];
@@ -2902,7 +3059,7 @@ function getSheetsList(userId) {
 
     debugLog('getSheetsList: User\'s spreadsheetId:', userInfo.spreadsheetId);
 
-    var service = getSheetsService();
+    var service = getSheetsServiceCached();
     if (!service) {
       console.error('❌ getSheetsList: Sheets service not initialized');
       return [];
@@ -3236,7 +3393,7 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
  */
 function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
   try {
-    var service = getSheetsService();
+    var service = getSheetsServiceCached();
     var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
     
     var reactionData = {
@@ -4382,7 +4539,7 @@ function getInitialData(requestUserId, targetSheetName) {
     if (includeSheetDetails && userInfo.spreadsheetId) {
       try {
         // 最適化: getSheetsServiceの重複呼び出しを避けるため、一度だけ作成して再利用
-        var sharedSheetsService = getSheetsService();
+        var sharedSheetsService = getSheetsServiceCached();
         
         // ExecutionContext を最適化版で作成（sheetsService と userInfo を渡して重複作成を回避）
         const context = createExecutionContext(currentUserId, {

@@ -9,7 +9,7 @@ _last updated: 2025‑07‑22 JST_
 ---
 
 ## 0. Global Directives
-* Language: **Japanese** (コード内コメント含む。).  
+* Language: **Japanese** (コード内コメント含む、全ての返答は、日本語で行なってください。).  
 * No chain‑of‑thought exposure.  
 * Always obey the latest explicit user instruction.  
 * If input is ambiguous, ask. If stuck, say so.  

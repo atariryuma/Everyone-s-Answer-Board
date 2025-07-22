@@ -615,7 +615,7 @@ function findBetterOpinionColumn(contentAnalysis, processedHeaders, currentResul
  * @param {string} spreadsheetId - 対象のスプレッドシートID
  * @param {string} sheetName - 対象のシート名
  * @param {object} config - 保存する設定オブジェクト
- * @returns {object} { success: boolean, message: string, status: object } 形式のオブジェクト
+ * @returns {object} { status: 'success'|'error', message: string, [data]: object } 形式のオブジェクト
  */
 function saveAndActivateSheet(requestUserId, spreadsheetId, sheetName, config) {
   verifyUserAccess(requestUserId);
@@ -1236,7 +1236,7 @@ function verifyUserAuthentication(requestUserId) {
  * セッションをリセットして新しいアカウント選択を促す (マルチテナント対応版)
  * SharedUtilities のアカウント切り替え機能から呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
- * @returns {{success:boolean,error:(string|undefined)}}
+ * @returns {{status:'success'|'error',message:string}}
  */
 function resetUserAuthentication(requestUserId) {
   // 新規ユーザー（requestUserIdがundefinedまたはnull）の場合はverifyUserAccessをスキップ
@@ -1248,10 +1248,10 @@ function resetUserAuthentication(requestUserId) {
     if (typeof cleanupSessionOnAccountSwitch === 'function' && email) {
       cleanupSessionOnAccountSwitch(email);
     }
-    return { success: true };
+    return { status: 'success', message: 'ユーザー認証がリセットされました' };
   } catch (e) {
     console.error('resetUserAuthentication エラー: ' + e.message);
-    return { success: false, error: e.message };
+    return { status: 'error', message: 'ユーザー認証のリセットに失敗しました: ' + e.message };
   }
 }
 
@@ -1332,12 +1332,25 @@ function createExecutionContext(requestUserId, options = {}) {
   
   try {
     // 1. 共有リソースの取得（最適化：既存リソース再利用対応）
-    const sheetsService = options.reuseService || getSheetsService();
+    const originalSheetsService = options.reuseService || getSheetsServiceCached();
     const userInfo = options.reuseUserInfo || getCachedUserInfo(requestUserId);
     
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
+    
+    // SheetsServiceオブジェクトの安全なコピー（関数を含むため JSON.parse(JSON.stringify()) は不適用）
+    if (!originalSheetsService || !originalSheetsService.baseUrl || !originalSheetsService.accessToken) {
+      throw new Error('SheetsServiceオブジェクトが無効です。baseUrlまたはaccessTokenが見つかりません');
+    }
+    
+    const sheetsService = {
+      baseUrl: originalSheetsService.baseUrl,
+      accessToken: originalSheetsService.accessToken,
+      spreadsheets: originalSheetsService.spreadsheets // 関数参照を保持
+    };
+    
+    console.log('DEBUG: SheetsService安全コピー完了 - baseUrl存在:', !!sheetsService.baseUrl);
     
     // 2. 実行コンテキスト構築（既存プロパティ名を完全保持）
     const context = {
@@ -1346,8 +1359,8 @@ function createExecutionContext(requestUserId, options = {}) {
       startTime: startTime,
       
       // 共有リソース
-      sheetsService: sheetsService,
-      userInfo: JSON.parse(JSON.stringify(userInfo)), // Deep copy
+      sheetsService: sheetsService, // 関数参照を保持した安全なコピー
+      userInfo: JSON.parse(JSON.stringify(userInfo)), // Deep copy（userInfoは単純オブジェクトのため有効）
       
       // 変更トラッキング
       pendingUpdates: {},
@@ -1507,7 +1520,20 @@ function buildResponseFromContext(context) {
     const userInfo = context.userInfo;
     const configJson = JSON.parse(userInfo.configJson || '{}');
     const spreadsheetId = userInfo.spreadsheetId;
-    const publishedSheetName = configJson.publishedSheetName || '';
+    
+    // publishedSheetNameの型安全性確保（'true'問題の修正）
+    let publishedSheetName = '';
+    if (configJson.publishedSheetName) {
+      if (typeof configJson.publishedSheetName === 'string') {
+        publishedSheetName = configJson.publishedSheetName;
+      } else {
+        console.error('❌ publishedSheetNameが不正な型です:', typeof configJson.publishedSheetName, configJson.publishedSheetName);
+        console.log('🔧 publishedSheetNameを空文字にリセットしました');
+        publishedSheetName = '';
+        // 不正な値をデータベースから修正する必要があることをログ出力
+        console.warn('⚠️ データベースの publishedSheetName を修正してください。現在の値:', configJson.publishedSheetName);
+      }
+    }
 
     // 公開シートに紐づく設定を取得
     const sheetConfigKey = publishedSheetName ? 'sheet_' + publishedSheetName : '';

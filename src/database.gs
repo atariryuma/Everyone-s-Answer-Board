@@ -33,7 +33,7 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
       return;
     }
     
-    const service = getSheetsService();
+    const service = getSheetsServiceCached();
     const logSheetName = DELETE_LOG_SHEET_CONFIG.SHEET_NAME;
     
     // ログシートの存在確認・作成
@@ -44,21 +44,30 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
       );
       
       if (!logSheetExists) {
-        // ログシートを作成
+        // バッチ最適化: ログシート作成
+        console.log('📊 バッチ最適化: ログシート作成を実行');
+        
         const addSheetRequest = {
           addSheet: {
             properties: {
-              title: logSheetName
+              title: logSheetName,
+              gridProperties: {
+                rowCount: 1000,
+                columnCount: DELETE_LOG_SHEET_CONFIG.HEADERS.length
+              }
             }
           }
         };
         
+        // シートを作成
         batchUpdateSpreadsheet(service, dbId, {
           requests: [addSheetRequest]
         });
         
-        // ヘッダー行を追加
+        // ヘッダー行を追加（作成直後）
         appendSheetsData(service, dbId, `'${logSheetName}'!A1`, [DELETE_LOG_SHEET_CONFIG.HEADERS]);
+        
+        console.log('✅ ログシートとヘッダーの作成完了');
       }
     } catch (sheetError) {
       console.warn('ログシートの確認に失敗しましたが、処理を続行します:', sheetError.message);
@@ -100,7 +109,7 @@ function getAllUsersForAdmin() {
       throw new Error('データベースIDが設定されていません');
     }
     
-    const service = getSheetsService();
+    const service = getSheetsServiceCached();
     const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
     const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
@@ -188,7 +197,7 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
         throw new Error('データベースIDが設定されていません');
       }
       
-      const service = getSheetsService();
+      const service = getSheetsServiceCached();
       const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
       
       // データベーススプレッドシートの情報を取得
@@ -305,7 +314,7 @@ function getDeletionLogs() {
       throw new Error('データベースIDが設定されていません');
     }
     
-    const service = getSheetsService();
+    const service = getSheetsServiceCached();
     const logSheetName = DELETE_LOG_SHEET_CONFIG.SHEET_NAME;
     
     try {
@@ -354,6 +363,40 @@ function getDeletionLogs() {
   } catch (error) {
     console.error('getDeletionLogs error:', error.message);
     throw new Error('削除ログの取得に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * 長期キャッシュ対応Sheetsサービスを取得
+ * @returns {object} Sheets APIサービス
+ */
+function getSheetsServiceCached() {
+  const SHEETS_SERVICE_CACHE_KEY = 'SHEETS_SERVICE_CACHE';
+  
+  try {
+    return cacheManager.get(SHEETS_SERVICE_CACHE_KEY, () => {
+      console.log('🔧 getSheetsServiceCached: 新規サービス作成開始');
+      
+      var accessToken = getServiceAccountTokenCached();
+      if (!accessToken) {
+        throw new Error('サービスアカウントトークンが取得できませんでした');
+      }
+      
+      var service = createSheetsService(accessToken);
+      if (!service || !service.baseUrl) {
+        throw new Error('Sheets APIサービスの初期化に失敗しました');
+      }
+      
+      console.log('✅ キャッシュ用新規Sheetsサービス作成完了');
+      return service;
+      
+    }, { 
+      ttl: 3300, // 55分間キャッシュ（トークンより少し短め）
+      enableMemoization: true 
+    });
+  } catch (error) {
+    console.error('❌ getSheetsServiceCached error:', error.message);
+    throw error;
   }
 }
 
@@ -547,10 +590,58 @@ function getUserWithFallback(userId) {
  * @returns {object} 更新結果
  */
 function updateUser(userId, updateData) {
+  // 型安全性とバリデーション強化: パラメータ検証
+  if (!userId) {
+    throw new Error('データ更新エラー: ユーザーIDが指定されていません');
+  }
+  if (typeof userId !== 'string') {
+    throw new Error('データ更新エラー: ユーザーIDは文字列である必要があります');
+  }
+  if (userId.trim().length === 0) {
+    throw new Error('データ更新エラー: ユーザーIDが空文字列です');
+  }
+  if (userId.length > 255) {
+    throw new Error('データ更新エラー: ユーザーIDが長すぎます（最大255文字）');
+  }
+  
+  if (!updateData) {
+    throw new Error('データ更新エラー: 更新データが指定されていません');
+  }
+  if (typeof updateData !== 'object' || Array.isArray(updateData)) {
+    throw new Error('データ更新エラー: 更新データはオブジェクトである必要があります');
+  }
+  if (Object.keys(updateData).length === 0) {
+    throw new Error('データ更新エラー: 更新データが空です');
+  }
+  
+  // 許可されたフィールドのホワイトリスト検証
+  const allowedFields = ['adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'configJson', 'lastAccessedAt', 'createdAt'];
+  const updateFields = Object.keys(updateData);
+  const invalidFields = updateFields.filter(field => !allowedFields.includes(field));
+  
+  if (invalidFields.length > 0) {
+    throw new Error('データ更新エラー: 許可されていないフィールドが含まれています: ' + invalidFields.join(', '));
+  }
+  
+  // 各フィールドの型検証
+  for (const field of updateFields) {
+    const value = updateData[field];
+    if (value !== null && value !== undefined && typeof value !== 'string') {
+      throw new Error(`データ更新エラー: フィールド "${field}" は文字列である必要があります`);
+    }
+    if (typeof value === 'string' && value.length > 10000) {
+      throw new Error(`データ更新エラー: フィールド "${field}" が長すぎます（最大10000文字）`);
+    }
+  }
+  
   try {
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    var service = getSheetsService();
+    
+    if (!dbId) {
+      throw new Error('データ更新エラー: データベースIDが設定されていません');
+    }
+    var service = getSheetsServiceCached();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
     // 現在のデータを取得
@@ -611,7 +702,7 @@ function updateUser(userId, updateData) {
     // キャッシュを無効化（必要最小限）
     invalidateUserCache(userId, email, spreadsheetId, false);
     
-    return { success: true };
+    return { status: 'success', message: 'ユーザープロフィールが正常に更新されました' };
   } catch (error) {
     console.error('ユーザー更新エラー:', error);
     throw error;
@@ -637,7 +728,7 @@ function createUser(userData) {
 
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    var service = getSheetsService();
+    var service = getSheetsServiceCached();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
     var newRow = DB_SHEET_CONFIG.HEADERS.map(function(header) {
@@ -676,7 +767,7 @@ function waitForUserRecord(userId, maxWaitMs, intervalMs) {
  * @param {string} spreadsheetId - データベースのスプレッドシートID
  */
 function initializeDatabaseSheet(spreadsheetId) {
-  var service = getSheetsService();
+  var service = getSheetsServiceCached();
   var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
   try {
@@ -687,15 +778,39 @@ function initializeDatabaseSheet(spreadsheetId) {
     });
 
     if (!sheetExists) {
-      // シートが存在しない場合は作成
-      batchUpdateSpreadsheet(service, spreadsheetId, {
-        requests: [{ addSheet: { properties: { title: sheetName } } }]
-      });
+      // バッチ処理最適化: シート作成とヘッダー追加を1回のAPI呼び出しで実行
+      console.log('📊 バッチ最適化: シート作成+ヘッダー追加を同時実行');
+      
+      var requests = [
+        // 1. シートを作成
+        { 
+          addSheet: { 
+            properties: { 
+              title: sheetName,
+              gridProperties: {
+                rowCount: 1000,
+                columnCount: DB_SHEET_CONFIG.HEADERS.length
+              }
+            } 
+          } 
+        }
+      ];
+      
+      // バッチ実行: シートを作成
+      batchUpdateSpreadsheet(service, spreadsheetId, { requests: requests });
+      
+      // 2. 作成直後にヘッダーを追加（A1記法でレンジを指定）
+      var headerRange = "'" + sheetName + "'!A1:" + String.fromCharCode(65 + DB_SHEET_CONFIG.HEADERS.length - 1) + '1';
+      updateSheetsData(service, spreadsheetId, headerRange, [DB_SHEET_CONFIG.HEADERS]);
+      
+      console.log('✅ バッチ最適化完了: シート作成+ヘッダー追加（2回のAPI呼び出し→シーケンシャル実行）');
+      
+    } else {
+      // シートが既に存在する場合は、ヘッダーのみ更新（既存動作を維持）
+      var headerRange = "'" + sheetName + "'!A1:" + String.fromCharCode(65 + DB_SHEET_CONFIG.HEADERS.length - 1) + '1';
+      updateSheetsData(service, spreadsheetId, headerRange, [DB_SHEET_CONFIG.HEADERS]);
+      console.log('✅ 既存シートのヘッダー更新完了');
     }
-    
-    // ヘッダーを書き込み
-    var headerRange = "'" + sheetName + "'!A1:" + String.fromCharCode(65 + DB_SHEET_CONFIG.HEADERS.length - 1) + '1';
-    updateSheetsData(service, spreadsheetId, headerRange, [DB_SHEET_CONFIG.HEADERS]);
 
     debugLog('データベースシート「' + sheetName + '」の初期化が完了しました。');
   } catch (e) {
@@ -804,38 +919,111 @@ function createSheetsService(accessToken) {
 }
 
 /**
- * バッチ取得
+ * バッチ取得（baseUrl 問題修正版）
  * @param {object} service - Sheetsサービス
  * @param {string} spreadsheetId - スプレッドシートID
  * @param {string[]} ranges - 取得範囲の配列
  * @returns {object} レスポンス
  */
 function batchGetSheetsData(service, spreadsheetId, ranges) {
-  console.log('DEBUG: batchGetSheetsData received service object');
+  console.log('DEBUG: batchGetSheetsData - 安全なサービスオブジェクト処理開始');
+  
+  // 型安全性とバリデーション強化: 入力パラメータ検証
+  if (!service) {
+    throw new Error('Sheetsサービスオブジェクトが提供されていません');
+  }
+  if (typeof service !== 'object' || !service.baseUrl) {
+    throw new Error('無効なSheetsサービスオブジェクトです: baseUrlが見つかりません');
+  }
+  
+  if (!spreadsheetId || typeof spreadsheetId !== 'string') {
+    throw new Error('無効なspreadsheetIDです: 文字列である必要があります');
+  }
+  if (spreadsheetId.length < 20 || spreadsheetId.length > 60) {
+    throw new Error('無効なspreadsheetID形式です: 長さが不正です');
+  }
+  if (!/^[a-zA-Z0-9_-]+$/.test(spreadsheetId)) {
+    throw new Error('無効なspreadsheetID形式です: 許可されていない文字が含まれています');
+  }
+  
+  if (!ranges || !Array.isArray(ranges) || ranges.length === 0) {
+    throw new Error('無効な範囲配列です: 配列で1つ以上の範囲が必要です');
+  }
+  if (ranges.length > 100) {
+    throw new Error('範囲配列が大きすぎます: 最大100個までです');
+  }
+  
+  // 各範囲の検証
+  for (let i = 0; i < ranges.length; i++) {
+    const range = ranges[i];
+    if (!range || typeof range !== 'string') {
+      throw new Error(`範囲[${i}]が無効です: 文字列である必要があります`);
+    }
+    if (range.length === 0) {
+      throw new Error(`範囲[${i}]が空文字列です`);
+    }
+    if (range.length > 200) {
+      throw new Error(`範囲[${i}]が長すぎます: 最大200文字までです`);
+    }
+  }
+
   // API呼び出しをキャッシュ化（短期間）
   var cacheKey = `batchGet_${spreadsheetId}_${JSON.stringify(ranges)}`;
   
   return cacheManager.get(cacheKey, () => {
-    const currentService = service; // Capture service in local variable
     try {
-      console.log('DEBUG: Accessing service.baseUrl from service object');
-      var url = currentService.baseUrl + '/' + spreadsheetId + '/values:batchGet?' + 
-        ranges.map(function(range) { return 'ranges=' + encodeURIComponent(range); }).join('&');
+      // 防御的プログラミング: サービスオブジェクトのプロパティを安全に取得
+      var baseUrl = service.baseUrl;
+      var accessToken = service.accessToken;
+      
+      // baseUrlが失われている場合の防御処理
+      if (!baseUrl || typeof baseUrl !== 'string') {
+        console.warn('⚠️ baseUrlが見つかりません。デフォルトのGoogleSheetsAPIエンドポイントを使用します');
+        baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
+      }
+      
+      if (!accessToken || typeof accessToken !== 'string') {
+        throw new Error('アクセストークンが見つかりません。サービスオブジェクトが破損している可能性があります');
+      }
+      
+      console.log('DEBUG: 使用するbaseUrl:', baseUrl);
+      
+      // 安全なURL構築
+      var url = baseUrl + '/' + encodeURIComponent(spreadsheetId) + '/values:batchGet?' + 
+        ranges.map(function(range) { 
+          return 'ranges=' + encodeURIComponent(range); 
+        }).join('&');
+      
+      console.log('DEBUG: 構築されたURL:', url.substring(0, 100) + '...');
       
       var response = UrlFetchApp.fetch(url, {
-        headers: { 'Authorization': 'Bearer ' + service.accessToken },
+        headers: { 'Authorization': 'Bearer ' + accessToken },
         muteHttpExceptions: true,
         followRedirects: true,
         validateHttpsCertificates: true
       });
       
-      if (response.getResponseCode() !== 200) {
-        throw new Error('Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText());
+      var responseCode = response.getResponseCode();
+      var responseText = response.getContentText();
+      
+      if (responseCode !== 200) {
+        console.error('Sheets API エラー詳細:', {
+          code: responseCode,
+          response: responseText,
+          url: url.substring(0, 100) + '...',
+          spreadsheetId: spreadsheetId
+        });
+        throw new Error('Sheets API error: ' + responseCode + ' - ' + responseText);
       }
       
-      return JSON.parse(response.getContentText());
+      var result = JSON.parse(responseText);
+      console.log('✅ batchGetSheetsData 成功: 取得した範囲数:', result.valueRanges ? result.valueRanges.length : 0);
+      
+      return result;
+      
     } catch (error) {
-      console.error('batchGetSheetsData error:', error.message);
+      console.error('❌ batchGetSheetsData error:', error.message);
+      console.error('❌ Error stack:', error.stack);
       throw new Error('データ取得に失敗しました: ' + error.message);
     }
   }, { ttl: 120 }); // 2分間キャッシュ（API制限対策）
@@ -899,47 +1087,89 @@ function appendSheetsData(service, spreadsheetId, range, values) {
 }
 
 /**
- * スプレッドシート情報取得
+ * スプレッドシート情報取得（baseUrl 問題修正版）
  * @param {object} service - Sheetsサービス
  * @param {string} spreadsheetId - スプレッドシートID
  * @returns {object} スプレッドシート情報
  */
 function getSpreadsheetsData(service, spreadsheetId) {
   try {
-    if (!service || !service.baseUrl) {
-      throw new Error('Sheets APIサービスオブジェクトが無効です。baseUrlが見つかりません。');
+    // 入力パラメータ検証強化
+    if (!service) {
+      throw new Error('Sheetsサービスオブジェクトが提供されていません');
     }
-    // シート情報を含む基本的なメタデータを取得するために fields パラメータを追加
-    var baseUrl = service.baseUrl; // Store baseUrl in a local variable
-    var url = baseUrl + '/' + spreadsheetId + '?fields=sheets.properties';
+    if (!spreadsheetId || typeof spreadsheetId !== 'string') {
+      throw new Error('無効なspreadsheetIDです');
+    }
+
+    // 防御的プログラミング: サービスオブジェクトのプロパティを安全に取得
+    var baseUrl = service.baseUrl;
+    var accessToken = service.accessToken;
+    
+    // baseUrlが失われている場合の防御処理
+    if (!baseUrl || typeof baseUrl !== 'string') {
+      console.warn('⚠️ baseUrlが見つかりません。デフォルトのGoogleSheetsAPIエンドポイントを使用します');
+      baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
+    }
+    
+    if (!accessToken || typeof accessToken !== 'string') {
+      throw new Error('アクセストークンが見つかりません。サービスオブジェクトが破損している可能性があります');
+    }
+    
+    console.log('DEBUG: getSpreadsheetsData - 使用するbaseUrl:', baseUrl);
+    
+    // 安全なURL構築 - シート情報を含む基本的なメタデータを取得するために fields パラメータを追加
+    var url = baseUrl + '/' + encodeURIComponent(spreadsheetId) + '?fields=sheets.properties';
+    
+    console.log('DEBUG: getSpreadsheetsData - 構築されたURL:', url.substring(0, 100) + '...');
+    
     var response = UrlFetchApp.fetch(url, {
-      headers: { 'Authorization': 'Bearer ' + service.accessToken },
+      headers: { 'Authorization': 'Bearer ' + accessToken },
       muteHttpExceptions: true,
       followRedirects: true,
       validateHttpsCertificates: true
     });
     
-    if (response.getResponseCode() !== 200) {
-      console.error('Sheets API response code:', response.getResponseCode());
-      console.error('Sheets API response body:', response.getContentText());
+    var responseCode = response.getResponseCode();
+    var responseText = response.getContentText();
+    
+    if (responseCode !== 200) {
+      console.error('Sheets API エラー詳細:', {
+        code: responseCode,
+        response: responseText,
+        url: url.substring(0, 100) + '...',
+        spreadsheetId: spreadsheetId
+      });
       
-      if (response.getResponseCode() === 403) {
-        var errorResponse = JSON.parse(response.getContentText());
-        if (errorResponse.error && errorResponse.error.message === 'The caller does not have permission') {
-          var serviceAccountEmail = getServiceAccountEmail();
-          throw new Error('スプレッドシートへのアクセス権限がありません。サービスアカウント（' + serviceAccountEmail + '）をスプレッドシートの編集者として共有してください。');
+      if (responseCode === 403) {
+        try {
+          var errorResponse = JSON.parse(responseText);
+          if (errorResponse.error && errorResponse.error.message === 'The caller does not have permission') {
+            var serviceAccountEmail = getServiceAccountEmail();
+            throw new Error('スプレッドシートへのアクセス権限がありません。サービスアカウント（' + serviceAccountEmail + '）をスプレッドシートの編集者として共有してください。');
+          }
+        } catch (parseError) {
+          console.warn('エラーレスポンスのJSON解析に失敗:', parseError.message);
         }
       }
       
-      throw new Error('Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText());
+      throw new Error('Sheets API error: ' + responseCode + ' - ' + responseText);
     }
     
-    var result = JSON.parse(response.getContentText());
-    console.log('getSpreadsheetsData success: Found', result.sheets ? result.sheets.length : 0, 'sheets');
+    var result = JSON.parse(responseText);
+    var sheetCount = result.sheets ? result.sheets.length : 0;
+    
+    console.log('✅ getSpreadsheetsData 成功: 発見シート数:', sheetCount);
+    
+    if (sheetCount === 0) {
+      console.warn('⚠️ スプレッドシートにシートが見つかりませんでした');
+    }
+    
     return result;
+    
   } catch (error) {
-    console.error('getSpreadsheetsData error:', error.message);
-    console.error('getSpreadsheetsData error stack:', error.stack);
+    console.error('❌ getSpreadsheetsData error:', error.message);
+    console.error('❌ Error stack:', error.stack);
     throw new Error('スプレッドシート情報取得に失敗しました: ' + error.message);
   }
 }
@@ -952,7 +1182,7 @@ function getAllUsers() {
   try {
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    var service = getSheetsService();
+    var service = getSheetsServiceCached();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
     var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
@@ -1077,7 +1307,7 @@ function deleteUserAccount(userId) {
         throw new Error('データベースIDが設定されていません');
       }
       
-      var service = getSheetsService();
+      var service = getSheetsServiceCached();
       if (!service) {
         throw new Error('Sheets APIサービスの初期化に失敗しました');
       }

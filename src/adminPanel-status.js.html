@@ -103,18 +103,85 @@ function showError(error) {
 // STATUS VALIDATION AND UPDATES
 // =============================================================================
 
-// Validate current status and update UI accordingly
+// API レスポンス標準化: 強化された検証とエラーハンドリング
 function validateStatus(status) {
   if (!status) {
-    console.warn('No status received');
+    console.error('❌ レスポンス検証失敗: ステータスオブジェクトがnullまたはundefined');
+    showMessage('システムからの応答が無効です。ページを再読み込みしてください。', 'error');
     return false;
   }
+  
+  // エラーレスポンスの処理
+  if (status.status === 'error') {
+    console.error('❌ APIエラーレスポンス:', status.message);
+    showMessage('エラー: ' + status.message, 'error');
+    return false;
+  }
+  
+  // 必須プロパティの検証
+  const validationErrors = [];
   
   if (!status.userInfo) {
-    console.warn('No user info in status');
+    validationErrors.push('ユーザー情報が見つかりません');
+  } else {
+    // ユーザー情報の詳細検証
+    if (!status.userInfo.userId) {
+      validationErrors.push('ユーザーIDが設定されていません');
+    }
+    if (!status.userInfo.adminEmail) {
+      validationErrors.push('管理者メールアドレスが設定されていません');
+    }
+  }
+  
+  // 設定情報の検証
+  if (!status.config) {
+    validationErrors.push('設定情報が見つかりません');
+    console.warn('⚠️ status.config が存在しません、空のオブジェクトで初期化します');
+    status.config = {};
+  }
+  
+  // appUrlsの検証
+  if (!status.appUrls) {
+    validationErrors.push('アプリケーションURLが設定されていません');
+    console.warn('⚠️ status.appUrls が存在しません');
+  }
+  
+  // シート情報の検証（警告レベル）
+  if (!status.allSheets || !Array.isArray(status.allSheets)) {
+    console.warn('⚠️ シート一覧が無効または存在しません:', status.allSheets);
+    status.allSheets = []; // フォールバック
+  }
+  
+  // シート詳細の検証（オプショナル）
+  if (status.sheetDetails) {
+    if (!status.sheetDetails.allHeaders || !Array.isArray(status.sheetDetails.allHeaders)) {
+      console.warn('⚠️ シートヘッダー情報が無効です:', status.sheetDetails.allHeaders);
+      console.warn('これは「No headers found for フォームの回答」エラーの原因となる可能性があります');
+    } else {
+      console.log('✅ シートヘッダー検証OK:', status.sheetDetails.allHeaders.length + '個のヘッダー');
+    }
+    
+    if (!status.sheetDetails.guessedConfig) {
+      console.warn('⚠️ AI列判定結果が存在しません');
+    }
+  } else {
+    console.log('ℹ️ シート詳細はオプショナルなので存在しません（正常）');
+  }
+  
+  // セットアップステップの検証
+  if (typeof status.setupStep !== 'number') {
+    console.warn('⚠️ セットアップステップが数値ではありません:', status.setupStep);
+    status.setupStep = 1; // デフォルト値
+  }
+  
+  // 検証エラーがある場合
+  if (validationErrors.length > 0) {
+    console.error('❌ レスポンス検証エラー:', validationErrors);
+    showMessage('データ検証エラー: ' + validationErrors.join(', '), 'error');
     return false;
   }
   
+  console.log('✅ レスポンス検証成功');
   return true;
 }
 

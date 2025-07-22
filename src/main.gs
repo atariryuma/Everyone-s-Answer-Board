@@ -327,10 +327,10 @@ function getGoogleClientId() {
       };
     }
     
-    return { clientId: clientId, success: true };
+    return { status: 'success', message: 'Google Client IDを取得しました', data: { clientId: clientId } };
   } catch (error) {
     console.error('Error getting GOOGLE_CLIENT_ID:', error);
-    return { clientId: '', error: error.toString() };
+    return { status: 'error', message: 'Google Client IDの取得に失敗しました: ' + error.toString(), data: { clientId: '' } };
   }
 }
 
@@ -559,47 +559,45 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
     return _executionUserInfoCache.userInfo;
   }
 
-  // 永続キャッシュの確認
-  const cache = CacheService.getUserCache();
-  const cachedInfo = cache.get(cacheKey);
-  if (cachedInfo) {
-    try {
-      const userInfo = JSON.parse(cachedInfo);
-      // 実行レベルキャッシュにも保存（オプション）
-      if (opts.useExecutionCache && userId) {
-        _executionUserInfoCache = { userId, userInfo };
-      }
-      return userInfo;
-    } catch (e) {
-      console.warn('キャッシュデータのパースに失敗:', e.message);
-    }
-  }
-
-  // データベースから取得
+  // 統合キャッシュマネージャーを使用（キャッシュ miss 時は自動でデータベースから取得）
   let userInfo = null;
   
-  if (userId) {
-    userInfo = findUserById(userId);
-    // セキュリティチェック: 取得した情報のemailが現在のユーザーと一致するか確認
-    if (opts.enableSecurityCheck && userInfo && opts.currentUserEmail && 
-        userInfo.adminEmail !== opts.currentUserEmail) {
-      console.warn('セキュリティチェック失敗: 他人の情報へのアクセス試行');
-      return null;
-    }
-  } else if (email) {
-    userInfo = findUserByEmail(email);
-  }
-
-  // キャッシュに保存
-  if (userInfo) {
-    try {
-      cache.put(cacheKey, JSON.stringify(userInfo), opts.ttl);
-      // 実行レベルキャッシュにも保存（オプション）
-      if (opts.useExecutionCache && (userId || userInfo.userId)) {
-        _executionUserInfoCache = { userId: userId || userInfo.userId, userInfo };
+  try {
+    userInfo = cacheManager.get(cacheKey, () => {
+      console.log('🔍 キャッシュmiss - データベースから取得:', userId || email);
+      
+      let dbUserInfo = null;
+      if (userId) {
+        dbUserInfo = findUserById(userId);
+        // セキュリティチェック: 取得した情報のemailが現在のユーザーと一致するか確認
+        if (opts.enableSecurityCheck && dbUserInfo && opts.currentUserEmail && 
+            dbUserInfo.adminEmail !== opts.currentUserEmail) {
+          console.warn('セキュリティチェック失敗: 他人の情報へのアクセス試行');
+          return null;
+        }
+      } else if (email) {
+        dbUserInfo = findUserByEmail(email);
       }
-    } catch (e) {
-      console.warn('キャッシュ保存に失敗:', e.message);
+      
+      return dbUserInfo;
+    }, { 
+      ttl: opts.ttl || 300,
+      enableMemoization: opts.enableMemoization || false 
+    });
+    
+    // 実行レベルキャッシュにも保存（オプション）
+    if (userInfo && opts.useExecutionCache && (userId || userInfo.userId)) {
+      _executionUserInfoCache = { userId: userId || userInfo.userId, userInfo };
+      console.log('✅ 実行レベルキャッシュに保存:', userId || userInfo.userId);
+    }
+    
+  } catch (cacheError) {
+    console.error('統合キャッシュアクセスでエラー:', cacheError.message);
+    // フォールバック: 直接データベースから取得
+    if (userId) {
+      userInfo = findUserById(userId);
+    } else if (email) {
+      userInfo = findUserByEmail(email);
     }
   }
 
@@ -1042,8 +1040,20 @@ function renderAnswerBoard(userInfo, params) {
   } catch (e) {
     console.warn('Invalid configJson:', e.message);
   }
-  const isPublished = !!(config.appPublished && config.publishedSpreadsheetId && config.publishedSheetName);
-  const sheetConfigKey = 'sheet_' + (config.publishedSheetName || params.sheetName);
+  // publishedSheetNameの型安全性確保（'true'問題の修正）
+  let safePublishedSheetName = '';
+  if (config.publishedSheetName) {
+    if (typeof config.publishedSheetName === 'string') {
+      safePublishedSheetName = config.publishedSheetName;
+    } else {
+      console.error('❌ main.gs: publishedSheetNameが不正な型です:', typeof config.publishedSheetName, config.publishedSheetName);
+      console.warn('🔧 main.gs: publishedSheetNameを空文字にリセットしました');
+      safePublishedSheetName = '';
+    }
+  }
+
+  const isPublished = !!(config.appPublished && config.publishedSpreadsheetId && safePublishedSheetName);
+  const sheetConfigKey = 'sheet_' + (safePublishedSheetName || params.sheetName);
   const sheetConfig = config[sheetConfigKey] || {};
   const showBoard = params.isDirectPageAccess || isPublished;
   const file = showBoard ? 'Page' : 'Unpublished';
@@ -1058,7 +1068,7 @@ function renderAnswerBoard(userInfo, params) {
       template.userId = userInfo.userId;
       template.spreadsheetId = userInfo.spreadsheetId;
       template.ownerName = userInfo.adminEmail;
-      template.sheetName = escapeJavaScript(config.publishedSheetName || params.sheetName);
+      template.sheetName = escapeJavaScript(safePublishedSheetName || params.sheetName);
       template.DEBUG_MODE = shouldEnableDebugMode();
       // setupStatus未完了時の安全なopinionHeader取得
       const setupStatus = config.setupStatus || 'pending';
@@ -1067,7 +1077,7 @@ function renderAnswerBoard(userInfo, params) {
       if (setupStatus === 'pending') {
         rawOpinionHeader = 'セットアップ中...';
       } else {
-        rawOpinionHeader = sheetConfig.opinionHeader || config.publishedSheetName || 'お題';
+        rawOpinionHeader = sheetConfig.opinionHeader || safePublishedSheetName || 'お題';
       }
       template.opinionHeader = escapeJavaScript(rawOpinionHeader);
       template.cacheTimestamp = Date.now();
