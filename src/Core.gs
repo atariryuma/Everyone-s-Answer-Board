@@ -850,14 +850,7 @@ function getAppConfig(requestUserId) {
  * @param {object} options.displayOptions - バッチモード時の表示オプション
  */
 function saveSheetConfig(userId, spreadsheetId, sheetName, config, options = {}) {
-  var persistenceLog = [];
-  var originalConfigState = null;
-  
   try {
-    console.log('saveSheetConfig: 列マッピング保存開始 - sheetName:', sheetName);
-    persistenceLog.push('Column mapping save started');
-    
-    // Enhanced validation for column mapping persistence
     if (!spreadsheetId || typeof spreadsheetId !== 'string') {
       throw new Error('無効なspreadsheetIdです: ' + spreadsheetId);
     }
@@ -868,22 +861,6 @@ function saveSheetConfig(userId, spreadsheetId, sheetName, config, options = {})
       throw new Error('無効なconfigです: ' + config);
     }
     
-    // Validate essential column mapping fields
-    var requiredFields = ['opinionHeader', 'reasonHeader', 'nameHeader', 'classHeader'];
-    var providedFields = [];
-    
-    for (var i = 0; i < requiredFields.length; i++) {
-      var field = requiredFields[i];
-      if (config.hasOwnProperty(field)) {
-        providedFields.push(field);
-        if (typeof config[field] !== 'string') {
-          throw new Error('列マッピングフィールドは文字列である必要があります: ' + field + ' (現在: ' + typeof config[field] + ')');
-        }
-      }
-    }
-    
-    persistenceLog.push('Column mapping validation passed for fields: ' + providedFields.join(', '));
-    
     var currentUserId = userId;
     
     // 最適化モード: 事前取得済みuserInfoを使用、なければ取得
@@ -892,60 +869,14 @@ function saveSheetConfig(userId, spreadsheetId, sheetName, config, options = {})
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    // Store original state for rollback purposes
-    originalConfigState = userInfo.configJson;
     var configJson = JSON.parse(userInfo.configJson || '{}');
-    persistenceLog.push('Current configuration loaded');
 
-    // Create sheet-specific configuration with enhanced persistence tracking
+    // シート設定を更新
     var sheetKey = 'sheet_' + sheetName;
-    var previousSheetConfig = configJson[sheetKey] || {};
-    
-    // Build enhanced sheet configuration with metadata
-    var enhancedSheetConfig = {
-      // Core column mappings
-      opinionHeader: config.opinionHeader || previousSheetConfig.opinionHeader || '',
-      reasonHeader: config.reasonHeader || previousSheetConfig.reasonHeader || '',
-      nameHeader: config.nameHeader || previousSheetConfig.nameHeader || '',
-      classHeader: config.classHeader || previousSheetConfig.classHeader || '',
-      
-      // Persistence metadata
-      lastModified: new Date().toISOString(),
-      saveTimestamp: Date.now(),
-      configVersion: '2.0', // Version for compatibility tracking
-      userId: currentUserId,
-      spreadsheetId: spreadsheetId,
-      sheetName: sheetName,
-      
-      // Merge any additional config fields safely
-      ...Object.keys(config).reduce(function(result, key) {
-        if (!['opinionHeader', 'reasonHeader', 'nameHeader', 'classHeader'].includes(key)) {
-          result[key] = config[key];
-        }
-        return result;
-      }, {})
+    configJson[sheetKey] = {
+      ...config,
+      lastModified: new Date().toISOString()
     };
-    
-    // Data integrity check - ensure column mappings are preserved
-    var mappingIntegrityCheck = {
-      beforeSave: {
-        opinionHeader: previousSheetConfig.opinionHeader || 'not_set',
-        reasonHeader: previousSheetConfig.reasonHeader || 'not_set',
-        nameHeader: previousSheetConfig.nameHeader || 'not_set',
-        classHeader: previousSheetConfig.classHeader || 'not_set'
-      },
-      afterMapping: {
-        opinionHeader: enhancedSheetConfig.opinionHeader || 'not_set',
-        reasonHeader: enhancedSheetConfig.reasonHeader || 'not_set',
-        nameHeader: enhancedSheetConfig.nameHeader || 'not_set',
-        classHeader: enhancedSheetConfig.classHeader || 'not_set'
-      }
-    };
-    
-    persistenceLog.push('Integrity check prepared: ' + JSON.stringify(mappingIntegrityCheck));
-    
-    // Update configuration with enhanced sheet config
-    configJson[sheetKey] = enhancedSheetConfig;
 
     // バッチモード: 表示オプションも同時更新
     if (options.batchMode && options.displayOptions) {
@@ -955,93 +886,14 @@ function saveSheetConfig(userId, spreadsheetId, sheetName, config, options = {})
       configJson.showCounts = options.displayOptions.showCounts;
       configJson.appPublished = true;
       configJson.lastModified = new Date().toISOString();
-      persistenceLog.push('Batch mode options applied');
     }
 
-    // Execute atomic database update with enhanced error handling
-    var updateResult = updateUser(currentUserId, { 
-      configJson: JSON.stringify(configJson),
-      lastAccessedAt: new Date().toISOString()
-    });
-    
-    if (!updateResult || !updateResult.success) {
-      throw new Error('データベース更新に失敗しました: ' + (updateResult ? updateResult.message : '不明なエラー'));
-    }
-    
-    persistenceLog.push('Database update successful');
-    
-    // Verification step: re-read configuration to ensure persistence
-    try {
-      Utilities.sleep(100); // Brief pause for database consistency
-      var verificationUserInfo = findUserById(currentUserId);
-      if (verificationUserInfo && verificationUserInfo.configJson) {
-        var verificationConfig = JSON.parse(verificationUserInfo.configJson);
-        var verificationSheetConfig = verificationConfig[sheetKey];
-        
-        if (!verificationSheetConfig) {
-          throw new Error('設定の検証に失敗: シート設定が見つかりません');
-        }
-        
-        // Verify critical column mappings were persisted
-        var verificationFailed = false;
-        for (var j = 0; j < requiredFields.length; j++) {
-          var field = requiredFields[j];
-          if (config[field] && verificationSheetConfig[field] !== config[field]) {
-            verificationFailed = true;
-            console.error('列マッピング検証失敗:', field, 'expected:', config[field], 'actual:', verificationSheetConfig[field]);
-          }
-        }
-        
-        if (verificationFailed) {
-          throw new Error('列マッピングの永続化検証に失敗しました');
-        }
-        
-        persistenceLog.push('Column mapping persistence verified successfully');
-      }
-    } catch (verificationError) {
-      console.warn('saveSheetConfig: 検証ステップで警告:', verificationError.message);
-      persistenceLog.push('Verification warning: ' + verificationError.message);
-      // Don't fail the entire operation for verification warnings
-    }
-
-    console.log('saveSheetConfig: 列マッピング保存完了 -', sheetKey);
+    updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
     debugLog('✅ シート設定を保存しました: %s', sheetKey);
-    
-    return { 
-      status: 'success', 
-      message: 'シート設定を保存しました。',
-      persistenceLog: persistenceLog,
-      configKey: sheetKey,
-      mappingIntegrityCheck: mappingIntegrityCheck
-    };
-    
+    return { status: 'success', message: 'シート設定を保存しました。' };
   } catch (e) {
-    console.error('saveSheetConfig: 列マッピング保存エラー:', e.message);
-    persistenceLog.push('Save failed: ' + e.message);
-    
-    // Attempt rollback if we have original state
-    if (originalConfigState && userId) {
-      try {
-        console.log('saveSheetConfig: 設定のロールバックを試行中...');
-        updateUser(userId, { configJson: originalConfigState });
-        persistenceLog.push('Rollback attempted');
-      } catch (rollbackError) {
-        console.error('saveSheetConfig: ロールバック失敗:', rollbackError.message);
-        persistenceLog.push('Rollback failed: ' + rollbackError.message);
-      }
-    }
-    
-    var enhancedError = new Error('シート設定の保存に失敗しました: ' + e.message);
-    enhancedError.persistenceLog = persistenceLog;
-    enhancedError.originalError = e;
-    enhancedError.originalConfigState = originalConfigState;
-    
-    return { 
-      status: 'error', 
-      message: enhancedError.message,
-      persistenceLog: persistenceLog,
-      error: enhancedError
-    };
+    console.error('シート設定保存エラー: ' + e.message);
+    return { status: 'error', message: 'シート設定の保存に失敗しました: ' + e.message };
   }
 }
 
@@ -1526,65 +1378,26 @@ function toggleHighlight(requestUserId, rowIndex, sheetName) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function quickStartSetup(requestUserId) {
-  var validationCheckpoints = [];
-  var progressCheckpoints = {};
-  
+  // 新規ユーザー（requestUserIdがundefinedまたはnull）の場合はverifyUserAccessをスキップ
+  if (requestUserId) {
+    verifyUserAccess(requestUserId);
+  }
   try {
-    console.log('🚀 クイックスタートセットアップ開始: ' + requestUserId);
-    validationCheckpoints.push('Setup started');
+    debugLog('🚀 クイックスタートセットアップ開始: ' + requestUserId);
     
-    // Checkpoint 1: User Access Validation
-    console.log('📋 Checkpoint 1: ユーザーアクセス検証中...');
-    updateProgressStatus(requestUserId, 'ユーザー認証中...', 10);
-    if (requestUserId) {
-      verifyUserAccess(requestUserId);
-      validationCheckpoints.push('User access verified');
-    } else {
-      validationCheckpoints.push('New user - access verification skipped');
-    }
-    progressCheckpoints.userAccessValidated = true;
-    
-    // Checkpoint 2: Pre-flight System Health Check
-    console.log('📋 Checkpoint 2: システム健全性チェック中...');
-    updateProgressStatus(requestUserId, 'システムを確認中...', 20);
-    var systemHealth = testAndRepairDatabaseConnection();
-    if (!systemHealth.isHealthy) {
-      throw new Error('システムの前提条件が満たされていません: ' + systemHealth.issues.join(', '));
-    }
-    validationCheckpoints.push('System health verified');
-    if (systemHealth.repaired) {
-      validationCheckpoints.push('System components repaired');
-    }
-    progressCheckpoints.systemHealthChecked = true;
-    
-    // Checkpoint 3: User Information Validation
-    console.log('📋 Checkpoint 3: ユーザー情報検証中...');
+    // ユーザー情報の取得
     var userInfo = findUserById(requestUserId);
     if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません: ' + requestUserId);
+      throw new Error('ユーザー情報が見つかりません');
     }
-    
-    if (!userInfo.adminEmail) {
-      throw new Error('ユーザーの管理者メールアドレスが設定されていません');
-    }
-    
-    // Validate email format
-    var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(userInfo.adminEmail)) {
-      throw new Error('無効なメールアドレス形式: ' + userInfo.adminEmail);
-    }
-    
-    validationCheckpoints.push('User information validated');
-    progressCheckpoints.userInfoValidated = true;
     
     var configJson = JSON.parse(userInfo.configJson || '{}');
     var userEmail = userInfo.adminEmail;
     
-    // Checkpoint 4: Configuration Validation and Reset Handling
-    console.log('📋 Checkpoint 4: 設定状態の検証とリセット処理...');
+    // クイックスタート繰り返し実行を許可
+    // 既存のセットアップがある場合は完全にリセットして新しいセットアップで上書きする
     if (configJson.formCreated && userInfo.spreadsheetId) {
       console.log('⚠️ 既存のセットアップが検出されました。新しいセットアップで完全に上書きします。');
-      validationCheckpoints.push('Existing setup detected - preparing for reset');
       
       // 既存のキャッシュを完全にクリアして、新しいセットアップが確実に反映されるようにする
       invalidateUserCache(requestUserId, userEmail, userInfo.spreadsheetId, true);
@@ -1596,69 +1409,15 @@ function quickStartSetup(requestUserId) {
         formCreated: false,
         appPublished: false
       };
-      validationCheckpoints.push('Configuration reset completed');
-    } else {
-      validationCheckpoints.push('Fresh setup - no existing configuration');
     }
-    progressCheckpoints.configurationValidated = true;
     
-    // Checkpoint 5: Folder Creation with Validation
-    console.log('📋 Checkpoint 5: ユーザーフォルダ作成中...');
-    updateProgressStatus(requestUserId, 'フォルダを準備中...', 40);
+    // ステップ1: ユーザー専用フォルダを作成
     debugLog('📁 ステップ1: フォルダ作成中...');
-    var folder;
-    try {
-      folder = createUserFolder(userEmail);
-      if (!folder) {
-        throw new Error('フォルダの作成に失敗しました');
-      }
-      validationCheckpoints.push('User folder created successfully');
-      progressCheckpoints.folderCreated = true;
-    } catch (folderError) {
-      validationCheckpoints.push('Folder creation failed: ' + folderError.message);
-      console.warn('フォルダ作成エラー（処理は継続）:', folderError.message);
-      folder = null; // Continue without folder
-    }
+    var folder = createUserFolder(userEmail);
     
-    // Checkpoint 6: Form and Spreadsheet Creation with Validation  
-    console.log('📋 Checkpoint 6: フォーム・スプレッドシート作成中...');
-    updateProgressStatus(requestUserId, 'フォームを作成中...', 60);
+    // ステップ2: Googleフォームとスプレッドシートを作成
     debugLog('📝 ステップ2: フォーム作成中...');
-    var formAndSsInfo;
-    try {
-      formAndSsInfo = createStudyQuestForm(userEmail, requestUserId);
-      
-      // Validate the created form and spreadsheet
-      if (!formAndSsInfo) {
-        throw new Error('フォーム作成関数が結果を返しませんでした');
-      }
-      
-      if (!formAndSsInfo.formId || !formAndSsInfo.spreadsheetId) {
-        throw new Error('フォームIDまたはスプレッドシートIDが取得できませんでした');
-      }
-      
-      if (!formAndSsInfo.formUrl || !formAndSsInfo.spreadsheetUrl) {
-        throw new Error('フォームURLまたはスプレッドシートURLが取得できませんでした');
-      }
-      
-      // Test accessibility of created resources
-      try {
-        var testFormAccess = DriveApp.getFileById(formAndSsInfo.formId);
-        var testSpreadsheetAccess = DriveApp.getFileById(formAndSsInfo.spreadsheetId);
-        if (!testFormAccess || !testSpreadsheetAccess) {
-          throw new Error('作成されたリソースへのアクセステストに失敗しました');
-        }
-      } catch (accessTestError) {
-        throw new Error('作成されたリソースのアクセス検証に失敗: ' + accessTestError.message);
-      }
-      
-      validationCheckpoints.push('Form and spreadsheet created and validated');
-      progressCheckpoints.formCreated = true;
-      
-    } catch (formCreationError) {
-      validationCheckpoints.push('Form creation failed: ' + formCreationError.message);
-      throw new Error('フォーム・スプレッドシート作成に失敗しました: ' + formCreationError.message);
-    }
+    var formAndSsInfo = createStudyQuestForm(userEmail, requestUserId);
     
     // 作成したファイルをフォルダに移動
     if (folder) {
@@ -1680,200 +1439,66 @@ function quickStartSetup(requestUserId) {
       }
     }
     
-    // Checkpoint 7: Atomic Database Transaction Setup  
-    console.log('📋 Checkpoint 7: アトミックなデータベース更新処理開始...');
-    updateProgressStatus(requestUserId, 'データを保存中...', 80);
+    // ステップ3: データベースを更新
     debugLog('💾 ステップ3: データベース更新中...');
     
-    // Create atomic transaction data
-    var transactionData = {
-      operationId: 'quickstart_' + requestUserId + '_' + Date.now(),
-      userId: requestUserId,
-      startTime: new Date().toISOString(),
-      steps: []
+    // クイックスタート用の適切な初期設定を作成
+    var sheetConfigKey = 'sheet_' + formAndSsInfo.sheetName;
+    var quickStartSheetConfig = {
+      opinionHeader: '今日のテーマについて、あなたの考えや意見を聞かせてください',
+      reasonHeader: 'そう考える理由や体験があれば教えてください（任意）',
+      nameHeader: '名前',
+      classHeader: 'クラス',
+      lastModified: new Date().toISOString()
     };
     
-    try {
-      // Step 3a: Prepare configuration data
-      console.log('📋 Step 3a: 設定データ準備中...');
-      var sheetConfigKey = 'sheet_' + formAndSsInfo.sheetName;
-      var quickStartSheetConfig = {
-        opinionHeader: '今日のテーマについて、あなたの考えや意見を聞かせてください',
-        reasonHeader: 'そう考える理由や体験があれば教えてください（任意）',
-        nameHeader: '名前',
-        classHeader: 'クラス',
-        lastModified: new Date().toISOString()
-      };
-      
-      var updatedConfig = {
-        ...configJson,
-        setupStatus: 'completed',
-        formCreated: true,
-        formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl,
-        editFormUrl: formAndSsInfo.editFormUrl,
-        publishedSpreadsheetId: formAndSsInfo.spreadsheetId,
-        publishedSheetName: formAndSsInfo.sheetName,
-        appPublished: true,
-        folderId: folder ? folder.getId() : '',
-        folderUrl: folder ? folder.getUrl() : '',
-        completedAt: new Date().toISOString(),
-        [sheetConfigKey]: quickStartSheetConfig
-      };
-      
-      transactionData.steps.push({
-        step: '3a_config_prepared',
-        timestamp: new Date().toISOString(),
-        status: 'completed'
-      });
-      
-      validationCheckpoints.push('Configuration data prepared for atomic update');
-      progressCheckpoints.configPrepared = true;
-      
-      // Step 3b: Pre-validate configuration integrity
-      console.log('📋 Step 3b: 設定整合性事前検証中...');
-      try {
-        var configString = JSON.stringify(updatedConfig);
-        var parsedConfig = JSON.parse(configString);
-        
-        if (!parsedConfig.setupStatus || !parsedConfig.formUrl || !parsedConfig.spreadsheetId) {
-          throw new Error('必須設定フィールドが不足しています');
-        }
-        
-        transactionData.steps.push({
-          step: '3b_config_validated',
-          timestamp: new Date().toISOString(),
-          status: 'completed'
-        });
-        
-        validationCheckpoints.push('Configuration integrity pre-validated');
-        
-      } catch (configValidationError) {
-        transactionData.steps.push({
-          step: '3b_config_validation',
-          timestamp: new Date().toISOString(),
-          status: 'failed',
-          error: configValidationError.message
-        });
-        throw new Error('設定データの整合性検証に失敗: ' + configValidationError.message);
-      }
-      
-      // Step 3c: Execute atomic database update
-      console.log('📋 Step 3c: アトミックデータベース更新実行中...');
-      console.log('💾 ユーザーデータベースを新しいセットアップで更新中...');
-      
-      var updateResult = updateUser(requestUserId, {
-        spreadsheetId: formAndSsInfo.spreadsheetId,
-        spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
-        configJson: JSON.stringify(updatedConfig),
-        lastAccessedAt: new Date().toISOString()
-      });
-      
-      if (!updateResult || !updateResult.success) {
-        throw new Error('データベース更新が失敗しました: ' + (updateResult ? updateResult.message : '不明なエラー'));
-      }
-      
-      transactionData.steps.push({
-        step: '3c_database_updated',
-        timestamp: new Date().toISOString(),
-        status: 'completed',
-        fieldsUpdated: updateResult.fieldsUpdated || []
-      });
-      
-      validationCheckpoints.push('Atomic database update completed successfully');
-      progressCheckpoints.databaseUpdated = true;
-      
-    } catch (atomicUpdateError) {
-      console.error('quickStartSetup: アトミック更新エラー:', atomicUpdateError.message);
-      transactionData.steps.push({
-        step: 'atomic_update_failed',
-        timestamp: new Date().toISOString(),
-        status: 'failed',
-        error: atomicUpdateError.message
-      });
-      
-      validationCheckpoints.push('Atomic update failed: ' + atomicUpdateError.message);
-      throw new Error('データベースのアトミック更新に失敗しました: ' + atomicUpdateError.message);
-    }
+    var updatedConfig = {
+      ...configJson,
+      setupStatus: 'completed',
+      formCreated: true,
+      formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl,
+      editFormUrl: formAndSsInfo.editFormUrl,
+      publishedSpreadsheetId: formAndSsInfo.spreadsheetId,
+      publishedSheetName: formAndSsInfo.sheetName,
+      appPublished: true,
+      folderId: folder ? folder.getId() : '',
+      folderUrl: folder ? folder.getUrl() : '',
+      completedAt: new Date().toISOString(),
+      [sheetConfigKey]: quickStartSheetConfig
+    };
     
-    transactionData.endTime = new Date().toISOString();
-    transactionData.status = 'completed';
+    // ユーザーデータベースを新しいセットアップ情報で完全に更新
+    console.log('💾 ユーザーデータベースを新しいセットアップで更新中...');
+    updateUser(requestUserId, {
+      spreadsheetId: formAndSsInfo.spreadsheetId,
+      spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+      configJson: JSON.stringify(updatedConfig),
+      lastAccessedAt: new Date().toISOString()
+    });
     
-    console.log('📋 Checkpoint 7 完了: アトミック更新成功');
-    validationCheckpoints.push('Atomic database transaction completed');
-    progressCheckpoints.atomicUpdateCompleted = true;
-    
-    // Systematic cache invalidation with proper sequencing
-    console.log('🗑️ 段階的キャッシュクリアの開始...');
-    
-    // Phase 1: Clear execution cache first (immediate effect)
-    clearExecutionUserInfoCache();
-    console.log('✅ Phase 1: 実行キャッシュクリア完了');
-    
-    // Phase 2: Clear user-specific caches
+    // 重要: 新しいセットアップ完了後に全関連キャッシュを強制的にクリア
+    console.log('🗑️ 古いキャッシュをクリアして新しいセットアップを反映中...');
     invalidateUserCache(requestUserId, userEmail, formAndSsInfo.spreadsheetId, true);
-    console.log('✅ Phase 2: ユーザーキャッシュクリア完了');
     
-    // Phase 3: Clear any remaining related caches
-    try {
-      var cacheManager = getCacheManager();
-      var keysToRemove = [
-        'user_' + requestUserId,
-        'email_' + userEmail,
-        'config_' + requestUserId,
-        'status_' + requestUserId,
-        'data_' + formAndSsInfo.spreadsheetId
-      ];
-      
-      keysToRemove.forEach(function(key) {
-        try {
-          cacheManager.remove(key);
-        } catch (cacheError) {
-          console.warn('Cache key removal warning:', key, cacheError.message);
-        }
-      });
-      
-      console.log('✅ Phase 3: 関連キャッシュクリア完了');
-    } catch (cacheManagementError) {
-      console.warn('Cache management warning:', cacheManagementError.message);
-    }
+    // 管理パネルでの表示を確実に更新するために、実行キャッシュもクリア
+    clearExecutionUserInfoCache();
     
-    // Phase 4: Schedule delayed cache refresh to ensure consistency
-    try {
-      // Use a more reliable approach than setTimeout for GAS environment
-      console.log('🔄 Phase 4: 遅延キャッシュ同期をスケジュール');
-      
-      // Immediate re-validation to warm up caches with new data
-      setTimeout(function() {
-        try {
-          // Re-fetch user data to warm up caches
-          var refreshedUserInfo = findUserById(requestUserId);
-          if (refreshedUserInfo) {
-            console.log('🔄 キャッシュ同期完了: ユーザー情報を再取得しました');
-          }
-          
-          // Clear execution cache one more time for management panel consistency
-          clearExecutionUserInfoCache();
-          console.log('🔄 管理パネル表示更新のための最終キャッシュクリア完了');
-        } catch (refreshError) {
-          console.warn('Cache refresh warning:', refreshError.message);
-        }
-      }, 500); // Reduced delay for better UX
-      
-    } catch (scheduleError) {
-      console.warn('Cache scheduling warning:', scheduleError.message);
-    }
+    // さらに、少し遅延してもう一度全キャッシュをクリアして確実に反映
+    setTimeout(() => {
+      invalidateUserCache(requestUserId, userEmail, formAndSsInfo.spreadsheetId, true);
+      clearExecutionUserInfoCache();
+      console.log('🔄 管理パネル表示更新のための追加キャッシュクリア完了');
+    }, 1000);
     
     // ステップ4: 回答ボードを公開状態に設定
     debugLog('🌐 ステップ4: 回答ボード公開中...');
     
     debugLog('✅ クイックスタートセットアップ完了: ' + requestUserId);
-    updateProgressStatus(requestUserId, '完了しました！', 100);
     
     var appUrls = generateAppUrls(requestUserId);
     return {
       status: 'success',
-      message: '🎉 セットアップが完了しました！',
-      detailedMessage: 'フォームと回答ボードの準備ができました。すぐにご利用いただけます。',
+      message: 'クイックスタートが完了しました！回答ボードをお楽しみください。',
       webAppUrl: appUrls.webAppUrl,
       adminUrl: appUrls.adminUrl,
       viewUrl: appUrls.viewUrl,
@@ -1881,602 +1506,37 @@ function quickStartSetup(requestUserId) {
       formUrl: updatedConfig.formUrl,
       editFormUrl: updatedConfig.editFormUrl,
       spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
-      folderUrl: updatedConfig.folderUrl,
-      validationCheckpoints: validationCheckpoints,
-      progressCheckpoints: progressCheckpoints,
-      nextSteps: [
-        'フォームを生徒に共有してください',
-        '回答ボードで回答をリアルタイムで確認できます',
-        '設定はいつでも変更可能です'
-      ]
+      folderUrl: updatedConfig.folderUrl
     };
     
   } catch (e) {
     console.error('❌ quickStartSetup エラー: ' + e.message);
-    validationCheckpoints.push('Error occurred: ' + e.message);
-    
-    // Enhanced error reporting with diagnostics
-    var errorReport = {
-      operationId: 'quickstart_' + requestUserId + '_' + Date.now(),
-      userId: requestUserId,
-      errorTime: new Date().toISOString(),
-      errorMessage: e.message,
-      errorStack: e.stack,
-      validationCheckpoints: validationCheckpoints,
-      progressCheckpoints: progressCheckpoints,
-      lastSuccessfulStep: null,
-      diagnostics: {}
-    };
-    
-    // Determine last successful step
-    var completedSteps = Object.keys(progressCheckpoints).filter(function(key) {
-      return progressCheckpoints[key] === true;
-    });
-    if (completedSteps.length > 0) {
-      errorReport.lastSuccessfulStep = completedSteps[completedSteps.length - 1];
-    }
-    
-    // Gather diagnostic information
-    try {
-      errorReport.diagnostics.userExists = !!findUserById(requestUserId);
-      errorReport.diagnostics.serviceAccountStatus = getServiceAccountEmail();
-      var dbHealth = testAndRepairDatabaseConnection();
-      errorReport.diagnostics.databaseHealth = {
-        isHealthy: dbHealth.isHealthy,
-        issues: dbHealth.issues
-      };
-    } catch (diagnosticError) {
-      errorReport.diagnostics.gatheringError = diagnosticError.message;
-    }
     
     // エラー時はセットアップ状態をリセット
     try {
-      console.log('❌ エラー状態をデータベースに記録中...');
-      var currentConfig = JSON.parse((userInfo && userInfo.configJson) || '{}');
+      var currentConfig = JSON.parse(userInfo.configJson || '{}');
       currentConfig.setupStatus = 'error';
       currentConfig.lastError = e.message;
       currentConfig.errorAt = new Date().toISOString();
-      currentConfig.errorReport = errorReport;
-      currentConfig.validationCheckpoints = validationCheckpoints;
       
       updateUser(requestUserId, {
         configJson: JSON.stringify(currentConfig)
       });
-      
-      invalidateUserCache(requestUserId, userEmail || 'unknown', null, false);
+      invalidateUserCache(requestUserId, userEmail, null, false);
       clearExecutionUserInfoCache();
-      
-      console.log('❌ エラー状態の記録完了');
     } catch (updateError) {
       console.error('エラー状態の更新に失敗: ' + updateError.message);
-      errorReport.statusUpdateError = updateError.message;
     }
-    
-    // Create simple, user-friendly error message
-    var userMessage = createUserFriendlyErrorMessage(e.message, progressCheckpoints);
     
     return {
       status: 'error',
-      message: userMessage.simple,
-      detailedMessage: userMessage.detailed,
+      message: 'クイックスタートセットアップに失敗しました: ' + e.message,
       webAppUrl: '',
       adminUrl: '',
       viewUrl: '',
-      setupUrl: '',
-      errorReport: errorReport,
-      validationCheckpoints: validationCheckpoints,
-      progressCheckpoints: progressCheckpoints,
-      troubleshootingHints: userMessage.suggestions,
-      canRetry: userMessage.canRetry
+      setupUrl: ''
     };
   }
-}
-
-/**
- * プログレス状態をキャッシュに保存（フロントエンドでのリアルタイム更新用）
- * @param {string} userId - ユーザーID
- * @param {string} message - 進行状況メッセージ
- * @param {number} percent - 進行率（0-100）
- */
-function updateProgressStatus(userId, message, percent) {
-  try {
-    if (!userId) return;
-    
-    var progressData = {
-      userId: userId,
-      message: message,
-      percent: Math.min(100, Math.max(0, percent)),
-      timestamp: new Date().toISOString(),
-      status: 'in_progress'
-    };
-    
-    var cacheManager = getCacheManager();
-    var cacheKey = 'progress_' + userId;
-    cacheManager.put(cacheKey, JSON.stringify(progressData), 300); // 5分間キャッシュ
-    
-    console.log('Progress update:', message, percent + '%');
-  } catch (error) {
-    console.warn('updateProgressStatus warning:', error.message);
-    // プログレス更新の失敗は処理を止めない
-  }
-}
-
-/**
- * プログレス状態を取得
- * @param {string} userId - ユーザーID
- * @returns {object} プログレス情報
- */
-function getProgressStatus(userId) {
-  try {
-    if (!userId) return null;
-    
-    var cacheManager = getCacheManager();
-    var cacheKey = 'progress_' + userId;
-    var cachedProgress = cacheManager.get(cacheKey);
-    
-    if (cachedProgress) {
-      return JSON.parse(cachedProgress);
-    }
-    
-    return null;
-  } catch (error) {
-    console.warn('getProgressStatus warning:', error.message);
-    return null;
-  }
-}
-
-/**
- * エラーメッセージをユーザーにとって分かりやすい形式に変換
- * @param {string} technicalError - 技術的なエラーメッセージ
- * @param {object} progressCheckpoints - 進行状況チェックポイント
- * @returns {object} {simple: string, detailed: string, suggestions: array, canRetry: boolean}
- */
-function createUserFriendlyErrorMessage(technicalError, progressCheckpoints) {
-  var result = {
-    simple: '',
-    detailed: '',
-    suggestions: [],
-    canRetry: false
-  };
-  
-  try {
-    // システム設定関連のエラー
-    if (technicalError.includes('サービスアカウント') || technicalError.includes('service account')) {
-      result.simple = '設定に問題があります';
-      result.detailed = 'システムの設定が正しくないため、処理を完了できませんでした。';
-      result.suggestions = ['管理者に連絡してください', 'しばらく待ってから再試行してください'];
-      result.canRetry = true;
-    }
-    // データベース接続エラー
-    else if (technicalError.includes('データベース') || technicalError.includes('database')) {
-      result.simple = '一時的な問題が発生しました';
-      result.detailed = 'データの保存で問題が発生しました。通常は一時的な問題です。';
-      result.suggestions = ['少し待ってから再試行してください', '問題が続く場合は管理者に連絡してください'];
-      result.canRetry = true;
-    }
-    // フォーム作成エラー
-    else if (technicalError.includes('フォーム') || technicalError.includes('form')) {
-      result.simple = 'フォームの作成に失敗しました';
-      result.detailed = 'Google フォームの作成で問題が発生しました。';
-      result.suggestions = ['再試行してください', 'Google サービスが利用可能か確認してください'];
-      result.canRetry = true;
-    }
-    // 権限・アクセスエラー
-    else if (technicalError.includes('権限') || technicalError.includes('access') || technicalError.includes('permission')) {
-      result.simple = 'アクセスできません';
-      result.detailed = '必要な権限がないため、処理を完了できませんでした。';
-      result.suggestions = ['正しいアカウントでログインしているか確認してください', '管理者に権限について相談してください'];
-      result.canRetry = true;
-    }
-    // ユーザー情報関連エラー
-    else if (technicalError.includes('ユーザー') || technicalError.includes('user')) {
-      result.simple = 'ユーザー情報に問題があります';
-      result.detailed = 'アカウント情報の確認で問題が発生しました。';
-      result.suggestions = ['ページを再読み込みしてください', '再ログインしてください'];
-      result.canRetry = true;
-    }
-    // ネットワーク・接続エラー
-    else if (technicalError.includes('fetch') || technicalError.includes('network') || technicalError.includes('timeout')) {
-      result.simple = '接続に問題があります';
-      result.detailed = 'インターネット接続または Google サービスとの通信で問題が発生しました。';
-      result.suggestions = ['インターネット接続を確認してください', '少し待ってから再試行してください'];
-      result.canRetry = true;
-    }
-    // 設定・構成エラー
-    else if (technicalError.includes('設定') || technicalError.includes('config')) {
-      result.simple = '設定を確認してください';
-      result.detailed = '入力された設定に問題があります。';
-      result.suggestions = ['入力内容を確認してください', '必須項目がすべて入力されているか確認してください'];
-      result.canRetry = true;
-    }
-    // 進行状況に基づくメッセージ調整
-    else if (progressCheckpoints) {
-      if (progressCheckpoints.formCreated && !progressCheckpoints.databaseUpdated) {
-        result.simple = 'データの保存に失敗しました';
-        result.detailed = 'フォームは作成されましたが、設定の保存で問題が発生しました。';
-        result.suggestions = ['再試行してください', '作成されたフォームは自動的に削除されます'];
-        result.canRetry = true;
-      } else if (!progressCheckpoints.userAccessValidated) {
-        result.simple = 'ログインを確認してください';
-        result.detailed = 'アカウントの認証で問題が発生しました。';
-        result.suggestions = ['再ログインしてください', '正しいアカウントを使用しているか確認してください'];
-        result.canRetry = true;
-      } else {
-        result.simple = '処理を完了できませんでした';
-        result.detailed = '予期しない問題が発生しました。';
-        result.suggestions = ['再試行してください', '問題が続く場合は管理者に連絡してください'];
-        result.canRetry = true;
-      }
-    }
-    // 一般的なエラー
-    else {
-      result.simple = '問題が発生しました';
-      result.detailed = '申し訳ございませんが、処理中に問題が発生しました。';
-      result.suggestions = ['再試行してください', 'ページを再読み込みしてください', '問題が続く場合は管理者に連絡してください'];
-      result.canRetry = true;
-    }
-    
-    return result;
-    
-  } catch (error) {
-    // エラーメッセージ生成でエラーが発生した場合のフォールバック
-    return {
-      simple: '問題が発生しました',
-      detailed: '申し訳ございませんが、予期しない問題が発生しました。',
-      suggestions: ['再試行してください', '管理者に連絡してください'],
-      canRetry: true
-    };
-  }
-}
-
-/**
- * エラー内容と進行状況に基づいてトラブルシューティングヒントを生成
- * @param {string} errorMessage - エラーメッセージ
- * @param {object} progressCheckpoints - 進行状況チェックポイント
- * @returns {array} トラブルシューティングヒントの配列
- */
-function generateTroubleshootingHints(errorMessage, progressCheckpoints) {
-  var hints = [];
-  
-  try {
-    // Service account related issues
-    if (errorMessage.includes('サービスアカウント') || errorMessage.includes('service account')) {
-      hints.push('サービスアカウントの設定を確認してください');
-      hints.push('Google Cloud Consoleでサービスアカウントのキーが有効か確認してください');
-      hints.push('サービスアカウントにGoogle Drive APIとGoogle Sheets APIの権限があるか確認してください');
-    }
-    
-    // Database related issues
-    if (errorMessage.includes('データベース') || errorMessage.includes('database')) {
-      hints.push('データベーススプレッドシートIDが正しく設定されているか確認してください');
-      hints.push('データベーススプレッドシートがサービスアカウントと共有されているか確認してください');
-      hints.push('データベーススプレッドシートが削除されていないか確認してください');
-    }
-    
-    // Permission related issues
-    if (errorMessage.includes('権限') || errorMessage.includes('permission') || errorMessage.includes('access')) {
-      hints.push('Googleアカウントのドメイン設定を確認してください');
-      hints.push('管理者権限でログインしているか確認してください');
-      hints.push('Driveの共有設定が適切に設定されているか確認してください');
-    }
-    
-    // Form creation issues
-    if (errorMessage.includes('フォーム') || errorMessage.includes('form')) {
-      hints.push('Google Formsサービスが利用可能か確認してください');
-      hints.push('ドメインでGoogle Formsが有効になっているか確認してください');
-      hints.push('一時的なGoogle APIの制限に達していないか確認してください');
-    }
-    
-    // Network/connectivity issues
-    if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('timeout')) {
-      hints.push('インターネット接続を確認してください');
-      hints.push('Google APIサービスのステータスを確認してください');
-      hints.push('しばらく待ってから再試行してください');
-    }
-    
-    // Progress-based hints
-    if (progressCheckpoints) {
-      if (!progressCheckpoints.userAccessValidated) {
-        hints.push('ユーザー認証の問題です。再ログインを試してください');
-      }
-      
-      if (!progressCheckpoints.systemHealthChecked) {
-        hints.push('システム設定に問題があります。管理者に連絡してください');
-      }
-      
-      if (progressCheckpoints.formCreated && !progressCheckpoints.databaseUpdated) {
-        hints.push('フォームは作成されましたが、データベース更新に失敗しました。手動でデータベースを確認してください');
-      }
-    }
-    
-    // General hints
-    if (hints.length === 0) {
-      hints.push('詳細なエラーログを管理者に報告してください');
-      hints.push('しばらく待ってから再試行してください');
-      hints.push('ブラウザのキャッシュをクリアして再試行してください');
-    }
-    
-    // Add systematic troubleshooting steps
-    hints.push('== 一般的なトラブルシューティング手順 ==');
-    hints.push('1. ブラウザを再読み込みしてください');
-    hints.push('2. 別のブラウザまたはシークレットモードで試してください');
-    hints.push('3. Google Workspaceの管理者に設定を確認してもらってください');
-    hints.push('4. 問題が継続する場合は、エラーレポートをサポートに送信してください');
-    
-  } catch (hintGenerationError) {
-    console.error('Troubleshooting hint generation error:', hintGenerationError.message);
-    hints.push('トラブルシューティングヒントの生成中にエラーが発生しました');
-    hints.push('管理者に詳細なエラーログを報告してください');
-  }
-  
-  return hints;
-}
-
-/**
- * 管理者向け包括的診断ツール
- * @param {string} requestUserId - 診断対象のユーザーID
- * @returns {object} 詳細な診断レポート
- */
-function runAdminDiagnostics(requestUserId) {
-  var diagnosticsReport = {
-    reportId: 'diagnostics_' + requestUserId + '_' + Date.now(),
-    userId: requestUserId,
-    timestamp: new Date().toISOString(),
-    overallStatus: 'unknown',
-    checks: {},
-    issues: [],
-    recommendations: [],
-    systemHealth: {}
-  };
-  
-  try {
-    console.log('runAdminDiagnostics: 包括的診断開始 - userId:', requestUserId);
-    
-    // Diagnostic Check 1: User Authentication & Access
-    console.log('🔍 診断チェック 1: ユーザー認証・アクセス権限');
-    try {
-      verifyUserAccess(requestUserId);
-      var userInfo = findUserById(requestUserId);
-      
-      diagnosticsReport.checks.userAuthentication = {
-        status: 'pass',
-        userExists: !!userInfo,
-        userId: requestUserId,
-        adminEmail: userInfo ? userInfo.adminEmail : 'not_found',
-        hasValidEmail: userInfo ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userInfo.adminEmail) : false
-      };
-      
-      if (!userInfo) {
-        diagnosticsReport.issues.push('ユーザー情報がデータベースに見つかりません');
-        diagnosticsReport.recommendations.push('ユーザーの再登録が必要です');
-      }
-    } catch (authError) {
-      diagnosticsReport.checks.userAuthentication = {
-        status: 'fail',
-        error: authError.message
-      };
-      diagnosticsReport.issues.push('ユーザー認証エラー: ' + authError.message);
-    }
-    
-    // Diagnostic Check 2: Service Account Configuration
-    console.log('🔍 診断チェック 2: サービスアカウント設定');
-    var serviceAccountValidation = validateAndRepairServiceAccount();
-    diagnosticsReport.checks.serviceAccount = {
-      status: serviceAccountValidation.isValid ? 'pass' : 'fail',
-      email: serviceAccountValidation.email,
-      issues: serviceAccountValidation.issues,
-      repaired: serviceAccountValidation.repaired
-    };
-    
-    if (!serviceAccountValidation.isValid) {
-      diagnosticsReport.issues.push('サービスアカウント設定に問題があります');
-      diagnosticsReport.recommendations.push('サービスアカウントの再設定を行ってください');
-    }
-    
-    // Diagnostic Check 3: Database Connectivity
-    console.log('🔍 診断チェック 3: データベース接続');
-    var dbHealth = testAndRepairDatabaseConnection();
-    diagnosticsReport.checks.database = {
-      status: dbHealth.isHealthy ? 'pass' : 'fail',
-      issues: dbHealth.issues,
-      repaired: dbHealth.repaired,
-      dbInfo: dbHealth.dbInfo
-    };
-    
-    if (!dbHealth.isHealthy) {
-      diagnosticsReport.issues.push('データベース接続に問題があります');
-      diagnosticsReport.recommendations.push('データベース設定を確認してください');
-    }
-    
-    // Diagnostic Check 4: User Configuration Integrity
-    console.log('🔍 診断チェック 4: ユーザー設定の整合性');
-    try {
-      var userInfo = findUserById(requestUserId);
-      if (userInfo && userInfo.configJson) {
-        var configJson = JSON.parse(userInfo.configJson);
-        
-        diagnosticsReport.checks.userConfiguration = {
-          status: 'pass',
-          hasConfig: true,
-          setupStatus: configJson.setupStatus || 'unknown',
-          formCreated: configJson.formCreated || false,
-          appPublished: configJson.appPublished || false,
-          hasSpreadsheetId: !!userInfo.spreadsheetId,
-          configKeys: Object.keys(configJson)
-        };
-        
-        // Check for common configuration issues
-        if (configJson.setupStatus === 'error') {
-          diagnosticsReport.issues.push('ユーザー設定がエラー状態です: ' + (configJson.lastError || '詳細不明'));
-          diagnosticsReport.recommendations.push('クイックスタートまたはカスタムセットアップを再実行してください');
-        }
-        
-        if (configJson.formCreated && !userInfo.spreadsheetId) {
-          diagnosticsReport.issues.push('フォームは作成されていますが、スプレッドシートIDが見つかりません');
-          diagnosticsReport.recommendations.push('データベースの整合性確認が必要です');
-        }
-        
-      } else {
-        diagnosticsReport.checks.userConfiguration = {
-          status: 'warn',
-          hasConfig: false,
-          message: 'ユーザー設定が見つかりません'
-        };
-        diagnosticsReport.recommendations.push('初回セットアップを実行してください');
-      }
-    } catch (configError) {
-      diagnosticsReport.checks.userConfiguration = {
-        status: 'fail',
-        error: configError.message
-      };
-      diagnosticsReport.issues.push('ユーザー設定の読み込みエラー: ' + configError.message);
-    }
-    
-    // Diagnostic Check 5: Spreadsheet Access & Permissions
-    console.log('🔍 診断チェック 5: スプレッドシートアクセス・権限');
-    try {
-      var userInfo = findUserById(requestUserId);
-      if (userInfo && userInfo.spreadsheetId) {
-        var spreadsheetTest = SpreadsheetApp.openById(userInfo.spreadsheetId);
-        var sheets = spreadsheetTest.getSheets();
-        
-        diagnosticsReport.checks.spreadsheetAccess = {
-          status: 'pass',
-          spreadsheetId: userInfo.spreadsheetId,
-          sheetsCount: sheets.length,
-          sheetNames: sheets.map(function(sheet) { return sheet.getName(); }),
-          url: userInfo.spreadsheetUrl || 'not_available'
-        };
-        
-        // Test service account sharing
-        try {
-          shareSpreadsheetWithServiceAccount(userInfo.spreadsheetId);
-          diagnosticsReport.checks.spreadsheetAccess.serviceAccountSharing = 'verified';
-        } catch (shareError) {
-          diagnosticsReport.checks.spreadsheetAccess.serviceAccountSharing = 'failed';
-          diagnosticsReport.issues.push('サービスアカウントとの共有に問題があります: ' + shareError.message);
-        }
-        
-      } else {
-        diagnosticsReport.checks.spreadsheetAccess = {
-          status: 'skip',
-          message: 'スプレッドシートIDが設定されていません'
-        };
-      }
-    } catch (spreadsheetError) {
-      diagnosticsReport.checks.spreadsheetAccess = {
-        status: 'fail',
-        error: spreadsheetError.message
-      };
-      diagnosticsReport.issues.push('スプレッドシートアクセスエラー: ' + spreadsheetError.message);
-    }
-    
-    // Diagnostic Check 6: Cache Status
-    console.log('🔍 診断チェック 6: キャッシュ状態');
-    try {
-      var cacheManager = getCacheManager();
-      var userCacheKey = 'user_' + requestUserId;
-      var cachedUser = cacheManager.get(userCacheKey);
-      
-      diagnosticsReport.checks.cache = {
-        status: 'pass',
-        userCached: !!cachedUser,
-        cacheStats: cacheManager.stats || 'not_available'
-      };
-    } catch (cacheError) {
-      diagnosticsReport.checks.cache = {
-        status: 'warn',
-        error: cacheError.message
-      };
-    }
-    
-    // Overall Status Determination
-    var failedChecks = Object.keys(diagnosticsReport.checks).filter(function(key) {
-      return diagnosticsReport.checks[key].status === 'fail';
-    });
-    
-    var warnChecks = Object.keys(diagnosticsReport.checks).filter(function(key) {
-      return diagnosticsReport.checks[key].status === 'warn';
-    });
-    
-    if (failedChecks.length === 0 && warnChecks.length === 0) {
-      diagnosticsReport.overallStatus = 'healthy';
-    } else if (failedChecks.length === 0) {
-      diagnosticsReport.overallStatus = 'warning';
-    } else {
-      diagnosticsReport.overallStatus = 'critical';
-    }
-    
-    // Generate system-wide recommendations
-    if (diagnosticsReport.overallStatus === 'healthy') {
-      diagnosticsReport.recommendations.push('システムは正常に動作しています');
-    } else {
-      diagnosticsReport.recommendations.push('上記の問題を順番に解決してください');
-      diagnosticsReport.recommendations.push('問題が継続する場合は、管理者にこの診断レポートを送信してください');
-    }
-    
-    console.log('runAdminDiagnostics: 診断完了 - status:', diagnosticsReport.overallStatus);
-    
-    return diagnosticsReport;
-    
-  } catch (diagnosticsError) {
-    console.error('runAdminDiagnostics: 診断ツール実行エラー:', diagnosticsError.message);
-    
-    diagnosticsReport.overallStatus = 'error';
-    diagnosticsReport.issues.push('診断ツール実行中にエラーが発生しました: ' + diagnosticsError.message);
-    diagnosticsReport.error = {
-      message: diagnosticsError.message,
-      stack: diagnosticsError.stack
-    };
-    
-    return diagnosticsReport;
-  }
-}
-
-/**
- * 診断レポートを人間が読みやすい形式でフォーマット
- * @param {object} diagnosticsReport - runAdminDiagnosticsの結果
- * @returns {string} フォーマットされた診断レポート
- */
-function formatDiagnosticsReport(diagnosticsReport) {
-  var report = [];
-  
-  report.push('=== 管理パネル診断レポート ===');
-  report.push('レポートID: ' + diagnosticsReport.reportId);
-  report.push('ユーザーID: ' + diagnosticsReport.userId);
-  report.push('実行時刻: ' + diagnosticsReport.timestamp);
-  report.push('総合ステータス: ' + diagnosticsReport.overallStatus);
-  report.push('');
-  
-  report.push('=== 診断チェック結果 ===');
-  Object.keys(diagnosticsReport.checks).forEach(function(checkName) {
-    var check = diagnosticsReport.checks[checkName];
-    report.push('✓ ' + checkName + ': ' + check.status);
-    if (check.error) {
-      report.push('  エラー: ' + check.error);
-    }
-  });
-  report.push('');
-  
-  if (diagnosticsReport.issues.length > 0) {
-    report.push('=== 発見された問題 ===');
-    diagnosticsReport.issues.forEach(function(issue, index) {
-      report.push((index + 1) + '. ' + issue);
-    });
-    report.push('');
-  }
-  
-  if (diagnosticsReport.recommendations.length > 0) {
-    report.push('=== 推奨アクション ===');
-    diagnosticsReport.recommendations.forEach(function(recommendation, index) {
-      report.push((index + 1) + '. ' + recommendation);
-    });
-    report.push('');
-  }
-  
-  report.push('=== 診断終了 ===');
-  
-  return report.join('\n');
 }
 
 /**
@@ -3268,101 +2328,30 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
  */
 function shareSpreadsheetWithServiceAccount(spreadsheetId) {
   try {
-    console.log('shareSpreadsheetWithServiceAccount: 開始 -', spreadsheetId);
+    var serviceAccountEmail = getServiceAccountEmail();
     
-    // First validate service account configuration
-    var serviceAccountValidation = validateAndRepairServiceAccount();
-    if (!serviceAccountValidation.isValid) {
-      var errorMsg = 'サービスアカウント設定に問題があります: ' + serviceAccountValidation.issues.join(', ');
-      console.error('shareSpreadsheetWithServiceAccount:', errorMsg);
-      throw new Error(errorMsg);
+    if (!serviceAccountEmail || serviceAccountEmail === 'サービスアカウント未設定' || serviceAccountEmail === 'サービスアカウント設定エラー') {
+      throw new Error('サービスアカウントのメールアドレスが取得できません: ' + serviceAccountEmail);
     }
     
-    var serviceAccountEmail = serviceAccountValidation.email;
-    console.log('shareSpreadsheetWithServiceAccount: 検証済みサービスアカウント -', serviceAccountEmail);
+    debugLog('サービスアカウント共有開始:', serviceAccountEmail, 'スプレッドシート:', spreadsheetId);
     
-    if (serviceAccountValidation.repaired) {
-      console.log('shareSpreadsheetWithServiceAccount: サービスアカウント認証を修復しました');
-    }
-    
-    // Validate spreadsheet exists and is accessible
-    var file;
+    // DriveAppを使用してスプレッドシートをサービスアカウントと共有
     try {
-      file = DriveApp.getFileById(spreadsheetId);
+      var file = DriveApp.getFileById(spreadsheetId);
       if (!file) {
         throw new Error('スプレッドシートが見つかりません: ' + spreadsheetId);
       }
+      file.addEditor(serviceAccountEmail);
     } catch (driveError) {
-      if (driveError.message.includes('File not found')) {
-        throw new Error('指定されたスプレッドシートが存在しません: ' + spreadsheetId);
-      }
-      console.error('shareSpreadsheetWithServiceAccount: Drive API エラー:', driveError.message);
-      throw new Error('スプレッドシートアクセスエラー: ' + driveError.message);
+      console.error('DriveApp error:', driveError.message);
+      throw new Error('Drive API操作に失敗しました: ' + driveError.message);
     }
     
-    // Check if service account already has access
-    try {
-      var editors = file.getEditors();
-      var hasAccess = false;
-      for (var i = 0; i < editors.length; i++) {
-        if (editors[i].getEmail() === serviceAccountEmail) {
-          hasAccess = true;
-          break;
-        }
-      }
-      
-      if (hasAccess) {
-        console.log('shareSpreadsheetWithServiceAccount: サービスアカウントは既にアクセス権限を持っています');
-        return;
-      }
-    } catch (permissionError) {
-      console.warn('shareSpreadsheetWithServiceAccount: アクセス権限確認でエラー:', permissionError.message);
-      // Continue with sharing attempt
-    }
-    
-    // Attempt to share with retry logic
-    var maxRetries = 3;
-    var retryDelay = 1000; // 1 second
-    
-    for (var retry = 0; retry < maxRetries; retry++) {
-      try {
-        file.addEditor(serviceAccountEmail);
-        console.log('shareSpreadsheetWithServiceAccount: 共有成功 (試行 ' + (retry + 1) + '/' + maxRetries + ')');
-        
-        // Verify sharing was successful
-        Utilities.sleep(500); // Short delay for Google API consistency
-        var verificationEditors = file.getEditors();
-        var shareVerified = false;
-        for (var j = 0; j < verificationEditors.length; j++) {
-          if (verificationEditors[j].getEmail() === serviceAccountEmail) {
-            shareVerified = true;
-            break;
-          }
-        }
-        
-        if (!shareVerified) {
-          throw new Error('共有処理は完了しましたが、アクセス権限の確認に失敗しました');
-        }
-        
-        console.log('shareSpreadsheetWithServiceAccount: アクセス権限確認完了');
-        return; // Success, exit retry loop
-        
-      } catch (shareError) {
-        console.warn('shareSpreadsheetWithServiceAccount: 共有試行 ' + (retry + 1) + ' 失敗:', shareError.message);
-        
-        if (retry === maxRetries - 1) {
-          // Last retry failed
-          throw new Error('サービスアカウント共有に失敗しました (最大試行回数に達しました): ' + shareError.message);
-        }
-        
-        // Wait before retry
-        Utilities.sleep(retryDelay);
-        retryDelay *= 2; // Exponential backoff
-      }
-    }
+    debugLog('サービスアカウント共有成功:', serviceAccountEmail);
     
   } catch (error) {
-    console.error('shareSpreadsheetWithServiceAccount: 致命的エラー:', error.message);
+    console.error('shareSpreadsheetWithServiceAccount エラー:', error.message);
     throw new Error('サービスアカウントとの共有に失敗しました: ' + error.message);
   }
 }
@@ -4554,89 +3543,11 @@ function getAllUsersForAdminForUI(requestUserId) {
  * @param {object} config - フォーム設定
  */
 function createCustomFormUI(requestUserId, config) {
-  var validationCheckpoints = [];
-  var progressCheckpoints = {};
-  
   try {
-    console.log('🎯 カスタムフォーム作成開始 - userId:', requestUserId);
-    validationCheckpoints.push('Custom form creation started');
-    
-    // Checkpoint 1: Access Verification
-    console.log('📋 Checkpoint 1: アクセス権限確認中...');
     verifyUserAccess(requestUserId);
-    validationCheckpoints.push('User access verified');
-    progressCheckpoints.accessVerified = true;
-    
-    // Checkpoint 2: Configuration Validation
-    console.log('📋 Checkpoint 2: カスタム設定検証中...');
-    if (!config || typeof config !== 'object') {
-      throw new Error('無効な設定オブジェクト: ' + typeof config);
-    }
-    
-    // Validate required config fields
-    var requiredFields = ['formTitle', 'mainQuestion'];
-    for (var i = 0; i < requiredFields.length; i++) {
-      var field = requiredFields[i];
-      if (!config[field] || typeof config[field] !== 'string' || config[field].trim() === '') {
-        throw new Error('必須設定フィールドが不足または無効です: ' + field);
-      }
-    }
-    
-    // Validate form title length with user-friendly message
-    if (config.formTitle.length > 100) {
-      throw new Error('フォームタイトルは100文字以内で入力してください');
-    }
-    
-    // Validate main question length with user-friendly message
-    if (config.mainQuestion.length > 500) {
-      throw new Error('メイン質問は500文字以内で入力してください');
-    }
-    
-    validationCheckpoints.push('Configuration validation passed');
-    progressCheckpoints.configValidated = true;
-    
-    // Checkpoint 3: User Environment Check
-    console.log('📋 Checkpoint 3: ユーザー環境確認中...');
     const activeUserEmail = Session.getActiveUser().getEmail();
-    if (!activeUserEmail) {
-      throw new Error('アクティブユーザーのメールアドレスが取得できません');
-    }
     
-    var existingUser = findUserById(requestUserId);
-    if (!existingUser) {
-      throw new Error('ユーザー情報が見つかりません: ' + requestUserId);
-    }
-    
-    validationCheckpoints.push('User environment verified');
-    progressCheckpoints.userEnvironmentChecked = true;
-    
-    // Checkpoint 4: Database Health Check
-    console.log('📋 Checkpoint 4: データベース健全性チェック中...');
-    var dbHealth = testAndRepairDatabaseConnection();
-    if (!dbHealth.isHealthy) {
-      throw new Error('データベース接続エラー: ' + dbHealth.issues.join(', '));
-    }
-    if (dbHealth.repaired) {
-      validationCheckpoints.push('Database connection repaired');
-    }
-    validationCheckpoints.push('Database health verified');
-    progressCheckpoints.databaseHealthChecked = true;
-    
-    // Checkpoint 5: Form Creation Execution
-    console.log('📋 Checkpoint 5: カスタムフォーム作成実行中...');
     const result = createCustomForm(activeUserEmail, requestUserId, config);
-    
-    // Validate creation result
-    if (!result) {
-      throw new Error('フォーム作成関数が結果を返しませんでした');
-    }
-    
-    if (!result.formUrl || !result.spreadsheetUrl) {
-      throw new Error('作成されたフォームまたはスプレッドシートのURLが取得できませんでした');
-    }
-    
-    validationCheckpoints.push('Custom form created successfully');
-    progressCheckpoints.formCreated = true;
     
     // 既存ユーザーの情報を更新（スプレッドシート情報を追加）
     const existingUser = findUserById(requestUserId);
@@ -4680,33 +3591,16 @@ function createCustomFormUI(requestUserId, config) {
     
     return {
       status: 'success',
-      message: '✅ フォームが作成されました！',
-      detailedMessage: 'カスタムフォームの作成が完了しました。設定を確認して公開してください。',
+      message: 'カスタムフォームが正常に作成されました！',
       formUrl: result.formUrl,
       spreadsheetUrl: result.spreadsheetUrl,
-      formTitle: result.formTitle,
-      validationCheckpoints: validationCheckpoints,
-      progressCheckpoints: progressCheckpoints,
-      nextSteps: [
-        '列の設定を確認してください',
-        '設定を保存して公開してください',
-        'フォームを生徒に共有してください'
-      ]
+      formTitle: result.formTitle
     };
   } catch (error) {
     console.error('createCustomFormUI error:', error.message);
-    validationCheckpoints.push('Error occurred: ' + error.message);
-    
-    var userMessage = createUserFriendlyErrorMessage(error.message, progressCheckpoints);
-    
     return {
       status: 'error',
-      message: userMessage.simple,
-      detailedMessage: userMessage.detailed,
-      suggestions: userMessage.suggestions,
-      canRetry: userMessage.canRetry,
-      validationCheckpoints: validationCheckpoints,
-      progressCheckpoints: progressCheckpoints
+      message: error.message
     };
   }
 }
