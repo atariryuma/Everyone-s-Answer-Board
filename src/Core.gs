@@ -4639,7 +4639,7 @@ function createCustomFormUI(requestUserId, config) {
     progressCheckpoints.formCreated = true;
     
     // 既存ユーザーの情報を更新（スプレッドシート情報を追加）
-    existingUser = findUserById(requestUserId);
+    const existingUser = findUserById(requestUserId);
     if (existingUser) {
       console.log('createCustomFormUI - updating user data for:', requestUserId);
       
@@ -4723,7 +4723,7 @@ function createQuickStartFormUI(requestUserId) {
     const result = createQuickStartForm(activeUserEmail, requestUserId);
     
     // 既存ユーザーの情報を更新
-    existingUser = findUserById(requestUserId);
+    const existingUser = findUserById(requestUserId);
     if (existingUser) {
       const updatedConfigJson = JSON.parse(existingUser.configJson || '{}');
       updatedConfigJson.formUrl = result.viewFormUrl || result.formUrl;
