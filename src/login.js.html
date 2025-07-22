@@ -513,9 +513,15 @@
             .copy-btn:hover { color: #60a5fa; }
             .note {
               color: #9ca3af;
-              font-size: 14px;
+              font-size: 13px;
               margin-top: 20px;
-              line-height: 1.4;
+              line-height: 1.5;
+              text-align: left;
+            }
+            .note div {
+              margin-bottom: 4px;
+              word-break: keep-all;
+              overflow-wrap: break-word;
             }
           </style>
         </head>
@@ -527,7 +533,7 @@
             
             <a href="${adminUrl}" target="_top" class="main-button" id="admin-panel-btn" onclick="handleAdminPanelClick(event, '${adminUrl}', this)">
               <span id="admin-panel-btn-text">🚀 管理パネルを開く</span>
-              <div id="admin-panel-btn-spinner" style="display: none; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.8);">
+              <div id="admin-panel-btn-spinner" style="display: none; position: absolute; inset: 0; align-items: center; justify-content: center; background: rgba(0,0,0,0.8);">
                 <div style="width: 20px; height: 20px; border: 2px solid white; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
               </div>
             </a>
@@ -541,10 +547,10 @@
             </div>
             
             <div class="note">
-              ✓ このリンクは安全です<br>
-              ✓ Google Apps Script公式のセキュリティガイドラインに準拠<br>
-              💡 このURLをブックマークすると、次回から直接アクセスできます<br>
-              🔒 セキュリティのため、URLは他人と共有しないでください
+              <div style="margin-bottom: 4px;">✓ このリンクは安全です</div>
+              <div style="margin-bottom: 4px;">✓ Google Apps Script公式のセキュリティガイドラインに準拠</div>
+              <div style="margin-bottom: 4px;">💡 このURLをブックマークすると、次回から直接アクセスできます</div>
+              <div>🔒 セキュリティのため、URLは他人と共有しないでください</div>
             </div>
           </div>
         </body>
