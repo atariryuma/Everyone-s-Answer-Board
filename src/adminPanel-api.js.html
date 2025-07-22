@@ -9,33 +9,24 @@
 
 // マルチテナント対応: 新しいrunGasWithUserId関数
 function runGasWithUserId(functionName, ...args) {
-  let userIdToSend = userId; // Use a local variable for clarity
-
-  // If userId is not set (null/undefined), wait for initialization
-  if (!userIdToSend) {
-    return userIdPromise.then(resolvedUserId => {
-      userIdToSend = resolvedUserId; // Update local variable with resolved ID
-      // Perform validation after resolution
-      validateUserId(userIdToSend, functionName);
-      return gasOptimizer.call(functionName, userIdToSend, ...args);
-    }).catch(error => {
-      console.error('❌ runGasWithUserId: userIdの初期化に失敗しました:', error);
-      throw new Error('ユーザーIDの取得に失敗しました。ページを再読み込みしてください。');
+  // userIdが設定されていない場合は初期化を待つ
+  if (!userId) {
+    return userIdPromise.then(() => {
+      if (!userId) {
+        logError('No userId available for:', functionName);
+        throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
+      }
+      
+      // userIdを第一引数として追加
+      return gasOptimizer.call(functionName, userId, ...args);
+    }).catch((error) => {
+      logError('userIdPromise rejected:', error);
+      throw error;
     });
   }
-
-  // If userId is already set, validate its type
-  if (typeof userIdToSend !== 'string' || userIdToSend.trim() === '') {
-    // This is the problematic case: userId is set but not a valid string
-    const errorMsg = `runGasWithUserId: 無効なuserIdが設定されています: "${userIdToSend}" (type: ${typeof userIdToSend})`;
-    console.error('❌ ' + errorMsg);
-    // Throw an error immediately to prevent sending invalid data to backend
-    throw new Error('ユーザーIDの形式が正しくありません。ページを再読み込みしてください。');
-  }
-
-  // If userId is a valid string, proceed
-  validateUserId(userIdToSend, functionName); // This validation should now catch it if it's not a string
-  return gasOptimizer.call(functionName, userIdToSend, ...args);
+  
+  // userIdを第一引数として追加
+  return gasOptimizer.call(functionName, userId, ...args);
 }
 
 // callWithCache 関数 - 読み取り専用操作用
@@ -277,32 +268,9 @@ function loadSavedClassChoices() {
     sharedUtilities.gas.callWithLoading('getSavedClassChoices', 'クラス選択肢を読み込み中...')
         .then(function(result) {
             if (result.status === 'success' && result.classChoices) {
-                const enableClassSelectionCheckbox = document.getElementById('enable-class-selection');
-                const classCountSelect = document.getElementById('class-count-select');
-                const classChoicesContainer = document.getElementById('class-choices-container');
-
-                if (result.classChoices.length > 0) {
-                    // クラス選択を有効にする
-                    if (enableClassSelectionCheckbox) enableClassSelectionCheckbox.checked = true;
-                    // クラス数を設定
-                    if (classCountSelect) {
-                        const savedCount = result.classChoices.length;
-                        // プルダウンにsavedCountが存在するか確認し、なければ最も近い大きい値を選択
-                        let bestMatch = 1;
-                        for (let i = 1; i <= 10; i++) { // Assuming max 10 classes from HTML
-                            if (i <= savedCount) {
-                                bestMatch = i;
-                            }
-                        }
-                        classCountSelect.value = bestMatch.toString();
-                    }
-                    // クラス選択コンテナを表示
-                    if (classChoicesContainer) classChoicesContainer.classList.remove('hidden');
-                } else {
-                    // クラス選択を無効にする
-                    if (enableClassSelectionCheckbox) enableClassSelectionCheckbox.checked = false;
-                    // クラス選択コンテナを非表示
-                    if (classChoicesContainer) classChoicesContainer.classList.add('hidden');
+                const classChoicesTextarea = document.getElementById('class-choices');
+                if (classChoicesTextarea) {
+                    classChoicesTextarea.value = result.classChoices.join('\n');
                 }
             }
         })
@@ -314,33 +282,37 @@ function loadSavedClassChoices() {
 
 // Create form with custom configuration
 function createFormWithConfig() {
-  const question = questionTextarea.value.trim();
-  const enableClassSelection = document.getElementById('enable-class-selection').checked;
-  const classCountSelect = document.getElementById('class-count-select');
-  let classChoices = [];
-
-  if (enableClassSelection) {
-    if (!classCountSelect) {
-      showMessage('クラス数選択の要素が見つかりません。', 'error');
-      return;
-    }
-    const classCount = parseInt(classCountSelect.value, 10);
-    for (let i = 1; i <= classCount; i++) {
-      classChoices.push(`クラス${i}`);
-    }
+  const questionTextarea = document.getElementById('custom-main-question');
+  const classChoicesTextarea = document.getElementById('class-choices');
+  const includeOthersOption = document.getElementById('include-others-option').checked;
+  
+  if (!questionTextarea || !classChoicesTextarea) {
+    showMessage('フォーム作成に必要な要素が見つかりません。', 'error');
+    return;
   }
-
+  
+  const question = questionTextarea.value.trim();
+  const classChoicesText = classChoicesTextarea.value.trim();
+  
   if (!question) {
     showMessage('問題文は必須です。', 'warning');
     return;
   }
-
-  // クラス選択が有効で、かつクラスが一つも生成されていない場合はエラー
-  if (enableClassSelection && classChoices.length === 0) {
-    showMessage('クラス選択が有効ですが、クラスが一つも生成されていません。クラス数を選択してください。', 'warning');
+  
+  if (!classChoicesText) {
+    showMessage('クラス選択肢を入力してください。', 'warning');
     return;
   }
-
+  
+  const classChoices = classChoicesText.split('\n')
+    .map(choice => choice.trim())
+    .filter(choice => choice.length > 0);
+  
+  if (classChoices.length === 0) {
+    showMessage('有効なクラス選択肢を入力してください。', 'warning');
+    return;
+  }
+  
   const config = {
     mainQuestion: question, // mainQuestionは文字列として送信（バックエンドが期待する形式）
     classChoices: classChoices,
@@ -364,7 +336,7 @@ function createFormWithConfig() {
     return;
   }
   
-  sharedUtilities.gas.callWithLoading('createCustomFormUI', 'カスタムフォームを作成中...', currentStatus.userInfo.userId, config)
+  sharedUtilities.gas.callWithLoading('createCustomFormUI', 'カスタムフォームを作成中...', config)
     .then(function(result) {
       console.log('📥 Received response from createCustomFormUI:', result);
       if (result && result.status === 'success') {
