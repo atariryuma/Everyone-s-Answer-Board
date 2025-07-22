@@ -692,25 +692,13 @@ class UnifiedLoadingManager {
     this.variantClasses = ['transparent', 'modal', 'progress', 'quickstart', 'page-specific'];
   }
 
-  // Initialize the loading manager with enhanced error handling.
+  // Initialize the loading manager.
   init() {
     if (this.initialized) return true;
     
     this.overlay = document.getElementById('loading-overlay');
     if (!this.overlay) {
-      console.warn('UnifiedLoadingManager: loading-overlay element not found. Attempting retry...');
-      
-      // Retry after DOM is ready
-      setTimeout(() => {
-        this.overlay = document.getElementById('loading-overlay');
-        if (this.overlay) {
-          console.log('UnifiedLoadingManager: Initialized successfully after retry.');
-          this.initialized = true;
-        } else {
-          console.error('UnifiedLoadingManager: Critical failure - loading-overlay element not found after retry. Please check HTML structure.');
-        }
-      }, 100);
-      
+      console.warn('UnifiedLoadingManager: loading-overlay element not found. Will not initialize.');
       return false;
     }
     
@@ -719,24 +707,17 @@ class UnifiedLoadingManager {
     return true;
   }
 
-  // Main loading function with a unified API and enhanced error handling.
+  // Main loading function with a unified API.
   setLoading(isLoading, options = {}) {
     if (!this.initialized) {
-      console.warn('UnifiedLoadingManager: Not initialized, attempting initialization...');
-      if (!this.init()) {
-        console.error('UnifiedLoadingManager: Cannot manage loading state - initialization failed.');
-        return;
-      }
+      console.warn('UnifiedLoadingManager: Not initialized, cannot manage loading state.');
+      return;
     }
 
-    try {
-      if (isLoading) {
-        this.show(options);
-      } else {
-        this.hide();
-      }
-    } catch (error) {
-      console.error('UnifiedLoadingManager: Error during loading state change:', error);
+    if (isLoading) {
+      this.show(options);
+    } else {
+      this.hide();
     }
   }
 
@@ -761,13 +742,11 @@ class UnifiedLoadingManager {
       this.overlay.classList.add(config.type);
     }
     
-    // Update content and show the overlay with enhanced visibility enforcement
+    // Update content and show the overlay
     this.updateContent(config);
     this.overlay.classList.remove('hidden');
-    // Force display override with highest specificity
-    this.overlay.style.setProperty('display', 'flex', 'important');
-    this.overlay.style.setProperty('visibility', 'visible', 'important');
-    this.overlay.style.setProperty('opacity', '1', 'important');
+    this.overlay.style.display = 'flex'; // 明示的にdisplayをflexに設定
+    this.overlay.style.visibility = 'visible'; // 明示的にvisibilityをvisibleに設定
     
     // Manage user interaction
     if (config.disableInteraction && config.type !== 'transparent') {
