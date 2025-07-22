@@ -2327,6 +2327,11 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
     // シート名を取得（通常は「フォームの回答 1」）
     var sheets = spreadsheetObj.getSheets();
     var sheetName = sheets[0].getName();
+    // シート名が不正な値でないことを確認
+    if (!sheetName || sheetName === 'true') {
+      sheetName = 'Sheet1'; // または適切なデフォルト値
+      console.warn('不正なシート名が検出されました。デフォルトのシート名を使用します: ' + sheetName);
+    }
     
     // サービスアカウントとスプレッドシートを共有（失敗しても処理継続）
     try {
