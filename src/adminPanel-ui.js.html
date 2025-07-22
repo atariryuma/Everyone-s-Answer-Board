@@ -1195,8 +1195,8 @@ function handleSheetSelectionChange(event) {
 }
 
 // Load configuration for selected sheet - OPTIMIZED
-function loadConfigForSelected(sheetName, spreadsheetId) {
-  console.log('📋 Loading config for:', { selectedSheet: sheetName, spreadsheetId: spreadsheetId });
+function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetries = 3) {
+  console.log('📋 Loading config for:', { selectedSheet: sheetName, spreadsheetId: spreadsheetId, retry: retryCount });
 
   if (!spreadsheetId || !sheetName) {
     console.error('スプレッドシート情報が不足しています。');
@@ -1209,7 +1209,7 @@ function loadConfigForSelected(sheetName, spreadsheetId) {
   
   // Check if we already have sheet details from integrated API
   if (!isFreshSaveActive && currentStatus && currentStatus.sheetDetails && 
-      currentStatus.activeSheetName === sheetName) {
+      currentStatus.activeSheetName === sheetName && currentStatus.sheetDetails.allHeaders && currentStatus.sheetDetails.allHeaders.length > 0) {
     console.log('⚡ Using cached sheet details from integrated API');
     try {
       populateHeaderOptions(currentStatus.sheetDetails.allHeaders);
@@ -1233,11 +1233,25 @@ function loadConfigForSelected(sheetName, spreadsheetId) {
   runGasWithUserId('getSheetDetails', spreadsheetId, sheetName)
     .then(function(details) {
       console.log('✅ Sheet details loaded via API:', details);
+      
+      // If headers are empty, and we have retries left, try again after a delay
+      if (details && (!details.allHeaders || details.allHeaders.length === 0) && retryCount < maxRetries) {
+        console.warn(`⚠️ No headers found for ${sheetName}. Retrying in 2 seconds... (Attempt ${retryCount + 1}/${maxRetries})`);
+        showMessage(`シート情報を再取得中... (${retryCount + 1}/${maxRetries})`, 'info');
+        setTimeout(() => {
+          loadConfigForSelected(sheetName, spreadsheetId, retryCount + 1, maxRetries);
+        }, 2000); // Retry after 2 seconds
+        return;
+      }
+
       try {
         populateHeaderOptions(details.allHeaders);
         console.log('✅ Header options populated from API');
         populateConfig(details.guessedConfig);
         console.log('✅ AI configuration applied from API');
+        if (retryCount > 0) {
+          showMessage('✅ シート情報が正常に読み込まれました！', 'success');
+        }
       } catch (error) {
         console.error('Error in API config population sequence:', error);
         showMessage('設定の適用中にエラーが発生しました', 'error');
