@@ -163,6 +163,12 @@
     .text-cyan-400:hover, .underline:hover {
       transition: all var(--transition-duration) var(--transition-easing);
     }
+
+    /* Keyframe for fade-in animation */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body class="login-background">

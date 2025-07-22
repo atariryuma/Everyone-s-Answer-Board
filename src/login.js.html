@@ -467,8 +467,9 @@
 
     if (buttonText) buttonText.classList.add('hidden');
     if (buttonSpinner) buttonSpinner.classList.remove('hidden');
-    buttonElement.classList.add('disabled'); // ボタンを無効化
+    buttonElement.classList.add('cursor-not-allowed'); // カーソルを変更
     buttonElement.style.pointerEvents = 'none'; // クリックイベントを無効化
+    buttonElement.setAttribute('aria-disabled', 'true'); // アクセシビリティ対応
 
     // ユーザー情報確認中... のようなメッセージを表示したい場合は、ここで設定
     // 例: buttonText.textContent = '管理パネルへ遷移中...';
