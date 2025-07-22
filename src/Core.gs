@@ -1807,18 +1807,6 @@ function getHeaderIndices(spreadsheetId, sheetName) {
   return getHeadersCached(spreadsheetId, sheetName);
 }
 
-function clearAllCaches() {
-  cacheManager.clearExpired();
-  clearServiceAccountTokenCache();
-}
-
-/**
- * 指定されたシートの列ヘッダーを取得します。
- * AdminPanel.htmlから呼び出される
- * @param {string} userId - リクエスト元のユーザーID
- * @param {number} sheetId - 対象シートのID
- * @returns {Array<Object>} 列ヘッダーのリスト（例: [{id: 'Timestamp', name: 'Timestamp'}, ...]）
- */
 function getSheetColumns(userId, sheetId) {
   verifyUserAccess(userId);
   try {
@@ -2795,55 +2783,6 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
  * @param {string} spreadsheetId - スプレッドシートID
  * @returns {object} 修復結果
  */
-function emergencyAdminPanelRepair(userEmail, spreadsheetId) {
-  try {
-    debugLog('緊急修復開始: 管理パネルアクセス用');
-    
-    // 1. サービスアカウント権限の強制追加
-    addServiceAccountToSpreadsheet(spreadsheetId);
-    debugLog('ステップ1: サービスアカウント権限追加完了');
-    
-    // 2. ユーザー権限の強制追加
-    const repairResult = repairUserSpreadsheetAccess(userEmail, spreadsheetId);
-    debugLog('ステップ2: ユーザー権限修復結果:', repairResult);
-    
-    // 3. 権限確認テスト
-    try {
-      const testAccess = SpreadsheetApp.openById(spreadsheetId);
-      testAccess.getName();
-      debugLog('ステップ3: 権限確認テスト成功');
-    } catch (testError) {
-      console.warn('ステップ3: 権限確認テスト失敗:', testError.message);
-    }
-    
-    // 4. サービスアカウントアクセステスト
-    try {
-      const service = getSheetsServiceCached();
-      const testData = getSpreadsheetsData(service, spreadsheetId);
-      debugLog('ステップ4: サービスアカウントアクセステスト成功');
-    } catch (serviceTestError) {
-      console.warn('ステップ4: サービスアカウントアクセステスト失敗:', serviceTestError.message);
-    }
-    
-    return {
-      success: true,
-      message: '管理パネルアクセス権限を緊急修復しました',
-      timestamp: new Date().toISOString()
-    };
-    
-  } catch (error) {
-    console.error('緊急修復エラー:', error.message);
-    return {
-      success: false,
-      error: error.message,
-      timestamp: new Date().toISOString()
-    };
-  }
-}
-
-/**
- * スプレッドシートにリアクション列を追加
- */
 function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName) {
   try {
     var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
@@ -2886,52 +2825,6 @@ function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName) {
  * スプレッドシートの共有設定をチェックする
  * @param {string} spreadsheetId - チェックするスプレッドシートのID
  * @returns {object} status ('success' or 'error') と message
- */
-function checkSpreadsheetSharingPermission(spreadsheetId) {
-  try {
-    var service = getDriveService(); // Drive APIサービスを取得
-    var file = service.files.get({
-      fileId: spreadsheetId,
-      fields: 'permissions'
-    });
-
-    var isRestricted = true;
-    var publicAccessFound = false;
-
-    if (file.permissions) {
-      for (var i = 0; i < file.permissions.length; i++) {
-        var permission = file.permissions[i];
-        // typeが'anyone'または'domain'でroleが'reader'以上の場合は公開状態
-        if (permission.type === 'anyone' || (permission.type === 'domain' && permission.role !== 'reader')) {
-          publicAccessFound = true;
-          isRestricted = false;
-          break;
-        }
-      }
-    }
-
-    if (publicAccessFound) {
-      return {
-        status: 'error',
-        message: 'スプレッドシートの共有設定が「制限付き」になっていません。セキュリティのため、「制限付き」に設定してください。'
-      };
-    } else {
-      return {
-        status: 'success',
-        message: 'スプレッドシートの共有設定は「制限付き」です。'
-      };
-    }
-  } catch (e) {
-    console.error('スプレッドシート共有設定チェックエラー: ' + e.message);
-    return {
-      status: 'error',
-      message: 'スプレッドシートの共有設定の確認中にエラーが発生しました: ' + e.message
-    };
-  }
-}
-
-/**
- * シートデータ取得
  */
 function getSheetData(userId, sheetName, classFilter, sortMode, adminMode) {
   // キャッシュキー生成（ユーザー、シート、フィルタ条件ごとに個別キャッシュ）
@@ -3296,10 +3189,6 @@ function getColumnHeaderName(columnKey) {
  * @param {string} columnKey - COLUMN_HEADERSのキー
  * @returns {number} インデックス（見つからない場合は-1）
  */
-function getColumnIndex(headers, columnKey) {
-  var headerName = getColumnHeaderName(columnKey);
-  return getHeaderIndex(headers, headerName);
-}
 
 /**
  * 設定された列名と実際のスプレッドシートヘッダーをマッピング
@@ -3676,45 +3565,6 @@ function getDeletionLogsForUI() {
   }
 }
 
-
-
-/**
- * ボードを作成 (createBoardFromAdminのエイリアス)
- * AdminPanel.htmlから呼び出される
- * @param {string} requestUserId - リクエスト元のユーザーID
- */
-function createBoard(requestUserId) {
-  return createBoardFromAdmin(requestUserId);
-}
-
-/**
- * ユーザーのセットアップページアクセス権限をチェックする
- */
-function checkSetupPageAccess() {
-  try {
-    var activeUserEmail = Session.getActiveUser().getEmail();
-    var userInfo = findUserByEmail(activeUserEmail);
-    var hasAccess = hasSetupPageAccess();
-    
-    return {
-      status: 'success',
-      email: activeUserEmail,
-      userInfo: userInfo,
-      hasAccess: hasAccess,
-      isActive: userInfo ? userInfo.isActive : null
-    };
-  } catch (e) {
-    return {
-      status: 'error',
-      message: e.message
-    };
-  }
-}
-
-/**
- * 全ユーザー一覧を取得（AppSetupPage.html用ラッパー）
- * @param {string} requestUserId - リクエスト元のユーザーID
- */
 function getAllUsersForAdminForUI(requestUserId) {
   try {
     const result = getAllUsersForAdmin();
@@ -3851,14 +3701,6 @@ function createQuickStartFormUI(requestUserId) {
 /**
  * @deprecated createCustomFormUIを使用してください
  */
-function createAdditionalFormWithConfig(requestUserId, config) {
-  return createCustomFormUI(requestUserId, config);
-}
-
-/**
- * 現在のユーザーアカウントを削除（AdminPanel.html用）
- * @param {string} requestUserId - リクエスト元のユーザーID
- */
 function deleteCurrentUserAccount(requestUserId) {
   try {
     verifyUserAccess(requestUserId);
@@ -3918,203 +3760,11 @@ function getCurrentUserEmail() {
  * ログインフロー修正の検証テスト
  * @returns {object} テスト結果
  */
-function verifyLoginFlowFix() {
-  try {
-    const testResults = {
-      timestamp: new Date().toISOString(),
-      processLoginFlowTest: null,
-      cacheOperationTest: null,
-      overallStatus: 'unknown'
-    };
-
-    console.log('🔍 ログインフロー修正検証開始');
-
-    // 1. processLoginFlow関数の基本動作テスト
-    try {
-      const loginResult = processLoginFlow();
-      testResults.processLoginFlowTest = {
-        success: true,
-        status: loginResult.status,
-        hasAdminUrl: !!loginResult.adminUrl,
-        hasMessage: !!loginResult.message,
-        isErrorResponse: loginResult.status === 'error'
-      };
-      console.log('✅ processLoginFlow動作確認:', testResults.processLoginFlowTest);
-    } catch (error) {
-      testResults.processLoginFlowTest = {
-        success: false,
-        error: error.message,
-        isValueFnError: error.message.includes('valueFn is not a function')
-      };
-      console.log('❌ processLoginFlowエラー:', testResults.processLoginFlowTest);
-    }
-
-    // 2. キャッシュ操作の基本テスト
-    try {
-      const testKey = 'test_cache_' + Date.now();
-      const testValue = { test: true, timestamp: Date.now() };
-      
-      // キャッシュ保存テスト
-      CacheService.getScriptCache().put(testKey, JSON.stringify(testValue), 10);
-      
-      // キャッシュ読み込みテスト
-      const retrieved = CacheService.getScriptCache().get(testKey);
-      const parsed = JSON.parse(retrieved || 'null');
-      
-      testResults.cacheOperationTest = {
-        success: true,
-        canSave: true,
-        canRetrieve: !!retrieved,
-        dataIntegrity: parsed && parsed.test === true
-      };
-      
-      // テストキャッシュを削除
-      CacheService.getScriptCache().remove(testKey);
-      
-      console.log('✅ キャッシュ操作確認:', testResults.cacheOperationTest);
-    } catch (error) {
-      testResults.cacheOperationTest = {
-        success: false,
-        error: error.message
-      };
-      console.log('❌ キャッシュ操作エラー:', testResults.cacheOperationTest);
-    }
-
-    // 3. 総合判定
-    const loginSuccess = testResults.processLoginFlowTest?.success;
-    const cacheSuccess = testResults.cacheOperationTest?.success;
-    const noValueFnError = !testResults.processLoginFlowTest?.isValueFnError;
-
-    if (loginSuccess && cacheSuccess && noValueFnError) {
-      testResults.overallStatus = 'fixed';
-    } else if (noValueFnError) {
-      testResults.overallStatus = 'partially_fixed';
-    } else {
-      testResults.overallStatus = 'still_broken';
-    }
-
-    console.log('🎯 修正検証結果:', testResults.overallStatus);
-    return testResults;
-
-  } catch (error) {
-    console.error('❌ 修正検証エラー:', error);
-    return {
-      timestamp: new Date().toISOString(),
-      error: error.message,
-      overallStatus: 'test_error'
-    };
-  }
-}
 
 /**
  * セキュリティ強化とキャッシュ最適化のパフォーマンステスト
  * @returns {object} パフォーマンステスト結果
  */
-function runPerformanceTest() {
-  try {
-    const startTime = Date.now();
-    const testResults = {
-      timestamp: new Date().toISOString(),
-      testDuration: 0,
-      cacheHealth: null,
-      loginFlowPerformance: null,
-      securityVerificationPerformance: null,
-      overallStatus: 'unknown',
-      recommendations: []
-    };
-
-    console.log('🚀 パフォーマンステスト開始');
-
-    // 1. キャッシュの健全性チェック
-    testResults.cacheHealth = cacheManager.getHealth();
-    console.log('📊 キャッシュ健全性:', testResults.cacheHealth);
-
-    // 2. ログインフロー性能テスト (統合前後の比較)
-    const loginStartTime = Date.now();
-    try {
-      const loginResult = processLoginFlow();
-      const loginDuration = Date.now() - loginStartTime;
-      
-      testResults.loginFlowPerformance = {
-        duration: loginDuration,
-        status: loginResult.status,
-        success: !!loginResult.adminUrl,
-        cacheHit: loginDuration < 500 // 500ms以下はキャッシュヒットと推定
-      };
-      console.log('⚡ ログインフロー性能:', testResults.loginFlowPerformance);
-    } catch (error) {
-      testResults.loginFlowPerformance = {
-        duration: Date.now() - loginStartTime,
-        error: error.message,
-        success: false
-      };
-    }
-
-    // 3. セキュリティ検証機能の性能テスト
-    const activeUserEmail = Session.getActiveUser().getEmail();
-    if (activeUserEmail) {
-      const userInfo = findUserByEmail(activeUserEmail);
-      if (userInfo && userInfo.userId) {
-        const securityStartTime = Date.now();
-        const verificationResult = verifyAdminAccess(userInfo.userId);
-        const securityDuration = Date.now() - securityStartTime;
-        
-        testResults.securityVerificationPerformance = {
-          duration: securityDuration,
-          success: verificationResult,
-          efficient: securityDuration < 200, // 200ms以下が効率的
-          cacheOptimized: securityDuration < 100 // 100ms以下はキャッシュ最適化済み
-        };
-        console.log('🔒 セキュリティ検証性能:', testResults.securityVerificationPerformance);
-      }
-    }
-
-    // 4. 全体的な評価とステータス決定
-    const totalDuration = Date.now() - startTime;
-    testResults.testDuration = totalDuration;
-
-    // パフォーマンス評価
-    const cacheHitRate = parseFloat(testResults.cacheHealth.stats.hitRate);
-    const loginEfficient = testResults.loginFlowPerformance?.duration < 1000;
-    const securityEfficient = testResults.securityVerificationPerformance?.efficient !== false;
-
-    if (cacheHitRate > 80 && loginEfficient && securityEfficient) {
-      testResults.overallStatus = 'excellent';
-    } else if (cacheHitRate > 60 && (loginEfficient || securityEfficient)) {
-      testResults.overallStatus = 'good';
-    } else if (cacheHitRate > 40) {
-      testResults.overallStatus = 'acceptable';
-    } else {
-      testResults.overallStatus = 'needs_improvement';
-    }
-
-    // 5. 推奨事項の生成
-    if (cacheHitRate < 70) {
-      testResults.recommendations.push('キャッシュヒット率が低いです。キャッシュキーの見直しやTTL調整を検討してください。');
-    }
-    if (testResults.loginFlowPerformance?.duration > 2000) {
-      testResults.recommendations.push('ログインフローが2秒以上かかっています。processLoginFlow関数の最適化を検討してください。');
-    }
-    if (testResults.securityVerificationPerformance?.duration > 500) {
-      testResults.recommendations.push('セキュリティ検証が500ms以上かかっています。verifyAdminAccess関数のキャッシュ戦略を見直してください。');
-    }
-    if (testResults.recommendations.length === 0) {
-      testResults.recommendations.push('✅ パフォーマンスは良好です。現在の最適化が効果的に機能しています。');
-    }
-
-    console.log('🎯 パフォーマンステスト完了:', testResults.overallStatus, 'テスト時間:', totalDuration + 'ms');
-    return testResults;
-
-  } catch (error) {
-    console.error('❌ パフォーマンステストエラー:', error);
-    return {
-      timestamp: new Date().toISOString(),
-      error: error.message,
-      overallStatus: 'error',
-      recommendations: ['テスト実行中にエラーが発生しました。システムの状態を確認してください。']
-    };
-  }
-}
 
 /**
  * 統合ログインフロー処理 - セキュリティ強化とパフォーマンス最適化
@@ -4255,62 +3905,6 @@ function processLoginFlow() {
       message: errorMessage,
       errorType: error.name,
       timestamp: new Date().toISOString()
-    };
-  }
-}
-
-/**
- * データベース修正の検証用関数
- */
-function verifyDatabaseFieldFix() {
-  try {
-    const activeUserEmail = Session.getActiveUser().getEmail();
-    console.log('=== データベースフィールド取得検証開始 ===');
-    console.log('検証対象ユーザー:', activeUserEmail);
-    
-    // キャッシュをクリアして最新データを取得
-    cacheManager.remove('email_' + activeUserEmail);
-    
-    const userInfo = findUserByEmail(activeUserEmail);
-    if (userInfo) {
-      console.log('=== 検証結果 ===');
-      console.log('ユーザーID:', userInfo.userId);
-      console.log('メールアドレス:', userInfo.adminEmail);
-      console.log('isActive:', userInfo.isActive, '(型:', typeof userInfo.isActive, ')');
-      console.log('configJson:', userInfo.configJson ? 'あり（長さ:' + userInfo.configJson.length + ')' : 'なし');
-      console.log('lastAccessedAt:', userInfo.lastAccessedAt);
-      console.log('createdAt:', userInfo.createdAt);
-      console.log('全フィールド:', Object.keys(userInfo));
-      
-      // isActive値の詳細チェック
-      const isActiveCheck = (userInfo.isActive === undefined || 
-                           userInfo.isActive === true || 
-                           userInfo.isActive === 'true' ||
-                           String(userInfo.isActive).toLowerCase() === 'true');
-      console.log('アクティブユーザー判定:', isActiveCheck);
-      
-      return {
-        success: true,
-        userId: userInfo.userId,
-        hasIsActive: userInfo.isActive !== undefined,
-        isActiveValue: userInfo.isActive,
-        isActiveType: typeof userInfo.isActive,
-        allFieldsCount: Object.keys(userInfo).length,
-        message: 'データベースフィールド取得が正常に動作しています'
-      };
-    } else {
-      console.log('=== 検証結果: ユーザーが見つかりません ===');
-      return {
-        success: false,
-        message: 'ユーザーが見つかりませんでした: ' + activeUserEmail
-      };
-    }
-  } catch (error) {
-    console.error('=== 検証エラー ===', error.message);
-    return {
-      success: false,
-      error: error.message,
-      message: '検証中にエラーが発生しました'
     };
   }
 }
