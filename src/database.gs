@@ -129,6 +129,7 @@ function getAllUsersForAdmin() {
       }
       
       users.push(user);
+      console.log(`DEBUG: getAllUsersForAdmin - User object: ${JSON.stringify(user)}`);
     }
     
     console.log(`✅ 管理者用ユーザー一覧を取得: ${users.length}件`);

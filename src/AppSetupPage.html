@@ -16,6 +16,12 @@
     </script>
 </head>
 <body>
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[9999] hidden">
+        <div class="loading-spinner w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notification-container" class="fixed top-4 right-4 z-[10000] space-y-2"></div>
     <div class="max-w-4xl mx-auto p-6">
         <!-- ヘッダー -->
         <div class="text-center mb-8">
@@ -24,8 +30,7 @@
             <p class="text-sm text-gray-400 mt-2">このページでアプリの有効/無効を切り替えることができます</p>
         </div>
 
-        <!-- メッセージエリア -->
-        <div id="message-area" class="mb-6"></div>
+        
 
         <!-- 現在のステータス表示 -->
         <div class="glass-panel rounded-xl p-6 mb-6">
@@ -272,27 +277,52 @@
         let currentUserInfo = null;
         let setupInProgress = false;
 
-        // メッセージ表示関数
-        function showMessage(message, type = 'info') {
-            const messageArea = document.getElementById('message-area');
+        // メッセージ表示関数 (通知として右上に表示)
+        function showMessage(message, type = 'info', duration = 5000) {
+            const notificationContainer = document.getElementById('notification-container');
+            if (!notificationContainer) {
+                console.error('Notification container not found!');
+                return;
+            }
+
             const colors = {
                 success: 'bg-green-600/20 border-green-500/50 text-green-100',
                 error: 'bg-red-600/20 border-red-500/50 text-red-100',
                 warning: 'bg-yellow-600/20 border-yellow-500/50 text-yellow-100',
                 info: 'bg-blue-600/20 border-blue-500/50 text-blue-100'
             };
-            
-            messageArea.innerHTML = `
-                <div class="message show glass-panel rounded-lg p-4 border ${colors[type]}">
-                    <div class="flex items-center">
-                        <div class="mr-3">
-                            ${type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'}
-                        </div>
-                        <div class="flex-1">${message}</div>
-                        <button onclick="this.closest('.message').style.display='none'" class="ml-4 text-gray-400 hover:text-white">✕</button>
-                    </div>
-                </div>
+
+            const icon = {
+                success: '✅',
+                error: '❌',
+                warning: '⚠️',
+                info: 'ℹ️'
+            };
+
+            const notification = document.createElement('div');
+            notification.className = `notification glass-panel rounded-lg p-4 border shadow-lg flex items-center transition-all duration-300 ease-out transform translate-x-full opacity-0 ${colors[type]}`;
+            notification.innerHTML = `
+                <div class="mr-3 text-2xl">${icon[type]}</div>
+                <div class="flex-1 text-sm">${message}</div>
+                <button class="ml-4 text-gray-400 hover:text-white text-xl leading-none" onclick="this.closest('.notification').remove()">✕</button>
             `;
+
+            notificationContainer.appendChild(notification);
+
+            // アニメーションで表示
+            setTimeout(() => {
+                notification.classList.remove('translate-x-full', 'opacity-0');
+                notification.classList.add('translate-x-0', 'opacity-100');
+            }, 10); // 小さな遅延でトランジションをトリガー
+
+            // 自動的に消えるように設定
+            if (duration > 0) {
+                setTimeout(() => {
+                    notification.classList.remove('translate-x-0', 'opacity-100');
+                    notification.classList.add('translate-x-full', 'opacity-0');
+                    notification.addEventListener('transitionend', () => notification.remove());
+                }, duration);
+            }
         }
 
         // 現在のステータスを取得して表示
@@ -590,7 +620,7 @@
                     confirmBtn.disabled = false;
                     confirmBtn.textContent = '削除実行';
                 })
-                .deleteUserAccountByAdminForUI(__USER_ID__, userToDelete.userId, reason);
+                .deleteUserAccountByAdminForUI(userToDelete.userId, reason);
         }
 
         // 削除ログを表示
