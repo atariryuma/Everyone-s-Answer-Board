@@ -206,8 +206,8 @@ function verifyAdminAccess(userId) {
 }
 
 /**
- * ログインフローを処理し、適切なページにリダイレクトする
- * 既存ユーザーの設定を保護しつつ、セットアップ状況に応じたメッセージを表示
+ * ログインフローを処理し、適切なページに直接リダイレクトする
+ * 自動リダイレクト強化版：即座に管理パネルへ遷移
  * @param {string} userEmail ログインユーザーのメールアドレス
  * @returns {HtmlOutput} 表示するHTMLコンテンツ
  */
@@ -217,6 +217,8 @@ function processLoginFlow(userEmail) {
       throw new Error('ユーザーメールアドレスが指定されていません');
     }
 
+    console.log('🔐 processLoginFlow開始:', userEmail);
+
     // 1. ユーザー情報をデータベースから取得
     var userInfo = findUserByEmail(userEmail);
 
@@ -224,27 +226,21 @@ function processLoginFlow(userEmail) {
     if (userInfo) {
       // 2a. アクティブユーザーの場合
       if (isTrue(userInfo.isActive)) {
-        console.log('processLoginFlow: 既存アクティブユーザー:', userEmail);
+        console.log('✅ 既存アクティブユーザー確認:', userEmail);
         
         // 最終アクセス時刻を更新（設定は保護）
         updateUserLastAccess(userInfo.userId);
         
-        // セットアップ状況を確認してメッセージを調整
-        const setupStatus = getSetupStatusFromConfig(userInfo.configJson);
-        let welcomeMessage = '管理パネルへようこそ';
+        // 統一されたURL生成関数を使用
+        const adminUrl = buildAdminPanelUrl(userInfo.userId);
+        console.log('🚀 管理パネルへリダイレクト:', adminUrl);
         
-        if (setupStatus === 'pending') {
-          welcomeMessage = 'セットアップを続行してください';
-        } else if (setupStatus === 'completed') {
-          welcomeMessage = 'おかえりなさい！';
-        }
-        
-        const adminUrl = buildUserAdminUrl(userInfo.userId);
-        return createSecureRedirect(adminUrl, welcomeMessage);
+        // 高速自動リダイレクトを実行
+        return createRedirectResponse(adminUrl);
       } 
       // 2b. 非アクティブユーザーの場合
       else {
-        console.warn('processLoginFlow: 既存だが非アクティブなユーザー:', userEmail);
+        console.warn('⚠️ 非アクティブユーザーのアクセス試行:', userEmail);
         return showErrorPage(
           'アカウントが無効です', 
           'あなたのアカウントは現在無効化されています。管理者にお問い合わせください。'
@@ -253,7 +249,7 @@ function processLoginFlow(userEmail) {
     } 
     // 3. 新規ユーザーの処理
     else {
-      console.log('processLoginFlow: 新規ユーザー登録開始:', userEmail);
+      console.log('👤 新規ユーザー登録開始:', userEmail);
       
       // 3a. 新規ユーザーデータを準備（初期設定でpending状態）
       const initialConfig = {
@@ -277,16 +273,18 @@ function processLoginFlow(userEmail) {
       // 3b. データベースに作成
       createUser(newUser);
       if (!waitForUserRecord(newUser.userId, 3000, 500)) {
-        console.warn('processLoginFlow: user not found after create:', newUser.userId);
+        console.warn('⚠️ ユーザー作成後の確認に失敗:', newUser.userId);
       }
-      console.log('processLoginFlow: 新規ユーザー作成完了:', newUser.userId);
+      console.log('✅ 新規ユーザー作成完了:', newUser.userId);
       
-      // 3c. 新規ユーザーの管理パネルへリダイレクト
-      const adminUrl = buildUserAdminUrl(newUser.userId);
-      return createSecureRedirect(adminUrl, 'ようこそ！セットアップを開始してください');
+      // 3c. 新規ユーザーの管理パネルへ高速リダイレクト
+      const adminUrl = buildAdminPanelUrl(newUser.userId);
+      console.log('🚀 新規ユーザー管理パネルへリダイレクト:', adminUrl);
+      
+      return createRedirectResponse(adminUrl);
     }
   } catch (error) {
-    console.error('processLoginFlowでエラー:', error.stack);
+    console.error('❌ processLoginFlowでエラー:', error.stack);
     return showErrorPage('ログインエラー', 'ログイン処理中にエラーが発生しました。', error);
   }
 }
