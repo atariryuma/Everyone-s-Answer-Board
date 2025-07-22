@@ -194,11 +194,11 @@ function updateSpreadsheetButton() {
     btn.onclick = function() {
       window.open(currentStatus.userInfo.spreadsheetUrl, '_blank');
     };
-    console.log('✅ Spreadsheet button enabled with URL:', currentStatus.userInfo.spreadsheetUrl);
+    logDebug('✅ Spreadsheet button enabled with URL:', currentStatus.userInfo.spreadsheetUrl);
   } else {
     btn.disabled = true;
     btn.onclick = null;
-    console.log('⚠️ Spreadsheet button disabled - no URL available');
+    logDebug('⚠️ Spreadsheet button disabled - no URL available');
   }
 }
 
@@ -211,7 +211,7 @@ function updateStaticUI(status) {
   updateExistingUserSection(status);
   
   // Populate sheet selection - fix property name mismatch
-  console.log('🔍 Debug: Checking sheet data properties', {
+  logDebug('🔍 Debug: Checking sheet data properties', {
     allSheets: status.allSheets,
     sheetNames: status.sheetNames,
     activeSheetName: status.activeSheetName
@@ -344,7 +344,7 @@ function populateSheetSelect(sheetNames, activeSheetName) {
     return;
   }
 
-  console.log('📋 Populating sheet select with data:', {
+  logDebug('📋 Populating sheet select with data:', {
     sheetNames: sheetNames,
     activeSheetName: activeSheetName,
     dataType: typeof sheetNames,
@@ -355,7 +355,7 @@ function populateSheetSelect(sheetNames, activeSheetName) {
   select.innerHTML = '<option value="">-- シートを選択 --</option>';
   
   if (sheetNames && sheetNames.length > 0) {
-    console.log('✅ Adding sheets to dropdown:', sheetNames.length);
+    logDebug('✅ Adding sheets to dropdown:', sheetNames.length);
     
     sheetNames.forEach((sheet, index) => {
       const option = document.createElement('option');
@@ -364,11 +364,11 @@ function populateSheetSelect(sheetNames, activeSheetName) {
       if (typeof sheet === 'object' && sheet.name) {
         option.value = sheet.name;
         option.textContent = sheet.name;
-        console.log(`📄 Sheet ${index + 1}: ${sheet.name} (ID: ${sheet.id})`);
+        logDebug(`📄 Sheet ${index + 1}: ${sheet.name} (ID: ${sheet.id})`);
       } else if (typeof sheet === 'string') {
         option.value = sheet;
         option.textContent = sheet;
-        console.log(`📄 Sheet ${index + 1}: ${sheet}`);
+        logDebug(`📄 Sheet ${index + 1}: ${sheet}`);
       } else {
         console.warn('⚠️ Unknown sheet format:', sheet);
         return;
@@ -377,7 +377,7 @@ function populateSheetSelect(sheetNames, activeSheetName) {
       select.appendChild(option);
     });
     select.disabled = false;
-    console.log('✅ Sheet dropdown populated successfully');
+    logDebug('✅ Sheet dropdown populated successfully');
   } else {
     console.warn('⚠️ No sheets available:', sheetNames);
     select.innerHTML = '<option value="">利用可能なシートがありません</option>';
@@ -389,7 +389,7 @@ function populateSheetSelect(sheetNames, activeSheetName) {
     select.value = activeSheetName;
     selectedSheet = activeSheetName;
     lastSelectedSheetName = activeSheetName; // Update last selected sheet
-    console.log('✅ Active sheet set:', activeSheetName);
+    logDebug('✅ Active sheet set:', activeSheetName);
   }
   
   // Add change event listener for data preview
@@ -403,8 +403,17 @@ function populateSheetSelect(sheetNames, activeSheetName) {
 
 // Populate header options for configuration
 function populateHeaderOptions(headers) {
-  console.group('🎯 populateHeaderOptions');
-  console.log('📝 Headers to populate:', headers.length, headers);
+  // Throttle function calls to prevent spam
+  if (window.populateHeaderOptionsRunning) {
+    return;
+  }
+  window.populateHeaderOptionsRunning = true;
+  
+  const DEBUG_UI = window.DEBUG || false;
+  if (DEBUG_UI) {
+    console.group('🎯 populateHeaderOptions');
+    console.log('📝 Headers to populate:', headers.length, headers);
+  }
   
   const selects = [
     'opinionHeader',      // Main required field
@@ -413,22 +422,32 @@ function populateHeaderOptions(headers) {
     'class-column'
   ];
   
-  console.log('🎯 Target dropdown elements:', selects);
+  if (DEBUG_UI) {
+    console.log('🎯 Target dropdown elements:', selects);
+  }
   
   selects.forEach(selectId => {
-    console.log(`🔍 Looking for element: ${selectId}`);
+    if (DEBUG_UI) {
+      console.log(`🔍 Looking for element: ${selectId}`);
+    }
     const select = document.getElementById(selectId);
     
     if (select) {
-      console.log(`✅ Found element: ${selectId}`);
+      if (DEBUG_UI) {
+        console.log(`✅ Found element: ${selectId}`);
+      }
       
       // Store current value
       const currentValue = select.value;
-      console.log(`📄 Current value: "${currentValue}"`);
+      if (DEBUG_UI) {
+        console.log(`📄 Current value: "${currentValue}"`);
+      }
       
       // Clear and repopulate
       select.innerHTML = '<option value="">-- 列を選択 --</option>';
-      console.log(`🧹 Cleared dropdown: ${selectId}`);
+      if (DEBUG_UI) {
+        console.log(`🧹 Cleared dropdown: ${selectId}`);
+      }
       
       let optionsAdded = 0;
       const excludedHeaders = [
@@ -450,37 +469,61 @@ function populateHeaderOptions(headers) {
         optionsAdded++;
       });
       
-      console.log(`📋 Added ${optionsAdded} options to ${selectId}`);
-      console.log(`📊 Total options in ${selectId}:`, select.options.length);
+      if (DEBUG_UI) {
+        console.log(`📋 Added ${optionsAdded} options to ${selectId}`);
+        console.log(`📊 Total options in ${selectId}:`, select.options.length);
+      }
       
       // Restore previous value if still valid
       if (currentValue && headers.includes(currentValue)) {
         select.value = currentValue;
-        console.log(`♻️ Restored value: "${currentValue}" for ${selectId}`);
+        if (DEBUG_UI) {
+          console.log(`♻️ Restored value: "${currentValue}" for ${selectId}`);
+        }
       }
       
       // Debug final state
-      console.log(`🎯 Final state of ${selectId}:`, {
-        value: select.value,
-        optionsCount: select.options.length,
-        visible: !select.hidden,
-        disabled: select.disabled
-      });
+      if (DEBUG_UI) {
+        console.log(`🎯 Final state of ${selectId}:`, {
+          value: select.value,
+          optionsCount: select.options.length,
+          visible: !select.hidden,
+          disabled: select.disabled
+        });
+      }
       
     } else {
-      console.error(`❌ Element not found: ${selectId}`);
+      if (DEBUG_UI) {
+        console.error(`❌ Element not found: ${selectId}`);
+      }
     }
   });
   
-  console.groupEnd();
+  if (DEBUG_UI) {
+    console.groupEnd();
+  }
+  
+  // Reset throttle after a delay
+  setTimeout(() => {
+    window.populateHeaderOptionsRunning = false;
+  }, 100);
 }
 
 // Populate configuration with guessed values
 function populateConfig(cfg) {
   if (!cfg) return;
   
-  console.group('🤖 populateConfig');
-  console.log('📝 AI Config received:', cfg);
+  // Throttle function calls to prevent spam
+  if (window.populateConfigRunning) {
+    return;
+  }
+  window.populateConfigRunning = true;
+  
+  const DEBUG_UI = window.DEBUG || false;
+  if (DEBUG_UI) {
+    console.group('🤖 populateConfig');
+    console.log('📝 AI Config received:', cfg);
+  }
   
   const mappings = {
     // Main opinion dropdown (primary target)
@@ -494,46 +537,62 @@ function populateConfig(cfg) {
     'show-counts': cfg.showCounts
   };
   
-  console.log('🎯 Mappings to apply:', mappings);
+  if (DEBUG_UI) {
+    console.log('🎯 Mappings to apply:', mappings);
+  }
   
   Object.keys(mappings).forEach(elementId => {
     const element = document.getElementById(elementId);
     const value = mappings[elementId];
     
-    console.log(`🔍 Setting ${elementId}:`, { 
-      element: !!element, 
-      value: value,
-      valueType: typeof value 
-    });
+    if (DEBUG_UI) {
+      console.log(`🔍 Setting ${elementId}:`, { 
+        element: !!element, 
+        value: value,
+        valueType: typeof value 
+      });
+    }
     
     if (element && value !== undefined) {
       if (element.type === 'checkbox') {
         element.checked = Boolean(value);
-        console.log(`☑️ Checkbox ${elementId} set to:`, element.checked);
+        if (DEBUG_UI) {
+          console.log(`☑️ Checkbox ${elementId} set to:`, element.checked);
+        }
       } else {
         element.value = value;
-        console.log(`📋 Dropdown ${elementId} set to:`, element.value);
+        if (DEBUG_UI) {
+          console.log(`📋 Dropdown ${elementId} set to:`, element.value);
+        }
         
         // Verify the option exists in the dropdown
         const hasOption = Array.from(element.options).some(option => option.value === value);
-        if (!hasOption) {
+        if (!hasOption && DEBUG_UI) {
           console.warn(`⚠️ Option "${value}" not found in ${elementId} dropdown`);
           console.log(`Available options:`, Array.from(element.options).map(opt => opt.value));
-        } else {
+        } else if (DEBUG_UI) {
           console.log(`✅ Option "${value}" successfully selected in ${elementId}`);
         }
       }
     } else {
-      if (!element) {
+      if (!element && DEBUG_UI) {
         console.warn(`❌ Element not found: ${elementId}`);
       }
-      if (value === undefined) {
+      if (value === undefined && DEBUG_UI) {
         console.log(`⚪ No value for: ${elementId}`);
       }
     }
   });
   
-  console.groupEnd();
+  if (DEBUG_UI) {
+    console.groupEnd();
+  }
+  
+  // Reset throttle after a delay
+  setTimeout(() => {
+    window.populateConfigRunning = false;
+  }, 100);
+  
   updateConfigButtons();
 }
 
@@ -558,7 +617,9 @@ function clearConfigFields() {
 
 // Build configuration object from form
 function buildConfigObject() {
-  console.group('📋 buildConfigObject');
+  if (window.DEBUG) {
+    console.group('📋 buildConfigObject');
+  }
   
   // Get values from primary elements (with fallback to secondary elements)
   const opinionValue = document.getElementById('opinionHeader')?.value || 
@@ -582,10 +643,12 @@ function buildConfigObject() {
     showCounts: showCounts
   };
   
-  console.log('📊 Built config object:', config);
-  console.log('🎯 Primary opinion value from opinionHeader:', document.getElementById('opinionHeader')?.value);
-  console.log('🔄 Fallback opinion value from opinion-column:', document.getElementById('opinion-column')?.value);
-  console.groupEnd();
+  if (window.DEBUG) {
+    console.log('📊 Built config object:', config);
+    console.log('🎯 Primary opinion value from opinionHeader:', document.getElementById('opinionHeader')?.value);
+    console.log('🔄 Fallback opinion value from opinion-column:', document.getElementById('opinion-column')?.value);
+    console.groupEnd();
+  }
   
   return config;
 }
@@ -598,12 +661,14 @@ function validateConfig() {
   
   const isValid = opinionValue && opinionValue.trim() !== '';
   
-  console.log('🔍 validateConfig:', {
-    opinionHeader: document.getElementById('opinionHeader')?.value,
-    opinionColumn: document.getElementById('opinion-column')?.value,
-    finalValue: opinionValue,
-    isValid: isValid
-  });
+  if (window.DEBUG) {
+    console.log('🔍 validateConfig:', {
+      opinionHeader: document.getElementById('opinionHeader')?.value,
+      opinionColumn: document.getElementById('opinion-column')?.value,
+      finalValue: opinionValue,
+      isValid: isValid
+    });
+  }
   
   return isValid;
 }

@@ -138,16 +138,16 @@ var userId = '';
 // マルチテナント対応: バックエンドから安全にユーザーIDを取得
 function initializeUserId() {
   console.group('🔐 Initializing UserId');
-  console.log('📞 About to call getCurrentUserStatus');
+  logDebug('📞 About to call getCurrentUserStatus');
   
   return new Promise((resolve, reject) => {
     google.script.run
       .withSuccessHandler(response => {
-        console.log('📥 getCurrentUserStatus response:', response);
+        logDebug('📥 getCurrentUserStatus response:', response);
         
         if (response && response.status === 'success' && response.userInfo && response.userInfo.userId) {
           userId = response.userInfo.userId;
-          console.log('✅ AdminPanel: User authenticated, userId:', userId);
+          logDebug('✅ AdminPanel: User authenticated, userId:', userId);
           console.groupEnd();
           resolve(userId);
         } else {
@@ -274,7 +274,7 @@ function initCore() {
 
 // 統合初期化システム - 単一エントリーポイント
 function initializeAdminPanelMaster() {
-  console.log('🚀 AdminPanel Master Initialization Started');
+  logInfo('🚀 AdminPanel Master Initialization Started');
   
   // Phase 1: Core初期化
   initCore();
@@ -282,19 +282,19 @@ function initializeAdminPanelMaster() {
   // Phase 2: 各モジュールを順次初期化 (race conditionを防ぐ)
   // 遅延を最小限に抑制して即座に初期化
   setTimeout(() => {
-    console.log('🔧 Phase 2: モジュール初期化開始');
+    logDebug('🔧 Phase 2: モジュール初期化開始');
     
     // Status管理初期化
     if (typeof initializeMessageArea === 'function') {
       initializeMessageArea();
-      console.log('✅ Status module initialized');
+      logDebug('✅ Status module initialized');
     }
     
     // API通信初期化（最重要 - getInitialDataを呼び出す）
     if (typeof initializeAPI === 'function') {
-      console.log('🚀 API module initialization starting...');
+      logDebug('🚀 API module initialization starting...');
       initializeAPI();
-      console.log('✅ API module initialized');
+      logDebug('✅ API module initialized');
     } else {
       console.error('❌ initializeAPI function not found!');
     }
@@ -302,22 +302,22 @@ function initializeAdminPanelMaster() {
     // UI初期化
     if (typeof initializeUI === 'function') {
       initializeUI();
-      console.log('✅ UI module initialized');
+      logDebug('✅ UI module initialized');
     }
     
     // フォーム管理初期化
     if (typeof setupCharacterCounters === 'function') {
       setupCharacterCounters();
-      console.log('✅ Forms module initialized');
+      logDebug('✅ Forms module initialized');
     }
     
     // イベント管理初期化（最後に実行）
     setTimeout(() => {
       if (typeof initializeEventListeners === 'function') {
         initializeEventListeners();
-        console.log('✅ Events module initialized');
+        logDebug('✅ Events module initialized');
       }
-      console.log('🎉 AdminPanel Master Initialization Complete');
+      logInfo('🎉 AdminPanel Master Initialization Complete');
     }, 50); // 100ms -> 50msに短縮
     
   }, 10); // 50ms -> 10msに短縮

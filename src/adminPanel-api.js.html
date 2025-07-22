@@ -86,8 +86,8 @@ function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
 // Load system status - OPTIMIZED with integrated API
 function loadStatus(bypassCache = false) {
   console.group('🔄 loadStatus - Integrated API');
-  console.log('🚀 Loading system status with integrated API, bypassCache:', bypassCache);
-  console.log('📞 About to call runGasWithUserId for getInitialData');
+  logDebug('🚀 Loading system status with integrated API, bypassCache:', bypassCache);
+  logDebug('📞 About to call runGasWithUserId for getInitialData');
 
   // userIdPromise が解決されるのを待ってから getInitialData を呼び出す
   userIdPromise.then(() => {
@@ -98,32 +98,32 @@ function loadStatus(bypassCache = false) {
       return;
     }
 
-    console.log('✅ userId is available:', userId);
-    console.log('🌐 Calling getInitialData with userId:', userId);
+    logDebug('✅ userId is available:', userId);
+    logDebug('🌐 Calling getInitialData with userId:', userId);
 
     // runGasWithUserId を使用して getInitialData を呼び出す
     // runGasWithUserId は userId を自動的に第一引数として追加するため、getInitialData の引数には bypassCache のみ渡す
     runGasWithUserId('getInitialData', 'システム情報を読み込み中...', bypassCache)
       .then(response => {
-        console.log('✅ Integrated data loaded:', response);
+        logDebug('✅ Integrated data loaded:', response);
 
         // Update UI with integrated response
         updateUIWithNewStatus(response);
 
         // If sheet details are included, apply them immediately
         if (response.sheetDetails && response.activeSheetName) {
-          console.log('✅ Sheet details included in integrated response, applying configuration');
+          logDebug('✅ Sheet details included in integrated response, applying configuration');
           try {
             populateHeaderOptions(response.sheetDetails.allHeaders);
-            console.log('✅ Header options populated from integrated data');
+            logDebug('✅ Header options populated from integrated data');
             populateConfig(response.sheetDetails.guessedConfig);
-            console.log('✅ AI configuration applied from integrated data');
+            logDebug('✅ AI configuration applied from integrated data');
           } catch (configError) {
             console.error('Error applying sheet configuration from integrated data:', configError);
           }
         }
 
-        console.log('⚡ Performance: Single API call replaced 3-4 separate calls');
+        logInfo('⚡ Performance: Single API call replaced 3-4 separate calls');
       })
       .catch(error => {
         console.error('❌ Integrated API failed:', error);
@@ -286,7 +286,7 @@ function saveAndPublish() {
 function unpublishBoard() {
   runGasWithUserId('unpublishBoard', 'ボードの公開を停止中...')
     .then(function(response) {
-      console.log('公開停止レスポンス:', response);
+      logDebug('公開停止レスポンス:', response);
       showMessage(response.message || '✅ 回答ボードの公開を停止しました。', 'success');
       if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
         window.unifiedCache.clear();
@@ -376,7 +376,7 @@ function createFormWithConfig() {
   
   runGasWithUserId('createCustomFormUI', false, config)
     .then(function(result) {
-      console.log('📥 Received response from createCustomFormUI:', result);
+      logDebug('📥 Received response from createCustomFormUI:', result);
       if (result && result.status === 'success') {
         showMessage('✅ 新しいフォームが作成され、連携されました！', 'success');
         
@@ -917,7 +917,7 @@ function handleQuickStart() {
 
 // Initialize API communications
 function initializeAPI() {
-  console.log('🔧 API初期化開始');
+  logDebug('🔧 API初期化開始');
   
   // Start background status updates
   startSystemStatusUpdate();
@@ -928,10 +928,10 @@ function initializeAPI() {
   document.addEventListener('scroll', updateUserActivity);
 
   // 初回ロード時にシステムステータスをロード
-  console.log('🚀 loadStatus()を呼び出します');
+  logDebug('🚀 loadStatus()を呼び出します');
   loadStatus();
   
-  console.log('✅ API初期化完了');
+  logDebug('✅ API初期化完了');
 }
 
 // Setup real-time updates

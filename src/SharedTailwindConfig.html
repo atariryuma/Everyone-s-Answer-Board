@@ -1,12 +1,40 @@
 <!-- Shared TailwindCSS CDN Configuration -->
 <!-- 手軽さ重視のCDN読み込み方式 - シンプル統一設定 -->
 <script>
-  // TailwindCSS configuration to suppress production warnings
-  window.tailwind = {
-    config: {
-      mode: 'jit',
-      corePlugins: { preflight: false }
+  // TailwindCSS configuration with production mode detection
+  (function() {
+    const isProduction = window.location.hostname !== 'localhost' && 
+                        window.location.hostname !== '127.0.0.1' && 
+                        !window.location.hostname.includes('script.google.com');
+    
+    window.tailwind = {
+      config: {
+        mode: 'jit',
+        corePlugins: { preflight: false },
+        // Suppress console warnings in production
+        devtools: !isProduction,
+        // Additional production optimizations
+        ...(isProduction && {
+          important: true,
+          purge: { enabled: true },
+          experimental: { optimizeUniversalDefaults: true }
+        })
+      }
+    };
+    
+    // Suppress Tailwind development warnings in production
+    if (isProduction) {
+      const originalWarn = console.warn;
+      console.warn = function(...args) {
+        const message = args.join(' ');
+        if (message.includes('tailwind') || 
+            message.includes('TailwindCSS') ||
+            message.includes('cdn.tailwindcss.com')) {
+          return;
+        }
+        originalWarn.apply(console, args);
+      };
     }
-  };
+  })();
 </script>
 <script src="https://cdn.tailwindcss.com" defer onerror="console.warn('TailwindCSS failed to load')"></script>

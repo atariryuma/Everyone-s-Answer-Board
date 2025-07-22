@@ -722,7 +722,10 @@ class UnifiedLoadingManager {
       setTimeout(() => {
         this.overlay = document.getElementById('loading-overlay');
         if (this.overlay) {
-          console.log('UnifiedLoadingManager: Initialized successfully after retry.');
+          if (!window.unifiedLoadingInitialized) {
+            window.unifiedLoadingInitialized = true;
+            console.log('UnifiedLoadingManager: Initialized successfully after retry.');
+          }
           this.initialized = true;
         } else {
           console.error('UnifiedLoadingManager: Critical failure - loading-overlay element not found after retry. Please check HTML structure.');
@@ -732,7 +735,10 @@ class UnifiedLoadingManager {
        return false;
      }
      
-     console.log('UnifiedLoadingManager: Initialized successfully.');
+     if (!window.unifiedLoadingInitialized) {
+       window.unifiedLoadingInitialized = true;
+       console.log('UnifiedLoadingManager: Initialized successfully.');
+     }
      this.initialized = true;
      return true;
    }
@@ -897,5 +903,75 @@ window.setLoading = function(isLoading, message, step, percentage) {
   }
 };
 
-console.log('✅ SharedUtilities loaded successfully - Version 1.1.0 (with UnifiedLoadingManager)');
+// =============================================================================
+// GOOGLE APPS SCRIPT ENVIRONMENT WARNING SUPPRESSION
+// =============================================================================
+
+// Suppress iframe and sandbox-related warnings specific to Google Apps Script
+(function() {
+  const isGoogleAppsScript = window.location.hostname.includes('script.google.com') ||
+                           window.location.href.includes('script.googleusercontent.com') ||
+                           typeof google !== 'undefined' && google.script;
+
+  if (isGoogleAppsScript) {
+    const originalConsoleWarn = console.warn;
+    console.warn = function(...args) {
+      const message = args.join(' ').toLowerCase();
+      
+      // Suppress common iframe/sandbox warnings in GAS environment
+      const suppressPatterns = [
+        'iframe',
+        'sandbox',
+        'x-frame-options',
+        'frame-ancestors',
+        'refused to frame',
+        'same-origin policy',
+        'cross-origin frame access',
+        'document.domain',
+        'postmessage'
+      ];
+      
+      const shouldSuppress = suppressPatterns.some(pattern => 
+        message.includes(pattern)
+      );
+      
+      if (!shouldSuppress) {
+        originalConsoleWarn.apply(console, args);
+      }
+    };
+
+    // Suppress common iframe-related errors
+    const originalConsoleError = console.error;
+    console.error = function(...args) {
+      const message = args.join(' ').toLowerCase();
+      
+      if (message.includes('iframe') && 
+          (message.includes('refused to frame') || 
+           message.includes('x-frame-options') ||
+           message.includes('frame-ancestors'))) {
+        return;
+      }
+      
+      originalConsoleError.apply(console, args);
+    };
+
+    // Handle iframe-related window errors silently
+    window.addEventListener('error', function(event) {
+      if (event.message && typeof event.message === 'string') {
+        const message = event.message.toLowerCase();
+        if ((message.includes('iframe') || message.includes('frame')) &&
+            (message.includes('denied') || message.includes('blocked'))) {
+          event.preventDefault();
+          return false;
+        }
+      }
+    }, true);
+  }
+})();
+
+// Prevent duplicate loading messages
+if (!window.sharedUtilitiesLoaded) {
+  window.sharedUtilitiesLoaded = true;
+  console.log('✅ SharedUtilities loaded successfully - Version 1.2.0 (with GAS warnings suppression)');
+}
 </script>
