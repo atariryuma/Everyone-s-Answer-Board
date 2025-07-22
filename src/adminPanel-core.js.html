@@ -138,42 +138,12 @@ var userId = '';
 // ユーザーIDの設定（getInitialDataレスポンスから抽出）
 function setUserId(newUserId) {
   if (newUserId && typeof newUserId === 'string') {
-    // Store timestamp when userID was last updated
-    const previousUserId = userId;
     userId = newUserId;
-    window.userIdSetTimestamp = Date.now();
-    
     console.log('✅ AdminPanel: User authenticated, userId:', userId);
-    
-    // Log userID changes for debugging
-    if (previousUserId && previousUserId !== newUserId) {
-      console.warn('🔄 UserID changed:', {
-        previous: previousUserId,
-        new: newUserId,
-        timestamp: new Date().toISOString()
-      });
-    }
-    
     return true;
   }
   console.error('❌ Invalid userId provided:', newUserId);
   return false;
-}
-
-// Check if current userID is fresh (updated recently)
-function isUserIdFresh(maxAgeMs = 300000) { // 5 minutes default
-  if (!window.userIdSetTimestamp) {
-    return false;
-  }
-  return (Date.now() - window.userIdSetTimestamp) < maxAgeMs;
-}
-
-// Get userID age in seconds
-function getUserIdAge() {
-  if (!window.userIdSetTimestamp) {
-    return Infinity;
-  }
-  return Math.floor((Date.now() - window.userIdSetTimestamp) / 1000);
 }
 var selectedSheet = '';
 var currentActiveSheet = '';
