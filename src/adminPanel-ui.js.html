@@ -1134,51 +1134,24 @@ function checkAutoPublishDialog(status) {
 function initializeUI() {
   console.log('✅ AdminPanel: UI components ready');
   
-  // Load initial status
-  loadStatus(true); // 強制的にキャッシュをバイパスして最新のステータス情報を取得
+  // Load initial status (delegate to API version)
+  if (typeof window.loadStatusFromAPI === 'function') {
+    window.loadStatusFromAPI(true); // 強制的にキャッシュをバイパスして最新のステータス情報を取得
+  } else {
+    console.error('❌ loadStatusFromAPI not available during UI initialization');
+  }
 }
 
-// Load system status - OPTIMIZED with integrated API
+// Load system status - Removed duplicate (delegate to API version)
 function loadStatus(bypassCache = false) {
-  console.group('🔄 loadStatus - Integrated API');
-  console.log('🚀 Loading system status with integrated API, bypassCache:', bypassCache);
-
-  // Single API call to get all initial data
-  runGasWithUserId('getInitialData')
-    .then(response => {
-      console.log('✅ Integrated data loaded:', response);
-      
-      // Extract userId for compatibility
-      if (response.userInfo && response.userInfo.userId) {
-        userId = response.userInfo.userId;
-        console.log('✅ userId extracted from integrated response:', userId);
-      }
-      
-      // Update UI with integrated response
-      updateUIWithNewStatus(response);
-      
-      // If sheet details are included, apply them immediately
-      if (response.sheetDetails && response.activeSheetName) {
-        console.log('✅ Sheet details included in integrated response, applying configuration');
-        try {
-          populateHeaderOptions(response.sheetDetails.allHeaders);
-          console.log('✅ Header options populated from integrated data');
-          populateConfig(response.sheetDetails.guessedConfig);
-          console.log('✅ AI configuration applied from integrated data');
-        } catch (configError) {
-          console.error('Error applying sheet configuration from integrated data:', configError);
-        }
-      }
-      
-      console.log('⚡ Performance: Single API call replaced 3-4 separate calls');
-    })
-    .catch(error => {
-      console.error('❌ Integrated API failed:', error);
-      showMessage('システムステータスの読み込みに失敗しました', 'error');
-    })
-    .finally(() => {
-      console.groupEnd();
-    });
+  console.warn('⚠️ loadStatus called from UI module - delegating to API module');
+  // This should not be called since we now initialize everything through API
+  if (typeof window.loadStatusFromAPI === 'function') {
+    return window.loadStatusFromAPI(bypassCache);
+  }
+  
+  console.error('❌ Main loadStatus function not available - check initialization order');
+  throw new Error('システム初期化エラー: メイン関数が見つかりません');
 }
 
 // =============================================================================
@@ -2233,12 +2206,18 @@ function hideSuggestionsModal() {
   }
 }
 
-// Initialize when DOM is ready
-if (document.readyState !== 'loading') {
-  setTimeout(initializeUI, 300);
-} else {
-  document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(initializeUI, 300);
-  });
+// Initialize when DOM is ready - Coordinated with API initialization
+if (!window.adminPanelUIInitialized) {
+  window.adminPanelUIInitialized = true;
+  
+  if (document.readyState !== 'loading') {
+    // Wait for API initialization to complete first - increased timeout
+    setTimeout(initializeUI, 800);
+  } else {
+    document.addEventListener('DOMContentLoaded', function() {
+      // Wait for API initialization to complete first - increased timeout
+      setTimeout(initializeUI, 800);
+    });
+  }
 }
 </script>
