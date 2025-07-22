@@ -520,14 +520,6 @@
           </style>
         </head>
         <body>
-          <script>
-            // ページ読み込み時に背景遷移を開始
-            window.addEventListener('DOMContentLoaded', function() {
-              setTimeout(function() {
-                document.body.classList.add('success-transition');
-              }, 300);
-            });
-          </script>
           <div class="container">
             <div class="icon">✅</div>
             <h1 class="title">${message || 'ログインが完了しました'}</h1>
@@ -539,38 +531,6 @@
                 <div style="width: 20px; height: 20px; border: 2px solid white; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
               </div>
             </a>
-            <script>
-              let isAdminPanelClicking = false;
-              
-              function handleAdminPanelClick(event, adminUrl, buttonElement) {
-                event.preventDefault();
-                
-                if (isAdminPanelClicking) {
-                  console.log('管理パネルボタンクリック処理中、二重クリックをブロック');
-                  return false;
-                }
-                
-                isAdminPanelClicking = true;
-                console.log('管理パネルへ遷移中...');
-                
-                // ボタンを無効化してローディング状態にする
-                buttonElement.style.pointerEvents = 'none';
-                buttonElement.style.opacity = '0.8';
-                
-                const btnText = document.getElementById('admin-panel-btn-text');
-                const btnSpinner = document.getElementById('admin-panel-btn-spinner');
-                
-                if (btnText) btnText.style.display = 'none';
-                if (btnSpinner) btnSpinner.style.display = 'flex';
-                
-                // 実際の遷移
-                setTimeout(() => {
-                  window.location.href = adminUrl;
-                }, 100);
-                
-                return false;
-              }
-            </script>
             
             <div class="url-info">
               <div class="url-label">📱 管理パネルURL:</div>
@@ -593,6 +553,43 @@
       
       // 現在のコンテンツを成功画面に完全置換
       document.body.innerHTML = successHtml;
+      
+      // JavaScript関数を再定義（HTMLに埋め込まれたスクリプトが実行されるため）
+      window.isAdminPanelClicking = false;
+      
+      window.handleAdminPanelClick = function(event, adminUrl, buttonElement) {
+        event.preventDefault();
+        
+        if (window.isAdminPanelClicking) {
+          console.log('管理パネルボタンクリック処理中、二重クリックをブロック');
+          return false;
+        }
+        
+        window.isAdminPanelClicking = true;
+        console.log('管理パネルへ遷移中...');
+        
+        // ボタンを無効化してローディング状態にする
+        buttonElement.style.pointerEvents = 'none';
+        buttonElement.style.opacity = '0.8';
+        
+        const btnText = document.getElementById('admin-panel-btn-text');
+        const btnSpinner = document.getElementById('admin-panel-btn-spinner');
+        
+        if (btnText) btnText.style.display = 'none';
+        if (btnSpinner) btnSpinner.style.display = 'flex';
+        
+        // 実際の遷移
+        setTimeout(() => {
+          window.location.href = adminUrl;
+        }, 100);
+        
+        return false;
+      };
+      
+      // 背景遷移を開始
+      setTimeout(function() {
+        document.body.classList.add('success-transition');
+      }, 300);
       
       console.log('✅ ユーザーアクション待ち画面を表示しました');
       
