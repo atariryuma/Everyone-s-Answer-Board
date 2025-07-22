@@ -891,29 +891,6 @@ body {
   opacity: 1 !important;
 }
 
-/* Success Page Overrides - 成功画面でのローディングオーバーレイの完全な無効化 */
-.success-page .loading-overlay,
-.success-page #loading-overlay {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  z-index: -1 !important;
-}
-
-/* 成功画面でのアニメーション競合防止 */
-.success-page .loading-spinner,
-.success-page .spinner {
-  display: none !important;
-}
-
-/* ページ置換時の競合回避 */
-body.success-page-active .loading-overlay,
-body.success-page-active #loading-overlay {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-}
-
 /* Media Queries */
 
 /* Performance optimizations for low-end devices */
