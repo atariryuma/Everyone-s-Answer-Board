@@ -9,18 +9,48 @@
 
 // マルチテナント対応: 新しいrunGasWithUserId関数 - ローディング機能付き
 function runGasWithUserId(functionName, loadingMessage = '処理中...', ...args) {
+  // ローディング表示が必要な場合は callWithLoading を使用
+  if (loadingMessage && loadingMessage !== false) {
+    // userIdが設定されていない場合は初期化を待つ
+    if (!userId) {
+      return userIdPromise.then(() => {
+        if (!userId) {
+          logError('No userId available for:', functionName);
+          throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
+        }
+        
+        // ローディング機能付きでuserIdを第一引数として追加
+        return sharedUtilities.gas.callWithLoading(functionName, loadingMessage, userId, ...args);
+      }).catch((error) => {
+        logError('Error in runGasWithUserId (after userIdPromise):', error);
+        throw error;
+      });
+    }
+    
+    // userIdが既に設定されている場合 - ローディング機能付き
+    return sharedUtilities.gas.callWithLoading(functionName, loadingMessage, userId, ...args).catch((error) => {
+      logError('Error in runGasWithUserId (direct call with loading):', error);
+      throw error;
+    });
+  }
+  
+  // ローディング不要の場合（loadingMessage = false）は従来通り
   if (!userId) {
     return userIdPromise.then(() => {
       if (!userId) {
         logError('No userId available for:', functionName);
         throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
       }
+      
+      // userIdを第一引数として追加
       return gasOptimizer.call(functionName, userId, ...args);
     }).catch((error) => {
-      logError('Error in runGasWithUserId (after userIdPromise):', error);
+      logError('userIdPromise rejected:', error);
       throw error;
     });
   }
+  
+  // userIdを第一引数として追加
   return gasOptimizer.call(functionName, userId, ...args);
 }
 
@@ -542,10 +572,11 @@ function openAppSetupPage() {
 
       // ユーザーにリダイレクト中であることを伝える
       showMessage('アプリ設定ページへ移動中...', 'info');
+      window.unifiedLoading.showSimple('アプリ設定ページへ移動中...');
 
       const redirectTimeout = setTimeout(() => {
         console.warn('Redirect to app setup page timed out. Attempting fallback.');
-
+        window.unifiedLoading.hide();
         showMessage(timeoutMessage, 'warning');
         window.open(setupUrl, '_blank'); // Fallback: open in new tab
       }, 10000); // 10秒でタイムアウト
@@ -553,11 +584,11 @@ function openAppSetupPage() {
       // 直接リダイレクトを試みる
       try {
         clearTimeout(redirectTimeout);
-
+        window.unifiedLoading.hide();
         window.open(setupUrl, '_top'); // _top を使用して現在のウィンドウで開く
       } catch (e) {
         console.error('Error opening app setup page:', e);
-
+        window.unifiedLoading.hide();
         showMessage(errorMessage + ' ' + (e.message || ''), 'error');
         // フォールバック: 新しいタブで開く
         showMessage(fallbackMessage, 'info');
@@ -566,7 +597,7 @@ function openAppSetupPage() {
     })
     .catch(function(error) {
       console.error('Failed to get web app URL for app setup page:', error);
-      
+      window.unifiedLoading.hide();
       showMessage('アプリ設定ページのURLを取得できませんでした。' + (error.message || ''), 'error');
     });
 }
@@ -945,8 +976,8 @@ function setupRealtimeUpdates() {
 
 // Load user information
 function loadUserInfo() {
-  if (typeof sharedUtilities.gas.call === 'function') {
-    sharedUtilities.gas.call('getUserInfo')
+  if (typeof sharedUtilities.gas.callWithLoading === 'function') {
+    sharedUtilities.gas.callWithLoading('getUserInfo', 'ユーザー情報を読み込み中...')
       .then(userInfo => {
         if (userInfo) {
           document.getElementById('info-admin-email').textContent = userInfo.email || '-';
@@ -962,8 +993,8 @@ function loadUserInfo() {
 
 // Load system status
 function loadSystemStatus() {
-  if (typeof sharedUtilities.gas.call === 'function') {
-    sharedUtilities.gas.call('getAppConfig')
+  if (typeof sharedUtilities.gas.callWithLoading === 'function') {
+    sharedUtilities.gas.callWithLoading('getAppConfig', 'システム設定を読み込み中...')
       .then(status => {
         updateSystemStatusDisplay(status);
       })

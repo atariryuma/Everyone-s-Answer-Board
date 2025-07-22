@@ -7,7 +7,7 @@
 class GASOptimizer {
   constructor() {
     this.cache = new Map();
-    
+    this.loadingStates = new Map();
     this.concurrentLimit = 10;
     this.activeCalls = 0;
     this.callQueue = [];
@@ -38,7 +38,7 @@ class GASOptimizer {
     this.activeCalls++;
     
     // ローディング状態の管理
-    
+    this.setLoadingState(functionName, true);
 
     // --- NEW ADDITION FOR DEBUGGING --- 
     console.log(`DEBUG: Attempting to call google.script.run.${functionName}`);
@@ -49,13 +49,13 @@ class GASOptimizer {
     google.script.run
       .withSuccessHandler((result) => {
         this.activeCalls--;
-        
+        this.setLoadingState(functionName, false);
         resolve(result);
         this.processQueue();
       })
       .withFailureHandler((error) => {
         this.activeCalls--;
-        
+        this.setLoadingState(functionName, false);
         console.error(`GAS Function Error [${functionName}]:`, error);
         reject(this.enhanceError(error, functionName));
         this.processQueue();
@@ -104,7 +104,21 @@ class GASOptimizer {
     return '予期しないエラーが発生しました。しばらく待ってから再度お試しください。';
   }
 
-  
+  /**
+   * ローディング状態の管理
+   */
+  setLoadingState(functionName, isLoading) {
+    this.loadingStates.set(functionName, isLoading);
+    this.updateGlobalLoadingIndicator();
+  }
+
+  /**
+   * グローバルローディングインジケーターの更新
+   */
+  updateGlobalLoadingIndicator() {
+    const hasActiveLoading = Array.from(this.loadingStates.values()).some(state => state);
+    document.body.classList.toggle('gas-loading', hasActiveLoading);
+  }
 
   /**
    * キャッシュ付きの関数呼び出し
@@ -152,7 +166,7 @@ class GASOptimizer {
       activeCalls: this.activeCalls,
       queueLength: this.callQueue.length,
       cacheSize: this.cache.size,
-      
+      loadingStates: Object.fromEntries(this.loadingStates)
     };
   }
 }
@@ -282,7 +296,15 @@ const loadingCSS = `
   100% { transform: rotate(360deg); }
 }
 
+/* Loading overlay styles moved to UnifiedStyles.html for consistency */
 
+.loading-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 0.5rem;
+  text-align: center;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
 </style>
 `;
 

@@ -187,7 +187,8 @@ let currentConfig = null;
 // Initialize admin panel
 function initializeAdminPanel(incomingUserId) {
   // userId is now managed globally by adminPanel-core.js
-  
+  loadUserInfo();
+  loadSystemStatus();
   setupEventListeners();
   setupRealtimeUpdates();
   validateCurrentStep();
@@ -257,7 +258,8 @@ function adjustLayout() {
   }
 }
 
-
+// AdminPanel no longer overrides global setLoading
+// Uses unified loading system with admin-specific configurations
 
 
 // =============================================================================
