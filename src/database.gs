@@ -121,6 +121,11 @@ function getAllUsersForAdmin() {
         user[header] = row[index] || '';
       });
       
+      // createdAt を registrationDate にマッピング
+      if (user.createdAt) {
+        user.registrationDate = user.createdAt;
+      }
+
       // 設定情報をパース
       try {
         user.configJson = JSON.parse(user.configJson || '{}');
