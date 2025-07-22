@@ -101,9 +101,9 @@ function loadStatus(bypassCache = false) {
     logDebug('✅ userId is available:', userId);
     logDebug('🌐 Calling getInitialData with userId:', userId);
 
-    // runGasWithUserId を使用して getInitialData を呼び出す
-    // runGasWithUserId は userId を自動的に第一引数として追加するため、getInitialData の引数には bypassCache のみ渡す
-    runGasWithUserId('getInitialData', 'システム情報を読み込み中...', bypassCache)
+  // runGasWithUserId を使用して getInitialData を呼び出す
+  // 最新のステータスを取得するため追加の引数は不要
+    runGasWithUserId('getInitialData', 'システム情報を読み込み中...')
       .then(response => {
         logDebug('✅ Integrated data loaded:', response);
 
