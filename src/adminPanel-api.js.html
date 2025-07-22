@@ -236,7 +236,7 @@ function loadConfigForSelected() {
     return;
   }
   
-  sharedUtilities.gas.callWithLoading('getSheetDetails', 'シート情報を読み込み中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
+  sharedUtilities.gas.callWithLoading('getSheetDetails', 'シート情報を読み込み中...', userId, currentStatus.userInfo.spreadsheetId, selectedSheet)
     .then(handleSheetDetailsSuccess)
     .catch(handleSheetDetailsError);
 }
@@ -293,7 +293,7 @@ function runHeaderGuessing() {
     return;
   }
   
-  sharedUtilities.gas.callWithLoading('getSheetDetails', 'AI搭載高精度列判定システムが分析中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
+  sharedUtilities.gas.callWithLoading('getSheetDetails', 'AI搭載高精度列判定システムが分析中...', userId, currentStatus.userInfo.spreadsheetId, selectedSheet)
     .then(function(details) {
       const configToUse = {
         ...details.guessedConfig,
@@ -326,7 +326,7 @@ function saveAndPublish() {
   freshSaveTimestamp = Date.now();
   window.freshSaveTimestamp = freshSaveTimestamp;
   
-  sharedUtilities.gas.callWithLoading('saveAndPublish', '設定を保存し、ボードを公開しています...', selectedSheet, config)
+  sharedUtilities.gas.callWithLoading('saveAndPublish', '設定を保存し、ボードを公開しています...', userId, selectedSheet, config)
     .then(function(result) {
       isSaveInProgress = false;
       
@@ -365,7 +365,7 @@ function saveAndPublish() {
 
 // Unpublish board
 function unpublishBoard() {
-  sharedUtilities.gas.callWithLoading('unpublishBoard', 'ボードの公開を停止中...')
+  sharedUtilities.gas.callWithLoading('unpublishBoard', 'ボードの公開を停止中...', userId)
     .then(function(response) {
       console.log('公開停止レスポンス:', response);
       showMessage(response.message || '✅ 回答ボードの公開を停止しました。', 'success');
@@ -385,7 +385,7 @@ function unpublishBoard() {
 
 // Load saved class choices
 function loadSavedClassChoices() {
-    sharedUtilities.gas.callWithLoading('getSavedClassChoices', 'クラス選択肢を読み込み中...')
+    sharedUtilities.gas.callWithLoading('getSavedClassChoices', 'クラス選択肢を読み込み中...', userId)
         .then(function(result) {
             if (result.status === 'success' && result.classChoices) {
                 const enableClassSelectionCheckbox = document.getElementById('enable-class-selection');
@@ -577,7 +577,7 @@ function addResource() {
     return;
   }
 
-  sharedUtilities.gas.callWithLoading('addSpreadsheetUrl', 'リソースを追加しています...', url)
+  sharedUtilities.gas.callWithLoading('addSpreadsheetUrl', 'リソースを追加しています...', userId, url)
     .then(function(result) {
       if (result.status === 'success') {
         showMessage(result.message, 'success');
@@ -931,7 +931,7 @@ function handleQuickStart() {
   // Show loading message optimized for QuickStart
   // クイックスタート中は専用のプログレスバーを使用するため、汎用ローディングは表示しない
   
-  sharedUtilities.gas.callWithLoading('quickStartSetup', 'クイックスタートセットアップ中...')
+  sharedUtilities.gas.callWithLoading('quickStartSetup', 'クイックスタートセットアップ中...', userId)
     .then(function(result) {
       if (result && result.status === 'success') {
         // Final progress update
@@ -1084,7 +1084,7 @@ if (!window.adminPanelInitialized) {
 // Load user information
 function loadUserInfo() {
   if (typeof sharedUtilities.gas.callWithLoading === 'function') {
-    sharedUtilities.gas.callWithLoading('getUserInfo', 'ユーザー情報を読み込み中...')
+    sharedUtilities.gas.callWithLoading('getUserInfo', 'ユーザー情報を読み込み中...', userId)
       .then(userInfo => {
         if (userInfo) {
           document.getElementById('info-admin-email').textContent = userInfo.email || '-';
@@ -1101,7 +1101,7 @@ function loadUserInfo() {
 // Load system status
 function loadSystemStatus() {
   if (typeof sharedUtilities.gas.callWithLoading === 'function') {
-    sharedUtilities.gas.callWithLoading('getAppConfig', 'システム設定を読み込み中...')
+    sharedUtilities.gas.callWithLoading('getAppConfig', 'システム設定を読み込み中...', userId)
       .then(status => {
         updateSystemStatusDisplay(status);
       })
