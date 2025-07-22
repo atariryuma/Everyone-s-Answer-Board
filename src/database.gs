@@ -387,7 +387,7 @@ function getSheetsService() {
     }
     
     console.log('✅ Sheets service created successfully');
-    console.log('DEBUG: getSheetsService returning service object (details hidden for security)');
+    console.log('DEBUG: getSheetsService returning service object with baseUrl:', service.baseUrl);
     return service;
     
   } catch (error) {

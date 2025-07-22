@@ -1456,12 +1456,13 @@ function quickStartSetup(requestUserId) {
         var formFile = DriveApp.getFileById(formAndSsInfo.formId);
         var ssFile = DriveApp.getFileById(formAndSsInfo.spreadsheetId);
         
+        debugLog('Attempting to move form file %s to folder %s', formFile.getId(), folder.getId());
         folder.addFile(formFile);
+        debugLog('Form file moved successfully.');
+
+        debugLog('Attempting to move spreadsheet file %s to folder %s', ssFile.getId(), folder.getId());
         folder.addFile(ssFile);
-        
-        // 元の場所から削除（Myドライブから移動）
-        DriveApp.getRootFolder().removeFile(formFile);
-        DriveApp.getRootFolder().removeFile(ssFile);
+        debugLog('Spreadsheet file moved successfully.');
         
         debugLog('📁 ファイルをフォルダに移動しました: ' + folder.getName());
       } catch (moveError) {
@@ -2327,7 +2328,7 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
     
     // シート名を取得（通常は「フォームの回答 1」）
     var sheets = spreadsheetObj.getSheets();
-    var sheetName = sheets[0].getName();
+    var sheetName = String(sheets[0].getName());
     // シート名が不正な値でないことを確認
     if (!sheetName || sheetName === 'true') {
       sheetName = 'Sheet1'; // または適切なデフォルト値
@@ -3595,6 +3596,8 @@ function createCustomFormUI(requestUserId, config) {
       updatedConfigJson.lastFormCreatedAt = new Date().toISOString();
       updatedConfigJson.setupStatus = 'completed';
       updatedConfigJson.appPublished = true;
+      updatedConfigJson.publishedSpreadsheetId = result.spreadsheetId;
+      updatedConfigJson.publishedSheetName = result.sheetName;
       
       // カスタムフォーム設定情報を保存
       updatedConfigJson.formTitle = config.formTitle;
