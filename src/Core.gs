@@ -5348,40 +5348,10 @@ function getInitialData(targetSheetName) {
     var activeUserEmail = Session.getActiveUser().getEmail();
     
     // Always derive userID from authenticated email to prevent mismatch
-    var currentUserId = null;
-    
-    try {
-      // CRITICAL: Always derive userID from authenticated email - NEVER use requestUserId
-      currentUserId = getUserId();
-      debugLog('✅ getInitialData: UserID derived from authenticated email', { 
-        activeUserEmail, 
-        derivedUserId: currentUserId,
-        derivedUserId: currentUserId 
-      });
-      
-      // Log any mismatch for debugging but ALWAYS use the derived userID
-      if (requestUserId && requestUserId !== currentUserId) {
-        console.warn('⚠️ getInitialData: UserID mismatch detected - using derived userID', {
-          ignoredRequestUserId: requestUserId,
-          correctDerivedUserId: currentUserId,
-          activeUserEmail: activeUserEmail
-        });
-      }
-      
-    } catch (userIdError) {
-      debugLog('❌ getInitialData: Failed to derive userID from email', { 
-        activeUserEmail, 
-        error: userIdError.message 
-      });
-      
-      // NO FALLBACK: If we can't derive userID from email, authentication has failed
-      throw new Error('認証エラー: ユーザーIDを取得できませんでした。' + 
-                      '認証セッションが無効です。再度ログインしてください。');
-    }
-    
+    var currentUserId = getUserId(); // 常に認証されたユーザーのIDを使用
+
     if (!currentUserId) {
-      throw new Error('認証エラー: ユーザーIDが設定されていません。' + 
-                      '認証セッションが無効です。再度ログインしてください。');
+      throw new Error('認証エラー: ユーザーIDを取得できませんでした。認証セッションが無効です。再度ログインしてください。');
     }
     
     // Phase3 Optimization: Use execution-level cache to avoid duplicate database queries
