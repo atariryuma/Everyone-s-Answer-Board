@@ -412,15 +412,42 @@ class GASUtilities {
   // GAS function call with loading overlay
   callWithLoading(functionName, message = '処理中...', ...args) {
     return new Promise((resolve, reject) => {
+      // Enhanced logging for userID flow tracking
+      console.log('🔧 SharedUtilities.callWithLoading:', {
+        functionName: functionName,
+        message: message,
+        argsCount: args.length,
+        args: args.length <= 3 ? args : ['...args'],
+        timestamp: new Date().toISOString()
+      });
+      
       window.unifiedLoading.showSimple(message); // Show loading overlay
 
       google.script.run
         .withSuccessHandler(result => {
           window.unifiedLoading.hide(); // Hide loading overlay on success
+          
+          // Log successful response for debugging
+          console.log('✅ SharedUtilities.callWithLoading success:', {
+            functionName: functionName,
+            hasUserInfo: !!(result && result.userInfo),
+            hasUserId: !!(result && result.userInfo && result.userInfo.userId),
+            userId: result && result.userInfo ? result.userInfo.userId : 'N/A'
+          });
+          
           resolve(result);
         })
         .withFailureHandler(error => {
           window.unifiedLoading.hide(); // Hide loading overlay on failure
+          
+          // Enhanced error logging for userID flow tracking
+          console.error('❌ SharedUtilities.callWithLoading failed:', {
+            functionName: functionName,
+            error: error,
+            errorMessage: error ? error.message : 'Unknown error',
+            timestamp: new Date().toISOString()
+          });
+          
           // Log the error using the shared error handler
           window.sharedUtilities.errors.logError(error, `GAS call failed: ${functionName}`);
           reject(error);
