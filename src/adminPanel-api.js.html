@@ -87,53 +87,56 @@ function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
 function loadStatus(bypassCache = false) {
   console.group('🔄 loadStatus - Integrated API');
   console.log('🚀 Loading system status with integrated API, bypassCache:', bypassCache);
-  console.log('📞 About to call sharedUtilities.gas.callWithLoading for getInitialData');
-  
-  // Verify sharedUtilities is available
-  if (!window.sharedUtilities || !window.sharedUtilities.gas || !window.sharedUtilities.gas.callWithLoading) {
-    console.error('❌ sharedUtilities.gas.callWithLoading not available!');
-    console.error('sharedUtilities:', window.sharedUtilities);
-    return;
-  }
-  
-  console.log('✅ sharedUtilities.gas.callWithLoading is available');
+  console.log('📞 About to call runGasWithUserId for getInitialData');
 
-  // Single API call to get all initial data
-  console.log('🌐 Calling getInitialData...');
-  sharedUtilities.gas.callWithLoading('getInitialData', 'システム情報を読み込み中...')
-    .then(response => {
-      console.log('✅ Integrated data loaded:', response);
-
-      // Extract userId for compatibility
-      if (response.userInfo && response.userInfo.userId) {
-        userId = response.userInfo.userId;
-        console.log('✅ userId extracted from integrated response:', userId);
-      }
-
-      // Update UI with integrated response
-      updateUIWithNewStatus(response);
-
-      // If sheet details are included, apply them immediately
-      if (response.sheetDetails && response.activeSheetName) {
-        console.log('✅ Sheet details included in integrated response, applying configuration');
-        try {
-          populateHeaderOptions(response.sheetDetails.allHeaders);
-          console.log('✅ Header options populated from integrated data');
-          populateConfig(response.sheetDetails.guessedConfig);
-          console.log('✅ AI configuration applied from integrated data');
-        } catch (configError) {
-          console.error('Error applying sheet configuration from integrated data:', configError);
-        }
-      }
-      console.log('⚡ Performance: Single API call replaced 3-4 separate calls');
-    })
-    .catch(error => {
-      console.error('❌ Integrated API failed:', error);
-      showMessage('システムステータスの読み込みに失敗しました', 'error');
-    })
-    .finally(() => {
+  // userIdPromise が解決されるのを待ってから getInitialData を呼び出す
+  userIdPromise.then(() => {
+    if (!userId) {
+      console.error('❌ userId is not available after userIdPromise resolution in loadStatus!');
+      showMessage('ユーザーIDが取得できません。ページを再読み込みしてください。', 'error');
       console.groupEnd();
-    });
+      return;
+    }
+
+    console.log('✅ userId is available:', userId);
+    console.log('🌐 Calling getInitialData with userId:', userId);
+
+    // runGasWithUserId を使用して getInitialData を呼び出す
+    // runGasWithUserId は userId を自動的に第一引数として追加するため、getInitialData の引数には bypassCache のみ渡す
+    runGasWithUserId('getInitialData', 'システム情報を読み込み中...', bypassCache)
+      .then(response => {
+        console.log('✅ Integrated data loaded:', response);
+
+        // Update UI with integrated response
+        updateUIWithNewStatus(response);
+
+        // If sheet details are included, apply them immediately
+        if (response.sheetDetails && response.activeSheetName) {
+          console.log('✅ Sheet details included in integrated response, applying configuration');
+          try {
+            populateHeaderOptions(response.sheetDetails.allHeaders);
+            console.log('✅ Header options populated from integrated data');
+            populateConfig(response.sheetDetails.guessedConfig);
+            console.log('✅ AI configuration applied from integrated data');
+          } catch (configError) {
+            console.error('Error applying sheet configuration from integrated data:', configError);
+          }
+        }
+
+        console.log('⚡ Performance: Single API call replaced 3-4 separate calls');
+      })
+      .catch(error => {
+        console.error('❌ Integrated API failed:', error);
+        showMessage('システムステータスの読み込みに失敗しました', 'error');
+      })
+      .finally(() => {
+        console.groupEnd();
+      });
+  }).catch(error => {
+    console.error('❌ Error resolving userIdPromise in loadStatus:', error);
+    showMessage('ユーザーIDの初期化に失敗しました。ページを再読み込みしてください。', 'error');
+    console.groupEnd();
+  });
 }
 
 // Load sheet configuration for selected sheet
