@@ -46,7 +46,7 @@ function computeWebAppUrl() {
     }
 
     // 有効なURLパターンかチェック
-    var validPattern = /^https:\/\/script\.google\.com\/(a\/macros\/[^\/]+\/)?s\/[A-Za-z0-9_-]+\/exec$/;
+    var validPattern = /^https:\/\/script\.google\.com\/(a\/macros\/[^\/]+\/)?s\/[A-Za-z0-9_-]+\/(exec|dev)$/;
     if (!validPattern.test(url)) {
       console.warn('無効なURLパターンを検出しました: ' + url + ' フォールバックURLを使用します');
       return getFallbackUrl();
@@ -270,8 +270,7 @@ function generateAppUrls(userId) {
     
     return {
       webAppUrl: webAppUrl,
-      adminUrl: webAppUrl.replace(/\/dev$/, '/exec') +
-        '?userId=' + encodedUserId + '&mode=admin',
+      adminUrl: webAppUrl + '?userId=' + encodedUserId + '&mode=admin',
       viewUrl: webAppUrl + '?userId=' + encodedUserId + '&mode=view',
       setupUrl: webAppUrl + '?setup=true',
       status: 'success'
