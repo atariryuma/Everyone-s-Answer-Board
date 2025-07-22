@@ -1514,11 +1514,9 @@ function quickStartSetup(requestUserId) {
     clearExecutionUserInfoCache();
     
     // さらに、少し遅延してもう一度全キャッシュをクリアして確実に反映
-    setTimeout(() => {
-      invalidateUserCache(requestUserId, userEmail, formAndSsInfo.spreadsheetId, true);
-      clearExecutionUserInfoCache();
-      console.log('🔄 管理パネル表示更新のための追加キャッシュクリア完了');
-    }, 1000);
+    invalidateUserCache(requestUserId, userEmail, formAndSsInfo.spreadsheetId, true);
+    clearExecutionUserInfoCache();
+    console.log('🔄 管理パネル表示更新のための追加キャッシュクリア完了');
     
     // ステップ4: 回答ボードを公開状態に設定
     debugLog('🌐 ステップ4: 回答ボード公開中...');
