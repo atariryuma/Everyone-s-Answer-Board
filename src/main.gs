@@ -383,8 +383,8 @@ function checkSystemConfiguration() {
 }
 
 /**
- * Retrieves the administrator domain for the login page.
- * @returns {{adminDomain: string}|{error: string}} Domain info or error message.
+ * Retrieves the administrator domain for the login page with domain match status.
+ * @returns {{adminDomain: string, isDomainMatch: boolean}|{error: string}} Domain info or error message.
  */
 function getSystemDomainInfo() {
   try {
@@ -395,8 +395,19 @@ function getSystemDomainInfo() {
     }
 
     var adminDomain = adminEmail.split('@')[1];
-    return { adminDomain: adminDomain };
+    
+    // 現在のユーザーのドメイン一致状況を取得
+    var domainInfo = getDeployUserDomainInfo();
+    var isDomainMatch = domainInfo.isDomainMatch !== undefined ? domainInfo.isDomainMatch : false;
+    
+    return { 
+      adminDomain: adminDomain,
+      isDomainMatch: isDomainMatch,
+      currentDomain: domainInfo.currentDomain || '不明',
+      deployDomain: domainInfo.deployDomain || adminDomain
+    };
   } catch (e) {
+    console.error('getSystemDomainInfo エラー:', e.message);
     return { error: e.message };
   }
 }
