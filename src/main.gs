@@ -438,7 +438,7 @@ function doGet(e) {
 
   // 4. アプリ設定ページリクエストの処理
   if (params.setupParam === 'true') {
-    return showAppSetupPage();
+    return showAppSetupPage(params.userId);
   }
 
   // 5. パラメータ検証とデフォルト処理
@@ -663,7 +663,7 @@ function showSetupPage() {
  * アプリ設定ページを表示
  * @returns {HtmlOutput}
  */
-function showAppSetupPage() {
+function showAppSetupPage(userId) {
     // システム管理者権限チェック
     try {
       if (!isDeployUser()) {
@@ -676,6 +676,7 @@ function showAppSetupPage() {
     }
     
     const appSetupTemplate = HtmlService.createTemplateFromFile('AppSetupPage');
+    appSetupTemplate.userId = userId;
     const htmlOutput = appSetupTemplate.evaluate()
       .setTitle('アプリ設定 - StudyQuest');
     
