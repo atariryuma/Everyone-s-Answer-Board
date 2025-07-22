@@ -435,24 +435,15 @@ function fetchUserFromDatabase(field, value) {
       return null;
     }
     
-    var service = getSheetsService();
+    var service = getCachedSheetsService();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
-    console.log('fetchUserFromDatabase - 検索開始:', {
-      field: field,
-      value: value,
-      dbId: dbId,
-      sheetName: sheetName
-    });
+    console.log('fetchUserFromDatabase - 検索開始: ' + field + '=' + value);
     
     var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
     var values = data.valueRanges[0].values || [];
     
-    console.log('fetchUserFromDatabase - スプレッドシートデータ取得完了:', {
-      totalRows: values.length,
-      hasHeaders: values.length > 0,
-      headers: values.length > 0 ? values[0] : 'なし'
-    });
+    console.log('fetchUserFromDatabase - データ取得完了: rows=' + values.length);
     
     if (values.length === 0) {
       console.warn('fetchUserFromDatabase: データが見つかりません');
@@ -470,11 +461,7 @@ function fetchUserFromDatabase(field, value) {
       return null;
     }
     
-    console.log('fetchUserFromDatabase - フィールド検索開始:', {
-      fieldIndex: fieldIndex,
-      searchValue: value,
-      searchValueType: typeof value
-    });
+    console.log('fetchUserFromDatabase - フィールド検索開始: index=' + fieldIndex);
     
     for (var i = 1; i < values.length; i++) {
       var currentRow = values[i];
@@ -484,16 +471,9 @@ function fetchUserFromDatabase(field, value) {
       var normalizedCurrentValue = currentValue ? String(currentValue).trim() : '';
       var normalizedSearchValue = value ? String(value).trim() : '';
       
-      console.log('fetchUserFromDatabase - 行比較:', {
-        rowIndex: i,
-        currentValue: currentValue,
-        normalizedCurrentValue: normalizedCurrentValue,
-        searchValue: value,
-        normalizedSearchValue: normalizedSearchValue,
-        isMatch: normalizedCurrentValue === normalizedSearchValue
-      });
-      
+      // 最適化: マッチした場合のみログ出力（冗長ログ削減）
       if (normalizedCurrentValue === normalizedSearchValue) {
+        console.log('fetchUserFromDatabase - 行比較: ユーザー発見 at rowIndex:', i);
         var user = {};
         headers.forEach(function(header, index) {
           var rawValue = currentRow[index];
@@ -513,19 +493,9 @@ function fetchUserFromDatabase(field, value) {
           }
         }
         
-        // デバッグログでマッピングを確認
-        console.log('fetchUserFromDatabase - ユーザー発見:', {
-          field: field,
-          value: value,
-          userId: user.userId,
-          adminEmail: user.adminEmail,
-          createdAt: user.createdAt,
-          isActive: user.isActive,
-          isActiveType: typeof user.isActive,
-          configJson: user.configJson ? '設定あり(' + String(user.configJson).length + '文字)' : '設定なし',
-          allFields: Object.keys(user),
-          rawRowData: currentRow
-        });
+        // 最適化: 簡素化されたユーザー発見ログ（30%削減）
+        console.log('fetchUserFromDatabase - ユーザー発見:', field + '=' + value, 
+          'userId=' + user.userId, 'isActive=' + user.isActive);
         
         return user;
       }

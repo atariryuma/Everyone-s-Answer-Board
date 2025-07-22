@@ -408,6 +408,9 @@ function getSystemDomainInfo() {
  */
 function doGet(e) {
   try {
+    // 0. 実行レベルキャッシュクリア（新しいリクエスト開始）
+    clearAllExecutionCache();
+    
     // 1. システムセットアップの確認 (最優先)
     if (!isSystemSetup()) {
       return showSetupPage();

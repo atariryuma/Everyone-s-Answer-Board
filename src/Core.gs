@@ -32,12 +32,42 @@ function determineSetupStep(userInfo, configJson) {
 // =================================================================
 
 var _executionUserInfoCache = null;
+var _executionSheetsServiceCache = null;
 
 /**
  * 関数実行中のユーザー情報キャッシュをクリア
  */
 function clearExecutionUserInfoCache() {
   _executionUserInfoCache = null;
+}
+
+/**
+ * 関数実行中のSheetsServiceキャッシュをクリア
+ */
+function clearExecutionSheetsServiceCache() {
+  _executionSheetsServiceCache = null;
+}
+
+/**
+ * 関数実行中のSheetsServiceを取得（キャッシュを使用）
+ * @returns {Object} SheetsServiceオブジェクト
+ */
+function getCachedSheetsService() {
+  if (_executionSheetsServiceCache === null) {
+    console.log('🔧 ExecutionLevel SheetsService: 初回作成');
+    _executionSheetsServiceCache = getSheetsService();
+  } else {
+    console.log('♻️ ExecutionLevel SheetsService: キャッシュから取得');
+  }
+  return _executionSheetsServiceCache;
+}
+
+/**
+ * 実行開始時のキャッシュクリア（新しいリクエスト開始時に呼び出し）
+ */
+function clearAllExecutionCache() {
+  clearExecutionUserInfoCache();
+  clearExecutionSheetsServiceCache();
 }
 
 /**
