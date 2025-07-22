@@ -2071,16 +2071,18 @@ function createFormFactory(options) {
     // フォーム作成
     var form = FormApp.create(formTitle);
     form.setDescription(formDescription);
-    
+
     // 基本的な質問を追加
     addUnifiedQuestions(form, options.questions || 'default', options.customConfig || {});
-    
+
     // スプレッドシート作成
     var spreadsheetResult = createLinkedSpreadsheet(userEmail, form, dateTimeString);
-    
+
     return {
       formId: form.getId(),
       formUrl: form.getPublishedUrl(),
+      viewFormUrl: form.getPublishedUrl(),
+      editFormUrl: typeof form.getEditUrl === 'function' ? form.getEditUrl() : '',
       spreadsheetId: spreadsheetResult.spreadsheetId,
       spreadsheetUrl: spreadsheetResult.spreadsheetUrl,
       sheetName: spreadsheetResult.sheetName
