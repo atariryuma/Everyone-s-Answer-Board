@@ -365,6 +365,10 @@
               justify-content: center;
               padding: 20px;
               position: relative;
+              transition: background 2s ease-out;
+            }
+            body.success-transition {
+              background: linear-gradient(135deg, #1a1b26 0%, #2a3d4a 30%, #1e3a3f 60%, #1a1b26 100%);
             }
             body::before {
               content: '';
@@ -374,19 +378,74 @@
                                 radial-gradient(circle at 80% 70%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
                                 radial-gradient(circle at 40% 80%, rgba(6, 182, 212, 0.1) 0%, transparent 50%);
               pointer-events: none;
+              transition: background-image 2s ease-out, opacity 2s ease-out;
+            }
+            body.success-transition::before {
+              background-image: radial-gradient(circle at 25% 25%, rgba(16, 185, 129, 0.15) 0%, transparent 60%),
+                                radial-gradient(circle at 75% 75%, rgba(59, 130, 246, 0.15) 0%, transparent 60%),
+                                radial-gradient(circle at 50% 50%, rgba(139, 233, 253, 0.1) 0%, transparent 70%);
+              opacity: 0.8;
             }
             .container {
               background: rgba(26,27,38,0.7);
               backdrop-filter: blur(12px);
               border: 1px solid rgba(255,255,255,0.1);
               border-radius: 16px;
-              padding: 40px;
-              max-width: 500px;
-              width: 100%;
+              padding: 2rem;
+              max-width: 420px;
+              width: 90%;
+              min-height: 580px;
+              max-height: 90vh;
+              overflow-y: auto;
               text-align: center;
               box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
               position: relative;
               z-index: 1;
+              animation: slideUp 0.6s ease-out;
+            }
+            /* Responsive design matching login panel breakpoints */
+            @media (max-width: 640px) {
+              .container {
+                width: 95%;
+                max-width: 380px;
+                min-height: 520px;
+                padding: 1.5rem;
+              }
+              .main-button {
+                min-height: 48px;
+                padding: 1rem 1.5rem;
+                font-size: 16px;
+              }
+            }
+            @media (max-width: 768px) {
+              .container {
+                padding: 1rem;
+              }
+            }
+            @media (max-height: 700px) {
+              .container {
+                min-height: auto;
+                max-height: 85vh;
+              }
+            }
+            @media (min-width: 768px) {
+              .container {
+                padding: 2rem;
+              }
+            }
+            @media (min-width: 1024px) {
+              .container {
+                max-width: 450px;
+                padding: 2.5rem;
+              }
+            }
+            @keyframes slideUp {
+              0% { opacity: 0; transform: translateY(20px); }
+              100% { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
             }
             .icon { font-size: 64px; margin-bottom: 20px; }
             .title { 
@@ -461,14 +520,57 @@
           </style>
         </head>
         <body>
+          <script>
+            // ページ読み込み時に背景遷移を開始
+            window.addEventListener('DOMContentLoaded', function() {
+              setTimeout(function() {
+                document.body.classList.add('success-transition');
+              }, 300);
+            });
+          </script>
           <div class="container">
             <div class="icon">✅</div>
             <h1 class="title">${message || 'ログインが完了しました'}</h1>
             <p class="subtitle">管理パネルにアクセスしてください</p>
             
-            <a href="${adminUrl}" target="_top" class="main-button">
-              🚀 管理パネルを開く
+            <a href="${adminUrl}" target="_top" class="main-button" id="admin-panel-btn" onclick="handleAdminPanelClick(event, '${adminUrl}', this)">
+              <span id="admin-panel-btn-text">🚀 管理パネルを開く</span>
+              <div id="admin-panel-btn-spinner" style="display: none; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.8);">
+                <div style="width: 20px; height: 20px; border: 2px solid white; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+              </div>
             </a>
+            <script>
+              let isAdminPanelClicking = false;
+              
+              function handleAdminPanelClick(event, adminUrl, buttonElement) {
+                event.preventDefault();
+                
+                if (isAdminPanelClicking) {
+                  console.log('管理パネルボタンクリック処理中、二重クリックをブロック');
+                  return false;
+                }
+                
+                isAdminPanelClicking = true;
+                console.log('管理パネルへ遷移中...');
+                
+                // ボタンを無効化してローディング状態にする
+                buttonElement.style.pointerEvents = 'none';
+                buttonElement.style.opacity = '0.8';
+                
+                const btnText = document.getElementById('admin-panel-btn-text');
+                const btnSpinner = document.getElementById('admin-panel-btn-spinner');
+                
+                if (btnText) btnText.style.display = 'none';
+                if (btnSpinner) btnSpinner.style.display = 'flex';
+                
+                // 実際の遷移
+                setTimeout(() => {
+                  window.location.href = adminUrl;
+                }, 100);
+                
+                return false;
+              }
+            </script>
             
             <div class="url-info">
               <div class="url-label">📱 管理パネルURL:</div>
