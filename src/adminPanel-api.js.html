@@ -87,8 +87,19 @@ function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
 function loadStatus(bypassCache = false) {
   console.group('🔄 loadStatus - Integrated API');
   console.log('🚀 Loading system status with integrated API, bypassCache:', bypassCache);
+  console.log('📞 About to call sharedUtilities.gas.callWithLoading for getInitialData');
+  
+  // Verify sharedUtilities is available
+  if (!window.sharedUtilities || !window.sharedUtilities.gas || !window.sharedUtilities.gas.callWithLoading) {
+    console.error('❌ sharedUtilities.gas.callWithLoading not available!');
+    console.error('sharedUtilities:', window.sharedUtilities);
+    return;
+  }
+  
+  console.log('✅ sharedUtilities.gas.callWithLoading is available');
 
   // Single API call to get all initial data
+  console.log('🌐 Calling getInitialData...');
   sharedUtilities.gas.callWithLoading('getInitialData', 'システム情報を読み込み中...')
     .then(response => {
       console.log('✅ Integrated data loaded:', response);
@@ -869,6 +880,8 @@ function handleQuickStart() {
 
 // Initialize API communications
 function initializeAPI() {
+  console.log('🔧 API初期化開始');
+  
   // Start background status updates
   startSystemStatusUpdate();
   
@@ -876,6 +889,12 @@ function initializeAPI() {
   document.addEventListener('click', updateUserActivity);
   document.addEventListener('keypress', updateUserActivity);
   document.addEventListener('scroll', updateUserActivity);
+
+  // 初回ロード時にシステムステータスをロード
+  console.log('🚀 loadStatus()を呼び出します');
+  loadStatus();
+  
+  console.log('✅ API初期化完了');
 }
 
 // Setup real-time updates

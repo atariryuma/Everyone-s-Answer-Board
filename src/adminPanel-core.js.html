@@ -280,17 +280,23 @@ function initializeAdminPanelMaster() {
   initCore();
   
   // Phase 2: 各モジュールを順次初期化 (race conditionを防ぐ)
+  // 遅延を最小限に抑制して即座に初期化
   setTimeout(() => {
+    console.log('🔧 Phase 2: モジュール初期化開始');
+    
     // Status管理初期化
     if (typeof initializeMessageArea === 'function') {
       initializeMessageArea();
       console.log('✅ Status module initialized');
     }
     
-    // API通信初期化
+    // API通信初期化（最重要 - getInitialDataを呼び出す）
     if (typeof initializeAPI === 'function') {
+      console.log('🚀 API module initialization starting...');
       initializeAPI();
       console.log('✅ API module initialized');
+    } else {
+      console.error('❌ initializeAPI function not found!');
     }
     
     // UI初期化
@@ -312,9 +318,9 @@ function initializeAdminPanelMaster() {
         console.log('✅ Events module initialized');
       }
       console.log('🎉 AdminPanel Master Initialization Complete');
-    }, 100);
+    }, 50); // 100ms -> 50msに短縮
     
-  }, 50);
+  }, 10); // 50ms -> 10msに短縮
 }
 
 // 単一DOMContentLoadedハンドラー
