@@ -247,29 +247,11 @@ function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
  * @throws {Error} 認証エラーまたは権限エラー
  */
 function verifyUserAccess(requestUserId) {
-  debugLog('🔧 verifyUserAccess: 開始', { 
-    requestUserId: requestUserId,
-    requestUserIdType: typeof requestUserId,
-    requestUserIdLength: requestUserId ? requestUserId.length : null,
-    caller: 'verifyUserAccess'
-  });
-  
   clearExecutionUserInfoCache(); // キャッシュをクリアして最新のユーザー情報を取得
   const activeUserEmail = Session.getActiveUser().getEmail();
-  
-  debugLog('🔧 verifyUserAccess: findUserById実行前', { 
-    requestUserId: requestUserId,
-    activeUserEmail: activeUserEmail 
-  });
-  
   const requestedUserInfo = findUserById(requestUserId);
 
   if (!requestedUserInfo) {
-    debugLog('❌ verifyUserAccess: ユーザーが見つかりません', { 
-      requestUserId: requestUserId,
-      activeUserEmail: activeUserEmail,
-      errorType: 'USER_NOT_FOUND'
-    });
     throw new Error(`認証エラー: 指定されたユーザーID (${requestUserId}) が見つかりません。`);
   }
 
@@ -5333,13 +5315,7 @@ function confirmUserRegistration() {
  * @returns {Object} 統合された初期データ
  */
 function getInitialData(requestUserId, targetSheetName) {
-  debugLog('🚀 getInitialData: 統合初期化開始', { 
-    requestUserId: requestUserId, 
-    requestUserIdType: typeof requestUserId,
-    requestUserIdLength: requestUserId ? requestUserId.length : null,
-    targetSheetName: targetSheetName,
-    caller: 'getInitialData'
-  });
+  debugLog('🚀 getInitialData: 統合初期化開始', { requestUserId, targetSheetName });
   
   try {
     var startTime = new Date().getTime();
@@ -5347,11 +5323,11 @@ function getInitialData(requestUserId, targetSheetName) {
     // === ステップ1: ユーザー認証とユーザー情報取得（キャッシュ活用） ===
     var activeUserEmail = Session.getActiveUser().getEmail();
     
-    // Always derive userID from authenticated email to prevent mismatch
+    // Enhanced user authentication with email-based fallback
     var currentUserId = null;
     
     try {
-      // CRITICAL: Always derive userID from authenticated email - NEVER use requestUserId
+      // Always derive userID from authenticated email to prevent mismatch
       currentUserId = getUserId();
       debugLog('✅ getInitialData: UserID derived from authenticated email', { 
         activeUserEmail, 
@@ -5359,13 +5335,14 @@ function getInitialData(requestUserId, targetSheetName) {
         requestUserId: requestUserId 
       });
       
-      // Log any mismatch for debugging but ALWAYS use the derived userID
+      // Validate that the derived userID matches any provided requestUserId
       if (requestUserId && requestUserId !== currentUserId) {
-        console.warn('⚠️ getInitialData: UserID mismatch detected - using derived userID', {
-          ignoredRequestUserId: requestUserId,
-          correctDerivedUserId: currentUserId,
+        console.warn('⚠️ getInitialData: UserID mismatch detected', {
+          requestUserId: requestUserId,
+          derivedUserId: currentUserId,
           activeUserEmail: activeUserEmail
         });
+        // Use the derived userID instead of the provided one
       }
       
     } catch (userIdError) {
@@ -5374,14 +5351,17 @@ function getInitialData(requestUserId, targetSheetName) {
         error: userIdError.message 
       });
       
-      // NO FALLBACK: If we can't derive userID from email, authentication has failed
-      throw new Error('認証エラー: ユーザーIDを取得できませんでした。' + 
-                      '認証セッションが無効です。再度ログインしてください。');
+      // Fallback: Try to use requestUserId if derivation fails
+      if (requestUserId) {
+        currentUserId = requestUserId;
+        console.warn('🔄 getInitialData: Using requestUserId as fallback', { requestUserId });
+      } else {
+        throw new Error('認証エラー: ユーザーIDを取得できませんでした。再度ログインしてください。');
+      }
     }
     
     if (!currentUserId) {
-      throw new Error('認証エラー: ユーザーIDが設定されていません。' + 
-                      '認証セッションが無効です。再度ログインしてください。');
+      throw new Error('認証エラー: ユーザーIDが設定されていません。再度ログインしてください。');
     }
     
     // Phase3 Optimization: Use execution-level cache to avoid duplicate database queries

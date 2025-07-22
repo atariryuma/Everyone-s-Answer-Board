@@ -13,31 +13,7 @@ function runGasWithUserId(functionName, ...args) {
 
   // If userId is not set, throw error immediately (no promise waiting)
   if (!userIdToSend) {
-    console.error('❌ runGasWithUserId: userId not initialized for function:', functionName);
-    throw new Error('ユーザーIDが初期化されていません。ページを再読み込みしてください。');
-  }
-  
-  // Check userID freshness to detect stale IDs
-  const userIdAge = getUserIdAge();
-  const isUserIdFreshCheck = isUserIdFresh();
-  
-  // Log the userID being sent for debugging
-  console.log('🔧 runGasWithUserId:', {
-    functionName: functionName,
-    userIdToSend: userIdToSend,
-    userIdLength: userIdToSend.length,
-    userIdAge: userIdAge + 's',
-    isUserIdFresh: isUserIdFreshCheck,
-    timestamp: new Date().toISOString()
-  });
-  
-  // Warn if userID is stale (older than 5 minutes)
-  if (!isUserIdFreshCheck) {
-    console.warn('⚠️ UserID may be stale:', {
-      functionName: functionName,
-      userIdAge: userIdAge + 's',
-      recommendation: 'Consider calling getInitialData to refresh userID'
-    });
+    throw new Error('ユーザーIDが初期化されていません。システムの初期化を待ってください。');
   }
 
   // Enhanced userId validation with user-friendly error messages
@@ -68,16 +44,6 @@ function runGasWithUserId(functionName, ...args) {
       userIdLength: userIdToSend ? userIdToSend.length : 'null',
       userIdType: typeof userIdToSend
     });
-    
-    // Check if this is a userID-related authentication error
-    if (userFriendlyMessage.includes('認証') || userFriendlyMessage.includes('ユーザー')) {
-      console.warn('🔄 UserID authentication error detected, suggesting refresh...');
-      
-      // For critical errors, suggest refreshing userID
-      if (userFriendlyMessage.includes('形式エラー') || userFriendlyMessage.includes('破損')) {
-        userFriendlyMessage += ' \n\n自動修復を試行する場合は、ページを再読み込みするか、管理パネルのデータを再読み込みしてください。';
-      }
-    }
     
     throw new Error(userFriendlyMessage);
   }
@@ -164,37 +130,11 @@ window.loadStatusFromAPI = function loadStatus(bypassCache = false) {
 
       // Extract and set userId from response (critical step)
       if (response.userInfo && response.userInfo.userId) {
-        // Validate the userID format before setting it
-        try {
-          validateUserId(response.userInfo.userId, 'getInitialData response');
-          
-          // Log the previous userID if it exists and differs
-          if (userId && userId !== response.userInfo.userId) {
-            console.warn('🔄 UserID changed during session:', {
-              previousUserId: userId,
-              newUserId: response.userInfo.userId,
-              source: 'getInitialData response'
-            });
-          }
-          
-          setUserId(response.userInfo.userId);
-          console.log('✅ userId extracted and set from integrated response:', userId);
-          
-          // Double-check that the userID was actually set correctly
-          if (userId !== response.userInfo.userId) {
-            throw new Error('ユーザーIDの設定に失敗しました');
-          }
-          
-        } catch (validationError) {
-          console.error('❌ Invalid userId received from getInitialData:', {
-            receivedUserId: response.userInfo.userId,
-            validationError: validationError.message
-          });
-          throw new Error('サーバーから無効なユーザーIDを受信しました。ページを再読み込みしてください。');
-        }
+        setUserId(response.userInfo.userId);
+        console.log('✅ userId extracted and set from integrated response:', userId);
       } else {
         console.error('❌ No userId in getInitialData response:', response);
-        throw new Error('ユーザーIDが取得できませんでした。認証に失敗している可能性があります。');
+        throw new Error('ユーザーIDが取得できませんでした');
       }
 
       // Update UI with integrated response
