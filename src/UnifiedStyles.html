@@ -421,20 +421,22 @@ body {
    UNIFIED LOADING OVERLAY SYSTEM
    ============================================================================= */
 
-/* Base loading overlay */
+/* Base loading overlay - Enhanced specificity to override TailwindCSS */
 .loading-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
   transition: opacity 0.3s ease, background-color 0.3s ease;
-  z-index: 8000;
-  background-color: rgba(0,0,0,0.8);
+  z-index: 8500 !important;
+  background-color: rgba(0,0,0,0.8) !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 /* Variant: Transparent background, allows interaction with elements behind it */
@@ -444,8 +446,8 @@ body {
 
 /* Variant: Modal, for critical blocking actions */
 .loading-overlay.modal {
-  background-color: rgba(0,0,0,0.9);
-  z-index: 9000;
+  background-color: rgba(0,0,0,0.9) !important;
+  z-index: 9500 !important;
 }
 
 /* Variant: Page-specific styling with backdrop blur */
@@ -455,8 +457,8 @@ body {
 
 /* Variant: QuickStart, lightweight and non-blocking */
 .loading-overlay.quickstart {
-  background-color: rgba(0,0,0,0.1);
-  z-index: 7000;
+  background-color: rgba(0,0,0,0.1) !important;
+  z-index: 8500 !important;
 }
 
 /* Content container for all loading elements */
@@ -546,7 +548,7 @@ body {
 /* Ensure QuickStart progress bar is visible */
 #quickstart-progress {
   position: relative;
-  z-index: 8500 !important;
+  z-index: 9000 !important;
 }
 
 /* Completed section styling - only show checkmark when truly completed */
@@ -866,9 +868,27 @@ body {
   line-height: 1.5;
 }
 
-/* Tailwind CSS Fallback */
+/* Loading Overlay Hidden State Override */
+.loading-overlay.hidden {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* Tailwind CSS Fallback - Enhanced */
 .tailwind-fallback {
   /* Fallback styles when TailwindCSS fails to load */
+}
+
+.tailwind-fallback .hidden { 
+  display: none !important; 
+}
+
+/* Loading Overlay Override for TailwindCSS conflicts */
+.loading-overlay:not(.hidden) {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 /* Media Queries */
