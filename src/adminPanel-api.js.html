@@ -561,22 +561,57 @@ function openForm() {
 
 // Open app setup page
 function openAppSetupPage() {
-  runGasWithUserId('getWebAppUrl', 'アプリ設定ページを準備中...')
+  const loadingMessage = 'アプリ設定ページを準備中...';
+  const errorMessage = 'アプリ設定ページへの移動に失敗しました。';
+  const timeoutMessage = 'リダイレクトがタイムアウトしました。新しいタブで開きます。';
+  const fallbackMessage = 'アプリ設定ページを新しいタブで開きます。';
+
+  runGasWithUserId('getWebAppUrl', loadingMessage)
     .then(function(webAppUrl) {
-      const setupUrl =
-        webAppUrl + '?setup=true&mode=appsetup&userId=' + encodeURIComponent(userId);
-      // サーバーサイドのリダイレクト関数を呼び出す
-      google.script.run
-        .withSuccessHandler(function() { /* リダイレクトはサーバーサイドで行われるため、ここでは何もしない */ })
-        .withFailureHandler(function(error) {
-          console.error('Failed to redirect to app setup page:', error);
-          showMessage('アプリ設定ページへのリダイレクトに失敗しました。', 'error');
-        })
-        .redirectToUrl(setupUrl);
+      const setupUrl = webAppUrl + '?setup=true&mode=appsetup&userId=' + encodeURIComponent(userId);
+
+      // ユーザーにリダイレクト中であることを伝える
+      showMessage('アプリ設定ページへ移動中...', 'info');
+      window.unifiedLoading.showSimple('アプリ設定ページへ移動中...');
+
+      const redirectTimeout = setTimeout(() => {
+        console.warn('Redirect to app setup page timed out. Attempting fallback.');
+        window.unifiedLoading.hide();
+        showMessage(timeoutMessage, 'warning');
+        window.open(setupUrl, '_blank'); // Fallback: open in new tab
+      }, 10000); // 10秒でタイムアウト
+
+      try {
+        google.script.run
+          .withSuccessHandler(function() {
+            clearTimeout(redirectTimeout);
+            // サーバーサイドのリダイレクトが成功した場合、ここでは何もしない
+            // ユーザーは新しいページに移動するため、ローディングは自動的に消える
+          })
+          .withFailureHandler(function(error) {
+            clearTimeout(redirectTimeout);
+            console.error('Failed to redirect to app setup page:', error);
+            window.unifiedLoading.hide();
+            showMessage(errorMessage + ' ' + (error.message || ''), 'error');
+            // フォールバック: 新しいタブで開く
+            showMessage(fallbackMessage, 'info');
+            window.open(setupUrl, '_blank');
+          })
+          .redirectToUrl(setupUrl);
+      } catch (e) {
+        clearTimeout(redirectTimeout);
+        console.error('Error calling redirectToUrl:', e);
+        window.unifiedLoading.hide();
+        showMessage(errorMessage + ' ' + (e.message || ''), 'error');
+        // フォールバック: 新しいタブで開く
+        showMessage(fallbackMessage, 'info');
+        window.open(setupUrl, '_blank');
+      }
     })
     .catch(function(error) {
       console.error('Failed to get web app URL for app setup page:', error);
-      showMessage('アプリ設定ページのURLを取得できませんでした。', 'error');
+      window.unifiedLoading.hide();
+      showMessage('アプリ設定ページのURLを取得できませんでした。' + (error.message || ''), 'error');
     });
 }
 

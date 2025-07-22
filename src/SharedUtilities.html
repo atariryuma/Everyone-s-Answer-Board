@@ -711,37 +711,30 @@ class UnifiedLoadingManager {
   }
 
   // Initialize the loading manager with enhanced error handling.
-   init() {
-     if (this.initialized) return true;
-     
-     this.overlay = document.getElementById('loading-overlay');
-     if (!this.overlay) {
-      console.warn('UnifiedLoadingManager: loading-overlay element not found. Attempting retry...');
-      
-      // Retry after DOM is ready
-      setTimeout(() => {
-        this.overlay = document.getElementById('loading-overlay');
-        if (this.overlay) {
-          if (!window.unifiedLoadingInitialized) {
-            window.unifiedLoadingInitialized = true;
-            console.log('UnifiedLoadingManager: Initialized successfully after retry.');
-          }
-          this.initialized = true;
-        } else {
-          console.error('UnifiedLoadingManager: Critical failure - loading-overlay element not found after retry. Please check HTML structure.');
-        }
-      }, 100);
-      
-       return false;
-     }
-     
-     if (!window.unifiedLoadingInitialized) {
-       window.unifiedLoadingInitialized = true;
-       console.log('UnifiedLoadingManager: Initialized successfully.');
-     }
-     this.initialized = true;
-     return true;
-   }
+  init(retries = 5, delay = 100) {
+    if (this.initialized) {
+      console.log('UnifiedLoadingManager: Already initialized.');
+      return true;
+    }
+
+    this.overlay = document.getElementById('loading-overlay');
+    if (this.overlay) {
+      if (!window.unifiedLoadingInitialized) {
+        window.unifiedLoadingInitialized = true;
+        console.log('UnifiedLoadingManager: Initialized successfully.');
+      }
+      this.initialized = true;
+      return true;
+    }
+
+    if (retries > 0) {
+      console.warn(`UnifiedLoadingManager: loading-overlay element not found. Retrying in ${delay}ms (${retries} retries left)...`);
+      setTimeout(() => this.init(retries - 1, delay * 1.5), delay); // Exponential backoff
+    } else {
+      console.error('UnifiedLoadingManager: Critical failure - loading-overlay element not found after multiple retries. Please check HTML structure.');
+    }
+    return false;
+  }
 
   // Main loading function with a unified API and enhanced error handling.
    setLoading(isLoading, options = {}) {
@@ -755,8 +748,10 @@ class UnifiedLoadingManager {
 
     try {
       if (isLoading) {
+        console.log('UnifiedLoadingManager: Showing loading overlay with options:', options);
         this.show(options);
       } else {
+        console.log('UnifiedLoadingManager: Hiding loading overlay.');
         this.hide();
       }
     } catch (error) {
