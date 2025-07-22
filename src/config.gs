@@ -1720,7 +1720,7 @@ function getSheetDetails(context, spreadsheetId, sheetName) {
     };
 
   } catch (error) {
-    console.warn('getSheetDetailsOptimized エラー:', error.message);
+    console.warn('getSheetDetails エラー:', error.message);
     return {
       allHeaders: [],
       guessedConfig: {},
