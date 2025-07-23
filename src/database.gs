@@ -625,14 +625,30 @@ function fetchUserFromDatabase(field, value) {
     }
     
     console.log('fetchUserFromDatabase - フィールド検索開始: index=' + fieldIndex);
+    console.log('fetchUserFromDatabase - デバッグ: headers=' + JSON.stringify(headers));
+    console.log('fetchUserFromDatabase - デバッグ: 検索対象データ行数=' + (values.length - 1));
     
     for (var i = 1; i < values.length; i++) {
       var currentRow = values[i];
       var currentValue = currentRow[fieldIndex];
       
+      console.log('fetchUserFromDatabase - 行' + i + 'データ詳細:', {
+        fullRow: JSON.stringify(currentRow),
+        fieldValue: currentValue,
+        fieldIndex: fieldIndex,
+        rowLength: currentRow ? currentRow.length : 0
+      });
+      
       // 値の比較を厳密に行う（文字列の trim と型変換）
       var normalizedCurrentValue = currentValue ? String(currentValue).trim() : '';
       var normalizedSearchValue = value ? String(value).trim() : '';
+      
+      console.log('fetchUserFromDatabase - 値比較:', {
+        original: currentValue,
+        normalized: normalizedCurrentValue,
+        searchValue: normalizedSearchValue,
+        isMatch: normalizedCurrentValue === normalizedSearchValue
+      });
       
       // 最適化: マッチした場合のみログ出力（冗長ログ削減）
       if (normalizedCurrentValue === normalizedSearchValue) {
@@ -908,8 +924,14 @@ function createUser(userData) {
     var newRow = DB_SHEET_CONFIG.HEADERS.map(function(header) {
       return userData[header] || '';
     });
+    
+    console.log('createUser - デバッグ: ヘッダー構成=' + JSON.stringify(DB_SHEET_CONFIG.HEADERS));
+    console.log('createUser - デバッグ: ユーザーデータ=' + JSON.stringify(userData));
+    console.log('createUser - デバッグ: 作成される行データ=' + JSON.stringify(newRow));
   
     appendSheetsData(service, dbId, "'" + sheetName + "'!A1", [newRow]);
+    
+    console.log('createUser - データベース書き込み完了: userId=' + userData.userId);
 
     // 最適化: 新規ユーザー作成時は対象キャッシュのみ無効化
     invalidateUserCache(userData.userId, userData.adminEmail, userData.spreadsheetId, false);
