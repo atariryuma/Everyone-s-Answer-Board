@@ -1781,10 +1781,19 @@ function createExecutionContext(requestUserId, options = {}) {
   try {
     // 1. 共有リソースの取得（最適化：既存リソース再利用対応）
     const originalSheetsService = options.reuseService || getSheetsServiceCached();
-    const userInfo = options.reuseUserInfo || getCachedUserInfo(requestUserId);
-    
+    let userInfo = options.reuseUserInfo || getCachedUserInfo(requestUserId);
+
     if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません');
+      console.warn('getCachedUserInfo miss: userId=%s', requestUserId);
+      userInfo = findUserByIdFresh(requestUserId);
+
+      if (userInfo) {
+        _executionUserInfoCache = { userId: requestUserId, userInfo };
+        console.log('✅ findUserByIdFresh success: cached for execution');
+      } else {
+        console.error('❌ findUserByIdFresh failed for userId=%s', requestUserId);
+        throw new Error('ユーザー情報が取得できません。ユーザー登録が完了しているか、データベース設定を確認してください');
+      }
     }
     
     // SheetsServiceオブジェクトの安全なコピー - 関数のクロージャスコープを保持
