@@ -2086,32 +2086,33 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
  * AdminPanel.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function unpublishBoard(requestUserId) {
-  verifyUserAccess(requestUserId);
-  try {
-    var currentUserId = requestUserId;
-    var userInfo = findUserById(currentUserId);
-    if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません');
-    }
+// NOTE: unpublishBoard関数の重複を回避するため、config.gsの実装を使用
+// function unpublishBoard(requestUserId) {
+//   verifyUserAccess(requestUserId);
+//   try {
+//     var currentUserId = requestUserId;
+//     var userInfo = findUserById(currentUserId);
+//     if (!userInfo) {
+//       throw new Error('ユーザー情報が見つかりません');
+//     }
 
-    var configJson = JSON.parse(userInfo.configJson || '{}');
+//     var configJson = JSON.parse(userInfo.configJson || '{}');
 
-    configJson.publishedSpreadsheetId = '';
-    configJson.publishedSheetName = '';
-    configJson.appPublished = false; // 公開状態をfalseにする
-    configJson.setupStatus = 'completed'; // 公開停止後もセットアップは完了状態とする
+//     configJson.publishedSpreadsheetId = '';
+//     configJson.publishedSheetName = '';
+//     configJson.appPublished = false; // 公開状態をfalseにする
+//     configJson.setupStatus = 'completed'; // 公開停止後もセットアップは完了状態とする
 
-    updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
-    invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId, true);
+//     updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
+//     invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId, true);
 
-    debugLog('✅ 回答ボードの公開を停止しました: %s', currentUserId);
-    return { status: 'success', message: '回答ボードの公開を停止しました。' };
-  } catch (e) {
-    console.error('公開停止エラー: ' + e.message);
-    return { status: 'error', message: '回答ボードの公開停止に失敗しました: ' + e.message };
-  }
-}
+//     debugLog('✅ 回答ボードの公開を停止しました: %s', currentUserId);
+//     return { status: 'success', message: '回答ボードの公開を停止しました。' };
+//   } catch (e) {
+//     console.error('公開停止エラー: ' + e.message);
+//     return { status: 'error', message: '回答ボードの公開停止に失敗しました: ' + e.message };
+//   }
+// }
 
 /**
  * フォーム作成ファクトリ

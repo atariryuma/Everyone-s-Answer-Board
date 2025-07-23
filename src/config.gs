@@ -1340,16 +1340,30 @@ function addSpreadsheetUrl(requestUserId, url) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function unpublishBoard(requestUserId) {
+  console.log('🔧 unpublishBoard: 公開停止処理開始', { requestUserId });
   verifyUserAccess(requestUserId);
   try {
     var currentUserId = requestUserId; // requestUserId を使用
 
     var userInfo = findUserById(currentUserId);
     if (!userInfo) {
+      console.error('❌ ユーザー情報が見つかりません:', currentUserId);
       throw new Error('ユーザー情報が見つかりません。');
     }
+    
+    console.log('✅ ユーザー情報取得成功:', {
+      userId: currentUserId,
+      hasConfigJson: !!userInfo.configJson,
+      adminEmail: userInfo.adminEmail
+    });
 
     var configJson = JSON.parse(userInfo.configJson || '{}');
+    console.log('🔍 公開停止前の設定:', {
+      publishedSheet: configJson.publishedSheet,
+      publishedSheetName: configJson.publishedSheetName,
+      publishedSpreadsheetId: configJson.publishedSpreadsheetId,
+      appPublished: configJson.appPublished
+    });
 
     // 完全な公開状態のクリア（正しいプロパティ名を使用）
     configJson.publishedSheet = ''; // 後方互換性のため残す

@@ -1094,22 +1094,60 @@ function hideDigitalCitizenshipModal() {
 // Show confirmation modal
 function showConfirmationModal(title, message, onConfirm) {
   const modal = document.getElementById('confirmation-modal');
-  const titleElement = document.getElementById('confirmation-title');
-  const messageElement = document.getElementById('confirmation-message');
-  const confirmBtn = document.getElementById('confirmation-confirm');
+  const titleElement = document.getElementById('modal-title');
+  const messageElement = document.getElementById('modal-message');
+  const confirmBtn = document.getElementById('modal-confirm-btn');
+  const cancelBtn = document.getElementById('modal-cancel-btn');
+  
+  console.log('🔍 showConfirmationModal: 要素検索結果:', {
+    modal: !!modal,
+    titleElement: !!titleElement,
+    messageElement: !!messageElement,
+    confirmBtn: !!confirmBtn,
+    cancelBtn: !!cancelBtn
+  });
   
   if (modal && titleElement && messageElement && confirmBtn) {
     titleElement.textContent = title;
     messageElement.textContent = message;
     
+    // 確認ボタンのクリックイベント
     confirmBtn.onclick = function() {
+      console.log('✅ 確認ボタンがクリックされました');
       hideConfirmationModal();
-      if (onConfirm) onConfirm();
+      if (onConfirm) {
+        try {
+          onConfirm();
+        } catch (error) {
+          console.error('❌ 確認コールバック実行エラー:', error);
+        }
+      }
     };
+    
+    // キャンセルボタンのクリックイベント
+    if (cancelBtn) {
+      cancelBtn.onclick = function() {
+        console.log('❌ キャンセルボタンがクリックされました');
+        hideConfirmationModal();
+      };
+    }
     
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     manageFocusForModal('confirmation-modal', true);
+    console.log('✅ 確認モーダルを表示しました');
+  } else {
+    console.error('❌ モーダル要素が見つかりません。フォールバックを使用します。');
+    // フォールバック: ブラウザ標準の確認ダイアログ
+    if (window.confirm(`${title}\n\n${message}`)) {
+      if (onConfirm) {
+        try {
+          onConfirm();
+        } catch (error) {
+          console.error('❌ フォールバック確認コールバック実行エラー:', error);
+        }
+      }
+    }
   }
 }
 
