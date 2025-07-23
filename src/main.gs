@@ -443,8 +443,29 @@ function doGet(e) {
 
   // 5. パラメータ検証とデフォルト処理
     if (!params || !params.mode) {
-      // パラメータなしまたは不正な場合はログインページを表示
-      console.log('No mode parameter, showing login page');
+      // パラメータなしの場合、前回の管理パネル状態を確認
+      console.log('No mode parameter, checking previous admin session');
+      
+      var activeUserEmail = Session.getActiveUser().getEmail();
+      if (activeUserEmail) {
+        var userProperties = PropertiesService.getUserProperties();
+        var lastAdminUserId = userProperties.getProperty('lastAdminUserId');
+        
+        if (lastAdminUserId) {
+          console.log('Found previous admin session, redirecting to admin panel:', lastAdminUserId);
+          // 前回の管理パネルセッションが存在する場合、そこにリダイレクト
+          if (verifyAdminAccess(lastAdminUserId)) {
+            const userInfo = findUserById(lastAdminUserId);
+            return renderAdminPanel(userInfo, 'admin');
+          } else {
+            // 権限がない場合は状態をクリア
+            userProperties.deleteProperty('lastAdminUserId');
+          }
+        }
+      }
+      
+      // 前回のセッションがない場合はログインページを表示
+      console.log('No previous admin session, showing login page');
       return showLoginPage();
     }
 
@@ -457,6 +478,12 @@ function doGet(e) {
       if (!verifyAdminAccess(params.userId)) {
         return showErrorPage('アクセス拒否', 'この管理パネルにアクセスする権限がありません。');
       }
+      
+      // 管理パネルアクセス時に状態を保存
+      var userProperties = PropertiesService.getUserProperties();
+      userProperties.setProperty('lastAdminUserId', params.userId);
+      console.log('Saved admin session state:', params.userId);
+      
       const userInfo = findUserById(params.userId);
       return renderAdminPanel(userInfo, 'admin');
     }
@@ -1012,7 +1039,7 @@ function renderAdminPanel(userInfo, mode) {
   
   
   const htmlOutput = adminTemplate.evaluate()
-    .setTitle('みんなの回答ボード 管理パネル')
+    .setTitle('StudyQuest - 管理パネル')
     .setSandboxMode(HtmlService.SandboxMode.NATIVE);
   
   // XFrameOptionsMode を安全に設定
