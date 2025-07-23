@@ -201,7 +201,7 @@ function forceUrlSystemReset() {
  * @param {string} userId - ユーザーID
  * @returns {object} URL群
  */
-function generateAppUrls(userId) {
+function generateUserUrls(userId) {
   try {
     // userIdの妥当性チェック
     if (!userId || userId === 'undefined' || typeof userId !== 'string' || userId.trim() === '') {
