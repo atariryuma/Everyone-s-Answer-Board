@@ -4270,7 +4270,7 @@ function getInitialData(requestUserId, targetSheetName) {
           reuseService: sharedSheetsService,
           reuseUserInfo: userInfo
         });
-        var sheetDetails = getSheetDetails(context, userInfo.spreadsheetId, includeSheetDetails);
+        var sheetDetails = getSheetDetailsFromContext(context, userInfo.spreadsheetId, includeSheetDetails);
         response.sheetDetails = sheetDetails;
         response._meta.includedApis.push('getSheetDetails');
         debugLog('✅ シート詳細を統合応答に追加 (最適化版):', includeSheetDetails);

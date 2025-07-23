@@ -1567,6 +1567,20 @@ function resetUserAuthentication(requestUserId) {
  * @returns {object} { allHeaders: Array<string>, guessedConfig: object, existingConfig: object }
  */
 function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
+  // パラメータ型検証（従来版）
+  console.log('🔍 getSheetDetails (userId version) parameter validation:', {
+    requestUserIdType: typeof requestUserId,
+    spreadsheetIdType: typeof spreadsheetId,
+    sheetNameType: typeof sheetName,
+    userIdIsString: typeof requestUserId === 'string'
+  });
+  
+  if (typeof requestUserId === 'object') {
+    console.error('❌ CRITICAL: getSheetDetails received object as requestUserId parameter');
+    console.error('❌ This suggests you meant to call getSheetDetailsFromContext instead');
+    throw new Error('Parameter mismatch: Use getSheetDetailsFromContext for context-based calls');
+  }
+  
   verifyUserAccess(requestUserId);
   try {
     if (!sheetName) {
@@ -2005,9 +2019,9 @@ function buildResponseFromContext(context) {
           console.error('❌ buildResponseFromContext: 無効なシート名を検出:', publishedSheetName);
           console.warn('⚠️ シート詳細取得をスキップします');
         } else {
-          console.log('DEBUG: Calling getSheetDetails with context service');
+          console.log('DEBUG: Calling getSheetDetailsFromContext with context service');
           // シート情報を取得（最低限の情報のみ、既存SheetsServiceを使用）
-          const sheetDetails = getSheetDetails(context, spreadsheetId, publishedSheetName);
+          const sheetDetails = getSheetDetailsFromContext(context, spreadsheetId, publishedSheetName);
           response.sheetDetails = sheetDetails;
           response.allSheets = sheetDetails.allSheets || [];
           response.sheetNames = sheetDetails.sheetNames || [];
@@ -2054,43 +2068,40 @@ function buildResponseFromContext(context) {
  * @param {string} sheetName - シート名
  * @returns {object} シート詳細情報
  */
-function getSheetDetails(context, spreadsheetId, sheetName) {
-  console.log('DEBUG: getSheetDetails received context with sheetsService');
+function getSheetDetailsFromContext(context, spreadsheetId, sheetName) {
+  console.log('DEBUG: getSheetDetailsFromContext called with context object');
   
-  // 🚨 緊急診断: contextの型と内容を確認
-  console.log('🚨 CRITICAL: Context parameter analysis:', {
+  // 🚨 パラメータ型検証: 正しい型で呼ばれているか確認
+  console.log('🔍 Parameter validation:', {
     contextType: typeof context,
-    isString: typeof context === 'string',
-    isObject: typeof context === 'object' && context !== null,
-    contextLength: context && context.length,
-    contextConstructor: context && context.constructor && context.constructor.name,
-    firstFewChars: typeof context === 'string' ? context.substring(0, 100) : 'not string'
+    spreadsheetIdType: typeof spreadsheetId,
+    sheetNameType: typeof sheetName,
+    contextIsObject: typeof context === 'object' && context !== null,
+    spreadsheetIdIsString: typeof spreadsheetId === 'string',
+    sheetNameIsString: typeof sheetName === 'string'
   });
   
-  // contextが文字列の場合は復元を試みる
+  // contextが文字列の場合はエラー（パラメータ順序間違いの可能性）
   if (typeof context === 'string') {
-    console.error('❌ CRITICAL ERROR: getSheetDetails received string context, attempting recovery');
-    try {
-      context = JSON.parse(context);
-      console.log('✅ Successfully recovered context from JSON string:', {
-        newType: typeof context,
-        hasUserInfo: !!(context && context.userInfo),
-        hasSheetsService: !!(context && context.sheetsService)
-      });
-      
-      // sheetsServiceが失われている場合は再作成
-      if (!context.sheetsService) {
-        console.warn('⚠️ SheetsService lost during serialization in getSheetDetails, recreating...');
-        const accessToken = getServiceAccountTokenCached();
-        if (accessToken) {
-          context.sheetsService = createSheetsService(accessToken);
-          console.log('✅ SheetsService recreated after deserialization in getSheetDetails');
-        }
-      }
-    } catch (parseError) {
-      console.error('❌ Failed to parse context string as JSON:', parseError.message);
-      throw new Error('Context parameter is corrupted (string instead of object)');
-    }
+    console.error('❌ CRITICAL: getSheetDetailsFromContext received string as context parameter');
+    console.error('❌ This suggests parameter order mismatch. Expected: (context:object, spreadsheetId:string, sheetName:string)');
+    console.error('❌ Received parameters:', {
+      param1: typeof context === 'string' ? context.substring(0, 50) : context,
+      param2: spreadsheetId,
+      param3: sheetName
+    });
+    throw new Error('Parameter order mismatch: context must be an object, not a string. Check function call parameters.');
+  }
+  
+  // 基本的なパラメータ検証
+  if (!context || typeof context !== 'object') {
+    throw new Error('getSheetDetailsFromContext: context parameter must be a valid object');
+  }
+  if (!spreadsheetId || typeof spreadsheetId !== 'string') {
+    throw new Error('getSheetDetailsFromContext: spreadsheetId parameter must be a valid string');
+  }
+  if (!sheetName || typeof sheetName !== 'string') {
+    throw new Error('getSheetDetailsFromContext: sheetName parameter must be a valid string');
   }
   
   try {
