@@ -3633,6 +3633,15 @@ function createCustomFormUI(requestUserId, config) {
         classChoices: config.classChoices,
         lastModified: new Date().toISOString()
       };
+
+      // 以前の実行で誤ってトップレベルに追加された可能性のあるプロパティを削除
+      delete updatedConfigJson.formTitle;
+      delete updatedConfigJson.mainQuestion;
+      delete updatedConfigJson.questionType;
+      delete updatedConfigJson.choices;
+      delete updatedConfigJson.includeOthers;
+      delete updatedConfigJson.enableClass;
+      delete updatedConfigJson.classChoices;
       
       // 新しく作成されたスプレッドシート情報をメインのユーザー情報として更新
       const updateData = {
