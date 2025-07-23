@@ -691,8 +691,14 @@ function showSetupPage() {
 function showAppSetupPage(userId) {
     // システム管理者権限チェック
     try {
-      if (!isDeployUser()) {
-        console.warn('Unauthorized access attempt to app setup page:', Session.getActiveUser().getEmail());
+      console.log('showAppSetupPage: Checking deploy user permissions...');
+      const currentUserEmail = Session.getActiveUser().getEmail();
+      console.log('showAppSetupPage: Current user email:', currentUserEmail);
+      const deployUserCheckResult = isDeployUser();
+      console.log('showAppSetupPage: isDeployUser() result:', deployUserCheckResult);
+
+      if (!deployUserCheckResult) {
+        console.warn('Unauthorized access attempt to app setup page:', currentUserEmail);
         return showErrorPage('アクセス権限がありません', 'この機能にアクセスする権限がありません。システム管理者にお問い合わせください。');
       }
     } catch (error) {
