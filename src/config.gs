@@ -2037,7 +2037,32 @@ function getSheetDetails(context, spreadsheetId, sheetName) {
     if (!context?.sheetsService?.baseUrl || !context?.sheetsService?.accessToken) {
       console.warn('⚠️ ExecutionContextのSheetsServiceが無効、復旧中...');
       try {
-        context.sheetsService = getSheetsServiceCached();
+        // Step 1: 新しいサービスを取得（代入前の検証）
+        console.log('🔍 Step 1: getSheetsServiceCached呼び出し前');
+        const newService = getSheetsServiceCached();
+        console.log('🔍 Step 2: getSheetsServiceCached返り値の検証:', {
+          hasService: !!newService,
+          hasBaseUrl: !!(newService && newService.baseUrl),
+          hasAccessToken: !!(newService && newService.accessToken),
+          baseUrl: newService && newService.baseUrl,
+          serviceType: typeof newService,
+          serviceKeys: newService ? Object.keys(newService) : null
+        });
+        
+        // Step 2: 代入前のコンテキスト状態確認
+        console.log('🔍 Step 3: 代入前のコンテキスト状態:', {
+          hasContext: !!context,
+          contextType: typeof context,
+          contextKeys: context ? Object.keys(context) : null,
+          currentService: context ? typeof context.sheetsService : 'no context'
+        });
+        
+        // Step 3: 実際の代入
+        console.log('🔍 Step 4: サービス代入実行');
+        context.sheetsService = newService;
+        console.log('🔍 Step 5: 代入直後の確認');
+        
+        // Step 4: 代入後の検証
         console.log('🔍 復旧後のサービスオブジェクト検証:', {
           hasService: !!context.sheetsService,
           hasBaseUrl: !!(context.sheetsService && context.sheetsService.baseUrl),
@@ -2047,18 +2072,87 @@ function getSheetDetails(context, spreadsheetId, sheetName) {
           serviceKeys: context.sheetsService ? Object.keys(context.sheetsService) : null
         });
         
+        // 代入が失敗した場合のフォールバック: 直接サービスを作成
         if (!context.sheetsService || !context.sheetsService.baseUrl || !context.sheetsService.accessToken) {
-          throw new Error('SheetsService復旧に失敗: 有効なサービスオブジェクトを作成できません');
+          console.warn('⚠️ 代入が失敗、直接サービス作成でリトライ');
+          
+          // トークンを取得して直接サービスを作成
+          const accessToken = getServiceAccountTokenCached();
+          if (!accessToken) {
+            throw new Error('SheetsService復旧に失敗: アクセストークンが取得できません');
+          }
+          
+          // 直接createSheetsServiceを呼び出してコンテキストに設定
+          context.sheetsService = createSheetsService(accessToken);
+          
+          console.log('🔍 直接作成後の検証:', {
+            hasService: !!context.sheetsService,
+            hasBaseUrl: !!(context.sheetsService && context.sheetsService.baseUrl),
+            hasAccessToken: !!(context.sheetsService && context.sheetsService.accessToken),
+            baseUrl: context.sheetsService && context.sheetsService.baseUrl,
+            serviceType: typeof context.sheetsService
+          });
+          
+          // 最終検証
+          if (!context.sheetsService || !context.sheetsService.baseUrl || !context.sheetsService.accessToken) {
+            throw new Error('SheetsService復旧に失敗: 直接作成でも有効なサービスオブジェクトを作成できません');
+          }
+          
+          console.log('✅ SheetsService直接作成による復旧完了');
+        } else {
+          console.log('✅ SheetsService復旧完了');
         }
-        console.log('✅ SheetsService復旧完了');
       } catch (serviceError) {
         console.error('❌ SheetsService復旧エラー:', serviceError.message);
-        throw new Error('Sheets APIサービスの復旧に失敗しました: ' + serviceError.message);
+        console.error('❌ Error stack:', serviceError.stack);
+        
+        // 最後の手段: 強制リフレッシュでリトライ
+        try {
+          console.warn('🔄 最後の手段: 強制リフレッシュでサービス復旧をリトライ');
+          
+          // キャッシュを強制クリアして新しいトークンで再試行
+          cacheManager.remove('service_account_token');
+          const freshToken = generateNewServiceAccountToken();
+          
+          if (!freshToken) {
+            throw new Error('強制リフレッシュでもトークン取得に失敗');
+          }
+          
+          context.sheetsService = createSheetsService(freshToken);
+          
+          console.log('🔍 強制リフレッシュ後の検証:', {
+            hasService: !!context.sheetsService,
+            hasBaseUrl: !!(context.sheetsService && context.sheetsService.baseUrl),
+            hasAccessToken: !!(context.sheetsService && context.sheetsService.accessToken),
+            serviceType: typeof context.sheetsService
+          });
+          
+          if (!context.sheetsService || !context.sheetsService.baseUrl || !context.sheetsService.accessToken) {
+            throw new Error('強制リフレッシュでも復旧失敗');
+          }
+          
+          console.log('✅ 強制リフレッシュによるSheetsService復旧成功');
+          
+        } catch (retryError) {
+          console.error('❌ 強制リフレッシュリトライも失敗:', retryError.message);
+          throw new Error(`Sheets APIサービスの復旧に完全に失敗しました。初期エラー: ${serviceError.message}, リトライエラー: ${retryError.message}`);
+        }
       }
     }
     
     // コンテキスト内のSheetsServiceを使用してシート情報を取得
     console.log('DEBUG: Calling getSpreadsheetsData with context service');
+    
+    // 最終的なサービス状態の検証（API呼び出し前）
+    console.log('🔍 API呼び出し前の最終サービス検証:', {
+      hasService: !!context.sheetsService,
+      hasBaseUrl: !!(context.sheetsService && context.sheetsService.baseUrl),
+      hasAccessToken: !!(context.sheetsService && context.sheetsService.accessToken),
+      hasSpreadsheets: !!(context.sheetsService && context.sheetsService.spreadsheets),
+      hasGet: !!(context.sheetsService && context.sheetsService.spreadsheets && typeof context.sheetsService.spreadsheets.get === 'function'),
+      serviceType: typeof context.sheetsService,
+      baseUrl: context.sheetsService && context.sheetsService.baseUrl
+    });
     let data;
     try {
       data = getSpreadsheetsData(context.sheetsService, spreadsheetId);

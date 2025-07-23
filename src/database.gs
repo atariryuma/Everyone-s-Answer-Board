@@ -408,10 +408,21 @@ function getSheetsServiceCached(forceRefresh) {
     console.log('✅ サービスオブジェクト検証成功:', {
       hasBaseUrl: true,
       hasAccessToken: true,
+      hasSpreadsheets: !!service.spreadsheets,
+      hasGet: !!(service.spreadsheets && typeof service.spreadsheets.get === 'function'),
       baseUrl: service.baseUrl
     });
     
-    console.log('✅ キャッシュ用新規Sheetsサービス作成完了');
+    // 関数の存在確認（重要: Google Apps Scriptで関数が失われていないか確認）
+    if (!service.spreadsheets || typeof service.spreadsheets.get !== 'function') {
+      console.error('❌ 重要な関数が失われています:', {
+        hasSpreadsheets: !!service.spreadsheets,
+        getType: service.spreadsheets ? typeof service.spreadsheets.get : 'no spreadsheets'
+      });
+      throw new Error('SheetsServiceオブジェクトの関数が正しく設定されていません');
+    }
+    
+    console.log('✅ キャッシュ用新規Sheetsサービス作成完了（関数検証済み）');
     return service;
     
   } catch (error) {
