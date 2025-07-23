@@ -379,45 +379,41 @@ function getDeletionLogs() {
  * @returns {object} Sheets APIサービス
  */
 function getSheetsServiceCached(forceRefresh) {
-  const SHEETS_SERVICE_CACHE_KEY = 'SHEETS_SERVICE_CACHE';
-  
   try {
-    // forceRefreshが指定された場合はキャッシュをクリア
+    console.log('🔧 getSheetsServiceCached: 新規サービス作成開始（キャッシュなし版）');
+    
+    var accessToken;
     if (forceRefresh) {
-      console.log('🔄 getSheetsServiceCached: 強制リフレッシュでキャッシュクリア');
-      cacheManager.remove(SHEETS_SERVICE_CACHE_KEY);
+      console.log('🔐 認証トークンも強制リフレッシュ');
+      cacheManager.remove('service_account_token');
+      accessToken = generateNewServiceAccountToken();
+    } else {
+      accessToken = getServiceAccountTokenCached();
     }
     
-    return cacheManager.get(SHEETS_SERVICE_CACHE_KEY, () => {
-      console.log('🔧 getSheetsServiceCached: 新規サービス作成開始');
-      
-      // forceRefreshの場合は認証トークンも強制リフレッシュ
-      var accessToken;
-      if (forceRefresh) {
-        console.log('🔐 認証トークンも強制リフレッシュ');
-        // 認証キャッシュをクリア
-        cacheManager.remove('service_account_token');
-        accessToken = generateNewServiceAccountToken();
-      } else {
-        accessToken = getServiceAccountTokenCached();
-      }
-      
-      if (!accessToken) {
-        throw new Error('サービスアカウントトークンが取得できませんでした');
-      }
-      
-      var service = createSheetsService(accessToken);
-      if (!service || !service.baseUrl) {
-        throw new Error('Sheets APIサービスの初期化に失敗しました');
-      }
-      
-      console.log('✅ キャッシュ用新規Sheetsサービス作成完了');
-      return service;
-      
-    }, { 
-      ttl: 3300, // 55分間キャッシュ（トークンより少し短め）
-      enableMemoization: true 
+    if (!accessToken) {
+      throw new Error('サービスアカウントトークンが取得できませんでした');
+    }
+    
+    var service = createSheetsService(accessToken);
+    if (!service || !service.baseUrl || !service.accessToken) {
+      console.error('❌ サービスオブジェクト検証失敗:', {
+        hasService: !!service,
+        hasBaseUrl: !!(service && service.baseUrl),
+        hasAccessToken: !!(service && service.accessToken)
+      });
+      throw new Error('Sheets APIサービスの初期化に失敗しました: 有効なサービスオブジェクトを作成できません');
+    }
+    
+    console.log('✅ サービスオブジェクト検証成功:', {
+      hasBaseUrl: true,
+      hasAccessToken: true,
+      baseUrl: service.baseUrl
     });
+    
+    console.log('✅ キャッシュ用新規Sheetsサービス作成完了');
+    return service;
+    
   } catch (error) {
     console.error('❌ getSheetsServiceCached error:', error.message);
     throw error;

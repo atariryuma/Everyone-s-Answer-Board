@@ -554,7 +554,7 @@ function autoMapHeaders(headers, sheetName = null) {
   // 高精度マッピングルール（優先度順）
   const mappingRules = {
     opinionHeader: {
-      exact: ['今日のテーマについて、あなたの考えや意見を聞かせてください', 'あなたの回答・意見', '回答・意見'],
+      exact: ['今日の学習について、あなたの考えや感想を聞かせてください', 'あなたの回答・意見', '回答・意見'],
       high: ['今日のテーマ', 'あなたの考え', '意見', '回答', '答え', '質問への回答'],
       medium: ['answer', 'response', 'opinion', 'comment', '投稿', 'コメント', '内容'],
       low: ['テキスト', 'text', '記述', '入力', '自由記述']
@@ -2038,6 +2038,15 @@ function getSheetDetails(context, spreadsheetId, sheetName) {
       console.warn('⚠️ ExecutionContextのSheetsServiceが無効、復旧中...');
       try {
         context.sheetsService = getSheetsServiceCached();
+        console.log('🔍 復旧後のサービスオブジェクト検証:', {
+          hasService: !!context.sheetsService,
+          hasBaseUrl: !!(context.sheetsService && context.sheetsService.baseUrl),
+          hasAccessToken: !!(context.sheetsService && context.sheetsService.accessToken),
+          baseUrl: context.sheetsService && context.sheetsService.baseUrl,
+          serviceType: typeof context.sheetsService,
+          serviceKeys: context.sheetsService ? Object.keys(context.sheetsService) : null
+        });
+        
         if (!context.sheetsService || !context.sheetsService.baseUrl || !context.sheetsService.accessToken) {
           throw new Error('SheetsService復旧に失敗: 有効なサービスオブジェクトを作成できません');
         }

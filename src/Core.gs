@@ -2297,7 +2297,7 @@ function getQuestionConfig(questionType, customConfig) {
       helpText: ''
     },
     mainQuestion: {
-      title: '今日のテーマについて、あなたの考えや意見を聞かせてください',
+      title: '今日の学習について、あなたの考えや感想を聞かせてください',
       helpText: '',
       choices: ['気づいたことがある。', '疑問に思うことがある。', 'もっと知りたいことがある。'],
       type: 'paragraph'
