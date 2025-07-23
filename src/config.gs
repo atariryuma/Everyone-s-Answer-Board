@@ -1895,6 +1895,38 @@ function buildResponseFromContext(context) {
   const startTime = new Date().getTime();
   console.log('🏗️ buildResponseFromContext: DB検索なしでレスポンス構築');
   
+  // 🚨 緊急診断: buildResponseFromContext受信時のcontext確認
+  console.log('🚨 CRITICAL: Context at buildResponseFromContext entry:', {
+    contextType: typeof context,
+    isString: typeof context === 'string',
+    isObject: typeof context === 'object' && context !== null,
+    contextConstructor: context && context.constructor && context.constructor.name,
+    hasUserInfo: context && typeof context.userInfo !== 'undefined',
+    hasSheetsService: context && typeof context.sheetsService !== 'undefined'
+  });
+  
+  // contextが文字列の場合の復旧処理
+  if (typeof context === 'string') {
+    console.error('❌ CRITICAL: buildResponseFromContext received string context, attempting recovery');
+    try {
+      context = JSON.parse(context);
+      console.log('✅ Successfully recovered context from JSON string');
+      
+      // sheetsServiceが失われている場合は再作成
+      if (!context.sheetsService) {
+        console.warn('⚠️ SheetsService lost during serialization, recreating...');
+        const accessToken = getServiceAccountTokenCached();
+        if (accessToken) {
+          context.sheetsService = createSheetsService(accessToken);
+          console.log('✅ SheetsService recreated after deserialization');
+        }
+      }
+    } catch (parseError) {
+      console.error('❌ Failed to recover context from JSON:', parseError.message);
+      throw new Error('Context parameter corrupted and cannot be recovered');
+    }
+  }
+  
   try {
     // 最新のuserInfoから必要な情報を取得
     const userInfo = context.userInfo;
@@ -2024,6 +2056,43 @@ function buildResponseFromContext(context) {
  */
 function getSheetDetails(context, spreadsheetId, sheetName) {
   console.log('DEBUG: getSheetDetails received context with sheetsService');
+  
+  // 🚨 緊急診断: contextの型と内容を確認
+  console.log('🚨 CRITICAL: Context parameter analysis:', {
+    contextType: typeof context,
+    isString: typeof context === 'string',
+    isObject: typeof context === 'object' && context !== null,
+    contextLength: context && context.length,
+    contextConstructor: context && context.constructor && context.constructor.name,
+    firstFewChars: typeof context === 'string' ? context.substring(0, 100) : 'not string'
+  });
+  
+  // contextが文字列の場合は復元を試みる
+  if (typeof context === 'string') {
+    console.error('❌ CRITICAL ERROR: getSheetDetails received string context, attempting recovery');
+    try {
+      context = JSON.parse(context);
+      console.log('✅ Successfully recovered context from JSON string:', {
+        newType: typeof context,
+        hasUserInfo: !!(context && context.userInfo),
+        hasSheetsService: !!(context && context.sheetsService)
+      });
+      
+      // sheetsServiceが失われている場合は再作成
+      if (!context.sheetsService) {
+        console.warn('⚠️ SheetsService lost during serialization in getSheetDetails, recreating...');
+        const accessToken = getServiceAccountTokenCached();
+        if (accessToken) {
+          context.sheetsService = createSheetsService(accessToken);
+          console.log('✅ SheetsService recreated after deserialization in getSheetDetails');
+        }
+      }
+    } catch (parseError) {
+      console.error('❌ Failed to parse context string as JSON:', parseError.message);
+      throw new Error('Context parameter is corrupted (string instead of object)');
+    }
+  }
+  
   try {
     // 入力パラメータの検証強化
     if (!spreadsheetId) {
@@ -2431,6 +2500,17 @@ function saveAndPublish(requestUserId, sheetName, config) {
 
     // Phase 4: 統合レスポンス生成（DB検索なし）
     console.log('🏗️ Phase 4: レスポンス構築開始');
+    
+    // 🚨 緊急診断: buildResponseFromContext呼び出し前のcontext検証
+    console.log('🚨 CRITICAL: Context before buildResponseFromContext:', {
+      contextType: typeof context,
+      isString: typeof context === 'string',
+      isObject: typeof context === 'object' && context !== null,
+      hasUserInfo: context && typeof context.userInfo !== 'undefined',
+      hasSheetsService: context && typeof context.sheetsService !== 'undefined',
+      contextKeys: context && typeof context === 'object' ? Object.keys(context) : 'not object'
+    });
+    
     const finalResponse = buildResponseFromContext(context);
     console.log('✅ Phase 4完了: レスポンス構築完了');
 
