@@ -537,6 +537,50 @@ function invalidateUserCache(userId, email, spreadsheetId, clearPattern) {
 }
 
 /**
+ * クリティカル更新時の包括的キャッシュ同期化
+ * データベース更新直後に使用し、すべての関連キャッシュを確実にクリア
+ * @param {string} userId - ユーザーID
+ * @param {string} email - メールアドレス 
+ * @param {string} oldSpreadsheetId - 古いスプレッドシートID
+ * @param {string} newSpreadsheetId - 新しいスプレッドシートID
+ */
+function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId) {
+  try {
+    console.log('🔄 クリティカル更新後のキャッシュ同期開始...');
+    
+    // 段階1: 基本ユーザーキャッシュクリア
+    invalidateUserCache(userId, email, oldSpreadsheetId, true);
+    if (newSpreadsheetId && newSpreadsheetId !== oldSpreadsheetId) {
+      invalidateUserCache(userId, email, newSpreadsheetId, true);
+    }
+    
+    // 段階2: 実行レベルキャッシュクリア
+    clearExecutionUserInfoCache();
+    
+    // 段階3: 関連データベースキャッシュクリア
+    clearDatabaseCache();
+    
+    // 段階4: メモ化キャッシュの強制リセット（利用可能な場合）
+    try {
+      if (typeof resetMemoizationCache === 'function') {
+        resetMemoizationCache();
+      }
+    } catch (memoError) {
+      console.warn('メモ化キャッシュリセットをスキップ:', memoError.message);
+    }
+    
+    console.log('✅ クリティカル更新後のキャッシュ同期完了');
+    
+    // 少し待ってから検証用に短い待機
+    Utilities.sleep(100);
+    
+  } catch (error) {
+    console.error('❌ キャッシュ同期エラー:', error);
+    throw new Error('キャッシュ同期に失敗しました: ' + error.message);
+  }
+}
+
+/**
  * データベース関連キャッシュをクリアします。
  * エラー時やデータ整合性が必要な場合に使用します。
  */
