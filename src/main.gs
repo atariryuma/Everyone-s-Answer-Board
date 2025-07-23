@@ -414,7 +414,6 @@ function getSystemDomainInfo() {
 
 /**
  * Webアプリケーションのメインエントリーポイント
- * リダイレクト処理強化版：認証成功時に直接管理パネルへリダイレクト
  * @param {Object} e - URLパラメータを含むイベントオブジェクト
  * @returns {HtmlOutput} 表示するHTMLコンテンツ
  */
@@ -428,44 +427,28 @@ function doGet(e) {
       return showSetupPage();
     }
 
-    // 2. URLパラメータの解析（統一されたURL解析関数を使用）
-    const params = parseUrlParameters(e);
+    // 2. URLパラメータの解析
+    const params = parseRequestParams(e);
 
     // 3. ログイン状態の確認
-    const userEmail = Session.getActiveUser().getEmail();
-    if (!userEmail) {
+  const userEmail = Session.getActiveUser().getEmail();
+  if (!userEmail) {
+    return showLoginPage();
+  }
+
+  // 4. アプリ設定ページリクエストの処理
+  if (params.setupParam === 'true') {
+    return showAppSetupPage(params.userId);
+  }
+
+  // 5. パラメータ検証とデフォルト処理
+    if (!params || !params.mode) {
+      // パラメータなしまたは不正な場合はログインページを表示
+      console.log('No mode parameter, showing login page');
       return showLoginPage();
     }
 
-    // 4. アプリ設定ページリクエストの処理
-    if (params.setup === 'true') {
-      return showAppSetupPage(params.userId);
-    }
-
-    // 5. 認証成功後の自動リダイレクト処理
-    if (!params.mode && userEmail) {
-      // モードが指定されていない場合、ログインユーザーの管理パネルに自動リダイレクト
-      console.log('認証成功、管理パネルに自動リダイレクト開始:', userEmail);
-      
-      try {
-        // 既存ユーザーかチェック
-        const existingUser = findUserByEmail(userEmail);
-        if (existingUser && existingUser.userId) {
-          const adminUrl = buildAdminPanelUrl(existingUser.userId);
-          console.log('既存ユーザー、管理パネルへリダイレクト:', adminUrl);
-          return createRedirectResponse(adminUrl);
-        } else {
-          // 新規ユーザーの場合はログインページを表示（初回登録のため）
-          console.log('新規ユーザー、ログインページを表示');
-          return showLoginPage();
-        }
-      } catch (redirectError) {
-        console.error('自動リダイレクト処理エラー:', redirectError.message);
-        return showLoginPage(); // エラー時はログインページにフォールバック
-      }
-    }
-
-    // 6. mode=admin の場合
+    // mode=admin の場合
     if (params.mode === 'admin') {
       if (!params.userId) {
         return showErrorPage('不正なリクエスト', 'ユーザーIDが指定されていません。');
@@ -475,13 +458,10 @@ function doGet(e) {
         return showErrorPage('アクセス拒否', 'この管理パネルにアクセスする権限がありません。');
       }
       const userInfo = findUserById(params.userId);
-      if (!userInfo) {
-        return showErrorPage('エラー', 'ユーザー情報が見つかりません。');
-      }
       return renderAdminPanel(userInfo, 'admin');
     }
 
-    // 7. mode=view の場合
+    // mode=view の場合
     if (params.mode === 'view') {
       if (!params.userId) {
         return showErrorPage('不正なリクエスト', 'ユーザーIDが指定されていません。');
@@ -493,8 +473,7 @@ function doGet(e) {
       return renderAnswerBoard(userInfo, params);
     }
     
-    // 8. 不明なモードの場合はログインページへ
-    console.log('不明なモードまたはパラメータなし、ログインページを表示');
+    // 不明なモードの場合はログインページへ
     return showLoginPage();
 
   } catch (error) {
@@ -975,26 +954,30 @@ function getWebAppUrl() {
 
 
 /**
- * doGet のリクエストパラメータを解析（レガシー互換版）
- * @deprecated parseUrlParameters()を使用してください
+ * doGet のリクエストパラメータを解析
  * @param {Object} e Event object
  * @return {{mode:string,userId:string|null,setupParam:string|null,spreadsheetId:string|null,sheetName:string|null,isDirectPageAccess:boolean}}
  */
 function parseRequestParams(e) {
-  console.warn('parseRequestParams()は非推奨です。parseUrlParameters()を使用してください。');
+  // 引数の安全性チェック
+  if (!e || typeof e !== 'object') {
+    console.log('parseRequestParams: 無効なeventオブジェクト');
+    return { mode: null, userId: null, setupParam: null, spreadsheetId: null, sheetName: null, isDirectPageAccess: false };
+  }
+
+  const p = e.parameter || {};
+  const mode = p.mode || null;
+  const userId = p.userId || null;
+  const setupParam = p.setup || null;
+  const spreadsheetId = p.spreadsheetId || null;
+  const sheetName = p.sheetName || null;
+  const isDirectPageAccess = !!(userId && mode === 'view');
   
-  // 新しい統一された解析関数を使用
-  const parsed = parseUrlParameters(e);
+  // デバッグログを追加
+  console.log('parseRequestParams - Received parameters:', JSON.stringify(p));
+  console.log('parseRequestParams - Parsed mode:', mode, 'setupParam:', setupParam);
   
-  // レガシー形式に変換
-  return {
-    mode: parsed.mode || null,
-    userId: parsed.userId || null,
-    setupParam: parsed.setup || null,
-    spreadsheetId: parsed.spreadsheetId || null,
-    sheetName: parsed.sheetName || null,
-    isDirectPageAccess: !!(parsed.userId && parsed.mode === 'view')
-  };
+  return { mode, userId, setupParam, spreadsheetId, sheetName, isDirectPageAccess };
 }
 
 

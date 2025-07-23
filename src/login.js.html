@@ -123,23 +123,26 @@
         .getCurrentUserEmail();
     };
 
-    // 簡素化されたログイン処理（直接サーバーサイドへ）
+    // GAS内蔵認証を使用した簡易ログイン処理
     const handleSimpleLogin = () => {
       try {
-        setLoading(true, 'ログイン中…');
-        userEmailDisplay.textContent = 'アクセス中...';
+        setLoading(true, 'ユーザー情報確認中…');
         
-        // 直接サーバーサイドのログインフローを実行
-        // processLoginFlow()がリダイレクトレスポンスを返すため、
-        // クライアントサイドでの複雑な処理は不要
+        // URL システムのリセットを事前に実行
         google.script.run
-          .withSuccessHandler((response) => {
-            console.log('✅ ログイン処理完了:', response);
-            // サーバーサイドでリダイレクトされるため、通常ここには到達しない
-            setLoading(false);
+          .withSuccessHandler(() => {
+            console.log('URL system reset completed');
+            // 統合されたログインフローを実行
+            processUnifiedLogin()
+              .catch(handleLoginError);
           })
-          .withFailureHandler(handleLoginError)
-          .processLoginFlow(getCurrentUserEmail());
+          .withFailureHandler((error) => {
+            console.warn('URL system reset failed:', error);
+            // リセットに失敗してもログイン処理は続行
+            processUnifiedLogin()
+              .catch(handleLoginError);
+          })
+          .forceUrlSystemReset();
       } catch (err) {
         console.error('Login function error:', err);
         userEmailDisplay.textContent = 'ログイン処理エラー';

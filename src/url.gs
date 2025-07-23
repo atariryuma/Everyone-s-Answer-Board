@@ -1,287 +1,290 @@
 /**
- * @fileoverview URL生成・管理機能
- * アプリケーション全体のURL生成を統一管理
+ * @fileoverview URL管理 - GAS互換版
  */
 
-/**
- * WebApp基本URL取得（キャッシュ対応）
- */
-function getWebAppBaseUrl() {
-  const cacheKey = 'webapp_base_url';
-  return cacheManager.get(cacheKey, () => {
-    try {
-      const url = ScriptApp.getService().getUrl();
-      if (!url) {
-        throw new Error('WebApp URLが取得できませんでした');
-      }
-      console.log('WebApp基本URL取得成功:', url);
-      return url;
-    } catch (error) {
-      console.error('WebApp基本URL取得エラー:', error.message);
-      throw new Error('WebApp基本URLの取得に失敗しました: ' + error.message);
-    }
-  }, { ttl: 3600 }); // 1時間キャッシュ
-}
+// URL管理の定数
+var URL_CACHE_KEY = 'WEB_APP_URL';
+var URL_CACHE_TTL = 21600; // 6時間
 
 /**
- * 管理パネルURLを生成
- * @param {string} userId - ユーザーID
- * @returns {string} 管理パネルURL
+ * WebアプリのURLを取得（キャッシュ利用）
+ * @returns {string} WebアプリURL
  */
-function buildAdminPanelUrl(userId) {
+function computeWebAppUrl() {
   try {
-    if (!userId || typeof userId !== 'string') {
-      throw new Error('無効なユーザーIDです');
+    var url = ScriptApp.getService().getUrl();
+    if (!url) {
+      console.warn('ScriptApp.getService().getUrl()がnullを返しました');
+      return getFallbackUrl();
     }
-    
-    const baseUrl = getWebAppBaseUrl();
-    const encodedUserId = encodeURIComponent(userId);
-    const adminUrl = `${baseUrl}?mode=admin&userId=${encodedUserId}`;
-    
-    debugLog(`管理パネルURL生成: ${adminUrl}`);
-    return adminUrl;
-    
-  } catch (error) {
-    console.error('管理パネルURL生成エラー:', error.message);
-    throw new Error('管理パネルURLの生成に失敗しました: ' + error.message);
-  }
-}
 
-/**
- * 回答ボードURLを生成
- * @param {string} userId - ユーザーID
- * @returns {string} 回答ボードURL
- */
-function buildViewBoardUrl(userId) {
-  try {
-    if (!userId || typeof userId !== 'string') {
-      throw new Error('無効なユーザーIDです');
-    }
-    
-    const baseUrl = getWebAppBaseUrl();
-    const encodedUserId = encodeURIComponent(userId);
-    const viewUrl = `${baseUrl}?mode=view&userId=${encodedUserId}`;
-    
-    debugLog(`回答ボードURL生成: ${viewUrl}`);
-    return viewUrl;
-    
-  } catch (error) {
-    console.error('回答ボードURL生成エラー:', error.message);
-    throw new Error('回答ボードURLの生成に失敗しました: ' + error.message);
-  }
-}
+    url = url.replace(/\/$/, '');
 
-/**
- * セットアップURLを生成
- * @param {string} [userId] - ユーザーID（オプション）
- * @returns {string} セットアップURL
- */
-function buildSetupUrl(userId = null) {
-  try {
-    const baseUrl = getWebAppBaseUrl();
-    let setupUrl = `${baseUrl}?setup=true`;
+    // 開発モードやテスト用の一時URLを検出して除外
+    var devPatterns = [
+      /^https:\/\/[a-z0-9-]+\.googleusercontent\.com\//, // 開発モード
+      /\/userCodeAppPanel/, // テスト用パネル
+      /\/dev$/, // 開発エンドポイント
+      /\/test$/ // テストエンドポイント
+    ];
     
-    if (userId && typeof userId === 'string') {
-      const encodedUserId = encodeURIComponent(userId);
-      setupUrl += `&userId=${encodedUserId}`;
-    }
-    
-    debugLog(`セットアップURL生成: ${setupUrl}`);
-    return setupUrl;
-    
-  } catch (error) {
-    console.error('セットアップURL生成エラー:', error.message);
-    throw new Error('セットアップURLの生成に失敗しました: ' + error.message);
-  }
-}
-
-/**
- * ログインURLを生成
- * @returns {string} ログインURL
- */
-function buildLoginUrl() {
-  try {
-    const baseUrl = getWebAppBaseUrl();
-    debugLog(`ログインURL生成: ${baseUrl}`);
-    return baseUrl;
-    
-  } catch (error) {
-    console.error('ログインURL生成エラー:', error.message);
-    throw new Error('ログインURLの生成に失敗しました: ' + error.message);
-  }
-}
-
-/**
- * ユーザー用URL一式を生成（キャッシュ対応）
- * @param {string} userId - ユーザーID
- * @returns {object} URL一式
- */
-function generateUserUrls(userId) {
-  const cacheKey = `user_urls_${userId}`;
-  return cacheManager.get(cacheKey, () => {
-    try {
-      if (!userId || typeof userId !== 'string') {
-        throw new Error('無効なユーザーIDです');
-      }
-      
-      const urls = {
-        baseUrl: getWebAppBaseUrl(),
-        adminUrl: buildAdminPanelUrl(userId),
-        viewUrl: buildViewBoardUrl(userId),
-        setupUrl: buildSetupUrl(userId),
-        loginUrl: buildLoginUrl()
-      };
-      
-      console.log(`ユーザーURL一式生成完了: ${userId}`);
-      return urls;
-      
-    } catch (error) {
-      console.error('ユーザーURL生成エラー:', error.message);
-      throw new Error('ユーザーURLの生成に失敗しました: ' + error.message);
-    }
-  }, { ttl: 1800 }); // 30分キャッシュ
-}
-
-/**
- * HTTPリダイレクトレスポンスを生成
- * @param {string} targetUrl - リダイレクト先URL
- * @param {number} [statusCode=302] - HTTPステータスコード
- * @returns {HtmlOutput} リダイレクトレスポンス
- */
-function createRedirectResponse(targetUrl, statusCode = 302) {
-  try {
-    if (!targetUrl || typeof targetUrl !== 'string') {
-      throw new Error('無効なリダイレクトURLです');
-    }
-    
-    // HTTPリダイレクトのHTMLを生成
-    const redirectHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="refresh" content="0;url=${targetUrl}">
-  <title>リダイレクト中...</title>
-  <style>
-    body {
-      font-family: 'Google Sans', Arial, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-      background-color: #f8f9fa;
-    }
-    .redirect-message {
-      text-align: center;
-      color: #5f6368;
-    }
-    .spinner {
-      border: 3px solid #f3f3f3;
-      border-top: 3px solid #4285f4;
-      border-radius: 50%;
-      width: 30px;
-      height: 30px;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 20px;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-  </style>
-</head>
-<body>
-  <div class="redirect-message">
-    <div class="spinner"></div>
-    <p>ページを移動しています...</p>
-    <p><small>自動的に移動しない場合は<a href="${targetUrl}">こちら</a>をクリックしてください</small></p>
-  </div>
-  <script>
-    // 即座にリダイレクト実行
-    setTimeout(function() {
-      window.location.href = '${targetUrl}';
-    }, 100);
-  </script>
-</body>
-</html>`;
-    
-    const output = HtmlService.createHtmlOutput(redirectHtml);
-    output.setTitle('リダイレクト中...');
-    
-    console.log(`リダイレクトレスポンス生成: ${targetUrl}`);
-    return output;
-    
-  } catch (error) {
-    console.error('リダイレクトレスポンス生成エラー:', error.message);
-    throw new Error('リダイレクトレスポンスの生成に失敗しました: ' + error.message);
-  }
-}
-
-/**
- * URLパラメータを安全に解析
- * @param {object} e - doGet()のイベントオブジェクト
- * @returns {object} 解析されたパラメータ
- */
-function parseUrlParameters(e) {
-  try {
-    const params = e.parameters || {};
-    const parsed = {};
-    
-    // 各パラメータを安全に処理
-    Object.keys(params).forEach(key => {
-      const value = params[key];
-      if (Array.isArray(value)) {
-        parsed[key] = value[0] || ''; // 配列の場合は最初の値
-      } else {
-        parsed[key] = String(value || '').trim();
-      }
+    var isDevUrl = devPatterns.some(function(pattern) {
+      return pattern.test(url);
     });
     
-    // URLデコード
-    if (parsed.userId) {
-      try {
-        parsed.userId = decodeURIComponent(parsed.userId);
-      } catch (decodeError) {
-        console.warn('userIDのデコードに失敗:', decodeError.message);
-        parsed.userId = String(params.userId || '').trim();
+    if (isDevUrl) {
+      console.warn('開発モードのURLを検出しました: ' + url + ' フォールバックURLを使用します');
+      return getFallbackUrl();
+    }
+
+    // \"https://script.google.com/a/<domain>/macros/s/...\" 形式を
+    // \"https://script.google.com/a/macros/<domain>/s/...\" に補正
+    var wrongPattern = /^https:\/\/script\.google\.com\/a\/([^\/]+)\/macros\//;
+    var match = url.match(wrongPattern);
+    if (match) {
+      url = url.replace(wrongPattern, 'https://script.google.com/a/macros/' + match[1] + '/');
+    }
+
+    // 有効なURLパターンかチェック
+    var validPattern = /^https:\/\/script\.google\.com\/(a\/macros\/[^\/]+\/)?s\/[A-Za-z0-9_-]+\/(exec|dev)$/;
+    if (!validPattern.test(url)) {
+      console.warn('無効なURLパターンを検出しました: ' + url + ' フォールバックURLを使用します');
+      return getFallbackUrl();
+    }
+
+    return url;
+  } catch (e) {
+    console.error('WebアプリURL取得エラー: ' + e.message);
+    return getFallbackUrl();
+  }
+}
+
+function getWebAppUrlCached() {
+  try {
+    // 統合キャッシュマネージャーを使用してURL取得・生成・キャッシュを一元化
+    var webAppUrl = cacheManager.get(URL_CACHE_KEY, () => {
+      console.log('🔍 WebAppURL キャッシュmiss - 新規生成開始');
+      
+      // 新しいURLを生成
+      var freshUrl = ScriptApp.getService().getUrl();
+      
+      // 開発URLの検証
+      if (freshUrl.includes('googleusercontent.com') ||
+          freshUrl.includes('userCodeAppPanel') ||
+          freshUrl.endsWith('/dev')) {
+        console.warn('⚠️ 開発URLが検出されました、キャッシュしません:', freshUrl);
+        return null; // 開発URLはキャッシュしない
       }
+      
+      console.log('✅ 有効なWebAppURL生成:', freshUrl);
+      return freshUrl;
+    }, { 
+      ttl: 3600, // 1時間キャッシュ
+      enableMemoization: true 
+    });
+
+    // キャッシュされたURLの検証（既存URLが開発URLになっていないかチェック）
+    if (webAppUrl && (webAppUrl.includes('googleusercontent.com') ||
+        webAppUrl.includes('userCodeAppPanel') ||
+        webAppUrl.endsWith('/dev'))) {
+      console.warn('⚠️ キャッシュされたURLが開発URLです、クリアして再生成:', webAppUrl);
+      cacheManager.remove(URL_CACHE_KEY);
+      // 再帰的に呼び出して新しいURLを生成
+      return getWebAppUrlCached();
+    }
+
+    if (webAppUrl) {
+      console.log('✅ 統合キャッシュから有効URL取得:', webAppUrl);
+      return webAppUrl;
+    }
+
+    // フォールバック: 統合キャッシュマネージャーが失敗した場合の直接生成
+    console.warn('⚠️ 統合キャッシュが利用できません、直接URL生成に切り替え');
+    var currentUrl = computeWebAppUrl();
+    
+    if (currentUrl && !currentUrl.includes('googleusercontent.com') && !currentUrl.includes('userCodeAppPanel')) {
+      console.log('✅ 新規URL生成成功（キャッシュなし）:', currentUrl);
+      return currentUrl;
+    } else {
+      console.warn('⚠️ 無効なURL生成、フォールバックURLを使用:', currentUrl);
+      return getFallbackUrl();
     }
     
-    debugLog('URLパラメータ解析完了:', JSON.stringify(parsed));
-    return parsed;
-    
-  } catch (error) {
-    console.error('URLパラメータ解析エラー:', error.message);
-    return {}; // エラー時は空オブジェクトを返す
+  } catch (e) {
+    console.error('❌ getWebAppUrlCached critical error:', e.message);
+    return getFallbackUrl();
   }
 }
 
 /**
- * URLの妥当性をチェック
- * @param {string} url - チェック対象URL
- * @returns {boolean} 妥当な場合true
+ * フォールバックURL生成
+ * @returns {string} フォールバックURL
  */
-function isValidUrl(url) {
+function getFallbackUrl() {
   try {
-    if (!url || typeof url !== 'string') {
-      return false;
+    var scriptId = ScriptApp.getScriptId();
+    if (scriptId) {
+      return 'https://script.google.com/macros/s/' + scriptId + '/exec';
     }
-    
-    // 基本的なURL形式チェック
-    const urlPattern = /^https?:\/\/.+/;
-    if (!urlPattern.test(url)) {
-      return false;
-    }
-    
-    // Google Apps Script WebApp URLかチェック
-    const gasUrlPattern = /script\.google\.com.*\/exec/;
-    return gasUrlPattern.test(url);
-    
-  } catch (error) {
-    console.warn('URL妥当性チェックエラー:', error.message);
-    return false;
+  } catch (e) {
+    console.error('フォールバックURL生成エラー: ' + e.message);
   }
+  return '';
+}
+
+/**
+ * URLキャッシュをクリアして再初期化
+ */
+function clearUrlCache() {
+  try {
+    var cache = CacheService.getScriptCache();
+    cache.remove(URL_CACHE_KEY);
+    console.log('URL cache cleared successfully');
+    
+    // 新しいURLを即座に生成してキャッシュ
+    var newUrl = computeWebAppUrl();
+    if (newUrl && !newUrl.includes('googleusercontent.com') && !newUrl.includes('userCodeAppPanel')) {
+      cache.put(URL_CACHE_KEY, newUrl, URL_CACHE_TTL);
+      console.log('New URL cached:', newUrl);
+    }
+    
+    return newUrl;
+  } catch (e) {
+    console.error('clearUrlCache error:', e.message);
+    return getFallbackUrl();
+  }
+}
+
+/**
+ * 強制的にURLシステムをリセット（公開API）
+ * フロントエンドから呼び出し可能
+ */
+function forceUrlSystemReset() {
+  try {
+    console.log('Forcing URL system reset...');
+    
+    // 全てのURLキャッシュをクリア
+    var cache = CacheService.getScriptCache();
+    cache.remove(URL_CACHE_KEY);
+    
+    // 新しいURLを生成
+    var newUrl = computeWebAppUrl();
+    console.log('New URL generated:', newUrl);
+    
+    // 開発URLチェック
+    if (newUrl && (newUrl.includes('googleusercontent.com') || newUrl.includes('userCodeAppPanel'))) {
+      console.warn('Development URL detected, using fallback');
+      newUrl = getFallbackUrl();
+    }
+    
+    // 新しいURLをキャッシュ
+    if (newUrl) {
+      cache.put(URL_CACHE_KEY, newUrl, URL_CACHE_TTL);
+    }
+    
+    return {
+      status: 'success',
+      message: 'URLシステムがリセットされました',
+      newUrl: newUrl
+    };
+  } catch (e) {
+    console.error('forceUrlSystemReset error:', e.message);
+    return {
+      status: 'error',
+      message: 'URLシステムリセットに失敗しました: ' + e.message
+    };
+  }
+}
+
+/**
+ * アプリケーション用のURL群を生成
+ * @param {string} userId - ユーザーID
+ * @returns {object} URL群
+ */
+function generateAppUrls(userId) {
+  try {
+    // userIdの妥当性チェック
+    if (!userId || userId === 'undefined' || typeof userId !== 'string' || userId.trim() === '') {
+      console.error('generateAppUrls: 無効なuserIdが渡されました: ' + userId);
+      return {
+        webAppUrl: '',
+        adminUrl: '',
+        viewUrl: '',
+        setupUrl: '',
+        status: 'error',
+        message: '無効なユーザーIDです。有効なIDを指定してください。'
+      };
+    }
+    
+    var webAppUrl = getWebAppUrlCached();
+    
+    // 最終的なURL検証を複数回実行
+    var maxRetries = 3;
+    for (var i = 0; i < maxRetries; i++) {
+      if (!webAppUrl || webAppUrl.includes('googleusercontent.com') || webAppUrl.includes('userCodeAppPanel')) {
+        console.warn('無効なURLが返されました（試行 ' + (i + 1) + '/' + maxRetries + '）: ' + webAppUrl);
+        
+        // キャッシュをクリアして再取得
+        webAppUrl = clearUrlCache();
+        
+        if (i < maxRetries - 1) {
+          // 再試行
+          webAppUrl = computeWebAppUrl();
+        } else {
+          // 最後の試行でもダメな場合はフォールバック
+          webAppUrl = getFallbackUrl();
+        }
+      } else {
+        break;
+      }
+    }
+    
+    // 最終チェック: まだ開発URLが含まれている場合は強制的にフォールバック
+    if (webAppUrl && (webAppUrl.includes('googleusercontent.com') || webAppUrl.includes('userCodeAppPanel'))) {
+      console.error('開発URLが最終チェックで検出されました。フォールバックURLを使用します: ' + webAppUrl);
+      webAppUrl = getFallbackUrl();
+    }
+    
+    if (!webAppUrl) {
+      return {
+        webAppUrl: '',
+        adminUrl: '',
+        viewUrl: '',
+        setupUrl: '',
+        status: 'error',
+        message: 'WebアプリURLが取得できませんでした'
+      };
+    }
+    
+    // URLエンコードして安全にユーザーIDを追加
+    var encodedUserId = encodeURIComponent(userId.trim());
+    
+    return {
+      webAppUrl: webAppUrl,
+      adminUrl: webAppUrl + '?userId=' + encodedUserId + '&mode=admin',
+      viewUrl: webAppUrl + '?userId=' + encodedUserId + '&mode=view',
+      setupUrl: webAppUrl + '?setup=true',
+      status: 'success'
+    };
+  } catch (e) {
+    console.error('URL生成エラー: ' + e.message);
+    return {
+      webAppUrl: '',
+      adminUrl: '',
+      viewUrl: '',
+      setupUrl: '',
+      status: 'error',
+      message: 'URLの生成に失敗しました: ' + e.message
+    };
+  }
+}
+
+/**
+ * 指定されたURLへサーバーサイドでリダイレクトします。
+ * @param {string} url リダイレクト先のURL
+ */
+function redirectToUrl(url) {
+  return HtmlService.createHtmlOutput('<script>window.top.location.href="' + url + '";</script>');
 }
 
 /**
@@ -292,4 +295,3 @@ function buildUserAdminUrl(userId) {
   console.warn('buildUserAdminUrl()は非推奨です。buildAdminPanelUrl()を使用してください。');
   return buildAdminPanelUrl(userId);
 }
-
