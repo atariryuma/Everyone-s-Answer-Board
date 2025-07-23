@@ -1631,6 +1631,29 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
     throw new Error('Parameter mismatch: Use getSheetDetailsFromContext for context-based calls');
   }
   
+  // 強化されたパラメータ検証
+  if (typeof requestUserId !== 'string' || requestUserId.trim() === '') {
+    console.error('❌ CRITICAL: Invalid requestUserId parameter:', { requestUserId, type: typeof requestUserId });
+    throw new Error('requestUserId must be a non-empty string');
+  }
+  
+  // spreadsheetIdが提供されている場合、その形式を検証
+  if (spreadsheetId !== null && spreadsheetId !== undefined) {
+    if (typeof spreadsheetId !== 'string') {
+      console.error('❌ CRITICAL: Invalid spreadsheetId parameter type:', { spreadsheetId, type: typeof spreadsheetId });
+      throw new Error('spreadsheetId must be a string or null/undefined');
+    }
+    // Google Sheets IDの基本的な形式チェック（44文字の英数字とハイフン、アンダースコア）
+    if (spreadsheetId.length > 0 && !/^[a-zA-Z0-9_-]{10,100}$/.test(spreadsheetId)) {
+      console.error('❌ CRITICAL: Invalid spreadsheetId format:', { 
+        spreadsheetId, 
+        length: spreadsheetId.length,
+        pattern: 'Expected: 10-100 chars of [a-zA-Z0-9_-]'
+      });
+      throw new Error('spreadsheetId has invalid format for Google Sheets ID');
+    }
+  }
+  
   verifyUserAccess(requestUserId);
   try {
     // sheetNameのバリデーションとフォールバック処理
@@ -1660,6 +1683,17 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
     var targetId = spreadsheetId || getEffectiveSpreadsheetId(requestUserId);
     if (!targetId) {
       throw new Error('spreadsheetIdが取得できません');
+    }
+    
+    // targetIdがspreadsheetIdではなくsheetNameになっていないかチェック
+    if (typeof targetId === 'string' && !/^[a-zA-Z0-9_-]{10,100}$/.test(targetId)) {
+      console.error('❌ CRITICAL: targetId appears to be a sheet name instead of spreadsheet ID:', { 
+        targetId, 
+        sheetName,
+        length: targetId.length,
+        providedSpreadsheetId: spreadsheetId
+      });
+      throw new Error(`無効なspreadsheetID形式です: "${targetId}" はシート名のようです。パラメータの順序を確認してください。`);
     }
     // SpreadsheetApp.openById()の代わりにSheets APIを使用（権限問題回避）
     console.log('🔧 Sheets APIを使用してヘッダーを取得中:', { targetId, sheetName });

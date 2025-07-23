@@ -1335,7 +1335,7 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
     console.log('📞 Making API call for sheet details:', sheetName);
   }
   
-  runGasWithUserId('getSheetDetails', spreadsheetId, sheetName)
+  runGasWithUserId('getSheetDetails', 'シート情報を取得中...', spreadsheetId, sheetName)
     .then(function(details) {
       console.log('✅ Sheet details loaded via API:', details);
       
@@ -1454,7 +1454,7 @@ function loadDataPreview(sheetName, details) {
       return;
     }
     
-    runGasWithUserId('getSheetDetails', currentStatus.userInfo.spreadsheetId, sheetName)
+    runGasWithUserId('getSheetDetails', 'シート詳細を読み込み中...', currentStatus.userInfo.spreadsheetId, sheetName)
       .then(function(details) {
         if (details && details.headers) {
           const headersList = details.headers.slice(0, 5); // First 5 headers
