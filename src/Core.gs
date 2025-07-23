@@ -4136,6 +4136,21 @@ function getInitialData(requestUserId, targetSheetName) {
       throw new Error('ユーザー情報が見つかりません');
     }
     
+    // === ステップ1.5: データ整合性の自動チェックと修正 ===
+    try {
+      console.log('🔍 データ整合性の自動チェック開始...');
+      var consistencyResult = fixUserDataConsistency(currentUserId);
+      if (consistencyResult.updated) {
+        console.log('✅ データ整合性が自動修正されました');
+        // 修正後は最新データを再取得
+        clearExecutionUserInfoCache();
+        userInfo = getCachedUserInfo(currentUserId);
+      }
+    } catch (consistencyError) {
+      console.warn('⚠️ データ整合性チェック中にエラー:', consistencyError.message);
+      // エラーが発生しても初期化処理は続行
+    }
+    
     // === ステップ2: 設定データの取得と自動修復 ===
     var configJson = JSON.parse(userInfo.configJson || '{}');
     
@@ -4289,6 +4304,48 @@ function getInitialData(requestUserId, targetSheetName) {
         apiVersion: 'integrated_v1',
         error: error.message
       }
+    };
+  }
+}
+
+/**
+ * 手動データ整合性修正（管理パネル用）
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ * @returns {object} 修正結果
+ */
+function fixDataConsistencyManual(requestUserId) {
+  try {
+    verifyUserAccess(requestUserId);
+    console.log('🔧 手動データ整合性修正実行:', requestUserId);
+    
+    var result = fixUserDataConsistency(requestUserId);
+    
+    if (result.status === 'success') {
+      if (result.updated) {
+        return {
+          status: 'success',
+          message: 'データ整合性の問題を修正しました。ページを再読み込みしてください。',
+          details: result.message
+        };
+      } else {
+        return {
+          status: 'success', 
+          message: 'データ整合性に問題は見つかりませんでした。',
+          details: result.message
+        };
+      }
+    } else {
+      return {
+        status: 'error',
+        message: 'データ整合性修正中にエラーが発生しました: ' + result.message
+      };
+    }
+    
+  } catch (error) {
+    console.error('❌ 手動データ整合性修正エラー:', error);
+    return {
+      status: 'error',
+      message: '修正処理中にエラーが発生しました: ' + error.message
     };
   }
 }

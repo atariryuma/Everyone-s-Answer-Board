@@ -499,6 +499,76 @@ function findUserByIdFresh(userId) {
 }
 
 /**
+ * ユーザーデータの整合性を修正する
+ * @param {string} userId - ユーザーID
+ * @returns {object} 修正結果
+ */
+function fixUserDataConsistency(userId) {
+  try {
+    console.log('🔧 ユーザーデータ整合性修正開始:', userId);
+    
+    // 最新のユーザー情報を取得
+    var userInfo = findUserByIdFresh(userId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    console.log('📊 現在のspreadsheetId:', userInfo.spreadsheetId);
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    console.log('📝 configJson内のpublishedSpreadsheetId:', configJson.publishedSpreadsheetId);
+    
+    var needsUpdate = false;
+    var updateData = {};
+    
+    // 1. エラー情報をクリーンアップ
+    if (configJson.lastError || configJson.errorAt) {
+      console.log('🧹 エラー情報をクリーンアップ');
+      delete configJson.lastError;
+      delete configJson.errorAt;
+      needsUpdate = true;
+    }
+    
+    // 2. spreadsheetIdとpublishedSpreadsheetIdの整合性チェック
+    if (userInfo.spreadsheetId && configJson.publishedSpreadsheetId !== userInfo.spreadsheetId) {
+      console.log('🔄 publishedSpreadsheetIdを実際のspreadsheetIdに合わせて修正');
+      console.log('  修正前:', configJson.publishedSpreadsheetId);
+      console.log('  修正後:', userInfo.spreadsheetId);
+      
+      configJson.publishedSpreadsheetId = userInfo.spreadsheetId;
+      needsUpdate = true;
+    }
+    
+    // 3. セットアップ状態の正規化
+    if (userInfo.spreadsheetId && configJson.setupStatus !== 'completed') {
+      console.log('🔄 セットアップ状態を正規化');
+      configJson.setupStatus = 'completed';
+      configJson.formCreated = true;
+      configJson.appPublished = true;
+      needsUpdate = true;
+    }
+    
+    if (needsUpdate) {
+      updateData.configJson = JSON.stringify(configJson);
+      updateData.lastAccessedAt = new Date().toISOString();
+      
+      console.log('💾 整合性修正のためデータベース更新実行');
+      updateUser(userId, updateData);
+      
+      console.log('✅ ユーザーデータ整合性修正完了');
+      return { status: 'success', message: 'データ整合性が修正されました', updated: true };
+    } else {
+      console.log('✅ データ整合性に問題なし');
+      return { status: 'success', message: 'データ整合性に問題ありません', updated: false };
+    }
+    
+  } catch (error) {
+    console.error('❌ データ整合性修正エラー:', error);
+    return { status: 'error', message: 'データ整合性修正に失敗: ' + error.message };
+  }
+}
+
+/**
  * メールアドレスでユーザー検索
  * @param {string} email - メールアドレス
  * @returns {object|null} ユーザー情報
