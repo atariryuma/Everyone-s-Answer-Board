@@ -1612,9 +1612,23 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
   
   console.log('✅ ユーザーデータベース更新完了!');
   
-  // 重要: 新しいセットアップ完了後に全関連キャッシュを強制的にクリア
-  console.log('🗑️ 古いキャッシュをクリアして新しいセットアップを反映中...');
-  invalidateUserCache(requestUserId, userEmail, formAndSsInfo.spreadsheetId, true);
+  // 重要: 新しいセットアップ完了後に包括的キャッシュ同期を実行（二重保証）
+  console.log('🗑️ 新しいセットアップ確実反映のための包括的キャッシュ同期中...');
+  
+  // updateUserで既にキャッシュ同期されているが、クイックスタートの場合は追加で確実性を高める
+  synchronizeCacheAfterCriticalUpdate(requestUserId, userEmail, null, formAndSsInfo.spreadsheetId);
+  
+  // 最終検証: 更新が正確に反映されているかデータベースから直接確認
+  console.log('🔍 データベース更新の最終検証中...');
+  var verificationUserInfo = findUserByIdFresh(requestUserId);
+  if (verificationUserInfo && verificationUserInfo.spreadsheetId === formAndSsInfo.spreadsheetId) {
+    console.log('✅ データベース更新検証成功: 新しいスプレッドシートID確認');
+  } else {
+    console.error('❌ データベース更新検証失敗:');
+    console.error('  期待値:', formAndSsInfo.spreadsheetId);
+    console.error('  実際値:', verificationUserInfo ? verificationUserInfo.spreadsheetId : 'null');
+    throw new Error('データベース更新の検証に失敗しました');
+  }
   
   return updatedConfig;
 }
@@ -1694,8 +1708,20 @@ function initializeQuickStartContext(requestUserId) {
     
     // 強制的に新規作成を保証するためにspreadsheetIdをクリア
     console.log('🗑️ 既存スプレッドシートIDをクリアして新規作成を強制します');
+    
+    // データベースレベルでもスプレッドシート情報をクリア（確実性を高める）
+    updateUser(requestUserId, {
+      spreadsheetId: '',
+      spreadsheetUrl: '',
+      configJson: JSON.stringify(configJson)
+    });
+    
+    // userInfo オブジェクトもクリア
     userInfo.spreadsheetId = null;
     userInfo.spreadsheetUrl = null;
+    
+    // 更新後のキャッシュを強制同期
+    synchronizeCacheAfterCriticalUpdate(requestUserId, userEmail, userInfo.spreadsheetId, null);
   } else {
     console.log('✨ 初回セットアップを開始します');
   }
@@ -3705,8 +3731,9 @@ function createCustomFormUI(requestUserId, config) {
       
       updateUser(requestUserId, updateData);
       
-      // キャッシュをクリアして次回取得時に最新データを確保
-      invalidateUserCache(requestUserId, activeUserEmail, result.spreadsheetId, true);
+      // カスタムフォーム作成後の包括的キャッシュ同期（Quick Startと同様）
+      console.log('🗑️ カスタムフォーム作成後の包括的キャッシュ同期中...');
+      synchronizeCacheAfterCriticalUpdate(requestUserId, activeUserEmail, existingUser.spreadsheetId, result.spreadsheetId);
     } else {
       console.warn('createCustomFormUI - user not found:', requestUserId);
     }
