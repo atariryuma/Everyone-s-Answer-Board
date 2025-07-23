@@ -3620,13 +3620,19 @@ function createCustomFormUI(requestUserId, config) {
       updatedConfigJson.publishedSheetName = result.sheetName;
       
       // カスタムフォーム設定情報を保存
-      updatedConfigJson.formTitle = config.formTitle;
-      updatedConfigJson.mainQuestion = config.mainQuestion;
-      updatedConfigJson.questionType = config.questionType;
-      updatedConfigJson.choices = config.choices;
-      updatedConfigJson.includeOthers = config.includeOthers;
-      updatedConfigJson.enableClass = config.enableClass;
-      updatedConfigJson.classChoices = config.classChoices;
+      // カスタムフォーム設定情報をシート固有のキーの下に保存
+      const sheetKey = 'sheet_' + result.sheetName;
+      updatedConfigJson[sheetKey] = {
+        ...(updatedConfigJson[sheetKey] || {}), // 既存のシート設定を保持
+        formTitle: config.formTitle,
+        mainQuestion: config.mainQuestion,
+        questionType: config.questionType,
+        choices: config.choices,
+        includeOthers: config.includeOthers,
+        enableClass: config.enableClass,
+        classChoices: config.classChoices,
+        lastModified: new Date().toISOString()
+      };
       
       // 新しく作成されたスプレッドシート情報をメインのユーザー情報として更新
       const updateData = {
