@@ -497,7 +497,7 @@ function handleAdminRoute(userInfo, params, userEmail) {
   if (params.userId && params.userId !== userInfo.userId) {
     console.warn(`不正アクセス試行: ${userEmail} が userId ${params.userId} にアクセスしようとしました。`);
     const correctUrl = buildUserAdminUrl(userInfo.userId);
-    return createSecureRedirect(correctUrl, '要求された管理パネルへのアクセス権がありません。');
+    return redirectToUrl(correctUrl);
   }
 
   // 強化されたセキュリティ検証: 指定されたIDの登録メールアドレスと現在ログイン中のGoogleアカウントが一致するかを検証
@@ -506,7 +506,7 @@ function handleAdminRoute(userInfo, params, userEmail) {
     if (!isVerified) {
       console.warn(`セキュリティ検証失敗: userId ${params.userId} への不正アクセス試行をブロックしました。`);
       const correctUrl = buildUserAdminUrl(userInfo.userId);
-      return createSecureRedirect(correctUrl, 'セキュリティ検証に失敗しました。正しい管理パネルにリダイレクトします。');
+      return redirectToUrl(correctUrl);
     }
     console.log(`✅ セキュリティ検証成功: userId ${params.userId} への正当なアクセスを確認しました。`);
   }
