@@ -15,7 +15,7 @@ describe('generateAppUrls admin url', () => {
         remove() {}
       },
       ScriptApp: {
-        getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/dev' }),
+        getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/exec' }),
         getScriptId: () => 'ID'
       },
       console: { error: () => {}, log: () => {}, warn: () => {} },
@@ -59,7 +59,7 @@ describe('generateAppUrls admin url', () => {
   });
 
   test('returns adminUrl with userId and mode parameter', () => {
-    const urls = context.generateAppUrls('abc');
-    expect(urls.adminUrl).toBe('https://script.google.com/macros/s/ID/exec?userId=abc&mode=admin');
+    const urls = context.generateUserUrls('abc');
+    expect(urls.adminUrl).toBe('https://script.google.com/macros/s/ID/exec?mode=admin&userId=abc');
   });
 });

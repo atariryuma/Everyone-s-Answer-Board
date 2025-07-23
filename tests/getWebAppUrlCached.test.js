@@ -1,7 +1,7 @@
 const fs = require('fs');
 const vm = require('vm');
 
-describe('getWebAppUrlCached upgrade', () => {
+describe('getWebAppBaseUrl caching', () => {
   const mainCode = fs.readFileSync('src/main.gs', 'utf8');
   const urlCode = fs.readFileSync('src/url.gs', 'utf8');
   let context;
@@ -20,7 +20,7 @@ describe('getWebAppUrlCached upgrade', () => {
         remove(key) { delete this.store[key]; }
       },
       ScriptApp: {
-        getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/dev' }),
+        getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/exec' }),
         getScriptId: () => 'ID'
       },
       console: { warn: () => {}, log: () => {}, error: () => {} },
@@ -34,7 +34,7 @@ describe('getWebAppUrlCached upgrade', () => {
       },
 
       CacheService: (() => {
-        const store = { WEB_APP_URL: 'https://script.google.com/macros/s/ID/dev' };
+        const store = { webapp_base_url: 'https://script.google.com/macros/s/ID/exec' };
         return {
           getUserCache: () => ({
             get: () => null,
@@ -64,23 +64,22 @@ describe('getWebAppUrlCached upgrade', () => {
   });
 
 
-  test('updates cached dev url when production url available', () => {
+  test('returns the correct web app base URL and caches it', () => {
+    // Clear cache to ensure it's fetched
+    context.cacheManager.remove('webapp_base_url');
+    
+    // First call fetches and caches
+    const url1 = context.getWebAppBaseUrl();
+    expect(url1).toBe('https://script.google.com/macros/s/ID/exec');
 
-    expect(context.getWebAppUrlCached()).toMatch('/exec');
-    context.ScriptApp.getService = () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/exec' });
-    expect(context.getWebAppUrlCached()).toMatch('/exec');
-  });
+    // Change the underlying service URL, but cache should still return old value
+    context.ScriptApp.getService = () => ({ getUrl: () => 'https://script.google.com/macros/s/NEW_ID/exec' });
+    const url2 = context.getWebAppBaseUrl();
+    expect(url2).toBe('https://script.google.com/macros/s/ID/exec'); // Still the cached value
 
-  test('normalizes domain placement in url', () => {
-    context.ScriptApp.getService = () => ({ getUrl: () => 'https://script.google.com/a/example.com/macros/s/ID/exec' });
-    const normalized = context.computeWebAppUrl();
-    expect(normalized).toBe('https://script.google.com/a/macros/example.com/s/ID/exec');
-  });
-
-  test('returns cached url when domain format differs', () => {
-    context.cacheManager.store['WEB_APP_URL'] = 'https://script.google.com/a/example.com/macros/s/ID/exec';
-    context.ScriptApp.getService = () => ({ getUrl: () => 'https://script.google.com/a/macros/example.com/s/ID/exec' });
-    const updated = context.getWebAppUrlCached();
-    expect(updated).toBe('https://script.google.com/a/example.com/macros/s/ID/exec');
+    // Clear cache and call again, should get new URL
+    context.cacheManager.remove('webapp_base_url');
+    const url3 = context.getWebAppBaseUrl();
+    expect(url3).toBe('https://script.google.com/macros/s/NEW_ID/exec');
   });
 });

@@ -1442,7 +1442,7 @@ function createBoardFromAdmin(requestUserId) {
     createUser(userData);
 
     // 成功レスポンスを返す
-    var appUrls = generateAppUrls(userId);
+    var appUrls = generateUserUrls(userId);
     return {
       status: 'success',
       message: '新しいボードが作成され、公開されました！',
@@ -1473,7 +1473,7 @@ function getExistingBoard(requestUserId) {
     var userInfo = findUserByEmail(activeUserEmail);
 
     if (userInfo && isTrue(userInfo.isActive)) {
-      var appUrls = generateAppUrls(userInfo.userId);
+      var appUrls = generateUserUrls(userInfo.userId);
       return {
         status: 'existing_user',
         userId: userInfo.userId,

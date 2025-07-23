@@ -293,11 +293,3 @@ function buildUserAdminUrl(userId) {
   return buildAdminPanelUrl(userId);
 }
 
-/**
- * 後方互換性のためのレガシー関数
- * @deprecated generateUserUrls()を使用してください
- */
-function generateAppUrls(userId) {
-  console.warn('generateAppUrls()は非推奨です。generateUserUrls()を使用してください。');
-  return generateUserUrls(userId);
-}

@@ -1131,7 +1131,7 @@ function renderAnswerBoard(userInfo, params) {
       template.isOwner = true;
       template.adminEmail = userInfo.adminEmail;
       template.cacheTimestamp = Date.now();
-      const appUrls = generateAppUrls(userInfo.userId);
+      var appUrls = generateUserUrls(userId);
       template.adminPanelUrl = appUrls.adminUrl;
       template.boardUrl = appUrls.viewUrl;
     } catch (e) {

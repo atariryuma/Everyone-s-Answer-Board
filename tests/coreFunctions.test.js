@@ -2,10 +2,12 @@ const fs = require('fs');
 const vm = require('vm');
 
 describe('Core.gs utilities', () => {
-  const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
+  const urlCode = fs.readFileSync('src/url.gs', 'utf8');
   const mainCode = fs.readFileSync('src/main.gs', 'utf8');
+  const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
   let context;
   beforeEach(() => {
+    const store = {};
     context = { 
       debugLog: () => {}, 
       console, 
@@ -21,7 +23,33 @@ describe('Core.gs utilities', () => {
         getUserCache: () => ({
           get: () => null,
           put: () => {}
+        }),
+        getScriptCache: () => ({
+          get: (k) => store[k] || null,
+          put: (k, v) => { store[k] = v; },
+          remove: (k) => { delete store[k]; }
         })
+      },
+      cacheManager: {
+        store,
+        get(key, fn) {
+          if (this.store[key]) return this.store[key];
+          const val = fn();
+          this.store[key] = val;
+          return val;
+        },
+        remove(key) { delete this.store[key]; },
+        clearByPattern: (pattern) => {
+          for (const key in store) {
+            if (key.startsWith(pattern.replace('*', ''))) {
+              delete store[key];
+            }
+          }
+        }
+      },
+      ScriptApp: {
+        getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/exec' }),
+        getScriptId: () => 'ID'
       },
       Session: {
         getActiveUser: () => ({ getEmail: () => 'test@example.com' })
@@ -33,6 +61,7 @@ describe('Core.gs utilities', () => {
       }
     };
     vm.createContext(context);
+    vm.runInContext(urlCode, context);
     vm.runInContext(mainCode, context);
     vm.runInContext(coreCode, context);
   });
@@ -69,7 +98,7 @@ describe('Core.gs utilities', () => {
         createUser: jest.fn(),
         updateUser: jest.fn(),
         invalidateUserCache: jest.fn(),
-        generateAppUrls: jest.fn(() => ({ adminUrl: 'admin', viewUrl: 'view' })),
+        generateUserUrls: jest.fn(() => ({ adminUrl: 'admin', viewUrl: 'view' })),
         getDeployUserDomainInfo: jest.fn(() => ({ deployDomain: '', isDomainMatch: true }))
       });
     });

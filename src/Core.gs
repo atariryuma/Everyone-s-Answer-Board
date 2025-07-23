@@ -158,7 +158,7 @@ function registerNewUser(adminEmail) {
     invalidateUserCache(userId, adminEmail, existingUser.spreadsheetId, false);
     
     debugLog('✅ 既存ユーザーの最終アクセス時刻を更新しました（設定は保護）: ' + adminEmail);
-    appUrls = generateAppUrls(userId);
+    appUrls = generateUserUrls(userId);
     
     return {
       userId: userId,
@@ -202,7 +202,7 @@ function registerNewUser(adminEmail) {
   }
 
   // 成功レスポンスを返す
-  appUrls = generateAppUrls(userId);
+  appUrls = generateUserUrls(userId);
   return {
     userId: userId,
     adminUrl: appUrls.adminUrl,
@@ -813,7 +813,7 @@ function getAppConfig(requestUserId) {
     }
 
     var sheets = getSheetsList(currentUserId);
-    var appUrls = generateAppUrls(currentUserId);
+    var appUrls = generateUserUrls(currentUserId);
     
     // 回答数を取得
     var answerCount = 0;
@@ -2642,7 +2642,7 @@ function createStudyQuestForm(userEmail, userId, formTitle, questionType) {
     }
     
     // 確認メッセージの設定（回答ボードURLを含む）
-    var appUrls = generateAppUrls(userId);
+    var appUrls = generateUserUrls(userId);
     var boardUrl = appUrls.viewUrl || (appUrls.webAppUrl + '?userId=' + encodeURIComponent(userId || ''));
     
     var confirmationMessage = 'ご回答ありがとうございます！ボードはこちら: ' + boardUrl;
@@ -3842,7 +3842,7 @@ function processLoginFlow() {
           // 更新エラーは無視して続行
         }
         
-        var appUrls = generateAppUrls(userInfo.userId);
+        var appUrls = generateUserUrls(userInfo.userId);
         result = {
           status: 'existing_user',
           userId: userInfo.userId,
@@ -3853,7 +3853,7 @@ function processLoginFlow() {
         console.log('processLoginFlow: 既存アクティブユーザー（設定保護）-', userInfo.userId);
       } else {
         // 明示的に非アクティブなユーザー
-        var appUrls = generateAppUrls(userInfo.userId);
+        var appUrls = generateUserUrls(userInfo.userId);
         result = {
           status: 'inactive_user',
           userId: userInfo.userId,
@@ -3947,7 +3947,7 @@ function getLoginStatus() {
 
     var result;
     if (userInfo && (userInfo.isActive === true || String(userInfo.isActive).toLowerCase() === 'true')) {
-      var urls = generateAppUrls(userInfo.userId);
+      var urls = generateUserUrls(userInfo.userId);
       result = {
         status: 'existing_user',
         userId: userInfo.userId,
@@ -3956,7 +3956,7 @@ function getLoginStatus() {
         message: 'ログインが完了しました'
       };
     } else if (userInfo) {
-      var urls = generateAppUrls(userInfo.userId);
+      var urls = generateUserUrls(userInfo.userId);
       result = {
         status: 'setup_required',
         userId: userInfo.userId,
@@ -4062,7 +4062,7 @@ function getInitialData(requestUserId, targetSheetName) {
     
     // === ステップ3: シート一覧とアプリURL生成 ===
     var sheets = getSheetsList(currentUserId);
-    var appUrls = generateAppUrls(currentUserId);
+    var appUrls = generateUserUrls(currentUserId);
     
     // === ステップ4: 回答数とリアクション数の取得 ===
     var answerCount = 0;
