@@ -1326,7 +1326,43 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
     })
     .catch(function(error) {
       console.error('Failed to load sheet config via API:', error);
-      showMessage('シート設定の読み込みに失敗しました', 'error');
+      
+      // より詳細なエラーメッセージの表示
+      let errorMessage = 'シート設定の読み込みに失敗しました';
+      
+      if (error && error.message) {
+        if (error.message.includes('が見つかりません')) {
+          errorMessage = `指定されたシート "${sheetName}" が見つかりません。`;
+        } else if (error.message.includes('ヘッダーが見つかりません')) {
+          errorMessage = `シート "${sheetName}" の1行目にヘッダーが見つかりません。`;
+        } else if (error.message.includes('アクセス権限')) {
+          errorMessage = 'スプレッドシートへのアクセス権限がありません。管理者にお問い合わせください。';
+        } else if (error.message.includes('SheetsService')) {
+          errorMessage = 'Google Sheets APIサービスでエラーが発生しました。しばらく時間をおいて再試行してください。';
+        } else {
+          errorMessage = `エラーの詳細: ${error.message}`;
+        }
+      }
+      
+      showMessage(errorMessage, 'error');
+      
+      // エラー時のリトライオプションを提供
+      if (retryCount < maxRetries) {
+        setTimeout(() => {
+          const retryButton = document.createElement('button');
+          retryButton.textContent = '再試行';
+          retryButton.className = 'ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600';
+          retryButton.onclick = () => {
+            retryButton.remove();
+            loadConfigForSelected(sheetName, spreadsheetId, retryCount + 1, maxRetries);
+          };
+          
+          const messageElement = document.querySelector('.message');
+          if (messageElement) {
+            messageElement.appendChild(retryButton);
+          }
+        }, 1000);
+      }
     });
 }
 

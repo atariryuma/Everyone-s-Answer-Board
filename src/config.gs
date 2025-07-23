@@ -2025,35 +2025,82 @@ function buildResponseFromContext(context) {
 function getSheetDetails(context, spreadsheetId, sheetName) {
   console.log('DEBUG: getSheetDetails received context with sheetsService');
   try {
+    // 入力パラメータの検証強化
+    if (!spreadsheetId) {
+      throw new Error('spreadsheetIdは必須です');
+    }
+    if (!sheetName) {
+      throw new Error('sheetNameは必須です');
+    }
+    
     // サービスオブジェクトの健全性を確認し、必要に応じて復旧
     if (!context?.sheetsService?.baseUrl || !context?.sheetsService?.accessToken) {
       console.warn('⚠️ ExecutionContextのSheetsServiceが無効、復旧中...');
-      context.sheetsService = getSheetsServiceCached();
-      if (!context.sheetsService) {
-        throw new Error('SheetsService復旧に失敗しました');
+      try {
+        context.sheetsService = getSheetsServiceCached();
+        if (!context.sheetsService || !context.sheetsService.baseUrl || !context.sheetsService.accessToken) {
+          throw new Error('SheetsService復旧に失敗: 有効なサービスオブジェクトを作成できません');
+        }
+        console.log('✅ SheetsService復旧完了');
+      } catch (serviceError) {
+        console.error('❌ SheetsService復旧エラー:', serviceError.message);
+        throw new Error('Sheets APIサービスの復旧に失敗しました: ' + serviceError.message);
       }
-      console.log('✅ SheetsService復旧完了');
     }
     
     // コンテキスト内のSheetsServiceを使用してシート情報を取得
     console.log('DEBUG: Calling getSpreadsheetsData with context service');
-    const data = getSpreadsheetsData(context.sheetsService, spreadsheetId);
+    let data;
+    try {
+      data = getSpreadsheetsData(context.sheetsService, spreadsheetId);
+      if (!data) {
+        throw new Error('getSpreadsheetsData returned null');
+      }
+      console.log('DEBUG: getSpreadsheetsData success, sheets count:', data.sheets?.length || 0);
+    } catch (apiError) {
+      console.error('❌ getSpreadsheetsData failed:', apiError.message);
+      throw new Error('スプレッドシート情報の取得に失敗: ' + apiError.message);
+    }
 
-    if (!data || !data.sheets) {
-      throw new Error('スプレッドシートデータの取得に失敗しました');
+    if (!data.sheets || data.sheets.length === 0) {
+      throw new Error('スプレッドシートにシートが存在しません');
+    }
+    
+    // 指定されたシートが存在するか確認
+    const targetSheet = data.sheets.find(sheet => sheet.properties.title === sheetName);
+    if (!targetSheet) {
+      throw new Error(`指定されたシート '${sheetName}' が見つかりません。利用可能なシート: ${data.sheets.map(s => s.properties.title).join(', ')}`);
     }
 
     // ヘッダー行をAPIで取得
     const range = `'${sheetName}'!1:1`;
-    const batch = batchGetSheetsData(context.sheetsService, spreadsheetId, [range]);
+    console.log('DEBUG: Fetching headers with range:', range);
+    let batch;
+    try {
+      batch = batchGetSheetsData(context.sheetsService, spreadsheetId, [range]);
+      if (!batch || !batch.valueRanges) {
+        throw new Error('batchGetSheetsData returned invalid response');
+      }
+      console.log('DEBUG: batchGetSheetsData success, valueRanges count:', batch.valueRanges.length);
+    } catch (batchError) {
+      console.error('❌ batchGetSheetsData failed:', batchError.message);
+      throw new Error('ヘッダー行の取得に失敗: ' + batchError.message);
+    }
+    
     const headers = (batch.valueRanges && batch.valueRanges[0] && batch.valueRanges[0].values)
       ? batch.valueRanges[0].values[0] || []
       : [];
+    
+    console.log('DEBUG: Retrieved headers:', headers.length, 'columns');
+    
+    if (headers.length === 0) {
+      throw new Error(`シート '${sheetName}' の1行目にヘッダーが見つかりません`);
+    }
 
     const guessed = autoMapHeaders(headers);
     const existing = getConfigFromContext(context, sheetName);
 
-    return {
+    const result = {
       allHeaders: headers,
       guessedConfig: guessed,
       existingConfig: existing,
@@ -2063,16 +2110,20 @@ function getSheetDetails(context, spreadsheetId, sheetName) {
         id: sheet.properties.sheetId
       }))
     };
+    
+    console.log('✅ getSheetDetails success:', {
+      headersCount: headers.length,
+      sheetsCount: data.sheets.length,
+      hasExistingConfig: Object.keys(existing).length > 0
+    });
+    
+    return result;
 
   } catch (error) {
-    console.warn('getSheetDetails エラー:', error.message);
-    return {
-      allHeaders: [],
-      guessedConfig: {},
-      existingConfig: {},
-      allSheets: [],
-      sheetNames: []
-    };
+    console.error('❌ getSheetDetails エラー:', error.message);
+    console.error('❌ Error stack:', error.stack);
+    // エラーの詳細を含めてスローし直す（空のオブジェクトを返さない）
+    throw new Error('シート詳細情報の取得に失敗しました: ' + error.message);
   }
 }
 

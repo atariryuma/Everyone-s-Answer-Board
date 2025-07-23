@@ -1024,8 +1024,37 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
         throw new Error('Sheets API error: ' + responseCode + ' - ' + responseText);
       }
       
-      var result = JSON.parse(responseText);
-      console.log('✅ batchGetSheetsData 成功: 取得した範囲数:', result.valueRanges ? result.valueRanges.length : 0);
+      var result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ JSON解析エラー:', parseError.message);
+        console.error('❌ Response text:', responseText.substring(0, 200));
+        throw new Error('APIレスポンスのJSON解析に失敗: ' + parseError.message);
+      }
+      
+      // レスポンス構造の検証
+      if (!result || typeof result !== 'object') {
+        throw new Error('無効なAPIレスポンス: オブジェクトが期待されましたが ' + typeof result + ' を受信');
+      }
+      
+      if (!result.valueRanges || !Array.isArray(result.valueRanges)) {
+        console.warn('⚠️ valueRanges配列が見つからないか、配列でありません:', typeof result.valueRanges);
+        result.valueRanges = []; // 空配列を設定
+      }
+      
+      // リクエストした範囲数と一致するか確認
+      if (result.valueRanges.length !== ranges.length) {
+        console.warn(`⚠️ リクエスト範囲数(${ranges.length})とレスポンス数(${result.valueRanges.length})が一致しません`);
+      }
+      
+      console.log('✅ batchGetSheetsData 成功: 取得した範囲数:', result.valueRanges.length);
+      
+      // 各範囲のデータ存在確認
+      result.valueRanges.forEach((valueRange, index) => {
+        const hasValues = valueRange.values && valueRange.values.length > 0;
+        console.log(`📊 範囲[${index}] ${ranges[index]}: ${hasValues ? valueRange.values.length + '行' : 'データなし'}`);
+      });
       
       return result;
       
@@ -1164,13 +1193,32 @@ function getSpreadsheetsData(service, spreadsheetId) {
       throw new Error('Sheets API error: ' + responseCode + ' - ' + responseText);
     }
     
-    var result = JSON.parse(responseText);
-    var sheetCount = result.sheets ? result.sheets.length : 0;
+    var result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('❌ JSON解析エラー:', parseError.message);
+      console.error('❌ Response text:', responseText.substring(0, 200));
+      throw new Error('APIレスポンスのJSON解析に失敗: ' + parseError.message);
+    }
     
+    // レスポンス構造の検証
+    if (!result || typeof result !== 'object') {
+      throw new Error('無効なAPIレスポンス: オブジェクトが期待されましたが ' + typeof result + ' を受信');
+    }
+    
+    if (!result.sheets || !Array.isArray(result.sheets)) {
+      console.warn('⚠️ sheets配列が見つからないか、配列でありません:', typeof result.sheets);
+      result.sheets = []; // 空配列を設定してエラーを避ける
+    }
+    
+    var sheetCount = result.sheets.length;
     console.log('✅ getSpreadsheetsData 成功: 発見シート数:', sheetCount);
     
     if (sheetCount === 0) {
       console.warn('⚠️ スプレッドシートにシートが見つかりませんでした');
+    } else {
+      console.log('📋 利用可能なシート:', result.sheets.map(s => s.properties?.title || 'Unknown').join(', '));
     }
     
     return result;
