@@ -1619,7 +1619,7 @@ function generateQuickStartResponse(setupContext, createdFiles, updatedConfig) {
   
   debugLog('✅ クイックスタートセットアップ完了: ' + requestUserId);
   
-  var appUrls = generateAppUrls(requestUserId);
+  var appUrls = generateUserUrls(requestUserId);
   return {
     status: 'success',
     message: 'クイックスタートが完了しました！回答ボードをお楽しみください。',
