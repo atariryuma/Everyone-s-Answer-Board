@@ -378,14 +378,30 @@ function getDeletionLogs() {
  * 長期キャッシュ対応Sheetsサービスを取得
  * @returns {object} Sheets APIサービス
  */
-function getSheetsServiceCached() {
+function getSheetsServiceCached(forceRefresh) {
   const SHEETS_SERVICE_CACHE_KEY = 'SHEETS_SERVICE_CACHE';
   
   try {
+    // forceRefreshが指定された場合はキャッシュをクリア
+    if (forceRefresh) {
+      console.log('🔄 getSheetsServiceCached: 強制リフレッシュでキャッシュクリア');
+      cacheManager.remove(SHEETS_SERVICE_CACHE_KEY);
+    }
+    
     return cacheManager.get(SHEETS_SERVICE_CACHE_KEY, () => {
       console.log('🔧 getSheetsServiceCached: 新規サービス作成開始');
       
-      var accessToken = getServiceAccountTokenCached();
+      // forceRefreshの場合は認証トークンも強制リフレッシュ
+      var accessToken;
+      if (forceRefresh) {
+        console.log('🔐 認証トークンも強制リフレッシュ');
+        // 認証キャッシュをクリア
+        cacheManager.remove('service_account_token');
+        accessToken = generateNewServiceAccountToken();
+      } else {
+        accessToken = getServiceAccountTokenCached();
+      }
+      
       if (!accessToken) {
         throw new Error('サービスアカウントトークンが取得できませんでした');
       }
@@ -713,24 +729,55 @@ function updateUser(userId, updateData) {
         console.log('  ' + (index + 1) + '. 範囲: ' + req.range + ', 値: ' + JSON.stringify(req.values));
       });
       
-      try {
-        batchUpdateSheetsData(service, dbId, requests);
-        console.log('✅ データベース更新リクエスト送信完了');
-        
-        // 更新成功の確認
-        console.log('🔍 更新直後の確認のため、データベースから再取得...');
-        var verifyData = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!" + String.fromCharCode(65 + userIdIndex) + rowIndex + ":" + String.fromCharCode(72) + rowIndex]);
-        if (verifyData.valueRanges && verifyData.valueRanges[0] && verifyData.valueRanges[0].values) {
-          var updatedRow = verifyData.valueRanges[0].values[0];
-          console.log('📊 更新後のユーザー行データ:', updatedRow);
-          if (updateData.spreadsheetId) {
-            var spreadsheetIdIndex = headers.indexOf('spreadsheetId');
-            console.log('🎯 スプレッドシートID更新確認:', updatedRow[spreadsheetIdIndex] === updateData.spreadsheetId ? '✅ 成功' : '❌ 失敗');
+      var maxRetries = 2;
+      var retryCount = 0;
+      var updateSuccess = false;
+      
+      while (retryCount <= maxRetries && !updateSuccess) {
+        try {
+          if (retryCount > 0) {
+            console.log('🔄 認証エラーによるリトライ (' + retryCount + '/' + maxRetries + ')');
+            // 認証エラーの場合、新しいサービスを取得
+            service = getSheetsServiceCached(true); // forceRefresh = true
+            Utilities.sleep(1000); // 少し待機
+          }
+          
+          batchUpdateSheetsData(service, dbId, requests);
+          console.log('✅ データベース更新リクエスト送信完了');
+          updateSuccess = true;
+          
+          // 更新成功の確認
+          console.log('🔍 更新直後の確認のため、データベースから再取得...');
+          var verifyData = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!" + String.fromCharCode(65 + userIdIndex) + rowIndex + ":" + String.fromCharCode(72) + rowIndex]);
+          if (verifyData.valueRanges && verifyData.valueRanges[0] && verifyData.valueRanges[0].values) {
+            var updatedRow = verifyData.valueRanges[0].values[0];
+            console.log('📊 更新後のユーザー行データ:', updatedRow);
+            if (updateData.spreadsheetId) {
+              var spreadsheetIdIndex = headers.indexOf('spreadsheetId');
+              console.log('🎯 スプレッドシートID更新確認:', updatedRow[spreadsheetIdIndex] === updateData.spreadsheetId ? '✅ 成功' : '❌ 失敗');
+            }
+          }
+          
+        } catch (updateError) {
+          retryCount++;
+          var errorMessage = updateError.toString();
+          
+          if (errorMessage.includes('401') || errorMessage.includes('UNAUTHENTICATED') || errorMessage.includes('ACCESS_TOKEN_EXPIRED')) {
+            console.warn('🔐 認証エラーを検出:', errorMessage);
+            
+            if (retryCount <= maxRetries) {
+              console.log('🔄 認証トークンをリフレッシュしてリトライします...');
+              continue; // リトライループを続行
+            } else {
+              console.error('❌ 最大リトライ回数に達しました');
+              throw new Error('認証エラーにより更新に失敗しました（最大リトライ回数超過）');
+            }
+          } else {
+            // 認証エラー以外のエラーはすぐに終了
+            console.error('❌ データベース更新中にエラーが発生:', updateError);
+            throw new Error('データベース更新に失敗しました: ' + updateError.message);
           }
         }
-      } catch (updateError) {
-        console.error('❌ データベース更新中にエラーが発生:', updateError);
-        throw new Error('データベース更新に失敗しました: ' + updateError.message);
       }
       
       // 更新が確実に反映されるまで少し待機
