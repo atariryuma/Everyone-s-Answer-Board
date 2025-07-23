@@ -1379,7 +1379,7 @@ setupEventDelegation() {
   }
 
   // Add these two methods
-  showLoadingOverlay(message = '読み込み中...') {
+  showLoadingOverlay(message = 'データを読み込み中...') {
     if (window.unifiedLoading) {
       window.unifiedLoading.setLoading(true, { 
         message: message, 
@@ -1398,7 +1398,7 @@ setupEventDelegation() {
   async loadSheetData(showLoading = true, isInitialLoad = false, requestedSheetName = null) {
     if (this.state.isLoading && showLoading) return;
     this.state.isLoading = true;
-    this.showLoadingOverlay('読み込み中...'); // Add this line
+    this.showLoadingOverlay('回答データを読み込み中...'); // Enhanced loading message
 
     const selectedClass = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
     const oldAnswers = [...this.state.currentAnswers];
@@ -1460,6 +1460,10 @@ setupEventDelegation() {
             }
 
             console.log('Received data:', result.data);
+            
+            // 🔥 CRITICAL FIX: Set currentAnswers with received data
+            this.state.currentAnswers = result.data || [];
+            console.log('✅ StudyQuestApp: Set currentAnswers with', this.state.currentAnswers.length, 'items');
             
             // Apply saved reaction states to restore user's previous reactions
             this.applyReactionState(result.data);

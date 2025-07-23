@@ -427,17 +427,22 @@ body {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
   transition: opacity 0.3s ease, background-color 0.3s ease;
-  z-index: 8500 !important;
+  z-index: 9999 !important;
   background-color: rgba(0,0,0,0) !important;
   visibility: visible !important;
   opacity: 1 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
 }
 
 /* Variant: Transparent background, allows interaction with elements behind it */
@@ -462,7 +467,7 @@ body {
 /* Variant: QuickStart, lightweight and non-blocking */
 .loading-overlay.quickstart {
   background-color: rgba(0,0,0,0.1) !important;
-  z-index: 8500 !important;
+  z-index: 9999 !important;
 }
 
 /* Content container for all loading elements */
@@ -488,6 +493,14 @@ body {
   font-size: 1.1rem;
   margin-bottom: 1.5rem;
   font-weight: 600;
+  opacity: 0.95;
+  animation: fadeInOut 2s ease-in-out infinite;
+}
+
+/* Improved loading message animation */
+@keyframes fadeInOut {
+  0%, 100% { opacity: 0.95; }
+  50% { opacity: 0.7; }
 }
 
 /* Spinner for global loading */
