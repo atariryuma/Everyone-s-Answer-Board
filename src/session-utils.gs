@@ -63,26 +63,36 @@ function cleanupSessionOnAccountSwitch(currentEmail) {
 }
 
 /**
- * Detect account switch and handle cleanup if necessary.
- * @param {string} currentEmail - Current user's email.
- * @returns {Object} Result info.
+ * ユーザー認証をリセットし、ログインページURLを返す
+ * @returns {string} ログインページのURL
  */
-function detectAccountSwitch(currentEmail) {
+function resetUserAuthentication() {
   try {
-    var props = PropertiesService.getUserProperties();
-    var lastEmail = props.getProperty('LAST_ACCESS_EMAIL');
-    var isSwitch = !!(lastEmail && lastEmail !== currentEmail);
-    props.setProperty('LAST_ACCESS_EMAIL', currentEmail);
-    if (isSwitch) {
-      cleanupSessionOnAccountSwitch(currentEmail);
-      if (typeof clearDatabaseCache === 'function') {
-        clearDatabaseCache(currentEmail);
-      }
+    console.log('ユーザー認証をリセット中...');
+    const userCache = CacheService.getUserCache();
+    if (userCache) {
+      userCache.removeAll(); // ユーザーキャッシュを全てクリア
+      console.log('ユーザーキャッシュをクリアしました。');
     }
-    return { isAccountSwitch: isSwitch, previousEmail: lastEmail };
-  } catch (e) {
-    console.error('detectAccountSwitch error: ' + e.message);
-    return { isAccountSwitch: false };
+    
+    const scriptCache = CacheService.getScriptCache();
+    if (scriptCache) {
+      scriptCache.removeAll(); // スクリプトキャッシュを全てクリア
+      console.log('スクリプトキャッシュをクリアしました。');
+    }
+
+    // PropertiesServiceもクリアする（LAST_ACCESS_EMAILなど）
+    const props = PropertiesService.getUserProperties();
+    props.deleteAllProperties();
+    console.log('ユーザープロパティをクリアしました。');
+
+    // ログインページのURLを返す
+    const loginPageUrl = ScriptApp.getWebAppUrl();
+    console.log('リセット完了。ログインページURL:', loginPageUrl);
+    return loginPageUrl;
+  } catch (error) {
+    console.error('ユーザー認証リセット中にエラーが発生しました:', error.message);
+    throw new Error('認証リセットに失敗しました: ' + error.message);
   }
 }
 

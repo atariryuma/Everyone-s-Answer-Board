@@ -351,6 +351,40 @@
     switchToAnotherAccount,
     openAppSetupPage,
     loadSystemStatus,
-    updateAnswerCount
+    updateAnswerCount,
+    logoutAndRedirect
   };
+
+  // StudyQuest アプリ設定への遷移
+  function openAppSetupPage() {
+    google.script.run
+      .withSuccessHandler(function(url) {
+        if (url) {
+          // ログイン画面からの遷移と同じフローを再現
+          showAdminPanelRedirect(url, 'アプリ設定管理へ遷移します');
+        } else {
+          showMessage('アプリ設定URLの取得に失敗しました', 'error');
+        }
+      })
+      .withFailureHandler(function(error) {
+        console.error('Failed to get app setup URL:', error);
+        showMessage('アプリ設定URLの取得中にエラーが発生しました', 'error');
+      })
+      .getAppSetupUrl(); // この関数はバックエンドで実装されていると仮定
+  }
+
+  // ログアウトしてログイン画面へリダイレクト
+  function logoutAndRedirect() {
+    if (confirm('ログアウトしてログイン画面に戻りますか？')) {
+      google.script.run
+        .withSuccessHandler(function(url) {
+          window.location.href = url; // ログイン画面へリダイレクト
+        })
+        .withFailureHandler(function(error) {
+          console.error('Logout failed:', error);
+          showMessage('ログアウト処理中にエラーが発生しました', 'error');
+        })
+        .resetUserAuthentication(); // バックエンドの認証リセット関数を呼び出す
+    }
+  }
 </script>
