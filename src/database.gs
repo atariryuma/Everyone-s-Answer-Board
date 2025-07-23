@@ -473,11 +473,13 @@ function findUserByIdFresh(userId) {
   var cacheKey = 'user_' + userId;
   cacheManager.remove(cacheKey);
   
-  // データベースから直接取得（キャッシュなし）
+  // データベースから直接取得
   var freshUserInfo = fetchUserFromDatabase('userId', userId);
   
-  // 次回の通常アクセス時にキャッシュされるため、ここでは手動設定不要
-  console.log('✅ Fresh user data retrieved for:', userId);
+  // 新しいデータをキャッシュに保存
+  if (freshUserInfo) {
+    cacheManager.set(cacheKey, freshUserInfo, { ttl: 300, enableMemoization: true });
+  }
   
   return freshUserInfo;
 }
