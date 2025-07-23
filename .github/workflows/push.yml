@@ -53,6 +53,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Run tests
+        run: npm test
+
       # 4. Google Apps Scriptへの認証を設定（mainブランチへのpush時のみ）
       - name: Create clasprc.json for authentication
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
