@@ -156,22 +156,7 @@ function verifyAdminAccess(userId) {
     // 直接データベースから取得（キャッシュを経由しない）
     // 初回登録直後の場合、データベース書き込み完了を待つためのリトライ機能
     console.log('verifyAdminAccess: データベースから直接ユーザー検索');
-    var userFromDb = null;
-    var maxRetries = 3;
-    var retryDelay = 300; // 300ms
-    
-    for (var retry = 0; retry < maxRetries; retry++) {
-      userFromDb = fetchUserFromDatabase('userId', userId);
-      if (userFromDb) {
-        console.log('verifyAdminAccess: ユーザー見つかりました (試行' + (retry + 1) + '回目)');
-        break;
-      }
-      
-      if (retry < maxRetries - 1) {
-        console.log('verifyAdminAccess: ユーザーが見つかりません。' + retryDelay + 'ms後に再試行... (試行' + (retry + 1) + '/' + maxRetries + ')');
-        Utilities.sleep(retryDelay);
-      }
-    }
+    var userFromDb = fetchUserFromDatabase('userId', userId);
     
     console.log('verifyAdminAccess: データベース検索結果:', {
       found: !!userFromDb,
@@ -179,7 +164,7 @@ function verifyAdminAccess(userId) {
       adminEmail: userFromDb ? userFromDb.adminEmail : 'なし',
       isActive: userFromDb ? userFromDb.isActive : 'なし',
       activeUserEmail: activeUserEmail,
-      retriesUsed: userFromDb ? retry + 1 : maxRetries
+      retriesUsed: 0 // リトライは行わないため0
     });
 
     if (!userFromDb) {
