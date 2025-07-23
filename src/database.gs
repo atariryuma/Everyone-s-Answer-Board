@@ -708,35 +708,7 @@ function updateUser(userId, updateData) {
     }).filter(function(item) { return item !== null; });
     
     if (requests.length > 0) {
-      console.log('📝 データベース更新リクエスト詳細:');
-      requests.forEach(function(req, index) {
-        console.log('  ' + (index + 1) + '. 範囲: ' + req.range + ', 値: ' + JSON.stringify(req.values));
-      });
-      
-      try {
-        batchUpdateSheetsData(service, dbId, requests);
-        console.log('✅ データベース更新リクエスト送信完了');
-        
-        // 更新成功の確認
-        console.log('🔍 更新直後の確認のため、データベースから再取得...');
-        var verifyData = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!" + String.fromCharCode(65 + userIdIndex) + rowIndex + ":" + String.fromCharCode(72) + rowIndex]);
-        if (verifyData.valueRanges && verifyData.valueRanges[0] && verifyData.valueRanges[0].values) {
-          var updatedRow = verifyData.valueRanges[0].values[0];
-          console.log('📊 更新後のユーザー行データ:', updatedRow);
-          if (updateData.spreadsheetId) {
-            var spreadsheetIdIndex = headers.indexOf('spreadsheetId');
-            console.log('🎯 スプレッドシートID更新確認:', updatedRow[spreadsheetIdIndex] === updateData.spreadsheetId ? '✅ 成功' : '❌ 失敗');
-          }
-        }
-      } catch (updateError) {
-        console.error('❌ データベース更新中にエラーが発生:', updateError);
-        throw new Error('データベース更新に失敗しました: ' + updateError.message);
-      }
-      
-      // 更新が確実に反映されるまで少し待機
-      Utilities.sleep(100);
-    } else {
-      console.log('⚠️ 更新するデータがありません');
+      batchUpdateSheetsData(service, dbId, requests);
     }
     
     // スプレッドシートIDが更新された場合、サービスアカウントと共有
