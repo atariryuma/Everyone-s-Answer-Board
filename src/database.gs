@@ -463,28 +463,6 @@ function findUserById(userId) {
 }
 
 /**
- * キャッシュをバイパスして最新のユーザー情報を強制取得
- * クリティカルな更新操作直後に使用
- * @param {string} userId - ユーザーID
- * @returns {object|null} 最新のユーザー情報
- */
-function findUserByIdFresh(userId) {
-  // 既存キャッシュを強制削除
-  var cacheKey = 'user_' + userId;
-  cacheManager.remove(cacheKey);
-  
-  // データベースから直接取得
-  var freshUserInfo = fetchUserFromDatabase('userId', userId);
-  
-  // 新しいデータをキャッシュに保存
-  if (freshUserInfo) {
-    cacheManager.set(cacheKey, freshUserInfo, { ttl: 300, enableMemoization: true });
-  }
-  
-  return freshUserInfo;
-}
-
-/**
  * メールアドレスでユーザー検索
  * @param {string} email - メールアドレス
  * @returns {object|null} ユーザー情報
@@ -724,14 +702,13 @@ function updateUser(userId, updateData) {
       }
     }
     
-    // 重要: 更新完了後に包括的キャッシュ同期を実行
+    // 最適化: 変更された内容に基づいてキャッシュを選択的に無効化
     var userInfo = findUserById(userId);
     var email = updateData.adminEmail || (userInfo ? userInfo.adminEmail : null);
-    var oldSpreadsheetId = userInfo ? userInfo.spreadsheetId : null;
-    var newSpreadsheetId = updateData.spreadsheetId || oldSpreadsheetId;
+    var spreadsheetId = updateData.spreadsheetId || (userInfo ? userInfo.spreadsheetId : null);
     
-    // クリティカル更新時の包括的キャッシュ同期
-    synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId);
+    // キャッシュを無効化（必要最小限）
+    invalidateUserCache(userId, email, spreadsheetId, false);
     
     return { status: 'success', message: 'ユーザープロフィールが正常に更新されました' };
   } catch (error) {

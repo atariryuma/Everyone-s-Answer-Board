@@ -2308,17 +2308,10 @@ function saveAndPublish(requestUserId, sheetName, config) {
     commitAllChanges(context);
     console.log('✅ Phase 3完了: DB書き込み完了');
 
-    // DB書き込み後に包括的キャッシュ同期を実行
-    console.log('🗑️ saveAndPublish完了後の包括的キャッシュ同期中...');
-    synchronizeCacheAfterCriticalUpdate(
-      context.requestUserId, 
-      context.userInfo.adminEmail,
-      context.userInfo.spreadsheetId, 
-      context.userInfo.spreadsheetId  // 同じスプレッドシートIDだが設定更新のため同期が必要
-    );
-    
-    // 最新ユーザー情報を再取得してコンテキストを更新
-    const updatedUserInfo = findUserByIdFresh(context.requestUserId);
+    // DB書き込み後にキャッシュを無効化し、最新ユーザー情報を再取得
+    invalidateUserCache(context.requestUserId, context.userInfo.adminEmail,
+      context.userInfo.spreadsheetId, false);
+    const updatedUserInfo = fetchUserFromDatabase('userId', context.requestUserId);
     if (updatedUserInfo) {
       context.userInfo = updatedUserInfo;
       console.log('✅ コンテキストをDBの最新情報で更新しました。');
