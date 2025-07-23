@@ -330,7 +330,43 @@ function getCurrentSpreadsheet(requestUserId) {
       throw new Error('ユーザー情報またはスプレッドシートIDが見つかりません');
     }
 
-    return SpreadsheetApp.openById(userInfo.spreadsheetId);
+    // スプレッドシートIDの形式チェック
+    const spreadsheetIdPattern = /^[a-zA-Z0-9-_]{44}$/;
+    if (!spreadsheetIdPattern.test(userInfo.spreadsheetId)) {
+      console.error('❌ 無効なスプレッドシートID形式:', userInfo.spreadsheetId);
+      throw new Error(`無効なスプレッドシートID形式です: ${userInfo.spreadsheetId}`);
+    }
+    
+    // SpreadsheetApp.openById()で権限エラーが発生する可能性があるため、事前チェック
+    console.log('🔧 getCurrentSpreadsheet: スプレッドシートアクセス試行中:', userInfo.spreadsheetId);
+    
+    try {
+      return SpreadsheetApp.openById(userInfo.spreadsheetId);
+    } catch (openError) {
+      console.error('❌ SpreadsheetApp.openById 権限エラー:', openError.message);
+      
+      // 詳細なエラー情報とデバッグ情報を提供
+      console.log('🔍 権限エラー診断情報:', {
+        spreadsheetId: userInfo.spreadsheetId,
+        userId: requestUserId,
+        userEmail: userInfo.adminEmail,
+        executionContext: 'WebApp',
+        errorType: openError.name,
+        errorMessage: openError.message
+      });
+      
+      if (openError.message.includes('openById') || openError.message.includes('permission') || openError.message.includes('Unexpected error')) {
+        throw new Error(`スプレッドシートへのアクセス権限がありません。
+原因: Webアプリの実行コンテキストでスプレッドシートにアクセスできません。
+対処法: 
+1. スプレッドシートの共有設定でサービスアカウントに編集者権限を付与
+2. Webアプリの実行権限設定を確認
+3. スプレッドシートID: ${userInfo.spreadsheetId}
+詳細エラー: ${openError.message}`);
+      } else {
+        throw new Error(`スプレッドシートの取得に失敗しました: ${openError.message}`);
+      }
+    }
   } catch (e) {
     console.error('getCurrentSpreadsheet エラー: ' + e.message);
     throw new Error('スプレッドシートの取得に失敗しました: ' + e.message);
@@ -1611,17 +1647,48 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
     if (!targetId) {
       throw new Error('spreadsheetIdが取得できません');
     }
-    const ss = SpreadsheetApp.openById(targetId);
-    const sheet = ss.getSheetByName(sheetName);
-    if (!sheet) {
-      throw new Error('シートが見つかりません: ' + sheetName);
+    // SpreadsheetApp.openById()の代わりにSheets APIを使用（権限問題回避）
+    console.log('🔧 Sheets APIを使用してヘッダーを取得中:', { targetId, sheetName });
+    
+    let headers = [];
+    try {
+      // Sheets APIサービスを取得
+      const sheetsService = getSheetsServiceCached();
+      
+      // ヘッダー行を取得（1行目）
+      const range = `'${sheetName}'!1:1`;
+      const batch = batchGetSheetsData(sheetsService, targetId, [range]);
+      
+      if (batch && batch.valueRanges && batch.valueRanges[0] && batch.valueRanges[0].values) {
+        headers = batch.valueRanges[0].values[0] || [];
+        console.log('✅ Sheets APIでヘッダー取得成功:', headers.length, '列');
+      } else {
+        console.warn('⚠️ ヘッダー行が空または取得できませんでした');
+        headers = [];
+      }
+    } catch (apiError) {
+      console.error('❌ Sheets API取得エラー:', apiError.message);
+      
+      // フォールバック: SpreadsheetApp.openById()を試行（権限がある場合のみ）
+      console.warn('⚠️ フォールバック: SpreadsheetApp.openById()を試行');
+      try {
+        const ss = SpreadsheetApp.openById(targetId);
+        const sheet = ss.getSheetByName(sheetName);
+        if (!sheet) {
+          throw new Error('シートが見つかりません: ' + sheetName);
+        }
+        
+        const lastColumn = sheet.getLastColumn();
+        if (lastColumn < 1) {
+          throw new Error(`シート '${sheetName}' に列が存在しません`);
+        }
+        headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0] || [];
+        console.log('✅ SpreadsheetApp フォールバック成功');
+      } catch (spreadsheetError) {
+        console.error('❌ SpreadsheetApp フォールバックも失敗:', spreadsheetError.message);
+        throw new Error(`ヘッダー取得に失敗しました。Sheets API: ${apiError.message}, SpreadsheetApp: ${spreadsheetError.message}`);
+      }
     }
-
-    const lastColumn = sheet.getLastColumn();
-    if (lastColumn < 1) {
-      throw new Error(`シート '${sheetName}' に列が存在しません`);
-    }
-    const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0] || [];
     const guessed = autoMapHeaders(headers);
 
     let existing = {};
