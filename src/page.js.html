@@ -1774,15 +1774,20 @@ setupEventDelegation() {
           
           if (!card) {
             card = this.createAnswerCard(row);
-            card.classList.add('new-card');
-            
-            // Add to visibility observer
-            if (this.visibilityObserver) {
-              this.visibilityObserver.observe(card);
+            if (card) {
+              card.classList.add('new-card');
+              
+              // Add to visibility observer
+              if (this.visibilityObserver) {
+                this.visibilityObserver.observe(card);
+              }
+              
+              changedItems.push(row);
+              fragment.appendChild(card);
+            } else {
+              console.warn('renderBoard: Failed to create card for row:', row.rowIndex);
+              // Skip this row and continue with the next one
             }
-            
-            changedItems.push(row);
-            fragment.appendChild(card);
           } else {
             this.updateExistingCard(card, row, oldData, changedItems);
             // 既存のカードは既にDOMにあるので、フラグメントに追加しない
@@ -1825,15 +1830,20 @@ setupEventDelegation() {
         
         if (!card) {
           card = this.createAnswerCard(row);
-          card.classList.add('new-card');
-          
-          // Add to visibility observer for virtual scrolling
-          if (this.visibilityObserver) {
-            this.visibilityObserver.observe(card);
+          if (card) {
+            card.classList.add('new-card');
+            
+            // Add to visibility observer for virtual scrolling
+            if (this.visibilityObserver) {
+              this.visibilityObserver.observe(card);
+            }
+            
+            changedItems.push(row);
+            fragment.appendChild(card);
+          } else {
+            console.warn('renderWithVirtualScrolling: Failed to create card for row:', row.rowIndex);
+            // Skip this row and continue with the next one
           }
-          
-          changedItems.push(row);
-          fragment.appendChild(card);
         } else {
           this.updateExistingCard(card, row, oldData, changedItems);
           // 既存のカードは既にDOMにあるので、フラグメントに追加しない
@@ -1906,153 +1916,200 @@ setupEventDelegation() {
     }
   }
   createAnswerCard(data) {
-    // Optimized cache key generation (faster than JSON.stringify)
-    const cacheKey = `${data.rowIndex}-${data.opinion?.slice(0,50)}-${data.reason?.slice(0,30)}-${data.name}-${JSON.stringify(data.reactions)}-${data.highlight}-${this.state.showCounts}-${this.state.displayMode}-${this.state.showHighlightToggle}`;
-    
-    // Answer card cache check
-    
-    const cachedCard = this.cache.get(`render-${cacheKey}`);
-    if (cachedCard) {
-      const clonedCard = cachedCard.cloneNode(true);
-      // Ensure cloned card has proper data-row-index
-      clonedCard.dataset.rowIndex = data.rowIndex;
-      
-      // Optimized: Only update elements that need row index (avoid querySelectorAll)
-      const reactionButtons = clonedCard.querySelectorAll('.reaction-btn');
-      reactionButtons.forEach(btn => {
-        btn.dataset.rowIndex = data.rowIndex;
-      });
-      
-      // Using cached card
-      return clonedCard;
-    }
-    
-    const card = document.createElement('div');
-    const highlightClass = data.highlight ? ' highlighted' : '';
-    card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer' + highlightClass;
-    card.dataset.rowIndex = data.rowIndex;
-    card.setAttribute('role', 'article');
-    card.setAttribute('tabindex', '0');
-    card.setAttribute('aria-label', '回答カード: ' + (data.opinion || '').substring(0, 50) + (data.opinion && data.opinion.length > 50 ? '...' : ''));
-    
-    // Answer card created
-    let highlightBtnHtml = '';
-    // Highlight button condition check
-    if (this.state.showHighlightToggle) {
-      const cls = data.highlight ? 'liked' : '';
-      const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
-      highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
-      // Highlight button created
-    } else {
-      // Highlight button skipped
-    }
-    const showName = this.state.displayMode === 'named';
-    let displayName = '';
-    
-    // Debug: Log display mode and admin features state
-    // Card display state configured
-    
-    if (showName) {
-      // 名前が利用可能な場合はそれを使用、なければemailから生成
-      if (data.name) {
-        displayName = data.name;
-      } else if (data.email) {
-        displayName = data.email.split('@')[0];
+    try {
+      // Data validation and sanitization
+      if (!data || typeof data !== 'object') {
+        console.warn('createAnswerCard: Invalid data provided:', data);
+        return null;
       }
       
+      // Ensure required properties exist with safe defaults
+      const safeData = {
+        rowIndex: data.rowIndex || 0,
+        opinion: data.opinion || '',
+        reason: data.reason || '',
+        name: data.name || '',
+        email: data.email || '',
+        reactions: data.reactions || {},
+        highlight: Boolean(data.highlight)
+      };
+      
+      // Optimized cache key generation (faster than JSON.stringify)
+      const cacheKey = `${safeData.rowIndex}-${safeData.opinion.slice(0,50)}-${safeData.reason.slice(0,30)}-${safeData.name}-${JSON.stringify(safeData.reactions)}-${safeData.highlight}-${this.state.showCounts}-${this.state.displayMode}-${this.state.showHighlightToggle}`;
+      
+      // Answer card cache check
+      const cachedCard = this.cache.get(`render-${cacheKey}`);
+      if (cachedCard) {
+        try {
+          const clonedCard = cachedCard.cloneNode(true);
+          // Ensure cloned card has proper data-row-index
+          clonedCard.dataset.rowIndex = safeData.rowIndex;
+          
+          // Optimized: Only update elements that need row index (avoid querySelectorAll)
+          const reactionButtons = clonedCard.querySelectorAll('.reaction-btn');
+          reactionButtons.forEach(btn => {
+            btn.dataset.rowIndex = safeData.rowIndex;
+          });
+          
+          return clonedCard;
+        } catch (cacheError) {
+          console.warn('createAnswerCard: Cache clone error, creating new card:', cacheError);
+          // Continue to create new card if cache fails
+        }
+      }
+    
+      const card = document.createElement('div');
+      const highlightClass = safeData.highlight ? ' highlighted' : '';
+      card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer' + highlightClass;
+      card.dataset.rowIndex = safeData.rowIndex;
+      card.setAttribute('role', 'article');
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('aria-label', '回答カード: ' + safeData.opinion.substring(0, 50) + (safeData.opinion.length > 50 ? '...' : ''));
+    
+      // Answer card created
+      let highlightBtnHtml = '';
+      // Highlight button condition check
+      if (this.state.showHighlightToggle) {
+        const cls = safeData.highlight ? 'liked' : '';
+        const highlightAriaLabel = safeData.highlight ? 'ハイライトを解除する' : 'ハイライトする';
+        highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + safeData.highlight + '" data-row-index="' + safeData.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', safeData.highlight) + '</button>';
+      }
+      const showName = this.state.displayMode === 'named';
+      let displayName = '';
+      
+      if (showName) {
+        // 名前が利用可能な場合はそれを使用、なければemailから生成
+        if (safeData.name) {
+          displayName = safeData.name;
+        } else if (safeData.email) {
+          try {
+            displayName = safeData.email.split('@')[0];
+          } catch (emailError) {
+            console.warn('createAnswerCard: Email parsing error:', emailError);
+            displayName = 'ユーザー';
+          }
+        }
+      }
+      
+      const nameHtml = showName && displayName ? '<div class="name-display flex-shrink-0 mr-2"><span class="font-bold text-sm text-cyan-300 bg-gray-800/50 px-2 py-1 rounded border border-cyan-400">' + this.escapeHtml(displayName) + '</span></div>' : '';
+      const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex flex-col sm:flex-row justify-between items-start sm:items-center gap-y-1 min-h-[2rem]' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
+    
+      // Name display configuration complete
+      const reactionButtonsHtml = this.reactionTypes.map(rt => {
+        try {
+          const info = safeData.reactions && safeData.reactions[rt.key] ? safeData.reactions[rt.key] : { count: 0, reacted: false };
+          const cls = info.reacted ? 'liked' : '';
+          const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+          const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-lg text-gray-200" aria-hidden="true">' + (info.count || 0) + '</span>' : '';
+          const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
+          const reactionName = reactionNames[rt.key] || rt.key;
+          const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
+          return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + safeData.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + ariaLabel + '" aria-pressed="' + info.reacted + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
+        } catch (reactionError) {
+          console.warn('createAnswerCard: Reaction button creation error:', reactionError);
+          return ''; // Skip problematic reaction button
+        }
+      }).join('');
+      // Optimized: Use DocumentFragment instead of innerHTML for better performance
+      const fragment = document.createDocumentFragment();
+      
+      // Create main content div
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'relative flex-grow mb-3 answer-preview';
+      
+      const opinionTitle = document.createElement('h3');
+      opinionTitle.className = 'opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
+      opinionTitle.textContent = safeData.opinion;
+      
+      const reasonText = document.createElement('p');
+      reasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
+      reasonText.textContent = safeData.reason;
+      
+      contentDiv.appendChild(opinionTitle);
+      contentDiv.appendChild(reasonText);
+    
+      // Create footer div
+      const footerDiv = document.createElement('div');
+      footerDiv.className = containerClass;
+      
+      // 名前表示部分を追加
+      if (nameHtml) {
+        try {
+          const nameContainer = document.createElement('div');
+          nameContainer.className = 'name-container flex-shrink-0';
+          nameContainer.innerHTML = nameHtml;
+          footerDiv.appendChild(nameContainer);
+        } catch (nameError) {
+          console.warn('createAnswerCard: Name container creation error:', nameError);
+        }
+      }
+      
+      // リアクション部分を追加
+      try {
+        const reactionsDiv = document.createElement('div');
+        reactionsDiv.className = 'flex items-center gap-1 flex-shrink-0';
+        reactionsDiv.setAttribute('role', 'group');
+        reactionsDiv.setAttribute('aria-label', '回答への反応');
+        reactionsDiv.innerHTML = reactionButtonsHtml + highlightBtnHtml;
+        
+        footerDiv.appendChild(reactionsDiv);
+      } catch (reactionError) {
+        console.warn('createAnswerCard: Reactions div creation error:', reactionError);
+      }
+      
+      fragment.appendChild(contentDiv);
+      fragment.appendChild(footerDiv);
+      card.appendChild(fragment);
+      
+      if (safeData.highlight) {
+        try {
+          const badge = document.createElement('span');
+          badge.className = 'highlight-badge';
+          badge.innerHTML = this.getIcon('star', '', true);
+          card.appendChild(badge);
+        } catch (badgeError) {
+          console.warn('createAnswerCard: Highlight badge creation error:', badgeError);
+        }
+      }
+      
+      // 統一されたリアクションスタイルを適用
+      try {
+        this.applyReactionStyles(card, safeData);
+      } catch (styleError) {
+        console.warn('createAnswerCard: Reaction styles application error:', styleError);
+      }
+      
+      // Cache the card for reuse (limit cache size)
+      try {
+        if (this.cache.size > 100) {
+          this.cache.cleanup();
+        }
+        this.cache.set(`render-${cacheKey}`, card.cloneNode(true));
+      } catch (cacheError) {
+        console.warn('createAnswerCard: Cache storage error:', cacheError);
+      }
+      
+      return card;
+      
+    } catch (error) {
+      console.error('createAnswerCard: Critical error creating card:', error, 'Data:', data);
+      
+      // Return a minimal error card instead of null
+      try {
+        const errorCard = document.createElement('div');
+        errorCard.className = 'answer-card glass-panel rounded-xl p-4 border-2 border-red-400/50 bg-red-900/20';
+        errorCard.innerHTML = `
+          <div class="text-red-300 text-center">
+            <div class="mb-2">⚠️ カード表示エラー</div>
+            <div class="text-xs text-red-400">データ処理中に問題が発生しました</div>
+          </div>
+        `;
+        return errorCard;
+      } catch (fallbackError) {
+        console.error('createAnswerCard: Fallback card creation also failed:', fallbackError);
+        return null;
+      }
     }
-    
-    const nameHtml = showName && displayName ? '<div class="name-display flex-shrink-0 mr-2"><span class="font-bold text-sm text-cyan-300 bg-gray-800/50 px-2 py-1 rounded border border-cyan-400">' + this.escapeHtml(displayName) + '</span></div>' : '';
-    const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex flex-col sm:flex-row justify-between items-start sm:items-center gap-y-1 min-h-[2rem]' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
-    
-    // Name display configuration complete
-    const reactionButtonsHtml = this.reactionTypes.map(rt => {
-      const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
-      const cls = info.reacted ? 'liked' : '';
-      const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
-      const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-lg text-gray-200" aria-hidden="true">' + (info.count || 0) + '</span>' : '';
-      const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
-      const reactionName = reactionNames[rt.key] || rt.key;
-      const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
-      return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + ariaLabel + '" aria-pressed="' + info.reacted + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
-    }).join('');
-    // Optimized: Use DocumentFragment instead of innerHTML for better performance
-    const fragment = document.createDocumentFragment();
-    
-    // Create main content div
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'relative flex-grow mb-3 answer-preview';
-    
-    const opinionTitle = document.createElement('h3');
-    opinionTitle.className = 'opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
-    opinionTitle.textContent = data.opinion || '';
-    
-    const reasonText = document.createElement('p');
-    reasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
-    reasonText.textContent = data.reason || '';
-    
-    contentDiv.appendChild(opinionTitle);
-    contentDiv.appendChild(reasonText);
-    
-    // Create footer div
-    const footerDiv = document.createElement('div');
-    footerDiv.className = containerClass;
-    
-    // 名前表示部分を追加
-    if (nameHtml) {
-      const nameContainer = document.createElement('div');
-      nameContainer.className = 'name-container flex-shrink-0';
-      nameContainer.innerHTML = nameHtml;
-      footerDiv.appendChild(nameContainer);
-      console.log('✅ 名前コンテナを追加:', {
-        rowIndex: data.rowIndex,
-        nameHtml,
-        containerHTML: nameContainer.outerHTML
-      });
-    } else {
-      console.log('❌ 名前HTML生成されず:', {
-        rowIndex: data.rowIndex,
-        showName,
-        displayName
-      });
-    }
-    
-    // リアクション部分を追加
-    const reactionsDiv = document.createElement('div');
-    reactionsDiv.className = 'flex items-center gap-1 flex-shrink-0';
-    reactionsDiv.setAttribute('role', 'group');
-    reactionsDiv.setAttribute('aria-label', '回答への反応');
-    reactionsDiv.innerHTML = reactionButtonsHtml + highlightBtnHtml;
-    
-    footerDiv.appendChild(reactionsDiv);
-    
-    // 最終的なfooterDivの内容を確認
-    console.log('📦 フッター構成確認:', {
-      rowIndex: data.rowIndex,
-      footerChildren: footerDiv.children.length,
-      footerHTML: footerDiv.outerHTML.substring(0, 200)
-    });
-    
-    fragment.appendChild(contentDiv);
-    fragment.appendChild(footerDiv);
-    card.appendChild(fragment);
-    if (data.highlight) {
-      const badge = document.createElement('span');
-      badge.className = 'highlight-badge';
-      badge.innerHTML = this.getIcon('star', '', true);
-      card.appendChild(badge);
-    }
-    
-    // 統一されたリアクションスタイルを適用
-    this.applyReactionStyles(card, data);
-    
-    // Cache the card for reuse (limit cache size)
-    if (this.cache.size > 100) {
-      this.cache.cleanup();
-    }
-    this.cache.set(`render-${cacheKey}`, card.cloneNode(true));
-    
-    return card;
   }
   createSkeletonCard() {
     const card = document.createElement('div');
