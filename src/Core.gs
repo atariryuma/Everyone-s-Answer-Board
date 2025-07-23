@@ -4243,7 +4243,7 @@ function getInitialData(requestUserId, targetSheetName) {
         nameHeader: nameHeader,
         classHeader: classHeader,
         showNames: configJson.showNames || false,
-        showCounts: configJson.showCounts !== undefined ? configJson.showCounts : true,
+        showCounts: configJson.showCounts !== undefined ? configJson.showCounts : false,
         displayMode: configJson.displayMode || 'anonymous',
         setupStatus: configJson.setupStatus || 'initial',
         isPublished: !!configJson.appPublished,

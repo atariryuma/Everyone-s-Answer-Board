@@ -71,13 +71,13 @@ function resetUserAuthentication() {
     console.log('ユーザー認証をリセット中...');
     const userCache = CacheService.getUserCache();
     if (userCache) {
-      userCache.removeAll(); // ユーザーキャッシュを全てクリア
+      userCache.removeAll([]); // ユーザーキャッシュを全てクリア
       console.log('ユーザーキャッシュをクリアしました。');
     }
     
     const scriptCache = CacheService.getScriptCache();
     if (scriptCache) {
-      scriptCache.removeAll(); // スクリプトキャッシュを全てクリア
+      scriptCache.removeAll([]); // スクリプトキャッシュを全てクリア
       console.log('スクリプトキャッシュをクリアしました。');
     }
 

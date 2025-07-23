@@ -946,6 +946,19 @@ function createUser(userData) {
     
     console.log('createUser - データベース書き込み完了: userId=' + userData.userId);
 
+    // 新規ユーザー用の専用フォルダを作成
+    try {
+      console.log('createUser - 専用フォルダ作成開始: ' + userData.adminEmail);
+      var folder = createUserFolder(userData.adminEmail);
+      if (folder) {
+        console.log('✅ createUser - 専用フォルダ作成成功: ' + folder.getName());
+      } else {
+        console.log('⚠️ createUser - 専用フォルダ作成失敗（処理は続行）');
+      }
+    } catch (folderError) {
+      console.warn('createUser - フォルダ作成でエラーが発生しましたが、処理を続行します: ' + folderError.message);
+    }
+
     // 最適化: 新規ユーザー作成時は対象キャッシュのみ無効化
     invalidateUserCache(userData.userId, userData.adminEmail, userData.spreadsheetId, false);
 

@@ -265,7 +265,7 @@ function updateDatabaseInfo(status) {
   // カウント表示の更新
   const showCountsFlag = cfg.showCounts !== undefined
     ? cfg.showCounts
-    : (status.showCounts !== undefined ? status.showCounts : true);
+    : (status.showCounts !== undefined ? status.showCounts : false);
   const showCounts = showCountsFlag ? '表示' : '非表示';
   safeSetText('info-show-counts', showCounts);
 
@@ -296,7 +296,7 @@ function updatePublicationStatusUI(isPublished) {
 function syncCheckboxStates(status) {
   // Priority: Database config (configJson) > status properties > defaults
   let showNames = false;
-  let showCounts = true;
+  let showCounts = false;
   
   // 1. Prefer status.config if available
   if (status.config) {
@@ -1664,41 +1664,46 @@ function updateSystemStatusDisplay(status) {
     }
   }
   
-  if (status.formUrl) {
+  // フォームURLの取得優先順位: userInfo.formUrl > customFormInfo.formUrl > status.formUrl
+  const formUrl = (status.userInfo && status.userInfo.formUrl) || 
+                  (status.customFormInfo && status.customFormInfo.formUrl) || 
+                  status.formUrl;
+  
+  if (formUrl) {
     if (formBtn) {
       formBtn.disabled = false;
-      formBtn.onclick = () => window.open(status.formUrl, '_blank');
+      formBtn.onclick = () => window.open(formUrl, '_blank');
     }
     
     // Update form URL input field
     const formUrlInput = document.getElementById('form-url-input');
     if (formUrlInput) {
-      formUrlInput.value = status.formUrl;
+      formUrlInput.value = formUrl;
     }
     
     // Update form URL link
     const formUrlLink = document.getElementById('open-form-url-link');
     if (formUrlLink) {
-      formUrlLink.href = status.formUrl;
+      formUrlLink.href = formUrl;
     }
   }
   
   // Handle generic resource button in Step 1
-  if (resourceBtn && (status.formUrl || status.spreadsheetUrl)) {
+  if (resourceBtn && (formUrl || status.spreadsheetUrl)) {
     resourceBtn.disabled = false;
     resourceBtn.onclick = () => {
       // Priority: Form first, then spreadsheet
-      if (status.formUrl) {
-        window.open(status.formUrl, '_blank');
+      if (formUrl) {
+        window.open(formUrl, '_blank');
       } else if (status.spreadsheetUrl) {
         window.open(status.spreadsheetUrl, '_blank');
       }
     };
     
     // Update button title based on available resources
-    if (status.formUrl && status.spreadsheetUrl) {
+    if (formUrl && status.spreadsheetUrl) {
       resourceBtn.title = 'フォームを開く (スプレッドシートも利用可能)';
-    } else if (status.formUrl) {
+    } else if (formUrl) {
       resourceBtn.title = 'フォームを開く';
     } else if (status.spreadsheetUrl) {
       resourceBtn.title = 'スプレッドシートを開く';

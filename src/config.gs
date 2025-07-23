@@ -1297,11 +1297,27 @@ function addSpreadsheetUrl(requestUserId, url) {
     configJson.publishedSheetName = '';
     configJson.appPublished = false;
 
-    updateUser(currentUserId, {
+    // スプレッドシートからフォームURLを自動検出（可能な場合）
+    var formUrl = null;
+    try {
+      formUrl = detectFormUrlFromSpreadsheet(spreadsheetId);
+      console.log('スプレッドシートからフォーム検出:', formUrl ? 'あり' : 'なし');
+    } catch (formDetectionError) {
+      console.warn('フォーム自動検出でエラー:', formDetectionError.message);
+    }
+
+    var updateData = {
       spreadsheetId: spreadsheetId,
       spreadsheetUrl: url,
       configJson: JSON.stringify(configJson)
-    });
+    };
+
+    // フォームURLが検出できた場合は一緒に更新
+    if (formUrl) {
+      updateData.formUrl = formUrl;
+    }
+
+    updateUser(currentUserId, updateData);
 
     // シートリストを即座に取得
     var sheets = [];
@@ -1320,17 +1336,123 @@ function addSpreadsheetUrl(requestUserId, url) {
     // 必要最小限のキャッシュ無効化
     invalidateUserCache(currentUserId, userInfo.adminEmail, spreadsheetId, true);
 
+    var message = 'スプレッドシートが正常に追加されました。';
+    if (formUrl) {
+      message += ' 関連するフォームも自動で連携されました。';
+    }
+    
     return { 
       status: 'success', 
-      message: 'スプレッドシートが正常に追加されました。', 
+      message: message, 
       sheets: sheets,
       spreadsheetId: spreadsheetId,
       autoSelectFirst: sheets.length > 0 ? sheets[0].name : null,
-      needsRefresh: true // UI側でのリフレッシュが必要
+      needsRefresh: true, // UI側でのリフレッシュが必要
+      formDetected: !!formUrl
     };
   } catch (e) {
     console.error('addSpreadsheetUrl エラー: ' + e.message);
     throw new Error('スプレッドシートの追加に失敗しました: ' + e.message);
+  }
+}
+
+/**
+ * フォームURLを追加 (外部リソース連携)
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ * @param {string} url - GoogleフォームのURL
+ */
+function addFormUrl(requestUserId, url) {
+  verifyUserAccess(requestUserId);
+  try {
+    // GoogleフォームのIDを抽出
+    var formIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (!formIdMatch) {
+      throw new Error('無効なGoogleフォームURLです。');
+    }
+    var formId = formIdMatch[1];
+
+    var currentUserId = requestUserId;
+
+    var userInfo = findUserById(currentUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません。');
+    }
+
+    // フォームURLをユーザー情報に追加
+    updateUser(currentUserId, {
+      formUrl: url
+    });
+
+    // キャッシュを無効化
+    invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId, true);
+
+    console.log('✅ フォームURL追加完了: ' + currentUserId);
+    return {
+      status: 'success',
+      message: 'フォームが追加されました。回答ボードでフォームを開くことができるようになりました。'
+    };
+
+  } catch (e) {
+    console.error('addFormUrl エラー: ' + e.message);
+    throw new Error('フォームの追加に失敗しました: ' + e.message);
+  }
+}
+
+/**
+ * スプレッドシートからフォームURLを自動検出
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @returns {string|null} フォームURL（見つからない場合はnull）
+ */
+function detectFormUrlFromSpreadsheet(spreadsheetId) {
+  try {
+    // スプレッドシートを開く
+    var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    var sheets = spreadsheet.getSheets();
+    
+    // 各シートでフォームへのリンクを探す
+    for (var i = 0; i < sheets.length; i++) {
+      var sheet = sheets[i];
+      
+      try {
+        // シートに関連付けられたフォームがあるかチェック
+        var form = sheet.getFormUrl();
+        if (form) {
+          console.log('✅ フォーム自動検出成功 (getFormUrl):', form);
+          return form;
+        }
+      } catch (formError) {
+        // getFormUrl()がエラーになる場合があるのでcatchする
+      }
+      
+      // 手動でセルの内容からフォームURLを探す（A1:Z10の範囲）
+      try {
+        var range = sheet.getRange('A1:Z10');
+        var values = range.getValues();
+        
+        for (var row = 0; row < values.length; row++) {
+          for (var col = 0; col < values[row].length; col++) {
+            var cellValue = values[row][col];
+            if (typeof cellValue === 'string' && cellValue.includes('docs.google.com/forms/')) {
+              // GoogleフォームのURLらしき文字列を見つけた
+              var urlMatch = cellValue.match(/https:\/\/docs\.google\.com\/forms\/d\/[a-zA-Z0-9_-]+/);
+              if (urlMatch) {
+                console.log('✅ フォーム自動検出成功 (セル内容):', urlMatch[0]);
+                return urlMatch[0];
+              }
+            }
+          }
+        }
+      } catch (cellError) {
+        console.warn('セル内容の検索でエラー:', cellError.message);
+      }
+    }
+    
+    console.log('ℹ️ フォームURL検出: 見つかりませんでした');
+    return null;
+    
+  } catch (error) {
+    console.error('detectFormUrlFromSpreadsheet エラー:', error.message);
+    return null;
   }
 }
 
@@ -1370,6 +1492,35 @@ function unpublishBoard(requestUserId) {
     configJson.publishedSheetName = ''; // 正しいプロパティ名
     configJson.publishedSpreadsheetId = ''; // スプレッドシートIDもクリア
     configJson.appPublished = false; // 公開停止
+    
+    // 回答ボード連携の完全解除
+    configJson.formCreated = false; // フォーム作成状態をリセット
+    configJson.setupStatus = 'initial'; // セットアップ状態を初期状態に戻す
+    
+    // シート設定と表示設定の完全クリア
+    configJson.opinionHeader = '';
+    configJson.nameHeader = '';
+    configJson.reasonHeader = '';
+    configJson.classHeader = '';
+    configJson.timestampHeader = '';
+    configJson.showNames = false;
+    configJson.showCounts = false;
+    configJson.highlightMode = false;
+    
+    // カラムマッピングのクリア
+    if (configJson.columnMappings) {
+      configJson.columnMappings = {};
+    }
+    
+    // 各セクションをオープン状態に復元
+    configJson.sectionStates = {
+      quickstart: 'open',
+      custom: 'open',
+      resources: 'open',
+      settings: 'open'
+    };
+
+    console.log('🧹 公開停止: 設定を完全クリア完了');
 
     // データベースを更新
     updateUser(currentUserId, {

@@ -363,7 +363,7 @@ function createFormWithConfig() {
   
   // カスタムセットアップ用進捗表示を開始
   showQuickStartProgress();
-  simulateCustomFormProgress();
+  simulateCustomFormProgressWithFolderCheck();
   
   // カスタムフォーム作成中は専用のプログレスバーを使用するため、汎用ローディングは表示しない
 
@@ -446,18 +446,33 @@ function addResource() {
     return;
   }
 
-  runGasWithUserId('addSpreadsheetUrl', 'リソースを追加しています...', url)
+  // URLの種類を判定
+  let resourceType = 'unknown';
+  let backendFunction = 'addSpreadsheetUrl'; // デフォルト
+  
+  if (url.includes('docs.google.com/forms/')) {
+    resourceType = 'form';
+    backendFunction = 'addFormUrl';
+  } else if (url.includes('docs.google.com/spreadsheets/')) {
+    resourceType = 'spreadsheet';
+    backendFunction = 'addSpreadsheetUrl';
+  }
+  
+  const resourceTypeText = resourceType === 'form' ? 'フォーム' : 
+                          resourceType === 'spreadsheet' ? 'スプレッドシート' : 'リソース';
+
+  runGasWithUserId(backendFunction, `${resourceTypeText}を追加しています...`, url)
     .then(function(result) {
       if (result.status === 'success') {
         showMessage(result.message, 'success');
         urlInput.value = ''; // Clear input
         loadStatus(true); // Refresh status
       } else {
-        showMessage(result.message || 'リソースの追加に失敗しました。', 'error');
+        showMessage(result.message || `${resourceTypeText}の追加に失敗しました。`, 'error');
       }
     })
     .catch(function(error) {
-      handleError(error, 'addResource', 'リソースの追加に失敗しました。');
+      handleError(error, 'addResource', `${resourceTypeText}の追加に失敗しました。`);
     });
 }
 
@@ -552,8 +567,20 @@ function openDatabaseSpreadsheet() {
 
 // Open form
 function openForm() {
-  if (currentStatus && currentStatus.customFormInfo && currentStatus.customFormInfo.formUrl) {
-    window.open(currentStatus.customFormInfo.formUrl, '_blank');
+  // データベースからフォームURLを取得する優先順位を設定
+  let formUrl = null;
+  
+  // 1. ユーザー情報のformUrlから取得
+  if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.formUrl) {
+    formUrl = currentStatus.userInfo.formUrl;
+  }
+  // 2. カスタムフォーム情報から取得（後方互換性）
+  else if (currentStatus && currentStatus.customFormInfo && currentStatus.customFormInfo.formUrl) {
+    formUrl = currentStatus.customFormInfo.formUrl;
+  }
+  
+  if (formUrl) {
+    window.open(formUrl, '_blank');
   } else {
     showMessage('フォームのURLが見つかりません。先にフォームを作成してください。', 'warning');
   }
@@ -801,6 +828,45 @@ function simulateQuickStartProgress() {
   setTimeout(() => {
     updateProgressStep(4, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
   }, 5000);
+}
+
+// Progress simulation for custom forms with folder check
+function simulateCustomFormProgressWithFolderCheck() {
+  // Step 1: フォルダ作成・チェック
+  updateProgressStep(1, 'active', 'ユーザー専用フォルダの作成・確認', 'フォルダ構造を準備中...');
+  updateOverallProgress(10, 'フォルダをチェック・作成しています...');
+  
+  // 実際にフォルダチェック・作成APIを呼び出し
+  runGasWithUserId('createUserFolder', 'フォルダを確認・作成中...')
+    .then(function(folderResult) {
+      updateProgressStep(1, 'completed', 'ユーザー専用フォルダの作成・確認', '✅ フォルダが準備されました');
+      updateProgressStep(2, 'active', 'Googleフォームとスプレッドシートの作成', 'データ収集の仕組みを構築中...');
+      updateOverallProgress(35, 'フォームとスプレッドシートを作成しています...');
+      
+      // Step 2: フォーム・スプレッドシート作成は元の処理に続く
+      setTimeout(() => {
+        updateProgressStep(2, 'completed', 'Googleフォームとスプレッドシートの作成', '✅ フォームとスプレッドシートが作成されました');
+        updateProgressStep(3, 'active', '回答ボードの設定と公開', 'Webアプリケーションを設定中...');
+        updateOverallProgress(70, '回答ボードを設定しています...');
+      }, 2000);
+    })
+    .catch(function(error) {
+      updateProgressStep(1, 'error', 'ユーザー専用フォルダの作成・確認', '⚠️ フォルダ作成でエラーが発生しましたが処理を続行します');
+      console.error('Folder creation failed:', error);
+      showMessage('フォルダの作成に失敗しました。処理を続行します。', 'warning');
+      
+      // エラーでも処理を続行
+      setTimeout(() => {
+        updateProgressStep(2, 'active', 'Googleフォームとスプレッドシートの作成', 'データ収集の仕組みを構築中...');
+        updateOverallProgress(35, 'フォームとスプレッドシートを作成しています...');
+        
+        setTimeout(() => {
+          updateProgressStep(2, 'completed', 'Googleフォームとスプレッドシートの作成', '✅ フォームとスプレッドシートが作成されました');
+          updateProgressStep(3, 'active', '回答ボードの設定と公開', 'Webアプリケーションを設定中...');
+          updateOverallProgress(70, '回答ボードを設定しています...');
+        }, 2000);
+      }, 1000);
+    });
 }
 
 // Simulate Custom Form creation progress

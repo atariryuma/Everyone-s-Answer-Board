@@ -729,6 +729,40 @@ function showAppSetupPage(userId) {
     return htmlOutput;
 }
 
+/**
+ * アプリ設定ページのURLを取得（フロントエンドから呼び出し用）
+ * @returns {string} アプリ設定ページのURL
+ */
+function getAppSetupUrl() {
+  try {
+    // システム管理者権限チェック
+    console.log('getAppSetupUrl: Checking deploy user permissions...');
+    const currentUserEmail = Session.getActiveUser().getEmail();
+    console.log('getAppSetupUrl: Current user email:', currentUserEmail);
+    const deployUserCheckResult = isDeployUser();
+    console.log('getAppSetupUrl: isDeployUser() result:', deployUserCheckResult);
+
+    if (!deployUserCheckResult) {
+      console.warn('Unauthorized access attempt to get app setup URL:', currentUserEmail);
+      throw new Error('アクセス権限がありません');
+    }
+
+    // WebアプリのベースURLを取得
+    const baseUrl = ScriptApp.getWebAppUrl();
+    if (!baseUrl) {
+      throw new Error('WebアプリのURLを取得できませんでした');
+    }
+
+    // アプリ設定ページのURLを生成
+    const appSetupUrl = baseUrl + '?mode=appSetup';
+    console.log('getAppSetupUrl: Generated URL:', appSetupUrl);
+    
+    return appSetupUrl;
+  } catch (error) {
+    console.error('Error getting app setup URL:', error);
+    throw new Error('アプリ設定URLの取得に失敗しました: ' + error.message);
+  }
+}
 
 /**
  * エラーページを表示
