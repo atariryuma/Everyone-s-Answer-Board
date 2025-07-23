@@ -591,7 +591,13 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
   
   try {
     userInfo = cacheManager.get(cacheKey, () => {
-      console.log('🔍 キャッシュmiss - データベースから取得:', userId || email);
+      console.error('cache miss - fetching from database');
+
+      const props = PropertiesService.getScriptProperties();
+      if (!props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID)) {
+        console.error('DATABASE_SPREADSHEET_ID not set');
+        return null;
+      }
       
       let dbUserInfo = null;
       if (userId) {

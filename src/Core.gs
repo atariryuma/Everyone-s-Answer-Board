@@ -292,8 +292,9 @@ function verifyUserAccess(requestUserId) {
   }
   
   clearExecutionUserInfoCache(); // キャッシュをクリアして最新のユーザー情報を取得
-  
+
   const activeUserEmail = Session.getActiveUser().getEmail();
+  debugLog(`verifyUserAccess start: userId=${requestUserId}, email=${activeUserEmail}`);
   if (!activeUserEmail) {
     throw new Error('認証エラー: アクティブユーザーの情報を取得できませんでした');
   }
