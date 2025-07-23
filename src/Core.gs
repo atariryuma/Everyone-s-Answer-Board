@@ -1550,16 +1550,24 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
   var folder = createdFiles.folder;
   
   debugLog('💾 ステップ3: データベース更新中...');
+  console.log('📊 新規作成されたファイル情報:');
+  console.log('  📝 フォームID:', formAndSsInfo.formId);
+  console.log('  📊 スプレッドシートID:', formAndSsInfo.spreadsheetId);
+  console.log('  📄 シート名:', formAndSsInfo.sheetName);
   
   // クイックスタート用の適切な初期設定を作成
   var sheetConfigKey = 'sheet_' + formAndSsInfo.sheetName;
   var quickStartSheetConfig = {
-    opinionHeader: '今日のテーマについて、あなたの考えや意見を聞かせてください',
+    opinionHeader: '今日の学習について、あなたの考えや感想を聞かせてください',
     reasonHeader: 'そう考える理由や体験があれば教えてください（任意）',
     nameHeader: '名前',
     classHeader: 'クラス',
     lastModified: new Date().toISOString()
   };
+  
+  console.log('📝 クイックスタート用質問文設定:');
+  console.log('  💭 メイン質問:', quickStartSheetConfig.opinionHeader);
+  console.log('  💡 理由質問:', quickStartSheetConfig.reasonHeader);
   
   // 型安全性確保: publishedSheetNameの明示的文字列変換
   var safeSheetName = formAndSsInfo.sheetName;
@@ -1589,12 +1597,20 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
   
   // ユーザーデータベースを新しいセットアップ情報で完全に更新
   console.log('💾 ユーザーデータベースを新しいセットアップで更新中...');
-  updateUser(requestUserId, {
+  var updateData = {
     spreadsheetId: formAndSsInfo.spreadsheetId,
     spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
     configJson: JSON.stringify(updatedConfig),
     lastAccessedAt: new Date().toISOString()
-  });
+  };
+  
+  console.log('📋 データベース更新内容:');
+  console.log('  📊 新スプレッドシートID:', updateData.spreadsheetId);
+  console.log('  🔗 新スプレッドシートURL:', updateData.spreadsheetUrl);
+  
+  updateUser(requestUserId, updateData);
+  
+  console.log('✅ ユーザーデータベース更新完了!');
   
   // 重要: 新しいセットアップ完了後に全関連キャッシュを強制的にクリア
   console.log('🗑️ 古いキャッシュをクリアして新しいセットアップを反映中...');
@@ -1616,6 +1632,14 @@ function generateQuickStartResponse(setupContext, createdFiles, updatedConfig) {
   
   // ステップ4: 回答ボードを公開状態に設定
   debugLog('🌐 ステップ4: 回答ボード公開中...');
+  
+  // 最終検証：新規作成されたファイルの確認
+  console.log('🔍 最終検証 - 作成されたファイル:');
+  console.log('  📝 フォームID:', formAndSsInfo.formId);
+  console.log('  📊 スプレッドシートID:', formAndSsInfo.spreadsheetId);
+  console.log('  📄 シート名:', formAndSsInfo.sheetName);
+  console.log('  🔗 フォームURL:', formAndSsInfo.formUrl);
+  console.log('  🔗 スプレッドシートURL:', formAndSsInfo.spreadsheetUrl);
   
   debugLog('✅ クイックスタートセットアップ完了: ' + requestUserId);
   
@@ -1653,8 +1677,9 @@ function initializeQuickStartContext(requestUserId) {
   
   // クイックスタート繰り返し実行を許可
   // 既存のセットアップがある場合は完全にリセットして新しいセットアップで上書きする
-  if (configJson.formCreated && userInfo.spreadsheetId) {
+  if (configJson.formCreated || userInfo.spreadsheetId) {
     console.log('⚠️ 既存のセットアップが検出されました。新しいセットアップで完全に上書きします。');
+    console.log('🔄 既存スプレッドシートID:', userInfo.spreadsheetId);
     
     // 既存のキャッシュを完全にクリアして、新しいセットアップが確実に反映されるようにする
     invalidateUserCache(requestUserId, userEmail, userInfo.spreadsheetId, true);
@@ -1666,6 +1691,13 @@ function initializeQuickStartContext(requestUserId) {
       formCreated: false,
       appPublished: false
     };
+    
+    // 強制的に新規作成を保証するためにspreadsheetIdをクリア
+    console.log('🗑️ 既存スプレッドシートIDをクリアして新規作成を強制します');
+    userInfo.spreadsheetId = null;
+    userInfo.spreadsheetUrl = null;
+  } else {
+    console.log('✨ 初回セットアップを開始します');
   }
   
   return {
@@ -2614,6 +2646,11 @@ function shareAllSpreadsheetsWithServiceAccount() {
  */
 function createStudyQuestForm(userEmail, userId, formTitle, questionType) {
   try {
+    console.log('📝 新しいStudyQuestフォームを作成開始');
+    console.log('👤 ユーザー:', userEmail);
+    console.log('🆔 ユーザーID:', userId);
+    console.log('📋 フォームタイトル:', formTitle);
+    
     // パフォーマンス測定開始
     var profiler = (typeof globalProfiler !== 'undefined') ? globalProfiler : {
       start: function() {},
@@ -2627,7 +2664,13 @@ function createStudyQuestForm(userEmail, userId, formTitle, questionType) {
       questions: questionType || 'simple'
     };
     
+    console.log('🏭 統合ファクトリでフォーム作成中:', JSON.stringify(overrides));
     var formResult = createUnifiedForm('study', userEmail, userId, overrides);
+    
+    console.log('✅ 新しいフォーム作成完了:');
+    console.log('  📝 フォームID:', formResult.formId);
+    console.log('  📊 スプレッドシートID:', formResult.spreadsheetId);
+    console.log('  📄 シート名:', formResult.sheetName);
     
     // StudyQuest固有のカスタマイズ
     var form = FormApp.openById(formResult.formId);
@@ -2665,6 +2708,13 @@ function createStudyQuestForm(userEmail, userId, formTitle, questionType) {
     addReactionColumnsToSpreadsheet(formResult.spreadsheetId, formResult.sheetName);
     
     profiler.end('createForm');
+    
+    console.log('🎉 StudyQuestフォーム作成が完全に完了しました:');
+    console.log('  📝 最終フォームID:', formResult.formId);
+    console.log('  📊 最終スプレッドシートID:', formResult.spreadsheetId);
+    console.log('  🔗 フォームURL:', formResult.formUrl || 'N/A');
+    console.log('  🔗 スプレッドシートURL:', formResult.spreadsheetUrl || 'N/A');
+    
     return formResult;
     
   } catch (e) {
