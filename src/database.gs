@@ -603,6 +603,11 @@ function fetchUserFromDatabase(field, value) {
     
     console.log('fetchUserFromDatabase - 検索開始: ' + field + '=' + value);
     
+    // fetchUserFromDatabase が常に最新のデータを取得するように、関連する batchGetSheetsData のキャッシュを強制的に無効化
+    // キャッシュキーは batchGetSheetsData 内で生成される形式と一致させる
+    const batchGetCacheKey = `batchGet_${dbId}_["'${sheetName}'!A:H"]`;
+    cacheManager.remove(batchGetCacheKey);
+    
     var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
     var values = data.valueRanges[0].values || [];
     

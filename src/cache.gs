@@ -67,7 +67,16 @@ class CacheManager {
       if (cachedValue !== null) {
         debugLog(`[Cache] ScriptCache hit for key: ${key}`);
         this.stats.hits++;
-        const parsedValue = JSON.parse(cachedValue);
+        let parsedValue = cachedValue;
+        // WEB_APP_URL のように JSON ではない可能性のあるキーはパースしない
+        if (key !== 'WEB_APP_URL') {
+          try {
+            parsedValue = JSON.parse(cachedValue);
+          } catch (e) {
+            console.warn(`[Cache] Failed to parse cache for key: ${key} (not JSON, returning raw):`, e.message);
+            // パース失敗時は元の文字列をそのまま返す
+          }
+        }
         if (enableMemoization) {
           this.memoCache.set(key, { value: parsedValue, createdAt: Date.now(), ttl });
         }
