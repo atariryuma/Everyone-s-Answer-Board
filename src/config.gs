@@ -1583,8 +1583,29 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
   
   verifyUserAccess(requestUserId);
   try {
-    if (!sheetName) {
-      throw new Error('sheetNameは必須です');
+    // sheetNameのバリデーションとフォールバック処理
+    if (!sheetName || (typeof sheetName === 'string' && sheetName.trim() === '')) {
+      console.warn('⚠️ getSheetDetails: sheetNameが空です。フォールバック処理を実行中...');
+      
+      // ユーザー情報から publishedSheetName を取得
+      try {
+        const userInfo = getCachedUserInfo(requestUserId);
+        if (userInfo && userInfo.configJson) {
+          const configJson = JSON.parse(userInfo.configJson);
+          const fallbackSheetName = configJson.publishedSheetName;
+          if (fallbackSheetName && typeof fallbackSheetName === 'string' && fallbackSheetName.trim() !== '') {
+            console.log('✅ configJsonからフォールバックシート名を使用:', fallbackSheetName);
+            sheetName = fallbackSheetName;
+          } else {
+            throw new Error('getSheetDetails: sheetNameが必須ですが、configJsonからも取得できませんでした');
+          }
+        } else {
+          throw new Error('getSheetDetails: sheetNameが必須ですが、ユーザー情報からも取得できませんでした');
+        }
+      } catch (fallbackError) {
+        console.error('❌ フォールバック処理に失敗:', fallbackError.message);
+        throw new Error('sheetNameは必須です');
+      }
     }
     var targetId = spreadsheetId || getEffectiveSpreadsheetId(requestUserId);
     if (!targetId) {
@@ -2100,8 +2121,34 @@ function getSheetDetailsFromContext(context, spreadsheetId, sheetName) {
   if (!spreadsheetId || typeof spreadsheetId !== 'string') {
     throw new Error('getSheetDetailsFromContext: spreadsheetId parameter must be a valid string');
   }
-  if (!sheetName || typeof sheetName !== 'string') {
-    throw new Error('getSheetDetailsFromContext: sheetName parameter must be a valid string');
+  if (!sheetName || typeof sheetName !== 'string' || sheetName.trim() === '') {
+    console.error('❌ CRITICAL: Invalid sheetName parameter:', {
+      sheetName: sheetName,
+      sheetNameType: typeof sheetName,
+      sheetNameTrimmed: typeof sheetName === 'string' ? sheetName.trim() : 'not string',
+      contextUserInfo: context && context.userInfo ? {
+        hasConfigJson: !!(context.userInfo.configJson),
+        publishedSheetName: JSON.parse(context.userInfo.configJson || '{}').publishedSheetName
+      } : 'no userInfo'
+    });
+    
+    // フォールバック: configJsonからpublishedSheetNameを取得
+    if (context && context.userInfo && context.userInfo.configJson) {
+      try {
+        const configJson = JSON.parse(context.userInfo.configJson);
+        const fallbackSheetName = configJson.publishedSheetName;
+        if (fallbackSheetName && typeof fallbackSheetName === 'string' && fallbackSheetName.trim() !== '') {
+          console.warn('⚠️ Using fallback publishedSheetName from config:', fallbackSheetName);
+          sheetName = fallbackSheetName;
+        } else {
+          throw new Error('getSheetDetailsFromContext: sheetName parameter must be a valid non-empty string. Received: ' + sheetName);
+        }
+      } catch (parseError) {
+        throw new Error('getSheetDetailsFromContext: sheetName parameter must be a valid non-empty string and configJson fallback failed');
+      }
+    } else {
+      throw new Error('getSheetDetailsFromContext: sheetName parameter must be a valid non-empty string and no fallback available');
+    }
   }
   
   try {

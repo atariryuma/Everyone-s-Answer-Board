@@ -4260,6 +4260,46 @@ function getInitialData(requestUserId, targetSheetName) {
     
     // === ステップ6: シート詳細の取得（オプション）- 最適化版 ===
     var includeSheetDetails = targetSheetName || configJson.publishedSheetName;
+    
+    // デバッグ: シート詳細取得パラメータの確認
+    console.log('🔍 getInitialData: シート詳細取得パラメータ確認:', {
+      targetSheetName: targetSheetName,
+      publishedSheetName: configJson.publishedSheetName,
+      includeSheetDetails: includeSheetDetails,
+      hasSpreadsheetId: !!userInfo.spreadsheetId,
+      willIncludeSheetDetails: !!(includeSheetDetails && userInfo.spreadsheetId)
+    });
+    
+    // publishedSheetNameが空の場合のフォールバック処理
+    if (!includeSheetDetails && userInfo.spreadsheetId && configJson) {
+      console.warn('⚠️ シート名が指定されていません。デフォルトシート名を検索中...');
+      try {
+        // 一般的なシート名パターンを試す
+        const commonSheetNames = ['フォームの回答 1', 'フォーム回答 1', 'Form Responses 1', 'Sheet1', 'シート1'];
+        const tempService = getSheetsServiceCached();
+        const spreadsheetInfo = getSpreadsheetsData(tempService, userInfo.spreadsheetId);
+        
+        if (spreadsheetInfo && spreadsheetInfo.sheets && spreadsheetInfo.sheets.length > 0) {
+          // 既知のシート名から最初に見つかったものを使用
+          for (const commonName of commonSheetNames) {
+            if (spreadsheetInfo.sheets.some(sheet => sheet.properties.title === commonName)) {
+              includeSheetDetails = commonName;
+              console.log('✅ フォールバックシート名を使用:', commonName);
+              break;
+            }
+          }
+          
+          // それでも見つからない場合は最初のシートを使用
+          if (!includeSheetDetails) {
+            includeSheetDetails = spreadsheetInfo.sheets[0].properties.title;
+            console.log('✅ 最初のシートを使用:', includeSheetDetails);
+          }
+        }
+      } catch (fallbackError) {
+        console.warn('⚠️ フォールバックシート名検索に失敗:', fallbackError.message);
+      }
+    }
+    
     if (includeSheetDetails && userInfo.spreadsheetId) {
       try {
         // 最適化: getSheetsServiceの重複呼び出しを避けるため、一度だけ作成して再利用
