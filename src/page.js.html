@@ -1450,6 +1450,7 @@ setupEventDelegation() {
                 }
               } else {
                 console.warn('⚠️ StudyQuestApp: Received empty or invalid data:', result);
+                console.log('DEBUG: Calling displayEmptyState. currentAnswers.length:', this.state.currentAnswers.length, 'result.data.length:', result.data.length);
               }
               
               this.displayEmptyState();
