@@ -458,8 +458,9 @@ function doGet(e) {
             const userInfo = findUserById(lastAdminUserId);
             return renderAdminPanel(userInfo, 'admin');
           } else {
-            // 権限がない場合は状態をクリア
+            // 権限がない場合は状態をクリアし、ログインページへ
             userProperties.deleteProperty('lastAdminUserId');
+            return showLoginPage();
           }
         }
       }
@@ -476,7 +477,8 @@ function doGet(e) {
       }
       // 本人確認
       if (!verifyAdminAccess(params.userId)) {
-        return showErrorPage('アクセス拒否', 'この管理パネルにアクセスする権限がありません。');
+        console.warn('アクセス拒否: ユーザーID', params.userId, 'の管理パネルへのアクセス権限がありません。');
+        return showLoginPage(); // 権限がない場合はログインページへ
       }
       
       // 管理パネルアクセス時に状態を保存
