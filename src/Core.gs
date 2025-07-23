@@ -522,8 +522,11 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
     }
 
     // スプレッドシートとシートを取得
-    var spreadsheet = SpreadsheetApp.openById(publishedSpreadsheetId);
-    var sheet = spreadsheet.getSheetByName(publishedSheetName);
+    var ss = SpreadsheetApp.openById(publishedSpreadsheetId);
+      debugLog('DEBUG: Spreadsheet object obtained: %s', ss ? ss.getName() : 'null');
+      
+      var sheet = ss.getSheetByName(publishedSheetName);
+      debugLog('DEBUG: Sheet object obtained: %s', sheet ? sheet.getName() : 'null');
 
     if (!sheet) {
       throw new Error('指定されたシートが見つかりません: ' + publishedSheetName);
@@ -2956,7 +2959,9 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
       var ranges = [sheetName + '!A:Z'];
       
       var responses = batchGetSheetsData(service, spreadsheetId, ranges);
+      debugLog('DEBUG: batchGetSheetsData responses: %s', JSON.stringify(responses));
       var sheetData = responses.valueRanges[0].values || [];
+      debugLog('DEBUG: sheetData length: %s', sheetData.length);
     
     // 名簿機能は使用せず、空の配列を設定
     var rosterData = [];
