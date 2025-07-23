@@ -471,14 +471,17 @@ body {
   text-align: center;
   padding: 2rem;
   max-width: 400px;
-  background: rgba(26,27,38,0.7); /* Darker background for the content box */
+  background: rgba(16,17,28,0.95); /* Much darker and more opaque background */
   border-radius: 1rem;
-  border: 1px solid rgba(255,255,255,0.1);
-  box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.15);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  /* Add backdrop filter to prevent glass-panel bleed-through */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .loading-message {

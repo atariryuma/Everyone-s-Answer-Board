@@ -710,29 +710,103 @@ class UnifiedLoadingManager {
     this.variantClasses = ['transparent', 'modal', 'progress', 'quickstart', 'page-specific'];
   }
 
-  // Initialize the loading manager with enhanced error handling.
-  init(retries = 5, delay = 100) {
+  // Initialize the loading manager with enhanced error handling and DOM monitoring.
+  init(retries = 5, delay = 100, onSuccess = null) {
     if (this.initialized) {
       console.log('UnifiedLoadingManager: Already initialized.');
+      if (onSuccess) onSuccess();
       return true;
+    }
+
+    // Enhanced DOM readiness check
+    if (document.readyState === 'loading') {
+      console.log('UnifiedLoadingManager: DOM still loading, waiting for DOMContentLoaded...');
+      document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => this.init(retries, delay, onSuccess), 50);
+      }, { once: true });
+      return false;
     }
 
     this.overlay = document.getElementById('loading-overlay');
     if (this.overlay) {
       if (!window.unifiedLoadingInitialized) {
         window.unifiedLoadingInitialized = true;
-        console.log('UnifiedLoadingManager: Initialized successfully.');
+        console.log('✅ UnifiedLoadingManager: Initialized successfully with element:', this.overlay.className);
       }
       this.initialized = true;
+      if (onSuccess) onSuccess();
       return true;
     }
 
+    // Enhanced retry logic with DOM mutation observation
     if (retries > 0) {
-      console.warn(`UnifiedLoadingManager: loading-overlay element not found. Retrying in ${delay}ms (${retries} retries left)...`);
-      setTimeout(() => this.init(retries - 1, delay * 1.5), delay); // Exponential backoff
+      console.warn(`⚠️ UnifiedLoadingManager: loading-overlay element not found. DOM state: ${document.readyState}. Retrying in ${delay}ms (${retries} retries left)...`);
+      
+      // Try to observe DOM changes for the loading-overlay element
+      if (retries === 5) { // Only set up observer on first try
+        this.setupDOMObserver(onSuccess);
+      }
+      
+      setTimeout(() => this.init(retries - 1, delay * 1.5, onSuccess), delay); // Exponential backoff
     } else {
-      console.error('UnifiedLoadingManager: Critical failure - loading-overlay element not found after multiple retries. Please check HTML structure.');
+      console.error('❌ UnifiedLoadingManager: Critical failure - loading-overlay element not found after multiple retries.');
+      console.error('❌ UnifiedLoadingManager: Current DOM structure check:');
+      console.error('  - Document ready state:', document.readyState);
+      console.error('  - Body exists:', !!document.body);
+      console.error('  - Available IDs:', Array.from(document.querySelectorAll('[id]')).map(el => el.id).join(', '));
+      
+      // Create fallback overlay as last resort
+      this.createFallbackOverlay();
     }
+    return false;
+  }
+
+  // Setup DOM observer to watch for the loading-overlay element
+  setupDOMObserver(onSuccess) {
+    if (typeof MutationObserver === 'undefined') return;
+    
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+          for (const node of mutation.addedNodes) {
+            if (node.nodeType === 1 && (node.id === 'loading-overlay' || node.querySelector('#loading-overlay'))) {
+              console.log('✅ UnifiedLoadingManager: loading-overlay detected via DOM observer');
+              observer.disconnect();
+              setTimeout(() => this.init(1, 50, onSuccess), 10); // Quick retry
+              return;
+            }
+          }
+        }
+      }
+    });
+    
+    observer.observe(document.body || document.documentElement, {
+      childList: true,
+      subtree: true
+    });
+    
+    // Disconnect observer after 10 seconds to prevent memory leaks
+    setTimeout(() => observer.disconnect(), 10000);
+  }
+
+  // Create a fallback overlay if none exists
+  createFallbackOverlay() {
+    if (document.getElementById('loading-overlay')) return;
+    
+    console.warn('⚠️ UnifiedLoadingManager: Creating fallback loading-overlay element');
+    const fallbackOverlay = document.createElement('div');
+    fallbackOverlay.id = 'loading-overlay';
+    fallbackOverlay.className = 'loading-overlay page-specific hidden';
+    
+    // Insert at the beginning of body
+    if (document.body) {
+      document.body.insertBefore(fallbackOverlay, document.body.firstChild);
+      this.overlay = fallbackOverlay;
+      this.initialized = true;
+      console.log('✅ UnifiedLoadingManager: Fallback overlay created and initialized');
+      return true;
+    }
+    
     return false;
   }
 

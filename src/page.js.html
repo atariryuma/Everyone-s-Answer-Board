@@ -72,6 +72,45 @@ class UnifiedCache {
 }
 
 class StudyQuestApp {
+  /**
+   * ユーザーIDを検証し、必要に応じてフォールバック値を提供
+   * @param {string} userId - 検証するユーザーID
+   * @returns {string} 有効なユーザーID、またはフォールバック値
+   */
+  validateUserId(userId) {
+    // 基本的な検証
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      console.warn('⚠️ StudyQuestApp: Invalid or empty userId provided:', userId);
+      
+      // URLパラメータからuserIdを取得するフォールバック
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const fallbackUserId = urlParams.get('userId');
+        
+        if (fallbackUserId) {
+          console.log('✅ StudyQuestApp: Using fallback userId from URL parameters:', fallbackUserId);
+          return fallbackUserId;
+        }
+      } catch (error) {
+        console.warn('⚠️ StudyQuestApp: Failed to get userId from URL parameters:', error.message);
+      }
+      
+      // 最後のフォールバック
+      console.error('❌ StudyQuestApp: No valid userId available. Data loading may fail.');
+      return '';
+    }
+    
+    // UUID形式の基本的な形式チェック（36文字、ハイフン付き）
+    if (userId.length === 36 && userId.includes('-')) {
+      console.log('✅ StudyQuestApp: Valid userId format detected:', userId.substring(0, 8) + '...');
+      return userId;
+    }
+    
+    // その他の形式も許可するが警告を出す
+    console.warn('⚠️ StudyQuestApp: Unusual userId format, but proceeding:', userId.substring(0, 8) + '...');
+    return userId;
+  }
+
   constructor() {
     this.cache = new UnifiedCache();
     this.weakCache = new WeakMap(); // For DOM element caching
@@ -132,7 +171,7 @@ class StudyQuestApp {
       showScoreSort: window.showScoreSort,
       displayMode: window.displayMode,
       sheetName: SHEET_NAME,
-      userId: USER_ID, // Add userId to state
+      userId: this.validateUserId(USER_ID), // Validate and add userId to state
       hasNewContent: false,
       newContentCount: 0,
       lastSeenCount: 0,
@@ -1153,18 +1192,134 @@ setupEventDelegation() {
     debugLog('アプリケーションのクリーンアップ完了');
   }
   async loadDataImmediate() {
-    // Verify admin first to ensure proper initialization
-    await this.verifyAdminAsync();
+    try {
+      console.log('🚀 StudyQuestApp: Starting immediate data loading...');
+      
+      // 1. Validate essential prerequisites
+      if (!this.validatePrerequisites()) {
+        console.error('❌ StudyQuestApp: Prerequisites validation failed, aborting initialization');
+        this.displayInitializationError('アプリケーションの初期化に必要な条件が満たされていません');
+        return;
+      }
+      
+      // 2. Verify admin status to ensure proper initialization
+      console.log('🔍 StudyQuestApp: Verifying admin status...');
+      await this.verifyAdminAsync().catch(error => {
+        console.warn('⚠️ StudyQuestApp: Admin verification failed, continuing with default permissions:', error.message);
+      });
+      
+      // 3. Start loading immediately without waiting
+      console.log('📊 StudyQuestApp: Starting sheet data loading...');
+      this.loadSheetData(false, true).then(() => {
+        console.log('✅ StudyQuestApp: Sheet data loaded, starting polling...');
+        this.startPolling();
+      }).catch(error => {
+        console.error('❌ StudyQuestApp: Sheet data loading failed:', error);
+        this.displayDataLoadError(error.message || 'データの読み込みに失敗しました');
+      });
+      
+      // 4. Load sheets in background only for administrators
+      if (this.state.isAdminUser) {
+        console.log('👑 StudyQuestApp: Loading available sheets for admin user...');
+        this.loadAvailableSheets().catch(error => {
+          console.warn('⚠️ StudyQuestApp: Available sheets loading failed:', error.message);
+        });
+      }
+      
+      console.log('🎯 StudyQuestApp: Immediate loading initialization completed');
+      
+    } catch (error) {
+      console.error('❌ StudyQuestApp: Critical error in loadDataImmediate:', error);
+      this.displayInitializationError('アプリケーションの初期化中にエラーが発生しました: ' + error.message);
+    }
+  }
+
+  /**
+   * Validate essential prerequisites for app initialization
+   * @returns {boolean} true if all prerequisites are met
+   */
+  validatePrerequisites() {
+    const checks = [
+      { name: 'userId', value: this.state.userId, required: true },
+      { name: 'answersContainer', value: this.elements.answersContainer, required: true },
+      { name: 'sheetName', value: this.state.sheetName, required: false },
+      { name: 'google.script.run', value: typeof google !== 'undefined' && google.script && google.script.run, required: true }
+    ];
     
-    // Start loading immediately without waiting
-    this.loadSheetData(false, true).then(() => {
-      this.startPolling();
+    let allValid = true;
+    console.log('🔍 StudyQuestApp: Validating prerequisites:');
+    
+    checks.forEach(check => {
+      const isValid = check.required ? !!check.value : true;
+      const status = isValid ? '✅' : '❌';
+      console.log(`  ${status} ${check.name}: ${check.required ? 'required' : 'optional'} - ${isValid ? 'OK' : 'MISSING'}`);
+      
+      if (check.required && !isValid) {
+        allValid = false;
+      }
     });
     
-    // Load sheets in background only for administrators
-    if (this.state.isAdminUser) {
-      this.loadAvailableSheets();
-    }
+    return allValid;
+  }
+
+  /**
+   * Display initialization error to user
+   * @param {string} message - Error message to display
+   */
+  displayInitializationError(message) {
+    const container = this.elements.answersContainer;
+    if (!container) return;
+    
+    container.innerHTML = `
+      <div class="text-center py-16 px-6 col-span-full">
+        <svg class="mx-auto h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <h3 class="mt-2 text-lg font-medium text-red-400">初期化エラー</h3>
+        <p class="mt-1 text-sm text-gray-400">${this.escapeHtml(message)}</p>
+        <div class="mt-6">
+          <button 
+            onclick="window.location.reload()" 
+            class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+          >
+            ページを再読み込み
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Display data loading error to user
+   * @param {string} message - Error message to display
+   */
+  displayDataLoadError(message) {
+    const container = this.elements.answersContainer;
+    if (!container) return;
+    
+    container.innerHTML = `
+      <div class="text-center py-16 px-6 col-span-full">
+        <svg class="mx-auto h-12 w-12 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.08 16.5c-.77.833.192 2.5 1.732 2.5z" />
+        </svg>
+        <h3 class="mt-2 text-lg font-medium text-yellow-400">データ読み込みエラー</h3>
+        <p class="mt-1 text-sm text-gray-400">${this.escapeHtml(message)}</p>
+        <div class="mt-6 space-x-3">
+          <button 
+            onclick="window.location.reload()" 
+            class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600"
+          >
+            ページを再読み込み
+          </button>
+          <button 
+            onclick="window.studyQuestApp && window.studyQuestApp.loadSheetData(true, true)" 
+            class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-300 bg-blue-700 hover:bg-blue-600"
+          >
+            再試行
+          </button>
+        </div>
+      </div>
+    `;
   }
   
   showMinimalSkeleton() {
@@ -1188,6 +1343,37 @@ setupEventDelegation() {
         </svg>
         <h3 class="mt-2 text-lg font-medium text-white">まだ回答がありません</h3>
         <p class="mt-1 text-sm text-gray-400">最初の回答者になりましょう！</p>
+      </div>
+    `;
+  }
+
+  /**
+   * ユーザー情報が見つからない場合のエラー画面を表示
+   * @param {string} errorMessage - エラーメッセージ
+   */
+  displayUserNotFoundError(errorMessage) {
+    const container = this.elements.answersContainer;
+    if (!container) return;
+    
+    container.innerHTML = `
+      <div class="text-center py-16 px-6 col-span-full">
+        <svg class="mx-auto h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.08 16.5c-.77.833.192 2.5 1.732 2.5z" />
+        </svg>
+        <h3 class="mt-2 text-lg font-medium text-red-400">アクセスエラー</h3>
+        <p class="mt-1 text-sm text-gray-400">この回答ボードにアクセスする権限がありません</p>
+        <p class="mt-2 text-xs text-gray-500">エラー詳細: ${this.escapeHtml(errorMessage)}</p>
+        <div class="mt-6">
+          <button 
+            onclick="window.location.reload()" 
+            class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+          >
+            <svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            ページを再読み込み
+          </button>
+        </div>
       </div>
     `;
   }
@@ -1246,11 +1432,30 @@ setupEventDelegation() {
             }
             
             if (!result || !result.data || result.data.length === 0) {
+              // 詳細なエラーログ出力
+              if (result && result.status === 'error') {
+                console.error('❌ StudyQuestApp: Data fetch failed with error:', result.message);
+                
+                // ユーザー情報エラーの特別な処理
+                if (result.message && result.message.includes('ユーザー情報が見つかりません')) {
+                  console.error('❌ StudyQuestApp: User not found. Current userId:', this.state.userId);
+                  console.error('❌ StudyQuestApp: This may indicate:');
+                  console.error('  1. Invalid userId parameter');
+                  console.error('  2. User not registered in the system');
+                  console.error('  3. Database connectivity issues');
+                  
+                  // UIにエラーメッセージを表示
+                  this.displayUserNotFoundError(result.message);
+                  return;
+                }
+              } else {
+                console.warn('⚠️ StudyQuestApp: Received empty or invalid data:', result);
+              }
+              
               this.displayEmptyState();
               if (isInitialLoad) {
                 this.state.lastSeenCount = 0;
               }
-              console.log('Received empty or invalid data:', result);
               return;
             }
 
