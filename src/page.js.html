@@ -126,12 +126,6 @@ class StudyQuestApp {
       body: document.body,
       mainContainer: document.getElementById('main-container'),
       answersContainer: document.getElementById('answers'),
-    };
-    if (!this.elements.answersContainer) {
-      console.error('❌ StudyQuestApp: answersContainer element not found!');
-    } else {
-      console.log('✅ StudyQuestApp: answersContainer found:', this.elements.answersContainer);
-    }
       sizeSlider: document.getElementById('sizeSlider'),
       sliderValue: document.getElementById('sliderValue'),
       headingLabel: document.getElementById('headingLabel'),
@@ -1470,7 +1464,6 @@ setupEventDelegation() {
             // 🔥 CRITICAL FIX: Set currentAnswers with received data
             this.state.currentAnswers = result.data || [];
             console.log('✅ StudyQuestApp: Set currentAnswers with', this.state.currentAnswers.length, 'items');
-            console.log('DEBUG: currentAnswers after loadSheetData:', this.state.currentAnswers);
             
             // Apply saved reaction states to restore user's previous reactions
             this.applyReactionState(result.data);
@@ -1722,7 +1715,6 @@ setupEventDelegation() {
     const container = this.elements.answersContainer;
     container.querySelectorAll('.skeleton').forEach(el => el.remove());
     const newRows = this.state.currentAnswers;
-    console.log('DEBUG: renderBoard called. newRows length:', newRows.length);
     
     // Batch DOM updates using performance-aware batching
     const updates = [];
@@ -1770,10 +1762,8 @@ setupEventDelegation() {
       let prevNode = null;
       // Enhanced batch processing with virtual scrolling for large datasets
       if (newRows.length > RENDER_BATCH_SIZE) {
-        console.log('DEBUG: renderBoard - Using virtual scrolling path.');
         this.renderWithVirtualScrolling(newRows, oldRows, container, existingMap, changedItems);
       } else {
-        console.log('DEBUG: renderBoard - Using normal rendering path.');
         // Process small datasets normally
         const fragment = this.getReusableFragment();
         
@@ -1785,7 +1775,6 @@ setupEventDelegation() {
           if (!card) {
             card = this.createAnswerCard(row);
             if (card) {
-              console.log('DEBUG: createAnswerCard returned a card for rowIndex:', row.rowIndex);
               card.classList.add('new-card');
               
               // Add to visibility observer
@@ -1807,12 +1796,8 @@ setupEventDelegation() {
         });
         
         // Append fragment to container
-        console.log('DEBUG: renderBoard - Fragment children length before append:', fragment.children.length);
         if (fragment.children.length > 0) {
           container.appendChild(fragment);
-          console.log('DEBUG: renderBoard - Fragment appended to container.');
-        } else {
-          console.log('DEBUG: renderBoard - Fragment is empty, not appended.');
         }
         
         // Recycle fragment
