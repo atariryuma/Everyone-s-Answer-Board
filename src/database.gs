@@ -626,9 +626,10 @@ function fetchUserFromDatabase(field, value) {
     
     console.log('fetchUserFromDatabase - フィールド検索開始: index=' + fieldIndex);
     console.log('fetchUserFromDatabase - デバッグ: headers=' + JSON.stringify(headers));
-    console.log('fetchUserFromDatabase - デバッグ: 検索対象データ行数=' + (values.length - 1));
+    console.log('fetchUserFromDatabase - デバッグ: 検索対象データ行数=' + (values.length > 1 ? values.length - 1 : 0));
     
-    for (var i = 1; i < values.length; i++) {
+    for (var i = 0; i < values.length; i++) {
+      if (i === 0) continue; // ヘッダー行をスキップ
       var currentRow = values[i];
       var currentValue = currentRow[fieldIndex];
       
@@ -1242,6 +1243,9 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
       result.valueRanges.forEach((valueRange, index) => {
         const hasValues = valueRange.values && valueRange.values.length > 0;
         console.log(`📊 範囲[${index}] ${ranges[index]}: ${hasValues ? valueRange.values.length + '行' : 'データなし'}`);
+      if (hasValues) {
+        console.log(`DEBUG: batchGetSheetsData - 範囲[${index}] データプレビュー:`, JSON.stringify(valueRange.values.slice(0, 5))); // 最初の5行をプレビュー
+      }
       });
       
       return result;
