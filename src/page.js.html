@@ -1704,6 +1704,7 @@ setupEventDelegation() {
     }
   }
   renderBoard(isLayoutChange = false, oldRows = []) {
+    debugLog('DEBUG: renderBoard called. newRows.length:', this.state.currentAnswers.length);
     // 管理者の場合はハイライトトグルを確実に有効化
     if (this.state.isAdminUser && !this.state.showHighlightToggle) {
       this.state.showHighlightToggle = true;
@@ -1741,6 +1742,7 @@ setupEventDelegation() {
     this.batchDOMUpdates(updates);
     
     if (newRows.length === 0) {
+      debugLog('DEBUG: renderBoard - newRows.length is 0. Displaying empty state.');
       if (!container.querySelector('.no-answers')) {
         container.innerHTML = '';
         const p = document.createElement('p');
