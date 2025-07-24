@@ -87,7 +87,7 @@ function resetUserAuthentication() {
     console.log('ユーザープロパティをクリアしました。');
 
     // ログインページのURLを返す
-    const loginPageUrl = ScriptApp.getWebAppUrl();
+    const loginPageUrl = ScriptApp.getService().getUrl();
     console.log('リセット完了。ログインページURL:', loginPageUrl);
     return loginPageUrl;
   } catch (error) {
