@@ -1415,11 +1415,30 @@ setupEventDelegation() {
         disableInteraction: true 
       });
     }
+    
+    // Add loading-active class to body and container to disable render optimizations
+    // This prevents stacking context issues with the loading overlay
+    document.body.classList.add('loading-active');
+    if (this.elements.answersContainer) {
+      this.elements.answersContainer.classList.add('loading-active');
+      // Replace render-optimized with loading-safe temporarily
+      if (this.elements.answersContainer.classList.contains('render-optimized')) {
+        this.elements.answersContainer.classList.add('loading-safe');
+      }
+    }
   }
 
   hideLoadingOverlay() {
     if (window.unifiedLoading) {
       window.unifiedLoading.setLoading(false);
+    }
+    
+    // Remove loading-active classes to restore render optimizations
+    document.body.classList.remove('loading-active');
+    if (this.elements.answersContainer) {
+      this.elements.answersContainer.classList.remove('loading-active');
+      // Remove loading-safe class to restore normal render optimization
+      this.elements.answersContainer.classList.remove('loading-safe');
     }
   }
 
@@ -1590,6 +1609,11 @@ setupEventDelegation() {
       
       if (isInitialLoad) {
         this.elements.answersContainer.classList.add('render-optimized');
+        // If loading is active, also add loading-safe class to prevent stacking context issues
+        if (document.body.classList.contains('loading-active') || 
+            this.elements.answersContainer.classList.contains('loading-active')) {
+          this.elements.answersContainer.classList.add('loading-safe');
+        }
       }
     } catch (error) {
       console.error('Error loading sheet data:', error);

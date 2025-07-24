@@ -422,7 +422,7 @@ body {
    UNIFIED LOADING OVERLAY SYSTEM
    ============================================================================= */
 
-/* Base loading overlay - Enhanced specificity to override TailwindCSS */
+/* Base loading overlay - Enhanced specificity to override TailwindCSS and prevent stacking context issues */
 .loading-overlay {
   position: fixed !important;
   top: 0 !important;
@@ -443,6 +443,12 @@ body {
   margin: 0 !important;
   padding: 0 !important;
   transform: none !important;
+  /* Force isolation from any parent stacking contexts */
+  isolation: isolate !important;
+  /* Ensure the overlay is always positioned relative to viewport */
+  contain: layout !important;
+  /* Override any parent transforms that might affect positioning */
+  will-change: auto !important;
 }
 
 /* Variant: Transparent background, allows interaction with elements behind it */
@@ -788,6 +794,21 @@ body {
   transform: translateZ(0);
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
+}
+
+/* Disable render optimization when global loading is active to prevent stacking context issues */
+body.gas-loading .render-optimized,
+.loading-active .render-optimized {
+  transform: none !important;
+  will-change: auto !important;
+}
+
+/* Alternative loading-safe optimization for when we need performance but loading is active */
+.render-optimized.loading-safe {
+  /* Use containment instead of transform for performance without stacking context issues */
+  contain: style layout !important;
+  transform: none !important;
+  will-change: auto !important;
 }
 
 /* Accessibility */
