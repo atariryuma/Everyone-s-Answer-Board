@@ -1400,52 +1400,10 @@ setupEventDelegation() {
             </svg>
             ページを再読み込み
           </button>
-          ${isUserNotFoundError ? `
-          <button 
-            onclick="this.redirectToLogin()"
-            class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
-          >
-            <svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-            </svg>
-            ログインページへ
-          </button>` : ''}
         </div>
       </div>
     `;
     
-    // Add redirect function to the error container
-    if (isUserNotFoundError) {
-      container.querySelector('button[onclick="this.redirectToLogin()"]').onclick = () => {
-        this.redirectToLogin();
-      };
-    }
-  }
-  
-  redirectToLogin() {
-    try {
-      // Try to get login URL from the backend
-      google.script.run
-        .withSuccessHandler((loginUrl) => {
-          if (loginUrl) {
-            window.location.href = loginUrl;
-          } else {
-            // Fallback: try to construct login URL
-            const baseUrl = window.location.origin + window.location.pathname;
-            window.location.href = baseUrl.replace('?mode=page', '').replace(/\?.*$/, '') + '?mode=login';
-          }
-        })
-        .withFailureHandler(() => {
-          // Fallback: try to construct login URL
-          const baseUrl = window.location.origin + window.location.pathname;
-          window.location.href = baseUrl.replace('?mode=page', '').replace(/\?.*$/, '') + '?mode=login';
-        })
-        .getWebAppUrlCached();
-    } catch (error) {
-      // Final fallback: remove parameters and add login mode
-      const baseUrl = window.location.origin + window.location.pathname;
-      window.location.href = baseUrl.replace(/\?.*$/, '') + '?mode=login';
-    }
   }
 
   // Add these two methods
