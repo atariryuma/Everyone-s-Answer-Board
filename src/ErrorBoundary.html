@@ -506,9 +506,9 @@
         }
     </style>
     <script>
-        // 強制ログアウトしてログイン画面にリダイレクトする関数
+        // 強制ログアウトしてログイン画面にリダイレクトする関数（簡素化版）
         function forceLogoutAndRedirect() {
-            console.log('🔄 強制ログアウトを開始...');
+            console.log('🔄 サーバーサイド強制ログアウト開始...');
             console.log('📍 現在のURL:', window.location.href);
             
             // リダイレクトループ防止：既にログインページにいる場合は単純にリロード
@@ -520,193 +520,43 @@
             
             // ボタンを無効化して重複実行を防ぐ
             const logoutBtn = event.target;
-            const originalText = logoutBtn.innerHTML;
-            logoutBtn.disabled = true;
-            logoutBtn.innerHTML = '🔄 処理中...';
+            if (logoutBtn) {
+                logoutBtn.disabled = true;
+                logoutBtn.innerHTML = '🔄 処理中...';
+            }
             
             try {
-                // Google Apps Script の resetUserAuthentication を呼び出してセッションをクリア
+                // サーバーサイドリダイレクト関数を呼び出し（全ての制約を回避）
                 google.script.run
-                    .withSuccessHandler(function(loginUrl) {
-                        console.log('✅ セッションクリア成功:', loginUrl);
-                        // セッションクリア後、ログインページにリダイレクト
-                        if (loginUrl) {
-                            // ログインモードパラメータを確実に追加
-                            const finalLoginUrl = ensureLoginMode(loginUrl);
-                            console.log('🔧 最終ログインURL:', finalLoginUrl);
-                            performFrameAwareRedirect(finalLoginUrl);
+                    .withSuccessHandler(function(htmlOutput) {
+                        console.log('✅ サーバーサイドリダイレクト取得成功');
+                        // サーバーから返されたHTMLを現在のページに設定（自動リダイレクト実行）
+                        if (htmlOutput) {
+                            document.open();
+                            document.write(htmlOutput);
+                            document.close();
                         } else {
-                            // フォールバック: 現在のURLからパラメータを削除してリダイレクト
-                            handleLogoutFallback();
+                            console.warn('⚠️ 空のHTMLOutput、フォールバック実行');
+                            fallbackReload();
                         }
                     })
                     .withFailureHandler(function(error) {
-                        console.warn('⚠️ セッションクリアに失敗:', error);
-                        // エラー時のフォールバック処理
-                        handleLogoutFallback();
+                        console.error('❌ サーバーサイドリダイレクト失敗:', error);
+                        fallbackReload();
                     })
-                    .resetUserAuthentication();
+                    .forceLogoutAndRedirectToLogin();
                     
             } catch (error) {
                 console.error('❌ 強制ログアウト処理でエラー:', error);
-                handleLogoutFallback();
+                fallbackReload();
             }
         }
         
-        // ログインモードパラメータを確実に追加する関数
-        function ensureLoginMode(url) {
-            try {
-                const urlObj = new URL(url);
-                
-                // 既にログインモードが設定されている場合はそのまま返す
-                if (urlObj.searchParams.has('mode')) {
-                    console.log('🔍 既存のmodeパラメータ:', urlObj.searchParams.get('mode'));
-                    return url;
-                }
-                
-                // ログインモードパラメータを追加
-                urlObj.searchParams.set('mode', 'login');
-                const finalUrl = urlObj.toString();
-                console.log('✅ ログインモードを追加:', finalUrl);
-                return finalUrl;
-                
-            } catch (urlError) {
-                console.warn('⚠️ URL解析に失敗、フォールバック処理:', urlError);
-                // URL解析に失敗した場合はクエリパラメータを手動で追加
-                const separator = url.includes('?') ? '&' : '?';
-                return url + separator + 'mode=login';
-            }
-        }
-        
-        // iframe対応のリダイレクト関数（Google Apps Script Sandbox制限対応）
-        function performFrameAwareRedirect(url) {
-            console.log('🔄 フレーム対応リダイレクトを実行...', url);
-            
-            // Google Apps Script環境を検出
-            const isGoogleAppsScript = window.location.hostname.includes('script.google.com') ||
-                                     window.location.href.includes('script.googleusercontent.com') ||
-                                     typeof google !== 'undefined' && google.script;
-            
-            if (isGoogleAppsScript) {
-                console.log('🔧 Google Apps Script環境を検出 - 最適化されたリダイレクト');
-                // Google Apps Script環境では階層的フォールバック戦略を使用
-                performGASOptimizedRedirect(url);
-            } else {
-                console.log('🌐 通常環境 - 標準リダイレクト');
-                try {
-                    window.location.href = url;
-                } catch (error) {
-                    console.warn('⚠️ 通常リダイレクトに失敗:', error);
-                    performGASOptimizedRedirect(url);
-                }
-            }
-        }
-        
-        // Google Apps Script最適化リダイレクト（階層的フォールバック）
-        function performGASOptimizedRedirect(url) {
-            console.log('🎯 GAS最適化リダイレクトを実行...', url);
-            
-            // 第1候補: window.top.location.href（最も安全で推奨される方法）
-            try {
-                console.log('🔝 Top frameでリダイレクト試行');
-                window.top.location.href = url;
-                return;
-            } catch (topError) {
-                console.warn('⚠️ Top frame遷移に失敗:', topError);
-            }
-            
-            // 第2候補: window.parent.location.href
-            try {
-                if (window.parent !== window) {
-                    console.log('👆 Parent frameでリダイレクト試行');
-                    window.parent.location.href = url;
-                    return;
-                }
-            } catch (parentError) {
-                console.warn('⚠️ Parent frame遷移に失敗:', parentError);
-            }
-            
-            // 第3候補: 現在のウィンドウで直接リダイレクト
-            try {
-                console.log('🔄 Current windowでリダイレクト試行');
-                window.location.href = url;
-                return;
-            } catch (currentError) {
-                console.warn('⚠️ Current window遷移に失敗:', currentError);
-            }
-            
-            // 第4候補: 新しいタブで開く
-            try {
-                console.log('🆕 新しいタブでリダイレクト');
-                const newWindow = window.open(url, '_blank');
-                if (newWindow) {
-                    // 新しいタブが開けた場合、ユーザーに通知
-                    setTimeout(() => {
-                        if (confirm('新しいタブでログイン画面を開きました。このタブを閉じますか？')) {
-                            window.close();
-                        }
-                    }, 1000);
-                } else {
-                    throw new Error('新しいタブを開けませんでした（ポップアップブロック？）');
-                }
-                return;
-            } catch (openError) {
-                console.error('❌ 新しいタブでの遷移も失敗:', openError);
-            }
-            
-            // 最終手段: ユーザーに手動操作を求める
-            console.error('❌ 全ての自動リダイレクト方法が失敗');
-            const userAction = confirm(
-                'ログイン画面への自動移動に失敗しました。\n\n' +
-                '以下の方法をお試しください：\n' +
-                '• [OK] をクリック: URLをクリップボードにコピーして手動で移動\n' +
-                '• [キャンセル] をクリック: ページを再読み込み\n\n' +
-                'URL: ' + url
-            );
-            
-            if (userAction) {
-                // URLをクリップボードにコピー（可能であれば）
-                try {
-                    navigator.clipboard.writeText(url).then(() => {
-                        alert('URLをクリップボードにコピーしました。\n新しいタブを開いて貼り付けてください。');
-                    }).catch(() => {
-                        prompt('以下のURLを手動でコピーして新しいタブで開いてください:', url);
-                    });
-                } catch (clipboardError) {
-                    prompt('以下のURLを手動でコピーして新しいタブで開いてください:', url);
-                }
-            } else {
-                window.location.reload();
-            }
-        }
-        
-        // フォールバック処理：直接ログインページにリダイレクト
-        function handleLogoutFallback() {
-            console.log('🔄 フォールバック処理を実行...');
-            try {
-                // 現在のURLからパラメータを削除してベースURLを取得
-                const baseUrl = window.location.origin + window.location.pathname;
-                console.log('📍 ベースURL:', baseUrl);
-                
-                // ログインモードパラメータを確実に追加
-                const loginUrl = ensureLoginMode(baseUrl);
-                console.log('📍 最終リダイレクト先:', loginUrl);
-                
-                // セッションストレージとローカルストレージをクリア
-                if (typeof sessionStorage !== 'undefined') {
-                    sessionStorage.clear();
-                }
-                if (typeof localStorage !== 'undefined') {
-                    localStorage.clear();
-                }
-                
-                // ログインページにリダイレクト
-                performFrameAwareRedirect(loginUrl);
-                
-            } catch (fallbackError) {
-                console.error('❌ フォールバック処理でもエラー:', fallbackError);
-                // 最終手段：ページリロード
-                alert('ログイン画面への移動に失敗しました。ページを再読み込みします。');
+        // シンプルなフォールバック関数
+        function fallbackReload() {
+            console.log('🔄 フォールバック：ページリロード実行');
+            const confirmMessage = 'ログイン画面への移動に失敗しました。\nページを再読み込みしてもよろしいですか？';
+            if (confirm(confirmMessage)) {
                 window.location.reload();
             }
         }
