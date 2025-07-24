@@ -1738,7 +1738,10 @@ setupEventDelegation() {
     }
   }
   renderBoard(isLayoutChange = false, isInitialLoad = false, oldRows = []) {
+    // Define newRows first to avoid TDZ error
+    const newRows = this.state.currentAnswers;
     debugLog('DEBUG: renderBoard called. newRows.length:', newRows.length);
+    
     // 管理者の場合はハイライトトグルを確実に有効化
     if (this.state.isAdminUser && !this.state.showHighlightToggle) {
       this.state.showHighlightToggle = true;
@@ -1751,7 +1754,6 @@ setupEventDelegation() {
     const container = this.elements.answersContainer;
     container.querySelectorAll('.skeleton').forEach(el => el.remove());
     debugLog('DEBUG: Skeletons removed. answersContainer children count:', container.children.length);
-    const newRows = this.state.currentAnswers;
     
     // Batch DOM updates using performance-aware batching
     const updates = [];
@@ -1856,6 +1858,15 @@ setupEventDelegation() {
     let currentIndex = 0;
     let prevNode = null;
     
+    // Initialize virtual scrolling state if not exists
+    if (!this.virtualScrollState) {
+      this.virtualScrollState = {
+        renderedItems: 0,
+        totalItems: newRows.length,
+        isLoading: false
+      };
+    }
+    
     const processBatch = () => {
       const startTime = performance.now();
       const endIndex = Math.min(currentIndex + batchSize, newRows.length);
@@ -1895,6 +1906,9 @@ setupEventDelegation() {
       if (fragment.children.length > 0) {
         container.appendChild(fragment);
         debugLog('DEBUG: renderWithVirtualScrolling - Fragment appended. answersContainer children count:', container.children.length);
+        
+        // Update virtual scroll state
+        this.virtualScrollState.renderedItems = container.children.length;
       }
       
       // Recycle fragment
@@ -1913,6 +1927,9 @@ setupEventDelegation() {
           // Defer to next frame/idle callback
           this.deferredRender(processBatch);
         }
+      } else {
+        // All items processed, setup scroll observer for dynamic loading
+        this.setupScrollObserver();
       }
     };
     
@@ -3271,6 +3288,185 @@ async handleReaction(rowIndex, reaction) {
   }
   
   // Enhanced cache methods with timestamp tracking
+
+  // ===== Virtual Scrolling Methods =====
+  
+  setupScrollObserver() {
+    if (!this.elements.answersContainer) {
+      console.warn('setupScrollObserver: answersContainer not found');
+      return;
+    }
+    
+    // Create scroll observer for dynamic loading
+    if (!this.scrollObserver) {
+      this.scrollObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            this.handleVirtualScroll(entry.target);
+          }
+        });
+      }, {
+        root: null,
+        rootMargin: '100px', // Load content 100px before it comes into view
+        threshold: 0.1
+      });
+    }
+    
+    // Observe the last few elements for dynamic loading trigger
+    const cards = this.elements.answersContainer.querySelectorAll('.answer-card');
+    const observeCount = Math.min(5, cards.length); // Observe last 5 cards
+    
+    for (let i = cards.length - observeCount; i < cards.length; i++) {
+      if (cards[i]) {
+        this.scrollObserver.observe(cards[i]);
+      }
+    }
+    
+    debugLog('setupScrollObserver: Observing', observeCount, 'cards for dynamic loading');
+  }
+  
+  handleVirtualScroll(triggerElement) {
+    if (!triggerElement || !this.virtualScrollState) {
+      return;
+    }
+    
+    if (this.virtualScrollState.isLoading) {
+      debugLog('handleVirtualScroll: Already loading, skipping');
+      return;
+    }
+    
+    const currentCards = this.elements.answersContainer.querySelectorAll('.answer-card');
+    const totalAvailable = this.state.currentAnswers.length;
+    const currentRendered = currentCards.length;
+    
+    debugLog('handleVirtualScroll triggered:', {
+      currentRendered,
+      totalAvailable,
+      triggerRowIndex: triggerElement.dataset.rowIndex
+    });
+    
+    // Check if we need to load more items
+    if (currentRendered < totalAvailable) {
+      this.loadMoreItems();
+    } else {
+      // Optimize visible elements when we've rendered everything
+      this.optimizeVisibleElements();
+    }
+  }
+  
+  loadMoreItems() {
+    if (this.virtualScrollState.isLoading) {
+      return;
+    }
+    
+    this.virtualScrollState.isLoading = true;
+    
+    const currentCards = this.elements.answersContainer.querySelectorAll('.answer-card');
+    const currentCount = currentCards.length;
+    const batchSize = this.isLowPerformanceMode ? CHUNK_SIZE : RENDER_BATCH_SIZE;
+    const remainingItems = this.state.currentAnswers.slice(currentCount, currentCount + batchSize);
+    
+    if (remainingItems.length === 0) {
+      this.virtualScrollState.isLoading = false;
+      debugLog('loadMoreItems: No more items to load');
+      return;
+    }
+    
+    debugLog('loadMoreItems: Loading', remainingItems.length, 'additional items');
+    
+    // Use deferred rendering for performance
+    this.deferredRender(() => {
+      this.renderAdditionalItems(remainingItems);
+    });
+  }
+  
+  renderAdditionalItems(items) {
+    if (!items || items.length === 0) {
+      this.virtualScrollState.isLoading = false;
+      return;
+    }
+    
+    const fragment = this.getReusableFragment();
+    const changedItems = [];
+    
+    items.forEach((item) => {
+      const card = this.createAnswerCard(item);
+      if (card) {
+        card.classList.add('new-card');
+        
+        // Add to visibility observer
+        if (this.visibilityObserver) {
+          this.visibilityObserver.observe(card);
+        }
+        
+        // Add to scroll observer for the last few items
+        const isLastFew = items.indexOf(item) >= items.length - 3;
+        if (isLastFew && this.scrollObserver) {
+          this.scrollObserver.observe(card);
+        }
+        
+        fragment.appendChild(card);
+        changedItems.push(item);
+      }
+    });
+    
+    // Append new items to container
+    if (fragment.children.length > 0) {
+      this.elements.answersContainer.appendChild(fragment);
+      
+      // Update virtual scroll state
+      this.virtualScrollState.renderedItems = this.elements.answersContainer.children.length;
+      
+      debugLog('renderAdditionalItems: Added', fragment.children.length, 'new cards');
+    }
+    
+    // Apply updates if needed
+    if (changedItems.length > 0) {
+      this.deferredRender(() => this.applyUpdates(changedItems));
+    }
+    
+    // Recycle fragment
+    this.recycleFragment(fragment);
+    
+    // Reset loading state
+    this.virtualScrollState.isLoading = false;
+  }
+  
+  optimizeVisibleElements() {
+    if (!this.elements.answersContainer || this.virtualScrollState.isLoading) {
+      return;
+    }
+    
+    const cards = this.elements.answersContainer.querySelectorAll('.answer-card');
+    let optimizedCount = 0;
+    
+    cards.forEach((card) => {
+      const rect = card.getBoundingClientRect();
+      const isVisible = rect.top < window.innerHeight && rect.bottom > 0;
+      
+      if (!isVisible && !card.classList.contains('hidden-card')) {
+        // Hide cards that are far from viewport to save memory
+        const distanceFromViewport = Math.min(
+          Math.abs(rect.top - window.innerHeight),
+          Math.abs(rect.bottom)
+        );
+        
+        if (distanceFromViewport > window.innerHeight * 2) {
+          card.classList.add('hidden-card');
+          card.style.visibility = 'hidden';
+          optimizedCount++;
+        }
+      } else if (isVisible && card.classList.contains('hidden-card')) {
+        // Show cards that are back in viewport
+        card.classList.remove('hidden-card');
+        card.style.visibility = 'visible';
+      }
+    });
+    
+    if (optimizedCount > 0) {
+      debugLog('optimizeVisibleElements: Optimized', optimizedCount, 'cards');
+    }
+  }
 }
 // ===== 共通ドメイン情報処理関数 =====
 // AdminPanel.html と Login.html で共通使用
