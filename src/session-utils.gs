@@ -102,11 +102,14 @@ function resetUserAuthentication() {
  * @returns {HtmlOutput} サーバーサイドリダイレクトHTML
  */
 function forceLogoutAndRedirectToLogin() {
+  console.log('🔄 forceLogoutAndRedirectToLogin - 関数開始');
+  
   try {
-    console.log('🔄 サーバーサイド強制ログアウト開始...');
+    console.log('✅ forceLogoutAndRedirectToLogin - try block内に入りました');
     
     // Step 1: セッションクリア処理（エラーハンドリング強化）
     try {
+      console.log('🧹 キャッシュクリア開始...');
       const userCache = CacheService.getUserCache();
       if (userCache) {
         userCache.removeAll([]);
@@ -125,33 +128,64 @@ function forceLogoutAndRedirectToLogin() {
       
     } catch (cacheError) {
       console.warn('⚠️ キャッシュクリア中に一部エラー:', cacheError.message);
+      console.warn('⚠️ エラースタック:', cacheError.stack);
       // キャッシュクリアエラーは致命的ではないので継続
     }
     
     // Step 2: ログインページURLの生成と適切なサニタイズ
     let loginUrl;
     try {
+      console.log('🔗 URL生成開始...');
+      
+      // getWebAppUrlCached関数の存在確認
+      if (typeof getWebAppUrlCached !== 'function') {
+        throw new Error('getWebAppUrlCached function not found');
+      }
+      
       const rawUrl = getWebAppUrlCached() + '?mode=login';
+      console.log('📝 Raw URL generated:', rawUrl);
+      
+      // sanitizeRedirectUrl関数の存在確認
+      if (typeof sanitizeRedirectUrl !== 'function') {
+        throw new Error('sanitizeRedirectUrl function not found');
+      }
+      
       loginUrl = sanitizeRedirectUrl(rawUrl);
       console.log('✅ ログインURL生成・サニタイズ成功:', loginUrl);
+      
     } catch (urlError) {
       console.warn('⚠️ WebAppURL取得失敗、フォールバック使用:', urlError.message);
+      console.warn('⚠️ URLエラースタック:', urlError.stack);
+      
       const fallbackUrl = ScriptApp.getService().getUrl() + '?mode=login';
-      loginUrl = sanitizeRedirectUrl(fallbackUrl);
+      console.log('📝 Fallback URL:', fallbackUrl);
+      
+      try {
+        loginUrl = sanitizeRedirectUrl(fallbackUrl);
+      } catch (sanitizeError) {
+        console.error('❌ Fallback URL sanitization failed:', sanitizeError.message);
+        loginUrl = fallbackUrl; // 最終フォールバック
+      }
     }
+    
+    console.log('🎯 Final login URL:', loginUrl);
     
     // Step 3: JavaScript文字列エスケープユーティリティ
     const escapeJavaScript = (str) => {
-      return str.replace(/\\/g, '\\\\')
-                .replace(/'/g, "\\'")
-                .replace(/"/g, '\\"')
-                .replace(/\n/g, '\\n')
-                .replace(/\r/g, '\\r')
-                .replace(/\t/g, '\\t');
+      if (!str) return '';
+      return String(str)
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t');
     };
     
     // Step 4: 安全なHTML生成（エスケープ済みURL使用）
     const safeLoginUrl = escapeJavaScript(loginUrl);
+    console.log('🔒 Escaped login URL:', safeLoginUrl);
+    
     const redirectScript = `
       <script>
         console.log('🚀 サーバーサイドリダイレクト実行:', '${safeLoginUrl}');
@@ -178,22 +212,40 @@ function forceLogoutAndRedirectToLogin() {
       </noscript>
     `;
     
+    console.log('📄 Generated HTML script length:', redirectScript.length);
+    console.log('📄 Generated HTML preview (first 200 chars):', redirectScript.substring(0, 200));
+    
+    // HtmlServiceの存在確認
+    if (typeof HtmlService === 'undefined') {
+      throw new Error('HtmlService is not available');
+    }
+    
     const htmlOutput = HtmlService.createHtmlOutput(redirectScript);
+    console.log('✅ HtmlService.createHtmlOutput 成功');
+    
+    // HtmlOutputの内容確認
+    if (!htmlOutput) {
+      throw new Error('HtmlOutput is null or undefined');
+    }
     
     // XFrameOptionsMode を安全に設定（iframe内での動作を許可）
     try {
       if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
         htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+        console.log('✅ XFrameOptionsMode.ALLOWALL設定完了');
       }
     } catch (frameError) {
       console.warn('XFrameOptionsMode設定失敗:', frameError.message);
     }
     
-    console.log('✅ サーバーサイドリダイレクトHTML生成完了');
+    console.log('✅ サーバーサイドリダイレクトHTML生成完了 - 正常終了');
     return htmlOutput;
     
   } catch (error) {
     console.error('❌ サーバーサイドログアウト処理でエラー:', error.message);
+    console.error('❌ エラースタック:', error.stack);
+    console.error('❌ エラーの型:', typeof error);
+    console.error('❌ エラーオブジェクト:', error);
     
     // Step 5: エラー時のフォールバックHTML（安全なエスケープ）
     const safeErrorMessage = String(error.message || 'Unknown error')
@@ -204,13 +256,24 @@ function forceLogoutAndRedirectToLogin() {
     const fallbackScript = `
       <script>
         console.error('サーバーサイドログアウトエラー: ${safeErrorMessage}');
-        alert('ログアウト処理中にエラーが発生しました。ページを再読み込みします。');
+        alert('ログアウト処理中にエラーが発生しました。\\n\\n詳細: ${safeErrorMessage}\\n\\nページを再読み込みします。');
         window.location.reload();
       </script>
-      <p>エラーが発生しました。ページを再読み込みしています...</p>
+      <p>エラーが発生しました: ${safeErrorMessage}</p>
+      <p>ページを再読み込みしています...</p>
     `;
     
-    return HtmlService.createHtmlOutput(fallbackScript);
+    console.log('📄 Fallback HTML generated');
+    
+    try {
+      const fallbackOutput = HtmlService.createHtmlOutput(fallbackScript);
+      console.log('✅ Fallback HtmlOutput created successfully');
+      return fallbackOutput;
+    } catch (fallbackError) {
+      console.error('❌ Fallback HTML creation failed:', fallbackError.message);
+      // 最終手段として最小限のHTML
+      return HtmlService.createHtmlOutput('<script>window.location.reload();</script>');
+    }
   }
 }
 
