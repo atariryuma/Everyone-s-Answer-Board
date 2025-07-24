@@ -542,33 +542,105 @@
             }
         }
         
-        // iframe対応のリダイレクト関数
+        // iframe対応のリダイレクト関数（Google Apps Script Sandbox制限対応）
         function performFrameAwareRedirect(url) {
             console.log('🔄 フレーム対応リダイレクトを実行...', url);
             
-            try {
-                // iframe内で実行されているかを判定
-                if (window.parent !== window) {
-                    console.log('📄 iframe環境を検出 - 親フレームでリダイレクト');
-                    // iframe内の場合、親フレームでリダイレクト（X-Frame-Options回避）
-                    window.parent.location.href = url;
-                } else {
-                    console.log('🌐 通常環境 - 直接リダイレクト');
-                    // 通常環境では直接リダイレクト
-                    window.location.href = url;
-                }
-            } catch (frameError) {
-                console.warn('⚠️ フレーム遷移に失敗:', frameError);
-                // フレーム遷移に失敗した場合は新しいタブで開く
+            // Google Apps Script環境を検出
+            const isGoogleAppsScript = window.location.hostname.includes('script.google.com') ||
+                                     window.location.href.includes('script.googleusercontent.com') ||
+                                     typeof google !== 'undefined' && google.script;
+            
+            if (isGoogleAppsScript) {
+                console.log('🔧 Google Apps Script環境を検出 - 最適化されたリダイレクト');
+                // Google Apps Script環境では階層的フォールバック戦略を使用
+                performGASOptimizedRedirect(url);
+            } else {
+                console.log('🌐 通常環境 - 標準リダイレクト');
                 try {
-                    console.log('🆕 新しいタブでリダイレクト');
-                    window.open(url, '_blank');
-                } catch (openError) {
-                    console.error('❌ 新しいタブでの遷移も失敗:', openError);
-                    // 最終手段：アラートで通知してページリロード
-                    alert('ログイン画面への移動に失敗しました。手動でページを更新してください。\nURL: ' + url);
-                    window.location.reload();
+                    window.location.href = url;
+                } catch (error) {
+                    console.warn('⚠️ 通常リダイレクトに失敗:', error);
+                    performGASOptimizedRedirect(url);
                 }
+            }
+        }
+        
+        // Google Apps Script最適化リダイレクト（階層的フォールバック）
+        function performGASOptimizedRedirect(url) {
+            console.log('🎯 GAS最適化リダイレクトを実行...', url);
+            
+            // 第1候補: window.top.location.href（最も安全で推奨される方法）
+            try {
+                console.log('🔝 Top frameでリダイレクト試行');
+                window.top.location.href = url;
+                return;
+            } catch (topError) {
+                console.warn('⚠️ Top frame遷移に失敗:', topError);
+            }
+            
+            // 第2候補: window.parent.location.href
+            try {
+                if (window.parent !== window) {
+                    console.log('👆 Parent frameでリダイレクト試行');
+                    window.parent.location.href = url;
+                    return;
+                }
+            } catch (parentError) {
+                console.warn('⚠️ Parent frame遷移に失敗:', parentError);
+            }
+            
+            // 第3候補: 現在のウィンドウで直接リダイレクト
+            try {
+                console.log('🔄 Current windowでリダイレクト試行');
+                window.location.href = url;
+                return;
+            } catch (currentError) {
+                console.warn('⚠️ Current window遷移に失敗:', currentError);
+            }
+            
+            // 第4候補: 新しいタブで開く
+            try {
+                console.log('🆕 新しいタブでリダイレクト');
+                const newWindow = window.open(url, '_blank');
+                if (newWindow) {
+                    // 新しいタブが開けた場合、ユーザーに通知
+                    setTimeout(() => {
+                        if (confirm('新しいタブでログイン画面を開きました。このタブを閉じますか？')) {
+                            window.close();
+                        }
+                    }, 1000);
+                } else {
+                    throw new Error('新しいタブを開けませんでした（ポップアップブロック？）');
+                }
+                return;
+            } catch (openError) {
+                console.error('❌ 新しいタブでの遷移も失敗:', openError);
+            }
+            
+            // 最終手段: ユーザーに手動操作を求める
+            console.error('❌ 全ての自動リダイレクト方法が失敗');
+            const userAction = confirm(
+                'ログイン画面への自動移動に失敗しました。\n\n' +
+                '以下の方法をお試しください：\n' +
+                '• [OK] をクリック: URLをクリップボードにコピーして手動で移動\n' +
+                '• [キャンセル] をクリック: ページを再読み込み\n\n' +
+                'URL: ' + url
+            );
+            
+            if (userAction) {
+                // URLをクリップボードにコピー（可能であれば）
+                try {
+                    navigator.clipboard.writeText(url).then(() => {
+                        alert('URLをクリップボードにコピーしました。\n新しいタブを開いて貼り付けてください。');
+                    }).catch(() => {
+                        prompt('以下のURLを手動でコピーして新しいタブで開いてください:', url);
+                    });
+                } catch (clipboardError) {
+                    prompt('以下のURLを手動でコピーして新しいタブで開いてください:', url);
+                }
+            } else {
+                window.location.reload();
             }
         }
         
