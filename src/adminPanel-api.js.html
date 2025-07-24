@@ -446,20 +446,16 @@ function addResource() {
     return;
   }
 
-  // URLの種類を判定
-  let resourceType = 'unknown';
-  let backendFunction = 'addSpreadsheetUrl'; // デフォルト
+  // URLの種類を判定（スプレッドシートのみ対応）
+  let resourceType = 'spreadsheet';
+  let backendFunction = 'addSpreadsheetUrl';
   
-  if (url.includes('docs.google.com/forms/')) {
-    resourceType = 'form';
-    backendFunction = 'addFormUrl';
-  } else if (url.includes('docs.google.com/spreadsheets/')) {
-    resourceType = 'spreadsheet';
-    backendFunction = 'addSpreadsheetUrl';
+  if (!url.includes('docs.google.com/spreadsheets/')) {
+    showMessage('GoogleスプレッドシートのURLを入力してください。', 'warning');
+    return;
   }
   
-  const resourceTypeText = resourceType === 'form' ? 'フォーム' : 
-                          resourceType === 'spreadsheet' ? 'スプレッドシート' : 'リソース';
+  const resourceTypeText = 'スプレッドシート';
 
   runGasWithUserId(backendFunction, `${resourceTypeText}を追加しています...`, url)
     .then(function(result) {

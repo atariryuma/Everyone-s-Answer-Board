@@ -1169,8 +1169,7 @@ function hideConfirmationModal() {
 function updateDynamicContent(status) {
   // Enable buttons that require active state
   const buttons = [
-    'open-spreadsheet-btn',
-    'open-form-btn'
+    'open-spreadsheet-btn'
   ];
   
   buttons.forEach(buttonId => {
@@ -1186,7 +1185,7 @@ function updateDynamicContent(status) {
 function updateUIForNoActiveSheet(status) {
   // Disable buttons that require active state
   const buttons = [
-    'open-form-btn'
+    // No form buttons to disable since we only support spreadsheets
   ];
   
   buttons.forEach(buttonId => {
@@ -1664,50 +1663,15 @@ function updateSystemStatusDisplay(status) {
     }
   }
   
-  // フォームURLの取得優先順位: userInfo.formUrl > customFormInfo.formUrl > status.formUrl
-  const formUrl = (status.userInfo && status.userInfo.formUrl) || 
-                  (status.customFormInfo && status.customFormInfo.formUrl) || 
-                  status.formUrl;
-  
-  if (formUrl) {
-    if (formBtn) {
-      formBtn.disabled = false;
-      formBtn.onclick = () => window.open(formUrl, '_blank');
-    }
-    
-    // Update form URL input field
-    const formUrlInput = document.getElementById('form-url-input');
-    if (formUrlInput) {
-      formUrlInput.value = formUrl;
-    }
-    
-    // Update form URL link
-    const formUrlLink = document.getElementById('open-form-url-link');
-    if (formUrlLink) {
-      formUrlLink.href = formUrl;
-    }
-  }
-  
-  // Handle generic resource button in Step 1
-  if (resourceBtn && (formUrl || status.spreadsheetUrl)) {
+  // Handle generic resource button in Step 1 (spreadsheet only)
+  if (resourceBtn && status.spreadsheetUrl) {
     resourceBtn.disabled = false;
     resourceBtn.onclick = () => {
-      // Priority: Form first, then spreadsheet
-      if (formUrl) {
-        window.open(formUrl, '_blank');
-      } else if (status.spreadsheetUrl) {
-        window.open(status.spreadsheetUrl, '_blank');
-      }
+      window.open(status.spreadsheetUrl, '_blank');
     };
     
-    // Update button title based on available resources
-    if (formUrl && status.spreadsheetUrl) {
-      resourceBtn.title = 'フォームを開く (スプレッドシートも利用可能)';
-    } else if (formUrl) {
-      resourceBtn.title = 'フォームを開く';
-    } else if (status.spreadsheetUrl) {
-      resourceBtn.title = 'スプレッドシートを開く';
-    }
+    // Update button title for spreadsheet only
+    resourceBtn.title = 'スプレッドシートを開く';
   }
 }
 
