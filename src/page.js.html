@@ -1,10 +1,35 @@
 <script>
-// Optimize initial render
-const RENDER_BATCH_SIZE = 10;
+// Dynamic performance-based batch sizing
+const BASE_RENDER_BATCH_SIZE = 10; // Base batch size for normal performance
+const LOW_PERF_BATCH_SIZE = 5; // Reduced batch size for low performance devices
+const HIGH_PERF_BATCH_SIZE = 15; // Increased batch size for high performance devices
 const VIEWPORT_BUFFER = 200; // Viewport buffer for virtual scrolling
-const PERFORMANCE_BUDGET = 16; // Maximum ms per frame
+const PERFORMANCE_BUDGET = 16; // Maximum ms per frame (60fps)
 const CHUNK_SIZE = 5; // DOM operations per chunk
 const IDLE_TIMEOUT = 5000; // Idle timeout for cleanup
+
+// Dynamic batch size calculation based on device performance
+function getDynamicBatchSize(performanceMetrics = {}) {
+  const memory = navigator.deviceMemory || 4;
+  const cores = navigator.hardwareConcurrency || 4;
+  const frameTime = performanceMetrics.frameTime || 16;
+  
+  // High performance: plenty of memory, many cores, fast frame time
+  if (memory >= 8 && cores >= 8 && frameTime < 12) {
+    return HIGH_PERF_BATCH_SIZE;
+  }
+  
+  // Low performance: limited memory, few cores, slow frame time
+  if (memory <= 2 || cores <= 2 || frameTime > 20) {
+    return LOW_PERF_BATCH_SIZE;
+  }
+  
+  // Normal performance
+  return BASE_RENDER_BATCH_SIZE;
+}
+
+// Get optimal batch size for current device
+const RENDER_BATCH_SIZE = getDynamicBatchSize();
 const ICONS = {
   'lightbulb-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
   'lightbulb-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6z M10.5 11.25 L11 13 L13 13 L13.5 11.25 H 10.5 Z"/><path d="M9 16.5h6v1H9z M9 18h6v1H9z M9 19.5h6v1H9z"/></svg>',
@@ -1826,9 +1851,10 @@ setupEventDelegation() {
       const changedItems = [];
       let prevNode = null;
       // Enhanced batch processing with virtual scrolling for large datasets
-      // Skip virtual scrolling for initial load to show all data immediately
-      if (newRows.length > RENDER_BATCH_SIZE && !isInitialLoad) {
-        this.renderWithVirtualScrolling(newRows, oldRows, container, existingMap, changedItems);
+      // Use virtual scrolling for datasets larger than batch size
+      if (newRows.length > RENDER_BATCH_SIZE) {
+        debugLog('DEBUG: renderBoard - Using virtual scrolling for', newRows.length, 'items (initial load:', isInitialLoad, ')');
+        this.renderWithVirtualScrolling(newRows, oldRows, container, existingMap, changedItems, isInitialLoad);
       } else {
         // Process small datasets normally
         const fragment = this.getReusableFragment();
@@ -1877,10 +1903,14 @@ setupEventDelegation() {
     }
   }
   
-  renderWithVirtualScrolling(newRows, oldRows, container, existingMap, changedItems) {
-    const batchSize = this.isLowPerformanceMode ? CHUNK_SIZE : RENDER_BATCH_SIZE;
+  renderWithVirtualScrolling(newRows, oldRows, container, existingMap, changedItems, isInitialLoad = false) {
+    // Use dynamic batch sizing based on current performance metrics
+    const dynamicBatchSize = getDynamicBatchSize(this.performanceMetrics);
+    const batchSize = this.isLowPerformanceMode ? Math.min(CHUNK_SIZE, dynamicBatchSize) : dynamicBatchSize;
     let currentIndex = 0;
     let prevNode = null;
+    
+    debugLog('renderWithVirtualScrolling: Using batch size', batchSize, 'for', newRows.length, 'items (low perf mode:', this.isLowPerformanceMode, ')');
     
     // Initialize virtual scrolling state if not exists
     if (!this.virtualScrollState) {
@@ -1889,6 +1919,9 @@ setupEventDelegation() {
         totalItems: newRows.length,
         isLoading: false
       };
+    } else {
+      // Update total items for existing state
+      this.virtualScrollState.totalItems = newRows.length;
     }
     
     const processBatch = () => {
@@ -1941,7 +1974,7 @@ setupEventDelegation() {
       currentIndex = endIndex;
       
       // Continue processing if there are more items
-      if (currentIndex < newRows.length) {
+      if (currentIndex < newRows.length && !isInitialLoad) {
         const elapsed = performance.now() - startTime;
         
         if (elapsed < PERFORMANCE_BUDGET && !this.isLowPerformanceMode) {
@@ -1952,7 +1985,8 @@ setupEventDelegation() {
           this.deferredRender(processBatch);
         }
       } else {
-        // All items processed, setup scroll observer for dynamic loading
+        // Setup scroll observer for dynamic loading (initial load or all items processed)
+        debugLog('DEBUG: renderWithVirtualScrolling - Setting up scroll observer. Rendered:', currentIndex, 'of', newRows.length);
         this.setupScrollObserver();
       }
     };
@@ -3196,39 +3230,42 @@ async handleReaction(rowIndex, reaction) {
   }
 
   setupObservers() {
-    // Intersection Observer for virtual scrolling
+    // Intersection Observer for virtual scrolling - optimized for performance
     if ('IntersectionObserver' in window) {
-      this.visibilityObserver = new IntersectionObserver((entries) => {
+      // Debounce visibility changes to reduce excessive firing
+      const debouncedVisibilityHandler = this.debounce((entries) => {
         entries.forEach(entry => {
           const card = entry.target;
-          const rect = card.getBoundingClientRect();
-          const isPartiallyVisible = rect.top < window.innerHeight && rect.bottom > 0;
           
-          debugLog('IntersectionObserver:', {
-            rowIndex: card.dataset.rowIndex,
-            isIntersecting: entry.isIntersecting,
-            cardHeight: card.offsetHeight,
-            cardWidth: card.offsetWidth,
-            intersectionRatio: entry.intersectionRatio,
-            rectTop: rect.top,
-            rectBottom: rect.bottom,
-            windowInnerHeight: window.innerHeight,
-            isPartiallyVisible: isPartiallyVisible
-          });
+          // Only log significant visibility changes for debugging
+          if (DEBUG_MODE && entry.intersectionRatio === 0 || entry.intersectionRatio === 1) {
+            debugLog('IntersectionObserver visibility change:', {
+              rowIndex: card.dataset.rowIndex,
+              isIntersecting: entry.isIntersecting,
+              intersectionRatio: entry.intersectionRatio
+            });
+          }
 
           if (entry.isIntersecting) {
             card.classList.add('visible');
             card.classList.remove('hidden-card');
-          } else if (!isPartiallyVisible) {
-            // Only mark as hidden if the card is completely outside the viewport
-            card.classList.remove('visible');
-            card.classList.add('hidden-card');
+            // Restore visibility if it was hidden
+            if (card.style.visibility === 'hidden') {
+              card.style.visibility = 'visible';
+            }
+          } else {
+            // Only mark as hidden if completely out of view
+            if (entry.intersectionRatio === 0) {
+              card.classList.remove('visible');
+              card.classList.add('hidden-card');
+            }
           }
-          // If partially visible but not intersecting, keep it accessible
         });
-      }, {
+      }, 16); // Debounce to ~60fps
+      
+      this.visibilityObserver = new IntersectionObserver(debouncedVisibilityHandler, {
         rootMargin: `${VIEWPORT_BUFFER}px`,
-        threshold: [0, 0.1, 0.5, 1.0] // Multiple thresholds for better visibility detection
+        threshold: [0, 1.0] // Simplified thresholds: fully out vs fully in
       });
     }
 
@@ -3321,32 +3358,49 @@ async handleReaction(rowIndex, reaction) {
       return;
     }
     
-    // Create scroll observer for dynamic loading
-    if (!this.scrollObserver) {
-      this.scrollObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            this.handleVirtualScroll(entry.target);
-          }
-        });
-      }, {
-        root: null,
-        rootMargin: '100px', // Load content 100px before it comes into view
-        threshold: 0.1
-      });
+    const cards = this.elements.answersContainer.querySelectorAll('.answer-card');
+    if (cards.length === 0) {
+      debugLog('setupScrollObserver: No cards found, skipping setup');
+      return;
     }
     
+    // Clear existing scroll observer if it exists
+    if (this.scrollObserver) {
+      this.scrollObserver.disconnect();
+    }
+    
+    // Create scroll observer for dynamic loading
+    this.scrollObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          debugLog('setupScrollObserver: Trigger card intersecting:', entry.target.dataset.rowIndex);
+          this.handleVirtualScroll(entry.target);
+        }
+      });
+    }, {
+      root: null,
+      rootMargin: '200px', // Load content 200px before it comes into view (increased for better UX)
+      threshold: 0.1
+    });
+    
     // Observe the last few elements for dynamic loading trigger
-    const cards = this.elements.answersContainer.querySelectorAll('.answer-card');
-    const observeCount = Math.min(5, cards.length); // Observe last 5 cards
+    const observeCount = Math.min(3, cards.length); // Reduced to last 3 cards for better performance
+    const observedCards = [];
     
     for (let i = cards.length - observeCount; i < cards.length; i++) {
-      if (cards[i]) {
+      if (cards[i] && cards[i].dataset.rowIndex) {
         this.scrollObserver.observe(cards[i]);
+        observedCards.push(cards[i].dataset.rowIndex);
       }
     }
     
-    debugLog('setupScrollObserver: Observing', observeCount, 'cards for dynamic loading');
+    debugLog('setupScrollObserver: Observing cards for dynamic loading:', {
+      totalCards: cards.length,
+      observedCount: observedCards.length,
+      observedRowIndexes: observedCards,
+      totalItems: this.virtualScrollState?.totalItems || 0,
+      renderedItems: this.virtualScrollState?.renderedItems || 0
+    });
   }
   
   handleVirtualScroll(triggerElement) {
@@ -3387,7 +3441,9 @@ async handleReaction(rowIndex, reaction) {
     
     const currentCards = this.elements.answersContainer.querySelectorAll('.answer-card');
     const currentCount = currentCards.length;
-    const batchSize = this.isLowPerformanceMode ? CHUNK_SIZE : RENDER_BATCH_SIZE;
+    // Use dynamic batch sizing for better performance adaptation
+    const dynamicBatchSize = getDynamicBatchSize(this.performanceMetrics);
+    const batchSize = this.isLowPerformanceMode ? Math.min(CHUNK_SIZE, dynamicBatchSize) : dynamicBatchSize;
     const remainingItems = this.state.currentAnswers.slice(currentCount, currentCount + batchSize);
     
     if (remainingItems.length === 0) {
@@ -3396,7 +3452,7 @@ async handleReaction(rowIndex, reaction) {
       return;
     }
     
-    debugLog('loadMoreItems: Loading', remainingItems.length, 'additional items');
+    debugLog('loadMoreItems: Loading', remainingItems.length, 'additional items with batch size', batchSize);
     
     // Use deferred rendering for performance
     this.deferredRender(() => {
@@ -3462,33 +3518,44 @@ async handleReaction(rowIndex, reaction) {
     }
     
     const cards = this.elements.answersContainer.querySelectorAll('.answer-card');
-    let optimizedCount = 0;
+    let hiddenCount = 0;
+    let restoredCount = 0;
     
     cards.forEach((card) => {
       const rect = card.getBoundingClientRect();
       const isVisible = rect.top < window.innerHeight && rect.bottom > 0;
+      const isCurrentlyHidden = card.classList.contains('hidden-card');
       
-      if (!isVisible && !card.classList.contains('hidden-card')) {
+      if (!isVisible && !isCurrentlyHidden) {
         // Hide cards that are far from viewport to save memory
         const distanceFromViewport = Math.min(
           Math.abs(rect.top - window.innerHeight),
           Math.abs(rect.bottom)
         );
         
+        // Only hide cards that are really far away (2 viewport heights)
         if (distanceFromViewport > window.innerHeight * 2) {
           card.classList.add('hidden-card');
           card.style.visibility = 'hidden';
-          optimizedCount++;
+          hiddenCount++;
         }
-      } else if (isVisible && card.classList.contains('hidden-card')) {
-        // Show cards that are back in viewport
+      } else if (isVisible && isCurrentlyHidden) {
+        // Show cards that are back in viewport - ensure complete restoration
         card.classList.remove('hidden-card');
         card.style.visibility = 'visible';
+        card.classList.add('visible');
+        restoredCount++;
+        
+        // Ensure the card is properly re-rendered
+        if (this.visibilityObserver) {
+          this.visibilityObserver.unobserve(card);
+          this.visibilityObserver.observe(card);
+        }
       }
     });
     
-    if (optimizedCount > 0) {
-      debugLog('optimizeVisibleElements: Optimized', optimizedCount, 'cards');
+    if (hiddenCount > 0 || restoredCount > 0) {
+      debugLog('optimizeVisibleElements: Hidden', hiddenCount, 'cards, restored', restoredCount, 'cards');
     }
   }
 }
