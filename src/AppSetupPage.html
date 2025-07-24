@@ -440,32 +440,15 @@
             google.script.run
                 .withSuccessHandler((webAppUrl) => {
                     const targetUrl = webAppUrl + '?mode=admin&userId=' + __USER_ID__;
-                    try {
-                        // iframeの場合は親ウィンドウに移動
-                        if (window.parent !== window) {
-                            window.parent.location.href = targetUrl;
-                        } else {
-                            window.location.href = targetUrl;
-                        }
-                    } catch (e) {
-                        // フォールバック: 新しいタブで開く
-                        window.open(targetUrl, '_blank');
-                    }
+                    // サンドボックス環境では window.top への直接アクセスが制限されるため
+                    // 確実に遷移させるために window.open を利用する
+                    window.open(targetUrl, '_top');
                 })
                 .withFailureHandler((error) => {
                     console.error('WebApp URL取得エラー:', error);
-                    // フォールバック: 現在のURLを使用
                     const currentUrl = window.location.href.split('?')[0];
                     const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__;
-                    try {
-                        if (window.parent !== window) {
-                            window.parent.location.href = targetUrl;
-                        } else {
-                            window.location.href = targetUrl;
-                        }
-                    } catch (e) {
-                        window.open(targetUrl, '_blank');
-                    }
+                    window.open(targetUrl, '_top');
                 })
                 .getWebAppUrlCached();
         }
