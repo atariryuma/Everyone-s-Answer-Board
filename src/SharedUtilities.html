@@ -997,7 +997,14 @@ window.setLoading = function(isLoading, message, step, percentage) {
         'same-origin policy',
         'cross-origin frame access',
         'document.domain',
-        'postmessage'
+        'postmessage',
+        'unrecognized feature',
+        'ambient-light-sensor',
+        'speaker',
+        'vibrate',
+        'vr',
+        'allow-scripts',
+        'allow-same-origin'
       ];
       
       const shouldSuppress = suppressPatterns.some(pattern => 

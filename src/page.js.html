@@ -1442,10 +1442,16 @@ setupEventDelegation() {
                 // ユーザー情報エラーの特別な処理
                 if (result.message && result.message.includes('ユーザー情報が見つかりません')) {
                   console.error('❌ StudyQuestApp: User not found. Current userId:', this.state.userId);
+                  console.error('❌ StudyQuestApp: URL parameters:', window.location.href);
                   console.error('❌ StudyQuestApp: This may indicate:');
-                  console.error('  1. Invalid userId parameter');
+                  console.error('  1. Invalid userId parameter in URL');
                   console.error('  2. User not registered in the system');
                   console.error('  3. Database connectivity issues');
+                  console.error('  4. Session expired or corrupted');
+                  console.error('❌ StudyQuestApp: Possible solutions:');
+                  console.error('  - Check if the URL parameters are correct');
+                  console.error('  - Try refreshing the page');
+                  console.error('  - Contact administrator if the issue persists');
                   
                   // UIにエラーメッセージを表示
                   this.displayUserNotFoundError(result.message);

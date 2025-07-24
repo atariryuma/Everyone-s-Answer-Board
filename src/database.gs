@@ -609,6 +609,8 @@ function fetchUserFromDatabase(field, value) {
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
     
     console.log('fetchUserFromDatabase - 検索開始: ' + field + '=' + value);
+    console.log('fetchUserFromDatabase - データベースID: ' + dbId);
+    console.log('fetchUserFromDatabase - シート名: ' + sheetName);
     
     // fetchUserFromDatabase が常に最新のデータを取得するように、関連する batchGetSheetsData のキャッシュを強制的に無効化
     // キャッシュキーは batchGetSheetsData 内で生成される形式と一致させる
@@ -696,7 +698,8 @@ function fetchUserFromDatabase(field, value) {
     console.warn('fetchUserFromDatabase - ユーザーが見つかりません:', {
       field: field,
       value: value,
-      totalSearchedRows: values.length - 1
+      totalSearchedRows: values.length - 1,
+      availableUserIds: values.slice(1).map(row => row[headers.indexOf('userId')] || 'undefined').slice(0, 5)
     });
     
     return null;
