@@ -530,13 +530,21 @@
                 google.script.run
                     .withSuccessHandler(function(htmlOutput) {
                         console.log('✅ サーバーサイドリダイレクト取得成功');
+                        console.log('🔍 Response type:', typeof htmlOutput);
+                        console.log('🔍 Response value:', htmlOutput);
+                        console.log('🔍 Response length:', htmlOutput ? htmlOutput.length : 'N/A');
+                        console.log('🔍 Response preview:', htmlOutput ? htmlOutput.substring(0, 200) : 'NO CONTENT');
+                        
                         // サーバーから返されたHTMLを現在のページに設定（自動リダイレクト実行）
-                        if (htmlOutput) {
+                        if (htmlOutput && htmlOutput.trim()) {
+                            console.log('✅ Valid HTML received, applying...');
                             document.open();
                             document.write(htmlOutput);
                             document.close();
                         } else {
                             console.warn('⚠️ 空のHTMLOutput、フォールバック実行');
+                            console.warn('  - htmlOutput:', htmlOutput);
+                            console.warn('  - Trimmed:', htmlOutput ? htmlOutput.trim() : 'N/A');
                             fallbackReload();
                         }
                     })
@@ -560,6 +568,24 @@
                 window.location.reload();
             }
         }
+        
+        // テスト用関数
+        function testServerFunction() {
+            console.log('🧪 Testing server function...');
+            
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    console.log('🧪 Test Success:', result);
+                    console.log('🧪 Test Result Type:', typeof result);
+                    console.log('🧪 Test Result Length:', result ? result.length : 'N/A');
+                    alert('テスト成功: ' + (result ? '内容あり (' + result.length + ' chars)' : '空の結果'));
+                })
+                .withFailureHandler(function(error) {
+                    console.error('🧪 Test Error:', error);
+                    alert('テスト失敗: ' + error.message);
+                })
+                .testForceLogoutRedirect();
+        }
     </script>
 </head>
 <body>
@@ -569,11 +595,14 @@
         <p class="error-message"><?= htmlEncode(message || 'システムエラーが発生しました。管理者にお問い合わせください。') ?></p>
         
         <div class="error-actions">
-            <button class="btn btn-primary" onclick="location.reload()">
+            <button type="button" class="btn btn-primary" onclick="location.reload()">
                 🔄 再読み込み
             </button>
-            <button class="btn btn-secondary" onclick="forceLogoutAndRedirect()">
+            <button type="button" class="btn btn-secondary" onclick="forceLogoutAndRedirect()">
                 🏠 ログイン画面に戻る
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="testServerFunction()" style="font-size: 12px;">
+                🧪 テスト
             </button>
         </div>
         

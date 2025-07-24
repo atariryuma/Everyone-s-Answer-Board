@@ -103,6 +103,11 @@ function resetUserAuthentication() {
  */
 function forceLogoutAndRedirectToLogin() {
   console.log('🔄 forceLogoutAndRedirectToLogin - 関数開始');
+  console.log('🔍 Function called at:', new Date().toISOString());
+  console.log('🔍 Available functions check:');
+  console.log('  - getWebAppUrlCached:', typeof getWebAppUrlCached);
+  console.log('  - sanitizeRedirectUrl:', typeof sanitizeRedirectUrl);
+  console.log('  - HtmlService:', typeof HtmlService);
   
   try {
     console.log('✅ forceLogoutAndRedirectToLogin - try block内に入りました');
@@ -238,6 +243,15 @@ function forceLogoutAndRedirectToLogin() {
       console.warn('XFrameOptionsMode設定失敗:', frameError.message);
     }
     
+    // 最終検証: HtmlOutputの内容を確認
+    try {
+      const outputContent = htmlOutput.getContent();
+      console.log('📋 HtmlOutput content length:', outputContent ? outputContent.length : 'null/undefined');
+      console.log('📋 HtmlOutput content preview:', outputContent ? outputContent.substring(0, 100) : 'NO CONTENT');
+    } catch (contentError) {
+      console.warn('⚠️ Cannot access HtmlOutput content:', contentError.message);
+    }
+    
     console.log('✅ サーバーサイドリダイレクトHTML生成完了 - 正常終了');
     return htmlOutput;
     
@@ -274,6 +288,27 @@ function forceLogoutAndRedirectToLogin() {
       // 最終手段として最小限のHTML
       return HtmlService.createHtmlOutput('<script>window.location.reload();</script>');
     }
+  }
+}
+
+/**
+ * テスト用の簡単なHTMLOutput関数
+ * @returns {HtmlOutput} テストHTML
+ */
+function testForceLogoutRedirect() {
+  console.log('🧪 testForceLogoutRedirect - 開始');
+  
+  try {
+    const testHtml = '<script>console.log("Test redirect working"); alert("Test successful!");</script>';
+    const htmlOutput = HtmlService.createHtmlOutput(testHtml);
+    
+    console.log('✅ Test HtmlOutput created successfully');
+    console.log('📋 Test content length:', testHtml.length);
+    
+    return htmlOutput;
+  } catch (error) {
+    console.error('❌ Test function error:', error.message);
+    return HtmlService.createHtmlOutput('<script>alert("Test failed: ' + error.message + '");</script>');
   }
 }
 
