@@ -156,6 +156,14 @@ function clearUrlCache() {
 }
 
 /**
+ * WebアプリのベースURLを取得（キャッシュ利用）
+ * @returns {string} WebアプリのベースURL
+ */
+function getWebAppBaseUrl() {
+  return getWebAppUrlCached();
+}
+
+/**
  * 強制的にURLシステムをリセット（公開API）
  * フロントエンドから呼び出し可能
  */
@@ -261,8 +269,8 @@ function generateUserUrls(userId) {
     
     return {
       webAppUrl: webAppUrl,
-      adminUrl: webAppUrl + '?userId=' + encodedUserId + '&mode=admin',
-      viewUrl: webAppUrl + '?userId=' + encodedUserId + '&mode=view',
+      adminUrl: webAppUrl + '?mode=admin&userId=' + encodedUserId,
+      viewUrl: webAppUrl + '?mode=view&userId=' + encodedUserId,
       setupUrl: webAppUrl + '?setup=true',
       status: 'success'
     };

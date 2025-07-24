@@ -15,6 +15,7 @@ describe('Core.gs utilities', () => {
         getScriptProperties: () => ({
           getProperty: (key) => {
             if (key === 'DEBUG_MODE') return 'false';
+            if (key === 'DATABASE_SPREADSHEET_ID') return 'mock-spreadsheet-id';
             return null;
           }
         })
@@ -69,6 +70,8 @@ describe('Core.gs utilities', () => {
   describe('getOpinionHeaderSafely', () => {
     beforeEach(() => {
       context.findUserById = jest.fn();
+      // Clear cache before each test
+      context.cacheManager.store = {};
     });
 
     test('returns default when user not found', () => {

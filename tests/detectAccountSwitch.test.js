@@ -25,9 +25,12 @@ describe('detectAccountSwitch uses user properties', () => {
         getUserCache: () => ({ removeAll: jest.fn() }),
         getScriptCache: () => ({ remove: jest.fn() })
       },
-      cleanupSessionOnAccountSwitch: jest.fn(),
-      clearDatabaseCache: jest.fn(),
-      console: { log: jest.fn(), warn: jest.fn(), error: jest.fn() }
+      cleanupSessionOnAccountSwitch: jest.fn(() => {}),
+      clearDatabaseCache: jest.fn(() => {}),
+      console: { log: jest.fn(), warn: jest.fn(), error: jest.fn() },
+      SCRIPT_PROPS_KEYS: {
+        DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID'
+      }
     };
 
     vm.createContext(context);

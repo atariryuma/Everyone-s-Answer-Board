@@ -66,7 +66,7 @@ describe('getWebAppBaseUrl caching', () => {
 
   test('returns the correct web app base URL and caches it', () => {
     // Clear cache to ensure it's fetched
-    context.cacheManager.remove('webapp_base_url');
+    context.cacheManager.remove('WEB_APP_URL');
     
     // First call fetches and caches
     const url1 = context.getWebAppBaseUrl();
@@ -78,7 +78,7 @@ describe('getWebAppBaseUrl caching', () => {
     expect(url2).toBe('https://script.google.com/macros/s/ID/exec'); // Still the cached value
 
     // Clear cache and call again, should get new URL
-    context.cacheManager.remove('webapp_base_url');
+    context.cacheManager.remove('WEB_APP_URL');
     const url3 = context.getWebAppBaseUrl();
     expect(url3).toBe('https://script.google.com/macros/s/NEW_ID/exec');
   });

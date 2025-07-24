@@ -96,6 +96,44 @@ function resetUserAuthentication() {
   }
 }
 
+/**
+ * アカウント切り替えを検出
+ * @param {string} currentEmail - 現在のユーザーメール
+ * @returns {object} アカウント切り替え検出結果
+ */
+function detectAccountSwitch(currentEmail) {
+  try {
+    const props = PropertiesService.getUserProperties();
+    const lastEmailKey = 'last_active_email';
+    const lastEmail = props.getProperty(lastEmailKey);
+    
+    const isAccountSwitch = !!(lastEmail && lastEmail !== currentEmail);
+    
+    if (isAccountSwitch) {
+      console.log('アカウント切り替えを検出:', lastEmail, '->', currentEmail);
+      cleanupSessionOnAccountSwitch(currentEmail);
+      clearDatabaseCache();
+    }
+    
+    // 現在のメールアドレスを記録
+    props.setProperty(lastEmailKey, currentEmail);
+    
+    return {
+      isAccountSwitch: isAccountSwitch,
+      previousEmail: lastEmail,
+      currentEmail: currentEmail
+    };
+  } catch (error) {
+    console.error('アカウント切り替え検出中にエラー:', error.message);
+    return {
+      isAccountSwitch: false,
+      previousEmail: null,
+      currentEmail: currentEmail,
+      error: error.message
+    };
+  }
+}
+
 
 
 
