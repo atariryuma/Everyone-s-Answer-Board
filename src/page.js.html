@@ -1780,7 +1780,7 @@ setupEventDelegation() {
     }
   }
   renderBoard(isLayoutChange = false, isInitialLoad = false, oldRows = []) {
-    debugLog('DEBUG: renderBoard called. newRows.length:', this.state.currentAnswers.length);
+    debugLog('DEBUG: renderBoard called. newRows.length:', newRows.length);
     // 管理者の場合はハイライトトグルを確実に有効化
     if (this.state.isAdminUser && !this.state.showHighlightToggle) {
       this.state.showHighlightToggle = true;
@@ -3205,6 +3205,18 @@ async handleReaction(rowIndex, reaction) {
           const rect = card.getBoundingClientRect();
           const isPartiallyVisible = rect.top < window.innerHeight && rect.bottom > 0;
           
+          debugLog('IntersectionObserver:', {
+            rowIndex: card.dataset.rowIndex,
+            isIntersecting: entry.isIntersecting,
+            cardHeight: card.offsetHeight,
+            cardWidth: card.offsetWidth,
+            intersectionRatio: entry.intersectionRatio,
+            rectTop: rect.top,
+            rectBottom: rect.bottom,
+            windowInnerHeight: window.innerHeight,
+            isPartiallyVisible: isPartiallyVisible
+          });
+
           if (entry.isIntersecting) {
             card.classList.add('visible');
             card.classList.remove('hidden-card');

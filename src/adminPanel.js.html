@@ -516,10 +516,43 @@
             <a href="${targetUrl}" class="redirect-button" target="_top">
               🔗 アプリ設定画面を開く
             </a>
-            <button onclick="history.back()" class="redirect-button back-button">
+            <button onclick="returnToAdminPanel()" class="redirect-button back-button">
               ← 管理パネルに戻る
             </button>
           </div>
+          <script>
+            function returnToAdminPanel() {
+              try {
+                // 管理パネルのURLを構築
+                const currentUrl = new URL(window.location.href);
+                const baseUrl = currentUrl.origin + currentUrl.pathname;
+                
+                // 現在の管理ユーザーIDを取得（サーバーサイドから）
+                google.script.run
+                  .withSuccessHandler(function(adminUserId) {
+                    if (adminUserId) {
+                      const adminUrl = baseUrl + '?mode=admin&userId=' + encodeURIComponent(adminUserId);
+                      console.log('Returning to admin panel:', adminUrl);
+                      window.top.location.href = adminUrl;
+                    } else {
+                      // フォールバック：ログインページへ
+                      window.top.location.href = baseUrl + '?mode=login';
+                    }
+                  })
+                  .withFailureHandler(function(error) {
+                    console.error('Failed to get admin user ID:', error);
+                    // フォールバック：ログインページへ
+                    const loginUrl = baseUrl + '?mode=login';
+                    window.top.location.href = loginUrl;
+                  })
+                  .getLastAdminUserId();
+              } catch (error) {
+                console.error('Error returning to admin panel:', error);
+                // 最終フォールバック：単純にログインページへ
+                window.location.href = window.location.origin + window.location.pathname + '?mode=login';
+              }
+            }
+          </script>
         </body>
         </html>
       `;

@@ -469,6 +469,35 @@ function doGet(e) {
       return showLoginPage();
     }
 
+    // mode=login の場合
+    if (params.mode === 'login') {
+      console.log('Login mode requested, showing login page');
+      return showLoginPage();
+    }
+
+    // mode=appSetup の場合
+    if (params.mode === 'appSetup') {
+      console.log('AppSetup mode requested');
+      
+      // 管理パネルへのアクセス権限確認（前回のセッションから）
+      var userProperties = PropertiesService.getUserProperties();
+      var lastAdminUserId = userProperties.getProperty('lastAdminUserId');
+      
+      if (!lastAdminUserId) {
+        console.log('No admin session found, redirecting to login');
+        return showErrorPage('認証が必要です', 'アプリ設定にアクセスするにはログインが必要です。');
+      }
+      
+      // 管理者権限の確認
+      if (!verifyAdminAccess(lastAdminUserId)) {
+        console.log('Admin access denied for userId:', lastAdminUserId);
+        return showErrorPage('アクセス拒否', 'アプリ設定にアクセスする権限がありません。');
+      }
+      
+      console.log('Showing app setup page for userId:', lastAdminUserId);
+      return showAppSetupPage(lastAdminUserId);
+    }
+
     // mode=admin の場合
     if (params.mode === 'admin') {
       if (!params.userId) {
@@ -500,7 +529,19 @@ function doGet(e) {
       return renderAnswerBoard(userInfo, params);
     }
     
-    // 不明なモードの場合はログインページへ
+    // 不明なモードの場合の処理
+    console.log('Unknown mode received:', params.mode);
+    console.log('Available modes: login, appSetup, admin, view');
+    
+    // 不明なモードでもuserId付きの場合は適切にリダイレクト
+    if (params.userId && verifyAdminAccess(params.userId)) {
+      console.log('Redirecting unknown mode to admin panel for valid user:', params.userId);
+      const userInfo = findUserById(params.userId);
+      return renderAdminPanel(userInfo, 'admin');
+    }
+    
+    // その他の場合はログインページへ
+    console.log('Redirecting unknown mode to login page');
     return showLoginPage();
 
   } catch (error) {
@@ -730,6 +771,30 @@ function showAppSetupPage(userId) {
 }
 
 /**
+ * 最後にアクセスした管理ユーザーIDを取得
+ * リダイレクト時の戻り先決定に使用
+ * @returns {string|null} 管理ユーザーID、存在しない場合はnull
+ */
+function getLastAdminUserId() {
+  try {
+    const userProperties = PropertiesService.getUserProperties();
+    const lastAdminUserId = userProperties.getProperty('lastAdminUserId');
+    
+    // ユーザーIDが存在し、かつ有効な管理者権限を持つかチェック
+    if (lastAdminUserId && verifyAdminAccess(lastAdminUserId)) {
+      console.log('Found valid admin user ID:', lastAdminUserId);
+      return lastAdminUserId;
+    } else {
+      console.log('No valid admin user ID found');
+      return null;
+    }
+  } catch (error) {
+    console.error('Error getting last admin user ID:', error.message);
+    return null;
+  }
+}
+
+/**
  * アプリ設定ページのURLを取得（フロントエンドから呼び出し用）
  * @returns {string} アプリ設定ページのURL
  */
@@ -806,6 +871,69 @@ function buildUserAdminUrl(userId) {
   const baseUrl = getWebAppUrl();
   return `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
 }
+
+/**
+ * 標準化されたページURL生成のヘルパー関数群
+ */
+const URLBuilder = {
+  /**
+   * ログインページのURLを生成
+   * @returns {string} ログインページURL
+   */
+  login: function() {
+    const baseUrl = getWebAppUrl();
+    return `${baseUrl}?mode=login`;
+  },
+  
+  /**
+   * 管理パネルのURLを生成
+   * @param {string} userId - ユーザーID
+   * @returns {string} 管理パネルURL
+   */
+  admin: function(userId) {
+    const baseUrl = getWebAppUrl();
+    return `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
+  },
+  
+  /**
+   * アプリ設定ページのURLを生成
+   * @returns {string} アプリ設定ページURL
+   */
+  appSetup: function() {
+    const baseUrl = getWebAppUrl();
+    return `${baseUrl}?mode=appSetup`;
+  },
+  
+  /**
+   * 回答ボードのURLを生成
+   * @param {string} userId - ユーザーID
+   * @returns {string} 回答ボードURL
+   */
+  view: function(userId) {
+    const baseUrl = getWebAppUrl();
+    return `${baseUrl}?mode=view&userId=${encodeURIComponent(userId)}`;
+  },
+  
+  /**
+   * パラメータ付きURLを安全に生成
+   * @param {string} mode - モード ('login', 'admin', 'view', 'appSetup')
+   * @param {Object} params - 追加パラメータ
+   * @returns {string} 生成されたURL
+   */
+  build: function(mode, params = {}) {
+    const baseUrl = getWebAppUrl();
+    const url = new URL(baseUrl);
+    url.searchParams.set('mode', mode);
+    
+    Object.keys(params).forEach(key => {
+      if (params[key] !== null && params[key] !== undefined) {
+        url.searchParams.set(key, params[key]);
+      }
+    });
+    
+    return url.toString();
+  }
+};
 
 /**
  * 指定されたURLへリダイレクトするサーバーサイド関数
