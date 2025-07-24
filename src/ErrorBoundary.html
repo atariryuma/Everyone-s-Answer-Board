@@ -509,6 +509,14 @@
         // 強制ログアウトしてログイン画面にリダイレクトする関数
         function forceLogoutAndRedirect() {
             console.log('🔄 強制ログアウトを開始...');
+            console.log('📍 現在のURL:', window.location.href);
+            
+            // リダイレクトループ防止：既にログインページにいる場合は単純にリロード
+            if (window.location.href.includes('mode=login')) {
+                console.log('⚠️ 既にログインモードです。ページをリロードします。');
+                window.location.reload();
+                return;
+            }
             
             // ボタンを無効化して重複実行を防ぐ
             const logoutBtn = event.target;
@@ -523,7 +531,10 @@
                         console.log('✅ セッションクリア成功:', loginUrl);
                         // セッションクリア後、ログインページにリダイレクト
                         if (loginUrl) {
-                            performFrameAwareRedirect(loginUrl);
+                            // ログインモードパラメータを確実に追加
+                            const finalLoginUrl = ensureLoginMode(loginUrl);
+                            console.log('🔧 最終ログインURL:', finalLoginUrl);
+                            performFrameAwareRedirect(finalLoginUrl);
                         } else {
                             // フォールバック: 現在のURLからパラメータを削除してリダイレクト
                             handleLogoutFallback();
@@ -539,6 +550,31 @@
             } catch (error) {
                 console.error('❌ 強制ログアウト処理でエラー:', error);
                 handleLogoutFallback();
+            }
+        }
+        
+        // ログインモードパラメータを確実に追加する関数
+        function ensureLoginMode(url) {
+            try {
+                const urlObj = new URL(url);
+                
+                // 既にログインモードが設定されている場合はそのまま返す
+                if (urlObj.searchParams.has('mode')) {
+                    console.log('🔍 既存のmodeパラメータ:', urlObj.searchParams.get('mode'));
+                    return url;
+                }
+                
+                // ログインモードパラメータを追加
+                urlObj.searchParams.set('mode', 'login');
+                const finalUrl = urlObj.toString();
+                console.log('✅ ログインモードを追加:', finalUrl);
+                return finalUrl;
+                
+            } catch (urlError) {
+                console.warn('⚠️ URL解析に失敗、フォールバック処理:', urlError);
+                // URL解析に失敗した場合はクエリパラメータを手動で追加
+                const separator = url.includes('?') ? '&' : '?';
+                return url + separator + 'mode=login';
             }
         }
         
@@ -650,7 +686,11 @@
             try {
                 // 現在のURLからパラメータを削除してベースURLを取得
                 const baseUrl = window.location.origin + window.location.pathname;
-                console.log('📍 リダイレクト先:', baseUrl);
+                console.log('📍 ベースURL:', baseUrl);
+                
+                // ログインモードパラメータを確実に追加
+                const loginUrl = ensureLoginMode(baseUrl);
+                console.log('📍 最終リダイレクト先:', loginUrl);
                 
                 // セッションストレージとローカルストレージをクリア
                 if (typeof sessionStorage !== 'undefined') {
@@ -661,7 +701,7 @@
                 }
                 
                 // ログインページにリダイレクト
-                performFrameAwareRedirect(baseUrl);
+                performFrameAwareRedirect(loginUrl);
                 
             } catch (fallbackError) {
                 console.error('❌ フォールバック処理でもエラー:', fallbackError);
