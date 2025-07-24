@@ -523,7 +523,7 @@
                         console.log('✅ セッションクリア成功:', loginUrl);
                         // セッションクリア後、ログインページにリダイレクト
                         if (loginUrl) {
-                            window.location.replace(loginUrl);
+                            performFrameAwareRedirect(loginUrl);
                         } else {
                             // フォールバック: 現在のURLからパラメータを削除してリダイレクト
                             handleLogoutFallback();
@@ -539,6 +539,36 @@
             } catch (error) {
                 console.error('❌ 強制ログアウト処理でエラー:', error);
                 handleLogoutFallback();
+            }
+        }
+        
+        // iframe対応のリダイレクト関数
+        function performFrameAwareRedirect(url) {
+            console.log('🔄 フレーム対応リダイレクトを実行...', url);
+            
+            try {
+                // iframe内で実行されているかを判定
+                if (window.parent !== window) {
+                    console.log('📄 iframe環境を検出 - 親フレームでリダイレクト');
+                    // iframe内の場合、親フレームでリダイレクト（X-Frame-Options回避）
+                    window.parent.location.href = url;
+                } else {
+                    console.log('🌐 通常環境 - 直接リダイレクト');
+                    // 通常環境では直接リダイレクト
+                    window.location.href = url;
+                }
+            } catch (frameError) {
+                console.warn('⚠️ フレーム遷移に失敗:', frameError);
+                // フレーム遷移に失敗した場合は新しいタブで開く
+                try {
+                    console.log('🆕 新しいタブでリダイレクト');
+                    window.open(url, '_blank');
+                } catch (openError) {
+                    console.error('❌ 新しいタブでの遷移も失敗:', openError);
+                    // 最終手段：アラートで通知してページリロード
+                    alert('ログイン画面への移動に失敗しました。手動でページを更新してください。\nURL: ' + url);
+                    window.location.reload();
+                }
             }
         }
         
@@ -559,7 +589,7 @@
                 }
                 
                 // ログインページにリダイレクト
-                window.location.replace(baseUrl);
+                performFrameAwareRedirect(baseUrl);
                 
             } catch (fallbackError) {
                 console.error('❌ フォールバック処理でもエラー:', fallbackError);
