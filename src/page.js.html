@@ -301,7 +301,7 @@ class StudyQuestApp {
       this.elements.answerModalCloseBtn.addEventListener('click', this.handlers.onAnswerModalCloseClick);
     }
     // Size slider for immediate response with throttling
-    const debouncedRender = this.debounce(() => this.renderBoard(true), 200);
+    const debouncedRender = this.debounce(() => this.renderBoard(true, false), 200);
     this.handlers.onSizeSliderInput = this.throttle((e) => {
       localStorage.setItem('boardColumns', e.target.value);
       debouncedRender();
@@ -1493,7 +1493,7 @@ setupEventDelegation() {
               this.elements.headingLabel.textContent = result.header;
             }
 
-            this.renderBoard(false);
+            this.renderBoard(false, isInitialLoad);
           } finally {
             // 成功時にローディング状態を解除
             this.state.isLoading = false;
@@ -1706,7 +1706,7 @@ setupEventDelegation() {
       element.classList.add('reaction-border-1');
     }
   }
-  renderBoard(isLayoutChange = false, oldRows = []) {
+  renderBoard(isLayoutChange = false, isInitialLoad = false, oldRows = []) {
     debugLog('DEBUG: renderBoard called. newRows.length:', this.state.currentAnswers.length);
     // 管理者の場合はハイライトトグルを確実に有効化
     if (this.state.isAdminUser && !this.state.showHighlightToggle) {
@@ -1769,7 +1769,8 @@ setupEventDelegation() {
       const changedItems = [];
       let prevNode = null;
       // Enhanced batch processing with virtual scrolling for large datasets
-      if (newRows.length > RENDER_BATCH_SIZE) {
+      // Skip virtual scrolling for initial load to show all data immediately
+      if (newRows.length > RENDER_BATCH_SIZE && !isInitialLoad) {
         this.renderWithVirtualScrolling(newRows, oldRows, container, existingMap, changedItems);
       } else {
         // Process small datasets normally

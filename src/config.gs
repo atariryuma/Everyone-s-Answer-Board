@@ -1302,6 +1302,11 @@ function addSpreadsheetUrl(requestUserId, url) {
     try {
       formUrl = detectFormUrlFromSpreadsheet(spreadsheetId);
       console.log('スプレッドシートからフォーム検出:', formUrl ? 'あり' : 'なし');
+      
+      // 検出されたフォームURLをconfigJsonにも保存
+      if (formUrl) {
+        configJson.formUrl = formUrl;
+      }
     } catch (formDetectionError) {
       console.warn('フォーム自動検出でエラー:', formDetectionError.message);
     }
