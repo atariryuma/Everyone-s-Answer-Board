@@ -128,30 +128,43 @@ function forceLogoutAndRedirectToLogin() {
       // キャッシュクリアエラーは致命的ではないので継続
     }
     
-    // Step 2: ログインページURLの生成（フォールバック付き）
+    // Step 2: ログインページURLの生成と適切なサニタイズ
     let loginUrl;
     try {
-      loginUrl = getWebAppUrlCached() + '?mode=login';
-      console.log('✅ ログインURL生成成功:', loginUrl);
+      const rawUrl = getWebAppUrlCached() + '?mode=login';
+      loginUrl = sanitizeRedirectUrl(rawUrl);
+      console.log('✅ ログインURL生成・サニタイズ成功:', loginUrl);
     } catch (urlError) {
       console.warn('⚠️ WebAppURL取得失敗、フォールバック使用:', urlError.message);
-      loginUrl = ScriptApp.getService().getUrl() + '?mode=login';
+      const fallbackUrl = ScriptApp.getService().getUrl() + '?mode=login';
+      loginUrl = sanitizeRedirectUrl(fallbackUrl);
     }
     
-    // Step 3: サーバーサイドリダイレクトHTMLの生成
+    // Step 3: JavaScript文字列エスケープユーティリティ
+    const escapeJavaScript = (str) => {
+      return str.replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'")
+                .replace(/"/g, '\\"')
+                .replace(/\n/g, '\\n')
+                .replace(/\r/g, '\\r')
+                .replace(/\t/g, '\\t');
+    };
+    
+    // Step 4: 安全なHTML生成（エスケープ済みURL使用）
+    const safeLoginUrl = escapeJavaScript(loginUrl);
     const redirectScript = `
       <script>
-        console.log('🚀 サーバーサイドリダイレクト実行:', '${loginUrl}');
+        console.log('🚀 サーバーサイドリダイレクト実行:', '${safeLoginUrl}');
         
         // Google Apps Script環境に最適化されたリダイレクト
         try {
           // 最も確実な方法：window.top.location.href
-          window.top.location.href = '${loginUrl}';
+          window.top.location.href = '${safeLoginUrl}';
         } catch (topError) {
           console.warn('Top frame遷移失敗:', topError);
           try {
             // フォールバック：現在のウィンドウでリダイレクト
-            window.location.href = '${loginUrl}';
+            window.location.href = '${safeLoginUrl}';
           } catch (currentError) {
             console.error('リダイレクト完全失敗:', currentError);
             // 最終手段：ページリロード
@@ -182,10 +195,15 @@ function forceLogoutAndRedirectToLogin() {
   } catch (error) {
     console.error('❌ サーバーサイドログアウト処理でエラー:', error.message);
     
-    // エラー時のフォールバックHTML
+    // Step 5: エラー時のフォールバックHTML（安全なエスケープ）
+    const safeErrorMessage = String(error.message || 'Unknown error')
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/"/g, '\\"');
+    
     const fallbackScript = `
       <script>
-        console.error('サーバーサイドログアウトエラー: ${error.message}');
+        console.error('サーバーサイドログアウトエラー: ${safeErrorMessage}');
         alert('ログアウト処理中にエラーが発生しました。ページを再読み込みします。');
         window.location.reload();
       </script>
