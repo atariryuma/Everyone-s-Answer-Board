@@ -748,7 +748,7 @@ function getAppSetupUrl() {
     }
 
     // WebアプリのベースURLを取得
-    const baseUrl = ScriptApp.getWebAppUrl();
+    const baseUrl = ScriptApp.getService().getUrl();
     if (!baseUrl) {
       throw new Error('WebアプリのURLを取得できませんでした');
     }
