@@ -1358,15 +1358,39 @@ setupEventDelegation() {
     const container = this.elements.answersContainer;
     if (!container) return;
     
+    const isUserNotFoundError = errorMessage && (
+      errorMessage.includes('ユーザー情報が見つかりません') || 
+      errorMessage.includes('が見つかりません')
+    );
+    
     container.innerHTML = `
       <div class="text-center py-16 px-6 col-span-full">
         <svg class="mx-auto h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.08 16.5c-.77.833.192 2.5 1.732 2.5z" />
         </svg>
-        <h3 class="mt-2 text-lg font-medium text-red-400">アクセスエラー</h3>
-        <p class="mt-1 text-sm text-gray-400">この回答ボードにアクセスする権限がありません</p>
+        <h3 class="mt-2 text-lg font-medium text-red-400">${isUserNotFoundError ? 'ユーザー情報が見つかりません' : 'アクセスエラー'}</h3>
+        <p class="mt-1 text-sm text-gray-400">${isUserNotFoundError ? 
+          'この回答ボードは存在しないか、アクセス権限が不正です' : 
+          'この回答ボードにアクセスする権限がありません'}</p>
+        ${isUserNotFoundError ? `
+        <div class="mt-4 p-4 bg-blue-900/20 border border-blue-500/50 rounded-lg text-left max-w-md mx-auto">
+          <h4 class="text-sm font-medium text-blue-400 mb-2">🔍 考えられる原因：</h4>
+          <ul class="text-xs text-gray-400 space-y-1">
+            <li>• URLのユーザーIDが無効または期限切れ</li>
+            <li>• ボードが削除されたか非アクティブ化された</li>
+            <li>• ブラウザのセッション情報が破損</li>
+          </ul>
+        </div>
+        <div class="mt-4 p-4 bg-green-900/20 border border-green-500/50 rounded-lg text-left max-w-md mx-auto">
+          <h4 class="text-sm font-medium text-green-400 mb-2">💡 解決方法：</h4>
+          <ul class="text-xs text-gray-400 space-y-1">
+            <li>• 正しいボードURLを管理者に確認</li>
+            <li>• 新しい回答ボードを作成する</li>
+            <li>• しばらく時間をおいて再度アクセス</li>
+          </ul>
+        </div>` : ''}
         <p class="mt-2 text-xs text-gray-500">エラー詳細: ${this.escapeHtml(errorMessage)}</p>
-        <div class="mt-6">
+        <div class="mt-6 space-x-3">
           <button 
             onclick="window.location.reload()" 
             class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800"
@@ -1376,9 +1400,52 @@ setupEventDelegation() {
             </svg>
             ページを再読み込み
           </button>
+          ${isUserNotFoundError ? `
+          <button 
+            onclick="this.redirectToLogin()"
+            class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+          >
+            <svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+            </svg>
+            ログインページへ
+          </button>` : ''}
         </div>
       </div>
     `;
+    
+    // Add redirect function to the error container
+    if (isUserNotFoundError) {
+      container.querySelector('button[onclick="this.redirectToLogin()"]').onclick = () => {
+        this.redirectToLogin();
+      };
+    }
+  }
+  
+  redirectToLogin() {
+    try {
+      // Try to get login URL from the backend
+      google.script.run
+        .withSuccessHandler((loginUrl) => {
+          if (loginUrl) {
+            window.location.href = loginUrl;
+          } else {
+            // Fallback: try to construct login URL
+            const baseUrl = window.location.origin + window.location.pathname;
+            window.location.href = baseUrl.replace('?mode=page', '').replace(/\?.*$/, '') + '?mode=login';
+          }
+        })
+        .withFailureHandler(() => {
+          // Fallback: try to construct login URL
+          const baseUrl = window.location.origin + window.location.pathname;
+          window.location.href = baseUrl.replace('?mode=page', '').replace(/\?.*$/, '') + '?mode=login';
+        })
+        .getWebAppUrlCached();
+    } catch (error) {
+      // Final fallback: remove parameters and add login mode
+      const baseUrl = window.location.origin + window.location.pathname;
+      window.location.href = baseUrl.replace(/\?.*$/, '') + '?mode=login';
+    }
   }
 
   // Add these two methods

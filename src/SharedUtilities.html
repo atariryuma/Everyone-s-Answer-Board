@@ -992,7 +992,7 @@ window.setLoading = function(isLoading, message, step, percentage) {
         'iframe',
         'sandbox',
         'x-frame-options',
-        'frame-ancestors',
+        'frame-ancestors', 
         'refused to frame',
         'same-origin policy',
         'cross-origin frame access',
@@ -1004,7 +1004,9 @@ window.setLoading = function(isLoading, message, step, percentage) {
         'vibrate',
         'vr',
         'allow-scripts',
-        'allow-same-origin'
+        'allow-same-origin',
+        'feature',
+        'permission'
       ];
       
       const shouldSuppress = suppressPatterns.some(pattern => 
