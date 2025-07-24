@@ -19,16 +19,16 @@ function runGasWithUserId(functionName, loadingMessage = '処理中...', ...args
           throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
         }
         
-        // ローディング機能付きでuserIdを第一引数として追加 - Admin Panel uses transparent loading
-        return sharedUtilities.gas.callWithLoading(functionName, loadingMessage, 'transparent', userId, ...args);
+        // ローディング機能付きでuserIdを第一引数として追加 - Admin Panel uses overlay loading
+        return sharedUtilities.gas.callWithLoading(functionName, loadingMessage, 'overlay', userId, ...args);
       }).catch((error) => {
         logError('Error in runGasWithUserId (after userIdPromise):', error);
         throw error;
       });
     }
     
-    // userIdが既に設定されている場合 - ローディング機能付き - Admin Panel uses transparent loading
-    return sharedUtilities.gas.callWithLoading(functionName, loadingMessage, 'transparent', userId, ...args).catch((error) => {
+    // userIdが既に設定されている場合 - ローディング機能付き - Admin Panel uses overlay loading
+    return sharedUtilities.gas.callWithLoading(functionName, loadingMessage, 'overlay', userId, ...args).catch((error) => {
       logError('Error in runGasWithUserId (direct call with loading):', error);
       throw error;
     });
@@ -1102,7 +1102,7 @@ function setupRealtimeUpdates() {
 // Load user information
 function loadUserInfo() {
   if (typeof sharedUtilities.gas.callWithLoading === 'function') {
-    sharedUtilities.gas.callWithLoading('getUserInfo', 'ユーザー情報を読み込み中...', 'transparent')
+    sharedUtilities.gas.callWithLoading('getUserInfo', 'ユーザー情報を読み込み中...', 'overlay')
       .then(userInfo => {
         if (userInfo) {
           document.getElementById('info-admin-email').textContent = userInfo.email || '-';
@@ -1119,7 +1119,7 @@ function loadUserInfo() {
 // Load system status
 function loadSystemStatus() {
   if (typeof sharedUtilities.gas.callWithLoading === 'function') {
-    sharedUtilities.gas.callWithLoading('getAppConfig', 'システム設定を読み込み中...', 'transparent')
+    sharedUtilities.gas.callWithLoading('getAppConfig', 'システム設定を読み込み中...', 'overlay')
       .then(status => {
         updateSystemStatusDisplay(status);
       })

@@ -902,12 +902,6 @@ class UnifiedLoadingManager {
 
   // Update loading content based on configuration.
   updateContent(config) {
-    // For transparent mode, don't render any content at all
-    if (config.type === 'transparent') {
-      this.overlay.innerHTML = ''; // Completely empty for transparent overlay
-      return;
-    }
-    
     let content = `<div class="loading-content">`;
     
     if (config.message) {

@@ -1917,11 +1917,16 @@ setupEventDelegation() {
       this.virtualScrollState = {
         renderedItems: 0,
         totalItems: newRows.length,
-        isLoading: false
+        isLoading: false,
+        renderedRowIndexes: new Set()
       };
     } else {
       // Update total items for existing state
       this.virtualScrollState.totalItems = newRows.length;
+      // Ensure renderedRowIndexes exists
+      if (!this.virtualScrollState.renderedRowIndexes) {
+        this.virtualScrollState.renderedRowIndexes = new Set();
+      }
     }
     
     const processBatch = () => {
@@ -1942,6 +1947,9 @@ setupEventDelegation() {
           if (card) {
             card.classList.add('new-card');
             
+            // Track this item as rendered
+            this.virtualScrollState.renderedRowIndexes.add(rowId);
+            
             // Add to visibility observer for virtual scrolling
             if (this.visibilityObserver) {
               this.visibilityObserver.observe(card);
@@ -1954,6 +1962,8 @@ setupEventDelegation() {
             // Skip this row and continue with the next one
           }
         } else {
+          // Track existing card as rendered
+          this.virtualScrollState.renderedRowIndexes.add(rowId);
           this.updateExistingCard(card, row, oldData, changedItems);
           // 既存のカードは既にDOMにあるので、フラグメントに追加しない
         }
@@ -3232,13 +3242,23 @@ async handleReaction(rowIndex, reaction) {
   setupObservers() {
     // Intersection Observer for virtual scrolling - optimized for performance
     if ('IntersectionObserver' in window) {
-      // Debounce visibility changes to reduce excessive firing
+      // Enhanced debounce visibility changes with batching to reduce excessive firing
       const debouncedVisibilityHandler = this.debounce((entries) => {
+        // Batch entries by card to prevent rapid state changes on the same element
+        const cardChanges = new Map();
+        
         entries.forEach(entry => {
           const card = entry.target;
+          const rowIndex = card.dataset.rowIndex;
           
+          // Keep only the latest change for each card
+          cardChanges.set(rowIndex, { card, entry });
+        });
+        
+        // Process batched changes
+        cardChanges.forEach(({ card, entry }) => {
           // Only log significant visibility changes for debugging
-          if (DEBUG_MODE && entry.intersectionRatio === 0 || entry.intersectionRatio === 1) {
+          if (DEBUG_MODE && (entry.intersectionRatio === 0 || entry.intersectionRatio === 1)) {
             debugLog('IntersectionObserver visibility change:', {
               rowIndex: card.dataset.rowIndex,
               isIntersecting: entry.isIntersecting,
@@ -3247,21 +3267,24 @@ async handleReaction(rowIndex, reaction) {
           }
 
           if (entry.isIntersecting) {
-            card.classList.add('visible');
-            card.classList.remove('hidden-card');
-            // Restore visibility if it was hidden
-            if (card.style.visibility === 'hidden') {
-              card.style.visibility = 'visible';
+            // Card is becoming visible
+            if (!card.classList.contains('visible')) {
+              card.classList.add('visible');
+              card.classList.remove('hidden-card');
+              // Restore visibility if it was hidden
+              if (card.style.visibility === 'hidden') {
+                card.style.visibility = 'visible';
+              }
             }
           } else {
-            // Only mark as hidden if completely out of view
-            if (entry.intersectionRatio === 0) {
+            // Only mark as hidden if completely out of view and not already hidden
+            if (entry.intersectionRatio === 0 && card.classList.contains('visible')) {
               card.classList.remove('visible');
               card.classList.add('hidden-card');
             }
           }
         });
-      }, 16); // Debounce to ~60fps
+      }, 50); // Increased debounce to 50ms for better stability
       
       this.visibilityObserver = new IntersectionObserver(debouncedVisibilityHandler, {
         rootMargin: `${VIEWPORT_BUFFER}px`,
@@ -3369,17 +3392,19 @@ async handleReaction(rowIndex, reaction) {
       this.scrollObserver.disconnect();
     }
     
-    // Create scroll observer for dynamic loading
-    this.scrollObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          debugLog('setupScrollObserver: Trigger card intersecting:', entry.target.dataset.rowIndex);
-          this.handleVirtualScroll(entry.target);
-        }
-      });
-    }, {
+    // Create scroll observer for dynamic loading with debouncing
+    const debouncedScrollHandler = this.debounce((entries) => {
+      // Only process the first intersecting entry to prevent multiple simultaneous loads
+      const intersectingEntry = entries.find(entry => entry.isIntersecting);
+      if (intersectingEntry) {
+        debugLog('setupScrollObserver: Trigger card intersecting:', intersectingEntry.target.dataset.rowIndex);
+        this.handleVirtualScroll(intersectingEntry.target);
+      }
+    }, 150); // 150ms debounce for scroll triggers to prevent rapid firing
+    
+    this.scrollObserver = new IntersectionObserver(debouncedScrollHandler, {
       root: null,
-      rootMargin: '200px', // Load content 200px before it comes into view (increased for better UX)
+      rootMargin: '300px', // Increased buffer for even smoother loading
       threshold: 0.1
     });
     
@@ -3439,20 +3464,38 @@ async handleReaction(rowIndex, reaction) {
     
     this.virtualScrollState.isLoading = true;
     
-    const currentCards = this.elements.answersContainer.querySelectorAll('.answer-card');
-    const currentCount = currentCards.length;
+    // Enhanced item tracking - use Set instead of relying on DOM count
+    if (!this.virtualScrollState.renderedRowIndexes) {
+      this.virtualScrollState.renderedRowIndexes = new Set();
+      // Initialize with existing cards in DOM
+      const existingCards = this.elements.answersContainer.querySelectorAll('.answer-card');
+      existingCards.forEach(card => {
+        if (card.dataset.rowIndex) {
+          this.virtualScrollState.renderedRowIndexes.add(card.dataset.rowIndex);
+        }
+      });
+    }
+    
     // Use dynamic batch sizing for better performance adaptation
     const dynamicBatchSize = getDynamicBatchSize(this.performanceMetrics);
     const batchSize = this.isLowPerformanceMode ? Math.min(CHUNK_SIZE, dynamicBatchSize) : dynamicBatchSize;
-    const remainingItems = this.state.currentAnswers.slice(currentCount, currentCount + batchSize);
+    
+    // Find items that haven't been rendered yet
+    const unrenderedItems = this.state.currentAnswers.filter(item => 
+      !this.virtualScrollState.renderedRowIndexes.has(String(item.rowIndex))
+    );
+    
+    // Take next batch of unrendered items
+    const remainingItems = unrenderedItems.slice(0, batchSize);
     
     if (remainingItems.length === 0) {
       this.virtualScrollState.isLoading = false;
-      debugLog('loadMoreItems: No more items to load');
+      debugLog('loadMoreItems: No more items to load - all items rendered');
       return;
     }
     
-    debugLog('loadMoreItems: Loading', remainingItems.length, 'additional items with batch size', batchSize);
+    debugLog('loadMoreItems: Loading', remainingItems.length, 'additional items with batch size', batchSize, 
+      'Total rendered:', this.virtualScrollState.renderedRowIndexes.size, 'Total available:', this.state.currentAnswers.length);
     
     // Use deferred rendering for performance
     this.deferredRender(() => {
@@ -3463,16 +3506,34 @@ async handleReaction(rowIndex, reaction) {
   renderAdditionalItems(items) {
     if (!items || items.length === 0) {
       this.virtualScrollState.isLoading = false;
+      debugLog('renderAdditionalItems: No items to render');
       return;
     }
     
     const fragment = this.getReusableFragment();
     const changedItems = [];
+    let successfullyCreated = 0;
+    
+    // Ensure renderedRowIndexes exists
+    if (!this.virtualScrollState.renderedRowIndexes) {
+      this.virtualScrollState.renderedRowIndexes = new Set();
+    }
     
     items.forEach((item) => {
+      const rowIndexStr = String(item.rowIndex);
+      
+      // Skip if already rendered (defensive check)
+      if (this.virtualScrollState.renderedRowIndexes.has(rowIndexStr)) {
+        debugLog('renderAdditionalItems: Item', rowIndexStr, 'already rendered, skipping');
+        return;
+      }
+      
       const card = this.createAnswerCard(item);
       if (card) {
         card.classList.add('new-card');
+        
+        // Track this item as rendered
+        this.virtualScrollState.renderedRowIndexes.add(rowIndexStr);
         
         // Add to visibility observer
         if (this.visibilityObserver) {
@@ -3487,6 +3548,9 @@ async handleReaction(rowIndex, reaction) {
         
         fragment.appendChild(card);
         changedItems.push(item);
+        successfullyCreated++;
+      } else {
+        console.warn('renderAdditionalItems: Failed to create card for item:', item.rowIndex);
       }
     });
     
@@ -3494,10 +3558,13 @@ async handleReaction(rowIndex, reaction) {
     if (fragment.children.length > 0) {
       this.elements.answersContainer.appendChild(fragment);
       
-      // Update virtual scroll state
+      // Update virtual scroll state with actual counts
       this.virtualScrollState.renderedItems = this.elements.answersContainer.children.length;
       
-      debugLog('renderAdditionalItems: Added', fragment.children.length, 'new cards');
+      debugLog('renderAdditionalItems: Added', fragment.children.length, 'new cards. Total rendered:', 
+        this.virtualScrollState.renderedRowIndexes.size, 'DOM children:', this.virtualScrollState.renderedItems);
+    } else {
+      debugLog('renderAdditionalItems: No cards were successfully created from', items.length, 'items');
     }
     
     // Apply updates if needed
@@ -3510,6 +3577,48 @@ async handleReaction(rowIndex, reaction) {
     
     // Reset loading state
     this.virtualScrollState.isLoading = false;
+    
+    // Validate state consistency
+    this.validateVirtualScrollState();
+  }
+  
+  validateVirtualScrollState() {
+    if (!this.virtualScrollState || !this.virtualScrollState.renderedRowIndexes) {
+      return;
+    }
+    
+    const domCards = this.elements.answersContainer.querySelectorAll('.answer-card');
+    const domRowIndexes = new Set();
+    
+    domCards.forEach(card => {
+      if (card.dataset.rowIndex) {
+        domRowIndexes.add(card.dataset.rowIndex);
+      }
+    });
+    
+    const trackedCount = this.virtualScrollState.renderedRowIndexes.size;
+    const domCount = domRowIndexes.size;
+    const totalAvailable = this.state.currentAnswers.length;
+    
+    // Check for inconsistencies
+    const missingInDOM = [...this.virtualScrollState.renderedRowIndexes].filter(x => !domRowIndexes.has(x));
+    const extraInDOM = [...domRowIndexes].filter(x => !this.virtualScrollState.renderedRowIndexes.has(x));
+    
+    if (missingInDOM.length > 0 || extraInDOM.length > 0 || trackedCount !== domCount) {
+      console.warn('Virtual scroll state inconsistency detected:', {
+        trackedCount,
+        domCount,
+        totalAvailable,
+        missingInDOM: missingInDOM.slice(0, 5),
+        extraInDOM: extraInDOM.slice(0, 5)
+      });
+      
+      // Auto-repair: sync tracked state with DOM reality
+      this.virtualScrollState.renderedRowIndexes = domRowIndexes;
+      this.virtualScrollState.renderedItems = domCount;
+      
+      debugLog('validateVirtualScrollState: Auto-repaired state. New tracked count:', domCount);
+    }
   }
   
   optimizeVisibleElements() {
@@ -3520,43 +3629,123 @@ async handleReaction(rowIndex, reaction) {
     const cards = this.elements.answersContainer.querySelectorAll('.answer-card');
     let hiddenCount = 0;
     let restoredCount = 0;
+    const viewportHeight = window.innerHeight;
+    const hideThreshold = viewportHeight * 3; // Increased threshold for better UX
+    
+    // Track hidden cards for better restoration
+    if (!this.virtualScrollState.hiddenCards) {
+      this.virtualScrollState.hiddenCards = new Set();
+    }
     
     cards.forEach((card) => {
       const rect = card.getBoundingClientRect();
-      const isVisible = rect.top < window.innerHeight && rect.bottom > 0;
-      const isCurrentlyHidden = card.classList.contains('hidden-card');
+      const isInViewport = rect.top < viewportHeight && rect.bottom > 0;
+      const rowIndex = card.dataset.rowIndex;
+      const isCurrentlyHidden = this.virtualScrollState.hiddenCards.has(rowIndex);
       
-      if (!isVisible && !isCurrentlyHidden) {
-        // Hide cards that are far from viewport to save memory
-        const distanceFromViewport = Math.min(
-          Math.abs(rect.top - window.innerHeight),
-          Math.abs(rect.bottom)
-        );
+      if (!isInViewport && !isCurrentlyHidden) {
+        // Calculate distance from viewport
+        const distanceFromViewport = rect.top > viewportHeight 
+          ? rect.top - viewportHeight  // Below viewport
+          : -rect.bottom;             // Above viewport
         
-        // Only hide cards that are really far away (2 viewport heights)
-        if (distanceFromViewport > window.innerHeight * 2) {
-          card.classList.add('hidden-card');
-          card.style.visibility = 'hidden';
+        // Only hide cards that are really far away
+        if (distanceFromViewport > hideThreshold) {
+          this.hideCard(card, rowIndex);
           hiddenCount++;
         }
-      } else if (isVisible && isCurrentlyHidden) {
-        // Show cards that are back in viewport - ensure complete restoration
-        card.classList.remove('hidden-card');
-        card.style.visibility = 'visible';
-        card.classList.add('visible');
+      } else if (isInViewport && isCurrentlyHidden) {
+        // Restore cards that are back in viewport
+        this.restoreCard(card, rowIndex);
         restoredCount++;
-        
-        // Ensure the card is properly re-rendered
-        if (this.visibilityObserver) {
-          this.visibilityObserver.unobserve(card);
-          this.visibilityObserver.observe(card);
-        }
       }
     });
     
     if (hiddenCount > 0 || restoredCount > 0) {
       debugLog('optimizeVisibleElements: Hidden', hiddenCount, 'cards, restored', restoredCount, 'cards');
     }
+  }
+  
+  hideCard(card, rowIndex) {
+    // Use CSS transform instead of visibility for better performance
+    card.style.transform = 'translateZ(0) scale(0.01)';
+    card.style.opacity = '0';
+    card.style.pointerEvents = 'none';
+    card.classList.add('hidden-card');
+    this.virtualScrollState.hiddenCards.add(rowIndex);
+    
+    // Temporarily unobserve from intersection observers to prevent state confusion
+    if (this.visibilityObserver) {
+      this.visibilityObserver.unobserve(card);
+    }
+    if (this.scrollObserver) {
+      this.scrollObserver.unobserve(card);
+    }
+  }
+  
+  restoreCard(card, rowIndex) {
+    // Restore card to full visibility
+    card.style.transform = '';
+    card.style.opacity = '';
+    card.style.pointerEvents = '';
+    card.classList.remove('hidden-card');
+    card.classList.add('visible');
+    this.virtualScrollState.hiddenCards.delete(rowIndex);
+    
+    // Re-add to intersection observers
+    if (this.visibilityObserver) {
+      this.visibilityObserver.observe(card);
+    }
+    
+    // Only re-add to scroll observer if it's one of the last few cards
+    const allCards = this.elements.answersContainer.querySelectorAll('.answer-card');
+    const cardIndex = Array.from(allCards).indexOf(card);
+    const isLastFew = cardIndex >= allCards.length - 3;
+    
+    if (isLastFew && this.scrollObserver) {
+      this.scrollObserver.observe(card);
+    }
+  }
+  
+  // Reset virtual scrolling state for debugging and recovery
+  resetVirtualScrollState() {
+    debugLog('resetVirtualScrollState: Resetting virtual scroll state');
+    
+    // Clear state
+    this.virtualScrollState = {
+      renderedItems: 0,
+      totalItems: this.state.currentAnswers.length,
+      isLoading: false,
+      renderedRowIndexes: new Set(),
+      hiddenCards: new Set()
+    };
+    
+    // Clear all observers
+    if (this.scrollObserver) {
+      this.scrollObserver.disconnect();
+      this.scrollObserver = null;
+    }
+    
+    if (this.visibilityObserver) {
+      this.visibilityObserver.disconnect();
+      this.visibilityObserver = null;
+    }
+    
+    // Restore all cards to visible state
+    const cards = this.elements.answersContainer.querySelectorAll('.answer-card');
+    cards.forEach(card => {
+      card.style.transform = '';
+      card.style.opacity = '';
+      card.style.pointerEvents = '';
+      card.style.visibility = '';
+      card.classList.remove('hidden-card');
+      card.classList.add('visible');
+    });
+    
+    // Re-setup observers
+    this.setupObservers();
+    
+    debugLog('resetVirtualScrollState: Virtual scroll state reset complete');
   }
 }
 // ===== 共通ドメイン情報処理関数 =====
