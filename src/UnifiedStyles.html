@@ -451,9 +451,20 @@ body {
   will-change: auto !important;
 }
 
-/* Variant: Transparent background, allows interaction with elements behind it */
+/* Variant: Transparent overlay - completely invisible interaction blocker */
 .loading-overlay.transparent {
-  background-color: rgba(0,0,0,0.1);
+  background-color: rgba(0,0,0,0) !important; /* Completely transparent */
+  backdrop-filter: none !important; /* No visual effects */
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Hide all content elements in transparent mode */
+.loading-overlay.transparent .loading-content,
+.loading-overlay.transparent .loading-spinner,
+.loading-overlay.transparent .loading-message,
+.loading-overlay.transparent .loading-progress {
+  display: none !important;
+  visibility: hidden !important;
 }
 
 /* Variant: Modal, for critical blocking actions */

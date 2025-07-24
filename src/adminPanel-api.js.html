@@ -19,16 +19,16 @@ function runGasWithUserId(functionName, loadingMessage = '処理中...', ...args
           throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
         }
         
-        // ローディング機能付きでuserIdを第一引数として追加
-        return sharedUtilities.gas.callWithLoading(functionName, loadingMessage, userId, ...args);
+        // ローディング機能付きでuserIdを第一引数として追加 - Admin Panel uses transparent loading
+        return sharedUtilities.gas.callWithLoading(functionName, loadingMessage, 'transparent', userId, ...args);
       }).catch((error) => {
         logError('Error in runGasWithUserId (after userIdPromise):', error);
         throw error;
       });
     }
     
-    // userIdが既に設定されている場合 - ローディング機能付き
-    return sharedUtilities.gas.callWithLoading(functionName, loadingMessage, userId, ...args).catch((error) => {
+    // userIdが既に設定されている場合 - ローディング機能付き - Admin Panel uses transparent loading
+    return sharedUtilities.gas.callWithLoading(functionName, loadingMessage, 'transparent', userId, ...args).catch((error) => {
       logError('Error in runGasWithUserId (direct call with loading):', error);
       throw error;
     });
@@ -178,7 +178,18 @@ function handleSheetDetailsSuccess(details) {
       // DOMの更新が完了するのを待ってからpopulateConfigを呼び出す
       setTimeout(() => {
         populateConfig(details.guessedConfig);
-        showMessage('AI列判定が完了しました。設定を確認してください。', 'success');
+        
+        // Enhanced auto-detection success message with specifics
+        const detectedColumns = [];
+        if (details.guessedConfig.opinionColumn) detectedColumns.push(`回答列: ${details.guessedConfig.opinionColumn}`);
+        if (details.guessedConfig.nameColumn) detectedColumns.push(`名前列: ${details.guessedConfig.nameColumn}`);
+        if (details.guessedConfig.classColumn) detectedColumns.push(`クラス列: ${details.guessedConfig.classColumn}`);
+        
+        const message = detectedColumns.length > 0 
+          ? `🤖 AI列判定が自動実行されました！検出された列: ${detectedColumns.join(', ')}。設定を確認してください。`
+          : '🤖 AI列判定が自動実行されました。設定を確認してください。';
+        
+        showMessage(message, 'success');
       }, 0);
     }
   } else {
@@ -209,21 +220,73 @@ function runHeaderGuessing() {
     return;
   }
   
-  runGasWithUserId('getSheetDetails', 'AI搭載高精度列判定システムが分析中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
-    .then(function(details) {
-      const configToUse = {
-        ...details.guessedConfig,
-        sheetName: selectedSheet
-      };
-      
-      setTimeout(() => {
-        populateConfig(configToUse);
-        showMessage('AI列判定が完了しました！設定を確認して「保存・公開」を押してください。', 'success');
-      }, 0);
-    })
-    .catch(function(error) {
-      handleError(error, 'runHeaderGuessing', 'AI列判定に失敗しました。');
-    });
+  // Update button state to show AI is working
+  const reguessBtn = document.getElementById('reguess-headers-btn');
+  if (reguessBtn) {
+    const originalContent = reguessBtn.innerHTML;
+    reguessBtn.disabled = true;
+    reguessBtn.innerHTML = `
+      <span class="relative z-10 flex items-center gap-1">
+        <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+        <span class="text-xs font-bold">AI分析中</span>
+      </span>
+    `;
+    
+    // Restore button after completion
+    const restoreButton = () => {
+      reguessBtn.disabled = false;
+      reguessBtn.innerHTML = originalContent;
+    };
+    
+    runGasWithUserId('getSheetDetails', 'AI搭載高精度列判定システムが分析中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
+      .then(function(details) {
+        if (!details || !details.guessedConfig) {
+          restoreButton();
+          showMessage('AI列判定の結果が取得できませんでした。手動で列を設定してください。', 'warning');
+          return;
+        }
+        
+        const configToUse = {
+          ...details.guessedConfig,
+          sheetName: selectedSheet
+        };
+        
+        setTimeout(() => {
+          populateConfig(configToUse);
+          restoreButton();
+          
+          // Enhanced success message with specifics
+          const detectedColumns = [];
+          if (configToUse.opinionColumn) detectedColumns.push(`回答列: ${configToUse.opinionColumn}`);
+          if (configToUse.nameColumn) detectedColumns.push(`名前列: ${configToUse.nameColumn}`);
+          if (configToUse.classColumn) detectedColumns.push(`クラス列: ${configToUse.classColumn}`);
+          
+          const message = detectedColumns.length > 0 
+            ? `✅ AI列判定が完了しました！検出された列: ${detectedColumns.join(', ')}。設定を確認して「保存・公開」を押してください。`
+            : '✅ AI列判定が完了しました！設定を確認して「保存・公開」を押してください。';
+          
+          showMessage(message, 'success');
+        }, 100);
+      })
+      .catch(function(error) {
+        restoreButton();
+        console.error('AI column detection error:', error);
+        
+        // Enhanced error message
+        let errorMessage = 'AI列判定に失敗しました。';
+        if (error?.message?.includes('permission') || error?.message?.includes('権限')) {
+          errorMessage += 'スプレッドシートへのアクセス権限を確認してください。';
+        } else if (error?.message?.includes('network') || error?.message?.includes('timeout')) {
+          errorMessage += 'ネットワーク接続を確認して再試行してください。';
+        } else {
+          errorMessage += '手動で列を設定するか、再度お試しください。';
+        }
+        
+        handleError(error, 'runHeaderGuessing', errorMessage);
+      });
+  }
 }
 
 // =============================================================================
@@ -1039,7 +1102,7 @@ function setupRealtimeUpdates() {
 // Load user information
 function loadUserInfo() {
   if (typeof sharedUtilities.gas.callWithLoading === 'function') {
-    sharedUtilities.gas.callWithLoading('getUserInfo', 'ユーザー情報を読み込み中...')
+    sharedUtilities.gas.callWithLoading('getUserInfo', 'ユーザー情報を読み込み中...', 'transparent')
       .then(userInfo => {
         if (userInfo) {
           document.getElementById('info-admin-email').textContent = userInfo.email || '-';
@@ -1056,7 +1119,7 @@ function loadUserInfo() {
 // Load system status
 function loadSystemStatus() {
   if (typeof sharedUtilities.gas.callWithLoading === 'function') {
-    sharedUtilities.gas.callWithLoading('getAppConfig', 'システム設定を読み込み中...')
+    sharedUtilities.gas.callWithLoading('getAppConfig', 'システム設定を読み込み中...', 'transparent')
       .then(status => {
         updateSystemStatusDisplay(status);
       })

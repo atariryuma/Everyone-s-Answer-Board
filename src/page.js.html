@@ -1432,11 +1432,11 @@ setupEventDelegation() {
   }
 
   // Add these two methods
-  showLoadingOverlay(message = 'データを読み込み中...') {
+  showLoadingOverlay(message = '') {
     if (window.unifiedLoading) {
       window.unifiedLoading.setLoading(true, { 
-        message: message, 
-        type: 'page-specific',
+        message: '', // No message for transparent overlay
+        type: 'transparent',
         disableInteraction: true 
       });
     }
@@ -1470,7 +1470,7 @@ setupEventDelegation() {
   async loadSheetData(showLoading = true, isInitialLoad = false, requestedSheetName = null) {
     if (this.state.isLoading && showLoading) return;
     this.state.isLoading = true;
-    this.showLoadingOverlay('回答データを読み込み中...'); // Enhanced loading message
+    this.showLoadingOverlay(); // Transparent overlay for interaction blocking only
 
     const selectedClass = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
     const oldAnswers = [...this.state.currentAnswers];

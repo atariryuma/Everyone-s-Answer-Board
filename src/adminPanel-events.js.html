@@ -342,7 +342,7 @@ function handleDeleteRequest() {
     'アカウント削除の確認',
     '本当にこのアカウントを削除しますか？この操作は元に戻せず、すべてのデータが失われます。',
     function() {
-      sharedUtilities.gas.callWithLoading('deleteCurrentUserAccount', 'アカウントを完全に削除しています...')
+      sharedUtilities.gas.callWithLoading('deleteCurrentUserAccount', 'アカウントを完全に削除しています...', 'transparent')
         .then(function(response) {
           showMessage(response.message || 'アカウントが削除されました', 'success');
           if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
@@ -377,7 +377,7 @@ function switchToAnotherAccount() {
     'アカウント切り替え',
     '別のアカウントでログインしますか？現在のセッションがクリアされます。',
     function() {
-      sharedUtilities.gas.callWithLoading('resetUserAuthentication', 'セッションをクリアしています...')
+      sharedUtilities.gas.callWithLoading('resetUserAuthentication', 'セッションをクリアしています...', 'transparent')
         .then(function(result) {
           console.log('Session cleanup result:', result);
           window.location.href = 'https://accounts.google.com/logout';

@@ -410,7 +410,14 @@ class GASUtilities {
   }
 
   // GAS function call with loading overlay - 重複リクエスト防止版
-  callWithLoading(functionName, message = '処理中...', ...args) {
+  callWithLoading(functionName, message = '処理中...', loadingType = 'overlay', ...args) {
+    // Support legacy calls where message is an object with config
+    if (typeof message === 'object' && message !== null) {
+      const config = message;
+      message = config.message || '処理中...';
+      loadingType = config.type || loadingType;
+    }
+    
     // 重複リクエスト防止: 同じ関数が実行中の場合は既存のPromiseを返す
     const requestKey = `${functionName}_${JSON.stringify(args)}`;
     if (this.pendingRequests && this.pendingRequests.has(requestKey)) {
@@ -424,7 +431,12 @@ class GASUtilities {
     }
     
     const promise = new Promise((resolve, reject) => {
-      window.unifiedLoading.showSimple(message); // Show loading overlay
+      // Use appropriate loading method based on type
+      if (loadingType === 'transparent') {
+        window.unifiedLoading.showTransparent(message);
+      } else {
+        window.unifiedLoading.showSimple(message);
+      }
 
       google.script.run
         .withSuccessHandler(result => {
@@ -890,6 +902,12 @@ class UnifiedLoadingManager {
 
   // Update loading content based on configuration.
   updateContent(config) {
+    // For transparent mode, don't render any content at all
+    if (config.type === 'transparent') {
+      this.overlay.innerHTML = ''; // Completely empty for transparent overlay
+      return;
+    }
+    
     let content = `<div class="loading-content">`;
     
     if (config.message) {

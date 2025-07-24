@@ -162,7 +162,9 @@ function validateStatus(status) {
     }
     
     if (!status.sheetDetails.guessedConfig) {
-      console.warn('⚠️ AI列判定結果が存在しません');
+      console.warn('⚠️ AI列判定結果が存在しません - 手動設定が必要です');
+    } else {
+      console.log('✅ AI列判定結果が利用可能:', status.sheetDetails.guessedConfig);
     }
   } else {
     console.log('ℹ️ シート詳細はオプショナルなので存在しません（正常）');
