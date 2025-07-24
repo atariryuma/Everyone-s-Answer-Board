@@ -505,6 +505,70 @@
             margin-top: 16px;
         }
     </style>
+    <script>
+        // 強制ログアウトしてログイン画面にリダイレクトする関数
+        function forceLogoutAndRedirect() {
+            console.log('🔄 強制ログアウトを開始...');
+            
+            // ボタンを無効化して重複実行を防ぐ
+            const logoutBtn = event.target;
+            const originalText = logoutBtn.innerHTML;
+            logoutBtn.disabled = true;
+            logoutBtn.innerHTML = '🔄 処理中...';
+            
+            try {
+                // Google Apps Script の resetUserAuthentication を呼び出してセッションをクリア
+                google.script.run
+                    .withSuccessHandler(function(loginUrl) {
+                        console.log('✅ セッションクリア成功:', loginUrl);
+                        // セッションクリア後、ログインページにリダイレクト
+                        if (loginUrl) {
+                            window.location.replace(loginUrl);
+                        } else {
+                            // フォールバック: 現在のURLからパラメータを削除してリダイレクト
+                            handleLogoutFallback();
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        console.warn('⚠️ セッションクリアに失敗:', error);
+                        // エラー時のフォールバック処理
+                        handleLogoutFallback();
+                    })
+                    .resetUserAuthentication();
+                    
+            } catch (error) {
+                console.error('❌ 強制ログアウト処理でエラー:', error);
+                handleLogoutFallback();
+            }
+        }
+        
+        // フォールバック処理：直接ログインページにリダイレクト
+        function handleLogoutFallback() {
+            console.log('🔄 フォールバック処理を実行...');
+            try {
+                // 現在のURLからパラメータを削除してベースURLを取得
+                const baseUrl = window.location.origin + window.location.pathname;
+                console.log('📍 リダイレクト先:', baseUrl);
+                
+                // セッションストレージとローカルストレージをクリア
+                if (typeof sessionStorage !== 'undefined') {
+                    sessionStorage.clear();
+                }
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.clear();
+                }
+                
+                // ログインページにリダイレクト
+                window.location.replace(baseUrl);
+                
+            } catch (fallbackError) {
+                console.error('❌ フォールバック処理でもエラー:', fallbackError);
+                // 最終手段：ページリロード
+                alert('ログイン画面への移動に失敗しました。ページを再読み込みします。');
+                window.location.reload();
+            }
+        }
+    </script>
 </head>
 <body>
     <div class="error-container">
@@ -516,9 +580,9 @@
             <button class="btn btn-primary" onclick="location.reload()">
                 🔄 再読み込み
             </button>
-            <a class="btn btn-secondary" href="<?= loginUrl ?>">
+            <button class="btn btn-secondary" onclick="forceLogoutAndRedirect()">
                 🏠 ログイン画面に戻る
-            </a>
+            </button>
         </div>
         
         <? if (typeof debugInfo !== 'undefined' && debugInfo) { ?>
