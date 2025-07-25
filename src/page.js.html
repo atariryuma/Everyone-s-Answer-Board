@@ -328,7 +328,7 @@ class StudyQuestApp {
         if (event.data && event.data.type === 'REFRESH_BOARD_DATA') {
           // Refresh board data message received
           try {
-            await this.loadSheetData(true);
+            await this.loadSheetData({ bypassCache: true });
             // Show info modal on board refresh
             setTimeout(() => this.showInfoModal(), 1000);
           } catch (error) {
@@ -341,14 +341,14 @@ class StudyQuestApp {
             // キャッシュバイパスで新しいデータをチェック
             await this.checkForNewContentLight(true);
             // 必要に応じてフルリフレッシュ
-            await this.loadSheetData(true);
+            await this.loadSheetData({ bypassCache: true });
             // Show info modal when new board is published
             setTimeout(() => this.showInfoModal(), 1500);
           } catch (error) {
             console.warn('新しいボードの即座更新でエラー:', error);
             // エラー時もフルリフレッシュを実行
             try {
-              await this.loadSheetData(true);
+              await this.loadSheetData({ bypassCache: true });
             } catch (loadError) {
               console.error('フォールバック読み込みもエラー:', loadError);
             }
@@ -366,13 +366,13 @@ class StudyQuestApp {
             console.log('BroadcastChannelから新しいボード公開を受信:', event.data.sheetName);
             try {
               await this.checkForNewContentLight(true);
-              await this.loadSheetData(true);
+              await this.loadSheetData({ bypassCache: true });
               // Show info modal when board is updated via BroadcastChannel
               setTimeout(() => this.showInfoModal(), 1500);
             } catch (error) {
               console.warn('BroadcastChannel経由の更新でエラー:', error);
               try {
-                await this.loadSheetData(true);
+                await this.loadSheetData({ bypassCache: true });
               } catch (loadError) {
                 console.error('BroadcastChannel フォールバック読み込みもエラー:', loadError);
               }
@@ -483,7 +483,7 @@ class StudyQuestApp {
     this.handlers.onClassFilterChange = async () => {
       this.dismissNewContentBanner(); // フィルター変更時は既存の通知を消去
       try {
-        await this.loadSheetData(true);
+        await this.loadSheetData({ bypassCache: true });
         this.state.lastSeenCount = this.state.currentAnswers.length; // 新しいベースラインを設定
       } catch (error) {
         console.error('クラスフィルター変更時のデータ読み込みエラー:', error);
@@ -492,7 +492,7 @@ class StudyQuestApp {
     this.handlers.onSortOrderChange = async () => {
       this.dismissNewContentBanner(); // ソート変更時は既存の通知を消去
       try {
-        await this.loadSheetData(true);
+        await this.loadSheetData({ bypassCache: true });
         this.state.lastSeenCount = this.state.currentAnswers.length; // 新しいベースラインを設定
       } catch (error) {
         console.error('ソート順変更時のデータ読み込みエラー:', error);
@@ -554,7 +554,7 @@ class StudyQuestApp {
  * イベント委譲の設定（安定版の堅牢なロジックを採用）
  * これにより、クリックイベントが他のイベントと競合しなくなります。
  */
-setupEventDelegation() {
+  setupEventDelegation() {
     // 重複登録防止
     if (this.eventDelegationSetup) {
         // Event delegation already set up
@@ -739,163 +739,212 @@ setupEventDelegation() {
     }
   }
   
-  // 軽量な新着コンテンツチェック
   async checkForNewContentLight(bypassCache = false) {
+    // ポーリング実行中の場合は重複実行を防ぐ
+    if (this.contentCheckInProgress) {
+      console.log('Content check already in progress, skipping...');
+      return;
+    }
+    
     try {
-      // フィルター条件の正常化（空文字列の場合はデフォルト値を使用）
-      let selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
-      if (!selectedClass || selectedClass.trim() === '') {
-        selectedClass = 'すべて';
-        debugLog('checkForNewContentLight: selectedClassが空のためデフォルト値を使用:', selectedClass);
-      }
-      const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
+      this.contentCheckInProgress = true;
       
-      // キャッシュバイパス時はサーバーキャッシュをクリア
+      // 基本状態の検証
+      if (!this.validateContentCheckPrerequisites()) {
+        return;
+      }
+      
+      // パラメータの準備
+      const { selectedClass, sortOrder } = this.prepareContentCheckParams();
+      
+      // キャッシュクリア（必要な場合）
       if (bypassCache) {
-        try {
-          await new Promise((resolve, reject) => {
-            google.script.run
-              .withSuccessHandler(resolve)
-              .withFailureHandler(reject)
-              .clearCache();
-          });
-          debugLog('checkForNewContentLight: Server cache cleared for fresh count');
-        } catch (error) {
-          console.warn('checkForNewContentLight: Failed to clear cache, proceeding:', error);
-        }
+        await this.clearCacheForContentCheck();
       }
       
-      // 軽量な件数チェックのみ実行（フルデータ取得なし）
-      const countData = await this.gas.getDataCount(selectedClass, sortOrder, this.state.showAdminFeatures);
+      // サーバーから件数を取得
+      const countData = await this.fetchContentCount(selectedClass, sortOrder);
       
-      console.log('📊 軽量新着チェック:', {
-        countResponse: countData,
-        newCount: countData.count || 0,
-        currentCount: this.state.currentAnswers ? this.state.currentAnswers.length : 0,
-        lastSeenCount: this.state.lastSeenCount,
-        selectedClass,
-        sortOrder,
-        status: countData.status,
-        error: countData.message
-      });
+      // レスポンスの処理
+      await this.processContentCountResponse(countData, selectedClass, sortOrder);
       
-      const newCount = countData.count || 0;
-      
-      // 成功した場合は失敗カウントをリセット
-      this.state.pollingFailureCount = 0;
-      
-      // 現在のフィルター/ソート設定をキーとして保存
-      const currentViewKey = `${selectedClass}-${sortOrder}`;
-      
-      // 初回データロード完了の確認
-      if (!this.initialDataLoaded) {
-        // Initial data load completed
-        this.lastViewKey = currentViewKey;
-        this.state.lastSeenCount = newCount;
-        this.initialDataLoaded = true;
-        return;
-      }
-      
-      // フィルター/ソート設定が変わった場合は比較をリセット
-      if (this.lastViewKey !== null && this.lastViewKey !== currentViewKey) {
-        console.log('🔄 表示設定変更検出、新着チェックをリセット:', {
-          oldKey: this.lastViewKey,
-          newKey: currentViewKey,
-          newCount,
-          settingLastSeenToNewCount: true
-        });
-        this.lastViewKey = currentViewKey;
-        this.state.lastSeenCount = newCount;
-        return;
-      }
-      
-      // 新着判定ロジックの修正（初期状態からの新着も検出）
-      const hasNewItems = newCount > this.state.lastSeenCount;
-      
-      // 詳細ログ出力でデバッグを強化
-      console.log('🔍 新着判定詳細:', {
-        '1_newCount': newCount,
-        '2_lastSeenCount': this.state.lastSeenCount,
-        '3_difference': newCount - this.state.lastSeenCount,
-        '4_hasNewItems_OLD_LOGIC': newCount > this.state.lastSeenCount && this.state.lastSeenCount > 0,
-        '5_hasNewItems_NEW_LOGIC': hasNewItems,
-        '6_selectedClass': selectedClass,
-        '7_currentViewKey': `${selectedClass}-${sortOrder}`,
-        '8_initialDataLoaded': this.initialDataLoaded
-      });
-      console.log('📊 新着判定:', {
-        newCount,
-        lastSeenCount: this.state.lastSeenCount,
-        hasNewItems,
-        difference: newCount - this.state.lastSeenCount,
-        currentViewKey
-      });
-      
-      if (hasNewItems) {
-        const newItems = newCount - this.state.lastSeenCount;
-        
-        // 異常に大きな差は誤検知の可能性が高い
-        if (newItems <= 10 && newItems > 0) { // 妥当な範囲の新着のみ通知
-          this.showNewContentBanner(newItems);
-          console.log('🎉 軽量新着検出・通知表示:', { 
-            newItems, 
-            newCount, 
-            lastSeenCount: this.state.lastSeenCount,
-            viewKey: currentViewKey,
-            lightweightCheck: true
-          });
-          
-          // 新着検出時の自動フルリフレッシュを実行
-          console.log('🔄 新着データ検出により自動リフレッシュを実行します...');
-          
-          // キャッシュバイパスで新しいデータを取得
-          this.loadSheetData(true, false, null)
-            .then(() => {
-              console.log('✅ 新着データの自動リフレッシュが完了しました');
-              // 新しいデータロード後に lastSeenCount を更新
-              this.state.lastSeenCount = newCount;
-            })
-            .catch(error => {
-              console.error('⚠️ 新着データの自動リフレッシュでエラー:', error);
-              // エラー時も lastSeenCount を更新して無限ループを防ぐ
-              this.state.lastSeenCount = newCount;
-            });
-        } else {
-          console.log('⚠️ 異常な新着数検出、誤検知として無視:', {
-            newItems,
-            newCount,
-            lastSeenCount: this.state.lastSeenCount
-          });
-          // 異常な値の場合も lastSeenCount を更新して無限ループを防ぐ
-          this.state.lastSeenCount = newCount;
-        }
-      }
-      
-      // 現在のビューキーを確実に設定
-      this.lastViewKey = currentViewKey;
-      
-      // ポーリング結果を記録（設定検証用）
-      this.lastPollingResult = {
-        newCount,
-        selectedClass,
-        sortOrder,
-        timestamp: Date.now(),
-        hasNewItems
-      };
     } catch (error) {
-      this.state.pollingFailureCount++;
-      console.warn('軽量新着チェックに失敗:', error, 'failureCount:', this.state.pollingFailureCount);
+      await this.handleContentCheckError(error);
+    } finally {
+      this.contentCheckInProgress = false;
+    }
+  }
+  
+  validateContentCheckPrerequisites() {
+    // 必要な要素の存在確認
+    if (!this.elements.classFilter || !this.elements.sortOrder) {
+      console.warn('Required UI elements not available for content check');
+      return false;
+    }
+    
+    // 初期化状態の確認
+    if (!this.state.userId) {
+      console.warn('User ID not available for content check');
+      return false;
+    }
+    
+    return true;
+  }
+  
+  prepareContentCheckParams() {
+    let selectedClass = this.elements.classFilter.value || 'すべて';
+    if (!selectedClass.trim()) {
+      selectedClass = 'すべて';
+    }
+    
+    const sortOrder = this.elements.sortOrder.value || 'newest';
+    
+    return { selectedClass, sortOrder };
+  }
+  
+  async clearCacheForContentCheck() {
+    try {
+      await this.gas.clearCache();
+      console.log('✅ Cache cleared for content check');
+    } catch (error) {
+      console.warn('⚠️ Failed to clear cache:', error.message);
+      // Continue without cache clearing
+    }
+  }
+  
+  async fetchContentCount(selectedClass, sortOrder) {
+    const countData = await this.gas.getDataCount(
+      selectedClass, 
+      sortOrder, 
+      this.state.showAdminFeatures
+    );
+    
+    if (!countData) {
+      throw new Error('No response from server for content count');
+    }
+    
+    return countData;
+  }
+  
+  async processContentCountResponse(countData, selectedClass, sortOrder) {
+    const newCount = countData.count || 0;
+    
+    console.log('📊 Content count check:', {
+      newCount,
+      currentCount: this.state.currentAnswers?.length || 0,
+      lastSeenCount: this.state.lastSeenCount,
+      selectedClass,
+      sortOrder
+    });
+    
+    // ポーリング成功のマーク
+    this.state.pollingFailureCount = 0;
+    
+    // 現在のビューキー
+    const currentViewKey = `${selectedClass}-${sortOrder}`;
+    
+    // 初回データロード完了の処理
+    if (!this.initialDataLoaded) {
+      await this.handleInitialContentLoad(currentViewKey, newCount);
+      return;
+    }
+    
+    // ビュー設定変更の処理
+    if (this.lastViewKey !== currentViewKey) {
+      await this.handleViewChange(currentViewKey, newCount);
+      return;
+    }
+    
+    // 新着コンテンツの検出
+    await this.checkForNewItems(newCount);
+  }
+  
+  async handleInitialContentLoad(currentViewKey, newCount) {
+    this.lastViewKey = currentViewKey;
+    this.state.lastSeenCount = newCount;
+    this.initialDataLoaded = true;
+    
+    console.log('✅ Initial content load completed:', {
+      viewKey: currentViewKey,
+      count: newCount
+    });
+  }
+  
+  async handleViewChange(currentViewKey, newCount) {
+    console.log('🔄 View settings changed:', {
+      from: this.lastViewKey,
+      to: currentViewKey,
+      newCount
+    });
+    
+    this.lastViewKey = currentViewKey;
+    this.state.lastSeenCount = newCount;
+    this.dismissNewContentBanner();
+  }
+  
+  async checkForNewItems(newCount) {
+    if (newCount > this.state.lastSeenCount) {
+      const newItems = newCount - this.state.lastSeenCount;
       
-      // 連続で失敗が続く場合はポーリング間隔を延ばす
-      if (this.state.pollingFailureCount >= 3) {
-        // Polling interval extended due to consecutive failures
-        this.stopPolling();
-        setTimeout(() => {
-          this.startPolling();
-        }, 5000); // 5秒後に再開
-        this.state.pollingFailureCount = 0;
+      console.log('📢 New content detected:', {
+        newCount,
+        lastSeen: this.state.lastSeenCount,
+        newItems
+      });
+      
+      // 自動リフレッシュの判定
+      if (this.shouldAutoRefresh(newItems)) {
+        await this.performAutoRefresh(newCount);
+      } else {
+        this.showNewContentBanner(newItems);
       }
     }
+  }
+  
+  shouldAutoRefresh(newItems) {
+    // 少数の新着（3件以下）の場合は自動リフレッシュ
+    return newItems <= 3;
+  }
+  
+  async performAutoRefresh(newCount) {
+    console.log('🔄 Performing auto-refresh for new content...');
+    
+    try {
+      await this.loadSheetData({ bypassCache: true });
+      this.state.lastSeenCount = newCount;
+      console.log('✅ Auto-refresh completed');
+    } catch (error) {
+      console.error('❌ Auto-refresh failed:', error);
+      // フォールバック: 通知バナーを表示
+      const newItems = newCount - this.state.lastSeenCount;
+      this.showNewContentBanner(newItems);
+    }
+  }
+  
+  async handleContentCheckError(error) {
+    this.state.pollingFailureCount++;
+    
+    console.warn('❌ Content check failed:', {
+      error: error.message,
+      failureCount: this.state.pollingFailureCount
+    });
+    
+    // 連続失敗時の対処
+    if (this.state.pollingFailureCount >= 3) {
+      console.log('⏳ Too many polling failures, extending interval...');
+      await this.handlePollingFailures();
+    }
+  }
+  
+  async handlePollingFailures() {
+    this.stopPolling();
+    
+    // 5秒後にポーリング再開
+    setTimeout(() => {
+      this.startPolling();
+      this.state.pollingFailureCount = 0;
+      console.log('✅ Polling restarted after failure recovery');
+    }, 5000);
   }
   
   // 新着通知バナーを表示
@@ -1045,7 +1094,7 @@ setupEventDelegation() {
       this.cache.clear();
       console.log('🔄 全体リフレッシュ開始 - キャッシュクリア完了');
       
-      await this.loadSheetData(true, false);
+      await this.loadSheetData({ bypassCache: true });
       
       // 手動リフレッシュ後は新着チェック基準を更新（初期化フラグは維持）
       this.state.lastSeenCount = this.state.currentAnswers.length;
@@ -1524,7 +1573,7 @@ setupEventDelegation() {
       // 3. Start loading immediately without waiting
       console.log('📊 StudyQuestApp: Starting sheet data loading...');
       try {
-        await this.loadSheetData(false, true);
+        await this.loadSheetData({ showLoading: false, isInitialLoad: true });
         console.log('✅ StudyQuestApp: Sheet data loaded, starting polling...');
         this.startPolling();
       } catch (error) {
@@ -1628,7 +1677,7 @@ setupEventDelegation() {
             ページを再読み込み
           </button>
           <button 
-            onclick="window.studyQuestApp && window.studyQuestApp.loadSheetData(true, true)" 
+            onclick="window.studyQuestApp && window.studyQuestApp.loadSheetData({ bypassCache: true, isInitialLoad: true })" 
             class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-300 bg-blue-700 hover:bg-blue-600"
           >
             再試行
@@ -1851,7 +1900,7 @@ setupEventDelegation() {
     }
     
     // 強制データ再読み込み
-    await this.loadSheetData(true, false, null);
+    await this.loadSheetData({ bypassCache: true });
     
     console.log('✅ 強制データリフレッシュ完了');
   }
@@ -2321,78 +2370,159 @@ setupEventDelegation() {
   }
   async switchSheet() {
     const selectedSheet = this.elements.sheetSelector.value;
+    
+    // 早期リターン: 無効な選択または同じシート
     if (!selectedSheet || selectedSheet === this.state.currentActiveSheet) {
+      console.log('Sheet switch skipped - same sheet or invalid selection');
       return;
     }
     
-    console.log('🔄 Sheet switching initiated:', {
+    // 現在切り替え中の場合は処理を拒否
+    if (this.sheetSwitchInProgress) {
+      console.log('Sheet switch already in progress - ignoring request');
+      return;
+    }
+    
+    console.log('🔄 Starting sheet switch:', {
       from: this.state.currentActiveSheet,
       to: selectedSheet,
-      userId: this.state.userId,
-      timestamp: new Date().toISOString()
+      userId: this.state.userId
     });
     
     try {
-      // パラメータ検証を強化
-      if (!this.state.userId) {
-        throw new Error('User ID is missing - cannot switch sheet');
-      }
+      this.sheetSwitchInProgress = true;
       
-      // シート切り替え前にバーチャルスクロール状態とDOMをクリア
-      this.clearVirtualScrollingState();
+      // 前処理: 状態のクリーンアップ
+      await this.prepareForSheetSwitch(selectedSheet);
       
-      // 新しいシートのデータを読み込み（リトライ機能付き）
-      let success = false;
-      let lastError = null;
-      const maxRetries = 2;
+      // メインプロセス: データ読み込み
+      await this.performSheetSwitch(selectedSheet);
       
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          console.log(`🔄 Sheet data load attempt ${attempt}/${maxRetries} for sheet: ${selectedSheet}`);
-          
-          await this.loadSheetData(true, false, selectedSheet);
-          success = true;
-          console.log('✅ Sheet switch successful on attempt', attempt);
-          break;
-        } catch (loadError) {
-          lastError = loadError;
-          console.warn(`❌ Sheet data load attempt ${attempt} failed:`, loadError);
-          
-          if (attempt < maxRetries) {
-            console.log(`⏳ Retrying sheet switch in ${attempt * 500}ms...`);
-            await new Promise(resolve => setTimeout(resolve, attempt * 500));
-          }
-        }
-      }
+      // 後処理: 状態の確定
+      await this.finalizeSheetSwitch(selectedSheet);
       
-      if (!success) {
-        throw new Error(`Failed to load sheet data after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
-      }
-      
-      this.state.currentActiveSheet = selectedSheet;
-      
-      // UIを更新
-      this.updateSheetSelectorLabels();
-      
-      console.log('✅ Sheet switch completed successfully:', {
+      console.log('✅ Sheet switch completed:', {
         newSheet: selectedSheet,
         dataCount: this.state.currentAnswers?.length || 0
       });
       
     } catch (error) {
-      console.error('❌ Failed to switch sheet:', error);
-      console.error('Error details:', {
-        selectedSheet,
-        currentSheet: this.state.currentActiveSheet,
-        userId: this.state.userId,
-        error: error.message
-      });
-      
-      // エラー時は元のシートに戻す
+      console.error('❌ Sheet switch failed:', error);
+      await this.handleSheetSwitchError(error, selectedSheet);
+    } finally {
+      this.sheetSwitchInProgress = false;
+    }
+  }
+  
+  async prepareForSheetSwitch(targetSheet) {
+    // 必要な前提条件をチェック
+    if (!this.state.userId) {
+      throw new Error('User ID is missing - cannot switch sheet');
+    }
+    
+    // UI状態をリセット
+    this.dismissNewContentBanner();
+    
+    // 仮想スクロール状態をクリア
+    this.clearVirtualScrollingState();
+    
+    // 既存のポーリングを一時停止
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+    }
+    
+    console.log('Sheet switch preparation completed');
+  }
+  
+  async performSheetSwitch(targetSheet) {
+    const maxRetries = 3;
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🔄 Loading sheet data (attempt ${attempt}/${maxRetries}):`, targetSheet);
+        
+        await this.loadSheetData({ 
+          bypassCache: true, 
+          requestedSheetName: targetSheet,
+          showLoading: true
+        });
+        
+        console.log('✅ Sheet data loaded successfully on attempt', attempt);
+        return; // 成功時は早期リターン
+        
+      } catch (error) {
+        lastError = error;
+        console.warn(`⚠️ Sheet load attempt ${attempt} failed:`, error.message);
+        
+        if (attempt < maxRetries) {
+          const delay = attempt * 1000; // 指数バックオフ
+          console.log(`⏳ Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    // すべての試行が失敗した場合
+    throw new Error(`Failed to load sheet after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
+  }
+  
+  async finalizeSheetSwitch(targetSheet) {
+    // 状態の確定
+    this.state.currentActiveSheet = targetSheet;
+    this.state.sheetName = targetSheet;
+    
+    // 新着通知の基準をリセット
+    this.state.lastSeenCount = this.state.currentAnswers?.length || 0;
+    
+    // UIの更新
+    this.updateSheetSelectorLabels();
+    this.updateSheetDisplayName(targetSheet);
+    
+    // ポーリングを再開
+    this.startPolling();
+    
+    console.log('Sheet switch finalization completed');
+  }
+  
+  async handleSheetSwitchError(error, targetSheet) {
+    console.error('Sheet switch error details:', {
+      error: error.message,
+      targetSheet,
+      currentSheet: this.state.currentActiveSheet,
+      userId: this.state.userId
+    });
+    
+    // 元のシートの選択に戻す
+    if (this.elements.sheetSelector) {
       this.elements.sheetSelector.value = this.state.currentActiveSheet || '';
-      
-      // ユーザーにエラーを通知
-      this.showErrorMessage(`シートの切り替えに失敗しました: ${error.message}`);
+    }
+    
+    // ポーリングを再開（元のシートで）
+    this.startPolling();
+    
+    // ユーザーにエラーを通知
+    if (window.messageManager) {
+      window.messageManager.show(
+        `ボードの切り替えに失敗しました: ${error.message}`,
+        'error',
+        5000
+      );
+    }
+    
+    // 現在のデータでUI更新を試行
+    try {
+      this.renderBoard(false, false);
+    } catch (renderError) {
+      console.error('Failed to render board after sheet switch error:', renderError);
+    }
+  }
+  
+  updateSheetDisplayName(sheetName) {
+    if (this.elements.sheetNameText && sheetName) {
+      const sheetIcon = this.getIcon('users', 'w-3 h-3 inline-block mr-1');
+      this.elements.sheetNameText.innerHTML = sheetIcon + this.escapeHtml(sheetName);
     }
   }
   
@@ -2431,6 +2561,7 @@ setupEventDelegation() {
     
     debugLog('clearVirtualScrollingState: Virtual scrolling state cleared for sheet switch');
   }
+  
   updateSheetSelectorLabels() {
     const selector = this.elements.sheetSelector;
     const options = Array.from(selector.options);
@@ -2447,6 +2578,7 @@ setupEventDelegation() {
       }
     });
   }
+  
   populateClassFilter(rows) {
     const classFilter = this.elements.classFilter;
     // Ensure rows is an array before mapping
@@ -2455,6 +2587,7 @@ setupEventDelegation() {
     classFilter.value = 'すべて';
     classFilter.classList.remove('hidden');
   }
+  
   applyReactionStyles(element, data) {
     if (!element || !data) return;
     
@@ -2708,7 +2841,6 @@ setupEventDelegation() {
     } catch (fallbackError) {
       console.error('フォールバック表示も失敗:', fallbackError);
     }
-  }
   }
   
   updateAnswerCard(card, newData, oldData) {
@@ -3016,6 +3148,7 @@ setupEventDelegation() {
       }
     }
   }
+  
   createSkeletonCard() {
     const card = document.createElement('div');
     card.className = 'answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 skeleton';
@@ -3023,147 +3156,151 @@ setupEventDelegation() {
     card.innerHTML = '<div class="h-20 w-full rounded bg-gray-500/30 mb-4"></div><div class="h-6 w-full rounded bg-gray-500/20"></div>';
     return card;
   }
+
   /**
- * リアクション処理（連続クリック防止機能＋安定化されたUI更新）
- */
-/**
- * リアクション処理（連続クリック防止機能＋安定化されたUI更新）
- */
-async handleReaction(rowIndex, reaction) {
+   * リアクション処理（連続クリック防止機能＋安定化されたUI更新）
+   */
+  async handleReaction(rowIndex, reaction) {
     const numericRowIndex = parseInt(rowIndex, 10);
     const reactionKey = `${numericRowIndex}-${reaction}`;
 
-    // ★連続クリック防止機能（問題版から継承）
+    // 連続クリック防止
     if (this.pendingReactions.has(reactionKey)) {
-        return; // すでに処理中なら何もしない
-    }
-    this.pendingReactions.add(reactionKey);
-
-    const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
-    
-    // ボタンを即座に無効化して視覚的フィードバックを提供
-    btns.forEach(btn => {
-        btn.disabled = true;
-        btn.classList.add('loading');
-    });
-    const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
-
-    if (!item) {
-        // エラー時はボタンを再有効化
-        btns.forEach(btn => {
-            btn.disabled = false;
-            btn.classList.remove('loading');
-        });
-        this.pendingReactions.delete(reactionKey);
+        console.log('リアクション処理中のため無視:', reactionKey);
         return;
     }
 
-    // 1人1つのリアクション制限をチェック
-    const currentReactions = item.reactions || {};
-    const hasAnyReaction = Object.keys(currentReactions).some(key => 
-      currentReactions[key] && currentReactions[key].reacted
-    );
-    
-    const isCurrentReactionActive = currentReactions[reaction] && currentReactions[reaction].reacted;
-    
-    // 既に他のリアクションをしている場合でも、別のリアクションに直接切り替えを許可
-    // （サーバー側で自動的に既存のリアクションを削除して新しいリアクションを追加）
-    if (hasAnyReaction && !isCurrentReactionActive) {
-      debugLog('既存のリアクションを切り替えます:', { 
-        existingReactions: Object.keys(currentReactions).filter(key => currentReactions[key]?.reacted),
-        newReaction: reaction
-      });
-    }
-
     try {
-        // ★修正ポイント②：先にサーバーと通信する
-        const res = await this.gas.addReaction(numericRowIndex, reaction, this.state.sheetName);
-
-        // レスポンスの安全な処理
-        debugLog('addReactionレスポンス:', { res, type: typeof res });
+        this.pendingReactions.add(reactionKey);
         
-        if (res && res.status === 'ok') {
-            // ★修正ポイント③：サーバーからの応答成功後に、UIを完全に更新する
-            if (res.reactions && typeof res.reactions === 'object') {
-                item.reactions = res.reactions;
-            } else {
-                debugLog('警告: reactionsプロパティが期待された形式ではありません');
-                // フォールバック: 既存のreactionsを保持し、カウントのみ更新
-                if (!item.reactions) {
-                    item.reactions = {};
-                }
-                if (!item.reactions[reaction]) {
-                    item.reactions[reaction] = { count: 0, reacted: false };
-                }
-                item.reactions[reaction].count = (item.reactions[reaction].count || 0) + 1;
-                item.reactions[reaction].reacted = true;
-            }
-            
-            // リアクション状態をlocalStorageに保存
-            this.saveReactionState(numericRowIndex, item.reactions);
-            
-            // UI状態を即座に更新
-            requestAnimationFrame(() => {
-                this.applyUpdates([item]); // 次の描画フレームで安全にUIを更新
-                
-                // リアクションボタンの状態を強制更新
-                const reactionBtns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
-                reactionBtns.forEach(btn => {
-                    const reactionInfo = item.reactions?.[reaction];
-                    if (reactionInfo?.reacted) {
-                        btn.classList.add('liked');
-                        btn.setAttribute('aria-pressed', 'true');
-                    } else {
-                        btn.classList.remove('liked');
-                        btn.setAttribute('aria-pressed', 'false');
-                    }
-                });
-            });
-
-            // モーダルが開いていればそちらも更新
-            if (!this.elements.answerModalContainer.classList.contains('hidden')) {
-                const modalRowIndex = this.elements.modalReactionContainer.querySelector('[data-row-index]')?.dataset.rowIndex;
-                if (modalRowIndex == rowIndex) {
-                    this.updateModalContent(item);
-                }
-            }
-        } else {
-            const errorMsg = res?.message || 'リアクションの処理に失敗しました';
-            debugLog('リアクションAPIエラー:', { 
-                res, 
-                errorMsg,
-                responseType: typeof res,
-                hasValues: res?.values !== undefined,
-                responseKeys: res ? Object.keys(res) : []
-            });
-            
-            // ユーザーフレンドリーなエラーメッセージ
-            if (errorMsg.includes('Cannot read properties of undefined')) {
-                throw new Error('データの読み込みに失敗しました。ページを更新してもう一度お試しください。');
-            } else {
-                throw new Error(errorMsg);
-            }
+        // ボタンの状態を即座に更新（視覚的フィードバック）
+        const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
+        this.setReactionButtonsLoading(btns, true);
+        
+        // データの存在確認
+        const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
+        if (!item) {
+            throw new Error(`Item not found for rowIndex: ${numericRowIndex}`);
         }
+
+        console.log('🎯 リアクション送信:', { rowIndex: numericRowIndex, reaction, sheetName: this.state.sheetName });
+        
+        // サーバーにリアクションを送信
+        const response = await this.sendReactionToServer(numericRowIndex, reaction);
+        
+        // レスポンス処理
+        await this.processReactionResponse(item, response, reaction);
+        
+        console.log('✅ リアクション処理完了:', reactionKey);
+        
     } catch (error) {
-        console.error('Failed to add reaction:', error);
-        debugLog('リアクションエラー詳細:', {
-            error: error.message,
-            stack: error.stack,
-            reaction,
-            rowIndex,
-            item: item ? { rowIndex: item.rowIndex, hasReactions: !!item.reactions } : null
-        });
-        this.showErrorFeedback(btns[0], 'リアクションに失敗しました');
-        // エラー時は何もしない（UIは元の状態のまま）
+        console.error('❌ リアクション処理エラー:', error);
+        await this.handleReactionError(error, rowIndex, reaction);
     } finally {
-        // ★修正ポイント④：最後にボタンのローディング状態を解除
-        btns.forEach(btn => {
-            btn.classList.remove('loading');
-            btn.disabled = false;
-        });
         this.pendingReactions.delete(reactionKey);
+        
+        // ボタンの状態をリセット
+        const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
+        this.setReactionButtonsLoading(btns, false);
+    }
+  }
+
+  setReactionButtonsLoading(buttons, isLoading) {
+    buttons.forEach(btn => {
+        btn.disabled = isLoading;
+        if (isLoading) {
+            btn.classList.add('loading');
+        } else {
+            btn.classList.remove('loading');
+        }
+    });
+  }
+
+  async sendReactionToServer(rowIndex, reaction) {
+    const response = await this.gas.addReaction(rowIndex, reaction, this.state.sheetName);
+    
+    if (!response) {
+        throw new Error('サーバーからの応答がありません');
+    }
+    
+    if (response.status !== 'ok') {
+        throw new Error(response.message || 'リアクション送信に失敗しました');
+    }
+    
+    return response;
+}
+
+  async processReactionResponse(item, response, reaction) {
+    // サーバーから返されたリアクション状態を適用
+    if (response.reactions && typeof response.reactions === 'object') {
+        item.reactions = response.reactions;
+        console.log('✅ リアクション状態更新:', response.reactions);
+    } else {
+        console.warn('⚠️ 期待されたリアクション形式ではありません:', response);
+        // フォールバック処理
+        this.applyFallbackReactionUpdate(item, reaction);
+    }
+    
+    // ローカルストレージに保存
+    this.saveReactionState(item.rowIndex, item.reactions);
+    
+    // UIを更新
+    await this.updateReactionUI(item);
+}
+
+  applyFallbackReactionUpdate(item, reaction) {
+    if (!item.reactions) {
+        item.reactions = {};
+    }
+    if (!item.reactions[reaction]) {
+        item.reactions[reaction] = { count: 0, reacted: false };
+    }
+    
+    // Toggle reaction state
+    if (item.reactions[reaction].reacted) {
+        item.reactions[reaction].count = Math.max(0, item.reactions[reaction].count - 1);
+        item.reactions[reaction].reacted = false;
+    } else {
+        item.reactions[reaction].count = (item.reactions[reaction].count || 0) + 1;
+        item.reactions[reaction].reacted = true;
     }
 }
+
+  async updateReactionUI(item) {
+    return new Promise(resolve => {
+        requestAnimationFrame(() => {
+            try {
+                // カードのリアクション表示を更新
+                const card = document.querySelector(`[data-row-index="${item.rowIndex}"]`);
+                if (card) {
+                    this.updateCardReactions(card, item);
+                }
+                
+                resolve();
+            } catch (error) {
+                console.error('UI更新エラー:', error);
+                resolve();
+            }
+        });
+    });
+}
+
+  async handleReactionError(error, rowIndex, reaction) {
+    console.error('リアクションエラーの詳細:', {
+        error: error.message,
+        rowIndex,
+        reaction,
+        timestamp: new Date().toISOString()
+    });
+    
+    // ユーザーにエラーを表示（オプション）
+    if (window.messageManager) {
+        window.messageManager.show(
+            'リアクションの処理に失敗しました。再度お試しください。',
+            'error',
+            3000
+        );
+    }
   
   showErrorFeedback(btn, message) {
     if (!btn) return;
@@ -3181,6 +3318,7 @@ async handleReaction(rowIndex, reaction) {
       btn.title = '';
     }, 2000);
   }
+  
   async handleHighlight(rowIndex) {
     // Highlight processing started
     
@@ -3369,7 +3507,7 @@ async handleReaction(rowIndex, reaction) {
       this.updateAdminButtonUI();
       this.updateEndPublicationButtonUI();
       // 管理モード切り替え時は設定変更のため再描画が必要
-      this.loadSheetData(true, false).then(() => {
+      this.loadSheetData({ bypassCache: true }).then(() => {
         // 管理モード切り替え後に新着チェックの基準を更新
         this.state.lastSeenCount = this.state.currentAnswers.length;
         console.log('🔄 管理モード切り替え完了、新着チェック基準更新:', {
@@ -4021,7 +4159,7 @@ async handleReaction(rowIndex, reaction) {
     // Reduce polling frequency
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
-      this.pollingInterval = setInterval(() => this.loadSheetData(false), 30000); // 30s instead of 15s
+      this.pollingInterval = setInterval(() => this.loadSheetData({ showLoading: false }), 30000); // 30s instead of 15s
     }
   }
 
