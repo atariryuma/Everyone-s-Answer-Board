@@ -140,6 +140,7 @@ function setupFormConfigModalHandlers() {
 function setupResourceHandlers() {
   var addResourceBtn = document.getElementById('add-resource-btn');
   var resourceUrlInput = document.getElementById('resource-url-input');
+  var resetConfigBtn = document.getElementById('reset-config-btn');
   
   if (addResourceBtn) {
     addResourceBtn.addEventListener('click', addResource);
@@ -152,6 +153,10 @@ function setupResourceHandlers() {
         addResource();
       }
     });
+  }
+  
+  if (resetConfigBtn) {
+    resetConfigBtn.addEventListener('click', resetConfigJson);
   }
 }
 

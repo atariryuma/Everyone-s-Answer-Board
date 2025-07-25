@@ -1246,6 +1246,68 @@ function updateCustomFormInfo(status) {
       formQuestion.textContent = status.customFormInfo.mainQuestion || '';
     }
   }
+  
+  // フォームURL表示の更新（configJsonから確実に取得）
+  updateFormUrlDisplay(status);
+}
+
+// フォームURL表示を確実に更新
+function updateFormUrlDisplay(status = null) {
+  const formUrlInput = document.getElementById('form-url-input');
+  const formUrlSection = document.getElementById('form-url-section');
+  const openFormLink = document.getElementById('open-form-url-link');
+  
+  if (!formUrlInput) return;
+  
+  // 現在のstatusがない場合はglobal currentStatusを使用
+  const currentStatusToUse = status || currentStatus;
+  let formUrl = null;
+  
+  // 1. configJsonから直接取得（最も確実）
+  if (currentStatusToUse && currentStatusToUse.userInfo && currentStatusToUse.userInfo.configJson) {
+    try {
+      const configJson = typeof currentStatusToUse.userInfo.configJson === 'string' 
+        ? JSON.parse(currentStatusToUse.userInfo.configJson) 
+        : currentStatusToUse.userInfo.configJson;
+      
+      if (configJson && configJson.formUrl) {
+        formUrl = configJson.formUrl;
+        logDebug('✅ FormURL表示: configJsonから直接取得成功');
+      }
+    } catch (error) {
+      logWarn('⚠️ configJsonの解析でエラー:', error);
+    }
+  }
+  
+  // 2. ユーザー情報のformUrlから取得（フォールバック）
+  if (!formUrl && currentStatusToUse && currentStatusToUse.userInfo && currentStatusToUse.userInfo.formUrl) {
+    formUrl = currentStatusToUse.userInfo.formUrl;
+    logDebug('📋 FormURL表示: userInfo.formUrlから取得');
+  }
+  
+  // 3. カスタムフォーム情報から取得（後方互換性）
+  if (!formUrl && currentStatusToUse && currentStatusToUse.customFormInfo && currentStatusToUse.customFormInfo.formUrl) {
+    formUrl = currentStatusToUse.customFormInfo.formUrl;
+    logDebug('📄 FormURL表示: customFormInfo.formUrlから取得');
+  }
+  
+  // UI要素の更新
+  if (formUrl) {
+    formUrlInput.value = formUrl;
+    if (formUrlSection) {
+      formUrlSection.classList.remove('hidden');
+    }
+    if (openFormLink) {
+      openFormLink.href = formUrl;
+    }
+    logDebug('🔗 FormURL UI更新完了:', formUrl);
+  } else {
+    formUrlInput.value = '';
+    if (formUrlSection) {
+      formUrlSection.classList.add('hidden');
+    }
+    logDebug('📭 FormURL未設定のためUI非表示');
+  }
 }
 
 // Check for auto-publish dialog
@@ -1429,90 +1491,113 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
     });
 }
 
-// Load data preview for selected sheet
+// Load data preview for selected sheet (Enhanced version)
 function loadDataPreview(sheetName, details) {
   const previewContent = document.getElementById('data-preview-content');
   if (!previewContent) return;
+  
+  console.log('📊 Loading data preview for sheet:', sheetName, 'with details:', details);
   
   // Show loading state (if details are not yet available)
   if (!details) {
     previewContent.innerHTML = `
       <div class="animate-pulse">
         <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-        <div class="h-4 bg-gray-700 rounded w-1/2"></div>
+        <div class="h-4 bg-gray-700 rounded w-1/2 mb-2"></div>
+        <div class="h-3 bg-gray-700 rounded w-full"></div>
       </div>
     `;
+    return;
   }
 
   // If details are provided, use them directly
-  if (details) {
-    if (details && details.headers) {
-      const headersList = details.headers.slice(0, 5); // First 5 headers
-      const moreHeaders = details.headers.length > 5 ? `...他${details.headers.length - 5}列` : '';
-      
-      previewContent.innerHTML = `
-        <div class="text-sm">
-          <div class="mb-2">
-            <span class="text-gray-400">列数:</span>
-            <span class="text-white font-medium">${details.headers.length}列</span>
-          </div>
-          <div class="mb-2">
-            <span class="text-gray-400">主要な列:</span>
-            <div class="flex flex-wrap gap-1 mt-1">
-              ${headersList.map(header => `
-                <span class="px-2 py-1 bg-blue-500/20 text-blue-200 rounded text-xs">${header}</span>
-              `).join('')}
-              ${moreHeaders ? `<span class="text-gray-400 text-xs">${moreHeaders}</span>` : ''}
-            </div>
-          </div>
-          <div class="text-xs text-gray-400 mt-2">
-            データの内容を確認して、次のステップで列設定を行ってください
+  if (details && details.headers) {
+    const headersList = details.headers.slice(0, 6); // First 6 headers for better display
+    const moreHeaders = details.headers.length > 6 ? `...他${details.headers.length - 6}列` : '';
+    
+    // Calculate data row count (excluding header)
+    const dataRowCount = (details.rowCount || 0) - 1; // Subtract 1 for header row
+    const hasData = dataRowCount > 0;
+    
+    // Show sample data if available
+    let sampleDataHtml = '';
+    if (details.sampleData && details.sampleData.length > 0) {
+      const sampleRows = details.sampleData.slice(0, 3); // Show first 3 rows
+      sampleDataHtml = `
+        <div class="mb-3">
+          <span class="text-gray-400 text-xs">サンプルデータ:</span>
+          <div class="mt-1 bg-gray-800/50 rounded p-2 text-xs">
+            ${sampleRows.map((row, index) => `
+              <div class="flex gap-2 mb-1 ${index > 0 ? 'text-gray-400' : 'text-gray-300'}">
+                <span class="text-blue-400 w-4">${index + 1}:</span>
+                <span class="truncate">${Array.isArray(row) ? row.slice(0, 3).join(' | ') : row}</span>
+                ${Array.isArray(row) && row.length > 3 ? '<span class="text-gray-500">...</span>' : ''}
+              </div>
+            `).join('')}
+            ${details.sampleData.length > 3 ? '<div class="text-gray-500 text-center">...</div>' : ''}
           </div>
         </div>
       `;
-    } else {
-      previewContent.innerHTML = '<p class="text-yellow-400">データを取得できませんでした</p>';
-    }
-  } else { // Fallback if details are not provided (should not happen after refactoring handleSheetSelectionChange)
-    if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
-      previewContent.innerHTML = '<p class="text-red-400">スプレッドシート情報が見つかりません</p>';
-      return;
     }
     
-    runGasWithUserId('getSheetDetails', 'シート詳細を読み込み中...', currentStatus.userInfo.spreadsheetId, sheetName)
-      .then(function(details) {
-        if (details && details.headers) {
-          const headersList = details.headers.slice(0, 5); // First 5 headers
-          const moreHeaders = details.headers.length > 5 ? `...他${details.headers.length - 5}列` : '';
-          
-          previewContent.innerHTML = `
-            <div class="text-sm">
-              <div class="mb-2">
-                <span class="text-gray-400">列数:</span>
-                <span class="text-white font-medium">${details.headers.length}列</span>
-              </div>
-              <div class="mb-2">
-                <span class="text-gray-400">主要な列:</span>
-                <div class="flex flex-wrap gap-1 mt-1">
-                  ${headersList.map(header => `
-                    <span class="px-2 py-1 bg-blue-500/20 text-blue-200 rounded text-xs">${header}</span>
-                  `).join('')}
-                  ${moreHeaders ? `<span class="text-gray-400 text-xs">${moreHeaders}</span>` : ''}
-                </div>
-              </div>
-              <div class="text-xs text-gray-400 mt-2">
-                データの内容を確認して、次のステップで列設定を行ってください
-              </div>
-            </div>
-          `;
-        } else {
-          previewContent.innerHTML = '<p class="text-yellow-400">データを取得できませんでした</p>';
-        }
-      })
-      .catch(function(error) {
-        console.error('Data preview error:', error);
-        previewContent.innerHTML = '<p class="text-red-400">プレビューの読み込みに失敗しました</p>';
-      });
+    previewContent.innerHTML = `
+      <div class="text-sm space-y-3">
+        <!-- Basic Info -->
+        <div class="flex justify-between items-center">
+          <div>
+            <span class="text-gray-400">列数:</span>
+            <span class="text-white font-medium">${details.headers.length}列</span>
+          </div>
+          <div>
+            <span class="text-gray-400">データ行数:</span>
+            <span class="text-${hasData ? 'green' : 'yellow'}-400 font-medium">
+              ${hasData ? `${dataRowCount}行` : '0行'}
+            </span>
+          </div>
+        </div>
+        
+        <!-- Headers -->
+        <div>
+          <span class="text-gray-400 text-xs">列一覧:</span>
+          <div class="flex flex-wrap gap-1 mt-1">
+            ${headersList.map((header, index) => `
+              <span class="px-2 py-1 bg-blue-500/20 text-blue-200 rounded text-xs flex items-center gap-1">
+                <span class="text-blue-400">${index + 1}.</span>
+                ${header || '(空白)'}
+              </span>
+            `).join('')}
+            ${moreHeaders ? `<span class="text-gray-400 text-xs px-2 py-1">${moreHeaders}</span>` : ''}
+          </div>
+        </div>
+        
+        ${sampleDataHtml}
+        
+        <!-- Status Message -->
+        <div class="text-xs ${hasData ? 'text-green-400' : 'text-yellow-400'} bg-gray-800/30 rounded p-2 border ${hasData ? 'border-green-500/20' : 'border-yellow-500/20'}">
+          ${hasData 
+            ? '✅ データが確認できました。列設定を行って公開準備を進めてください。' 
+            : '⚠️ データが入力されていません。スプレッドシートにデータを追加してから設定してください。'
+          }
+        </div>
+      </div>
+    `;
+  } else {
+    previewContent.innerHTML = `
+      <div class="text-sm">
+        <div class="text-yellow-400 bg-yellow-500/10 rounded p-3 border border-yellow-500/20">
+          <div class="flex items-center gap-2 mb-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.314 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+            <span class="font-medium">データを取得できませんでした</span>
+          </div>
+          <p class="text-xs text-yellow-300">
+            シートが存在しない、またはアクセス権限がない可能性があります。<br>
+            スプレッドシートの設定を確認してください。
+          </p>
+        </div>
+      </div>
+    `;
   }
 }
 

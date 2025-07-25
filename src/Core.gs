@@ -2251,7 +2251,7 @@ function addUnifiedQuestions(form, questionType, customConfig) {
 
       // 理由欄（常にオン）
       var reasonItem = form.addParagraphTextItem();
-      reasonItem.setTitle('そう考える根拠（こんきょ）や理由を書いてください。');
+      reasonItem.setTitle('そう考える理由や体験があれば教えてください。');
       reasonItem.setRequired(false);
     } else {
       var classItem = form.addTextItem();
@@ -2308,7 +2308,7 @@ function getQuestionConfig(questionType, customConfig) {
       type: 'paragraph'
     },
     reasonQuestion: {
-      title: 'そう考える根拠（こんきょ）や理由を書いてください。',
+      title: 'そう考える理由や体験があれば教えてください。',
       helpText: '',
       type: 'paragraph'
     }
@@ -2479,21 +2479,25 @@ function createUnifiedForm(presetType, userEmail, userId, overrides = {}) {
  * @deprecated createUnifiedForm('quickstart', ...) を使用してください
  */
 function createQuickStartForm(userEmail, userId) {
+  console.warn('createQuickStartForm() is deprecated. Use createUnifiedForm("quickstart", ...) instead.');
   return createUnifiedForm('quickstart', userEmail, userId);
 }
 
 /**
  * カスタムフォーム作成（管理パネル用）
  * @deprecated createUnifiedForm('custom', ...) を使用してください
+ * 互換性のため保持、内部でcreateUnifiedFormを使用
  */
 function createCustomForm(userEmail, userId, config) {
   try {
+    console.warn('createCustomForm() is deprecated. Use createUnifiedForm("custom", ...) instead.');
+    
     // AdminPanelのconfig構造を内部形式に変換
     const convertedConfig = {
       mainQuestion: {
         title: config.mainQuestion || '今日の学習について、あなたの考えや感想を聞かせてください',
-        type: config.questionType || 'text',
-        choices: config.choices || [],
+        type: config.responseType || config.questionType || 'text', // responseTypeを優先して使用
+        choices: config.questionChoices || config.choices || [], // questionChoicesを優先して使用
         includeOthers: config.includeOthers || false
       },
       enableClass: config.enableClass || false,
@@ -2687,6 +2691,7 @@ function shareAllSpreadsheetsWithServiceAccount() {
  */
 function createStudyQuestForm(userEmail, userId, formTitle, questionType) {
   try {
+    console.warn('createStudyQuestForm() is deprecated. Use createUnifiedForm("study", ...) instead.');
     console.log('📝 新しいStudyQuestフォームを作成開始');
     console.log('👤 ユーザー:', userEmail);
     console.log('🆔 ユーザーID:', userId);

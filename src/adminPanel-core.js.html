@@ -272,12 +272,53 @@ function initCore() {
   adjustLayout();
 }
 
+// 公開停止後の全セクション展開処理
+function checkAndExpandAllSections() {
+  try {
+    const expandAllFlag = localStorage.getItem('expandAllSections');
+    if (expandAllFlag === 'true') {
+      logInfo('📂 公開停止後のため全セクションを展開します');
+      
+      // 少し遅延してからセクションを展開（DOM要素の準備を待つ）
+      setTimeout(() => {
+        const sectionIds = ['step1-content', 'step2-content', 'step3-content'];
+        let expandedCount = 0;
+        
+        sectionIds.forEach(sectionId => {
+          const section = document.getElementById(sectionId);
+          if (section) {
+            // セクションが折りたたまれている場合のみ展開
+            if (section.classList.contains('hidden')) {
+              toggleSection(sectionId);
+              expandedCount++;
+              logDebug(`✅ セクション展開: ${sectionId}`);
+            }
+          }
+        });
+        
+        if (expandedCount > 0) {
+          logInfo(`📂 ${expandedCount}個のセクションを展開しました`);
+        }
+        
+        // フラグをクリア（一度だけ実行）
+        localStorage.removeItem('expandAllSections');
+        logDebug('🧹 全セクション展開フラグをクリアしました');
+      }, 500);
+    }
+  } catch (error) {
+    logWarn('⚠️ 全セクション展開処理でエラー:', error);
+  }
+}
+
 // 統合初期化システム - 単一エントリーポイント
 function initializeAdminPanelMaster() {
   logInfo('🚀 AdminPanel Master Initialization Started');
   
   // Phase 1: Core初期化
   initCore();
+  
+  // 公開停止後の全セクション展開処理
+  checkAndExpandAllSections();
   
   // Phase 2: 各モジュールを順次初期化 (race conditionを防ぐ)
   // 遅延を最小限に抑制して即座に初期化

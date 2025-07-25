@@ -20,11 +20,27 @@ function computeWebAppUrl() {
 
     url = url.replace(/\/$/, '');
 
-    // 開発モードやテスト用の一時URLを検出して除外
+    // googleusercontent.comドメインの適切な処理
+    if (url.includes('googleusercontent.com')) {
+      console.log('🔍 googleusercontent.comドメインURL検出:', url);
+      
+      // デプロイされたWeb Appとして有効かチェック
+      var isValidDeployedApp = /^https:\/\/[a-z0-9-]+\.googleusercontent\.com\//.test(url) && 
+                               !url.includes('userCodeAppPanel'); // 開発パネルでない
+      
+      if (isValidDeployedApp) {
+        console.log('✅ 有効なデプロイURLとして認識:', url);
+        return url; // そのまま使用
+      } else {
+        console.warn('⚠️ 無効なgoogleusercontent.comURL、フォールバックを使用:', url);
+        return getFallbackUrl();
+      }
+    }
+    
+    // 明確な開発モードやテスト用URLを検出して除外
     var devPatterns = [
-      /^https:\/\/[a-z0-9-]+\.googleusercontent\.com\//, // 開発モード
       /\/userCodeAppPanel/, // テスト用パネル
-      /\/dev$/, // 開発エンドポイント
+      /\/dev$/, // 開発エンドポイント  
       /\/test$/ // テストエンドポイント
     ];
     
@@ -45,9 +61,17 @@ function computeWebAppUrl() {
       url = url.replace(wrongPattern, 'https://script.google.com/a/macros/' + match[1] + '/');
     }
 
-    // 有効なURLパターンかチェック
-    var validPattern = /^https:\/\/script\.google\.com\/(a\/macros\/[^\/]+\/)?s\/[A-Za-z0-9_-]+\/(exec|dev)$/;
-    if (!validPattern.test(url)) {
+    // 有効なURLパターンかチェック（googleusercontent.comも含む）
+    var validPatterns = [
+      /^https:\/\/script\.google\.com\/(a\/macros\/[^\/]+\/)?s\/[A-Za-z0-9_-]+\/(exec|dev)$/, // 従来のscript.google.com
+      /^https:\/\/[a-z0-9-]+\.googleusercontent\.com\/$/ // googleusercontent.com (デプロイ形式)
+    ];
+    
+    var isValidUrl = validPatterns.some(function(pattern) {
+      return pattern.test(url);
+    });
+    
+    if (!isValidUrl) {
       console.warn('無効なURLパターンを検出しました: ' + url + ' フォールバックURLを使用します');
       return getFallbackUrl();
     }
@@ -68,10 +92,10 @@ function getWebAppUrlCached() {
       // 新しいURLを生成
       var freshUrl = ScriptApp.getService().getUrl();
       
-      // 開発URLの検証
-      if (freshUrl.includes('googleusercontent.com') ||
-          freshUrl.includes('userCodeAppPanel') ||
-          freshUrl.endsWith('/dev')) {
+      // 開発URLの検証（googleusercontent.comは除く）
+      if (freshUrl.includes('userCodeAppPanel') ||
+          freshUrl.endsWith('/dev') ||
+          (freshUrl.includes('googleusercontent.com') && freshUrl.includes('userCodeAppPanel'))) {
         console.warn('⚠️ 開発URLが検出されました、キャッシュしません:', freshUrl);
         return null; // 開発URLはキャッシュしない
       }

@@ -1118,14 +1118,18 @@ function sanitizeRedirectUrl(url) {
       return getWebAppUrlCached();
     }
     
-    // 開発モードURLのチェック
-    if (cleanUrl.includes('googleusercontent.com') || cleanUrl.includes('userCodeAppPanel')) {
+    // 開発モードURLのチェック（googleusercontent.comは有効なデプロイURLも含むため調整）
+    if (cleanUrl.includes('userCodeAppPanel')) {
       console.warn('Development URL detected in redirect, using fallback:', cleanUrl);
       return getWebAppUrlCached();
     }
     
-    // 最終的な URL 妥当性チェック
-    if (!cleanUrl.includes('script.google.com') && !cleanUrl.includes('localhost')) {
+    // 最終的な URL 妥当性チェック（googleusercontent.comも有効URLとして認識）
+    var isValidUrl = cleanUrl.includes('script.google.com') || 
+                     cleanUrl.includes('googleusercontent.com') || 
+                     cleanUrl.includes('localhost');
+    
+    if (!isValidUrl) {
       console.warn('Suspicious URL detected:', cleanUrl);
       return getWebAppUrlCached();
     }

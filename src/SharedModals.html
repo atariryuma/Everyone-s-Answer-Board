@@ -23,10 +23,28 @@
         </svg>
         公開準備完了
       </h3>
-      <p class="text-gray-300 mb-6">
+      <p class="text-gray-300 mb-4">
         シートの設定が完了しました。<br>
         学習者がアクセスできるよう公開しますか？
       </p>
+      
+      <!-- 自動停止機能の説明 -->
+      <div class="bg-blue-500/10 border border-blue-400/30 rounded-lg p-3 mb-4">
+        <h4 class="text-sm font-semibold text-blue-400 mb-2 flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          🔄 自動停止機能について
+        </h4>
+        <p class="text-xs text-blue-200 leading-relaxed">
+          公開後、設定した時間が経過すると自動的に公開が停止されます。<br>
+          学習者の回答期間を適切に管理し、授業時間に合わせた運用が可能です。
+        </p>
+        <div class="mt-2 text-xs text-blue-300">
+          <span class="font-medium">現在の設定:</span>
+          <span id="auto-stop-time-display" class="text-blue-100">確認中...</span>
+        </div>
+      </div>
       <div class="flex justify-end gap-3">
         <button type="button" id="publish-modal-private-btn" class="btn btn-secondary">非公開のまま</button>
         <button type="button" id="publish-modal-publish-btn" class="btn btn-primary">
@@ -935,6 +953,47 @@ class SharedModals {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
   }
+
+  // 公開モーダルの表示（自動停止時間表示付き）
+  showPublish(onPublish, onCancel, autoStopSettings = null) {
+    const modal = document.getElementById('publish-modal');
+    if (!modal) {
+      console.error('公開モーダルが見つかりません');
+      return;
+    }
+    
+    // 自動停止時間の表示を更新
+    const autoStopDisplay = document.getElementById('auto-stop-time-display');
+    if (autoStopDisplay) {
+      if (autoStopSettings && autoStopSettings.enabled) {
+        const minutes = autoStopSettings.minutes || 30;
+        autoStopDisplay.textContent = `${minutes}分後に自動停止`;
+        autoStopDisplay.className = 'text-blue-100';
+      } else {
+        autoStopDisplay.textContent = '自動停止は無効';
+        autoStopDisplay.className = 'text-gray-400';
+      }
+    }
+    
+    modal.classList.remove('hidden');
+    
+    const publishBtn = document.getElementById('publish-modal-publish-btn');
+    const privateBtn = document.getElementById('publish-modal-private-btn');
+    
+    if (publishBtn) {
+      publishBtn.onclick = () => {
+        this.hideModal('publish-modal');
+        if (onPublish) onPublish();
+      };
+    }
+    
+    if (privateBtn) {
+      privateBtn.onclick = () => {
+        this.hideModal('publish-modal');
+        if (onCancel) onCancel();
+      };
+    }
+  }
 }
 
 // グローバルインスタンスの作成
@@ -947,6 +1006,10 @@ window.showPrivacyModal = function(onContinue) {
 
 window.showDigitalCitizenshipModal = function() {
   window.sharedModals.showDigitalCitizenship();
+};
+
+window.showPublishModal = function(onPublish, onCancel, autoStopSettings) {
+  window.sharedModals.showPublish(onPublish, onCancel, autoStopSettings);
 };
 
 // 管理者専用モーダル用グローバル関数（後方互換性のため）

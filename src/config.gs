@@ -2893,6 +2893,66 @@ function saveAndPublish(requestUserId, sheetName, config) {
   }
 }
 
+/**
+ * configJsonを初期値にリセット
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ * @returns {object} リセット結果
+ */
+function resetConfigJson(requestUserId) {
+  verifyUserAccess(requestUserId);
+  
+  console.log('🔄 ConfigJsonリセット開始 for user:', requestUserId);
+  
+  try {
+    // 初期configJsonを定義
+    const initialConfigJson = {
+      // フォーム設定
+      title: '',
+      questionText: '',
+      responseType: 'text',
+      options: [],
+      
+      // 表示設定  
+      displayMode: 'anonymous',
+      showCounts: false,
+      sortOrder: 'newest',
+      
+      // システム設定
+      formCreated: false,
+      formUrl: '',
+      editFormUrl: '',
+      spreadsheetId: '',
+      targetSheetName: '',
+      
+      // メタデータ
+      version: '1.0.0',
+      lastModified: new Date().toISOString(),
+      resetAt: new Date().toISOString()
+    };
+    
+    // データベースでconfigJsonを更新
+    const updateResult = updateUserInfo(requestUserId, {
+      configJson: JSON.stringify(initialConfigJson)
+    });
+    
+    if (updateResult.success) {
+      console.log('✅ ConfigJsonリセット完了');
+      return {
+        success: true,
+        message: '設定を初期値にリセットしました',
+        resetAt: initialConfigJson.resetAt,
+        configJson: initialConfigJson
+      };
+    } else {
+      throw new Error('データベース更新に失敗しました: ' + updateResult.message);
+    }
+    
+  } catch (error) {
+    console.error('❌ ConfigJsonリセットエラー:', error.message);
+    throw new Error('設定リセットに失敗しました: ' + error.message);
+  }
+}
+
 
 
 

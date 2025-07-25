@@ -200,7 +200,8 @@ class StudyQuestApp {
       hasNewContent: false,
       newContentCount: 0,
       lastSeenCount: 0,
-      pollingFailureCount: 0
+      pollingFailureCount: 0,
+      startTime: Date.now() // パフォーマンス監視用
     };
     
     // 新着チェック用の初期化
@@ -1209,9 +1210,15 @@ setupEventDelegation() {
     this.pollingTimeout = setTimeout(adaptivePoll, this.currentPollInterval);
     
     // Start automatic cleanup for memory management
+    // 定期的なクリーンアップとメモリ管理
     this.cleanupInterval = setInterval(() => {
-      this.cache.cleanup();
+      this.performMemoryCleanup();
     }, 5 * 60 * 1000); // Cleanup every 5 minutes
+    
+    // 長時間実行監視（1時間ごと）
+    this.longRunningCheckInterval = setInterval(() => {
+      this.checkLongRunningPerformance();
+    }, 60 * 60 * 1000); // Check every hour
   }
   stopPolling() {
     if (this.pollingInterval) {
@@ -1228,7 +1235,142 @@ setupEventDelegation() {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
     }
+    
+    if (this.longRunningCheckInterval) {
+      clearInterval(this.longRunningCheckInterval);
+      this.longRunningCheckInterval = null;
+    }
   }
+  
+  // メモリ管理とクリーンアップ
+  performMemoryCleanup() {
+    try {
+      console.log('🧹 Performing memory cleanup...');
+      
+      // キャッシュクリーンアップ
+      if (this.cache) {
+        const cacheSize = this.cache.size();
+        this.cache.cleanup();
+        console.log('🗑️ Cache cleanup completed', {cacheSize});
+      }
+      
+      // 古いDOM要素の参照をクリア
+      this.cleanupDOMReferences();
+      
+      // イベントリスナーの整理
+      this.cleanupEventListeners();
+      
+      // 仮想スクロール状態の最適化
+      this.optimizeVirtualScrollState();
+      
+      console.log('✅ Memory cleanup completed');
+    } catch (error) {
+      console.warn('⚠️ Memory cleanup failed:', error);
+    }
+  }
+  
+  cleanupDOMReferences() {
+    // 削除されたDOM要素への参照をクリア
+    const elementsToCheck = ['answersContainer', 'loadingOverlay', 'newContentBanner'];
+    elementsToCheck.forEach(key => {
+      const element = this.elements[key];
+      if (element && !document.contains(element)) {
+        console.log(`🧹 Removing stale DOM reference: ${key}`);
+        delete this.elements[key];
+      }
+    });
+  }
+  
+  cleanupEventListeners() {
+    // 重複したイベントリスナーの確認とクリーンアップ
+    if (this.handlers) {
+      Object.keys(this.handlers).forEach(key => {
+        if (typeof this.handlers[key] !== 'function') {
+          console.log(`🧹 Removing invalid handler: ${key}`);
+          delete this.handlers[key];
+        }
+      });
+    }
+  }
+  
+  optimizeVirtualScrollState() {
+    // 仮想スクロール状態の最適化
+    if (this.virtualScrollState && this.virtualScrollState.renderedRowIndexes) {
+      const size = this.virtualScrollState.renderedRowIndexes.size;
+      if (size > 1000) { // 大量のインデックスが蓄積されている場合
+        console.log(`🧹 Optimizing virtual scroll state (${size} items)`);
+        this.virtualScrollState.renderedRowIndexes.clear();
+        this.virtualScrollState.renderedItems = 0;
+      }
+    }
+  }
+  
+  checkLongRunningPerformance() {
+    try {
+      const uptime = Date.now() - this.state.startTime;
+      const uptimeHours = Math.floor(uptime / (1000 * 60 * 60));
+      
+      console.log(`⏰ Long-running check: ${uptimeHours}h uptime`);
+      
+      // 2時間以上実行されている場合のパフォーマンス対策
+      if (uptimeHours >= 2) {
+        console.log('🔧 Applying long-running optimizations...');
+        
+        // ポーリング間隔を延長（負荷軽減）
+        if (this.currentPollInterval < 60000) { // 1分未満の場合
+          this.currentPollInterval = Math.min(60000, this.currentPollInterval * 1.5);
+          console.log(`📉 Polling interval extended to ${this.currentPollInterval}ms`);
+        }
+        
+        // 強制的なメモリクリーンアップ
+        this.performMemoryCleanup();
+        
+        // 可能であればガベージコレクションを促す
+        if (window.gc && typeof window.gc === 'function') {
+          window.gc();
+          console.log('🗑️ Manual garbage collection triggered');
+        }
+      }
+      
+      // 6時間以上の場合は警告
+      if (uptimeHours >= 6) {
+        console.warn('⚠️ Application has been running for over 6 hours. Consider refreshing the page.');
+        this.showWarningMessage('長時間の実行が検出されました。パフォーマンス向上のため、ページの再読み込みを推奨します。');
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ Long-running performance check failed:', error);
+    }
+  }
+  
+  showWarningMessage(message) {
+    // 警告メッセージを表示（既存のshowErrorMessageを参考に）
+    const warningDiv = document.createElement('div');
+    warningDiv.className = 'fixed top-4 right-4 z-50 bg-yellow-600 text-white px-6 py-3 rounded-lg shadow-lg max-w-md border-l-4 border-yellow-400';
+    warningDiv.innerHTML = `
+      <div class="flex items-center">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13 4c-.77-.833-1.964-.833-2.732 0L3 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+        </svg>
+        <span class="text-sm">${this.escapeHtml(message)}</span>
+        <button onclick="this.parentElement.parentElement.remove()" class="ml-4 hover:bg-yellow-700 rounded p-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+    `;
+    
+    document.body.appendChild(warningDiv);
+    
+    // 10秒後に自動削除
+    setTimeout(() => {
+      if (warningDiv.parentNode) {
+        warningDiv.parentNode.removeChild(warningDiv);
+      }
+    }, 10000);
+  }
+
   destroy() {
     this.stopPolling();
     this.cleanup();
@@ -3248,6 +3390,14 @@ async handleReaction(rowIndex, reaction) {
     }
   }
   redirectToUnpublishedPage() {
+    // 公開停止時は次回管理パネルを開いたときに全セクションをオープンにする
+    try {
+      localStorage.setItem('expandAllSections', 'true');
+      console.log('✅ アコーディオン全展開フラグを設定しました');
+    } catch (error) {
+      console.warn('⚠️ localStorage設定に失敗:', error);
+    }
+    
     // Force redirect to Unpublished.html for both admin and viewers
     google.script.run
       .withSuccessHandler(function(webAppUrl) {
