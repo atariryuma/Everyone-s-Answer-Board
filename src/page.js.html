@@ -1442,6 +1442,33 @@ setupEventDelegation() {
     `;
   }
   
+  showErrorMessage(message, isTemporary = true) {
+    // 一時的なエラーメッセージを表示（トースト風）
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'fixed top-4 right-4 z-50 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg max-w-md';
+    errorDiv.innerHTML = `
+      <div class="flex items-center">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <span class="text-sm">${this.escapeHtml(message)}</span>
+      </div>
+    `;
+    
+    document.body.appendChild(errorDiv);
+    
+    if (isTemporary) {
+      // 5秒後に自動削除
+      setTimeout(() => {
+        if (errorDiv.parentNode) {
+          errorDiv.parentNode.removeChild(errorDiv);
+        }
+      }, 5000);
+    }
+    
+    return errorDiv;
+  }
+  
   showMinimalSkeleton() {
     // Show only 3 skeletons for immediate visual feedback
     const count = 3;
@@ -1731,6 +1758,22 @@ setupEventDelegation() {
     this.showLoadingOverlay(); // Transparent overlay for interaction blocking only
 
     const selectedClass = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
+    
+    // 詳細デバッグ情報をログ出力
+    const debugInfo = {
+      timestamp: new Date().toISOString(),
+      showLoading,
+      isInitialLoad,
+      requestedSheetName,
+      currentActiveSheet: this.state.currentActiveSheet,
+      userId: this.state.userId,
+      selectedClass,
+      sortOrder: this.elements.sortOrder ? this.elements.sortOrder.value : 'newest',
+      showAdminFeatures: this.state.showAdminFeatures,
+      currentAnswersCount: this.state.currentAnswers?.length || 0
+    };
+    
+    console.log('🔍 loadSheetData started with parameters:', debugInfo);
     const oldAnswers = [...this.state.currentAnswers];
     
     // シート切り替え時または強制リフレッシュ時はキャッシュをクリア
@@ -1779,6 +1822,16 @@ setupEventDelegation() {
       const sortOrder = this.elements.sortOrder.value;
       const classFilter = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
       
+      // データ取得パラメータの詳細ログ
+      const fetchParams = {
+        userId: this.state.userId,
+        classFilter,
+        sortOrder,
+        showAdminFeatures: this.state.showAdminFeatures,
+        requestedSheetName
+      };
+      console.log('📡 Starting data fetch with parameters:', fetchParams);
+      
       google.script.run
         .withSuccessHandler(result => {
           try {
@@ -1812,19 +1865,65 @@ setupEventDelegation() {
                   return;
                 }
               } else {
+                // データ不整合チェック: 軽量チェックでデータが存在するかを確認
                 console.warn('⚠️ StudyQuestApp: Received empty or invalid data:', result);
-                console.log('DEBUG: Calling displayEmptyState. currentAnswers.length:', this.state.currentAnswers.length, 'result.data.length:', result.data ? result.data.length : 'undefined');
+                console.log('DEBUG: Calling data consistency check. currentAnswers.length:', this.state.currentAnswers.length, 'result.data.length:', result.data ? result.data.length : 'undefined');
+                
+                try {
+                  // フォールバック: 軽量チェックでデータの存在を確認
+                  const countData = await this.gas.getDataCount(classFilter, 'newest', this.state.showAdminFeatures);
+                  console.log('🔍 Data consistency check:', {
+                    fullDataEmpty: !result?.data || result.data.length === 0,
+                    lightCheckCount: countData?.count || 0,
+                    requestedSheet: requestedSheetName,
+                    currentSheet: this.state.currentActiveSheet
+                  });
+                  
+                  if (countData && countData.count > 0) {
+                    console.warn('⚠️ Data inconsistency detected! Light check shows', countData.count, 'items but full fetch returned empty');
+                    console.log('🔄 Attempting fallback data fetch with retry...');
+                    
+                    // フォールバック: 少し待ってから再試行
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    // 再試行でデータ取得を試行
+                    const retryResult = await new Promise((resolve, reject) => {
+                      google.script.run
+                        .withSuccessHandler(resolve)
+                        .withFailureHandler(reject)
+                        .getStudentData(
+                          this.state.userId, 
+                          classFilter, 
+                          this.elements.sortOrder ? this.elements.sortOrder.value : 'newest',
+                          this.state.showAdminFeatures,
+                          requestedSheetName
+                        );
+                    });
+                    
+                    if (retryResult && retryResult.data && retryResult.data.length > 0) {
+                      console.log('✅ Fallback retry successful! Got', retryResult.data.length, 'items');
+                      result = retryResult; // 成功した結果を使用
+                    } else {
+                      console.warn('❌ Fallback retry also returned empty data');
+                    }
+                  }
+                } catch (fallbackError) {
+                  console.warn('⚠️ Fallback data consistency check failed:', fallbackError);
+                }
               }
               
-              // 空データ受信時は古いカードを強制的にクリア
-              this.clearAllCardsForEmptyData();
-              
-              // 空状態を表示
-              this.displayEmptyState();
-              if (isInitialLoad) {
-                this.state.lastSeenCount = 0;
+              // 再チェック後もデータが空の場合のみ空状態を表示
+              if (!result || !result.data || result.data.length === 0) {
+                // 空データ受信時は古いカードを強制的にクリア
+                this.clearAllCardsForEmptyData();
+                
+                // 空状態を表示
+                this.displayEmptyState();
+                if (isInitialLoad) {
+                  this.state.lastSeenCount = 0;
+                }
+                return;
               }
-              return;
             }
 
             console.log('Received data:', result.data);
@@ -2013,20 +2112,74 @@ setupEventDelegation() {
       return;
     }
     
+    console.log('🔄 Sheet switching initiated:', {
+      from: this.state.currentActiveSheet,
+      to: selectedSheet,
+      userId: this.state.userId,
+      timestamp: new Date().toISOString()
+    });
+    
     try {
+      // パラメータ検証を強化
+      if (!this.state.userId) {
+        throw new Error('User ID is missing - cannot switch sheet');
+      }
+      
       // シート切り替え前にバーチャルスクロール状態とDOMをクリア
       this.clearVirtualScrollingState();
       
-      // 新しいシートのデータを読み込み
-      await this.loadSheetData(true, false, selectedSheet);
+      // 新しいシートのデータを読み込み（リトライ機能付き）
+      let success = false;
+      let lastError = null;
+      const maxRetries = 2;
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`🔄 Sheet data load attempt ${attempt}/${maxRetries} for sheet: ${selectedSheet}`);
+          
+          await this.loadSheetData(true, false, selectedSheet);
+          success = true;
+          console.log('✅ Sheet switch successful on attempt', attempt);
+          break;
+        } catch (loadError) {
+          lastError = loadError;
+          console.warn(`❌ Sheet data load attempt ${attempt} failed:`, loadError);
+          
+          if (attempt < maxRetries) {
+            console.log(`⏳ Retrying sheet switch in ${attempt * 500}ms...`);
+            await new Promise(resolve => setTimeout(resolve, attempt * 500));
+          }
+        }
+      }
+      
+      if (!success) {
+        throw new Error(`Failed to load sheet data after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
+      }
+      
       this.state.currentActiveSheet = selectedSheet;
       
       // UIを更新
       this.updateSheetSelectorLabels();
+      
+      console.log('✅ Sheet switch completed successfully:', {
+        newSheet: selectedSheet,
+        dataCount: this.state.currentAnswers?.length || 0
+      });
+      
     } catch (error) {
-      console.error('Failed to switch sheet:', error);
+      console.error('❌ Failed to switch sheet:', error);
+      console.error('Error details:', {
+        selectedSheet,
+        currentSheet: this.state.currentActiveSheet,
+        userId: this.state.userId,
+        error: error.message
+      });
+      
       // エラー時は元のシートに戻す
       this.elements.sheetSelector.value = this.state.currentActiveSheet || '';
+      
+      // ユーザーにエラーを通知
+      this.showErrorMessage(`シートの切り替えに失敗しました: ${error.message}`);
     }
   }
   
