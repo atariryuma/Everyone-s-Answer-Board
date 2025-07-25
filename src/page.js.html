@@ -307,8 +307,36 @@ class StudyQuestApp {
         if (event.data && event.data.type === 'REFRESH_BOARD_DATA') {
           // Refresh board data message received
           this.loadSheetData(true);
+        } else if (event.data && event.data.type === 'BOARD_PUBLISHED') {
+          // 新しいボードが公開された時の即座更新
+          console.log('新しいボードが公開されました:', event.data.sheetName);
+          // キャッシュバイパスで新しいデータをチェック
+          this.checkForNewContentLight(true).then(() => {
+            // 必要に応じてフルリフレッシュ
+            this.loadSheetData(true);
+          }).catch(error => {
+            console.warn('新しいボードの即座更新でエラー:', error);
+            // エラー時もフルリフレッシュを実行
+            this.loadSheetData(true);
+          });
         }
       });
+      
+      // BroadcastChannelで他のタブからの更新通知も受信
+      if (typeof BroadcastChannel !== 'undefined') {
+        const channel = new BroadcastChannel('board-updates');
+        channel.addEventListener('message', (event) => {
+          if (event.data && event.data.type === 'BOARD_PUBLISHED') {
+            console.log('BroadcastChannelから新しいボード公開を受信:', event.data.sheetName);
+            this.checkForNewContentLight(true).then(() => {
+              this.loadSheetData(true);
+            }).catch(error => {
+              console.warn('BroadcastChannel経由の更新でエラー:', error);
+              this.loadSheetData(true);
+            });
+          }
+        });
+      }
     }
   setupCriticalElements() {
     if (this.elements.headingLabel) {
@@ -655,10 +683,25 @@ setupEventDelegation() {
   }
   
   // 軽量な新着コンテンツチェック
-  async checkForNewContentLight() {
+  async checkForNewContentLight(bypassCache = false) {
     try {
       const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
       const sortOrder = this.elements.sortOrder.value;
+      
+      // キャッシュバイパス時はサーバーキャッシュをクリア
+      if (bypassCache) {
+        try {
+          await new Promise((resolve, reject) => {
+            google.script.run
+              .withSuccessHandler(resolve)
+              .withFailureHandler(reject)
+              .clearCache();
+          });
+          debugLog('checkForNewContentLight: Server cache cleared for fresh count');
+        } catch (error) {
+          console.warn('checkForNewContentLight: Failed to clear cache, proceeding:', error);
+        }
+      }
       
       // 軽量な件数チェックのみ実行（フルデータ取得なし）
       const countData = await this.gas.getDataCount(selectedClass, sortOrder, this.state.showAdminFeatures);
@@ -1374,6 +1417,33 @@ setupEventDelegation() {
       </div>
     `;
   }
+  
+  safeDisplayEmptyState() {
+    const container = this.elements.answersContainer;
+    if (!container) return;
+    
+    // 既存のカードがあるかチェック
+    const existingCards = container.querySelectorAll('.answer-card');
+    if (existingCards.length > 0) {
+      console.log('safeDisplayEmptyState: 既存カードが', existingCards.length, '個あるため空状態を表示しません');
+      return; // カードがある場合は空状態を表示しない
+    }
+    
+    // currentAnswersもチェック
+    if (this.state.currentAnswers && this.state.currentAnswers.length > 0) {
+      console.log('safeDisplayEmptyState: currentAnswersに', this.state.currentAnswers.length, '個のアイテムがあるため空状態を表示しません');
+      return; // データがある場合も空状態を表示しない
+    }
+    
+    // ローディング中は表示しない
+    if (this.state.isLoading) {
+      console.log('safeDisplayEmptyState: ローディング中のため空状態を表示しません');
+      return;
+    }
+    
+    console.log('safeDisplayEmptyState: 条件を満たしたため空状態を表示します');
+    this.displayEmptyState();
+  }
 
   /**
    * ユーザー情報が見つからない場合のエラー画面を表示
@@ -1475,9 +1545,20 @@ setupEventDelegation() {
     const selectedClass = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
     const oldAnswers = [...this.state.currentAnswers];
     
-    // シート切り替え時はサーバーキャッシュをクリア
-    if (requestedSheetName && requestedSheetName !== this.state.currentActiveSheet) {
-      debugLog('loadSheetData: Switching to new sheet', requestedSheetName, 'clearing server cache');
+    // シート切り替え時または強制リフレッシュ時はキャッシュをクリア
+    const shouldClearCache = (requestedSheetName && requestedSheetName !== this.state.currentActiveSheet) || 
+                            (showLoading && !isInitialLoad); // 明示的なリフレッシュ時
+    
+    if (shouldClearCache) {
+      debugLog('loadSheetData: Clearing caches for fresh data load');
+      
+      // フロントエンドキャッシュをクリア
+      if (this.cache) {
+        this.cache.clear();
+        debugLog('loadSheetData: Frontend cache cleared');
+      }
+      
+      // サーバーキャッシュをクリア
       try {
         await new Promise((resolve, reject) => {
           google.script.run
@@ -1544,10 +1625,11 @@ setupEventDelegation() {
                 }
               } else {
                 console.warn('⚠️ StudyQuestApp: Received empty or invalid data:', result);
-                console.log('DEBUG: Calling displayEmptyState. currentAnswers.length:', this.state.currentAnswers.length, 'result.data.length:', result.data.length);
+                console.log('DEBUG: Calling displayEmptyState. currentAnswers.length:', this.state.currentAnswers.length, 'result.data.length:', result.data ? result.data.length : 'undefined');
               }
               
-              this.displayEmptyState();
+              // 空状態表示の厳格な条件チェック
+              this.safeDisplayEmptyState();
               if (isInitialLoad) {
                 this.state.lastSeenCount = 0;
               }
@@ -1613,7 +1695,7 @@ setupEventDelegation() {
               return;
             }
             
-            this.displayEmptyState();
+            this.safeDisplayEmptyState();
           } finally {
             // エラー時にもローディング状態を解除
             this.state.isLoading = false;

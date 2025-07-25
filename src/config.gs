@@ -2813,19 +2813,37 @@ function saveAndPublish(requestUserId, sheetName, config) {
     
     console.log('✅ Phase 2完了: 全設定をコンテキストに蓄積');
 
+    // Phase 2.5: キャッシュクリア（DB書き込み前に実行）
+    console.log('🗑️ DB書き込み前にキャッシュをクリア（古いデータ配信防止）');
+    try {
+      // フロントエンドが古いキャッシュを参照しないよう事前にクリア
+      synchronizeCacheAfterCriticalUpdate(
+        context.requestUserId, 
+        context.userInfo.adminEmail,
+        context.userInfo.spreadsheetId, 
+        context.userInfo.spreadsheetId
+      );
+      console.log('✅ 事前キャッシュクリア完了');
+    } catch (cacheError) {
+      console.warn('⚠️ 事前キャッシュクリアでエラー（処理は続行）:', cacheError.message);
+    }
+    
     // Phase 3: 一括DB書き込み（1回のみ）
     console.log('💽 Phase 3: 一括DB書き込み開始');
     commitAllChanges(context);
     console.log('✅ Phase 3完了: DB書き込み完了');
 
-    // DB書き込み後に包括的キャッシュ同期を実行
-    console.log('🗑️ saveAndPublish完了後の包括的キャッシュ同期中...');
-    synchronizeCacheAfterCriticalUpdate(
-      context.requestUserId, 
-      context.userInfo.adminEmail,
-      context.userInfo.spreadsheetId, 
-      context.userInfo.spreadsheetId  // 同じスプレッドシートIDだが設定更新のため同期が必要
-    );
+    // Phase 3.5: DB書き込み後の追加キャッシュウォーミング
+    console.log('🔥 新しいデータでキャッシュウォーミング中...');
+    try {
+      // 新しいデータを事前にキャッシュに読み込み
+      const freshUserInfo = findUserByIdFresh(context.requestUserId);
+      if (freshUserInfo) {
+        console.log('✅ 新しいデータでキャッシュをウォーミング完了');
+      }
+    } catch (warmingError) {
+      console.warn('⚠️ キャッシュウォーミングでエラー（処理は続行）:', warmingError.message);
+    }
     
     // 最新ユーザー情報を再取得してコンテキストを更新
     const updatedUserInfo = findUserByIdFresh(context.requestUserId);
