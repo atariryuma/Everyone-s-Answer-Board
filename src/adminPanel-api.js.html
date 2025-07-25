@@ -240,11 +240,14 @@ function runHeaderGuessing() {
       reguessBtn.innerHTML = originalContent;
     };
     
+    // Show start notification
+    showMessage('🤖 高精度AI判定システムが起動しました。データを分析中...', 'info');
+    
     runGasWithUserId('getSheetDetails', 'AI搭載高精度列判定システムが分析中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
       .then(function(details) {
         if (!details || !details.guessedConfig) {
           restoreButton();
-          showMessage('AI列判定の結果が取得できませんでした。手動で列を設定してください。', 'warning');
+          showMessage('❌ AI列判定が失敗しました。手動で列を設定してください。', 'warning');
           return;
         }
         
@@ -257,15 +260,16 @@ function runHeaderGuessing() {
           populateConfig(configToUse);
           restoreButton();
           
-          // Enhanced success message with specifics
+          // Enhanced completion notification with analysis details
           const detectedColumns = [];
-          if (configToUse.opinionColumn) detectedColumns.push(`回答列: ${configToUse.opinionColumn}`);
-          if (configToUse.nameColumn) detectedColumns.push(`名前列: ${configToUse.nameColumn}`);
-          if (configToUse.classColumn) detectedColumns.push(`クラス列: ${configToUse.classColumn}`);
+          if (configToUse.opinionColumn) detectedColumns.push(`💬 回答列: ${configToUse.opinionColumn}`);
+          if (configToUse.nameColumn) detectedColumns.push(`👤 名前列: ${configToUse.nameColumn}`);
+          if (configToUse.classColumn) detectedColumns.push(`🏫 クラス列: ${configToUse.classColumn}`);
+          if (configToUse.reasonColumn) detectedColumns.push(`💭 理由列: ${configToUse.reasonColumn}`);
           
           const message = detectedColumns.length > 0 
-            ? `✅ AI列判定が完了しました！検出された列: ${detectedColumns.join(', ')}。設定を確認して「保存・公開」を押してください。`
-            : '✅ AI列判定が完了しました！設定を確認して「保存・公開」を押してください。';
+            ? `🎉 高精度AI判定が完了しました！\n\n検出された列:\n${detectedColumns.join('\n')}\n\n設定内容を確認して「保存・公開」を押してください。`
+            : '🎉 高精度AI判定が完了しました！設定内容を確認して「保存・公開」を押してください。';
           
           showMessage(message, 'success');
         }, 100);
@@ -274,17 +278,19 @@ function runHeaderGuessing() {
         restoreButton();
         console.error('AI column detection error:', error);
         
-        // Enhanced error message
-        let errorMessage = 'AI列判定に失敗しました。';
+        // Enhanced error message with specific guidance
+        let errorMessage = '❌ 高精度AI判定システムでエラーが発生しました。\n\n';
         if (error?.message?.includes('permission') || error?.message?.includes('権限')) {
-          errorMessage += 'スプレッドシートへのアクセス権限を確認してください。';
+          errorMessage += '📋 スプレッドシートへのアクセス権限を確認してください。';
         } else if (error?.message?.includes('network') || error?.message?.includes('timeout')) {
-          errorMessage += 'ネットワーク接続を確認して再試行してください。';
+          errorMessage += '🌐 ネットワーク接続を確認して再試行してください。';
         } else {
-          errorMessage += '手動で列を設定するか、再度お試しください。';
+          errorMessage += '⚙️ 手動で列を設定するか、再度お試しください。';
         }
         
-        handleError(error, 'runHeaderGuessing', errorMessage);
+        errorMessage += '\n\n💡 問題が続く場合は、管理者にお問い合わせください。';
+        
+        showMessage(errorMessage, 'error');
       });
   }
 }
@@ -302,6 +308,42 @@ function saveAndPublish() {
   
   // UIからconfigオブジェクトを構築
   const config = buildConfigObject(); // ここでconfigを取得
+  
+  // Check for privacy-sensitive settings and show warning if enabled
+  const showNames = document.getElementById('show-names')?.checked || false;
+  const showCounts = document.getElementById('show-counts')?.checked || false;
+  
+  if (showNames || showCounts) {
+    // Show privacy warning modal
+    if (window.sharedModals) {
+      const privacySettings = [];
+      if (showNames) privacySettings.push('名前表示');
+      if (showCounts) privacySettings.push('リアクション数表示');
+      
+      console.log(`⚠️ プライバシー警告: ${privacySettings.join('・')}が有効です`);
+      
+      window.sharedModals.showPrivacyWarning(
+        // onConfirm - user acknowledged and wants to continue
+        () => {
+          console.log('✅ プライバシー警告を確認して公開を継続');
+          proceedWithSaveAndPublish(config);
+        },
+        // onCancel - user wants to review settings
+        () => {
+          console.log('❌ ユーザーがプライバシー設定の見直しを選択');
+          showMessage('設定を見直してから再度お試しください。', 'info');
+        }
+      );
+      return; // Stop here and wait for user decision
+    }
+  }
+  
+  // If no privacy concerns, proceed directly
+  proceedWithSaveAndPublish(config);
+}
+
+// Proceed with the actual save and publish operation
+function proceedWithSaveAndPublish(config) {
 
   // Set save protection flags to prevent interference
   isSaveInProgress = true;
@@ -381,11 +423,46 @@ function unpublishBoard() {
       if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
         window.unifiedCache.clear();
       }
+      
+      // Reset column selection dropdowns to default "--列を選択--" state
+      resetColumnSelections();
+      
       loadStatus(true); // ステータスを強制更新
     })
     .catch(function(error) {
       handleError(error, 'unpublishBoard', 'ボードの公開停止に失敗しました。');
     });
+}
+
+// Reset column selection dropdowns to default state
+function resetColumnSelections() {
+  console.log('🔄 Resetting column selections to default state');
+  
+  const columnSelects = [
+    'opinion-column-select',
+    'name-column-select', 
+    'reason-column-select',
+    'class-column-select',
+    'timestamp-column-select'
+  ];
+  
+  columnSelects.forEach(selectId => {
+    const select = document.getElementById(selectId);
+    if (select) {
+      select.value = ''; // Reset to empty value
+      console.log(`✅ Reset ${selectId} to default`);
+    }
+  });
+  
+  // Also reset any display checkboxes
+  const checkboxes = ['show-names', 'show-counts'];
+  checkboxes.forEach(checkboxId => {
+    const checkbox = document.getElementById(checkboxId);
+    if (checkbox) {
+      checkbox.checked = false;
+      console.log(`✅ Reset ${checkboxId} to unchecked`);
+    }
+  });
 }
 
 // =============================================================================
@@ -889,31 +966,63 @@ function updateOverallProgress(percentage, statusMessage) {
 
 // Simulate QuickStart progress (for demonstration)
 function simulateQuickStartProgress() {
-  // Step 1: Folder creation
+  // Step 1: Real folder creation/check
   updateProgressStep(1, 'active', 'ユーザー専用フォルダの作成', 'フォルダ構造を準備中...');
   updateOverallProgress(10, 'フォルダを作成しています...');
   
-  setTimeout(() => {
-    updateProgressStep(1, 'completed', 'ユーザー専用フォルダの作成', '✅ フォルダが作成されました');
-    updateProgressStep(2, 'active', 'Googleフォームとスプレッドシートの作成', 'データ収集の仕組みを構築中...');
-    updateOverallProgress(35, 'フォームとスプレッドシートを作成しています...');
-  }, 1500);
-  
-  setTimeout(() => {
-    updateProgressStep(2, 'completed', 'Googleフォームとスプレッドシートの作成', '✅ フォームとスプレッドシートが作成されました');
-    updateProgressStep(3, 'active', '回答ボードの設定と公開', 'Webアプリケーションを設定中...');
-    updateOverallProgress(70, '回答ボードを設定しています...');
-  }, 3000);
-  
-  setTimeout(() => {
-    updateProgressStep(3, 'completed', '回答ボードの設定と公開', '✅ 回答ボードが公開されました');
-    updateProgressStep(4, 'active', 'セットアップ完了', '利用準備が整いました！');
-    updateOverallProgress(100, 'セットアップが完了しました！');
-  }, 4500);
-  
-  setTimeout(() => {
-    updateProgressStep(4, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
-  }, 5000);
+  // Actually call the folder creation API to sync with real backend progress
+  runGasWithUserId('createUserFolder', 'フォルダを確認・作成中...')
+    .then(function(folderResult) {
+      console.log('✅ QuickStart folder creation successful:', folderResult);
+      updateProgressStep(1, 'completed', 'ユーザー専用フォルダの作成', '✅ フォルダが作成されました');
+      updateProgressStep(2, 'active', 'Googleフォームとスプレッドシートの作成', 'データ収集の仕組みを構築中...');
+      updateOverallProgress(35, 'フォームとスプレッドシートを作成しています...');
+      
+      // Continue with form/spreadsheet creation (still simulated as backend handles this)
+      setTimeout(() => {
+        updateProgressStep(2, 'completed', 'Googleフォームとスプレッドシートの作成', '✅ フォームとスプレッドシートが作成されました');
+        updateProgressStep(3, 'active', '回答ボードの設定と公開', 'Webアプリケーションを設定中...');
+        updateOverallProgress(70, '回答ボードを設定しています...');
+        
+        // Final completion step
+        setTimeout(() => {
+          updateProgressStep(3, 'completed', '回答ボードの設定と公開', '✅ 回答ボードが公開されました');
+          updateProgressStep(4, 'active', 'セットアップ完了', '利用準備が整いました！');
+          updateOverallProgress(100, 'セットアップが完了しました！');
+          
+          setTimeout(() => {
+            updateProgressStep(4, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
+          }, 500);
+        }, 2000);
+      }, 1500);
+    })
+    .catch(function(error) {
+      console.warn('⚠️ QuickStart folder creation failed, continuing with fallback:', error);
+      updateProgressStep(1, 'error', 'ユーザー専用フォルダの作成', '⚠️ フォルダ作成でエラーが発生しましたが処理を続行します');
+      showMessage('フォルダの作成に警告がありましたが、セットアップを続行します。', 'warning');
+      
+      // Continue with fallback timing even if folder creation fails
+      setTimeout(() => {
+        updateProgressStep(2, 'active', 'Googleフォームとスプレッドシートの作成', 'データ収集の仕組みを構築中...');
+        updateOverallProgress(35, 'フォームとスプレッドシートを作成しています...');
+        
+        setTimeout(() => {
+          updateProgressStep(2, 'completed', 'Googleフォームとスプレッドシートの作成', '✅ フォームとスプレッドシートが作成されました');
+          updateProgressStep(3, 'active', '回答ボードの設定と公開', 'Webアプリケーションを設定中...');
+          updateOverallProgress(70, '回答ボードを設定しています...');
+          
+          setTimeout(() => {
+            updateProgressStep(3, 'completed', '回答ボードの設定と公開', '✅ 回答ボードが公開されました');
+            updateProgressStep(4, 'active', 'セットアップ完了', '利用準備が整いました！');
+            updateOverallProgress(100, 'セットアップが完了しました！');
+            
+            setTimeout(() => {
+              updateProgressStep(4, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
+            }, 500);
+          }, 2000);
+        }, 1500);
+      }, 1000);
+    });
 }
 
 // Progress simulation for custom forms with folder check

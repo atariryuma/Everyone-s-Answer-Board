@@ -293,13 +293,8 @@ class StudyQuestApp {
             this.elements.adminToggleBtn.style.display = 'none'; // 確実に非表示
           }
         }
-        // Check if modal should be shown
-        const introSeen = localStorage.getItem('introSeen');
-        
-        // Show modal if never seen before
-        if (!introSeen) {
-          setTimeout(() => this.showInfoModal(), 500);
-        }
+        // Show info modal on initial load (always show for new boards)
+        setTimeout(() => this.showInfoModal(), 500);
       }, { timeout: 50 });
 
       // AdminPanelからのメッセージをリッスン
@@ -307,6 +302,8 @@ class StudyQuestApp {
         if (event.data && event.data.type === 'REFRESH_BOARD_DATA') {
           // Refresh board data message received
           this.loadSheetData(true);
+          // Show info modal on board refresh
+          setTimeout(() => this.showInfoModal(), 1000);
         } else if (event.data && event.data.type === 'BOARD_PUBLISHED') {
           // 新しいボードが公開された時の即座更新
           console.log('新しいボードが公開されました:', event.data.sheetName);
@@ -314,10 +311,14 @@ class StudyQuestApp {
           this.checkForNewContentLight(true).then(() => {
             // 必要に応じてフルリフレッシュ
             this.loadSheetData(true);
+            // Show info modal when new board is published
+            setTimeout(() => this.showInfoModal(), 1500);
           }).catch(error => {
             console.warn('新しいボードの即座更新でエラー:', error);
             // エラー時もフルリフレッシュを実行
             this.loadSheetData(true);
+            // Show info modal even on error
+            setTimeout(() => this.showInfoModal(), 1500);
           });
         }
       });
@@ -330,9 +331,13 @@ class StudyQuestApp {
             console.log('BroadcastChannelから新しいボード公開を受信:', event.data.sheetName);
             this.checkForNewContentLight(true).then(() => {
               this.loadSheetData(true);
+              // Show info modal when board is updated via BroadcastChannel
+              setTimeout(() => this.showInfoModal(), 1500);
             }).catch(error => {
               console.warn('BroadcastChannel経由の更新でエラー:', error);
               this.loadSheetData(true);
+              // Show info modal even on error
+              setTimeout(() => this.showInfoModal(), 1500);
             });
           }
         });
@@ -3400,7 +3405,7 @@ async handleReaction(rowIndex, reaction) {
     this.elements.infoModalContainer.classList.remove('modal-fade');
     this.elements.infoModalCard.classList.remove('modal-scale');
     
-    localStorage.setItem('introSeen', '1');
+    // Note: localStorage 'introSeen' flag removed to allow modal to show on every board update
     if (this.state.lastFocusedElement) {
       this.state.lastFocusedElement.focus();
     }

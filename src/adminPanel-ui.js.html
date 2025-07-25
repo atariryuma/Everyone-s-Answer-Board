@@ -948,6 +948,32 @@ function expandActiveSection(stepNumber) {
 function manageSectionStates(currentStep) {
   console.log(`🔄 Managing section states for step ${currentStep}`);
   
+  // Check if we're in reconfiguring state (after unpublish)
+  const isReconfiguring = currentStatus && currentStatus.userInfo && 
+    JSON.parse(currentStatus.userInfo.configJson || '{}').setupStatus === 'reconfiguring';
+  
+  if (isReconfiguring) {
+    console.log('🔧 Reconfiguring mode: Opening all steps for easy reconfiguration');
+    // In reconfiguring mode, open all steps 1-3 for easy reconfiguration
+    for (let i = 1; i <= 3; i++) {
+      const sectionContainer = document.getElementById(`step${i}-content`)?.closest('.glass-panel');
+      if (!sectionContainer) continue;
+      
+      sectionContainer.classList.remove('section-completed', 'section-active', 'section-future', 'show-checkmark');
+      sectionContainer.classList.add('section-active');
+      expandActiveSection(i);
+      
+      // Show config area for step 3 if we have a sheet
+      if (i === 3 && currentStatus && currentStatus.activeSheetName) {
+        const configArea = document.getElementById('config-area');
+        if (configArea) {
+          configArea.classList.remove('hidden');
+        }
+      }
+    }
+    return;
+  }
+  
   // Determine if sections are truly completed based on setup status
   const isStepCompleted = (stepNumber) => {
     if (stepNumber === 1) {

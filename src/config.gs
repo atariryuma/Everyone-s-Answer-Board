@@ -1492,22 +1492,23 @@ function unpublishBoard(requestUserId) {
       appPublished: configJson.appPublished
     });
 
-    // 完全な公開状態のクリア（正しいプロパティ名を使用）
+    // 公開状態のクリア（データソースとシート選択は保持）
     configJson.publishedSheet = ''; // 後方互換性のため残す
     configJson.publishedSheetName = ''; // 正しいプロパティ名
     configJson.publishedSpreadsheetId = ''; // スプレッドシートIDもクリア
     configJson.appPublished = false; // 公開停止
     
-    // 回答ボード連携の完全解除
-    configJson.formCreated = false; // フォーム作成状態をリセット
-    configJson.setupStatus = 'initial'; // セットアップ状態を初期状態に戻す
+    // 回答ボード連携の解除（フォーム情報は保持）
+    configJson.setupStatus = 'reconfiguring'; // ステップ1-3を全オープンにするための状態
     
-    // シート設定と表示設定の完全クリア
+    // 列設定のみクリア（データソース・シート選択は保持）
     configJson.opinionHeader = '';
     configJson.nameHeader = '';
     configJson.reasonHeader = '';
     configJson.classHeader = '';
     configJson.timestampHeader = '';
+    
+    // 表示設定のクリア
     configJson.showNames = false;
     configJson.showCounts = false;
     configJson.highlightMode = false;
@@ -1517,13 +1518,8 @@ function unpublishBoard(requestUserId) {
       configJson.columnMappings = {};
     }
     
-    // 各セクションをオープン状態に復元
-    configJson.sectionStates = {
-      quickstart: 'open',
-      custom: 'open',
-      resources: 'open',
-      settings: 'open'
-    };
+    // 注意: spreadsheetId, activeSheetName, formUrl等のデータソース情報は保持
+    // 注意: formCreated状態も保持（ユーザーが作成したフォームを維持）
 
     console.log('🧹 公開停止: 設定を完全クリア完了');
 

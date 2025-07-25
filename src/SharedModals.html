@@ -467,6 +467,102 @@
   </div>
 </div>
 
+<!-- プライバシー警告モーダル -->
+<div id="privacy-warning-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center p-6 border-b border-gray-600/30">
+        <h2 class="text-xl font-semibold text-yellow-400">⚠️ 個人情報表示に関する重要な注意</h2>
+        <button type="button" id="privacy-warning-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="p-6 space-y-6">
+        <!-- 警告メッセージ -->
+        <div class="bg-yellow-900/30 border border-yellow-500/50 rounded-lg p-4">
+          <div class="flex items-start gap-3">
+            <div class="text-yellow-400 text-xl">⚠️</div>
+            <div>
+              <h3 class="text-lg font-semibold text-yellow-400 mb-2">教育現場での個人情報保護について</h3>
+              <p class="text-yellow-200 text-sm leading-relaxed">
+                「名前を表示する」や「リアクション数を表示する」の設定を有効にすると、学習者の個人情報や活動データが他の参加者に表示されます。教育現場でのプライバシー保護の観点から、以下の点にご注意ください。
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- チェックポイント -->
+        <div class="space-y-4">
+          <h3 class="text-lg font-semibold text-cyan-400 flex items-center gap-2">
+            <span>📋</span> 公開前に確認してください
+          </h3>
+          
+          <div class="space-y-3">
+            <div class="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg">
+              <span class="text-cyan-400 text-lg">✓</span>
+              <div>
+                <p class="text-white font-medium">学習者・保護者の同意</p>
+                <p class="text-gray-300 text-sm">名前やリアクション情報の公開について、事前に学習者や保護者の理解と同意を得ていますか？</p>
+              </div>
+            </div>
+            
+            <div class="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg">
+              <span class="text-cyan-400 text-lg">✓</span>
+              <div>
+                <p class="text-white font-medium">教育目的の明確化</p>
+                <p class="text-gray-300 text-sm">個人情報を表示する教育的意義や学習効果を明確にし、必要最小限の情報のみ表示していますか？</p>
+              </div>
+            </div>
+            
+            <div class="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg">
+              <span class="text-cyan-400 text-lg">✓</span>
+              <div>
+                <p class="text-white font-medium">安全な学習環境</p>
+                <p class="text-gray-300 text-sm">学習者が安心して意見を表明できる環境が整っていますか？個人攻撃や差別につながる可能性はありませんか？</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- プライバシー保護の推奨設定 -->
+        <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
+          <h3 class="text-lg font-medium text-green-400 mb-3 flex items-center gap-2">
+            🛡️ 推奨設定
+          </h3>
+          <ul class="space-y-2 text-sm text-green-200">
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>匿名での議論：</strong>初期設定では名前表示をオフにして、安全な議論環境を提供
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>段階的な公開：</strong>学習者の成熟度に応じて、徐々に個人情報の表示を検討
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>定期的な見直し：</strong>設定を定期的に見直し、学習者の状況に応じて調整
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="p-6 border-t border-gray-600/30 flex gap-3 justify-end">
+        <button type="button" id="privacy-warning-cancel" class="btn bg-gray-600 hover:bg-gray-500 text-white px-4 py-2">設定を見直す</button>
+        <button type="button" id="privacy-warning-confirm" class="btn btn-primary px-4 py-2">理解して続行</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Google連携の利点モーダル -->
 <div id="google-integration-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
   <div class="flex items-center justify-center min-h-full p-4">
@@ -800,6 +896,45 @@ class SharedModals {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
   }
+
+  // プライバシー警告モーダルの表示
+  showPrivacyWarning(onConfirm, onCancel) {
+    this.loadAdminModals();
+    const modal = document.getElementById('privacy-warning-modal');
+    if (!modal) {
+      console.error('プライバシー警告モーダルが見つかりません');
+      return;
+    }
+    
+    // ボタンのイベントリスナーを設定
+    const confirmBtn = document.getElementById('privacy-warning-confirm');
+    const cancelBtn = document.getElementById('privacy-warning-cancel');
+    const closeBtn = document.getElementById('privacy-warning-modal-close');
+    
+    if (confirmBtn) {
+      confirmBtn.onclick = () => {
+        this.hideModal('privacy-warning-modal');
+        if (onConfirm) onConfirm();
+      };
+    }
+    
+    if (cancelBtn) {
+      cancelBtn.onclick = () => {
+        this.hideModal('privacy-warning-modal');
+        if (onCancel) onCancel();
+      };
+    }
+    
+    if (closeBtn) {
+      closeBtn.onclick = () => {
+        this.hideModal('privacy-warning-modal');
+        if (onCancel) onCancel();
+      };
+    }
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
 }
 
 // グローバルインスタンスの作成
@@ -822,6 +957,8 @@ window.showModal = function(modalId) {
     window.sharedModals.showSecurityDetails();
   } else if (modalId === 'google-integration-modal') {
     window.sharedModals.showGoogleIntegration();
+  } else if (modalId === 'privacy-warning-modal') {
+    window.sharedModals.showPrivacyWarning();
   } else {
     // 従来のshowModal実装
     const modal = document.getElementById(modalId);
