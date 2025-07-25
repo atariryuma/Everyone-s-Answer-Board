@@ -1475,6 +1475,22 @@ setupEventDelegation() {
     const selectedClass = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
     const oldAnswers = [...this.state.currentAnswers];
     
+    // シート切り替え時はサーバーキャッシュをクリア
+    if (requestedSheetName && requestedSheetName !== this.state.currentActiveSheet) {
+      debugLog('loadSheetData: Switching to new sheet', requestedSheetName, 'clearing server cache');
+      try {
+        await new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .clearCache();
+        });
+        debugLog('loadSheetData: Server cache cleared successfully');
+      } catch (error) {
+        console.warn('loadSheetData: Failed to clear server cache:', error);
+      }
+    }
+    
     // Show immediate visual feedback - but keep the question text visible
     // (Removed loading spinner from heading to keep question text always visible)
     
@@ -1699,6 +1715,9 @@ setupEventDelegation() {
     }
     
     try {
+      // シート切り替え前にバーチャルスクロール状態とDOMをクリア
+      this.clearVirtualScrollingState();
+      
       // 新しいシートのデータを読み込み
       await this.loadSheetData(true, false, selectedSheet);
       this.state.currentActiveSheet = selectedSheet;
@@ -1710,6 +1729,42 @@ setupEventDelegation() {
       // エラー時は元のシートに戻す
       this.elements.sheetSelector.value = this.state.currentActiveSheet || '';
     }
+  }
+  
+  clearVirtualScrollingState() {
+    // バーチャルスクロール状態をリセット
+    if (this.virtualScrollState) {
+      this.virtualScrollState = {
+        renderedItems: 0,
+        totalItems: 0,
+        isLoading: false,
+        renderedRowIndexes: new Set(),
+        cardRegistry: new Map()
+      };
+    }
+    
+    // 既存のオブザーバーを切断
+    if (this.scrollObserver) {
+      this.scrollObserver.disconnect();
+      this.scrollObserver = null;
+    }
+    
+    if (this.visibilityObserver) {
+      this.visibilityObserver.disconnect();
+      // visibilityObserver は setupObservers() で再作成されるので null にしない
+    }
+    
+    // 回答コンテナをクリア
+    if (this.elements.answersContainer) {
+      // すべての既存カードを削除
+      this.elements.answersContainer.innerHTML = '';
+      debugLog('clearVirtualScrollingState: Cleared all existing cards from DOM');
+    }
+    
+    // currentAnswers を明示的にクリア（キャッシュされた古いデータを防ぐ）
+    this.state.currentAnswers = [];
+    
+    debugLog('clearVirtualScrollingState: Virtual scrolling state cleared for sheet switch');
   }
   updateSheetSelectorLabels() {
     const selector = this.elements.sheetSelector;
@@ -1854,6 +1909,10 @@ setupEventDelegation() {
       // Use virtual scrolling for datasets larger than batch size
       if (newRows.length > RENDER_BATCH_SIZE) {
         debugLog('DEBUG: renderBoard - Using virtual scrolling for', newRows.length, 'items (initial load:', isInitialLoad, ')');
+        // 初期ロード時やシート切り替え時は、確実に新しいデータでレンダリング
+        if (isInitialLoad || this.state.currentAnswers.length === 0) {
+          this.clearVirtualScrollingState();
+        }
         this.renderWithVirtualScrolling(newRows, oldRows, container, existingMap, changedItems, isInitialLoad);
       } else {
         // Process small datasets normally
@@ -1918,7 +1977,8 @@ setupEventDelegation() {
         renderedItems: 0,
         totalItems: newRows.length,
         isLoading: false,
-        renderedRowIndexes: new Set()
+        renderedRowIndexes: new Set(),
+        cardRegistry: new Map() // カードの参照を保持して再利用を可能に
       };
     } else {
       // Update total items for existing state
@@ -1926,6 +1986,10 @@ setupEventDelegation() {
       // Ensure renderedRowIndexes exists
       if (!this.virtualScrollState.renderedRowIndexes) {
         this.virtualScrollState.renderedRowIndexes = new Set();
+      }
+      // Ensure cardRegistry exists
+      if (!this.virtualScrollState.cardRegistry) {
+        this.virtualScrollState.cardRegistry = new Map();
       }
     }
     
@@ -1943,7 +2007,17 @@ setupEventDelegation() {
         const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
         
         if (!card) {
-          card = this.createAnswerCard(row);
+          // カードレジストリから再利用可能なカードをチェック
+          card = this.virtualScrollState.cardRegistry.get(rowId);
+          
+          if (!card) {
+            card = this.createAnswerCard(row);
+            if (card) {
+              // カードレジストリに登録
+              this.virtualScrollState.cardRegistry.set(rowId, card);
+            }
+          }
+          
           if (card) {
             card.classList.add('new-card');
             
@@ -1964,6 +2038,8 @@ setupEventDelegation() {
         } else {
           // Track existing card as rendered
           this.virtualScrollState.renderedRowIndexes.add(rowId);
+          // カードレジストリにも登録
+          this.virtualScrollState.cardRegistry.set(rowId, card);
           this.updateExistingCard(card, row, oldData, changedItems);
           // 既存のカードは既にDOMにあるので、フラグメントに追加しない
         }
@@ -3271,16 +3347,22 @@ async handleReaction(rowIndex, reaction) {
             if (!card.classList.contains('visible')) {
               card.classList.add('visible');
               card.classList.remove('hidden-card');
-              // Restore visibility if it was hidden
+              // Restore visibility and display if it was hidden
               if (card.style.visibility === 'hidden') {
                 card.style.visibility = 'visible';
               }
+              if (card.style.display === 'none') {
+                card.style.display = '';
+              }
             }
           } else {
-            // Only mark as hidden if completely out of view and not already hidden
+            // MODIFIED: Do not hide cards for virtual scrolling - keep them in DOM
+            // This prevents cards from disappearing when scrolling back up
+            // Only mark as not visible for optimization purposes
             if (entry.intersectionRatio === 0 && card.classList.contains('visible')) {
               card.classList.remove('visible');
               card.classList.add('hidden-card');
+              // Do NOT hide or remove from DOM - just mark as not visible
             }
           }
         });
