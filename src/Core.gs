@@ -2135,10 +2135,10 @@ function createFormFactory(options) {
     
     // タイムスタンプ生成
     var now = new Date();
-    var dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm:ss');
+    var dateString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd');
     
     // フォームタイトル生成
-    var formTitle = options.formTitle || ('📝 みんなの回答ボード - ' + userEmail + ' - ' + dateTimeString);
+    var formTitle = options.formTitle || ('みんなの回答ボード ' + dateString);
     
     // フォーム作成
     var form = FormApp.create(formTitle);
@@ -2148,7 +2148,7 @@ function createFormFactory(options) {
     addUnifiedQuestions(form, options.questions || 'default', options.customConfig || {});
 
     // スプレッドシート作成
-    var spreadsheetResult = createLinkedSpreadsheet(userEmail, form, dateTimeString);
+    var spreadsheetResult = createLinkedSpreadsheet(userEmail, form, dateString);
 
     return {
       formId: form.getId(),
@@ -2176,7 +2176,7 @@ function addUnifiedQuestions(form, questionType, customConfig) {
   try {
     var config = getQuestionConfig(questionType, customConfig);
 
-    form.setCollectEmail(true);
+    form.setCollectEmail(false);
 
     if (questionType === 'simple') {
       var classItem = form.addListItem();
@@ -2251,7 +2251,7 @@ function addUnifiedQuestions(form, questionType, customConfig) {
 
       // 理由欄（常にオン）
       var reasonItem = form.addParagraphTextItem();
-      reasonItem.setTitle('そう考える理由や体験があれば教えてください（任意）');
+      reasonItem.setTitle('そう考える根拠（こんきょ）や理由を書きましょう。');
       reasonItem.setRequired(false);
     } else {
       var classItem = form.addTextItem();
@@ -2308,7 +2308,7 @@ function getQuestionConfig(questionType, customConfig) {
       type: 'paragraph'
     },
     reasonQuestion: {
-      title: 'そう考える理由や体験があれば教えてください（任意）',
+      title: 'そう考える根拠（こんきょ）や理由を書きましょう。',
       helpText: '',
       type: 'paragraph'
     }
@@ -2411,7 +2411,7 @@ const FORM_PRESETS = {
   quickstart: {
     titlePrefix: 'みんなの回答ボード',
     questions: 'custom',
-    description: 'このフォームに回答すると、みんなの回答ボードに反映されます。',
+    description: 'このフォームは学校での学習や話し合いで使います。みんなで考えを共有して、お互いから学び合いましょう。\n\n【デジタル市民としてのお約束】\n• 相手を思いやる気持ちを大切にしましょう\n• 正しい情報を共有しましょう\n• 個人情報は書かないようにしましょう',
     config: {
       mainQuestion: '今日の学習について、あなたの考えや感想を聞かせてください',
       questionType: 'text',
@@ -2420,15 +2420,15 @@ const FORM_PRESETS = {
     }
   },
   custom: {
-    titlePrefix: 'カスタムフォーム',
+    titlePrefix: 'みんなの回答ボード',
     questions: 'custom',
-    description: 'このフォームに回答すると、みんなの回答ボードに反映されます。',
+    description: 'このフォームは学校での学習や話し合いで使います。みんなで考えを共有して、お互いから学び合いましょう。\n\n【デジタル市民としてのお約束】\n• 相手を思いやる気持ちを大切にしましょう\n• 正しい情報を共有しましょう\n• 個人情報は書かないようにしましょう',
     config: {} // Will be overridden by user input
   },
   study: {
-    titlePrefix: 'StudyQuest',
+    titlePrefix: 'みんなの回答ボード',
     questions: 'simple', // Default, can be overridden
-    description: 'このフォームに回答すると、みんなの回答ボードに反映されます。',
+    description: 'このフォームは学校での学習や話し合いで使います。みんなで考えを共有して、お互いから学び合いましょう。\n\n【デジタル市民としてのお約束】\n• 相手を思いやる気持ちを大切にしましょう\n• 正しい情報を共有しましょう\n• 個人情報は書かないようにしましょう',
     config: {}
   }
 };
@@ -2449,11 +2449,11 @@ function createUnifiedForm(presetType, userEmail, userId, overrides = {}) {
     }
 
     const now = new Date();
-    const dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm:ss');
+    const dateString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd');
     
     // タイトル生成（上書き可能）
     const titlePrefix = overrides.titlePrefix || preset.titlePrefix;
-    const formTitle = overrides.formTitle || `${titlePrefix} - ${dateTimeString}`;
+    const formTitle = overrides.formTitle || `${titlePrefix} ${dateString}`;
     
     // 設定をマージ（プリセット + ユーザー設定）
     const mergedConfig = { ...preset.config, ...overrides.customConfig };
@@ -2521,13 +2521,13 @@ function createCustomForm(userEmail, userId, config) {
  * リンクされたスプレッドシートを作成
  * @param {string} userEmail - ユーザーメール
  * @param {GoogleAppsScript.Forms.Form} form - フォーム
- * @param {string} dateTimeString - 日時文字列
+ * @param {string} dateString - 日付文字列
  * @returns {Object} スプレッドシート情報
  */
-function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
+function createLinkedSpreadsheet(userEmail, form, dateString) {
   try {
     // スプレッドシート名を設定
-    var spreadsheetName = userEmail + ' - 回答データ - ' + dateTimeString;
+    var spreadsheetName = userEmail + ' - 回答データ - ' + dateString;
     
     // 新しいスプレッドシートを作成
     var spreadsheetObj = SpreadsheetApp.create(spreadsheetName);
@@ -2729,7 +2729,12 @@ function createStudyQuestForm(userEmail, userId, formTitle, questionType) {
     var appUrls = generateUserUrls(userId);
     var boardUrl = appUrls.viewUrl || (appUrls.webAppUrl + '?userId=' + encodeURIComponent(userId || ''));
     
-    var confirmationMessage = 'ご回答ありがとうございます！ボードはこちら: ' + boardUrl;
+    var confirmationMessage = '回答してくれて、ありがとうございます！🎉\n\n' +
+      'みんなの考えを見てみましょう: ' + boardUrl + '\n\n' +
+      '【デジタル市民として】\n' +
+      '✨ 相手の気持ちを考えながら、やさしい言葉で伝えましょう\n' +
+      '💡 正しい情報を大切にして、みんなで学び合いましょう\n' +
+      '🔒 自分や友だちの大切な情報は守りましょう';
 
     if (form.getPublishedUrl()) {
       confirmationMessage += '\n\n回答の編集はこちら: ' + form.getPublishedUrl();
