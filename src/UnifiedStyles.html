@@ -578,6 +578,25 @@ body {
   position: relative;
   z-index: 9000 !important;
 }
+/* Completed section styling - only show checkmark when truly completed */
+.section-completed {
+  opacity: 0.7;
+  border-color: rgba(34, 197, 94, 0.3) !important;
+  position: relative;
+}
+
+/* チェックマーク削除 - デザイン統一のため */
+
+/* Active section styling */
+.section-active {
+  border-color: rgba(59, 130, 246, 0.5) !important;
+  position: relative;
+}
+
+/* Future section styling */
+.section-future {
+  opacity: 0.8;
+}
 
 /* Variant: Modal, for critical blocking actions */
 .loading-overlay.modal {
@@ -599,146 +618,6 @@ body {
   z-index: 9999 !important;
 }
 
-/* Content container for all loading elements */
-.loading-content {
-  color: var(--color-text);
-  text-align: center;
-  padding: 2rem;
-  max-width: 400px;
-  background: #000000; /* Completely opaque dark background */
-  border-radius: 1rem;
-  border: 1px solid rgba(255,255,255,0.15);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.6);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  /* Add backdrop filter to prevent glass-panel bleed-through */
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-.loading-message {
-  font-size: 1.1rem;
-  margin-bottom: 1.5rem;
-  font-weight: 600;
-  opacity: 0.95;
-  animation: fadeInOut 2s ease-in-out infinite;
-}
-
-/* Improved loading message animation */
-@keyframes fadeInOut {
-  0%, 100% { opacity: 0.95; }
-  50% { opacity: 0.7; }
-}
-
-/* Spinner for global loading */
-.global-spinner {
-  width: 60px;
-  height: 60px;
-  border: 6px solid rgba(255,255,255,0.3);
-  border-top: 6px solid var(--color-primary);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 1.5rem;
-}
-
-/* Progress bar styles (if needed, can be hidden by default) */
-.loading-progress {
-  width: 80%;
-  margin-top: 1rem;
-}
-
-.loading-progress-bar {
-  width: 100%;
-  height: 6px;
-  background: rgba(255,255,255,0.2);
-  border-radius: 3px;
-  overflow: hidden;
-  margin-bottom: 0.5rem;
-}
-
-.loading-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--color-primary), #50fa7b);
-  transition: width 0.5s ease;
-  border-radius: 3px;
-}
-
-.loading-percentage {
-  font-size: 0.9rem;
-  color: rgba(255,255,255,0.7);
-}
-
-/* Step-based loading indicator */
-.loading-steps {
-  margin-top: 1.5rem;
-  text-align: left;
-}
-
-.loading-step {
-  display: flex;
-  align-items: center;
-  margin-bottom: 0.75rem;
-  font-size: 0.875rem;
-}
-
-.loading-step-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-border);
-  margin-right: 0.75rem;
-  flex-shrink: 0;
-  transition: all 0.3s ease;
-}
-
-.loading-step.active .loading-step-dot {
-  background: var(--color-primary);
-  animation: pulse 2s infinite;
-}
-
-.loading-step.completed .loading-step-dot {
-  background: var(--color-success);
-}
-
-.loading-step-text {
-  color: var(--color-text);
-}
-
-.loading-step.active .loading-step-text {
-  color: var(--color-primary);
-}
-
-.loading-step.completed .loading-step-text {
-  color: var(--color-success);
-}
-
-/* Ensure QuickStart progress bar is visible */
-#quickstart-progress {
-  position: relative;
-  z-index: 9000 !important;
-}
-
-/* Completed section styling - only show checkmark when truly completed */
-.section-completed {
-  opacity: 0.7;
-  border-color: rgba(34, 197, 94, 0.3) !important;
-  position: relative;
-}
-
-/* チェックマーク削除 - デザイン統一のため */
-
-/* Active section styling */
-.section-active {
-  border-color: rgba(59, 130, 246, 0.5) !important;
-  position: relative;
-}
-
-/* Future section styling */
-.section-future {
-  opacity: 0.8;
-}
 
 /* Spinner Variants */
 .spinner {
