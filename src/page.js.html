@@ -685,8 +685,13 @@ setupEventDelegation() {
   // 軽量な新着コンテンツチェック
   async checkForNewContentLight(bypassCache = false) {
     try {
-      const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
-      const sortOrder = this.elements.sortOrder.value;
+      // フィルター条件の正常化（空文字列の場合はデフォルト値を使用）
+      let selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+      if (!selectedClass || selectedClass.trim() === '') {
+        selectedClass = 'すべて';
+        debugLog('checkForNewContentLight: selectedClassが空のためデフォルト値を使用:', selectedClass);
+      }
+      const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
       
       // キャッシュバイパス時はサーバーキャッシュをクリア
       if (bypassCache) {
@@ -747,8 +752,20 @@ setupEventDelegation() {
         return;
       }
       
-      // 同じフィルター/ソート設定での新着チェック
-      const hasNewItems = newCount > this.state.lastSeenCount && this.state.lastSeenCount > 0;
+      // 新着判定ロジックの修正（初期状態からの新着も検出）
+      const hasNewItems = newCount > this.state.lastSeenCount;
+      
+      // 詳細ログ出力でデバッグを強化
+      console.log('🔍 新着判定詳細:', {
+        '1_newCount': newCount,
+        '2_lastSeenCount': this.state.lastSeenCount,
+        '3_difference': newCount - this.state.lastSeenCount,
+        '4_hasNewItems_OLD_LOGIC': newCount > this.state.lastSeenCount && this.state.lastSeenCount > 0,
+        '5_hasNewItems_NEW_LOGIC': hasNewItems,
+        '6_selectedClass': selectedClass,
+        '7_currentViewKey': `${selectedClass}-${sortOrder}`,
+        '8_initialDataLoaded': this.initialDataLoaded
+      });
       console.log('📊 新着判定:', {
         newCount,
         lastSeenCount: this.state.lastSeenCount,
@@ -770,12 +787,30 @@ setupEventDelegation() {
             viewKey: currentViewKey,
             lightweightCheck: true
           });
+          
+          // 新着検出時の自動フルリフレッシュを実行
+          console.log('🔄 新着データ検出により自動リフレッシュを実行します...');
+          
+          // キャッシュバイパスで新しいデータを取得
+          this.loadSheetData(true, false, null)
+            .then(() => {
+              console.log('✅ 新着データの自動リフレッシュが完了しました');
+              // 新しいデータロード後に lastSeenCount を更新
+              this.state.lastSeenCount = newCount;
+            })
+            .catch(error => {
+              console.error('⚠️ 新着データの自動リフレッシュでエラー:', error);
+              // エラー時も lastSeenCount を更新して無限ループを防ぐ
+              this.state.lastSeenCount = newCount;
+            });
         } else {
           console.log('⚠️ 異常な新着数検出、誤検知として無視:', {
             newItems,
             newCount,
             lastSeenCount: this.state.lastSeenCount
           });
+          // 異常な値の場合も lastSeenCount を更新して無限ループを防ぐ
+          this.state.lastSeenCount = newCount;
         }
       }
       
