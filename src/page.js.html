@@ -816,6 +816,15 @@ setupEventDelegation() {
       
       // 現在のビューキーを確実に設定
       this.lastViewKey = currentViewKey;
+      
+      // ポーリング結果を記録（設定検証用）
+      this.lastPollingResult = {
+        newCount,
+        selectedClass,
+        sortOrder,
+        timestamp: Date.now(),
+        hasNewItems
+      };
     } catch (error) {
       this.state.pollingFailureCount++;
       console.warn('軽量新着チェックに失敗:', error, 'failureCount:', this.state.pollingFailureCount);
@@ -1551,6 +1560,72 @@ setupEventDelegation() {
     } else {
       console.log('✅ 状態検証: DOMとデータの状態が一致しています');
     }
+    
+    // 追加: 設定と表示内容の一致性を検証
+    this.validateConfigConsistency();
+  }
+  
+  validateConfigConsistency() {
+    // フロントエンドの表示している質問文を取得
+    const displayedHeader = this.elements.headingLabel ? this.elements.headingLabel.textContent : '';
+    
+    // 現在のデータ数とポーリングで取得したカウントを比較
+    const currentDataCount = this.state.currentAnswers ? this.state.currentAnswers.length : 0;
+    
+    console.log('🔍 設定一致性検証:', {
+      '表示中の質問文': displayedHeader,
+      '現在のデータ数': currentDataCount,
+      '最新ポーリング結果': this.lastPollingResult || '未実行'
+    });
+    
+    // ポーリング結果と現在のデータ数の不一致を検出
+    if (this.lastPollingResult && this.lastPollingResult.newCount !== currentDataCount) {
+      console.warn('⚠️ データ不整合検出:', {
+        'ポーリングカウント': this.lastPollingResult.newCount,
+        '表示データ数': currentDataCount,
+        '差分': this.lastPollingResult.newCount - currentDataCount
+      });
+      
+      // 不整合が検出された場合の対応
+      this.handleDataInconsistency();
+    }
+  }
+  
+  handleDataInconsistency() {
+    console.log('🔄 データ不整合を解決するため強制リフレッシュを実行します...');
+    
+    // 強制キャッシュクリアとデータ再読み込み
+    this.forceDataRefresh().catch(error => {
+      console.error('⚠️ 強制リフレッシュでエラー:', error);
+    });
+  }
+  
+  async forceDataRefresh() {
+    console.log('🗑️ 強制データリフレッシュ開始...');
+    
+    // フロントエンドキャッシュをクリア
+    if (this.cache) {
+      this.cache.clear();
+      console.log('✅ フロントエンドキャッシュをクリア');
+    }
+    
+    // サーバーキャッシュをクリア
+    try {
+      await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          .clearCache();
+      });
+      console.log('✅ サーバーキャッシュをクリア');
+    } catch (error) {
+      console.warn('⚠️ サーバーキャッシュクリアでエラー:', error);
+    }
+    
+    // 強制データ再読み込み
+    await this.loadSheetData(true, false, null);
+    
+    console.log('✅ 強制データリフレッシュ完了');
   }
 
   /**
@@ -1753,11 +1828,34 @@ setupEventDelegation() {
             this.state.currentAnswers = result.data || [];
             console.log('✅ StudyQuestApp: Set currentAnswers with', this.state.currentAnswers.length, 'items');
             
+            // サーバーからの質問文と現在表示の一致性をチェック
+            if (result.header) {
+              const currentDisplayed = this.elements.headingLabel ? this.elements.headingLabel.textContent : '';
+              if (currentDisplayed && currentDisplayed !== result.header) {
+                console.warn('⚠️ 質問文不一致検出:', {
+                  '現在表示': currentDisplayed,
+                  'サーバー設定': result.header,
+                  'シート名': result.sheetName
+                });
+                
+                // 質問文を新しいものに更新
+                console.log('🔄 質問文をサーバー設定に合わせます');
+              }
+            }
+            
             // Apply saved reaction states to restore user's previous reactions
             this.applyReactionState(result.data);
             
             // Populate class filter with available classes and make it visible
             this.populateClassFilter(result.data);
+            
+            // アクティブシート情報を記録（ポーリングで使用）
+            this.state.activeSheetInfo = {
+              sheetName: result.sheetName || 'フォームの回答 1',
+              opinionHeader: result.header || 'お題',
+              lastUpdated: Date.now()
+            };
+            console.log('📄 アクティブシート情報を更新:', this.state.activeSheetInfo);
             
             if (isInitialLoad) {
               this.state.lastSeenCount = result.data.length;
