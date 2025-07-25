@@ -2251,7 +2251,7 @@ function addUnifiedQuestions(form, questionType, customConfig) {
 
       // 理由欄（常にオン）
       var reasonItem = form.addParagraphTextItem();
-      reasonItem.setTitle('そう考える根拠（こんきょ）や理由を書きましょう。');
+      reasonItem.setTitle('そう考える根拠（こんきょ）や理由を書いてください。');
       reasonItem.setRequired(false);
     } else {
       var classItem = form.addTextItem();
@@ -2308,7 +2308,7 @@ function getQuestionConfig(questionType, customConfig) {
       type: 'paragraph'
     },
     reasonQuestion: {
-      title: 'そう考える根拠（こんきょ）や理由を書きましょう。',
+      title: 'そう考える根拠（こんきょ）や理由を書いてください。',
       helpText: '',
       type: 'paragraph'
     }
