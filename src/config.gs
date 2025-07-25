@@ -2931,7 +2931,7 @@ function resetConfigJson(requestUserId) {
     };
     
     // データベースでconfigJsonを更新
-    const updateResult = updateUserInfo(requestUserId, {
+    const updateResult = updateUser(requestUserId, {
       configJson: JSON.stringify(initialConfigJson)
     });
     

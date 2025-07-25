@@ -17,8 +17,10 @@
     window.addEventListener('error', function(event) {
       if (event.error && event.error.message) {
         if (event.error.message.includes('document.write') ||
-            event.error.message.includes('Unexpected token')) {
-          console.warn('Document.write or syntax error caught and handled:', event.error.message);
+            event.error.message.includes('Unexpected token') ||
+            event.error.message.includes('await is only valid in async functions') ||
+            event.error.message.includes('Failed to execute \'write\' on \'Document\'')) {
+          console.warn('Document.write, syntax error, or async error caught and handled:', event.error.message);
           event.preventDefault();
           return false;
         }

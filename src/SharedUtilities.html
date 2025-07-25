@@ -5,6 +5,63 @@
    ============================================================================= */
 
 // =============================================================================
+// ENHANCED ERROR HANDLING FOR ASYNC/AWAIT ISSUES
+// =============================================================================
+
+// Global error handling for Google Apps Script compatibility issues
+(function() {
+  // Enhanced error suppression for GAS-specific issues
+  const suppressedErrors = [
+    'document.write',
+    'Failed to execute \'write\' on \'Document\'',
+    'await is only valid in async functions',
+    'Unexpected token',
+    'SyntaxError: Failed to execute \'write\'',
+    'mae_html_user_bin_i18n_mae_html_user',
+    'warden_bin_i18n_warden',
+    'unrecognized feature',
+    'PostCSS plugin',
+    'Tailwind CLI'
+  ];
+
+  // Override default error handling
+  const originalErrorHandler = window.onerror;
+  window.onerror = function(message, source, lineno, colno, error) {
+    const errorMessage = message ? message.toString() : '';
+    const shouldSuppress = suppressedErrors.some(pattern => 
+      errorMessage.includes(pattern)
+    );
+    
+    if (shouldSuppress) {
+      console.debug('Suppressed GAS internal error:', errorMessage);
+      return true; // Prevent default error handling
+    }
+    
+    // Call original handler if not suppressed
+    if (originalErrorHandler) {
+      return originalErrorHandler.call(this, message, source, lineno, colno, error);
+    }
+    return false;
+  };
+
+  // Enhanced promise rejection handling
+  window.addEventListener('unhandledrejection', function(event) {
+    const reason = event.reason?.toString() || '';
+    const shouldSuppress = suppressedErrors.some(pattern => 
+      reason.includes(pattern)
+    );
+    
+    if (shouldSuppress) {
+      console.debug('Suppressed internal promise rejection:', reason);
+      event.preventDefault();
+      return;
+    }
+    
+    console.warn('Unhandled promise rejection:', event.reason);
+  });
+})();
+
+// =============================================================================
 // PERFORMANCE UTILITIES
 // =============================================================================
 
