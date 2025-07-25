@@ -1444,6 +1444,79 @@ setupEventDelegation() {
     console.log('safeDisplayEmptyState: 条件を満たしたため空状態を表示します');
     this.displayEmptyState();
   }
+  
+  clearAllCardsForEmptyData() {
+    console.log('🗑️ clearAllCardsForEmptyData: 空データ受信のため全カードをクリアします');
+    
+    // currentAnswersを空にリセット
+    this.state.currentAnswers = [];
+    
+    // DOM内の全カードをクリア
+    const container = this.elements.answersContainer;
+    if (container) {
+      const existingCards = container.querySelectorAll('.answer-card');
+      console.log('clearAllCardsForEmptyData: DOMから', existingCards.length, '個のカードを削除します');
+      
+      // オブザーバーからカードを解除
+      existingCards.forEach(card => {
+        if (this.visibilityObserver) {
+          this.visibilityObserver.unobserve(card);
+        }
+        if (this.scrollObserver) {
+          this.scrollObserver.unobserve(card);
+        }
+      });
+      
+      // DOMをクリア
+      container.innerHTML = '';
+    }
+    
+    // バーチャルスクロール状態をリセット
+    if (this.virtualScrollState) {
+      this.virtualScrollState = {
+        renderedItems: 0,
+        totalItems: 0,
+        isLoading: false,
+        renderedRowIndexes: new Set(),
+        cardRegistry: new Map()
+      };
+    }
+    
+    console.log('✅ clearAllCardsForEmptyData: クリア完了');
+  }
+  
+  validatePostLoadState() {
+    const container = this.elements.answersContainer;
+    if (!container) return;
+    
+    const domCards = container.querySelectorAll('.answer-card');
+    const dataLength = this.state.currentAnswers ? this.state.currentAnswers.length : 0;
+    
+    console.log('🔍 validatePostLoadState: DOMカード数:', domCards.length, 'currentAnswers数:', dataLength);
+    
+    // 空データなのにDOMにカードが残っている場合
+    if (dataLength === 0 && domCards.length > 0) {
+      console.warn('⚠️ 状態不整合検出: 空データなのにDOMに', domCards.length, '個のカードが残っています');
+      
+      // 空データのためのクリーンアップを実行
+      this.clearAllCardsForEmptyData();
+      
+      // 空状態を表示
+      this.displayEmptyState();
+      
+      console.log('✅ 状態不整合を修正しました');
+      
+    } else if (dataLength > 0 && domCards.length === 0) {
+      console.warn('⚠️ 状態不整合検出: データが', dataLength, '個あるのにDOMにカードがありません');
+      
+      // データがあるのにカードがない場合は再レンダリング
+      console.log('再レンダリングを実行します...');
+      this.renderBoard(false, false);
+      
+    } else {
+      console.log('✅ 状態検証: DOMとデータの状態が一致しています');
+    }
+  }
 
   /**
    * ユーザー情報が見つからない場合のエラー画面を表示
@@ -1628,8 +1701,11 @@ setupEventDelegation() {
                 console.log('DEBUG: Calling displayEmptyState. currentAnswers.length:', this.state.currentAnswers.length, 'result.data.length:', result.data ? result.data.length : 'undefined');
               }
               
-              // 空状態表示の厳格な条件チェック
-              this.safeDisplayEmptyState();
+              // 空データ受信時は古いカードを強制的にクリア
+              this.clearAllCardsForEmptyData();
+              
+              // 空状態を表示
+              this.displayEmptyState();
               if (isInitialLoad) {
                 this.state.lastSeenCount = 0;
               }
@@ -1667,6 +1743,9 @@ setupEventDelegation() {
             }
 
             this.renderBoard(false, isInitialLoad);
+            
+            // データロード完了後の状態検証
+            this.validatePostLoadState();
           } finally {
             // 成功時にローディング状態を解除
             this.state.isLoading = false;
@@ -1927,6 +2006,19 @@ setupEventDelegation() {
     // Define newRows first to avoid TDZ error
     const newRows = this.state.currentAnswers;
     debugLog('DEBUG: renderBoard called. newRows.length:', newRows.length);
+    
+    // 空データの場合の早期処理
+    if (!newRows || newRows.length === 0) {
+      console.log('renderBoard: 空データを受信、DOMをクリアして空状態を表示します');
+      
+      // 古いカードを強制的にクリア
+      this.clearAllCardsForEmptyData();
+      
+      // 空状態を表示
+      this.displayEmptyState();
+      
+      return; // 早期リターン
+    }
     
     // 管理者の場合はハイライトトグルを確実に有効化
     if (this.state.isAdminUser && !this.state.showHighlightToggle) {
