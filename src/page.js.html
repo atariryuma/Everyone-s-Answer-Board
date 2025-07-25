@@ -245,27 +245,52 @@ class StudyQuestApp {
       this.elements.sizeSlider.value = savedCols;
       this.elements.sliderValue.textContent = savedCols;
     }
-    this.init();
+    this.init().catch(error => {
+      console.error('❌ StudyQuestApp: Fatal initialization error:', error);
+      this.displayInitializationError('アプリケーションの起動に失敗しました: ' + error.message);
+    });
   }
-  init() {
-      // 初期ロード状態を表示
-      this.showLoadingOverlay();
-      
-      // タイムアウト設定（15秒）
-      this.initTimeoutId = setTimeout(() => {
+  async init() {
+      try {
+        // 初期ロード状態を表示
+        this.showLoadingOverlay();
+        
+        // タイムアウト設定（15秒）
+        this.initTimeoutId = setTimeout(() => {
+          this.hideLoadingOverlay();
+          console.warn('ページの初期化に時間がかかっています。ページを再読み込みしてください。');
+        }, 15000);
+        
+        // Critical path only - non-blocking
+        this.setupCriticalElements();
+        this.showMinimalSkeleton();
+        
+        // Apply default low performance tweaks
+        this.optimizeForLowPerformance();
+        
+        // Immediate async loading for data with proper await
+        await this.loadDataImmediate();
+        
+        // Clear timeout on successful completion
+        if (this.initTimeoutId) {
+          clearTimeout(this.initTimeoutId);
+          this.initTimeoutId = null;
+        }
+        
+      } catch (error) {
+        console.error('❌ StudyQuestApp: Critical error in init():', error);
+        this.displayInitializationError('アプリケーションの初期化中にエラーが発生しました: ' + error.message);
+        
+        // Clear timeout on error
+        if (this.initTimeoutId) {
+          clearTimeout(this.initTimeoutId);
+          this.initTimeoutId = null;
+        }
+        
+        // Hide loading overlay on error
         this.hideLoadingOverlay();
-        console.warn('ページの初期化に時間がかかっています。ページを再読み込みしてください。');
-      }, 15000);
-      
-      // Critical path only - non-blocking
-      this.setupCriticalElements();
-      this.showMinimalSkeleton();
-      
-      // Apply default low performance tweaks
-      this.optimizeForLowPerformance();
-      
-      // Immediate async loading for data
-      this.loadDataImmediate();
+        return; // Exit early on initialization failure
+      }
       
       // Defer all non-critical operations
       requestIdleCallback(() => {
@@ -1923,62 +1948,79 @@ setupEventDelegation() {
     }
   }
 
-  async loadSheetData(showLoading = true, isInitialLoad = false, requestedSheetName = null) {
-    if (this.state.isLoading && showLoading) return;
-    this.state.isLoading = true;
-    this.showLoadingOverlay(); // Transparent overlay for interaction blocking only
-
-    const selectedClass = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
-    
-    // 詳細デバッグ情報をログ出力
-    const debugInfo = {
-      timestamp: new Date().toISOString(),
-      showLoading,
-      isInitialLoad,
-      requestedSheetName,
-      currentActiveSheet: this.state.currentActiveSheet,
-      userId: this.state.userId,
-      selectedClass,
-      sortOrder: this.elements.sortOrder ? this.elements.sortOrder.value : 'newest',
-      showAdminFeatures: this.state.showAdminFeatures,
-      currentAnswersCount: this.state.currentAnswers?.length || 0
+  async loadSheetData(options = {}) {
+    // Normalize options with defaults
+    const config = {
+      showLoading: options.showLoading !== false, // default true
+      bypassCache: options.bypassCache || false,
+      isInitialLoad: options.isInitialLoad || false,
+      requestedSheetName: options.requestedSheetName || null,
+      ...options
     };
     
-    console.log('🔍 loadSheetData started with parameters:', debugInfo);
-    const oldAnswers = [...this.state.currentAnswers];
-    
-    // シート切り替え時または強制リフレッシュ時はキャッシュをクリア
-    const shouldClearCache = (requestedSheetName && requestedSheetName !== this.state.currentActiveSheet) || 
-                            (showLoading && !isInitialLoad); // 明示的なリフレッシュ時
-    
-    if (shouldClearCache) {
-      debugLog('loadSheetData: Clearing caches for fresh data load');
-      
-      // フロントエンドキャッシュをクリア
-      if (this.cache) {
-        this.cache.clear();
-        debugLog('loadSheetData: Frontend cache cleared');
-      }
-      
-      // サーバーキャッシュをクリア
-      try {
-        await new Promise((resolve, reject) => {
-          google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
-            .clearCache();
-        });
-        debugLog('loadSheetData: Server cache cleared successfully');
-      } catch (error) {
-        console.warn('loadSheetData: Failed to clear server cache:', error);
-      }
+    // Prevent concurrent loading
+    if (this.state.isLoading && config.showLoading) {
+      console.log('loadSheetData: Already loading, skipping...');
+      return;
     }
     
-    // Show immediate visual feedback - but keep the question text visible
-    // (Removed loading spinner from heading to keep question text always visible)
+    try {
+      this.state.isLoading = true;
+      if (config.showLoading) {
+        this.showLoadingOverlay();
+      }
+      
+      console.log('🔍 loadSheetData started:', config);
+      const oldAnswers = [...this.state.currentAnswers];
+      
+      // Clear caches if needed
+      if (config.bypassCache || this.shouldClearCache(config)) {
+        await this.clearDataCaches();
+      }
+      
+      // Load data with simplified parameters
+      await this.performDataLoad(config, oldAnswers);
+      
+    } catch (error) {
+      console.error('❌ loadSheetData error:', error);
+      this.handleLoadError(error);
+    } finally {
+      this.state.isLoading = false;
+      this.hideLoadingOverlay();
+    }
+  }
+  
+  shouldClearCache(config) {
+    // Clear cache on sheet switching or explicit refresh
+    return (config.requestedSheetName && config.requestedSheetName !== this.state.currentActiveSheet) ||
+           (config.showLoading && !config.isInitialLoad);
+  }
+  
+  async clearDataCaches() {
+    console.log('🧹 Clearing data caches...');
     
-    // Optimized loading state - don't clear if initial load
-    if (showLoading && !isInitialLoad) {
+    // Clear frontend cache
+    if (this.cache) {
+      this.cache.clear();
+    }
+    
+    // Clear server cache
+    try {
+      await this.gas.clearCache();
+      console.log('✅ Server cache cleared');
+    } catch (error) {
+      console.warn('⚠️ Failed to clear server cache:', error);
+    }
+  }
+  
+  async performDataLoad(config, oldAnswers) {
+    // Get current filter and sort settings
+    const selectedClass = config.isInitialLoad ? 'すべて' : 
+                         (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
+    const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
+    
+    // Show skeleton cards during loading
+    if (config.showLoading && !config.isInitialLoad) {
       const count = Math.min(parseInt(this.elements.sizeSlider.value, 10) * 2, 8); // Cap at 8
       const frag = document.createDocumentFragment();
       for (let i = 0; i < count; i++) {
@@ -2465,36 +2507,58 @@ setupEventDelegation() {
     }
   }
   renderBoard(isLayoutChange = false, isInitialLoad = false, oldRows = []) {
-    // Define newRows first to avoid TDZ error
-    const newRows = this.state.currentAnswers;
-    debugLog('DEBUG: renderBoard called. newRows.length:', newRows.length);
-    
-    // 空データの場合の早期処理
-    if (!newRows || newRows.length === 0) {
-      console.log('renderBoard: 空データを受信、DOMをクリアして空状態を表示します');
+    try {
+      // Define newRows first to avoid TDZ error
+      const newRows = this.state.currentAnswers;
+      debugLog('DEBUG: renderBoard called. newRows.length:', newRows.length);
       
-      // 古いカードを強制的にクリア
-      this.clearAllCardsForEmptyData();
+      // 空データの場合の早期処理
+      if (!newRows || newRows.length === 0) {
+        console.log('renderBoard: 空データを受信、DOMをクリアして空状態を表示します');
+        this.renderEmptyState();
+        return;
+      }
       
-      // 空状態を表示
-      this.displayEmptyState();
+      // 管理者ハイライト設定の初期化
+      this.initializeAdminSettings();
       
-      return; // 早期リターン
+      // レンダリング前の状態準備
+      this.prepareRenderingState(newRows);
+      
+      // メインレンダリング処理
+      this.performMainRendering(newRows, oldRows, isLayoutChange, isInitialLoad);
+      
+      // レンダリング後の状態更新
+      this.finalizeRenderingState();
+      
+    } catch (error) {
+      console.error('❌ renderBoard: レンダリングエラー:', error);
+      this.handleRenderingError(error);
     }
-    
+  }
+  
+  renderEmptyState() {
+    this.clearAllCardsForEmptyData();
+    this.displayEmptyState();
+  }
+  
+  initializeAdminSettings() {
     // 管理者の場合はハイライトトグルを確実に有効化
     if (this.state.isAdminUser && !this.state.showHighlightToggle) {
       this.state.showHighlightToggle = true;
-      // Highlight toggle force enabled in renderBoard
-      // ハイライトトグル設定が変更されたのでキャッシュをクリア
       this.cache.clear();
-      // Cache cleared due to highlight setting change
     }
-    
+  }
+  
+  prepareRenderingState(newRows) {
     const container = this.elements.answersContainer;
     container.querySelectorAll('.skeleton').forEach(el => el.remove());
     debugLog('DEBUG: Skeletons removed. answersContainer children count:', container.children.length);
     
+    this.updateLayoutControls(newRows);
+  }
+  
+  updateLayoutControls(newRows) {
     // Batch DOM updates using performance-aware batching
     const updates = [];
     if (this.elements.sliderValue && this.elements.sizeSlider && 
@@ -2502,6 +2566,7 @@ setupEventDelegation() {
       updates.push(() => this.elements.sliderValue.textContent = this.elements.sizeSlider.value);
     }
     if (this.elements.sizeSlider) {
+      const container = this.elements.answersContainer;
       const newClassName = 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-' + this.elements.sizeSlider.value;
       if (container.className !== newClassName) {
         updates.push(() => container.className = newClassName);
@@ -2517,203 +2582,204 @@ setupEventDelegation() {
     
     // Apply updates using performance-aware batching
     this.batchDOMUpdates(updates);
+  }
+  
+  performMainRendering(newRows, oldRows, isLayoutChange, isInitialLoad) {
+    const container = this.elements.answersContainer;
     
-    if (newRows.length === 0) {
-      debugLog('DEBUG: renderBoard - newRows.length is 0. Displaying empty state.');
-      if (!container.querySelector('.no-answers')) {
-        container.innerHTML = '';
-        debugLog('DEBUG: renderBoard - container.innerHTML cleared for empty state. children count:', container.children.length);
-        const p = document.createElement('p');
-        p.className = 'text-center text-gray-500 col-span-full mt-8 no-answers';
-        p.textContent = 'このクラスの回答はありません。';
-        container.appendChild(p);
+    // 既存カードのマップを作成（リアクション状態を保持）
+    const existingMap = new Map();
+    container.querySelectorAll('.answer-card').forEach(card => {
+      existingMap.set(card.dataset.rowIndex, card);
+    });
+    
+    // 不要なカードを削除
+    existingMap.forEach((card, id) => {
+      if (!newRows.some(r => String(r.rowIndex) === id)) {
+        card.remove();
+        existingMap.delete(id);
       }
+    });
+    
+    // メインレンダリング処理
+    if (newRows.length > RENDER_BATCH_SIZE) {
+      this.renderWithVirtualScrolling(newRows, oldRows, container, existingMap, isInitialLoad);
     } else {
-      const existingMap = new Map();
-      container.querySelectorAll('.answer-card').forEach(card => {
-        existingMap.set(card.dataset.rowIndex, card);
-      });
-      existingMap.forEach((card, id) => {
-        if (!newRows.some(r => String(r.rowIndex) === id)) {
-          card.remove();
-          existingMap.delete(id);
-        }
-      });
-      const changedItems = [];
-      let prevNode = null;
-      // Enhanced batch processing with virtual scrolling for large datasets
-      // Use virtual scrolling for datasets larger than batch size
-      if (newRows.length > RENDER_BATCH_SIZE) {
-        debugLog('DEBUG: renderBoard - Using virtual scrolling for', newRows.length, 'items (initial load:', isInitialLoad, ')');
-        // 初期ロード時やシート切り替え時は、確実に新しいデータでレンダリング
-        if (isInitialLoad || this.state.currentAnswers.length === 0) {
-          this.clearVirtualScrollingState();
-        }
-        this.renderWithVirtualScrolling(newRows, oldRows, container, existingMap, changedItems, isInitialLoad);
-      } else {
-        // Process small datasets normally
-        const fragment = this.getReusableFragment();
-        
-        newRows.forEach((row) => {
-          const rowId = String(row.rowIndex);
-          let card = existingMap.get(rowId);
-          const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
-          
-          if (!card) {
-            card = this.createAnswerCard(row);
-            if (card) {
-              card.classList.add('new-card');
-              
-              // Add to visibility observer
-              if (this.visibilityObserver) {
-                this.visibilityObserver.observe(card);
-              }
-              
-              changedItems.push(row);
-              fragment.appendChild(card);
-            } else {
-              console.warn('renderBoard: Failed to create card for row:', row.rowIndex);
-              // Skip this row and continue with the next one
-            }
-          } else {
-            this.updateExistingCard(card, row, oldData, changedItems);
-            // 既存のカードは既にDOMにあるので、フラグメントに追加しない
-            // 必要に応じて位置を調整するが、ここでは元の位置を保持
-          }
-        });
-        
-        // Append fragment to container
-        if (fragment.children.length > 0) {
-          container.appendChild(fragment);
-          debugLog('DEBUG: renderBoard - Fragment appended. answersContainer children count:', container.children.length);
-        }
-        
-        // Recycle fragment
-        this.recycleFragment(fragment);
-      }
-      // Defer updates for better performance
-      if (changedItems.length) {
-        this.deferredRender(() => this.applyUpdates(changedItems));
-      }
+      this.renderDirectly(newRows, oldRows, container, existingMap);
     }
   }
   
-  renderWithVirtualScrolling(newRows, oldRows, container, existingMap, changedItems, isInitialLoad = false) {
-    // Use dynamic batch sizing based on current performance metrics
-    const dynamicBatchSize = getDynamicBatchSize(this.performanceMetrics);
-    const batchSize = this.isLowPerformanceMode ? Math.min(CHUNK_SIZE, dynamicBatchSize) : dynamicBatchSize;
-    let currentIndex = 0;
-    let prevNode = null;
+  renderDirectly(newRows, oldRows, container, existingMap) {
+    const fragment = this.getReusableFragment();
     
-    debugLog('renderWithVirtualScrolling: Using batch size', batchSize, 'for', newRows.length, 'items (low perf mode:', this.isLowPerformanceMode, ')');
+    newRows.forEach((row) => {
+      const rowId = String(row.rowIndex);
+      let card = existingMap.get(rowId);
+      const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
+      
+      if (!card) {
+        // 新しいカードを作成（リアクション機能を含む）
+        card = this.createAnswerCard(row);
+        if (card) {
+          card.classList.add('new-card');
+          fragment.appendChild(card);
+        } else {
+          console.warn('renderBoard: Failed to create card for row:', row.rowIndex);
+        }
+      } else if (this.shouldUpdateCard(row, oldData)) {
+        // 既存カードを更新（リアクション状態を保持）
+        this.updateAnswerCard(card, row, oldData);
+      }
+    });
     
-    // Initialize virtual scrolling state if not exists
-    if (!this.virtualScrollState) {
-      this.virtualScrollState = {
-        renderedItems: 0,
-        totalItems: newRows.length,
-        isLoading: false,
-        renderedRowIndexes: new Set(),
-        cardRegistry: new Map() // カードの参照を保持して再利用を可能に
-      };
-    } else {
-      // Update total items for existing state
-      this.virtualScrollState.totalItems = newRows.length;
-      // Ensure renderedRowIndexes exists
-      if (!this.virtualScrollState.renderedRowIndexes) {
-        this.virtualScrollState.renderedRowIndexes = new Set();
-      }
-      // Ensure cardRegistry exists
-      if (!this.virtualScrollState.cardRegistry) {
-        this.virtualScrollState.cardRegistry = new Map();
-      }
+    if (fragment.children.length > 0) {
+      container.appendChild(fragment);
+      debugLog('DEBUG: renderBoard - Fragment appended. answersContainer children count:', container.children.length);
+    }
+  }
+  
+  renderWithVirtualScrolling(newRows, oldRows, container, existingMap, isInitialLoad) {
+    debugLog('DEBUG: renderBoard - Using virtual scrolling for', newRows.length, 'items (initial load:', isInitialLoad, ')');
+    
+    if (isInitialLoad || this.state.currentAnswers.length === 0) {
+      this.clearVirtualScrollingState();
     }
     
-    const processBatch = () => {
-      const startTime = performance.now();
-      const endIndex = Math.min(currentIndex + batchSize, newRows.length);
-      const batch = newRows.slice(currentIndex, endIndex);
-      
-      // Use document fragment for efficient DOM manipulation
-      const fragment = this.getReusableFragment();
-      
-      batch.forEach((row) => {
-        const rowId = String(row.rowIndex);
-        let card = existingMap.get(rowId);
-        const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
-        
-        if (!card) {
-          // カードレジストリから再利用可能なカードをチェック
-          card = this.virtualScrollState.cardRegistry.get(rowId);
-          
-          if (!card) {
-            card = this.createAnswerCard(row);
-            if (card) {
-              // カードレジストリに登録
-              this.virtualScrollState.cardRegistry.set(rowId, card);
-            }
-          }
-          
-          if (card) {
-            card.classList.add('new-card');
-            
-            // Track this item as rendered
-            this.virtualScrollState.renderedRowIndexes.add(rowId);
-            
-            // Add to visibility observer for virtual scrolling
-            if (this.visibilityObserver) {
-              this.visibilityObserver.observe(card);
-            }
-            
-            changedItems.push(row);
-            fragment.appendChild(card);
-          } else {
-            console.warn('renderWithVirtualScrolling: Failed to create card for row:', row.rowIndex);
-            // Skip this row and continue with the next one
-          }
-        } else {
-          // Track existing card as rendered
-          this.virtualScrollState.renderedRowIndexes.add(rowId);
-          // カードレジストリにも登録
-          this.virtualScrollState.cardRegistry.set(rowId, card);
-          this.updateExistingCard(card, row, oldData, changedItems);
-          // 既存のカードは既にDOMにあるので、フラグメントに追加しない
-        }
-      });
-      
-      // Append fragment to container
-      if (fragment.children.length > 0) {
-        container.appendChild(fragment);
-        debugLog('DEBUG: renderWithVirtualScrolling - Fragment appended. answersContainer children count:', container.children.length);
-        
-        // Update virtual scroll state
-        this.virtualScrollState.renderedItems = container.children.length;
-      }
-      
-      // Recycle fragment
-      this.recycleFragment(fragment);
-      
-      currentIndex = endIndex;
-      
-      // Continue processing if there are more items
-      if (currentIndex < newRows.length && !isInitialLoad) {
-        const elapsed = performance.now() - startTime;
-        
-        if (elapsed < PERFORMANCE_BUDGET && !this.isLowPerformanceMode) {
-          // Continue synchronously if we have time budget
-          processBatch();
-        } else {
-          // Defer to next frame/idle callback
-          this.deferredRender(processBatch);
-        }
-      } else {
-        // Setup scroll observer for dynamic loading (initial load or all items processed)
-        debugLog('DEBUG: renderWithVirtualScrolling - Setting up scroll observer. Rendered:', currentIndex, 'of', newRows.length);
-        this.setupScrollObserver();
-      }
-    };
+    // 仮想スクロールでも既存のリアクション状態を保持
+    const fragment = this.getReusableFragment();
+    const visibleRange = this.calculateVisibleRange(newRows.length);
+    const visibleRows = newRows.slice(visibleRange.start, visibleRange.end);
     
-    processBatch();
+    visibleRows.forEach((row) => {
+      const rowId = String(row.rowIndex);
+      let card = existingMap.get(rowId);
+      const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
+      
+      if (!card) {
+        card = this.createAnswerCard(row);
+        if (card) {
+          fragment.appendChild(card);
+        }
+      } else if (this.shouldUpdateCard(row, oldData)) {
+        // 既存カードを更新（リアクション状態を保持）
+        this.updateAnswerCard(card, row, oldData);
+      }
+    });
+    
+    if (fragment.children.length > 0) {
+      container.appendChild(fragment);
+    }
+  }
+  
+  shouldUpdateCard(newData, oldData) {
+    if (!oldData) return true;
+    
+    // リアクション数の変更をチェック
+    const newReactionCount = this.reactionTypes.reduce((sum, rt) => 
+      sum + (newData.reactions?.[rt.key]?.count || 0), 0);
+    const oldReactionCount = this.reactionTypes.reduce((sum, rt) => 
+      sum + (oldData.reactions?.[rt.key]?.count || 0), 0);
+    
+    return newReactionCount !== oldReactionCount || 
+           newData.isHighlighted !== oldData.isHighlighted ||
+           newData.content !== oldData.content;
+  }
+  
+  finalizeRenderingState() {
+    // レンダリング完了後の状態更新
+    this.updateAnswerCount();
+    this.applyAnimations();
+  }
+  
+  handleRenderingError(error) {
+    console.error('レンダリングエラーの詳細:', error);
+    
+    // フォールバック: 最小限の表示を試行
+    try {
+      const container = this.elements.answersContainer;
+      container.innerHTML = `
+        <div class="text-center py-8 col-span-full">
+          <p class="text-red-400">表示エラーが発生しました</p>
+          <button onclick="location.reload()" class="mt-2 px-4 py-2 bg-blue-600 text-white rounded">
+            再読み込み
+          </button>
+        </div>
+      `;
+    } catch (fallbackError) {
+      console.error('フォールバック表示も失敗:', fallbackError);
+    }
+  }
+  }
+  
+  updateAnswerCard(card, newData, oldData) {
+    if (!card || !newData) return;
+    
+    try {
+      // Update text content if changed
+      if (!oldData || oldData.content !== newData.content) {
+        const contentElement = card.querySelector('.answer-preview p');
+        if (contentElement) {
+          contentElement.textContent = newData.content || newData.reason || '';
+        }
+      }
+      
+      // Update student name if changed
+      if (!oldData || oldData.name !== newData.name) {
+        const nameElement = card.querySelector('.font-bold');
+        if (nameElement) {
+          nameElement.textContent = newData.name || '';
+        }
+      }
+      
+      // リアクション状態を保持しつつ更新
+      this.updateCardReactions(card, newData);
+      
+      // ハイライト状態を更新
+      this.updateCardHighlight(card, newData);
+      
+    } catch (error) {
+      console.error('updateAnswerCard error:', error);
+    }
+  }
+  
+  updateCardReactions(card, data) {
+    // Preserve existing reaction UI state while updating counts
+    const reactionContainer = card.querySelector('.reaction-container');
+    if (!reactionContainer) return;
+    
+    this.reactionTypes.forEach(reactionType => {
+      const button = reactionContainer.querySelector(`[data-reaction="${reactionType.key}"]`);
+      if (!button) return;
+      
+      const countElement = button.querySelector('.reaction-count');
+      const newCount = data.reactions?.[reactionType.key]?.count || 0;
+      
+      if (countElement) {
+        countElement.textContent = newCount;
+      }
+      
+      // Update button visibility based on count
+      button.style.display = newCount > 0 ? 'flex' : 'none';
+    });
+    
+    // Update card background based on reactions
+    this.updateCardReactionBackground(card, data);
+  }
+  
+  updateCardHighlight(card, data) {
+    const isHighlighted = data.isHighlighted || data.highlight;
+    
+    if (isHighlighted) {
+      card.classList.add('highlighted-card');
+    } else {
+      card.classList.remove('highlighted-card');
+    }
+    
+    // Update highlight button if present
+    const highlightBtn = card.querySelector('.highlight-btn');
+    if (highlightBtn) {
+      highlightBtn.classList.toggle('active', isHighlighted);
+    }
   }
   
   updateExistingCard(card, row, oldData, changedItems) {
