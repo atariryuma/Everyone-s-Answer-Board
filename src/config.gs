@@ -2935,7 +2935,7 @@ function resetConfigJson(requestUserId) {
       configJson: JSON.stringify(initialConfigJson)
     });
     
-    if (updateResult.success) {
+    if (updateResult.status === 'success') {
       console.log('✅ ConfigJsonリセット完了');
       return {
         success: true,

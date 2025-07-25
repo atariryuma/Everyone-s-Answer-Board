@@ -299,47 +299,61 @@ class StudyQuestApp {
       }, { timeout: 50 });
 
       // AdminPanelからのメッセージをリッスン
-      window.addEventListener('message', (event) => {
+      window.addEventListener('message', async (event) => {
         if (event.data && event.data.type === 'REFRESH_BOARD_DATA') {
           // Refresh board data message received
-          this.loadSheetData(true);
-          // Show info modal on board refresh
-          setTimeout(() => this.showInfoModal(), 1000);
+          try {
+            await this.loadSheetData(true);
+            // Show info modal on board refresh
+            setTimeout(() => this.showInfoModal(), 1000);
+          } catch (error) {
+            console.error('ボードデータ更新エラー:', error);
+          }
         } else if (event.data && event.data.type === 'BOARD_PUBLISHED') {
           // 新しいボードが公開された時の即座更新
           console.log('新しいボードが公開されました:', event.data.sheetName);
-          // キャッシュバイパスで新しいデータをチェック
-          this.checkForNewContentLight(true).then(() => {
+          try {
+            // キャッシュバイパスで新しいデータをチェック
+            await this.checkForNewContentLight(true);
             // 必要に応じてフルリフレッシュ
-            this.loadSheetData(true);
+            await this.loadSheetData(true);
             // Show info modal when new board is published
             setTimeout(() => this.showInfoModal(), 1500);
-          }).catch(error => {
+          } catch (error) {
             console.warn('新しいボードの即座更新でエラー:', error);
             // エラー時もフルリフレッシュを実行
-            this.loadSheetData(true);
+            try {
+              await this.loadSheetData(true);
+            } catch (loadError) {
+              console.error('フォールバック読み込みもエラー:', loadError);
+            }
             // Show info modal even on error
             setTimeout(() => this.showInfoModal(), 1500);
-          });
+          }
         }
       });
       
       // BroadcastChannelで他のタブからの更新通知も受信
       if (typeof BroadcastChannel !== 'undefined') {
         const channel = new BroadcastChannel('board-updates');
-        channel.addEventListener('message', (event) => {
+        channel.addEventListener('message', async (event) => {
           if (event.data && event.data.type === 'BOARD_PUBLISHED') {
             console.log('BroadcastChannelから新しいボード公開を受信:', event.data.sheetName);
-            this.checkForNewContentLight(true).then(() => {
-              this.loadSheetData(true);
+            try {
+              await this.checkForNewContentLight(true);
+              await this.loadSheetData(true);
               // Show info modal when board is updated via BroadcastChannel
               setTimeout(() => this.showInfoModal(), 1500);
-            }).catch(error => {
+            } catch (error) {
               console.warn('BroadcastChannel経由の更新でエラー:', error);
-              this.loadSheetData(true);
+              try {
+                await this.loadSheetData(true);
+              } catch (loadError) {
+                console.error('BroadcastChannel フォールバック読み込みもエラー:', loadError);
+              }
               // Show info modal even on error
               setTimeout(() => this.showInfoModal(), 1500);
-            });
+            }
           }
         });
       }
@@ -441,17 +455,23 @@ class StudyQuestApp {
     if (this.elements.modalReactionContainer) {
       this.elements.modalReactionContainer.addEventListener('click', this.handlers.onModalReactionClick);
     }
-    this.handlers.onClassFilterChange = () => {
+    this.handlers.onClassFilterChange = async () => {
       this.dismissNewContentBanner(); // フィルター変更時は既存の通知を消去
-      this.loadSheetData(true).then(() => {
+      try {
+        await this.loadSheetData(true);
         this.state.lastSeenCount = this.state.currentAnswers.length; // 新しいベースラインを設定
-      });
+      } catch (error) {
+        console.error('クラスフィルター変更時のデータ読み込みエラー:', error);
+      }
     };
-    this.handlers.onSortOrderChange = () => {
+    this.handlers.onSortOrderChange = async () => {
       this.dismissNewContentBanner(); // ソート変更時は既存の通知を消去
-      this.loadSheetData(true).then(() => {
+      try {
+        await this.loadSheetData(true);
         this.state.lastSeenCount = this.state.currentAnswers.length; // 新しいベースラインを設定
-      });
+      } catch (error) {
+        console.error('ソート順変更時のデータ読み込みエラー:', error);
+      }
     };
     if (this.elements.classFilter) {
       this.elements.classFilter.addEventListener('change', this.handlers.onClassFilterChange);
@@ -470,7 +490,13 @@ class StudyQuestApp {
     
     // 新着通知バナーのイベントハンドラー
     if (this.elements.refreshContentBtn) {
-      this.handlers.onRefreshContentClick = () => this.refreshContent();
+      this.handlers.onRefreshContentClick = async () => {
+        try {
+          await this.refreshContent();
+        } catch (error) {
+          console.error('コンテンツ更新エラー:', error);
+        }
+      };
       this.elements.refreshContentBtn.addEventListener('click', this.handlers.onRefreshContentClick);
     }
     if (this.elements.dismissBannerBtn) {
@@ -1472,20 +1498,23 @@ setupEventDelegation() {
       
       // 3. Start loading immediately without waiting
       console.log('📊 StudyQuestApp: Starting sheet data loading...');
-      this.loadSheetData(false, true).then(() => {
+      try {
+        await this.loadSheetData(false, true);
         console.log('✅ StudyQuestApp: Sheet data loaded, starting polling...');
         this.startPolling();
-      }).catch(error => {
+      } catch (error) {
         console.error('❌ StudyQuestApp: Sheet data loading failed:', error);
         this.displayDataLoadError(error.message || 'データの読み込みに失敗しました');
-      });
+      }
       
       // 4. Load sheets in background only for administrators
       if (this.state.isAdminUser) {
         console.log('👑 StudyQuestApp: Loading available sheets for admin user...');
-        this.loadAvailableSheets().catch(error => {
+        try {
+          await this.loadAvailableSheets();
+        } catch (error) {
           console.warn('⚠️ StudyQuestApp: Available sheets loading failed:', error.message);
-        });
+        }
       }
       
       console.log('🎯 StudyQuestApp: Immediate loading initialization completed');

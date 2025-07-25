@@ -19,6 +19,8 @@
         if (event.error.message.includes('document.write') ||
             event.error.message.includes('Unexpected token') ||
             event.error.message.includes('await is only valid in async functions') ||
+            event.error.message.includes('await is only valid in async functions and the top level bodies of modules') ||
+            event.error.message.includes('SyntaxError: await is only valid') ||
             event.error.message.includes('Failed to execute \'write\' on \'Document\'')) {
           console.warn('Document.write, syntax error, or async error caught and handled:', event.error.message);
           event.preventDefault();
