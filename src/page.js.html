@@ -678,6 +678,7 @@ class StudyQuestApp {
     }
     
     // Fallback API call (slower)
+    let prevState;
     try {
       const isAdmin = await this.gas.checkAdmin();
       if (isAdmin) {
@@ -3238,37 +3239,41 @@ class StudyQuestApp {
         console.log('リアクション処理中のため無視:', reactionKey);
         return;
     }
+    let prevState;
 
     try {
         this.pendingReactions.add(reactionKey);
-        
-        // ボタンの状態を即座に更新（視覚的フィードバック）
+
         const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
         this.setReactionButtonsLoading(btns, true);
-        
-        // データの存在確認
+
         const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
         if (!item) {
             throw new Error(`Item not found for rowIndex: ${numericRowIndex}`);
         }
 
+        prevState = JSON.parse(JSON.stringify(item.reactions || {}));
+        this.applyFallbackReactionUpdate(item, reaction);
+        await this.updateReactionUI(item);
+
         console.log('🎯 リアクション送信:', { rowIndex: numericRowIndex, reaction, sheetName: this.state.sheetName });
-        
-        // サーバーにリアクションを送信
+
         const response = await this.sendReactionToServer(numericRowIndex, reaction);
-        
-        // レスポンス処理
+
         await this.processReactionResponse(item, response, reaction);
-        
+
         console.log('✅ リアクション処理完了:', reactionKey);
-        
     } catch (error) {
         console.error('❌ リアクション処理エラー:', error);
+        const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
+        if (item) {
+            item.reactions = JSON.parse(JSON.stringify(prevState || {}));
+            await this.updateReactionUI(item);
+        }
         await this.handleReactionError(error, rowIndex, reaction);
     } finally {
         this.pendingReactions.delete(reactionKey);
-        
-        // ボタンの状態をリセット
+
         const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
         this.setReactionButtonsLoading(btns, false);
     }
