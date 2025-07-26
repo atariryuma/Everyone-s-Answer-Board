@@ -58,6 +58,69 @@
   </div>
 </div>
 
+<!-- 6時間自動停止確認モーダル -->
+<div id="auto-stop-confirmation-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-md w-full">
+      <div class="flex items-center gap-3 mb-4">
+        <svg class="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <h3 class="text-xl font-bold text-green-400">📋 公開完了</h3>
+      </div>
+      
+      <div class="space-y-4 text-gray-300">
+        <p class="text-center text-gray-200">回答ボードが正常に公開されました。</p>
+        
+        <!-- 自動停止機能の詳細 -->  
+        <div class="bg-blue-500/10 border border-blue-400/30 rounded-lg p-4">
+          <h4 class="text-sm font-semibold text-blue-400 mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            ⏰ 自動停止設定
+          </h4>
+          <div class="space-y-2 text-xs text-blue-200">
+            <div class="flex justify-between">
+              <span class="text-gray-400">公開開始時間:</span>
+              <span id="publish-start-time" class="font-medium text-blue-100">確認中...</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">自動停止予定:</span>
+              <span id="auto-stop-time" class="font-medium text-yellow-100">確認中...</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">残り時間:</span>
+              <span id="remaining-time" class="font-medium text-green-100">確認中...</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-3">
+          <p class="text-xs text-yellow-200 leading-relaxed">
+            <strong>⚠️ 重要:</strong> 6時間後に自動的に公開が停止されます。学習者の回答期間を考慮して適切に管理してください。
+          </p>
+        </div>
+      </div>
+      
+      <div class="flex justify-end gap-3 mt-6">
+        <button type="button" id="extend-time-btn" class="btn btn-secondary flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          時間延長
+        </button>
+        <button type="button" id="confirm-auto-stop-btn" class="btn btn-primary">
+          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          確認
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- プライバシーモーダル -->
 <div id="privacy-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
   <div class="flex items-center justify-center min-h-full p-4">
@@ -853,6 +916,86 @@ class SharedModals {
     modal.classList.remove('hidden');
   }
 
+  // 6時間自動停止確認モーダルの表示
+  showAutoStopConfirmation(publishResult) {
+    const modal = document.getElementById('auto-stop-confirmation-modal');
+    if (!modal) {
+      console.error('自動停止確認モーダルが見つかりません');
+      return;
+    }
+
+    // 公開時間と停止時間の設定
+    if (publishResult && publishResult.publishedAt) {
+      const publishTime = new Date(publishResult.publishedAt);
+      const stopTime = new Date(publishTime.getTime() + (360 * 60 * 1000)); // 6時間後
+      
+      document.getElementById('publish-start-time').textContent = publishTime.toLocaleString('ja-JP');
+      document.getElementById('auto-stop-time').textContent = stopTime.toLocaleString('ja-JP');
+      
+      // 残り時間のカウントダウンを開始
+      this.startCountdown(stopTime);
+    }
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    // イベントリスナーの設定
+    const confirmBtn = document.getElementById('confirm-auto-stop-btn');
+    const extendBtn = document.getElementById('extend-time-btn');
+
+    if (confirmBtn) {
+      confirmBtn.onclick = () => {
+        this.hideModal('auto-stop-confirmation-modal');
+      };
+    }
+
+    if (extendBtn) {
+      extendBtn.onclick = () => {
+        // 時間延長機能（将来実装）
+        alert('時間延長機能は今後実装予定です。');
+      };
+    }
+  }
+
+  // 残り時間カウントダウン
+  startCountdown(stopTime) {
+    const updateRemainingTime = () => {
+      const now = new Date();
+      const remaining = stopTime - now;
+      
+      if (remaining <= 0) {
+        document.getElementById('remaining-time').textContent = '自動停止済み';
+        return;
+      }
+      
+      const hours = Math.floor(remaining / (1000 * 60 * 60));
+      const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+      document.getElementById('remaining-time').textContent = `${hours}時間${minutes}分`;
+    };
+
+    // 初回実行
+    updateRemainingTime();
+    
+    // 1分毎に更新
+    const interval = setInterval(updateRemainingTime, 60000);
+    
+    // モーダルが閉じられたときにインターバルをクリア
+    const modal = document.getElementById('auto-stop-confirmation-modal');
+    if (modal) {
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+            if (modal.classList.contains('hidden')) {
+              clearInterval(interval);
+              observer.disconnect();
+            }
+          }
+        });
+      });
+      observer.observe(modal, { attributes: true });
+    }
+  }
+
   // フォーム設定モーダルの表示
   showFormConfig() {
     this.loadAdminModals();
@@ -1010,6 +1153,10 @@ window.showDigitalCitizenshipModal = function() {
 
 window.showPublishModal = function(onPublish, onCancel, autoStopSettings) {
   window.sharedModals.showPublish(onPublish, onCancel, autoStopSettings);
+};
+
+window.showAutoStopConfirmationModal = function(publishResult) {
+  window.sharedModals.showAutoStopConfirmation(publishResult);
 };
 
 // 管理者専用モーダル用グローバル関数（後方互換性のため）

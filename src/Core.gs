@@ -4,6 +4,93 @@
  */
 
 /**
+ * 自動停止時間を計算する
+ * @param {string} publishedAt - 公開開始時間のISO文字列
+ * @param {number} minutes - 自動停止までの分数
+ * @returns {object} 停止時間情報
+ */
+function getAutoStopTime(publishedAt, minutes) {
+  try {
+    const publishTime = new Date(publishedAt);
+    const stopTime = new Date(publishTime.getTime() + (minutes * 60 * 1000));
+    
+    return {
+      publishTime: publishTime,
+      stopTime: stopTime,
+      publishTimeFormatted: publishTime.toLocaleString('ja-JP'),
+      stopTimeFormatted: stopTime.toLocaleString('ja-JP'),
+      remainingMinutes: Math.max(0, Math.floor((stopTime.getTime() - new Date().getTime()) / (1000 * 60)))
+    };
+  } catch (error) {
+    console.error('自動停止時間計算エラー:', error);
+    return null;
+  }
+}
+
+/**
+ * アクティブなシートの公開を終了する（公開終了ボタン用）
+ * @param {string} requestUserId - リクエスト元のユーザーID（オプション）
+ * @returns {object} 公開終了結果
+ */
+function clearActiveSheet(requestUserId) {
+  if (!requestUserId) {
+    requestUserId = getUserId();
+  }
+  
+  verifyUserAccess(requestUserId);
+  const lock = LockService.getScriptLock();
+  
+  try {
+    if (!lock.tryLock(10000)) {
+      throw new Error('システムが混雑しています。しばらく待ってから再度お試しください。');
+    }
+    
+    console.log('clearActiveSheet開始: userId=%s', requestUserId);
+    
+    const userInfo = getConfigUserInfo(requestUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません。');
+    }
+    
+    const configJson = JSON.parse(userInfo.configJson || '{}');
+    
+    console.log('🔍 公開停止前の設定:', {
+      publishedSheetName: configJson.publishedSheetName,
+      publishedSpreadsheetId: configJson.publishedSpreadsheetId,
+      appPublished: configJson.appPublished
+    });
+    
+    // 公開状態のクリア（データソースとシート選択は保持）
+    configJson.publishedSheet = ''; // 後方互換性のため残す
+    configJson.publishedSheetName = ''; // 正しいプロパティ名
+    configJson.publishedSpreadsheetId = ''; // スプレッドシートIDもクリア
+    configJson.appPublished = false; // 公開停止
+    
+    // データベースに保存
+    updateUser(requestUserId, {
+      configJson: JSON.stringify(configJson),
+      lastUpdated: new Date().toISOString()
+    });
+    
+    console.log('clearActiveSheet完了: 公開を停止しました');
+    
+    return {
+      success: true,
+      message: '回答ボードの公開を終了しました',
+      status: 'unpublished'
+    };
+    
+  } catch (error) {
+    console.error('clearActiveSheetでエラー:', error.message, error.stack);
+    throw new Error('公開終了処理中にエラーが発生しました: ' + error.message);
+  } finally {
+    if (lock) {
+      lock.releaseLock();
+    }
+  }
+}
+
+/**
  * セットアップステップを統一的に判定する関数
  * @param {Object} userInfo - ユーザー情報
  * @param {Object} configJson - 設定JSON

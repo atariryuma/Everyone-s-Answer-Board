@@ -2714,6 +2714,11 @@ function switchToSheetInContext(context, spreadsheetId, sheetName) {
     configJson.appPublished = true;
     configJson.lastModified = new Date().toISOString();
     
+    // 6時間自動停止機能の設定
+    configJson.publishedAt = new Date().toISOString(); // 公開開始時間
+    configJson.autoStopEnabled = true; // 6時間自動停止フラグ
+    configJson.autoStopMinutes = 360; // 6時間 = 360分
+    
     // updateUserOptimizedを使用してコンテキストに変更を蓄積
     updateUserOptimized(context, { 
       configJson: JSON.stringify(configJson) 

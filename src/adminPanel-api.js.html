@@ -385,6 +385,19 @@ function proceedWithSaveAndPublish(config) {
           console.warn('リアルタイム更新通知でエラー:', broadcastError);
         }
         
+        // 6時間自動停止の確認モーダルを表示
+        setTimeout(() => {
+          if (typeof showAutoStopConfirmationModal === 'function' && result.userInfo) {
+            const configJson = JSON.parse(result.userInfo.configJson || '{}');
+            if (configJson.publishedAt && configJson.autoStopEnabled) {
+              showAutoStopConfirmationModal({
+                publishedAt: configJson.publishedAt,
+                autoStopMinutes: configJson.autoStopMinutes || 360
+              });
+            }
+          }
+        }, 1000); // 成功メッセージの後に表示
+        
         // Use fresh data from save response if available
         if (result.userInfo && result._meta) {
           logInfo('Using fresh data from save response');

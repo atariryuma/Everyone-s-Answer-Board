@@ -252,14 +252,32 @@
             // サーバーに再公開リクエスト
             google.script.run
                 .withSuccessHandler((result) => {
-                    showMessage('回答ボードが再公開されました！', 'success');
-                    // 公開後はページをリロードして公開状態を表示
+                    console.log('✅ 再公開成功:', result);
+                    showMessage(`${result.message || '回答ボードが再公開されました！'}`, 'success');
+                    
+                    // 公開後は公開ページに遷移
                     setTimeout(() => {
-                        location.reload();
+                        // 元の回答ボードページに遷移
+                        google.script.run
+                            .withSuccessHandler(function(webAppUrl) {
+                                const url = new URL(webAppUrl);
+                                // 通常の回答ボード表示ページに遷移
+                                window.location.href = url.toString();
+                            })
+                            .withFailureHandler(function(error) {
+                                console.error('URL取得失敗:', error);
+                                // フォールバック: 現在のページをリロード
+                                location.reload();
+                            })
+                            .getWebAppUrl();
                     }, 1500);
                 })
                 .withFailureHandler((error) => {
-                    showMessage('再公開に失敗しました: ' + (error.message || '不明なエラー'), 'error');
+                    console.error('❌ 再公開エラー:', error);
+                    const errorMessage = error.message || error.toString() || '不明なエラー';
+                    showMessage(`再公開に失敗しました: ${errorMessage}`, 'error');
+                    
+                    // ボタンを元の状態に戻す
                     button.disabled = false;
                     button.innerHTML = originalHTML;
                 })
