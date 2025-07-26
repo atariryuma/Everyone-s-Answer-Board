@@ -2772,37 +2772,47 @@ class StudyQuestApp {
     }
   }
   
-  renderWithVirtualScrolling(newRows, oldRows, container, existingMap, isInitialLoad) {
-    debugLog('DEBUG: renderBoard - Using virtual scrolling for', newRows.length, 'items (initial load:', isInitialLoad, ')');
-    
-    if (isInitialLoad || this.state.currentAnswers.length === 0) {
-      this.clearVirtualScrollingState();
+  calculateVisibleRange(totalItems) {
+    const container = this.elements.answersContainer;
+    if (!container) {
+      return { startIndex: 0, endIndex: 0 };
     }
-    
-    // 仮想スクロールでも既存のリアクション状態を保持
-    const fragment = this.getReusableFragment();
-    const visibleRange = this.calculateVisibleRange(newRows.length);
-    const visibleRows = newRows.slice(visibleRange.start, visibleRange.end);
-    
-    visibleRows.forEach((row) => {
-      const rowId = String(row.rowIndex);
-      let card = existingMap.get(rowId);
-      const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
-      
-      if (!card) {
-        card = this.createAnswerCard(row);
-        if (card) {
-          fragment.appendChild(card);
-        }
-      } else if (this.shouldUpdateCard(row, oldData)) {
-        // 既存カードを更新（リアクション状態を保持）
-        this.updateAnswerCard(card, row, oldData);
+
+    const scrollTop = container.scrollTop;
+    const containerHeight = container.clientHeight;
+    const cardHeight = 150; // 仮のカードの高さ。実際のCSSに基づいて調整が必要。
+
+    const startIndex = Math.floor(scrollTop / cardHeight);
+    const endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight));
+
+    return { startIndex, endIndex };
+  }
+
+  renderWithVirtualScrolling(answers) {
+    const container = this.elements.answersContainer;
+    if (!container) return;
+
+    // Clear existing content
+    container.innerHTML = '';
+
+    // Calculate visible range
+    const visibleRange = this.calculateVisibleRange(answers.length);
+    const { startIndex, endIndex } = visibleRange;
+
+    // Render only visible items
+    const fragment = document.createDocumentFragment();
+    for (let i = startIndex; i < endIndex; i++) {
+      const answer = answers[i];
+      const cardElement = this.createAnswerCard(answer);
+      if (cardElement) {
+        fragment.appendChild(cardElement);
       }
-    });
-    
-    if (fragment.children.length > 0) {
-      container.appendChild(fragment);
     }
+    container.appendChild(fragment);
+
+    // Update scroll position to maintain user's view
+    // This part might need more sophisticated logic for smooth scrolling
+    // For now, we just re-render the visible portion.
   }
   
   shouldUpdateCard(newData, oldData) {
