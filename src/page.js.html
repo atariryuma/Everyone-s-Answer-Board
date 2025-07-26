@@ -4677,33 +4677,59 @@ class StudyQuestApp {
    */
   applyReactionState(answers) {
     const savedReactions = this.loadReactionState();
-    
+    let modified = false;
+
     answers.forEach(answer => {
+      if (!savedReactions[answer.rowIndex]) {
+        savedReactions[answer.rowIndex] = {};
+      }
       const savedReaction = savedReactions[answer.rowIndex];
+
       if (answer.reactions) {
-        // 各リアクションタイプについて状態を統合
         Object.keys(answer.reactions).forEach(reactionType => {
-          if (answer.reactions[reactionType]) {
-            // サーバーから既にreacted: trueが来ている場合はそれを優先
-            // サーバーがfalseでもローカルストレージにあれば保持
-            const serverReacted = answer.reactions[reactionType].reacted;
-            const localReacted = savedReaction && savedReaction[reactionType];
-            
-            // 最終的なreacted状態を決定
-            answer.reactions[reactionType].reacted = serverReacted || !!localReacted;
-            
-            debugLog(`✅ リアクション状態統合 [行${answer.rowIndex}][${reactionType}]:`, {
-              serverReacted: serverReacted,
-              localReacted: !!localReacted, 
-              finalReacted: answer.reactions[reactionType].reacted,
-              timestamp: new Date().toISOString()
-            });
+          const info = answer.reactions[reactionType];
+          if (!info) return;
+
+          const serverReacted = !!info.reacted;
+          const localReacted = !!savedReaction[reactionType];
+
+          info.reacted = serverReacted;
+
+          if (serverReacted) {
+            if (!localReacted) {
+              if (!savedReactions[answer.rowIndex]) {
+                savedReactions[answer.rowIndex] = {};
+              }
+              savedReactions[answer.rowIndex][reactionType] = {
+                reacted: true,
+                timestamp: new Date().toISOString()
+              };
+              modified = true;
+            }
+          } else if (localReacted) {
+            delete savedReaction[reactionType];
+            modified = true;
           }
+
+          if (Object.keys(savedReaction).length === 0) {
+            delete savedReactions[answer.rowIndex];
+          }
+
+          debugLog(`✅ リアクション状態同期 [行${answer.rowIndex}][${reactionType}]:`, {
+            serverReacted,
+            localReacted,
+            finalReacted: info.reacted,
+            timestamp: new Date().toISOString()
+          });
         });
       }
     });
-    
-    debugLog('サーバーとローカルのリアクション状態統合完了');
+
+    if (modified) {
+      localStorage.setItem(this.reactionStorageKey, JSON.stringify(savedReactions));
+    }
+
+    debugLog('サーバーとローカルのリアクション状態同期完了');
   }
 
   updateModalReactionButtons(item) {
