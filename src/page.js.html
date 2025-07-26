@@ -2064,7 +2064,9 @@ class StudyQuestApp {
   
   async performDataLoad(config, oldAnswers) {
     // Get current filter and sort settings
-    const selectedClass = config.isInitialLoad ? 'すべて' : 
+    const isInitialLoad = config.isInitialLoad;
+    const requestedSheetName = config.requestedSheetName;
+    const selectedClass = isInitialLoad ? 'すべて' :
                          (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
     const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
     
@@ -2081,8 +2083,7 @@ class StudyQuestApp {
       container.appendChild(frag);
     }
     try {
-      const sortOrder = this.elements.sortOrder.value;
-      const classFilter = isInitialLoad ? 'すべて' : (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
+      const classFilter = selectedClass;
       
       // データ取得パラメータの詳細ログ
       const fetchParams = {
