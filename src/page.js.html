@@ -2448,10 +2448,10 @@ class StudyQuestApp {
 
             requestAnimationFrame(() => {
               this.renderBoard(false, isInitialLoad);
+              // データロード完了後の状態検証をrenderBoardの実行後に移動
+              this.validatePostLoadState();
             });
             
-            // データロード完了後の状態検証
-            this.validatePostLoadState();
           } finally {
             // 成功時にローディング状態を解除
             this.state.isLoading = false;
