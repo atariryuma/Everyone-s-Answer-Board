@@ -297,7 +297,10 @@ class StudyQuestApp {
           clearTimeout(this.initTimeoutId);
           this.initTimeoutId = null;
         }
-        
+
+        // 初期化の最後に差分カードを復元
+        this.restoreDifferentialCards();
+
       } catch (error) {
         console.error('❌ StudyQuestApp: Critical error in init():', error);
         this.displayInitializationError('アプリケーションの初期化中にエラーが発生しました: ' + error.message);
@@ -955,8 +958,33 @@ class StudyQuestApp {
   
   // 新着通知バナーを表示
   showNewContentBanner(newItems) {
-    if (!this.elements.newContentBanner) return;
-    
+    const notification = this.elements.newContentBanner;
+    const message = this.elements.newContentText;
+    const jumpButton = this.elements.refreshContentBtn; // Assuming refreshContentBtn acts as jump button
+    const clearButton = document.createElement('button'); // ← 新しくボタンを作成
+
+    if (!notification || !message || !jumpButton) return;
+
+    message.textContent = `${newItems}件の新着カードがあります`; // Changed to newItems
+    notification.classList.remove('hidden');
+    notification.style.display = 'flex';
+
+    // クリアボタンの設定
+    clearButton.textContent = '新着表示をクリア';
+    clearButton.className = 'clear-diff-button'; // ← クラス名を設定
+    notification.appendChild(clearButton); // ← 通知エリアに追加
+
+    const clearAndHide = () => {
+      this.clearDifferentialCards();
+      const cards = this.elements.answersContainer.querySelectorAll('[data-differential-card="true"]');
+      cards.forEach(card => card.removeAttribute('data-differential-card'));
+      notification.classList.add('hidden');
+      notification.style.display = 'none';
+      clearButton.remove(); // ← ボタン自体も削除
+    };
+
+    clearButton.addEventListener('click', clearAndHide, { once: true });
+
     // デバウンス：短時間内の連続通知を防ぐ
     const now = Date.now();
     if (this.lastNotificationTime && (now - this.lastNotificationTime) < 2000) {
@@ -964,7 +992,7 @@ class StudyQuestApp {
       return;
     }
     this.lastNotificationTime = now;
-    
+
     // 既に表示されている場合は、新しい数で上書き（累積しない）
     if (!this.elements.newContentBanner.classList.contains('hidden')) {
       console.log('📱 通知更新: 既存バナーを新しい数で更新', {
@@ -975,29 +1003,30 @@ class StudyQuestApp {
     } else {
       this.state.newContentCount = newItems;
     }
-    
+
     this.state.hasNewContent = true;
-    
-    const message = this.state.newContentCount === 1 ? 
-      '新しい意見が投稿されました' : 
-      `${this.state.newContentCount}件の新しい意見が投稿されました`;
-    this.elements.newContentText.textContent = message;
-    
+
+    // The message is already set above, so this part is redundant.
+    // const message = this.state.newContentCount === 1 ?
+    //   '新しい意見が投稿されました' :
+    //   `${this.state.newContentCount}件の新しい意見が投稿されました`;
+    // this.elements.newContentText.textContent = message;
+
     this.elements.newContentBanner.classList.remove('hidden');
-    
+
     // アニメーションをリセットしてから適用
     this.elements.newContentBanner.style.animation = '';
-    
+
     // 3秒後にバウンスアニメーション
     setTimeout(() => {
       if (!this.elements.newContentBanner.classList.contains('hidden')) {
         this.elements.newContentBanner.style.animation = 'bounce 1s ease-in-out';
       }
     }, 3000);
-    
+
     console.log('📢 新着通知表示:', {
       count: this.state.newContentCount,
-      message: message
+      message: message.textContent // Use message.textContent here
     });
   }
   
@@ -5902,5 +5931,17 @@ try {
     const msg = StudyQuestApp.prototype.escapeHtml(error.message || '');
     container.innerHTML = '<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました: ' + msg + '</div>';
   }
+}
+.answer-card[data-differential-card="true"] {
+  border: 2px solid #ffab00; /* 目立つ色で囲む */
+  box-shadow: 0 0 15px rgba(255, 171, 0, 0.7); /* 影を付けて強調 */
+}
+
+.clear-diff-button {
+  margin-left: 10px;
+  padding: 5px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
 }
 </script>
