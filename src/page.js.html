@@ -2242,7 +2242,9 @@ class StudyQuestApp {
               this.elements.headingLabel.textContent = result.header;
             }
 
-            this.renderBoard(false, isInitialLoad);
+            requestAnimationFrame(() => {
+              this.renderBoard(false, isInitialLoad);
+            });
             
             // データロード完了後の状態検証
             this.validatePostLoadState();
