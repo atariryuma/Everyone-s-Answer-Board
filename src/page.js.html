@@ -3077,71 +3077,40 @@ class StudyQuestApp {
   }
 
   // バッチ処理でリアクションボタンを更新
-  batchUpdateReactionButtons(updates, options = {}) {
-    const { onComplete, immediate = false } = options;
-    const fragment = document.createDocumentFragment();
-    const updatedElements = new Map();
+  /**
+   * リアクションボタンの状態を一括で更新する
+   * @param {Array<Object>} cardsData - カードデータの配列
+   */
+  async batchUpdateReactionButtons(cardsData) {
+    if (!cardsData || cardsData.length === 0) return;
     
-    const executeUpdate = () => {
-      try {
-        updates.forEach(update => {
-          const buttons = document.querySelectorAll(`[data-row-index="${update.rowIndex}"][data-reaction="${update.reaction}"]`);
-          
-          buttons.forEach(btn => {
-            if (!updatedElements.has(btn)) {
-              // カウント表示更新
-              const countEl = btn.querySelector('.reaction-count');
-              if (countEl && this.state.showCounts) {
-                countEl.textContent = update.count;
-              }
-              
-              // アイコン更新
-              const rt = this.reactionTypes.find(r => r.key === update.reaction);
-              const svgEl = btn.querySelector('svg');
-              if (svgEl && rt) {
-                svgEl.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', update.reacted);
-              }
-              
-              // スタイル更新
-              const colorClass = update.reaction === 'LIKE' ? 'text-red-500' : 
-                               update.reaction === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
-              btn.classList.remove('text-red-500', 'text-yellow-500', 'text-green-500');
-              btn.classList.add(colorClass);
-              btn.classList.toggle('liked', update.reacted);
-              btn.setAttribute('aria-pressed', update.reacted.toString());
-              
-              // 表示/非表示
-              btn.style.display = update.shouldDisplay ? 'flex' : 'none';
-              
-              // aria-label更新
-              const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
-              const reactionName = reactionNames[update.reaction] || update.reaction;
-              const ariaLabel = `${reactionName}${update.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${update.count}件)` : ''}`;
-              btn.setAttribute('aria-label', ariaLabel);
-              
-              updatedElements.set(btn, true);
-            }
-          });
-        });
-        
-        // 完了コールバック実行
-        if (onComplete) {
-          onComplete(updatedElements);
+    console.log(' リアクションボタンの一括更新を開始:', cardsData.length + '件');
+    const container = this.elements.answersContainer;
+    if (!container) return;
+
+    try {
+      // 最後のカードがレンダリングされるのを動的に待機する
+      const lastCardIndex = cardsData[cardsData.length - 1].__row_index__;
+      const lastCardSelector = `[data-row-index="${lastCardIndex}"]`;
+      
+      console.log('⏳ 最後のカード描画待機:', lastCardSelector);
+      await this.waitForElement(lastCardSelector, container);
+      console.log('✅ 最後のカード描画を確認');
+
+      // 全てのカードに対して更新処理を実行
+      cardsData.forEach(cardData => {
+        const rowIndex = cardData.__row_index__;
+        const cardElement = container.querySelector(`[data-row-index="${rowIndex}"]`);
+        if (cardElement) {
+          const reactionContainer = cardElement.querySelector('.reaction-buttons');
+          const reactionState = this.state.reactionStates[rowIndex] || {};
+          this.updateReactionButtonsUI(reactionContainer, reactionState);
         }
-        
-      } catch (error) {
-        console.error('batchUpdateReactionButtons error:', error);
-        if (onComplete) {
-          onComplete(updatedElements, error);
-        }
-      }
-    };
-    
-    // 即座実行 or requestAnimationFrame
-    if (immediate) {
-      executeUpdate();
-    } else {
-      requestAnimationFrame(executeUpdate);
+      });
+
+      console.log(' リアクションボタンの一括更新が完了');
+    } catch (error) {
+      console.error('⚠️ リアクションボタンの一括更新中にエラー:', error);
     }
   }
   
@@ -3980,6 +3949,37 @@ class StudyQuestApp {
     });
     
     console.log('✅ 差分カード復元完了:', restoredCount + '件');
+  }
+
+  /**
+   * 指定されたセレクターに一致する要素がDOMに追加されるのを待つ
+   * @param {string} selector - CSSセレクター
+   * @param {Element} container - 監視対象の親要素
+   * @returns {Promise<Element>} - 見つかった要素を解決するPromise
+   */
+  waitForElement(selector, container) {
+    return new Promise(resolve => {
+      // すでに要素が存在すれば即座に解決
+      const element = container.querySelector(selector);
+      if (element) {
+        return resolve(element);
+      }
+
+      // DOMの変更を監視するオブザーバーを作成
+      const observer = new MutationObserver(mutations => {
+        const targetNode = container.querySelector(selector);
+        if (targetNode) {
+          observer.disconnect(); // 監視を停止
+          resolve(targetNode);
+        }
+      });
+
+      // 監視を開始
+      observer.observe(container, {
+        childList: true, // 子要素の追加・削除を監視
+        subtree: true    // 子孫要素も対象にする
+      });
+    });
   }
 
   async handleReactionError(error, rowIndex, reaction) {
