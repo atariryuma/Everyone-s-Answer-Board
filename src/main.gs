@@ -427,21 +427,28 @@ function doGet(e) {
       return showSetupPage();
     }
 
-    // 2. URLパラメータの解析
+    // 2. アプリケーション有効/無効チェック（システム管理者は除外）
+    const accessCheck = checkApplicationAccess();
+    if (!accessCheck.hasAccess) {
+      console.log('アプリケーションアクセス拒否:', accessCheck.accessReason);
+      return showAccessRestrictedPage(accessCheck);
+    }
+
+    // 3. URLパラメータの解析
     const params = parseRequestParams(e);
 
-    // 3. ログイン状態の確認
+    // 4. ログイン状態の確認
   const userEmail = Session.getActiveUser().getEmail();
   if (!userEmail) {
     return showLoginPage();
   }
 
-  // 4. アプリ設定ページリクエストの処理
+  // 5. アプリ設定ページリクエストの処理
   if (params.setupParam === 'true') {
     return showAppSetupPage(params.userId);
   }
 
-  // 5. パラメータ検証とデフォルト処理
+  // 6. パラメータ検証とデフォルト処理
     if (!params || !params.mode) {
       // パラメータなしの場合、前回の管理パネル状態を確認
       console.log('No mode parameter, checking previous admin session');
@@ -861,6 +868,48 @@ function showErrorPage(title, message, error) {
   return htmlOutput;
 }
 
+/**
+ * アクセス制限ページを表示
+ * @param {object} accessCheck - アクセスチェック結果
+ * @returns {HtmlOutput}
+ */
+function showAccessRestrictedPage(accessCheck) {
+  try {
+    const template = HtmlService.createTemplateFromFile('AccessRestricted');
+    template.include = include;
+    template.accessCheck = accessCheck;
+    template.isSystemAdmin = accessCheck.isSystemAdmin || false;
+    template.userEmail = accessCheck.userEmail || '';
+    template.timestamp = new Date().toISOString();
+    
+    const htmlOutput = template.evaluate()
+      .setTitle('アクセス制限 - StudyQuest');
+    
+    // XFrameOptionsMode を安全に設定
+    try {
+      if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
+        htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+      }
+    } catch (e) {
+      console.warn('XFrameOptionsMode設定エラー:', e.message);
+    }
+    
+    return htmlOutput;
+  } catch (error) {
+    console.error('Error in showAccessRestrictedPage:', error);
+    // フォールバック: シンプルなHTMLを返す
+    return HtmlService.createHtmlOutput(`
+      <html>
+        <head><title>アクセス制限</title></head>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+          <h1>アクセスが制限されています</h1>
+          <p>このアプリケーションは現在利用できません。</p>
+          <p>管理者にお問い合わせください。</p>
+        </body>
+      </html>
+    `).setTitle('アクセス制限');
+  }
+}
 
 /**
  * ユーザー専用の一意の管理パネルURLを構築

@@ -1532,6 +1532,293 @@ function batchUpdateSpreadsheet(service, spreadsheetId, requestBody) {
 }
 
 /**
+ * データベース状態を詳細確認する診断機能
+ * @param {string} targetUserId - 確認対象のユーザーID（オプション）
+ * @returns {object} データベース診断結果
+ */
+function diagnoseDatabase(targetUserId) {
+  try {
+    console.log('🔍 データベース診断開始:', targetUserId || 'ALL_USERS');
+    
+    var props = PropertiesService.getScriptProperties();
+    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    
+    var diagnosticResult = {
+      timestamp: new Date().toISOString(),
+      databaseId: dbId,
+      targetUserId: targetUserId,
+      checks: {},
+      summary: {
+        overallStatus: 'unknown',
+        criticalIssues: [],
+        warnings: [],
+        recommendations: []
+      }
+    };
+    
+    // 1. データベース設定チェック
+    diagnosticResult.checks.databaseConfig = {
+      hasDatabaseId: !!dbId,
+      databaseId: dbId ? dbId.substring(0, 10) + '...' : null
+    };
+    
+    if (!dbId) {
+      diagnosticResult.summary.criticalIssues.push('DATABASE_SPREADSHEET_ID が設定されていません');
+      diagnosticResult.summary.overallStatus = 'critical';
+      return diagnosticResult;
+    }
+    
+    // 2. サービス接続テスト
+    var service;
+    try {
+      service = getSheetsServiceCached();
+      diagnosticResult.checks.serviceConnection = { status: 'success' };
+    } catch (serviceError) {
+      diagnosticResult.checks.serviceConnection = { 
+        status: 'failed', 
+        error: serviceError.message 
+      };
+      diagnosticResult.summary.criticalIssues.push('Sheets サービス接続失敗: ' + serviceError.message);
+    }
+    
+    if (!service) {
+      diagnosticResult.summary.overallStatus = 'critical';
+      return diagnosticResult;
+    }
+    
+    // 3. データベーススプレッドシートアクセステスト
+    try {
+      var spreadsheetInfo = getSpreadsheetsData(service, dbId);
+      diagnosticResult.checks.spreadsheetAccess = {
+        status: 'success',
+        sheetCount: spreadsheetInfo.sheets ? spreadsheetInfo.sheets.length : 0,
+        hasUserSheet: spreadsheetInfo.sheets.some(sheet => sheet.properties.title === DB_SHEET_CONFIG.SHEET_NAME)
+      };
+    } catch (accessError) {
+      diagnosticResult.checks.spreadsheetAccess = {
+        status: 'failed',
+        error: accessError.message
+      };
+      diagnosticResult.summary.criticalIssues.push('スプレッドシートアクセス失敗: ' + accessError.message);
+    }
+    
+    // 4. ユーザーデータ取得テスト
+    try {
+      var data = batchGetSheetsData(service, dbId, ["'" + DB_SHEET_CONFIG.SHEET_NAME + "'!A:H"]);
+      var values = data.valueRanges[0].values || [];
+      
+      diagnosticResult.checks.userData = {
+        status: 'success',
+        totalRows: values.length,
+        userCount: Math.max(0, values.length - 1), // ヘッダー行を除く
+        hasHeaders: values.length > 0,
+        headers: values.length > 0 ? values[0] : []
+      };
+      
+      // 特定ユーザーの検索テスト
+      if (targetUserId && values.length > 1) {
+        var userFound = false;
+        var userRowIndex = -1;
+        
+        for (var i = 1; i < values.length; i++) {
+          if (values[i][0] === targetUserId) {
+            userFound = true;
+            userRowIndex = i;
+            break;
+          }
+        }
+        
+        diagnosticResult.checks.targetUser = {
+          userId: targetUserId,
+          found: userFound,
+          rowIndex: userRowIndex,
+          data: userFound ? values[userRowIndex] : null
+        };
+        
+        if (!userFound) {
+          diagnosticResult.summary.criticalIssues.push('対象ユーザー ' + targetUserId + ' がデータベースに見つかりません');
+        }
+      }
+      
+    } catch (dataError) {
+      diagnosticResult.checks.userData = {
+        status: 'failed',
+        error: dataError.message
+      };
+      diagnosticResult.summary.criticalIssues.push('ユーザーデータ取得失敗: ' + dataError.message);
+    }
+    
+    // 5. キャッシュ状態チェック
+    try {
+      var cacheStatus = checkCacheStatus(targetUserId);
+      diagnosticResult.checks.cache = cacheStatus;
+      
+      if (cacheStatus.staleEntries > 0) {
+        diagnosticResult.summary.warnings.push(cacheStatus.staleEntries + ' 個の古いキャッシュエントリが見つかりました');
+      }
+    } catch (cacheError) {
+      diagnosticResult.checks.cache = {
+        status: 'failed',
+        error: cacheError.message
+      };
+    }
+    
+    // 6. 総合判定
+    if (diagnosticResult.summary.criticalIssues.length === 0) {
+      diagnosticResult.summary.overallStatus = diagnosticResult.summary.warnings.length > 0 ? 'warning' : 'healthy';
+    } else {
+      diagnosticResult.summary.overallStatus = 'critical';
+    }
+    
+    // 7. 推奨事項の生成
+    if (diagnosticResult.summary.criticalIssues.length > 0) {
+      diagnosticResult.summary.recommendations.push('クリティカルな問題を解決してください');
+    }
+    if (diagnosticResult.checks.cache && diagnosticResult.checks.cache.staleEntries > 0) {
+      diagnosticResult.summary.recommendations.push('キャッシュをクリアすることを推奨します');
+    }
+    
+    console.log('✅ データベース診断完了:', diagnosticResult.summary.overallStatus);
+    return diagnosticResult;
+    
+  } catch (error) {
+    console.error('❌ データベース診断でエラー:', error);
+    return {
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      summary: {
+        overallStatus: 'error',
+        criticalIssues: ['診断処理自体が失敗: ' + error.message]
+      }
+    };
+  }
+}
+
+/**
+ * キャッシュ状態をチェックする
+ * @param {string} userId - チェック対象のユーザーID（オプション）
+ * @returns {object} キャッシュ状態情報
+ */
+function checkCacheStatus(userId) {
+  try {
+    var cacheStatus = {
+      userSpecific: null,
+      general: {
+        totalEntries: 0,
+        staleEntries: 0,
+        healthyEntries: 0
+      }
+    };
+    
+    // ユーザー固有のキャッシュ確認
+    if (userId) {
+      var userCacheKey = 'user_' + userId;
+      var cachedUser = cacheManager.get(userCacheKey, null, { skipFetch: true });
+      
+      cacheStatus.userSpecific = {
+        userId: userId,
+        cacheKey: userCacheKey,
+        cached: !!cachedUser,
+        data: cachedUser ? 'present' : 'absent'
+      };
+    }
+    
+    // 一般的なキャッシュ統計
+    // 注: 実際のキャッシュマネージャーの実装に依存
+    try {
+      if (typeof cacheManager.getStats === 'function') {
+        var stats = cacheManager.getStats();
+        cacheStatus.general = stats;
+      }
+    } catch (statsError) {
+      console.warn('キャッシュ統計取得エラー:', statsError.message);
+    }
+    
+    return cacheStatus;
+    
+  } catch (error) {
+    console.error('キャッシュ状態チェックエラー:', error);
+    return {
+      status: 'error',
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 問題の自動修復を試行する
+ * @param {string} targetUserId - 修復対象のユーザーID（オプション）
+ * @returns {object} 修復結果
+ */
+function performAutoRepair(targetUserId) {
+  try {
+    console.log('🔧 自動修復開始:', targetUserId || 'GENERAL');
+    
+    var repairResult = {
+      timestamp: new Date().toISOString(),
+      targetUserId: targetUserId,
+      actions: [],
+      success: false,
+      summary: ''
+    };
+    
+    // 1. キャッシュクリア
+    try {
+      if (targetUserId) {
+        // 特定ユーザーのキャッシュクリア
+        invalidateUserCache(targetUserId, null, null, false);
+        repairResult.actions.push('ユーザー固有キャッシュクリア: ' + targetUserId);
+      } else {
+        // 全体キャッシュクリア
+        clearDatabaseCache();
+        repairResult.actions.push('データベース全体キャッシュクリア');
+      }
+    } catch (cacheError) {
+      repairResult.actions.push('キャッシュクリア失敗: ' + cacheError.message);
+    }
+    
+    // 2. サービス接続リフレッシュ
+    try {
+      getSheetsServiceCached(true); // forceRefresh = true
+      repairResult.actions.push('Sheets サービス接続リフレッシュ');
+    } catch (serviceError) {
+      repairResult.actions.push('サービスリフレッシュ失敗: ' + serviceError.message);
+    }
+    
+    // 3. 修復後の検証
+    try {
+      Utilities.sleep(2000); // 少し待機
+      var postRepairDiagnosis = diagnoseDatabase(targetUserId);
+      
+      if (postRepairDiagnosis.summary.overallStatus === 'healthy' || 
+          postRepairDiagnosis.summary.overallStatus === 'warning') {
+        repairResult.success = true;
+        repairResult.summary = '修復成功: システム状態が改善されました';
+      } else {
+        repairResult.summary = '修復不完全: 追加の手動対応が必要です';
+      }
+      
+      repairResult.postRepairStatus = postRepairDiagnosis.summary;
+      
+    } catch (verifyError) {
+      repairResult.summary = '修復実行したが検証に失敗: ' + verifyError.message;
+    }
+    
+    console.log('✅ 自動修復完了:', repairResult.success ? '成功' : '要追加対応');
+    return repairResult;
+    
+  } catch (error) {
+    console.error('❌ 自動修復でエラー:', error);
+    return {
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      success: false,
+      summary: '修復処理自体が失敗: ' + error.message
+    };
+  }
+}
+
+/**
  * データベースシートを取得
  * @returns {object} データベースシート
  */

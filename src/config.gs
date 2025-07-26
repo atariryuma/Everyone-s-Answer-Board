@@ -2959,6 +2959,106 @@ function resetConfigJson(requestUserId) {
   }
 }
 
+// =================================================================
+// アプリケーション有効/無効機能（isActive概念）
+// =================================================================
+
+/**
+ * アプリケーション全体の有効/無効状態を取得
+ * @returns {boolean} アプリケーションが有効な場合はtrue
+ */
+function getApplicationEnabled() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const value = props.getProperty('APPLICATION_ENABLED');
+    
+    // デフォルト値: true（有効）
+    if (value === null || value === undefined) {
+      return true;
+    }
+    
+    // boolean型に変換
+    return value === 'true' || value === true;
+  } catch (error) {
+    console.error('getApplicationEnabled エラー:', error.message);
+    // エラー時はデフォルトで有効とする
+    return true;
+  }
+}
+
+/**
+ * アプリケーション全体の有効/無効状態を設定
+ * @param {boolean} enabled - 有効にする場合はtrue、無効にする場合はfalse
+ * @returns {object} 設定結果
+ */
+function setApplicationEnabled(enabled) {
+  try {
+    // システム管理者権限チェック
+    if (!isSystemAdmin()) {
+      throw new Error('この機能にアクセスする権限がありません。システム管理者のみが利用できます。');
+    }
+    
+    const props = PropertiesService.getScriptProperties();
+    const enabledValue = enabled ? 'true' : 'false';
+    
+    props.setProperty('APPLICATION_ENABLED', enabledValue);
+    
+    const message = enabled 
+      ? 'アプリケーションが有効化されました。すべてのユーザーがアクセス可能です。'
+      : 'アプリケーションが無効化されました。システム管理者以外のアクセスが制限されます。';
+    
+    console.log('setApplicationEnabled:', message);
+    
+    return {
+      success: true,
+      enabled: enabled,
+      message: message,
+      timestamp: new Date().toISOString(),
+      adminEmail: Session.getActiveUser().getEmail()
+    };
+    
+  } catch (error) {
+    console.error('setApplicationEnabled エラー:', error.message);
+    throw new Error('アプリケーション状態の設定に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * アプリケーションの有効/無効状態を確認し、アクセス可否を判定
+ * @returns {object} アクセス可否の詳細情報
+ */
+function checkApplicationAccess() {
+  try {
+    const isEnabled = getApplicationEnabled();
+    const currentUserEmail = Session.getActiveUser().getEmail();
+    const isAdmin = isSystemAdmin();
+    
+    // アプリケーションが有効、またはシステム管理者の場合はアクセス許可
+    const hasAccess = isEnabled || isAdmin;
+    
+    return {
+      hasAccess: hasAccess,
+      isApplicationEnabled: isEnabled,
+      isSystemAdmin: isAdmin,
+      userEmail: currentUserEmail,
+      accessReason: hasAccess 
+        ? (isEnabled ? 'アプリケーションが有効です' : 'システム管理者権限でアクセス')
+        : 'アプリケーションが無効化されています'
+    };
+    
+  } catch (error) {
+    console.error('checkApplicationAccess エラー:', error.message);
+    return {
+      hasAccess: false,
+      isApplicationEnabled: false,
+      isSystemAdmin: false,
+      userEmail: '',
+      accessReason: 'アクセス確認中にエラーが発生しました',
+      error: error.message
+    };
+  }
+}
+
 
 
 

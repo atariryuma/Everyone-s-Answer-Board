@@ -4717,3 +4717,54 @@ function fixDataConsistencyManual(requestUserId) {
  * @returns {Object} シート詳細
  */
 
+/**
+ * アプリケーション状態取得（UI用）
+ * @returns {Object} アプリケーション状態情報
+ */
+function getApplicationStatusForUI() {
+  try {
+    const accessCheck = checkApplicationAccess();
+    const isEnabled = getApplicationEnabled();
+    const adminEmail = Session.getActiveUser().getEmail();
+    
+    return {
+      status: 'success',
+      isEnabled: isEnabled,
+      isSystemAdmin: accessCheck.isSystemAdmin,
+      adminEmail: adminEmail,
+      lastUpdated: new Date().toISOString(),
+      message: accessCheck.accessReason
+    };
+  } catch (error) {
+    console.error('getApplicationStatusForUI エラー:', error);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+
+/**
+ * アプリケーション状態設定（UI用）
+ * @param {boolean} enabled - 有効化するかどうか
+ * @returns {Object} 設定結果
+ */
+function setApplicationStatusForUI(enabled) {
+  try {
+    const result = setApplicationEnabled(enabled);
+    return {
+      status: 'success',
+      enabled: result.enabled,
+      message: result.message,
+      timestamp: result.timestamp,
+      adminEmail: result.adminEmail
+    };
+  } catch (error) {
+    console.error('setApplicationStatusForUI エラー:', error);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+

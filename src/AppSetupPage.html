@@ -330,8 +330,8 @@
             google.script.run
                 .withSuccessHandler((result) => {
                     if (result.status === 'success') {
-                        currentUserInfo = result.userInfo;
-                        updateStatusDisplay(result.userInfo);
+                        currentUserInfo = result;
+                        updateStatusDisplay(result);
                         enableControls();
                     } else {
                         showMessage(`ステータス取得に失敗しました: ${result.message}`, 'error');
@@ -340,12 +340,12 @@
                 .withFailureHandler((error) => {
                     showMessage(`ステータス取得エラー: ${error.message || error}`, 'error');
                 })
-                .getCurrentUserStatus(__USER_ID__);
+                .getApplicationStatusForUI();
         }
 
         // ステータス表示を更新
-        function updateStatusDisplay(userInfo) {
-            const isActive = userInfo.isActive === true || String(userInfo.isActive).toLowerCase() === 'true';
+        function updateStatusDisplay(appInfo) {
+            const isActive = appInfo.isEnabled === true || String(appInfo.isEnabled).toLowerCase() === 'true';
             const statusElement = document.getElementById('current-status');
             const adminElement = document.getElementById('current-admin');
             const lastUpdatedElement = document.getElementById('last-updated');
@@ -356,9 +356,9 @@
                 ? '<span class="bg-green-600 text-green-100 px-3 py-1 rounded-full">🟢 アクティブ</span>'
                 : '<span class="bg-red-600 text-red-100 px-3 py-1 rounded-full">🔴 非アクティブ</span>';
 
-            adminElement.textContent = userInfo.adminEmail || '不明';
-            lastUpdatedElement.textContent = userInfo.lastAccessedAt 
-                ? new Date(userInfo.lastAccessedAt).toLocaleString('ja-JP')
+            adminElement.textContent = appInfo.adminEmail || '不明';
+            lastUpdatedElement.textContent = appInfo.lastUpdated 
+                ? new Date(appInfo.lastUpdated).toLocaleString('ja-JP')
                 : '不明';
 
             // トグルの状態を設定
@@ -420,7 +420,7 @@
                         console.error('Update error:', error);
                         showMessage(`❌ 更新に失敗しました: ${error.message || error}`, 'error');
                     })
-                    .updateIsActiveStatus(__USER_ID__, isActive);
+                    .setApplicationStatusForUI(isActive);
                     
             } catch (error) {
                 showMessage(`❌ ${error.message}`, 'error');
