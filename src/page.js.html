@@ -209,7 +209,7 @@ class StudyQuestApp {
       userId: this.validateUserId(USER_ID), // Validate and add userId to state
       hasNewContent: false,
       newContentCount: 0,
-      lastSeenCount: 0,
+      lastSeenCount: this.loadLastSeenCount(), // ローカルストレージから復元
       pollingFailureCount: 0,
       startTime: Date.now() // パフォーマンス監視用
     };
@@ -508,7 +508,7 @@ class StudyQuestApp {
       this.dismissNewContentBanner(); // フィルター変更時は既存の通知を消去
       try {
         await this.loadSheetData({ bypassCache: true });
-        this.state.lastSeenCount = this.state.currentAnswers.length; // 新しいベースラインを設定
+        this.updateLastSeenCount(this.state.currentAnswers.length); // 新しいベースラインを設定
       } catch (error) {
         console.error('クラスフィルター変更時のデータ読み込みエラー:', error);
       }
@@ -517,7 +517,7 @@ class StudyQuestApp {
       this.dismissNewContentBanner(); // ソート変更時は既存の通知を消去
       try {
         await this.loadSheetData({ bypassCache: true });
-        this.state.lastSeenCount = this.state.currentAnswers.length; // 新しいベースラインを設定
+        this.updateLastSeenCount(this.state.currentAnswers.length); // 新しいベースラインを設定
       } catch (error) {
         console.error('ソート順変更時のデータ読み込みエラー:', error);
       }
@@ -886,7 +886,7 @@ class StudyQuestApp {
   
   async handleInitialContentLoad(currentViewKey, newCount) {
     this.lastViewKey = currentViewKey;
-    this.state.lastSeenCount = newCount;
+    this.updateLastSeenCount(newCount);
     this.initialDataLoaded = true;
     
     console.log('✅ Initial content load completed:', {
@@ -903,7 +903,7 @@ class StudyQuestApp {
     });
     
     this.lastViewKey = currentViewKey;
-    this.state.lastSeenCount = newCount;
+    this.updateLastSeenCount(newCount);
     this.dismissNewContentBanner();
   }
   
@@ -1050,7 +1050,7 @@ class StudyQuestApp {
       // 新しいデータがない場合
       if (incrementalData.newCount === 0) {
         this.provideFeedback('最新の状態です', 'info');
-        this.state.lastSeenCount = incrementalData.totalCount;
+        this.updateLastSeenCount(incrementalData.totalCount);
         return;
       }
       
@@ -1066,7 +1066,7 @@ class StudyQuestApp {
 
       // サーバーキャッシュをクリアして他のソート順でも新着が反映されるようにする
       this.gas.clearCache().catch(err => console.warn('Cache clear failed', err));
-      this.state.lastSeenCount = incrementalData.totalCount;
+      this.updateLastSeenCount(incrementalData.totalCount);
       
       console.log('✅ 増分リフレッシュ完了:', {
         addedCards: incrementalData.newCount,
@@ -1103,7 +1103,7 @@ class StudyQuestApp {
       await this.loadSheetData({ bypassCache: true });
       
       // 手動リフレッシュ後は新着チェック基準を更新（初期化フラグは維持）
-      this.state.lastSeenCount = this.state.currentAnswers.length;
+      this.updateLastSeenCount(this.state.currentAnswers.length);
       console.log('🔄 全体リフレッシュ完了、新着基準更新:', {
         newLastSeenCount: this.state.lastSeenCount,
         maintainInitialFlag: this.initialDataLoaded,
@@ -1214,15 +1214,30 @@ class StudyQuestApp {
     
     // 新しいカードを作成してコンテナに追加
     const fragment = document.createDocumentFragment();
+    const addedCardIds = [];
     
     for (const data of newData) {
       const cardElement = this.createAnswerCard(data);
       if (cardElement) {
+        // 差分追加カードとしてマーク
+        cardElement.setAttribute('data-differential-card', 'true');
+        cardElement.setAttribute('data-added-timestamp', Date.now().toString());
+        
         // 新しいカードであることを示すアニメーション
         cardElement.style.opacity = '0';
         cardElement.style.transform = 'translateY(20px)';
         fragment.appendChild(cardElement);
+        
+        // 追加されたカードのIDを記録
+        if (data.rowIndex !== undefined) {
+          addedCardIds.push(data.rowIndex);
+        }
       }
+    }
+    
+    // 差分追加カードのIDをローカルストレージに保存
+    if (addedCardIds.length > 0) {
+      this.saveDifferentialCards(addedCardIds);
     }
     
     if (sortOrder === 'newest') {
@@ -3033,49 +3048,72 @@ class StudyQuestApp {
   }
 
   // バッチ処理でリアクションボタンを更新
-  batchUpdateReactionButtons(updates) {
+  batchUpdateReactionButtons(updates, options = {}) {
+    const { onComplete, immediate = false } = options;
     const fragment = document.createDocumentFragment();
     const updatedElements = new Map();
-
-    updates.forEach(update => {
-      const buttons = document.querySelectorAll(`[data-row-index="${update.rowIndex}"][data-reaction="${update.reaction}"]`);
-      
-      buttons.forEach(btn => {
-        if (!updatedElements.has(btn)) {
-          // カウント表示更新
-          const countEl = btn.querySelector('.reaction-count');
-          if (countEl && this.state.showCounts) {
-            countEl.textContent = update.count;
-          }
+    
+    const executeUpdate = () => {
+      try {
+        updates.forEach(update => {
+          const buttons = document.querySelectorAll(`[data-row-index="${update.rowIndex}"][data-reaction="${update.reaction}"]`);
           
-          // アイコン更新
-          const rt = this.reactionTypes.find(r => r.key === update.reaction);
-          const svgEl = btn.querySelector('svg');
-          if (svgEl && rt) {
-            svgEl.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', update.reacted);
-          }
-          
-          // スタイル更新
-          const colorClass = update.reaction === 'LIKE' ? 'text-red-500' : 
-                           update.reaction === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
-          btn.classList.remove('text-red-500', 'text-yellow-500', 'text-green-500');
-          btn.classList.add(colorClass);
-          btn.classList.toggle('liked', update.reacted);
-          btn.setAttribute('aria-pressed', update.reacted.toString());
-          
-          // 表示/非表示
-          btn.style.display = update.shouldDisplay ? 'flex' : 'none';
-          
-          // aria-label更新
-          const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
-          const reactionName = reactionNames[update.reaction] || update.reaction;
-          const ariaLabel = `${reactionName}${update.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${update.count}件)` : ''}`;
-          btn.setAttribute('aria-label', ariaLabel);
-          
-          updatedElements.set(btn, true);
+          buttons.forEach(btn => {
+            if (!updatedElements.has(btn)) {
+              // カウント表示更新
+              const countEl = btn.querySelector('.reaction-count');
+              if (countEl && this.state.showCounts) {
+                countEl.textContent = update.count;
+              }
+              
+              // アイコン更新
+              const rt = this.reactionTypes.find(r => r.key === update.reaction);
+              const svgEl = btn.querySelector('svg');
+              if (svgEl && rt) {
+                svgEl.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', update.reacted);
+              }
+              
+              // スタイル更新
+              const colorClass = update.reaction === 'LIKE' ? 'text-red-500' : 
+                               update.reaction === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+              btn.classList.remove('text-red-500', 'text-yellow-500', 'text-green-500');
+              btn.classList.add(colorClass);
+              btn.classList.toggle('liked', update.reacted);
+              btn.setAttribute('aria-pressed', update.reacted.toString());
+              
+              // 表示/非表示
+              btn.style.display = update.shouldDisplay ? 'flex' : 'none';
+              
+              // aria-label更新
+              const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
+              const reactionName = reactionNames[update.reaction] || update.reaction;
+              const ariaLabel = `${reactionName}${update.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${update.count}件)` : ''}`;
+              btn.setAttribute('aria-label', ariaLabel);
+              
+              updatedElements.set(btn, true);
+            }
+          });
+        });
+        
+        // 完了コールバック実行
+        if (onComplete) {
+          onComplete(updatedElements);
         }
-      });
-    });
+        
+      } catch (error) {
+        console.error('batchUpdateReactionButtons error:', error);
+        if (onComplete) {
+          onComplete(updatedElements, error);
+        }
+      }
+    };
+    
+    // 即座実行 or requestAnimationFrame
+    if (immediate) {
+      executeUpdate();
+    } else {
+      requestAnimationFrame(executeUpdate);
+    }
   }
   
   updateCardReactionBackground(card, data) {
@@ -3463,6 +3501,100 @@ class StudyQuestApp {
     });
   }
 
+  // 動的状態変化待機システム
+  async waitForReactionStateChange(rowIndex, reaction, initialState, timeoutMs = 3000, pollIntervalMs = 50) {
+    const startTime = Date.now();
+    
+    const getReactionButtonState = () => {
+      const buttons = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
+      if (buttons.length === 0) return null;
+      
+      const btn = buttons[0];
+      return {
+        reacted: btn.getAttribute('aria-pressed') === 'true',
+        count: parseInt(btn.querySelector('.count')?.textContent || '0'),
+        disabled: btn.disabled,
+        classes: btn.className,
+        timestamp: Date.now()
+      };
+    };
+    
+    const hasStateChanged = (current, initial) => {
+      if (!current || !initial) return false;
+      return current.reacted !== initial.reacted || 
+             current.count !== initial.count ||
+             current.disabled !== initial.disabled;
+    };
+    
+    return new Promise((resolve, reject) => {
+      const poll = () => {
+        const currentTime = Date.now();
+        if (currentTime - startTime >= timeoutMs) {
+          reject(new Error(`State change timeout after ${timeoutMs}ms`));
+          return;
+        }
+        
+        const currentState = getReactionButtonState();
+        if (hasStateChanged(currentState, initialState)) {
+          resolve({
+            initialState,
+            currentState,
+            changeDetectedAt: currentTime - startTime,
+            stateChanged: true
+          });
+          return;
+        }
+        
+        setTimeout(poll, pollIntervalMs);
+      };
+      
+      poll();
+    });
+  }
+
+  // 包括的リアクション状態監視
+  async waitForReactionUpdate(rowIndex, reaction, expectedChange = null, maxWaitMs = 3000) {
+    const reactionKey = `${rowIndex}-${reaction}`;
+    const initialState = this.getReactionButtonState(rowIndex, reaction);
+    
+    // 複数の待機方法を並行実行
+    const promises = [
+      // 方法1: 完了通知システム
+      this.waitForReactionComplete(reactionKey, maxWaitMs).catch(() => null),
+      
+      // 方法2: 動的状態変化検出
+      this.waitForReactionStateChange(rowIndex, reaction, initialState, maxWaitMs).catch(() => null)
+    ];
+    
+    try {
+      const result = await Promise.race(promises);
+      return result || { initialState, timeout: true };
+    } catch (error) {
+      return { 
+        initialState, 
+        error: error.message, 
+        finalState: this.getReactionButtonState(rowIndex, reaction) 
+      };
+    }
+  }
+
+  // リアクションボタン状態取得ヘルパー
+  getReactionButtonState(rowIndex, reaction) {
+    const buttons = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
+    if (buttons.length === 0) return null;
+    
+    const btn = buttons[0];
+    return {
+      reacted: btn.getAttribute('aria-pressed') === 'true',
+      count: parseInt(btn.querySelector('.count')?.textContent || '0'),
+      disabled: btn.disabled,
+      classes: btn.className,
+      visible: btn.style.display !== 'none',
+      computedStyle: getComputedStyle(btn),
+      timestamp: Date.now()
+    };
+  }
+
   setReactionButtonsLoading(buttons, isLoading) {
     buttons.forEach(btn => {
         btn.disabled = isLoading;
@@ -3489,22 +3621,106 @@ class StudyQuestApp {
 }
 
   async processReactionResponse(item, response, reaction) {
-    // サーバーから返されたリアクション状態を適用
+    console.log('🔄 サーバー応答処理開始:', { rowIndex: item.rowIndex, reaction, response });
+    
+    // 楽観的更新の状態を保存（比較用）
+    const optimisticState = JSON.parse(JSON.stringify(item.reactions || {}));
+    
+    // サーバー状態を絶対的に適用
     if (response.reactions && typeof response.reactions === 'object') {
-        item.reactions = response.reactions;
-        console.log('✅ リアクション状態更新:', response.reactions);
+        // サーバー状態で完全に上書き（楽観的更新を破棄）
+        const serverState = response.reactions;
+        item.reactions = JSON.parse(JSON.stringify(serverState));
+        
+        console.log('✅ サーバー状態適用完了:', {
+          before: optimisticState,
+          after: item.reactions,
+          serverResponse: serverState
+        });
+        
+        // 楽観的更新との差異をチェック
+        this.validateReactionConsistency(item.rowIndex, optimisticState, item.reactions);
+        
     } else {
         console.warn('⚠️ 期待されたリアクション形式ではありません:', response);
-        // フォールバック処理
+        // フォールバック処理（サーバー応答が不正な場合のみ）
         this.applyFallbackReactionUpdate(item, reaction);
+        console.log('🔄 フォールバック処理実行:', item.reactions);
     }
     
-    // ローカルストレージに保存
+    // ローカルストレージに保存（サーバー状態を保存）
     this.saveReactionState(item.rowIndex, item.reactions);
     
-    // UIを更新
-    await this.updateReactionUI(item);
+    // UI強制更新（サーバー状態を確実に反映）
+    await this.updateReactionUI(item, true); // immediate=true で即座更新
+    
+    console.log('🎯 サーバー応答処理完了:', { rowIndex: item.rowIndex, finalState: item.reactions });
 }
+
+  // リアクション状態整合性検証
+  validateReactionConsistency(rowIndex, optimisticState, serverState) {
+    const inconsistencies = [];
+    
+    // 各リアクションタイプをチェック
+    this.reactionTypes.forEach(rt => {
+      const reaction = rt.key;
+      const optimistic = optimisticState[reaction] || { count: 0, reacted: false };
+      const server = serverState[reaction] || { count: 0, reacted: false };
+      
+      if (optimistic.reacted !== server.reacted) {
+        inconsistencies.push({
+          reaction,
+          type: 'reacted_mismatch',
+          optimistic: optimistic.reacted,
+          server: server.reacted
+        });
+      }
+      
+      if (Math.abs(optimistic.count - server.count) > 1) {
+        inconsistencies.push({
+          reaction,
+          type: 'count_significant_diff',
+          optimistic: optimistic.count,
+          server: server.count,
+          diff: server.count - optimistic.count
+        });
+      }
+    });
+    
+    if (inconsistencies.length > 0) {
+      console.warn('⚠️ リアクション状態不整合検出:', {
+        rowIndex,
+        inconsistencies,
+        optimisticState,
+        serverState
+      });
+      
+      // 不整合を記録（デバッグ用）
+      this.recordReactionInconsistency(rowIndex, inconsistencies);
+    } else {
+      console.log('✅ リアクション状態整合性確認:', { rowIndex });
+    }
+    
+    return inconsistencies;
+  }
+
+  // 不整合記録（デバッグ用）
+  recordReactionInconsistency(rowIndex, inconsistencies) {
+    if (!this.reactionInconsistencies) {
+      this.reactionInconsistencies = [];
+    }
+    
+    this.reactionInconsistencies.push({
+      timestamp: new Date().toISOString(),
+      rowIndex,
+      inconsistencies
+    });
+    
+    // 最新10件のみ保持
+    if (this.reactionInconsistencies.length > 10) {
+      this.reactionInconsistencies.shift();
+    }
+  }
 
   applyFallbackReactionUpdate(item, reaction) {
     if (!item.reactions) {
@@ -3630,6 +3846,111 @@ class StudyQuestApp {
             }
         });
     });
+  }
+
+  // lastSeenCount永続化機能
+  loadLastSeenCount() {
+    try {
+      const key = `lastSeenCount_${this.state?.userId || USER_ID}_${SHEET_NAME}`;
+      const stored = localStorage.getItem(key);
+      const count = stored ? parseInt(stored, 10) : 0;
+      
+      console.log('📥 lastSeenCount復元:', { key, count });
+      return isNaN(count) ? 0 : count;
+    } catch (error) {
+      console.warn('⚠️ lastSeenCount読み込みエラー:', error);
+      return 0;
+    }
+  }
+
+  saveLastSeenCount(count) {
+    try {
+      const key = `lastSeenCount_${this.state?.userId || USER_ID}_${SHEET_NAME}`;
+      localStorage.setItem(key, count.toString());
+      
+      console.log('💾 lastSeenCount保存:', { key, count });
+    } catch (error) {
+      console.warn('⚠️ lastSeenCount保存エラー:', error);
+    }
+  }
+
+  updateLastSeenCount(newCount) {
+    if (typeof newCount === 'number' && newCount >= 0) {
+      const oldCount = this.state.lastSeenCount;
+      this.state.lastSeenCount = newCount;
+      this.saveLastSeenCount(newCount);
+      
+      console.log('📊 lastSeenCount更新:', { 
+        oldCount, 
+        newCount,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  // 差分カード管理メソッド
+  loadDifferentialCards() {
+    try {
+      const key = `differentialCards_${this.state?.userId || USER_ID}_${SHEET_NAME}`;
+      const stored = localStorage.getItem(key);
+      const cards = stored ? JSON.parse(stored) : [];
+      
+      console.log('📥 差分カード復元:', { key, count: cards.length });
+      return Array.isArray(cards) ? cards : [];
+    } catch (error) {
+      console.warn('⚠️ 差分カード読み込みエラー:', error);
+      return [];
+    }
+  }
+
+  saveDifferentialCards(cardIds) {
+    try {
+      const key = `differentialCards_${this.state?.userId || USER_ID}_${SHEET_NAME}`;
+      const existing = this.loadDifferentialCards();
+      const merged = [...new Set([...existing, ...cardIds])];
+      localStorage.setItem(key, JSON.stringify(merged));
+      
+      console.log('💾 差分カード保存:', { key, count: merged.length, new: cardIds.length });
+    } catch (error) {
+      console.warn('⚠️ 差分カード保存エラー:', error);
+    }
+  }
+
+  clearDifferentialCards() {
+    try {
+      const key = `differentialCards_${this.state?.userId || USER_ID}_${SHEET_NAME}`;
+      localStorage.removeItem(key);
+      console.log('🗑️ 差分カードクリア:', { key });
+    } catch (error) {
+      console.warn('⚠️ 差分カードクリアエラー:', error);
+    }
+  }
+
+  // 差分カードの復元（ページ再読み込み時）
+  restoreDifferentialCards() {
+    const differentialCardIds = this.loadDifferentialCards();
+    if (differentialCardIds.length === 0) return;
+
+    console.log('🔄 差分カード復元開始:', differentialCardIds.length + '件');
+    
+    const container = this.elements.answersContainer;
+    if (!container) return;
+
+    // 現在表示されているカードから差分カードをマーク
+    const allCards = container.querySelectorAll('.answer-card');
+    let restoredCount = 0;
+    
+    allCards.forEach(card => {
+      const rowIndex = parseInt(card.getAttribute('data-row-index'));
+      if (differentialCardIds.includes(rowIndex)) {
+        card.setAttribute('data-differential-card', 'true');
+        card.setAttribute('data-restored', 'true');
+        restoredCount++;
+        console.log('📌 差分カード復元:', rowIndex);
+      }
+    });
+    
+    console.log('✅ 差分カード復元完了:', restoredCount + '件');
   }
 
   async handleReactionError(error, rowIndex, reaction) {
@@ -3857,7 +4178,7 @@ class StudyQuestApp {
       // 管理モード切り替え時は設定変更のため再描画が必要
       this.loadSheetData({ bypassCache: true }).then(() => {
         // 管理モード切り替え後に新着チェックの基準を更新
-        this.state.lastSeenCount = this.state.currentAnswers.length;
+        this.updateLastSeenCount(this.state.currentAnswers.length);
         console.log('🔄 管理モード切り替え完了、新着チェック基準更新:', {
           newBaselineCount: this.state.lastSeenCount,
           adminMode: this.state.showAdminFeatures
@@ -5417,15 +5738,17 @@ try {
       
       reactionBtn.dispatchEvent(clickEvent);
       
-      // 処理完了を待機（新システム）または従来の時間待機
-      if (reactionCompletePromise) {
-        try {
-          const result = await reactionCompletePromise;
-          console.log('✅ リアクション処理完了確認:', result);
-        } catch (error) {
-          console.warn('⚠️ リアクション完了待機タイムアウト:', error.message);
+      // 処理完了を待機（高度な動的システム）
+      try {
+        const updateResult = await window.studyQuestApp.waitForReactionUpdate(rowIndex, reaction, null, 3000);
+        if (updateResult.stateChanged || updateResult.changeDetectedAt) {
+          console.log('✅ 状態変化検出:', updateResult);
+        } else if (updateResult.timeout) {
+          console.warn('⚠️ 動的待機タイムアウト - フォールバック待機実行');
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
-      } else {
+      } catch (error) {
+        console.warn('⚠️ 動的待機エラー:', error.message);
         // フォールバック: 従来の時間待機
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
@@ -5470,14 +5793,18 @@ try {
       
       reactionBtn.dispatchEvent(clickEvent);
       
-      if (secondReactionPromise) {
-        try {
-          const secondResult = await secondReactionPromise;
-          console.log('✅ 2回目リアクション処理完了確認:', secondResult);
-        } catch (error) {
-          console.warn('⚠️ 2回目リアクション完了待機タイムアウト:', error.message);
+      // 2回目の処理完了を待機（高度な動的システム）
+      try {
+        const secondUpdateResult = await window.studyQuestApp.waitForReactionUpdate(rowIndex, reaction, null, 3000);
+        if (secondUpdateResult.stateChanged || secondUpdateResult.changeDetectedAt) {
+          console.log('✅ 2回目状態変化検出:', secondUpdateResult);
+        } else if (secondUpdateResult.timeout) {
+          console.warn('⚠️ 2回目動的待機タイムアウト - フォールバック待機実行');
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
-      } else {
+      } catch (error) {
+        console.warn('⚠️ 2回目動的待機エラー:', error.message);
+        // フォールバック: 従来の時間待機
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
       
