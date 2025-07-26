@@ -2824,6 +2824,29 @@ class StudyQuestApp {
     this.updateAnswerCount();
     this.applyAnimations();
   }
+
+  updateAnswerCount() {
+    if (!this.elements.answerCount) return;
+
+    const count = Array.isArray(this.state.currentAnswers)
+      ? this.state.currentAnswers.length
+      : 0;
+    const userIcon = this.getIcon('users', 'w-4 h-4 inline-block -mt-1');
+    this.elements.answerCount.innerHTML =
+      userIcon + '<span>' + count + '件</span>';
+  }
+
+  applyAnimations() {
+    if (!this.elements.answersContainer) return;
+
+    const newCards =
+      this.elements.answersContainer.querySelectorAll('.new-card');
+    newCards.forEach(card => {
+      requestAnimationFrame(() => {
+        card.classList.remove('new-card');
+      });
+    });
+  }
   
   handleRenderingError(error) {
     console.error('レンダリングエラーの詳細:', error);
