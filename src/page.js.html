@@ -1827,10 +1827,10 @@ class StudyQuestApp {
       
       console.log('✅ 状態不整合を修正しました');
       
-    } else if (dataLength > 0 && domCards.length === 0) {
-      console.warn('⚠️ 状態不整合検出: データが', dataLength, '個あるのにDOMにカードがありません');
-      
-      // データがあるのにカードがない場合は再レンダリング
+    } else if (dataLength !== domCards.length) { // 数の不一致も不整合とみなす
+      console.warn('⚠️ 状態不整合検出: DOMカード数とデータ数が一致しません。DOM:', domCards.length, 'データ:', dataLength);
+
+      // 不整合がある場合は再レンダリング
       console.log('再レンダリングを実行します...');
       this.renderBoard(false, false);
       
@@ -2784,8 +2784,15 @@ class StudyQuestApp {
     const containerHeight = container.clientHeight;
     const cardHeight = 150; // 仮のカードの高さ。実際のCSSに基づいて調整が必要。
 
-    const startIndex = Math.floor(scrollTop / cardHeight);
-    const endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight));
+    let startIndex = 0;
+    let endIndex = totalItems;
+
+    if (containerHeight > 0) {
+      startIndex = Math.floor(scrollTop / cardHeight);
+      endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight));
+    } else {
+      console.warn('calculateVisibleRange: containerHeight is 0, rendering all items as fallback.');
+    }
 
     console.log('DEBUG: calculateVisibleRange:', {
       totalItems,
