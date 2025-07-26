@@ -2774,6 +2774,7 @@ class StudyQuestApp {
   calculateVisibleRange(totalItems) {
     const container = this.elements.answersContainer;
     if (!container) {
+      console.warn('calculateVisibleRange: answersContainer not found.');
       return { startIndex: 0, endIndex: 0 };
     }
 
@@ -2783,6 +2784,16 @@ class StudyQuestApp {
 
     const startIndex = Math.floor(scrollTop / cardHeight);
     const endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight));
+
+    console.log('DEBUG: calculateVisibleRange:', {
+      totalItems,
+      scrollTop,
+      containerHeight,
+      cardHeight,
+      startIndex,
+      endIndex,
+      visibleCount: endIndex - startIndex
+    });
 
     return { startIndex, endIndex };
   }
@@ -2798,6 +2809,7 @@ class StudyQuestApp {
     const fragment = this.getReusableFragment();
     const visibleRange = this.calculateVisibleRange(newRows.length);
     const visibleRows = newRows.slice(visibleRange.startIndex, visibleRange.endIndex);
+    console.log('DEBUG: renderWithVirtualScrolling - visibleRows.length:', visibleRows.length);
 
     visibleRows.forEach((row) => {
       const rowId = String(row.rowIndex);
@@ -2815,6 +2827,7 @@ class StudyQuestApp {
       }
     });
 
+    console.log('DEBUG: renderWithVirtualScrolling - fragment.children.length:', fragment.children.length);
     if (fragment.children.length > 0) {
       container.appendChild(fragment);
     }
