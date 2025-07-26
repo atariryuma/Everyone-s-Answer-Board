@@ -2243,7 +2243,9 @@ class StudyQuestApp {
             }
 
             requestAnimationFrame(() => {
-              this.renderBoard(false, isInitialLoad);
+              setTimeout(() => {
+                this.renderBoard(false, isInitialLoad);
+              }, 0); // 0msのsetTimeoutでマイクロタスクキューにプッシュ
             });
             
             // データロード完了後の状態検証
@@ -2660,8 +2662,7 @@ class StudyQuestApp {
       
       // レンダリング後の状態更新
       this.finalizeRenderingState();
-      
-    } catch (error) {
+      this.validatePostLoadState(); // ここに移動
       console.error('❌ renderBoard: レンダリングエラー:', error);
       this.handleRenderingError(error);
     }
@@ -2952,7 +2953,7 @@ class StudyQuestApp {
     });
     
     // Update card background based on reactions
-    this.updateCardReactionBackground(card, data);
+    this.applyReactionStyles(card, data);
   }
   
   updateCardHighlight(card, data) {
@@ -2969,7 +2970,7 @@ class StudyQuestApp {
     if (highlightBtn) {
       highlightBtn.classList.toggle('active', isHighlighted);
     }
-  }
+    this.applyReactionStyles(card, data);
   
   updateExistingCard(card, row, oldData, changedItems) {
     if (oldData) {
