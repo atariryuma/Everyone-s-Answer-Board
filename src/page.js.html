@@ -227,6 +227,8 @@ class StudyQuestApp {
     this.reactionDebounce = new Map(); // リアクションのデバウンス処理用
     this.highlightDebounce = new Map(); // ハイライトのデバウンス処理用
     this.pendingReactions = new Set(); // 処理中のリアクション
+    this.reactionQueue = new Map(); // リアクション操作キュー
+    this.isProcessingReactionQueue = false; // キュー処理中フラグ
     
     // イベントリスナー重複登録防止フラグ
     this.eventDelegationSetup = false;
@@ -249,6 +251,14 @@ class StudyQuestApp {
       checkAdmin: () => this.runGas('checkAdmin', this.state.userId),
       clearCache: () => this.runGas('refreshBoardData', this.state.userId),
       getDataCount: (classFilter, sortOrder, adminMode) => this.runGas('getDataCount', this.state.userId, classFilter, sortOrder, adminMode)
+    };
+    
+    // Polling settings
+    this.pollingSettings = {
+      enabled: true,
+      interval: 30000, // 30秒間隔
+      maxRetries: 3,
+      currentRetries: 0
     };
     const savedCols = localStorage.getItem('boardColumns');
     if (savedCols && this.elements.sizeSlider && this.elements.sliderValue) {
@@ -331,6 +341,9 @@ class StudyQuestApp {
         }
         // Show info modal on initial load (always show for new boards)
         setTimeout(() => this.showInfoModal(), 500);
+        
+        // Start polling for new answers
+        this.startNewAnswerPolling();
       }, { timeout: 50 });
 
       // AdminPanelからのメッセージをリッスン
@@ -1121,6 +1134,82 @@ class StudyQuestApp {
     } catch (error) {
       console.error('全体コンテンツ更新に失敗:', error);
       this.provideFeedback('更新失敗', 'error');
+      throw error;
+    }
+  }
+
+  // 新着回答のポーリング開始
+  startNewAnswerPolling() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+    }
+
+    this.pollingInterval = setInterval(async () => {
+      if (!this.pollingSettings.enabled) return;
+
+      try {
+        await this.checkForNewAnswers();
+        this.pollingSettings.currentRetries = 0; // 成功時はリトライカウントをリセット
+      } catch (error) {
+        this.pollingSettings.currentRetries++;
+        console.warn(`ポーリングエラー (${this.pollingSettings.currentRetries}/${this.pollingSettings.maxRetries}):`, error);
+        
+        if (this.pollingSettings.currentRetries >= this.pollingSettings.maxRetries) {
+          console.error('ポーリング最大リトライ数に達したため停止');
+          this.stopNewAnswerPolling();
+        }
+      }
+    }, this.pollingSettings.interval);
+
+    console.log('🔄 新着回答ポーリング開始:', {
+      interval: this.pollingSettings.interval,
+      enabled: this.pollingSettings.enabled
+    });
+  }
+
+  // 新着回答のポーリング停止
+  stopNewAnswerPolling() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+      console.log('⏹️ 新着回答ポーリング停止');
+    }
+  }
+
+  // 新着回答の確認
+  async checkForNewAnswers() {
+    if (this.state.isLoading) return; // 既にロード中の場合は跳ばす
+
+    try {
+      const classFilter = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+      const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
+      const adminMode = this.state.showAdminFeatures;
+      
+      const incrementalData = await this.gas.getIncrementalSheetData(
+        classFilter, 
+        sortOrder, 
+        adminMode, 
+        this.state.lastSeenCount || 0
+      );
+      
+      if (incrementalData.status === 'error') {
+        throw new Error(incrementalData.message);
+      }
+      
+      // 新着データがある場合
+      if (incrementalData.newCount > 0) {
+        console.log('🆕 新着回答検出:', {
+          newCount: incrementalData.newCount,
+          totalCount: incrementalData.totalCount
+        });
+        
+        this.state.hasNewContent = true;
+        this.state.newContentCount = incrementalData.newCount;
+        this.showNewContentBanner(incrementalData.newCount);
+      }
+      
+    } catch (error) {
+      console.error('新着確認エラー:', error);
       throw error;
     }
   }
@@ -2939,28 +3028,72 @@ class StudyQuestApp {
     const reactionContainer = card.querySelector('.reaction-container');
     if (!reactionContainer) return;
 
+    // DOM操作をバッチ化
+    const updates = [];
+    
     this.reactionTypes.forEach(reactionType => {
       const newCount = data.reactions?.[reactionType.key]?.count || 0;
       const reacted = data.reactions?.[reactionType.key]?.reacted || false;
 
-      // 統一されたボタン更新ロジックを利用
-      this.updateReactionButtonUI(
-        data.rowIndex,
-        reactionType.key,
-        newCount,
-        reacted
-      );
-
-      // ボタン表示の最終調整（存在する場合のみ）
-      const button = reactionContainer.querySelector(
-        `[data-reaction="${reactionType.key}"]`
-      );
-      if (button) {
-        button.style.display = newCount > 0 ? 'flex' : 'none';
-      }
+      // バッチ更新用にデータを蓄積
+      updates.push({
+        rowIndex: data.rowIndex,
+        reaction: reactionType.key,
+        count: newCount,
+        reacted,
+        shouldDisplay: newCount > 0
+      });
     });
 
+    // バッチでDOM更新を実行
+    this.batchUpdateReactionButtons(updates);
     this.updateCardReactionBackground(card, data);
+  }
+
+  // バッチ処理でリアクションボタンを更新
+  batchUpdateReactionButtons(updates) {
+    const fragment = document.createDocumentFragment();
+    const updatedElements = new Map();
+
+    updates.forEach(update => {
+      const buttons = document.querySelectorAll(`[data-row-index="${update.rowIndex}"][data-reaction="${update.reaction}"]`);
+      
+      buttons.forEach(btn => {
+        if (!updatedElements.has(btn)) {
+          // カウント表示更新
+          const countEl = btn.querySelector('.reaction-count');
+          if (countEl && this.state.showCounts) {
+            countEl.textContent = update.count;
+          }
+          
+          // アイコン更新
+          const rt = this.reactionTypes.find(r => r.key === update.reaction);
+          const svgEl = btn.querySelector('svg');
+          if (svgEl && rt) {
+            svgEl.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', update.reacted);
+          }
+          
+          // スタイル更新
+          const colorClass = update.reaction === 'LIKE' ? 'text-red-500' : 
+                           update.reaction === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+          btn.classList.remove('text-red-500', 'text-yellow-500', 'text-green-500');
+          btn.classList.add(colorClass);
+          btn.classList.toggle('liked', update.reacted);
+          btn.setAttribute('aria-pressed', update.reacted.toString());
+          
+          // 表示/非表示
+          btn.style.display = update.shouldDisplay ? 'flex' : 'none';
+          
+          // aria-label更新
+          const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
+          const reactionName = reactionNames[update.reaction] || update.reaction;
+          const ariaLabel = `${reactionName}${update.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${update.count}件)` : ''}`;
+          btn.setAttribute('aria-label', ariaLabel);
+          
+          updatedElements.set(btn, true);
+        }
+      });
+    });
   }
   
   updateCardReactionBackground(card, data) {
@@ -3228,17 +3361,43 @@ class StudyQuestApp {
   }
 
   /**
-   * リアクション処理（連続クリック防止機能＋安定化されたUI更新）
+   * リアクション処理（キューイングシステム＋安定化されたUI更新）
    */
   async handleReaction(rowIndex, reaction) {
     const numericRowIndex = parseInt(rowIndex, 10);
     const reactionKey = `${numericRowIndex}-${reaction}`;
 
-    // 連続クリック防止
-    if (this.pendingReactions.has(reactionKey)) {
-        console.log('リアクション処理中のため無視:', reactionKey);
-        return;
+    // キューに追加
+    this.reactionQueue.set(reactionKey, {
+      rowIndex: numericRowIndex,
+      reaction,
+      timestamp: Date.now()
+    });
+
+    // キュー処理を開始
+    this.processReactionQueue();
+  }
+
+  async processReactionQueue() {
+    if (this.isProcessingReactionQueue) return;
+    this.isProcessingReactionQueue = true;
+
+    try {
+      while (this.reactionQueue.size > 0) {
+        const [reactionKey, operation] = this.reactionQueue.entries().next().value;
+        this.reactionQueue.delete(reactionKey);
+
+        await this.executeReactionOperation(operation, reactionKey);
+      }
+    } catch (error) {
+      console.error('リアクションキュー処理エラー:', error);
+    } finally {
+      this.isProcessingReactionQueue = false;
     }
+  }
+
+  async executeReactionOperation(operation, reactionKey) {
+    const { rowIndex, reaction } = operation;
     let prevState;
 
     try {
@@ -3247,27 +3406,26 @@ class StudyQuestApp {
         const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
         this.setReactionButtonsLoading(btns, true);
 
-        const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
+        const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
         if (!item) {
-            throw new Error(`Item not found for rowIndex: ${numericRowIndex}`);
+            throw new Error(`Item not found for rowIndex: ${rowIndex}`);
         }
 
         prevState = JSON.parse(JSON.stringify(item.reactions || {}));
         this.applyFallbackReactionUpdate(item, reaction);
         await this.updateReactionUI(item);
 
-        console.log('🎯 リアクション送信:', { rowIndex: numericRowIndex, reaction, sheetName: this.state.sheetName });
+        console.log('🎯 リアクション送信:', { rowIndex, reaction, sheetName: this.state.sheetName });
 
-        const response = await this.sendReactionToServer(numericRowIndex, reaction);
-
+        const response = await this.sendReactionToServer(rowIndex, reaction);
         await this.processReactionResponse(item, response, reaction);
 
         console.log('✅ リアクション処理完了:', reactionKey);
     } catch (error) {
         console.error('❌ リアクション処理エラー:', error);
-        const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
-        if (item) {
-            item.reactions = JSON.parse(JSON.stringify(prevState || {}));
+        const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
+        if (item && prevState) {
+            item.reactions = JSON.parse(JSON.stringify(prevState));
             await this.updateReactionUI(item);
         }
         await this.handleReactionError(error, rowIndex, reaction);
@@ -3326,6 +3484,15 @@ class StudyQuestApp {
     if (!item.reactions) {
         item.reactions = {};
     }
+    
+    // 他のリアクションをまず解除
+    this.reactionTypes.forEach(rt => {
+      if (rt.key !== reaction && item.reactions[rt.key]?.reacted) {
+        item.reactions[rt.key].count = Math.max(0, item.reactions[rt.key].count - 1);
+        item.reactions[rt.key].reacted = false;
+      }
+    });
+    
     if (!item.reactions[reaction]) {
         item.reactions[reaction] = { count: 0, reacted: false };
     }
@@ -3358,6 +3525,7 @@ class StudyQuestApp {
                     const modalRowIndex = this.elements.modalReactionContainer
                       .querySelector('[data-row-index]')?.dataset.rowIndex;
                     if (modalRowIndex == item.rowIndex) {
+                      this.updateModalReactionButtons(item);
                       this.applyReactionStyles(this.elements.answerModalCard, item);
                     }
                 }
@@ -3870,33 +4038,56 @@ class StudyQuestApp {
     
     debugLog('サーバーとローカルのリアクション状態統合完了');
   }
-  updateReactionButtonUI(rowIndex, reaction, count, reacted) {
-    document.querySelectorAll('[data-row-index="' + rowIndex + '"][data-reaction="' + reaction + '"]').forEach(btn => {
-      const countEl = btn.querySelector('.reaction-count');
-      if (countEl && this.state.showCounts) {
-        countEl.textContent = count;
+
+  updateModalReactionButtons(item) {
+    if (!this.elements.modalReactionContainer) return;
+    
+    this.reactionTypes.forEach(rt => {
+      const info = item.reactions?.[rt.key] || { count: 0, reacted: false };
+      const modalBtn = this.elements.modalReactionContainer.querySelector(`[data-reaction="${rt.key}"]`);
+      
+      if (modalBtn) {
+        // カウント表示更新
+        const countEl = modalBtn.querySelector('.reaction-count');
+        if (countEl && this.state.showCounts) {
+          countEl.textContent = info.count;
+        }
+        
+        // アイコン更新
+        const svgEl = modalBtn.querySelector('svg');
+        if (svgEl) {
+          svgEl.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', info.reacted);
+        }
+        
+        // スタイル更新
+        const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+        modalBtn.classList.remove('text-red-500', 'text-yellow-500', 'text-green-500');
+        modalBtn.classList.add(colorClass);
+        modalBtn.classList.toggle('liked', info.reacted);
+        modalBtn.setAttribute('aria-pressed', info.reacted.toString());
+        
+        // aria-label更新
+        const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
+        const reactionName = reactionNames[rt.key] || rt.key;
+        const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count}件)` : ''}`;
+        modalBtn.setAttribute('aria-label', ariaLabel);
       }
-      const rt = this.reactionTypes.find(r => r.key === reaction);
-      const svgEl = btn.querySelector('svg');
-      if (svgEl && rt) {
-        svgEl.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', reacted);
-      }
-      const colorClass = reaction === 'LIKE' ? 'text-red-500' : reaction === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
-      btn.classList.remove('text-red-500', 'text-yellow-500', 'text-green-500');
-      btn.classList.add(colorClass);
-      btn.classList.toggle('liked', reacted);
-      btn.setAttribute('aria-pressed', reacted.toString());
-      const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
-      const reactionName = reactionNames[reaction] || reaction;
-      const ariaLabel = `${reactionName}${reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${count}件)` : ''}`;
-      btn.setAttribute('aria-label', ariaLabel);
     });
   }
   applyUpdates(items) {
+    // バッチ処理用にリアクション更新データを蓄積
+    const reactionUpdates = [];
+    
     items.forEach(item => {
       this.reactionTypes.forEach(rt => {
         if (item.reactions && item.reactions[rt.key]) {
-          this.updateReactionButtonUI(item.rowIndex, rt.key, item.reactions[rt.key].count, item.reactions[rt.key].reacted);
+          reactionUpdates.push({
+            rowIndex: item.rowIndex,
+            reaction: rt.key,
+            count: item.reactions[rt.key].count,
+            reacted: item.reactions[rt.key].reacted,
+            shouldDisplay: item.reactions[rt.key].count > 0
+          });
         }
       });
       const card = document.querySelector('.answer-card[data-row-index="' + item.rowIndex + '"]');
@@ -3925,6 +4116,11 @@ class StudyQuestApp {
         }
       }
     });
+
+    // バッチ処理でリアクション更新を実行
+    if (reactionUpdates.length > 0) {
+      this.batchUpdateReactionButtons(reactionUpdates);
+    }
   }
   showAnswerModal(rowIndex) {
     if (DEBUG_MODE) console.log('📱 [MODAL DEBUG] showAnswerModal called:', {
