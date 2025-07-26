@@ -97,6 +97,16 @@ class UnifiedCache {
 }
 
 class StudyQuestApp {
+  // アプリケーション定数
+  static CONSTANTS = {
+    REACTION_RATE_LIMIT_MS: 500,
+    HIGHLIGHT_RATE_LIMIT_MS: 500,
+    CACHE_TTL_MS: 1000,
+    RETRY_DELAY_MS: 2000,
+    POLLING_INTERVAL_MS: 5000,
+    INIT_TIMEOUT_MS: 30000
+  };
+
   /**
    * ユーザーIDを検証し、必要に応じてフォールバック値を提供
    * @param {string} userId - 検証するユーザーID
@@ -635,7 +645,7 @@ class StudyQuestApp {
         google.script.run
           .withSuccessHandler((result) => {
             if (!isStateChanging) {
-              this.cache.set(cacheKey, result, 1000); // 1秒キャッシュ
+              this.cache.set(cacheKey, result, StudyQuestApp.CONSTANTS.CACHE_TTL_MS);
             }
             resolve(result);
           })
@@ -649,7 +659,7 @@ class StudyQuestApp {
         console.warn('Google Apps Script environment not detected.');
         this.getMockData(funcName, ...args).then((result) => {
           if (!isStateChanging) {
-            this.cache.set(cacheKey, result, 1000); // 1秒キャッシュ
+            this.cache.set(cacheKey, result, StudyQuestApp.CONSTANTS.CACHE_TTL_MS);
           }
           resolve(result);
         }).catch(reject);
@@ -2130,7 +2140,7 @@ class StudyQuestApp {
               } else {
                 // データ不整合チェック: 軽量チェックでデータが存在するかを確認
                 console.warn('⚠️ StudyQuestApp: Received empty or invalid data:', result);
-                console.log('DEBUG: Calling data consistency check. currentAnswers.length:', this.state.currentAnswers.length, 'result.data.length:', result.data ? result.data.length : 'undefined');
+                debugLog('Data consistency check:', { currentAnswers: this.state.currentAnswers.length, resultData: result.data ? result.data.length : 0 });
                 
                 try {
                   // フォールバック: 軽量チェックでデータの存在を確認
@@ -2791,15 +2801,7 @@ class StudyQuestApp {
       console.warn('calculateVisibleRange: containerHeight is 0, rendering all items as fallback.');
     }
 
-    console.log('DEBUG: calculateVisibleRange:', {
-      totalItems,
-      scrollTop,
-      containerHeight,
-      cardHeight,
-      startIndex,
-      endIndex,
-      visibleCount: endIndex - startIndex
-    });
+    debugLog('Virtual scroll range:', { startIndex, endIndex, visibleCount: endIndex - startIndex, totalItems });
 
     return { startIndex, endIndex };
   }
@@ -2815,7 +2817,7 @@ class StudyQuestApp {
     const fragment = this.getReusableFragment();
     const visibleRange = this.calculateVisibleRange(newRows.length);
     const visibleRows = newRows.slice(visibleRange.startIndex, visibleRange.endIndex);
-    console.log('DEBUG: renderWithVirtualScrolling - visibleRows.length:', visibleRows.length);
+    debugLog('Virtual scroll rendering:', { visibleRows: visibleRows.length });
 
     visibleRows.forEach((row) => {
       const rowId = String(row.rowIndex);
@@ -2833,7 +2835,7 @@ class StudyQuestApp {
       }
     });
 
-    console.log('DEBUG: renderWithVirtualScrolling - fragment.children.length:', fragment.children.length);
+    debugLog('Virtual scroll completed:', { renderedCards: fragment.children.length });
     if (fragment.children.length > 0) {
       container.appendChild(fragment);
     }
@@ -3408,7 +3410,7 @@ class StudyQuestApp {
     // Rate limiting for highlights
     const now = Date.now();
     const lastHighlightTime = this.lastReactionTimes?.get(highlightKey) || 0;
-    if (now - lastHighlightTime < 500) { // Minimum 500ms between highlights
+    if (now - lastHighlightTime < StudyQuestApp.CONSTANTS.HIGHLIGHT_RATE_LIMIT_MS) {
       return;
     }
     
