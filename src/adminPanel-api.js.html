@@ -387,10 +387,14 @@ function proceedWithSaveAndPublish(config) {
         
         // 6時間自動停止の確認モーダルを表示
         setTimeout(() => {
-          if (typeof showAutoStopConfirmationModal === 'function' && result.userInfo) {
+          if (window.sharedModals && typeof window.sharedModals.loadModals === 'function') {
+            window.sharedModals.loadModals(['auto-stop-confirmation-modal']);
+          }
+
+          if (typeof window.showAutoStopConfirmationModal === 'function' && result.userInfo) {
             const configJson = JSON.parse(result.userInfo.configJson || '{}');
             if (configJson.publishedAt && configJson.autoStopEnabled) {
-              showAutoStopConfirmationModal({
+              window.showAutoStopConfirmationModal({
                 publishedAt: configJson.publishedAt,
                 autoStopMinutes: configJson.autoStopMinutes || 360
               });

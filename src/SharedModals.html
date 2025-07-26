@@ -721,7 +721,12 @@ class SharedModals {
 
   // 管理者専用モーダルの読み込み
   loadAdminModals() {
-    this.loadModals(['form-config-modal', 'security-details-modal', 'google-integration-modal']);
+    this.loadModals([
+      'form-config-modal',
+      'security-details-modal',
+      'google-integration-modal',
+      'auto-stop-confirmation-modal'
+    ]);
   }
 
   // 確認モーダルの表示
@@ -918,6 +923,8 @@ class SharedModals {
 
   // 6時間自動停止確認モーダルの表示
   showAutoStopConfirmation(publishResult) {
+    this.loadModals(['auto-stop-confirmation-modal']);
+
     const modal = document.getElementById('auto-stop-confirmation-modal');
     if (!modal) {
       console.error('自動停止確認モーダルが見つかりません');
@@ -927,7 +934,8 @@ class SharedModals {
     // 公開時間と停止時間の設定
     if (publishResult && publishResult.publishedAt) {
       const publishTime = new Date(publishResult.publishedAt);
-      const stopTime = new Date(publishTime.getTime() + (360 * 60 * 1000)); // 6時間後
+      const minutes = publishResult.autoStopMinutes || 360;
+      const stopTime = new Date(publishTime.getTime() + (minutes * 60 * 1000));
       
       document.getElementById('publish-start-time').textContent = publishTime.toLocaleString('ja-JP');
       document.getElementById('auto-stop-time').textContent = stopTime.toLocaleString('ja-JP');
