@@ -2095,7 +2095,7 @@ class StudyQuestApp {
       console.log('📡 Starting data fetch with parameters:', fetchParams);
       
       google.script.run
-        .withSuccessHandler(result => {
+        .withSuccessHandler(async result => {
           try {
             // 初期ロードタイムアウトをクリア
             if (isInitialLoad && this.initTimeoutId) {
@@ -3301,6 +3301,7 @@ class StudyQuestApp {
             3000
         );
     }
+  }
   
   showErrorFeedback(btn, message) {
     if (!btn) return;
