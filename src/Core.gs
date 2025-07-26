@@ -3960,6 +3960,9 @@ function createQuickStartFormUI(requestUserId) {
  */
 function deleteCurrentUserAccount(requestUserId) {
   try {
+    if (!requestUserId) {
+      throw new Error('認証エラー: ユーザーIDが指定されていません');
+    }
     verifyUserAccess(requestUserId);
     const result = deleteUserAccount(requestUserId);
     
