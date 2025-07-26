@@ -2243,9 +2243,7 @@ class StudyQuestApp {
             }
 
             requestAnimationFrame(() => {
-              setTimeout(() => {
-                this.renderBoard(false, isInitialLoad);
-              }, 0); // 0msのsetTimeoutでマイクロタスクキューにプッシュ
+              this.renderBoard(false, isInitialLoad);
             });
             
             // データロード完了後の状態検証
@@ -2662,8 +2660,8 @@ class StudyQuestApp {
       
       // レンダリング後の状態更新
       this.finalizeRenderingState();
-      this.validatePostLoadState(); // ここに移動
-
+      this.validatePostLoadState();
+      
     } catch (error) {
       console.error('❌ renderBoard: レンダリングエラー:', error);
       this.handleRenderingError(error);
@@ -2955,6 +2953,11 @@ class StudyQuestApp {
     });
     
     // Update card background based on reactions
+    this.updateCardReactionBackground(card, data);
+  }
+  
+  updateCardReactionBackground(card, data) {
+    // リアクションに基づいてカードの背景とボーダーを更新
     this.applyReactionStyles(card, data);
   }
   
@@ -2972,7 +2975,7 @@ class StudyQuestApp {
     if (highlightBtn) {
       highlightBtn.classList.toggle('active', isHighlighted);
     }
-    this.applyReactionStyles(card, data);
+  }
   
   updateExistingCard(card, row, oldData, changedItems) {
     if (oldData) {
@@ -3332,8 +3335,16 @@ class StudyQuestApp {
             try {
                 // カードのリアクション表示を更新
                 const card = document.querySelector(`[data-row-index="${item.rowIndex}"]`);
-                if (card) {
+                if (card && card instanceof HTMLElement) {
+                    // リアクション数とボタンの状態を更新
                     this.updateCardReactions(card, item);
+                    
+                    // カード背景色とボーダーを更新（重要：視覚的フィードバック）
+                    this.applyReactionStyles(card, item);
+                    
+                    console.log('✅ リアクションUI更新完了:', { rowIndex: item.rowIndex, reactions: item.reactions });
+                } else {
+                    console.warn('⚠️ カード要素が見つかりません:', item.rowIndex);
                 }
                 
                 resolve();
