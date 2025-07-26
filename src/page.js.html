@@ -2017,6 +2017,118 @@ class StudyQuestApp {
   }
 
   /**
+   * リトライ機能付きデータ取得
+   * @param {object} fetchParams - データ取得パラメータ
+   * @param {boolean} isInitialLoad - 初期ロードかどうか
+   * @returns {Promise} データ取得結果
+   */
+  async performDataFetchWithRetry(fetchParams, isInitialLoad) {
+    const maxRetries = 3;
+    const retryDelays = [1000, 2000, 3000]; // 段階的な待機時間
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`📡 データ取得試行 ${attempt + 1}/${maxRetries + 1}:`, fetchParams);
+        
+        // データ取得を Promise で実行
+        const result = await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('データ取得がタイムアウトしました'));
+          }, attempt === 0 ? 15000 : 10000); // 初回は15秒、以降は10秒
+          
+          google.script.run
+            .withSuccessHandler(response => {
+              clearTimeout(timeout);
+              resolve(response);
+            })
+            .withFailureHandler(error => {
+              clearTimeout(timeout);
+              reject(error);
+            })
+            .getPublishedSheetData(
+              fetchParams.userId,
+              fetchParams.classFilter,
+              fetchParams.sortOrder,
+              fetchParams.showAdminFeatures,
+              fetchParams.requestedSheetName
+            );
+        });
+        
+        // 成功した場合は結果を返す
+        if (result && (result.status === 'success' || (result.data && result.data.length > 0))) {
+          console.log(`✅ データ取得成功 (試行 ${attempt + 1}):`, result.data ? result.data.length : 0, '件');
+          return result;
+        }
+        
+        // データが空またはエラーの場合
+        if (result && result.status === 'error') {
+          const isUserNotFoundError = result.message && result.message.includes('ユーザー情報が見つかりません');
+          
+          if (isUserNotFoundError && attempt < maxRetries) {
+            console.warn(`⚠️ ユーザー情報エラー、リトライします (試行 ${attempt + 1}):`, result.message);
+            
+            // ユーザー情報エラーの場合は診断・修復を試行
+            try {
+              console.log('🔧 サーバー側診断・修復を要求中...');
+              await new Promise((resolve, reject) => {
+                google.script.run
+                  .withSuccessHandler(resolve)
+                  .withFailureHandler(reject)
+                  .performAutoRepair(fetchParams.userId);
+              });
+              console.log('✅ サーバー側修復完了、次の試行に進みます');
+            } catch (repairError) {
+              console.warn('⚠️ サーバー側修復失敗:', repairError);
+            }
+          } else {
+            // ユーザー情報エラー以外、または最後の試行
+            throw new Error(result.message || '不明なエラー');
+          }
+        }
+        
+        // 空データの場合
+        if (attempt < maxRetries) {
+          console.warn(`⚠️ 空データ、リトライします (試行 ${attempt + 1})`);
+        } else {
+          console.warn('❌ 最大試行回数に達しました、空データを返します');
+          return result || { status: 'error', message: 'データが見つかりませんでした', data: [] };
+        }
+        
+      } catch (error) {
+        console.error(`❌ データ取得エラー (試行 ${attempt + 1}):`, error.message);
+        
+        // 最後の試行で失敗した場合
+        if (attempt >= maxRetries) {
+          throw error;
+        }
+        
+        // 一時的なエラーの場合はリトライ
+        const isTemporaryError = 
+          error.message.includes('timeout') ||
+          error.message.includes('network') ||
+          error.message.includes('script runtime') ||
+          error.message.includes('temporarily unavailable');
+          
+        if (!isTemporaryError && error.message.includes('ユーザー情報が見つかりません')) {
+          // ユーザー情報エラーは特別扱い（上記の処理に委ねる）
+          throw error;
+        }
+        
+        if (isTemporaryError || attempt < maxRetries) {
+          const delay = retryDelays[attempt] || 3000;
+          console.log(`⏳ ${delay}ms 待機後にリトライ...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          throw error;
+        }
+      }
+    }
+    
+    // ここに到達することはないはずですが、安全のため
+    throw new Error('予期しないエラー: リトライループを抜けました');
+  }
+
+  /**
    * ユーザー情報が見つからない場合のエラー画面を表示
    * @param {string} errorMessage - エラーメッセージ
    */
@@ -2044,16 +2156,24 @@ class StudyQuestApp {
           <ul class="text-xs text-gray-400 space-y-1">
             <li>• URLのユーザーIDが無効または期限切れ</li>
             <li>• ボードが削除されたか非アクティブ化された</li>
+            <li>• データベース接続に一時的な問題</li>
+            <li>• サーバー側の権限設定に問題</li>
             <li>• ブラウザのセッション情報が破損</li>
           </ul>
         </div>
         <div class="mt-4 p-4 bg-green-900/20 border border-green-500/50 rounded-lg text-left max-w-md mx-auto">
           <h4 class="text-sm font-medium text-green-400 mb-2">💡 解決方法：</h4>
           <ul class="text-xs text-gray-400 space-y-1">
+            <li>• まずページを再読み込みしてみる</li>
             <li>• 正しいボードURLを管理者に確認</li>
+            <li>• 5-10分待ってから再度アクセス</li>
+            <li>• 別のブラウザで試してみる</li>
             <li>• 新しい回答ボードを作成する</li>
-            <li>• しばらく時間をおいて再度アクセス</li>
           </ul>
+        </div>
+        <div class="mt-4 p-3 bg-yellow-900/20 border border-yellow-500/50 rounded-lg text-left max-w-md mx-auto">
+          <h4 class="text-sm font-medium text-yellow-400 mb-2">🛠️ 自動修復：</h4>
+          <p class="text-xs text-gray-400">システムは自動的に問題の修復を試行しています。数分後に再度アクセスすると解決している可能性があります。</p>
         </div>` : ''}
         <p class="mt-2 text-xs text-gray-500">エラー詳細: ${this.escapeHtml(errorMessage)}</p>
         <div class="mt-6 space-x-3">
@@ -2206,8 +2326,9 @@ class StudyQuestApp {
       };
       console.log('📡 Starting data fetch with parameters:', fetchParams);
       
-      google.script.run
-        .withSuccessHandler(async result => {
+      // エラーハンドリング強化版のデータ取得
+      this.performDataFetchWithRetry(fetchParams, isInitialLoad)
+        .then(async result => {
           try {
             // 初期ロードタイムアウトをクリア
             if (isInitialLoad && this.initTimeoutId) {
@@ -2365,7 +2486,7 @@ class StudyQuestApp {
             this.hideLoadingOverlay();
           }
         })
-        .withFailureHandler(error => {
+        .catch(error => {
           try {
             // 初期ロードタイムアウトをクリア
             if (isInitialLoad && this.initTimeoutId) {
@@ -2373,7 +2494,7 @@ class StudyQuestApp {
               this.initTimeoutId = null;
             }
             
-            console.error('Error loading sheet data:', error);
+            console.error('❌ StudyQuestApp: All retry attempts failed:', error);
             
             // Check if the error indicates the board has been unpublished
             const errorStr = error.message || error.toString();
