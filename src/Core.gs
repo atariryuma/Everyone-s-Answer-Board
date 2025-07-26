@@ -1206,8 +1206,16 @@ function getResponsesData(userId, sheetName) {
     var range = "'" + (sheetName || 'フォームの回答 1') + "'!A:Z";
     
     var response = batchGetSheetsData(service, spreadsheetId, [range]);
-    var values = response.valueRanges[0].values || [];
-    
+    var values = response.valueRanges[0].values;
+
+    if (!values) {
+      return { status: 'success', data: [], headers: [] };
+    }
+
+    if (!Array.isArray(values[0])) {
+      values = [values];
+    }
+
     if (values.length === 0) {
       return { status: 'success', data: [], headers: [] };
     }
@@ -3098,7 +3106,12 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
       
       var responses = batchGetSheetsData(service, spreadsheetId, ranges);
       debugLog('DEBUG: batchGetSheetsData responses: %s', JSON.stringify(responses));
-      var sheetData = responses.valueRanges[0].values || [];
+      var sheetData = responses.valueRanges[0].values;
+      if (!sheetData) {
+        sheetData = [];
+      } else if (!Array.isArray(sheetData[0])) {
+        sheetData = [sheetData];
+      }
       debugLog('DEBUG: sheetData length: %s', sheetData.length);
     
     // 名簿機能は使用せず、空の配列を設定
