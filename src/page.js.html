@@ -2023,12 +2023,12 @@ class StudyQuestApp {
    * @returns {Promise} データ取得結果
    */
   async performDataFetchWithRetry(fetchParams, isInitialLoad) {
-    const maxRetries = 3;
+    const MAX_ATTEMPTS = 3;
     const retryDelays = [1000, 2000, 3000]; // 段階的な待機時間
-    
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
-        console.log(`📡 データ取得試行 ${attempt + 1}/${maxRetries + 1}:`, fetchParams);
+        console.log(`📡 データ取得試行 ${attempt + 1}/${MAX_ATTEMPTS}:`, fetchParams);
         
         // データ取得を Promise で実行
         const result = await new Promise((resolve, reject) => {
@@ -2064,7 +2064,7 @@ class StudyQuestApp {
         if (result && result.status === 'error') {
           const isUserNotFoundError = result.message && result.message.includes('ユーザー情報が見つかりません');
           
-          if (isUserNotFoundError && attempt < maxRetries) {
+          if (isUserNotFoundError && attempt < MAX_ATTEMPTS - 1) {
             console.warn(`⚠️ ユーザー情報エラー、リトライします (試行 ${attempt + 1}):`, result.message);
             
             // ユーザー情報エラーの場合は診断・修復を試行
@@ -2087,7 +2087,7 @@ class StudyQuestApp {
         }
         
         // 空データの場合
-        if (attempt < maxRetries) {
+        if (attempt < MAX_ATTEMPTS - 1) {
           console.warn(`⚠️ 空データ、リトライします (試行 ${attempt + 1})`);
         } else {
           console.warn('❌ 最大試行回数に達しました、空データを返します');
@@ -2098,7 +2098,7 @@ class StudyQuestApp {
         console.error(`❌ データ取得エラー (試行 ${attempt + 1}):`, error.message);
         
         // 最後の試行で失敗した場合
-        if (attempt >= maxRetries) {
+        if (attempt >= MAX_ATTEMPTS - 1) {
           throw error;
         }
         
@@ -2114,7 +2114,7 @@ class StudyQuestApp {
           throw error;
         }
         
-        if (isTemporaryError || attempt < maxRetries) {
+        if (isTemporaryError || attempt < MAX_ATTEMPTS - 1) {
           const delay = retryDelays[attempt] || 3000;
           console.log(`⏳ ${delay}ms 待機後にリトライ...`);
           await new Promise(resolve => setTimeout(resolve, delay));
