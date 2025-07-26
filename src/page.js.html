@@ -2663,6 +2663,8 @@ class StudyQuestApp {
       // レンダリング後の状態更新
       this.finalizeRenderingState();
       this.validatePostLoadState(); // ここに移動
+
+    } catch (error) {
       console.error('❌ renderBoard: レンダリングエラー:', error);
       this.handleRenderingError(error);
     }
