@@ -871,9 +871,8 @@ class StudyQuestApp {
   
   async handleInitialContentLoad(currentViewKey, newCount) {
     this.lastViewKey = currentViewKey;
-    this.state.lastSeenCount = newCount;
     this.initialDataLoaded = true;
-    
+
     console.log('✅ Initial content load completed:', {
       viewKey: currentViewKey,
       count: newCount
@@ -888,7 +887,6 @@ class StudyQuestApp {
     });
     
     this.lastViewKey = currentViewKey;
-    this.state.lastSeenCount = newCount;
     this.dismissNewContentBanner();
   }
   
@@ -2203,6 +2201,7 @@ class StudyQuestApp {
             
             // 🔥 CRITICAL FIX: Set currentAnswers with received data
             this.state.currentAnswers = result.data || [];
+            this.state.lastSeenCount = this.state.currentAnswers.length; // Update lastSeenCount after data is loaded
             console.log('✅ StudyQuestApp: Set currentAnswers with', this.state.currentAnswers.length, 'items');
             
             // サーバーからの質問文と現在表示の一致性をチェック
