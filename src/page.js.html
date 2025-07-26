@@ -2164,12 +2164,12 @@ class StudyQuestApp {
                       google.script.run
                         .withSuccessHandler(resolve)
                         .withFailureHandler(reject)
-                        .getStudentData(
-                          this.state.userId, 
-                          classFilter, 
+                        .getPublishedSheetData(
+                          this.state.userId,
+                          classFilter,
                           this.elements.sortOrder ? this.elements.sortOrder.value : 'newest',
                           this.state.showAdminFeatures,
-                          requestedSheetName
+                          true
                         );
                     });
                     
