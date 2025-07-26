@@ -639,7 +639,9 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
   
   try {
     userInfo = cacheManager.get(cacheKey, () => {
-      console.error('cache miss - fetching from database');
+      // キャッシュに存在しない場合はデータベースから取得する
+      // 通常フローのためエラーレベルでは記録しない
+      console.log('cache miss - fetching from database');
 
       const props = PropertiesService.getScriptProperties();
       if (!props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID)) {
