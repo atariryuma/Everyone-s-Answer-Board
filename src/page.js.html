@@ -450,35 +450,7 @@ class StudyQuestApp {
       return;
     }
     
-    // Optimized: Event delegation for answer cards container
-    this.handlers.onAnswersContainerClick = (e) => {
-      const card = e.target.closest('.answer-card');
-      const reactionBtn = e.target.closest('.reaction-btn');
-      const highlightBtn = e.target.closest('.highlight-btn');
-      
-      if (reactionBtn && card) {
-        const rowIndex = card.dataset.rowIndex;
-        const reaction = reactionBtn.dataset.reaction;
-        if (rowIndex && reaction) {
-          this.handleReaction(rowIndex, reaction);
-        }
-      } else if (highlightBtn && card) {
-        const rowIndex = card.dataset.rowIndex;
-        if (rowIndex) {
-          this.handleHighlight(rowIndex);
-        }
-      } else if (card) {
-        // Card click to show modal
-        const rowIndex = card.dataset.rowIndex;
-        if (rowIndex) {
-          this.showAnswerModal(parseInt(rowIndex));
-        }
-      }
-    };
-    
-    if (this.elements.answersContainer) {
-      this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
-    }
+    // answersContainer のクリックリスナーは setupEventDelegation() で登録済み
     
     // Modal handlers
     this.handlers.onAnswerModalContainerClick = (e) => {
