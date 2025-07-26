@@ -916,33 +916,14 @@ class StudyQuestApp {
         newItems
       });
       
-      // 自動リフレッシュの判定
-      if (this.shouldAutoRefresh(newItems)) {
-        await this.performAutoRefresh(newCount);
-      } else {
-        this.showNewContentBanner(newItems);
-      }
-    }
-  }
-  
-  shouldAutoRefresh(newItems) {
-    // 少数の新着（3件以下）の場合は自動リフレッシュ
-    return newItems <= 3;
-  }
-  
-  async performAutoRefresh(newCount) {
-    console.log('🔄 Performing auto-refresh for new content...');
-    
-    try {
-      await this.loadSheetData({ bypassCache: true });
-      this.state.lastSeenCount = newCount;
-      console.log('✅ Auto-refresh completed');
-    } catch (error) {
-      console.error('❌ Auto-refresh failed:', error);
-      // フォールバック: 通知バナーを表示
-      const newItems = newCount - this.state.lastSeenCount;
+      // 新着通知バナーを表示
       this.showNewContentBanner(newItems);
     }
+  }
+  
+  // 自動リフレッシュ機能は無効化 - 新着時は常に通知バナー表示
+  shouldAutoRefresh(newItems) {
+    return false;
   }
   
   async handleContentCheckError(error) {
