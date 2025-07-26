@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>リアクションシステムテスト</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-button {
+            background: #3B82F6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 8px;
+            transition: background 0.2s;
+        }
+        .test-button:hover {
+            background: #2563EB;
+        }
+        .test-button:disabled {
+            background: #9CA3AF;
+            cursor: not-allowed;
+        }
+        .results {
+            background: #F9FAFB;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .instructions {
+            background: #FEF3C7;
+            border: 1px solid #F59E0B;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 8px 16px;
+            border-radius: 6px;
+            margin: 8px 0;
+            font-weight: 600;
+        }
+        .status.success {
+            background: #D1FAE5;
+            color: #065F46;
+            border: 1px solid #10B981;
+        }
+        .status.error {
+            background: #FEE2E2;
+            color: #991B1B;
+            border: 1px solid #EF4444;
+        }
+        .status.warning {
+            background: #FEF3C7;
+            color: #92400E;
+            border: 1px solid #F59E0B;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 リアクションシステムテスト</h1>
+    
+    <div class="instructions">
+        <h3>📋 テスト手順</h3>
+        <ol>
+            <li>まず回答ボードを開いてデータを読み込んでください</li>
+            <li>回答カードが表示されていることを確認してください</li>
+            <li>下のテストボタンをクリックしてテストを実行してください</li>
+            <li>ブラウザの開発者ツール(F12)でコンソールログも確認してください</li>
+        </ol>
+    </div>
+
+    <div class="test-container">
+        <h2>🎯 基本テスト</h2>
+        <button class="test-button" onclick="runBasicTest()">単一リアクションテスト</button>
+        <button class="test-button" onclick="runAllReactionsTest()">全リアクションタイプテスト</button>
+        <button class="test-button" onclick="checkSystemStatus()">システム状態確認</button>
+        <button class="test-button" onclick="runComprehensiveTest()" style="background: #10B981;">🚀 総合テスト実行</button>
+        <div id="basicResults" class="results" style="display: none;"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>⚡ ストレステスト</h2>
+        <button class="test-button" onclick="runStressTest()">連続クリックテスト</button>
+        <button class="test-button" onclick="runConcurrentTest()">同時実行テスト</button>
+        <div id="stressResults" class="results" style="display: none;"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>🔍 詳細検証</h2>
+        <button class="test-button" onclick="runSyncTest()">サーバー同期テスト</button>
+        <button class="test-button" onclick="runUIConsistencyTest()">UI整合性テスト</button>
+        <div id="detailResults" class="results" style="display: none;"></div>
+    </div>
+
+    <div id="status" class="status" style="display: none;"></div>
+
+    <script>
+        let testWindow = null;
+
+        // テスト用のウィンドウを開く
+        function openTestWindow() {
+            if (!testWindow || testWindow.closed) {
+                // 実際の回答ボードURLに変更してください
+                testWindow = window.open('/a/macros/naha-okinawa.ed.jp/s/AKfycbyq0CohJCpwb8KYJQrba4pWhvtss5HD2nKDPMuzPBX2EOftIAI2UbtjjyEn4N52TCzX/exec?mode=view&userId=d6aad07b-8583-4fe2-be97-44f513f325dd', 'testWindow', 'width=1200,height=800');
+                
+                if (testWindow) {
+                    showStatus('回答ボードを開いています...', 'warning');
+                    
+                    // ウィンドウの読み込み完了を待つ
+                    testWindow.addEventListener('load', () => {
+                        setTimeout(() => {
+                            showStatus('回答ボードが準備完了しました', 'success');
+                        }, 2000);
+                    });
+                } else {
+                    showStatus('ポップアップがブロックされました。手動で回答ボードを開いてください。', 'error');
+                }
+            }
+            return testWindow;
+        }
+
+        function showStatus(message, type = 'success') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        function showResults(containerId, results) {
+            const container = document.getElementById(containerId);
+            container.style.display = 'block';
+            container.textContent = typeof results === 'string' ? results : JSON.stringify(results, null, 2);
+        }
+
+        // 基本テスト
+        async function runBasicTest() {
+            const win = openTestWindow();
+            if (!win) return;
+
+            try {
+                // ウィンドウの準備を待つ
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
+                if (typeof win.testReactionSystem === 'function') {
+                    showStatus('単一リアクションテストを実行中...', 'warning');
+                    const result = await win.testReactionSystem({ cardIndex: 0, reaction: 'LIKE' });
+                    showResults('basicResults', result);
+                    showStatus('単一リアクションテスト完了', 'success');
+                } else {
+                    showStatus('テスト関数が見つかりません。回答ボードが完全に読み込まれていない可能性があります。', 'error');
+                }
+            } catch (error) {
+                showStatus('テスト実行エラー: ' + error.message, 'error');
+                showResults('basicResults', 'エラー: ' + error.message);
+            }
+        }
+
+        async function runAllReactionsTest() {
+            const win = openTestWindow();
+            if (!win) return;
+
+            try {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
+                if (typeof win.testAllReactions === 'function') {
+                    showStatus('全リアクションタイプテストを実行中...', 'warning');
+                    const result = await win.testAllReactions(0);
+                    showResults('basicResults', result);
+                    showStatus('全リアクションタイプテスト完了', 'success');
+                } else {
+                    showStatus('テスト関数が見つかりません', 'error');
+                }
+            } catch (error) {
+                showStatus('テスト実行エラー: ' + error.message, 'error');
+                showResults('basicResults', 'エラー: ' + error.message);
+            }
+        }
+
+        async function checkSystemStatus() {
+            const win = openTestWindow();
+            if (!win) return;
+
+            try {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                const status = {
+                    studyQuestApp: !!win.studyQuestApp,
+                    answersContainer: !!win.studyQuestApp?.elements?.answersContainer,
+                    answerCards: win.document?.querySelectorAll('.answer-card')?.length || 0,
+                    testFunctions: {
+                        testReactionSystem: typeof win.testReactionSystem === 'function',
+                        testAllReactions: typeof win.testAllReactions === 'function',
+                        debugGetAnswerCardInfo: typeof win.debugGetAnswerCardInfo === 'function'
+                    }
+                };
+                
+                showResults('basicResults', status);
+                showStatus('システム状態確認完了', 'success');
+            } catch (error) {
+                showStatus('システム状態確認エラー: ' + error.message, 'error');
+                showResults('basicResults', 'エラー: ' + error.message);
+            }
+        }
+
+        // ストレステスト
+        async function runStressTest() {
+            const win = openTestWindow();
+            if (!win) return;
+
+            try {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                showStatus('連続クリックテストを実行中...', 'warning');
+                
+                const results = [];
+                for (let i = 0; i < 5; i++) {
+                    const result = await win.testReactionSystem({ 
+                        cardIndex: 0, 
+                        reaction: 'LIKE', 
+                        verbose: false 
+                    });
+                    results.push(`テスト${i + 1}: ${result.success ? '成功' : '失敗'}`);
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+                
+                showResults('stressResults', results.join('\n'));
+                showStatus('連続クリックテスト完了', 'success');
+            } catch (error) {
+                showStatus('ストレステストエラー: ' + error.message, 'error');
+                showResults('stressResults', 'エラー: ' + error.message);
+            }
+        }
+
+        async function runConcurrentTest() {
+            const win = openTestWindow();
+            if (!win) return;
+
+            try {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                showStatus('同時実行テストを実行中...', 'warning');
+                
+                // 複数のリアクションを同時実行
+                const promises = [
+                    win.testReactionSystem({ cardIndex: 0, reaction: 'LIKE', verbose: false }),
+                    win.testReactionSystem({ cardIndex: 0, reaction: 'UNDERSTAND', verbose: false }),
+                    win.testReactionSystem({ cardIndex: 0, reaction: 'CURIOUS', verbose: false })
+                ];
+                
+                const results = await Promise.allSettled(promises);
+                const summary = results.map((result, index) => {
+                    const reactions = ['LIKE', 'UNDERSTAND', 'CURIOUS'];
+                    return `${reactions[index]}: ${result.status === 'fulfilled' && result.value.success ? '成功' : '失敗'}`;
+                });
+                
+                showResults('stressResults', summary.join('\n'));
+                showStatus('同時実行テスト完了', 'success');
+            } catch (error) {
+                showStatus('同時実行テストエラー: ' + error.message, 'error');
+                showResults('stressResults', 'エラー: ' + error.message);
+            }
+        }
+
+        async function runSyncTest() {
+            showStatus('サーバー同期テストは手動で実行してください', 'warning');
+            showResults('detailResults', 'サーバー同期テストの手順:\n1. リアクションをクリック\n2. ページを再読み込み\n3. リアクション状態が保持されていることを確認\n4. 他のユーザーからも同じ状態が見えることを確認');
+        }
+
+        async function runUIConsistencyTest() {
+            const win = openTestWindow();
+            if (!win) return;
+
+            try {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                showStatus('UI整合性テストを実行中...', 'warning');
+                
+                const cardInfo = win.debugGetAnswerCardInfo(0);
+                if (!cardInfo.success) {
+                    throw new Error(cardInfo.error);
+                }
+                
+                const card = win.document.querySelectorAll('.answer-card')[0];
+                const reactionButtons = card.querySelectorAll('.reaction-btn');
+                
+                const uiState = Array.from(reactionButtons).map(btn => ({
+                    reaction: btn.dataset.reaction,
+                    pressed: btn.getAttribute('aria-pressed'),
+                    count: btn.querySelector('.count')?.textContent || '0',
+                    classes: btn.className,
+                    icon: btn.querySelector('svg')?.outerHTML || 'なし'
+                }));
+                
+                showResults('detailResults', uiState);
+                showStatus('UI整合性テスト完了', 'success');
+            } catch (error) {
+                showStatus('UI整合性テストエラー: ' + error.message, 'error');
+                showResults('detailResults', 'エラー: ' + error.message);
+            }
+        }
+
+        // 総合テスト実行
+        async function runComprehensiveTest() {
+            const win = openTestWindow();
+            if (!win) return;
+
+            try {
+                showStatus('総合テストを準備中...', 'warning');
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
+                // テストスクリプトを注入
+                if (!win.runAllTests) {
+                    const script = win.document.createElement('script');
+                    script.textContent = await fetch('./run-reaction-tests.js').then(r => r.text());
+                    win.document.head.appendChild(script);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+                
+                if (typeof win.runAllTests === 'function') {
+                    showStatus('総合テストを実行中...', 'warning');
+                    const results = await win.runAllTests();
+                    
+                    // 結果をフォーマット
+                    const summary = `
+📊 テスト結果サマリー
+====================
+🎯 総テスト数: ${results.summary.total}
+✅ 成功: ${results.summary.passed}
+❌ 失敗: ${results.summary.failed}
+📈 成功率: ${((results.summary.passed / results.summary.total) * 100).toFixed(1)}%
+⏱️ 実行時間: ${results.duration?.toFixed(2)}ms
+
+📋 カテゴリ別結果:
+${Object.entries(results.tests).map(([category, tests]) => {
+    const passed = tests.filter(t => t.status === 'passed').length;
+    const total = tests.length;
+    return `${category}: ${passed}/${total} (${((passed/total)*100).toFixed(1)}%)`;
+}).join('\n')}
+
+${results.summary.errors.length > 0 ? `\n🔍 エラー:\n${results.summary.errors.join('\n')}` : ''}
+                    `;
+                    
+                    showResults('basicResults', summary);
+                    
+                    if (results.summary.failed === 0) {
+                        showStatus('🎉 全テスト成功！リアクションシステムは正常に動作しています。', 'success');
+                    } else {
+                        showStatus(`⚠️ ${results.summary.failed}件のテストが失敗しました。詳細を確認してください。`, 'error');
+                    }
+                    
+                    // 詳細結果をコンソールにも出力
+                    console.log('詳細テスト結果:', results);
+                    
+                } else {
+                    showStatus('テストスクリプトの読み込みに失敗しました。', 'error');
+                }
+            } catch (error) {
+                showStatus('総合テスト実行エラー: ' + error.message, 'error');
+                showResults('basicResults', 'エラー: ' + error.message);
+            }
+        }
+
+        // ページ読み込み時の初期化
+        window.addEventListener('load', () => {
+            showStatus('テストページが準備完了しました。回答ボードを開いてテストを開始してください。', 'success');
+        });
+    </script>
+</body>
+</html>
