@@ -5226,6 +5226,195 @@ try {
       return { success: false, error: `Error getting card info: ${error.message}` };
     }
   };
+
+  // リアクションシステムの専用テスト関数
+  window.testReactionSystem = async (options = {}) => {
+    console.log('🧪 リアクションシステムテスト開始');
+    
+    if (!window.studyQuestApp) {
+      console.error('❌ StudyQuestApp not available');
+      return { success: false, error: 'StudyQuestApp not available' };
+    }
+
+    const {
+      cardIndex = 0,
+      reaction = 'LIKE',
+      verbose = true
+    } = options;
+
+    const testResults = {
+      success: false,
+      tests: [],
+      errors: []
+    };
+
+    try {
+      // Test 1: カード存在確認
+      const cardInfo = window.debugGetAnswerCardInfo(cardIndex);
+      if (!cardInfo.success) {
+        testResults.errors.push('カードが見つかりません: ' + cardInfo.error);
+        return testResults;
+      }
+      
+      const rowIndex = cardInfo.cardInfo.rowIndex;
+      testResults.tests.push({
+        name: 'カード存在確認',
+        status: 'passed',
+        data: { cardIndex, rowIndex }
+      });
+
+      // Test 2: リアクションボタン存在確認
+      const container = window.studyQuestApp.elements.answersContainer;
+      const card = container.querySelectorAll('.answer-card')[cardIndex];
+      const reactionBtn = card.querySelector(`[data-reaction="${reaction}"]`);
+      
+      if (!reactionBtn) {
+        testResults.errors.push(`リアクションボタンが見つかりません: ${reaction}`);
+        return testResults;
+      }
+      
+      testResults.tests.push({
+        name: 'リアクションボタン存在確認',
+        status: 'passed',
+        data: { reaction, button: reactionBtn.outerHTML }
+      });
+
+      // Test 3: 初期状態記録
+      const initialState = {
+        reacted: reactionBtn.getAttribute('aria-pressed') === 'true',
+        count: parseInt(reactionBtn.querySelector('.count')?.textContent || '0'),
+        classes: reactionBtn.className
+      };
+      
+      testResults.tests.push({
+        name: '初期状態記録',
+        status: 'passed',
+        data: initialState
+      });
+
+      if (verbose) console.log('📊 初期状態:', initialState);
+
+      // Test 4: リアクション送信テスト
+      console.log('🔄 リアクション送信テスト開始...');
+      
+      const clickEvent = new MouseEvent('click', { bubbles: true });
+      reactionBtn.dispatchEvent(clickEvent);
+      
+      // 短時間待機してUI更新を確認
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const afterClickState = {
+        reacted: reactionBtn.getAttribute('aria-pressed') === 'true',
+        count: parseInt(reactionBtn.querySelector('.count')?.textContent || '0'),
+        classes: reactionBtn.className
+      };
+      
+      testResults.tests.push({
+        name: 'クリック後状態',
+        status: 'passed',
+        data: afterClickState
+      });
+
+      if (verbose) console.log('📊 クリック後状態:', afterClickState);
+
+      // Test 5: 状態変化検証
+      const stateChanged = 
+        initialState.reacted !== afterClickState.reacted ||
+        initialState.count !== afterClickState.count;
+      
+      testResults.tests.push({
+        name: '状態変化検証',
+        status: stateChanged ? 'passed' : 'failed',
+        data: { 
+          changed: stateChanged,
+          reactedChanged: initialState.reacted !== afterClickState.reacted,
+          countChanged: initialState.count !== afterClickState.count
+        }
+      });
+
+      // Test 6: 再度クリックして戻るかテスト
+      console.log('🔄 リアクション取消テスト開始...');
+      
+      reactionBtn.dispatchEvent(clickEvent);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const finalState = {
+        reacted: reactionBtn.getAttribute('aria-pressed') === 'true',
+        count: parseInt(reactionBtn.querySelector('.count')?.textContent || '0'),
+        classes: reactionBtn.className
+      };
+      
+      testResults.tests.push({
+        name: 'リアクション取消後状態',
+        status: 'passed',
+        data: finalState
+      });
+
+      if (verbose) console.log('📊 取消後状態:', finalState);
+
+      // Test 7: 完全サイクル検証
+      const backToInitial = 
+        initialState.reacted === finalState.reacted &&
+        initialState.count === finalState.count;
+      
+      testResults.tests.push({
+        name: '完全サイクル検証',
+        status: backToInitial ? 'passed' : 'failed',
+        data: { 
+          backToInitial,
+          initialState,
+          finalState
+        }
+      });
+
+      testResults.success = testResults.tests.every(test => test.status === 'passed');
+
+      console.log('✅ リアクションシステムテスト完了');
+      console.table(testResults.tests.map(t => ({
+        テスト名: t.name,
+        結果: t.status,
+        詳細: JSON.stringify(t.data)
+      })));
+
+      return testResults;
+
+    } catch (error) {
+      console.error('❌ テスト実行エラー:', error);
+      testResults.errors.push(error.message);
+      return testResults;
+    }
+  };
+
+  // 複数リアクションタイプのテスト
+  window.testAllReactions = async (cardIndex = 0) => {
+    console.log('🧪 全リアクションタイプテスト開始');
+    
+    const reactions = ['LIKE', 'UNDERSTAND', 'CURIOUS'];
+    const results = [];
+    
+    for (const reaction of reactions) {
+      console.log(`\n--- ${reaction} テスト ---`);
+      const result = await window.testReactionSystem({ 
+        cardIndex, 
+        reaction, 
+        verbose: false 
+      });
+      results.push({ reaction, ...result });
+      
+      // テスト間の待機
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    console.log('\n📊 全リアクションテスト結果:');
+    console.table(results.map(r => ({
+      リアクション: r.reaction,
+      成功: r.success ? '✅' : '❌',
+      テスト数: r.tests.length,
+      エラー数: r.errors.length
+    })));
+    
+    return results;
+  };
   
   // ドメイン情報とフォームリンクを取得
   loadDomainInfo();
