@@ -347,7 +347,7 @@ function handleDeleteRequest() {
     'アカウント削除の確認',
     '本当にこのアカウントを削除しますか？この操作は元に戻せず、すべてのデータが失われます。',
     function() {
-      sharedUtilities.gas.callWithLoading('deleteCurrentUserAccount', 'アカウントを完全に削除しています...', 'overlay')
+      runGasWithUserId('deleteCurrentUserAccount', 'アカウントを完全に削除しています...')
         .then(function(response) {
           showMessage(response.message || 'アカウントが削除されました', 'success');
           if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
