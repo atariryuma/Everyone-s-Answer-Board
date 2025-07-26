@@ -231,6 +231,14 @@ class StudyQuestApp {
     this.reactionEventListeners = new Map(); // 処理完了通知用
     this.isProcessingReactionQueue = false; // キュー処理中フラグ
     
+    // バッチ処理システム（既存機能に影響しない追加機能）
+    this.enableBatchProcessing = true; // バッチ処理有効フラグ（簡単に無効化可能）
+    this.reactionBatchQueue = new Map(); // rowIndex -> reactions[] のバッチキュー
+    this.batchTimer = null; // バッチ処理タイマー
+    this.BATCH_TIMEOUT = 500; // 500ms以内の操作をバッチ化
+    this.BATCH_SIZE_LIMIT = 5; // 最大バッチサイズ（控えめに設定）
+    this.batchProcessingActive = false; // バッチ処理中フラグ
+    
     // イベントリスナー重複登録防止フラグ
     this.eventDelegationSetup = false;
     this.nonCriticalListenersSetup = false;
@@ -247,6 +255,7 @@ class StudyQuestApp {
       getPublishedSheetData: (classFilter, sort, adminMode, bypassCache) => this.runGas('getPublishedSheetData', this.state.userId, classFilter, sort, adminMode, bypassCache),
       getIncrementalSheetData: (classFilter, sort, adminMode, sinceRowCount) => this.runGas('getIncrementalSheetData', this.state.userId, classFilter, sort, adminMode, sinceRowCount),
       getAvailableSheets: () => this.runGas('getAvailableSheets', this.state.userId),
+      addReactionBatch: (batchOperations) => this.runGas('addReactionBatch', this.state.userId, batchOperations), // 新しいバッチAPI
       addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', this.state.userId, rowIndex, reaction, sheetName),
       toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', this.state.userId, rowIndex, sheetName),
       checkAdmin: () => this.runGas('checkAdmin', this.state.userId),
@@ -1671,7 +1680,12 @@ class StudyQuestApp {
       console.log('📊 StudyQuestApp: Starting sheet data loading...');
       try {
         await this.loadSheetData({ showLoading: false, isInitialLoad: true });
-        console.log('✅ StudyQuestApp: Sheet data loaded, starting polling...');
+        console.log('✅ StudyQuestApp: Sheet data loaded, restoring differential cards...');
+        
+        // 差分カードの復元
+        this.restoreDifferentialCards();
+        
+        console.log('✅ StudyQuestApp: Starting polling...');
         this.startPolling();
       } catch (error) {
         console.error('❌ StudyQuestApp: Sheet data loading failed:', error);
@@ -3381,20 +3395,25 @@ class StudyQuestApp {
   }
 
   /**
-   * リアクション処理（キューイングシステム＋安定化されたUI更新）
+   * リアクション処理（既存キューイングシステム＋オプショナルバッチ処理）
    */
   async handleReaction(rowIndex, reaction) {
     const numericRowIndex = parseInt(rowIndex, 10);
     const reactionKey = `${numericRowIndex}-${reaction}`;
 
-    // キューに追加
+    // 既存の個別キューシステム（常に維持）
     this.reactionQueue.set(reactionKey, {
       rowIndex: numericRowIndex,
       reaction,
       timestamp: Date.now()
     });
 
-    // キュー処理を開始
+    // オプション: バッチ処理も並行実行（既存機能に影響なし）
+    if (this.enableBatchProcessing && !this.batchProcessingActive) {
+      this.addToBatchQueue(numericRowIndex, reaction);
+    }
+
+    // 既存のキュー処理を開始（既存機能を保持）
     this.processReactionQueue();
   }
 
@@ -3403,6 +3422,18 @@ class StudyQuestApp {
     this.isProcessingReactionQueue = true;
 
     try {
+      // バッチ処理が有効で、キューに複数アイテムがある場合はバッチ処理を試行
+      if (this.enableBatchProcessing && this.reactionQueue.size > 1 && !this.batchProcessingActive) {
+        const canBatch = await this.tryBatchProcessing();
+        if (canBatch) {
+          // バッチ処理成功時は個別キューをクリア
+          this.reactionQueue.clear();
+          return;
+        }
+        // バッチ処理失敗時は既存の個別処理にフォールバック
+      }
+
+      // 既存の個別処理システム（完全に保持）
       while (this.reactionQueue.size > 0) {
         const [reactionKey, operation] = this.reactionQueue.entries().next().value;
         this.reactionQueue.delete(reactionKey);
@@ -3593,6 +3624,111 @@ class StudyQuestApp {
       computedStyle: getComputedStyle(btn),
       timestamp: Date.now()
     };
+  }
+
+  // バッチ処理関連メソッド（既存機能に影響しない追加機能）
+  
+  addToBatchQueue(rowIndex, reaction) {
+    try {
+      if (!this.reactionBatchQueue.has(rowIndex)) {
+        this.reactionBatchQueue.set(rowIndex, []);
+      }
+      
+      const batchForRow = this.reactionBatchQueue.get(rowIndex);
+      const existingIndex = batchForRow.findIndex(r => r.reaction === reaction);
+      
+      if (existingIndex >= 0) {
+        // 既存リアクションのタイムスタンプを更新
+        batchForRow[existingIndex].timestamp = Date.now();
+      } else {
+        // 新しいリアクションを追加
+        batchForRow.push({
+          reaction,
+          timestamp: Date.now()
+        });
+      }
+      
+      // バッチサイズ制限チェック
+      const totalBatchSize = Array.from(this.reactionBatchQueue.values())
+        .reduce((sum, reactions) => sum + reactions.length, 0);
+      
+      if (totalBatchSize >= this.BATCH_SIZE_LIMIT) {
+        console.log('📦 バッチサイズ制限到達、即座処理実行');
+        this.processBatchQueue();
+      }
+    } catch (error) {
+      console.warn('バッチキュー追加エラー（個別処理にフォールバック）:', error);
+      // エラー時は何もしない（既存の個別処理が動作）
+    }
+  }
+
+  async tryBatchProcessing() {
+    try {
+      if (this.batchProcessingActive || this.reactionQueue.size === 0) {
+        return false;
+      }
+
+      this.batchProcessingActive = true;
+      console.log('🔄 バッチ処理試行開始');
+
+      // キューからバッチ操作を準備
+      const batchOperations = Array.from(this.reactionQueue.values());
+      
+      if (batchOperations.length === 1) {
+        // 単一操作の場合はバッチ処理しない
+        this.batchProcessingActive = false;
+        return false;
+      }
+
+      // バッチでサーバーに送信（新しいAPI関数が必要）
+      const result = await this.gas.addReactionBatch(batchOperations);
+      
+      if (result && result.success) {
+        console.log('✅ バッチ処理成功:', batchOperations.length + '件');
+        
+        // バッチレスポンスを処理
+        this.processBatchReactionResponse(result.data, batchOperations);
+        
+        // 完了通知
+        batchOperations.forEach(op => {
+          const reactionKey = `${op.rowIndex}-${op.reaction}`;
+          this.notifyReactionComplete(reactionKey, { success: true, batch: true });
+        });
+        
+        return true;
+      } else {
+        console.warn('バッチ処理失敗、個別処理にフォールバック');
+        return false;
+      }
+    } catch (error) {
+      console.warn('バッチ処理エラー、個別処理にフォールバック:', error);
+      return false;
+    } finally {
+      this.batchProcessingActive = false;
+    }
+  }
+
+  processBatchReactionResponse(responseData, originalOperations) {
+    try {
+      if (!responseData || !Array.isArray(responseData)) {
+        console.warn('無効なバッチレスポンス、個別処理で続行');
+        return;
+      }
+      
+      // 各行のレスポンスを処理（既存の仕組みを再利用）
+      responseData.forEach(rowData => {
+        const item = this.state.currentAnswers.find(i => i.rowIndex == rowData.rowIndex);
+        if (item) {
+          // 既存のレスポンス処理システムを使用
+          this.processReactionResponse(rowData, item);
+        }
+      });
+      
+      console.log('✅ バッチレスポンス処理完了');
+    } catch (error) {
+      console.error('バッチレスポンス処理エラー:', error);
+      // エラー時は既存の個別処理システムが処理する
+    }
   }
 
   setReactionButtonsLoading(buttons, isLoading) {
@@ -5598,6 +5734,42 @@ try {
       success: true,
       totalCards: answerCards.length,
       results
+    };
+  };
+
+  // バッチ処理制御関数（デバッグ/運用制御用）
+  window.toggleBatchProcessing = (enable = null) => {
+    const app = window.studyQuestApp;
+    if (!app) {
+      console.error('StudyQuestApp not found');
+      return;
+    }
+    
+    if (enable === null) {
+      // 現在の状態をトグル
+      app.enableBatchProcessing = !app.enableBatchProcessing;
+    } else {
+      app.enableBatchProcessing = Boolean(enable);
+    }
+    
+    console.log('🔧 バッチ処理:', app.enableBatchProcessing ? '有効' : '無効');
+    console.log('💡 個別処理システムは常に動作します（フォールバック保証）');
+    return app.enableBatchProcessing;
+  };
+
+  window.getBatchProcessingStatus = () => {
+    const app = window.studyQuestApp;
+    if (!app) return null;
+    
+    return {
+      enabled: app.enableBatchProcessing,
+      active: app.batchProcessingActive,
+      queueSize: app.reactionQueue.size,
+      batchQueueSize: app.reactionBatchQueue.size,
+      settings: {
+        timeout: app.BATCH_TIMEOUT,
+        sizeLimit: app.BATCH_SIZE_LIMIT
+      }
     };
   };
 

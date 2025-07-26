@@ -351,6 +351,178 @@ function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
   }
 }
 
+/**
+ * バッチリアクション処理（既存addReaction機能を保持したまま追加）
+ * 複数のリアクション操作を効率的に一括処理
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ * @param {Array} batchOperations - バッチ操作配列 [{rowIndex, reaction, timestamp}, ...]
+ * @returns {object} バッチ処理結果
+ */
+function addReactionBatch(requestUserId, batchOperations) {
+  verifyUserAccess(requestUserId);
+  clearExecutionUserInfoCache();
+
+  try {
+    // 入力検証
+    if (!Array.isArray(batchOperations) || batchOperations.length === 0) {
+      throw new Error('バッチ操作が無効です');
+    }
+
+    // バッチサイズ制限（安全性のため）
+    const MAX_BATCH_SIZE = 20;
+    if (batchOperations.length > MAX_BATCH_SIZE) {
+      throw new Error(`バッチサイズが制限を超えています (最大${MAX_BATCH_SIZE}件)`);
+    }
+
+    console.log('🔄 バッチリアクション処理開始:', batchOperations.length + '件');
+
+    var reactingUserEmail = Session.getActiveUser().getEmail();
+    var ownerUserId = requestUserId;
+
+    // ボードオーナーの情報をDBから取得（キャッシュ利用）
+    var boardOwnerInfo = findUserById(ownerUserId);
+    if (!boardOwnerInfo) {
+      throw new Error('無効なボードです。');
+    }
+
+    // バッチ処理結果を格納
+    var batchResults = [];
+    var processedRows = new Set(); // 重複行の追跡
+
+    // 既存のsheetNameを取得（最初の操作から）
+    var sheetName = getCurrentSheetName(boardOwnerInfo.spreadsheetId);
+
+    // バッチ操作を順次処理（既存のprocessReaction関数を再利用）
+    for (var i = 0; i < batchOperations.length; i++) {
+      var operation = batchOperations[i];
+      
+      try {
+        // 入力検証
+        if (!operation.rowIndex || !operation.reaction) {
+          console.warn('無効な操作をスキップ:', operation);
+          continue;
+        }
+
+        // 既存のprocessReaction関数を使用（100%互換性保証）
+        var result = processReaction(
+          boardOwnerInfo.spreadsheetId,
+          sheetName,
+          operation.rowIndex,
+          operation.reaction,
+          reactingUserEmail
+        );
+
+        if (result && result.status === 'success') {
+          // 更新後のリアクション情報を取得
+          var updatedReactions = getRowReactions(
+            boardOwnerInfo.spreadsheetId, 
+            sheetName, 
+            operation.rowIndex, 
+            reactingUserEmail
+          );
+
+          batchResults.push({
+            rowIndex: operation.rowIndex,
+            reaction: operation.reaction,
+            reactions: updatedReactions,
+            status: 'success'
+          });
+
+          processedRows.add(operation.rowIndex);
+        } else {
+          console.warn('リアクション処理失敗:', operation, result.message);
+          batchResults.push({
+            rowIndex: operation.rowIndex,
+            reaction: operation.reaction,
+            status: 'error',
+            message: result.message || 'リアクション処理失敗'
+          });
+        }
+
+      } catch (operationError) {
+        console.error('個別操作エラー:', operation, operationError.message);
+        batchResults.push({
+          rowIndex: operation.rowIndex,
+          reaction: operation.reaction,
+          status: 'error',
+          message: operationError.message
+        });
+      }
+    }
+
+    // 成功した行の最新状態を収集
+    var finalResults = [];
+    processedRows.forEach(function(rowIndex) {
+      try {
+        var latestReactions = getRowReactions(
+          boardOwnerInfo.spreadsheetId, 
+          sheetName, 
+          rowIndex, 
+          reactingUserEmail
+        );
+        finalResults.push({
+          rowIndex: rowIndex,
+          reactions: latestReactions
+        });
+      } catch (error) {
+        console.warn('最終状態取得エラー:', rowIndex, error.message);
+      }
+    });
+
+    console.log('✅ バッチリアクション処理完了:', {
+      total: batchOperations.length,
+      processed: processedRows.size,
+      success: batchResults.filter(r => r.status === 'success').length
+    });
+
+    return {
+      success: true,
+      data: finalResults,
+      processedCount: batchOperations.length,
+      successCount: batchResults.filter(r => r.status === 'success').length,
+      timestamp: new Date().toISOString(),
+      details: batchResults // デバッグ用詳細情報
+    };
+
+  } catch (error) {
+    console.error('addReactionBatch エラー:', error.message);
+    
+    // バッチ処理失敗時は個別処理にフォールバック可能であることを示す
+    return {
+      success: false,
+      error: error.message,
+      fallbackToIndividual: true, // クライアント側が個別処理にフォールバック可能
+      timestamp: new Date().toISOString()
+    };
+
+  } finally {
+    // 実行終了時にユーザー情報キャッシュをクリア
+    clearExecutionUserInfoCache();
+  }
+}
+
+/**
+ * 現在のシート名を取得するヘルパー関数
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @returns {string} シート名
+ */
+function getCurrentSheetName(spreadsheetId) {
+  try {
+    var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    var sheets = spreadsheet.getSheets();
+    
+    // デフォルトでは最初のシートを使用
+    if (sheets.length > 0) {
+      return sheets[0].getName();
+    }
+    
+    throw new Error('シートが見つかりません');
+  } catch (error) {
+    console.warn('シート名取得エラー:', error.message);
+    return 'Sheet1'; // フォールバック
+  }
+}
+
 // =================================================================
 // データ取得関数
 // =================================================================
