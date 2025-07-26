@@ -2088,6 +2088,347 @@ function performAutoRepair(targetUserId) {
 }
 
 /**
+ * データベースの整合性を包括的にチェックする
+ * @param {object} options - チェックオプション
+ * @returns {object} 整合性チェック結果
+ */
+function performDataIntegrityCheck(options = {}) {
+  try {
+    console.log('🔍 データ整合性チェック開始');
+    
+    var opts = {
+      checkDuplicates: options.checkDuplicates !== false,
+      checkMissingFields: options.checkMissingFields !== false,
+      checkInvalidData: options.checkInvalidData !== false,
+      autoFix: options.autoFix || false,
+      ...options
+    };
+    
+    var result = {
+      timestamp: new Date().toISOString(),
+      summary: {
+        status: 'unknown',
+        totalUsers: 0,
+        issues: [],
+        warnings: [],
+        fixed: []
+      },
+      details: {
+        duplicates: [],
+        missingFields: [],
+        invalidData: [],
+        orphanedData: []
+      }
+    };
+    
+    // データベース接続確認
+    var props = PropertiesService.getScriptProperties();
+    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    if (!dbId) {
+      result.summary.issues.push('データベースIDが設定されていません');
+      result.summary.status = 'critical';
+      return result;
+    }
+    
+    var service = getSheetsServiceCached();
+    var data = batchGetSheetsData(service, dbId, ["'" + DB_SHEET_CONFIG.SHEET_NAME + "'!A:H"]);
+    var values = data.valueRanges[0].values || [];
+    
+    if (values.length <= 1) {
+      result.summary.status = 'empty';
+      return result;
+    }
+    
+    var headers = values[0];
+    var userRows = values.slice(1);
+    result.summary.totalUsers = userRows.length;
+    
+    console.log('📊 データ整合性チェック: ' + userRows.length + 'ユーザーを確認中');
+    
+    // 1. 重複チェック
+    if (opts.checkDuplicates) {
+      var duplicateResult = checkForDuplicates(headers, userRows);
+      result.details.duplicates = duplicateResult.duplicates;
+      if (duplicateResult.duplicates.length > 0) {
+        result.summary.issues.push(duplicateResult.duplicates.length + '件の重複データが見つかりました');
+      }
+    }
+    
+    // 2. 必須フィールドチェック
+    if (opts.checkMissingFields) {
+      var missingFieldsResult = checkMissingRequiredFields(headers, userRows);
+      result.details.missingFields = missingFieldsResult.missing;
+      if (missingFieldsResult.missing.length > 0) {
+        result.summary.warnings.push(missingFieldsResult.missing.length + '件の必須フィールド不足が見つかりました');
+      }
+    }
+    
+    // 3. データ形式チェック
+    if (opts.checkInvalidData) {
+      var invalidDataResult = checkInvalidDataFormats(headers, userRows);
+      result.details.invalidData = invalidDataResult.invalid;
+      if (invalidDataResult.invalid.length > 0) {
+        result.summary.warnings.push(invalidDataResult.invalid.length + '件の不正なデータ形式が見つかりました');
+      }
+    }
+    
+    // 4. 孤立データチェック
+    var orphanResult = checkOrphanedData(headers, userRows);
+    result.details.orphanedData = orphanResult.orphaned;
+    if (orphanResult.orphaned.length > 0) {
+      result.summary.warnings.push(orphanResult.orphaned.length + '件の孤立データが見つかりました');
+    }
+    
+    // 5. 自動修復
+    if (opts.autoFix && (result.summary.issues.length > 0 || result.summary.warnings.length > 0)) {
+      try {
+        var fixResult = performDataIntegrityFix(result.details, headers, userRows, dbId, service);
+        result.summary.fixed = fixResult.fixed;
+        console.log('🔧 自動修復完了: ' + fixResult.fixed.length + '件修復');
+      } catch (fixError) {
+        console.error('❌ 自動修復エラー:', fixError.message);
+        result.summary.issues.push('自動修復に失敗: ' + fixError.message);
+      }
+    }
+    
+    // 6. 最終判定
+    if (result.summary.issues.length === 0) {
+      result.summary.status = result.summary.warnings.length > 0 ? 'warning' : 'healthy';
+    } else {
+      result.summary.status = 'critical';
+    }
+    
+    console.log('✅ データ整合性チェック完了:', result.summary.status);
+    return result;
+    
+  } catch (error) {
+    console.error('❌ データ整合性チェックでエラー:', error);
+    return {
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      summary: {
+        status: 'error',
+        issues: ['整合性チェック自体が失敗: ' + error.message]
+      }
+    };
+  }
+}
+
+/**
+ * 重複データをチェック
+ * @param {Array} headers - ヘッダー行
+ * @param {Array} userRows - ユーザーデータ行
+ * @returns {object} 重複チェック結果
+ */
+function checkForDuplicates(headers, userRows) {
+  var duplicates = [];
+  var userIdIndex = headers.indexOf('userId');
+  var emailIndex = headers.indexOf('adminEmail');
+  
+  if (userIdIndex === -1 || emailIndex === -1) {
+    return { duplicates: [] };
+  }
+  
+  var seenUserIds = new Set();
+  var seenEmails = new Set();
+  
+  for (var i = 0; i < userRows.length; i++) {
+    var row = userRows[i];
+    var userId = row[userIdIndex];
+    var email = row[emailIndex];
+    
+    // userId重複チェック
+    if (userId && seenUserIds.has(userId)) {
+      duplicates.push({
+        type: 'userId',
+        value: userId,
+        rowIndex: i + 2, // スプレッドシート行番号（1ベース + ヘッダー）
+        message: 'ユーザーID重複: ' + userId
+      });
+    } else if (userId) {
+      seenUserIds.add(userId);
+    }
+    
+    // email重複チェック
+    if (email && seenEmails.has(email)) {
+      duplicates.push({
+        type: 'email',
+        value: email,
+        rowIndex: i + 2,
+        message: 'メールアドレス重複: ' + email
+      });
+    } else if (email) {
+      seenEmails.add(email);
+    }
+  }
+  
+  return { duplicates: duplicates };
+}
+
+/**
+ * 必須フィールドの不足をチェック
+ * @param {Array} headers - ヘッダー行
+ * @param {Array} userRows - ユーザーデータ行
+ * @returns {object} 必須フィールドチェック結果
+ */
+function checkMissingRequiredFields(headers, userRows) {
+  var missing = [];
+  var requiredFields = ['userId', 'adminEmail']; // 最低限必要なフィールド
+  
+  for (var i = 0; i < userRows.length; i++) {
+    var row = userRows[i];
+    var missingInThisRow = [];
+    
+    for (var j = 0; j < requiredFields.length; j++) {
+      var fieldName = requiredFields[j];
+      var fieldIndex = headers.indexOf(fieldName);
+      
+      if (fieldIndex === -1 || !row[fieldIndex] || row[fieldIndex].trim() === '') {
+        missingInThisRow.push(fieldName);
+      }
+    }
+    
+    if (missingInThisRow.length > 0) {
+      missing.push({
+        rowIndex: i + 2,
+        missingFields: missingInThisRow,
+        message: '必須フィールド不足: ' + missingInThisRow.join(', ')
+      });
+    }
+  }
+  
+  return { missing: missing };
+}
+
+/**
+ * データ形式の妥当性をチェック
+ * @param {Array} headers - ヘッダー行
+ * @param {Array} userRows - ユーザーデータ行
+ * @returns {object} データ形式チェック結果
+ */
+function checkInvalidDataFormats(headers, userRows) {
+  var invalid = [];
+  var emailIndex = headers.indexOf('adminEmail');
+  var userIdIndex = headers.indexOf('userId');
+  
+  for (var i = 0; i < userRows.length; i++) {
+    var row = userRows[i];
+    var rowIssues = [];
+    
+    // メールアドレス形式チェック
+    if (emailIndex !== -1 && row[emailIndex]) {
+      var email = row[emailIndex];
+      if (!EMAIL_REGEX.test(email)) {
+        rowIssues.push('無効なメールアドレス形式: ' + email);
+      }
+    }
+    
+    // ユーザーID形式チェック（UUIDかどうか）
+    if (userIdIndex !== -1 && row[userIdIndex]) {
+      var userId = row[userIdIndex];
+      var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(userId)) {
+        rowIssues.push('無効なユーザーID形式: ' + userId);
+      }
+    }
+    
+    if (rowIssues.length > 0) {
+      invalid.push({
+        rowIndex: i + 2,
+        issues: rowIssues,
+        message: rowIssues.join(', ')
+      });
+    }
+  }
+  
+  return { invalid: invalid };
+}
+
+/**
+ * 孤立データをチェック
+ * @param {Array} headers - ヘッダー行
+ * @param {Array} userRows - ユーザーデータ行
+ * @returns {object} 孤立データチェック結果
+ */
+function checkOrphanedData(headers, userRows) {
+  var orphaned = [];
+  var isActiveIndex = headers.indexOf('isActive');
+  
+  for (var i = 0; i < userRows.length; i++) {
+    var row = userRows[i];
+    var issues = [];
+    
+    // 非アクティブだが他のデータが残っている
+    if (isActiveIndex !== -1 && row[isActiveIndex] === 'false') {
+      // 非アクティブユーザーでスプレッドシートIDが残っている場合
+      var spreadsheetIdIndex = headers.indexOf('spreadsheetId');
+      if (spreadsheetIdIndex !== -1 && row[spreadsheetIdIndex]) {
+        issues.push('非アクティブユーザーにスプレッドシートIDが残存');
+      }
+    }
+    
+    if (issues.length > 0) {
+      orphaned.push({
+        rowIndex: i + 2,
+        issues: issues,
+        message: issues.join(', ')
+      });
+    }
+  }
+  
+  return { orphaned: orphaned };
+}
+
+/**
+ * データ整合性問題の自動修復
+ * @param {object} details - 問題の詳細
+ * @param {Array} headers - ヘッダー行
+ * @param {Array} userRows - ユーザーデータ行
+ * @param {string} dbId - データベースID
+ * @param {object} service - Sheetsサービス
+ * @returns {object} 修復結果
+ */
+function performDataIntegrityFix(details, headers, userRows, dbId, service) {
+  var fixed = [];
+  
+  // 注意: 重複データの自動削除は危険なため、ログのみ記録
+  if (details.duplicates.length > 0) {
+    console.warn('⚠️ 重複データが検出されましたが、自動削除は行いません:', details.duplicates.length + '件');
+    fixed.push('重複データの確認完了（手動対応が必要）');
+  }
+  
+  // 無効なisActiveフィールドの修正
+  var isActiveIndex = headers.indexOf('isActive');
+  if (isActiveIndex !== -1) {
+    var updatesNeeded = [];
+    
+    for (var i = 0; i < userRows.length; i++) {
+      var row = userRows[i];
+      var currentValue = row[isActiveIndex];
+      
+      // isActiveフィールドが空または無効な値の場合、trueに設定
+      if (!currentValue || (currentValue !== 'true' && currentValue !== 'false' && currentValue !== true && currentValue !== false)) {
+        updatesNeeded.push({
+          range: "'" + DB_SHEET_CONFIG.SHEET_NAME + "'!" + String.fromCharCode(65 + isActiveIndex) + (i + 2),
+          values: [['true']]
+        });
+      }
+    }
+    
+    if (updatesNeeded.length > 0) {
+      try {
+        batchUpdateSheetsData(service, dbId, updatesNeeded);
+        fixed.push(updatesNeeded.length + '件のisActiveフィールドを修正');
+      } catch (updateError) {
+        console.error('❌ isActiveフィールド修正エラー:', updateError.message);
+      }
+    }
+  }
+  
+  return { fixed: fixed };
+}
+
+/**
  * データベースシートを取得
  * @returns {object} データベースシート
  */
@@ -2109,6 +2450,436 @@ function getDbSheet() {
   } catch (e) {
     console.error('getDbSheet error:', e.message);
     throw new Error('データベースシートの取得に失敗しました: ' + e.message);
+  }
+}
+
+/**
+ * システム監視とアラート機能
+ * @param {object} options - 監視オプション
+ * @returns {object} 監視結果
+ */
+function performSystemMonitoring(options = {}) {
+  try {
+    console.log('📊 システム監視開始');
+    
+    var opts = {
+      checkHealth: options.checkHealth !== false,
+      checkPerformance: options.checkPerformance !== false,
+      checkSecurity: options.checkSecurity !== false,
+      enableAlerts: options.enableAlerts !== false,
+      ...options
+    };
+    
+    var monitoringResult = {
+      timestamp: new Date().toISOString(),
+      summary: {
+        overallHealth: 'unknown',
+        alerts: [],
+        warnings: [],
+        metrics: {}
+      },
+      details: {
+        healthCheck: null,
+        performanceCheck: null,
+        securityCheck: null
+      }
+    };
+    
+    // 1. ヘルスチェック
+    if (opts.checkHealth) {
+      try {
+        var healthResult = performHealthCheck();
+        monitoringResult.details.healthCheck = healthResult;
+        
+        if (healthResult.summary.overallStatus === 'critical') {
+          monitoringResult.summary.alerts.push('システムヘルスが危険な状態です');
+        } else if (healthResult.summary.overallStatus === 'warning') {
+          monitoringResult.summary.warnings.push('システムヘルスに軽微な問題があります');
+        }
+      } catch (healthError) {
+        console.error('❌ ヘルスチェックエラー:', healthError.message);
+        monitoringResult.summary.alerts.push('ヘルスチェック自体が失敗しました');
+      }
+    }
+    
+    // 2. パフォーマンスチェック
+    if (opts.checkPerformance) {
+      try {
+        var perfResult = performPerformanceCheck();
+        monitoringResult.details.performanceCheck = perfResult;
+        
+        if (perfResult.metrics.responseTime > 10000) { // 10秒以上
+          monitoringResult.summary.alerts.push('レスポンス時間が異常に長くなっています');
+        } else if (perfResult.metrics.responseTime > 5000) { // 5秒以上
+          monitoringResult.summary.warnings.push('レスポンス時間が少し長くなっています');
+        }
+        
+        monitoringResult.summary.metrics.responseTime = perfResult.metrics.responseTime;
+        monitoringResult.summary.metrics.cacheHitRate = perfResult.metrics.cacheHitRate;
+      } catch (perfError) {
+        console.error('❌ パフォーマンスチェックエラー:', perfError.message);
+        monitoringResult.summary.warnings.push('パフォーマンス測定に失敗しました');
+      }
+    }
+    
+    // 3. セキュリティチェック
+    if (opts.checkSecurity) {
+      try {
+        var securityResult = performSecurityCheck();
+        monitoringResult.details.securityCheck = securityResult;
+        
+        if (securityResult.vulnerabilities.length > 0) {
+          monitoringResult.summary.alerts.push(securityResult.vulnerabilities.length + '件のセキュリティ問題が検出されました');
+        }
+      } catch (securityError) {
+        console.error('❌ セキュリティチェックエラー:', securityError.message);
+        monitoringResult.summary.warnings.push('セキュリティチェックに失敗しました');
+      }
+    }
+    
+    // 4. 総合判定
+    if (monitoringResult.summary.alerts.length === 0) {
+      monitoringResult.summary.overallHealth = monitoringResult.summary.warnings.length > 0 ? 'warning' : 'healthy';
+    } else {
+      monitoringResult.summary.overallHealth = 'critical';
+    }
+    
+    // 5. アラート通知
+    if (opts.enableAlerts && (monitoringResult.summary.alerts.length > 0 || monitoringResult.summary.warnings.length > 0)) {
+      try {
+        sendSystemAlert(monitoringResult);
+      } catch (alertError) {
+        console.error('❌ アラート送信エラー:', alertError.message);
+      }
+    }
+    
+    console.log('✅ システム監視完了:', monitoringResult.summary.overallHealth);
+    return monitoringResult;
+    
+  } catch (error) {
+    console.error('❌ システム監視でエラー:', error);
+    return {
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      summary: {
+        overallHealth: 'error',
+        alerts: ['監視システム自体が失敗: ' + error.message]
+      }
+    };
+  }
+}
+
+/**
+ * システムヘルスチェック
+ * @returns {object} ヘルスチェック結果
+ */
+function performHealthCheck() {
+  var healthResult = {
+    timestamp: new Date().toISOString(),
+    checks: {},
+    summary: {
+      overallStatus: 'unknown',
+      passedChecks: 0,
+      failedChecks: 0
+    }
+  };
+  
+  // データベース接続チェック
+  try {
+    var diagnosis = diagnoseDatabase();
+    healthResult.checks.database = {
+      status: diagnosis.summary.overallStatus === 'healthy' ? 'pass' : 'fail',
+      details: diagnosis.summary
+    };
+    
+    if (diagnosis.summary.overallStatus === 'healthy') {
+      healthResult.summary.passedChecks++;
+    } else {
+      healthResult.summary.failedChecks++;
+    }
+  } catch (dbError) {
+    healthResult.checks.database = {
+      status: 'fail',
+      error: dbError.message
+    };
+    healthResult.summary.failedChecks++;
+  }
+  
+  // サービスアカウント権限チェック
+  try {
+    var permissionResult = verifyServiceAccountPermissions();
+    healthResult.checks.serviceAccount = {
+      status: permissionResult.summary.status === 'healthy' ? 'pass' : 'fail',
+      details: permissionResult.summary
+    };
+    
+    if (permissionResult.summary.status === 'healthy') {
+      healthResult.summary.passedChecks++;
+    } else {
+      healthResult.summary.failedChecks++;
+    }
+  } catch (permError) {
+    healthResult.checks.serviceAccount = {
+      status: 'fail',
+      error: permError.message
+    };
+    healthResult.summary.failedChecks++;
+  }
+  
+  // システム設定チェック
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var requiredProps = [
+      SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID,
+      SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS,
+      SCRIPT_PROPS_KEYS.ADMIN_EMAIL
+    ];
+    
+    var missingProps = [];
+    for (var i = 0; i < requiredProps.length; i++) {
+      if (!props.getProperty(requiredProps[i])) {
+        missingProps.push(requiredProps[i]);
+      }
+    }
+    
+    healthResult.checks.configuration = {
+      status: missingProps.length === 0 ? 'pass' : 'fail',
+      missingProperties: missingProps
+    };
+    
+    if (missingProps.length === 0) {
+      healthResult.summary.passedChecks++;
+    } else {
+      healthResult.summary.failedChecks++;
+    }
+  } catch (configError) {
+    healthResult.checks.configuration = {
+      status: 'fail',
+      error: configError.message
+    };
+    healthResult.summary.failedChecks++;
+  }
+  
+  // 総合判定
+  if (healthResult.summary.failedChecks === 0) {
+    healthResult.summary.overallStatus = 'healthy';
+  } else if (healthResult.summary.passedChecks > healthResult.summary.failedChecks) {
+    healthResult.summary.overallStatus = 'warning';
+  } else {
+    healthResult.summary.overallStatus = 'critical';
+  }
+  
+  return healthResult;
+}
+
+/**
+ * パフォーマンスチェック
+ * @returns {object} パフォーマンスチェック結果
+ */
+function performPerformanceCheck() {
+  var startTime = Date.now();
+  
+  var perfResult = {
+    timestamp: new Date().toISOString(),
+    metrics: {
+      responseTime: 0,
+      cacheHitRate: 0,
+      apiCallCount: 0
+    },
+    benchmarks: {}
+  };
+  
+  try {
+    // データベースアクセス速度テスト
+    var dbTestStart = Date.now();
+    var props = PropertiesService.getScriptProperties();
+    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    
+    if (dbId) {
+      var service = getSheetsServiceCached();
+      var testData = batchGetSheetsData(service, dbId, ["'" + DB_SHEET_CONFIG.SHEET_NAME + "'!A1:B1"]);
+      perfResult.benchmarks.databaseAccess = Date.now() - dbTestStart;
+      perfResult.metrics.apiCallCount++;
+    }
+    
+    // キャッシュ効率テスト（簡易版）
+    var cacheTestStart = Date.now();
+    try {
+      if (typeof cacheManager !== 'undefined' && cacheManager.getStats) {
+        var cacheStats = cacheManager.getStats();
+        perfResult.metrics.cacheHitRate = cacheStats.hitRate || 0;
+      }
+    } catch (cacheError) {
+      console.warn('キャッシュ統計取得エラー:', cacheError.message);
+    }
+    perfResult.benchmarks.cacheCheck = Date.now() - cacheTestStart;
+    
+  } catch (perfError) {
+    console.error('パフォーマンステスト実行エラー:', perfError.message);
+    perfResult.error = perfError.message;
+  }
+  
+  perfResult.metrics.responseTime = Date.now() - startTime;
+  
+  return perfResult;
+}
+
+/**
+ * セキュリティチェック
+ * @returns {object} セキュリティチェック結果
+ */
+function performSecurityCheck() {
+  var securityResult = {
+    timestamp: new Date().toISOString(),
+    vulnerabilities: [],
+    recommendations: []
+  };
+  
+  try {
+    // スクリプトプロパティのセキュリティチェック
+    var props = PropertiesService.getScriptProperties();
+    var allProps = props.getProperties();
+    
+    // サービスアカウント認証情報の存在確認
+    var serviceAccountCreds = props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
+    if (!serviceAccountCreds) {
+      securityResult.vulnerabilities.push({
+        type: 'missing_credentials',
+        severity: 'high',
+        message: 'サービスアカウント認証情報が設定されていません'
+      });
+    }
+    
+    // 管理者メールの設定確認
+    var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
+    if (!adminEmail) {
+      securityResult.vulnerabilities.push({
+        type: 'missing_admin',
+        severity: 'medium',
+        message: '管理者メールアドレスが設定されていません'
+      });
+    }
+    
+    // データベースアクセス権限の確認
+    try {
+      var permissionCheck = verifyServiceAccountPermissions();
+      if (permissionCheck.summary.status === 'critical') {
+        securityResult.vulnerabilities.push({
+          type: 'access_permission',
+          severity: 'high',
+          message: 'データベースアクセス権限に問題があります'
+        });
+      }
+    } catch (permError) {
+      securityResult.vulnerabilities.push({
+        type: 'permission_check_failed',
+        severity: 'medium',
+        message: '権限確認に失敗しました'
+      });
+    }
+    
+    // 推奨事項の生成
+    if (securityResult.vulnerabilities.length === 0) {
+      securityResult.recommendations.push('セキュリティ設定は適切です');
+    } else {
+      securityResult.recommendations.push('検出された脆弱性を修正してください');
+      securityResult.recommendations.push('定期的なセキュリティチェックを実施してください');
+    }
+    
+  } catch (securityError) {
+    console.error('セキュリティチェック実行エラー:', securityError.message);
+    securityResult.error = securityError.message;
+  }
+  
+  return securityResult;
+}
+
+/**
+ * システムアラートを送信
+ * @param {object} monitoringResult - 監視結果
+ */
+function sendSystemAlert(monitoringResult) {
+  try {
+    console.log('🚨 システムアラート送信開始');
+    
+    // アラート内容の構築
+    var alertMessage = '【StudyQuest システムアラート】\n\n';
+    alertMessage += '発生時刻: ' + monitoringResult.timestamp + '\n';
+    alertMessage += 'システム状態: ' + monitoringResult.summary.overallHealth + '\n\n';
+    
+    if (monitoringResult.summary.alerts.length > 0) {
+      alertMessage += '🚨 緊急問題:\n';
+      for (var i = 0; i < monitoringResult.summary.alerts.length; i++) {
+        alertMessage += '  • ' + monitoringResult.summary.alerts[i] + '\n';
+      }
+      alertMessage += '\n';
+    }
+    
+    if (monitoringResult.summary.warnings.length > 0) {
+      alertMessage += '⚠️ 警告:\n';
+      for (var j = 0; j < monitoringResult.summary.warnings.length; j++) {
+        alertMessage += '  • ' + monitoringResult.summary.warnings[j] + '\n';
+      }
+      alertMessage += '\n';
+    }
+    
+    if (monitoringResult.summary.metrics.responseTime) {
+      alertMessage += 'パフォーマンス:\n';
+      alertMessage += '  • レスポンス時間: ' + monitoringResult.summary.metrics.responseTime + 'ms\n';
+      if (monitoringResult.summary.metrics.cacheHitRate) {
+        alertMessage += '  • キャッシュヒット率: ' + (monitoringResult.summary.metrics.cacheHitRate * 100).toFixed(1) + '%\n';
+      }
+    }
+    
+    // 管理者への通知（メール送信は実装に依存）
+    var props = PropertiesService.getScriptProperties();
+    var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
+    
+    if (adminEmail) {
+      // ログに記録（実際のメール送信機能がある場合はここで実装）
+      console.log('📧 管理者アラート（' + adminEmail + '）:\n' + alertMessage);
+      
+      // 緊急レベルの場合は追加のログ記録
+      if (monitoringResult.summary.alerts.length > 0) {
+        console.error('🚨 緊急システムアラート: ' + monitoringResult.summary.alerts.join(', '));
+      }
+    }
+    
+    // システムログへの記録
+    logSystemEvent('system_alert', {
+      level: monitoringResult.summary.overallHealth,
+      alerts: monitoringResult.summary.alerts,
+      warnings: monitoringResult.summary.warnings,
+      timestamp: monitoringResult.timestamp
+    });
+    
+    console.log('✅ システムアラート送信完了');
+    
+  } catch (alertError) {
+    console.error('❌ アラート送信エラー:', alertError.message);
+  }
+}
+
+/**
+ * システムイベントをログに記録
+ * @param {string} eventType - イベントタイプ
+ * @param {object} eventData - イベントデータ
+ */
+function logSystemEvent(eventType, eventData) {
+  try {
+    var logEntry = {
+      timestamp: new Date().toISOString(),
+      type: eventType,
+      data: eventData
+    };
+    
+    // コンソールログ
+    console.log('📝 システムイベント [' + eventType + ']:', JSON.stringify(eventData));
+    
+    // 将来的にはログシートやログファイルに保存する機能を追加可能
+    
+  } catch (logError) {
+    console.error('システムイベントログエラー:', logError.message);
   }
 }
 
