@@ -2263,8 +2263,22 @@ function createFormFactory(options) {
     // 基本的な質問を追加
     addUnifiedQuestions(form, options.questions || 'default', options.customConfig || {});
 
+    // メールアドレス収集を有効化（スプレッドシート連携前に設定）
+    try {
+      if (typeof form.setEmailCollectionType === 'function') {
+        form.setEmailCollectionType(FormApp.EmailCollectionType.VERIFIED);
+      } else {
+        form.setCollectEmail(true);
+      }
+    } catch (emailError) {
+      console.warn('Email collection setting failed:', emailError.message);
+    }
+
     // スプレッドシート作成
     var spreadsheetResult = createLinkedSpreadsheet(userEmail, form, dateString);
+
+    // リアクション関連列を追加
+    addReactionColumnsToSpreadsheet(spreadsheetResult.spreadsheetId, spreadsheetResult.sheetName);
 
     return {
       formId: form.getId(),
@@ -2870,9 +2884,6 @@ function createStudyQuestForm(userEmail, userId, formTitle, questionType) {
       console.warn('サービスアカウント追加に失敗しましたが、処理を継続します:', serviceAccountError.message);
       // 権限エラーの場合でも、フォーム作成自体は成功とみなす
     }
-    
-    // リアクション列をスプレッドシートに追加
-    addReactionColumnsToSpreadsheet(formResult.spreadsheetId, formResult.sheetName);
     
     profiler.end('createForm');
     

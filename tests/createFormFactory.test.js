@@ -16,6 +16,7 @@ describe('createFormFactory returns URLs', () => {
     const mockForm = {
       setDescription: jest.fn(),
       setCollectEmail: jest.fn(),
+      setEmailCollectionType: jest.fn(),
       addTextItem: jest.fn(() => mockItem),
       addCheckboxItem: jest.fn(() => mockItem),
       addListItem: jest.fn(() => mockItem),
@@ -29,7 +30,10 @@ describe('createFormFactory returns URLs', () => {
     context = {
       console,
       debugLog: () => {},
-      FormApp: { create: jest.fn(() => mockForm) },
+      FormApp: {
+        create: jest.fn(() => mockForm),
+        EmailCollectionType: { VERIFIED: 'VERIFIED' }
+      },
       Utilities: { formatDate: jest.fn(() => '2025/01/01 00:00:00') }
     };
     vm.createContext(context);
@@ -39,6 +43,7 @@ describe('createFormFactory returns URLs', () => {
       spreadsheetUrl: 'https://example.com/ss',
       sheetName: 'Sheet1'
     }));
+    context.addReactionColumnsToSpreadsheet = jest.fn();
   });
 
   test('returns editFormUrl and viewFormUrl', () => {
