@@ -2788,31 +2788,37 @@ class StudyQuestApp {
     return { startIndex, endIndex };
   }
 
-  renderWithVirtualScrolling(answers) {
-    const container = this.elements.answersContainer;
-    if (!container) return;
+  renderWithVirtualScrolling(newRows, oldRows, container, existingMap, isInitialLoad) {
+    debugLog('DEBUG: renderBoard - Using virtual scrolling for', newRows.length, 'items (initial load:', isInitialLoad, ')');
 
-    // Clear existing content
-    container.innerHTML = '';
-
-    // Calculate visible range
-    const visibleRange = this.calculateVisibleRange(answers.length);
-    const { startIndex, endIndex } = visibleRange;
-
-    // Render only visible items
-    const fragment = document.createDocumentFragment();
-    for (let i = startIndex; i < endIndex; i++) {
-      const answer = answers[i];
-      const cardElement = this.createAnswerCard(answer);
-      if (cardElement) {
-        fragment.appendChild(cardElement);
-      }
+    if (isInitialLoad || this.state.currentAnswers.length === 0) {
+      this.clearVirtualScrollingState();
     }
-    container.appendChild(fragment);
 
-    // Update scroll position to maintain user's view
-    // This part might need more sophisticated logic for smooth scrolling
-    // For now, we just re-render the visible portion.
+    // 仮想スクロールでも既存のリアクション状態を保持
+    const fragment = this.getReusableFragment();
+    const visibleRange = this.calculateVisibleRange(newRows.length);
+    const visibleRows = newRows.slice(visibleRange.startIndex, visibleRange.endIndex);
+
+    visibleRows.forEach((row) => {
+      const rowId = String(row.rowIndex);
+      let card = existingMap.get(rowId);
+      const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
+
+      if (!card) {
+        card = this.createAnswerCard(row);
+        if (card) {
+          fragment.appendChild(card);
+        }
+      } else if (this.shouldUpdateCard(row, oldData)) {
+        // 既存カードを更新（リアクション状態を保持）
+        this.updateAnswerCard(card, row, oldData);
+      }
+    });
+
+    if (fragment.children.length > 0) {
+      container.appendChild(fragment);
+    }
   }
   
   shouldUpdateCard(newData, oldData) {
