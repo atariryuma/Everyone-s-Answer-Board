@@ -723,6 +723,9 @@ function refreshBoardData(requestUserId) {
  * @returns {Array<Object>} フォーマットされたデータ
  */
 function formatSheetDataForFrontend(rawData, mappedIndices, headerIndices, adminMode, isOwner, displayMode) {
+  // 現在のユーザーメールを取得（リアクション状態判定用）
+  var currentUserEmail = Session.getActiveUser().getEmail();
+  
   return rawData.map(function(row, index) {
     var classIndex = mappedIndices.classHeader;
     var opinionIndex = mappedIndices.opinionHeader;
@@ -762,6 +765,32 @@ function formatSheetDataForFrontend(rawData, mappedIndices, headerIndices, admin
       rawNameData: hasOriginalData && nameIndex !== undefined ? row.originalData[nameIndex] : 'N/A'
     });
 
+    // リアクション状態を判定するヘルパー関数
+    function checkReactionState(reactionKey) {
+      var columnName = COLUMN_HEADERS[reactionKey];
+      var columnIndex = headerIndices[columnName];
+      var count = 0;
+      var reacted = false;
+      
+      if (columnIndex !== undefined && row.originalData && row.originalData[columnIndex]) {
+        var reactionString = row.originalData[columnIndex].toString();
+        if (reactionString) {
+          var reactions = parseReactionString(reactionString);
+          count = reactions.length;
+          reacted = reactions.indexOf(currentUserEmail) !== -1;
+        }
+      }
+      
+      // フォールバック: プリカウントされた値を使用
+      if (count === 0) {
+        if (reactionKey === 'UNDERSTAND') count = row.understandCount || 0;
+        else if (reactionKey === 'LIKE') count = row.likeCount || 0;
+        else if (reactionKey === 'CURIOUS') count = row.curiousCount || 0;
+      }
+      
+      return { count: count, reacted: reacted };
+    }
+
     return {
       rowIndex: row.rowNumber || (index + 2),
       name: nameValue,
@@ -770,9 +799,9 @@ function formatSheetDataForFrontend(rawData, mappedIndices, headerIndices, admin
       opinion: (opinionIndex !== undefined && row.originalData && row.originalData[opinionIndex]) ? row.originalData[opinionIndex] : '',
       reason: (reasonIndex !== undefined && row.originalData && row.originalData[reasonIndex]) ? row.originalData[reasonIndex] : '',
       reactions: {
-        UNDERSTAND: { count: row.understandCount || 0, reacted: false },
-        LIKE: { count: row.likeCount || 0, reacted: false },
-        CURIOUS: { count: row.curiousCount || 0, reacted: false }
+        UNDERSTAND: checkReactionState('UNDERSTAND'),
+        LIKE: checkReactionState('LIKE'),
+        CURIOUS: checkReactionState('CURIOUS')
       },
       highlight: row.isHighlighted || false
     };
