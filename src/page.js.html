@@ -2552,12 +2552,7 @@ class StudyQuestApp {
       // visibilityObserver は setupObservers() で再作成されるので null にしない
     }
     
-    // 回答コンテナをクリア
-    if (this.elements.answersContainer) {
-      // すべての既存カードを削除
-      this.elements.answersContainer.innerHTML = '';
-      debugLog('clearVirtualScrollingState: Cleared all existing cards from DOM');
-    }
+    
     
     
     
@@ -2721,6 +2716,7 @@ class StudyQuestApp {
   
   performMainRendering(newRows, oldRows, isLayoutChange, isInitialLoad) {
     const container = this.elements.answersContainer;
+    container.innerHTML = ''; // ここでコンテナをクリア
     
     // 既存カードのマップを作成（リアクション状態を保持）
     const existingMap = new Map();
