@@ -1500,6 +1500,7 @@ function unpublishBoard(requestUserId) {
     
     // 回答ボード連携の解除（フォーム情報は保持）
     configJson.setupStatus = 'reconfiguring'; // ステップ1-3を全オープンにするための状態
+    configJson.setupStep = 1; // ステップ1にリセット（公開終了後はセットアップから再開）
     
     // 列設定のみクリア（データソース・シート選択は保持）
     configJson.opinionHeader = '';

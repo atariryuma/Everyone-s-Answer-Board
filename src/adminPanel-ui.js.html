@@ -842,7 +842,12 @@ function updateGuidanceForStep(step, guidanceElement) {
     3: 'ステップ3: 列を設定してボードを公開しましょう。'
   };
   
-  guidanceElement.textContent = messages[step] || 'セットアップを開始してください。';
+  // 公開終了後のステップ1では、明確にセットアップ再開のメッセージを表示
+  if (step === 1) {
+    guidanceElement.textContent = 'セットアップを開始してください';
+  } else {
+    guidanceElement.textContent = messages[step] || 'セットアップを開始してください';
+  }
 }
 
 // =============================================================================
