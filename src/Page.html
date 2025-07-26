@@ -103,7 +103,7 @@
     const __SHOW_COUNTS__ = '<?= typeof showCounts !== "undefined" ? showCounts : "false" ?>';
     const __DISPLAY_MODE__ = '<?= typeof displayMode !== "undefined" ? displayMode : "anonymous" ?>';
     const __SHEET_NAME__ = '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>';
-    const __MAPPING__ = '<?= typeof mapping !== "undefined" && mapping !== null ? JSON.stringify(mapping) : "{}" ?>';
+    const __MAPPING__ = '<?= typeof mapping !== "undefined" ? JSON.stringify(mapping) : "{}" ?>';
     const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
     const __SPREADSHEET_ID__ = '<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>';
     const __OWNER_NAME__ = '<?= typeof ownerName !== "undefined" ? ownerName : "" ?>';

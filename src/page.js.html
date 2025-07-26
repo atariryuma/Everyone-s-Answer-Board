@@ -2588,7 +2588,7 @@ class StudyQuestApp {
   }
   
   applyReactionStyles(element, data) {
-    if (!element || !data) return;
+    if (!element || !data || !(element instanceof HTMLElement)) return;
     
     // 既存のリアクション関連クラスをクリア
     const reactionClasses = [
