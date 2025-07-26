@@ -228,6 +228,7 @@ class StudyQuestApp {
     this.highlightDebounce = new Map(); // ハイライトのデバウンス処理用
     this.pendingReactions = new Set(); // 処理中のリアクション
     this.reactionQueue = new Map(); // リアクション操作キュー
+    this.reactionEventListeners = new Map(); // 処理完了通知用
     this.isProcessingReactionQueue = false; // キュー処理中フラグ
     
     // イベントリスナー重複登録防止フラグ
@@ -3394,7 +3395,9 @@ class StudyQuestApp {
 
         prevState = JSON.parse(JSON.stringify(item.reactions || {}));
         this.applyFallbackReactionUpdate(item, reaction);
-        await this.updateReactionUI(item);
+        
+        // 即座UI更新（楽観的更新）
+        await this.updateReactionUI(item, true);
 
         console.log('🎯 リアクション送信:', { rowIndex, reaction, sheetName: this.state.sheetName });
 
@@ -3402,6 +3405,9 @@ class StudyQuestApp {
         await this.processReactionResponse(item, response, reaction);
 
         console.log('✅ リアクション処理完了:', reactionKey);
+        
+        // 処理完了を通知
+        this.notifyReactionComplete(reactionKey, { rowIndex, reaction, success: true });
     } catch (error) {
         console.error('❌ リアクション処理エラー:', error);
         const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
@@ -3410,12 +3416,51 @@ class StudyQuestApp {
             await this.updateReactionUI(item);
         }
         await this.handleReactionError(error, rowIndex, reaction);
+        
+        // エラー完了を通知
+        this.notifyReactionComplete(reactionKey, { rowIndex, reaction, success: false, error: error.message });
     } finally {
         this.pendingReactions.delete(reactionKey);
 
         const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
         this.setReactionButtonsLoading(btns, false);
     }
+  }
+
+  // リアクション処理完了通知システム
+  notifyReactionComplete(reactionKey, result) {
+    const listeners = this.reactionEventListeners.get(reactionKey);
+    if (listeners && listeners.length > 0) {
+      listeners.forEach(listener => {
+        try {
+          listener(result);
+        } catch (error) {
+          console.error('❌ リアクション完了リスナーエラー:', error);
+        }
+      });
+      // 一度実行したら削除
+      this.reactionEventListeners.delete(reactionKey);
+    }
+  }
+
+  // リアクション処理完了を待機
+  waitForReactionComplete(reactionKey, timeout = 5000) {
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        this.reactionEventListeners.delete(reactionKey);
+        reject(new Error(`Reaction timeout: ${reactionKey}`));
+      }, timeout);
+
+      const listener = (result) => {
+        clearTimeout(timeoutId);
+        resolve(result);
+      };
+
+      if (!this.reactionEventListeners.has(reactionKey)) {
+        this.reactionEventListeners.set(reactionKey, []);
+      }
+      this.reactionEventListeners.get(reactionKey).push(listener);
+    });
   }
 
   setReactionButtonsLoading(buttons, isLoading) {
@@ -3488,7 +3533,70 @@ class StudyQuestApp {
     }
 }
 
-  async updateReactionUI(item) {
+  // 即座UI更新（requestAnimationFrameを使わない同期更新）
+  async immediateUIUpdate(rowIndex, reaction) {
+    const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
+    if (!item || !item.reactions || !item.reactions[reaction]) {
+      console.warn('⚠️ immediateUIUpdate: アイテムまたはリアクション状態が見つかりません');
+      return;
+    }
+
+    try {
+      // カードのUI更新（同期実行）
+      const card = document.querySelector(`[data-row-index="${rowIndex}"]`);
+      if (card && card instanceof HTMLElement) {
+        this.updateCardReactions(card, item);
+        this.applyReactionStyles(card, item);
+      }
+
+      // モーダルが開いている場合はそちらも更新
+      if (!this.elements.answerModalContainer.classList.contains('hidden')) {
+        const modalRowIndex = this.elements.modalReactionContainer
+          .querySelector('[data-row-index]')?.dataset.rowIndex;
+        if (modalRowIndex == rowIndex) {
+          this.updateModalReactionButtons(item);
+        }
+      }
+
+      console.log('⚡ 即座UI更新完了:', { rowIndex, reaction });
+    } catch (error) {
+      console.error('❌ 即座UI更新エラー:', error);
+    }
+  }
+
+  async updateReactionUI(item, immediate = false) {
+    if (immediate) {
+      // 即座実行（requestAnimationFrameを使わない）
+      try {
+        const card = document.querySelector(`[data-row-index="${item.rowIndex}"]`);
+        if (card && card instanceof HTMLElement) {
+          this.updateCardReactions(card, item);
+          this.applyReactionStyles(card, item);
+        } else {
+          console.warn('⚠️ カード要素が見つかりません:', item.rowIndex);
+        }
+
+        // モーダルが開いている場合はそちらも更新
+        if (!this.elements.answerModalContainer.classList.contains('hidden')) {
+          const modalRowIndex = this.elements.modalReactionContainer
+            .querySelector('[data-row-index]')?.dataset.rowIndex;
+          if (modalRowIndex == item.rowIndex) {
+            this.updateModalReactionButtons(item);
+            this.applyReactionStyles(this.elements.answerModalCard, item);
+          }
+        }
+
+        console.log('⚡ リアクションUI即座更新完了:', {
+          rowIndex: item.rowIndex,
+          reactions: item.reactions
+        });
+      } catch (error) {
+        console.error('❌ UI即座更新エラー:', error);
+      }
+      return;
+    }
+
+    // 通常実行（requestAnimationFrame使用）
     return new Promise(resolve => {
         requestAnimationFrame(() => {
             try {
@@ -5298,10 +5406,29 @@ try {
       console.log('🔄 リアクション送信テスト開始...');
       
       const clickEvent = new MouseEvent('click', { bubbles: true });
+      
+      // リアクション完了を待機する準備
+      const reactionKey = `${rowIndex}-${reaction}`;
+      let reactionCompletePromise = null;
+      
+      if (window.studyQuestApp && window.studyQuestApp.waitForReactionComplete) {
+        reactionCompletePromise = window.studyQuestApp.waitForReactionComplete(reactionKey, 3000);
+      }
+      
       reactionBtn.dispatchEvent(clickEvent);
       
-      // 短時間待機してUI更新を確認
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 処理完了を待機（新システム）または従来の時間待機
+      if (reactionCompletePromise) {
+        try {
+          const result = await reactionCompletePromise;
+          console.log('✅ リアクション処理完了確認:', result);
+        } catch (error) {
+          console.warn('⚠️ リアクション完了待機タイムアウト:', error.message);
+        }
+      } else {
+        // フォールバック: 従来の時間待機
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
       
       const afterClickState = {
         reacted: reactionBtn.getAttribute('aria-pressed') === 'true',
@@ -5335,8 +5462,24 @@ try {
       // Test 6: 再度クリックして戻るかテスト
       console.log('🔄 リアクション取消テスト開始...');
       
+      // 2回目のリアクション完了を待機
+      let secondReactionPromise = null;
+      if (window.studyQuestApp && window.studyQuestApp.waitForReactionComplete) {
+        secondReactionPromise = window.studyQuestApp.waitForReactionComplete(reactionKey, 3000);
+      }
+      
       reactionBtn.dispatchEvent(clickEvent);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      if (secondReactionPromise) {
+        try {
+          const secondResult = await secondReactionPromise;
+          console.log('✅ 2回目リアクション処理完了確認:', secondResult);
+        } catch (error) {
+          console.warn('⚠️ 2回目リアクション完了待機タイムアウト:', error.message);
+        }
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
       
       const finalState = {
         reacted: reactionBtn.getAttribute('aria-pressed') === 'true',
