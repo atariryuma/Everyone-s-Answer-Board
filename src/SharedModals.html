@@ -1116,24 +1116,51 @@ class SharedModals {
       errors.push('公開結果データが存在しません');
       isValid = false;
     } else {
-      // 公開成功フラグのチェック
-      if (!publishResult.success) {
+      // 公開成功フラグのチェック（クイックスタート用の柔軟な判定）
+      const isPublishedSuccessfully = publishResult.success || 
+                                    (publishResult.status === 'success') ||
+                                    (publishResult.publicationData && publishResult.publicationData.isPublished);
+      
+      if (!isPublishedSuccessfully) {
         errors.push('公開が成功していません');
-        isValid = false;
+        // クイックスタートの場合は警告レベルに下げる
+        if (publishResult.status === 'success') {
+          console.warn('⚠️ success フラグは false だが status は success - クイックスタート結果として受け入れます');
+        } else {
+          isValid = false;
+        }
       }
 
-      // URL検証
-      if (!publishResult.url || publishResult.url.trim() === '') {
+      // URL検証（複数のURLフィールドをチェック）
+      const candidateUrls = [
+        publishResult.url,
+        publishResult.viewUrl,
+        publishResult.webAppUrl
+      ].filter(url => url && url.trim() !== '');
+      
+      if (candidateUrls.length === 0) {
         errors.push('公開URLが空です');
-      } else if (publishResult.url.length < 10) {
-        errors.push('公開URLが不完全です（長さ不足）');
       } else {
-        hasValidUrl = true;
+        // 有効なURLが1つでもあれば OK
+        const validUrl = candidateUrls.find(url => url.length > 10);
+        if (validUrl) {
+          hasValidUrl = true;
+          // メインURLフィールドが空の場合は代替URLで補完
+          if (!publishResult.url || publishResult.url.trim() === '') {
+            publishResult.url = validUrl;
+            console.log('🔄 公開URL を代替URL で補完:', validUrl);
+          }
+        } else {
+          errors.push('公開URLが不完全です（長さ不足）');
+        }
       }
 
-      // 公開時刻チェック
+      // 公開時刻チェック（柔軟な対応）
       if (!publishResult.publishedAt) {
-        errors.push('公開時刻が設定されていません');
+        // 公開時刻が設定されていない場合は現在時刻を使用
+        publishResult.publishedAt = new Date().toISOString();
+        console.log('🕒 公開時刻を現在時刻で補完:', publishResult.publishedAt);
+        errors.push('公開時刻が設定されていません（現在時刻で補完）');
       } else {
         try {
           const publishTime = new Date(publishResult.publishedAt);
