@@ -66,10 +66,10 @@ function clearActiveSheet(requestUserId) {
     configJson.publishedSpreadsheetId = ''; // スプレッドシートIDもクリア
     configJson.appPublished = false; // 公開停止
     
-  // データベースに保存（許可されたフィールドのみ）
-  updateUser(requestUserId, {
-    configJson: JSON.stringify(configJson)
-  });
+    // データベースに保存
+    updateUser(requestUserId, {
+      configJson: JSON.stringify(configJson)
+    });
     
     console.log('clearActiveSheet完了: 公開を停止しました');
     
