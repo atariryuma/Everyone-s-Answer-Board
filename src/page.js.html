@@ -350,8 +350,6 @@ class StudyQuestApp {
             this.elements.adminToggleBtn.style.display = 'none'; // 確実に非表示
           }
         }
-        // Show info modal immediately on initial load (always show for new boards)
-        this.showInfoModal();
         
         // Start polling for new answers
         this.startNewAnswerPolling();
@@ -1726,6 +1724,10 @@ class StudyQuestApp {
           console.warn('⚠️ StudyQuestApp: Available sheets loading failed:', error.message);
         }
       }
+      
+      // Show info modal during loading (after data is loaded but before completion)
+      console.log('📋 StudyQuestApp: Showing info modal during initialization...');
+      this.showInfoModal();
       
       console.log('🎯 StudyQuestApp: Immediate loading initialization completed');
       
@@ -3707,7 +3709,11 @@ class StudyQuestApp {
       reasonText.textContent = safeData.reason;
       
       contentDiv.appendChild(opinionTitle);
-      contentDiv.appendChild(reasonText);
+      
+      // 理由テキストが存在する場合のみ追加
+      if (safeData.reason && safeData.reason.trim()) {
+        contentDiv.appendChild(reasonText);
+      }
     
       // Create footer div
       const footerDiv = document.createElement('div');
