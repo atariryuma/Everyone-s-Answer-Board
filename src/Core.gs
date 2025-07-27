@@ -1734,7 +1734,7 @@ function createQuickStartFiles(setupContext) {
   
   // ステップ2: Googleフォームとスプレッドシートを作成
   debugLog('📝 ステップ2: フォーム作成中...');
-  var formAndSsInfo = createStudyQuestForm(userEmail, requestUserId);
+  var formAndSsInfo = createUnifiedForm('study', userEmail, requestUserId);
   
   // 作成したファイルをフォルダに移動（改善版：冗長処理除去と安全な移動処理）
   if (folder) {

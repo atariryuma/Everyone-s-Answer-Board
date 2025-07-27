@@ -1617,7 +1617,7 @@ function createBoardFromAdmin(requestUserId) {
     var userId = requestUserId; // requestUserId を使用
 
     // フォームとスプレッドシートを作成
-    var formAndSsInfo = createStudyQuestForm(activeUserEmail, userId);
+    var formAndSsInfo = createUnifiedForm('study', activeUserEmail, userId);
 
     // 中央データベースにユーザー情報を登録
     var initialConfig = {
