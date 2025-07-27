@@ -191,6 +191,53 @@ class CacheManager {
   }
 
   /**
+   * スプレッドシート関連のキャッシュを無効化します（リアクション・ハイライト操作後）
+   * @param {string} spreadsheetId - スプレッドシートID
+   * @param {string} sheetName - シート名（オプション）
+   */
+  invalidateSheetData(spreadsheetId, sheetName = null) {
+    try {
+      // シート全体のデータキャッシュを無効化
+      const patterns = [
+        `batchGet_${spreadsheetId}_`,
+        `sheet_data_${spreadsheetId}_`,
+        `published_data_${spreadsheetId}_`
+      ];
+      
+      if (sheetName) {
+        patterns.push(`batchGet_${spreadsheetId}_["'${sheetName}'!A:Z"]`);
+      }
+      
+      let removedCount = 0;
+      for (const pattern of patterns) {
+        // メモキャッシュから削除
+        for (const key of this.memoCache.keys()) {
+          if (key.includes(pattern)) {
+            this.memoCache.delete(key);
+            removedCount++;
+          }
+        }
+        
+        // スクリプトキャッシュからも削除を試行
+        if (this.scriptCache) {
+          try {
+            this.scriptCache.remove(pattern);
+          } catch (e) {
+            // スクリプトキャッシュでは正確なキー一致のみ削除可能
+          }
+        }
+      }
+      
+      debugLog(`[Cache] Invalidated sheet data cache for ${spreadsheetId}, removed ${removedCount} entries`);
+      return removedCount;
+    } catch (e) {
+      console.warn(`[Cache] Failed to invalidate sheet data cache: ${e.message}`);
+      this.stats.errors++;
+      return 0;
+    }
+  }
+
+  /**
    * パターンに一致するキーのキャッシュを削除します。
    * @param {string} pattern - 削除するキーのパターン（部分一致）
    */

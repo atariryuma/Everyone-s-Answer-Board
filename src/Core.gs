@@ -2155,6 +2155,16 @@ function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
     var newValue = isHighlighted ? 'false' : 'true';
     updateSheetsData(service, spreadsheetId, range, [[newValue]]);
     
+    // ハイライト更新後のキャッシュ無効化
+    try {
+      if (typeof cacheManager !== 'undefined' && typeof cacheManager.invalidateSheetData === 'function') {
+        cacheManager.invalidateSheetData(spreadsheetId, sheetName);
+        debugLog('ハイライト更新後のキャッシュ無効化完了: ' + spreadsheetId);
+      }
+    } catch (cacheError) {
+      console.warn('ハイライト後のキャッシュ無効化エラー:', cacheError.message);
+    }
+    
     return {
       status: 'success',
       highlighted: !isHighlighted,
@@ -2348,6 +2358,16 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
         targetCount: targetCount,
         allColumns: Object.keys(allReactionColumns)
       });
+      
+      // リアクション更新後のキャッシュ無効化
+      try {
+        if (typeof cacheManager !== 'undefined' && typeof cacheManager.invalidateSheetData === 'function') {
+          cacheManager.invalidateSheetData(spreadsheetId, sheetName);
+          debugLog('リアクション更新後のキャッシュ無効化完了: ' + spreadsheetId);
+        }
+      } catch (cacheError) {
+        console.warn('リアクション後のキャッシュ無効化エラー:', cacheError.message);
+      }
       
       return { 
         status: 'success', 

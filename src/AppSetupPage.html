@@ -69,8 +69,8 @@
                 <div class="p-4 bg-gray-800 rounded-lg">
                     <div class="flex items-center justify-between mb-3">
                         <div>
-                            <h3 class="text-lg font-medium text-white">アプリケーション有効化</h3>
-                            <p class="text-sm text-gray-400">アプリの利用可能状態を制御します</p>
+                            <h3 class="text-lg font-medium text-white">アプリケーション全体制御</h3>
+                            <p class="text-sm text-gray-400">システム全体の利用可能状態を制御します（システム管理者以外のアクセス制限）</p>
                         </div>
                         <div class="flex items-center">
                             <label class="relative inline-flex items-center cursor-pointer">
@@ -82,8 +82,9 @@
                     
                     <!-- 詳細説明 -->
                     <div class="text-sm text-gray-400 mb-4">
-                        <p><strong>有効 (ON):</strong> ユーザーがアプリにアクセスできます</p>
-                        <p><strong>無効 (OFF):</strong> アプリへのアクセスが制限されます</p>
+                        <p><strong>有効 (ON):</strong> 全ユーザーがアプリにアクセス可能</p>
+                        <p><strong>無効 (OFF):</strong> システム管理者以外のアクセスを制限</p>
+                        <p class="text-xs text-yellow-400 mt-2">⚠️ 注意: これはシステム全体の制御で、個別ユーザーのisActiveとは別の機能です</p>
                     </div>
 
                     <!-- 変更ボタン -->
@@ -98,23 +99,23 @@
 
                 <!-- 使用シナリオの説明 -->
                 <div class="p-4 bg-gray-900 rounded-lg">
-                    <h4 class="text-md font-medium text-cyan-400 mb-3">🎯 使用シナリオ</h4>
+                    <h4 class="text-md font-medium text-cyan-400 mb-3">🎯 アプリケーション全体制御の使用シナリオ</h4>
                     <div class="grid md:grid-cols-2 gap-4 text-sm text-gray-300">
                         <div>
-                            <h5 class="font-medium text-white mb-2">一時的な停止・メンテナンス</h5>
-                            <p>アプリケーションのメンテナンス、アップデート、または一時的な問題解決のために使用します。</p>
+                            <h5 class="font-medium text-white mb-2">緊急メンテナンス</h5>
+                            <p>システム全体の緊急停止が必要な場合。管理者のみアクセス可能になります。</p>
                         </div>
                         <div>
-                            <h5 class="font-medium text-white mb-2">利用停止・アーカイブ</h5>
-                            <p>不要になったアプリを完全削除せず、履歴として残しておく場合に使用します。</p>
+                            <h5 class="font-medium text-white mb-2">大規模アップデート</h5>
+                            <p>データベース構造変更など、全ユーザーアクセスを停止する必要がある場合。</p>
                         </div>
                         <div>
-                            <h5 class="font-medium text-white mb-2">利用規約違反への対応</h5>
-                            <p>利用規約に違反する行為や不正な利用を検知した場合の対応に使用します。</p>
+                            <h5 class="font-medium text-white mb-2">セキュリティ問題対応</h5>
+                            <p>セキュリティ脆弱性発見時の緊急アクセス制限。調査・修正期間中の保護。</p>
                         </div>
                         <div>
-                            <h5 class="font-medium text-white mb-2">セットアップ中の状態管理</h5>
-                            <p>初期設定が完了するまで、または管理者の最終確認までアプリを非アクティブに保ちます。</p>
+                            <h5 class="font-medium text-white mb-2">個別ユーザー制御との違い</h5>
+                            <p>これはシステム全体制御。個別ユーザーのisActive管理は別途ユーザー管理セクションで行います。</p>
                         </div>
                     </div>
                 </div>
@@ -205,8 +206,14 @@
                             <button 
                                 id="view-logs-btn"
                                 onclick="viewDeletionLogs()"
-                                class="btn bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm">
+                                class="btn bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-xs">
                                 📋 削除ログ
+                            </button>
+                            <button 
+                                id="view-diagnostic-logs-btn"
+                                onclick="viewDiagnosticHistory()"
+                                class="btn bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-xs">
+                                📊 診断履歴
                             </button>
                         </div>
                     </div>
@@ -676,6 +683,10 @@
             const modal = document.getElementById('logs-modal');
             const loadingDiv = document.getElementById('logs-loading');
             const contentDiv = document.getElementById('logs-table-content');
+            const modalTitle = modal.querySelector('h3');
+
+            // タイトルを削除ログ用に戻す
+            modalTitle.textContent = '📋 削除ログ';
             
             modal.classList.remove('hidden');
             loadingDiv.classList.remove('hidden');
@@ -701,6 +712,16 @@
         function displayDeletionLogs(logs) {
             const tableBody = document.getElementById('logs-table-body');
             const contentDiv = document.getElementById('logs-table-content');
+
+            // テーブルヘッダーを削除ログ用に戻す
+            const tableHead = contentDiv.querySelector('thead tr');
+            tableHead.innerHTML = `
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">削除日時</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">実行者</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">対象ユーザー</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">削除理由</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">タイプ</th>
+            `;
             
             if (logs.length === 0) {
                 tableBody.innerHTML = `
@@ -778,11 +799,12 @@
                         const formattedResult = formatDiagnosticResult(result, functionName);
                         outputElement.textContent = formattedResult;
 
-                        if (result.status === 'success') {
-                            showMessage(`✅ ${functionName} が正常に完了しました`, 'success');
-                        } else {
-                            showMessage(`⚠️ ${functionName} で問題が検出されました`, 'warning');
-                        }
+                        // 診断結果の詳細なメッセージを表示
+                        const summary = createDiagnosticSummary(result, functionName);
+                        showMessage(summary.message, summary.type, 8000); // 8秒表示
+
+                        // 診断履歴に保存
+                        saveDiagnosticToHistory(functionName, result, summary);
                     } else {
                         outputElement.textContent = `結果: ${result}`;
                         showMessage(`✅ ${functionName} が完了しました`, 'success');
@@ -852,6 +874,155 @@
             }
 
             return formatted;
+        }
+
+        // 診断結果の要約を作成
+        function createDiagnosticSummary(result, functionName) {
+            let problemCount = 0;
+            let repairCount = 0;
+            let successfulRepairs = 0;
+            let problems = [];
+
+            // 問題をカウント
+            if (result.checks && Array.isArray(result.checks)) {
+                result.checks.forEach(check => {
+                    if (!check.passed) {
+                        problemCount++;
+                        problems.push(check.name);
+                    }
+                });
+            }
+
+            // 修復をカウント
+            if (result.repairs && Array.isArray(result.repairs)) {
+                repairCount = result.repairs.length;
+                successfulRepairs = result.repairs.filter(repair => repair.success).length;
+            }
+
+            // メッセージを作成
+            let message, type;
+            
+            if (problemCount === 0) {
+                message = `✅ ${functionName}: 問題は検出されませんでした。システムは正常に動作しています。`;
+                type = 'success';
+            } else if (repairCount > 0) {
+                if (successfulRepairs === repairCount) {
+                    message = `🔧 ${functionName}: ${problemCount}件の問題を検出し、${successfulRepairs}件すべて修復しました。`;
+                    type = 'success';
+                } else {
+                    message = `⚠️ ${functionName}: ${problemCount}件の問題を検出。${successfulRepairs}/${repairCount}件の修復が成功しました。`;
+                    type = 'warning';
+                }
+            } else {
+                message = `❌ ${functionName}: ${problemCount}件の問題を検出しました（${problems.slice(0, 2).join(', ')}${problems.length > 2 ? ' など' : ''}）。修復が必要です。`;
+                type = 'error';
+            }
+
+            return {
+                message,
+                type,
+                problemCount,
+                repairCount,
+                successfulRepairs,
+                problems
+            };
+        }
+
+        // 診断履歴をローカルストレージに保存
+        function saveDiagnosticToHistory(functionName, result, summary) {
+            const history = JSON.parse(localStorage.getItem('diagnosticHistory') || '[]');
+            
+            const entry = {
+                timestamp: new Date().toISOString(),
+                functionName,
+                summary: summary.message,
+                status: summary.type,
+                problemCount: summary.problemCount,
+                repairCount: summary.repairCount,
+                successfulRepairs: summary.successfulRepairs,
+                details: result
+            };
+
+            history.unshift(entry); // 最新を先頭に
+            
+            // 最大50件まで保持
+            if (history.length > 50) {
+                history.splice(50);
+            }
+
+            localStorage.setItem('diagnosticHistory', JSON.stringify(history));
+        }
+
+        // 診断履歴を表示（既存の削除ログモーダルを活用）
+        function viewDiagnosticHistory() {
+            const modal = document.getElementById('logs-modal');
+            const loadingDiv = document.getElementById('logs-loading');
+            const contentDiv = document.getElementById('logs-table-content');
+            const modalTitle = modal.querySelector('h3');
+
+            // タイトルを変更
+            modalTitle.textContent = '📊 診断履歴';
+            
+            modal.classList.remove('hidden');
+            loadingDiv.classList.remove('hidden');
+            contentDiv.classList.add('hidden');
+
+            // 少し遅延させて履歴を表示
+            setTimeout(() => {
+                displayDiagnosticHistory();
+                loadingDiv.classList.add('hidden');
+            }, 500);
+        }
+
+        // 診断履歴をテーブルに表示
+        function displayDiagnosticHistory() {
+            const tableBody = document.getElementById('logs-table-body');
+            const contentDiv = document.getElementById('logs-table-content');
+            const history = JSON.parse(localStorage.getItem('diagnosticHistory') || '[]');
+
+            // テーブルヘッダーを診断用に変更
+            const tableHead = contentDiv.querySelector('thead tr');
+            tableHead.innerHTML = `
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">実行日時</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">機能</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">結果</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">問題/修復</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">ステータス</th>
+            `;
+
+            if (history.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-4 py-8 text-center text-gray-400">
+                            診断履歴が見つかりません
+                        </td>
+                    </tr>
+                `;
+            } else {
+                tableBody.innerHTML = history.map(entry => {
+                    const executeDate = new Date(entry.timestamp).toLocaleString('ja-JP');
+                    const statusColor = entry.status === 'success' ? 'text-green-400' : 
+                                       entry.status === 'warning' ? 'text-yellow-400' : 'text-red-400';
+                    const statusIcon = entry.status === 'success' ? '✅' : 
+                                      entry.status === 'warning' ? '⚠️' : '❌';
+                    
+                    const problemRepair = entry.repairCount > 0 ? 
+                        `${entry.problemCount}件検出 / ${entry.successfulRepairs}/${entry.repairCount}件修復` :
+                        entry.problemCount > 0 ? `${entry.problemCount}件検出` : '問題なし';
+
+                    return `
+                        <tr class="hover:bg-gray-700/50">
+                            <td class="px-4 py-3 text-sm text-gray-300">${executeDate}</td>
+                            <td class="px-4 py-3 text-sm text-white">${entry.functionName}</td>
+                            <td class="px-4 py-3 text-sm text-gray-300" title="${entry.summary}">${entry.summary.substring(0, 50)}...</td>
+                            <td class="px-4 py-3 text-sm text-gray-300">${problemRepair}</td>
+                            <td class="px-4 py-3 text-sm ${statusColor}">${statusIcon}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            contentDiv.classList.remove('hidden');
         }
     </script>
 </body>

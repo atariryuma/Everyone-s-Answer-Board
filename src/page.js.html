@@ -354,6 +354,9 @@ class StudyQuestApp {
         
         // Start polling for new answers
         this.startNewAnswerPolling();
+        
+        // Start sync monitoring
+        this.startSyncMonitoring();
       }, { timeout: 50 });
 
       // AdminPanelからのメッセージをリッスン
@@ -2299,7 +2302,7 @@ class StudyQuestApp {
       console.log('📡 Starting data fetch with parameters:', fetchParams);
       
       // エラーハンドリング強化版のデータ取得
-      this.performDataFetchWithRetry(fetchParams, isInitialLoad)
+      await this.performDataFetchWithRetry(fetchParams, isInitialLoad)
         .then(async result => {
           try {
             // 初期ロードタイムアウトをクリア
@@ -3542,7 +3545,6 @@ class StudyQuestApp {
 
   async executeReactionOperation(operation, reactionKey) {
     const { rowIndex, reaction } = operation;
-    let prevState;
 
     try {
         this.pendingReactions.add(reactionKey);
@@ -3555,16 +3557,14 @@ class StudyQuestApp {
             throw new Error(`Item not found for rowIndex: ${rowIndex}`);
         }
 
-        prevState = JSON.parse(JSON.stringify(item.reactions || {}));
-        this.applyFallbackReactionUpdate(item, reaction);
-        
-        // 即座UI更新（楽観的更新）
-        await this.updateReactionUI(item, true);
+        console.log('📡 リアクション送信 (Server-first):', { rowIndex, reaction, sheetName: this.state.sheetName });
 
-        console.log('🎯 リアクション送信:', { rowIndex, reaction, sheetName: this.state.sheetName });
-
+        // Server-first approach: サーバーに送信してから結果を適用
         const response = await this.sendReactionToServer(rowIndex, reaction);
         await this.processReactionResponse(item, response, reaction);
+
+        // UI更新（サーバー応答後のみ）
+        await this.updateReactionUI(item, false);
 
         console.log('✅ リアクション処理完了:', reactionKey);
         
@@ -3572,11 +3572,6 @@ class StudyQuestApp {
         this.notifyReactionComplete(reactionKey, { rowIndex, reaction, success: true });
     } catch (error) {
         console.error('❌ リアクション処理エラー:', error);
-        const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
-        if (item && prevState) {
-            item.reactions = JSON.parse(JSON.stringify(prevState));
-            await this.updateReactionUI(item);
-        }
         await this.handleReactionError(error, rowIndex, reaction);
         
         // エラー完了を通知
@@ -3676,28 +3671,20 @@ class StudyQuestApp {
     });
   }
 
-  // 包括的リアクション状態監視
+  // シンプルなリアクション状態監視（通知システム中心）
   async waitForReactionUpdate(rowIndex, reaction, expectedChange = null, maxWaitMs = 3000) {
     const reactionKey = `${rowIndex}-${reaction}`;
-    const initialState = this.getReactionButtonState(rowIndex, reaction);
-    
-    // 複数の待機方法を並行実行
-    const promises = [
-      // 方法1: 完了通知システム
-      this.waitForReactionComplete(reactionKey, maxWaitMs).catch(() => null),
-      
-      // 方法2: 動的状態変化検出
-      this.waitForReactionStateChange(rowIndex, reaction, initialState, maxWaitMs).catch(() => null)
-    ];
     
     try {
-      const result = await Promise.race(promises);
-      return result || { initialState, timeout: true };
+      // 完了通知システムのみを使用（シンプルで信頼性が高い）
+      const result = await this.waitForReactionComplete(reactionKey, maxWaitMs);
+      return result || { timeout: false, success: true };
     } catch (error) {
+      console.warn(`⚠️ リアクション待機タイムアウト: ${reactionKey}`, error.message);
       return { 
-        initialState, 
         error: error.message, 
-        finalState: this.getReactionButtonState(rowIndex, reaction) 
+        timeout: true,
+        success: false
       };
     }
   }
@@ -3852,23 +3839,17 @@ class StudyQuestApp {
   async processReactionResponse(item, response, reaction) {
     console.log('🔄 サーバー応答処理開始:', { rowIndex: item.rowIndex, reaction, response });
     
-    // 楽観的更新の状態を保存（比較用）
-    const optimisticState = JSON.parse(JSON.stringify(item.reactions || {}));
-    
-    // サーバー状態を絶対的に適用
+    // サーバー状態を絶対的に適用（楽観的更新なし）
     if (response.reactions && typeof response.reactions === 'object') {
-        // サーバー状態で完全に上書き（楽観的更新を破棄）
+        // サーバー状態で完全に上書き
         const serverState = response.reactions;
         item.reactions = JSON.parse(JSON.stringify(serverState));
         
         console.log('✅ サーバー状態適用完了:', {
-          before: optimisticState,
-          after: item.reactions,
-          serverResponse: serverState
+          rowIndex: item.rowIndex,
+          reaction,
+          serverState: item.reactions
         });
-        
-        // 楽観的更新との差異をチェック
-        this.validateReactionConsistency(item.rowIndex, optimisticState, item.reactions);
         
     } else {
         console.warn('⚠️ 期待されたリアクション形式ではありません:', response);
@@ -3879,9 +3860,6 @@ class StudyQuestApp {
     
     // ローカルストレージに保存（サーバー状態を保存）
     this.saveReactionState(item.rowIndex, item.reactions);
-    
-    // UI強制更新（サーバー状態を確実に反映）
-    await this.updateReactionUI(item, true); // immediate=true で即座更新
     
     console.log('🎯 サーバー応答処理完了:', { rowIndex: item.rowIndex, finalState: item.reactions });
 }
@@ -4277,12 +4255,24 @@ class StudyQuestApp {
                     this.updateModalContent(item);
                 }
             }
+            
+            // ハイライト操作後の状態同期確認（遅延実行）
+            setTimeout(() => {
+                this.verifyHighlightSync(numericRowIndex, res.highlight);
+            }, 1000);
         } else {
             throw new Error(res?.message || 'ハイライトの処理に失敗しました');
         }
     } catch (error) {
         console.error('Failed to toggle highlight:', error);
-        this.showErrorFeedback(btns[0], 'ハイライトに失敗しました');
+        
+        // 権限エラーの特別処理
+        if (error.message && error.message.includes('管理者のみ')) {
+            this.showErrorFeedback(btns[0], '権限エラー: 管理者のみ利用可能です');
+            console.warn('ハイライト機能は管理者のみ利用可能です');
+        } else {
+            this.showErrorFeedback(btns[0], 'ハイライトに失敗しました');
+        }
     } finally {
         // ★修正ポイント④：最後にボタンのローディング状態を解除
         btns.forEach(btn => {
@@ -4290,6 +4280,241 @@ class StudyQuestApp {
             btn.disabled = false;
         });
         this.pendingReactions.delete(highlightKey);
+    }
+  }
+
+  // ハイライト状態同期確認
+  async verifyHighlightSync(rowIndex, expectedHighlight) {
+    try {
+      const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
+      if (!item) return;
+      
+      // UI状態とサーバー応答の一致確認
+      if (item.highlight !== expectedHighlight) {
+        console.warn(`⚠️ ハイライト状態不整合検出: rowIndex=${rowIndex}, UI=${item.highlight}, Expected=${expectedHighlight}`);
+        
+        // 不整合の場合は強制的にサーバー状態に合わせる
+        item.highlight = expectedHighlight;
+        requestAnimationFrame(() => this.applyUpdates([item]));
+        
+        console.log('✅ ハイライト状態を修正しました');
+      } else {
+        console.log('✅ ハイライト状態同期確認: 正常');
+      }
+    } catch (error) {
+      console.error('ハイライト状態同期確認エラー:', error);
+    }
+  }
+
+  // 包括的同期状態監視システム
+  async performSyncHealthCheck() {
+    console.log('🔍 同期状態ヘルスチェック開始');
+    const issues = [];
+    
+    try {
+      // 1. データ取得同期チェック
+      const currentTime = Date.now();
+      const lastDataLoad = this.lastDataLoadTime || 0;
+      const timeSinceLastLoad = currentTime - lastDataLoad;
+      
+      if (timeSinceLastLoad > 300000) { // 5分以上
+        issues.push({
+          type: 'data_staleness',
+          severity: 'warning',
+          message: `最後のデータ取得から${Math.round(timeSinceLastLoad/60000)}分経過`,
+          recommendation: 'データ更新を実行'
+        });
+      }
+      
+      // 2. 保留中のリアクション確認
+      if (this.pendingReactions.size > 0) {
+        issues.push({
+          type: 'pending_reactions',
+          severity: 'warning',
+          message: `${this.pendingReactions.size}件のリアクションが処理中`,
+          data: Array.from(this.pendingReactions)
+        });
+      }
+      
+      // 3. UI状態とデータ状態の整合性チェック
+      const uiButtons = document.querySelectorAll('.reaction-btn, .highlight-btn');
+      const inconsistentButtons = [];
+      
+      uiButtons.forEach(btn => {
+        const rowIndex = parseInt(btn.dataset.rowIndex);
+        const item = this.state.currentAnswers.find(i => i.rowIndex === rowIndex);
+        
+        if (!item) {
+          inconsistentButtons.push({
+            button: btn,
+            issue: 'data_missing',
+            rowIndex
+          });
+          return;
+        }
+        
+        if (btn.classList.contains('reaction-btn')) {
+          const reaction = btn.dataset.reaction;
+          const isPressed = btn.getAttribute('aria-pressed') === 'true';
+          const dataState = item.reactions?.[reaction]?.reacted === true;
+          
+          if (isPressed !== dataState) {
+            inconsistentButtons.push({
+              button: btn,
+              issue: 'reaction_state_mismatch',
+              rowIndex,
+              reaction,
+              uiState: isPressed,
+              dataState
+            });
+          }
+        }
+        
+        if (btn.classList.contains('highlight-btn')) {
+          const isHighlighted = btn.classList.contains('highlighted');
+          const dataState = item.highlight === true;
+          
+          if (isHighlighted !== dataState) {
+            inconsistentButtons.push({
+              button: btn,
+              issue: 'highlight_state_mismatch',
+              rowIndex,
+              uiState: isHighlighted,
+              dataState
+            });
+          }
+        }
+      });
+      
+      if (inconsistentButtons.length > 0) {
+        issues.push({
+          type: 'ui_data_inconsistency',
+          severity: 'error',
+          message: `${inconsistentButtons.length}件のUI状態不整合`,
+          data: inconsistentButtons
+        });
+      }
+      
+      // 4. キャッシュ状態チェック（可能な場合）
+      if (this.cache && typeof this.cache.size === 'number') {
+        if (this.cache.size > 100) {
+          issues.push({
+            type: 'cache_bloat',
+            severity: 'info',
+            message: `キャッシュサイズが大きい: ${this.cache.size}件`,
+            recommendation: 'キャッシュクリアを検討'
+          });
+        }
+      }
+      
+      // 5. 結果出力
+      if (issues.length === 0) {
+        console.log('✅ 同期状態ヘルスチェック: 問題なし');
+        return { status: 'healthy', issues: [] };
+      } else {
+        console.warn('⚠️ 同期状態ヘルスチェック: 問題検出', issues);
+        return { status: 'issues_detected', issues };
+      }
+      
+    } catch (error) {
+      console.error('❌ 同期状態ヘルスチェックエラー:', error);
+      return { 
+        status: 'check_failed', 
+        error: error.message,
+        issues: []
+      };
+    }
+  }
+
+  // 不整合の自動修復
+  async fixSyncIssues(healthCheckResult) {
+    if (!healthCheckResult.issues || healthCheckResult.issues.length === 0) {
+      return { fixed: 0, skipped: 0 };
+    }
+    
+    let fixed = 0;
+    let skipped = 0;
+    
+    for (const issue of healthCheckResult.issues) {
+      try {
+        switch (issue.type) {
+          case 'ui_data_inconsistency':
+            // UI状態をデータ状態に合わせる
+            for (const inconsistency of issue.data) {
+              const item = this.state.currentAnswers.find(i => i.rowIndex === inconsistency.rowIndex);
+              if (item) {
+                await this.applyUpdates([item]);
+                fixed++;
+              }
+            }
+            break;
+            
+          case 'data_staleness':
+            // データを強制リフレッシュ
+            console.log('🔄 古いデータを検出、強制リフレッシュ実行');
+            await this.forceDataRefresh();
+            fixed++;
+            break;
+            
+          case 'cache_bloat':
+            // キャッシュクリア
+            if (this.cache && typeof this.cache.clear === 'function') {
+              this.cache.clear();
+              fixed++;
+            }
+            break;
+            
+          default:
+            skipped++;
+            break;
+        }
+      } catch (fixError) {
+        console.error(`修復失敗 (${issue.type}):`, fixError);
+        skipped++;
+      }
+    }
+    
+    console.log(`🔧 自動修復完了: ${fixed}件修復, ${skipped}件スキップ`);
+    return { fixed, skipped };
+  }
+
+  // 定期的な同期監視の開始
+  startSyncMonitoring() {
+    // 既存の監視が動いている場合は停止
+    if (this.syncMonitoringInterval) {
+      clearInterval(this.syncMonitoringInterval);
+    }
+    
+    // 5分間隔で同期状態をチェック
+    this.syncMonitoringInterval = setInterval(async () => {
+      try {
+        const healthCheck = await this.performSyncHealthCheck();
+        
+        // 重要な問題があった場合は自動修復を試行
+        if (healthCheck.status === 'issues_detected') {
+          const criticalIssues = healthCheck.issues.filter(issue => 
+            issue.severity === 'error' || issue.type === 'ui_data_inconsistency'
+          );
+          
+          if (criticalIssues.length > 0) {
+            console.log('🔧 重要な同期問題を検出、自動修復を実行');
+            await this.fixSyncIssues({ issues: criticalIssues });
+          }
+        }
+      } catch (error) {
+        console.error('同期監視エラー:', error);
+      }
+    }, 5 * 60 * 1000); // 5分間隔
+    
+    console.log('✅ 同期状態監視を開始しました（5分間隔）');
+  }
+
+  // 同期監視の停止
+  stopSyncMonitoring() {
+    if (this.syncMonitoringInterval) {
+      clearInterval(this.syncMonitoringInterval);
+      this.syncMonitoringInterval = null;
+      console.log('🛑 同期状態監視を停止しました');
     }
   }
   
