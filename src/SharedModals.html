@@ -162,38 +162,51 @@
             </svg>
             ⏰ 自動停止設定
           </h4>
-          <div class="space-y-2 text-xs text-blue-200">
-            <div class="flex justify-between">
-              <span class="text-gray-400">公開開始時間:</span>
-              <span id="publish-start-time" class="font-medium text-blue-100">確認中...</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">自動停止予定:</span>
-              <span id="auto-stop-time" class="font-medium text-yellow-100">確認中...</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">残り時間:</span>
-              <span id="remaining-time" class="font-medium text-green-100">確認中...</span>
+          <div class="space-y-3 text-sm text-blue-200">
+            <div class="grid grid-cols-1 gap-2">
+              <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                <span class="text-gray-400 text-xs">公開開始時間:</span>
+                <span id="publish-start-time" class="font-medium text-blue-100 text-sm">確認中...</span>
+              </div>
+              <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                <span class="text-gray-400 text-xs">自動停止予定:</span>
+                <span id="auto-stop-time" class="font-medium text-yellow-100 text-sm">確認中...</span>
+              </div>
+              <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                <span class="text-gray-400 text-xs">残り時間:</span>
+                <span id="remaining-time" class="font-medium text-green-100 text-sm">確認中...</span>
+              </div>
             </div>
           </div>
         </div>
 
+        <!-- URL生成状態表示 -->
+        <div id="url-status-section" class="bg-green-500/10 border border-green-400/30 rounded-lg p-3">
+          <div class="flex items-center gap-2 mb-2">
+            <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
+            <span id="url-status-text" class="text-sm font-medium text-green-200">✅ URL生成済み</span>
+          </div>
+          <p id="url-preview" class="text-xs text-green-100 font-mono break-all">確認中...</p>
+        </div>
+
         <div class="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-3">
-          <p class="text-xs text-yellow-200 leading-relaxed">
+          <p class="text-sm text-yellow-200 leading-relaxed">
             <strong>⚠️ 重要:</strong> 6時間後に自動的に公開が停止されます。学習者の回答期間を考慮して適切に管理してください。
           </p>
         </div>
       </div>
       
-      <div class="flex justify-end gap-3 mt-6">
-        <button type="button" id="extend-time-btn" class="btn btn-secondary flex items-center gap-2">
+      <div class="flex flex-col sm:flex-row justify-end gap-3 mt-6">
+        <button type="button" id="extend-time-btn" class="btn btn-secondary flex items-center justify-center gap-2">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
           時間延長
         </button>
-        <button type="button" id="confirm-auto-stop-btn" class="btn btn-primary">
-          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <button type="button" id="confirm-auto-stop-btn" class="btn btn-primary flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
           </svg>
           確認
@@ -1045,7 +1058,7 @@ class SharedModals {
       document.getElementById('auto-stop-time').textContent = stopTime.toLocaleString('ja-JP');
       
       // URL状態の表示
-      this.displayUrlStatus(publishResult, validationResult);
+      this.updateUrlStatusDisplay(publishResult, validationResult);
       
       // 残り時間のカウントダウンを開始
       this.startCountdown(stopTime);
@@ -1091,7 +1104,7 @@ class SharedModals {
       }
       
       // URL状態の表示（エラーケース）
-      this.displayUrlStatus(publishResult, validationResult);
+      this.updateUrlStatusDisplay(publishResult, validationResult);
       
       console.log('🕒 フォールバック自動停止時間設定:', {
         publishTime: now.toLocaleString('ja-JP'),
@@ -1233,44 +1246,42 @@ class SharedModals {
     };
   }
 
-  // URL状態表示（モーダル内での状態表示）
-  displayUrlStatus(publishResult, validationResult) {
-    // URL状態を表示するための要素を探す（または作成）
-    let urlStatusElement = document.getElementById('url-status-display');
+  // URL状態表示の更新（改善版）
+  updateUrlStatusDisplay(publishResult, validationResult) {
+    const urlStatusText = document.getElementById('url-status-text');
+    const urlPreview = document.getElementById('url-preview');
+    const urlStatusSection = document.getElementById('url-status-section');
     
-    if (!urlStatusElement) {
-      // URL状態表示要素が存在しない場合は、既存の要素の近くに追加
-      const remainingTimeEl = document.getElementById('remaining-time');
-      if (remainingTimeEl && remainingTimeEl.parentNode) {
-        urlStatusElement = document.createElement('div');
-        urlStatusElement.id = 'url-status-display';
-        urlStatusElement.className = 'mt-2 text-xs';
-        remainingTimeEl.parentNode.insertBefore(urlStatusElement, remainingTimeEl.nextSibling);
-      }
+    if (!urlStatusText || !urlPreview || !urlStatusSection) {
+      console.warn('URL状態表示要素が見つかりません');
+      return;
     }
 
-    if (urlStatusElement) {
-      if (validationResult.hasValidUrl) {
-        urlStatusElement.innerHTML = `
-          <div class="text-green-300">
-            ✅ URL生成済み: <span class="font-mono text-xs break-all">${publishResult.url.substring(0, 50)}...</span>
-          </div>
-        `;
-      } else {
-        const urlError = validationResult.errors.find(e => e.includes('URL')) || '不明なURLエラー';
-        urlStatusElement.innerHTML = `
-          <div class="text-yellow-300">
-            ⚠️ URL問題: ${urlError}
-          </div>
-        `;
-      }
+    if (validationResult.hasValidUrl && publishResult.url) {
+      // 成功状態
+      urlStatusSection.className = 'bg-green-500/10 border border-green-400/30 rounded-lg p-3';
+      urlStatusText.innerHTML = '<span class="text-green-400">✅</span> URL生成済み';
+      urlStatusText.className = 'text-sm font-medium text-green-200';
+      
+      // URLを短縮表示
+      const shortUrl = publishResult.url.length > 60 ? 
+        publishResult.url.substring(0, 57) + '...' : 
+        publishResult.url;
+      urlPreview.textContent = shortUrl;
+      urlPreview.className = 'text-xs text-green-100 font-mono break-all';
+    } else {
+      // エラー状態
+      urlStatusSection.className = 'bg-red-500/10 border border-red-400/30 rounded-lg p-3';
+      urlStatusText.innerHTML = '<span class="text-red-400">❌</span> URL生成に問題があります';
+      urlStatusText.className = 'text-sm font-medium text-red-200';
+      urlPreview.textContent = '公開URLが正常に生成されていません';
+      urlPreview.className = 'text-xs text-red-100 break-all';
     }
+  }
 
-    console.log('🔗 URL状態表示更新:', {
-      hasValidUrl: validationResult.hasValidUrl,
-      url: publishResult?.url || 'undefined',
-      errors: validationResult.errors.filter(e => e.includes('URL'))
-    });
+  // 旧displayUrlStatus関数（互換性のため保持）
+  displayUrlStatus(publishResult, validationResult) {
+    this.updateUrlStatusDisplay(publishResult, validationResult);
   }
 
   // 残り時間カウントダウン

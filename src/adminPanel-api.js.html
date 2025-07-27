@@ -484,7 +484,7 @@ function proceedWithSaveAndPublish(config) {
 
 // Unpublish board
 function unpublishBoard() {
-  runGasWithUserId('unpublishBoard', 'ボードの公開を停止中...')
+  return runGasWithUserId('unpublishBoard', 'ボードの公開を停止中...')
     .then(function(response) {
       logDebug('公開停止レスポンス:', response);
       showMessage(response.message || '✅ 回答ボードの公開を停止しました。', 'success');
@@ -496,9 +496,14 @@ function unpublishBoard() {
       resetColumnSelections();
       
       loadStatus(true); // ステータスを強制更新
+      
+      // 公開停止処理が成功したことを返す
+      return Promise.resolve(response);
     })
     .catch(function(error) {
       handleError(error, 'unpublishBoard', 'ボードの公開停止に失敗しました。');
+      // エラーを再スローして呼び出し元でキャッチできるようにする
+      return Promise.reject(error);
     });
 }
 

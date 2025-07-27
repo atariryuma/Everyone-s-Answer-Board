@@ -98,10 +98,68 @@ function setupEventListeners() {
   function proceedWithCustomFormCreation(shouldStop) {
     if (shouldStop) {
       console.log('📝 公開停止してカスタムフォームを作成します');
+      
+      // 実際に公開停止処理を実行
+      if (typeof unpublishBoard === 'function') {
+        console.log('🛑 公開停止処理を開始します...');
+        
+        // 公開停止の確認ダイアログを表示
+        window.sharedModals.showConfirmation(
+          '公開停止の確認',
+          '現在公開中のボードを停止してから、カスタムフォームを作成します。よろしいですか？',
+          function() {
+            // 確認後、実際に停止処理を実行
+            executeStopAndCreateForm();
+          },
+          function() {
+            console.log('❌ 公開停止がキャンセルされました');
+          }
+        );
+      } else {
+        console.error('unpublishBoard function not found');
+        showMessage('公開停止機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
+      }
     } else {
       console.log('📝 公開を継続してカスタムフォームを作成します');
+      // 継続の場合は直接フォーム作成モーダルを表示
+      showFormConfigModalSafely();
     }
+  }
+
+  // 公開停止→フォーム作成の実行
+  function executeStopAndCreateForm() {
+    console.log('🛑 公開停止処理を実行中...');
     
+    // unpublishBoard関数を呼び出し
+    unpublishBoard()
+      .then(function(response) {
+        console.log('✅ 公開停止が完了しました:', response);
+        
+        // 公開停止が確実に完了した旨を表示
+        showMessage('✅ 公開停止が完了しました。カスタムフォームを作成できます。', 'success');
+        
+        // 全セクション展開フラグを設定（公開停止後の管理パネル表示改善）
+        try {
+          localStorage.setItem('expandAllSections', 'true');
+          console.log('📂 公開停止後の全セクション展開フラグを設定しました');
+        } catch (e) {
+          console.warn('⚠️ localStorage設定に失敗:', e);
+        }
+        
+        // 少し遅延してからフォーム作成モーダルを表示
+        setTimeout(function() {
+          console.log('🎨 フォーム作成モーダルを表示します');
+          showFormConfigModalSafely();
+        }, 1500); // 1.5秒後に表示（UIフィードバック時間を確保）
+      })
+      .catch(function(error) {
+        console.error('❌ 公開停止に失敗しました:', error);
+        showMessage('❌ 公開停止に失敗しました。再度お試しください。', 'error');
+      });
+  }
+
+  // 安全なフォーム作成モーダル表示
+  function showFormConfigModalSafely() {
     if (typeof showFormConfigModal === 'function') {
       showFormConfigModal();
     } else {
