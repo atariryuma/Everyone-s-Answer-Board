@@ -58,8 +58,90 @@
   </div>
 </div>
 
+<!-- 公開停止確認モーダル（クイックスタート用） -->
+<div id="quickstart-stop-confirmation-modal" class="fixed inset-0 bg-black/80 z-[70] hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-lg w-full">
+      <div class="flex items-center gap-3 mb-4">
+        <svg class="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+        </svg>
+        <h3 class="text-xl font-bold text-yellow-400">新しいフォームを作成しますか？</h3>
+      </div>
+      
+      <div class="space-y-4 mb-6">
+        <div class="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-4">
+          <p class="text-gray-300 leading-relaxed">
+            現在公開中の回答ボードを<span class="text-yellow-400 font-semibold">一時停止</span>して、新しいフォームとボードを作成します。
+          </p>
+        </div>
+        
+        <div class="bg-blue-500/10 border border-blue-400/30 rounded-lg p-4">
+          <h4 class="text-sm font-semibold text-blue-400 mb-2">📋 実行内容</h4>
+          <ul class="text-sm text-blue-200 space-y-1">
+            <li>• 既存の回答データは保持されます</li>
+            <li>• 新しいフォームとスプレッドシートを作成</li>
+            <li>• 高精度AI列判定を実行</li>
+            <li>• 作成完了後に自動で再公開</li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="flex justify-end gap-3">
+        <button type="button" id="quickstart-stop-cancel-btn" class="btn btn-secondary">キャンセル</button>
+        <button type="button" id="quickstart-stop-confirm-btn" class="btn btn-warning">停止して新規作成</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- カスタムセットアップ選択モーダル -->
+<div id="custom-setup-selection-modal" class="fixed inset-0 bg-black/80 z-[70] hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-lg w-full">
+      <div class="flex items-center gap-3 mb-4">
+        <svg class="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+        </svg>
+        <h3 class="text-xl font-bold text-cyan-400">カスタムフォームの作成方法を選択</h3>
+      </div>
+      
+      <div class="space-y-4 mb-6">
+        <div class="bg-green-500/10 border border-green-400/30 rounded-lg p-4 cursor-pointer hover:bg-green-500/20 transition-colors" id="custom-stop-option">
+          <div class="flex items-start gap-3">
+            <div class="w-5 h-5 rounded-full border-2 border-green-400 flex items-center justify-center mt-0.5">
+              <div class="w-3 h-3 rounded-full bg-green-400 hidden" id="custom-stop-radio"></div>
+            </div>
+            <div>
+              <h4 class="text-green-400 font-semibold mb-1">現在のボードを停止して作成 (推奨)</h4>
+              <p class="text-sm text-green-200">既存の公開を停止し、新しいフォーム作成後に再公開</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="bg-blue-500/10 border border-blue-400/30 rounded-lg p-4 cursor-pointer hover:bg-blue-500/20 transition-colors" id="custom-continue-option">
+          <div class="flex items-start gap-3">
+            <div class="w-5 h-5 rounded-full border-2 border-blue-400 flex items-center justify-center mt-0.5">
+              <div class="w-3 h-3 rounded-full bg-blue-400 hidden" id="custom-continue-radio"></div>
+            </div>
+            <div>
+              <h4 class="text-blue-400 font-semibold mb-1">公開を継続しながら作成</h4>
+              <p class="text-sm text-blue-200">現在の公開状態を維持し、フォームのみ作成</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="flex justify-end gap-3">
+        <button type="button" id="custom-setup-cancel-btn" class="btn btn-secondary">キャンセル</button>
+        <button type="button" id="custom-setup-confirm-btn" class="btn btn-primary" disabled>選択して作成</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- 6時間自動停止確認モーダル -->
-<div id="auto-stop-confirmation-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+<div id="auto-stop-confirmation-modal" class="fixed inset-0 bg-black/80 z-[10001] hidden flex items-center justify-center" role="dialog" aria-modal="true">
   <div class="flex items-center justify-center min-h-full p-4">
     <div class="glass-panel rounded-xl p-6 max-w-md w-full">
       <div class="flex items-center gap-3 mb-4">
@@ -725,7 +807,9 @@ class SharedModals {
       'form-config-modal',
       'security-details-modal',
       'google-integration-modal',
-      'auto-stop-confirmation-modal'
+      'auto-stop-confirmation-modal',
+      'quickstart-stop-confirmation-modal',
+      'custom-setup-selection-modal'
     ]);
   }
 
@@ -923,6 +1007,12 @@ class SharedModals {
 
   // 6時間自動停止確認モーダルの表示
   showAutoStopConfirmation(publishResult) {
+    // ローディングオーバーレイを確実に非表示にする
+    if (window.unifiedLoadingManager) {
+      window.unifiedLoadingManager.setLoading(false);
+      console.log('🔄 自動停止モーダル表示前にローディングを非表示にしました');
+    }
+    
     this.loadModals(['auto-stop-confirmation-modal']);
 
     const modal = document.getElementById('auto-stop-confirmation-modal');
@@ -1141,6 +1231,87 @@ class SharedModals {
     if (privateBtn) {
       privateBtn.onclick = () => {
         this.hideModal('publish-modal');
+        if (onCancel) onCancel();
+      };
+    }
+  }
+
+  // クイックスタート停止確認モーダルの表示
+  showQuickStartStopConfirmation(onConfirm, onCancel) {
+    this.loadAdminModals();
+    const modal = document.getElementById('quickstart-stop-confirmation-modal');
+    if (!modal) {
+      console.error('クイックスタート停止確認モーダルが見つかりません');
+      return;
+    }
+    
+    modal.classList.remove('hidden');
+    
+    const confirmBtn = document.getElementById('quickstart-stop-confirm-btn');
+    const cancelBtn = document.getElementById('quickstart-stop-cancel-btn');
+    
+    if (confirmBtn) {
+      confirmBtn.onclick = () => {
+        this.hideModal('quickstart-stop-confirmation-modal');
+        if (onConfirm) onConfirm();
+      };
+    }
+    
+    if (cancelBtn) {
+      cancelBtn.onclick = () => {
+        this.hideModal('quickstart-stop-confirmation-modal');
+        if (onCancel) onCancel();
+      };
+    }
+  }
+
+  // カスタムセットアップ選択モーダルの表示
+  showCustomSetupSelection(onConfirm, onCancel) {
+    this.loadAdminModals();
+    const modal = document.getElementById('custom-setup-selection-modal');
+    if (!modal) {
+      console.error('カスタムセットアップ選択モーダルが見つかりません');
+      return;
+    }
+    
+    modal.classList.remove('hidden');
+    
+    // ラジオボタンの制御
+    const stopOption = document.getElementById('custom-stop-option');
+    const continueOption = document.getElementById('custom-continue-option');
+    const stopRadio = document.getElementById('custom-stop-radio');
+    const continueRadio = document.getElementById('custom-continue-radio');
+    const confirmBtn = document.getElementById('custom-setup-confirm-btn');
+    const cancelBtn = document.getElementById('custom-setup-cancel-btn');
+    
+    let selectedOption = null;
+    
+    if (stopOption && continueOption) {
+      stopOption.onclick = () => {
+        selectedOption = 'stop';
+        stopRadio.classList.remove('hidden');
+        continueRadio.classList.add('hidden');
+        if (confirmBtn) confirmBtn.disabled = false;
+      };
+      
+      continueOption.onclick = () => {
+        selectedOption = 'continue';
+        continueRadio.classList.remove('hidden');
+        stopRadio.classList.add('hidden');
+        if (confirmBtn) confirmBtn.disabled = false;
+      };
+    }
+    
+    if (confirmBtn) {
+      confirmBtn.onclick = () => {
+        this.hideModal('custom-setup-selection-modal');
+        if (onConfirm) onConfirm(selectedOption);
+      };
+    }
+    
+    if (cancelBtn) {
+      cancelBtn.onclick = () => {
+        this.hideModal('custom-setup-selection-modal');
         if (onCancel) onCancel();
       };
     }

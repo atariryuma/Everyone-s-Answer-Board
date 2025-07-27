@@ -390,6 +390,19 @@ class StudyQuestApp {
             // Show info modal even on error
             this.showInfoModal();
           }
+        } else if (event.data && event.data.type === 'FORM_CREATED') {
+          // フォームが作成された時のフォームリンク更新
+          console.log('📝 新しいフォームが作成されました:', event.data.formUrl);
+          try {
+            const formLinkBtn = document.getElementById('form-link-btn');
+            if (formLinkBtn && event.data.formUrl) {
+              formLinkBtn.href = event.data.formUrl;
+              formLinkBtn.classList.remove('hidden');
+              console.log('✅ フォームリンクが更新されました');
+            }
+          } catch (error) {
+            console.warn('フォームリンク更新でエラー:', error);
+          }
         }
       });
       
@@ -413,6 +426,19 @@ class StudyQuestApp {
               }
               // Show info modal even on error
               this.showInfoModal();
+            }
+          } else if (event.data && event.data.type === 'FORM_CREATED') {
+            // フォームが作成された時のフォームリンク更新（BroadcastChannel）
+            console.log('📝 BroadcastChannelから新しいフォーム作成を受信:', event.data.formUrl);
+            try {
+              const formLinkBtn = document.getElementById('form-link-btn');
+              if (formLinkBtn && event.data.formUrl) {
+                formLinkBtn.href = event.data.formUrl;
+                formLinkBtn.classList.remove('hidden');
+                console.log('✅ フォームリンクが更新されました（BroadcastChannel）');
+              }
+            } catch (error) {
+              console.warn('BroadcastChannel フォームリンク更新でエラー:', error);
             }
           }
         });

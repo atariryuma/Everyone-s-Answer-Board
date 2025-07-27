@@ -69,13 +69,45 @@ function setupEventListeners() {
   var createBoardBtn = document.getElementById('create-board-btn');
   if (createBoardBtn) {
     createBoardBtn.addEventListener('click', function() {
-      if (typeof showFormConfigModal === 'function') {
-        showFormConfigModal();
+      // 公開状態をチェックしてカスタムセットアップ選択モーダルを表示
+      if (currentStatus && currentStatus._normalized && currentStatus._normalized.isPublished) {
+        // 公開中の場合、選択モーダルを表示
+        window.sharedModals.showCustomSetupSelection(
+          (selectedOption) => {
+            console.log('✅ ユーザーが選択:', selectedOption);
+            if (selectedOption === 'stop') {
+              // 停止して作成を選択
+              proceedWithCustomFormCreation(true);
+            } else if (selectedOption === 'continue') {
+              // 継続しながら作成を選択
+              proceedWithCustomFormCreation(false);
+            }
+          },
+          () => {
+            console.log('❌ カスタムセットアップがキャンセルされました');
+          }
+        );
       } else {
-        console.error('showFormConfigModal function not found');
-        showMessage('フォーム作成機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
+        // 公開していない場合、直接フォーム作成モーダルを表示
+        proceedWithCustomFormCreation(false);
       }
     });
+  }
+
+  // カスタムフォーム作成を進行
+  function proceedWithCustomFormCreation(shouldStop) {
+    if (shouldStop) {
+      console.log('📝 公開停止してカスタムフォームを作成します');
+    } else {
+      console.log('📝 公開を継続してカスタムフォームを作成します');
+    }
+    
+    if (typeof showFormConfigModal === 'function') {
+      showFormConfigModal();
+    } else {
+      console.error('showFormConfigModal function not found');
+      showMessage('フォーム作成機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
+    }
   }
 
   // Create additional form button

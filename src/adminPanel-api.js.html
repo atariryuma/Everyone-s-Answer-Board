@@ -387,20 +387,20 @@ function proceedWithSaveAndPublish(config) {
         
         // 6時間自動停止の確認モーダルを表示
         setTimeout(() => {
-          if (window.sharedModals && typeof window.sharedModals.loadModals === 'function') {
-            window.sharedModals.loadModals(['auto-stop-confirmation-modal']);
+          // ローディングオーバーレイを確実に非表示にしてからモーダル表示
+          if (window.unifiedLoadingManager) {
+            window.unifiedLoadingManager.setLoading(false);
+            console.log('🔄 通常公開後にローディングを非表示にしました');
           }
-
-          if (typeof window.showAutoStopConfirmationModal === 'function' && result.userInfo) {
-            const configJson = JSON.parse(result.userInfo.configJson || '{}');
-            if (configJson.publishedAt && configJson.autoStopEnabled) {
-              window.showAutoStopConfirmationModal({
-                publishedAt: configJson.publishedAt,
-                autoStopMinutes: configJson.autoStopMinutes || 360
-              });
+          
+          // 自動停止確認モーダルを表示
+          setTimeout(() => {
+            if (window.sharedModals && typeof window.sharedModals.showAutoStopConfirmation === 'function') {
+              window.sharedModals.showAutoStopConfirmation(result);
+              console.log('✅ 通常公開後に自動停止確認モーダルを表示しました');
             }
-          }
-        }, 1000); // 成功メッセージの後に表示
+          }, 500);
+        }, 2000); // 成功メッセージの後に表示
         
         // Use fresh data from save response if available
         if (result.userInfo && result._meta) {
@@ -578,6 +578,34 @@ function createFormWithConfig() {
         
         // ステータスを更新
         loadStatus(true);
+        
+        // フォームURL表示の強制更新（管理パネルのリソース欄用）
+        setTimeout(() => {
+          updateFormUrlDisplay();
+        }, 1000);
+        
+        // 回答ボードにフォーム作成完了を通知（フォームリンク更新用）
+        try {
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+              type: 'FORM_CREATED',
+              formUrl: result.formUrl,
+              timestamp: Date.now()
+            }, '*');
+          }
+          
+          if (typeof BroadcastChannel !== 'undefined') {
+            const channel = new BroadcastChannel('board-updates');
+            channel.postMessage({
+              type: 'FORM_CREATED',
+              formUrl: result.formUrl,
+              timestamp: Date.now()
+            });
+            channel.close();
+          }
+        } catch (notifyError) {
+          console.warn('フォーム作成通知でエラー:', notifyError);
+        }
         
         // モーダルを閉じる
         hideFormConfigModal();
@@ -1294,7 +1322,41 @@ function handleQuickStart() {
     console.error('QuickStart elements not found');
     return;
   }
-  
+
+  // 公開状態をチェックして、必要に応じて確認モーダルを表示
+  checkPublicationStatusAndProceed(() => {
+    // 確認完了後の処理
+    executeQuickStart(quickstartBtn, quickstartText);
+  }, () => {
+    // キャンセル時の処理
+    console.log('クイックスタートがキャンセルされました');
+  });
+}
+
+// 公開状態チェックとモーダル表示
+function checkPublicationStatusAndProceed(onProceed, onCancel) {
+  // 現在のステータスから公開状態を確認
+  if (currentStatus && currentStatus._normalized && currentStatus._normalized.isPublished) {
+    // 公開中の場合、確認モーダルを表示
+    window.sharedModals.showQuickStartStopConfirmation(
+      () => {
+        console.log('✅ ユーザーが停止して新規作成を選択');
+        if (onProceed) onProceed();
+      },
+      () => {
+        console.log('❌ ユーザーがキャンセルを選択');
+        if (onCancel) onCancel();
+      }
+    );
+  } else {
+    // 公開していない場合、直接進行
+    console.log('📝 公開されていないため、直接クイックスタートを開始');
+    if (onProceed) onProceed();
+  }
+}
+
+// クイックスタートの実際の実行
+function executeQuickStart(quickstartBtn, quickstartText) {
   // Update button state
   quickstartBtn.disabled = true;
   quickstartText.textContent = 'セットアップ中...';
@@ -1321,9 +1383,55 @@ function handleQuickStart() {
         }
         loadStatus(true);
         
+        // フォームURL表示の強制更新（管理パネルのリソース欄用）
+        setTimeout(() => {
+          updateFormUrlDisplay();
+        }, 1000);
+        
+        // 回答ボードにフォーム作成完了を通知（フォームリンク更新用）
+        try {
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+              type: 'FORM_CREATED',
+              formUrl: result.formUrl,
+              timestamp: Date.now()
+            }, '*');
+          }
+          
+          if (typeof BroadcastChannel !== 'undefined') {
+            const channel = new BroadcastChannel('board-updates');
+            channel.postMessage({
+              type: 'FORM_CREATED',
+              formUrl: result.formUrl,
+              timestamp: Date.now()
+            });
+            channel.close();
+          }
+        } catch (notifyError) {
+          console.warn('クイックスタート - フォーム作成通知でエラー:', notifyError);
+        }
+        
         // Reset button state
         quickstartBtn.disabled = false;
         quickstartText.textContent = 'クイックスタート完了';
+        
+        // 自動停止モーダルを表示（公開開始に合わせて）
+        setTimeout(() => {
+          // ローディングオーバーレイを非表示にしてからモーダル表示
+          if (window.unifiedLoadingManager) {
+            window.unifiedLoadingManager.setLoading(false);
+          }
+          
+          // 自動停止確認モーダルを表示
+          setTimeout(() => {
+            if (window.sharedModals && typeof window.sharedModals.showAutoStopConfirmation === 'function') {
+              window.sharedModals.showAutoStopConfirmation(result);
+              console.log('✅ 自動停止確認モーダルを表示しました');
+            } else {
+              console.warn('⚠️ 自動停止モーダルが利用できません');
+            }
+          }, 500); // ローディング非表示から少し遅れて表示
+        }, 2000);
         
         // Hide progress bar after delay and reset button
         setTimeout(() => {
